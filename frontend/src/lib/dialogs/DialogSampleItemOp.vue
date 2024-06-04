@@ -269,6 +269,7 @@ watchEffect(() => {
 .sample-field-grid {
   margin: auto;
   width: 90%;
+  min-height: 100%;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(30ch, 100%), 1fr));
   grid-auto-rows: auto;
@@ -276,6 +277,7 @@ watchEffect(() => {
   justify-items: start;
   justify-content: center;
   align-content: center;
+  gap: 5rem;
 }
 .item-filter {
   padding: 0;

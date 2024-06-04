@@ -16,20 +16,14 @@ import App from './App.vue'
 import router from './routes'
 import Karsa from './theme.js'
 
-const pinia = createPinia()
-pinia.use(apiPlugin)
-
 const app = createApp(App)
 
-// boilerplate
-app.use(pinia)
+// routing
 app.use(router)
-
-// theme
 
 // prime
 app.use(PrimeVue, {
-  // Default theme configuration
+  // theme
   theme: {
     preset: Karsa,
     options: {
@@ -40,10 +34,15 @@ app.use(PrimeVue, {
   },
   ripple: true
 })
-
 app.use(ConfirmationService)
 app.use(ToastService)
 app.directive('tooltip', Tooltip)
 app.directive('ripple', Ripple)
 
+// store
+const pinia = createPinia()
+pinia.use(apiPlugin)
+app.use(pinia)
+
+// init
 app.mount('#app')

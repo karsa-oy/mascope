@@ -5,12 +5,14 @@ import Button from 'primevue/button'
 import ConfirmPopup from 'primevue/confirmpopup'
 import { useConfirm } from 'primevue/useconfirm'
 
+import { api } from '@/api'
 import { DialogMatchRating } from '@/lib/dialogs'
 
-import { useVisualizationStore, useSampleStore } from '@/stores'
+import { useFocusedMatch, useFilterParams, useSampleStore } from '@/stores'
 
 const sampleStore = useSampleStore()
-const visualizationStore = useVisualizationStore()
+const focusedMatch = useFocusedMatch()
+const filterParams = useFilterParams()
 
 const confirm = useConfirm()
 const dialog = reactive({
@@ -20,17 +22,20 @@ const dialog = reactive({
 
 async function submit(rating) {
   const possibleMatch =
-    visualizationStore.activeIon.match_score >= visualizationStore.paramPossibleMatchThreshold
+    focusedMatch.ion.match_score >= filterParams.current.possible_match_threshold
   if ((rating == 0 && possibleMatch) || rating == 1 || (rating == 1 && !possibleMatch)) {
     dialog.rating = rating
     dialog.visible = true
   } else {
-    await visualizationStore.submitMatchRating({
-      sample_item_id: sampleStore.active.sample_item_id,
-      target_ion_id: visualizationStore.activeIon.target_ion_id,
-      rating,
-      environment: {
-        mz_calibration: sampleStore.active.mz_calibration
+    await api.request.create({
+      method: 'submitMatchRating',
+      body: {
+        sample_item_id: sampleStore.active.sample_item_id,
+        target_ion_id: focusedMatch.ion.target_ion_id,
+        rating,
+        environment: {
+          mz_calibration: sampleStore.active.mz_calibration
+        }
       }
     })
   }
@@ -100,10 +105,6 @@ async function submit(rating) {
 <style scoped>
 .p-panel {
   padding: 0.75rem;
-}
-
-.k-match-rating :deep(.p-button) {
-  opacity: 0.7;
 }
 
 .row {

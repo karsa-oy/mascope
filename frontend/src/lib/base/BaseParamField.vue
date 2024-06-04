@@ -23,6 +23,10 @@ const props = defineProps({
     default() {
       return { min: 0, max: 1, step: 0.01 }
     }
+  },
+  hideSlider: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -62,6 +66,7 @@ watch(param, (value) => {
       <label :for="id"> {{ label }}</label>
     </FloatLabel>
     <Slider
+      v-if="!hideSlider"
       v-model="inner"
       :min="range.min"
       :max="range.max"

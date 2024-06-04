@@ -334,6 +334,13 @@ export function createHttpClient() {
         console.error('Failed to update sample file: ', error)
       }
     },
+    getSampleSpectrum: async ({ sample_file_id }) => {
+      try {
+        return await client.get(`${filesBaseUrl}/${sample_file_id}/spectrum`)
+      } catch (error) {
+        console.error('Failed to get sample spectrum: ', error)
+      }
+    },
 
     // Sample Items
     getAllSampleItems: async (params = {}) => {

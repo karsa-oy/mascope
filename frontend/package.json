@@ -29,7 +29,7 @@
     "pinia": "^2.1.7",
     "plotly.js-basic-dist": "^2.30.1",
     "primeicons": "^7.0.0",
-    "primevue": "^4.0.0-beta.3",
+    "primevue": "^4.0.0-beta.4",
     "socket.io-client": "^4.7.5",
     "vue": "^3.4.21",
     "vue-router": "^4.3.0",

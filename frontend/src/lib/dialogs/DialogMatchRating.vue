@@ -15,11 +15,13 @@ import ScrollPanel from 'primevue/scrollpanel'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 
+import { api } from '@/api'
 import { BaseMatchTag } from '@/lib/base'
-import { useSampleStore, useVisualizationStore } from '@/stores'
+import { useSampleStore, useFilterParams, useFocusedMatch } from '@/stores'
 
 const sampleStore = useSampleStore()
-const visualizationStore = useVisualizationStore()
+const filterParams = useFilterParams()
+const focusedMatch = useFocusedMatch()
 
 const visible = defineModel('visible')
 
@@ -42,12 +44,12 @@ const expandedIsotopes = ref()
 
 // computed
 const title = computed(() => {
-  const ionSumIntensity = peak.format(visualizationStore.activeIon?.sample_peak_area_sum)
-  return `${sampleStore.active?.sample_item_name}: ${visualizationStore.activeIon?.target_ion_formula} | Intensity: ${ionSumIntensity}`
+  const ionSumIntensity = peak.format(focusedMatch.ion?.sample_peak_area_sum)
+  return `${sampleStore.active?.sample_item_name}: ${focusedMatch.ion?.target_ion_formula} | Intensity: ${ionSumIntensity}`
 })
 const checklistEnabled = computed(() => {
   const possibleMatch =
-    visualizationStore.activeIon.match_score >= visualizationStore.paramPossibleMatchThreshold
+    focusedMatch.ion.match_score >= filterParams.current.possible_match_threshold
   return (
     (props.rating === '0' && possibleMatch) ||
     props.rating === '1' ||
@@ -64,60 +66,63 @@ const invalid = computed(
 )
 
 const isotopes = computed(() =>
-  visualizationStore.activeIsotopes.map((isotope) => {
+  focusedMatch.isotopes.map((isotope) => {
     let failures = []
-    if (Math.abs(isotope.match_mz_error) > visualizationStore.paramMzTolerance) {
+    if (Math.abs(isotope.match_mz_error) > filterParams.current.mz_tolerance) {
       failures.push({
         filter: 'm/z tolerance',
         message: `Isotope m/z error is ${isotope.match_mz_error.toFixed(3)}`,
-        threshold: visualizationStore.paramMzTolerance
+        threshold: filterParams.current.mz_tolerance
       })
     }
-    if (Math.abs(isotope.match_abundance_error) > visualizationStore.paramIsotopeRatioTolerance) {
+    if (Math.abs(isotope.match_abundance_error) > filterParams.current.isotope_ratio_tolerance) {
       failures.push({
         filter: 'Isotope ratio tolerance',
         message: `Match abundance error is ${isotope.match_abundance_error.toFixed(3)}`,
-        threshold: visualizationStore.paramIsotopeRatioTolerance
+        threshold: filterParams.current.isotope_ratio_tolerance
       })
     }
-    if (isotope.sample_peak_area < visualizationStore.paramPeakMinIntensity) {
+    if (isotope.sample_peak_area < filterParams.current.peak_min_intensity) {
       failures.push({
         filter: 'Minimum peak intensity',
         message: `Sample peak area is ${isotope.sample_peak_area.toFixed(3)}`,
-        threshold: visualizationStore.paramPeakMinIntensity
+        threshold: filterParams.current.peak_min_intensity
       })
     }
     if (
-      Math.max(isotope.match_isotope_correlation, 0) < visualizationStore.paramMinIsotopeCorrelation
+      Math.max(isotope.match_isotope_correlation, 0) < filterParams.current.min_isotope_correlation
     ) {
       failures.push({
         filter: 'Minimum isotope correlation',
         isotopeValue: `Match isotope correlation is ${isotope.match_isotope_correlation.toFixed(3)}`,
-        threshold: visualizationStore.paramMinIsotopeCorrelation
+        threshold: filterParams.current.min_isotope_correlation
       })
     }
     return { ...isotope, failures, failure_count: failures.length }
   })
 )
 async function submit() {
-  await visualizationStore.submitMatchRating({
-    sample_item_id: sampleStore.active.sample_item_id,
-    target_ion_id: visualizationStore.activeIon.target_ion_id,
-    rating: props.rating,
-    environment: {
-      mz_calibration: sampleStore.active.mz_calibration
-    },
-    checklist: checklistEnabled.value
-      ? {
-          isotopes_rating: visualizationStore.activeIsotopes.map((isotope) => ({
-            isotope_rating: checklist.isotopeRating[isotope.mz],
-            target_isotope_id: isotope.target_isotope_id
-          })),
-          timeseries_good_match: checklist.timeseriesGoodMatch === 'true',
-          timeseries_expected_behavior: Number(checklist.timeseriesExpectedBehavior),
-          comment: checklist.comment
-        }
-      : null
+  await api.request.create({
+    method: 'submitMatchRating',
+    body: {
+      sample_item_id: sampleStore.active.sample_item_id,
+      target_ion_id: focusedMatch.ion.target_ion_id,
+      rating: props.rating,
+      environment: {
+        mz_calibration: sampleStore.active.mz_calibration
+      },
+      checklist: checklistEnabled.value
+        ? {
+            isotopes_rating: focusedMatch.isotopes.map((isotope) => ({
+              isotope_rating: checklist.isotopeRating[isotope.mz],
+              target_isotope_id: isotope.target_isotope_id
+            })),
+            timeseries_good_match: checklist.timeseriesGoodMatch === 'true',
+            timeseries_expected_behavior: Number(checklist.timeseriesExpectedBehavior),
+            comment: checklist.comment
+          }
+        : null
+    }
   })
   // close
   visible.value = false
@@ -125,7 +130,7 @@ async function submit() {
 
 // watchers
 watch(
-  computed(() => visualizationStore.activeIsotopes),
+  computed(() => focusedMatch.isotopes),
   (isotopes) => {
     if (isotopes) {
       isotopes.forEach((isotope) => {
@@ -143,7 +148,7 @@ function init(active) {
   checklist.timeseriesGoodMatch = null
   checklist.timeseriesExpectedBehavior = null
   checklist.comment = ''
-  visualizationStore.activeIsotopes.forEach((isotope) => {
+  focusedMatch.isotopes.forEach((isotope) => {
     checklist.isotopeRating[isotope.mz] = 3
   })
 }
@@ -170,7 +175,7 @@ const peak = new Intl.NumberFormat('en-US', {
               1) Is there a clear peak in the signal corresponding target isotope?
             </p>
             <div
-              v-for="isotope in visualizationStore.activeIsotopes"
+              v-for="isotope in focusedMatch.isotopes"
               :key="isotope.target_isotope_id"
               class="row"
               style="margin: 1rem; justify-content: flex-start; gap: 3rem"
@@ -239,7 +244,7 @@ const peak = new Intl.NumberFormat('en-US', {
             v-model:expandedRows="expandedIsotopes"
           >
             <Column expander style="width: 3ch" />
-            <Column field="match_score" sortable class="k-match-column">
+            <Column field="match_score" sortable class="match-column">
               <template #header>
                 <span class="pi pi-verified" />
               </template>

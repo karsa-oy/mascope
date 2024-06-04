@@ -9,129 +9,95 @@ import { useConfirm } from 'primevue/useconfirm'
 
 import BaseParamField from '@/lib/base/BaseParamField.vue'
 
-import { useVisualizationStore } from '@/stores'
+import { useFilterParams, useFocusedMatch } from '@/stores'
 
 const confirm = useConfirm()
 
-const visualizationStore = useVisualizationStore()
+const focusedMatch = useFocusedMatch()
+const filterParams = useFilterParams()
 
 const menu = ref()
-const initialParams = ref({})
 const isSaving = ref(false)
 
 const isotopeSettings = ref()
 const peakSettings = ref()
 
-const paramsChanged = computed(() => {
-  // Check if any parameter has changed
-  return Object.keys(initialParams.value).some((key) => {
-    return initialParams.value[key] !== visualizationStore[key]
-  })
-})
-const isDefaultSettings = computed(() => {
-  return Object.keys(visualizationStore.defaultFilterParams).every((key) => {
-    return visualizationStore[key] === visualizationStore.defaultFilterParams[key]
-  })
-})
+onMounted(() => filterParams.init())
 
-function onProbableMatchThresholdChange() {
-  if (
-    visualizationStore.paramProbableMatchThreshold < visualizationStore.paramPossibleMatchThreshold
-  ) {
-    visualizationStore.paramPossibleMatchThreshold = visualizationStore.paramProbableMatchThreshold
-  }
-  visualizationStore.loadMatches()
-}
-function onPossibleMatchThresholdChange() {
-  if (
-    visualizationStore.paramProbableMatchThreshold < visualizationStore.paramPossibleMatchThreshold
-  ) {
-    visualizationStore.paramProbableMatchThreshold = visualizationStore.paramPossibleMatchThreshold
-  }
-  visualizationStore.loadMatches()
+function undoChanges() {
+  // Revert filter parameters to their initial values
+  Object.keys(filterParams.initial).forEach((key) => {
+    filterParams.current[key] = filterParams.initial[key]
+  })
+  focusedMatch.reload()
 }
 
-async function saveFilterSettings() {
+async function saveParams() {
   confirm.require({
     header: 'Saving filtering parameters',
-    message: `Are you sure you want to save current ${visualizationStore.activeIon.target_ion_formula} filtering parameters for ${visualizationStore.activeIon.instrument} instrument?`,
+    message: `Are you sure you want to save current ${focusedMatch.ion.target_ion_formula} filtering parameters for ${focusedMatch.ion.instrument} instrument?`,
     acceptIcon: 'pi pi-save',
     acceptLabel: 'Save',
     accept: async () => {
       isSaving.value = true
-      await visualizationStore.saveFilterParams()
+      await filterParams.save()
       isSaving.value = false
-      visualizationStore.storeInitialParams()
-      await visualizationStore.loadMatches()
+      filterParams.init()
+      await focusedMatch.reload()
     },
     rejectLabel: 'Cancel',
     rejectIcon: 'pi pi-times'
   })
 }
-function undoChanges() {
-  // Revert filter parameters to their initial values
-  Object.keys(initialParams.value).forEach((key) => {
-    visualizationStore[key] = initialParams.value[key]
-  })
-}
-function filterParamsDelete() {
+
+function deleteParams() {
   confirm.require({
     header: 'Deleting filtering parameters',
-    message: `Are you sure you want to delete ${visualizationStore.activeIon.target_ion_formula} filtering parameters for ${visualizationStore.activeIon.instrument} instrument?`,
+    message: `Are you sure you want to delete ${focusedMatch.ion?.target_ion_formula} filtering parameters for ${focusedMatch.ion?.instrument} instrument?`,
     acceptIcon: 'pi pi-trash',
     acceptLabel: 'Delete',
     accept: async () => {
-      visualizationStore.setDefaultFilterParams()
-      await visualizationStore.deleteInstrumentFilterParams()
-      await visualizationStore.loadMatches()
-      storeInitialParams()
+      filterParams.reset()
+      await filterParams.remove()
+      await focusedMatch.reload()
+      filterParams.init()
     },
     rejectLabel: 'Cancel',
     rejectIcon: 'pi pi-times'
   })
 }
-function storeInitialParams() {
-  initialParams.value = {
-    paramMzTolerance: visualizationStore.paramMzTolerance,
-    paramMinIsotopeAbundance: visualizationStore.paramMinIsotopeAbundance,
-    paramIsotopeRatioTolerance: visualizationStore.paramIsotopeRatioTolerance,
-    paramPeakMinIntensity: visualizationStore.paramPeakMinIntensity,
-    paramMinIsotopeCorrelation: visualizationStore.paramMinIsotopeCorrelation,
-    paramProbableMatchThreshold: visualizationStore.paramProbableMatchThreshold,
-    paramPossibleMatchThreshold: visualizationStore.paramPossibleMatchThreshold
-  }
-}
 
-onMounted(() => {
-  storeInitialParams()
-})
+async function resetParams() {
+  await filterParams.reset()
+  await focusedMatch.reload()
+}
 
 const items = computed(() => [
   {
     label: 'Save params',
     icon: 'pi pi-save',
-    command: saveFilterSettings,
-    disabled: !paramsChanged.value
+    command: saveParams,
+    disabled: !filterParams.changed
   },
   {
     label: 'Revert changes',
     icon: 'pi pi-undo',
     command: undoChanges,
-    disabled: !paramsChanged.value
+    disabled: !filterParams.changed
   },
   {
     label: 'Set defaults',
     icon: 'pi pi-file-import',
-    command: visualizationStore.setDefaultFilterParams,
-    disabled: isDefaultSettings.value
+    command: resetParams,
+    disabled: filterParams.default
   },
   {
     label: 'Delete filtering params',
     icon: 'pi pi-trash',
-    command: filterParamsDelete,
+    command: deleteParams,
     disabled:
-      visualizationStore.activeIon?.filter_params &&
-      visualizationStore.activeIon.instrument in visualizationStore.activeIon.filter_params
+      focusedMatch.ion?.filter_params &&
+      focusedMatch.ion?.instrument in focusedMatch.ion.filter_params
         ? false
         : true
   }
@@ -139,7 +105,7 @@ const items = computed(() => [
 </script>
 
 <template>
-  <menu class="k-settings-filter-ion row">
+  <menu class="settings-filter-ion row">
     <Button
       v-tooltip.bottom="'Save & restore settings'"
       icon="pi pi-ellipsis-h"
@@ -179,28 +145,28 @@ const items = computed(() => [
       <div class="row" style="padding: 1rem; gap: 0.5rem">
         <BaseParamField
           label="m/z tolerance [ppm]"
-          v-model:param="visualizationStore.paramMzTolerance"
-          @change="visualizationStore.reload"
+          v-model:param="filterParams.current.mz_tolerance"
+          @change="focusedMatch.reload"
           :range="{ min: 0, max: 100, step: 1 }"
         />
         <BaseParamField
           label="Min. isotope abundance"
-          v-model:param="visualizationStore.paramMinIsotopeAbundance"
-          @change="visualizationStore.reload"
+          v-model:param="filterParams.current.min_isotope_abundance"
+          @change="focusedMatch.reload"
           :range="{ min: 0, max: 1, step: 0.01 }"
           disabled
           col
         />
         <BaseParamField
           label="Isotope ratio tolerance"
-          v-model:param="visualizationStore.paramIsotopeRatioTolerance"
-          @change="visualizationStore.loadMatches"
+          v-model:param="filterParams.current.isotope_ratio_tolerance"
+          @change="focusedMatch.reload"
           :range="{ min: 0, max: 1, step: 0.05 }"
         />
         <BaseParamField
           label="Min. isotope correlation"
-          v-model:param="visualizationStore.paramMinIsotopeCorrelation"
-          @change="visualizationStore.loadMatches"
+          v-model:param="filterParams.current.min_isotope_correlation"
+          @change="focusedMatch.reload"
           :range="{ min: 0, max: 1, step: 0.1 }"
         />
       </div>
@@ -233,21 +199,29 @@ const items = computed(() => [
       <div class="row" style="padding: 1rem; gap: 0.5rem">
         <BaseParamField
           label="Min. peak intensity"
-          v-model:param="visualizationStore.paramPeakMinIntensity"
-          @change="visualizationStore.reload"
+          v-model:param="filterParams.current.peak_min_intensity"
+          @change="focusedMatch.reload"
           :range="{ min: 0, max: 10000, step: 500 }"
         />
         <BaseParamField
           label="Possible match [%]"
-          v-model:param="visualizationStore.paramPossibleMatchThreshold"
-          @change="onPossibleMatchThresholdChange"
-          :range="{ min: 0, max: 1, step: 0.1 }"
+          v-model:param="filterParams.current.possible_match_threshold"
+          @change="focusedMatch.reload"
+          :range="{
+            min: 0,
+            max: filterParams.current.probable_match_threshold,
+            step: 0.05
+          }"
         />
         <BaseParamField
           label="Probable match [%]"
-          v-model:param="visualizationStore.paramProbableMatchThreshold"
-          @change="onProbableMatchThresholdChange"
-          :range="{ min: 0, max: 1, step: 0.1 }"
+          v-model:param="filterParams.current.probable_match_threshold"
+          @change="focusedMatch.reload"
+          :range="{
+            min: filterParams.current.possible_match_threshold,
+            max: 1,
+            step: 0.05
+          }"
         />
       </div>
     </Popover>
@@ -255,7 +229,7 @@ const items = computed(() => [
 </template>
 
 <style scoped>
-.k-settings-filter-ion {
+.settings-filter-ion {
   padding: 0;
   z-index: 100;
 }

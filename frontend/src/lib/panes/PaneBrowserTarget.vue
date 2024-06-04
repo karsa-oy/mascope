@@ -18,14 +18,14 @@ import {
   DialogTargetCompoundUpdate
 } from '@/lib/dialogs'
 
-import { useSampleStore, useBatchStore, useVisualizationStore, useTargetsStore } from '@/stores'
+import { useSampleStore, useBatchStore, useFocusedMatch, useTargetsStore } from '@/stores'
 
 const confirm = useConfirm()
 
 const targetsStore = useTargetsStore()
 const sampleStore = useSampleStore()
 const batchStore = useBatchStore()
-const visualizationStore = useVisualizationStore()
+const focusedMatch = useFocusedMatch()
 
 const emit = defineEmits(['focused'])
 
@@ -207,26 +207,24 @@ async function showMatch(row) {
     row?.target_ion_id ??
     sampleStore.matchIons?.find((ion) => ion.target_compound_id === row.target_compound_id)
       ?.target_ion_id
-  if (ionId && sampleStore.active && visualizationStore.activeIon?.target_ion_id !== ionId) {
-    await visualizationStore.load({
+  if (ionId && sampleStore.active && focusedMatch.ion?.target_ion_id !== ionId) {
+    await focusedMatch.load({
       sampleId: sampleStore.active.sample_item_id,
       ionId,
       collectionId: row?.target_collection_id,
       // pass the ion specific filter params if available to the loadSampleIon function
-      filterParams: sampleStore.matchIons.find((ion) => ion.target_ion_id === ionId)?.filter_params[
+      params: sampleStore.matchIons.find((ion) => ion.target_ion_id === ionId)?.filter_params[
         sampleStore.active.instrument
       ]
     })
     emit('focused')
   }
 }
-async function hideMatch() {
+watchEffect(() => {
   if (!selected.compound) {
-    visualizationStore.unload()
-  } else {
-    showMatch(selected.compound)
+    focusedMatch.unload()
   }
-}
+})
 
 watchEffect(() => {
   const collection_id = selected.collection?.target_collection_id
@@ -277,7 +275,7 @@ watchEffect(() => {
 </script>
 
 <template v-if="collections">
-  <Panel style="border: none" class="k-browser">
+  <Panel style="border: none" class="browser">
     <template #header>
       <TabMenu :model="[{ label: 'Targets', icon: 'pi pi-bullseye' }]" />
     </template>
@@ -296,7 +294,7 @@ watchEffect(() => {
         "
       />
     </template>
-    <ScrollPanel class="k-browser-target-scroller">
+    <ScrollPanel>
       <!-- collections -->
       <DataTable
         :value="tree"
@@ -312,7 +310,7 @@ watchEffect(() => {
         sortField="match_score"
         :sortOrder="-1"
       >
-        <Column field="match_score" sortable class="k-match-column">
+        <Column field="match_score" sortable class="match-column">
           <template #header>
             <span class="pi pi-verified" />
           </template>
@@ -351,12 +349,11 @@ watchEffect(() => {
             v-model:contextMenuSelection="context.compound"
             @rowContextmenu="compoundPreventDefault"
             @rowSelect="(e) => showMatch(e.data)"
-            @rowUnselect="hideMatch"
             size="small"
             sortField="match_score"
             :sortOrder="-1"
           >
-            <Column field="match_score" sortable class="k-match-column">
+            <Column field="match_score" sortable class="match-column">
               <template #header>
                 <span class="pi pi-verified" />
               </template>
@@ -386,12 +383,11 @@ watchEffect(() => {
                 selectionMode="single"
                 :metaKeySelection="false"
                 @rowSelect="(e) => showMatch(e.data)"
-                @rowUnselect="hideMatch"
                 size="small"
                 sortField="match_score"
                 :sortOrder="-1"
               >
-                <Column field="match_score" sortable class="k-match-column">
+                <Column field="match_score" sortable class="match-column">
                   <template #header>
                     <span class="pi pi-verified" />
                   </template>
@@ -421,7 +417,7 @@ watchEffect(() => {
                     sortField="match_score"
                     :sortOrder="-1"
                   >
-                    <Column field="match_score" sortable class="k-match-column">
+                    <Column field="match_score" sortable class="match-column">
                       <template #header>
                         <span class="pi pi-verified" />
                       </template>
@@ -445,15 +441,13 @@ watchEffect(() => {
                       </template>
                     </Column>
                   </DataTable>
-                  <div class="k-spinner" v-else>
-                    <ProgressSpinner strokeWidth="5px" />loading...
-                  </div>
+                  <div class="spinner" v-else><ProgressSpinner strokeWidth="5px" />loading...</div>
                 </template>
               </DataTable>
-              <div class="k-spinner" v-else><ProgressSpinner strokeWidth="5px" />loading...</div>
+              <div class="spinner" v-else><ProgressSpinner strokeWidth="5px" />loading...</div>
             </template>
           </DataTable>
-          <div class="k-spinner" v-else><ProgressSpinner strokeWidth="5px" />loading...</div>
+          <div class="spinner" v-else><ProgressSpinner strokeWidth="5px" />loading...</div>
         </template>
       </DataTable>
       <ContextMenu ref="collectionContextMenu" :model="menu.collection" />

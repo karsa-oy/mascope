@@ -22,6 +22,10 @@ const props = defineProps({
   },
   layout: {
     type: Object
+  },
+  hideTitle: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -33,9 +37,20 @@ const ready = ref(false)
 const derived = computed(() => ({
   layout: Object.assign(
     {
-      title: {
-        text: props.title
-      },
+      ...(!props.hideTitle
+        ? {
+            title: {
+              text: props.title
+            }
+          }
+        : {
+            margin: {
+              t: 40
+            },
+            title: {
+              automargin: false
+            }
+          }),
       hoverinfo: 'name+y',
       paper_bgcolor: 'transparent',
       autosize: true,
@@ -69,6 +84,7 @@ onMounted(() => {
   // event listener
   plot.value.on('plotly_click', (e) => emit('click', e))
   ready.value = true
+  Plotly.react(plot.value, props.data, derived.value.layout, derived.value.config)
 })
 
 watchEffect(() => {

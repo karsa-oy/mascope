@@ -44,7 +44,7 @@ export const useSampleStore = defineStore('sample', () => {
   async function load(sample) {
     if (!sample) return
     // reset if previous sample loaded
-    if (active.value) await unload()
+    if (active.value) await unload({ deactivate: false })
     const sampleItemId = sample.sample_item_id
     api.emit('subscribe', sampleItemId)
     active.value = sample
@@ -97,12 +97,12 @@ export const useSampleStore = defineStore('sample', () => {
     matchIsotopes.value = sampleData.match_isotopes
   }
 
-  async function unload() {
+  async function unload({ deactivate } = { deactivate: true }) {
     if (!active.value) return
     api.emit('unsubscribe', active.value.sample_item_id)
-
-    active.value = null
-
+    if (deactivate) {
+      active.value = null
+    }
     matched.value = null
     matchCollections.value = null
     matchCompounds.value = null

@@ -46,7 +46,7 @@ watchEffect(() => {
     optionLabel="tooltip"
     optionValue="value"
     dataKey="value"
-    :class="appStore.mode.measuring ? 'k-measuremode' : ''"
+    :class="appStore.mode.measuring ? 'measure-mode' : ''"
     style="height: 32px"
     :disabled="!batchStore.active"
     :allowEmpty="false"
@@ -76,7 +76,7 @@ watchEffect(() => {
   inherits: false;
 }
 
-.k-measuremode :deep(.p-togglebutton.p-togglebutton-checked::before) {
+.measure-mode :deep(.p-togglebutton.p-togglebutton-checked::before) {
   background-color: var(--light);
   border: 1px solid var(--dark);
   transition:

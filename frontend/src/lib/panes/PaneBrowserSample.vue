@@ -1,7 +1,7 @@
 <script setup>
 import { useConfirm } from 'primevue/useconfirm'
 
-import { ref, reactive, computed, watch } from 'vue'
+import { ref, reactive, computed, watch, watchEffect } from 'vue'
 
 import ScrollPanel from 'primevue/scrollpanel'
 import Panel from 'primevue/panel'
@@ -27,7 +27,7 @@ import {
   useWorkspaceStore,
   useSampleStore,
   useBatchStore,
-  useVisualizationStore,
+  useFocusedMatch,
   useMzFit
 } from '@/stores'
 
@@ -36,7 +36,7 @@ const confirm = useConfirm()
 const workspaceStore = useWorkspaceStore()
 const sampleStore = useSampleStore()
 const batchStore = useBatchStore()
-const visualizationStore = useVisualizationStore()
+const focusedMatch = useFocusedMatch()
 
 const dialog = reactive({
   batch: {
@@ -365,25 +365,21 @@ const batchPreventDefault = (event) => {
 const itemPreventDefault = (event) => {
   itemContextMenu.value.show(event.originalEvent)
 }
-async function showMatch(row) {
-  if (visualizationStore.current && row) {
-    await visualizationStore.load({
-      sampleId: row.sample_item_id,
-      ionId: visualizationStore.current.ionId,
-      collectionId: visualizationStore.current.collectionId,
-      // pass the ion specific filter params if available to the loadSampleIon function
-      filterParams: visualizationStore.current.filterParams
+
+watchEffect(async () => {
+  if (item.selected) {
+    await focusedMatch.load({
+      sampleId: item.selected.sample_item_id
     })
+  } else {
+    focusedMatch.unload({ target: false })
   }
-}
-async function hideMatch() {
-  visualizationStore.unload()
-}
+})
 </script>
 
 <template v-if="workspaceStore.batches">
   <Panel
-    class="k-browser"
+    class="browser"
     style="border: none"
     @contextmenu.prevent="
       (event) => {
@@ -413,7 +409,7 @@ async function hideMatch() {
         "
       />
     </template>
-    <ScrollPanel class="k-browser-sample-scroller">
+    <ScrollPanel>
       <DataTable
         :value="tree"
         v-model:expandedRows="batch.expanded"
@@ -459,11 +455,9 @@ async function hideMatch() {
                   parseClipboard()
                 }
               "
-              @rowSelect="(e) => showMatch(e.data)"
-              @rowUnselect="hideMatch"
               size="small"
             >
-              <Column field="match_score" sortable class="k-match-column">
+              <Column field="match_score" sortable class="match-column">
                 <template #header>
                   <span class="pi pi-verified" />
                 </template>
@@ -483,7 +477,7 @@ async function hideMatch() {
               Empty - no sample items
             </i>
           </div>
-          <div class="k-spinner" v-else><ProgressSpinner strokeWidth="5px" />loading...</div>
+          <div class="spinner" v-else><ProgressSpinner strokeWidth="5px" />loading...</div>
         </template>
       </DataTable>
       <ContextMenu ref="batchContextMenu" :model="menu.batch" />

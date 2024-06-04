@@ -1,12 +1,14 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watchEffect } from 'vue'
 
 import ToggleSwitch from 'primevue/toggleswitch'
+import Select from 'primevue/select'
 
 import BaseChartPlotly from './BaseChartPlotly.vue'
 
 import { glasbey } from './colors.js'
 
+import { beautifySnakeCase } from '@/lib/utils'
 import { useAppStore, useBatchStore, useSampleStore } from '@/stores'
 
 const appStore = useAppStore()
@@ -24,7 +26,84 @@ const hovertemplate = `
   <br>
   %{customdata}
 `
-const yAxisLog = ref(false)
+const log = ref(false)
+
+const inferType = (field) => {
+  const withField = batchStore.sampleItems.filter((item) => field in item)
+  const types = [
+    ...new Set(withField.map((item) => (item[field] ? typeof item[field] : 'null')))
+  ].filter((type) => type !== 'null')
+  return types.length == 1 ? types[0] : 'unknown'
+}
+const xFields = computed(() => {
+  const standard = [
+    ...new Set(
+      batchStore.sampleItems
+        ?.map((item) => Object.keys(item ?? {}))
+        .flat()
+        .filter((field) => field !== 'sample_item_attributes')
+    )
+  ].map((field) => ({ field, kind: 'standard' }))
+  const custom = [
+    ...new Set(
+      batchStore.sampleItems?.map((item) => Object.keys(item?.sample_item_attributes ?? {})).flat()
+    )
+  ].map((field) => ({ field, kind: 'custom' }))
+  return [...standard, { field: 'time', kind: 'custom', label: 'Time' }, ...custom]
+    .map(({ field, kind }) => ({
+      field,
+      kind,
+      label: beautifySnakeCase(field),
+      type: kind == 'custom' ? 'string' : inferType(field)
+    }))
+    .filter(({ type }) => type !== 'object')
+})
+const xField = ref()
+
+watchEffect(() => {
+  xField.value = xFields.value.find(({ field }) => field == 'index')
+})
+
+const num = new Intl.NumberFormat('en-US', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2
+})
+const score = new Intl.NumberFormat('en-US', {
+  style: 'percent',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2
+})
+const toField =
+  ({ field, type }) =>
+  (item) => {
+    let value
+    if (field in item) {
+      value = item[field]
+    } else if (field in item.sample_item_attributes) {
+      value = item.sample_item_attributes[field]
+    } else {
+      value = 'NA'
+    }
+    let formatted
+    switch (field) {
+      case 'match_score':
+        formatted = score.format(value)
+        break
+      case 'matched':
+        formatted = value > 0.5 ? 'true' : 'false'
+        break
+      case 'time':
+        formatted = item['datetime'].split('T')[1].split('.')[0]
+        break
+      default:
+        formatted = type == 'number' ? num.format(value) : value
+    }
+    return formatted
+  }
+const xAxis = computed(() => ({
+  tickvals: batchStore.sampleItems?.map((_, i) => i) ?? [],
+  ticktext: batchStore.sampleItems?.map(toField(xField.value ?? 'index')) ?? []
+}))
 
 const data = computed(() => {
   if (!(batchStore.sampleItems && batchStore.matchCompounds)) return []
@@ -107,20 +186,20 @@ const data = computed(() => {
 
   return data
 })
+
 const layout = computed(() => ({
   xaxis: {
-    title: 'Sample item',
+    title: xField.value?.label,
     autorange: true,
     showgrid: true,
     gridcolor: '#33333399',
     tickmode: 'array',
-    tickvals: batchStore.sampleItems?.map((item) => item.sample_item_id) ?? [],
-    ticktext: batchStore.sampleItems?.map((_, i) => i + 1) ?? [],
-    gridwidth: 1
+    gridwidth: 1,
+    ...xAxis.value
   },
   yaxis: {
     title: 'Intensity',
-    type: yAxisLog.value ? 'log' : 'lin',
+    type: log.value ? 'log' : 'lin',
     showgrid: true,
     gridcolor: '#33333399',
     autorange: true,
@@ -146,7 +225,15 @@ function onClick({ points }) {
 <template>
   <figure>
     <div class="row">
-      <ToggleSwitch v-model="yAxisLog" />
+      <Select
+        v-model:modelValue="xField"
+        :options="xFields"
+        optionLabel="label"
+        dataKey="field"
+        style="z-index: 100"
+        filter
+      />
+      <ToggleSwitch v-model="log" style="margin-left: 1rem" />
       <span> log scale </span>
     </div>
     <BaseChartPlotly

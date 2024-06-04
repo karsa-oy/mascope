@@ -3,36 +3,43 @@ import { ref, computed, watch } from 'vue'
 
 import Splitter from 'primevue/splitter'
 import SplitterPanel from 'primevue/splitterpanel'
-import TabMenu from 'primevue/tabmenu'
 import Panel from 'primevue/panel'
+import Tabs from 'primevue/tabs'
+import TabList from 'primevue/tablist'
+import Tab from 'primevue/tab'
+import TabPanels from 'primevue/tabpanels'
+import TabPanel from 'primevue/tabpanel'
 
 import { ToolbarAppFilters } from '@/lib/menus'
 import {
   PaneProgress,
   PaneBrowserSample,
   PaneBrowserTarget,
-  PaneDashSignal,
-  PaneAcquisitions
+  PaneTabMatch,
+  PaneTabAcquisitions
 } from '@/lib/panes'
-import { ChartBatchOverview } from '@/lib/charts'
+import { ChartBatchOverview, ChartSampleSpectrum } from '@/lib/charts'
 
 import {
   useAppStore,
   useBatchStore,
-  useVisualizationStore,
+  useFocusedMatch,
   useInstrumentStore,
   useWorkspaceStore,
   useSampleStore,
-  useTargetsStore
+  useTargetsStore,
+  useDashboard
 } from '@/stores'
 
 const appStore = useAppStore()
 const workspaceStore = useWorkspaceStore()
 const batchStore = useBatchStore()
 const sampleStore = useSampleStore()
-const visualizationStore = useVisualizationStore()
+const focusedMatch = useFocusedMatch()
 const instrumentStore = useInstrumentStore()
 const targetsStore = useTargetsStore()
+
+const dashboard = useDashboard()
 
 const tab = ref(0)
 const tabs = computed(() => [
@@ -41,9 +48,14 @@ const tabs = computed(() => [
     icon: 'pi pi-hashtag'
   },
   {
+    label: 'Spectrum',
+    icon: 'pi pi-chart-bar',
+    disabled: !sampleStore.active
+  },
+  {
     label: 'Match',
     icon: 'pi pi-wave-pulse',
-    disabled: !visualizationStore.activeIon
+    disabled: !focusedMatch.ion
   },
   {
     label: 'Acquisitions',
@@ -56,17 +68,27 @@ watch(
   computed(() => appStore.mode.measuring),
   (scenthound) => {
     if (scenthound) {
-      tab.value = 2
+      dashboard.tab = 'acquisitions'
     }
   }
 )
 watch(
-  computed(() => visualizationStore.activeIon),
-  (visualization) => {
-    if (!visualization) {
-      tab.value = 0
+  computed(() => focusedMatch.ion),
+  (focused) => {
+    if (focused && dashboard.tab !== 'spectrum') {
+      dashboard.tab = 'match'
     } else {
-      tab.value = 1
+      if (dashboard.tab == 'match') {
+        dashboard.tab = 'batch'
+      }
+    }
+  }
+)
+watch(
+  computed(() => sampleStore.active),
+  (sample) => {
+    if (!sample && dashboard.tab == 'spectrum') {
+      dashboard.tab = 'batch'
     }
   }
 )
@@ -107,13 +129,35 @@ watch(
         </Splitter>
       </SplitterPanel>
       <SplitterPanel :size="80">
-        <Panel id="charts" class="k-browser" style="border: none">
-          <template #header>
-            <TabMenu v-model:activeIndex="tab" :model="tabs" />
-          </template>
-          <ChartBatchOverview v-if="tab == 0 && batchStore.active" />
-          <PaneDashSignal v-if="tab == 1 && visualizationStore.activeIon" />
-          <PaneAcquisitions v-if="tab == 2 && instrumentStore.active" :active="tab == 2" />
+        <Panel id="charts" class="browser" style="border: none">
+          <Tabs v-model:value="dashboard.tab">
+            <TabList>
+              <Tab
+                v-for="{ icon, label, disabled } in tabs"
+                :value="label.toLowerCase()"
+                :key="label"
+                :disabled="disabled"
+              >
+                <div class="row">
+                  <span :class="icon" /><span>{{ label }}</span>
+                </div>
+              </Tab>
+            </TabList>
+            <TabPanels>
+              <TabPanel value="batch">
+                <ChartBatchOverview v-if="batchStore.active" />
+              </TabPanel>
+              <TabPanel value="spectrum">
+                <ChartSampleSpectrum />
+              </TabPanel>
+              <TabPanel value="match">
+                <PaneTabMatch v-if="focusedMatch.ion" />
+              </TabPanel>
+              <TabPanel value="acquisitions">
+                <PaneTabAcquisitions v-if="instrumentStore.active" :active="tab == 2" />
+              </TabPanel>
+            </TabPanels>
+          </Tabs>
         </Panel>
       </SplitterPanel>
     </Splitter>
