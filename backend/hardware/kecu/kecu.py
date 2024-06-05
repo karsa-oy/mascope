@@ -1,7 +1,9 @@
+import os
 import pandas as pd
 import numpy as np
 import xarray as xr
-from lib.file_func import load_array, load_file
+from lib.file_func import load_array, load_file, filename_to_zarr_path, get_base_path
+from lib.util import parse_path_from_item_filename
 
 
 def csv_to_xarr(csv_path: str, filename: str) -> xr.core.dataarray.DataArray:
@@ -80,6 +82,25 @@ def merge_data_array_into_dataset(
     return sample_file_data
 
 
-def write_to_sample_file() -> None:
-    # TODO write updated sample file data to the existing zarr
-    pass
+def write_to_sample_file(kecu_arr: xr.core.dataarray.DataArray, filename: str) -> None:
+    """Writes KECU data array to the existing sample data file
+
+    :param kecu_arr: data from KECU file as xarray
+    :type kecu_arr: xr.core.dataarray.DataArray
+    :param filename: base name of the target sample data file
+    :type filename: str
+    """
+    base_path = get_base_path()
+
+    # Check if proper filename
+    try:
+        data_path = parse_path_from_item_filename(filename, base_path)
+    except Exception as e:
+        raise Exception(f"Error parsing path from filename {filename}: {e}") from e
+
+    # Check if target sample file exists
+    if os.path.exists(data_path):
+        zarr_file_path = filename_to_zarr_path(filename, "kecu")
+        kecu_arr.to_zarr(zarr_file_path, mode="a")
+    else:
+        raise FileNotFoundError(f"Path {data_path} does not exist. Check filename.")
