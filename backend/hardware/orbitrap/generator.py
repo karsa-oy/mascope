@@ -218,15 +218,19 @@ class RawStreamer(Thread):
         :return: computed mz grid
         :rtype: numpy.ndarray
         """
-        # Set mz range with a stock
-        mz_min = self.raw.RunHeaderEx.LowMass - 10
-        mz_max = self.raw.RunHeaderEx.HighMass + 10
+        # Get mz range from the file
+        mz_min = self.raw.RunHeaderEx.LowMass
+        mz_max = self.raw.RunHeaderEx.HighMass
+        # Check if values are correct else return None
+        if not (10 < mz_min < mz_max < np.finfo(np.float64).max):
+            return None
+        # Expand mz range
+        mz_min -= 10
+        mz_max += 10
         # Set starting mz value
         mz = mz_min
         # Initialize list with mz grid
-        mz_grid = [
-            mz_min,
-        ]
+        mz_grid = [mz_min]
         while mz < mz_max:
             resolution = resolution_coeff / np.sqrt(mz)
             fwhm = mz / resolution
@@ -304,6 +308,15 @@ class RawStreamer(Thread):
 
             # Precompute mz grid
             self._mz_grid = self._precompute_grid()
+            # Check if precomputation
+            if self._mz_grid is None:
+                print(
+                    f"Failed to compute mz grid. File {self.filename} is likely damaged."
+                )
+                # Close raw file
+                with self.lock:
+                    self.raw.Dispose()
+                continue
             # Start streaming
             # Feed coordinates
             self._feed_coordinates()
