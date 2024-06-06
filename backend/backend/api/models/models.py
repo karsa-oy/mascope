@@ -1,18 +1,17 @@
 from sqlalchemy import (
     TIMESTAMP,
     Column,
+    Index,
     Float,
     ForeignKey,
     Integer,
     String,
     Text,
-    text,
     JSON,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql.schema import CheckConstraint
 from sqlalchemy.ext.declarative import declarative_base
-from datetime import datetime
 
 
 class BaseMixin(object):
@@ -42,21 +41,27 @@ Base = declarative_base(cls=BaseMixin)
 
 class Workspace(Base):
     __tablename__ = "workspace"
-    workspace_id = Column(String, primary_key=True)
-    workspace_name = Column(String)
+    workspace_id = Column(String(16), nullable=False, primary_key=True)
+    workspace_name = Column(String(256), nullable=False)
     workspace_description = Column(Text)
     workspace_utc_created = Column(TIMESTAMP)
     workspace_utc_modified = Column(TIMESTAMP)
 
     # Define relationships
-    sample_batch = relationship("SampleBatch", back_populates="workspace")
+    sample_batch = relationship(
+        "SampleBatch", back_populates="workspace", cascade="all, delete, delete-orphan"
+    )
 
 
 class SampleBatch(Base):
     __tablename__ = "sample_batch"
-    sample_batch_id = Column(String, primary_key=True)
-    workspace_id = Column(String, ForeignKey("workspace.workspace_id"))
-    sample_batch_name = Column(String)
+    sample_batch_id = Column(String(16), primary_key=True)
+    workspace_id = Column(
+        String(16),
+        ForeignKey("workspace.workspace_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    sample_batch_name = Column(String, nullable=False)
     sample_batch_description = Column(Text)
     build_params = Column(JSON)
     sample_batch_utc_created = Column(TIMESTAMP)
@@ -78,20 +83,30 @@ class SampleBatch(Base):
 
 class SampleItem(Base):
     __tablename__ = "sample_item"
-    sample_item_id = Column(String, primary_key=True)
-    sample_batch_id = Column(String, ForeignKey("sample_batch.sample_batch_id"))
-    filename = Column(String, ForeignKey("sample_file.filename"))
-    sample_item_name = Column(String)
-    sample_item_type = Column(String)
+    sample_item_id = Column(String(16), nullable=False, primary_key=True)
+    sample_batch_id = Column(
+        String(16),
+        ForeignKey("sample_batch.sample_batch_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    filename = Column(String(256), nullable=False)
+    sample_item_name = Column(String(256), nullable=False)
+    sample_item_type = Column(String(64), nullable=False)
     sample_item_attributes = Column(JSON)
     sample_item_utc_created = Column(TIMESTAMP)
     sample_item_utc_modified = Column(TIMESTAMP)
-    filter_id = Column(String)
+    filter_id = Column(String(6))
 
     # Define relationships
     sample_batch = relationship("SampleBatch", back_populates="sample_item")
+    # TODO_db issue #376
+    # sample_file = relationship(
+    #     "SampleFile", back_populates="sample_item", foreign_keys=[filename]
+    # )
     sample_file = relationship(
-        "SampleFile", back_populates="sample_item", foreign_keys=[filename]
+        "SampleFile",
+        primaryjoin="foreign(SampleItem.filename)==remote(SampleFile.filename)",
+        viewonly=True,
     )
     match = relationship(
         "Match", back_populates="sample_item", cascade="all, delete, delete-orphan"
@@ -107,10 +122,13 @@ class SampleItem(Base):
         cascade="all, delete, delete-orphan",
     )
 
+    # Define indexes
+    __table_args__ = (Index("idx_sample_item_sample_batch", "sample_batch_id"),)
+
 
 class SampleFile(Base):
     __tablename__ = "sample_file"
-    sample_file_id = Column(String(256), primary_key=True)
+    sample_file_id = Column(String(16), nullable=False, primary_key=True)
     filename = Column(String(256), nullable=False, unique=True)
     instrument = Column(String(64))
     datetime = Column(TIMESTAMP)
@@ -122,15 +140,16 @@ class SampleFile(Base):
     polarity = Column(String(1))
 
     # Define relationships
-    sample_item = relationship("SampleItem", back_populates="sample_file")
+    # TODO_db issue #376
+    # sample_item = relationship("SampleItem", back_populates="sample_file")
 
 
 class TargetCollection(Base):
     __tablename__ = "target_collection"
-    target_collection_id = Column(String(16), primary_key=True)
-    target_collection_name = Column(String(256))
+    target_collection_id = Column(String(16), nullable=False, primary_key=True)
+    target_collection_name = Column(String(256), nullable=False)
     target_collection_description = Column(Text)
-    target_collection_type = Column(String(64), nullable=False)
+    target_collection_type = Column(String(64), nullable=False, default="TARGETS")
 
     # Define relationships
     sample_batch = relationship(
@@ -151,9 +170,13 @@ class TargetCollectionInSampleBatch(Base):
         String(16),
         ForeignKey("target_collection.target_collection_id", ondelete="CASCADE"),
         primary_key=True,
+        nullable=False,
     )
     sample_batch_id = Column(
-        String(16), ForeignKey("sample_batch.sample_batch_id"), primary_key=True
+        String(16),
+        ForeignKey("sample_batch.sample_batch_id", ondelete="CASCADE"),
+        primary_key=True,
+        nullable=False,
     )
 
     # Define relationships
@@ -164,12 +187,16 @@ class TargetCollectionInSampleBatch(Base):
 class TargetCompoundInTargetCollection(Base):
     __tablename__ = "target_compound_in_target_collection"
     target_compound_id = Column(
-        String(32), ForeignKey("target_compound.target_compound_id"), primary_key=True
+        String(16),
+        ForeignKey("target_compound.target_compound_id", ondelete="CASCADE"),
+        primary_key=True,
+        nullable=False,
     )
     target_collection_id = Column(
         String(16),
         ForeignKey("target_collection.target_collection_id", ondelete="CASCADE"),
         primary_key=True,
+        nullable=False,
     )
 
     # Define relationships
@@ -181,9 +208,9 @@ class TargetCompoundInTargetCollection(Base):
 
 class TargetCompound(Base):
     __tablename__ = "target_compound"
-    target_compound_id = Column(String, primary_key=True)
+    target_compound_id = Column(String(16), nullable=False, primary_key=True)
     target_compound_name = Column(Text)
-    target_compound_formula = Column(String)
+    target_compound_formula = Column(String(256), nullable=False)
     cas_number = Column(String(12))
 
     # Define relationships
@@ -201,21 +228,22 @@ class TargetCompound(Base):
 
 class TargetIon(Base):
     __tablename__ = "target_ion"
-    target_ion_id = Column(String(16), primary_key=True)
+    target_ion_id = Column(String(16), nullable=False, primary_key=True)
     target_compound_id = Column(
-        String, ForeignKey("target_compound.target_compound_id", ondelete="CASCADE")
+        String(16),
+        ForeignKey("target_compound.target_compound_id", ondelete="CASCADE"),
+        nullable=False,
     )
     ionization_mechanism_id = Column(
-        String, ForeignKey("ionization_mechanism.ionization_mechanism_id")
+        String(16),
+        ForeignKey("ionization_mechanism.ionization_mechanism_id", ondelete="CASCADE"),
+        nullable=False,
     )
-    target_ion_formula = Column(String)
+    target_ion_formula = Column(String(256), nullable=False)
     filter_params = Column(JSON)
 
     # Define relationships
-    target_compound = relationship(
-        "TargetCompound",
-        back_populates="target_ion",
-    )
+    target_compound = relationship("TargetCompound", back_populates="target_ion")
     ionization_mechanism = relationship(
         "IonizationMechanism", back_populates="target_ion"
     )
@@ -225,14 +253,24 @@ class TargetIon(Base):
         cascade="all, delete, delete-orphan",
     )
     match_rating = relationship(
-        "MatchRating", back_populates="target_ion", cascade="all, delete, delete-orphan"
+        "MatchRating",
+        back_populates="target_ion",
+        cascade="all, delete, delete-orphan",
+    )
+
+    # Define indexes
+    __table_args__ = (
+        Index("idx_target_ion_ionization_mechanism", "ionization_mechanism_id"),
     )
 
 
 class IonizationMechanism(Base):
     __tablename__ = "ionization_mechanism"
-    ionization_mechanism_id = Column(String(16), primary_key=True)
-    ionization_mechanism_polarity = Column(String(1))
+    ionization_mechanism_id = Column(String(16), nullable=False, primary_key=True)
+    ionization_mechanism_polarity = Column(
+        String(1),
+        nullable=False,
+    )
     ionization_mechanism = Column(String)
     reagent = Column(String)
 
@@ -242,14 +280,19 @@ class IonizationMechanism(Base):
 
 class TargetIsotope(Base):
     __tablename__ = "target_isotope"
-    target_isotope_id = Column(String(16), primary_key=True)
+    target_isotope_id = Column(String(16), nullable=False, primary_key=True)
     target_ion_id = Column(
-        String, ForeignKey("target_ion.target_ion_id", ondelete="CASCADE")
+        String(16),
+        ForeignKey("target_ion.target_ion_id", ondelete="CASCADE"),
+        nullable=False,
     )
-    mz = Column(Float)
+    mz = Column(Float, nullable=False)
     relative_abundance = Column(
-        Float, CheckConstraint("relative_abundance >= 0 AND relative_abundance <= 1")
+        Float,
+        CheckConstraint("relative_abundance >= 0 AND relative_abundance <= 1"),
+        nullable=False,
     )
+
     # Define relationships
     target_ion = relationship("TargetIon", back_populates="target_isotope")
     match_interference = relationship(
@@ -266,15 +309,18 @@ class TargetIsotope(Base):
 
 class MatchRating(Base):
     __tablename__ = "match_rating"
-
-    match_rating_id = Column(String(32), primary_key=True)
+    match_rating_id = Column(String(32), nullable=False, primary_key=True)
     sample_item_id = Column(
-        String(16), ForeignKey("sample_item.sample_item_id"), nullable=False
+        String(16),
+        ForeignKey("sample_item.sample_item_id", ondelete="CASCADE"),
+        nullable=False,
     )
     target_ion_id = Column(
-        String(32), ForeignKey("target_ion.target_ion_id"), nullable=False
+        String(16),
+        ForeignKey("target_ion.target_ion_id", ondelete="CASCADE"),
+        nullable=False,
     )
-    match_rating_utc_created = Column(TIMESTAMP, default=datetime.utcnow)
+    match_rating_utc_created = Column(TIMESTAMP)
     rating = Column(Integer, CheckConstraint("rating BETWEEN 0 AND 2"), nullable=False)
     checklist = Column(JSON)
     environment = Column(JSON)
@@ -286,12 +332,16 @@ class MatchRating(Base):
 
 class MatchInterference(Base):
     __tablename__ = "match_interference"
-    match_interference_id = Column(String(32), primary_key=True)
+    match_interference_id = Column(String(32), nullable=False, primary_key=True)
     target_isotope_id = Column(
-        String(32), ForeignKey("target_isotope.target_isotope_id"), nullable=False
+        String(16),
+        ForeignKey("target_isotope.target_isotope_id", ondelete="CASCADE"),
+        nullable=False,
     )
     sample_item_id = Column(
-        String(16), ForeignKey("sample_item.sample_item_id"), nullable=False
+        String(16),
+        ForeignKey("sample_item.sample_item_id", ondelete="CASCADE"),
+        nullable=False,
     )
     sample_peak_interference = Column(Float, nullable=False)
 
@@ -299,30 +349,46 @@ class MatchInterference(Base):
     sample_item = relationship("SampleItem", back_populates="match_interference")
     target_isotope = relationship("TargetIsotope", back_populates="match_interference")
 
+    # Define indexes
+    __table_args__ = (Index("idx_match_interference_sample_item", "sample_item_id"),)
+
 
 class Match(Base):
     __tablename__ = "match"
-    match_id = Column(String, primary_key=True)
-    target_isotope_id = Column(String, ForeignKey("target_isotope.target_isotope_id"))
-    sample_item_id = Column(String, ForeignKey("sample_item.sample_item_id"))
-    sample_peak_id = Column(Integer)
-    sample_peak_mz = Column(Float)
-    sample_peak_area = Column(Float)
-    sample_peak_area_relative = Column(Float)
-    sample_peak_tof = Column(Float)
-    match_abundance_error = Column(Float)
-    match_mz_error = Column(Float)
-    match_score = Column(Float)
-    match_isotope_correlation = Column(Float)
+    match_id = Column(String(32), nullable=False, primary_key=True)
+    target_isotope_id = Column(
+        String(16),
+        ForeignKey("target_isotope.target_isotope_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    sample_item_id = Column(
+        String(16),
+        ForeignKey("sample_item.sample_item_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    sample_peak_id = Column(Integer, nullable=False)
+    sample_peak_mz = Column(Float, nullable=False)
+    sample_peak_area = Column(Float, nullable=False)
+    sample_peak_area_relative = Column(Float, nullable=False)
+    sample_peak_tof = Column(Float, nullable=False)
+    match_abundance_error = Column(Float, nullable=False)
+    match_mz_error = Column(Float, nullable=False)
+    match_score = Column(
+        Float, CheckConstraint("match_score BETWEEN 0 AND 1"), nullable=False
+    )
+    match_isotope_correlation = Column(Float, nullable=False)
 
     # Define relationships
     sample_item = relationship("SampleItem", back_populates="match")
     target_isotope = relationship("TargetIsotope", back_populates="match")
 
+    # Define indexes
+    __table_args__ = (Index("idx_match_sample_item", "sample_item_id"),)
+
 
 class AttributeTemplate(Base):
     __tablename__ = "attribute_template"
-    attribute_template_id = Column(String(256), primary_key=True)
+    attribute_template_id = Column(String(16), nullable=False, primary_key=True)
     name = Column(String(256), nullable=False)
     type = Column(String(64))
     template = Column(JSON)
@@ -330,8 +396,8 @@ class AttributeTemplate(Base):
 
 class InstrumentFunction(Base):
     __tablename__ = "instrument_function"
-    instrument_function_id = Column(String(32), primary_key=True)
-    instrument = Column(String(64))
+    instrument_function_id = Column(String(32), nullable=False, primary_key=True)
+    instrument = Column(String(64), nullable=False)
     datetime_utc = Column(TIMESTAMP)
     peakshape = Column(JSON)
     resolution_function = Column(JSON)
@@ -340,17 +406,16 @@ class InstrumentFunction(Base):
 class Sample(Base):
     __tablename__ = "sample_view"
     __table_args__ = {"extend_existing": True}
-
-    # all columns read-only
-    sample_item_id = Column(String, primary_key=True)
-    sample_file_id = Column(String)
-    sample_batch_id = Column(String, ForeignKey("sample_batch.sample_batch_id"))
-    sample_item_name = Column(String)
-    filename = Column(String)
-    instrument = Column(String)
-    sample_item_type = Column(String)
+    # All columns are read-only as this is a view, not a base table
+    sample_item_id = Column(String(16), primary_key=True)
+    sample_file_id = Column(String(16))
+    sample_batch_id = Column(String(16), ForeignKey("sample_batch.sample_batch_id"))
+    sample_item_name = Column(String(256))
+    filename = Column(String(256))
+    instrument = Column(String(64))
+    sample_item_type = Column(String(64))
     sample_item_attributes = Column(JSON)
-    filter_id = Column(String)
+    filter_id = Column(String(6))
     length = Column(Float)
     tic = Column(Float)
     polarity = Column(String(1))

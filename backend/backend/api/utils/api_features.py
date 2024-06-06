@@ -359,7 +359,9 @@ def api_controller_background_task(
                 # Update notification on success
                 notification.status = "success"
                 notification.message = result.get("message") if result else None
-                notification.data = result.get("_notification_data", None) if result else None
+                notification.data = (
+                    result.get("_notification_data", None) if result else None
+                )
 
                 # Handle success user notifications
                 await handle_notifications(

@@ -24,33 +24,35 @@ def run():
 
         # STEP 3 - Drop filter_params field from sample_batch table
         print("Dropping filter_params field from sample_batch table")
-
-        # SQLite does not support the ALTER TABLE DROP COLUMN syntax.
-        # To drop a column, you need to create a new table that has the same columns as the old table minus the column you want to drop.
-        # Then, copy data from the old table to the new table.
-        # And finally, you rename the new table to the old table.
-
+        # Create backup table with copy of old data
         new_conn.execute(
-            """
-            CREATE TABLE sample_batch_new AS
-            SELECT
-                sample_batch_id,
-                workspace_id,
-                sample_batch_name,
-                sample_batch_description,
-                build_params,
-                sample_batch_utc_created,
-                sample_batch_utc_modified
-            FROM
-                sample_batch;
-            """
+            "CREATE TABLE sample_batch_backup AS SELECT * FROM sample_batch;"
         )
-
         # Drop old table
         new_conn.execute("DROP TABLE sample_batch;")
-
-        # Rename new table to old table
-        new_conn.execute("ALTER TABLE sample_batch_new RENAME TO sample_batch;")
+        # Create new table with new structure
+        new_conn.execute(
+            """
+            CREATE TABLE sample_batch (
+                sample_batch_id VARCHAR(16) PRIMARY KEY,
+                workspace_id VARCHAR(16) NOT NULL REFERENCES workspace(workspace_id) ON DELETE CASCADE,
+                sample_batch_name VARCHAR NOT NULL,
+                sample_batch_description TEXT,
+                build_params JSON,
+                sample_batch_utc_created TIMESTAMP,
+                sample_batch_utc_modified TIMESTAMP
+            );
+            """
+        )
+        # Copy data from backup table to new table
+        new_conn.execute(
+            """
+            INSERT INTO sample_batch (sample_batch_id, workspace_id, sample_batch_name, sample_batch_description, build_params, sample_batch_utc_created, sample_batch_utc_modified)
+            SELECT sample_batch_id, workspace_id, sample_batch_name, sample_batch_description, build_params, sample_batch_utc_created, sample_batch_utc_modified FROM sample_batch_backup;
+            """
+        )
+        # Drop backup table
+        new_conn.execute("DROP TABLE sample_batch_backup;")
 
         # STEP 4 - Add new field target_collection_type to target_collection table
         print("Adding target_collection_type field to target_collection table")

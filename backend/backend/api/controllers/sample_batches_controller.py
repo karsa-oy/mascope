@@ -276,7 +276,7 @@ async def get_batch_targets(
                 )
 
         # Step 5: Fetch TargetIons associated with the fetched TargetCompounds, ion_mechanisms, and relevant TargetCollections
-        target_ions_query = await session.execute(
+        target_ions_query = (
             select(TargetIon)
             .distinct(TargetIon.target_ion_id)
             .join(
@@ -299,7 +299,8 @@ async def get_batch_targets(
                 IonizationMechanism.ionization_mechanism_id.in_(ion_mechanisms),
             )
         )
-        target_ions = target_ions_query.scalars().all()
+        target_ions_result = await session.execute(target_ions_query)
+        target_ions = target_ions_result.scalars().all()
 
         # Create a lookup dictionary for target_compound_id -> target_collection_id
         target_compound_to_collections = {}

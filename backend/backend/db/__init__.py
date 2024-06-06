@@ -1,6 +1,8 @@
 import os
 import re
 import traceback
+import shutil
+from datetime import datetime
 from importlib import import_module
 from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
@@ -73,6 +75,23 @@ async def test_database_connection():
         print("Error while establishing the database connection: ", e)
 
 
+def create_db_backup(db_path, operation):
+    """Creates a timestamped backup of the database."""
+    data_path = os.path.dirname(db_path)
+    current_version = get_current_db_version()
+    backup_dir = os.path.join(data_path, "backup")
+    if not os.path.exists(backup_dir):
+        os.makedirs(backup_dir)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_db_path = os.path.join(
+        backup_dir, f"{timestamp}_{operation}_backup_mascope.v{current_version}.db"
+    )
+    shutil.copyfile(db_path, backup_db_path)
+    print(f"Backup created at {backup_db_path}")
+    return backup_db_path
+
+
 async def init_db():
     try:
         print("Initializing mascope database")
@@ -91,8 +110,8 @@ async def init_db():
         else:
             print(f"This version of mascope requires: v{target_version}")
             current_version = migrate(current_version, target_version)
-    except Exception as error:  # noqa
-        traceback.print_exc()
+    except Exception as error:
+        traceback.print_exc(error)
     await test_database_connection()
 
 
@@ -107,6 +126,7 @@ DATABASE_URL = f"sqlite+aiosqlite:///{db_path}"
 engine = create_async_engine(
     DATABASE_URL,
     pool_pre_ping=True,  # Check connection liveness before using a connection from the pool
+    # echo=True, # TODO_debug_mode Enable logging of all SQL queries for debugging purposes
     connect_args={
         "timeout": 15
     },  # Set a timeout of 15 seconds for establishing connections and waiting for table locks

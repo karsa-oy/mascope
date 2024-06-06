@@ -10,7 +10,6 @@ from ..utils.api_features import api_controller
 from ..exceptions import NotFoundException
 from .ionization_mechanisms_controller import get_ionization_mechanisms
 from .target_ions_controller import create_target_ions
-from .helpers_controller import get_affected_batches_and_collections
 from ..models.models import (
     IonizationMechanism,
     TargetCompound,
@@ -23,6 +22,40 @@ from ..models.pydantic_models.target_compound_pydantic_model import (
 )
 
 # TODO_target_compound_management refactor to use same strucutre as other controllers
+
+
+# -------------------------------------------------------------------
+# Utility Functions
+# -------------------------------------------------------------------
+
+
+async def get_affected_batches_and_collections(target_compound_id: str):
+    async with async_session() as session:
+        # Get the target collections for this compound
+        target_collections = await session.execute(
+            select(TargetCompoundInTargetCollection.target_collection_id).where(
+                TargetCompoundInTargetCollection.target_compound_id
+                == target_compound_id
+            )
+        )
+        target_collections_ids = {tc[0] for tc in target_collections}
+
+        # Get all affected sample batches
+        sample_batches = await session.execute(
+            select(TargetCollectionInSampleBatch.sample_batch_id).where(
+                TargetCollectionInSampleBatch.target_collection_id.in_(
+                    target_collections_ids
+                )
+            )
+        )
+        sample_batches_ids = {sb[0] for sb in sample_batches}
+
+        return sample_batches_ids, target_collections_ids
+
+
+# -------------------------------------------------------------------
+# Controller or Route Handlers
+# -------------------------------------------------------------------
 
 
 @api_controller()

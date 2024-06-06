@@ -1,9 +1,9 @@
 # -------------------------------------------------------------------
 # Imports
 # -------------------------------------------------------------------
-import pandas as pd
 from datetime import datetime
 from typing import List, Optional, Tuple
+import pandas as pd
 from sqlalchemy import (
     asc,
     desc,
@@ -643,6 +643,7 @@ async def compile_samples_df(
     # Replace NaNs with 0
     samples_df[
         [
+            "tic",
             "match_score",
             "match_category",
             "sample_peak_area_sum",
@@ -651,6 +652,7 @@ async def compile_samples_df(
         ]
     ] = samples_df[
         [
+            "tic",
             "match_score",
             "match_category",
             "sample_peak_area_sum",
@@ -1317,7 +1319,9 @@ async def get_sample_compound_matches(
 
 
 @api_controller()
-async def init_batch_match_filter(sample_batch_id: str) -> list:
+async def init_batch_match_filter(
+    sample_batch_id: str, include_match_interference: bool = True
+) -> list:
     """
     Initializes and applies a batch-level match filter across all samples within a specified batch.
     This function aggregates isotopic level match data for all samples in the batch, applying ion-specific
@@ -1328,48 +1332,120 @@ async def init_batch_match_filter(sample_batch_id: str) -> list:
 
     Steps:
     1. Verify the existence of the specified sample batch.
-    2. Construct and execute a database query to fetch relevant isotopic match data across the batch.
-    3. Convert query result to DataFrame for easier manipulation.
+    2. Construct and execute structured queries to fetch relevant match data across the batch:
+       a. Fetch basic sample information.
+       b. Fetch associated target information including collections, compounds, ions, and isotopes.
+       c. Combine these to fetch relevant match data.
+    3. Optionally include match interference data if requested.
     4. Apply filtering criteria based on ion-specific parameters or default values to each isotopic match.
-    5. Convert the filtered DataFrame to a list of dictionaries.
+    5. Convert the filtered DataFrame to a list of dictionaries for the final output.
 
     :param sample_batch_id: ID of the sample batch for which to initialize and apply the match filter.
     :type sample_batch_id: str
+    :param include_match_interference: Flag indicating whether to include match interference data.
+    :rtype: bool
     :return: A list of dictionaries containing the filtered isotopic match data for the entire batch.
     :rtype: List[Dict]
     :raises NotFoundException: If the specified sample batch does not exist.
     """
     async with async_session() as session:
-        # Step 1: Fetch sample batch to verify sample batch existence
+        # Verify existence of the sample batch
         sample_batch = await session.get(SampleBatch, sample_batch_id)
         if not sample_batch:
             raise NotFoundException(
                 f"Sample batch with ID '{sample_batch_id}' not found"
             )
 
-        # Step 2: Construct and execute the query to fetch match data across the batch
-        stmt = (
+        # Step 2: Extract ion mechanisms from sample batch's build parameters
+        build_params = sample_batch.build_params
+        sample_batch_ion_mechanisms = build_params.get("ion_mechanisms", [])
+
+        # Query for fetching basic samples information
+        sample_query = select(
+            Sample.sample_item_id,
+            Sample.filename,
+            Sample.instrument,
+            Sample.sample_item_name,
+            Sample.sample_item_type,
+        ).where(Sample.sample_batch_id == sample_batch_id)
+
+        sample_result = await session.execute(sample_query)
+        samples_df = pd.DataFrame([row._asdict() for row in sample_result.fetchall()])
+
+        if samples_df.empty:
+            print(f"No samples found in the batch '{sample_batch.sample_batch_name}'")
+            return {}
+
+        sample_item_ids = samples_df["sample_item_id"].tolist()
+
+        # Subquery to get relevant Target data
+        target_query = (
             select(
-                Sample.filename,
-                Sample.instrument,
-                Sample.sample_item_id,
-                Sample.sample_item_name,
-                Sample.sample_item_type,
                 TargetCollection.target_collection_id,
                 TargetCollection.target_collection_name,
                 TargetCollection.target_collection_description,
                 TargetCollection.target_collection_type,
-                TargetCompound.target_compound_formula,
                 TargetCompound.target_compound_id,
+                TargetCompound.target_compound_formula,
                 TargetCompound.target_compound_name,
-                TargetIon.target_ion_formula,
                 TargetIon.target_ion_id,
+                TargetIon.target_ion_formula,
                 TargetIon.filter_params,
                 IonizationMechanism.ionization_mechanism.label("target_ion_mechanism"),
                 TargetIsotope.target_isotope_id,
                 TargetIsotope.mz,
                 TargetIsotope.relative_abundance,
-                MatchInterference.sample_peak_interference,
+            )
+            .select_from(TargetCollectionInSampleBatch)
+            .where(TargetCollectionInSampleBatch.sample_batch_id == sample_batch_id)
+            .join(
+                TargetCollection,
+                TargetCollection.target_collection_id
+                == TargetCollectionInSampleBatch.target_collection_id,
+            )
+            .join(
+                TargetCompoundInTargetCollection,
+                TargetCompoundInTargetCollection.target_collection_id
+                == TargetCollection.target_collection_id,
+            )
+            .join(
+                TargetCompound,
+                TargetCompound.target_compound_id
+                == TargetCompoundInTargetCollection.target_compound_id,
+            )
+            .join(
+                TargetIon,
+                TargetIon.target_compound_id == TargetCompound.target_compound_id,
+            )
+            .join(
+                IonizationMechanism,
+                IonizationMechanism.ionization_mechanism_id
+                == TargetIon.ionization_mechanism_id,
+            )
+            .where(
+                IonizationMechanism.ionization_mechanism_id.in_(
+                    sample_batch_ion_mechanisms
+                ),
+            )
+            .join(
+                TargetIsotope,
+                TargetIsotope.target_ion_id == TargetIon.target_ion_id,
+            )
+        )
+
+        target_result = await session.execute(target_query)
+        targets_df = pd.DataFrame([row._asdict() for row in target_result.fetchall()])
+        if targets_df.empty:
+            print(f"No targets found in the batch '{sample_batch.sample_batch_name}'")
+            return {}
+
+        target_isotope_ids = targets_df["target_isotope_id"].tolist()
+
+        # Fetch matches
+        match_query = (
+            select(
+                Match.sample_item_id,
+                Match.target_isotope_id,
                 Match.match_mz_error,
                 Match.match_abundance_error,
                 Match.match_isotope_correlation,
@@ -1379,69 +1455,109 @@ async def init_batch_match_filter(sample_batch_id: str) -> list:
                 Match.sample_peak_tof,
                 Match.match_score,
             )
-            .select_from(Sample)
-            .where(Sample.sample_batch_id == sample_batch_id)
-            .join(Match, Sample.sample_item_id == Match.sample_item_id)
-            .join(
-                MatchInterference,
-                and_(
-                    Sample.sample_item_id == MatchInterference.sample_item_id,
-                    Match.target_isotope_id == MatchInterference.target_isotope_id,
-                ),
-            )
-            .join(
-                TargetIsotope,
-                Match.target_isotope_id == TargetIsotope.target_isotope_id,
-            )
-            .join(TargetIon, TargetIsotope.target_ion_id == TargetIon.target_ion_id)
-            .join(
-                IonizationMechanism,
-                TargetIon.ionization_mechanism_id
-                == IonizationMechanism.ionization_mechanism_id,
-            )
-            .join(
-                TargetCompound,
-                TargetIon.target_compound_id == TargetCompound.target_compound_id,
-            )
-            .join(
-                TargetCompoundInTargetCollection,
-                TargetCompound.target_compound_id
-                == TargetCompoundInTargetCollection.target_compound_id,
-            )
-            .join(
-                TargetCollection,
-                TargetCompoundInTargetCollection.target_collection_id
-                == TargetCollection.target_collection_id,
-            )
-            .join(
-                TargetCollectionInSampleBatch,
-                TargetCollection.target_collection_id
-                == TargetCollectionInSampleBatch.target_collection_id,
-            )
+            .select_from(Match)
             .where(
                 and_(
-                    TargetCollectionInSampleBatch.sample_batch_id
-                    == Sample.sample_batch_id,
+                    Match.sample_item_id.in_(sample_item_ids),
+                    Match.target_isotope_id.in_(target_isotope_ids),
                 )
             )
-            .order_by(TargetIsotope.mz)
         )
 
-        result = await session.execute(stmt)
-        batch_match_filter = result.fetchall()
+        match_result = await session.execute(match_query)
+        matches_df = pd.DataFrame(match_result.fetchall())
 
-    # Step 3: Convert query result to DataFrame
-    batch_match_filter_df = pd.DataFrame([row._asdict() for row in batch_match_filter])
+        # Fetch match interference if the flag is true
+        if include_match_interference:
+            match_interference_query = (
+                select(
+                    MatchInterference.sample_peak_interference,
+                    MatchInterference.sample_item_id,
+                    MatchInterference.target_isotope_id,
+                )
+                .select_from(MatchInterference)
+                .where(
+                    and_(
+                        MatchInterference.sample_item_id.in_(sample_item_ids),
+                        MatchInterference.target_isotope_id.in_(target_isotope_ids),
+                    )
+                )
+            )
 
-    # Step 4: Apply filtering match_score, sample_peak_area
-    filtered_batch_match_filter_df = apply_filter_params(batch_match_filter_df)
+            match_interference_result = await session.execute(match_interference_query)
+            match_interference_df = pd.DataFrame(match_interference_result.fetchall())
 
-    # Step 5: Convert the filtered DataFrame to a list of dictionaries
-    filtered_batch_match_filter_dicts = filtered_batch_match_filter_df.to_dict(
-        "records"
-    )
+            if match_interference_df.empty:
+                print(
+                    f"No match interference found for the sample batch '{sample_batch.sample_batch_name}'"
+                )
+                return {}
 
-    return filtered_batch_match_filter_dicts
+            # Merge interference data into the matches DataFrame
+            matches_df = pd.merge(
+                matches_df,
+                match_interference_df,
+                on=["sample_item_id", "target_isotope_id"],
+                how="left",
+            )
+
+        # Merge DataFrames
+        if matches_df.empty:
+            print(
+                f"No matches found for the sample batch '{sample_batch.sample_batch_name}'"
+            )
+            return {}
+        combined_sample_matches_df = pd.merge(
+            matches_df, samples_df, on="sample_item_id", how="inner"
+        )
+        batch_match_data_df = pd.merge(
+            combined_sample_matches_df, targets_df, on="target_isotope_id", how="inner"
+        )
+
+        # Define the desired column order
+        column_order = [
+            "sample_item_id",
+            "filename",
+            "instrument",
+            "sample_item_name",
+            "sample_item_type",
+            "target_collection_id",
+            "target_collection_name",
+            "target_collection_description",
+            "target_collection_type",
+            "target_compound_id",
+            "target_compound_formula",
+            "target_compound_name",
+            "target_ion_id",
+            "target_ion_formula",
+            "filter_params",
+            "target_ion_mechanism",
+            "target_isotope_id",
+            "mz",
+            "relative_abundance",
+            "match_mz_error",
+            "match_abundance_error",
+            "match_isotope_correlation",
+            "sample_peak_area",
+            "sample_peak_area_relative",
+            "sample_peak_mz",
+            "sample_peak_tof",
+            "match_score",
+        ]
+        if include_match_interference:
+            column_order.append("sample_peak_interference")
+
+        # Reorder the columns according to the defined order and sort the DataFrame by 'mz'
+        batch_match_data_df = (
+            batch_match_data_df[column_order]
+            .sort_values(by="mz", kind="mergesort")
+            .reset_index(drop=True)
+        )
+
+        # Step 4: Apply filtering match_score, sample_peak_area
+        batch_match_data_filtered_df = apply_filter_params(batch_match_data_df)
+
+        return batch_match_data_filtered_df.to_dict("records")
 
 
 @api_controller()

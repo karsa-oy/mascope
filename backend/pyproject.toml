@@ -21,6 +21,8 @@ mascope-api = 'backend.main:run'
 file-converter = 'service.file_converter:run'
 file-downloader = 'service.file_downloader:run'
 log-rotate = 'service.log_rotate:run'
+db-maintenance = 'backend.db.scripts.maintenance:run' 
+db-restore = 'backend.db.scripts.restore:run'
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.11"

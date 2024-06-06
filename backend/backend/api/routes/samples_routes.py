@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from ..utils.api_features import api_route
 from ..controllers.samples_controller import (
     get_sample,
@@ -36,7 +36,6 @@ async def get_samples_route(
             if matched_samples
             else "No matches found for the batch"
         )
-
     response = {
         "results": result["results"],
         "message": message,
@@ -131,8 +130,13 @@ async def get_sample_compound_matches_route(
 @api_route()
 async def batch_match_filter_route(
     sample_batch_id: str,
+    include_match_interference: bool = Query(
+        True, description="Include match interference data in the response"
+    ),
 ):
-    batch_match_filter_data = await init_batch_match_filter(sample_batch_id)
+    batch_match_filter_data = batch_match_filter_data = await init_batch_match_filter(
+        sample_batch_id, include_match_interference
+    )
     message = (
         "Batch match filter successfully initialized"
         if len(batch_match_filter_data) > 0

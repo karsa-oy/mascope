@@ -36,6 +36,8 @@ class AttributeTemplateBase(BaseModel):
 
     @validator("template")
     def validate_unique_labels(cls, template_fields):
+        if not template_fields:
+            raise ValueError("Template is empty.")
         labels = [field.label for field in template_fields]
         if len(labels) != len(set(labels)):
             raise ValueError(
