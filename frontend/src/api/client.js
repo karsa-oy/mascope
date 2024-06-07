@@ -129,19 +129,19 @@ function log(...args) {
 }
 
 async function initSocket() {
-  // INIT API SOCKET
-
-  // create the socket in `/` namespace
-  let url = `ws://${host}:${config.server.port}`
-  if (mode === 'production') {
-    // production api server is routed to api_port via nginx reverse proxy
-    url = `ws://${host}`
-  }
+  // init socket in `/` namespace
+  const url = mode === 'production' ? `ws://${host}` : `ws://${host}:${config.server.port}`
   const socket = io(url)
   log('initialized socket for', mode, ':', url, socket)
-  const emit = (ev, ...args) => {
-    log(`emitting event "${ev}"`, ...args)
-    socket.emit(ev, ...args)
+  // create logged event emitter
+  const emit = (event, ...args) => {
+    log(`emitting event "${event}"`, ...args)
+    socket.emit(event, ...args)
   }
-  return [socket, emit]
+  // create logged event handler
+  const on = (event, callback, ...args) => {
+    socket.on(event, callback)
+    log(`handling event "${event}"`, ...args)
+  }
+  return [socket, emit, on]
 }
