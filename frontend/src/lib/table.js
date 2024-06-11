@@ -1,4 +1,4 @@
-import * as xlsx from 'xlsx/xlsx.mjs'
+import * as xlsx from 'xlsx'
 
 import { useBatchStore, useWorkspaceStore } from '@/stores'
 
