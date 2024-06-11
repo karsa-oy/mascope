@@ -515,7 +515,7 @@ watch(
               "
               v-tooltip.right="'Batch options'"
             />
-            <Popover ref="batchOptionsPopover">
+            <Popover ref="batchOptionsPopover" contentStyle="height: fit-content;">
               <div class="row" style="margin-bottom: 0.5rem">
                 <SelectButton
                   v-model="batchColumnTab"
@@ -545,6 +545,7 @@ watch(
                 optionLabel="label"
                 filter
                 dataKey="field"
+                style="height: 230px"
               />
             </Popover>
           </template>
@@ -614,3 +615,9 @@ watch(
   <DialogCalibration v-model:visible="dialog.batch.calibration" :context="batch.context" />
   <DialogCalibration v-model:visible="dialog.item.calibration" :context="item.context" />
 </template>
+
+<style scoped>
+:deep(.p-listbox-list-container) {
+  height: 180px;
+}
+</style>
