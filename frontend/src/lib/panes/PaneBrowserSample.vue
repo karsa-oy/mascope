@@ -584,13 +584,19 @@ watch(
                 </template>
               </Column>
 
-              <Column
-                v-for="{ field, label } in batchSelectedColumns"
-                :key="field"
-                :field="field"
-                :header="label"
-                sortable
-              />
+              <template v-for="{ field, label, kind } in batchSelectedColumns" :key="field">
+                <Column v-if="kind == 'standard'" :field="field" :header="label" sortable />
+                <Column
+                  v-if="kind == 'custom'"
+                  field="sample_item_attributes"
+                  :header="label"
+                  sortable
+                >
+                  <template #body="{ data }">
+                    <span>{{ data.sample_item_attributes[field] }}</span>
+                  </template>
+                </Column>
+              </template>
             </DataTable>
             <i v-else style="padding-left: 3em; margin-top: 1rem; line-height: 2rem">
               Empty - no sample items
