@@ -1,17 +1,16 @@
 <script setup>
 import ScrollPanel from 'primevue/scrollpanel'
-import Tag from 'primevue/tag'
 
 import { computed, reactive } from 'vue'
 
+import { BaseMatchTag } from '@/lib/base'
 import { ChartMatchSpectra, ChartMatchTimeseries } from '@/lib/charts'
 import { ToolbarFilterIon, ToolbarMatchCharts, ToolbarMatchRating } from '@/lib/menus'
-import { useAppStore, useFocusedMatch, useFilterParams, useBatchStore } from '@/stores'
+import { useAppStore, useFocusedMatch, useBatchStore } from '@/stores'
 
 const appStore = useAppStore()
 const focusedMatch = useFocusedMatch()
 const batchStore = useBatchStore()
-const filterParams = useFilterParams()
 
 const compound = computed(() =>
   batchStore.targetCompounds.find(
@@ -21,12 +20,6 @@ const compound = computed(() =>
 
 const settings = reactive({
   intensityScale: null
-})
-
-const score = new Intl.NumberFormat('en-US', {
-  style: 'percent',
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2
 })
 </script>
 
@@ -39,15 +32,7 @@ const score = new Intl.NumberFormat('en-US', {
   >
     <ScrollPanel style="height: calc(100vh - 150px); width: calc(100%-4rem)">
       <h1 style="text-align: center">
-        <Tag
-          :value="score.format(focusedMatch.ion?.match_score)"
-          :severity="
-            Math.abs(focusedMatch.ion?.match_score) > filterParams.current.probable_match_threshold
-              ? 'danger'
-              : 'success'
-          "
-          style="font-size: large"
-        />
+        <BaseMatchTag :row="focusedMatch.ion" :style="'font-size: large'" />
         match: ion <i>{{ focusedMatch.ion?.target_ion_formula }}</i>
         for
         <i>{{ focusedMatch.ion?.sample_item_name }}</i> with target

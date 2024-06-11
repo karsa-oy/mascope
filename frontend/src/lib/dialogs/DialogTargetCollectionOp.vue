@@ -492,7 +492,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onEnter))
                     .map((coll) => coll.target_collection_name)
                 ]"
                 id="target-collection-source"
-                style="min-width: 200px"
+                style="min-width: 200px; height: 300px"
               >
                 <template #option="slotProps">
                   <div style="display: flex; flex-flow: row; gap: 0.5rem; align-items: center">
@@ -851,10 +851,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onEnter))
 }
 :deep(.p-datatable-column-header-content :not(.custom) + .p-checkbox-box) {
   display: none;
-}
-
-:deep(.p-listbox-list-container) {
-  min-height: 300px;
 }
 
 .expandable {

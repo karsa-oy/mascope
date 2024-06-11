@@ -4,7 +4,6 @@ import { defineStore } from 'pinia'
 import { api } from '@/api'
 
 import { useNotification } from './notification'
-import { useMzFit } from './mzFit'
 import { useSampleStore } from './sample'
 import { useAppStore } from './app'
 
@@ -122,8 +121,6 @@ export const useInstrumentStore = defineStore('instrument', () => {
 
   async function resetAcquisitionStatus() {
     pending.filename = null
-    const mzFit = useMzFit()
-    mzFit.status = null
   }
 
   notification.on('instrument_acquisition', ({ process_id, data, status }) => {

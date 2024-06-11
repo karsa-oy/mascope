@@ -184,4 +184,8 @@
     max-width: 400px;
   }
 
+  .p-listbox-list-container {
+    height: 100%;
+    max-height: 100% !important;
+  }
 }

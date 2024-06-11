@@ -1,7 +1,7 @@
 export { default as DialogSampleBatchOp } from './DialogSampleBatchOp'
 export { default as DialogMatchRating } from './DialogMatchRating.vue'
 export * from './dialogSampleBatchDelete.js'
-export { default as DialogSampleItemCalibration } from './DialogSampleItemCalibration.vue'
+export { default as DialogCalibration } from './DialogCalibration.vue'
 export { default as DialogSampleItemOp } from './DialogSampleItemOp.vue'
 export { default as DialogSampleBatchImport } from './DialogSampleBatchImport.vue'
 export { default as DialogTargetCollectionOp } from './DialogTargetCollectionOp.vue'

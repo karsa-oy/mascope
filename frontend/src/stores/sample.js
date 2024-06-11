@@ -2,10 +2,10 @@ import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 
 import { api } from '@/api'
+import { useMzFit } from '@/lib/mzFit'
 
 import { useNotification } from './notification'
 import { useBatchStore } from './batch'
-import { useMzFit } from './mzFit'
 import { useTargetsStore } from './targets'
 
 export const useSampleStore = defineStore('sample', () => {
@@ -49,8 +49,6 @@ export const useSampleStore = defineStore('sample', () => {
     api.emit('subscribe', sampleItemId)
     active.value = sample
     await loadSampleData(sampleItemId)
-    const mzFit = useMzFit()
-    await mzFit.load(sample)
   }
 
   async function loadSampleData(sampleItemId) {
@@ -108,9 +106,6 @@ export const useSampleStore = defineStore('sample', () => {
     matchCompounds.value = null
     matchIons.value = null
     matchIsotopes.value = null
-
-    const mzFit = useMzFit()
-    mzFit.unload(null) // should this be awaited?
   }
 
   async function reload(sample = null) {
@@ -136,6 +131,7 @@ export const useSampleStore = defineStore('sample', () => {
   }
   async function process(sample) {
     const mzFit = useMzFit()
+    await mzFit.load(sample)
     const targetsStore = useTargetsStore()
     return await api.request.process({
       method: 'processSampleItem',

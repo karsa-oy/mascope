@@ -325,7 +325,7 @@ watchEffect(() => {
         <Column header="Collection" field="target_collection_name" sortable>
           <template #body="{ data }">
             <span
-              :class="`pi pi-chevron-${data.sample_batch_id in expanded.collections ? 'down' : 'right'}`"
+              :class="`pi pi-chevron-${data.target_collection_id in expanded.collections ? 'down' : 'right'}`"
               style="font-size: smaller; margin-right: 0.5rem"
             />
             {{ data.target_collection_name }}

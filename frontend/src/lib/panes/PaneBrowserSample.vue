@@ -12,24 +12,18 @@ import Column from 'primevue/column'
 import ProgressSpinner from 'primevue/progressspinner'
 import ContextMenu from 'primevue/contextmenu'
 
-import { api, generateCopyName } from '@/api'
+import { generateCopyName } from '@/api'
 
 import { BaseMatchTag } from '@/lib/base'
 import {
   DialogSampleBatchOp,
   DialogSampleItemOp,
-  DialogSampleItemCalibration,
+  DialogCalibration,
   useSampleBatchDeleteDialog
 } from '@/lib/dialogs'
 
 import { batchExportCsv } from '@/lib/table'
-import {
-  useWorkspaceStore,
-  useSampleStore,
-  useBatchStore,
-  useFocusedMatch,
-  useMzFit
-} from '@/stores'
+import { useWorkspaceStore, useSampleStore, useBatchStore, useFocusedMatch } from '@/stores'
 
 const confirm = useConfirm()
 
@@ -41,7 +35,8 @@ const focusedMatch = useFocusedMatch()
 const dialog = reactive({
   batch: {
     op: null,
-    delete: useSampleBatchDeleteDialog()
+    delete: useSampleBatchDeleteDialog(),
+    calibration: false
   },
   item: {
     op: null,
@@ -230,15 +225,8 @@ const menu = computed(() => ({
     {
       label: `Recalibrate batch`,
       icon: 'pi pi-replay',
-      command: async () => {
-        const mzFit = useMzFit()
-        await api.request.process({
-          method: 'recalibrateSampleBatch',
-          body: {
-            batchId: batch.context.sample_batch_id,
-            body: mzFit.params
-          }
-        })
+      command: () => {
+        dialog.batch.calibration = true
       },
       visible: batch.context !== null
     },
@@ -486,5 +474,6 @@ watchEffect(async () => {
   </Panel>
   <DialogSampleBatchOp v-model:action="dialog.batch.op" :batch="batch.context" />
   <DialogSampleItemOp v-model:action="dialog.item.op" :item="item.context" />
-  <DialogSampleItemCalibration v-model:visible="dialog.item.calibration" :item="item.context" />
+  <DialogCalibration v-model:visible="dialog.batch.calibration" :context="batch.context" />
+  <DialogCalibration v-model:visible="dialog.item.calibration" :context="item.context" />
 </template>

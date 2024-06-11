@@ -1,6 +1,5 @@
 export * from './app'
 export * from './batch'
-export * from './mzFit'
 export * from './instrument'
 export * from './key'
 export * from './notification'

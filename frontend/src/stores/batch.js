@@ -2,11 +2,11 @@ import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 
 import { api } from '@/api'
+import { useMzFit } from '@/lib/mzFit'
 
 import { useTargetsStore } from './targets.js'
 import { useSampleStore } from './sample.js'
 import { useAppStore } from './app.js'
-import { useMzFit } from './mzFit.js'
 
 export const useBatchStore = defineStore('batch', () => {
   const active = ref(null)

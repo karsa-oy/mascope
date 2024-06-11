@@ -15,6 +15,7 @@ import TabPanel from 'primevue/tabpanel'
 import { api } from '@/api'
 import { equals } from '@/lib/table'
 import { clone } from '@/lib/utils'
+import { useMzFit } from '@/lib/mzFit'
 
 import { useAppStore, useWorkspaceStore, useBatchStore, useTargetsStore } from '@/stores'
 
@@ -198,7 +199,7 @@ async function init(value) {
 }
 
 // confirmation
-function execute() {
+async function execute() {
   action.value = null
   switch (action.value) {
     case 'create': {
@@ -207,7 +208,17 @@ function execute() {
     }
     case 'update':
     case 'update_targets': {
-      batchStore.updateBatch(updated.value)
+      await batchStore.updateBatch(updated.value)
+      if (!equals(selected.calibrants, initial.calibrants, 'target_collection_id')) {
+        const mzFit = useMzFit()
+        await api.request.process({
+          method: 'recalibrateSampleBatch',
+          body: {
+            batchId: original.value.sample_batch_id,
+            body: mzFit.params
+          }
+        })
+      }
       break
     }
   }
@@ -226,7 +237,7 @@ function execute() {
         <Tab value="info">Info</Tab>
         <Tab value="targets">Targets</Tab>
         <Tab value="mechanisms" :disabled="action == 'update_targets'">Mechanisms</Tab>
-        <Tab value="calibrants" :disabled="action !== 'create'">Calibrants</Tab>
+        <Tab value="calibrants" :disabled="action == 'update_targets'">Calibrants</Tab>
       </TabList>
       <TabPanels>
         <TabPanel value="info">

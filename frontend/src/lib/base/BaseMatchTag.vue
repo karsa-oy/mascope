@@ -14,6 +14,10 @@ const props = defineProps({
   text: {
     type: Boolean,
     default: false
+  },
+  style: {
+    type: String,
+    default: 'font-size: 11px'
   }
 })
 
@@ -35,7 +39,7 @@ const severity = computed(() => {
     case 2:
       return 'danger'
     case 1:
-      return 'warning'
+      return 'warn'
     default:
       return 'success'
   }
@@ -50,7 +54,7 @@ const severity = computed(() => {
     :value="text ? `Match score: ${score}` : score"
     :severity="severity"
     :class="!row.alarm_mode || score == '00.00%' ? 'pale' : ''"
-    style="font-size: 11px"
+    :style="style"
   />
 </template>
 
