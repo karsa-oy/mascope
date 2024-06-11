@@ -89,6 +89,20 @@ def delete_orphaned_records(conn, table_name):
             print(
                 f"🗑️ Deleted {deleted_count} orphaned target_compound_in_target_collection records due to invalid target_compound_id."
             )
+
+    elif table_name in ["match", "match_interference"]:
+        cursor.execute(
+            f"""
+            DELETE FROM {table_name}
+            WHERE sample_item_id NOT IN (SELECT sample_item_id FROM sample_item);
+            """
+        )
+        deleted_count = cursor.rowcount
+        if deleted_count > 0:
+            print(
+                f"🗑️ Deleted {deleted_count} orphaned {table_name} records due to invalid sample_item_id."
+            )
+
     # Disable foreign key constraints temporarily to allow for orphans data restore
     cursor.execute("PRAGMA foreign_keys = OFF;")
 
