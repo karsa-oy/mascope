@@ -11,6 +11,9 @@ import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import ProgressSpinner from 'primevue/progressspinner'
 import ContextMenu from 'primevue/contextmenu'
+import Popover from 'primevue/popover'
+import Listbox from 'primevue/listbox'
+import SelectButton from 'primevue/selectbutton'
 
 import { generateCopyName } from '@/api'
 
@@ -22,6 +25,7 @@ import {
   useSampleBatchDeleteDialog
 } from '@/lib/dialogs'
 
+import { beautifySnakeCase } from '@/lib/utils'
 import { batchExportCsv } from '@/lib/table'
 import { useWorkspaceStore, useSampleStore, useBatchStore, useFocusedMatch } from '@/stores'
 
@@ -63,6 +67,8 @@ const pending = reactive({
   batchExport: false,
   peakExport: false
 })
+
+const batchOptionsPopover = ref()
 
 watch(
   computed(() => batch.selected),
@@ -363,6 +369,75 @@ watchEffect(async () => {
     focusedMatch.unload({ target: false })
   }
 })
+
+const batchColumnTab = ref('All')
+const inferType = (field) => {
+  const withField = batchStore.sampleItems.filter((item) => field in item)
+  const types = [
+    ...new Set(withField.map((item) => (item[field] ? typeof item[field] : 'null')))
+  ].filter((type) => type !== 'null')
+  return types.length == 1 ? types[0] : 'unknown'
+}
+const createLabel = (field) => {
+  const custom = {
+    index: '#',
+    sample_item_name: 'Item',
+    filter_id: 'Filter'
+  }
+  if (field in custom) {
+    return custom[field]
+  } else {
+    return beautifySnakeCase(field)
+  }
+}
+const batchDefaultColumns = [
+  { field: 'sample_item_name', kind: 'standard', label: 'Item', type: 'string' },
+  { field: 'index', kind: 'standard', label: '#', type: 'string' },
+  { field: 'filter_id', kind: 'standard', label: 'Filter', type: 'string' }
+]
+const batchAvailableColumns = computed(() => {
+  const standard = [
+    ...new Set(
+      batchStore.sampleItems
+        ?.map((item) => Object.keys(item ?? {}))
+        .flat()
+        .filter((field) => field !== 'sample_item_attributes')
+    )
+  ].map((field) => ({ field, kind: 'standard' }))
+  const custom = [
+    ...new Set(
+      batchStore.sampleItems?.map((item) => Object.keys(item?.sample_item_attributes ?? {})).flat()
+    )
+  ].map((field) => ({ field, kind: 'custom' }))
+  return [...standard, { field: 'time', kind: 'custom', label: 'Time' }, ...custom]
+    .map(({ field, kind }) => ({
+      field,
+      kind,
+      label: createLabel(field),
+      type: kind == 'custom' ? 'string' : inferType(field)
+    }))
+    .filter(({ type }) => type !== 'object')
+})
+
+const batchSelectedColumns = ref(batchDefaultColumns)
+
+watch(batchSelectedColumns, (cols) => {
+  localStorage.setItem(
+    `mascope-sample-columns-${batch.selected.sample_batch_id}`,
+    JSON.stringify(cols)
+  )
+})
+watch(
+  computed(() => batch.selected),
+  (selected) => {
+    if (selected) {
+      const storedColumns = localStorage.getItem(
+        `mascope-sample-columns-${selected.sample_batch_id}`
+      )
+      batchSelectedColumns.value = storedColumns ? JSON.parse(storedColumns) : batchDefaultColumns
+    }
+  }
+)
 </script>
 
 <template v-if="workspaceStore.batches">
@@ -426,6 +501,55 @@ watchEffect(async () => {
             {{ slotProps.data.sample_batch_name }}
           </template>
         </Column>
+        <Column style="width: 4rem">
+          <template #body="slotProps">
+            <Button
+              v-if="slotProps.data.sample_batch_id in batch.expanded"
+              icon="pi pi-ellipsis-h"
+              severity="secondary"
+              text
+              @click="
+                (event) => {
+                  batchOptionsPopover.show(event)
+                }
+              "
+              v-tooltip.right="'Batch options'"
+            />
+            <Popover ref="batchOptionsPopover" contentStyle="height: fit-content;">
+              <div class="row" style="margin-bottom: 0.5rem">
+                <SelectButton
+                  v-model="batchColumnTab"
+                  :options="['All', 'Selected']"
+                  :allowEmpty="false"
+                />
+                <Button
+                  icon="pi pi-replay"
+                  severity="secondary"
+                  label="Reset"
+                  iconPos="right"
+                  text
+                  @click="batchSelectedColumns = batchDefaultColumns"
+                  v-tooltip.right="'Reset columns'"
+                />
+              </div>
+              <Listbox
+                v-model="batchSelectedColumns"
+                :options="
+                  batchAvailableColumns.filter(({ field }) =>
+                    batchColumnTab == 'Selected'
+                      ? batchSelectedColumns.map(({ field }) => field).includes(field)
+                      : true
+                  )
+                "
+                multiple
+                optionLabel="label"
+                filter
+                dataKey="field"
+                style="height: 230px"
+              />
+            </Popover>
+          </template>
+        </Column>
         <template #expansion="slotProps">
           <div v-if="!batchStore.loading" style="min-height: 2rem">
             <DataTable
@@ -444,6 +568,9 @@ watchEffect(async () => {
                 }
               "
               size="small"
+              reorderableColumns
+              stateStorage="local"
+              :stateKey="`mascope-sample-table-${slotProps.data.sample_batch_id}`"
             >
               <Column field="match_score" sortable class="match-column">
                 <template #header>
@@ -457,9 +584,20 @@ watchEffect(async () => {
                   />
                 </template>
               </Column>
-              <Column field="sample_item_name" header="Item" sortable style="width: 30px" />
-              <Column field="index" header="#" sortable style="width: 3ch" />
-              <Column field="filter_id" header="Filter" sortable style="width: 5ch" />
+
+              <template v-for="{ field, label, kind } in batchSelectedColumns" :key="field">
+                <Column v-if="kind == 'standard'" :field="field" :header="label" sortable />
+                <Column
+                  v-if="kind == 'custom'"
+                  field="sample_item_attributes"
+                  :header="label"
+                  sortable
+                >
+                  <template #body="{ data }">
+                    <span>{{ data.sample_item_attributes[field] }}</span>
+                  </template>
+                </Column>
+              </template>
             </DataTable>
             <i v-else style="padding-left: 3em; margin-top: 1rem; line-height: 2rem">
               Empty - no sample items
@@ -477,3 +615,9 @@ watchEffect(async () => {
   <DialogCalibration v-model:visible="dialog.batch.calibration" :context="batch.context" />
   <DialogCalibration v-model:visible="dialog.item.calibration" :context="item.context" />
 </template>
+
+<style scoped>
+:deep(.p-listbox-list-container) {
+  height: 180px;
+}
+</style>
