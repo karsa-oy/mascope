@@ -267,7 +267,7 @@ watchEffect(() => {
 
 <style scoped>
 .sample-field-grid {
-  margin: auto;
+  margin: 1rem auto;
   width: 90%;
   min-height: 100%;
   display: grid;
