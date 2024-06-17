@@ -16,7 +16,7 @@ mascope         # Project root
 
 The backend and frontend have their own setup documentation for Windows and Linux, using scripts and virtualbox. In addition to these setup methods, the frontend and backend are Dockerized; see the _Quick start with Docker_ section for more information.
 
-![Mascope architecture diagram](/docs/assets/mascope_sw_architecture.png "Mascope architecture diagram")
+![Mascope architecture diagram](.legacy/docs/assets/mascope_sw_architecture.png "Mascope architecture diagram")
 
 ### Deploy for development (Windows)
 
