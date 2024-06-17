@@ -95,16 +95,9 @@ def create_db_backup(db_path, operation):
 async def init_db():
     try:
         print("Initializing mascope database")
-        target_version = int(os.environ.get("MASCOPE_PUBLIC_DB_VERSION"))
         current_version = get_current_db_version()
-        available_version = get_available_db_version()
+        target_version = get_available_db_version()
         print(f"Detected mascope database version: v{current_version}")
-        if target_version > available_version:
-            raise ValueError(
-                f"""
-                Latest available version is: {available_version}.
-            """
-            )
         if current_version == target_version:
             print("No database migration needed.")
         else:
