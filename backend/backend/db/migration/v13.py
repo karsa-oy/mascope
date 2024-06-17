@@ -1,7 +1,8 @@
 import os
 import shutil
-import subprocess
 
+from .lib.restore import run_db_restore
+from .lib.maintenance import run_db_maintenance
 
 def run():
     # Step 1: Setup new database
@@ -13,7 +14,7 @@ def run():
     # Step 2: Run db-restore
     # This will restore the database correct table schemas, create the missing indexes.
     # The configuration of table schemas is stored in the table_configs.
-    subprocess.run(["poetry", "run", "db-restore"], check=True)
+    run_db_restore()
 
     # Step 3: Run db-maintenance
-    subprocess.run(["poetry", "run", "db-maintenance"], check=True)
+    run_db_maintenance()

@@ -1,9 +1,9 @@
 import os
 import sqlite3
-from .. import get_current_db_version, create_db_backup
+from backend.db import get_current_db_version, create_db_backup
 
 
-def run():
+def run_db_maintenance():
     """
     Executes maintenance operations on the database. This includes backing up the database,
     vacuuming to defragment, analyzing to optimize query plans, and checking database integrity.
@@ -66,7 +66,3 @@ def log_indexes(conn):
 
     if manual_index_count == 0 and auto_index_count == 0:
         print("Warning: No indexes found, please verify if this is expected.")
-
-
-if __name__ == "__main__":
-    run()

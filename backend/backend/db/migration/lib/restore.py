@@ -1,7 +1,7 @@
 import os
 import sqlite3
 import sys
-from .. import get_current_db_version, create_db_backup
+from backend.db import get_current_db_version, create_db_backup
 
 
 def create_table_backup(cursor, table_name):
@@ -191,7 +191,7 @@ def restore_table(conn, table_name, schema_info):
         print(f"✅ Schema of {table_name} is correct, no restoration needed.")
 
 
-def run():
+def run_db_restore():
     """
     Orchestrates the schema restoration process for specified database tables.
 
@@ -708,6 +708,3 @@ table_configs = {
         """,
     },
 }
-
-if __name__ == "__main__":
-    run()
