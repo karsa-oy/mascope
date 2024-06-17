@@ -176,7 +176,27 @@ async def create_target_compound(
     independent_transaction=False,
     session=None,
 ) -> dict:
-    """Function to create a target compount record and derived target ions and isotopes
+    """Function to create a target compound record(s) and derived target ions and isotopes
+
+    For each target compound to create:
+    1. Check for existing records in the database with either similar name+formula or CAS number
+        - If no matching records, move to step 2
+        - If one matching record exists
+            - If match is based on name+formula
+              AND existing record is missing CAS number
+              AND new record has CAS number
+              THEN update the record with CAS number
+            - No need to create new record, continue to next compound
+        - If > 1 matching records exist
+            - Check for actual duplicates in the database (similar name+formula+CAS number)
+              - If duplicates, raise RuntimeError
+              - Else, no need to create new record, continue to next compound
+    2. Create new target compound record and derived target ions and isotopes
+    3. Notify clients about new target compounds
+
+    TODO: Different kinds of inconsistencies between new and existing records could be handled better. E.g. if the new record has similar
+    name+formula but different CAS number than an existing record, the existing record will be used and the inconsistency between CAS
+    numbers is silently ignored.
 
     :param target_compounds: List of target compounds to create
     :type target_compounds: List[TargetCompoundBase]
@@ -190,13 +210,6 @@ async def create_target_compound(
     """
     if independent_transaction:
         session = async_session()
-
-    # Fetch ionization mechanisms
-    ionization_mechanisms_data = await get_ionization_mechanisms()
-    ionization_mechanisms = [
-        IonizationMechanism(**ionization_mechanism_dict)
-        for ionization_mechanism_dict in ionization_mechanisms_data["data"]
-    ]
 
     # initialize list of targets to return
     target_compound_ids = []
@@ -212,25 +225,43 @@ async def create_target_compound(
             "status_code": 0,
             "messages": [],
         }
-        # check if the compound record is already in the database
+        # STEP 1: check if the compound record is already in the database (similar name and formula or CAS number)
         existing_compounds = await session.execute(
             select(TargetCompound).filter(
                 or_(
-                    func.lower(TargetCompound.target_compound_formula)
-                    == norm(target_compound.target_compound_formula, lower=True),
-                    TargetCompound.target_compound_formula
-                    == norm(target_compound.target_compound_formula, lower=True),
+                    # Similar CAS number
+                    and_(
+                        TargetCompound.cas_number is not None,
+                        (
+                            TargetCompound.cas_number
+                            == norm(target_compound.cas_number)
+                            if target_compound.cas_number
+                            else None
+                        ),
+                    ),
+                    # Similar name and formula
+                    and_(
+                        func.lower(TargetCompound.target_compound_formula)
+                        == norm(target_compound.target_compound_formula, lower=True),
+                        func.lower(TargetCompound.target_compound_name)
+                        == norm(target_compound.target_compound_name, lower=True),
+                    ),
                 )
             )
         )
         existing_compounds = existing_compounds.scalars().all()
+        existing_target_compounds += existing_compounds
         if len(existing_compounds) == 0:
             # save the new compound for creation if it doesn't exist
             target_compound = TargetCompound(
                 target_compound_id=gen_id(),
-                target_compound_name=target_compound.target_compound_name,
+                target_compound_name=norm(target_compound.target_compound_name),
                 target_compound_formula=norm(target_compound.target_compound_formula),
-                cas_number=target_compound.cas_number,
+                cas_number=(
+                    norm(target_compound.cas_number)
+                    if target_compound.cas_number
+                    else None
+                ),
             )
 
             target_compounds_to_create.append(target_compound)
@@ -242,20 +273,57 @@ async def create_target_compound(
             )
         elif len(existing_compounds) == 1:
             # use the existing compound record if it does exist
-            target_compound = existing_compounds[0]
-            existing_target_compounds.append(target_compound)
+            target_compound_old = existing_compounds[0]
+            # Check if CAS number update needed
+            if (
+                target_compound_old.cas_number is None
+                and target_compound.cas_number is not None
+            ):
+                target_compound_old.cas_number = target_compound.cas_number
+                await update_target_compound(
+                    [TargetCompoundUpdate(**target_compound_old.to_dict())]
+                )
+            target_compound = target_compound_old
             target_compound_ids.append(target_compound.target_compound_id)
 
             message_log[i + 1]["status_code"] = 200
             message_log[i + 1]["messages"].append(
-                f"Existing target compound {target_compound.target_compound_name} with target_compound_id: {target_compound.target_compound_name} used"
+                f"Existing target compound {target_compound.target_compound_name} with target_compound_id: {target_compound.target_compound_id} used"
             )
             continue  # as ions & isotopes are already there in this case
         else:
-            # the database is inconsistent
-            raise RuntimeError("Duplicate target compound in database")
+            # More than one matching compound in the database
+            # It is possible to arrive here if there are compound(s) that:
+            #   1) Have the same CAS number as the one to be created; AND
+            #   2) Another compound that has the same name and formula but not CAS number as the one to be created
+            # Let's check to be sure there are no actual duplicates in the database
+            target_compound = existing_compounds[0]
+            # Convert to dicts
+            existing_compounds = [
+                existing_compound.to_dict() for existing_compound in existing_compounds
+            ]
+            # Pop target compound ids for dict comparison afterwards
+            _ = [
+                existing_compound.pop("target_compound_id")
+                for existing_compound in existing_compounds
+            ]
+            # Check for identical target compounds
+            for i, existing_compound in enumerate(existing_compounds[:-1]):
+                if any(
+                    existing_compound == another_existing_compound
+                    for another_existing_compound in existing_compounds[i + 1 :]
+                ):
+                    # the database is inconsistent with two identical target compounds
+                    raise RuntimeError("Duplicate target compound in database")
+            # No duplicates, let's proceed
+            target_compound_ids.append(target_compound.target_compound_id)
+            message_log[i + 1]["status_code"] = 200
+            message_log[i + 1]["messages"].append(
+                f"Existing target compound {target_compound.target_compound_name} with target_compound_id: {target_compound.target_compound_id} used"
+            )
+            continue  # as ions & isotopes are already there in this case
 
-        # Proceed to generating target ions and isotopes for the compound
+        # STEP2: Proceed to creating new target compound record and generating target ions and isotopes for the compound
         try:
             # Try if target compound is given by mass (try to parse composition into float)
             target_compound_mass = float(target_compound.target_compound_formula)
@@ -263,6 +331,13 @@ async def create_target_compound(
             target_compound_mass = None
 
         # Create target ions for the compound
+        # Fetch ionization mechanisms
+        ionization_mechanisms_data = await get_ionization_mechanisms()
+        ionization_mechanisms = [
+            IonizationMechanism(**ionization_mechanism_dict)
+            for ionization_mechanism_dict in ionization_mechanisms_data["data"]
+        ]
+
         await create_target_ions(
             target_compound=target_compound,
             ionization_mechanisms=ionization_mechanisms,
@@ -275,7 +350,7 @@ async def create_target_compound(
 
     if independent_transaction:
         await session.commit()
-        # Emit global target reload event to inform all clients.
+        # STEP 3: Emit global target reload event to inform all clients.
         await sio.emit("targets_all_reload", namespace="/")
     else:
         await session.flush()
@@ -340,11 +415,17 @@ async def update_target_compound(target_compounds: List[TargetCompoundUpdate]):
                 and existing_compound.target_compound_formula
                 != target_compound.target_compound_formula
             ):
-                # Check if the new formula already exists in other TargetCompound records
+                # Check if the new formula already exists in other TargetCompound records with the same name
                 existing_formula_compound = await session.execute(
                     select(TargetCompound).where(
-                        TargetCompound.target_compound_formula
-                        == target_compound.target_compound_formula
+                        and_(
+                            func.lower(TargetCompound.target_compound_formula)
+                            == norm(
+                                target_compound.target_compound_formula, lower=True
+                            ),
+                            func.lower(TargetCompound.target_compound_name)
+                            == norm(target_compound.target_compound_name, lower=True),
+                        )
                     )
                 )
                 existing_formula_compound = (
@@ -356,7 +437,7 @@ async def update_target_compound(target_compounds: List[TargetCompoundUpdate]):
                     existing_target_compounds.append(existing_formula_compound)
                     message_log[i + 1]["status_code"] = 409
                     message_log[i + 1]["messages"].append(
-                        f"The compound with formula ({target_compound.target_compound_formula}) is already exists as {existing_formula_compound.target_compound_name} (target_compound_id: {existing_formula_compound.target_compound_id}). Use this compound instead of {target_compound.target_compound_name}"
+                        f"The compound with name {target_compound.target_compound_name} and formula {target_compound.target_compound_formula} is already exists as {existing_formula_compound.target_compound_name} (target_compound_id: {existing_formula_compound.target_compound_id}). Use this compound instead of {target_compound.target_compound_name}"
                     )
                     continue  # Skip this compound update, proceed to the next
 
