@@ -8,3 +8,4 @@ COPY . .
 RUN yarn install
 
 ENTRYPOINT [ "yarn", "serve" ]
+
