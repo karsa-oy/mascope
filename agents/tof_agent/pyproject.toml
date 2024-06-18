@@ -16,11 +16,10 @@ mascope-tof-agent = 'tof_agent:run'
 python = "~3.10"
 mascope_hardware = { path = '../../libraries/mascope_hardware', develop = true }
 
-setuptools = "62.6.0"
 python-socketio = "^5.7.2"
-numpy = "^1.23.5"
-pyaml = "^23.9.7"
-aiohttp = "^3.8.3"
+pyyaml = "^6.0.1"
+aiohttp = "^3.9.5"
 
 [tool.poetry.group.dev.dependencies]
+deptry = "^0.16.1"
 pyinstaller = "5.6.2"

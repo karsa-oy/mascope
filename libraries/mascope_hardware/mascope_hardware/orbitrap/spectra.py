@@ -8,7 +8,7 @@ Created on Mon Dec  2 12:09:29 2019
 from datetime import datetime, timedelta
 
 import numpy as np
-from mascope.hardware.orbitrap.util import net2np_array
+from .util import net2np_array
 from ThermoFisher.CommonCore.Data import Business
 
 from .instrument import KOInstrument

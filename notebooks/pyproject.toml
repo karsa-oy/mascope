@@ -15,7 +15,7 @@ python = "~3.10"
 jupyterlab = '~4.2'
 
 mascope = { path = '../backend', develop = true }
-mascope_api = { path = '../libraries/api_wrapper', develop = true }
+mascope_api = { path = '../libraries/mascope_api', develop = true }
 
 ipywidgets = "^8.1.2"
 lmfit = "^1.2.2"

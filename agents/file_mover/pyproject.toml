@@ -11,12 +11,13 @@ requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
-file-mover = 'file_mover:run'
+mascope-file-mover = 'file_mover:run'
 
 [tool.poetry.dependencies]
-python = ">=3.8,<3.11"
-setuptools = "62.6.0"
+python = "~3.10"
+
 watchdog = "^3.0.0"
 
 [tool.poetry.group.dev.dependencies]
+deptry = "^0.16.1"
 pyinstaller = "^6.3.0"

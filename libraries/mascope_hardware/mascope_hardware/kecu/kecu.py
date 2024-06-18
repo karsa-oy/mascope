@@ -2,8 +2,8 @@ import os
 import pandas as pd
 import numpy as np
 import xarray as xr
-from mascope.lib.file_func import load_array, load_file, filename_to_zarr_path, get_base_path
-from mascope.lib.util import parse_path_from_item_filename
+from mascope_lib.file_func import load_array, load_file, filename_to_zarr_path, get_base_path
+from mascope_lib.util import parse_path_from_item_filename
 
 
 def csv_to_xarr(csv_path: str, filename: str) -> xr.core.dataarray.DataArray:
