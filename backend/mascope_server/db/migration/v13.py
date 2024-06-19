@@ -1,8 +1,8 @@
 import os
 import shutil
 
-from .lib.restore import run_db_restore
-from .lib.maintenance import run_db_maintenance
+from ..ops.restore import run_db_restore
+from ..ops.maintenance import run_db_maintenance
 
 def run():
     # Step 1: Setup new database

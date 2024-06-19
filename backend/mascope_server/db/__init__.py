@@ -38,7 +38,7 @@ def migrate(current_version, target_version):
     while current_version < target_version:
         next_version = current_version + 1
         try:
-            migration = import_module(f"backend.db.migration.v{next_version}")
+            migration = import_module(f"mascope_server.db.migration.v{next_version}")
         except Exception as error:
             traceback.print_exc()
             print(error)
