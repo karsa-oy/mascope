@@ -64,7 +64,6 @@ export const useMzFit = (sample) => {
   }
 
   notification.on('calibration_mz_fit', (payload) => {
-    console.log(payload)
     status.value = payload?.status
     if (payload?.status === 'success') {
       current.value = payload?.data?.fit

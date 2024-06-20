@@ -61,6 +61,7 @@ export const useSampleStore = defineStore('sample', () => {
         }
       })
     )?.data
+    // TODO sample matched property is already exist in the sample object. Should delete this and check related code
     matched.value = sampleMatches.length > 0 ? 1 : 0
 
     // Get detailed sample data
@@ -131,13 +132,12 @@ export const useSampleStore = defineStore('sample', () => {
   }
   async function process(sample) {
     const mzFit = useMzFit()
-    await mzFit.load(sample)
     const targetsStore = useTargetsStore()
     return await api.request.process({
       method: 'processSampleItem',
       body: {
         sample,
-        params: mzFit.params,
+        mz_calibration_params: mzFit.params,
         alarms: targetsStore.alarmsList
       }
     })
