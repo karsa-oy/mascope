@@ -11,7 +11,6 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.dependencies]
 python = "~3.10"
-mascope_lib = { path = '../mascope_lib', develop = true }
 
 h5py = "^3.11.0"
 numpy = "^1.16.0"

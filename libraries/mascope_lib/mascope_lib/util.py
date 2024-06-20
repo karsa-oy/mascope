@@ -1,7 +1,6 @@
 import fnmatch
 import os
 import re
-from datetime import datetime, timedelta
 
 import datetime_glob
 
@@ -36,24 +35,6 @@ def ct_struct_to_dict(struct):
             value = value.decode()
         result[field] = value
     return result
-
-
-def filetime2datetime(timestamp):
-    """Function to convert timestamp in FILETIME format to datetime
-
-    Parameters
-    ----------
-    timestamp : int64
-        Number of 100-nanosecond intervals since January 1, 1601
-
-    Returns
-    -------
-    datetime
-        Input timestamp converted to datetime format
-    """
-
-    _FILETIME_null_date = datetime(1601, 1, 1, 0, 0, 0)
-    return _FILETIME_null_date + timedelta(microseconds=timestamp / 10)
 
 
 def timestamp_from_filename(filename):

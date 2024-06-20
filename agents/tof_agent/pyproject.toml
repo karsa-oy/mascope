@@ -22,4 +22,4 @@ aiohttp = "^3.9.5"
 
 [tool.poetry.group.dev.dependencies]
 deptry = "^0.16.1"
-pyinstaller = "5.6.2"
+pyinstaller = "^6.8.0"
