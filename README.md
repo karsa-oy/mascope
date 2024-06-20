@@ -7,23 +7,32 @@ This monorepo contains Mascope python backend and Vue frontend, as well as perip
 The project is structured as follows:
 
 ```
-mascope         # Project root
-├───agents           # Agent applications
-├───backend          # Mascope backend and related packages
-├───frontend         # Mascope frontend
-└───scripts          # Build and deploy scripts
+mascope/        # Project root
+├───agents/          # Instrument machine agents
+│   ├───file_mover          # File mover (for Orbitrap)
+│   ├───ht300a              # Autosampler
+│   └───tof_agent           # Tofwerk TOF
+├───backend/         # App backend (Python, FastAPI, SQLite)
+├───frontend/        # App frontend (Javascript, Vue, PrimeVue)
+├───libraries/       # Shared libraries
+│   ├───mascope_api/        # Public REST API wrapper
+│   ├───mascope_hardware/   # Internal hardware library
+│   ├───mascope_lib/        # Internal general library
+├───notebooks/        # Jupyter dev environment
+├───scripts/          # Build and deploy scripts
+└───.legacy/          # Deprecated code and docs
 ```
 
 The backend and frontend have their own setup documentation for Windows and Linux, using scripts and virtualbox. In addition to these setup methods, the frontend and backend are Dockerized; see the _Quick start with Docker_ section for more information.
 
-![Mascope architecture diagram](/docs/assets/mascope_sw_architecture.png "Mascope architecture diagram")
+![Mascope architecture diagram](.legacy/docs/assets/mascope_sw_architecture.png "Mascope architecture diagram")
 
 ### Deploy for development (Windows)
 
 1. Install prerequisites:
 
    - [Python 3.10](https://www.python.org/downloads/release/python-31011/) - Python interpreter
-   - [poetry](https://python-poetry.org/) - Python dependency manager
+   - [Poetry](https://python-poetry.org/) - Python dependency manager
    - [Node 22](https://nodejs.org/en) - JavaScript runtime environment
 
 2. Set up deployment environment by creating file `/scripts/deploy/dev.win/.debug_env`, with the following contents (example, note that the specified directories must exist):
@@ -41,21 +50,3 @@ MASCOPE_PRIVATE_INSTRUMENT_DIR=C:/mascope_data/instrument
 cd ./frontend
 npx playright install
 ```
-
-### Build for production (Linux)
-
-Refer to the `README.md` under `/scripts/build`.
-
-##
-
-### _DEPRECATED: Quick Start with Docker_
-
-**NOTE: Containerization to be reviewed and updated**
-
-For a quick development setup with docker:
-
-1.  _Install_ dependencies `docker` and `docker-compose`;
-2.  _Build_ with `./docker-build.sh`;
-3.  _Run_ with `docker-compose up`;
-
-The build script wraps `docker-compose build` with an extra optimization step. For additonal reference, check out the [docker-compose docs](https://docs.docker.com/compose/).

@@ -1,7 +1,7 @@
 @echo off 
 
 echo Build executable
-call poetry run pyinstaller tof_agent.py --name bin --noconfirm --onefile --console --collect-all hardware.tofwerk --icon=assets/icon.ico
+call poetry run pyinstaller tof_agent.py --name bin --noconfirm --onefile --console --collect-all mascope_hardware.tofwerk --icon=assets/icon.ico
 echo Executable published
 
 copy scripts\install.cmd dist\

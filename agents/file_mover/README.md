@@ -23,5 +23,5 @@ mascope
 ### Development
 
 1. `poetry install`
-2. `poetry run python file_mover.py`
-3. (See available command line arguments by running `poetry run python file_mover.py --help`)
+2. `poetry run mascope-file-mover`
+3. (See available command line arguments by running `poetry run mascope-file-mover --help`)

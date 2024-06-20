@@ -16,14 +16,14 @@ import shutil
 import requests
 import pandas as pd
 import numpy as np
-from lib.file_func import get_instrument_type
-from lib.peak import detect_peaks
+from mascope_lib.file_func import get_instrument_type
+from mascope_lib.peak import detect_peaks
 import pytest
 from tests.config import *
-from backend.api.controllers.instrument_functions_controller import (
+from mascope_server.api.controllers.instrument_functions_controller import (
     read_instrument_functions,
 )
-from backend.api.controllers.matches_controller import compute_matches
+from mascope_server.api.controllers.matches_controller import compute_matches
 
 
 # Load targets

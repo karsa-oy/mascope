@@ -4,26 +4,22 @@ version = "1.0"
 description = "Agent to connect Tofwerk TOF with Karsa Mascope"
 authors = ["Karsa Oy <support@karsa.fi>"]
 license = "Proprietary"
-packages = [
-    {include = "hardware", from = "../../backend"},
-]
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
-tof-agent = 'tof_agent:run'
+mascope-tof-agent = 'tof_agent:run'
 
 [tool.poetry.dependencies]
-python = ">=3.10,<3.11"
-setuptools = "62.6.0"
+python = "~3.10"
+mascope_hardware = { path = '../../libraries/mascope_hardware', develop = true }
+
 python-socketio = "^5.7.2"
-numpy = "^1.23.5"
-pyaml = "^23.9.7"
-aiohttp = "^3.8.3"
+pyyaml = "^6.0.1"
+aiohttp = "^3.9.5"
 
 [tool.poetry.group.dev.dependencies]
-pyinstaller = "5.6.2"
-# Local dependencies
-hardware = { path = "../../backend/hardware", develop = true }
+deptry = "^0.16.1"
+pyinstaller = "^6.8.0"

@@ -5,25 +5,22 @@
 This package contains the Mascope backend and related subpackages, written in Python. The dependencies are managed by [Poetry](https://python-poetry.org/). Each subpackage has their own poetry environment.
 
 ```
-mascope
-├───agents
-├───backend          # Mascope backend and related packages
-│   ├───backend         # Backend
-│   ├───docker          # Backend dockerization
-│   ├───docs            # Backend documentation
-│   ├───hardware        # Hardware interfaces
-│   ├───lib             # Library
-│   ├───scripts         # Build scripts
-│   ├───tests           # Tests
-│   └───vbox            # VirtualBox scripts
-├───frontend
-└───scripts
+backend/
+├───mascope_server/  # Mascope backend and related packages
+│   ├───api/            # REST API
+│   ├───api_sio/        # Custom socketio server
+│   ├───db/             # Database & filestore
+│   ├───service/        # File converter
+│   └───main.py         # Main entrypoint
+├───scripts/         # build scripts
+├───tests/           # tests
+└───pyproject.toml
 ```
 
 ### Setup Requirements
 
 - [Python 3.10](https://www.python.org/downloads/release/python-31011/) - Python interpreter
-- [poetry](https://python-poetry.org/) - Python dependency manager
+- [Poetry](https://python-poetry.org/) - Python dependency manager
 
 ### Project setup with Poetry
 
@@ -35,37 +32,14 @@ Once you have Poetry installed, you can run the following commands in this folde
 - `poetry run <script-name>` to run a script; we have the following:
   - `python`: run interactive Python shell in the virtual environment
   - `mascope-api`: run Mascope backend
-  - `file-converter`: run Mascope file converter service
-  - `file-downloader`: run Mascope file downloader service
-  - `log-rotate`: run Mascope log rotate service
+  - `mascope-file-converter`: run Mascope file converter service
+  - `mascope-log-rotate`: run Mascope log rotate service
 
 To manage dependencies:
 
 - `poetry add/remove` to add or remove packages
 - `poetry lock` will update the `poetry.lock` file;
 
-### Project setup with Docker
-
-See the README at the monorepo root.
-
-### Project setup with VirtualBox and Vagrant
-
-1. Have VirtualBox and vagrant installed
-
-2. go to vbox\backend folder
-
-cd vbox\backend
-
-1. run development setup for the project in VirtualBox virtual environment
-
-vagrant up
-
 ### Compile and build distribution packages
 
 To build the backend package, run `/scripts/build/build.cmd`. Refer to the README inside `/scripts/build` for more details.
-
-### DEPRECATED: Project profiling
-
-**NOTE: Could not manage to make `py-spy` work in the poetry environment. To be figured out.**
-
-1. py-spy profiler comes along with dev.setup: https://github.com/benfred/py-spy

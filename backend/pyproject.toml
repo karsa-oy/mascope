@@ -1,81 +1,48 @@
 [tool.poetry]
-name = "backend"
+name = "mascope_server"
 version = "1.2"
 description = "Karsa Mascope"
 authors = ["Karsa Oy <support@karsa.fi>"]
 license = "Proprietary"
-include = ["backend"]
-packages = [
-    {include = "backend"},
-    {include = "hardware"},
-    {include = "lib"},
-    {include = "service"},
-]
+packages = [{ include = "mascope_server" }]
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
-mascope-api = 'backend.main:run'
-file-converter = 'service.file_converter:run'
-file-downloader = 'service.file_downloader:run'
-log-rotate = 'service.log_rotate:run'
-db-maintenance = 'backend.db.scripts.maintenance:run' 
-db-restore = 'backend.db.scripts.restore:run'
+mascope-api = 'mascope_server.main:run'
+mascope-file-converter = 'mascope_server.service.file_converter:run'
+mascope-log-rotate = 'mascope_server.service.log_rotate:run'
+mascope-db-restore = 'mascope_server.db.ops.restore:run_db_restore'
+mascope-db-maintenance = 'mascope_server.db.ops.maintenance:run_db_maintenance'
 
 [tool.poetry.dependencies]
-python = ">=3.10,<3.11"
+python = "~3.10"
+mascope_lib = { path = '../libraries/mascope_lib', develop = true }
+mascope_hardware = { path = '../libraries/mascope_hardware', develop = true }
 
-aiohttp = "^3.8.1"
-aiohttp_cors = "^0.7.0"
-aiosqlite = "^0.19.0"
-asgiref = "^3.6.0"
-asynctest = "^0.13.0"
-Bottleneck = "^1.3.5"
+aiosqlite = "^0.20.0"
 colorcet = "^3.0.0"
-dask = "^2023.10.0"
-datashader = "^0.15.2"
-datetime_glob = "^1.0.8"
-decorator = "^5.1.1"
 fastapi = "^0.95.1"
-h5py = "^3.7.0"
-h5sparse = "^0.1.0"
-lmfit = "^1.0.3"
 nanoid = "^2.0.0"
 nest-asyncio = "^1.5.5"
-numpy = "^1.23.0"
-openpyxl = "^3.0.10"
+numpy = "^1.26.1"
 pandas = "^2.1.1"
-Pillow = "^9.1.1"
-pyarrow = "^11.0.0"
 python-dotenv = "^1.0.0"
-pythonnet = "^3.0.1"
 PyYAML = "^6.0"
-python-socketio = "^5.6.0"
+python-socketio = "^5.10.0"
 requests = "^2.28.1"
-scikit_learn = "^1.1.1"
-scipy = "^1.8.1"
-setuptools = "^62.6.0"
-sparse = "^0.14.0"
+scipy = "^1.11.3"
 sqlalchemy = "^2.0.12"
 uvicorn = "^0.19.0"
 watchdog = "^3.0.0"
-websocket-client = "^1.4.0"
-websockets = "^10.3"
-xarray = "^2023.10.1"
-zarr = "^2.12.0"
+zarr = "^2.16.1"
+websocket-client = "^1.8.0"
 
 [tool.poetry.group.dev.dependencies]
-hardware = { path = "./hardware", develop = true }
-lib = { path = "./lib", develop = true }
-service = { path = "./service", develop = true }
-sphinx = "^7.2.6"
-notebook = "^7.1.1"
-plotly = "^5.19.0"
-matplotlib = "^3.8.3"
-ipywidgets = "^8.1.2"
 austin-dist = "^3.6.0"
+deptry = "^0.16.1"
 pytest = "^8.2.0"
 pytest-asyncio = "^0.23.7"
 tqdm = "^4.66.4"

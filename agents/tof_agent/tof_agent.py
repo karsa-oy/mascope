@@ -9,7 +9,7 @@ import yaml
 from multiprocessing import Event
 from queue import Empty
 
-from tofwerk.tof_streamer import TofDaqStreamer
+from mascope_hardware.tofwerk.tof_streamer import TofDaqStreamer
 
 
 def load_env_yaml(yaml_file):

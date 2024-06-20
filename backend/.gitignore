@@ -6,6 +6,8 @@ dist
 *.db
 .venv
 .vscode
-.vagrant
 .Trash*
+
+profile_master.austin
+
 backend\service\file_converter_config\test.yaml
