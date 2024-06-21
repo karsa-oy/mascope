@@ -1,5 +1,5 @@
 from typing import List, Optional
-from pydantic import BaseModel, Field, validator, root_validator
+from pydantic import BaseModel, Field, validator, model_validator
 from .target_compound_pydantic_model import TargetCompoundBase, TargetCompoundUpdate
 
 # TODO_configuration possible collection types
@@ -39,7 +39,7 @@ class TargetCollectionCreateBody(TargetCollectionBase):
         None, description="IDs of sample batches where to add the new target collection"
     )
 
-    @root_validator
+    @model_validator(mode='after')
     def check_at_least_one_compound_provided(cls, values):
         compounds_create, compound_ids = values.get(
             "target_compounds_create"
@@ -61,7 +61,7 @@ class TargetCollectionUpdateBody(TargetCollectionBase):
         None, description="IDs of sample batches associated with the target collection"
     )
 
-    @root_validator(pre=True)
+    @model_validator(mode='before')
     def check_compounds_or_batches(cls, values):
         compounds_create, compound_ids, batches = (
             values.get("target_compounds_create"),
@@ -88,7 +88,7 @@ class TargetCollectionInDB(TargetCollectionBase):
     target_collection_id: str = Field(..., description="ID of the target collection")
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class GetTargetCollectionsQueryParams(BaseModel):

@@ -31,7 +31,7 @@ The backend and frontend have their own setup documentation for Windows and Linu
 
 1. Install prerequisites:
 
-   - [Python 3.10](https://www.python.org/downloads/release/python-31011/) - Python interpreter
+   - [Python 3.12](https://www.python.org/downloads/release/python-3120/) - Python interpreter
    - [Poetry](https://python-poetry.org/) - Python dependency manager
    - [Node 22](https://nodejs.org/en) - JavaScript runtime environment
 

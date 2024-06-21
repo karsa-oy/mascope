@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, root_validator
+from pydantic import BaseModel, Field, model_validator
 from typing import Optional, List
 from datetime import datetime
 
@@ -23,7 +23,7 @@ class GetInstrumentFunctionQueryParams(BaseModel):
         description="If ID provided, the system directly retrieves the instrument function details associated with this ID.",
     )
 
-    @root_validator
+    @model_validator(mode='after')
     def check_filename_or_instrument_function_id(cls, values):
         filename, instrument_function_id = values.get("filename"), values.get(
             "instrument_function_id"

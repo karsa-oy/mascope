@@ -53,7 +53,7 @@ class SampleFileInDB(SampleFileBase):
     sample_file_id: str = Field(..., description="ID of the sample file")
 
     class Config:
-        orm_mode = True
+        from_attributes = True
         # datetime and datetime_utc fields will be represented in the ISO 8601 format in response
         json_encoders = {
             dt: lambda v: v.replace(tzinfo=timezone.utc).isoformat(timespec="seconds")
@@ -89,10 +89,10 @@ class GetSampleFilePeakTimeseriesBody(BaseModel):
 
 
 class GetSpectrumQueryParams(BaseModel):
-    t_min: float = Field(None, description="Start of the time range", ge=0)
-    t_max: float = Field(None, description="End of the time range", gt=0)
-    mz_min: float = Field(None, description="Start of the m/z range", ge=0)
-    mz_max: float = Field(None, description="End of the m/z range", gt=0)
+    t_min: Optional[float] = Field(None, description="Start of the time range", ge=0)
+    t_max: Optional[float] = Field(None, description="End of the time range", gt=0)
+    mz_min: Optional[float] = Field(None, description="Start of the m/z range", ge=0)
+    mz_max: Optional[float] = Field(None, description="End of the m/z range", gt=0)
 
     @validator("t_max")
     def validate_time_range(cls, t_max, values):

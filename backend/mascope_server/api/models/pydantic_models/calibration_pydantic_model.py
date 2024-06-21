@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, root_validator
+from pydantic import BaseModel, Field, model_validator
 from typing import Optional
 
 
@@ -12,11 +12,9 @@ class GetMzCalibrationQueryParams(BaseModel):
         description="The instrument name to query for the last m/z calibration of that instrument.",
     )
 
-    @root_validator
+    @model_validator(mode='after')
     def check_sample_item_id_or_instrument(cls, values):
-        sample_item_id, instrument = values.get("sample_item_id"), values.get(
-            "instrument"
-        )
+        sample_item_id, instrument = values.sample_item_id, values.instrument
         if (sample_item_id and instrument) or (not sample_item_id and not instrument):
             raise ValueError(
                 "Must provide either ID of the sample or instrument name, not both."

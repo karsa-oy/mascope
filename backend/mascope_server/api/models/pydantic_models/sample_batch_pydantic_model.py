@@ -1,6 +1,6 @@
 from typing import Optional, List
 from mascope_lib.file_func import get_instrument_type
-from pydantic import BaseModel, Field, validator, root_validator
+from pydantic import BaseModel, Field, validator, model_validator
 from .calibration_pydantic_model import CalibrationMzFitParams
 from .sample_item_pydantic_model import SampleItemCreate
 
@@ -61,7 +61,7 @@ class SampleBatchInDB(SampleBatchBase):
     )
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class GetSampleBatchesQueryParams(BaseModel):
@@ -91,7 +91,7 @@ class SampleBatchImportSamplesBody(BaseModel):
         description="Flag to control whether the batch should be calibrated.",
     )
 
-    @root_validator
+    @model_validator(mode='after')
     def check_sample_items(cls, values):
         sample_items = values.get("sample_items")
         batch_ids = {item.sample_batch_id for item in sample_items}

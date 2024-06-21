@@ -57,7 +57,7 @@ class MatchRatingInDB(MatchRatingBase):
     )
 
     class Config:
-        orm_mode = True
+        from_attributes = True
         # datetime fields will be represented in the ISO 8601 format in response
         json_encoders = {
             dt: lambda v: v.replace(tzinfo=timezone.utc).isoformat(timespec="seconds")

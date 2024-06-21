@@ -1,13 +1,12 @@
 dist
 log
 __pycache__
-/.env
 *.tar.gz
 .debug_env
-
 
 .vscode/extensions.json
 .vscode/tasks.json
 
-# developer notes
-notes.md
+/.env
+/testdata
+/tofdaq

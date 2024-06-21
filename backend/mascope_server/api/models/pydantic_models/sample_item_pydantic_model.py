@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, validator, root_validator
+from pydantic import BaseModel, Field, validator, model_validator
 from typing import Optional, Dict
 from datetime import timezone, datetime as dt
 import re
@@ -30,7 +30,7 @@ class SampleItemBase(BaseModel):
     )
     filter_id: Optional[str] = Field(None, description="Filter ID of the sample item")
 
-    @root_validator
+    @model_validator(mode='after')
     def check_filter_id_based_on_item_type(cls, values):
         item_type = values.get("sample_item_type")
         filter_id = values.get("filter_id")
@@ -83,7 +83,7 @@ class SampleItemInDB(SampleItemBase):
     )
 
     class Config:
-        orm_mode = True
+        from_attributes = True
         # datetime and datetime_utc fields will be represented in the ISO 8601 format in response
         json_encoders = {
             dt: lambda v: v.replace(tzinfo=timezone.utc).isoformat(timespec="seconds")
