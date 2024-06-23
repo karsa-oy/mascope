@@ -1,6 +1,6 @@
 # Mascope
 
-### Description
+## Overview
 
 This monorepo contains Mascope python backend and Vue frontend, as well as peripheral "agent" applications and build/deploy scripts. For more details on these, refer to their respective READMEs.
 
@@ -27,26 +27,16 @@ The backend and frontend have their own setup documentation for Windows and Linu
 
 ![Mascope architecture diagram](.legacy/docs/assets/mascope_sw_architecture.png "Mascope architecture diagram")
 
-### Deploy for development (Windows)
+## Windows Development Environment
 
-1. Install prerequisites:
+The only prerequisite is [Powershell 7](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows), which should be available on Windows 11 by default.
 
-   - [Python 3.12](https://www.python.org/downloads/release/python-3120/) - Python interpreter
-   - [Poetry](https://python-poetry.org/) - Python dependency manager
-   - [Node 22](https://nodejs.org/en) - JavaScript runtime environment
-
-2. Set up deployment environment by creating file `/scripts/deploy/dev.win/.debug_env`, with the following contents (example, note that the specified directories must exist):
+To install your development environment, simply run:
 
 ```
-MASCOPE_PRIVATE_DATABASE_DIR=C:/mascope_data/database
-MASCOPE_PRIVATE_INSTRUMENT_DIR=C:/mascope_data/instrument
+> .\scripts\windows_dev_setup.ps1
 ```
 
-3. Run `/scripts/deploy/dev.win/deploy.cmd`. This will install and run the application (frontend and backend).
+The script will install _Python 3.12_, _Node 22_, _Pipx_ and _Poetry_, as well as dependencies for all our packages and the `mascope` cli.
 
-4. Setup Playwright for frontend tests:
-
-```
-cd ./frontend
-npx playright install
-```
+After installation, run `mascope --help` for usage instructions.
