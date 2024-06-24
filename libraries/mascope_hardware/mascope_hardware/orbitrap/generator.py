@@ -177,11 +177,12 @@ class RawStreamer(Thread):
                     }
                 )
         # Reset self
+        self.active.clear()
         self.speci = -1
         self._mz_grid = None
         with self.lock:
             self.raw.Dispose()
-        self.active.clear()
+            self.raw = None
         self.cancel_event.clear()
 
     def _has_negative_scans(self) -> bool:
