@@ -1,4 +1,3 @@
-import argparse
 import inspect
 import os
 import time
@@ -13,37 +12,7 @@ import watchdog
 from watchdog.events import PatternMatchingEventHandler
 from watchdog.observers import Observer
 
-MOVE_TIMEOUT = 10  # seconds without access before moving sample to target dir
-
-
-def parse_args() -> argparse.Namespace:
-    """Parse command line arguments
-
-    :return: Parsed arguments
-    :rtype: argparse.Namespace
-    """
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "-s", "--source", help="source data pool path to watch", type=str, required=True
-    )
-    parser.add_argument(
-        "-t",
-        "--target",
-        help="target data pool path to copy to",
-        type=str,
-        required=True,
-    )
-    parser.add_argument(
-        "-m", "--mask", help="source file mask to watch", type=str, required=True
-    )
-    parser.add_argument(
-        "-mt",
-        "--move_timeout",
-        help="seconds without access before moving sample to target dir",
-        type=int,
-        default=MOVE_TIMEOUT,
-    )
-    return parser.parse_args()
+import mascope_runtime as runtime
 
 
 def parent_func_name() -> str:
@@ -250,11 +219,11 @@ class SampleMover:
         copy2(fname, dst_fname)
         self.log(dst_fname)
 
-    def run_until_complete(self, args):
+    def run_until_complete(self, config):
         """Main loop
 
-        :param args: Arguments
-        :type args: argparse.Namespace
+        :param config: Configuration
+        :type config: MascopeConfig
         """
         try:
             while not self.shutdown_event.is_set():
@@ -263,7 +232,7 @@ class SampleMover:
                 try:
                     fname = self.jobs.get_nowait()
                     # self.log(fname)
-                    if self.seconds_since_last_access(fname) < args.move_timeout:
+                    if self.seconds_since_last_access(fname) < config.file_mover.timeout:
                         self.jobs.put(fname)
                         # self.log(fname, 'back')
                         continue
@@ -287,11 +256,15 @@ def run() -> None:
 
     Start `SampleMover` thread and wait until it finishes
     """
-    args = parse_args()
+    config = runtime.config.autoload()
     assert all(
-        map(lambda d: os.path.isdir(d), [args.source, args.target])
+        map(lambda d: os.path.isdir(d), [config.file_mover.source, config.file_mover.target])
     ), "Invalid source or target folder"
-    mover = SampleMover(args.source, args.target, args.mask)
+    mover = SampleMover(
+        config.file_mover.source,
+        config.file_mover.target,
+        config.file_mover.mask
+    )
     mover.watcher.run_as_daemon()
     mover.run_until_complete(args)
 

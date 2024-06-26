@@ -1,15 +1,16 @@
 import axios from 'axios'
 import { api } from './client.js'
 
+import { config } from '@/lib/config.js'
+
 // Create the URL
 
 // LOAD ENV VARS
-const mode = import.meta.env.MASCOPE_PUBLIC_MODE
 const host = location.hostname
-const api_port = import.meta.env.MASCOPE_PUBLIC_API_PORT
+const mode = import.meta.env.MODE
 
 // production api server is routed to api_port via nginx reverse proxy
-let url = mode === 'production' ? `http://${host}` : `http://${host}:${api_port}`
+let url = mode === 'production' ? `http://${host}` : `http://${host}:${config.server.port}`
 
 const getSessionId = () => {
   // get session id for emitting sio finished events

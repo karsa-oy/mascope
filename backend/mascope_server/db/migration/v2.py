@@ -6,17 +6,16 @@ import sqlite3
 
 from datetime import datetime
 
+from mascope_server.config import config
+
 # patch asyncio to supported run_until_complete
 # when an event loop is already running
 nest_asyncio.apply()
 
 
 def run():
-    data_path = os.environ.get("MASCOPE_PRIVATE_DATABASE_DIR")
-
     # STEP 1 - setup new database
-
-    db_path = os.path.join(data_path, "mascope.v2.db")
+    db_path = os.path.join(config.server.database, "mascope.v2.db")
     new_conn = sqlite3.connect(database=db_path)
     with new_conn:
         # Add datetime created and modified
@@ -204,7 +203,7 @@ def run():
         """
         )
         # STEP 2 - load v1 tables into pandas dataframes and write to v2
-        sqlite_path = os.path.join(data_path, "mascope.v1.db")
+        sqlite_path = os.path.join(config.server.database, "mascope.v1.db")
         old_conn = sqlite3.connect(sqlite_path)
         with old_conn:
             print("Transfering workspaces")

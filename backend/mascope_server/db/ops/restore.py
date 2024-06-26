@@ -1,8 +1,10 @@
 import os
 import sqlite3
 import sys
+
 from mascope_server.db import get_current_db_version, create_db_backup
 from mascope_server.db.tables_config import get_table_configs
+from mascope_server.config import config
 
 
 def create_table_backup(cursor, table_name):
@@ -206,7 +208,7 @@ def run_db_restore():
     Uses separate database connections for each major step to ensure changes are applied correctly and
     to manage database transactions effectively.
     """
-    data_path = os.environ.get("MASCOPE_PRIVATE_DATABASE_DIR")
+    data_path = config.server.database
     current_version = get_current_db_version()
     db_path = os.path.join(data_path, f"mascope.v{current_version}.db")
     create_db_backup(db_path, "restore")

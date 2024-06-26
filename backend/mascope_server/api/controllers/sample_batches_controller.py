@@ -15,9 +15,11 @@ from sqlalchemy.orm import joinedload
 
 from mascope_lib.file_func import get_instrument_type
 from mascope_lib.peak import detect_peaks, get_peaks
+
 from mascope_server.db import async_session
 from mascope_server.db.id import gen_id
 from mascope_server.api_sio import sio
+from mascope_server.config import config
 
 from ..utils.api_features import (
     api_controller,
@@ -1067,7 +1069,7 @@ async def sample_batch_export_peaks(
 
     dt_str = datetime.now().isoformat().replace("-", "").replace(":", "").split(".")[0]
 
-    peakfile_path = os.environ.get("MASCOPE_PRIVATE_INSTRUMENT_DIR", ".")
+    peakfile_path = config.server.streams
     peakfile_filename = (
         dt_str
         + "_peaks_"

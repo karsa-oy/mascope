@@ -1,0 +1,23 @@
+﻿,,,,,,,,,,,
+,,,,,,,,,,,
+,Autosampler,,,Generic samples,,,,,,Compounds,
+,,,,,,,,,,,
+,SAMPLE LIST,,,name,type,filter id,foo,bar,,ANFO,NH4NO3
+,,,,x,BLANK,ABC123,1,zz,,HMX,C4H8N8O8
+,Sequence step: 1,Method: 0 - MM,,y,SAMPLE,XYZ456,2,zz,,HMTD,C6H12N2O6
+,Tray type: 121,Cycle(s): 3,,,,,,,,Formic acid,CH2O2
+,Sample: A.1,Sample name: blank,,,,,,,,Formic acid,CH2O2
+,,Sample type: BLANK,,,,,,,,foo,XYZ
+,Internal standard: A.1,Pre-wash solvent: A,,,,,,,,1,ZZZ
+,Post-wash solvent: A,Injection port: Default,,,,,,,,2,ZZZ
+,Status: To be executed,Start time:,,,,,,,,,
+,End time:,Presence:,,,,,,,,,
+,,,,,,,,,,,
+,Sequence step: 2,Method: 0 - MM,,,,,,,,,
+,Tray type: 121,Cycle(s): 3,,,,,,,,,
+,Sample: A.2,Sample name: sample,,,,,,,,,
+,,Sample type: SAMPLE,,,,,,,,,
+,Internal standard: A.1,Pre-wash solvent: A,,,,,,,,,
+,Post-wash solvent: A,Injection port: Default,,,,,,,,,
+,Status: To be executed,Start time:,,,,,,,,,
+,End time:,Presence:,,,,,,,,,

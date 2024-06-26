@@ -1,0 +1,29 @@
+[meta]
+name = 'dev'
+description = "A development environment for Karsa internal use"
+
+[env]
+mode = 'development'
+platform = 'windows_x64'
+
+[server]
+port = 8090
+database = './runtime/data/database'
+streams = './runtime/data/streams'
+filestore = './runtime/data/filestore'
+
+[file_converter]
+threads = 2
+ping = false
+
+[tof_agent]
+host = 'localhost'
+port = 8090
+source = './runtime/data/sources/tof_agent'
+target = './runtime/data/streams'
+
+[file_mover]
+mask = '*.raw'
+timeout = 10
+source = './runtime/data/sources/file_mover'
+target = './runtime/data/streams'

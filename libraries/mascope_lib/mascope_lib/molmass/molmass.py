@@ -417,7 +417,7 @@ class Formula:
 
         """
         charge = 0
-        m = re.search("\]{1,}([0-9]*)([+-]{1,})$", self._formula)
+        m = re.search(r"\]{1,}([0-9]*)([+-]{1,})$", self._formula)
         if m:
             if m.groups()[0] == "":
                 charge = int("%s1" % m.groups()[1])
@@ -872,7 +872,7 @@ def from_string(formula, groups=None):
             formula = formula.split("]")[0] + "]"
     else:
         # Search for singly charged (e.g. *_- or *-)
-        m = re.search("([\]_]?)([+-]{1,})$", formula)
+        m = re.search(r"([\]_]?)([+-]{1,})$", formula)
         charge = 0
         if m:
             for char in m.groups()[1]:

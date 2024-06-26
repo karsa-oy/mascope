@@ -17,15 +17,14 @@ import fnmatch
 import os
 
 from datetime import datetime
-from dotenv import load_dotenv
 
-from backend.api.controllers.instrument_functions_controller import (
+from mascope_server.api.controllers.instrument_functions_controller import (
     read_instrument_functions,
 )
-from lib.peak import detect_peaks
+from mascope_server.config import config
+from mascope_lib.peak import detect_peaks
 
-load_dotenv()
-instrument_dir = os.environ["MASCOPE_PRIVATE_INSTRUMENT_DIR"]
+instrument_dir = config.server.streams
 
 
 def sample_file_op(sample_filepath: str, sample_filename: str) -> None:

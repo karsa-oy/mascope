@@ -27,16 +27,32 @@ The backend and frontend have their own setup documentation for Windows and Linu
 
 ![Mascope architecture diagram](.legacy/docs/assets/mascope_sw_architecture.png "Mascope architecture diagram")
 
-## Windows Development Environment
+## Getting Started
+
+### Windows
 
 The only prerequisite is [Powershell 7](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows), which should be available on Windows 11 by default.
 
-To install your development environment, simply run:
+#### Installation
+
+To install your development environment, run:
 
 ```
-> .\scripts\windows_dev_setup.ps1
+git clone git@github.com:karsa-oy/mascope.git && cd mascope && .\tooling\scripts\windows_dev_setup.ps1
 ```
 
-The script will install _Python 3.12_, _Node 22_, _Pipx_ and _Poetry_, as well as dependencies for all our packages and the `mascope` cli.
+The script will install our global dev tools _Python 3.12_, _Node 22_, _Pipx_ and _Poetry_, as well as dependencies for all our packages and the `mascope` cli.
 
 After installation, run `mascope --help` for usage instructions.
+
+#### Updating
+
+When pulling the latest changes from github, we often need to ensure our development environment is updated.
+
+To reinstall the `mascope` cli and development environment, run:
+
+```
+.\tooling\scripts\windows_dev_setup.ps1 -Update
+```
+
+This is much quicker than the full install, since it doesn't install the global dev tools.

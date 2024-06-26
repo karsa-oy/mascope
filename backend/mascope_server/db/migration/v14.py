@@ -2,20 +2,22 @@ import os
 import shutil
 import asyncio
 from sqlalchemy import text, select
-from mascope_server.db import configure_database_engine, async_session
+
 from mascope_server.api.controllers.match.match_aggregate_controller import (
     aggregate_and_create_matches,
 )
 from mascope_server.api.models.models import SampleBatch
 
+from mascope_server.config import config
+
+from mascope_server.db import configure_database_engine, async_session
 
 async def run():
     # Step 1: Setup new database
     new_version = 14
     # Define the database paths
-    data_path = os.environ.get("MASCOPE_PRIVATE_DATABASE_DIR")
-    old_db_path = os.path.join(data_path, "mascope.v13.db")
-    new_db_path = os.path.join(data_path, f"mascope.v{new_version}.db")
+    old_db_path = os.path.join(config.server.database, "mascope.v13.db")
+    new_db_path = os.path.join(config.server.database, f"mascope.v{new_version}.db")
     shutil.copyfile(old_db_path, new_db_path)  # Copy new version for migration
 
     # Update the engine to the new database (should update the global async_session, so no restart needed)

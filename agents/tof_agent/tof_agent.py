@@ -1,66 +1,14 @@
-import argparse
 import asyncio
 import os
-import re
 import shutil
 import socketio
-import yaml
 
 from multiprocessing import Event
 from queue import Empty
 
 from mascope_hardware.tofwerk.tof_streamer import TofDaqStreamer
 
-
-def load_env_yaml(yaml_file):
-    env_pattern = re.compile(r".*?\${(.*?)}.*?")
-
-    def env_constructor(loader, node):
-        value = loader.construct_scalar(node)
-        for group in env_pattern.findall(value):
-            value = value.replace(f"${{{group}}}", os.environ.get(group))
-        return value
-
-    yaml.add_implicit_resolver("!pathex", env_pattern)
-    yaml.add_constructor("!pathex", env_constructor)
-    with open(yaml_file, "r") as f:
-        res = yaml.load(f.read(), Loader=yaml.FullLoader)
-    return res
-
-
-def parse_cmd_args():
-    """
-    Parse command line arguments
-    ------------------------------
-    Return dict
-    Default argument values: see default_args.
-    """
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument(
-        "-c", "--config", help="path to yaml config file", type=str, required=False
-    )
-    parser.add_argument(
-        "-m", "--host", help="Mascope host IP", type=str, required=False
-    )
-    parser.add_argument(
-        "-p", "--port", help="Mascope socket.io port", type=str, required=False
-    )
-    parser.add_argument(
-        "-t", "--target", help="target directory", type=str, required=False
-    )
-
-    all_args = parser.parse_args()
-    cmdline_args = {}
-    for arg in vars(all_args):
-        if vars(all_args)[arg] is None:
-            continue
-        cmdline_args[arg] = vars(all_args)[arg]
-    file_args = {}
-    if all_args.config:
-        # service config may be defined in yaml file
-        file_args = load_env_yaml(all_args.config)
-    return {**file_args, **cmdline_args}
+import mascope_runtime as runtime
 
 
 async def streamer_processor(streamer):
@@ -190,12 +138,11 @@ def run():
     global shutdown_event
     global target_path
 
-    args = parse_cmd_args()
-    host = args.get("host")
-    port = args.get("port")
-    target_path = args.get(
-        "target", os.environ.get("MASCOPE_PRIVATE_DOWNLOADER_DIR", ".")
-    )
+    config = runtime.config.autoload()
+    
+    host = config.tof_agent.host
+    port = config.tof_agent.port
+    target_path = config.tof_agent.target
 
     streamer = TofDaqStreamer(
         shutdown_event=shutdown_event,

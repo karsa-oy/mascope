@@ -19,6 +19,7 @@ mascope-db-maintenance = 'mascope_server.db.ops.maintenance:run_db_maintenance'
 
 [tool.poetry.dependencies]
 python = "~3.12"
+mascope_runtime = { path = '../libraries/mascope_runtime', develop = true }
 mascope_lib = { path = '../libraries/mascope_lib', develop = true }
 mascope_hardware = { path = '../libraries/mascope_hardware', develop = true }
 
@@ -27,9 +28,8 @@ colorcet = "^3.1"
 fastapi = "^0.111"
 nanoid = "^2.0"
 nest-asyncio = "^1.6"
-numpy = "^2.0"
+numpy = "^1.6"
 pandas = "^2.2"
-python-dotenv = "^1.0"
 pyyaml = "^6.0"
 python-socketio = "^5.11"
 requests = "^2.32"

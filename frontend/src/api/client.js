@@ -2,19 +2,19 @@ import { io } from 'socket.io-client'
 
 import { createHttpClient } from './http.js'
 
+import { config } from '@/lib/config.js'
 import { strToSnakeCase } from '@/lib/utils'
 import { useNotification } from '@/stores'
 
 // LOAD ENV VARS
-const mode = import.meta.env.MASCOPE_PUBLIC_MODE
 const host = location.hostname
-const api_port = import.meta.env.MASCOPE_PUBLIC_API_PORT
+const mode = import.meta.env.MODE
 
 export const api = await initApi()
 
 async function initApi() {
   const [socket, emit] = await initSocket()
-  const http = createHttpClient(host, api_port)
+  const http = createHttpClient(host, config.server.port)
 
   // Catch errors, show error norification and return response from api
   async function apiResponse({ method, body = {} }) {
@@ -132,7 +132,7 @@ async function initSocket() {
   // INIT API SOCKET
 
   // create the socket in `/` namespace
-  let url = `ws://${host}:${api_port}`
+  let url = `ws://${host}:${config.server.port}`
   if (mode === 'production') {
     // production api server is routed to api_port via nginx reverse proxy
     url = `ws://${host}`

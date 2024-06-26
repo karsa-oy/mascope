@@ -1,14 +1,15 @@
 import os
 import sqlite3
-from mascope_server.db import get_current_db_version, create_db_backup
 
+from mascope_server.db import get_current_db_version, create_db_backup
+from mascope_server.config import config
 
 def run_db_maintenance():
     """
     Executes maintenance operations on the database. This includes backing up the database,
     vacuuming to defragment, analyzing to optimize query plans, and checking database integrity.
     """
-    data_path = os.environ.get("MASCOPE_PRIVATE_DATABASE_DIR")
+    data_path = config.server.database
 
     # Determine the current version and paths
     current_version = get_current_db_version()
