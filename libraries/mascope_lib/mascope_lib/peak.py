@@ -81,6 +81,8 @@ def segment_spec(sum_spec):
     """
     # Get non-zero indices
     non_zero_indices = np.flatnonzero(sum_spec)
+    if len(non_zero_indices) == 0:
+        return []  # Return an empty list if there are no non-zero indices
     # Split in chunks taking into account repeating zeros
     non_zero_indices = np.split(
         non_zero_indices, np.where(np.diff(non_zero_indices) > 2)[0] + 1
