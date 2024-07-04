@@ -55,7 +55,7 @@ export const useSampleStore = defineStore('sample', () => {
     // Check if matches exist for the given sampleItemId
     const sampleMatches = (
       await api.request.read({
-        method: 'getAllMatches',
+        method: 'getAllMatchIsotopes',
         body: {
           sample_item_id: sampleItemId
         }

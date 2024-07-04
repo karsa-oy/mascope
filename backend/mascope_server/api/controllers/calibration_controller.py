@@ -36,8 +36,8 @@ from ..utils.api_features import (
 )
 
 from ..exceptions import ApiException, NotFoundException
-from .match_controller import match_sample_remove
-from .matches_controller import compute_matches
+from .match.match_controller import match_remove_sample
+from mascope_server.api.controllers.match.match_data_ops import compute_match_isotopes
 from .sample_files_controller import (
     update_sample_file,
     get_sample_files,
@@ -110,7 +110,7 @@ async def mz_fit(
         ionization_mechanism_ids=ionization_mechanism_ids,
     )
     target_isotopes_df = pd.DataFrame(target_isotopes_result["data"])
-    match_isotope_df = await compute_matches(
+    match_isotope_df = await compute_match_isotopes(
         filename=filename,
         target_isotopes_df=target_isotopes_df,
         min_isotope_abundance=isotope_abundance_min,
@@ -468,9 +468,9 @@ async def calibration_mz_apply(
         await send_progress_user_notification(batch_notification)
 
         # FAQ_match removes mathces in all samples assosiated with filename
-        # Delete outdated matches, sid is not send to not receive the match_sample_remove notification for every sample
+        # Delete outdated matches, sid is not send to not receive the match_remove_sample notification for every sample
         for sample_item in batch_samples:
-            await match_sample_remove(
+            await match_remove_sample(
                 sample_item_id=sample_item.sample_item_id,
                 independent_transaction=False,
                 process_id=gen_id(8),

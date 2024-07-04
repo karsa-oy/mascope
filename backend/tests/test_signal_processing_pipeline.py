@@ -23,7 +23,7 @@ from tests.config import *
 from mascope_server.api.controllers.instrument_functions_controller import (
     read_instrument_functions,
 )
-from mascope_server.api.controllers.matches_controller import compute_matches
+from mascope_server.api.controllers.match.match_data_ops import compute_match_isotopes
 
 
 # Load targets
