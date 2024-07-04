@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import Optional, Dict
-from .sample_pydantic_model import FilterParams
+from .match_pydantic_model import FilterParams
 
 
 class TargetIonUpdate(BaseModel):

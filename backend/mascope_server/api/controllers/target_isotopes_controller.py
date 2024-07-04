@@ -1,7 +1,6 @@
-from fastapi import HTTPException
 from sqlalchemy import select, asc, desc, func
 from sqlalchemy.orm import joinedload
-from typing import List, Optional, Tuple
+from typing import List, Optional
 from mascope_server.db import async_session
 from ..utils.api_features import api_controller
 from ..exceptions import NotFoundException
@@ -84,9 +83,8 @@ async def get_target_isotopes(
             )
             sample_batch = result.unique().scalar_one_or_none()
             if not sample_batch:
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"Sample batch with id {sample_batch_id} not found",
+                raise NotFoundException(
+                    f"Sample batch with id {sample_batch_id} not found"
                 )
 
             # Extract ion mechanisms directly
@@ -167,129 +165,3 @@ async def get_target_isotope(target_isotope_id: str) -> dict:
             )
     # Step 3: Return target isotope details
     return target_isotope.to_dict()
-
-
-async def get_target_isotopes_for_match_compute(
-    batch_target_compounds_ids: List[str],
-    batch_ion_mechanisms_ids: List[str],
-    added_target_compound_ids: Optional[List[str]],
-    added_ionization_mechanism_ids: Optional[List[str]],
-) -> Tuple[List[dict], str]:
-    """
-    Retrieves a list of unique target isotope IDs that are associated with specific added compounds or
-    ionization mechanisms and sample batch target compounds. Adds a description of applied filters.
-    This function helps in identifying the isotopes that require new matches computation after the update in batch composition.
-
-    Steps:
-    1. Fetch isotopes related to added target compounds.
-    2. Fetch isotopes related to added ionization mechanisms.
-    3. Combine and deduplicate the isotope IDs from both sources.
-    4. Create a description of applied filters based on the retrieved data.
-
-    :param batch_target_compounds_ids: List of target compound IDs already associated with the batch.
-    :type batch_target_compounds_ids: List[str]
-    :param batch_ion_mechanisms_ids: List of ionization mechanism IDs already associated with the batch.
-    :type batch_ion_mechanisms_ids: List[str]
-    :param added_target_compound_ids: Optional list of added target compound IDs.
-    :type added_target_compound_ids: Optional[List[str]]
-    :param added_ionization_mechanism_ids: Optional list of added ionization mechanism IDs.
-    :type added_ionization_mechanism_ids: Optional[List[str]]
-    :return: A tuple containing a list of unique target isotope IDs and a string describing the applied filters.
-    :rtype: Tuple[List[dict], str]
-    """
-    target_isotopes = []
-    applied_filters = []
-
-    # Function to add unique isotopes
-    def add_unique_isotopes(isotope_data, filter_type):
-        for isotope in isotope_data:
-            if isotope not in target_isotopes:
-                target_isotopes.append(isotope)
-        if isotope_data:
-            applied_filters.append(
-                f"{len(isotope_data)} target isotopes associated with {filter_type}"
-            )
-
-    # Fetch isotopes related to added compounds
-    if added_target_compound_ids:
-        added_compounds_isotopes_result = await get_target_isotopes(
-            target_compound_ids=added_target_compound_ids,
-            ionization_mechanism_ids=batch_ion_mechanisms_ids,
-        )
-        add_unique_isotopes(
-            added_compounds_isotopes_result["data"],
-            f"{len(added_target_compound_ids)} added compound{'s' if len(added_target_compound_ids) > 1 else ''}",
-        )
-
-    # Fetch isotopes related to added ionization mechanisms
-    if added_ionization_mechanism_ids:
-        all_target_compound_ids = set(batch_target_compounds_ids).union(
-            set(added_target_compound_ids or [])
-        )
-        added_ion_mechanism_isotopes_result = await get_target_isotopes(
-            target_compound_ids=list(all_target_compound_ids),
-            ionization_mechanism_ids=added_ionization_mechanism_ids,
-        )
-        add_unique_isotopes(
-            added_ion_mechanism_isotopes_result["data"],
-            f"{len(added_ionization_mechanism_ids)} added ionization mechanism{'s' if len(added_ionization_mechanism_ids) > 1 else ''}",
-        )
-
-    filters_description = ", ".join(applied_filters)
-    return target_isotopes, filters_description
-
-
-async def get_target_isotopes_for_match_remove(
-    removed_target_compound_ids: Optional[List[str]],
-    removed_ionization_mechanism_ids: Optional[List[str]],
-) -> Tuple[List[str], str]:
-    """
-
-    Retrieves a list of unique target isotope IDs that are associated with specific added compounds or
-    ionization mechanisms. Get ALL the assosiated isotopes, not filtering by sample_batch_id.
-    This function aids in identifying the isotopes that should no longer have matches associated with them
-    after the update in the batch composition. Adds a description of applied filters.
-
-    Steps:
-    1. Fetch isotopes related to removed target compounds.
-    2. Fetch isotopes related to removed ionization mechanisms.
-    3. Combine and deduplicate the isotope IDs from both sources.
-    4. Create a description of applied filters based on the retrieved data.
-
-    :param removed_target_compound_ids: Optional list of removed target compound IDs.
-    :type removed_target_compound_ids: Optional[List[str]]
-    :param removed_ionization_mechanism_ids: Optional list of removed ionization mechanism IDs.
-    :type removed_ionization_mechanism_ids: Optional[List[str]]
-    :return: A tuple containing a list of unique target isotope IDs and a string describing the applied filters.
-    :rtype: Tuple[List[str], str]
-    """
-    unique_target_isotopes_ids = set()
-    applied_filters = []
-
-    # Function to add unique isotopes
-    def add_unique_isotopes(isotope_data):
-        for isotope in isotope_data:
-            unique_target_isotopes_ids.add(isotope["target_isotope_id"])
-
-    # Fetch isotopes related to removed compounds
-    if removed_target_compound_ids:
-        removed_compounds_isotopes_result = await get_target_isotopes(
-            target_compound_ids=removed_target_compound_ids,
-        )
-        add_unique_isotopes(removed_compounds_isotopes_result["data"])
-        applied_filters.append(
-            f"{len(removed_target_compound_ids)} removed compound{'s' if len(removed_target_compound_ids) > 1 else ''}"
-        )
-
-    # Fetch isotopes related to removed ionization mechanisms
-    if removed_ionization_mechanism_ids:
-        removed_ion_mechanisms_isotopes_result = await get_target_isotopes(
-            ionization_mechanism_ids=removed_ionization_mechanism_ids,
-        )
-        add_unique_isotopes(removed_ion_mechanisms_isotopes_result["data"])
-        applied_filters.append(
-            f"{len(removed_ionization_mechanism_ids)} removed ionization mechanism{'s' if len(removed_ionization_mechanism_ids) > 1 else ''}"
-        )
-
-    filters_description = ", ".join(applied_filters)
-    return list(unique_target_isotopes_ids), filters_description
