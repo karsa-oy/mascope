@@ -108,8 +108,30 @@ class SampleItem(Base):
         primaryjoin="foreign(SampleItem.filename)==remote(SampleFile.filename)",
         viewonly=True,
     )
-    match = relationship(
-        "Match", back_populates="sample_item", cascade="all, delete, delete-orphan"
+    match_sample = relationship(
+        "MatchSample",
+        back_populates="sample_item",
+        cascade="all, delete, delete-orphan",
+    )
+    match_collection = relationship(
+        "MatchCollection",
+        back_populates="sample_item",
+        cascade="all, delete, delete-orphan",
+    )
+    match_compound = relationship(
+        "MatchCompound",
+        back_populates="sample_item",
+        cascade="all, delete, delete-orphan",
+    )
+    match_ion = relationship(
+        "MatchIon",
+        back_populates="sample_item",
+        cascade="all, delete, delete-orphan",
+    )
+    match_isotope = relationship(
+        "MatchIsotope",
+        back_populates="sample_item",
+        cascade="all, delete, delete-orphan",
     )
     match_interference = relationship(
         "MatchInterference",
@@ -159,6 +181,11 @@ class TargetCollection(Base):
     )
     target_compound = relationship(
         "TargetCompoundInTargetCollection",
+        back_populates="target_collection",
+        cascade="all, delete, delete-orphan",
+    )
+    match_collection = relationship(
+        "MatchCollection",
         back_populates="target_collection",
         cascade="all, delete, delete-orphan",
     )
@@ -224,6 +251,11 @@ class TargetCompound(Base):
         back_populates="target_compound",
         cascade="all, delete, delete-orphan",
     )
+    match_compound = relationship(
+        "MatchCompound",
+        back_populates="target_compound",
+        cascade="all, delete, delete-orphan",
+    )
 
 
 class TargetIon(Base):
@@ -249,6 +281,11 @@ class TargetIon(Base):
     )
     target_isotope = relationship(
         "TargetIsotope",
+        back_populates="target_ion",
+        cascade="all, delete, delete-orphan",
+    )
+    match_ion = relationship(
+        "MatchIon",
         back_populates="target_ion",
         cascade="all, delete, delete-orphan",
     )
@@ -300,11 +337,123 @@ class TargetIsotope(Base):
         back_populates="target_isotope",
         cascade="all, delete, delete-orphan",
     )
-    match = relationship(
-        "Match",
+    match_isotope = relationship(
+        "MatchIsotope",
         back_populates="target_isotope",
         cascade="all, delete, delete-orphan",
     )
+
+
+class MatchSample(Base):
+    __tablename__ = "match_sample"
+    match_sample_id = Column(String(32), nullable=False, primary_key=True)
+    sample_item_id = Column(
+        String(16),
+        ForeignKey("sample_item.sample_item_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    match_score = Column(
+        Float, CheckConstraint("match_score BETWEEN 0 AND 1"), nullable=False
+    )
+    match_category = Column(
+        Integer, CheckConstraint("match_category BETWEEN 0 AND 2"), nullable=False
+    )
+    sample_peak_area_sum = Column(Float, nullable=False)
+    sample_peak_interference_sum = Column(Float, nullable=False)
+    match_sample_utc_created = Column(TIMESTAMP)
+    match_sample_utc_modified = Column(TIMESTAMP)
+
+    # Define relationships
+    sample_item = relationship("SampleItem", back_populates="match_sample")
+
+
+class MatchCollection(Base):
+    __tablename__ = "match_collection"
+    match_collection_id = Column(String(32), nullable=False, primary_key=True)
+    sample_item_id = Column(
+        String(16),
+        ForeignKey("sample_item.sample_item_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    target_collection_id = Column(
+        String(16),
+        ForeignKey("target_collection.target_collection_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    match_score = Column(
+        Float, CheckConstraint("match_score BETWEEN 0 AND 1"), nullable=False
+    )
+    match_category = Column(
+        Integer, CheckConstraint("match_category BETWEEN 0 AND 2"), nullable=False
+    )
+    sample_peak_area_sum = Column(Float, nullable=False)
+    sample_peak_interference_sum = Column(Float, nullable=False)
+    match_collection_utc_created = Column(TIMESTAMP)
+    match_collection_utc_modified = Column(TIMESTAMP)
+
+    # Define relationships
+    sample_item = relationship("SampleItem", back_populates="match_collection")
+    target_collection = relationship(
+        "TargetCollection", back_populates="match_collection"
+    )
+
+
+class MatchCompound(Base):
+    __tablename__ = "match_compound"
+    match_compound_id = Column(String(32), nullable=False, primary_key=True)
+    sample_item_id = Column(
+        String(16),
+        ForeignKey("sample_item.sample_item_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    target_compound_id = Column(
+        String(16),
+        ForeignKey("target_compound.target_compound_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    match_score = Column(
+        Float, CheckConstraint("match_score BETWEEN 0 AND 1"), nullable=False
+    )
+    match_category = Column(
+        Integer, CheckConstraint("match_category BETWEEN 0 AND 2"), nullable=False
+    )
+    sample_peak_area_sum = Column(Float, nullable=False)
+    sample_peak_interference_sum = Column(Float, nullable=False)
+    match_compound_utc_created = Column(TIMESTAMP)
+    match_compound_utc_modified = Column(TIMESTAMP)
+
+    # Define relationships
+    sample_item = relationship("SampleItem", back_populates="match_compound")
+    target_compound = relationship("TargetCompound", back_populates="match_compound")
+
+
+class MatchIon(Base):
+    __tablename__ = "match_ion"
+    match_ion_id = Column(String(32), nullable=False, primary_key=True)
+    sample_item_id = Column(
+        String(16),
+        ForeignKey("sample_item.sample_item_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    target_ion_id = Column(
+        String(16),
+        ForeignKey("target_ion.target_ion_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    match_score = Column(
+        Float, CheckConstraint("match_score BETWEEN 0 AND 1"), nullable=False
+    )
+    match_category = Column(
+        Integer, CheckConstraint("match_category BETWEEN 0 AND 2"), nullable=False
+    )
+    sample_peak_area_sum = Column(Float, nullable=False)
+    sample_peak_interference_sum = Column(Float, nullable=False)
+    match_ion_utc_created = Column(TIMESTAMP)
+    match_ion_utc_modified = Column(TIMESTAMP)
+
+    # Define relationships
+    sample_item = relationship("SampleItem", back_populates="match_ion")
+    target_ion = relationship("TargetIon", back_populates="match_ion")
 
 
 class MatchRating(Base):
@@ -353,9 +502,9 @@ class MatchInterference(Base):
     __table_args__ = (Index("idx_match_interference_sample_item", "sample_item_id"),)
 
 
-class Match(Base):
-    __tablename__ = "match"
-    match_id = Column(String(32), nullable=False, primary_key=True)
+class MatchIsotope(Base):
+    __tablename__ = "match_isotope"
+    match_isotope_id = Column(String(32), nullable=False, primary_key=True)
     target_isotope_id = Column(
         String(16),
         ForeignKey("target_isotope.target_isotope_id", ondelete="CASCADE"),
@@ -373,14 +522,17 @@ class Match(Base):
     sample_peak_tof = Column(Float, nullable=False)
     match_abundance_error = Column(Float, nullable=False)
     match_mz_error = Column(Float, nullable=False)
+    match_isotope_correlation = Column(Float, nullable=False)
     match_score = Column(
         Float, CheckConstraint("match_score BETWEEN 0 AND 1"), nullable=False
     )
-    match_isotope_correlation = Column(Float, nullable=False)
+    # match_category = Column(Integer, CheckConstraint("match_category BETWEEN 0 AND 2"))
+    match_isotope_utc_created = Column(TIMESTAMP)
+    match_isotope_utc_modified = Column(TIMESTAMP)
 
     # Define relationships
-    sample_item = relationship("SampleItem", back_populates="match")
-    target_isotope = relationship("TargetIsotope", back_populates="match")
+    sample_item = relationship("SampleItem", back_populates="match_isotope")
+    target_isotope = relationship("TargetIsotope", back_populates="match_isotope")
 
     # Define indexes
     __table_args__ = (Index("idx_match_sample_item", "sample_item_id"),)
