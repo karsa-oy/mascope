@@ -302,7 +302,7 @@ async def match_compute_sample(
         parent_id=parent_id,
         type="match_compute_sample",
         status="pending",
-        message=f"Computing matches for sample '{sample_item_name}'.",
+        message=f"Computing match isotopes and interferences for sample '{sample_item_name}'.",
         # NOTE: Set the internal metadata for the pending user_notifications like
         # room_ids and sid of the user.
         # The _instrument_room is provided separately to skip the check if the user
@@ -365,7 +365,7 @@ async def match_compute_sample(
         )
         target_isotopes_df = pd.DataFrame(target_isotopes_result["data"])
         print(
-            f"Computing matches and match interferences for all sample target isotopes. Total isotopes: {len(target_isotopes_df)}"
+            f"Computing match isotopes and interferences for all sample target isotopes. Total isotopes: {len(target_isotopes_df)}"
         )
 
     # Check if there are already records in matches and match interferences for the target isotopes.
@@ -374,11 +374,15 @@ async def match_compute_sample(
     )
 
     # Step 4: Process sample for match computation.
-    print(f"...Computing matches for sample {sample_item_name}: {sample_item_id} ...")
+    print(
+        f"...Computing match isotopes and interferences for sample {sample_item_name}: {sample_item_id} ..."
+    )
 
     # Skip computation if no new target isotopes are found for this sample item
     if target_isotopes_df.empty or target_isotopes_df is None:
-        error_message = "No new target isotopes to compute matches for."
+        error_message = (
+            "No new target isotopes to compute match isotopes and interferences for."
+        )
         raise ValueError(error_message)
 
     # Check if m/z calibration is verified for the sample
@@ -400,7 +404,7 @@ async def match_compute_sample(
     sample_item_name = sample["sample_item_name"]
     return {
         "data": sample,
-        "message": f"Matches computed for sample '{sample_item_name}'.",
+        "message": f"Match isotopes and interferences computed for sample '{sample_item_name}'.",
         "_notification_data": {"sample_item_id": sample_item_id},
     }
 
@@ -869,17 +873,17 @@ async def match_compute_batch(
     ]
 
     print(
-        f"...Computing matches for sample batch '{sample_batch_name}' with ID '{sample_batch_id}' ..."
+        f"...Computing match isotopes and interferences for sample batch '{sample_batch_name}' with ID '{sample_batch_id}' ..."
     )
     # Step 3: Identify target isotopes for computation.
     #   If compounds/ion_mechanisms were added get isotopes with specific filters.
     #   If no compounds/ion_mechanisms were added get all target isotopes for the sample's batch.
 
-    # Compute new matches for added compounds and mechanisms
+    # Compute new match isotopes and interferences for added compounds and mechanisms
     target_isotopes_df = None
 
     if added_target_compound_ids or added_ionization_mechanism_ids:
-        # Get necessary target isotopes for computing new matches of added compounds/ion_mechanisms
+        # Get necessary target isotopes for computing new match isotopes and interferences of added compounds/ion_mechanisms
         target_isotopes, applied_filters = (
             await fetch_target_isotopes_for_match_compute(
                 batch_target_compounds_ids,
@@ -897,7 +901,7 @@ async def match_compute_batch(
         )
         target_isotopes_df = pd.DataFrame(target_isotopes_result["data"])
         print(
-            f"Computing matches and match interferences for all batch target isotopes. Total isotopes: {len(target_isotopes_df)}"
+            f"Computing match isotopes and interferences for all batch target isotopes. Total isotopes: {len(target_isotopes_df)}"
         )
 
     # Step 4: Process each sample item for match computation and send progress user notification.
@@ -919,7 +923,7 @@ async def match_compute_batch(
             parent_id=parent_id,
             type="match_compute_batch",
             status="pending",
-            message=f"Computing matches for sample batch '{sample_batch_name}'.",
+            message=f"Computing match isotopes and interferences for sample batch '{sample_batch_name}'.",
             # NOTE: Set the internal metadata for the pending user_notifications like
             # room_ids and sid of the user.
             # Internal metadata will be cleaned up the from data in send_progress_user_notification.
@@ -934,7 +938,7 @@ async def match_compute_batch(
 
         try:
             print(
-                f"...Computing matches for sample '{sample.sample_item_name}' with ID {sample.sample_item_id} ..."
+                f"...Computing match isotopes and interferences for sample '{sample.sample_item_name}' with ID {sample.sample_item_id} ..."
             )
             # Gather sample information
             # Check if 'verified' exists in mz_calibration. If not, provide a default value of False
@@ -958,7 +962,7 @@ async def match_compute_batch(
 
             # Skip computation if no new target isotopes are found for this sample item
             if filtered_target_isotopes_df.empty:
-                error_message = f"No new target isotopes to compute matches for sample '{sample.sample_item_name}'."
+                error_message = f"No new target isotopes to compute match isotopes and interferences for sample '{sample.sample_item_name}'."
                 raise ValueError(error_message)
 
             # Step 5: Compute and save match_isotopes and match_interferences for the sample items that passed all checks,
@@ -986,7 +990,7 @@ async def match_compute_batch(
     # Step 7: If there are any failed samples, raise an exception with the list of failed samples included in the error message
     if samples_compute_failed:
         # raise warning user_notifications (ApiException with 200 code)
-        user_message = f"Failed to compute matches for {len(samples_compute_failed)} sample{'s' if len(samples_compute_failed) != 1 else ''} in sample batch '{sample_batch_name}'."
+        user_message = f"Failed to compute match isotopes and interferences for {len(samples_compute_failed)} sample{'s' if len(samples_compute_failed) != 1 else ''} in sample batch '{sample_batch_name}'."
 
         raise ApiException(
             user_message,
@@ -1000,7 +1004,7 @@ async def match_compute_batch(
     # Step 8: Return sample batch data and message
     return {
         "data": sample_batch.to_dict(),
-        "message": f"Matches computed for sample batch '{sample_batch_name}'.",
+        "message": f"Match isotopes and interferences computed for sample batch '{sample_batch_name}'.",
         "_notification_data": {"sample_batch_id": sample_batch_id},
     }
 
