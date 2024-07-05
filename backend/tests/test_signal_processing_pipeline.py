@@ -211,7 +211,7 @@ def test_matching(filepath):
         # )
 
         match_isotope_df = asyncio.run(
-            compute_matches(
+            compute_match_isotopes(
                 filename,
                 target_isotopes_df,
                 instrument_functions=(peakshape, resolution_function),
