@@ -75,7 +75,7 @@ async def send_progress_user_notification(
     if (
         notification_copy.type
         in [
-            "match_sample_compute",
+            "match_compute_sample",
             "calibration_mz_fit",
             "calibration_mz_apply",
             "calibration_mz_calibrate_sample",
@@ -85,7 +85,7 @@ async def send_progress_user_notification(
         and increment
     ):
         notification_copy.progress = increment * 100
-    if notification_copy.type == "match_batch_compute":
+    if notification_copy.type == "match_compute_batch":
         if total_samples is not None and item_index is not None:
             notification_copy.progress = (
                 (item_index + increment) / total_samples

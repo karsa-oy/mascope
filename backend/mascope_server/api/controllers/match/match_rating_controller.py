@@ -5,10 +5,10 @@ from sqlalchemy.future import select
 from mascope_server.db import async_session
 from datetime import datetime, timezone
 from mascope_server.db.id import gen_id
-from ..utils.api_features import api_controller
-from ..exceptions import NotFoundException
-from ..models.models import MatchRating
-from ..models.pydantic_models.match_rating_pydantic_model import (
+from mascope_server.api.utils.api_features import api_controller
+from mascope_server.api.exceptions import NotFoundException
+from mascope_server.api.models.models import MatchRating
+from mascope_server.api.models.pydantic_models.match_rating_pydantic_model import (
     MatchRatingCreate,
 )
 

@@ -1,5 +1,5 @@
 from sqlalchemy import asc, desc, func, select
-from typing import List
+from typing import List, Optional
 
 from mascope_server.db import async_session
 from mascope_server.api_sio import sio
@@ -27,6 +27,8 @@ from ..models.pydantic_models.target_ion_pydantic_model import TargetIonUpdate
 async def get_target_ions(
     target_compound_id: str = None,
     ionization_mechanism_id: str = None,
+    target_compound_ids: Optional[List[str]] = None,
+    ionization_mechanism_ids: Optional[List[str]] = None,
     target_ion_formula: str = None,
     sort: str = None,
     order: str = None,
@@ -48,6 +50,10 @@ async def get_target_ions(
     :type target_compound_id: str, optional
     :param ionization_mechanism_id: Filter by ionization mechanism ID, defaults to None.
     :type ionization_mechanism_id: str, optional
+    :param target_compound_ids: List of target compound IDs to filter by, defaults to None.
+    :type target_compound_ids: Optional[List[str]], optional
+    :param ionization_mechanism_ids: List of ionization mechanism IDs to filter by, defaults to None.
+    :type ionization_mechanism_ids: Optional[List[str]], optional
     :param target_ion_formula: Filter by target ion formula, defaults to None.
     :type target_ion_formula: str, optional
     :param sort: Column to sort by, defaults to "target_ion_id".
@@ -70,6 +76,12 @@ async def get_target_ions(
         if ionization_mechanism_id:
             stmt = stmt.filter(
                 TargetIon.ionization_mechanism_id == ionization_mechanism_id
+            )
+        if target_compound_ids:
+            stmt = stmt.filter(TargetIon.target_compound_id.in_(target_compound_ids))
+        if ionization_mechanism_ids:
+            stmt = stmt.filter(
+                TargetIon.ionization_mechanism_id.in_(ionization_mechanism_ids)
             )
         if target_ion_formula:
             stmt = stmt.filter(TargetIon.target_ion_formula == target_ion_formula)

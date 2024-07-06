@@ -61,8 +61,14 @@ const filesBaseUrl = '/sample_files'
 const itemsBaseUrl = '/sample_items'
 const calibrationBaseUrl = '/calibration'
 const matchBaseUrl = '/match'
-const matchesBaseUrl = '/matches'
-const matchRatingsBaseUrl = '/match_ratings'
+const matchAggregateBaseUrl = '/match/aggregate'
+const matchIsotopesBaseUrl = '/match/isotopes'
+const matchInterferencesBaseUrl = '/match/interferences'
+const matchIonsBaseUrl = '/match/ions'
+const matchCompoundsBaseUrl = '/match/compounds'
+const matchCollectionsBaseUrl = '/match/collections'
+const matchSamplesBaseUrl = '/match/samples'
+const matchRatingsBaseUrl = '/match/ratings'
 const targetCollectionsBaseUrl = '/target_collections'
 const targetCollectionsInSampleBatchBaseUrl = '/target_collections_in_sample_batch'
 const targetCompoundsBaseUrl = '/target_compounds'
@@ -70,7 +76,6 @@ const targetCompoundsInTargetCollectionBaseUrl = '/target_compound_in_target_col
 const targetIonsBaseUrl = '/target_ions'
 const ionizationMechanismsBaseUrl = '/ionization_mechanisms'
 const targetIsotopesBaseUrl = '/target_isotopes'
-const matchInterferencesBaseUrl = '/match_interferences'
 const instrumentFunctionsBaseUrl = '/instrument_functions'
 const attributeTemplatesBaseUrl = '/attribute_templates'
 const visualizationBaseUrl = '/visualization'
@@ -306,7 +311,7 @@ export function createHttpClient() {
         throw new Error(userErrorMessage)
       }
     },
-    getSampleFileById: async (sample_file_id) => {
+    getSampleFile: async (sample_file_id) => {
       try {
         return await client.get(`${filesBaseUrl}/${sample_file_id}`)
       } catch (error) {
@@ -350,7 +355,7 @@ export function createHttpClient() {
         console.error('Failed to get all sample items: ', error)
       }
     },
-    getSampleItemById: async (sample_item_id) => {
+    getSampleItem: async (sample_item_id) => {
       try {
         return await client.get(`${itemsBaseUrl}/${sample_item_id}`)
       } catch (error) {
@@ -480,27 +485,10 @@ export function createHttpClient() {
       }
     },
 
-    // Matches
-    getAllMatches: async (params = {}) => {
-      try {
-        return await client.get(`${matchesBaseUrl}`, { params })
-      } catch (error) {
-        const userErrorMessage = error?.response?.data?.error || `Failed to get matches: ${error}`
-        throw new Error(userErrorMessage)
-      }
-    },
-    getMatchById: async (matchId) => {
-      try {
-        return await client.get(`${matchesBaseUrl}/${matchId}`)
-      } catch (error) {
-        console.error('Failed to get match by id: ', error)
-      }
-    },
-
     // Match
     rematchBatch: async ({ batchId, body = {} }) => {
       try {
-        return await client.post(`${matchBaseUrl}/batch/${batchId}/rematch`, body)
+        return await client.post(`${matchBaseUrl}/rematch/batch/${batchId}`, body)
       } catch (error) {
         const userErrorMessage = error?.response?.data?.error || `Failed to rematch batch: ${error}`
         throw new Error(userErrorMessage)
@@ -509,7 +497,7 @@ export function createHttpClient() {
 
     matchSampleCompute: async ({ sampleId, body = {} }) => {
       try {
-        return await client.post(`${matchBaseUrl}/sample/${sampleId}/compute`, body)
+        return await client.post(`${matchBaseUrl}/compute/sample/${sampleId}`, body)
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error || `Failed to compute mathes for sample: ${error}`
@@ -519,11 +507,44 @@ export function createHttpClient() {
 
     rematchSample: async ({ sampleId, body = {} }) => {
       try {
-        return await client.post(`${matchBaseUrl}/sample/${sampleId}/rematch`, body)
+        return await client.post(`${matchBaseUrl}/rematch/sample/${sampleId}`, body)
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error || `Failed to rematch sample: ${error}`
         throw new Error(userErrorMessage)
+      }
+    },
+
+    // MatchIsotopes
+    getAllMatchIsotopes: async (params = {}) => {
+      try {
+        return await client.get(`${matchIsotopesBaseUrl}`, { params })
+      } catch (error) {
+        const userErrorMessage = error?.response?.data?.error || `Failed to get matches: ${error}`
+        throw new Error(userErrorMessage)
+      }
+    },
+    getMatchIsotope: async (matchId) => {
+      try {
+        return await client.get(`${matchIsotopesBaseUrl}/${matchId}`)
+      } catch (error) {
+        console.error('Failed to get match isotope: ', error)
+      }
+    },
+
+    // Match interferences
+    getAllMatchInterferences: async (params = {}) => {
+      try {
+        return await client.get(`${matchInterferencesBaseUrl}`, { params })
+      } catch (error) {
+        console.error('Failed to get all match interferences: ', error)
+      }
+    },
+    getMatchInterference: async (interferenceId) => {
+      try {
+        return await client.get(`${matchInterferencesBaseUrl}/${interferenceId}`)
+      } catch (error) {
+        console.error('Failed to get match interference by id: ', error)
       }
     },
 
@@ -618,7 +639,7 @@ export function createHttpClient() {
       }
     },
 
-    getTargetCompoundById: async (targetCompoundId) => {
+    getTargetCompound: async (targetCompoundId) => {
       try {
         return await client.get(`${targetCompoundsBaseUrl}/${targetCompoundId}`)
       } catch (error) {
@@ -720,7 +741,7 @@ export function createHttpClient() {
       }
     },
 
-    getIonizationMechanismById: async (ionizationMechanismId) => {
+    getIonizationMechanism: async (ionizationMechanismId) => {
       try {
         return await client.get(`${ionizationMechanismsBaseUrl}/${ionizationMechanismId}`)
       } catch (error) {
@@ -735,27 +756,11 @@ export function createHttpClient() {
         console.error('Failed to get all target isotopes: ', error)
       }
     },
-    getTargetIsotopeById: async (isotopeId) => {
+    getTargetIsotope: async (isotopeId) => {
       try {
         return await client.get(`${targetIsotopesBaseUrl}/${isotopeId}`)
       } catch (error) {
         console.error('Failed to get target isotope by id: ', error)
-      }
-    },
-
-    // Match interferences
-    getAllMatchInterferences: async (params = {}) => {
-      try {
-        return await client.get(`${matchInterferencesBaseUrl}`, { params })
-      } catch (error) {
-        console.error('Failed to get all match interferences: ', error)
-      }
-    },
-    getMatchInterferenceById: async (interferenceId) => {
-      try {
-        return await client.get(`${matchInterferencesBaseUrl}/${interferenceId}`)
-      } catch (error) {
-        console.error('Failed to get match interference by id: ', error)
       }
     },
 

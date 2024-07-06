@@ -14,32 +14,7 @@ from dotenv import load_dotenv
 from mascope_server.api_sio import sio
 from mascope_server.db import init_db
 from mascope_server.api.exceptions import handle_exception
-
-from mascope_server.api.routes.sample_items_routes import sample_items_router
-from mascope_server.api.routes.sample_batches_routes import sample_batches_router
-from mascope_server.api.routes.workspace_routes import workspace_router
-from mascope_server.api.routes.sample_files_routes import sample_files_router
-from mascope_server.api.routes.calibration_routes import calibration_router
-from mascope_server.api.routes.matches_routes import matches_router
-from mascope_server.api.routes.target_collections_routes import target_collections_router
-from mascope_server.api.routes.target_collection_in_sample_batch_routes import (
-    target_collection_in_sample_batch_router,
-)
-from mascope_server.api.routes.target_compounds_routes import target_compounds_router
-from mascope_server.api.routes.target_compound_in_target_collection_routes import (
-    target_compound_in_target_collection_router,
-)
-from mascope_server.api.routes.target_ions_routes import target_ions_router
-from mascope_server.api.routes.ionization_mechanisms_routes import ionization_mechanisms_router
-from mascope_server.api.routes.target_isotopes_routes import target_isotopes_router
-from mascope_server.api.routes.match_interferences_routes import match_interferences_router
-from mascope_server.api.routes.instrument_functions_routes import instrument_functions_router
-from mascope_server.api.routes.attribute_templates_routes import attribute_templates_router
-from mascope_server.api.routes.visualization_routes import visualization_router
-from mascope_server.api.routes.match_routes import match_router
-from mascope_server.api.routes.match_rating_routes import match_rating_router
-from mascope_server.api.routes.samples_routes import samples_router
-
+from mascope_server.api.routes import routers
 
 load_dotenv()
 
@@ -120,29 +95,7 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
     return handle_exception(exc, context_message, response_type="http")
 
 
-routers = [
-    sample_items_router,
-    sample_batches_router,
-    workspace_router,
-    sample_files_router,
-    calibration_router,
-    match_rating_router,
-    match_router,
-    match_interferences_router,
-    matches_router,
-    target_collections_router,
-    target_collection_in_sample_batch_router,
-    target_compounds_router,
-    target_compound_in_target_collection_router,
-    target_ions_router,
-    ionization_mechanisms_router,
-    target_isotopes_router,
-    instrument_functions_router,
-    attribute_templates_router,
-    visualization_router,
-    samples_router,
-]
-
+# Include all routers
 for router in routers:
     fastapi_app.include_router(router)
 

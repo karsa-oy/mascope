@@ -20,11 +20,14 @@ from mascope_server.db import async_session
 from ..utils.api_features import api_controller
 from ..exceptions import NotFoundException
 from .target_ions_controller import create_target_ions
-from .matches_controller import compute_matches
-from ..models.models import (
+from mascope_server.api.controllers.match.match_data_ops import (
+    apply_filter_params,
+    compute_match_isotopes,
+)
+from mascope_server.api.models.models import (
     Sample,
     SampleBatch,
-    Match,
+    MatchIsotope,
     TargetCompound,
     TargetIon,
     IonizationMechanism,
@@ -34,7 +37,8 @@ from ..models.models import (
     TargetCollection,
     TargetCollectionInSampleBatch,
 )
-from ..models.pydantic_models.sample_pydantic_model import FilterParams, AlarmsList
+from mascope_server.api.models.pydantic_models.sample_pydantic_model import AlarmsList
+from mascope_server.api.models.pydantic_models.match_pydantic_model import FilterParams
 
 # TODO_configuration
 # Default Filter Parameters
@@ -78,99 +82,6 @@ def aggregate_params(df: pd.DataFrame) -> pd.Series:
 # -------------------------------------------------------------------
 # Main Logic Functions
 # -------------------------------------------------------------------
-
-
-def apply_filter_params(matches_df, filter_params: FilterParams = None):
-    """
-    Apply filtering logic to a isotope-lvl matches DataFrame.
-
-    :param matches_df: DataFrame containing match data.
-    :type matches_df: pd.DataFrame
-    :param filter_params: Optional; Pydantic model of filtering parameters.
-    :type filter_params: FilterParams
-    :return: DataFrame with applied filters.
-    :rtype: pd.DataFrame
-    """
-    # Convert filter_params Pydantic model to dictionary if provided
-    provided_params = filter_params.dict() if filter_params else None
-
-    def get_params(row):
-        """
-        Determine the filter parameters to use based on the priority:
-        1. Provided filter parameters
-        2. Ion-specific filter parameters for the sample instrument
-        3. Default filter parameters
-        """
-        # If provided_params are available, use them for all rows
-        if provided_params:
-            return provided_params
-
-        # If row-specific filter_params are available for the instrument, use them
-        if "filter_params" in row and row["instrument"] in row["filter_params"]:
-            return row["filter_params"][row["instrument"]]
-
-        # Define default filter parameters from the FilterParams Pydantic model
-        default_params = FilterParams().dict()
-        # Fallback to default parameters
-        return default_params
-
-    def filter_row(row):
-        """
-        Apply filtering logic to the given row based on the determined parameters.
-        """
-        # Determine which filter parameters to use for the current row
-        params = get_params(row)
-
-        # Apply filtering logic
-        row["match_score"] = (
-            row["match_score"]
-            if all(
-                [
-                    abs(row["match_mz_error"]) <= params["mz_tolerance"],
-                    abs(row["match_abundance_error"])
-                    <= params["isotope_ratio_tolerance"],
-                    max(row.get("match_isotope_correlation", 0), 0)
-                    >= params["min_isotope_correlation"],
-                    row["sample_peak_area"] >= params["peak_min_intensity"],
-                    row["relative_abundance"] >= params["min_isotope_abundance"],
-                ]
-            )
-            else 0
-        )
-
-        row["sample_peak_area"] = (
-            row["sample_peak_area"]
-            if all(
-                [
-                    abs(row["match_mz_error"]) <= params["mz_tolerance"],
-                    abs(row["match_abundance_error"])
-                    <= params["isotope_ratio_tolerance"],
-                    max(row.get("match_isotope_correlation", 0), 0)
-                    >= params["min_isotope_correlation"],
-                    row["relative_abundance"] >= params["min_isotope_abundance"],
-                ]
-            )
-            else 0
-        )
-
-        # Determine match category based on match_score
-        match_score = row["match_score"]
-        row["match_category"] = (
-            2  # Probable match
-            if match_score >= params["probable_match_threshold"]
-            else (
-                1  # Possible match
-                if match_score >= params["possible_match_threshold"]
-                else 0
-            )  # No match
-        )
-
-        return row
-
-    # Apply the filtering logic to each row
-    filtered_df = matches_df.apply(filter_row, axis=1)
-
-    return filtered_df
 
 
 async def set_ions_match_category(
@@ -256,6 +167,9 @@ async def aggregate_match_isotopes(
     :type match_filter_df: pd.DataFrame
     :return: Tuple of DataFrames with aggregated matchIsotopes data.
     :rtype: (pd.DataFrame, pd.DataFrame)
+
+    TODO move to the match_aggregate module, use in get_sample_compound_matches controller
+    (compute_match_isotopes, apply_filter_params, optionally compute_match_interferences and combine data, aggregate_match_isotopes)
     """
     # Select relevant columns for detailed aggregation (backend processing)
     match_isotopes_data_df = match_filter_df.loc[
@@ -406,7 +320,7 @@ def aggregate_match_ions_simple(
 ) -> pd.DataFrame:
     """
     Aggregate fields for match ions from the filtered match isotope DataFrame.
-    Used in the get_sample_compound_matches to aggregate simpler match_isotope_df from compute_matches.
+    Used in the get_sample_compound_matches to aggregate simpler match_isotope_df from compute_match_isotopes.
 
     This function groups the filtered match isotope DataFrame by 'target_ion_id' and aggregates relevant data,
     such as summing up 'sample_peak_area' and computing a weighted 'match_score'.
@@ -925,7 +839,7 @@ async def get_sample(
     This function fetches the sample based on its unique identifier and conditionally computes matching data for  isotopes, ions,
     compounds, and collections, dependent on the association of the sample with target entities.
 
-    Match calculations can be omitted based on the `sample_matches_info` parameter.
+    MatchIsotope calculations can be omitted based on the `sample_matches_info` parameter.
     Default is True for http requests, False when called from other controllers.
 
     Steps:
@@ -1279,7 +1193,7 @@ async def get_sample_compound_matches(
         target_isotopes_df = pd.DataFrame(ion_creation_result["created_isotopes"])
 
         # Step 4: Compute matches for the isotopes in the sample file.
-        match_isotope_df = await compute_matches(
+        match_isotope_df = await compute_match_isotopes(
             filename=filename,
             target_isotopes_df=target_isotopes_df,
             min_isotope_abundance=filter_params.min_isotope_abundance,
@@ -1287,7 +1201,6 @@ async def get_sample_compound_matches(
 
         # Drop the 'index' column from the match_isotope_df DataFrame
         match_isotope_df = match_isotope_df.drop(columns=["index"])
-
         # Step 5: Apply filters to the computed isotope matches based on the provided parameters.
         filtered_match_isotope_df = apply_filter_params(match_isotope_df, filter_params)
 
@@ -1378,7 +1291,7 @@ async def init_batch_match_filter(
 
         sample_item_ids = samples_df["sample_item_id"].tolist()
 
-        # Subquery to get relevant Target data
+        # Query to get relevant Target data
         target_query = (
             select(
                 TargetCollection.target_collection_id,
@@ -1441,25 +1354,25 @@ async def init_batch_match_filter(
 
         target_isotope_ids = targets_df["target_isotope_id"].tolist()
 
-        # Fetch matches
+        # Fetch match isotopes
         match_query = (
             select(
-                Match.sample_item_id,
-                Match.target_isotope_id,
-                Match.match_mz_error,
-                Match.match_abundance_error,
-                Match.match_isotope_correlation,
-                Match.sample_peak_area,
-                Match.sample_peak_area_relative,
-                Match.sample_peak_mz,
-                Match.sample_peak_tof,
-                Match.match_score,
+                MatchIsotope.sample_item_id,
+                MatchIsotope.target_isotope_id,
+                MatchIsotope.match_mz_error,
+                MatchIsotope.match_abundance_error,
+                MatchIsotope.match_isotope_correlation,
+                MatchIsotope.sample_peak_area,
+                MatchIsotope.sample_peak_area_relative,
+                MatchIsotope.sample_peak_mz,
+                MatchIsotope.sample_peak_tof,
+                MatchIsotope.match_score,
             )
-            .select_from(Match)
+            .select_from(MatchIsotope)
             .where(
                 and_(
-                    Match.sample_item_id.in_(sample_item_ids),
-                    Match.target_isotope_id.in_(target_isotope_ids),
+                    MatchIsotope.sample_item_id.in_(sample_item_ids),
+                    MatchIsotope.target_isotope_id.in_(target_isotope_ids),
                 )
             )
         )
@@ -1619,14 +1532,14 @@ async def init_sample_match_filter(
         stmt = (
             select(
                 TargetIsotope.mz,
-                Match.match_mz_error,
-                Match.match_abundance_error,
-                Match.match_isotope_correlation,
-                Match.sample_item_id,
-                Match.sample_peak_area,
-                Match.sample_peak_area_relative,
-                Match.sample_peak_mz,
-                Match.sample_peak_tof,
+                MatchIsotope.match_mz_error,
+                MatchIsotope.match_abundance_error,
+                MatchIsotope.match_isotope_correlation,
+                MatchIsotope.sample_item_id,
+                MatchIsotope.sample_peak_area,
+                MatchIsotope.sample_peak_area_relative,
+                MatchIsotope.sample_peak_mz,
+                MatchIsotope.sample_peak_tof,
                 MatchInterference.sample_peak_interference,
                 TargetIsotope.relative_abundance,
                 Sample.filename,
@@ -1646,23 +1559,24 @@ async def init_sample_match_filter(
                 IonizationMechanism.ionization_mechanism.label("target_ion_mechanism"),
                 TargetIsotope.target_isotope_id,
                 literal(2).label("selection"),
-                Match.match_score,
+                MatchIsotope.match_score,
             )
             .select_from(Sample)
             .where(
                 Sample.sample_item_id == sample_item_id,
             )
-            .join(Match, Sample.sample_item_id == Match.sample_item_id)
+            .join(MatchIsotope, Sample.sample_item_id == MatchIsotope.sample_item_id)
             .join(
                 MatchInterference,
                 and_(
                     Sample.sample_item_id == MatchInterference.sample_item_id,
-                    Match.target_isotope_id == MatchInterference.target_isotope_id,
+                    MatchIsotope.target_isotope_id
+                    == MatchInterference.target_isotope_id,
                 ),
             )
             .join(
                 TargetIsotope,
-                Match.target_isotope_id == TargetIsotope.target_isotope_id,
+                MatchIsotope.target_isotope_id == TargetIsotope.target_isotope_id,
             )
             .join(TargetIon, TargetIsotope.target_ion_id == TargetIon.target_ion_id)
             .join(
@@ -1693,7 +1607,7 @@ async def init_sample_match_filter(
                 and_(
                     TargetCollectionInSampleBatch.sample_batch_id
                     == Sample.sample_batch_id,
-                    Match.sample_item_id == sample_item_id,
+                    MatchIsotope.sample_item_id == sample_item_id,
                     TargetIsotope.relative_abundance >= min_isotope_abundance,
                 )
             )

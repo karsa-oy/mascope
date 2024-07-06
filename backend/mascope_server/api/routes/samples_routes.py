@@ -134,7 +134,7 @@ async def batch_match_filter_route(
         True, description="Include match interference data in the response"
     ),
 ):
-    batch_match_filter_data = batch_match_filter_data = await init_batch_match_filter(
+    batch_match_filter_data = await init_batch_match_filter(
         sample_batch_id, include_match_interference
     )
     message = (

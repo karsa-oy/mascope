@@ -1,5 +1,5 @@
-from typing import List, Optional
-from fastapi import APIRouter, Query, Request, Depends
+from typing import List
+from fastapi import APIRouter, Depends
 from ..utils.api_features import api_route
 from ..controllers.target_compounds_controller import (
     get_target_compounds,

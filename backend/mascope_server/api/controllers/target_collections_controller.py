@@ -4,7 +4,7 @@
 from fastapi import BackgroundTasks
 from sqlalchemy import asc, desc, func, select
 from sqlalchemy.orm import joinedload
-from typing import List, Optional, Dict
+from typing import List, Tuple, Dict
 
 from mascope_server.api_sio import sio
 from mascope_server.db.id import gen_id
@@ -18,7 +18,8 @@ from .target_compounds_controller import (
     delete_target_compound,
     create_target_compound,
 )
-from .match_controller import rematch_batches
+from .match.match_controller import rematch_batches
+from .match.match_aggregate_controller import reaggregate_and_create_matches
 from ..models.models import (
     TargetCollection,
     TargetCompoundInTargetCollection,
@@ -40,7 +41,9 @@ from ..models.pydantic_models.match_pydantic_model import (
 # -------------------------------------------------------------------
 
 
-async def get_batches_compounds(sample_batches: List[str]) -> Dict[str, List[str]]:
+async def get_batches_compounds(
+    sample_batches: List[str], show_duplicates: False
+) -> Dict[str, List[str]]:
     """
     Retrieves the target compounds associated with a list of sample batch IDs. This function is intended to gather
     the current state of target compounds for each batch, either before or after updates to the target collection.
@@ -58,7 +61,7 @@ async def get_batches_compounds(sample_batches: List[str]) -> Dict[str, List[str
 
     for sample_batch_id in sample_batches:
         batch_compounds_result = await get_target_compounds(
-            sample_batch_id=sample_batch_id
+            sample_batch_id=sample_batch_id, show_duplicates=show_duplicates
         )
 
         # Extract target compound IDs from the result and assign to the corresponding batch ID in the dictionary
@@ -76,18 +79,18 @@ async def get_batches_compounds(sample_batches: List[str]) -> Dict[str, List[str
 
 
 async def compare_batches_compounds(
-    batches_compounds_before_update: Dict[str, List[str]],
-    batches_compounds_after_update: Dict[str, List[str]],
-) -> List[RematchBatchBody]:
+    batches_compounds_before: Dict[str, List[str]],
+    batches_compounds_after: Dict[str, List[str]],
+) -> Tuple[List[RematchBatchBody], List[str]]:
     """
     Compares the target compounds associated with sample batches before and after updates to identify changes.
     This function is used for determining which compounds have been added or removed from each batch as a result of updates to the target collection assosiations.
 
 
-    :param batches_compounds_before_update: The state of target compounds associated with sample batches before the updates.
-    :type batches_compounds_before_update: Dict[str, List[str]]
-    :param batches_compounds_after_update: The state of target compounds associated with sample batches after the updates.
-    :type batches_compounds_after_update: Dict[str, List[str]]
+    :param batches_compounds_before: The state of target compounds associated with sample batches before the updates.
+    :type batches_compounds_before: Dict[str, List[str]]
+    :param batches_compounds_after: The state of target compounds associated with sample batches after the updates.
+    :type batches_compounds_after: Dict[str, List[str]]
     :return: A list of `RematchBatchBody` objects, each representing a sample batch that requires a rematch operation. Each object includes the batch ID and lists of added or removed target compound IDs.
     :rtype: List[RematchBatchBody]
 
@@ -96,17 +99,18 @@ async def compare_batches_compounds(
       The resulting list of `RematchBatchBody` objects is used to construct `RematchBatchesBody` for the background rematch task, ensuring that the rematch operation only affects the necessary target compounds.
 
     """
-    rematch_batches = []
+    batches_rematch_data = []
+    batches_to_reaggregate = []
 
     # Combine keys from both dictionaries to ensure all batches are considered
-    all_batch_ids = set(batches_compounds_before_update.keys()) | set(
-        batches_compounds_after_update.keys()
+    all_batch_ids = set(batches_compounds_before.keys()) | set(
+        batches_compounds_after.keys()
     )
 
     for batch_id in all_batch_ids:
         # Get compounds before and after update, defaulting to empty list if not present
-        compounds_before = set(batches_compounds_before_update.get(batch_id, []))
-        compounds_after = set(batches_compounds_after_update.get(batch_id, []))
+        compounds_before = set(batches_compounds_before.get(batch_id, []))
+        compounds_after = set(batches_compounds_after.get(batch_id, []))
 
         # Determine added and removed compounds
         added_compounds = compounds_after - compounds_before
@@ -119,9 +123,20 @@ async def compare_batches_compounds(
                 added_target_compound_ids=list(added_compounds),
                 removed_target_compound_ids=list(removed_compounds),
             )
-            rematch_batches.append(rematch_batch)
+            batches_rematch_data.append(rematch_batch)
 
-    return rematch_batches
+        # Compare compounds (including duplicates) before and after
+        # to determine if a top lvl match reaggregation is needed
+        if sorted(batches_compounds_before.get(batch_id, [])) != sorted(
+            batches_compounds_after.get(batch_id, [])
+        ):
+            # Check for changes in the list itself, not just set comparisons
+            if batch_id not in [
+                batch.sample_batch_id for batch in batches_rematch_data
+            ]:
+                batches_to_reaggregate.append(batch_id)
+
+    return batches_rematch_data, batches_to_reaggregate
 
 
 # -------------------------------------------------------------------
@@ -405,7 +420,7 @@ async def create_target_collection(
 
             # Get compounds for each affected batch before saving to db the new collection and new compounds/batches associations
             affected_batches_compounds_before_create = await get_batches_compounds(
-                affected_batches_to_rematch
+                affected_batches_to_rematch, True
             )
 
             batches_to_add_total = len(affected_batches_to_rematch)
@@ -429,22 +444,36 @@ async def create_target_collection(
     # Step 8: Handle the rematch of sample batches if necessary
     # Get the rematch data for the batches affected by changes in tne new collection compounds/batches associations
     rematch_batches_data = []
+    sample_batches_to_reaggregate = []
     if affected_batches_to_rematch:
-        # Get compounds for each affected batch after saving to db the new collection and new compounds/batches associations
-        affected_batches_compounds_after_create = await get_batches_compounds(
-            affected_batches_to_rematch
-        )
-
-        # Compare compounds for affected batches
-        affected_batches_rematch_data = await compare_batches_compounds(
-            affected_batches_compounds_before_create,
-            affected_batches_compounds_after_create,
-        )
-
-        rematch_batches_data = affected_batches_rematch_data
-
         # add all affected batches to the reload set
         sample_batches_to_reload.update(affected_batches_to_rematch)
+
+        # Get compounds for each affected batch after saving to db the new collection and new compounds/batches associations
+        affected_batches_compounds_after_create = await get_batches_compounds(
+            affected_batches_to_rematch, True
+        )
+
+        # Compare compounds (unique sets) before and after createon to determine if a rematch is needed
+        affected_batches_rematch_data, batches_to_reaggregate = (
+            await compare_batches_compounds(
+                affected_batches_compounds_before_create,
+                affected_batches_compounds_after_create,
+            )
+        )
+        rematch_batches_data = affected_batches_rematch_data
+        sample_batches_to_reaggregate = batches_to_reaggregate
+
+    # Handle the case of adding/removing duplicated componds, meaning the low lvl match data is unchanged for
+    # sample (match_isotope, match_ion, match_compound) but top lvl match aggregates (match_collection, match_sample)
+    # may be different, so need to rematch.
+    if sample_batches_to_reaggregate:
+        for sample_batch_id in sample_batches_to_reaggregate:
+            await reaggregate_and_create_matches(
+                sample_batch_id=sample_batch_id,
+                match_ions=False,
+                match_compounds=False,
+            )
 
     # Check if there's any data to process for rematch
     if rematch_batches_data:
@@ -661,11 +690,11 @@ async def update_target_collection(
 
             # Get compounds for each added batch before update
             added_batches_compounds_before_update = await get_batches_compounds(
-                added_sample_batches
+                added_sample_batches, True
             )
             # Get compounds for each removed batch before update
             removed_batches_compounds_before_update = await get_batches_compounds(
-                removed_sample_batches
+                removed_sample_batches, True
             )
 
         if all_target_compound_ids and (
@@ -681,14 +710,14 @@ async def update_target_collection(
                     f"{compounds_to_add_total} compound{' was' if compounds_to_add_total == 1 else 's were'} added to the target collection {target_collection_name_update}."
                 )
             if removed_compounds:
-                compounds_to_removed_total = len(removed_compounds)
+                compounds_to_remove_total = len(removed_compounds)
                 message_logs["removed_compounds_info"] = (
-                    f"{compounds_to_removed_total} compound{' was' if compounds_to_removed_total == 1 else 's were'} removed from the target collection {target_collection_name_update}."
+                    f"{compounds_to_remove_total} compound{' was' if compounds_to_remove_total == 1 else 's were'} removed from the target collection {target_collection_name_update}."
                 )
 
             # Get compounds for each affected batch before update
             affected_batches_compounds_before_update = await get_batches_compounds(
-                existing_sample_batches
+                existing_sample_batches, True
             )
 
         # Step 7: Update the target collection
@@ -743,23 +772,28 @@ async def update_target_collection(
 
     # Step 8: Get the rematch data for the batches affected by changes in target_collection/sample_batches asoosiations
     rematch_batches_data = []
+    sample_batches_to_reaggregate = []
     if changed_batches:
         # Reload targets to inform about changed collection/batches associations
         targets_all_reload = True
         added_batches_rematch_data = []
         removed_batches_rematch_data = []
+        added_batches_to_reaggregate = []
+        removed_batches_to_reaggregate = []
         if added_sample_batches:
             # add all added batches to the reload set
             sample_batches_to_reload.update(added_sample_batches)
 
             # Get compounds for each added batch after update
             added_batches_compounds_after_update = await get_batches_compounds(
-                added_sample_batches
+                added_sample_batches, True
             )
             # Compare compounds for added batches
-            added_batches_rematch_data = await compare_batches_compounds(
-                added_batches_compounds_before_update,
-                added_batches_compounds_after_update,
+            added_batches_rematch_data, added_batches_to_reaggregate = (
+                await compare_batches_compounds(
+                    added_batches_compounds_before_update,
+                    added_batches_compounds_after_update,
+                )
             )
 
             message = f"Target collection '{target_collection_name_update}' was added to {len(added_sample_batches)} sample batch{'' if len(added_sample_batches) == 1 else 'es'}."
@@ -771,12 +805,14 @@ async def update_target_collection(
 
             # Get compounds for each removed batch after update
             removed_batches_compounds_after_update = await get_batches_compounds(
-                removed_sample_batches
+                removed_sample_batches, True
             )
             # Compare compounds for removed batches
-            removed_batches_rematch_data = await compare_batches_compounds(
-                removed_batches_compounds_before_update,
-                removed_batches_compounds_after_update,
+            removed_batches_rematch_data, removed_batches_to_reaggregate = (
+                await compare_batches_compounds(
+                    removed_batches_compounds_before_update,
+                    removed_batches_compounds_after_update,
+                )
             )
 
             message = f"Target collection '{target_collection_name_update}' was removed from {len(removed_sample_batches)} sample batch{'' if len(removed_sample_batches) == 1 else 'es'}."
@@ -784,6 +820,9 @@ async def update_target_collection(
 
         # Combine the results
         rematch_batches_data = added_batches_rematch_data + removed_batches_rematch_data
+        sample_batches_to_reaggregate = (
+            added_batches_to_reaggregate + removed_batches_to_reaggregate
+        )
 
     # Step 9: Get the rematch data for the batches affected by changes in target_collection/target_compounds asoosiations
     if changed_compounds:
@@ -791,17 +830,31 @@ async def update_target_collection(
         targets_all_reload = True
         # Get compounds for each affected batch after update
         affected_batches_compounds_after_update = await get_batches_compounds(
-            existing_sample_batches
+            existing_sample_batches, True
         )
         # Compare compounds for added batches
-        affected_batches_rematch_data = await compare_batches_compounds(
-            affected_batches_compounds_before_update,
-            affected_batches_compounds_after_update,
+        affected_batches_rematch_data, batches_to_reaggregate = (
+            await compare_batches_compounds(
+                affected_batches_compounds_before_update,
+                affected_batches_compounds_after_update,
+            )
         )
         rematch_batches_data = affected_batches_rematch_data
+        sample_batches_to_reaggregate = batches_to_reaggregate
 
         # add all affected batches to the reload set
         sample_batches_to_reload.update(existing_sample_batches)
+
+    # Handle the case of adding/removing duplicated componds, meaning the low lvl match data is unchanged for
+    # sample (match_isotope, match_ion, match_compound) but top lvl match aggregates (match_collection, match_sample)
+    # may be different, so need to rematch.
+    if sample_batches_to_reaggregate:
+        for sample_batch_id in sample_batches_to_reaggregate:
+            await reaggregate_and_create_matches(
+                sample_batch_id=sample_batch_id,
+                match_ions=False,
+                match_compounds=False,
+            )
 
     # Check if there's any data to process for rematch
     if rematch_batches_data:
@@ -927,7 +980,7 @@ async def delete_target_collection(
         # Step 2: Get associated sample batches compounds before deletion for potential rematch
         if affected_sample_batches:
             batches_compounds_before_deletion = await get_batches_compounds(
-                affected_sample_batches
+                affected_sample_batches, True
             )
 
         # Step 3: Identify orphan compoundsif required
@@ -953,21 +1006,36 @@ async def delete_target_collection(
 
     # Step 5: Rematch affected sample batches if necessary
     rematch_batches_data = []
+    sample_batches_to_reaggregate = []
     if affected_sample_batches:
         # add all affected batches to the reload set
         sample_batches_to_reload.update(affected_sample_batches)
 
         # Re-fetch compounds for each affected batch after deletion
         batches_compounds_after_deletion = await get_batches_compounds(
-            affected_sample_batches
+            affected_sample_batches, True
         )
 
-        # Compare compounds before and after deletion to determine if a rematch is needed
-        affected_batches_rematch_data = await compare_batches_compounds(
-            batches_compounds_before_deletion, batches_compounds_after_deletion
+        # Compare compounds (unique sets) before and after deletion to determine if a rematch is needed
+        affected_batches_rematch_data, batches_to_reaggregate = (
+            await compare_batches_compounds(
+                batches_compounds_before_deletion, batches_compounds_after_deletion
+            )
         )
-
         rematch_batches_data = affected_batches_rematch_data
+
+        sample_batches_to_reaggregate = batches_to_reaggregate
+
+    # Handle the case of adding/removing duplicated componds, meaning the low lvl match data is unchanged for
+    # sample (match_isotope, match_ion, match_compound) but top lvl match aggregates (match_collection, match_sample)
+    # may be different, so need to rematch.
+    if sample_batches_to_reaggregate:
+        for sample_batch_id in sample_batches_to_reaggregate:
+            await reaggregate_and_create_matches(
+                sample_batch_id=sample_batch_id,
+                match_ions=False,
+                match_compounds=False,
+            )
 
     # Check if there's any data to process for rematch
     if rematch_batches_data:

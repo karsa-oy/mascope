@@ -14,14 +14,14 @@ from ..utils.api_features import (
     send_progress_user_notification,
 )
 from ..exceptions import NotFoundException
-from ..controllers.match_controller import match_sample_compute
+from .match.match_controller import match_compute_sample
 from .calibration_controller import calibration_mz_calibrate_sample
 from .samples_controller import get_sample
 from ..models.models import (
     SampleBatch,
     SampleItem,
     SampleFile,
-    Match,
+    MatchIsotope,
     MatchInterference,
 )
 from ..models.pydantic_models.sample_item_pydantic_model import (
@@ -306,6 +306,7 @@ async def copy_sample_item(
     parent_id=None,
 ) -> dict:
     """
+    TODO_api_circular_impori  destinguish sample and sample_item controller, should be mocveved to samples_controller.py?
     The function copies the specified sample item and associates the new copy with a specified sample batch.
     May be a part of the copy sample batch operation or independent.
     Copies matches, match interferences of the original sample if part of a larger copy batch operation
@@ -348,11 +349,11 @@ async def copy_sample_item(
                 f"Sample batch with ID '{sample_batch_id}' not found"
             )
 
-        # Step 2: Fetch and validate the original sample item along with related Match and MatchInterference records
+        # Step 2: Fetch and validate the original sample item along with related MatchIsotope and MatchInterference records
         stmt = (
             select(SampleItem)
             .options(
-                joinedload(SampleItem.match),
+                joinedload(SampleItem.match_isotope),
                 joinedload(SampleItem.match_interference),
             )
             .filter(SampleItem.sample_item_id == sample_item_id)
@@ -386,18 +387,21 @@ async def copy_sample_item(
             not independent_transaction
             or original_sample_item.sample_batch_id == sample_batch_id
         ):
-            # Copy related Match records
-            for match in original_sample_item.match:
-                new_match_data = {
-                    c.name: getattr(match, c.name)
-                    for c in Match.__table__.columns
-                    if c.name != "match_id"
+            # Copy related MatchIsotope records
+            for match_isotope in original_sample_item.match_isotope:
+                new_match_isotope_data = {
+                    c.name: getattr(match_isotope, c.name)
+                    for c in MatchIsotope.__table__.columns
+                    if c.name != "match_isotope_id"
                 }
-                new_match_data.update(
-                    {"match_id": gen_id(32), "sample_item_id": new_sample_item_id}
+                new_match_isotope_data.update(
+                    {
+                        "match_isotope_id": gen_id(32),
+                        "sample_item_id": new_sample_item_id,
+                    }
                 )
-                new_match = Match(**new_match_data)
-                session.add(new_match)
+                new_match_isotope = MatchIsotope(**new_match_isotope_data)
+                session.add(new_match_isotope)
 
             # Copy related MatchInterference records
             for match_interference in original_sample_item.match_interference:
@@ -427,7 +431,7 @@ async def copy_sample_item(
         and original_sample_item.sample_batch_id != sample_batch_id
     ):
         background_tasks.add_task(
-            match_sample_compute,
+            match_compute_sample,
             sample_item_id=new_sample_item_id,
             added_target_compound_ids=None,
             added_ionization_mechanism_ids=None,
@@ -463,6 +467,7 @@ async def process_sample_item(
     process_id=None,
 ) -> dict:
     """
+    TODO_api_circular_impori  destinguish sample and sample_item controller, should be mocveved to samples_controller.py?
     Automates the process of sample item creation, calibration, and match computation
     as a single workflow. This process ensures that once a sample item is created, it is
     then calibrated and matches are computed without requiring manual intervention.
@@ -540,7 +545,7 @@ async def process_sample_item(
         await send_progress_user_notification(notification, 0.6)
 
     # Step 3: Compute matches if calibration is successful
-    await match_sample_compute(
+    await match_compute_sample(
         sample_item_id=sample_item_id,
         independent_transaction=False,
         sid=sid,

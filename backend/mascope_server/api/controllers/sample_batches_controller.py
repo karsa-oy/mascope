@@ -25,7 +25,7 @@ from ..utils.api_features import (
     send_progress_user_notification,
 )
 from ..exceptions import NotFoundException
-from .match_controller import rematch_batch
+from .match.match_controller import rematch_batch
 from .target_compounds_controller import get_target_compounds
 from .sample_items_controller import create_sample_item, copy_sample_item
 from .calibration_controller import calibration_mz_calibrate_batch
@@ -516,7 +516,9 @@ async def update_sample_batch(
         result = await session.execute(stmt)
         existing_sample_batch = result.unique().scalar_one_or_none()
         if not existing_sample_batch:
-            raise NotFoundException(f"Sample batch with ID {sample_batch_id} not found")
+            raise NotFoundException(
+                f"Sample batch with ID '{sample_batch_id}' not found"
+            )
 
         # Step 2: Determine if a rematch is needed based on changes in collections or ion mechanisms
         # Checks for changes in collections and ionization mechanisms.
