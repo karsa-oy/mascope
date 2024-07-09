@@ -2,11 +2,14 @@ from typing import List
 from fastapi import APIRouter, Depends
 from mascope_server.api.utils.api_features import api_route
 from mascope_server.api.controllers.match.match_ions_controller import (
+    get_match_ions,
+    get_match_ion,
     create_match_ions,
     delete_match_ions,
 )
 from mascope_server.api.models.pydantic_models.match_ion_pydantic_model import (
     MatchIonBase,
+    GetMatchIonsQueryParams,
     DeleteMatchIonsPayload,
 )
 
@@ -14,18 +17,18 @@ from mascope_server.api.models.pydantic_models.match_ion_pydantic_model import (
 match_ions_router = APIRouter()
 
 
-# @match_ions_router.get("/api/match/ions")
-# @api_route()
-# async def get_match_ions_route(
-#     query_params: GetMatchesQueryParams = Depends(),
-# ):
-#     return await get_match_ions(**query_params.dict())
+@match_ions_router.get("/api/match/ions")
+@api_route()
+async def get_match_ions_route(
+    query_params: GetMatchIonsQueryParams = Depends(),
+):
+    return await get_match_ions(**query_params.dict())
 
 
-# @match_ions_router.get("/api/match/ions/{match_ion_id}")
-# @api_route()
-# async def get_match_ion_route(match_ion_id: str):
-#     return await get_match_ion(match_ion_id)
+@match_ions_router.get("/api/match/ions/{match_ion_id}")
+@api_route()
+async def get_match_ion_route(match_ion_id: str):
+    return await get_match_ion(match_ion_id)
 
 
 @match_ions_router.post("/api/match/ions")

@@ -90,16 +90,15 @@ async def get_match_interferences(
 
         # Step 5: Execute the query and return results
         result = await session.execute(stmt)
-        match_interferences = result.scalars().all()
+    match_interferences = result.scalars().all()
 
-        # Step 6: Return results
-        return {
-            "results": total,
-            "data": [
-                match_interference.to_dict()
-                for match_interference in match_interferences
-            ],
-        }
+    # Step 6: Return results
+    return {
+        "results": total,
+        "data": [
+            match_interference.to_dict() for match_interference in match_interferences
+        ],
+    }
 
 
 @api_controller()
@@ -120,11 +119,11 @@ async def get_match_interference(match_interference_id: str) -> dict:
     """
     async with async_session() as session:
         match_interference = await session.get(MatchInterference, match_interference_id)
-        if not match_interference:
-            raise NotFoundException(
-                f"Match interference with ID '{match_interference_id}' not found"
-            )
-        return match_interference.to_dict()
+    if not match_interference:
+        raise NotFoundException(
+            f"Match interference with ID '{match_interference_id}' not found"
+        )
+    return match_interference.to_dict()
 
 
 @api_controller()

@@ -75,10 +75,10 @@ async def get_match_isotopes(
 
         # Step 5: Execute query
         result = await session.execute(stmt)
-        matches = result.scalars().all()
+    matches = result.scalars().all()
 
-        # Step 6: Return results
-        return {"results": total, "data": [match.to_dict() for match in matches]}
+    # Step 6: Return results
+    return {"results": total, "data": [match.to_dict() for match in matches]}
 
 
 @api_controller()
@@ -101,14 +101,12 @@ async def get_match_isotope(match_isotope_id: str) -> dict:
         # Step 1: Fetch match by ID
         match = await session.get(MatchIsotope, match_isotope_id)
 
-        # Step 2: Check existence
-        if not match:
-            raise NotFoundException(
-                f"MatchIsotope with ID '{match_isotope_id}' not found"
-            )
+    # Step 2: Check existence
+    if not match:
+        raise NotFoundException(f"MatchIsotope with ID '{match_isotope_id}' not found")
 
-        # Step 3: Return match details
-        return match.to_dict()
+    # Step 3: Return match details
+    return match.to_dict()
 
 
 @api_controller()

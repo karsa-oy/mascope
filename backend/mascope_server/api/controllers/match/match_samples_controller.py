@@ -1,19 +1,130 @@
 from datetime import datetime, timezone
 from typing import List, Optional
 from collections import defaultdict
-from sqlalchemy import select, delete
+from sqlalchemy import (
+    select,
+    delete,
+    func,
+)
 from mascope_server.db import async_session
 from mascope_server.db.id import gen_id
 from mascope_server.api.utils.api_features import api_controller
-from mascope_server.api.controllers.match.util import fetch_sample_item_ids
 from mascope_server.api.exceptions import (
     DuplicateException,
+    NotFoundException,
     ApiException,
 )
-from mascope_server.api.models.models import MatchSample
+from mascope_server.api.controllers.match.util import fetch_sample_item_ids
+from mascope_server.api.models.models import MatchSample, SampleItem
 from mascope_server.api.models.pydantic_models.match_sample_pydantic_model import (
     MatchSampleBase,
 )
+
+
+@api_controller()
+async def get_match_samples(
+    sample_item_id: Optional[str] = None,
+    sample_batch_id: Optional[str] = None,
+    match_category: Optional[int] = None,
+    sort: Optional[str] = None,
+    order: Optional[str] = None,
+    page: int = 0,
+    limit: int = 10000,
+) -> dict:
+    """
+    Retrieves a list of match samples based on filter criteria, including sample item ID and batch ID.
+    Results can be sorted and paginated according to the provided parameters.
+
+    Steps:
+    1. Construct a query to fetch match samples.
+    2. Apply filtering based on sample item ID, sample batch ID, and match category if specified.
+    3. Apply sorting if specified.
+    4. Count the total matching samples for pagination.
+    5. Apply pagination and execute the query.
+    6. Format the fetched match samples into a list of dictionaries for response.
+
+    :param sample_item_id: Filter match samples by sample item ID, defaults to None.
+    :type sample_item_id: Optional[str], optional
+    :param sample_batch_id: Filter match samples by sample batch ID, defaults to None.
+    :type sample_batch_id: Optional[str], optional
+    :param match_category: Filter by the category of the match, defaults to None.
+    :type match_category: Optional[int], optional
+    :param sort: Column to sort the results by, defaults to None.
+    :type sort: Optional[str], optional
+    :param order: Sort order, either 'asc' or 'desc', defaults to None.
+    :type order: Optional[str], optional
+    :param page: Page number for pagination, defaults to 0.
+    :type page: int, optional
+    :param limit: Number of items per page, defaults to 10000.
+    :type limit: int, optional
+    :return: A dictionary containing the total count and a list of match samples.
+    :rtype: dict
+    """
+    async with async_session() as session:
+        # Step 1: Construct base query
+        query = select(MatchSample)
+
+        # Step 2: Apply filters
+        if sample_item_id:
+            query = query.filter(MatchSample.sample_item_id == sample_item_id)
+        if match_category is not None:
+            query = query.filter(MatchSample.match_category == match_category)
+        if sample_batch_id:
+            query = query.join(
+                SampleItem, SampleItem.sample_item_id == MatchSample.sample_item_id
+            ).filter(SampleItem.sample_batch_id == sample_batch_id)
+
+        # Step 3: Apply sorting
+        if sort:
+            sort_expression = getattr(MatchSample, sort, None)
+            if sort_expression:
+                if order == "desc":
+                    query = query.order_by(sort_expression.desc())
+                else:
+                    query = query.order_by(sort_expression.asc())
+
+        # Step 4: Count total matching samples
+        count_stmt = select(func.count()).select_from(  # pylint: disable=not-callable
+            query.subquery()
+        )
+        total = await session.scalar(count_stmt)
+
+        # Step 5: Apply pagination
+        query = query.offset(page * limit).limit(limit)
+
+        # Step 6: Execute the query
+        result = await session.execute(query)
+    data = [item.to_dict() for item in result.scalars().all()]
+
+    return {"results": total, "data": data}
+
+
+@api_controller()
+async def get_match_sample(match_sample_id: str) -> dict:
+    """
+    Retrieves information for a specific match sample by its unique identifier.
+
+    Steps:
+    1. Fetch the match sample using the provided ID to ensure it exists.
+    2. Check if the match sample is found; if not, raise a NotFoundException.
+    3. Return the match sample's details as a dictionary.
+
+    :param match_sample_id: Unique identifier of the match sample to retrieve.
+    :type match_sample_id: str
+    :raises NotFoundException: If the match sample with the given ID is not found.
+    :return: The detailed information of the match sample.
+    :rtype: dict
+    """
+    async with async_session() as session:
+        # Step 1: Fetch match sample by ID
+        sample = await session.get(MatchSample, match_sample_id)
+
+    # Step 2: Check if the sample is found
+    if not sample:
+        raise NotFoundException(f"Match sample with ID '{match_sample_id}' not found")
+
+    # Step 3: Return sample details
+    return sample.to_dict()
 
 
 @api_controller()

@@ -1,16 +1,139 @@
 from datetime import datetime, timezone
 from typing import List, Optional
 from collections import defaultdict
-from sqlalchemy import select, and_, delete
+from sqlalchemy import (
+    select,
+    and_,
+    delete,
+    func,
+)
 from mascope_server.db import async_session
 from mascope_server.db.id import gen_id
 from mascope_server.api.utils.api_features import api_controller
+from mascope_server.api.exceptions import (
+    DuplicateException,
+    NotFoundException,
+    ApiException,
+)
 from mascope_server.api.controllers.match.util import fetch_sample_item_ids
-from mascope_server.api.exceptions import DuplicateException, ApiException
-from mascope_server.api.models.models import MatchCollection
+from mascope_server.api.models.models import MatchCollection, SampleItem
 from mascope_server.api.models.pydantic_models.match_collection_pydantic_model import (
     MatchCollectionBase,
 )
+
+
+@api_controller()
+async def get_match_collections(
+    sample_item_id: Optional[str] = None,
+    sample_batch_id: Optional[str] = None,
+    target_collection_id: Optional[str] = None,
+    match_category: Optional[int] = None,
+    sort: Optional[str] = None,
+    order: Optional[str] = None,
+    page: int = 0,
+    limit: int = 10000,
+) -> dict:
+    """
+    Retrieves a list of matched collections based on filter criteria.
+    Results can be sorted and paginated according to the provided parameters.
+
+    Steps:
+    1. Construct the base query to select from MatchCollection.
+    2. Apply filters based on provided criteria such as sample item ID, batch ID, target collection ID, and match category.
+    3. Apply sorting if specified.
+    4. Count the total matched collections for pagination.
+    5. Apply pagination and execute the query to fetch results.
+    6. Convert the fetched match collections into a list of dictionaries for response.
+
+    :param sample_item_id: Filter match collections by the ID of the sample item, defaults to None.
+    :type sample_item_id: Optional[str], optional
+    :param sample_batch_id: Filter match collections by the ID of the sample batch, defaults to None.
+    :type sample_batch_id: Optional[str], optional
+    :param target_collection_id: Filter match collections by the ID of the target collection, defaults to None.
+    :type target_collection_id: Optional[str], optional
+    :param match_category: Filter by the category of the match, defaults to None.
+    :type match_category: Optional[int], optional
+    :param sort: Column to sort the results by, defaults to None.
+    :type sort: Optional[str], optional
+    :param order: Sort order, either 'asc' for ascending or 'desc' for descending, defaults to None.
+    :type order: Optional[str], optional
+    :param page: Page number for pagination, defaults to 0.
+    :type page: int, optional
+    :param limit: Number of items per page, defaults to 10000.
+    :type limit: int, optional
+    :return: A dictionary containing the total count and a list of matched collections.
+    :rtype: dict
+    """
+    async with async_session() as session:
+        # Step 1: Construct base query
+        query = select(MatchCollection)
+
+        # Step 2: Apply filters
+        if sample_item_id:
+            query = query.filter(MatchCollection.sample_item_id == sample_item_id)
+        if target_collection_id:
+            query = query.filter(
+                MatchCollection.target_collection_id == target_collection_id
+            )
+        if match_category is not None:
+            query = query.filter(MatchCollection.match_category == match_category)
+        if sample_batch_id:
+            query = query.join(
+                SampleItem, SampleItem.sample_item_id == MatchCollection.sample_item_id
+            ).filter(SampleItem.sample_batch_id == sample_batch_id)
+
+        # Step 3: Apply sorting
+        if sort:
+            sort_expression = getattr(MatchCollection, sort, None)
+            if sort_expression:
+                if order == "desc":
+                    query = query.order_by(sort_expression.desc())
+                else:
+                    query = query.order_by(sort_expression.asc())
+
+        # Step 4: Count total matching collections
+        count_stmt = select(func.count()).select_from(  # pylint: disable=not-callable
+            query.subquery()
+        )
+        total = await session.scalar(count_stmt)
+
+        # Step 5: Apply pagination
+        query = query.offset(page * limit).limit(limit)
+        # Step 6: Execute the query and fetch results
+        result = await session.execute(query)
+    data = [item.to_dict() for item in result.scalars().all()]
+
+    return {"results": total, "data": data}
+
+
+@api_controller()
+async def get_match_collection(match_collection_id: str) -> dict:
+    """
+    Retrieves information for a specific match collection by its ID.
+
+    Steps:
+    1. Fetch the match collection using the provided ID to ensure it exists.
+    2. Check if the match collection is found; if not, raise a NotFoundException.
+    3. Return the match collection's details as a dictionary.
+
+    :param match_collection_id: Unique identifier of the match collection to retrieve.
+    :type match_collection_id: str
+    :raises NotFoundException: If the match collection with the given ID is not found.
+    :return: The detailed information of the match collection.
+    :rtype: dict
+    """
+    async with async_session() as session:
+        # Step 1: Fetch match collection by ID
+        collection = await session.get(MatchCollection, match_collection_id)
+
+    # Step 2: Check if the collection is found
+    if not collection:
+        raise NotFoundException(
+            f"Match collection with ID '{match_collection_id}' not found"
+        )
+
+    # Step 3: Return collection details
+    return collection.to_dict()
 
 
 @api_controller()

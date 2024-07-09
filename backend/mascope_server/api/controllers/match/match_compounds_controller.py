@@ -1,19 +1,200 @@
 from datetime import datetime, timezone
 from typing import List, Optional
 from collections import defaultdict
-from sqlalchemy import select, delete, and_
+from sqlalchemy import (
+    select,
+    delete,
+    func,
+    and_,
+)
 from mascope_server.db import async_session
 from mascope_server.db.id import gen_id
 from mascope_server.api.utils.api_features import api_controller
-from mascope_server.api.controllers.match.util import fetch_sample_item_ids
 from mascope_server.api.exceptions import (
     DuplicateException,
+    NotFoundException,
     ApiException,
 )
-from mascope_server.api.models.models import MatchCompound
+from mascope_server.api.controllers.match.util import fetch_sample_item_ids
+from mascope_server.api.models.models import (
+    MatchCompound,
+    SampleItem,
+    TargetCompound,
+    TargetCompoundInTargetCollection,
+    TargetCollectionInSampleBatch,
+    TargetCollection,
+)
 from mascope_server.api.models.pydantic_models.match_compound_pydantic_model import (
     MatchCompoundBase,
 )
+
+
+@api_controller()
+async def get_match_compounds(
+    sample_item_id: Optional[str] = None,
+    sample_batch_id: Optional[str] = None,
+    target_compound_id: Optional[str] = None,
+    match_category: Optional[int] = None,
+    show_target_collection: bool = False,
+    show_target_compound: bool = False,
+    sort: Optional[str] = None,
+    order: Optional[str] = None,
+    page: int = 0,
+    limit: int = 10000,
+) -> dict:
+    """
+    Retrieves a list of matched compounds based on filtering criteria. This function allows
+    for querying with options to include additional related data such as target compounds and collections.
+
+    Steps:
+    1. Construct the base query for fetching match compounds from the database.
+    2. Apply filters based on provided sample item ID, sample batch ID, target compound ID, and match category.
+    3. Optionally join with the TargetCompound and TargetCollection tables if related data is requested.
+    4. Apply sorting if a sort column and order are specified.
+    5. Count the total entries that match the criteria for pagination purposes.
+    6. Limit the query for pagination and fetch the results.
+    7. Format the fetched data into a dictionary for the response.
+
+    :param sample_item_id: Filter matches by the associated sample item's ID, defaults to None.
+    :type sample_item_id: Optional[str], optional
+    :param sample_batch_id: Filter matches by the associated sample batch's ID, defaults to None.
+    :type sample_batch_id: Optional[str], optional
+    :param target_compound_id: Filter matches by the associated target compound's ID, defaults to None.
+    :type target_compound_id: Optional[str], optional
+    :param match_category: Filter matches by their category (e.g., confirmed, probable), defaults to None.
+    :type match_category: Optional[int], optional
+    :param show_target_collection: Include additional data about the target collections, defaults to False.
+    :type show_target_collection: bool, optional
+    :param show_target_compound: Include additional data about the target compounds, defaults to False.
+    :type show_target_compound: bool, optional
+    :param sort: Column name to sort by, defaults to None.
+    :type sort: Optional[str], optional
+    :param order: Order of sorting, 'asc' for ascending or 'desc' for descending, defaults to None.
+    :type order: Optional[str], optional
+    :param page: Page number for pagination, starts from 0, defaults to 0.
+    :type page: int, optional
+    :param limit: Maximum number of results per page, defaults to 10000.
+    :type limit: int, optional
+    :return: A dictionary containing total results count and the paginated list of match compounds.
+    :rtype: dict
+    """
+    async with async_session() as session:
+        # Step 1: Define the main query for match compounds
+        query = select(MatchCompound)
+
+        # Step 2: Apply basic fields filters if provided
+        if sample_item_id:
+            query = query.filter(MatchCompound.sample_item_id == sample_item_id)
+        if target_compound_id:
+            query = query.filter(MatchCompound.target_compound_id == target_compound_id)
+        if match_category is not None:
+            query = query.filter(MatchCompound.match_category == match_category)
+
+        # Join with TargetCompound table to include target_compound data if requested
+        if show_target_compound:
+            query = query.join(
+                TargetCompound,
+                TargetCompound.target_compound_id == MatchCompound.target_compound_id,
+            ).add_columns(
+                TargetCompound.target_compound_name,
+            )
+
+        if sample_batch_id:
+            query = query.join(
+                SampleItem, SampleItem.sample_item_id == MatchCompound.sample_item_id
+            ).where(SampleItem.sample_batch_id == sample_batch_id)
+
+        # Join with TargetCompoundInTargetCollection to include target_collection data
+        if show_target_collection:
+            query = (
+                query.join(
+                    TargetCompoundInTargetCollection,
+                    TargetCompoundInTargetCollection.target_compound_id
+                    == MatchCompound.target_compound_id,
+                )
+                .join(
+                    TargetCollectionInSampleBatch,
+                    TargetCollectionInSampleBatch.target_collection_id
+                    == TargetCompoundInTargetCollection.target_collection_id,
+                )
+                .where(
+                    SampleItem.sample_batch_id
+                    == TargetCollectionInSampleBatch.sample_batch_id
+                )
+                .join(
+                    TargetCollection,
+                    TargetCollection.target_collection_id
+                    == TargetCompoundInTargetCollection.target_collection_id,
+                )
+                .add_columns(
+                    TargetCompoundInTargetCollection.target_collection_id,
+                    TargetCollection.target_collection_name,
+                    TargetCollection.target_collection_type,
+                )
+                .distinct()
+            )
+        # Step 4: Apply sorting
+        if sort:
+            sort_expression = getattr(MatchCompound, sort, None)
+            if sort_expression:
+                if order == "desc":
+                    query = query.order_by(sort_expression.desc())
+                else:
+                    query = query.order_by(sort_expression.asc())
+
+        # Step 5: Count total
+        count_stmt = select(func.count()).select_from(  # pylint: disable=not-callable
+            query.subquery()
+        )
+        total = await session.scalar(count_stmt)
+
+        # Step 6: Execute the paginated query
+        query = query.offset(page * limit).limit(limit)
+        result = await session.execute(query)
+
+    # Step 7: Construct response data
+    data = []
+    for row in result.all():
+        match_compound_data = row.MatchCompound.to_dict()
+        if show_target_compound:
+            match_compound_data["target_compound_name"] = row.target_compound_name
+        if show_target_collection:
+            match_compound_data["target_collection_id"] = row.target_collection_id
+            match_compound_data["target_collection_name"] = row.target_collection_name
+            match_compound_data["target_collection_type"] = row.target_collection_type
+        data.append(match_compound_data)
+
+    return {"results": total, "data": data}
+
+
+@api_controller()
+async def get_match_compound(match_compound_id: str) -> dict:
+    """
+    Retrieves information for a specific match compound identified by its ID.
+
+    Steps:
+    1. Fetch the match compound from the database using its ID to ensure it exists.
+    2. If not found, raise a NotFoundException.
+    3. Return the details of the match compound as a dictionary.
+
+    :param match_compound_id: Unique identifier of the match compound to retrieve.
+    :type match_compound_id: str
+    :raises NotFoundException: If no match compound is found with the specified ID.
+    :return: Detailed information of the match compound.
+    :rtype: dict
+    """
+    async with async_session() as session:
+        # Step 1: Fetch match compound by ID
+        compound = await session.get(MatchCompound, match_compound_id)
+
+    # Step 2: Check if the compound exists
+    if not compound:
+        raise NotFoundException(
+            f"Match compound with ID '{match_compound_id}' not found"
+        )
+
+    # Step 3: Return compound details
+    return compound.to_dict()
 
 
 @api_controller()
