@@ -30,6 +30,12 @@ from mascope_server.api.routes.match_isotopes_routes import match_isotopes_route
 from mascope_server.api.routes.match_interferences_routes import (
     match_interferences_router,
 )
+from mascope_server.api.routes.match.sample.match_sample_targets_routes import (
+    match_sample_targets_router,
+)
+from mascope_server.api.routes.match.batch.match_batch_targets_routes import (
+    match_batch_targets_router,
+)
 from mascope_server.api.routes.attribute_templates_routes import (
     attribute_templates_router,
 )
@@ -62,6 +68,8 @@ routers = [
     match_rating_router,
     match_interferences_router,
     match_isotopes_router,
+    match_sample_targets_router,
+    match_batch_targets_router,
     attribute_templates_router,
     instrument_functions_router,
     visualization_router,
