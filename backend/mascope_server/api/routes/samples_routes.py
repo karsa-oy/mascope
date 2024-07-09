@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Query
-from ..utils.api_features import api_route
-from ..controllers.samples_controller import (
+from fastapi import APIRouter, Query, Depends
+from mascope_server.api.utils.api_features import api_route
+from mascope_server.api.controllers.samples_controller import (
     get_sample,
     get_samples,
     init_batch_match_filter,
@@ -8,8 +8,13 @@ from ..controllers.samples_controller import (
     get_sample_ion_matches,
     get_sample_compound_matches,
 )
-from ..models.pydantic_models.sample_pydantic_model import (
+from mascope_server.api.controllers.samples_controller_new import (
+    get_samples_new,
+    get_sample_new,
+)
+from mascope_server.api.models.pydantic_models.sample_pydantic_model import (
     GetSamplesBody,
+    GetSamplesQueryParams,
     GetSampleBody,
     GetSampleMatchFilterBody,
     GetSampleIonMatchesBody,
@@ -17,6 +22,22 @@ from ..models.pydantic_models.sample_pydantic_model import (
 )
 
 samples_router = APIRouter()
+
+
+@samples_router.get("/api/samples/new", tags=["Samples Loading"])
+@api_route()
+async def get_samples_new_route(
+    query_params: GetSamplesQueryParams = Depends(),
+):
+    return await get_samples_new(**query_params.dict())
+
+
+@samples_router.get("/api/samples/new/{sample_item_id}")
+@api_route()
+async def get_sample_new_route(
+    sample_item_id: str,
+):
+    return await get_sample_new(sample_item_id=sample_item_id)
 
 
 @samples_router.post("/api/samples")
