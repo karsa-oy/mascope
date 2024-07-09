@@ -606,6 +606,22 @@ def apply_filter_params(match_isotope_df, filter_params: FilterParams = None):
         # Determine which filter parameters to use for the current row
         params = get_params(row)
 
+        # Check for None in necessary for filtering fields to ensure they can be processed
+        valid_data = True
+        for field in [
+            "match_mz_error",
+            "match_abundance_error",
+            "match_isotope_correlation",
+            "min_isotope_correlation",
+            "sample_peak_area",
+            "relative_abundance",
+        ]:
+            if row.get(field) is None:
+                valid_data = False
+                break
+        if not valid_data:
+            return row
+
         # Apply filtering logic
         row["match_score"] = (
             row["match_score"]
