@@ -100,6 +100,9 @@ class GetTargetCollectionsQueryParams(BaseModel):
         None,
         description="The name of the target collection for which you want to fetch the target collections.",
     )
+    sample_batch_id: Optional[str] = Field(
+        None, description="The ID of the sample batch to filter collections by."
+    )
     sort: Optional[str] = Field(
         None,
         description="The column name by which you want to sort the results. The column name should be one of the fields of target_collection.",

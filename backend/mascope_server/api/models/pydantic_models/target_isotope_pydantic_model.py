@@ -26,6 +26,17 @@ class GetTargetIsotopesQueryParams(BaseModel):
         None,
         description="ID of the sample batch for filtering the associated to batch isotopes.",
     )
+    target_collection_id: Optional[str] = Field(
+        None, description="The ID of the target collection to filter ions by."
+    )
+    show_target_collection: bool = Field(
+        False,
+        description="Flag to include target collection ID, also duplicate compounds present in several collections will be shown.",
+    )
+    show_filter_params: bool = Field(
+        False,
+        description="Flag to include filter_params of the isotope's parent target ion.",
+    )
     sort: Optional[str] = Field(None, description="Field to sort by.")
     order: Optional[str] = Field(
         None, description="Order of sorting ('asc' or 'desc')."

@@ -2,9 +2,9 @@ from sqlalchemy import select, asc, desc, func
 from sqlalchemy.orm import joinedload
 from typing import List, Optional
 from mascope_server.db import async_session
-from ..utils.api_features import api_controller
-from ..exceptions import NotFoundException
-from ..models.models import (
+from mascope_server.api.utils.api_features import api_controller
+from mascope_server.api.exceptions import NotFoundException
+from mascope_server.api.models.models import (
     SampleBatch,
     TargetCollection,
     TargetCompoundInTargetCollection,
@@ -23,35 +23,67 @@ async def get_target_isotopes(
     target_compound_ids: Optional[List[str]] = None,
     ionization_mechanism_ids: Optional[List[str]] = None,
     sample_batch_id: Optional[str] = None,
+    target_collection_id: Optional[str] = None,
+    show_target_collection: bool = False,
+    show_filter_params: bool = False,
     sort: str = None,
     order: str = None,
     page: int = 0,
     limit: int = 1000000,
-):
+) -> dict:
     """
-    Retrieves a list of target isotopes based on various filters including target ion ID, mz range,
-    relative abundance range, target compounds, and ionization mechanisms.
+    Retrieves a list of target isotopes based on various filters. The function supports
+    complex querying with options to include details about the target collections and taret ion filter parameters.
 
-    :param target_ion_id: Target ion ID filter.
-    :param min_mz: Minimum m/z filter.
-    :param max_mz: Maximum m/z filter.
-    :param min_relative_abundance: Minimum relative abundance filter.
-    :param max_relative_abundance: Maximum relative abundance filter.
-    :param target_compound_ids: List of target compound IDs for filtering.
-    :param ionization_mechanism_ids: List of ionization mechanism IDs for filtering.
-    :param sample_batch_id: ID of the sample batch for filtering.
-    :param sort: Sorting field.
-    :param order: Sorting order ('asc' or 'desc').
-    :param page: Pagination page.
-    :param limit: Number of items per page.
-    :return: Dict with total count and list of target isotopes.
+    Steps:
+    1. Start a session and define the base query with joins to necessary tables.
+    2. Apply filters based on input parameters.
+    3. Adjust the query based on optional filters for showing target collections or specific batch details.
+    4. Apply sorting if specified.
+    5. Count total matching isotopes for pagination.
+    6. Apply pagination and execute the query.
+    7. Construct the response data, including additional details if specified.
+
+    :param target_ion_id: Filter isotopes by the associated target ion ID.
+    :type target_ion_id: Optional[str], optional
+    :param min_mz: Minimum m/z value to filter isotopes.
+    :type min_mz: Optional[float], optional
+    :param max_mz: Maximum m/z value to filter isotopes.
+    :type max_mz: Optional[float], optional
+    :param min_relative_abundance: Minimum relative abundance percentage to filter isotopes.
+    :type min_relative_abundance: Optional[float], optional
+    :param max_relative_abundance: Maximum relative abundance percentage to filter isotopes.
+    :type max_relative_abundance: Optional[float], optional
+    :param target_compound_ids: List of target compound IDs to filter isotopes.
+    :type target_compound_ids: Optional[List[str]], optional
+    :param ionization_mechanism_ids: List of ionization mechanism IDs to filter isotopes.
+    :type ionization_mechanism_ids: Optional[List[str]], optional
+    :param sample_batch_id: Sample batch ID to filter isotopes related to specific batches.
+    :type sample_batch_id: Optional[str], optional
+    :param target_collection_id: Target collection ID to filter isotopes associated with specific collections.
+    :type target_collection_id: Optional[str], optional
+    :param show_target_collection: Whether to include target collection details in the response.
+    :type show_target_collection: bool, optional
+    :param show_filter_params: Whether to include filter parameters from the parent target ion.
+    :type show_filter_params: bool, optional
+    :param sort: Column name to sort the results by.
+    :type sort: str, optional
+    :param order: Sort order, 'asc' for ascending and 'desc' for descending.
+    :type order: str, optional
+    :param page: Page number for pagination.
+    :type page: int, optional
+    :param limit: Number of items per page, defaults to 1,000,000 for essentially no pagination limit.
+    :type limit: int, optional
+    :return: A dictionary containing the total count and a list of detailed isotopes matching the filters.
+    :rtype: dict
     """
     async with async_session() as session:
+        # Step 1: Construct the base query
         stmt = select(TargetIsotope).join(
             TargetIon, TargetIon.target_ion_id == TargetIsotope.target_ion_id
         )
 
-        # Apply filters
+        # Step 2: Apply filters based on provided arguments
         if target_ion_id:
             stmt = stmt.filter(TargetIsotope.target_ion_id == target_ion_id)
         if min_mz is not None:
@@ -74,68 +106,100 @@ async def get_target_isotopes(
                 TargetIon.ionization_mechanism_id.in_(ionization_mechanism_ids)
             )
 
-        if sample_batch_id:
-            # Step 1: Fetch sample batch and related ion mechanisms and target collection ids
-            result = await session.execute(
-                select(SampleBatch)
-                .options(joinedload(SampleBatch.target_collection))
-                .where(SampleBatch.sample_batch_id == sample_batch_id)
+        if show_filter_params:
+            stmt = stmt.add_columns(
+                TargetIon.filter_params,
             )
-            sample_batch = result.unique().scalar_one_or_none()
-            if not sample_batch:
-                raise NotFoundException(
-                    f"Sample batch with id {sample_batch_id} not found"
+        # Step 3: Adjust the query based on non-basic filters
+        if sample_batch_id or target_collection_id or show_target_collection:
+            stmt = stmt.join(
+                TargetCompoundInTargetCollection,
+                TargetCompoundInTargetCollection.target_compound_id
+                == TargetIon.target_compound_id,
+            )
+
+            # Filter ions by sample_batch_id if specified
+            if sample_batch_id:
+                # Fetch sample batch and related ion mechanisms and target collection ids
+                result = await session.execute(
+                    select(SampleBatch)
+                    .options(joinedload(SampleBatch.target_collection))
+                    .where(SampleBatch.sample_batch_id == sample_batch_id)
+                )
+                sample_batch = result.unique().scalar_one_or_none()
+                if not sample_batch:
+                    raise NotFoundException(
+                        f"Sample batch with id {sample_batch_id} not found"
+                    )
+
+                # Extract ion mechanisms directly
+                ionization_mechanism_ids = sample_batch.build_params["ion_mechanisms"]
+                # Since we have eager loaded the target_collection, we can fetch them directly from sample_batch
+                target_collection_ids = [
+                    tc.target_collection_id for tc in sample_batch.target_collection
+                ]
+
+                # Filter isotopes by batch ionization_mechanism_ids and target_collection_ids
+                stmt = stmt.where(
+                    TargetCompoundInTargetCollection.target_collection_id.in_(
+                        target_collection_ids
+                    ),
+                    TargetIon.ionization_mechanism_id.in_(ionization_mechanism_ids),
+                ).distinct()
+
+            # Filter isotopes by target_collection_id if specified
+            if target_collection_id:
+                stmt = stmt.filter(
+                    TargetCompoundInTargetCollection.target_collection_id
+                    == target_collection_id
                 )
 
-            # Extract ion mechanisms directly
-            ionization_mechanism_ids = sample_batch.build_params["ion_mechanisms"]
-
-            # Since we have eager loaded the target_collection, we can fetch them directly from sample_batch
-            target_collection_ids = [
-                tc.target_collection_id for tc in sample_batch.target_collection
-            ]
-
-            # Modify the statement to include filters based on target collections and ionization mechanisms
-            stmt = (
-                stmt.join(
-                    TargetCompoundInTargetCollection,
-                    TargetCompoundInTargetCollection.target_compound_id
-                    == TargetIon.target_compound_id,
-                )
-                .join(
+            # Add the target_collection_id to be shown
+            if show_target_collection:
+                stmt = stmt.join(
                     TargetCollection,
                     TargetCollection.target_collection_id
                     == TargetCompoundInTargetCollection.target_collection_id,
                 )
-                .where(
-                    TargetCollection.target_collection_id.in_(target_collection_ids),
-                    TargetIon.ionization_mechanism_id.in_(ionization_mechanism_ids),
+                stmt = stmt.add_columns(
+                    TargetCompoundInTargetCollection.target_collection_id,
+                    TargetCollection.target_collection_name,
+                    TargetCollection.target_collection_type,
                 )
-                .distinct()
-            )
 
-        # Apply sorting and pagination
+        # Step 4: Apply sorting
         if sort:
             if order == "desc":
                 stmt = stmt.order_by(desc(getattr(TargetIsotope, sort)))
             else:
                 stmt = stmt.order_by(asc(getattr(TargetIsotope, sort)))
-        stmt = stmt.offset(page * limit).limit(limit)
 
-        # Execute query
-        result = await session.execute(stmt)
-        target_isotopes = result.scalars().all()
-
-        # Get total count
-        count_stmt = select(func.count()).select_from(  # pylint: disable=not-callable
-            stmt
+        # Step 5: Get total count
+        total = await session.scalar(
+            select(func.count()).select_from(stmt)  # pylint: disable=not-callable
         )
-        total = await session.scalar(count_stmt)
 
-        return {
-            "results": total,
-            "data": [target_isotope.to_dict() for target_isotope in target_isotopes],
-        }
+        # Step 6:  Apply pagination
+        stmt = stmt.offset(page * limit).limit(limit)
+        result = await session.execute(stmt)
+
+    # Step 7: Construct the response data
+    data = []
+    for row in result.all():
+        # When show_target_collection is true, include target_collection_id
+        isotope_data = row.TargetIsotope.to_dict()
+        if show_filter_params:
+            isotope_data["filter_params"] = row.filter_params
+        if show_target_collection:
+            isotope_data["target_collection_id"] = row.target_collection_id
+            isotope_data["target_collection_name"] = row.target_collection_name
+            isotope_data["target_collection_type"] = row.target_collection_type
+        data.append(isotope_data)
+
+    return {
+        "results": total,
+        "data": data,
+    }
 
 
 @api_controller()

@@ -49,9 +49,12 @@ class GetTargetCompoundsQueryParams(BaseModel):
     sample_batch_id: Optional[str] = Field(
         None, description="The ID of the sample batch to filter compounds by."
     )
-    show_duplicates: bool = Field(
+    target_collection_id: Optional[str] = Field(
+        None, description="The ID of the target collection to filter compounds by."
+    )
+    show_target_collection: bool = Field(
         False,
-        description="Flag to include duplicate compounds and their collection IDs.",
+        description="Flag to include target collection ID, also duplicate compounds present in several collections will be shown.",
     )
     sort: Optional[str] = Field(
         None, description="The column name to sort the results by."

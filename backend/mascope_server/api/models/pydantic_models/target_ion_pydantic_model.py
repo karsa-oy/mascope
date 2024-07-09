@@ -25,6 +25,16 @@ class GetTargetIonsQueryParams(BaseModel):
     target_ion_formula: Optional[str] = Field(
         None, description="Filter by target ion formula."
     )
+    sample_batch_id: Optional[str] = Field(
+        None, description="The ID of the sample batch to filter ions by."
+    )
+    target_collection_id: Optional[str] = Field(
+        None, description="The ID of the target collection to filter ions by."
+    )
+    show_target_collection: bool = Field(
+        False,
+        description="Flag to include target collection ID, also duplicate compounds present in several collections will be shown.",
+    )
     sort: Optional[str] = Field(None, description="Field to sort by.")
     order: Optional[str] = Field(
         None, description="Order of sorting ('asc' or 'desc')."
