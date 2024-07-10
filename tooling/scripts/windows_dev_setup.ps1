@@ -133,7 +133,7 @@ function Install-Tooling {
         py -3.12 -m pipx ensurepath
     }
     # install poetry with pipx in our python
-    Set-EnvVar 'PIPX_DEFAULT_PYTHON' "C:\Users\${env:UserName}\AppData\Local\Programs\Python\Python312\python.exe"
+    Set-EnvVar 'PIPX_DEFAULT_PYTHON' "${env:UserProfile}\AppData\Local\Programs\Python\Python312\python.exe"
     pipx install poetry
     Write-Output @"
 
