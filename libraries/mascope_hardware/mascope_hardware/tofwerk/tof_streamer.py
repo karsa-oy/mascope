@@ -75,9 +75,13 @@ class TofDaqStreamer(BaseGenerator):
         BaseGenerator.__init__(self)
 
         # Initialize TW API related structures 'desc' and 'ptr'
+        count=0
+        warning_timeout=60
         while not TwTofDaqRunning() and not shutdown_event.is_set():
-            logger.warning("TofDaq Recorder not running.")
-            sleep(5)
+            if count % warning_timeout == 0:
+                logger.warning("[blink orange1]TofDaq Recorder not running[/blink orange1]")
+            count+=1
+            sleep(1)
         self.desc = TSharedMemoryDesc()  # TW shared memory descriptor
         ret = TwGetDescriptor(self.desc)
         if ret == 4:
