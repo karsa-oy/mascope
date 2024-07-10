@@ -201,7 +201,7 @@ async def run():
     for index, batch in enumerate(sample_batches, start=1):
         try:
             logger.info(
-                f"⚙️ Processing batch {index}/{total_batches}: {batch.sample_batch_name}"
+                f"Processing batch {index}/{total_batches}: {batch.sample_batch_name}"
             )
             await aggregate_and_create_matches(sample_batch_id=batch.sample_batch_id)
         except Exception as e:

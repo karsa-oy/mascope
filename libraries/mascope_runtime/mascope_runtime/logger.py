@@ -1,10 +1,20 @@
 import logging
 from rich.logging import RichHandler
+from rich.console import Console
+from rich.theme import Theme
+
+console = Console(
+    theme=Theme({
+        "logging.level.info": "deep_sky_blue1",
+        "logging.level.warning": "orange1",
+        "logging.level.error": "bold red"
+    })
+)
 
 from .modules import modules
 
 def create(name: str, color: str, max_length: int):
-    prefix=f'[{color}] {name.center(max_length, ' ').upper()} [/{color}]'
+    prefix=f'[{color}] {name.center(max_length, ' ')} [/{color}]'
     logging.basicConfig(
         level=logging.INFO,
         format=prefix + "%(message)s",
@@ -12,7 +22,8 @@ def create(name: str, color: str, max_length: int):
         handlers=[
             RichHandler(
                 markup=True,
-                rich_tracebacks=True
+                rich_tracebacks=True,
+                console=console
             )
         ]
     )

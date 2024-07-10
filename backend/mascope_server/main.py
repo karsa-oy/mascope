@@ -17,9 +17,11 @@ from mascope_server.config import config
 
 from mascope_server.db import init_db
 
-import mascope_runtime as runtime
+from .logger import setup_rich_logger
 
 fastapi_app = FastAPI()
+
+setup_rich_logger()
 
 @fastapi_app.on_event("startup")
 async def startup_event():
@@ -106,7 +108,8 @@ def run():
         "mascope_server.main:app",
         host="0.0.0.0" if config.env.mode == "development" else "127.0.0.1",
         port=config.server.port,
-        reload=(config.env.mode == "development")
+        reload=(config.env.mode == "development"),
+        log_level='warning'
     )
 
 

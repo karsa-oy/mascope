@@ -1,5 +1,5 @@
 import mascope_runtime as runtime
-logger = runtime.logget.service('backend')
+logger = runtime.logger.service('backend')
 
 def get_table_configs(version=None) -> dict:
     """

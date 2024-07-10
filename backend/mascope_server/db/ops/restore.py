@@ -131,7 +131,7 @@ def create_indexes(conn, table_name, schema_info):
             # Execute index creation if it doesn't already exist
             if index_name not in existing_indexes:
                 cursor.execute(f"CREATE INDEX IF NOT EXISTS {index_sql}")
-                logger.info(f"➕ Index {index_name} created.")
+                logger.info(f"Index {index_name} created.")
 
 
 def restore_table(conn, table_name, schema_info):
@@ -187,7 +187,7 @@ def restore_table(conn, table_name, schema_info):
     logger.debug("correct_fks", schema_info["fks"])
 
     if current_columns != schema_info["columns"] or current_fks != schema_info["fks"]:
-        logger.info(f"⚙️ Schema mismatch detected, restoring {table_name}.")
+        logger.info(f"Schema mismatch detected, restoring {table_name}.")
         create_table_backup(cursor, table_name)
         update_backup_table(cursor, table_name)
         drop_table(cursor, table_name)
