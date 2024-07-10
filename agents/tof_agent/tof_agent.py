@@ -10,6 +10,8 @@ from mascope_hardware.tofwerk.tof_streamer import TofDaqStreamer
 
 import mascope_runtime as runtime
 
+logger = runtime.logger.service('tof-agent')
+
 
 async def streamer_processor(streamer):
     global sio
@@ -26,11 +28,11 @@ async def streamer_processor(streamer):
         }
         if spec_i is None:
             # File finished
-            print("File finished")
+            logger.info("File finished")
             raw_filename = data["source_filepath"]
             global target_path
             if not os.path.exists(target_path):
-                print("Creating mailbox: %s" % target_path)
+                logger.info("Creating mailbox: %s" % target_path)
                 os.mkdir(target_path)
             while True:
                 try:
@@ -40,7 +42,7 @@ async def streamer_processor(streamer):
                     )
                     break
                 except Exception as e:
-                    print("Failed to copy acquired file: %s" % e)
+                    logger.error("Failed to copy acquired file: %s" % e)
                     await sio.sleep(1)
             if sio.connected:
                 await sio.emit(
@@ -49,7 +51,7 @@ async def streamer_processor(streamer):
                 )
         elif spec_i < 0:
             # New file
-            print("New file: %s" % filename)
+            logger.info("New file: %s" % filename)
             if sio.connected:
                 await sio.emit(
                     "instrument_acquisition_started",
@@ -62,7 +64,7 @@ async def streamer_processor(streamer):
                     "instrument_acquisition_progress",
                     notification_data,
                 )
-        print("%.2f" % streamer.progress)
+        logger.info("%.2f" % streamer.progress)
         return True
 
     async def handle_tps_data(data):
@@ -113,10 +115,10 @@ async def main():
     elif host:
         url = f"http://{host}"
     if not url:
-        print("Mascope host not defined, running in offline mode")
+        logger.warning("Mascope host not defined, running in offline mode")
     while url and not shutdown_event.is_set():
         try:
-            print(f"Connecting to {url}")
+            logger.info(f"Connecting to {url}")
             await sio.connect(url)
             break
         except:
@@ -157,7 +159,7 @@ def run():
     except KeyboardInterrupt:
         shutdown_event.set()
     except Exception as e:
-        print(e)
+        logger.error(e)
         shutdown_event.set()
 
 

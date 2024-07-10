@@ -20,6 +20,8 @@ from mascope_server.api.models.pydantic_models.match_sample_pydantic_model impor
     MatchSampleBase,
 )
 
+import mascope_runtime as runtime
+logger = runtime.logger.service('backend')
 
 @api_controller()
 async def get_match_samples(
@@ -212,7 +214,7 @@ async def create_match_samples(
             },
             409,
         )
-    print(message)
+    logger.info(message)
     return result
 
 
@@ -245,5 +247,5 @@ async def delete_match_samples(
         deleted_count = result.rowcount
 
     message = f"{deleted_count} match sample{'s' if deleted_count != 1 else ''} deleted for {sample_ref}."
-    print(message)
+    logger.info(message)
     return {"message": message}

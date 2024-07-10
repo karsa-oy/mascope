@@ -7,37 +7,32 @@ from time import sleep
 from watchdog.events import PatternMatchingEventHandler
 from watchdog.observers import Observer
 
+import mascope_runtime as runtime
+
+logger = runtime.logger.service('backend')
 
 class FSWatcher:
     class FSEventHandler(PatternMatchingEventHandler):
-        def __init__(self, parent, path, mask, recursive=False):
+        def __init__(self, parent, path, patterns, recursive=False):
             self.parent = parent
             self.path = path
-            self.mask = mask
             self.recursive = recursive
             self.observer = Observer()
-            if not isinstance(mask, list):
-                mask = [
-                    mask,
-                ]
-            super().__init__(patterns=mask)
-
-        def log(self, *arg):
-            print(f"[{self.__class__.__name__}.{inspect.stack()[1].function}]", *arg)
+            super().__init__(patterns=patterns)
 
         def start(self):
             self.observer.schedule(self, self.path, recursive=self.recursive)
             self.observer.start()
-            self.log("started watching", self.path)
+            logger.info(f"started watching {self.path}")
 
         def stop(self):
             self.observer.stop()
             self.observer.join()
-            self.log("stopped")
+            logger.info("stopped")
 
         def on_created(self, event):
             filepath = event.src_path
-            self.log(f"Processing {filepath}")
+            logger.info(f"Processing {filepath}")
             # Wait until the file is ready
             filesize = -1
             while not self.parent.shutdown_event.is_set():
@@ -50,7 +45,7 @@ class FSWatcher:
                     os.rename(filepath, filepath)
                     break
                 except PermissionError:
-                    self.log(f"Cannot access {filepath}, retrying...")
+                    logger.error(f"Cannot access {filepath}, retrying...")
                     sleep(2)
                     continue
             if not self.parent.shutdown_event.is_set():
@@ -62,37 +57,34 @@ class FSWatcher:
                 try:
                     sleep(0.5)
                 except KeyboardInterrupt:
-                    self.log("KeyboardInterrupt")
+                    logger.critical("KeyboardInterrupt")
                     self.parent.shutdown_event.set()
                 except Exception as e:
-                    self.log(f"Exception {e.__class__.__name__}({str(e)})")
+                    logger.error(f"Exception {e.__class__.__name__}({str(e)})")
                     pass
             self.stop()
 
     class FSPingHandler:
         PING_INTERVAL = 3
 
-        def __init__(self, parent, path, mask, recursive=False):
+        def __init__(self, parent, path, patterns, recursive=False):
             self.parent = parent
             self.path = path
-            self.mask = mask
+            self.patterns = patterns
             self.recursive = recursive
 
-        def log(self, *arg):
-            print(f"[{self.__class__.__name__}.{inspect.stack()[1].function}]", *arg)
-
-        def walk(self, path=".", mask="*.*", recursive=False):
+        def walk(self, path=".", pattern="*.*", recursive=False):
             if recursive:
-                search_path = os.path.join(path, "**", mask)
+                search_path = os.path.join(path, "**", pattern)
             else:
-                search_path = os.path.join(path, mask)
+                search_path = os.path.join(path, pattern)
             return glob.glob(search_path, recursive=recursive)
 
         def start(self):
-            self.log("started watching", self.path)
+            logger.info("started watching", self.path)
 
         def stop(self):
-            self.log("stopped")
+            logger.info("stopped")
 
         def on_created(self, filelist):
             # Check for ready files in the filelist,
@@ -105,17 +97,17 @@ class FSWatcher:
                     continue
                 try:
                     os.rename(filepath, filepath)
-                    self.log(f"Processing {filepath}")
+                    logger.info(f"Processing {filepath}")
                     self.parent.file_queue.put(filepath)
                 except PermissionError:
-                    self.log(f"Cannot access file {filepath}, retrying...")
+                    logger.error(f"Cannot access file {filepath}, retrying...")
                     files_in_progress.append([filepath, new_filesize])
                     continue
             return files_in_progress
 
         def run(self):
             self.start()
-            files = self.walk(self.path, self.mask, self.recursive)
+            files = self.walk(self.path, self.patterns[0], self.recursive)
             new_files = []
             while not self.parent.shutdown_event.is_set():
                 try:
@@ -127,20 +119,17 @@ class FSWatcher:
                     files = latest_files
                     new_files = self.on_created(new_files)
                 except KeyboardInterrupt:
-                    self.log("KeyboardInterrupt")
+                    logger.critical("KeyboardInterrupt")
                     self.parent.shutdown_event.set()
                 except Exception as e:
-                    self.log(f"Exception {e.__class__.__name__}({str(e)})")
+                    logger.error(f"Exception {e.__class__.__name__}({str(e)})")
                     pass
             self.stop()
-
-    def log(self, *arg):
-        print(f"[{self.__class__.__name__}.{inspect.stack()[1].function}]", *arg)
 
     def __init__(
         self,
         path,
-        mask,
+        patterns,
         file_queue,
         recursive=False,
         ping=False,
@@ -150,9 +139,9 @@ class FSWatcher:
         self.shutdown_event = shutdown_event
         self.file_queue = file_queue
         if ping:
-            self.handler = self.FSPingHandler(self, path, mask, recursive)
+            self.handler = self.FSPingHandler(self, path, patterns, recursive)
         else:
-            self.handler = self.FSEventHandler(self, path, mask, recursive)
+            self.handler = self.FSEventHandler(self, path, patterns, recursive)
 
     def run_as_daemon(self):
         Thread(target=self.handler.run).start()

@@ -10,9 +10,12 @@ import numpy as np
 import xarray
 import zarr
 
+import mascope_runtime as runtime
+
 from .structs import ExtendableDataArray
 from .util import parse_path_from_item_filename
 
+logger = runtime.logger.service('standard-lib')
 
 class zarr_sdk:
     @staticmethod
@@ -21,7 +24,7 @@ class zarr_sdk:
         try:
             final_length = float(item["signal"].time[-1] + item["signal_period"][-1])
         except Exception as e:
-            print(
+            logger.error(
                 f"""
                 [finalize_signal_dataset] Warning: {e.__class__.__name__}({str(e)})
             """
@@ -144,7 +147,7 @@ class zarr_sdk:
     def update_centroid_dataset(data, item):
         value = data["value"]
         ti = np.array([value["t"]], dtype=np.float32)
-        # print(ti.item())
+        logger.debug(ti.item())
         c_y = np.frombuffer(value["peak_intensity"], dtype=np.float32)
         c_y = c_y.reshape(-1, 1)
         c_mz = np.frombuffer(value["peak_mz"], dtype=np.float32)
@@ -161,7 +164,7 @@ class zarr_sdk:
         value = data["value"]
         ti = np.array([value["t"]], dtype=np.float32)
         period = np.array([value["period"]], dtype=np.float32)
-        # print(ti.item())
+        logger.debug(ti.item())
         spec = np.frombuffer(value["spec"], dtype=np.float32)
         spec = spec.reshape(-1, 1)
         if "mz" in value:
@@ -408,7 +411,7 @@ def load_array(base_filename, var, prev_array=None):
     :rtype: xarray.Dataset
     """
 
-    # print("Loading array %s : %s" %(base_filename, var))
+    logger.debug("Loading array %s : %s" %(base_filename, var))
     var_path = filename_to_zarr_path(base_filename, var)
     if not os.path.exists(var_path):
         raise FileNotFoundError(var_path)
@@ -475,7 +478,7 @@ def load_file(base_filename, vars=None, prev_dataset=None):
         zarrs = get_file_data_vars(filepath)
         vars = [zarr.strip(".zarr") for zarr in zarrs]
     # Load arrays from mfzarrs
-    print(f"Loading {vars} from {base_filename}")
+    logger.info(f"Loading {vars} from {base_filename}")
     datasets = []
     zarr_groups = {}
     # Load requested data arrays
@@ -488,8 +491,8 @@ def load_file(base_filename, vars=None, prev_dataset=None):
         try:
             var_dataset = load_array(base_filename, var, prev_item)
         except FileNotFoundError as e:
-            print(f"[load_file] Error {base_filename}/{var}:")
-            print(f"    {e.__class__.__name__}({str(e)})")
+            logger.error(f"[load_file] Error {base_filename}/{var}:")
+            logger.error(f"    {e.__class__.__name__}({str(e)})")
             continue
         datasets.append(var_dataset)
         zarr_groups[var] = var_dataset.attrs.get("zarr_groups", [])
@@ -533,12 +536,12 @@ def open_mfzarr(path, sync=None, mode="r", concat_dim="time", prev_array=None):
     if prev_array is not None:
         prev_groups = prev_array.attrs.get("zarr_groups", [])
         for g in prev_groups:
-            # print('group %s already loaded' %g)
+            logger.debug('group %s already loaded' %g)
             groups.remove(g)
     if not groups:
-        # print('no new groups')
+        logger.debug('no new groups')
         return prev_array
-    # print("loading groups: %s" %groups)
+    logger.debug("loading groups: %s" %groups)
     x = xarray.concat(
         [
             xarray.open_zarr(path, g, consolidated=False, synchronizer=sync)

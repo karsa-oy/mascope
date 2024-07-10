@@ -5,6 +5,10 @@ import shutil
 
 from mascope_server.config import config
 
+import mascope_runtime as runtime
+
+logger = runtime.logger.service('backend')
+
 # patch asyncio to support run_until_complete
 # when an event loop is already running
 nest_asyncio.apply()
@@ -18,7 +22,7 @@ def run():
     new_conn = sqlite3.connect(database=new_db_path)
 
     with new_conn:
-        print("Creating match_rating table")
+        logger.info("Creating match_rating table")
 
         # Create match_rating table
         new_conn.execute(

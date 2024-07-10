@@ -1,72 +1,72 @@
-pkgs=[
+modules=[
     {
         'name': 'runtime-lib',
         'path': ['libraries', 'mascope_runtime'],
         'install': 'poetry install',
         'run': None,
-        'color': 'magenta'
+        'color': 'dim white'
     },
     {
         'name': 'standard-lib',
         'path': ['libraries', 'mascope_lib'],
         'install': 'poetry install',
         'run': None,
-        'color': 'magenta'
+        'color': 'dim white'
     },
     {
         'name': 'hardware-lib',
         'path': ['libraries', 'mascope_hardware'],
         'install': 'poetry install',
         'run': None,
-        'color': 'magenta'
+        'color': 'dim white'
     },
     {
         'name': 'api-lib',
         'path': ['libraries', 'mascope_api'],
         'install': 'poetry install',
         'run': None,
-        'color': 'magenta'
+        'color': 'dim white'
     },
     {
         'name': 'tof-agent',
         'path': ['agents', 'tof_agent'],
         'install': 'poetry install',
         'run': 'poetry run mascope-tof-agent',
-        'color': 'yellow'
+        'color': 'dim white'
     },
     {
         'name': 'file-mover',
         'path': ['agents', 'file_mover'],
         'install': 'poetry install',
         'run': 'poetry run mascope-file-mover',
-        'color': 'yellow'
+        'color': 'dim white'
     },
     {
         'name': 'file-converter',
         'path': ['backend'],
         'install': None,
         'run': 'poetry run mascope-file-converter',
-        'color': 'cyan'
+        'color': 'dim white'
     },
     {
         'name': 'backend',
         'path': ['backend'],
         'install': 'poetry install',
         'run': 'poetry run mascope-api',
-        'color': 'blue'
+        'color': 'dim white'
     },
     {
         'name': 'frontend',
         'path': ['frontend'],
         'install': 'npm install',
         'run': 'npm run dev',
-        'color': 'green'
+        'color': 'dim white'
     },
     {
         'name': 'cli',
         'path': ['tooling', 'cli'],
         'install': 'poetry install',
         'run': None,
-        'color': 'white'
+        'color': 'dim white'
     },
 ]

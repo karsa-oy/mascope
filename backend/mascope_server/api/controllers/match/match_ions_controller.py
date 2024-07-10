@@ -28,6 +28,8 @@ from mascope_server.api.models.pydantic_models.match_ion_pydantic_model import (
     MatchIonBase,
 )
 
+import mascope_runtime as runtime
+logger = runtime.logger.service('backend')
 
 @api_controller()
 async def get_match_ions(
@@ -264,7 +266,7 @@ async def create_match_ions(
         ] += f" Failed to create match ions for {error_count} sample{'s' if error_count != 1 else ''}."
         result["errors"] = dict(errors)
 
-    print(result["message"])
+    logger.info(result["message"])
     if not new_match_ions and errors:
         raise ApiException(
             f"Failed to create match ions due to duplicate issues for {error_count} samples.",
@@ -318,5 +320,5 @@ async def delete_match_ions(
     if target_ion_ids:
         message += f" Limited by {len(target_ion_ids)} specified target ion{'s' if len(target_ion_ids) != 1 else ''}."
 
-    print(message)
+    logger.info(message)
     return {"message": message}

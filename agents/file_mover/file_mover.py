@@ -14,6 +14,7 @@ from watchdog.observers import Observer
 
 import mascope_runtime as runtime
 
+logger = runtime.logger.service('file-mover')
 
 def parent_func_name() -> str:
     """Return the name of a parent function calling a class method
@@ -44,10 +45,6 @@ class FSWatcher:
                 ]
             super().__init__(patterns=mask)
 
-        def log(self, *arg) -> None:
-            """Print log message"""
-            print(f"[{self.__class__.__name__}.{inspect.stack()[1].function}]", *arg)
-
         def on_created(self, event: watchdog.events.FileSystemEvent) -> None:
             """New file created
 
@@ -59,7 +56,7 @@ class FSWatcher:
             except AttributeError:
                 pass
             except Exception as e:
-                self.log(f"Exception {e.__class__.__name__}({str(e)})")
+                logger.error(f"Exception {e.__class__.__name__}({str(e)})")
 
         def on_modified(self, event: watchdog.events.FileSystemEvent) -> None:
             """File modified
@@ -72,7 +69,7 @@ class FSWatcher:
             except AttributeError:
                 pass
             except Exception as e:
-                self.log(f"Exception {e.__class__.__name__}({str(e)})")
+                logger.error(f"Exception {e.__class__.__name__}({str(e)})")
 
         def on_deleted(self, event: watchdog.events.FileSystemEvent) -> None:
             """File deleted
@@ -85,7 +82,7 @@ class FSWatcher:
             except AttributeError:
                 pass
             except Exception as e:
-                self.log(f"Exception {e.__class__.__name__}({str(e)})")
+                logger.error(f"Exception {e.__class__.__name__}({str(e)})")
 
         def on_moved(self, event: watchdog.events.FileSystemEvent) -> None:
             """File moved
@@ -98,17 +95,13 @@ class FSWatcher:
             except AttributeError:
                 pass
             except Exception as e:
-                self.log(f"Exception {e.__class__.__name__}({str(e)})")
+                logger.error(f"Exception {e.__class__.__name__}({str(e)})")
             try:
                 self.client.on_filesystem_object_deleted(event.src_path)
             except AttributeError:
                 pass
             except Exception as e:
-                self.log(f"Exception {e.__class__.__name__}({str(e)})")
-
-    def log(self, *arg) -> None:
-        """Print a log message"""
-        print(f"[{self.__class__.__name__}.{inspect.stack()[1].function}]", *arg)
+                logger.error(f"Exception {e.__class__.__name__}({str(e)})")
 
     def __init__(self, client, target_attrs, recursive=False):
         self.client = client
@@ -126,7 +119,7 @@ class FSWatcher:
             self.handler, self.target_attrs["path"], recursive=self.recursive
         )
         self.observer.start()
-        self.log("started watching", self.target_attrs)
+        logger.info(f"started watching {self.target_attrs['path']}")
 
     def stop(self) -> None:
         """Stop watching.
@@ -135,7 +128,7 @@ class FSWatcher:
         """
         self.observer.stop()
         self.observer.join()
-        self.log("stopped")
+        logger.info("stopped")
 
     def run(self) -> None:
         """Main loop
@@ -147,10 +140,10 @@ class FSWatcher:
             try:
                 time.sleep(1)
             except KeyboardInterrupt:
-                self.log("KeyboardInterrupt")
+                logger.critical("KeyboardInterrupt")
                 self.client.shutdown_event.set()
             except Exception as e:
-                self.log(f"Exception {e.__class__.__name__}({str(e)})")
+                logger.critical(f"Exception {e.__class__.__name__}({str(e)})")
                 pass
         self.stop()
 
@@ -162,10 +155,6 @@ class SampleMover:
     """Watch for new files matching a specified `mask` in `source` directory, copy into
     `target` directory after file has not been accessed for specified timeout period.
     """
-
-    def log(self, *arg) -> None:
-        """Print log message"""
-        print(f"[{self.__class__.__name__}.{parent_func_name()}]", *arg)
 
     def __init__(self, src, target, mask):
         self.shutdown_event = Event()
@@ -184,7 +173,7 @@ class SampleMover:
         :param fname: File path
         :type fname: str
         """
-        self.log(fname)
+        logger.info(fname)
         # Wait until the file is ready
         filesize = -1
         while True:
@@ -195,7 +184,7 @@ class SampleMover:
                 os.rename(fname, fname)
                 break
             except PermissionError:
-                print("PermissionError, retrying...")
+                logger.error("PermissionError, retrying...")
                 time.sleep(1)
         self.jobs.put(fname)
 
@@ -217,7 +206,7 @@ class SampleMover:
         """
         dst_fname = os.path.join(self.target_dir, basename(fname))
         copy2(fname, dst_fname)
-        self.log(dst_fname)
+        logger.info(dst_fname)
 
     def run_until_complete(self, config):
         """Main loop
@@ -231,10 +220,10 @@ class SampleMover:
                 fname = None
                 try:
                     fname = self.jobs.get_nowait()
-                    # self.log(fname)
+                    logger.debug(fname)
                     if self.seconds_since_last_access(fname) < config.file_mover.timeout:
                         self.jobs.put(fname)
-                        # self.log(fname, 'back')
+                        logger.debug(fname, 'back')
                         continue
                     self.copy(fname)
                 except Empty:
@@ -244,9 +233,9 @@ class SampleMover:
                 except SameFileError:
                     continue
         except KeyboardInterrupt as e:
-            self.log(f"{e.__class__.__name__}({str(e)})")
+            logger.critical(f"{e.__class__.__name__}({str(e)})")
         except Exception as e:
-            self.log(f"{e.__class__.__name__}({str(e)})")
+            logger.critical(f"{e.__class__.__name__}({str(e)})")
         finally:
             self.shutdown_event.set()
 
@@ -266,7 +255,7 @@ def run() -> None:
         config.file_mover.mask
     )
     mover.watcher.run_as_daemon()
-    mover.run_until_complete(args)
+    mover.run_until_complete(config)
 
 
 if __name__ == "__main__":

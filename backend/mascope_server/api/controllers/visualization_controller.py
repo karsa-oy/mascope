@@ -11,6 +11,9 @@ from ..models.models import Sample, TargetIsotope
 from ..exceptions import NotFoundException
 from ..utils.api_features import api_controller_background_task
 
+import mascope_runtime as runtime
+logger = runtime.logger.service('backend')
+
 # TODO_configuration shift traces color
 COLOR_OFFSET = 5
 
@@ -78,7 +81,7 @@ async def visualize_ion_focus(
             )
 
     # Step 2: Load the sample file and prepare data slice
-    print("Loading file: %s" % filename)
+    logger.info("Loading file: %s" % filename)
     sample_file = load_file(filename, vars=["sum_signal", "signal", "peak_heights"])
 
     # Step 3: Convert target ion data to DataFrame and prepare data
@@ -94,7 +97,7 @@ async def visualize_ion_focus(
     main_isotope_height = 0
     sum_timeseries = None
     for i, mz in enumerate(mzs):
-        print("{:d}/{:d}: {:3f}".format(i + 1, len(mzs), mz))
+        logger.info("{:d}/{:d}: {:3f}".format(i + 1, len(mzs), mz))
         spectrum_traces = []
         timeseries_traces = []
         dmz = 0.5

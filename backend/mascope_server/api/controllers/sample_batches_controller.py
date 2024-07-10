@@ -55,6 +55,8 @@ from ..models.pydantic_models.user_notification_pydantic_model import (
     UserNotification,
 )
 
+import mascope_runtime as runtime
+logger = runtime.logger.service('backend')
 
 @api_controller()
 async def get_sample_batches(
@@ -1036,7 +1038,7 @@ async def sample_batch_export_peaks(
 
             await send_progress_user_notification(notification, 1)
         except Exception as e:
-            print(repr(e))
+            logger.error(repr(e))
             continue
 
         peak_data.extend(
@@ -1076,11 +1078,11 @@ async def sample_batch_export_peaks(
         + sample_batch["sample_batch_name"].replace(" ", "_")
         + ".parquet"
     )
-    print(f"Writing peak data to file {peakfile_filename}")
+    logger.info(f"Writing peak data to file {peakfile_filename}")
     batch_peak_df.to_parquet(
         os.path.join(peakfile_path, peakfile_filename), index=False
     )
-    print("Write complete")
+    logger.info("Write complete")
 
     # Step 6: Return the status message
     return {

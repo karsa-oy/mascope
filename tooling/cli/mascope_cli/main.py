@@ -7,7 +7,7 @@ from rich.table import Table
 
 import mascope_runtime as runtime
 
-from . import cmd, lib
+from . import cmd
 
 mascope_path=os.environ['MASCOPE_PATH']
 
@@ -24,17 +24,20 @@ def main(config: Optional[str] = None):
     runtime.state.config_temp = config
 
 @app.command()
-def pkgs(installable: bool = False, runnable: bool = False):
+def modules(installable: bool = False, runnable: bool = False):
     """
-    📦 List packages in the monorepo
+    📦 List modules in the monorepo
 
-    Use --installable to list packages installed by 'mascope dev install' and
-    --runnable to list packages that can be run by 'mascope dev run'.
+    A 'module' may be a Python or NPM package or a service which is part of 
+    a package and can be independently run.
+
+    Use --installable to list modules installed by 'mascope dev install' and
+    --runnable to list modules that can be run by 'mascope dev run'.
     """
-    def show(pkg):
+    def show(mod):
         conditions=[
-            (pkg['install'] if installable else True),
-            (pkg['run'] if runnable else True)
+            (mod['install'] if installable else True),
+            (mod['run'] if runnable else True)
         ]
         return all(conditions)
     
@@ -44,10 +47,10 @@ def pkgs(installable: bool = False, runnable: bool = False):
     table.add_column("Install", style="magenta", no_wrap=True)
     table.add_column("Run", style="magenta", no_wrap=True)
     table.add_column("Color", style="cyan", no_wrap=True)
-    for pkg in lib.pkgs:
-        if show(pkg):
-            pkg_path=os.path.join(mascope_path, *pkg['path'])
-            table.add_row(pkg['name'], pkg_path, pkg['install'], pkg['run'], pkg['color'])
+    for mod in runtime.modules:
+        if show(mod):
+            mod_path=os.path.join(mascope_path, *mod['path'])
+            table.add_row(mod['name'], mod_path, mod['install'], mod['run'], mod['color'])
     console = Console()
     console.print(table)
 

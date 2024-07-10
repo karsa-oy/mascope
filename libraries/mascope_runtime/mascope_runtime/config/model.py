@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 
-from typing import Literal
+from typing import Literal, List
 
 EnvMode = Literal[
     'development',
@@ -36,6 +36,8 @@ class MascopeFileConverterConfig(BaseModel):
     ping: bool = False
     source: str = r'./runtime/data/streams'
     target: str = r'./runtime/data/filestore'
+    recursive: bool = False
+    patterns: List[str] = ['*.h5', '*.raw']
 
 class MascopeTofAgentConfig(BaseModel):
     host: str

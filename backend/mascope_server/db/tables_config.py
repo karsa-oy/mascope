@@ -1,3 +1,6 @@
+import mascope_runtime as runtime
+logger = runtime.logget.service('backend')
+
 def get_table_configs(version=None) -> dict:
     """
     Retrieves the table configurations for the specified version of the database schema. If a specific
@@ -14,14 +17,14 @@ def get_table_configs(version=None) -> dict:
         config_name = f"table_configs_v{version}"
         try:
             config = globals()[config_name]
-            print(f"Using schema configuration for version {version}.")
+            logger.info(f"Using schema configuration for version {version}.")
             return config
         except KeyError:
-            print(
+            logger.error(
                 f"No specific schema configuration for version {version}, using current configuration."
             )
     else:
-        print("No version specified, using current schema configuration.")
+        logger.info("No version specified, using current schema configuration.")
     return table_configs
 
 

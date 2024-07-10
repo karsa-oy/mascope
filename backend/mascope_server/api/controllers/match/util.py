@@ -13,6 +13,9 @@ from mascope_server.api.models.models import (
     SampleBatch,
 )
 
+import mascope_runtime as runtime
+logger = runtime.logger.service('backend')
+
 
 # -------------------------------------------------------------------
 # Utility Functions
@@ -54,7 +57,7 @@ async def fetch_sample_item_ids(
                 error_msg = (
                     f"No sample items found for sample batch ID '{sample_batch_id}'."
                 )
-                print(error_msg)
+                logger.error(error_msg)
                 raise NotFoundException(error_msg)
             sample_item_ids = [item.sample_item_id for item in sample_items]
             batch = await session.get(SampleBatch, sample_batch_id)

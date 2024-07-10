@@ -4,6 +4,10 @@ import sqlite3
 from mascope_server.db import get_current_db_version, create_db_backup
 from mascope_server.config import config
 
+import mascope_runtime as runtime
+
+logger = runtime.logger.service('backend')
+
 def run_db_maintenance():
     """
     Executes maintenance operations on the database. This includes backing up the database,
@@ -20,24 +24,24 @@ def run_db_maintenance():
     conn = sqlite3.connect(db_path)
     with conn:
         # Perform a VACUUM operation to rebuild the database and optimize disk space
-        print("Performing VACUUM...")
+        logger.info("Performing VACUUM...")
         conn.execute("VACUUM")
 
         # Perform an ANALYZE operation to optimize the database's internal statistics for better query planning
-        print("Performing ANALYZE...")
+        logger.info("Performing ANALYZE...")
         conn.execute("ANALYZE")
 
         # Log indexes after ANALYZE
-        print("Indexes after maintenance:")
+        logger.info("Indexes after maintenance:")
         log_indexes(conn)
 
         # Other maintenance operations could be added here
-        print("Checking database integrity...")
+        logger.info("Checking database integrity...")
         result = conn.execute("PRAGMA integrity_check")
         integrity_result = result.fetchone()
-        print(f"Integrity check result: {integrity_result}")
+        logger.info(f"Integrity check result: {integrity_result}")
 
-    print("Database maintenance operations completed successfully.")
+    logger.info("Database maintenance operations completed successfully.")
 
 
 def log_indexes(conn):
@@ -51,19 +55,19 @@ def log_indexes(conn):
 
     for table in tables:
         # TODO_debug_mode
-        # print(f"Indexes for table {table[0]}:")
+        logger.debug(f"Indexes for table {table[0]}:")
         cursor.execute(f"PRAGMA index_list({table[0]})")
         indexes = cursor.fetchall()
         for index in indexes:
-            print(index)
+            logger.info(index)
             if "idx_" in index[1]:
                 manual_index_count += 1
             elif "sqlite_autoindex_" in index[1]:
                 auto_index_count += 1
 
-    print("\nSummary of Index Usage:")
-    print(f"Manual indexes count: {manual_index_count}")
-    print(f"Auto-created indexes count: {auto_index_count}")
+    logger.info("\nSummary of Index Usage:")
+    logger.info(f"Manual indexes count: {manual_index_count}")
+    logger.info(f"Auto-created indexes count: {auto_index_count}")
 
     if manual_index_count == 0 and auto_index_count == 0:
-        print("Warning: No indexes found, please verify if this is expected.")
+        logger.warning("No indexes found, please verify if this is expected.")

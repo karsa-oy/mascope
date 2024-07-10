@@ -24,6 +24,9 @@ from mascope_server.api.controllers.instrument_functions_controller import (
 from mascope_server.config import config
 from mascope_lib.peak import detect_peaks
 
+import mascope_runtime as runtime
+logger = runtime.logger.service('backend')
+
 instrument_dir = config.server.streams
 
 
@@ -50,7 +53,7 @@ def sample_file_op(sample_filepath: str, sample_filename: str) -> None:
             )
         )
     except Exception as e:
-        print(f"Failed to process sample file {sample_filename}: {e}")
+        logger.error(f"Failed to process sample file {sample_filename}: {e}")
 
 
 def sample_file_array_op(sample_filepath: str, sample_file_array: str) -> None:
@@ -97,7 +100,7 @@ if __name__ == "__main__":
             continue
         # We are in a date directory, dirnames are sample files
         for sample_filename in fnmatch.filter(dirnames, sample_filename_pattern):
-            # print(sample_filename)
+            logger.debug(sample_filename)
             sample_filepath = os.path.join(dirpath, sample_filename)
             sample_file_op(sample_filepath, sample_filename)
             # Directories and files inside the sample file

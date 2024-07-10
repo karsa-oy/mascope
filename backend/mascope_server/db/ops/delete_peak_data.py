@@ -11,6 +11,9 @@ from datetime import datetime
 
 from mascope_server.config import config
 
+import mascope_runtime as runtime
+logger = runtime.logger.service('backend')
+
 instrument_dir = config.server.streams
 
 
@@ -59,7 +62,7 @@ if __name__ == "__main__":
             continue
         # We are in a date directory, dirnames are sample files
         for sample_filename in fnmatch.filter(dirnames, sample_filename_pattern):
-            print(sample_filename)
+            logger.info(sample_filename)
             sample_filepath = os.path.join(dirpath, sample_filename)
             # Directories and files inside the sample file
             _, sample_file_arrays, sample_file_attrs = next(os.walk(sample_filepath))

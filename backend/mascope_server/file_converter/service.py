@@ -26,6 +26,8 @@ from mascope_server.config import config
 from .util import load_env_yaml
 from .watcher import FSWatcher
 
+import mascope_runtime as runtime
+logger = runtime.logger.service('backend')
 
 def create_sample_file_db_record(data):
     """Create a sample file database record by a HTTP request
@@ -35,7 +37,7 @@ def create_sample_file_db_record(data):
     :raises Exception: HTTP request failed
     """
     filename = data["filename"]
-    print(f"Creating sample file record for file: {filename}")
+    logger.info(f"Creating sample file record for file: {filename}")
     instrument_name = filename.split("_")[0]
     committed_length = data["committed_length"]
     date = timestamp_from_filename(filename)
@@ -86,7 +88,7 @@ def process_stream(streamer):
 
         def cleanup():
             """Clean-up routine on stream canceled"""
-            print("Canceling...")
+            logger.info("Canceling...")
             streamer.cancel_event.set()
             # Clear queues
             streamer.spec_queue.get()  # data
@@ -104,7 +106,7 @@ def process_stream(streamer):
             "progress": streamer.progress,
         }
         if spec_i is None:
-            print("Signal termination detected, finalizing dataset")
+            logger.info("Signal termination detected, finalizing dataset")
             zarr_sdk.finalize_signal_dataset({"value": data}, sample_file)
             data.update(
                 {
@@ -116,30 +118,30 @@ def process_stream(streamer):
                 }
             )
             filepath = data.pop("source_filepath")
-            print("Deleting file from streams folder")
+            logger.info("Deleting file from streams folder")
             try:
                 os.remove(filepath)
             except FileNotFoundError as e:
-                print(f"Failed to delete file {filepath} from the streams folder: {e}")
+                logger.error(f"Failed to delete file {filepath} from the streams folder: {e}")
 
             # Send request to Mascope backend to create sample file record in the db
             try:
                 create_sample_file_db_record(data)
             except Exception as e:
-                print(f"Failed to create database record: {e}")
+                logger.error(f"Failed to create database record: {e}")
             try:
                 sio.emit(
                     "instrument_conversion_finished",
                     notification_data,
                 )
             except Exception as e:
-                print(f"Failed to emit notification: {e}")
+                logger.error(f"Failed to emit notification: {e}")
         elif spec_i < 0:
             # New file
             try:
                 sample_file = zarr_sdk.init_signal_dataset({"value": data})
             except Exception as e:
-                print(
+                logger.error(
                     f"Error starting {data['filename']}: {e.__class__.__name__}({str(e)})"
                 )
                 cleanup()
@@ -149,15 +151,15 @@ def process_stream(streamer):
             try:
                 sio.emit("instrument_conversion_started", notification_data)
             except Exception as e:
-                print(f"Failed to emit notification: {e}")
+                logger.error(f"Failed to emit notification: {e}")
         else:
             # New data to existing file
             zarr_sdk.update_signal_dataset({"value": data}, sample_file)
             try:
-                print(notification_data["progress"])
+                logger.info(notification_data["progress"])
                 sio.emit("instrument_conversion_progress", notification_data)
             except Exception as e:
-                print(f"Failed to emit notification: {e}")
+                logger.error(f"Failed to emit notification: {e}")
         return True
 
     def handle_tps_data(data):
@@ -303,7 +305,7 @@ def main():
     """Main loop of the service. Connect socket.io and then do nothing."""
     global sio
     url = f"http://{host}:{port}"
-    print(f"Connecting to {url}...")
+    logger.info(f"Connecting to {url}...")
     while not shutdown_event.is_set():
         # Keep trying to connect to socket.io server
         try:
@@ -337,54 +339,52 @@ def run():
     global file_queue
     global shutdown_event
 
-    # Parse command line arguments
-    args = parse_cmd_args()
-
-    host = args.get("host", "127.0.0.1")
-    port = args.get("port", os.environ.get("MASCOPE_PUBLIC_API_PORT"))
+    host = 'localhost'
+    port = config.server.port
 
     # Validate streamer type
-    streamer_type = args["streamer_type"]
-    if streamer_type == "H5":
-        streamer_class = H5Streamer
-        file_mask = "*.h5"
-    elif streamer_type == "Raw":
-        streamer_class = RawStreamer
-        file_mask = "*.raw"
-    else:
-        raise Exception(f"Unknown streamer type: {streamer_type}")
+    for pattern in config.file_converter.patterns:
+        if pattern not in ['*.raw', '*.h5']:
+            raise Exception(f"Unknown file converter pattern: {pattern}")
 
     # Initialize streamer thread(s)
-    n_jobs = args.get("n_jobs", 1)
     cache = dict()
     streamer_lock = Lock()
-    streamers = [
-        streamer_class(
+    raw_streamers = [
+        RawStreamer(
             file_queue=file_queue,
             shutdown_event=shutdown_event,
             lock=streamer_lock,
         )
-        for _ in range(n_jobs)
-    ]
+        for _ in range(config.file_converter.threads)
+    ] if '*.raw' in config.file_converter.patterns else []
+    h5_streamers = [
+        RawStreamer(
+            file_queue=file_queue,
+            shutdown_event=shutdown_event,
+            lock=streamer_lock,
+        )
+        for _ in range(config.file_converter.threads)
+    ] if '*.h5' in config.file_converter.patterns else []
+    streamers=[*raw_streamers, *h5_streamers]
+
     # Start streamer thread(s)
     for streamer in streamers:
         streamer.start()
         streamer_processor = Thread(target=process_stream, args=(streamer,))
         streamer_processor.start()
 
-    source_path = args.get("source_dir", ".")
-
-    if not os.path.exists(source_path):
-        print(f"Creating missing source directory {source_path}")
-        os.makedirs(source_path)
+    if not os.path.exists(config.file_converter.source):
+        logger.info(f"Creating missing source directory {config.file_converter.source}")
+        os.makedirs(config.file_converter.source)
 
     # Initialize file system watcher
     fs_watcher = FSWatcher(
-        path=source_path,
-        mask=file_mask,
+        path=config.file_converter.source,
+        patterns=['*.raw', '*.h5'],
         file_queue=file_queue,
-        recursive=args["recursive"],  # default False
-        ping=args["ping"],  # default False
+        recursive=config.file_converter.recursive,  # default False
+        ping=config.file_converter.ping,  # default False
         shutdown_event=shutdown_event,
     )
     # Start file system watcher

@@ -14,6 +14,10 @@ from mascope_lib.file_func import filename_to_zarr_path, load_file
 from mascope_server.db.id import gen_id
 from mascope_server.config import config
 
+import mascope_runtime as runtime
+
+logger = runtime.logger.service('backend')
+
 # patch asyncio to supported run_until_complete
 # when an event loop is already running
 nest_asyncio.apply()
@@ -220,7 +224,7 @@ def run():
             try:
                 shutil.rmtree(peaks_path)
             except Exception as e:
-                print(e)
+                logger.error(e)
 
         # Delete all matches
         new_conn.cursor().execute(

@@ -12,6 +12,10 @@ from mascope_server.config import config
 
 from mascope_server.db import configure_database_engine, async_session
 
+import mascope_runtime as runtime
+
+logger = runtime.logger.service('backend')
+
 async def run():
     # Step 1: Setup new database
     new_version = 14
@@ -24,7 +28,7 @@ async def run():
     configure_database_engine(new_version)
 
     # Step 2: Rename match table to match_isotope
-    print("Renaming match table to match_isotope.")
+    logger.info("Renaming match table to match_isotope.")
     async with async_session() as session:  # Perform database operations using async_session
         # Create backup of the current match table
         await session.execute(text("CREATE TABLE match_backup AS SELECT * FROM match;"))
@@ -91,7 +95,7 @@ async def run():
         await session.commit()
 
     #  Step 3: Create new match_ tables
-    print("Creating new match_ tables.")
+    logger.info("Creating new match_ tables.")
     async with async_session() as session:  # Perform database operations using async_session
         # Create match_sample table
         await session.execute(
@@ -191,21 +195,21 @@ async def run():
         sample_batches = result.scalars().all()
 
     total_batches = len(sample_batches)
-    print(f"Aggregating and creating matches for {total_batches} sample batches.")
+    logger.info(f"Aggregating and creating matches for {total_batches} sample batches.")
 
     # Call the aggregate_and_create_matches for each batch
     for index, batch in enumerate(sample_batches, start=1):
         try:
-            print(
+            logger.info(
                 f"⚙️ Processing batch {index}/{total_batches}: {batch.sample_batch_name}"
             )
             await aggregate_and_create_matches(sample_batch_id=batch.sample_batch_id)
         except Exception as e:
-            print(
+            logger.error(
                 f"Failed to aggregating and create matches for sample batch '{batch.sample_batch_name}': {str(e)}"
             )
 
-    print(f"Migration to v{new_version} completed successfully.")
+    logger.info(f"Migration to v{new_version} completed successfully.")
 
 
 if __name__ == "__main__":

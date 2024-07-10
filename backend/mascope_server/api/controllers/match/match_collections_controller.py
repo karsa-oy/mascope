@@ -21,6 +21,9 @@ from mascope_server.api.models.pydantic_models.match_collection_pydantic_model i
     MatchCollectionBase,
 )
 
+import mascope_runtime as runtime
+logger = runtime.logger.service('backend')
+
 
 @api_controller()
 async def get_match_collections(
@@ -223,7 +226,7 @@ async def create_match_collections(
         user_message = f"Failed to create match collections for {len(errors)} sample{'s' if len(errors) != 1 else ''}."
         raise ApiException(user_message, {"errors": errors}, 409)
 
-    print(message)
+    logger.info(message)
     return result
 
 
@@ -266,5 +269,5 @@ async def delete_match_collections(
     if target_collections_ids:
         message += f" Limited by specified {len(target_collections_ids)} target collection{'s' if len(target_collections_ids) != 1 else ''}."
 
-    print(message)
+    logger.info(message)
     return {"message": message}

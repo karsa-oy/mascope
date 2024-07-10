@@ -61,6 +61,8 @@ from mascope_server.api.models.pydantic_models.match_sample_pydantic_model impor
     MatchSampleBase,
 )
 
+import mascope_runtime as runtime
+logger = runtime.logger.service('backend')
 
 @api_controller()
 async def filter_match_isotope_data(
@@ -116,7 +118,7 @@ async def filter_match_isotope_data(
             message = (
                 f"No samples found in the batch '{sample_batch.sample_batch_name}'"
             )
-            print(message)
+            logger.info(message)
             return samples_df
 
         sample_item_ids = samples_df["sample_item_id"].tolist()
@@ -183,7 +185,7 @@ async def filter_match_isotope_data(
         target_result = await session.execute(target_query)
         targets_df = pd.DataFrame([row._asdict() for row in target_result.fetchall()])
         if targets_df.empty:
-            print(f"No targets found in the batch '{sample_batch.sample_batch_name}'")
+            logger.info(f"No targets found in the batch '{sample_batch.sample_batch_name}'")
             return targets_df
 
         target_isotope_ids = targets_df["target_isotope_id"].tolist()
@@ -215,7 +217,7 @@ async def filter_match_isotope_data(
         match_isotopes_result = await session.execute(match_isotopes_query)
         match_isotopes_df = pd.DataFrame(match_isotopes_result.fetchall())
         if match_isotopes_df.empty:
-            print(
+            logger.info(
                 f"No match isotopes found for the sample batch '{sample_batch.sample_batch_name}'"
             )
             return match_isotopes_df
@@ -241,7 +243,7 @@ async def filter_match_isotope_data(
             match_interference_df = pd.DataFrame(match_interference_result.fetchall())
 
             if match_interference_df.empty:
-                print(
+                logger.info(
                     f"No match interference found for the sample batch '{sample_batch.sample_batch_name}'"
                 )
                 return match_interference_df
@@ -458,7 +460,7 @@ async def aggregate_and_create_matches(
         )
         descriptions.append("match_samples")
 
-    print(f"Creating {', '.join(descriptions)} for {sample_ref}.")
+    logger.info(f"Creating {', '.join(descriptions)} for {sample_ref}.")
 
     # Process each type of match data if available
     for create_func, raw_data, model_cls in create_operations:

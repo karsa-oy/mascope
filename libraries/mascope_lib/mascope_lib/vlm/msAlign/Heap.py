@@ -1,3 +1,6 @@
+import mascope_runtime as runtime
+logger = runtime.logger.service('standard-lib')
+
 max_predicate = lambda a, b: a[2] <= b[2]
 
 
@@ -68,7 +71,7 @@ class Heap:
                 break
 
     def pop_and_feed(self, peak, comp=max_predicate):
-        # print('initial heap: %s' %str(self.heap))
+        logger.debug('initial heap: %s' %str(self.heap))
         if self.empty():
             raise Exception("Heap::popAndFeed(): theVector must be non empty")
 
@@ -80,15 +83,15 @@ class Heap:
 
         # swap 1st and last element and reconstruct heap without last element
         self.pop_heap(comp)
-        # print('heap after pop: %s' %str(self.heap))
+        logger.debug('heap after pop: %s' %str(self.heap))
         spectra = peak[spectra_indx]
 
         if peak_indx < len(spectra):
             new_value = [spectra_indx, peak_indx, spectra[peak_indx]]
             self.push_heap(new_value, comp)
-            # print('heap after push: %s' %str(self.heap))
+            logger.debug('heap after push: %s' %str(self.heap))
         else:
-            # print('heap; pop_and_feed; pop_back()')
+            logger.debug('heap; pop_and_feed; pop_back()')
             self.pop_back()
-        # print('final heap: %s' %str(self.heap))
+        logger.debug('final heap: %s' %str(self.heap))
         return returned_peak

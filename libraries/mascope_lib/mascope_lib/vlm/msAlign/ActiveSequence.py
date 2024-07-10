@@ -1,3 +1,6 @@
+import mascope_runtime as runtime
+logger = runtime.logger.service('standard-lib')
+
 class ActiveSequence:
     def __init__(
         self, num_spectra: int, window_size: float, p_vlm: bool, ref_spec: int
@@ -68,11 +71,11 @@ class ActiveSequence:
         new_size = float(len(self._the_list))
         if new_size == 0:
             self.mz_avg = 0
-            # print(self.mz_avg)
+            logger.debug(self.mz_avg)
         else:
             if self.ref_spec is None:
                 self.mz_avg = (old_size * self.mz_avg - self.mz_lb) / new_size
-            #  print(self.mz_avg)
+            logger.debug(self.mz_avg)
 
     def insert(self, heap, peak):
         if heap.empty():

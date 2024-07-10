@@ -6,6 +6,10 @@ from mascope_server.db import get_current_db_version, create_db_backup
 from mascope_server.db.tables_config import get_table_configs
 from mascope_server.config import config
 
+import mascope_runtime as runtime
+
+logger = runtime.logger.service('backend')
+
 
 def create_table_backup(cursor, table_name):
     """
@@ -77,7 +81,7 @@ def delete_orphaned_records(conn, table_name):
         )
         deleted_count = cursor.rowcount
         if deleted_count > 0:
-            print(
+            logger.info(
                 f"🗑️ Deleted {deleted_count} orphaned sample_batch records due to invalid workspace_id."
             )
     elif table_name == "target_compound_in_target_collection":
@@ -89,7 +93,7 @@ def delete_orphaned_records(conn, table_name):
         )
         deleted_count = cursor.rowcount
         if deleted_count > 0:
-            print(
+            logger.info(
                 f"🗑️ Deleted {deleted_count} orphaned target_compound_in_target_collection records due to invalid target_compound_id."
             )
 
@@ -102,7 +106,7 @@ def delete_orphaned_records(conn, table_name):
         )
         deleted_count = cursor.rowcount
         if deleted_count > 0:
-            print(
+            logger.info(
                 f"🗑️ Deleted {deleted_count} orphaned {table_name} records due to invalid sample_item_id."
             )
 
@@ -127,7 +131,7 @@ def create_indexes(conn, table_name, schema_info):
             # Execute index creation if it doesn't already exist
             if index_name not in existing_indexes:
                 cursor.execute(f"CREATE INDEX IF NOT EXISTS {index_sql}")
-                print(f"➕ Index {index_name} created.")
+                logger.info(f"➕ Index {index_name} created.")
 
 
 def restore_table(conn, table_name, schema_info):
@@ -176,22 +180,22 @@ def restore_table(conn, table_name, schema_info):
     # Fetch and format the current foreign key constraints
     cursor.execute(f"PRAGMA foreign_key_list({table_name})")
     current_fks = {fk[3]: (fk[2], fk[4], fk[5], fk[6]) for fk in cursor.fetchall()}
-    # TODO_debug_mode Debug mode conditional printing
-    # print("current_columns", current_columns)
-    # print("correct_columns", schema_info["columns"])
-    # print("current_fks", current_fks)
-    # print("correct_fks", schema_info["fks"])
+
+    logger.debug("current_columns", current_columns)
+    logger.debug("correct_columns", schema_info["columns"])
+    logger.debug("current_fks", current_fks)
+    logger.debug("correct_fks", schema_info["fks"])
 
     if current_columns != schema_info["columns"] or current_fks != schema_info["fks"]:
-        print(f"⚙️ Schema mismatch detected, restoring {table_name}.")
+        logger.info(f"⚙️ Schema mismatch detected, restoring {table_name}.")
         create_table_backup(cursor, table_name)
         update_backup_table(cursor, table_name)
         drop_table(cursor, table_name)
         cursor.execute(schema_info["create_sql"])  # create table with correct schema
         restore_data_from_backup(cursor, table_name, schema_info["columns"].keys())
-        print(f"Schema restoration of {table_name} completed.")
+        logger.info(f"Schema restoration of {table_name} completed.")
     else:
-        print(f"✅ Schema of {table_name} is correct, no restoration needed.")
+        logger.info(f"✅ Schema of {table_name} is correct, no restoration needed.")
 
 
 def run_db_restore():
@@ -233,6 +237,6 @@ def run_db_restore():
                 create_indexes(conn, table_name, table_configs[table_name])
                 conn.commit()
         else:
-            print(
+            logger.info(
                 f"No configuration found for '{table_name}'. Please check your table name or define its configuration."
             )
