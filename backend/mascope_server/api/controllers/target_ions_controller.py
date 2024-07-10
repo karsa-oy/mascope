@@ -1,14 +1,13 @@
-from sqlalchemy import asc, desc, func, select
 from typing import List, Optional
-
+from sqlalchemy import asc, desc, func, select
+from sqlalchemy.orm import joinedload
+from mascope_lib.molmass import Formula
 from mascope_server.db import async_session
 from mascope_server.api_sio import sio
 from mascope_server.db.id import gen_id
-
-from mascope_lib.molmass import Formula
-from ..utils.api_features import api_controller
-from ..exceptions import NotFoundException
-from ..models.models import (
+from mascope_server.api.utils.api_features import api_controller
+from mascope_server.api.exceptions import NotFoundException
+from mascope_server.api.models.models import (
     IonizationMechanism,
     TargetIon,
     TargetIsotope,
@@ -19,14 +18,21 @@ from ..models.models import (
     SampleBatch,
     Sample,
 )
-from ..models.pydantic_models.target_compound_pydantic_model import TargetCompoundBase
-from ..models.pydantic_models.target_ion_pydantic_model import TargetIonUpdate
+from mascope_server.api.models.pydantic_models.target_compound_pydantic_model import (
+    TargetCompoundBase,
+)
+from mascope_server.api.models.pydantic_models.target_ion_pydantic_model import (
+    TargetIonUpdate,
+)
 
 
 @api_controller()
 async def get_target_ions(
     target_compound_id: str = None,
     ionization_mechanism_id: str = None,
+    sample_batch_id: Optional[str] = None,
+    target_collection_id: Optional[str] = None,
+    show_target_collection: bool = False,
     target_compound_ids: Optional[List[str]] = None,
     ionization_mechanism_ids: Optional[List[str]] = None,
     target_ion_formula: str = None,
@@ -36,41 +42,52 @@ async def get_target_ions(
     limit: int = 10000,
 ) -> dict:
     """
-    Retrieves a paginated list of target ions, optionally filtered by compound ID, ionization mechanism ID, or ion formula, and sorted by a specified column.
+    Retrieves a paginated list of target ions based on various filtering criteria such as target compound,
+    ionization mechanism, sample batch, and specific ion formulas. Results can optionally include related
+    target collection information and can be ordered and sorted according to specified parameters.
 
     Steps:
-    1. Construct a SQLAlchemy query to select all target ions.
-    2. Apply filtering based on provided parameters.
-    3. Apply sorting based on the provided sort and order parameters.
-    4. Apply pagination based on the provided page and limit parameters.
-    5. Execute the query and fetch the results.
-    6. Convert the results into a list of dictionaries for JSON serialization.
+    1. Construct the base query for fetching target ions.
+    2. Apply filters based on target compound ID, ionization mechanism ID, compound list, and ionization mechanism list.
+    3. If additional context such as sample batch or target collection details are requested, enhance the query to join
+       with related tables and filter further based on these details.
+    4. If 'show_target_collection' is true, join with the target collection table to include these details in the results.
+    5. Apply ordering and sorting to the query.
+    6. Execute the query with pagination.
+    7. Format the fetched data into a list of dictionaries suitable for JSON serialization and return alongside total results count.
 
-    :param target_compound_id: Filter by target compound ID, defaults to None.
-    :type target_compound_id: str, optional
-    :param ionization_mechanism_id: Filter by ionization mechanism ID, defaults to None.
-    :type ionization_mechanism_id: str, optional
-    :param target_compound_ids: List of target compound IDs to filter by, defaults to None.
-    :type target_compound_ids: Optional[List[str]], optional
-    :param ionization_mechanism_ids: List of ionization mechanism IDs to filter by, defaults to None.
-    :type ionization_mechanism_ids: Optional[List[str]], optional
-    :param target_ion_formula: Filter by target ion formula, defaults to None.
-    :type target_ion_formula: str, optional
-    :param sort: Column to sort by, defaults to "target_ion_id".
-    :type sort: str, optional
-    :param order: Sorting order, "asc" for ascending or "desc" for descending, defaults to "asc".
-    :type order: str, optional
+    :param target_compound_id: Filter by specific target compound ID, defaults to None.
+    :type target_compound_id: Optional[str]
+    :param ionization_mechanism_id: Filter by specific ionization mechanism ID, defaults to None.
+    :type ionization_mechanism_id: Optional[str]
+    :param sample_batch_id: Filter ions by the ID of the associated sample batch, defaults to None.
+    :type sample_batch_id: Optional[str]
+    :param target_collection_id: Filter ions by the ID of the target collection they belong to, defaults to None.
+    :type target_collection_id: Optional[str]
+    :param show_target_collection: Include detailed target collection data in the results, defaults to False.
+    :type show_target_collection: bool
+    :param target_compound_ids: List of target compound IDs for broader filtering, defaults to None.
+    :type target_compound_ids: Optional[List[str]]
+    :param ionization_mechanism_ids: List of ionization mechanism IDs for broader filtering, defaults to None.
+    :type ionization_mechanism_ids: Optional[List[str]]
+    :param target_ion_formula: Filter ions by their chemical formula, defaults to None.
+    :type target_ion_formula: Optional[str]
+    :param sort: Field name to sort the results by, defaults to None.
+    :type sort: Optional[str]
+    :param order: Sorting order, either 'asc' or 'desc', defaults to None.
+    :type order: Optional[str]
     :param page: Page number for pagination, defaults to 0.
-    :type page: int, optional
-    :param limit: Number of items per page, defaults to 100.
-    :type limit: int, optional
-    :return: A dictionary with the total count and a list of target ions.
+    :type page: int
+    :param limit: Number of items per page, defaults to 10000.
+    :type limit: int
+    :return: A dictionary containing the total number of results and a list of target ions.
     :rtype: dict
     """
     async with async_session() as session:
+        # Step 1: Construct the base query
         stmt = select(TargetIon)
 
-        # Step 2: Apply filters if specified
+        # Step 2: Apply basic filters
         if target_compound_id:
             stmt = stmt.filter(TargetIon.target_compound_id == target_compound_id)
         if ionization_mechanism_id:
@@ -86,26 +103,93 @@ async def get_target_ions(
         if target_ion_formula:
             stmt = stmt.filter(TargetIon.target_ion_formula == target_ion_formula)
 
-        # Step 3: Apply sorting
+        # Step 3: Adjust the query based non-basic filters
+        if sample_batch_id or target_collection_id or show_target_collection:
+            stmt = stmt.join(
+                TargetCompoundInTargetCollection,
+                TargetCompoundInTargetCollection.target_compound_id
+                == TargetIon.target_compound_id,
+            )
+
+            # Filter ions by sample_batch_id if specified
+            if sample_batch_id:
+                # Fetch sample batch and related ion mechanisms and target collection ids
+                result = await session.execute(
+                    select(SampleBatch)
+                    .options(joinedload(SampleBatch.target_collection))
+                    .where(SampleBatch.sample_batch_id == sample_batch_id)
+                )
+                sample_batch = result.unique().scalar_one_or_none()
+                if not sample_batch:
+                    raise NotFoundException(
+                        f"Sample batch with id '{sample_batch_id}' not found"
+                    )
+
+                # Extract ion mechanisms
+                ionization_mechanism_ids = sample_batch.build_params["ion_mechanisms"]
+                target_collection_ids = [
+                    tc.target_collection_id for tc in sample_batch.target_collection
+                ]
+
+                # Filter ions by batch ionization_mechanism_ids and target_collection_ids
+                stmt = stmt.where(
+                    TargetCompoundInTargetCollection.target_collection_id.in_(
+                        target_collection_ids
+                    ),
+                    TargetIon.ionization_mechanism_id.in_(ionization_mechanism_ids),
+                ).distinct()
+
+            # Filter ions by target_collection_id if specified
+            if target_collection_id:
+                stmt = stmt.filter(
+                    TargetCompoundInTargetCollection.target_collection_id
+                    == target_collection_id
+                )
+
+            # Step 4: Include target collection details if requested
+            if show_target_collection:
+                stmt = stmt.join(
+                    TargetCollection,
+                    TargetCollection.target_collection_id
+                    == TargetCompoundInTargetCollection.target_collection_id,
+                )
+                stmt = stmt.add_columns(
+                    TargetCompoundInTargetCollection.target_collection_id,
+                    TargetCollection.target_collection_name,
+                    TargetCollection.target_collection_type,
+                )
+
+        # Step 5: Apply sorting
         if sort:
             if order == "desc":
                 stmt = stmt.order_by(desc(getattr(TargetIon, sort)))
             else:
                 stmt = stmt.order_by(asc(getattr(TargetIon, sort)))
 
-        # Step 4: Apply pagination and Step 5: Execute the query
+        # Get total count
         total = await session.scalar(
             select(func.count()).select_from(stmt)  # pylint: disable=not-callable
         )
+        # Step 4: Apply pagination
         stmt = stmt.offset(page * limit).limit(limit)
+        # Step 6: Execute the query
         result = await session.execute(stmt)
-        target_ions = result.scalars().all()
 
-        # Step 6: Return results
-        return {
-            "total": total,
-            "data": [target_ion.to_dict() for target_ion in target_ions],
-        }
+    # Step 7: Construct the response data
+    data = []
+    for row in result.all():
+        # When show_target_collection is true, include target_collection_id
+        ion_data = row.TargetIon.to_dict()
+        if show_target_collection and row.target_collection_id:
+            ion_data["target_collection_id"] = row.target_collection_id
+            ion_data["target_collection_name"] = row.target_collection_name
+            ion_data["target_collection_type"] = row.target_collection_type
+        data.append(ion_data)
+
+    return {
+        "results": total,
+        "data": data,
+    }
 
 
 @api_controller()

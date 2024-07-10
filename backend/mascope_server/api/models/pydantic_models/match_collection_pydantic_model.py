@@ -20,6 +20,30 @@ class MatchCollectionBase(BaseModel):
     )
 
 
+class GetMatchCollectionsQueryParams(BaseModel):
+    sample_item_id: Optional[str] = Field(
+        None, description="Filter collections by sample item ID"
+    )
+    sample_batch_id: Optional[str] = Field(
+        None, description="The ID of the sample batch to filter collections by."
+    )
+    target_collection_id: Optional[str] = Field(
+        None, description="Filter collections by target collection ID"
+    )
+    match_category: Optional[int] = Field(
+        None, description="Filter collections by match category"
+    )
+    sort: Optional[str] = Field(
+        None, description="The column name to sort the results by."
+    )
+    order: Optional[str] = Field(
+        None,
+        description="The sort order, either 'asc' for ascending or 'desc' for descending.",
+    )
+    page: int = Field(0, description="The page number for pagination.")
+    limit: int = Field(10000, description="The number of results per page.")
+
+
 class DeleteMatchCollectionsPayload(FilterSamplePayload):
     target_collections_ids: Optional[List[str]] = Field(
         None,

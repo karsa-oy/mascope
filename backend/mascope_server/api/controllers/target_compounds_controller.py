@@ -1,22 +1,24 @@
 from fastapi import HTTPException
 from sqlalchemy import asc, desc, func, select, or_, and_
-from sqlalchemy.orm import aliased
 from typing import List, Optional
 from mascope_server.api_sio import sio
 from mascope_server.db.id import gen_id
 from mascope_server.db import async_session
 from mascope_lib.util import norm
-from ..utils.api_features import api_controller
-from ..exceptions import NotFoundException
-from .ionization_mechanisms_controller import get_ionization_mechanisms
-from .target_ions_controller import create_target_ions
-from ..models.models import (
+from mascope_server.api.utils.api_features import api_controller
+from mascope_server.api.exceptions import NotFoundException
+from mascope_server.api.controllers.ionization_mechanisms_controller import (
+    get_ionization_mechanisms,
+)
+from mascope_server.api.controllers.target_ions_controller import create_target_ions
+from mascope_server.api.models.models import (
     IonizationMechanism,
     TargetCompound,
     TargetCompoundInTargetCollection,
     TargetCollectionInSampleBatch,
+    TargetCollection,
 )
-from ..models.pydantic_models.target_compound_pydantic_model import (
+from mascope_server.api.models.pydantic_models.target_compound_pydantic_model import (
     TargetCompoundBase,
     TargetCompoundUpdate,
 )
@@ -63,17 +65,53 @@ async def get_target_compounds(
     target_compound_name: Optional[str] = None,
     target_compound_formula: Optional[str] = None,
     sample_batch_id: Optional[str] = None,
-    show_duplicates: bool = False,
+    target_collection_id: Optional[str] = None,
+    show_target_collection: bool = False,
     sort: str = None,
     order: str = None,
     page: int = 0,
     limit: int = 10000,
 ) -> dict:
+    """
+    Retrieves a list of target compounds optionally filtered by name, formula, sample batch,
+    or target collection ID. The results can include related collection data, be sorted,
+    and paginated according to the provided parameters.
+
+    Steps:
+    1. Construct the initial query based on the TargetCompound model.
+    2. Apply filters for compound name and formula if provided.
+    3. Extend the query to include related collections if required by filters or flags.
+    4. Apply sorting if specified.
+    5. Count the total results for pagination.
+    6. Apply pagination settings and execute the query.
+    7. Format the fetched data into a list of dictionaries for the response.
+
+    :param target_compound_name: Filter compounds by their name, defaults to None.
+    :type target_compound_name: Optional[str], optional
+    :param target_compound_formula: Filter compounds by their chemical formula, defaults to None.
+    :type target_compound_formula: Optional[str], optional
+    :param sample_batch_id: Filter compounds associated with a specific sample batch ID, defaults to None.
+    :type sample_batch_id: Optional[str], optional
+    :param target_collection_id: Filter compounds associated with a specific target collection ID, defaults to None.
+    :type target_collection_id: Optional[str], optional
+    :param show_target_collection: Include target collection data in the response, defaults to False.
+    :type show_target_collection: bool, optional
+    :param sort: Column name to sort by, defaults to None.
+    :type sort: str, optional
+    :param order: Direction to sort the results ('asc' or 'desc'), defaults to None.
+    :type order: str, optional
+    :param page: Page number for pagination, defaults to 0.
+    :type page: int, optional
+    :param limit: Number of items per page, defaults to 10000.
+    :type limit: int, optional
+    :return: A dictionary containing the total number of results, and a list of compounds.
+    :rtype: dict
+    """
     async with async_session() as session:
-        # Define the main query for target compounds
+        # Step 1: Define the main query for target compounds
         stmt = select(TargetCompound)
 
-        # Apply filters if any
+        # Step 2: Apply name and formula filters
         if target_compound_name:
             stmt = stmt.filter(
                 TargetCompound.target_compound_name == target_compound_name
@@ -83,62 +121,75 @@ async def get_target_compounds(
                 TargetCompound.target_compound_formula == target_compound_formula
             )
 
-        # Adjust the query based on sample_batch_id filter
-        if sample_batch_id or show_duplicates:
-            # Alias for TargetCompoundInTargetCollection to be able to add to SELECT the target_collection_id
-            tcitc_alias = aliased(TargetCompoundInTargetCollection)
-
+        # Step 3: Adjust the query based non-basic filters
+        if sample_batch_id or target_collection_id or show_target_collection:
             stmt = stmt.join(
-                tcitc_alias,
-                tcitc_alias.target_compound_id == TargetCompound.target_compound_id,
-            ).join(
-                TargetCollectionInSampleBatch,
-                TargetCollectionInSampleBatch.target_collection_id
-                == tcitc_alias.target_collection_id,
-            )
+                TargetCompoundInTargetCollection,
+                TargetCompoundInTargetCollection.target_compound_id
+                == TargetCompound.target_compound_id,
+            ).distinct()
 
+            # Filter compounds by sample_batch_id if specified
             if sample_batch_id:
-                stmt = stmt.filter(
+                stmt = stmt.join(
+                    TargetCollectionInSampleBatch,
+                    TargetCollectionInSampleBatch.target_collection_id
+                    == TargetCompoundInTargetCollection.target_collection_id,
+                ).where(
                     TargetCollectionInSampleBatch.sample_batch_id == sample_batch_id
                 )
+            # Filter compounds by target_collection_id if specified
+            if target_collection_id:
+                stmt = stmt.filter(
+                    TargetCompoundInTargetCollection.target_collection_id
+                    == target_collection_id
+                )
 
-            if show_duplicates:
-                # Select the target_collection_id if duplicates are to be shown
-                stmt = stmt.add_columns(tcitc_alias.target_collection_id).distinct()
+            # Add the target_collection_id to be shown
+            if show_target_collection:
+                stmt = stmt.join(
+                    TargetCollection,
+                    TargetCollection.target_collection_id
+                    == TargetCompoundInTargetCollection.target_collection_id,
+                )
+                stmt = stmt.add_columns(
+                    TargetCompoundInTargetCollection.target_collection_id,
+                    TargetCollection.target_collection_name,
+                    TargetCollection.target_collection_type,
+                )
 
-            if not show_duplicates:
-                # Apply distinct only if duplicates should not be shown
-                stmt = stmt.distinct()
-
-        # Apply sorting if specified
+        # Step 4: Apply sorting if specified
         if sort:
             if order == "desc":
                 stmt = stmt.order_by(desc(getattr(TargetCompound, sort)))
             else:
                 stmt = stmt.order_by(asc(getattr(TargetCompound, sort)))
 
-        # Pagination logic
+        # Step 5: Count total results
         count_stmt = select(func.count()).select_from(  # pylint: disable=not-callable
             stmt.subquery()
         )
         total = await session.scalar(count_stmt)
 
+        # Step 6: Apply pagination and execute
         stmt = stmt.offset(page * limit).limit(limit)
         result = await session.execute(stmt)
 
-        # Construct the response data
-        data = []
-        for row in result.all():
-            # When duplicates are shown, include target_collection_id
-            compound_data = row.TargetCompound.to_dict()
-            if show_duplicates:
-                compound_data["target_collection_id"] = row.target_collection_id
-            data.append(compound_data)
+    # Step 7: Construct the response data
+    data = []
+    for row in result.all():
+        # When show_target_collection is true, include target_collection_id
+        compound_data = row.TargetCompound.to_dict()
+        if show_target_collection:
+            compound_data["target_collection_id"] = row.target_collection_id
+            compound_data["target_collection_name"] = row.target_collection_name
+            compound_data["target_collection_type"] = row.target_collection_type
+        data.append(compound_data)
 
-        return {
-            "results": total,
-            "data": data,
-        }
+    return {
+        "results": total,
+        "data": data,
+    }
 
 
 @api_controller()

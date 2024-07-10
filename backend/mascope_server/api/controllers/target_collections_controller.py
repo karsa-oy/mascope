@@ -4,7 +4,7 @@
 from fastapi import BackgroundTasks
 from sqlalchemy import asc, desc, func, select
 from sqlalchemy.orm import joinedload
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Optional
 
 from mascope_server.api_sio import sio
 from mascope_server.db.id import gen_id
@@ -61,7 +61,7 @@ async def get_batches_compounds(
 
     for sample_batch_id in sample_batches:
         batch_compounds_result = await get_target_compounds(
-            sample_batch_id=sample_batch_id, show_duplicates=show_duplicates
+            sample_batch_id=sample_batch_id, show_target_collection=show_duplicates
         )
 
         # Extract target compound IDs from the result and assign to the corresponding batch ID in the dictionary
@@ -146,8 +146,9 @@ async def compare_batches_compounds(
 
 @api_controller()
 async def get_target_collections(
-    target_collection_type: str = None,
-    target_collection_name: str = None,
+    target_collection_type: Optional[str] = None,
+    target_collection_name: Optional[str] = None,
+    sample_batch_id: Optional[str] = None,
     sort: str = None,
     order: str = None,
     page: int = 0,
@@ -168,6 +169,8 @@ async def get_target_collections(
     :type target_collection_type: str, optional
     :param target_collection_name: The name of the target collection for which you want to fetch the target collections, defaults to None
     :type target_collection_name: str, optional
+    :param sample_batch_id: Filter collections associated with a specific sample batch ID, defaults to None.
+    :type sample_batch_id: Optional[str], optional
     :param sort:  Column to sort by, defaults to "sample_item_utc_created"
     :type sort: str, optional
     :param order: Sorting order ('asc' for ascending, 'desc' for descending), defaults to "asc"
@@ -191,6 +194,14 @@ async def get_target_collections(
             stmt = stmt.where(
                 TargetCollection.target_collection_name == target_collection_name
             )
+
+        if sample_batch_id:
+            stmt = stmt.join(
+                TargetCollectionInSampleBatch,
+                TargetCollectionInSampleBatch.target_collection_id
+                == TargetCollection.target_collection_id,
+            ).where(TargetCollectionInSampleBatch.sample_batch_id == sample_batch_id)
+
         # Step 2: Apply sorting if specified
         if sort:
             if order == "desc":
