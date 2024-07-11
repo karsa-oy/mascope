@@ -55,7 +55,8 @@ from mascope_server.api.models.pydantic_models.user_notification_pydantic_model 
 )
 
 import mascope_runtime as runtime
-logger = runtime.logger.service('backend')
+
+logger = runtime.logger.service("backend")
 
 # TODO_configuration
 # Default Filter Parameters
@@ -615,7 +616,6 @@ def apply_filter_params(match_isotope_df, filter_params: FilterParams = None):
             "match_mz_error",
             "match_abundance_error",
             "match_isotope_correlation",
-            "min_isotope_correlation",
             "sample_peak_area",
             "relative_abundance",
         ]:
