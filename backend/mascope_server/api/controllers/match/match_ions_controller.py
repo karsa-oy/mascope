@@ -29,7 +29,9 @@ from mascope_server.api.models.pydantic_models.match_ion_pydantic_model import (
 )
 
 import mascope_runtime as runtime
-logger = runtime.logger.service('backend')
+
+logger = runtime.logger.service("backend")
+
 
 @api_controller()
 async def get_match_ions(
@@ -234,7 +236,7 @@ async def create_match_ions(
                     # Step 3: Insert new match ions
                     new_match_ion = MatchIon(
                         match_ion_id=gen_id(32),
-                        **match_ion.dict(),
+                        **match_ion.model_dump(),
                         match_ion_utc_created=datetime.now(timezone.utc),
                     )
                     session.add(new_match_ion)

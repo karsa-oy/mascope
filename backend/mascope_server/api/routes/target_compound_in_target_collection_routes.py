@@ -17,4 +17,4 @@ target_compound_in_target_collection_router = APIRouter()
 async def get_target_compound_in_target_collections_route(
     query_params: GetTargetCompoundInTargetCollectionQueryParams = Depends(),
 ):
-    return await get_target_compound_in_target_collection(**query_params.dict())
+    return await get_target_compound_in_target_collection(**query_params.model_dump())

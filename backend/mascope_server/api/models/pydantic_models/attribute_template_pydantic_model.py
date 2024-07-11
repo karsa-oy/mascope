@@ -1,5 +1,5 @@
 from typing import List, Optional
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class TemplateField(BaseModel):
@@ -21,20 +21,16 @@ class AttributeTemplateBase(BaseModel):
         ..., description="List of template fields for the attribute template"
     )
 
-    @validator("type")
+    @field_validator("type")
     def validate_type(cls, item):
-        allowed_types = ", ".join(
-            [
-                "sample_item",
-            ]
-        )
+        allowed_types = ["sample_item"]
         if item not in allowed_types:
             raise ValueError(
-                f"The '{item}' is not a valid type for template. Allowed type is '{allowed_types}'"
+                f"The '{item}' is not a valid type for template. Allowed type is '{', '.join(allowed_types)}'"
             )
         return item
 
-    @validator("template")
+    @field_validator("template")
     def validate_unique_labels(cls, template_fields):
         if not template_fields:
             raise ValueError("Template is empty.")

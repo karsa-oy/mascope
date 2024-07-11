@@ -1,6 +1,6 @@
 from typing import List, Optional
-from pydantic import BaseModel, Field, validator, model_validator
-from .target_compound_pydantic_model import TargetCompoundBase, TargetCompoundUpdate
+from pydantic import BaseModel, Field, field_validator, model_validator
+from .target_compound_pydantic_model import TargetCompoundBase
 
 # TODO_configuration possible collection types
 APP_COLLECTION_TYPES = ["TARGETS", "DIAGNOSTICS", "CALIBRANTS"]
@@ -17,7 +17,7 @@ class TargetCollectionBase(BaseModel):
         ..., description="Type of the target collection"
     )
 
-    @validator("target_collection_type")
+    @field_validator("target_collection_type")
     def check_collection_type(cls, item):
         if item not in APP_COLLECTION_TYPES:
             allowed_types = ", ".join(APP_COLLECTION_TYPES)
@@ -39,11 +39,12 @@ class TargetCollectionCreateBody(TargetCollectionBase):
         None, description="IDs of sample batches where to add the new target collection"
     )
 
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def check_at_least_one_compound_provided(cls, values):
-        compounds_create, compound_ids = values.get(
-            "target_compounds_create"
-        ), values.get("target_compound_ids")
+        compounds_create, compound_ids = (
+            values.target_compounds_create,
+            values.target_compound_ids,
+        )
         if not compounds_create and not compound_ids:
             raise ValueError("At least one compound must be provided.")
         return values
@@ -61,7 +62,7 @@ class TargetCollectionUpdateBody(TargetCollectionBase):
         None, description="IDs of sample batches associated with the target collection"
     )
 
-    @model_validator(mode='before')
+    @model_validator(mode="before")
     def check_compounds_or_batches(cls, values):
         compounds_create, compound_ids, batches = (
             values.get("target_compounds_create"),

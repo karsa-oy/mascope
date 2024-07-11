@@ -22,7 +22,8 @@ from mascope_server.api.models.pydantic_models.match_collection_pydantic_model i
 )
 
 import mascope_runtime as runtime
-logger = runtime.logger.service('backend')
+
+logger = runtime.logger.service("backend")
 
 
 @api_controller()
@@ -197,7 +198,7 @@ async def create_match_collections(
                 for match_collection in match_collections:
                     new_match_collection = MatchCollection(
                         match_collection_id=gen_id(32),
-                        **match_collection.dict(),
+                        **match_collection.model_dump(),
                         match_collection_utc_created=datetime.now(timezone.utc),
                     )
                     session.add(new_match_collection)

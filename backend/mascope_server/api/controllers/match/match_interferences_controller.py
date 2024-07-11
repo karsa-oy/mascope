@@ -12,7 +12,8 @@ from mascope_server.api.models.pydantic_models.match_interferences_pydantic_mode
 )
 
 import mascope_runtime as runtime
-logger = runtime.logger.service('backend')
+
+logger = runtime.logger.service("backend")
 
 
 @api_controller()
@@ -221,7 +222,7 @@ async def create_match_interferences(
 
         # Step 2: Insert the new match interference into the database and commit the transaction.
         new_match_interferences = [
-            MatchInterference(**mi.dict()) for mi in match_interferences
+            MatchInterference(**mi.model_dump()) for mi in match_interferences
         ]
         session.add_all(new_match_interferences)
         await session.commit()

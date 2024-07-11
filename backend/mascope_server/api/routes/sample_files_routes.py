@@ -27,7 +27,7 @@ sample_files_router = APIRouter()
 @sample_files_router.get("/api/sample_files")
 @api_route()
 async def get_sample_files_route(query_params: GetSampleFilesQueryParams = Depends()):
-    return await get_sample_files(**query_params.dict())
+    return await get_sample_files(**query_params.model_dump())
 
 
 @sample_files_router.get("/api/sample_files/recent")
@@ -107,4 +107,4 @@ async def get_sample_file_spectrum_route(
     sample_file_id: str,
     query_params: GetSpectrumQueryParams = Depends(),
 ):
-    return await get_sample_file_spectrum(sample_file_id, **query_params.dict())
+    return await get_sample_file_spectrum(sample_file_id, **query_params.model_dump())

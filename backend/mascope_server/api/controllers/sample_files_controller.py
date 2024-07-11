@@ -17,7 +17,8 @@ from ..models.pydantic_models.user_notification_pydantic_model import (
 )
 
 import mascope_runtime as runtime
-logger = runtime.logger.service('backend')
+
+logger = runtime.logger.service("backend")
 
 # ===================================================================
 # Controller functions
@@ -155,7 +156,9 @@ async def create_sample_file(sample_file: SampleFileCreate) -> dict:
     """
     async with async_session() as session:
         # Step 1: Construct new sample file
-        new_sample_file = SampleFile(sample_file_id=gen_id(16), **sample_file.dict())
+        new_sample_file = SampleFile(
+            sample_file_id=gen_id(16), **sample_file.model_dump()
+        )
         session.add(new_sample_file)
 
         # Step 2: Commit transaction

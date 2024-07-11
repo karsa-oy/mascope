@@ -18,7 +18,7 @@ match_rating_router = APIRouter()
 async def get_match_ratings_route(
     query_params: GetMatchRatingsQueryParams = Depends(),
 ):
-    return await get_match_ratings(**query_params.dict())
+    return await get_match_ratings(**query_params.model_dump())
 
 
 @match_rating_router.get("/api/match/ratings/{match_rating_id}")

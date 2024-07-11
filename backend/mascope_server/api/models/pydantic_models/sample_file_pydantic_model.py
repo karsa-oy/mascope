@@ -1,5 +1,5 @@
-from pydantic import BaseModel, Field, validator
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Annotated
+from pydantic import BaseModel, Field, field_validator, model_validator
 from datetime import timezone, datetime as dt
 
 
@@ -20,7 +20,7 @@ class SampleFileBase(BaseModel):
     tic: float = Field(..., description="TIC of the sample file")
     polarity: str = Field(..., description="Polarity of the sample file")
 
-    @validator("polarity")
+    @field_validator("polarity")
     def validate_polarity(cls, v):
         if v not in ["+", "-"]:
             raise ValueError("Polarity must be '+' or '-'")
@@ -89,24 +89,34 @@ class GetSampleFilePeakTimeseriesBody(BaseModel):
 
 
 class GetSpectrumQueryParams(BaseModel):
-    t_min: Optional[float] = Field(None, description="Start of the time range", ge=0)
-    t_max: Optional[float] = Field(None, description="End of the time range", gt=0)
-    mz_min: Optional[float] = Field(None, description="Start of the m/z range", ge=0)
-    mz_max: Optional[float] = Field(None, description="End of the m/z range", gt=0)
+    t_min: Optional[Annotated[float, Field(ge=0)]] = Field(
+        None, description="Start of the time range"
+    )
+    t_max: Optional[Annotated[float, Field(gt=0)]] = Field(
+        None, description="End of the time range"
+    )
+    mz_min: Optional[Annotated[float, Field(ge=0)]] = Field(
+        None, description="Start of the m/z range"
+    )
+    mz_max: Optional[Annotated[float, Field(gt=0)]] = Field(
+        None, description="End of the m/z range"
+    )
 
-    @validator("t_max")
-    def validate_time_range(cls, t_max, values):
-        t_min = values.get("t_min")
+    @model_validator(mode="after")
+    def validate_time_range(cls, values):
+        t_min = values.t_min
+        t_max = values.t_max
         if t_min is not None and t_max is not None:
             if t_max <= t_min:
                 raise ValueError("t_max must be greater than t_min")
         elif t_min is None and t_max is not None or t_min is not None and t_max is None:
             raise ValueError("Both t_min and t_max must be provided")
-        return t_max
+        return values
 
-    @validator("mz_max")
-    def validate_mz_range(cls, mz_max, values):
-        mz_min = values.get("mz_min")
+    @model_validator(mode="after")
+    def validate_mz_range(cls, values):
+        mz_min = values.mz_min
+        mz_max = values.mz_max
         if mz_min is not None and mz_max is not None:
             if mz_max <= mz_min:
                 raise ValueError("mz_max must be greater than mz_min")
@@ -117,4 +127,4 @@ class GetSpectrumQueryParams(BaseModel):
             and mz_max is None
         ):
             raise ValueError("Both mz_min and mz_max must be provided")
-        return mz_max
+        return values

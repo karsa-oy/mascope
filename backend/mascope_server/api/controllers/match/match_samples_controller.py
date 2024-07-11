@@ -21,7 +21,9 @@ from mascope_server.api.models.pydantic_models.match_sample_pydantic_model impor
 )
 
 import mascope_runtime as runtime
-logger = runtime.logger.service('backend')
+
+logger = runtime.logger.service("backend")
+
 
 @api_controller()
 async def get_match_samples(
@@ -176,7 +178,7 @@ async def create_match_samples(
                 for match_sample in match_samples:
                     new_match_sample = MatchSample(
                         match_sample_id=gen_id(32),
-                        **match_sample.dict(),
+                        **match_sample.model_dump(),
                         match_sample_utc_created=datetime.now(timezone.utc),
                     )
                     session.add(new_match_sample)

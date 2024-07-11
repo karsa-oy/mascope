@@ -23,10 +23,11 @@ class GetInstrumentFunctionQueryParams(BaseModel):
         description="If ID provided, the system directly retrieves the instrument function details associated with this ID.",
     )
 
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def check_filename_or_instrument_function_id(cls, values):
-        filename, instrument_function_id = values.get("filename"), values.get(
-            "instrument_function_id"
+        filename, instrument_function_id = (
+            values.filename,
+            values.instrument_function_id,
         )
         if (filename and instrument_function_id) or (
             not filename and not instrument_function_id

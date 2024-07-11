@@ -29,7 +29,7 @@ sample_batches_router = APIRouter()
 async def get_sample_batches_route(
     query_params: GetSampleBatchesQueryParams = Depends(),
 ):
-    return await get_sample_batches(**query_params.dict())
+    return await get_sample_batches(**query_params.model_dump())
 
 
 @sample_batches_router.get("/api/sample_batches/{sample_batch_id}")

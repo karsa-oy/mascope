@@ -13,7 +13,9 @@ from mascope_server.api.models.pydantic_models.match_isotopes_pydantic_model imp
 )
 
 import mascope_runtime as runtime
-logger = runtime.logger.service('backend')
+
+logger = runtime.logger.service("backend")
+
 
 @api_controller()
 async def get_match_isotopes(
@@ -203,7 +205,7 @@ async def create_match_isotopes(
         # Step 2: Insert the new match isotope into the database and commit the transaction.
         new_match_isotopes = [
             MatchIsotope(
-                **mi.dict(), match_isotope_utc_created=datetime.now(timezone.utc)
+                **mi.model_dump(), match_isotope_utc_created=datetime.now(timezone.utc)
             )
             for mi in match_isotopes
         ]

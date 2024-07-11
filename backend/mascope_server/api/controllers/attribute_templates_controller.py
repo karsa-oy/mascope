@@ -114,7 +114,7 @@ async def create_attribute_template(template_data: AttributeTemplateCreateBody):
     """
     async with async_session() as session:
         # Step 1: Convert each TemplateField object in the template list to a dictionary
-        template_dicts = [field.dict() for field in template_data.template]
+        template_dicts = [field.model_dump() for field in template_data.template]
 
         # Step 2: Construct new template
         new_template = AttributeTemplate(

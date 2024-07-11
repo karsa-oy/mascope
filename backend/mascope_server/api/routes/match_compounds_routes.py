@@ -21,7 +21,7 @@ match_compounds_router = APIRouter()
 async def get_all_match_compounds_route(
     query_params: GetMatchCompoundsQueryParams = Depends(),
 ):
-    return await get_match_compounds(**query_params.dict())
+    return await get_match_compounds(**query_params.model_dump())
 
 
 @match_compounds_router.get("/api/match/compounds/{match_compound_id}")

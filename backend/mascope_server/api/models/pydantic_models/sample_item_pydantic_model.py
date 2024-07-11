@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import Optional, Dict
 from datetime import timezone, datetime as dt
 import re
@@ -30,10 +30,9 @@ class SampleItemBase(BaseModel):
     )
     filter_id: Optional[str] = Field(None, description="Filter ID of the sample item")
 
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def check_filter_id_based_on_item_type(cls, values):
-        item_type = values.get("sample_item_type")
-        filter_id = values.get("filter_id")
+        item_type, filter_id = values.sample_item_type, values.filter_id
         if item_type in ["INSTRUMENT_BACKGROUND", "ONLINE"] and filter_id is not None:
             raise ValueError(
                 f"There must be no filter_id for sample type '{item_type}'"
@@ -42,9 +41,13 @@ class SampleItemBase(BaseModel):
             raise ValueError(
                 f"The filter_id must be provided for sample type '{item_type}'"
             )
+        if filter_id and not re.match(FILTER_ID_REGEX, filter_id):
+            raise ValueError(
+                "Invalid filter_id format. Must be 6 characters long and contain only uppercase letters and numbers."
+            )
         return values
 
-    @validator("sample_item_type")
+    @field_validator("sample_item_type")
     def check_item_type(cls, item):
         if item not in APP_ITEM_TYPES:
             allowed_types = ", ".join(APP_ITEM_TYPES)
@@ -53,17 +56,6 @@ class SampleItemBase(BaseModel):
             )
         return item
 
-    @validator("filter_id", always=True)
-    def validate_filter_id(cls, v, values, **kwargs):
-        item_type = values.get("sample_item_type")
-        # Only validate filter_id if it's required and provided
-        if item_type not in ["INSTRUMENT_BACKGROUND", "ONLINE"] and v:
-            if not re.match(FILTER_ID_REGEX, v):
-                raise ValueError(
-                    "Invalid filter_id format. Must be 6 characters long and contain only uppercase letters and numbers."
-                )
-        return v
-
 
 class SampleItemCreate(SampleItemBase):
     pass
@@ -71,23 +63,6 @@ class SampleItemCreate(SampleItemBase):
 
 class SampleItemUpdate(SampleItemBase):
     pass
-
-
-class SampleItemInDB(SampleItemBase):
-    sample_item_id: str = Field(..., description="ID of the sample item")
-    sample_item_utc_created: dt = Field(
-        ..., description="Creation timestamp of the sample item"
-    )
-    sample_item_utc_modified: dt = Field(
-        ..., description="Last modification timestamp of the sample item"
-    )
-
-    class Config:
-        from_attributes = True
-        # datetime and datetime_utc fields will be represented in the ISO 8601 format in response
-        json_encoders = {
-            dt: lambda v: v.replace(tzinfo=timezone.utc).isoformat(timespec="seconds")
-        }
 
 
 class GetSampleItemsQueryParams(BaseModel):

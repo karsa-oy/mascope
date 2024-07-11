@@ -21,7 +21,7 @@ match_collections_router = APIRouter()
 async def get_match_collections_route(
     query_params: GetMatchCollectionsQueryParams = Depends(),
 ):
-    return await get_match_collections(**query_params.dict())
+    return await get_match_collections(**query_params.model_dump())
 
 
 @match_collections_router.get("/api/match/collections/{match_collection_id}")

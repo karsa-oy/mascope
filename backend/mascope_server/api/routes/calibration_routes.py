@@ -27,7 +27,7 @@ calibration_router = APIRouter()
 async def get_sample_mz_calibration_route(
     query_params: GetMzCalibrationQueryParams = Depends(),
 ):
-    return await get_mz_calibration(**query_params.dict())
+    return await get_mz_calibration(**query_params.model_dump())
 
 
 @calibration_router.post("/api/calibration/mz_fit")

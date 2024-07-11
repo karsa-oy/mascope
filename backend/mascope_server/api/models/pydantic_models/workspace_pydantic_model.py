@@ -17,19 +17,6 @@ class WorkspaceUpdate(WorkspaceBase):
     workspace_name: Optional[str] = Field(None, description="Name of the workspace")
 
 
-class WorkspaceInDB(WorkspaceBase):
-    workspace_id: str = Field(..., description="ID of the workspace")
-    workspace_utc_created: Optional[str] = Field(
-        None, description="Creation timestamp of the workspace"
-    )
-    workspace_utc_modified: Optional[str] = Field(
-        None, description="Last modification timestamp of the workspace"
-    )
-
-    class Config:
-        from_attributes = True
-
-
 class GetWorkspacesQueryParams(BaseModel):
     sort: Optional[str] = Field(
         "workspace_utc_created",

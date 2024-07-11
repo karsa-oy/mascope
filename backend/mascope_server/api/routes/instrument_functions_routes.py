@@ -21,7 +21,7 @@ instrument_functions_router = APIRouter()
 async def get_instrument_functions_route(
     query_params: GetInstrumentFunctionsQueryParams = Depends(),
 ):
-    return await get_instrument_functions(**query_params.dict())
+    return await get_instrument_functions(**query_params.model_dump())
 
 
 @instrument_functions_router.get("/api/instrument_functions/")

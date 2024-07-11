@@ -581,7 +581,7 @@ def apply_filter_params(match_isotope_df, filter_params: FilterParams = None):
     :rtype: pd.DataFrame
     """
     # Convert filter_params Pydantic model to dictionary if provided
-    provided_params = filter_params.dict() if filter_params else None
+    provided_params = filter_params.model_dump() if filter_params else None
 
     def get_params(row):
         """
@@ -599,7 +599,7 @@ def apply_filter_params(match_isotope_df, filter_params: FilterParams = None):
             return row["filter_params"][row["instrument"]]
 
         # Define default filter parameters from the FilterParams Pydantic model
-        default_params = FilterParams().dict()
+        default_params = FilterParams().model_dump()
         # Fallback to default parameters
         return default_params
 

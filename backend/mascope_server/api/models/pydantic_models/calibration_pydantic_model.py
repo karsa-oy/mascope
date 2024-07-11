@@ -12,7 +12,7 @@ class GetMzCalibrationQueryParams(BaseModel):
         description="The instrument name to query for the last m/z calibration of that instrument.",
     )
 
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def check_sample_item_id_or_instrument(cls, values):
         sample_item_id, instrument = values.sample_item_id, values.instrument
         if (sample_item_id and instrument) or (not sample_item_id and not instrument):

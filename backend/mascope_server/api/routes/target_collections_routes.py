@@ -22,7 +22,7 @@ target_collections_router = APIRouter()
 async def get_target_collections_route(
     query_params: GetTargetCollectionsQueryParams = Depends(),
 ):
-    return await get_target_collections(**query_params.dict())
+    return await get_target_collections(**query_params.model_dump())
 
 
 @target_collections_router.get("/api/target_collections/{target_collection_id}")

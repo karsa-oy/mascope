@@ -16,4 +16,4 @@ target_collection_in_sample_batch_router = APIRouter()
 async def get_target_collections_in_sample_batch_route(
     query_params: GetTargetCollectionsInSampleBatchQueryParams = Depends(),
 ):
-    return await get_target_collections_in_sample_batch(**query_params.dict())
+    return await get_target_collections_in_sample_batch(**query_params.model_dump())

@@ -173,7 +173,7 @@ async def create_sample_item(
         # Step 2: Generate unique ID and create new sample item
         new_sample_item = SampleItem(
             sample_item_id=gen_id(),
-            **sample_item.dict(),  # Pydantic model's data
+            **sample_item.model_dump(),  # Pydantic model's data
             sample_item_utc_created=datetime.now(timezone.utc),
             sample_item_utc_modified=datetime.now(timezone.utc),
         )

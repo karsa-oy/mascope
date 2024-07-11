@@ -22,7 +22,7 @@ match_isotopes_router = APIRouter()
 async def get_match_isotopes_route(
     query_params: GetMatchesQueryParams = Depends(),
 ):
-    return await get_match_isotopes(**query_params.dict())
+    return await get_match_isotopes(**query_params.model_dump())
 
 
 @match_isotopes_router.get("/api/match/isotopes/{match_isotope_id}")

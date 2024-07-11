@@ -1,5 +1,5 @@
 from typing import Optional, Dict, Any
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class UserNotification(BaseModel):
@@ -35,7 +35,7 @@ class UserNotification(BaseModel):
     class Config:
         exclude_none = True  # Exclude fields with None values from output
 
-    @validator("status")
+    @field_validator("status")
     def validate_status(cls, v):
         valid_statuses = ["success", "error", "pending", "warning"]
         if v not in valid_statuses:
@@ -44,7 +44,7 @@ class UserNotification(BaseModel):
             )
         return v
 
-    @validator("progress")
+    @field_validator("progress")
     def validate_progress(cls, v):
         if v is not None and not (0 <= v <= 100):
             raise ValueError("Progress must be between 0 and 100.")

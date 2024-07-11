@@ -18,7 +18,7 @@ ionization_mechanisms_router = APIRouter()
 async def get_ionization_mechanisms_route(
     query_params: GetIonizationMechanismsQueryParams = Depends(),
 ):
-    return await get_ionization_mechanisms(**query_params.dict())
+    return await get_ionization_mechanisms(**query_params.model_dump())
 
 
 @ionization_mechanisms_router.get(

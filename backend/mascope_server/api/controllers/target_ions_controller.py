@@ -449,7 +449,7 @@ async def update_target_ion(target_ion_id: str, target_ion_update: TargetIonUpda
         else:
             updated_filter_params = target_ion_update.filter_params
             for instrument, update_params in updated_filter_params.items():
-                update_params_dict = update_params.dict()
+                update_params_dict = update_params.model_dump()
                 # Check for changes in filter_params
                 if (
                     instrument not in existing_filter_params
