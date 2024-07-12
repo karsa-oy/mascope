@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, model_validator
 from typing import Optional, List
 
 # TODO_configuration Default Filter Parameters
@@ -41,14 +41,20 @@ class FilterParams(BaseModel):
         description="Threshold score above which a match is considered possible, but below the probable match threshold.",
     )
 
-    @field_validator("possible_match_threshold")
-    def validate_thresholds(cls, possible_match_threshold, values):
-        if "probable_match_threshold" in values:
-            if possible_match_threshold > values["probable_match_threshold"]:
+    @model_validator(mode="after")
+    def validate_thresholds(cls, values):
+        probable_match_threshold = values.probable_match_threshold
+        possible_match_threshold = values.possible_match_threshold
+
+        if (
+            possible_match_threshold is not None
+            and probable_match_threshold is not None
+        ):
+            if possible_match_threshold > probable_match_threshold:
                 raise ValueError(
                     "Possible match threshold must be less than or equal to probable match threshold"
                 )
-        return possible_match_threshold
+        return values
 
 
 class FilterMatchIsotopeDataBody(BaseModel):
