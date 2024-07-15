@@ -93,11 +93,12 @@ def run_concurrently(processes: Annotated[List[str], typer.Argument()]=None, kil
     os.environ['MASCOPE_CONFIG'] = config.model_dump_json()
     # construct arguments
     names=f'--names {','.join(map(lambda proc: f'{proc['name']}', selected))}'
-    colors=f'--prefix-colors "{','.join(map(lambda proc: proc['color'], selected))}"'
     cmds=f'{" ".join(map(run_mod, selected))}'
     options='--kill-others' if kill_others else ''
     # run command
-    lib.run(f'concurrently.cmd --raw {options} {names} {colors} {cmds}')
+    command=f'concurrently.cmd --raw {options} {names} {cmds}'
+    print(command)
+    lib.run(command)
 
 
 @dev.command()
@@ -125,7 +126,7 @@ def run(processes: Annotated[List[str], typer.Argument()]=None, kill_others: boo
 
 def install_mod(mod, lock):
     if mod['install']:
-        options=f'--names "{mod['name']}" --prefix-colors {mod['color']}'
+        options=f'--names "{mod['name']}"'
         path=os.path.join(mascope_path, *mod['path'])
         python_path=os.environ['PIPX_DEFAULT_PYTHON']
         # lock command
@@ -147,6 +148,7 @@ def install_mod(mod, lock):
             else ''
         )
         # execution
+        print(f'concurrently.cmd {options} "cd {path} && {env_setup} {lock_cmd} {mod['install']}"')
         lib.run(f'concurrently.cmd {options} "cd {path} && {env_setup} {lock_cmd} {mod['install']}"')
 
 @dev.command()
