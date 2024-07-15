@@ -10,7 +10,7 @@ config=typer.Typer()
 @config.callback()
 def main():
     """
-    📜 Manage your mascope configurations
+    Manage your mascope configurations
     """
 
 @config.command()

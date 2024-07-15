@@ -15,7 +15,7 @@ def run_mod(mod: List[Dict]):
 @dev.callback()
 def main():
     """
-    🏗️ Manage your development environment
+    Manage your development environment
     """
 
 def run_threaded(processes: Annotated[List[str], typer.Argument()]=None, all: bool=False):
@@ -106,9 +106,15 @@ def run(processes: Annotated[List[str], typer.Argument()]=None, kill_others: boo
     Run your development environment
 
     Runs the backend and frontend by default. Use the --all flag to run all
-    services, or pass service names as arguments.
+    services, or pass service names as arguments. To list available services,
+    run 'mascope modules --runnable'.
 
-    To list available services, run 'mascope modules --runnable'.
+    Python services can still be run directly with poetry, but the frontend
+    must be run with this command.
+    
+    Runs with concurrently.js by default, or using a custom Python threads
+    implementation when using the --threaded flag.
+
     """
     if (threaded):
         run_threaded(processes, all)

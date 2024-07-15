@@ -19,14 +19,14 @@ app.add_typer(cmd.config, name="config")
 @app.callback()
 def main(config: Optional[str] = None):
     """
-    🔭 Mascope development CLI
+    Mascope development CLI
     """
     runtime.state.config_temp = config
 
 @app.command()
 def modules(installable: bool = False, runnable: bool = False):
     """
-    📦 List modules in the monorepo
+    List modules in the monorepo
 
     A 'module' may be a Python or NPM package or a service which is part of 
     a package and can be independently run.
@@ -57,7 +57,7 @@ def modules(installable: bool = False, runnable: bool = False):
 @app.command()
 def path():
     """
-    📂 Prints your mascope path
+    Prints your mascope path
 
     This information is stored in the MASCOPE_PATH enviroment variable
     and used by the CLI and application.
