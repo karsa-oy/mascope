@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { computed, watch } from 'vue'
 
 import Splitter from 'primevue/splitter'
 import SplitterPanel from 'primevue/splitterpanel'
@@ -41,7 +41,6 @@ const targetsStore = useTargetsStore()
 
 const dashboard = useDashboard()
 
-const tab = ref(0)
 const tabs = computed(() => [
   {
     label: 'Batch',
@@ -154,7 +153,10 @@ watch(
                 <PaneTabMatch v-if="focusedMatch.ion" />
               </TabPanel>
               <TabPanel value="acquisitions">
-                <PaneTabAcquisitions v-if="instrumentStore.active" :active="tab == 2" />
+                <PaneTabAcquisitions
+                  v-if="instrumentStore.active"
+                  :active="dashboard.tab == 'acquisitions'"
+                />
               </TabPanel>
             </TabPanels>
           </Tabs>

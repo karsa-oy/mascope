@@ -9,7 +9,8 @@ from watchdog.observers import Observer
 
 import mascope_runtime as runtime
 
-logger = runtime.logger.service('backend')
+logger = runtime.logger.service("backend")
+
 
 class FSWatcher:
     class FSEventHandler(PatternMatchingEventHandler):
