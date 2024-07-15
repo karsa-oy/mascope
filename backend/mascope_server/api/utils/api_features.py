@@ -84,22 +84,21 @@ async def send_progress_user_notification(
         ]
         and increment
     ):
-        notification_copy.progress = int(increment * 100)
+        notification_copy.progress = increment * 100
     if notification_copy.type == "match_compute_batch":
         if total_samples is not None and item_index is not None:
-            notification_copy.progress = int(
-                ((item_index + increment) / total_samples) * 100
-            )
+            notification_copy.progress = (
+                (item_index + increment) / total_samples
+            ) * 100
+
             notification_copy.message = f"Computing sample batch matches, processing sample {item_index + 1}/{total_samples}"
     if notification_copy.type == "rematch_batches":
-        notification_copy.progress = int(
-            (batch_index - 1 + increment) * batch_weight * 100
-        )
+        notification_copy.progress = (batch_index - 1 + increment) * batch_weight * 100
     if notification_copy.type == "sample_batch_export_peaks":
         if total_samples is not None and item_index is not None:
-            notification_copy.progress = int(
-                ((item_index + increment) / total_samples) * 100
-            )
+            notification_copy.progress = (
+                (item_index + increment) / total_samples
+            ) * 100
             notification_copy.message = f"Exporting peak data, processing sample {item_index + 1}/{total_samples}"
 
     # Emit the notification to all specified rooms
