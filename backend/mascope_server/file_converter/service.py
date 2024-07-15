@@ -248,7 +248,7 @@ cache = None
 raw_file_queue = Queue()
 h5_file_queue = Queue()
 shutdown_event = Event()
-sio = socketio.Client(logger=True, ssl_verify=False)
+sio = socketio.Client(logger=False, ssl_verify=False)
 
 
 def run():
