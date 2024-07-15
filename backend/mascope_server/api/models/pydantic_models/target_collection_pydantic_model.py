@@ -85,13 +85,6 @@ class TargetCollectionUpdateBody(TargetCollectionBase):
         return values
 
 
-class TargetCollectionInDB(TargetCollectionBase):
-    target_collection_id: str = Field(..., description="ID of the target collection")
-
-    class Config:
-        from_attributes = True
-
-
 class GetTargetCollectionsQueryParams(BaseModel):
     target_collection_type: Optional[str] = Field(
         None,

@@ -1,6 +1,6 @@
 from typing import Optional, Dict, List, Annotated
 from pydantic import BaseModel, Field, field_validator, model_validator
-from datetime import timezone, datetime as dt
+from datetime import datetime as dt
 
 
 class SampleFileBase(BaseModel):
@@ -47,17 +47,6 @@ class SampleFileUpdate(BaseModel):
     )
     tic: float = Field(..., description="TIC of the sample file")
     polarity: str = Field(None, description="Polarity of the sample file")
-
-
-class SampleFileInDB(SampleFileBase):
-    sample_file_id: str = Field(..., description="ID of the sample file")
-
-    class Config:
-        from_attributes = True
-        # datetime and datetime_utc fields will be represented in the ISO 8601 format in response
-        json_encoders = {
-            dt: lambda v: v.replace(tzinfo=timezone.utc).isoformat(timespec="seconds")
-        }
 
 
 class GetSampleFilesQueryParams(BaseModel):

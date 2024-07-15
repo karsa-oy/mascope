@@ -51,19 +51,6 @@ class SampleBatchUpdateBody(SampleBatchBase):
     )
 
 
-class SampleBatchInDB(SampleBatchBase):
-    sample_batch_id: str = Field(..., description="ID of the sample batch")
-    sample_batch_utc_created: Optional[str] = Field(
-        None, description="Creation timestamp of the sample batch"
-    )
-    sample_batch_utc_modified: Optional[str] = Field(
-        None, description="Last modification timestamp of the sample batch"
-    )
-
-    class Config:
-        from_attributes = True
-
-
 class GetSampleBatchesQueryParams(BaseModel):
     workspace_id: Optional[str] = Field(
         None,

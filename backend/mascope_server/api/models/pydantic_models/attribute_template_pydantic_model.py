@@ -50,15 +50,6 @@ class AttributeTemplateUpdateBody(AttributeTemplateBase):
     pass
 
 
-class AttributeTemplateInDB(AttributeTemplateBase):
-    attribute_template_id: str = Field(
-        ..., description="Unique ID for the attribute template"
-    )
-
-    class Config:
-        from_attributes = True
-
-
 class GetAttributeTemplatesQueryParams(BaseModel):
     sort: Optional[str] = Field(
         "name", description="The column name by which you want to sort the results."
