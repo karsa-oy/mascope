@@ -6,11 +6,6 @@ param (
 
 $Main = {
 
-    if ($true) {
-        Set-RuntimePermissions
-        exit 0
-    }
-
     if ( !$update ) {    
         Write-Output @"
 
@@ -23,7 +18,7 @@ $Main = {
 "@
         Test-ExistingPipx
         Set-MascopeEnvVars
-        Set-RuntimePermissions
+        # Set-RuntimePermissions
         Install-Tooling
     }
     else {
