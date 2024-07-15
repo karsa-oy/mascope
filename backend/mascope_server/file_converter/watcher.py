@@ -41,12 +41,10 @@ class FSWatcher:
                     filesize = new_filesize
                     sleep(2)
                     continue
-                try:
-                    os.rename(filepath, filepath)
+                if os.access(filepath, os.W_OK):
                     break
-                except PermissionError as e:
-                    logger.error(f"Cannot access {filepath}, retrying...")
-                    logger.exception(e)
+                else:
+                    logger.warning(f"Cannot access {filepath}, retrying...")
                     sleep(2)
                     continue
             if not self.parent.shutdown_event.is_set():

@@ -32,9 +32,6 @@ async def streamer_processor(streamer):
             logger.info("File finished")
             raw_filename = data["source_filepath"]
             global target_path
-            if not os.path.exists(target_path):
-                logger.info("Creating mailbox: %s" % target_path)
-                os.mkdir(target_path)
             while True:
                 try:
                     shutil.copyfile(
