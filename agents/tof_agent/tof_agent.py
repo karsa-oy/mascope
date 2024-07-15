@@ -11,6 +11,7 @@ from mascope_hardware.tofwerk.tof_streamer import TofDaqStreamer
 import mascope_runtime as runtime
 
 logger = runtime.logger.service('tof-agent')
+sio_logger = runtime.logger.service('tof-agent', markup=False)
 
 
 async def streamer_processor(streamer):
@@ -130,7 +131,7 @@ async def main():
 host = None
 port = None
 shutdown_event = Event()
-sio = socketio.AsyncClient(logger=True, ssl_verify=False)
+sio = socketio.AsyncClient(logger=False, ssl_verify=False)
 target_path = None
 
 

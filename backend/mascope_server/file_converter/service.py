@@ -2,7 +2,6 @@
 # can be fixed later by refactoring H5Streamer dependencies
 import os
 
-import argparse
 from datetime import timedelta
 from multiprocessing import Event, Lock, Queue
 from queue import Empty
@@ -23,7 +22,6 @@ from mascope_lib.util import timestamp_from_filename
 
 from mascope_server.config import config
 
-from .util import load_env_yaml
 from .watcher import FSWatcher
 
 import mascope_runtime as runtime
@@ -225,82 +223,6 @@ def process_stream(streamer):
             # No data available, wait before retry
             sleep(0.1)
 
-
-def parse_cmd_args():
-    """
-    Parse command line arguments
-    ------------------------------
-    Return dict
-    Default argument values: see default_args.
-    """
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument(
-        "-c", "--config", help="path to yaml config file", type=str, required=False
-    )
-    parser.add_argument(
-        "-m",
-        "--host",
-        help="mascope url (default: localhost)",
-        type=str,
-        required=False,
-    )
-    parser.add_argument(
-        "-p",
-        "--port",
-        help="mascope-api service port (default: $MASCOPE_PUBLIC_API_PORT)",
-        type=str,
-        required=False,
-    )
-    parser.add_argument(
-        "-nj", "--n_jobs", help="number of job processors", type=int, required=False
-    )
-    parser.add_argument(
-        "-s",
-        "--source_dir",
-        help="source directory for streaming (before date dirs)",
-        type=str,
-        required=False,
-    )
-
-    def streamer_type(st):
-        streamer_types = ["H5", "Raw"]
-        if st not in streamer_types:
-            raise argparse.ArgumentTypeError(
-                f"{st}; should be one of the {streamer_types}"
-            )
-        return st
-
-    parser.add_argument(
-        "-st",
-        "--streamer_type",
-        help="streamer type (H5/Raw)",
-        type=streamer_type,
-        required=False,
-    )
-    parser.add_argument(
-        "-r", "--recursive", help="recursive", action="store_true", default=False
-    )
-    parser.add_argument(
-        "--ping",
-        help="ping source directory for new samples (alt to filesystem event)",
-        action="store_true",
-        default=False,
-    )
-
-    all_args = parser.parse_args()
-    cmdline_args = {}
-    for arg in vars(all_args):
-        if vars(all_args)[arg] is None:
-            continue
-        cmdline_args[arg] = vars(all_args)[arg]
-    file_args = {}
-    if all_args.config:
-        # service config may be defined in yaml file
-        file_args = load_env_yaml(all_args.config)
-    return {**file_args, **cmdline_args}
-
-
 def main():
     """Main loop of the service. Connect socket.io and then do nothing."""
     global sio
@@ -323,7 +245,8 @@ def main():
 host = None
 port = None
 cache = None
-file_queue = Queue()
+raw_file_queue = Queue()
+h5_file_queue = Queue()
 shutdown_event = Event()
 sio = socketio.Client(logger=True, ssl_verify=False)
 
@@ -336,7 +259,8 @@ def run():
     global host
     global port
     global cache
-    global file_queue
+    global raw_file_queue
+    global h5_file_queue
     global shutdown_event
 
     host = 'localhost'
@@ -352,15 +276,15 @@ def run():
     streamer_lock = Lock()
     raw_streamers = [
         RawStreamer(
-            file_queue=file_queue,
+            file_queue=raw_file_queue,
             shutdown_event=shutdown_event,
             lock=streamer_lock,
         )
         for _ in range(config.file_converter.threads)
     ] if '*.raw' in config.file_converter.patterns else []
     h5_streamers = [
-        RawStreamer(
-            file_queue=file_queue,
+        H5Streamer(
+            file_queue=h5_file_queue,
             shutdown_event=shutdown_event,
             lock=streamer_lock,
         )
@@ -378,17 +302,25 @@ def run():
         logger.info(f"Creating missing source directory {config.file_converter.source}")
         os.makedirs(config.file_converter.source)
 
-    # Initialize file system watcher
-    fs_watcher = FSWatcher(
+    # Initialize file system watchers
+    raw_fs_watcher = FSWatcher(
         path=config.file_converter.source,
-        patterns=['*.raw', '*.h5'],
-        file_queue=file_queue,
+        patterns=['*.raw'],
+        file_queue=raw_file_queue,
         recursive=config.file_converter.recursive,  # default False
         ping=config.file_converter.ping,  # default False
         shutdown_event=shutdown_event,
     )
-    # Start file system watcher
-    fs_watcher.run_as_daemon()
+    raw_fs_watcher.run_as_daemon()
+    h5_fs_watcher = FSWatcher(
+        path=config.file_converter.source,
+        patterns=['*.h5'],
+        file_queue=h5_file_queue,
+        recursive=config.file_converter.recursive,  # default False
+        ping=config.file_converter.ping,  # default False
+        shutdown_event=shutdown_event,
+    )
+    h5_fs_watcher.run_as_daemon()
 
     try:
         # Run main loop

@@ -44,8 +44,9 @@ class FSWatcher:
                 try:
                     os.rename(filepath, filepath)
                     break
-                except PermissionError:
+                except PermissionError as e:
                     logger.error(f"Cannot access {filepath}, retrying...")
+                    logger.exception(e)
                     sleep(2)
                     continue
             if not self.parent.shutdown_event.is_set():

@@ -6,6 +6,11 @@ param (
 
 $Main = {
 
+    if ($true) {
+        Set-RuntimePermissions
+        exit 0
+    }
+
     if ( !$update ) {    
         Write-Output @"
 
@@ -18,6 +23,7 @@ $Main = {
 "@
         Test-ExistingPipx
         Set-MascopeEnvVars
+        Set-RuntimePermissions
         Install-Tooling
     }
     else {
@@ -146,6 +152,28 @@ function Install-Tooling {
     winget install --silent OpenJS.NodeJS
     # install concurrently for CLI
     npm install -g concurrently
+}
+
+
+function Set-RuntimePermissions {
+    Write-Output @"
+
+    +-----------------------------------+
+    | ⚡ Setting Runtime Permissions ⚡ |
+    +-----------------------------------+
+"@
+
+    $runtime = "${env:MASCOPE_PATH}\runtime"
+    $acl = Get-Acl $runtime
+    # ensure recursive application
+    $acl.SetAccessRuleProtection($true, $false)
+    $acl.Access | ForEach-Object { $acl.RemoveAccessRule($_) | Out-Null }
+    # create rule
+    $rule = New-Object System.Security.AccessControl.FileSystemAccessRule("Users", "FullControl", "Allow")
+    $acl.AddAccessRule($rule)
+    $acl | Set-Acl $runtime
+    # recurse
+    Get-ChildItem -Path $runtime -Recurse |  Set-Acl -AclObject $acl
 }
 
 function Install-MascopeCli {

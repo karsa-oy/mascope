@@ -13,7 +13,7 @@ console = Console(
 
 from .modules import modules
 
-def create(name: str, color: str, max_length: int):
+def create(name: str, color: str, max_length: int, markup: bool = True):
     prefix=f'[{color}] {name.center(max_length, ' ')} [/{color}]'
     logging.basicConfig(
         level=logging.INFO,
@@ -21,7 +21,7 @@ def create(name: str, color: str, max_length: int):
         datefmt="[%X]",
         handlers=[
             RichHandler(
-                markup=True,
+                markup=markup,
                 rich_tracebacks=True,
                 console=console
             )
@@ -29,7 +29,7 @@ def create(name: str, color: str, max_length: int):
     )
     return logging.getLogger(name)
 
-def service(name: str):
+def service(name: str, markup: bool = True):
     max_length=max(*map(lambda p: len(p['name']), modules))
     mod=next(m for m in modules if m['name'] == name)
-    return create(mod['name'], mod['color'], max_length)
+    return create(mod['name'], mod['color'], max_length, markup)

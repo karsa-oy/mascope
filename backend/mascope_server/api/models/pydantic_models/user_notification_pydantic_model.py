@@ -17,7 +17,7 @@ class UserNotification(BaseModel):
     message: str = Field(
         ..., description="User-friendly message describing the notification context."
     )
-    progress: Optional[int] = Field(
+    progress: Optional[float] = Field(
         None, description="Current progress percentage of the process, if applicable"
     )
     status: str = Field(

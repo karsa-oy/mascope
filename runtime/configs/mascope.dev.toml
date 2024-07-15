@@ -13,7 +13,7 @@ streams = './runtime/data/streams'
 filestore = './runtime/data/filestore'
 
 [file_converter]
-threads = 2
+threads = 1
 ping = false
 
 [tof_agent]
