@@ -7,6 +7,9 @@ from mascope_server.api_sio import sio
 from mascope_server.db.id import gen_id
 from mascope_server.api.utils.api_features import api_controller
 from mascope_server.api.exceptions import NotFoundException
+from mascope_server.api.controllers.match.match_aggregate_controller import (
+    reaggregate_and_create_matches,
+)
 from mascope_server.api.models.models import (
     IonizationMechanism,
     TargetIon,
@@ -24,6 +27,9 @@ from mascope_server.api.models.pydantic_models.target_compound_pydantic_model im
 from mascope_server.api.models.pydantic_models.target_ion_pydantic_model import (
     TargetIonUpdate,
 )
+import mascope_runtime as runtime
+
+logger = runtime.logger.service("backend")
 
 
 @api_controller()
@@ -489,6 +495,9 @@ async def update_target_ion(target_ion_id: str, target_ion_update: TargetIonUpda
 
                 # Emit signal for affected sample batches
                 for sample_batch_id in affected_batch_ids:
+                    await reaggregate_and_create_matches(
+                        sample_batch_id=sample_batch_id,
+                    )
                     await sio.emit(
                         "sample_batch_reload",
                         room=sample_batch_id,

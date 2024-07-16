@@ -62,7 +62,9 @@ from mascope_server.api.models.pydantic_models.match_sample_pydantic_model impor
 )
 
 import mascope_runtime as runtime
-logger = runtime.logger.service('backend')
+
+logger = runtime.logger.service("backend")
+
 
 @api_controller()
 async def filter_match_isotope_data(
@@ -185,7 +187,9 @@ async def filter_match_isotope_data(
         target_result = await session.execute(target_query)
         targets_df = pd.DataFrame([row._asdict() for row in target_result.fetchall()])
         if targets_df.empty:
-            logger.info(f"No targets found in the batch '{sample_batch.sample_batch_name}'")
+            logger.info(
+                f"No targets found in the batch '{sample_batch.sample_batch_name}'"
+            )
             return targets_df
 
         target_isotope_ids = targets_df["target_isotope_id"].tolist()

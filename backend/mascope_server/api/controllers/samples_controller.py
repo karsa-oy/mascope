@@ -41,7 +41,8 @@ from mascope_server.api.models.pydantic_models.sample_pydantic_model import Alar
 from mascope_server.api.models.pydantic_models.match_pydantic_model import FilterParams
 
 import mascope_runtime as runtime
-logger = runtime.logger.service('backend')
+
+logger = runtime.logger.service("backend")
 
 # TODO_configuration
 # Default Filter Parameters
@@ -1289,7 +1290,9 @@ async def init_batch_match_filter(
         samples_df = pd.DataFrame([row._asdict() for row in sample_result.fetchall()])
 
         if samples_df.empty:
-            logger.warning(f"No samples found in the batch '{sample_batch.sample_batch_name}'")
+            logger.warning(
+                f"No samples found in the batch '{sample_batch.sample_batch_name}'"
+            )
             return {}
 
         sample_item_ids = samples_df["sample_item_id"].tolist()
@@ -1352,7 +1355,9 @@ async def init_batch_match_filter(
         target_result = await session.execute(target_query)
         targets_df = pd.DataFrame([row._asdict() for row in target_result.fetchall()])
         if targets_df.empty:
-            logger.info(f"No targets found in the batch '{sample_batch.sample_batch_name}'")
+            logger.info(
+                f"No targets found in the batch '{sample_batch.sample_batch_name}'"
+            )
             return {}
 
         target_isotope_ids = targets_df["target_isotope_id"].tolist()

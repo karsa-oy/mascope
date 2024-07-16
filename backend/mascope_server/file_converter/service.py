@@ -25,7 +25,9 @@ from mascope_server.config import config
 from .watcher import FSWatcher
 
 import mascope_runtime as runtime
-logger = runtime.logger.service('backend')
+
+logger = runtime.logger.service("backend")
+
 
 def create_sample_file_db_record(data):
     """Create a sample file database record by a HTTP request
@@ -120,7 +122,9 @@ def process_stream(streamer):
             try:
                 os.remove(filepath)
             except FileNotFoundError as e:
-                logger.error(f"Failed to delete file {filepath} from the streams folder: {e}")
+                logger.error(
+                    f"Failed to delete file {filepath} from the streams folder: {e}"
+                )
 
             # Send request to Mascope backend to create sample file record in the db
             try:
@@ -223,6 +227,7 @@ def process_stream(streamer):
             # No data available, wait before retry
             sleep(0.1)
 
+
 def main():
     """Main loop of the service. Connect socket.io and then do nothing."""
     global sio
@@ -263,34 +268,42 @@ def run():
     global h5_file_queue
     global shutdown_event
 
-    host = 'localhost'
+    host = "localhost"
     port = config.server.port
 
     # Validate streamer type
     for pattern in config.file_converter.patterns:
-        if pattern not in ['*.raw', '*.h5']:
+        if pattern not in ["*.raw", "*.h5"]:
             raise Exception(f"Unknown file converter pattern: {pattern}")
 
     # Initialize streamer thread(s)
     cache = dict()
     streamer_lock = Lock()
-    raw_streamers = [
-        RawStreamer(
-            file_queue=raw_file_queue,
-            shutdown_event=shutdown_event,
-            lock=streamer_lock,
-        )
-        for _ in range(config.file_converter.threads)
-    ] if '*.raw' in config.file_converter.patterns else []
-    h5_streamers = [
-        H5Streamer(
-            file_queue=h5_file_queue,
-            shutdown_event=shutdown_event,
-            lock=streamer_lock,
-        )
-        for _ in range(config.file_converter.threads)
-    ] if '*.h5' in config.file_converter.patterns else []
-    streamers=[*raw_streamers, *h5_streamers]
+    raw_streamers = (
+        [
+            RawStreamer(
+                file_queue=raw_file_queue,
+                shutdown_event=shutdown_event,
+                lock=streamer_lock,
+            )
+            for _ in range(config.file_converter.threads)
+        ]
+        if "*.raw" in config.file_converter.patterns
+        else []
+    )
+    h5_streamers = (
+        [
+            H5Streamer(
+                file_queue=h5_file_queue,
+                shutdown_event=shutdown_event,
+                lock=streamer_lock,
+            )
+            for _ in range(config.file_converter.threads)
+        ]
+        if "*.h5" in config.file_converter.patterns
+        else []
+    )
+    streamers = [*raw_streamers, *h5_streamers]
 
     # Start streamer thread(s)
     for streamer in streamers:
@@ -305,7 +318,7 @@ def run():
     # Initialize file system watchers
     raw_fs_watcher = FSWatcher(
         path=config.file_converter.source,
-        patterns=['*.raw'],
+        patterns=["*.raw"],
         file_queue=raw_file_queue,
         recursive=config.file_converter.recursive,  # default False
         ping=config.file_converter.ping,  # default False
@@ -314,7 +327,7 @@ def run():
     raw_fs_watcher.run_as_daemon()
     h5_fs_watcher = FSWatcher(
         path=config.file_converter.source,
-        patterns=['*.h5'],
+        patterns=["*.h5"],
         file_queue=h5_file_queue,
         recursive=config.file_converter.recursive,  # default False
         ping=config.file_converter.ping,  # default False
