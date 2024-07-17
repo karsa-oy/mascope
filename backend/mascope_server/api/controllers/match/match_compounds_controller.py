@@ -28,6 +28,10 @@ from mascope_server.api.models.pydantic_models.match_compound_pydantic_model imp
     MatchCompoundBase,
 )
 
+import mascope_runtime as runtime
+
+logger = runtime.logger.service("backend")
+
 
 @api_controller()
 async def get_match_compounds(
@@ -252,7 +256,7 @@ async def create_match_compounds(
                 for match_compound in match_compounds:
                     new_match_compound = MatchCompound(
                         match_compound_id=gen_id(32),
-                        **match_compound.dict(),
+                        **match_compound.model_dump(),
                         match_compound_utc_created=datetime.now(timezone.utc),
                     )
                     session.add(new_match_compound)
@@ -291,7 +295,7 @@ async def create_match_compounds(
             409,
         )
 
-    print(message)
+    logger.info(message)
     return result
 
 
@@ -335,5 +339,5 @@ async def delete_match_compounds(
     if target_compound_ids:
         message += f" Limited by {len(target_compound_ids)} specified target compound{'s' if len(target_compound_ids) != 1 else ''}."
 
-    print(message)
+    logger.info(message)
     return {"message": message}

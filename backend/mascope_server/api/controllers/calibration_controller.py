@@ -58,6 +58,8 @@ from ..models.pydantic_models.user_notification_pydantic_model import (
     UserNotification,
 )
 
+import mascope_runtime as runtime
+logger = runtime.logger.service('backend')
 
 # -------------------------------------------------------------------
 # Main Logic Functions
@@ -198,7 +200,7 @@ def signal_mz_calibration_update(fit, filename):
     new_range = [new_mz[0], new_mz[-1]]
 
     # Update zarr file coordinates and props
-    print("Calibrating file: %s" % filename)
+    logger.info("Calibrating file: %s" % filename)
     if nbr_samples != get_zarr_var_shape(filename, "signal")[0]:
         raise Exception("Number of TOF samples does not match")
     update_props(filename, {"range": new_range, "mz_calibration": fit})
@@ -532,7 +534,7 @@ async def calibration_mz_calibrate_sample(
     if not sample:
         raise NotFoundException(f"Sample item with ID '{sample_item_id}' not found")
 
-    print(f"...m/z calibrating sample '{sample.sample_item_name}' ...")
+    logger.info(f"...m/z calibrating sample '{sample.sample_item_name}' ...")
 
     # Step 2: Prepare progress user notification.
     notification = UserNotification(
@@ -649,7 +651,7 @@ async def calibration_mz_calibrate_batch(
     if not samples:
         raise NotFoundException(f"Sample batch '{sample_batch_name}' has no samples")
 
-    print(f"...m/z calibrating batch: '{sample_batch_name}' ...")
+    logger.info(f"...m/z calibrating batch: '{sample_batch_name}' ...")
     # Prepare progress user notification.
     notification = UserNotification(
         process_id=process_id,
@@ -692,7 +694,7 @@ async def calibration_mz_calibrate_batch(
             sample_batch_ids_to_reload.update(affected_sample_batch_ids)
         except ApiException as e:
             # If an exception occurs during sample calibration, log the error and add the sample to the failed list
-            print(f"Calibrating sample '{sample.sample_item_name}' failed: {e}")
+            logger.error(f"Calibrating sample '{sample.sample_item_name}' failed: {e}")
             samples_calibrate_failed.append(
                 {
                     "sample_item": {

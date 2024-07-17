@@ -22,7 +22,7 @@ attribute_templates_router = APIRouter()
 async def get_attribute_templates_route(
     query_params: GetAttributeTemplatesQueryParams = Depends(),
 ):
-    return await get_attribute_templates(**query_params.dict())
+    return await get_attribute_templates(**query_params.model_dump())
 
 
 @attribute_templates_router.get("/api/attribute_templates/{attribute_template_id}")

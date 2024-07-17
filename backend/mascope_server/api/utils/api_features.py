@@ -90,6 +90,7 @@ async def send_progress_user_notification(
             notification_copy.progress = (
                 (item_index + increment) / total_samples
             ) * 100
+
             notification_copy.message = f"Computing sample batch matches, processing sample {item_index + 1}/{total_samples}"
     if notification_copy.type == "rematch_batches":
         notification_copy.progress = (batch_index - 1 + increment) * batch_weight * 100

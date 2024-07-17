@@ -2,8 +2,11 @@ import os
 import pandas as pd
 import numpy as np
 import xarray as xr
-from mascope_lib.file_func import load_array, load_file, filename_to_zarr_path, get_base_path
+from mascope_lib.file_func import load_array, load_file, filename_to_zarr_path
 from mascope_lib.util import parse_path_from_item_filename
+import mascope_runtime as runtime
+
+config = runtime.config.autoload()
 
 
 def csv_to_xarr(csv_path: str, filename: str) -> xr.core.dataarray.DataArray:
@@ -90,7 +93,7 @@ def write_to_sample_file(kecu_arr: xr.core.dataarray.DataArray, filename: str) -
     :param filename: base name of the target sample data file
     :type filename: str
     """
-    base_path = get_base_path()
+    base_path = config.server.filestore
 
     # Check if proper filename
     try:

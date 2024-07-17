@@ -40,6 +40,10 @@ from mascope_server.api.models.models import (
 from mascope_server.api.models.pydantic_models.sample_pydantic_model import AlarmsList
 from mascope_server.api.models.pydantic_models.match_pydantic_model import FilterParams
 
+import mascope_runtime as runtime
+
+logger = runtime.logger.service("backend")
+
 # TODO_configuration
 # Default Filter Parameters
 DEFAULT_MZ_TOLERANCE = 15
@@ -1286,7 +1290,9 @@ async def init_batch_match_filter(
         samples_df = pd.DataFrame([row._asdict() for row in sample_result.fetchall()])
 
         if samples_df.empty:
-            print(f"No samples found in the batch '{sample_batch.sample_batch_name}'")
+            logger.warning(
+                f"No samples found in the batch '{sample_batch.sample_batch_name}'"
+            )
             return {}
 
         sample_item_ids = samples_df["sample_item_id"].tolist()
@@ -1349,7 +1355,9 @@ async def init_batch_match_filter(
         target_result = await session.execute(target_query)
         targets_df = pd.DataFrame([row._asdict() for row in target_result.fetchall()])
         if targets_df.empty:
-            print(f"No targets found in the batch '{sample_batch.sample_batch_name}'")
+            logger.info(
+                f"No targets found in the batch '{sample_batch.sample_batch_name}'"
+            )
             return {}
 
         target_isotope_ids = targets_df["target_isotope_id"].tolist()
@@ -1401,7 +1409,7 @@ async def init_batch_match_filter(
             match_interference_df = pd.DataFrame(match_interference_result.fetchall())
 
             if match_interference_df.empty:
-                print(
+                logger.info(
                     f"No match interference found for the sample batch '{sample_batch.sample_batch_name}'"
                 )
                 return {}
@@ -1416,7 +1424,7 @@ async def init_batch_match_filter(
 
         # Merge DataFrames
         if matches_df.empty:
-            print(
+            logger.info(
                 f"No matches found for the sample batch '{sample_batch.sample_batch_name}'"
             )
             return {}

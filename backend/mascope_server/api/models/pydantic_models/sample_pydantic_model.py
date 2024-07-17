@@ -1,5 +1,5 @@
-from typing import List, Optional
-from pydantic import BaseModel, Field, validator
+from typing import List, Optional, Annotated
+from pydantic import BaseModel, Field, field_validator
 from datetime import datetime
 from .target_compound_pydantic_model import TargetCompoundMatches
 from .match_pydantic_model import FilterParams
@@ -9,21 +9,25 @@ from .match_pydantic_model import FilterParams
 APP_COLLECTION_TYPES = ["TARGETS", "DIAGNOSTICS", "CALIBRANTS"]
 
 
-#  Note that AlarmsList acts as a common base class that includes the alarms_list field and its validator
+#  Note that AlarmsList acts as a common base class that includes the alarms_list field and its field validator
 class AlarmsList(BaseModel):
-    alarms_list: List[str] = Field(
+    alarms_list: List[Annotated[str, Field(description="Type of alarm")]] = Field(
         default=["TARGETS"],
         description="List of collection types to set alarm mode to true",
     )
 
-    @validator("alarms_list", each_item=True)
-    def validate_alarms_list(cls, item):
-        if item not in APP_COLLECTION_TYPES:
-            allowed_types = ", ".join(APP_COLLECTION_TYPES)
-            raise ValueError(
-                f"{item} is not a valid collection type. Allowed types are {allowed_types}."
-            )
-        return item
+    @field_validator("alarms_list")
+    def validate_alarms_list(cls, items):
+        errors = []
+        for item in items:
+            if item not in APP_COLLECTION_TYPES:
+                allowed_types = ", ".join(APP_COLLECTION_TYPES)
+                errors.append(
+                    f"{item} is not a valid collection type. Allowed types are {allowed_types}."
+                )
+        if errors:
+            raise ValueError(" ".join(errors))
+        return items
 
 
 class GetSamplesBody(AlarmsList):

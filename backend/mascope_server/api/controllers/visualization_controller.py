@@ -11,6 +11,10 @@ from ..models.models import Sample, TargetIsotope
 from ..exceptions import NotFoundException
 from ..utils.api_features import api_controller_background_task
 
+import mascope_runtime as runtime
+
+logger = runtime.logger.service("backend")
+
 # TODO_configuration shift traces color
 COLOR_OFFSET = 5
 
@@ -78,7 +82,7 @@ async def visualize_ion_focus(
             )
 
     # Step 2: Load the sample file and prepare data slice
-    print("Loading file: %s" % filename)
+    logger.info("Loading file: %s" % filename)
     sample_file = load_file(filename, vars=["sum_signal", "signal", "peak_heights"])
 
     # Step 3: Convert target ion data to DataFrame and prepare data
@@ -94,7 +98,7 @@ async def visualize_ion_focus(
     main_isotope_height = 0
     sum_timeseries = None
     for i, mz in enumerate(mzs):
-        print("{:d}/{:d}: {:3f}".format(i + 1, len(mzs), mz))
+        logger.info("{:d}/{:d}: {:3f}".format(i + 1, len(mzs), mz))
         spectrum_traces = []
         timeseries_traces = []
         dmz = 0.5
@@ -102,8 +106,15 @@ async def visualize_ion_focus(
         rel_abu = rel_abus[i]
         current_target_isotope_id = target_isotope_ids[i]
 
+        # Extract the specific isotope slice and compute the sum spectrum
         isotope_slice = sample_file.sel(mz=slice(*mz_range)).compute()
         isotope_sum_spectrum = isotope_slice.sum_signal
+        # Check if the spectrum slice is empty
+        if isotope_sum_spectrum.size == 0:
+            logger.warning(
+                f"No data found in the mz range {mz_range} for requested mz {mz}"
+            )
+            continue  # Skip this iteration or adjust the range
         isotope_height = isotope_sum_spectrum.dropna(dim="mz").sel(
             mz=mz, method="nearest"
         )
@@ -151,9 +162,16 @@ async def visualize_ion_focus(
             )
             if match:
                 # Timeseries trace
-                match_timeseries = isotope_slice.signal.dropna(dim="mz").sel(
-                    mz=peak_mz, method="nearest"
-                )
+                try:
+                    match_timeseries = isotope_slice.signal.dropna(dim="mz").sel(
+                        mz=peak_mz, method="nearest"
+                    )
+                except KeyError as e:
+                    logger.warning(
+                        f"Failed to find mz {peak_mz} in the dataset. Error: {e}"
+                    )
+                    continue
+
                 timeseries_time = match_timeseries.time.values.astype(np.float32)
                 timeseries_y = match_timeseries.values.astype(np.float32)
                 timeseries_traces.append(

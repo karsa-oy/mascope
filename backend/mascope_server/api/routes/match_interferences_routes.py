@@ -21,7 +21,7 @@ match_interferences_router = APIRouter()
 async def get_match_interferences_route(
     query_params: GetMatchInterferencesQueryParams = Depends(),
 ):
-    return await get_match_interferences(**query_params.dict())
+    return await get_match_interferences(**query_params.model_dump())
 
 
 @match_interferences_router.get("/api/match/interferences/{match_interference_id}")

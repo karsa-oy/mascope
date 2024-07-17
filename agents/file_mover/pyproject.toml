@@ -14,10 +14,11 @@ build-backend = "poetry.core.masonry.api"
 mascope-file-mover = 'file_mover:run'
 
 [tool.poetry.dependencies]
-python = "~3.10"
+python = "~3.12"
+mascope_runtime = { path = '../../libraries/mascope_runtime', develop = true }
 
-watchdog = "^3.0.0"
+watchdog = "^4.0"
 
 [tool.poetry.group.dev.dependencies]
-deptry = "^0.16.1"
-pyinstaller = "^6.3.0"
+deptry = "^0.16"
+pyinstaller = "^6.8"

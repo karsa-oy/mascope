@@ -16,6 +16,8 @@ from time import sleep
 
 import numpy as np
 
+import mascope_runtime as runtime
+
 from .generator import BaseGenerator
 from .instrument import KInstrument
 from .lib.TwH5 import (
@@ -27,6 +29,8 @@ from .lib.TwH5 import (
     TwGetTofSpectrumFromH5,
     TwH5Desc,
 )
+
+logger = runtime.logger.service('hardware-lib')
 
 
 class H5Streamer(BaseGenerator, KInstrument):
@@ -41,7 +45,7 @@ class H5Streamer(BaseGenerator, KInstrument):
         Exception
             Exception is raised if fetching 'TwH5Desc' fails for some reason.
         """
-        print("H5Streamer initializing")
+        logger.info("H5Streamer initializing")
         BaseGenerator.__init__(self)
 
         # Initialize with empty TW h5 descriptor
@@ -227,7 +231,7 @@ class H5Streamer(BaseGenerator, KInstrument):
         Loop until 'self.shutdown_event' is set.
         """
 
-        print("H5Streamer running")
+        logger.info("H5Streamer running")
         # Main loop
         while not self.shutdown_event.is_set():
             try:
@@ -237,12 +241,12 @@ class H5Streamer(BaseGenerator, KInstrument):
                 with self.lock:
                     ret = TwGetH5Descriptor(file_to_stream, self.desc)
                     if ret != 4:
-                        print("Error reading file: %s" % ret)
+                        logger.error("Failed to read file: %s" % ret)
                         TwCloseH5(file_to_stream)
                         continue
                     if not (self.desc.nbrBufs and self.desc.nbrWrites):
                         # Empty file, skip
-                        print("Skipping empty file: %s" % file_to_stream)
+                        logger.warning("Skipping empty file: %s" % file_to_stream)
                         TwCloseH5(file_to_stream)
                         continue
                 # Test read to check for corrupt file
@@ -260,7 +264,7 @@ class H5Streamer(BaseGenerator, KInstrument):
                         True,
                     )
                     if ret != 4:
-                        print("Error reading file: %s" % ret)
+                        logger.error("Failed to read file: %s" % ret)
                         TwCloseH5(file_to_stream)
                         continue
                 # Add fields to comply with TW shared memory descriptor
@@ -301,9 +305,9 @@ class H5Streamer(BaseGenerator, KInstrument):
             self.active.clear()
             self._finalize()
             self.cancel_event.clear()
-            print("h5Stream finished")
+            logger.info("h5Stream finished")
         # Out of main loop
-        print("H5Streamer exiting")
+        logger.info("H5Streamer exiting")
         self.shutdown()
 
     def start_stream(self, filename):

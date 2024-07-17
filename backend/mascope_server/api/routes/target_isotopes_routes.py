@@ -16,7 +16,7 @@ target_isotopes_router = APIRouter()
 async def get_target_isotopes_route(
     query_params: GetTargetIsotopesQueryParams = Depends(),
 ):
-    return await get_target_isotopes(**query_params.dict())
+    return await get_target_isotopes(**query_params.model_dump())
 
 
 @target_isotopes_router.get("/api/target_isotopes/{target_isotope_id}")

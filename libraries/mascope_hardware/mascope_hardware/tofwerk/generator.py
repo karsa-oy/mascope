@@ -13,6 +13,9 @@ from queue import Empty
 from threading import Thread
 from time import sleep
 
+import mascope_runtime as runtime
+
+logger = runtime.logger.service('hardware-lib')
 
 def strip_filepath(filepath):
     """Strip path and file extension
@@ -164,16 +167,16 @@ class BaseGenerator(Thread):
             ) * self.interval  # [s]
             # Feed coordinates
             self._feed_coordinates()
-            print("TofDaqStreamer started: %s" % self.filename)
+            logger.info("TofDaqStreamer started: %s" % self.filename)
             # Check again for new data
             state = self._check()
         if state == 1:
             # New data
             new_speci = (self.desc.iWrite * self.desc.nbrBufs) + self.desc.iBuf
             if new_speci - self.speci > 1:
-                print("Warning: Skipped a spec!")
+                logger.warning("skipped a spec!")
             self.speci = new_speci
-            print(self.speci)
+            logger.info(self.speci)
             self._get_and_feed_data()
 
     def shutdown(self):

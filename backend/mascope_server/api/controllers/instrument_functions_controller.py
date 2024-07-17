@@ -202,7 +202,7 @@ async def create_instrument_function(
         # Step 1: Construct new instrument function
         new_instrument_function = InstrumentFunction(
             instrument_function_id=gen_id(32),
-            **instrument_function_data.dict(),  # Unpack the Pydantic model's data
+            **instrument_function_data.model_dump(),  # Unpack the Pydantic model's data
         )
 
         # Step 2: Add to session and commit the changes to the database

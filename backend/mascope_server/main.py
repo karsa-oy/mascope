@@ -1,7 +1,6 @@
 # Import this here to avoid "free(): invalid pointer" error on Linux
 from mascope_hardware.tofwerk.lib.TwTool import *
 
-import os
 import socketio
 import uvicorn
 
@@ -10,19 +9,19 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from dotenv import load_dotenv
 from mascope_server.api_sio import sio
-from mascope_server.db import init_db
 from mascope_server.api.exceptions import handle_exception
 from mascope_server.api.routes import routers
 
-load_dotenv()
+from mascope_server.config import config
 
-api_port = int(os.environ.get("MASCOPE_PUBLIC_API_PORT"))
-mode = os.environ.get("MASCOPE_PUBLIC_MODE")
+from mascope_server.db import init_db
+
+from .logger import setup_rich_logger
 
 fastapi_app = FastAPI()
 
+setup_rich_logger()
 
 @fastapi_app.on_event("startup")
 async def startup_event():
@@ -107,9 +106,10 @@ def run():
     """Entry point to run Mascope server"""
     uvicorn.run(
         "mascope_server.main:app",
-        host="0.0.0.0" if mode == "development" else "127.0.0.1",
-        port=api_port,
-        reload=(mode == "development"),
+        host="0.0.0.0" if config.env.mode == "development" else "127.0.0.1",
+        port=config.server.port,
+        reload=(config.env.mode == "development"),
+        log_level='warning'
     )
 
 

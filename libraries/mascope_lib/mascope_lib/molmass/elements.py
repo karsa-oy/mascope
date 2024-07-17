@@ -92,6 +92,10 @@ Examples
 
 """
 
+import mascope_runtime as runtime
+
+logger = runtime.logger.service('standard-lib')
+
 __version__ = '2020.1.1'
 
 __all__ = ('ELEMENTS', 'Element', 'Isotope', 'sqlite_script')
@@ -2330,6 +2334,6 @@ def word_wrap(text, linelen=79, indent=0, joinstr='\n'):
 if __name__ == '__main__':
     import doctest
 
-    print(f'ELEMENTS = {repr(ELEMENTS)}')
+    logger.info(f'ELEMENTS = {repr(ELEMENTS)}')
     # print(sqlite_script())
     doctest.testmod(verbose=False)

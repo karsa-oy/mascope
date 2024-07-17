@@ -5,13 +5,15 @@ from mascope_server.api.exceptions import NotFoundException
 from mascope_server.api.controllers.target_isotopes_controller import (
     get_target_isotopes,
 )
-from mascope_server.api.controllers.target_ions_controller import (
-    get_target_ions,
-)
 from mascope_server.api.models.models import (
     SampleItem,
     SampleBatch,
+    TargetIon,
 )
+
+import mascope_runtime as runtime
+
+logger = runtime.logger.service("backend")
 
 
 # -------------------------------------------------------------------
@@ -54,7 +56,7 @@ async def fetch_sample_item_ids(
                 error_msg = (
                     f"No sample items found for sample batch ID '{sample_batch_id}'."
                 )
-                print(error_msg)
+                logger.error(error_msg)
                 raise NotFoundException(error_msg)
             sample_item_ids = [item.sample_item_id for item in sample_items]
             batch = await session.get(SampleBatch, sample_batch_id)
@@ -228,6 +230,7 @@ async def fetch_targets_for_match_remove(
     :type removed_ionization_mechanism_ids: Optional[List[str]]
     :return: A dictionary containing lists of unique target IDs for isotopes, ions, and potentially compounds.
     :rtype: Dict[str, List[str]]
+    TODO_api_circular_import reorginize the cross dependency for rematch and get_target_ controllers
     """
     targets = {
         "target_isotope_ids": [],
@@ -240,16 +243,22 @@ async def fetch_targets_for_match_remove(
         isotopes_result = await get_target_isotopes(
             target_compound_ids=removed_target_compound_ids
         )
-        ions_result = await get_target_ions(
-            target_compound_ids=removed_target_compound_ids
-        )
-
         targets["target_isotope_ids"].extend(
             [item["target_isotope_id"] for item in isotopes_result["data"]]
         )
-        targets["target_ion_ids"].extend(
-            [item["target_ion_id"] for item in ions_result["data"]]
-        )
+        # ions_result = await get_target_ions(
+        #     target_compound_ids=removed_target_compound_ids
+        # )
+        # targets["target_ion_ids"].extend(
+        #     [item["target_ion_id"] for item in ions_result["data"]]
+        # )
+        async with async_session() as session:
+            ion_query = select(TargetIon).filter(
+                TargetIon.target_compound_id.in_(removed_target_compound_ids)
+            )
+            ion_result = await session.execute(ion_query)
+        ion_ids = [ion.target_ion_id for ion in ion_result.scalars().all()]
+        targets["target_ion_ids"].extend(ion_ids)
 
         # # Set target_compound_ids only if there are no removed ionization mechanisms
         # if not removed_ionization_mechanism_ids:
@@ -259,16 +268,22 @@ async def fetch_targets_for_match_remove(
         isotopes_result = await get_target_isotopes(
             ionization_mechanism_ids=removed_ionization_mechanism_ids
         )
-        ions_result = await get_target_ions(
-            ionization_mechanism_ids=removed_ionization_mechanism_ids
-        )
-
         targets["target_isotope_ids"].extend(
             [item["target_isotope_id"] for item in isotopes_result["data"]]
         )
-        targets["target_ion_ids"].extend(
-            [item["target_ion_id"] for item in ions_result["data"]]
-        )
+        # ions_result = await get_target_ions(
+        #     ionization_mechanism_ids=removed_ionization_mechanism_ids
+        # )
+        # targets["target_ion_ids"].extend(
+        #     [item["target_ion_id"] for item in ions_result["data"]]
+        # )
+        async with async_session() as session:
+            ion_query = select(TargetIon).filter(
+                TargetIon.ionization_mechanism_id.in_(removed_ionization_mechanism_ids)
+            )
+            ion_result = await session.execute(ion_query)
+        ion_ids = [ion.target_ion_id for ion in ion_result.scalars().all()]
+        targets["target_ion_ids"].extend(ion_ids)
 
     # Deduplicate the lists
     for key in targets:

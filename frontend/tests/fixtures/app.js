@@ -1,7 +1,4 @@
 import { test as base } from '@playwright/test'
-import { config } from 'dotenv'
-
-config({ path: '../.env' })
 
 base.beforeEach(async ({ page }) => {
   // spoof time

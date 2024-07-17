@@ -101,6 +101,9 @@ import re
 import sys
 from functools import reduce
 
+import mascope_runtime as runtime
+logger = runtime.logger.service('standard-lib')
+
 try:
     from elements import ELECTRON, ELEMENTS, Isotope
 except ImportError:
@@ -417,7 +420,7 @@ class Formula:
 
         """
         charge = 0
-        m = re.search("\]{1,}([0-9]*)([+-]{1,})$", self._formula)
+        m = re.search(r"\]{1,}([0-9]*)([+-]{1,})$", self._formula)
         if m:
             if m.groups()[0] == "":
                 charge = int("%s1" % m.groups()[1])
@@ -872,7 +875,7 @@ def from_string(formula, groups=None):
             formula = formula.split("]")[0] + "]"
     else:
         # Search for singly charged (e.g. *_- or *-)
-        m = re.search("([\]_]?)([+-]{1,})$", formula)
+        m = re.search(r"([\]_]?)([+-]{1,})$", formula)
         charge = 0
         if m:
             for char in m.groups()[1]:
@@ -1185,31 +1188,31 @@ def test(verbose=False):
         ("CuSO4.5H2O", "CuH10O9S", 249.68),
     ]:
         if verbose:
-            print(f"Trying Formula('{data[0]}') ...", end="")
+            logger.info(f"Trying Formula('{data[0]}') ...", end="")
         try:
             f = Formula(data[0])
             f.empirical
             f.mass
             f.spectrum
         except FormulaError as exc:
-            print("Error:", exc)
+            logger.error(exc)
             continue
         if data[1] and f.empirical != data[1]:
-            print(
+            logger.error(
                 "Failure for {}:\n    Expected '{}', got '{}':".format(
                     data[0], data[1], f.empirical
                 )
             )
             continue
         if data[2] and abs(f.mass - data[2]) > 0.1:
-            print(
+            logger.error(
                 "Failure for {}:\n    Expected {}, got {}".format(
                     data[0], data[2], f.mass
                 )
             )
             continue
         if verbose:
-            print("ok")
+            logger.info("ok")
 
     # these formulas are expected to fail
     for data in [
@@ -1233,14 +1236,14 @@ def test(verbose=False):
         "Ox: 0.26, 30Si: 0.74",
     ]:
         if verbose:
-            print(f"Trying Formula('{data}') ...", end="")
+            logger.info(f"Trying Formula('{data}') ...", end="")
         try:
             f = Formula(data).empirical
         except FormulaError as exc:
             if verbose:
-                print("ok\nExpected error:", exc)
+                logger.error("ok\nExpected error:", exc)
         else:
-            print(f"Failure expected for '{data}', got '{Formula(data).formula}'")
+            logger.error(f"Failure expected for '{data}', got '{Formula(data).formula}'")
 
 
 def main(argv=None):
@@ -1283,10 +1286,10 @@ def main(argv=None):
     try:
         results = analyze(formula)
     except Exception as exc:
-        print("\nError: \n  ", exc, sep="")
+        logger.error("\nError: \n  ", exc, sep="")
         raise exc
     else:
-        print("\n", results, sep="")
+        logger.info("\n", results, sep="")
 
 
 if __name__ == "__main__":

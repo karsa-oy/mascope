@@ -7,6 +7,9 @@ Created on Mon Dec  2 12:23:05 2019
 
 from ThermoFisher.CommonCore.Data import Business
 
+import mascope_runtime as runtime
+
+logger = runtime.logger.service('hardware-lib')
 
 class KOInstrument:
     """
@@ -20,7 +23,7 @@ class KOInstrument:
             i_type = self.raw.GetInstrumentType(0)
             self.raw.SelectInstrument(i_type, 1)
             i_data = self.raw.GetInstrumentData()
-            print(f"File: {rawfile}\nInstrument: {i_data.Name} #{i_data.SerialNumber}")
+            logger.info(f"File: {rawfile}\nInstrument: {i_data.Name} #{i_data.SerialNumber}")
             self.filename = rawfile
         except:
             self.raw = None

@@ -8,8 +8,12 @@ import os
 import platform
 import sys
 
+import mascope_runtime as runtime
+
 import numpy as np
 from numpy.ctypeslib import ndpointer
+
+logger = runtime.logger.service('hardware-lib')
 
 libname = {
     "linux": "libtwh5.so",
@@ -106,7 +110,7 @@ def TwGetH5Descriptor(filename, h5Descriptor):
     try:
         geth5descriptor.argtypes = [ct.c_char_p, ct.POINTER(TwH5Desc)]
     except Exception as e:
-        print(e)
+        logger.error(e)
     return geth5descriptor(filename, ct.pointer(h5Descriptor))
 
 

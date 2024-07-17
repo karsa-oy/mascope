@@ -11,6 +11,9 @@ import zarr
 from watchdog.events import PatternMatchingEventHandler
 from watchdog.observers import Observer
 
+import mascope_runtime as runtime
+
+logger = runtime.logger.service('standard-lib')
 
 class AttrDict(dict):
     """Dict object that allows accessing values like attributes
@@ -200,9 +203,6 @@ class ExtendableDataArray:
         self.data_array = xarray.concat(to_concat, dim=dim)
         if self.persist:
             self.data_array = self.data_array.persist()
-        # t1 = time.time()
-        # print("Concatenation took: %.2f seconds" %(t1-t0))
-        # t0 = time.time()
 
         # Incremental write to file
         if self.path is not None:
@@ -227,9 +227,6 @@ class ExtendableDataArray:
                     compute=True,
                 )
                 self.delayed_write = None
-
-        # t1 = time.time()
-        # print("Write operation took: %.2f seconds" %(t1-t0))
 
         # Optional callback function
         if callback is not None:
@@ -288,7 +285,7 @@ class FSWatcher:
             super().__init__(patterns=mask)
 
         def log(self, *arg):
-            print(f"[{self.__class__.__name__}.{inspect.stack()[1].function}]", *arg)
+            logger.info(f"[{self.__class__.__name__}.{inspect.stack()[1].function}]", *arg)
 
         def on_created(self, event):
             try:
@@ -334,7 +331,7 @@ class FSWatcher:
                 pass
 
     def log(self, *arg):
-        print(f"[{self.__class__.__name__}.{inspect.stack()[1].function}]", *arg)
+        logger.info(f"[{self.__class__.__name__}.{inspect.stack()[1].function}]", *arg)
 
     def __init__(self, client, target_attrs, recursive=False):
         self.client = client

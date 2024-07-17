@@ -18,7 +18,7 @@ target_ions_router = APIRouter()
 async def get_target_ions_route(
     query_params: GetTargetIonsQueryParams = Depends(),
 ):
-    return await get_target_ions(**query_params.dict())
+    return await get_target_ions(**query_params.model_dump())
 
 
 @target_ions_router.get("/api/target_ions/{target_ion_id}")

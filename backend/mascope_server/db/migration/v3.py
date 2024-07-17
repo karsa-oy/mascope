@@ -9,8 +9,14 @@ import shutil
 
 from scipy.io import loadmat
 
-from mascope_server.db.id import gen_id
 from mascope_lib.file_func import filename_to_zarr_path, load_file
+
+from mascope_server.db.id import gen_id
+from mascope_server.config import config
+
+import mascope_runtime as runtime
+
+logger = runtime.logger.service('backend')
 
 # patch asyncio to supported run_until_complete
 # when an event loop is already running
@@ -29,11 +35,9 @@ def load_peakshape_mat(peakshape_file):
 
 
 def run():
-    data_path = os.environ.get("MASCOPE_PRIVATE_DATABASE_DIR")
-
     # STEP 1 - setup new database
-    old_db_path = os.path.join(data_path, "mascope.v2.db")
-    new_db_path = os.path.join(data_path, "mascope.v3.db")
+    old_db_path = os.path.join(config.server.database, "mascope.v2.db")
+    new_db_path = os.path.join(config.server.database, "mascope.v3.db")
     shutil.copyfile(old_db_path, new_db_path)
     new_conn = sqlite3.connect(database=new_db_path)
     with new_conn:
@@ -220,7 +224,7 @@ def run():
             try:
                 shutil.rmtree(peaks_path)
             except Exception as e:
-                print(e)
+                logger.error(e)
 
         # Delete all matches
         new_conn.cursor().execute(

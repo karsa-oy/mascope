@@ -1,66 +1,17 @@
-import argparse
 import asyncio
 import os
-import re
 import shutil
 import socketio
-import yaml
 
 from multiprocessing import Event
 from queue import Empty
 
 from mascope_hardware.tofwerk.tof_streamer import TofDaqStreamer
 
+import mascope_runtime as runtime
 
-def load_env_yaml(yaml_file):
-    env_pattern = re.compile(r".*?\${(.*?)}.*?")
-
-    def env_constructor(loader, node):
-        value = loader.construct_scalar(node)
-        for group in env_pattern.findall(value):
-            value = value.replace(f"${{{group}}}", os.environ.get(group))
-        return value
-
-    yaml.add_implicit_resolver("!pathex", env_pattern)
-    yaml.add_constructor("!pathex", env_constructor)
-    with open(yaml_file, "r") as f:
-        res = yaml.load(f.read(), Loader=yaml.FullLoader)
-    return res
-
-
-def parse_cmd_args():
-    """
-    Parse command line arguments
-    ------------------------------
-    Return dict
-    Default argument values: see default_args.
-    """
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument(
-        "-c", "--config", help="path to yaml config file", type=str, required=False
-    )
-    parser.add_argument(
-        "-m", "--host", help="Mascope host IP", type=str, required=False
-    )
-    parser.add_argument(
-        "-p", "--port", help="Mascope socket.io port", type=str, required=False
-    )
-    parser.add_argument(
-        "-t", "--target", help="target directory", type=str, required=False
-    )
-
-    all_args = parser.parse_args()
-    cmdline_args = {}
-    for arg in vars(all_args):
-        if vars(all_args)[arg] is None:
-            continue
-        cmdline_args[arg] = vars(all_args)[arg]
-    file_args = {}
-    if all_args.config:
-        # service config may be defined in yaml file
-        file_args = load_env_yaml(all_args.config)
-    return {**file_args, **cmdline_args}
+logger = runtime.logger.service('tof-agent')
+sio_logger = runtime.logger.service('tof-agent', markup=False)
 
 
 async def streamer_processor(streamer):
@@ -78,12 +29,9 @@ async def streamer_processor(streamer):
         }
         if spec_i is None:
             # File finished
-            print("File finished")
+            logger.info("File finished")
             raw_filename = data["source_filepath"]
             global target_path
-            if not os.path.exists(target_path):
-                print("Creating mailbox: %s" % target_path)
-                os.mkdir(target_path)
             while True:
                 try:
                     shutil.copyfile(
@@ -92,7 +40,7 @@ async def streamer_processor(streamer):
                     )
                     break
                 except Exception as e:
-                    print("Failed to copy acquired file: %s" % e)
+                    logger.error("Failed to copy acquired file: %s" % e)
                     await sio.sleep(1)
             if sio.connected:
                 await sio.emit(
@@ -101,7 +49,7 @@ async def streamer_processor(streamer):
                 )
         elif spec_i < 0:
             # New file
-            print("New file: %s" % filename)
+            logger.info("New file: %s" % filename)
             if sio.connected:
                 await sio.emit(
                     "instrument_acquisition_started",
@@ -114,7 +62,7 @@ async def streamer_processor(streamer):
                     "instrument_acquisition_progress",
                     notification_data,
                 )
-        print("%.2f" % streamer.progress)
+        logger.info("%.2f" % streamer.progress)
         return True
 
     async def handle_tps_data(data):
@@ -165,10 +113,10 @@ async def main():
     elif host:
         url = f"http://{host}"
     if not url:
-        print("Mascope host not defined, running in offline mode")
+        logger.warning("Mascope host not defined, running in offline mode")
     while url and not shutdown_event.is_set():
         try:
-            print(f"Connecting to {url}")
+            logger.info(f"Connecting to {url}")
             await sio.connect(url)
             break
         except:
@@ -180,7 +128,7 @@ async def main():
 host = None
 port = None
 shutdown_event = Event()
-sio = socketio.AsyncClient(logger=True, ssl_verify=False)
+sio = socketio.AsyncClient(logger=False, ssl_verify=False)
 target_path = None
 
 
@@ -190,12 +138,11 @@ def run():
     global shutdown_event
     global target_path
 
-    args = parse_cmd_args()
-    host = args.get("host")
-    port = args.get("port")
-    target_path = args.get(
-        "target", os.environ.get("MASCOPE_PRIVATE_DOWNLOADER_DIR", ".")
-    )
+    config = runtime.config.autoload()
+    
+    host = config.tof_agent.host
+    port = config.tof_agent.port
+    target_path = config.tof_agent.target
 
     streamer = TofDaqStreamer(
         shutdown_event=shutdown_event,
@@ -210,7 +157,7 @@ def run():
     except KeyboardInterrupt:
         shutdown_event.set()
     except Exception as e:
-        print(e)
+        logger.error(e)
         shutdown_event.set()
 
 

@@ -25,7 +25,7 @@ async def get_match_sample_collections_route(
     query_params: SortingPaginationQueryParams = Depends(),
 ):
     return await get_match_sample_collections(
-        sample_item_id=sample_item_id, **query_params.dict()
+        sample_item_id=sample_item_id, **query_params.model_dump()
     )
 
 
@@ -38,7 +38,7 @@ async def get_match_sample_compounds_route(
     query_params: GetMatchSampleCompoundsQueryParams = Depends(),
 ):
     return await get_match_sample_compounds(
-        sample_item_id=sample_item_id, **query_params.dict()
+        sample_item_id=sample_item_id, **query_params.model_dump()
     )
 
 
@@ -51,7 +51,7 @@ async def get_match_sample_ions_route(
     query_params: GetMatchSampleIonsQueryParams = Depends(),
 ):
     return await get_match_sample_ions(
-        sample_item_id=sample_item_id, **query_params.dict()
+        sample_item_id=sample_item_id, **query_params.model_dump()
     )
 
 
@@ -64,5 +64,5 @@ async def get_match_sample_isotopes_route(
     query_params: GetMatchSampleIsotopesQueryParams = Depends(),
 ):
     return await get_match_sample_isotopes(
-        sample_item_id=sample_item_id, **query_params.dict()
+        sample_item_id=sample_item_id, **query_params.model_dump()
     )

@@ -32,7 +32,7 @@ async def visualization_ion_focus_route(
 
     background_tasks.add_task(
         visualize_ion_focus,
-        **query_params.dict(),
+        **query_params.model_dump(),
         independent_transaction=True,
         sid=sid,
         process_id=process_id,

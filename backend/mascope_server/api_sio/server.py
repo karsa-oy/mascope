@@ -4,6 +4,5 @@ import socketio
 sio = socketio.AsyncServer(
     async_mode="asgi",
     cors_allowed_origins="*",
-    ping_timeout=60,
-    logger=True,
+    ping_timeout=60
 )

@@ -16,10 +16,10 @@ import fnmatch
 import os
 
 from datetime import datetime
-from dotenv import load_dotenv
 
-load_dotenv()
-instrument_dir = os.environ["MASCOPE_PRIVATE_INSTRUMENT_DIR"]
+from mascope_server.config import config
+
+instrument_dir = config.server.streams
 
 
 def sample_file_op(sample_filepath: str, sample_filename: str) -> None:

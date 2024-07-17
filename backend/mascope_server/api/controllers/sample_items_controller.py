@@ -173,7 +173,7 @@ async def create_sample_item(
         # Step 2: Generate unique ID and create new sample item
         new_sample_item = SampleItem(
             sample_item_id=gen_id(),
-            **sample_item.dict(),  # Pydantic model's data
+            **sample_item.model_dump(),  # Pydantic model's data
             sample_item_utc_created=datetime.now(timezone.utc),
             sample_item_utc_modified=datetime.now(timezone.utc),
         )
@@ -306,7 +306,7 @@ async def copy_sample_item(
     parent_id=None,
 ) -> dict:
     """
-    TODO_api_circular_impori  destinguish sample and sample_item controller, should be mocveved to samples_controller.py?
+    TODO_api_circular_import  destinguish sample and sample_item controller, should be mocveved to samples_controller.py?
     The function copies the specified sample item and associates the new copy with a specified sample batch.
     May be a part of the copy sample batch operation or independent.
     Copies matches, match interferences of the original sample if part of a larger copy batch operation
@@ -467,7 +467,7 @@ async def process_sample_item(
     process_id=None,
 ) -> dict:
     """
-    TODO_api_circular_impori  destinguish sample and sample_item controller, should be mocveved to samples_controller.py?
+    TODO_api_circular_import  destinguish sample and sample_item controller, should be mocveved to samples_controller.py?
     Automates the process of sample item creation, calibration, and match computation
     as a single workflow. This process ensures that once a sample item is created, it is
     then calibrated and matches are computed without requiring manual intervention.

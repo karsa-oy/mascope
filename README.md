@@ -1,6 +1,6 @@
 # Mascope
 
-### Description
+## Overview
 
 This monorepo contains Mascope python backend and Vue frontend, as well as peripheral "agent" applications and build/deploy scripts. For more details on these, refer to their respective READMEs.
 
@@ -27,26 +27,32 @@ The backend and frontend have their own setup documentation for Windows and Linu
 
 ![Mascope architecture diagram](.legacy/docs/assets/mascope_sw_architecture.png "Mascope architecture diagram")
 
-### Deploy for development (Windows)
+## Getting Started
 
-1. Install prerequisites:
+### Windows
 
-   - [Python 3.10](https://www.python.org/downloads/release/python-31011/) - Python interpreter
-   - [Poetry](https://python-poetry.org/) - Python dependency manager
-   - [Node 22](https://nodejs.org/en) - JavaScript runtime environment
+The only prerequisite is [Powershell 7](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows), which should be available on Windows 11 by default.
 
-2. Set up deployment environment by creating file `/scripts/deploy/dev.win/.debug_env`, with the following contents (example, note that the specified directories must exist):
+#### Installation
 
-```
-MASCOPE_PRIVATE_DATABASE_DIR=C:/mascope_data/database
-MASCOPE_PRIVATE_INSTRUMENT_DIR=C:/mascope_data/instrument
-```
-
-3. Run `/scripts/deploy/dev.win/deploy.cmd`. This will install and run the application (frontend and backend).
-
-4. Setup Playwright for frontend tests:
+To install your development environment, run:
 
 ```
-cd ./frontend
-npx playright install
+git clone git@github.com:karsa-oy/mascope.git && cd mascope && .\tooling\scripts\windows_dev_setup.ps1
 ```
+
+The script will install our global dev tools _Python 3.12_, _Node 22_, _Pipx_ and _Poetry_, as well as dependencies for all our packages and the `mascope` cli.
+
+After installation, run `mascope --help` for usage instructions.
+
+#### Updating
+
+When pulling the latest changes from github, we often need to ensure our development environment is updated.
+
+To reinstall the `mascope` cli and development environment, run:
+
+```
+.\tooling\scripts\windows_dev_setup.ps1 -Update
+```
+
+This is much quicker than the full install, since it doesn't install the global dev tools.

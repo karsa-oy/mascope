@@ -29,7 +29,7 @@ samples_router = APIRouter()
 async def get_samples_new_route(
     query_params: GetSamplesQueryParams = Depends(),
 ):
-    return await get_samples_new(**query_params.dict())
+    return await get_samples_new(**query_params.model_dump())
 
 
 @samples_router.get("/api/samples/new/{sample_item_id}")
@@ -45,7 +45,7 @@ async def get_sample_new_route(
 async def get_samples_route(
     body: GetSamplesBody,
 ):
-    result = await get_samples(**body.dict())
+    result = await get_samples(**body.model_dump())
 
     # Default message
     message = "Samples with no match info"
@@ -76,7 +76,7 @@ async def get_sample_route(
     sample_item_id: str,
     body: GetSampleBody,
 ):
-    sample_data = await get_sample(sample_item_id=sample_item_id, **body.dict())
+    sample_data = await get_sample(sample_item_id=sample_item_id, **body.model_dump())
 
     if sample_data and body.sample_matches_info:
         if sample_data and sample_data.get("matched", 0) > 0:

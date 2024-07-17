@@ -172,9 +172,9 @@ async def create_match_rating(match_rating: MatchRatingCreate) -> dict:
             rating=match_rating.rating,
             # Convert Pydantic model to dictionary and then to JSON string
             checklist=json.dumps(
-                match_rating.checklist.dict() if match_rating.checklist else {}
+                match_rating.checklist.model_dump() if match_rating.checklist else {}
             ),
-            environment=json.dumps(match_rating.environment.dict()),
+            environment=json.dumps(match_rating.environment.model_dump()),
             match_rating_utc_created=datetime.now(timezone.utc),
         )
 

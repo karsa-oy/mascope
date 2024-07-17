@@ -24,7 +24,6 @@ mascope
 1. `poetry install`
 2. Edit the config file `tof_agent_config.yaml` according to the specific setup.
 3. `poetry run mascope-tof-agent`
-4. (See available command line arguments by running `poetry run mascop-tof-agent --help`)
 
 ### Deployment
 

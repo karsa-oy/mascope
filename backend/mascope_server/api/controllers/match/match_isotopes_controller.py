@@ -12,6 +12,10 @@ from mascope_server.api.models.pydantic_models.match_isotopes_pydantic_model imp
     MatchIsotopeBase,
 )
 
+import mascope_runtime as runtime
+
+logger = runtime.logger.service("backend")
+
 
 @api_controller()
 async def get_match_isotopes(
@@ -154,7 +158,7 @@ async def delete_match_isotopes(
     if target_isotope_ids:
         message += f" Limited by {len(target_isotope_ids)} specified target isotope{'s' if len(target_isotope_ids) != 1 else ''}."
 
-    print(message)
+    logger.info(message)
     return {"message": message}
 
 
@@ -179,7 +183,7 @@ async def create_match_isotopes(
     :rtype: dict
     :raises DuplicateException: If match isotopes already exist for the given sample item and target isotopes.
     """
-    print("Saving match isotopes to database")
+    logger.info("Saving match isotopes to database")
     sample_item_id = match_isotopes[0].sample_item_id
     target_isotope_ids = [mi.target_isotope_id for mi in match_isotopes]
 
@@ -201,7 +205,7 @@ async def create_match_isotopes(
         # Step 2: Insert the new match isotope into the database and commit the transaction.
         new_match_isotopes = [
             MatchIsotope(
-                **mi.dict(), match_isotope_utc_created=datetime.now(timezone.utc)
+                **mi.model_dump(), match_isotope_utc_created=datetime.now(timezone.utc)
             )
             for mi in match_isotopes
         ]
@@ -214,7 +218,7 @@ async def create_match_isotopes(
 
     # Step 4: Return created match isotopes
     message = f"{len(new_match_isotopes)} match isotope(s) created successfully."
-    print(message)
+    logger.info(message)
     return {
         "message": message,
         "data": [match_isotope.to_dict() for match_isotope in new_match_isotopes],

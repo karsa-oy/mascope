@@ -1,6 +1,6 @@
 from typing import Optional, List
 from mascope_lib.file_func import get_instrument_type
-from pydantic import BaseModel, Field, validator, root_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from .calibration_pydantic_model import CalibrationMzFitParams
 from .sample_item_pydantic_model import SampleItemCreate
 
@@ -13,13 +13,13 @@ class BuildParams(BaseModel):
         ..., description="List of ionisation mechanism IDs"
     )
 
-    @validator("calibration_collection")
+    @field_validator("calibration_collection")
     def check_calibration_collection_length(cls, v):
         if len(v) != 16:
             raise ValueError("Only one calibration collection can be applied")
         return v
 
-    @validator("ion_mechanisms")
+    @field_validator("ion_mechanisms")
     def check_ion_mechanisms_non_empty(cls, v):
         if len(v) == 0:
             raise ValueError("At least one ionization mechanism must be provided")
@@ -51,19 +51,6 @@ class SampleBatchUpdateBody(SampleBatchBase):
     )
 
 
-class SampleBatchInDB(SampleBatchBase):
-    sample_batch_id: str = Field(..., description="ID of the sample batch")
-    sample_batch_utc_created: Optional[str] = Field(
-        None, description="Creation timestamp of the sample batch"
-    )
-    sample_batch_utc_modified: Optional[str] = Field(
-        None, description="Last modification timestamp of the sample batch"
-    )
-
-    class Config:
-        orm_mode = True
-
-
 class GetSampleBatchesQueryParams(BaseModel):
     workspace_id: Optional[str] = Field(
         None,
@@ -91,9 +78,9 @@ class SampleBatchImportSamplesBody(BaseModel):
         description="Flag to control whether the batch should be calibrated.",
     )
 
-    @root_validator
+    @model_validator(mode="after")
     def check_sample_items(cls, values):
-        sample_items = values.get("sample_items")
+        sample_items = values.sample_items
         batch_ids = {item.sample_batch_id for item in sample_items}
         instruments = set(get_instrument_type(item.filename) for item in sample_items)
         if len(batch_ids) > 1:

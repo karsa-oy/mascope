@@ -6,15 +6,16 @@ authors = ["Oskari Kausiala <oskari.kausiala@karsa.fi>"]
 readme = "README.md"
 packages = [{ include = "mascope_api.py" }]
 
-[tool.poetry.dependencies]
-python = ">=3.9,<3.11"
-ipywidgets = "^8.1.1"
-pandas = "^2.1.1"
-requests = "^2.31.0"
-
-[tool.poetry.group.dev.dependencies]
-deptry = "^0.16.1"
-
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.dependencies]
+python = "~3.12"
+
+ipywidgets = "^8.1"
+pandas = "^2.2"
+requests = "^2.32"
+
+[tool.poetry.group.dev.dependencies]
+deptry = "^0.16"

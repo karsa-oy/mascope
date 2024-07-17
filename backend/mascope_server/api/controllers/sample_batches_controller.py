@@ -15,9 +15,11 @@ from sqlalchemy.orm import joinedload
 
 from mascope_lib.file_func import get_instrument_type
 from mascope_lib.peak import detect_peaks, get_peaks
+
 from mascope_server.db import async_session
 from mascope_server.db.id import gen_id
 from mascope_server.api_sio import sio
+from mascope_server.config import config
 
 from ..utils.api_features import (
     api_controller,
@@ -52,6 +54,10 @@ from ..models.pydantic_models.calibration_pydantic_model import CalibrationMzFit
 from ..models.pydantic_models.user_notification_pydantic_model import (
     UserNotification,
 )
+
+import mascope_runtime as runtime
+
+logger = runtime.logger.service("backend")
 
 
 @api_controller()
@@ -439,7 +445,7 @@ async def create_sample_batch(
             workspace_id=sample_batch.workspace_id,
             sample_batch_name=sample_batch.sample_batch_name,
             sample_batch_description=sample_batch.sample_batch_description,
-            build_params=sample_batch.build_params.dict(),
+            build_params=sample_batch.build_params.model_dump(),
             sample_batch_utc_created=datetime.now(timezone.utc),
         )
         # Step 2: Add to session
@@ -571,7 +577,7 @@ async def update_sample_batch(
 
         # Update build_params and associations with target collections
         existing_sample_batch.build_params = (
-            sample_batch_update_body.build_params.dict()
+            sample_batch_update_body.build_params.model_dump()
         )
 
         if "target_collection_ids" in update_data and (
@@ -1034,7 +1040,7 @@ async def sample_batch_export_peaks(
 
             await send_progress_user_notification(notification, 1)
         except Exception as e:
-            print(repr(e))
+            logger.error(repr(e))
             continue
 
         peak_data.extend(
@@ -1067,18 +1073,18 @@ async def sample_batch_export_peaks(
 
     dt_str = datetime.now().isoformat().replace("-", "").replace(":", "").split(".")[0]
 
-    peakfile_path = os.environ.get("MASCOPE_PRIVATE_INSTRUMENT_DIR", ".")
+    peakfile_path = config.server.streams
     peakfile_filename = (
         dt_str
         + "_peaks_"
         + sample_batch["sample_batch_name"].replace(" ", "_")
         + ".parquet"
     )
-    print(f"Writing peak data to file {peakfile_filename}")
+    logger.info(f"Writing peak data to file {peakfile_filename}")
     batch_peak_df.to_parquet(
         os.path.join(peakfile_path, peakfile_filename), index=False
     )
-    print("Write complete")
+    logger.info("Write complete")
 
     # Step 6: Return the status message
     return {

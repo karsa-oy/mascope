@@ -22,7 +22,7 @@ match_ions_router = APIRouter()
 async def get_match_ions_route(
     query_params: GetMatchIonsQueryParams = Depends(),
 ):
-    return await get_match_ions(**query_params.dict())
+    return await get_match_ions(**query_params.model_dump())
 
 
 @match_ions_router.get("/api/match/ions/{match_ion_id}")

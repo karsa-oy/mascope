@@ -54,6 +54,10 @@ from mascope_server.api.models.pydantic_models.user_notification_pydantic_model 
     UserNotification,
 )
 
+import mascope_runtime as runtime
+
+logger = runtime.logger.service("backend")
+
 # TODO_configuration
 # Default Filter Parameters
 DEFAULT_MIN_ISOTOPE_ABUNDANCE = 0.15
@@ -98,7 +102,7 @@ async def compute_and_create_sample_match_isotope_data(
         await send_progress_user_notification(notification, 0.25)
 
     # Step 2: Compute match interferences for the given sample and target isotopes.
-    print("Computing match interferences for file: %s" % filename)
+    logger.info("Computing match interferences for file: %s" % filename)
     match_interference_df = await compute_match_interferences(
         filename, target_isotopes_df
     )
@@ -109,7 +113,7 @@ async def compute_and_create_sample_match_isotope_data(
         await send_progress_user_notification(notification, 0.5)
 
     # Step 3: Compute match isotopes for the given sample and target isotopes.
-    print("Computing match isotopes for file: %s" % filename)
+    logger.info("Computing match isotopes for file: %s" % filename)
     match_isotope_df = await compute_match_isotopes(
         filename=filename,
         target_isotopes_df=target_isotopes_df,
@@ -488,7 +492,7 @@ async def remove_matches(
     delete_matches_message = (
         "all matches" if len(descriptions) == 6 else ", ".join(descriptions)
     )
-    print(f"Removing {delete_matches_message}. {filtered_targets_message}")
+    logger.info(f"Removing {delete_matches_message}. {filtered_targets_message}")
 
     message_logs = []
     for delete_func, description, params in delete_operations:
@@ -577,7 +581,7 @@ def apply_filter_params(match_isotope_df, filter_params: FilterParams = None):
     :rtype: pd.DataFrame
     """
     # Convert filter_params Pydantic model to dictionary if provided
-    provided_params = filter_params.dict() if filter_params else None
+    provided_params = filter_params.model_dump() if filter_params else None
 
     def get_params(row):
         """
@@ -595,7 +599,7 @@ def apply_filter_params(match_isotope_df, filter_params: FilterParams = None):
             return row["filter_params"][row["instrument"]]
 
         # Define default filter parameters from the FilterParams Pydantic model
-        default_params = FilterParams().dict()
+        default_params = FilterParams().model_dump()
         # Fallback to default parameters
         return default_params
 
@@ -612,7 +616,6 @@ def apply_filter_params(match_isotope_df, filter_params: FilterParams = None):
             "match_mz_error",
             "match_abundance_error",
             "match_isotope_correlation",
-            "min_isotope_correlation",
             "sample_peak_area",
             "relative_abundance",
         ]:

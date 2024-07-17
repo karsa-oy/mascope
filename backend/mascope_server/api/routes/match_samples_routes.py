@@ -23,7 +23,7 @@ match_samples_router = APIRouter()
 async def get_match_samples_route(
     query_params: GetMatchSamplesQueryParams = Depends(),
 ):
-    return await get_match_samples(**query_params.dict())
+    return await get_match_samples(**query_params.model_dump())
 
 
 @match_samples_router.get("/api/match/samples/{match_sample_id}")

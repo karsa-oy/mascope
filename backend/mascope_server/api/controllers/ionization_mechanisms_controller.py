@@ -139,7 +139,7 @@ async def create_ionization_mechanism(
     # Step 1: Create a new ionization mechanism instance and add it to the session.
     async with async_session() as session:
         new_ionization_mechanism = IonizationMechanism(
-            ionization_mechanism_id=gen_id(11), **ionization_mechanism.dict()
+            ionization_mechanism_id=gen_id(11), **ionization_mechanism.model_dump()
         )
         session.add(new_ionization_mechanism)
 

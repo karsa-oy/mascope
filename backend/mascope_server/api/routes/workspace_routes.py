@@ -19,7 +19,7 @@ workspace_router = APIRouter()
 @workspace_router.get("/api/workspaces")
 @api_route()
 async def get_workspaces_route(query_params: GetWorkspacesQueryParams = Depends()):
-    return await get_workspaces(**query_params.dict())
+    return await get_workspaces(**query_params.model_dump())
 
 
 @workspace_router.get("/api/workspaces/{workspace_id}")

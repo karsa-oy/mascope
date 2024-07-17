@@ -29,7 +29,7 @@ sample_items_router = APIRouter()
 async def get_sample_items_route(
     query_params: GetSampleItemsQueryParams = Depends(),
 ):
-    return await get_sample_items(**query_params.dict())
+    return await get_sample_items(**query_params.model_dump())
 
 
 @sample_items_router.get("/api/sample_items/{sample_item_id}")

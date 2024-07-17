@@ -4,6 +4,9 @@ import re
 
 import datetime_glob
 
+import mascope_runtime as runtime
+
+logger = runtime.logger.service('standard-lib')
 
 def ct_struct_to_dict(struct):
     """Convert ctypes struct to dict
@@ -84,7 +87,7 @@ def parse_path_from_item_filename(item_filename, base_path=""):
 
 
 def recursive_walk(dir_path, *file_masks):
-    print("walking", dir_path)
+    logger.info("walking", dir_path)
     res = []
     cur_dir, dirs, files = next(os.walk(dir_path))
     for file_mask in file_masks:

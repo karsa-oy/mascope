@@ -50,20 +50,6 @@ class MatchRatingUpdate(MatchRatingBase):
     pass
 
 
-class MatchRatingInDB(MatchRatingBase):
-    match_rating_id: str = Field(..., description="ID of the match rating")
-    match_rating_utc_created: dt = Field(
-        ..., description="Creation timestamp of the match rating"
-    )
-
-    class Config:
-        orm_mode = True
-        # datetime fields will be represented in the ISO 8601 format in response
-        json_encoders = {
-            dt: lambda v: v.replace(tzinfo=timezone.utc).isoformat(timespec="seconds")
-        }
-
-
 class GetMatchRatingsQueryParams(BaseModel):
     sample_item_id: Optional[str] = Field(None, description="ID of the sample item")
     target_ion_id: Optional[str] = Field(None, description="ID of the target ion")

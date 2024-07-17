@@ -22,6 +22,10 @@ import xarray
 from colorcet import fire
 from PIL import Image
 
+import mascope_runtime as runtime
+
+logger = runtime.logger.service('standard-lib')
+
 VIZ_TYPES_SUPPORTED = {"spectrogram", "timeseries", "waterfall"}
 
 # JSON compatible template for plotly scatter trace
@@ -538,7 +542,7 @@ def write_img_to_h5(filename, location, img):
 
     """
 
-    print("Writing image to : " + location)
+    logger.info("Writing image to : " + location)
     with h5py.File(filename, "r+") as h5f:
         if location in h5f:
             # Delete previous image if exists
@@ -569,15 +573,15 @@ class ImageGenerator(Process):
 
     def run(self):
         global VIZ_GENERATORS
-        print(f"ImageGenerator started - PID: {os.getpid()}")
+        logger.info(f"ImageGenerator started - PID: {os.getpid()}")
         while not self.shutdown_event.is_set():
             try:
                 data = self.queue_in.get()
             except KeyboardInterrupt:
-                print(f"KeyboardInterrupt for PID: {os.getpid()}")
+                logger.critical(f"KeyboardInterrupt for PID: {os.getpid()}")
                 break
             except Exception as e:
-                print(f"Exception {str(e)} for PID: {os.getpid()}")
+                logger.critical(f"Exception {str(e)} for PID: {os.getpid()}")
                 break
             if data is not None:
                 # Select function to generate the image
@@ -585,7 +589,7 @@ class ImageGenerator(Process):
                 try:
                     viz_gen_func = VIZ_GENERATORS[viz_type]
                 except KeyError:
-                    print("Requested visualization type '%s' not available!" % viz_type)
+                    logger.error("Requested visualization type '%s' not available!" % viz_type)
                     continue
                 data_array = data.pop("data")
                 mz_range = data.get("mz_range", None)
@@ -593,12 +597,12 @@ class ImageGenerator(Process):
                 try:
                     viz = viz_gen_func(data_array, mz_range=mz_range, y_range=y_range)
                 except ZeroDivisionError:
-                    print("Caught ZeroDivisionError in %s" % str(viz_gen_func))
+                    logger.error("Caught ZeroDivisionError in %s" % str(viz_gen_func))
                     continue
                 except Exception as e:
                     # TODO: check if this exception handling is right: without it process hangs
                     # after acq.stopped, often there goes exception: y must be real (y_range-[0, 15.135354995727539])
-                    print(
+                    logger.error(
                         f"ImageGenerator {os.getpid()} exception: {str(e)} for y_range {y_range}"
                     )
                     continue
@@ -609,5 +613,5 @@ class ImageGenerator(Process):
                     data.update({"traces": [viz]})
                 self.queue_out.put(data)
             else:
-                print(f"ImageGenerator stopped - PID: {os.getpid()}")
+                logger.info(f"ImageGenerator stopped - PID: {os.getpid()}")
                 break

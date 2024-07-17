@@ -18,6 +18,10 @@ from ThermoFisher.CommonCore.Data import Business as ThermoBusiness
 
 from .util import net2np_array
 
+import mascope_runtime as runtime
+
+logger = runtime.logger.service('hardware-lib')
+
 
 def strip_filepath(filepath):
     """Strip path and file extension
@@ -37,7 +41,7 @@ def strip_filepath(filepath):
 
 class RawStreamer(Thread):
     def __init__(self, file_queue=Queue(), shutdown_event=Event(), lock=Lock()):
-        print("RawStreamer initializing")
+        logger.info("RawStreamer initializing")
         Thread.__init__(self)
         # Parameters
         self._mz_grid = None
@@ -287,7 +291,7 @@ class RawStreamer(Thread):
         return False
 
     def run(self):
-        print("RawStreamer running")
+        logger.info("RawStreamer running")
         # Main loop
         while not self.shutdown_event.is_set():
             try:
@@ -301,7 +305,7 @@ class RawStreamer(Thread):
                         i_type = self.raw.GetInstrumentType(0)
                         self.raw.SelectInstrument(i_type, 1)
                 except Exception as e:
-                    print(f"Error reading file {file_to_stream}: {e}")
+                    logger.error(f"Failed to read file {file_to_stream}: {e}")
                     continue
             except Empty:
                 # No file to stream, keep waiting
@@ -311,7 +315,7 @@ class RawStreamer(Thread):
             self._mz_grid = self._precompute_grid()
             # Check if precomputation
             if self._mz_grid is None:
-                print(
+                logger.error(
                     f"Failed to compute mz grid. File {self.filename} is likely damaged."
                 )
                 # Close raw file
@@ -321,7 +325,7 @@ class RawStreamer(Thread):
             # Start streaming
             # Feed coordinates
             self._feed_coordinates()
-            print(f"Acquisition started: {self.filename}")
+            logger.info(f"Acquisition started: {self.filename}")
             # Set active flag
             self.active.set()
             # Loop through the file and feed to queues
@@ -330,7 +334,7 @@ class RawStreamer(Thread):
                 self.raw.RunHeaderEx.LastSpectrum + 1,
             )
             for scan_no in all_scans:
-                print(scan_no)
+                logger.info(scan_no)
                 self.speci = scan_no - 1
                 # Update self and feed data into queue
                 self._get_and_feed_data(scan_no)
@@ -343,9 +347,9 @@ class RawStreamer(Thread):
                     break
             # Out of stream loop
             self._finalize()
-            print("RawStream finished")
+            logger.info("RawStream finished")
         # Out of main loop
-        print("RawStreamer exiting")
+        logger.info("RawStreamer exiting")
         self.shutdown()
 
     def shutdown(self):

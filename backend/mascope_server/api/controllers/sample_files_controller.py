@@ -16,6 +16,10 @@ from ..models.pydantic_models.user_notification_pydantic_model import (
     UserNotification,
 )
 
+import mascope_runtime as runtime
+
+logger = runtime.logger.service("backend")
+
 # ===================================================================
 # Controller functions
 # ===================================================================
@@ -152,7 +156,9 @@ async def create_sample_file(sample_file: SampleFileCreate) -> dict:
     """
     async with async_session() as session:
         # Step 1: Construct new sample file
-        new_sample_file = SampleFile(sample_file_id=gen_id(16), **sample_file.dict())
+        new_sample_file = SampleFile(
+            sample_file_id=gen_id(16), **sample_file.model_dump()
+        )
         session.add(new_sample_file)
 
         # Step 2: Commit transaction
@@ -402,7 +408,7 @@ async def get_sample_file_spectrum(
     filename = sample_file["filename"]
 
     # Step 2: Load the sample file and determine whether to use the full signal or a time slice and calculate the corresponding spectrum DataArray
-    print("Loading file: %s" % filename)
+    logger.info("Loading file: %s" % filename)
     time_data_points = None
 
     # Step 3: If a time range is specified, finds the closest matching time coordinates in the dataset and slices the dataset to this time range.

@@ -20,11 +20,11 @@ from mascope_lib.file_func import get_instrument_type
 from mascope_lib.peak import detect_peaks
 import pytest
 from tests.config import *
-from mascope_server.api.controllers.instrument_functions_controller import (
-    read_instrument_functions,
-)
+
 from mascope_server.api.controllers.match.match_data_ops import compute_match_isotopes
 
+import mascope_runtime as runtime
+logger = runtime.logger.service('backend')
 
 # Load targets
 with open(TARGETS_PATH, encoding="utf8") as file:
@@ -78,7 +78,7 @@ def clean_folder(folder):
             elif os.path.isdir(file_path):
                 shutil.rmtree(file_path)
         except OSError as e:
-            print(f"Failed to delete {file_path}. Reason: {e}")
+            logger.error(f"Failed to delete {file_path}. Reason: {e}")
 
 
 def run_convertion_server(st: str):
