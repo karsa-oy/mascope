@@ -10,7 +10,7 @@ from mascope_server.config import config
 
 import mascope_runtime as runtime
 
-logger = runtime.logger.service('backend')
+logger = runtime.logger.service("backend")
 
 # patch asyncio to supported run_until_complete
 # when an event loop is already running
@@ -95,7 +95,7 @@ def run():
                 sample_file_id VARCHAR(256) PRIMARY KEY
                 ,filename VARCHAR(256) NOT NULL
                 ,instrument VARCHAR(64)
-                ,datetime TIMESTAMP WITH TIME ZONE
+                ,datetime TIMESTAMP
                 ,datetime_utc TIMESTAMP
                 ,length FLOAT
                 ,range JSON

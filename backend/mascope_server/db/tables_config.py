@@ -1,5 +1,7 @@
 import mascope_runtime as runtime
-logger = runtime.logger.service('backend')
+
+logger = runtime.logger.service("backend")
+
 
 def get_table_configs(version=None) -> dict:
     """
@@ -20,7 +22,7 @@ def get_table_configs(version=None) -> dict:
             logger.info(f"Using schema configuration for version {version}.")
             return config
         except KeyError:
-            logger.error(
+            logger.warning(
                 f"No specific schema configuration for version {version}, using current configuration."
             )
     else:
@@ -599,7 +601,7 @@ table_configs = {
             "sample_file_id": ("VARCHAR(16)", 1, None, 1),
             "filename": ("VARCHAR(256)", 1, None, 0),
             "instrument": ("VARCHAR(64)", 0, None, 0),
-            "datetime": ("TIMESTAMP WITH TIME ZONE", 0, None, 0),
+            "datetime": ("TIMESTAMP", 0, None, 0),
             "datetime_utc": ("TIMESTAMP", 0, None, 0),
             "length": ("FLOAT", 0, None, 0),
             "range": ("JSON", 0, None, 0),
@@ -613,7 +615,7 @@ table_configs = {
             sample_file_id VARCHAR(16) NOT NULL PRIMARY KEY,
             filename VARCHAR(256) NOT NULL UNIQUE,
             instrument VARCHAR(64),
-            datetime TIMESTAMP WITH TIME ZONE,
+            datetime TIMESTAMP,
             datetime_utc TIMESTAMP,
             length FLOAT,
             range JSON,
@@ -1053,7 +1055,7 @@ table_configs_v13 = {
             "sample_file_id": ("VARCHAR(16)", 1, None, 1),
             "filename": ("VARCHAR(256)", 1, None, 0),
             "instrument": ("VARCHAR(64)", 0, None, 0),
-            "datetime": ("TIMESTAMP WITH TIME ZONE", 0, None, 0),
+            "datetime": ("TIMESTAMP", 0, None, 0),
             "datetime_utc": ("TIMESTAMP", 0, None, 0),
             "length": ("FLOAT", 0, None, 0),
             "range": ("JSON", 0, None, 0),
@@ -1067,7 +1069,7 @@ table_configs_v13 = {
             sample_file_id VARCHAR(16) NOT NULL PRIMARY KEY,
             filename VARCHAR(256) NOT NULL UNIQUE,
             instrument VARCHAR(64),
-            datetime TIMESTAMP WITH TIME ZONE,
+            datetime TIMESTAMP,
             datetime_utc TIMESTAMP,
             length FLOAT,
             range JSON,

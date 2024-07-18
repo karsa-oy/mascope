@@ -79,7 +79,7 @@ def run():
                 ,sample_file_name VARCHAR(256)
                 ,sample_file_description TEXT
                 ,instrument VARCHAR(64)
-                ,datetime TIMESTAMP WITH TIME ZONE
+                ,datetime TIMESTAMP
                 ,datetime_utc TIMESTAMP
                 ,length FLOAT
                 ,range JSON
