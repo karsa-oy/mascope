@@ -14,7 +14,8 @@ from mascope_server.db import configure_database_engine, async_session
 
 import mascope_runtime as runtime
 
-logger = runtime.logger.service('backend')
+logger = runtime.logger.service("backend")
+
 
 async def run():
     # Step 1: Setup new database
@@ -45,7 +46,7 @@ async def run():
                     REFERENCES target_isotope(target_isotope_id) ON DELETE CASCADE,
                 sample_item_id VARCHAR(16) NOT NULL
                     REFERENCES sample_item(sample_item_id) ON DELETE CASCADE,
-                sample_peak_id INT NOT NULL,
+                sample_peak_id INTEGER NOT NULL,
                 sample_peak_mz FLOAT NOT NULL,
                 sample_peak_area FLOAT NOT NULL,
                 sample_peak_area_relative FLOAT NOT NULL,

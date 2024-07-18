@@ -7,7 +7,7 @@ from mascope_server.config import config
 
 import mascope_runtime as runtime
 
-logger = runtime.logger.service('backend')
+logger = runtime.logger.service("backend")
 
 # patch asyncio to support run_until_complete
 # when an event loop is already running
@@ -34,7 +34,7 @@ def run():
                 target_ion_id VARCHAR(32) NOT NULL
                     REFERENCES target_ion(target_ion_id) ON DELETE CASCADE,
                 match_rating_utc_created TIMESTAMP NOT NULL,
-                rating INT CHECK (rating BETWEEN 0 AND 2) NOT NULL,
+                rating INTEGER CHECK (rating BETWEEN 0 AND 2) NOT NULL,
                 checklist JSON,
                 environment JSON
             );

@@ -430,7 +430,7 @@ table_configs = {
             "match_isotope_id": ("VARCHAR(32)", 1, None, 1),
             "target_isotope_id": ("VARCHAR(16)", 1, None, 0),
             "sample_item_id": ("VARCHAR(16)", 1, None, 0),
-            "sample_peak_id": ("INT", 1, None, 0),
+            "sample_peak_id": ("INTEGER", 1, None, 0),
             "sample_peak_mz": ("FLOAT", 1, None, 0),
             "sample_peak_area": ("FLOAT", 1, None, 0),
             "sample_peak_area_relative": ("FLOAT", 1, None, 0),
@@ -463,7 +463,7 @@ table_configs = {
                     REFERENCES target_isotope(target_isotope_id) ON DELETE CASCADE,
                 sample_item_id VARCHAR(16) NOT NULL
                     REFERENCES sample_item(sample_item_id) ON DELETE CASCADE,
-                sample_peak_id INT NOT NULL,
+                sample_peak_id INTEGER NOT NULL,
                 sample_peak_mz FLOAT NOT NULL,
                 sample_peak_area FLOAT NOT NULL,
                 sample_peak_area_relative FLOAT NOT NULL,
@@ -522,7 +522,7 @@ table_configs = {
             "sample_item_id": ("VARCHAR(16)", 1, None, 0),
             "target_ion_id": ("VARCHAR(16)", 1, None, 0),
             "match_rating_utc_created": ("TIMESTAMP", 0, None, 0),
-            "rating": ("INT", 1, None, 0),
+            "rating": ("INTEGER", 1, None, 0),
             "checklist": ("JSON", 0, None, 0),
             "environment": ("JSON", 0, None, 0),
         },
@@ -548,7 +548,7 @@ table_configs = {
                 target_ion_id VARCHAR(16) NOT NULL
                     REFERENCES target_ion(target_ion_id) ON DELETE CASCADE,
                 match_rating_utc_created TIMESTAMP,
-                rating INT NOT NULL CHECK (rating BETWEEN 0 AND 2),
+                rating INTEGER NOT NULL CHECK (rating BETWEEN 0 AND 2),
                 checklist JSON,
                 environment JSON
             );
@@ -919,7 +919,7 @@ table_configs_v13 = {
                     REFERENCES target_isotope(target_isotope_id) ON DELETE CASCADE,
                 sample_item_id VARCHAR(16) NOT NULL
                     REFERENCES sample_item(sample_item_id) ON DELETE CASCADE,
-                sample_peak_id INT NOT NULL,
+                sample_peak_id INTEGER NOT NULL,
                 sample_peak_mz FLOAT NOT NULL,
                 sample_peak_area FLOAT NOT NULL,
                 sample_peak_area_relative FLOAT NOT NULL,
@@ -1002,7 +1002,7 @@ table_configs_v13 = {
                 target_ion_id VARCHAR(16) NOT NULL
                     REFERENCES target_ion(target_ion_id) ON DELETE CASCADE,
                 match_rating_utc_created TIMESTAMP,
-                rating INT NOT NULL CHECK (rating BETWEEN 0 AND 2),
+                rating INTEGER NOT NULL CHECK (rating BETWEEN 0 AND 2),
                 checklist JSON,
                 environment JSON
             );

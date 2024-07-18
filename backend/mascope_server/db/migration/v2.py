@@ -194,7 +194,7 @@ def run():
                         REFERENCES target_isotope(target_isotope_id) ON DELETE CASCADE
                     ,sample_item_id VARCHAR(16) NOT NULL
                         REFERENCES sample_item(sample_item_id) ON DELETE CASCADE
-                    ,sample_peak_id INT NOT NULL
+                    ,sample_peak_id INTEGER NOT NULL
                     ,sample_peak_mz FLOAT NOT NULL
                     ,sample_peak_height FLOAT NOT NULL
                     ,sample_peak_height_relative FLOAT NOT NULL
