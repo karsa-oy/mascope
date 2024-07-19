@@ -1,9 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List
 
-# TODO_configuration Default Filter Parameters
-DEFAULT_MIN_ISOTOPE_ABUNDANCE = 0.15
-
 
 class SortingPaginationQueryParams(BaseModel):
     order: Optional[str] = Field(

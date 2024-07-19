@@ -1,5 +1,7 @@
 import mascope_runtime as runtime
-logger = runtime.logger.service('backend')
+
+logger = runtime.logger.service("backend")
+
 
 def get_table_configs(version=None) -> dict:
     """
@@ -20,7 +22,7 @@ def get_table_configs(version=None) -> dict:
             logger.info(f"Using schema configuration for version {version}.")
             return config
         except KeyError:
-            logger.error(
+            logger.warning(
                 f"No specific schema configuration for version {version}, using current configuration."
             )
     else:
@@ -430,7 +432,7 @@ table_configs = {
             "match_isotope_id": ("VARCHAR(32)", 1, None, 1),
             "target_isotope_id": ("VARCHAR(16)", 1, None, 0),
             "sample_item_id": ("VARCHAR(16)", 1, None, 0),
-            "sample_peak_id": ("INT", 1, None, 0),
+            "sample_peak_id": ("INTEGER", 1, None, 0),
             "sample_peak_mz": ("FLOAT", 1, None, 0),
             "sample_peak_area": ("FLOAT", 1, None, 0),
             "sample_peak_area_relative": ("FLOAT", 1, None, 0),
@@ -463,7 +465,7 @@ table_configs = {
                     REFERENCES target_isotope(target_isotope_id) ON DELETE CASCADE,
                 sample_item_id VARCHAR(16) NOT NULL
                     REFERENCES sample_item(sample_item_id) ON DELETE CASCADE,
-                sample_peak_id INT NOT NULL,
+                sample_peak_id INTEGER NOT NULL,
                 sample_peak_mz FLOAT NOT NULL,
                 sample_peak_area FLOAT NOT NULL,
                 sample_peak_area_relative FLOAT NOT NULL,
@@ -522,7 +524,7 @@ table_configs = {
             "sample_item_id": ("VARCHAR(16)", 1, None, 0),
             "target_ion_id": ("VARCHAR(16)", 1, None, 0),
             "match_rating_utc_created": ("TIMESTAMP", 0, None, 0),
-            "rating": ("INT", 1, None, 0),
+            "rating": ("INTEGER", 1, None, 0),
             "checklist": ("JSON", 0, None, 0),
             "environment": ("JSON", 0, None, 0),
         },
@@ -548,7 +550,7 @@ table_configs = {
                 target_ion_id VARCHAR(16) NOT NULL
                     REFERENCES target_ion(target_ion_id) ON DELETE CASCADE,
                 match_rating_utc_created TIMESTAMP,
-                rating INT NOT NULL CHECK (rating BETWEEN 0 AND 2),
+                rating INTEGER NOT NULL CHECK (rating BETWEEN 0 AND 2),
                 checklist JSON,
                 environment JSON
             );
@@ -599,7 +601,7 @@ table_configs = {
             "sample_file_id": ("VARCHAR(16)", 1, None, 1),
             "filename": ("VARCHAR(256)", 1, None, 0),
             "instrument": ("VARCHAR(64)", 0, None, 0),
-            "datetime": ("TIMESTAMP WITH TIME ZONE", 0, None, 0),
+            "datetime": ("TIMESTAMP", 0, None, 0),
             "datetime_utc": ("TIMESTAMP", 0, None, 0),
             "length": ("FLOAT", 0, None, 0),
             "range": ("JSON", 0, None, 0),
@@ -613,7 +615,7 @@ table_configs = {
             sample_file_id VARCHAR(16) NOT NULL PRIMARY KEY,
             filename VARCHAR(256) NOT NULL UNIQUE,
             instrument VARCHAR(64),
-            datetime TIMESTAMP WITH TIME ZONE,
+            datetime TIMESTAMP,
             datetime_utc TIMESTAMP,
             length FLOAT,
             range JSON,
@@ -919,7 +921,7 @@ table_configs_v13 = {
                     REFERENCES target_isotope(target_isotope_id) ON DELETE CASCADE,
                 sample_item_id VARCHAR(16) NOT NULL
                     REFERENCES sample_item(sample_item_id) ON DELETE CASCADE,
-                sample_peak_id INT NOT NULL,
+                sample_peak_id INTEGER NOT NULL,
                 sample_peak_mz FLOAT NOT NULL,
                 sample_peak_area FLOAT NOT NULL,
                 sample_peak_area_relative FLOAT NOT NULL,
@@ -1002,7 +1004,7 @@ table_configs_v13 = {
                 target_ion_id VARCHAR(16) NOT NULL
                     REFERENCES target_ion(target_ion_id) ON DELETE CASCADE,
                 match_rating_utc_created TIMESTAMP,
-                rating INT NOT NULL CHECK (rating BETWEEN 0 AND 2),
+                rating INTEGER NOT NULL CHECK (rating BETWEEN 0 AND 2),
                 checklist JSON,
                 environment JSON
             );
@@ -1053,7 +1055,7 @@ table_configs_v13 = {
             "sample_file_id": ("VARCHAR(16)", 1, None, 1),
             "filename": ("VARCHAR(256)", 1, None, 0),
             "instrument": ("VARCHAR(64)", 0, None, 0),
-            "datetime": ("TIMESTAMP WITH TIME ZONE", 0, None, 0),
+            "datetime": ("TIMESTAMP", 0, None, 0),
             "datetime_utc": ("TIMESTAMP", 0, None, 0),
             "length": ("FLOAT", 0, None, 0),
             "range": ("JSON", 0, None, 0),
@@ -1067,7 +1069,7 @@ table_configs_v13 = {
             sample_file_id VARCHAR(16) NOT NULL PRIMARY KEY,
             filename VARCHAR(256) NOT NULL UNIQUE,
             instrument VARCHAR(64),
-            datetime TIMESTAMP WITH TIME ZONE,
+            datetime TIMESTAMP,
             datetime_utc TIMESTAMP,
             length FLOAT,
             range JSON,

@@ -1,6 +1,7 @@
 import os
 import sqlite3
 import sys
+import logging
 
 from mascope_server.db import get_current_db_version, create_db_backup
 from mascope_server.db.tables_config import get_table_configs
@@ -8,7 +9,7 @@ from mascope_server.config import config
 
 import mascope_runtime as runtime
 
-logger = runtime.logger.service('backend')
+logger = runtime.logger.service("backend")
 
 
 def create_table_backup(cursor, table_name):
@@ -181,13 +182,13 @@ def restore_table(conn, table_name, schema_info):
     cursor.execute(f"PRAGMA foreign_key_list({table_name})")
     current_fks = {fk[3]: (fk[2], fk[4], fk[5], fk[6]) for fk in cursor.fetchall()}
 
-    logger.debug("current_columns", current_columns)
-    logger.debug("correct_columns", schema_info["columns"])
-    logger.debug("current_fks", current_fks)
-    logger.debug("correct_fks", schema_info["fks"])
+    logger.debug("Current columns: %s", current_columns)
+    logger.debug("Correct columns: %s", schema_info["columns"])
+    logger.debug("Current foreign keys: %s", current_fks)
+    logger.debug("Correct foreign keys: %s", schema_info["fks"])
 
     if current_columns != schema_info["columns"] or current_fks != schema_info["fks"]:
-        logger.info(f"Schema mismatch detected, restoring {table_name}.")
+        logger.warning(f"Schema mismatch detected, restoring {table_name}.")
         create_table_backup(cursor, table_name)
         update_backup_table(cursor, table_name)
         drop_table(cursor, table_name)

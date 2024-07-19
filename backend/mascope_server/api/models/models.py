@@ -8,6 +8,7 @@ from sqlalchemy import (
     String,
     Text,
     JSON,
+    text,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql.schema import CheckConstraint
@@ -171,7 +172,12 @@ class TargetCollection(Base):
     target_collection_id = Column(String(16), nullable=False, primary_key=True)
     target_collection_name = Column(String(256), nullable=False)
     target_collection_description = Column(Text)
-    target_collection_type = Column(String(64), nullable=False, default="TARGETS")
+    target_collection_type = Column(
+        String(64),
+        nullable=False,
+        # the default is set at the database level using server_default
+        server_default=text("'TARGETS'"),
+    )
 
     # Define relationships
     sample_batch = relationship(
