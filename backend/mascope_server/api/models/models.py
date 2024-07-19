@@ -541,7 +541,7 @@ class MatchIsotope(Base):
     target_isotope = relationship("TargetIsotope", back_populates="match_isotope")
 
     # Define indexes
-    __table_args__ = (Index("idx_match_sample_item", "sample_item_id"),)
+    __table_args__ = (Index("idx_match_isotope_sample_item", "sample_item_id"),)
 
 
 class AttributeTemplate(Base):
