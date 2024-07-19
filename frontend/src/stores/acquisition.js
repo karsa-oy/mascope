@@ -3,20 +3,19 @@ import { defineStore } from 'pinia'
 
 import { api } from '@/api'
 
+import { useData } from './data'
 import { useNotification } from './notification'
-import { useSampleStore } from './sample'
-import { useAppStore } from './app'
 
-export const useInstrumentStore = defineStore('instrument', () => {
-  const appStore = useAppStore()
+export const useAcquisition = defineStore('app.acquisition', () => {
   const notification = useNotification()
+  const data = useData()
 
-  const active = ref(null)
-  const acquisitions = ref([])
+  const mode = ref(false)
+  const list = ref([])
   const pending = reactive({
     filename: null,
-    sampleItem: null,
-    acquisition: null,
+    sample: null,
+    measurement: null,
     conversion: null
   })
   const ready = reactive({
@@ -37,46 +36,36 @@ export const useInstrumentStore = defineStore('instrument', () => {
     }
   })
   watchEffect(() => {
-    const appStore = useAppStore()
-    if (appStore.mode?.measuring) {
+    if (mode.value) {
       time.mode = 'Last 24 hours'
     }
   })
 
   const mzCalibration = ref(null)
-  const orbi = computed(() => active.value?.instrument.toLowerCase().includes('orbi'))
+  const orbi = computed(() => data.instrument.focused.toLowerCase().includes('orbi'))
   // instrument
 
-  watch(active, async (next, prev) => {
-    if (prev) await unload(prev.instrument)
-    load(next.instrument)
-  })
-
-  async function load(instrument) {
-    api.emit('subscribe', instrument)
-    await loadMzCalibration()
-    await loadAcquisitions()
-  }
-
-  async function unload(instrument) {
-    if (!instrument) return
-    api.emit('unsubscribe', instrument)
-    mzCalibration.value = null
-    acquisitions.value = null
-    await resetAcquisitionStatus()
-  }
+  watch(
+    computed(() => data.instrument.focused),
+    async () => {
+      mzCalibration.value = null
+      pending.filename = null
+      await loadMzCalibration()
+      await load()
+    }
+  )
 
   // acquisitions
 
-  watch(time, loadAcquisitions)
+  watch(time, load)
 
-  function loadAcquisitions() {
+  async function load() {
     if (time.mode.startsWith('Last')) {
-      loadAcquisitionsRecent(days.value)
+      await loadRecent(days.value)
     } else if (time.mode == 'range') {
       const [min, max] = time.range
       if (min && max) {
-        loadAcquisitionsRange({
+        await loadRange({
           min,
           max
         })
@@ -84,30 +73,30 @@ export const useInstrumentStore = defineStore('instrument', () => {
     }
   }
 
-  async function loadAcquisitionsRange(range) {
+  async function loadRange(range) {
     const sampleFiles = await (
       await api.request.read({
         method: 'getAllSampleFiles',
         body: {
           datetime_min: range.min.toISOString(),
           datetime_max: range.max.toISOString(),
-          instrument: active.value.instrument,
+          instrument: data.instrument.focused,
           sort: 'datetime_utc',
           order: 'asc'
         }
       })
     )?.data
     if (sampleFiles) {
-      acquisitions.value = sampleFiles
+      list.value = sampleFiles
     }
   }
 
-  async function loadAcquisitionsRecent(days = 7) {
+  async function loadRecent(days = 7) {
     const recent = (
       await api.request.read({
         method: 'getRecentSampleFiles',
         body: {
-          instrument: active.value.instrument,
+          instrument: data.instrument.focused,
           sort: 'datetime_utc',
           order: 'asc',
           days
@@ -115,31 +104,27 @@ export const useInstrumentStore = defineStore('instrument', () => {
       })
     )?.data
     if (recent) {
-      acquisitions.value = recent
+      list.value = recent
     }
   }
 
-  async function resetAcquisitionStatus() {
-    pending.filename = null
-  }
-
   notification.on('instrument_acquisition', ({ process_id, data, status }) => {
-    if (appStore.mode.measuring) {
+    if (mode.value) {
       // acquisition started
-      if (process_id !== pending.acquisition) {
-        resetAcquisitionStatus()
-        pending.acquisition = process_id
+      if (process_id !== pending.measurement) {
+        pending.filename = null
+        pending.measurement = process_id
         pending.filename = data?.filename
       } else {
         if (status !== 'pending') {
-          pending.acquisition = null
+          pending.measurement = null
         }
       }
     }
   })()
 
   notification.on('instrument_conversion', ({ process_id, data, status }) => {
-    if (appStore.mode.measuring) {
+    if (mode.value) {
       // conversion started
       if (process_id !== pending.conversion) {
         pending.conversion = process_id
@@ -156,11 +141,10 @@ export const useInstrumentStore = defineStore('instrument', () => {
 
   // measurement mode
   notification.on('create_sample_file', async () => {
-    loadAcquisitions()
-    if (pending.sampleItem) {
-      const sampleStore = useSampleStore()
-      await sampleStore.process(pending.sampleItem)
-      pending.sampleItem = null
+    load()
+    if (pending.sample) {
+      await data.sample.process(pending.sample)
+      pending.sample = null
     } else {
       ready.filename = pending.filename
     }
@@ -173,7 +157,7 @@ export const useInstrumentStore = defineStore('instrument', () => {
       await api.request.read({
         method: 'getMzCalibration',
         body: {
-          instrument: active.value.instrument
+          instrument: data.instrument.focused?.instrument
         }
       })
     )?.data
@@ -183,16 +167,13 @@ export const useInstrumentStore = defineStore('instrument', () => {
 
   return {
     // state
-    active,
-    acquisitions,
+    mode,
+    list,
     pending,
     ready,
     time,
     mzCalibration,
     // actions
-    load,
-    unload,
-    loadAcquisitions,
-    resetAcquisitionStatus
+    load
   }
 })

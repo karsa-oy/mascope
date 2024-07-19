@@ -8,11 +8,9 @@ import { useConfirm } from 'primevue/useconfirm'
 import { api } from '@/api'
 import { DialogMatchRating } from '@/lib/dialogs'
 
-import { useFocusedMatch, useFilterParams, useSampleStore } from '@/stores'
+import { useApp } from '@/stores'
 
-const sampleStore = useSampleStore()
-const focusedMatch = useFocusedMatch()
-const filterParams = useFilterParams()
+const app = useApp()
 
 const confirm = useConfirm()
 const dialog = reactive({
@@ -22,7 +20,7 @@ const dialog = reactive({
 
 async function submit(rating) {
   const possibleMatch =
-    focusedMatch.ion.match_score >= filterParams.current.possible_match_threshold
+    app.ui.matchVisualized.ion.match_score >= app.filterParams.current.possible_match_threshold
   if ((rating == 0 && possibleMatch) || rating == 1 || (rating == 1 && !possibleMatch)) {
     dialog.rating = rating
     dialog.visible = true
@@ -30,11 +28,11 @@ async function submit(rating) {
     await api.request.create({
       method: 'submitMatchRating',
       body: {
-        sample_item_id: sampleStore.active.sample_item_id,
-        target_ion_id: focusedMatch.ion.target_ion_id,
+        sample_item_id: app.data.sample.focused.sample_item_id,
+        target_ion_id: app.ui.matchVisualized.ion.target_ion_id,
         rating,
         environment: {
-          mz_calibration: sampleStore.active.mz_calibration
+          mz_calibration: app.data.sample.focused.mz_calibration
         }
       }
     })

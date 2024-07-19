@@ -3,9 +3,11 @@ import { defineStore } from 'pinia'
 
 import { api } from '@/api'
 
-import { useFocusedMatch } from './focusedMatch'
+import { useUi } from './ui'
 
-export const useFilterParams = defineStore('filterParams', () => {
+export const useFilterParams = defineStore('app.filterParams', () => {
+  const ui = useUi()
+
   const defaults = {
     mz_tolerance: 15,
     min_isotope_abundance: 0.15,
@@ -47,29 +49,27 @@ export const useFilterParams = defineStore('filterParams', () => {
   }
 
   async function save() {
-    const match = useFocusedMatch()
     return await api.request.update({
       method: 'saveTargetIonFilterParams',
       body: {
-        target_ion_id: match.ion?.target_ion_id,
-        target_ion_formula: match.ion?.target_ion_formula,
+        target_ion_id: ui.matchVisualized.ion?.target_ion_id,
+        target_ion_formula: ui.matchVisualized.ion?.target_ion_formula,
         body: {
           filter_params: {
-            [match.ion?.instrument]: current
+            [ui.matchVisualized.ion?.instrument]: current
           }
         }
       }
     })
   }
   async function remove() {
-    const focusedMatch = useFocusedMatch()
     return await api.request.delete({
       method: 'deleteTargetIonFilterParams',
       body: {
-        target_ion_id: focusedMatch.ion.target_ion_id,
-        target_ion_formula: focusedMatch.ion.target_ion_formula,
+        target_ion_id: ui.matchVisualized.ion.target_ion_id,
+        target_ion_formula: ui.matchVisualized.ion.target_ion_formula,
         body: {
-          delete_instrument_filters: focusedMatch.ion.instrument
+          delete_instrument_filters: ui.matchVisualized.ion.instrument
         }
       }
     })
@@ -79,13 +79,12 @@ export const useFilterParams = defineStore('filterParams', () => {
     initial.value = { ...current }
   }
 
-  const focusedMatch = useFocusedMatch()
   watchEffect(async () => {
-    if (focusedMatch.hash) {
-      if (focusedMatch.hash !== hash.value) {
-        await set(focusedMatch.filterParams)
+    if (ui.matchVisualized.hash) {
+      if (ui.matchVisualized.hash !== hash.value) {
+        await set(ui.matchVisualized.filterParams)
         init()
-        hash.value = focusedMatch.hash
+        hash.value = ui.matchVisualized.hash
       }
     } else {
       hash.value = null

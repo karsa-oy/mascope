@@ -13,7 +13,7 @@ const keymap = {
   KeyX: 'x'
 }
 
-export const useKeyStore = defineStore('key', () => {
+export const useKey = defineStore('app.ui.key', () => {
   // state
 
   const state = reactive({

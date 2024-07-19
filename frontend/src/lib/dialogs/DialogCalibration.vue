@@ -15,13 +15,13 @@ import Listbox from 'primevue/listbox'
 import { computed, watch, reactive, ref, watchEffect } from 'vue'
 
 import { api } from '@/api'
-import { useSampleStore } from '@/stores'
+import { useApp } from '@/stores'
 import { useMzFit } from '@/lib/mzFit'
 import { PaneSettingsCalibration } from '@/lib/panes'
 
 const mzFit = useMzFit()
 
-const sampleStore = useSampleStore()
+const app = useApp()
 
 const visible = defineModel('visible')
 
@@ -31,7 +31,7 @@ const props = defineProps({
   }
 })
 
-const original = computed(() => props.context ?? sampleStore.active)
+const original = computed(() => props.context ?? app.data.sample.focused)
 const batch = computed(() => (original.value?.sample_item_id ? null : original.value))
 const samples = ref(null)
 const previewSample = ref()
@@ -205,7 +205,7 @@ const formatter = new Intl.NumberFormat('en-US', {
               })
             } else {
               await mzFit.apply(original)
-              await sampleStore.matchSampleRematch(original)
+              await app.data.sample.rematch(original)
             }
             visible = false
           }

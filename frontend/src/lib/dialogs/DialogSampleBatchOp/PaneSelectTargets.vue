@@ -7,9 +7,9 @@ import SelectButton from 'primevue/selectbutton'
 
 import { ref, computed } from 'vue'
 
-import { useTargetsStore } from '@/stores'
+import { useApp } from '@/stores'
 
-const targetsStore = useTargetsStore()
+const app = useApp()
 
 const selected = defineModel('selected')
 
@@ -27,7 +27,7 @@ const categories = ['Targets', 'Calibrants', 'Diagnostics', 'All']
 const category = ref(categories.find((c) => c.toLowerCase() == props.mode.toLowerCase()))
 
 const targetCollections = computed(() =>
-  targetsStore.targetCollectionsAll.filter((coll) => {
+  app.data.target.collection.list.filter((coll) => {
     const type = category.value.toUpperCase()
     return type == 'ALL' ? true : coll.target_collection_type == type
   })

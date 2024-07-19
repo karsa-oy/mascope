@@ -3,7 +3,7 @@ import { defineStore } from 'pinia'
 
 import { genId } from '@/lib/utils'
 
-export const useNotification = defineStore('notification', () => {
+export const useNotification = defineStore('app.notification', () => {
   const retentionLimit = 250
   const state = reactive({
     latest: null,

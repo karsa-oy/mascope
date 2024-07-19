@@ -11,11 +11,9 @@ import Dialog from 'primevue/dialog'
 
 import { ToolbarTemplate } from '@/lib/menus'
 import { clone, strToSnakeCase, beautifySnakeCase, genId } from '@/lib/utils'
-import { useBatchStore, useSampleStore, useInstrumentStore } from '@/stores'
+import { useApp } from '@/stores'
 
-const batchStore = useBatchStore()
-const sampleStore = useSampleStore()
-const instrumentStore = useInstrumentStore()
+const app = useApp()
 
 const props = defineProps({
   item: {
@@ -88,7 +86,7 @@ function init(active) {
   template.selected = initial.value
   // reset inputs
   input.filename =
-    action.value !== 'create_pending' ? original.value?.filename : instrumentStore.pending.filename
+    action.value !== 'create_pending' ? original.value?.filename : app.acquisition.pending.filename
   input.instrument = original.value?.instrument
   input.filterId = original.value?.filter_id ?? null
   input.type = original.value?.sample_item_type ?? null
@@ -117,11 +115,11 @@ const generated = reactive({
   filterId: null
 })
 const filters = computed(() => {
-  return batchStore.active
+  return app.data.batch.focused
     ? [
         null,
         ...(generated.filterId ? [generated.filterId] : []),
-        ...new Set(batchStore.sampleItems.map(({ filter_id }) => filter_id).filter((f) => f))
+        ...new Set(app.data.sample.list.map(({ filter_id }) => filter_id).filter((f) => f))
       ]
     : [generated.filterId]
 })
@@ -130,7 +128,7 @@ async function save() {
   const sample_item = {
     sample_item_name: input.fields.find((field) => field.label == 'sample_item_name').value,
     sample_item_type: input.type,
-    sample_batch_id: batchStore.active.sample_batch_id,
+    sample_batch_id: app.data.batch.focused.sample_batch_id,
     filter_id: input.filterId,
     sample_item_attributes: clone(
       input.fields
@@ -145,28 +143,28 @@ async function save() {
     )
   }
   if (props.action == 'create') {
-    await sampleStore.process({
+    await app.data.sample.process({
       filename: input.filename,
       ...sample_item
     })
   } else if (props.action == 'create_pending') {
-    if (!(instrumentStore.ready.filename == input.filename)) {
+    if (!(app.acquisition.ready.filename == input.filename)) {
       // submitted before conversion completed
-      instrumentStore.pending.sampleItem = {
+      app.acquisition.pending.sample = {
         ...sample_item,
-        filename: instrumentStore.pending.filename
+        filename: app.acquisition.pending.filename
       }
     } else {
       // submitted after conversion completed
-      sampleStore.process({
+      app.data.sample.process({
         ...sample_item,
         filename: input.filename
       })
-      instrumentStore.ready.filename = null
+      app.acquisition.ready.filename = null
     }
-    instrumentStore.pending.filename = null
+    app.acquisition.pending.filename = null
   } else if (props.action == 'update') {
-    await sampleStore.update({
+    await app.data.sample.update({
       ...props.item, // To include sample_item_id
       ...sample_item,
       filename: input.filename

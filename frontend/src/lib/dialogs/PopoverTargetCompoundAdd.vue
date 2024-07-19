@@ -8,10 +8,10 @@ import { useConfirm } from 'primevue/useconfirm'
 import { ref, reactive } from 'vue'
 
 import { api } from '@/api'
-import { useTargetsStore } from '@/stores'
+import { useApp } from '@/stores'
 
 const confirm = useConfirm()
-const targetsStore = useTargetsStore()
+const app = useApp()
 
 const props = defineProps({
   collection: {
@@ -29,7 +29,7 @@ const input = reactive({
 })
 
 const addCompound = () => {
-  const prexisting = targetsStore.targetCompoundsAll.find(
+  const prexisting = app.data.target.compound.list.find(
     (comp) => comp.target_compound_formula === input.target_compound_formula
   )
   const common = {
@@ -38,7 +38,7 @@ const addCompound = () => {
     target_collection_type: props.collection.target_collection_type
   }
   if (prexisting) {
-    targetsStore.updateCollection({
+    app.data.target.collection.update({
       ...common,
       target_compound_ids: [
         ...props.collection.children.map(({ target_compound_id }) => target_compound_id),
@@ -46,7 +46,7 @@ const addCompound = () => {
       ]
     })
   } else {
-    targetsStore.updateCollection({
+    app.data.target.collection.update({
       ...common,
       target_compound_ids: props.collection.children.map(
         ({ target_compound_id }) => target_compound_id

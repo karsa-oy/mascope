@@ -1,6 +1,6 @@
 import * as xlsx from 'xlsx'
 
-import { useBatchStore, useWorkspaceStore } from '@/stores'
+import { useApp } from '@/stores'
 
 import { beautifySnakeCase, strToSnakeCase, genId } from './utils'
 
@@ -148,9 +148,9 @@ export function parseGenericCsv(cols, rows) {
 /*
  *  Compare records or record arrays by a field
  *
- *  e.g. equals(appStore.workspaces, selected.workspaces, workspace_id)
+ *  e.g. equals(app.data.workspace.list, selected.workspaces, workspace_id)
  *  will check that the selected workspace ids match those in the store
- *  and equals(sampleStore.active, selected.sample, sample_item_id) will
+ *  and equals(app.data.sample.focused, selected.sample, sample_item_id) will
  *  check that the selected sample has the same id as the active one.
  */
 export function equals(first, second, field) {
@@ -177,20 +177,19 @@ export function equals(first, second, field) {
 
 // methods
 export function batchExportCsv() {
-  const workspaceStore = useWorkspaceStore()
-  const batchStore = useBatchStore()
+  const app = useApp()
 
   const batchCols = [
     { field: 'field', label: 'Batch' },
     { field: 'value', label: '' }
   ]
   let batchRows = [
-    { field: 'Name', value: batchStore.active.sample_batch_name },
+    { field: 'Name', value: app.data.batch.focused.sample_batch_name },
     {
       field: 'Description',
-      value: batchStore.active.sample_batch_description
+      value: app.data.batch.focused.sample_batch_description
     },
-    { field: 'Workspace', value: workspaceStore.active.workspace_name },
+    { field: 'Workspace', value: app.data.workspace.focused.workspace_name },
     { field: '', value: '' },
     {
       field: 'Target collections',
@@ -247,7 +246,7 @@ export function batchExportCsv() {
     { field: 'match_score', label: 'Match score' }
   ]
   const datetimestamp = new Date().toJSON().slice(0, -5).replace(/[-:]/g, '')
-  const filename = `${datetimestamp}_${batchStore.active.sample_batch_name.replaceAll(
+  const filename = `${datetimestamp}_${app.data.batch.focused.sample_batch_name.replaceAll(
     ' ',
     '_'
   )}.xlsx`

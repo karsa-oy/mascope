@@ -7,12 +7,11 @@ import { useConfirm } from 'primevue/useconfirm'
 import { ref, computed } from 'vue'
 
 import DialogTemplateCreate from '@/lib/dialogs/DialogTemplateCreate.vue'
-import { useAppStore, useSampleStore } from '@/stores'
+import { useApp } from '@/stores'
 
 const confirm = useConfirm()
 
-const appStore = useAppStore()
-const sampleStore = useSampleStore()
+const app = useApp()
 
 const props = defineProps({
   initial: {
@@ -26,7 +25,7 @@ const template = defineModel('template')
 
 const templates = computed(() => [
   props.initial,
-  ...appStore.attributeTemplates.filter((temp) => temp.type == 'sample_item')
+  ...app.data.template.list.filter((temp) => temp.type == 'sample_item')
 ])
 </script>
 

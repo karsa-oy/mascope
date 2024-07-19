@@ -9,12 +9,13 @@ export const defineModule = ({
   subscribe = false, // socket io subscription
   useParent = null, // optional parent module
   multiselect = false, // enable multiselection,
+  autofocus = false, // focused first element on load
   // api
   load, // async func, may accept parent record
   read, // get one record by id
   ...ops // other operations optional
 }) =>
-  defineStore(`data.${name.replaceAll('_', '.')}`, () => {
+  defineStore(`app.data.${name.replaceAll('_', '.')}`, () => {
     // CONFIG
 
     const prefix = `[${name.replaceAll('_', ' ')}]`
@@ -51,11 +52,12 @@ export const defineModule = ({
     // but ensures you don't accidently corrupt state through inconsistent binds.
 
     // state
-    const selected = multiselect ? ref([]) : computed(() => [focused.value])
+    const selected = multiselect ? ref([]) : computed(() => (focused.value ? [focused.value] : []))
     const focused = singleselect
       ? ref(null)
       : computed(() => (selected.value?.length == 1 ? selected.value[0] : null))
-    const active = (arg) => selected.value.map((record) => record[key]).includes(arg[key])
+    const active = (arg) =>
+      arg ? selected.value.map((record) => record[key]).includes(arg[key]) : false
 
     // methods
     const select = multiselect
@@ -66,12 +68,11 @@ export const defineModule = ({
             }
           })
         }
-      : (...args) => {
-          args.forEach((arg) => {
-            if (!active(arg)) {
-              focused.value = records.value.find((record) => record[key] == arg[key])
-            }
-          })
+      : // singleselect
+        (arg) => {
+          if (!active(arg)) {
+            focused.value = records.value.find((record) => record[key] == arg[key])
+          }
         }
     const unselect = multiselect
       ? (...args) => {
@@ -81,12 +82,11 @@ export const defineModule = ({
             }
           })
         }
-      : (...args) => {
-          args.forEach((arg) => {
-            if (active(arg)) {
-              focused.value = null
-            }
-          })
+      : // singleselect
+        (arg) => {
+          if (active(arg)) {
+            focused.value = null
+          }
         }
     const focus = multiselect
       ? (arg) => {
@@ -94,7 +94,8 @@ export const defineModule = ({
             selected.value = [records.value.find((record) => record[key] == arg[key])]
           }
         }
-      : (arg) => {
+      : // singleselect
+        (arg) => {
           if (!active(arg)) {
             focused.value = records.value.find((record) => record[key] == arg[key])
           }
@@ -105,7 +106,8 @@ export const defineModule = ({
             selected.value = []
           }
         }
-      : (arg) => {
+      : // singleselect
+        (arg) => {
           if (active(arg)) {
             focused.value = null
           }
@@ -114,7 +116,8 @@ export const defineModule = ({
       ? () => {
           selected.value = []
         }
-      : () => {
+      : // singleselect
+        () => {
           focused.value = null
         }
 
@@ -142,6 +145,9 @@ export const defineModule = ({
       if (selected.value.length > 0) {
         clear()
         log('selection cleared')
+      }
+      if (autofocus && records.value.length > 0) {
+        focus(records.value[0])
       }
       // propegate to children
       if (children.value.length > 0) {
@@ -172,6 +178,16 @@ export const defineModule = ({
           })
         )
       })
+    }
+
+    // root reloading
+
+    // TODO replace this
+
+    function onOrgReload() {
+      if (!parent) {
+        reload()
+      }
     }
 
     // EVENTS
@@ -234,6 +250,7 @@ export const defineModule = ({
       // data
       list,
       loading,
+      onOrgReload,
       // options
       multiselect,
       singleselect,

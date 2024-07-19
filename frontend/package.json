@@ -25,22 +25,22 @@
     "palette": "node scripts/palette.js"
   },
   "dependencies": {
-    "axios": "^1.6.8",
+    "axios": "^1.7.2",
     "pinia": "^2.1.7",
     "plotly.js-basic-dist": "^2.30.1",
     "primeicons": "^7.0.0",
-    "primevue": "^4.0.0-beta.4",
+    "primevue": "^4.0.1",
     "socket.io-client": "^4.7.5",
-    "vue": "^3.4.21",
-    "vue-router": "^4.3.0",
+    "vue": "^3.4.33",
+    "vue-router": "^4.4.0",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.2/xlsx-0.20.2.tgz"
   },
   "devDependencies": {
     "@playwright/test": "^1.44.0",
     "@rushstack/eslint-patch": "^1.3.3",
     "@types/node": "^20.12.12",
-    "@vitejs/plugin-vue": "^5.0.4",
-    "@vue/eslint-config-prettier": "^8.0.0",
+    "@vitejs/plugin-vue": "^5.0.5",
+    "@vue/eslint-config-prettier": "^9.0.0",
     "chroma-js": "^2.4.2",
     "eslint": "^8.49.0",
     "eslint-plugin-vue": "^9.17.0",

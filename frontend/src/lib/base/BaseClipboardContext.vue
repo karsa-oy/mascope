@@ -1,11 +1,11 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 
 import Message from 'primevue/message'
 
-import { useKeyStore } from '@/stores'
+import { useApp } from '@/stores'
 
-const keyStore = useKeyStore()
+const app = useApp()
 
 const data = defineModel('data')
 const status = defineModel('status')
@@ -47,9 +47,12 @@ const show = (severity, message) => {
   }, 3500)
 }
 
-watch(keyStore, process)
+watch(
+  computed(() => app.ui.key.state.v || app.ui.key.state.control),
+  process
+)
 async function process() {
-  if (keyStore.state.control && keyStore.state.v) {
+  if (app.ui.key.state.control && app.ui.key.state.v) {
     navigator.permissions.query({ name: 'clipboard-read' })
     let text = await navigator.clipboard.readText()
     let result

@@ -220,9 +220,9 @@ export function createHttpClient() {
       }
     },
     // Samples
-    getAllSamples: async (body) => {
+    getAllSamples: async (params) => {
       try {
-        return await client.post('/sample', body)
+        return await client.get('/samples/new', { params })
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error || `Failed to get batch samples data: ${error}`
@@ -809,7 +809,6 @@ export function createHttpClient() {
         throw new Error(userErrorMessage)
       }
     },
-
     // Visualization
     getVisualizationIonFocus: async (params = {}) => {
       try {
@@ -821,6 +820,88 @@ export function createHttpClient() {
           error?.response?.data?.error ||
           `Failed to visualize ion '${params.target_ion_id}' focus for sample '${params.sample_item_id}': ${error}`
         throw new Error(userErrorMessage)
+      }
+    },
+    // Batch Matches
+    getBatchMatchCollections: async ({ sample_batch_id, params = {} }) => {
+      try {
+        return await client.get(`/match/batch/${sample_batch_id}/collections`, params)
+      } catch (error) {
+        throw new Error(
+          error?.response?.data?.error ??
+            `Failed to retrieve batch match collections (batch id ${sample_batch_id}): ${error}`
+        )
+      }
+    },
+    getBatchMatchCompounds: async ({ sample_batch_id, params = {} }) => {
+      try {
+        return await client.get(`/match/batch/${sample_batch_id}/compounds`, params)
+      } catch (error) {
+        throw new Error(
+          error?.response?.data?.error ??
+            `Failed to retrieve batch match compounds (batch id ${sample_batch_id}): ${error}`
+        )
+      }
+    },
+    getBatchMatchIons: async ({ sample_batch_id, params = {} }) => {
+      try {
+        return await client.get(`/match/batch/${sample_batch_id}/ions`, params)
+      } catch (error) {
+        throw new Error(
+          error?.response?.data?.error ??
+            `Failed to retrieve batch match ions (batch id ${sample_batch_id}): ${error}`
+        )
+      }
+    },
+    getBatchMatchIsotopes: async ({ sample_batch_id, params = {} }) => {
+      try {
+        return await client.get(`/match/batch/${sample_batch_id}/isotopes`, params)
+      } catch (error) {
+        throw new Error(
+          error?.response?.data?.error ??
+            `Failed to retrieve batch match isotopes (batch id ${sample_batch_id}): ${error}`
+        )
+      }
+    },
+    // Sample Matches
+    getSampleMatchCollections: async ({ sample_item_id, params = {} }) => {
+      try {
+        return await client.get(`/match/sample/${sample_item_id}/collections`, params)
+      } catch (error) {
+        throw new Error(
+          error?.response?.data?.error ??
+            `Failed to retrieve sample match collections (sample id ${sample_item_id}): ${error}`
+        )
+      }
+    },
+    getSampleMatchCompounds: async ({ sample_item_id, params = {} }) => {
+      try {
+        return await client.get(`/match/sample/${sample_item_id}/compounds`, params)
+      } catch (error) {
+        throw new Error(
+          error?.response?.data?.error ??
+            `Failed to retrieve sample match compounds (sample id ${sample_item_id}): ${error}`
+        )
+      }
+    },
+    getSampleMatchIons: async ({ sample_item_id, params = {} }) => {
+      try {
+        return await client.get(`/match/sample/${sample_item_id}/ions`, params)
+      } catch (error) {
+        throw new Error(
+          error?.response?.data?.error ??
+            `Failed to retrieve sample match ions (sample id ${sample_item_id}): ${error}`
+        )
+      }
+    },
+    getSampleMatchIsotopes: async ({ sample_item_id, params = {} }) => {
+      try {
+        return await client.get(`/match/sample/${sample_item_id}/isotopes`, params)
+      } catch (error) {
+        throw new Error(
+          error?.response?.data?.error ??
+            `Failed to retrieve sample match isotopes (sample id ${sample_item_id}): ${error}`
+        )
       }
     }
   }

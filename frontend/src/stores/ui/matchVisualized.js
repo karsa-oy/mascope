@@ -1,17 +1,17 @@
-import { ref, reactive, computed, watch } from 'vue'
+import { ref, computed, reactive, watch } from 'vue'
 import { defineStore } from 'pinia'
 
 import { api } from '@/api'
+import { alarmsList } from '@/lib/constants'
 
-import { useSampleStore } from './sample'
-import { useTargetsStore } from './targets'
-import { useWorkspaceStore } from './workspace'
-import { useFilterParams } from './filterParams'
-import { useDashboard } from './dashboard'
+import { useData } from '../data'
+import { useFilterParams } from '../filterParams'
+import { useChart } from './chart'
 
-export const useFocusedMatch = defineStore('focusedMatch', () => {
-  const workspaceStore = useWorkspaceStore()
-  const sampleStore = useSampleStore()
+// MATCH VISUALIZATION
+
+export const useMatchVisualized = defineStore('app.ui.matchVisualized', () => {
+  const data = useData()
 
   // state
   const ion = ref(null)
@@ -30,11 +30,11 @@ export const useFocusedMatch = defineStore('focusedMatch', () => {
   })
 
   const filterParams = computed(() =>
-    hash.value ? ion.value?.filter_params[sampleStore.active.instrument] : null
+    hash.value ? ion.value?.filter_params[data.sample.focused.instrument] : null
   )
 
   // actions
-  async function load({
+  async function set({
     sampleId = cache.sampleId,
     ionId = cache.ionId,
     collectionId = cache.collectionId,
@@ -46,21 +46,21 @@ export const useFocusedMatch = defineStore('focusedMatch', () => {
     const filterParams = useFilterParams()
     if (params) await filterParams.set(params)
     await loadMatches({ sampleId, ionId, collectionId })
-    await focus({ sampleId, ionId })
+    await activate({ sampleId, ionId })
     // cache
     cache.sampleId = sampleId
     cache.ionId = ionId
     cache.collectionId = collectionId
   }
 
-  async function reload() {
+  async function reset() {
     await loadMatches()
-    await focus()
+    await activate()
   }
 
-  async function unload({ sample = true, target = true } = {}) {
-    const dashboard = useDashboard()
-    dashboard.clear()
+  async function unset({ sample = true, target = true } = {}) {
+    const chart = useChart()
+    chart.clear()
     if (!ion.value) return
     ion.value = null
     isotopes.value = null
@@ -77,7 +77,6 @@ export const useFocusedMatch = defineStore('focusedMatch', () => {
     const target_ion_id = ionId ?? ion.value?.target_ion_id
     if (!target_ion_id) return
     const filterParams = useFilterParams()
-    const targetsStore = useTargetsStore()
     const sampleIon = await api.request.read({
       method: 'getSampleIonMatches',
       body: {
@@ -86,7 +85,7 @@ export const useFocusedMatch = defineStore('focusedMatch', () => {
           target_ion_id,
           target_collection_id: collectionId ?? ion.value?.target_collection_id,
           filter_params: filterParams.current,
-          alarms_list: targetsStore.alarmsList
+          alarms_list: alarmsList
         }
       }
     })
@@ -119,12 +118,12 @@ export const useFocusedMatch = defineStore('focusedMatch', () => {
     })
   }
 
-  async function focus({ sampleId, ionId } = {}) {
+  async function activate({ sampleId, ionId } = {}) {
     if (!ion.value) return
     const filterParams = useFilterParams()
-    const dashboard = useDashboard()
+    const chart = useChart()
 
-    dashboard.clear()
+    chart.clear()
 
     await api.request.read({
       method: 'getVisualizationIonFocus',
@@ -139,9 +138,9 @@ export const useFocusedMatch = defineStore('focusedMatch', () => {
   }
 
   watch(
-    computed(() => workspaceStore.active),
+    computed(() => data.workspace.focused),
     () => {
-      unload()
+      unset()
     }
   )
 
@@ -152,8 +151,8 @@ export const useFocusedMatch = defineStore('focusedMatch', () => {
     hash,
     filterParams,
     // actions
-    load,
-    reload,
-    unload
+    set,
+    reset,
+    unset
   }
 })

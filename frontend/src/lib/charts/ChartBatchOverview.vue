@@ -9,13 +9,11 @@ import BaseChartPlotly from './BaseChartPlotly.vue'
 import { glasbey } from './colors.js'
 
 import { beautifySnakeCase } from '@/lib/utils'
-import { useAppStore, useBatchStore, useSampleStore } from '@/stores'
+import { useApp } from '@/stores'
 
-const appStore = useAppStore()
-const sampleStore = useSampleStore()
-const batchStore = useBatchStore()
+const app = useApp()
 
-const swatches = computed(() => (appStore.mode.dark ? glasbey.dark : glasbey.light))
+const swatches = computed(() => (app.ui.darkmode.active ? glasbey.dark : glasbey.light))
 
 const hovertemplate = `
   <b># %{x}</b>
@@ -29,7 +27,7 @@ const hovertemplate = `
 const log = ref(false)
 
 const inferType = (field) => {
-  const withField = batchStore.sampleItems.filter((item) => field in item)
+  const withField = app.data.sample.list.filter((item) => field in item)
   const types = [
     ...new Set(withField.map((item) => (item[field] ? typeof item[field] : 'null')))
   ].filter((type) => type !== 'null')
@@ -38,7 +36,7 @@ const inferType = (field) => {
 const xFields = computed(() => {
   const standard = [
     ...new Set(
-      batchStore.sampleItems
+      app.data.sample.list
         ?.map((item) => Object.keys(item ?? {}))
         .flat()
         .filter((field) => field !== 'sample_item_attributes')
@@ -46,7 +44,7 @@ const xFields = computed(() => {
   ].map((field) => ({ field, kind: 'standard' }))
   const custom = [
     ...new Set(
-      batchStore.sampleItems?.map((item) => Object.keys(item?.sample_item_attributes ?? {})).flat()
+      app.data.sample.list?.map((item) => Object.keys(item?.sample_item_attributes ?? {})).flat()
     )
   ].map((field) => ({ field, kind: 'custom' }))
   return [...standard, { field: 'time', kind: 'custom', label: 'Time' }, ...custom]
@@ -101,27 +99,27 @@ const toField =
     return formatted
   }
 const xAxis = computed(() => ({
-  tickvals: batchStore.sampleItems?.map((_, i) => i) ?? [],
-  ticktext: batchStore.sampleItems?.map(toField(xField.value ?? 'index')) ?? []
+  tickvals: app.data.sample.list?.map((_, i) => i) ?? [],
+  ticktext: app.data.sample.list?.map(toField(xField.value ?? 'index')) ?? []
 }))
 
-const data = computed(() => {
-  if (!(batchStore.sampleItems && batchStore.matchCompounds)) return []
+const chartData = computed(() => {
+  if (!(app.data.sample.list && app.data.match.compound.list)) return []
   let allCompoundIds =
-    batchStore.targetCompounds?.map((compound) => compound.target_compound_id) ?? []
+    app.data.match.compound.list.map((compound) => compound.target_compound_id) ?? []
   allCompoundIds = [...new Set(allCompoundIds)]
   let compoundColors = Object.fromEntries(
     allCompoundIds.map((compoundId, index) => [[compoundId], swatches.value[index]])
   )
-  let data = []
-  let x = batchStore.sampleItems?.map((item) => item.sample_item_id) ?? []
+  let traces = []
+  let x = app.data.sample.list?.map((item) => item.sample_item_id) ?? []
 
   // Loop through target compounds, make traces and push to data
   for (let targetCompoundId of allCompoundIds) {
     let y = []
     let compoundMaxMatchCategory
     for (let sampleItemId of x) {
-      let itemMatches = batchStore.matchCompounds.filter(
+      let itemMatches = app.data.match.compound.list.filter(
         (row) => row.sample_item_id === sampleItemId
       )
       let sampleItemCompoundStats = itemMatches
@@ -144,18 +142,18 @@ const data = computed(() => {
     if (y.every((intensity) => intensity === null)) continue
     let compoundSymbol = compoundMaxMatchCategory === 2 ? 'square' : 'square-open'
     let compoundColor = compoundColors[targetCompoundId]
-    let compound = batchStore.targetCompounds.filter(
+    let compound = app.data.match.compound.list.filter(
       (target) => target.target_compound_id === targetCompoundId
     )[0]
-    data.push({
+    traces.push({
       name: compound.target_compound_name.trim()
         ? compound.target_compound_name
         : compound.target_compound_formula,
       target_compound_id: targetCompoundId,
       x,
       y,
-      customdata: batchStore.sampleItems.map((item) => item.datetime),
-      text: batchStore.sampleItems.map((item) => item.sample_item_name),
+      customdata: app.data.sample.list.map((item) => item.datetime),
+      text: app.data.sample.list.map((item) => item.sample_item_name),
       hovertemplate,
       mode: 'markers',
       type: 'scatter',
@@ -167,24 +165,24 @@ const data = computed(() => {
     })
   }
   // Make trace for TIC
-  let y = batchStore.sampleItems?.map((item) => item.tic) ?? []
-  data.push({
+  let y = app.data.sample.list?.map((item) => item.tic) ?? []
+  traces.push({
     name: 'TIC',
     x,
     y,
-    customdata: batchStore.sampleItems?.map((item) => item.datetime) ?? [],
-    text: batchStore.sampleItems?.map((item) => item.sample_item_name) ?? [],
+    customdata: app.data.sample.list?.map((item) => item.datetime) ?? [],
+    text: app.data.sample.list?.map((item) => item.sample_item_name) ?? [],
     hovertemplate,
     mode: 'markers',
     type: 'scatter',
     marker: {
-      color: appStore.mode.dark ? '#fff' : '#222',
+      color: app.ui.darkmode.active ? '#fff' : '#222',
       size: 10,
       symbol: 'diamond'
     }
   })
 
-  return data
+  return traces
 })
 
 const layout = computed(() => ({
@@ -213,11 +211,11 @@ function onClick({ points }) {
   if (!points) return
   // Select sample item corresponding to clicked data point
   let sampleItemIndex = points[0].pointIndex
-  let sampleItem = batchStore.sampleItems[sampleItemIndex]
+  let sampleItem = app.data.sample.list[sampleItemIndex]
   if (sampleItem) {
-    sampleStore.load(sampleItem)
+    app.data.sample.focus(sampleItem)
   } else {
-    sampleStore.unload()
+    app.data.sample.unfocus()
   }
 }
 </script>
@@ -238,8 +236,8 @@ function onClick({ points }) {
     </div>
     <BaseChartPlotly
       id="ChartSampleIntensity"
-      :title="batchStore.active?.sample_batch_name ?? ''"
-      :data="data"
+      :title="app.data.batch.focused.sample_batch_name ?? ''"
+      :data="chartData"
       :layout="layout"
       @click="onClick"
     />

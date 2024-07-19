@@ -3,14 +3,13 @@ import { defineModule } from './lib/module'
 import { api } from '@/api'
 
 import { useMzFit } from '@/lib/mzFit'
+import { alarmsList } from '@/lib/constants'
 
-import { alarms_list } from './immutable'
 import { useBatch } from './batch'
 
 export const useSample = defineModule({
   name: 'sample',
   key: 'sample_item_id',
-  multiselect: true,
   useParent: useBatch,
   load: async (sample_batch_id) =>
     (
@@ -20,7 +19,7 @@ export const useSample = defineModule({
           sample_batch_id,
           batch_matches_info: true,
           sort: 'datetime_utc',
-          alarms_list
+          alarms_list: alarmsList
         }
       })
     )?.data,
@@ -61,7 +60,7 @@ export const useSample = defineModule({
       body: {
         sample,
         params: mzFit.params,
-        alarms: alarms_list
+        alarms: alarmsList
       }
     })
   },

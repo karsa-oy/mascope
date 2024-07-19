@@ -2,9 +2,9 @@
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 
-import { useData } from '@/stores/data'
+import { useApp } from '@/stores'
 
-const data = useData()
+const app = useApp()
 </script>
 
 <template>
@@ -13,8 +13,8 @@ const data = useData()
       <h4>workspace</h4>
       <DataTable
         dataKey="workspace_id"
-        :value="data.workspace.list"
-        v-model:selection="data.workspace.focused"
+        :value="app.data.workspace.list"
+        v-model:selection="app.data.workspace.focused"
         :metaKeySelection="false"
         selectionMode="single"
       >
@@ -26,8 +26,8 @@ const data = useData()
       <h4>sample batch</h4>
       <DataTable
         dataKey="sample_batch_id"
-        :value="data.batch.list"
-        v-model:selection="data.batch.focused"
+        :value="app.data.batch.list"
+        v-model:selection="app.data.batch.focused"
         :metaKeySelection="false"
         selectionMode="single"
         scrollable
@@ -41,8 +41,8 @@ const data = useData()
       <h4>sample item</h4>
       <DataTable
         dataKey="sample_item_id"
-        :value="data.sample.list"
-        v-model:selection="data.sample.selected"
+        :value="app.data.sample.list"
+        v-model:selection="app.data.sample.selected"
         :metaKeySelection="false"
         selectionMode="multiple"
         scrollable

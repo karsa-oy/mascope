@@ -2,10 +2,10 @@ import { ref, reactive } from 'vue'
 
 import { api } from '@/api'
 
-import { useNotification } from '@/stores'
+import { useApp } from '@/stores'
 
 export const useMzFit = (sample) => {
-  const notification = useNotification()
+  const app = useApp()
 
   if (sample) load(sample)
 
@@ -63,7 +63,7 @@ export const useMzFit = (sample) => {
     })
   }
 
-  notification.on('calibration_mz_fit', (payload) => {
+  app.notification.on('calibration_mz_fit', (payload) => {
     status.value = payload?.status
     if (payload?.status === 'success') {
       current.value = payload?.data?.fit

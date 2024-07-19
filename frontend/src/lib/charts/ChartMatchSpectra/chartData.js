@@ -1,14 +1,15 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 
-import { useDashboard, useFocusedMatch } from '@/stores'
+import { useApp } from '@/stores'
 
-export const useData = defineStore('matchSpectraChartData', () => {
+export const useChartData = defineStore('matchSpectraChart', () => {
   const traces = ref([])
   const length = ref()
 
-  const dashboard = useDashboard()
-  dashboard.register({
+  const app = useApp()
+
+  app.ui.chart.register({
     name: 'ChartMatchSpectra',
     clear: () => {
       traces.value = []
@@ -17,7 +18,6 @@ export const useData = defineStore('matchSpectraChartData', () => {
   })
 
   async function onVisualizationSignalSumSpectrum(payload) {
-    const match = useFocusedMatch()
     for (let trace of payload) {
       length.value = length.value + trace.x.length
       trace.x = new Float32Array(trace.x)
@@ -25,7 +25,7 @@ export const useData = defineStore('matchSpectraChartData', () => {
 
       // Check if the trace has target_isotope_id and update the corresponding isotope in activeIsotopes
       if (trace.target_isotope_id) {
-        const isotope = match.isotopes.find(
+        const isotope = app.ui.matchVisualized.isotopes.find(
           (iso) => iso.target_isotope_id === trace.target_isotope_id
         )
         if (isotope) {

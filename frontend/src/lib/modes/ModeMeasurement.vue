@@ -4,41 +4,40 @@ import { reactive } from 'vue'
 import SelectButton from 'primevue/selectbutton'
 
 import { DialogSampleItemOp } from '@/lib/dialogs'
-import { useAppStore, useBatchStore } from '@/stores'
+import { useApp } from '@/stores'
 import { watchEffect } from 'vue'
 
-const appStore = useAppStore()
-const batchStore = useBatchStore()
+const app = useApp()
 
-appStore.mode.measuring = false
+app.acquisition.mode = false
 
 const dialog = reactive({
   sampleItem: null
 })
 
 watchEffect(() => {
-  if (!batchStore.active) {
-    appStore.mode.measuring = false
+  if (!app.data.batch.focused) {
+    app.acquisition.mode = false
   }
 })
 </script>
 
 <template>
   <div id="measurement-mode" class="hidden">
-    {{ appStore.mode.measuring ? 'active' : '' }}
+    {{ app.acquisition.mode ? 'active' : '' }}
   </div>
   <SelectButton
-    v-model="appStore.mode.measuring"
+    v-model="app.acquisition.mode"
     :options="[
       {
         id: 'stop-measuring',
-        tooltip: appStore.mode.measuring ? 'Pause' : 'Paused',
+        tooltip: app.acquisition.mode ? 'Pause' : 'Paused',
         value: false,
         icon: 'pi pi-pause'
       },
       {
         id: 'start-measuring',
-        tooltip: appStore.mode.measuring ? 'Measuring' : 'Measure',
+        tooltip: app.acquisition.mode ? 'Measuring' : 'Measure',
         value: true,
         icon: 'pi pi-play'
       }
@@ -46,9 +45,9 @@ watchEffect(() => {
     optionLabel="tooltip"
     optionValue="value"
     dataKey="value"
-    :class="appStore.mode.measuring ? 'measure-mode' : ''"
+    :class="app.acquisition.mode ? 'measure-mode' : ''"
     style="height: 32px"
-    :disabled="!batchStore.active"
+    :disabled="!app.data.batch.focused"
     :allowEmpty="false"
   >
     <template #option="{ option }">

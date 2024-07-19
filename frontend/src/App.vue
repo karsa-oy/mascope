@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 
 import ProgressSpinner from 'primevue/progressspinner'
 import ConfirmDialog from 'primevue/confirmdialog'
@@ -8,31 +8,27 @@ import { useToast } from 'primevue/usetoast'
 
 import { beautifySnakeCase } from '@/lib/utils'
 import { BaseKarsaLogo } from '@/lib/base'
-import { useAppStore, useNotification, useKeyStore } from '@/stores'
+import { useApp } from '@/stores'
 
 const toast = useToast()
 
-const appStore = useAppStore()
-const keyStore = useKeyStore()
+const app = useApp()
 
-const notification = useNotification()
+const ready = computed(() => app.data.workspace.focused && app.data.instrument.focused)
 
 // init
-
-appStore.load()
-
 onMounted(() => {
   // add event listeners
   window.addEventListener('keydown', (event) => {
-    keyStore.down(event)
+    app.ui.key.down(event)
   })
   window.addEventListener('keyup', (event) => {
-    keyStore.up(event)
+    app.ui.key.up(event)
   })
 })
 
 // toaster
-notification.on('*', ({ status, type, message }) => {
+app.notification.on('*', ({ status, type, message }) => {
   if (status !== 'pending') {
     const severity =
       {
@@ -49,7 +45,7 @@ notification.on('*', ({ status, type, message }) => {
 </script>
 
 <template>
-  <div id="app" v-if="appStore.ready">
+  <div id="app" v-if="ready">
     <RouterView />
   </div>
   <div id="loading" v-else>
@@ -59,7 +55,7 @@ notification.on('*', ({ status, type, message }) => {
       <strong>Loading...</strong>
     </div>
   </div>
-  <Toast position="bottom-right" v-if="!notification.drawer" />
+  <Toast position="bottom-right" v-if="!app.notification.drawer" />
   <ConfirmDialog />
 </template>
 

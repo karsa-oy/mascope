@@ -4,13 +4,12 @@ import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Button from 'primevue/button'
 
-
 import { reactive, computed, watch } from 'vue'
 
 import { genId } from '@/lib/utils'
-import { useSampleStore } from '@/stores'
+import { useApp } from '@/stores'
 
-const sampleStore = useSampleStore()
+const app = useApp()
 
 const props = defineProps({
   original: {
@@ -86,7 +85,7 @@ function init(active) {
         label="Create"
         @click="
           async () => {
-            await sampleStore.template.create(updated)
+            await app.data.template.create(updated)
             visible = false
           }
         "

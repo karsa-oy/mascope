@@ -8,11 +8,11 @@ import BaseChartPlotly from '../BaseChartPlotly.vue'
 
 import { BaseMatchTag } from '@/lib/base'
 import { clone } from '@/lib/utils'
-import { useFocusedMatch, useFilterParams } from '@/stores'
+import { useApp } from '@/stores'
 
-import { useData } from './data'
+import { useChartData } from './chartData.js'
 
-const filterParams = useFilterParams()
+const app = useApp()
 
 const props = defineProps({
   settings: {
@@ -22,9 +22,8 @@ const props = defineProps({
 })
 
 const isotopes = computed(() => {
-  const focusedMatch = useFocusedMatch()
-  const data = useData()
-  return clone(focusedMatch.isotopes).map((isotope) => {
+  const data = useChartData()
+  return clone(app.ui.matchVisualized.isotopes).map((isotope) => {
     const start = data.traces?.findIndex(
       (trace) => trace.target_isotope_id === isotope.target_isotope_id
     )
@@ -35,10 +34,10 @@ const isotopes = computed(() => {
     const traces = data.traces?.slice(start, end)
 
     let match_category = 0
-    if (isotope.match_score > filterParams.current.possible_match_threshold) {
+    if (isotope.match_score > app.filterParams.current.possible_match_threshold) {
       match_category = 1
     }
-    if (isotope.match_score > filterParams.current.probable_match_threshold) {
+    if (isotope.match_score > app.filterParams.current.probable_match_threshold) {
       match_category = 2
     }
 
@@ -96,13 +95,15 @@ const error = new Intl.NumberFormat('en-US', {
             <Tag
               :value="`Intensity: ${area.format(isotope.sample_peak_area)}`"
               :severity="
-                isotope.sample_peak_area < filterParams.current.peak_min_intensity ? 'warn' : 'info'
+                isotope.sample_peak_area < app.filterParams.current.peak_min_intensity
+                  ? 'warn'
+                  : 'info'
               "
             />
             <Tag
               :value="`mz error: ${error.format(isotope.match_mz_error)}`"
               :severity="
-                Math.abs(isotope.match_mz_error) > filterParams.current.mz_tolerance
+                Math.abs(isotope.match_mz_error) > app.filterParams.current.mz_tolerance
                   ? 'warn'
                   : 'info'
               "
@@ -112,7 +113,7 @@ const error = new Intl.NumberFormat('en-US', {
               :value="`Abundance error: ${error.format(isotope.match_abundance_error)}`"
               :severity="
                 Math.abs(isotope.match_abundance_error) >
-                filterParams.current.isotope_ratio_tolerance
+                app.filterParams.current.isotope_ratio_tolerance
                   ? 'warn'
                   : 'info'
               "

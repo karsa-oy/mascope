@@ -1,5 +1,5 @@
 <script setup>
-import BaseParamField from '@/lib/base/BaseParamField.vue'
+import { BaseParamField } from '@/lib/base'
 
 const params = defineModel('params')
 </script>

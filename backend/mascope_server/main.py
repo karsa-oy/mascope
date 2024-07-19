@@ -110,7 +110,7 @@ def run():
         host="0.0.0.0" if config.env.mode == "development" else "127.0.0.1",
         port=config.server.port,
         reload=(config.env.mode == "development"),
-        log_level="warning",
+        log_level="info",
     )
 
 

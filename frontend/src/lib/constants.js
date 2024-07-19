@@ -1,6 +1,6 @@
-export const alarms_list = ['TARGETS']
+export const alarmsList = ['TARGETS']
 
-export const sample_types = [
+export const sampleTypes = [
   'FILTER_REGENERATION',
   'FILTER_BACKGROUND',
   'INSTRUMENT_BACKGROUND',

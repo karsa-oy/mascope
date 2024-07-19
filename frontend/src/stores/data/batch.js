@@ -54,7 +54,7 @@ export const useBatch = defineModule({
         }
       }
     }),
-  importItems: async ({ batch, sample_items }) => {
+  importSamples: async ({ batch, sample_items }) => {
     const mzFit = useMzFit()
     return await api.request.process({
       method: 'importSamplesToBatch',
@@ -71,5 +71,10 @@ export const useBatch = defineModule({
     await api.request.process({
       method: 'rematchBatch',
       body: { batchId: sample_batch_id }
+    }),
+  exportPeaks: async ({ sample_batch_id }) =>
+    await api.request.process({
+      method: 'batchExportPeakData',
+      body: { sample_batch_id }
     })
 })

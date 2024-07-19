@@ -4,9 +4,9 @@ import ScrollPanel from 'primevue/scrollpanel'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 
-import { useAppStore } from '@/stores'
+import { useApp } from '@/stores'
 
-const appStore = useAppStore()
+const app = useApp()
 
 const selected = defineModel('selected')
 </script>
@@ -16,7 +16,7 @@ const selected = defineModel('selected')
     <ScrollPanel style="width: 100%; height: 300px">
       <DataTable
         v-model:selection="selected"
-        :value="appStore.ionMechanisms"
+        :value="app.data.mechanism.list"
         tableStyle="min-width: 70ch;"
       >
         <Column selectionMode="multiple" />

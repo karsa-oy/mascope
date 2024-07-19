@@ -8,9 +8,9 @@ import { BaseParamField } from '@/lib/base'
 
 import BaseChartPlotly from '../BaseChartPlotly.vue'
 
-import { useData } from './data'
+import { useChartData } from './chartData.js'
 
-const data = useData()
+const data = useChartData()
 
 const scale = ref()
 const log = ref()

@@ -13,19 +13,18 @@ import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 
 import { api } from '@/api'
+
 import { equals } from '@/lib/table'
 import { clone } from '@/lib/utils'
 import { useMzFit } from '@/lib/mzFit'
+import { alarmsList } from '@/lib/constants'
 
-import { useAppStore, useWorkspaceStore, useBatchStore, useTargetsStore } from '@/stores'
+import { useApp } from '@/stores'
 
 import PaneSelectTargets from './PaneSelectTargets.vue'
 import PaneSelectMechanisms from './PaneSelectMechanisms.vue'
 
-const appStore = useAppStore()
-const workspaceStore = useWorkspaceStore()
-const batchStore = useBatchStore()
-const targetsStore = useTargetsStore()
+const app = useApp()
 
 const props = defineProps({
   batch: {
@@ -33,7 +32,7 @@ const props = defineProps({
   }
 })
 
-const original = computed(() => props.batch ?? batchStore.active)
+const original = computed(() => props.batch ?? app.data.batch.focused)
 
 // api
 const action = defineModel('action') // create, update, update_targets
@@ -83,7 +82,7 @@ const updated = computed(() => {
   const common = {
     sample_batch_name: selected.info.name,
     sample_batch_description: selected.info.desc,
-    workspace_id: workspaceStore.active.workspace_id,
+    workspace_id: app.data.workspace.focused.workspace_id,
     build_params: {
       calibration_collection: selected.calibrants.target_collection_id,
       ion_mechanisms: selected.mechanisms.map((row) => row.ionization_mechanism_id)
@@ -143,7 +142,7 @@ async function init(value) {
     selected.info.name = original.value.sample_batch_name
     selected.info.desc = original.value.sample_batch_description
     // init ionization mechanisms
-    selected.mechanisms = appStore.ionMechanisms.filter((mech) =>
+    selected.mechanisms = app.data.mechanism.list.filter((mech) =>
       original.value.build_params?.ion_mechanisms?.includes(mech.ionization_mechanism_id)
     )
     // init target collections with batch collections
@@ -153,18 +152,18 @@ async function init(value) {
         body: {
           batchId: original.value.sample_batch_id,
           body: {
-            alarms_list: targetsStore.alarmsList
+            alarms_list: alarmsList
           }
         }
       })
     )?.data?.target_collections
-    selected.targets = targetsStore.getAllCollections.filter((coll) =>
+    selected.targets = app.data.target.collection.list.filter((coll) =>
       batchCollections
         .map(({ target_collection_id }) => target_collection_id)
         .includes(coll.target_collection_id)
     )
     // init calibrants with batch param
-    selected.calibrants = targetsStore.getAllCollections.find(
+    selected.calibrants = app.data.target.collection.list.find(
       ({ target_collection_id }) =>
         target_collection_id == original.value.build_params?.calibration_collection
     )
@@ -173,17 +172,17 @@ async function init(value) {
     selected.info.name = ''
     selected.info.desc = ''
     // init ionization mechanisms
-    selected.mechanisms = appStore.ionMechanisms.filter(
+    selected.mechanisms = app.data.mechanism.list.filter(
       (mech) => mech.ionization_mechanism === '+Br-'
     )
     // init target collections with defaults
-    selected.targets = targetsStore.targetCollectionsAll.filter(
+    selected.targets = app.data.target.collection.list.filter(
       (coll) =>
         coll.target_collection_name === 'Explosives targets' ||
         coll.target_collection_id === 'kNBOCx32dpehRWUw'
     )
     // init calibrants with defaults
-    selected.calibrants = targetsStore.targetCollectionsAll.find(
+    selected.calibrants = app.data.target.collection.list.find(
       (coll) =>
         coll.target_collection_name === 'Br calibrants' ||
         coll.target_collection_id === 'xkSPp3eZrWXYSVDa'
@@ -203,12 +202,12 @@ async function execute() {
   action.value = null
   switch (action.value) {
     case 'create': {
-      batchStore.createBatch(updated.value)
+      app.data.batch.create(updated.value)
       break
     }
     case 'update':
     case 'update_targets': {
-      await batchStore.updateBatch(updated.value)
+      await app.data.batch.update(updated.value)
       if (!equals(selected.calibrants, initial.calibrants, 'target_collection_id')) {
         const mzFit = useMzFit()
         await api.request.process({

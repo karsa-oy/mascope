@@ -1,8 +1,8 @@
 <script setup>
-import { useNotification } from '@/stores'
+import { useApp } from '@/stores'
 import { beautifySnakeCase } from '@/lib/utils'
 
-const notification = useNotification()
+const app = useApp()
 
 function color(type) {
   if (type.includes('calibrat')) {
@@ -23,7 +23,7 @@ function color(type) {
 
 <template>
   <div id="progress">
-    <template v-for="process of notification.progress" :key="process.process_id">
+    <template v-for="process of app.notification.progress" :key="process.process_id">
       <div
         v-if="process.progress > 0"
         v-tooltip.top="`${beautifySnakeCase(process.type)}: ${process.message}`"

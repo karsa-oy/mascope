@@ -1,38 +1,37 @@
 import { ref, computed, watchEffect } from 'vue'
 import { defineStore } from 'pinia'
 
-import { useDashboard, useSampleStore } from '@/stores'
+import { useApp } from '@/stores'
 import { api } from '@/api'
 
-export const useData = defineStore('sampleSpectrumChartData', () => {
+export const useChartData = defineStore('sampleSpectrumChartData', () => {
   const traces = ref([])
   const loadedFileId = ref()
   const length = ref()
   const loading = ref(false)
 
-  const dashboard = useDashboard()
-  const sampleStore = useSampleStore()
+  const app = useApp()
 
-  dashboard.register({
+  app.ui.chart.register({
     name: 'ChartSampleSpectrum',
     clear: () => {
       // not needed
     }
   })
 
-  const activeFileId = computed(() => sampleStore.active?.sample_file_id)
+  const activeFileId = computed(() => app.data.sample.focused?.sample_file_id)
 
   watchEffect(async () => {
     if (activeFileId.value) {
-      if (activeFileId.value !== loadedFileId.value && dashboard.tab == 'spectrum') {
+      if (activeFileId.value !== loadedFileId.value && app.ui.tab.active == 'spectrum') {
         await load(activeFileId.value)
         loadedFileId.value = activeFileId.value
       }
     } else {
       traces.value = []
       loadedFileId.value = null
-      if (dashboard.tab == 'spectrum') {
-        dashboard.tab = 'batch'
+      if (app.ui.tab.active == 'spectrum') {
+        app.ui.tab.active = 'batch'
       }
     }
   })

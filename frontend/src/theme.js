@@ -1,5 +1,5 @@
-import Aura from 'primevue/themes/aura'
-import { definePreset } from 'primevue/themes'
+import Aura from '@primevue/themes/aura'
+import { definePreset } from '@primevue/themes'
 
 import palette from '@/assets/palette.json'
 

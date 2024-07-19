@@ -19,18 +19,15 @@ import { ModeMeasurement } from '@/lib/modes'
 import { DialogWorkspaceOp } from '@/lib/dialogs'
 import { beautifySnakeCase } from '@/lib/utils'
 
-import { useAppStore, useWorkspaceStore, useInstrumentStore, useNotification } from '@/stores'
+import { useApp } from '@/stores'
 
-const appStore = useAppStore()
-const workspaceStore = useWorkspaceStore()
-const instrumentStore = useInstrumentStore()
-const notification = useNotification()
+const app = useApp()
 
 const saved = {
-  workspace: appStore.workspaces.find(
+  workspace: app.data.workspace.list.find(
     ({ workspace_id }) => workspace_id == localStorage.getItem('mascope-workspace')
   ),
-  instrument: appStore.instruments.find(
+  instrument: app.data.instrument.list.find(
     ({ instrument }) => instrument == localStorage.getItem('mascope-instrument')
   )
 }
@@ -39,7 +36,7 @@ const dialog = reactive({
   workspace: null
 })
 const filter = reactive({
-  workspace: saved.workspace ?? appStore.workspaces[0]
+  workspace: saved.workspace ?? app.data.workspace.list[0]
 })
 const settings = ref()
 const menu = ref()
@@ -48,25 +45,25 @@ const log = reactive({
 })
 
 // initial load
-workspaceStore.load(filter.workspace.workspace_id)
+app.data.workspace.focus(filter.workspace)
 
 if (saved.instrument) {
-  instrumentStore.active = saved.instrument
+  app.data.instrument.focused = saved.instrument
 }
 
 watch(
   computed(() => filter.workspace),
   (workspace) => {
     if (workspace) {
-      workspaceStore.load(workspace.workspace_id)
+      app.data.workspace.focus(workspace)
       localStorage.setItem('mascope-workspace', workspace.workspace_id)
     } else {
-      workspaceStore.unload()
+      app.data.workspace.unfocus()
     }
   }
 )
 watch(
-  computed(() => workspaceStore.active),
+  computed(() => app.data.workspace.focused),
   (workspace) => {
     if (workspace && filter.workspace.workspace_id !== workspace.workspace_id) {
       filter.workspace = workspace
@@ -74,7 +71,7 @@ watch(
   }
 )
 watch(
-  computed(() => instrumentStore.active),
+  computed(() => app.data.instrument.focused),
   (instrument) => {
     if (instrument) {
       localStorage.setItem('mascope-instrument', instrument.instrument)
@@ -82,7 +79,7 @@ watch(
   }
 )
 watchEffect(() => {
-  if (appStore.mode.dark) {
+  if (app.ui.darkmode.active) {
     document.documentElement.classList.add('darkmode')
     localStorage.setItem('mascope-darkmode', 'true')
   } else {
@@ -116,7 +113,7 @@ function parseTimestamp(timestamp) {
         <Popover ref="settings">
           <div class="row">
             <span class="pi pi-sun" v-tooltip.bottom="'Light mode'" />
-            <ToggleSwitch v-model="appStore.mode.dark" />
+            <ToggleSwitch v-model="app.ui.darkmode.active" />
             <span class="pi pi-moon" v-tooltip.bottom="'Dark mode'" />
           </div>
         </Popover>
@@ -126,7 +123,7 @@ function parseTimestamp(timestamp) {
             inputId="workspace-selector"
             dataKey="workspace_id"
             v-model="filter.workspace"
-            :options="appStore.workspaces"
+            :options="app.data.workspace.list"
             optionLabel="workspace_name"
             style="flex-direction: row-reverse"
             appendTo="self"
@@ -199,8 +196,8 @@ function parseTimestamp(timestamp) {
         <label for="instrument-selector" class="hidden">Instrument selector</label>
         <Select
           inputId="instrument-selector"
-          v-model="instrumentStore.active"
-          :options="appStore.instruments"
+          v-model="app.data.instrument.focused"
+          :options="app.data.instrument.list"
           optionLabel="instrument"
           appendTo="self"
         >
@@ -231,12 +228,12 @@ function parseTimestamp(timestamp) {
           text
           @click="
             (event) => {
-              notification.drawer = true
+              app.notification.drawer = true
             }
           "
         />
         <Drawer
-          v-model:visible="notification.drawer"
+          v-model:visible="app.notification.drawer"
           header="Notifications"
           position="right"
           style="width: 350px"
@@ -249,9 +246,14 @@ function parseTimestamp(timestamp) {
           </IconField>
           <ScrollPanel>
             <Message
-              v-for="{ process_id, type, status, message, timestamp } in notification.log.filter(
-                ({ type, status, message }) =>
-                  `${beautifySnakeCase(type)} ${status} ${message}`.includes(log.query)
+              v-for="{
+                process_id,
+                type,
+                status,
+                message,
+                timestamp
+              } in app.notification.log.filter(({ type, status, message }) =>
+                `${beautifySnakeCase(type)} ${status} ${message}`.includes(log.query)
               )"
               :key="process_id"
               :severity="
