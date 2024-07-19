@@ -1,7 +1,6 @@
 import os
 import sqlite3
 import sys
-import logging
 
 from mascope_server.db import get_current_db_version, create_db_backup
 from mascope_server.db.tables_config import get_table_configs

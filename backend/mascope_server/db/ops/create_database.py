@@ -1,5 +1,6 @@
 import os
 import asyncio
+from sqlalchemy import text
 from mascope_server.db import (
     get_available_db_version,
     get_current_db_version,
@@ -7,7 +8,7 @@ from mascope_server.db import (
     configure_database_engine,
     async_session,
 )
-from mascope_server.api.models.models import Base
+from mascope_server.api.models.models import Base, Sample
 import mascope_runtime as runtime
 
 from mascope_server.config import config
@@ -41,8 +42,42 @@ async def create_database():
         # Acquire a connection
         connection = await session.connection()
 
-        # Create all tables according to the Base metadata
-        await connection.run_sync(Base.metadata.create_all)
+        # Explicitly create tables, excluding the Sample view
+        for table_name, table_obj in Base.metadata.tables.items():
+            if table_name != Sample.__tablename__:
+                await connection.run_sync(table_obj.create)
+
+        # Create the sample_view
+        await connection.execute(
+            text(
+                """
+            CREATE VIEW IF NOT EXISTS sample_view AS
+            SELECT
+                sample_item.sample_item_id,
+                sample_file.sample_file_id,
+                sample_item.sample_batch_id,
+                sample_item.sample_item_name,
+                sample_file.instrument,
+                sample_item.filename,
+                sample_item.sample_item_type,
+                sample_item.sample_item_attributes,
+                sample_item.filter_id,
+                sample_file.length,
+                sample_file.tic,
+                sample_file.range,
+                sample_file.mz_calibration,
+                sample_file.datetime,
+                sample_file.datetime_utc,
+                sample_item.sample_item_utc_created,
+                sample_item.sample_item_utc_modified,
+                sample_file.polarity
+            FROM
+                sample_item
+            JOIN
+                sample_file ON sample_item.filename = sample_file.filename
+            """
+            )
+        )
         await session.commit()
 
     logger.info(f"New database mascope.v{last_version} created successfully.")
