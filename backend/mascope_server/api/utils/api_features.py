@@ -290,7 +290,11 @@ async def handle_notifications(rooms, notification, kwargs, result, sid):
         room_id = kwargs.get(room)
         if not room_id and result:
             # TODO_data wrapper
-            room_id = result.get(room) or result.get("data").get(room)
+            room_id = (
+                result.get(room)
+                or result.get("data", {}).get(room)
+                or result.get("_notification_data", {}).get(room)
+            )
         # for istrument room don't check if the user has moved from the room -> no sid is provided
         if room_id and room == "instrument":
             await emit_user_notification(notification, room_id)

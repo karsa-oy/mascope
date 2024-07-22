@@ -1,18 +1,27 @@
 from datetime import datetime
+import numpy as np
 from sqlalchemy import asc, desc, func
 from sqlalchemy.future import select
 from mascope_lib.file_func import load_file
-from mascope_lib.peak import get_peaks
+from mascope_lib.peak import detect_peaks, get_peaks
 from mascope_server.db import async_session
 from mascope_server.db.id import gen_id
-from ..utils.api_features import api_controller, emit_user_notification
-from ..exceptions import NotFoundException
-from ..models.models import SampleFile
-from ..models.pydantic_models.sample_file_pydantic_model import (
+from mascope_lib.file_func import get_instrument_type
+from mascope_server.api.controllers.instrument_functions_controller import (
+    read_instrument_functions,
+)
+from mascope_server.api.utils.api_features import (
+    api_controller,
+    api_controller_background_task,
+    emit_user_notification,
+)
+from mascope_server.api.exceptions import NotFoundException
+from mascope_server.api.models.models import SampleFile
+from mascope_server.api.models.pydantic_models.sample_file_pydantic_model import (
     SampleFileCreate,
     SampleFileUpdate,
 )
-from ..models.pydantic_models.user_notification_pydantic_model import (
+from mascope_server.api.models.pydantic_models.user_notification_pydantic_model import (
     UserNotification,
 )
 
@@ -281,17 +290,89 @@ async def get_sample_file_peaks(sample_file_id: str) -> dict:
     # Step 2: Load the sample file
     try:
         sample_file = load_file(filename, vars=["peak_areas"])
-        # Step 3: Extract peaks
-        peaks = get_peaks(sample_file, "area").sum(dim="time")
-    except FileNotFoundError:
-        raise NotFoundException(f"Sample file with name '{filename}' not found")
-
+    except FileNotFoundError as e:
+        raise NotFoundException(f"Sample file with name '{filename}' not found") from e
+    # Step 3: Extract peaks
+    if "peak_areas" not in sample_file:
+        raise NotFoundException(f"No peak areas found in sample file '{filename}'")
+    peaks = get_peaks(sample_file, "area").sum(dim="time")
     # Step 4: Format and return data
     return {
         "total": len(peaks.mz.values),
         "data": {
             "mz": list(peaks.mz.values.astype(float)),
             "intensity": list(peaks.values.astype(float)),
+        },
+    }
+
+
+@api_controller_background_task(
+    success_notification_rooms=["sid"],
+    error_notification_rooms=["sid"],
+)
+async def compute_all_sample_file_peaks(
+    sample_file_id: str,
+    independent_transaction: bool = False,
+    sid: str = None,
+    process_id=None,
+    parent_id=None,
+) -> dict:
+    """
+    Computes all peak data for a specific sample file, performing the operation as a background task.
+
+    Steps:
+    1. Fetch the sample file details using the provided ID.
+    2. Load necessary instrument functions based on the filename.
+    3. Determine the instrument type and set the appropriate threshold for peak detection.
+    4. Execute the peak detection process.
+
+    :param sample_file_id: ID of the sample file for which peaks are to be computed.
+    :type sample_file_id: str
+    :param independent_transaction: Flag to indicate if the operation should be treated as an independent transaction.
+    :type independent_transaction: bool, optional
+    :param sid: Session ID for targeting specific clients when emitting events, used for notifications.
+    :type sid: str, optional
+    :param process_id: Optional identifier for the processing task, used for tracking.
+    :type process_id: Optional[str]
+    :param parent_id: Optional identifier of the parent task, if this task is part of a larger workflow.
+    :type parent_id: Optional[str]
+    :return: A dictionary containing a message with the outcome and the data about the peaks detected.
+    :rtype: dict
+    """
+    # Step 1: Fetch the sample file
+    sample_file = await get_sample_file(sample_file_id)
+    filename = sample_file["filename"]
+
+    # Step 2: Load instrument functions and determine instrument type.
+    instrument_functions = await read_instrument_functions(filename)
+    instrument_type = get_instrument_type(filename)
+
+    # Step 3: Set threshold based on instrument type.
+    if instrument_type == "orbi":
+        threshold = 0.8
+    if instrument_type == "tof":
+        threshold = 0.9
+
+    # Step 4: Detect peaks.
+    sample_file, all_peak_mzs = await detect_peaks(
+        filename,
+        instrument_functions,
+        threshold,
+        u_list=None,
+        if_exists="append",
+        return_peak_mzs=True,
+        instrument_type=instrument_type,
+    )
+    list_of_peaks = all_peak_mzs.astype(np.float32)
+
+    # Return completion message and peak details.
+    message = f"Detected {len(list_of_peaks)} peaks for file '{filename}'"
+    logger.info(message)
+    return {
+        "message": message,
+        "_notification_data": {
+            "sample_file_id": sample_file_id,
+            "filename": filename,
         },
     }
 

@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, BackgroundTasks, Request, Depends
 from datetime import datetime, timedelta, timezone
+from mascope_server.db.id import gen_id
 from ..utils.api_features import api_route
 
 from ..controllers.sample_files_controller import (
@@ -9,6 +10,7 @@ from ..controllers.sample_files_controller import (
     delete_sample_file,
     update_sample_file,
     get_sample_file_peaks,
+    compute_all_sample_file_peaks,
     get_sample_file_peak_timeseries,
     get_sample_file_spectrum,
 )
@@ -83,13 +85,48 @@ async def delete_sample_file_route(sample_file_id: str):
     await delete_sample_file(sample_file_id)
 
 
-@sample_files_router.get("/api/sample_files/{sample_file_id}/peaks")
+@sample_files_router.get(
+    "/api/sample_files/{sample_file_id}/peaks", tags=["Sample File Peaks"]
+)
 @api_route()
 async def get_sample_file_peaks_route(sample_file_id: str):
     return await get_sample_file_peaks(sample_file_id)
 
 
-@sample_files_router.post("/api/sample_files/{sample_file_id}/peak_timeseries")
+@sample_files_router.get(
+    "/api/sample_files/{sample_file_id}/peaks/compute", tags=["Sample File Peaks"]
+)
+@api_route(
+    status_code=202,
+)
+async def compute_all_sample_file_peaks_route(
+    request: Request,
+    sample_file_id: str,
+    background_tasks: BackgroundTasks,
+):
+    # Verify the existance of sample file
+    sample_file = await get_sample_file(sample_file_id)
+    filename = sample_file["filename"]
+
+    sid = request.headers.get("X-SID")
+    process_id = gen_id(8)
+
+    background_tasks.add_task(
+        compute_all_sample_file_peaks,
+        sample_file_id=sample_file_id,
+        independent_transaction=True,
+        sid=sid,
+        process_id=process_id,
+    )
+    return {
+        "message": f"Computina all peaks data for sample file '{filename}', please wait.",
+        "process_id": process_id,
+    }
+
+
+@sample_files_router.post(
+    "/api/sample_files/{sample_file_id}/peaks/timeseries", tags=["Sample File Peaks"]
+)
 @api_route()
 async def get_sample_file_peak_timeseries_route(
     sample_file_id: str, body: GetSampleFilePeakTimeseriesBody
@@ -101,7 +138,9 @@ async def get_sample_file_peak_timeseries_route(
     )
 
 
-@sample_files_router.get("/api/sample_files/{sample_file_id}/spectrum")
+@sample_files_router.get(
+    "/api/sample_files/{sample_file_id}/spectrum", tags=["Sample File Spectrum"]
+)
 @api_route()
 async def get_sample_file_spectrum_route(
     sample_file_id: str,
