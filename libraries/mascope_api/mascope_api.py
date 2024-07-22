@@ -437,7 +437,7 @@ def get_sample_file_peak_timeseries(
     peak_mz: float,
     peak_mz_tolerance_ppm: float = None,
 ) -> dict:
-    """Call /api/sample_files/{sample_file_id}/peak_timeseries endpoint
+    """Call /api/sample_files/{sample_file_id}/peaks/timeseries endpoint
 
     :param mascope_url: Mascope server URL
     :type mascope_url: str
@@ -462,7 +462,9 @@ def get_sample_file_peak_timeseries(
         if peak_mz_tolerance_ppm is not None
         else {"peak_mz": peak_mz}
     )
-    resp = api_post(mascope_url, f"sample_files/{sample_file_id}/peak_timeseries", body)
+    resp = api_post(
+        mascope_url, f"sample_files/{sample_file_id}/peaks/timeseries", body
+    )
     content = None if not resp or resp.status_code != 200 else json.loads(resp.content)
     return content["data"] if content is not None else None
 
