@@ -290,11 +290,12 @@ async def get_sample_file_peaks(sample_file_id: str) -> dict:
     # Step 2: Load the sample file
     try:
         sample_file = load_file(filename, vars=["peak_areas"])
-        # Step 3: Extract peaks
-        peaks = get_peaks(sample_file, "area").sum(dim="time")
-    except FileNotFoundError:
-        raise NotFoundException(f"Sample file with name '{filename}' not found")
-
+    except FileNotFoundError as e:
+        raise NotFoundException(f"Sample file with name '{filename}' not found") from e
+    # Step 3: Extract peaks
+    if "peak_areas" not in sample_file:
+        raise NotFoundException(f"No peak areas found in sample file '{filename}'")
+    peaks = get_peaks(sample_file, "area").sum(dim="time")
     # Step 4: Format and return data
     return {
         "total": len(peaks.mz.values),
