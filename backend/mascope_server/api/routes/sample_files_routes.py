@@ -9,6 +9,7 @@ from ..controllers.sample_files_controller import (
     delete_sample_file,
     update_sample_file,
     get_sample_file_peaks,
+    compute_all_sample_file_peaks,
     get_sample_file_peak_timeseries,
     get_sample_file_spectrum,
 )
@@ -89,7 +90,35 @@ async def get_sample_file_peaks_route(sample_file_id: str):
     return await get_sample_file_peaks(sample_file_id)
 
 
-@sample_files_router.post("/api/sample_files/{sample_file_id}/peak_timeseries")
+@sample_files_router.get(
+    "/api/sample_files/{sample_file_id}/peaks/compute", tags=["Sample File Peaks"]
+)
+@api_route(
+    status_code=202,
+)
+async def compute_all_sample_file_peaks_route(
+    request: Request,
+    sample_file_id: str,
+    background_tasks: BackgroundTasks,
+):
+    # Verify the existance of sample file
+    sample_file = await get_sample_file(sample_file_id)
+    filename = sample_file["filename"]
+
+    sid = request.headers.get("X-SID")
+    process_id = gen_id(8)
+
+    background_tasks.add_task(
+        compute_all_sample_file_peaks,
+        sample_file_id=sample_file_id,
+        independent_transaction=True,
+        sid=sid,
+        process_id=process_id,
+    )
+    return {
+        "message": f"Computina all peaks data for sample file '{filename}', please wait.",
+        "process_id": process_id,
+    }
 @api_route()
 async def get_sample_file_peak_timeseries_route(
     sample_file_id: str, body: GetSampleFilePeakTimeseriesBody
