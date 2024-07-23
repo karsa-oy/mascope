@@ -46,6 +46,12 @@ const severity = computed(() => {
       return 'success'
   }
 })
+
+const nonAlarmTarget = computed(
+  () =>
+    'target_collection_type' in props.row && !alarmsList.includes(props.row.target_collection_type)
+)
+const zeroScored = computed(() => props.score == '00.00%')
 </script>
 
 <template>
@@ -55,7 +61,7 @@ const severity = computed(() => {
     v-tooltip.right="tooltip"
     :value="text ? `Match score: ${score}` : score"
     :severity="severity"
-    :class="!alarmsList.includes(row.target_collection_type) || score == '00.00%' ? 'pale' : ''"
+    :class="nonAlarmTarget || zeroScored ? 'pale' : ''"
     :style="style"
   />
 </template>
