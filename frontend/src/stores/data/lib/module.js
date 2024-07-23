@@ -141,6 +141,7 @@ export const defineModule = ({
       } else {
         records.value = await load()
       }
+      records.value.forEach((record, index) => (record.index = (index + 1).toString()))
       log('data loaded')
       if (selected.value.length > 0) {
         clear()
@@ -158,16 +159,16 @@ export const defineModule = ({
       loading.value = false
     }
 
-    // init
+    // load on init
     if (!parent) {
-      // root modules self init
+      // root modules self init on mount
       onMounted(() => reload())
     } else {
       // child modules init with parent
       parent.register({ reload })
     }
 
-    // refocus
+    // reload children on refocus
     if (singleselect) {
       watchEffect(() => {
         const focusedId = focused.value ? focused.value[key] : null

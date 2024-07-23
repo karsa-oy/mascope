@@ -1,5 +1,7 @@
 export const alarmsList = ['TARGETS']
 
+export const collectionTypes = ['TARGETS', 'DIAGNOSTICS', 'CALIBRANTS']
+
 export const sampleTypes = [
   'FILTER_REGENERATION',
   'FILTER_BACKGROUND',

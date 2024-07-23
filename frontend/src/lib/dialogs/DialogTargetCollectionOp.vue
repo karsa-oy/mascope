@@ -26,6 +26,7 @@ import { useApp } from '@/stores'
 import { fromSpreadsheet, equals } from '@/lib/table'
 import { BaseClipboardContext } from '@/lib/base'
 import { clone } from '@/lib/utils'
+import { collectionTypes } from '@/lib/constants'
 
 const confirm = useConfirm()
 
@@ -468,7 +469,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onEnter))
         </FloatLabel>
         <SelectButton
           v-model="info.type"
-          :options="targetsStore.collectionTypes"
+          :options="collectionTypes"
           :allowEmpty="false"
           :disabled="action == 'update_batches'"
         />

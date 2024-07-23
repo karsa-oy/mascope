@@ -3,6 +3,8 @@ import { computed } from 'vue'
 
 import Tag from 'primevue/tag'
 
+import { alarmsList } from '@/lib/constants'
+
 const props = defineProps({
   row: {
     type: Object,
@@ -53,7 +55,7 @@ const severity = computed(() => {
     v-tooltip.right="tooltip"
     :value="text ? `Match score: ${score}` : score"
     :severity="severity"
-    :class="!row.alarm_mode || score == '00.00%' ? 'pale' : ''"
+    :class="!alarmsList.includes(row.target_collection_type) || score == '00.00%' ? 'pale' : ''"
     :style="style"
   />
 </template>

@@ -109,7 +109,10 @@ export const useChartData = defineStore('chart.batch.overview', () => {
     })
   }
   watchEffect(async () => {
-    await load(app.data.batch.focused.sample_batch_id)
+    const batchId = app.data.batch.focused?.sample_batch_id
+    if (batchId) {
+      await load(batchId)
+    }
   })
 
   return {

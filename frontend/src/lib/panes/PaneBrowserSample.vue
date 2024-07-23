@@ -560,6 +560,7 @@ watch(
               v-model:selection="app.data.sample.focused"
               selectionMode="single"
               :metaKeySelection="false"
+              dataKey="sample_item_id"
               sortField="index"
               contextMenu
               v-model:contextMenuSelection="item.context"
