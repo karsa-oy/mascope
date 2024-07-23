@@ -11,8 +11,8 @@ import { useSample } from './sample'
 // making it a bit different from the rest of the data
 // modules. See the footnote for details.
 
-const defineMatch = (level) =>
-  defineModule({
+const defineMatch = (level) => {
+  return defineModule({
     name: `match.${level.toLowerCase()}`,
     key: `match_${level.toLowerCase()}_id`,
     useParent: () => ({
@@ -21,12 +21,10 @@ const defineMatch = (level) =>
       name: 'batch & sample',
       multiselect: false,
       register: ({ reload }) => {
+        const batch = useBatch()
+        const sample = useSample()
         watch(
-          computed(() => {
-            const batch = useBatch()
-            const sample = useSample()
-            return sample.focused?.sample_item_id ?? batch.focused?.sample_batch_id
-          }),
+          computed(() => sample.focused?.sample_item_id ?? batch.focused?.sample_batch_id),
           () => reload()
         )
       }
@@ -60,6 +58,7 @@ const defineMatch = (level) =>
       }
     }
   })
+}
 
 export const useMatchCollection = defineMatch('Collection')
 export const useMatchCompound = defineMatch('Compound')

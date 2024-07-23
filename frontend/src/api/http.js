@@ -825,7 +825,7 @@ export function createHttpClient() {
     // Batch Matches
     getBatchMatchCollections: async ({ sample_batch_id, params = {} }) => {
       try {
-        return await client.get(`/match/batch/${sample_batch_id}/collections`, params)
+        return await client.get(`/match/batch/${sample_batch_id}/collections`, { params })
       } catch (error) {
         throw new Error(
           error?.response?.data?.error ??
@@ -835,7 +835,7 @@ export function createHttpClient() {
     },
     getBatchMatchCompounds: async ({ sample_batch_id, params = {} }) => {
       try {
-        return await client.get(`/match/batch/${sample_batch_id}/compounds`, params)
+        return await client.get(`/match/batch/${sample_batch_id}/compounds`, { params })
       } catch (error) {
         throw new Error(
           error?.response?.data?.error ??
@@ -845,7 +845,7 @@ export function createHttpClient() {
     },
     getBatchMatchIons: async ({ sample_batch_id, params = {} }) => {
       try {
-        return await client.get(`/match/batch/${sample_batch_id}/ions`, params)
+        return await client.get(`/match/batch/${sample_batch_id}/ions`, { params })
       } catch (error) {
         throw new Error(
           error?.response?.data?.error ??
@@ -855,7 +855,7 @@ export function createHttpClient() {
     },
     getBatchMatchIsotopes: async ({ sample_batch_id, params = {} }) => {
       try {
-        return await client.get(`/match/batch/${sample_batch_id}/isotopes`, params)
+        return await client.get(`/match/batch/${sample_batch_id}/isotopes`, { params })
       } catch (error) {
         throw new Error(
           error?.response?.data?.error ??
@@ -866,7 +866,7 @@ export function createHttpClient() {
     // Sample Matches
     getSampleMatchCollections: async ({ sample_item_id, params = {} }) => {
       try {
-        return await client.get(`/match/sample/${sample_item_id}/collections`, params)
+        return await client.get(`/match/sample/${sample_item_id}/collections`, { params })
       } catch (error) {
         throw new Error(
           error?.response?.data?.error ??
@@ -876,7 +876,7 @@ export function createHttpClient() {
     },
     getSampleMatchCompounds: async ({ sample_item_id, params = {} }) => {
       try {
-        return await client.get(`/match/sample/${sample_item_id}/compounds`, params)
+        return await client.get(`/match/sample/${sample_item_id}/compounds`, { params })
       } catch (error) {
         throw new Error(
           error?.response?.data?.error ??
@@ -886,7 +886,7 @@ export function createHttpClient() {
     },
     getSampleMatchIons: async ({ sample_item_id, params = {} }) => {
       try {
-        return await client.get(`/match/sample/${sample_item_id}/ions`, params)
+        return await client.get(`/match/sample/${sample_item_id}/ions`, { params })
       } catch (error) {
         throw new Error(
           error?.response?.data?.error ??
@@ -896,7 +896,7 @@ export function createHttpClient() {
     },
     getSampleMatchIsotopes: async ({ sample_item_id, params = {} }) => {
       try {
-        return await client.get(`/match/sample/${sample_item_id}/isotopes`, params)
+        return await client.get(`/match/sample/${sample_item_id}/isotopes`, { params })
       } catch (error) {
         throw new Error(
           error?.response?.data?.error ??

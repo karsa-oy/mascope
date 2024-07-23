@@ -18,7 +18,7 @@ export const defineModule = ({
   defineStore(`app.data.${name.replaceAll('_', '.')}`, () => {
     // CONFIG
 
-    const prefix = `[${name.replaceAll('_', ' ')}]`
+    const prefix = `[app.data.${name.replaceAll('_', ' ')}]`
     const log = (message) => console.log(`${prefix} ${message}`)
 
     const singleselect = !multiselect

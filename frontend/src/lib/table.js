@@ -194,7 +194,8 @@ export function batchExportCsv() {
     {
       field: 'Target collections',
       value:
-        batchStore.targetCollections?.map((row) => row.target_collection_name).join(', ') ?? 'none'
+        app.data.match.collection.list?.map((row) => row.target_collection_name).join(', ') ??
+        'none'
     },
     { field: '', value: '' },
     { field: 'Parameters', value: '' }
@@ -252,7 +253,7 @@ export function batchExportCsv() {
   )}.xlsx`
   // Extend batchMatchCompounds with sample_item_type
   const extendedMatchCompounds =
-    batchStore.matchCompounds?.map((compound) => {
+    app.data.match.compound.list?.map((compound) => {
       const sampleItem = batchStore.sampleItems.find(
         (item) => item.sample_item_id === compound.sample_item_id
       )
