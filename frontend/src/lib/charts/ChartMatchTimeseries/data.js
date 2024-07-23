@@ -3,7 +3,7 @@ import { defineStore } from 'pinia'
 
 import { useApp } from '@/stores'
 
-export const useChartData = defineStore('matchTimeseriesChartData', () => {
+export const useChartData = defineStore('chart.match.timeseries', () => {
   const traces = ref([])
   const length = ref()
 

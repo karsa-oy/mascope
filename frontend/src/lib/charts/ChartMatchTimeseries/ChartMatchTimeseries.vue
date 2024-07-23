@@ -6,11 +6,11 @@ import { useApp } from '@/stores'
 
 import BaseChartPlotly from '../BaseChartPlotly.vue'
 
-import { useChartData } from './chartData.js'
+import { useChartData } from './data.js'
 
 const app = useApp()
 
-const chartData = useChartData()
+const data = useChartData()
 
 const layout = computed(() => ({
   xaxis: {
@@ -56,7 +56,7 @@ const corr = new Intl.NumberFormat('en-US', {
     <BaseChartPlotly
       id="ChartMatchTimeseries"
       title="Timeseries"
-      :data="chartData.traces"
+      :data="data.traces"
       :layout="layout"
     />
   </figure>

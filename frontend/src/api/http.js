@@ -79,6 +79,7 @@ export function createHttpClient() {
   client.interceptors.response.use(logResponse, handleError)
 
   return {
+    client,
     // Workspaces
     getAllWorkspaces: async (params = {}) => {
       try {
@@ -229,7 +230,6 @@ export function createHttpClient() {
         throw new Error(userErrorMessage)
       }
     },
-
     getSample: async ({ sampleId, body }) => {
       try {
         return await client.post(`/sample/${sampleId}`, body)

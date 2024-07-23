@@ -115,6 +115,7 @@ async function initApi() {
   }
 
   return {
+    client: http.client,
     socket,
     emit,
     request,

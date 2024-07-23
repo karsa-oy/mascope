@@ -8,7 +8,7 @@ import { BaseParamField } from '@/lib/base'
 
 import BaseChartPlotly from '../BaseChartPlotly.vue'
 
-import { useChartData } from './chartData.js'
+import { useChartData } from './data.js'
 
 const data = useChartData()
 

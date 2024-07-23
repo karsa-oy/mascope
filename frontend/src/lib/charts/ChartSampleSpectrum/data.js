@@ -4,7 +4,7 @@ import { defineStore } from 'pinia'
 import { useApp } from '@/stores'
 import { api } from '@/api'
 
-export const useChartData = defineStore('sampleSpectrumChartData', () => {
+export const useChartData = defineStore('chart.sample.spectrum', () => {
   const traces = ref([])
   const loadedFileId = ref()
   const length = ref()

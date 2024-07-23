@@ -4,26 +4,16 @@ import { ref, computed, watchEffect } from 'vue'
 import ToggleSwitch from 'primevue/toggleswitch'
 import Select from 'primevue/select'
 
-import BaseChartPlotly from './BaseChartPlotly.vue'
-
-import { glasbey } from './colors.js'
+import BaseChartPlotly from '../BaseChartPlotly.vue'
 
 import { beautifySnakeCase } from '@/lib/utils'
 import { useApp } from '@/stores'
 
+import { useChartData } from './data'
+
 const app = useApp()
+const data = useChartData()
 
-const swatches = computed(() => (app.ui.darkmode.active ? glasbey.dark : glasbey.light))
-
-const hovertemplate = `
-  <b># %{x}</b>
-  <br>
-  <b>%{text}</b>
-  <br>
-  y: %{y:,.0f}
-  <br>
-  %{customdata}
-`
 const log = ref(false)
 
 const inferType = (field) => {
@@ -103,88 +93,6 @@ const xAxis = computed(() => ({
   ticktext: app.data.sample.list?.map(toField(xField.value ?? 'index')) ?? []
 }))
 
-const chartData = computed(() => {
-  if (!(app.data.sample.list && app.data.match.compound.list)) return []
-  let allCompoundIds =
-    app.data.match.compound.list.map((compound) => compound.target_compound_id) ?? []
-  allCompoundIds = [...new Set(allCompoundIds)]
-  let compoundColors = Object.fromEntries(
-    allCompoundIds.map((compoundId, index) => [[compoundId], swatches.value[index]])
-  )
-  let traces = []
-  let x = app.data.sample.list?.map((item) => item.sample_item_id) ?? []
-
-  // Loop through target compounds, make traces and push to data
-  for (let targetCompoundId of allCompoundIds) {
-    let y = []
-    let compoundMaxMatchCategory
-    for (let sampleItemId of x) {
-      let itemMatches = app.data.match.compound.list.filter(
-        (row) => row.sample_item_id === sampleItemId
-      )
-      let sampleItemCompoundStats = itemMatches
-        .filter((match) => match.target_compound_id === targetCompoundId)
-        .map((compoundMatch) =>
-          Object.fromEntries([
-            ['match_category', compoundMatch.match_category],
-            ['intensity', compoundMatch.sample_peak_area_sum]
-          ])
-        )[0]
-      if (sampleItemCompoundStats) {
-        y.push(
-          sampleItemCompoundStats.match_category > 0 ? sampleItemCompoundStats.intensity : null
-        )
-      } else {
-        y.push(null)
-      }
-      compoundMaxMatchCategory = sampleItemCompoundStats?.match_category || 0
-    }
-    if (y.every((intensity) => intensity === null)) continue
-    let compoundSymbol = compoundMaxMatchCategory === 2 ? 'square' : 'square-open'
-    let compoundColor = compoundColors[targetCompoundId]
-    let compound = app.data.match.compound.list.filter(
-      (target) => target.target_compound_id === targetCompoundId
-    )[0]
-    traces.push({
-      name: compound.target_compound_name.trim()
-        ? compound.target_compound_name
-        : compound.target_compound_formula,
-      target_compound_id: targetCompoundId,
-      x,
-      y,
-      customdata: app.data.sample.list.map((item) => item.datetime),
-      text: app.data.sample.list.map((item) => item.sample_item_name),
-      hovertemplate,
-      mode: 'markers',
-      type: 'scatter',
-      marker: {
-        color: compoundColor,
-        size: 10,
-        symbol: compoundSymbol
-      }
-    })
-  }
-  // Make trace for TIC
-  let y = app.data.sample.list?.map((item) => item.tic) ?? []
-  traces.push({
-    name: 'TIC',
-    x,
-    y,
-    customdata: app.data.sample.list?.map((item) => item.datetime) ?? [],
-    text: app.data.sample.list?.map((item) => item.sample_item_name) ?? [],
-    hovertemplate,
-    mode: 'markers',
-    type: 'scatter',
-    marker: {
-      color: app.ui.darkmode.active ? '#fff' : '#222',
-      size: 10,
-      symbol: 'diamond'
-    }
-  })
-
-  return traces
-})
-
 const layout = computed(() => ({
   xaxis: {
     title: xField.value?.label,
@@ -237,7 +145,7 @@ function onClick({ points }) {
     <BaseChartPlotly
       id="ChartSampleIntensity"
       :title="app.data.batch.focused.sample_batch_name ?? ''"
-      :data="chartData"
+      :data="data.traces"
       :layout="layout"
       @click="onClick"
     />

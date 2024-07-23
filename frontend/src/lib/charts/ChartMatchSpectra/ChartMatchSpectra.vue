@@ -10,7 +10,7 @@ import { BaseMatchTag } from '@/lib/base'
 import { clone } from '@/lib/utils'
 import { useApp } from '@/stores'
 
-import { useChartData } from './chartData.js'
+import { useChartData } from './data.js'
 
 const app = useApp()
 

@@ -1,4 +1,4 @@
-export { default as ChartBatchOverview } from './ChartBatchOverview.vue'
+export { ChartBatchOverview } from './ChartBatchOverview'
 export { ChartMatchSpectra } from './ChartMatchSpectra'
 export { ChartMatchTimeseries } from './ChartMatchTimeseries'
 export { ChartSampleSpectrum } from './ChartSampleSpectrum'

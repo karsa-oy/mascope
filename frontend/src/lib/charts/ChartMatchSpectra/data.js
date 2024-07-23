@@ -3,7 +3,7 @@ import { defineStore } from 'pinia'
 
 import { useApp } from '@/stores'
 
-export const useChartData = defineStore('matchSpectraChart', () => {
+export const useChartData = defineStore('chart.match.spectra', () => {
   const traces = ref([])
   const length = ref()
 
