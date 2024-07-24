@@ -170,15 +170,17 @@ export const defineModule = ({
 
     // reload children on refocus
     if (singleselect) {
-      watchEffect(() => {
-        const focusedId = focused.value ? focused.value[key] : null
-        children.value.forEach(({ reload }) =>
-          reload({
-            name,
-            focusedId
-          })
-        )
-      })
+      watch(
+        computed(() => (focused.value ? focused.value[key] : null)),
+        (focusedId) => {
+          children.value.forEach(({ reload }) =>
+            reload({
+              name,
+              focusedId
+            })
+          )
+        }
+      )
     }
 
     // root reloading
