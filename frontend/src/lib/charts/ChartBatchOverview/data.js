@@ -29,7 +29,8 @@ export const useChartData = defineStore('chart.batch.overview', () => {
       compounds = (
         await api.client.get(`/match/compounds`, {
           params: {
-            sample_batch_id
+            sample_batch_id,
+            show_target_compound: true
           }
         })
       )?.data?.data
