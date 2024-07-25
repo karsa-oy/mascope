@@ -318,7 +318,11 @@ class IonizationMechanism(Base):
     reagent = Column(String)
 
     # Define relationships
-    target_ion = relationship("TargetIon", back_populates="ionization_mechanism")
+    target_ion = relationship(
+        "TargetIon",
+        back_populates="ionization_mechanism",
+        cascade="all, delete, delete-orphan",
+    )
 
 
 class TargetIsotope(Base):

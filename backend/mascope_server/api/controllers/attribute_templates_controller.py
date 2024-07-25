@@ -1,6 +1,9 @@
-from sqlalchemy import asc, desc, func
-from sqlalchemy.future import select
-
+from sqlalchemy import (
+    select,
+    asc,
+    desc,
+    func,
+)
 from mascope_server.db import async_session
 from mascope_server.api_sio import sio
 from mascope_server.db.id import gen_id

@@ -1,7 +1,11 @@
 import json
 
-from sqlalchemy import asc, desc, func, and_
-from sqlalchemy.future import select
+from sqlalchemy import (
+    select,
+    asc,
+    desc,
+    func,
+)
 from mascope_server.db import async_session
 from datetime import datetime, timezone
 from mascope_server.db.id import gen_id

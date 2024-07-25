@@ -1,12 +1,20 @@
-from sqlalchemy import asc, desc, func
-from sqlalchemy.future import select
+from sqlalchemy import (
+    select,
+    asc,
+    desc,
+    func,
+)
 from mascope_server.db import async_session
 from mascope_server.db.id import gen_id
-from ..utils.api_features import api_controller
-from ..exceptions import NotFoundException
-from .target_ions_controller import create_target_ions
-from ..models.models import IonizationMechanism, TargetCompound
-from ..models.pydantic_models.ionization_mechanism_pydantic_model import (
+from mascope_server.api.utils.api_features import api_controller
+from mascope_server.api.exceptions import ApiException, NotFoundException
+from mascope_server.api.controllers.target_ions_controller import create_target_ions
+from mascope_server.api.models.models import (
+    IonizationMechanism,
+    TargetCompound,
+    SampleBatch,
+)
+from mascope_server.api.models.pydantic_models.ionization_mechanism_pydantic_model import (
     IonizationMechanismCreate,
 )
 
@@ -112,8 +120,28 @@ async def get_ionization_mechanism(ionization_mechanism_id: str) -> dict:
                 f"Ionization mechanism with ID '{ionization_mechanism_id}' not found"
             )
 
-        # Step 3: Return ionization mechanism details
-        return ionization_mechanism.to_dict()
+        # Step 3: Retrieve sample batches using the specified ionization mechanism
+        result = await session.execute(select(SampleBatch))
+        all_batches = result.scalars().all()
+        affected_sample_batches = []
+        for batch in all_batches:
+            build_params = batch.build_params
+            if (
+                "ion_mechanisms" in build_params
+                and ionization_mechanism_id in build_params["ion_mechanisms"]
+            ):
+                affected_sample_batches.append(
+                    {
+                        "sample_batch_id": batch.sample_batch_id,
+                        "sample_batch_name": batch.sample_batch_name,
+                    }
+                )
+
+        # Step 4: Return ionization mechanism details with sample batches
+        ionization_mechanism_dict = ionization_mechanism.to_dict()
+        ionization_mechanism_dict["sample_batches_count"] = len(affected_sample_batches)
+        ionization_mechanism_dict["sample_batches"] = affected_sample_batches
+        return ionization_mechanism_dict
 
 
 @api_controller()
@@ -176,3 +204,49 @@ async def create_ionization_mechanism(
 
     # Step 5: Return created ionization mechanism details
     return new_ionization_mechanism.to_dict()
+
+
+@api_controller()
+async def delete_ionization_mechanism(ionization_mechanism_id: str) -> dict:
+    """
+    Deletes an ionization mechanism by its ID, ensuring it's not used by any sample batches.
+
+    Steps:
+    1. Retrieve the ionization mechanism along with any referencing sample batches.
+    2. If no sample batches use this ionization mechanism, delete it from the database.
+    3. If referenced, throw an APIException preventing deletion.
+
+    :param ionization_mechanism_id: The unique identifier of the ionization mechanism to delete.
+    :type ionization_mechanism_id: str
+    :raises ApiException: If the ionization mechanism is referenced in any sample batch.
+    :raises NotFoundException: If no ionization mechanism is found with the provided ID.
+    :return: Deleted ionization mechanism message.
+    :rtype: dict
+    """
+    # Step 1: Fetch the ionization mechanism
+    async with async_session() as session:
+        ionization_mechanism = await session.get(
+            IonizationMechanism, ionization_mechanism_id
+        )
+    if not ionization_mechanism:
+        raise NotFoundException(
+            f"Ionization mechanism with ID '{ionization_mechanism_id}' not found"
+        )
+
+    # Step 2: Retrieve the ionization mechanism and check for sample batch references
+    ionization_details = await get_ionization_mechanism(ionization_mechanism_id)
+    if ionization_details["sample_batches_count"] > 0:
+        raise ApiException(
+            f"Ionization mechanism '{ionization_mechanism.ionization_mechanism}' cannot be deleted as it is used in {ionization_details['sample_batches_count']} sample batches.",
+            {"sample_batches": ionization_details["sample_batches"]},
+            400,
+        )
+
+    # Step 3: Delete the ionization mechanism
+    async with async_session() as session:
+        await session.delete(ionization_mechanism)
+        await session.commit()
+
+    return {
+        "message": f"Ionization mechanism '{ionization_mechanism.ionization_mechanism}' was deleted successfully."
+    }

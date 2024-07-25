@@ -1,7 +1,7 @@
 import asyncio
 import numpy as np
 import pandas as pd
-from sqlalchemy.future import select
+from sqlalchemy import select
 from colorcet import glasbey_hv as colormap
 from mascope_lib.file_func import load_file
 from mascope_lib.peak import filter_peaks, get_peaks

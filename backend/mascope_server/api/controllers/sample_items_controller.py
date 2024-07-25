@@ -1,7 +1,11 @@
 from datetime import datetime, timezone
 from fastapi import BackgroundTasks
-from sqlalchemy import asc, desc, func
-from sqlalchemy.future import select
+from sqlalchemy import (
+    select,
+    asc,
+    desc,
+    func,
+)
 from sqlalchemy.orm import joinedload
 from mascope_lib.file_func import get_instrument_type
 from mascope_server.api_sio import sio

@@ -1,7 +1,11 @@
 from datetime import datetime
 import numpy as np
-from sqlalchemy import asc, desc, func
-from sqlalchemy.future import select
+from sqlalchemy import (
+    select,
+    asc,
+    desc,
+    func,
+)
 from mascope_lib.file_func import load_file
 from mascope_lib.peak import detect_peaks, get_peaks
 from mascope_server.db import async_session
