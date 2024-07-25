@@ -1,12 +1,11 @@
 import numpy as np
 
 from sqlalchemy import (
+    select,
     asc,
     desc,
-    select,
     func,
 )
-from sqlalchemy.future import select
 from mascope_server.db.id import gen_id
 from mascope_server.db import async_session
 from ..utils.api_features import api_controller

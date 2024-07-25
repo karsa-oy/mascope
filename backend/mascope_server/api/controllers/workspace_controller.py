@@ -1,12 +1,13 @@
-from sqlalchemy import asc, desc, func
-from sqlalchemy.future import select
-from datetime import datetime
-
+from datetime import datetime, timezone
+from sqlalchemy import (
+    select,
+    asc,
+    desc,
+    func,
+)
 from mascope_server.db import async_session
 from mascope_server.api_sio import sio
-from datetime import datetime, timezone
 from mascope_server.db.id import gen_id
-
 from ..utils.api_features import api_controller
 from ..exceptions import NotFoundException
 from ..models.models import Workspace
