@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed } from 'vue'
 
 import ProgressSpinner from 'primevue/progressspinner'
 import ConfirmDialog from 'primevue/confirmdialog'
@@ -15,17 +15,6 @@ const toast = useToast()
 const app = useApp()
 
 const ready = computed(() => app.data.workspace.focused && app.data.instrument.focused)
-
-// init
-onMounted(() => {
-  // add event listeners
-  window.addEventListener('keydown', (event) => {
-    app.ui.key.down(event)
-  })
-  window.addEventListener('keyup', (event) => {
-    app.ui.key.up(event)
-  })
-})
 
 // toaster
 app.notification.on('*', ({ status, type, message }) => {
