@@ -51,10 +51,11 @@ test.describe('sample batch ops', () => {
     `
       )
     )
-    await dialog.press('Control+v')
+    await page.getByText('No spreadsheet data pasted').click()
+    await page.keyboard.press('ControlOrMeta+KeyV')
     await dialog.getByLabel('process').click()
     const confirm = page.getByLabel('import samples')
-    await confirm.getByLabel('import').click()
+    await confirm.getByLabel('import').click({ delay: 200 })
     await expect(sampleBrowser.content).toContainText(
       'test_sample_item1XYZ456test_blank_item2ABC123'
     )
