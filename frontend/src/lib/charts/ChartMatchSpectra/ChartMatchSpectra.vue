@@ -124,3 +124,9 @@ const error = new Intl.NumberFormat('en-US', {
     </ScrollPanel>
   </div>
 </template>
+
+<style scoped>
+.row :global(*) {
+  margin: 0 !important;
+}
+</style>
