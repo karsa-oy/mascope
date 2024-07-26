@@ -81,7 +81,7 @@ export const useMatchVisualized = defineStore('app.ui.matchVisualized', () => {
       method: 'getSampleIonMatches',
       body: {
         sampleId: sampleId ?? ion.value?.sample_item_id,
-        body: {
+        params: {
           target_ion_id,
           target_collection_id: collectionId ?? ion.value?.target_collection_id,
           filter_params: filterParams.current,

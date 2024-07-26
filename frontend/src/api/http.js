@@ -240,9 +240,9 @@ export function createHttpClient() {
       }
     },
 
-    getSampleIonMatches: async ({ sampleId, body }) => {
+    getSampleIonMatches: async ({ sampleId, params }) => {
       try {
-        return await client.post(`/sample/${sampleId}/ion_matches`, body)
+        return await client.post(`/samples/${sampleId}/ion_matches`, params)
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error || `Failed to get sample ion match data: ${error}`
