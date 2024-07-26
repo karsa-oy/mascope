@@ -42,6 +42,16 @@ app.notification.on('*', ({ status, type, message }) => {
     })
   }
 })()
+
+// focus new workspace
+app.notification.on('create_workspace', ({ status, data }) => {
+  if (status == 'success') {
+    const createdWorkspace = app.data.workspace.list.find(
+      (workspace) => workspace.workspace_id == data.response.data.workspace_id
+    )
+    app.data.workspace.focus(createdWorkspace)
+  }
+})()
 </script>
 
 <template>
