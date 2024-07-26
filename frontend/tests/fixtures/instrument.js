@@ -15,7 +15,7 @@ export default base.extend({
   },
   acquisitionsTab: async ({ page }, use) => {
     const panel = page.locator('#acquisitions')
-    const open = () => page.getByLabel('Acquisitions').click({ delay: 100 })
+    const open = () => page.getByRole('tab', { name: 'Acquisitions' }).click({ delay: 100 })
     const datetime = page.locator('#range')
     const filter = async (range) => {
       await datetime.fill(range)

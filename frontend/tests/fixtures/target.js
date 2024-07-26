@@ -2,7 +2,7 @@ import { default as base } from './workspace'
 
 export default base.extend({
   targetBrowser: async ({ page }, use) => {
-    const panel = page.locator('.k-browser', { hasText: 'targets' })
+    const panel = page.locator('.browser', { hasText: 'targets' })
     const header = panel.locator('.p-panel-header')
     const content = panel.locator('.p-panel-content')
     const button = panel.getByLabel('create collection')

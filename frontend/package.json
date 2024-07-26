@@ -19,7 +19,7 @@
     "test:only": "npx playwright test --project=chromium --retries=0 -g",
     "test:headed": "npx playwright test --project=chromium --headed --trace off --timeout 0 --reporter list --project=chromium --retries=0 -g",
     "test:trace": "npx playwright test --project=chromium --trace on --project=chromium --retries=0 -g",
-    "test:gen": "npx playwright codegen http://localhost:8080/",
+    "test:gen": "npx playwright codegen http://localhost:5173/",
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore",
     "format": "prettier --write src/",
     "palette": "node scripts/palette.js"
