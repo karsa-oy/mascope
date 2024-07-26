@@ -2,47 +2,19 @@
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 
-import { useApp } from '@/stores'
+import { useSample } from '@/stores/data/sample'
 
-const app = useApp()
+const sample = useSample()
 </script>
 
 <template>
   <main>
     <section>
-      <h4>workspace</h4>
-      <DataTable
-        dataKey="workspace_id"
-        :value="app.data.workspace.list"
-        v-model:selection="app.data.workspace.focused"
-        :metaKeySelection="false"
-        selectionMode="single"
-      >
-        <Column field="workspace_id" />
-        <Column field="workspace_name" />
-      </DataTable>
-    </section>
-    <section>
-      <h4>sample batch</h4>
-      <DataTable
-        dataKey="sample_batch_id"
-        :value="app.data.batch.list"
-        v-model:selection="app.data.batch.focused"
-        :metaKeySelection="false"
-        selectionMode="single"
-        scrollable
-        scrollHeight="300px"
-      >
-        <Column field="sample_batch_id" />
-        <Column field="sample_batch_name" />
-      </DataTable>
-    </section>
-    <section>
       <h4>sample item</h4>
       <DataTable
         dataKey="sample_item_id"
-        :value="app.data.sample.list"
-        v-model:selection="app.data.sample.selected"
+        :value="sample.list"
+        v-model:selection="sample.selected"
         :metaKeySelection="false"
         selectionMode="multiple"
         scrollable
