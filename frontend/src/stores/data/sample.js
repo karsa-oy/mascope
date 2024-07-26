@@ -36,7 +36,7 @@ export const useSample = defineModule({
       method: 'updateSampleItem',
       body: { sampleId: sample.sample_item_id, body: sample }
     }),
-  delete: async (sample_item_id) => {
+  delete: async ({ sample_item_id }) => {
     return await api.request.delete({
       method: 'deleteSampleItem',
       body: { sampleId: sample_item_id }

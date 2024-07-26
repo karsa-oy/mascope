@@ -1,4 +1,4 @@
-import { ref, computed, watch, watchEffect, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { defineStore } from 'pinia'
 
 import { api } from '@/api'
@@ -10,6 +10,8 @@ export const defineModule = ({
   useParent = null, // optional parent module
   multiselect = false, // enable multiselection,
   autofocus = false, // focused first element on load
+  reloadSelfOn = null, // events to reload the module on
+  reloadChildrenOn = null, // events to reload child modules on
   // api
   load, // async func, may accept parent record
   read, // get one record by id
@@ -183,14 +185,17 @@ export const defineModule = ({
       )
     }
 
-    // root reloading
+    // event triggered reloading
 
-    // TODO replace this
-
-    function onOrgReload() {
-      if (!parent) {
-        reload()
+    if (!parent) {
+      api.socket.on(`org_reload`, reload)
+    } else {
+      if (parent.reloadChildrenOn) {
+        api.socket.on(parent.reloadChildrenOn, reload)
       }
+    }
+    if (reloadSelfOn) {
+      api.socket.on(reloadSelfOn, reload)
     }
 
     // EVENTS
@@ -253,10 +258,10 @@ export const defineModule = ({
       // data
       list,
       loading,
-      onOrgReload,
       // options
       multiselect,
       singleselect,
+      reloadChildrenOn,
       // selection
       selected,
       focused,

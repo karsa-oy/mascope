@@ -5,6 +5,7 @@ import { api } from '@/api'
 export const useTargetCollection = defineModule({
   name: 'target_collection',
   key: 'target_collection_id',
+  reloadSelfOn: 'targets_all_reload',
   load: async () =>
     (
       await api.request.read({
@@ -39,6 +40,7 @@ export const useTargetCollection = defineModule({
 export const useTargetCompound = defineModule({
   name: 'target_compound',
   key: 'target_compound_id',
+  reloadSelfOn: 'targets_all_reload',
   load: async () =>
     (
       await api.request.read({
@@ -46,7 +48,7 @@ export const useTargetCompound = defineModule({
         body: {}
       })
     )?.data,
-  read: async (target_compound_id) => {
+  read: async () => {
     // TODO
   }
 })
