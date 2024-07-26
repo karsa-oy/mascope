@@ -90,7 +90,11 @@ const error = new Intl.NumberFormat('en-US', {
             :layout="layout"
             hideTitle
           />
-          <div class="row" style="flex-wrap: wrap; max-width: 35ch; justify-content: center">
+          <div
+            id="chart-spectrum-controls"
+            class="row"
+            style="flex-wrap: wrap; max-width: 35ch; justify-content: center"
+          >
             <BaseMatchTag :row="isotope" text />
             <Tag
               :value="`Intensity: ${area.format(isotope.sample_peak_area)}`"
@@ -126,7 +130,7 @@ const error = new Intl.NumberFormat('en-US', {
 </template>
 
 <style scoped>
-.row :global(*) {
+#chart-spectrum-controls :global(fieldset) {
   margin: 0 !important;
 }
 </style>

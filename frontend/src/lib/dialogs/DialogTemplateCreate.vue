@@ -114,7 +114,7 @@ function init(active) {
   gap: 0.5rem;
   margin: 1rem 0;
 }
-.editable-field :deep(.p-float-label) {
+.editable-field :deep(.p-floatlabel) {
   margin-bottom: 0;
 }
 </style>

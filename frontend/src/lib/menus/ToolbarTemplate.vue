@@ -89,7 +89,7 @@ const templates = computed(() => [
   gap: 0.5rem;
   margin: 0.5rem 0;
 }
-.editable-field :deep(.p-float-label) {
+.editable-field :deep(.p-floatlabel) {
   margin-bottom: 0;
 }
 </style>

@@ -29,7 +29,7 @@ const defineMatch = (level) => {
         )
       }
     }),
-    load: async (focusedId) => {
+    load: async () => {
       const batch = useBatch()
       const sample = useSample()
       if (sample.focused) {
