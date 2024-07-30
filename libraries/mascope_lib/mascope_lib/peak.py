@@ -11,7 +11,6 @@ from concurrent.futures import ProcessPoolExecutor
 
 import lmfit
 import numpy as np
-from scipy.interpolate import interp1d
 from scipy.signal._peak_finding_utils import _select_by_peak_distance
 from scipy.stats import norm
 from scipy.integrate import simpson
@@ -20,7 +19,7 @@ import mascope_runtime as runtime
 
 from .file_func import load_file, zarr_sdk, get_instrument_type, get_sum_signal
 
-logger = runtime.logger.service('standard-lib')
+logger = runtime.logger.service("standard-lib")
 
 # Precompute sigma multiplier for peak generation
 SIGMA_MULTIPLIER = 2 * np.sqrt(2 * np.log(2))
@@ -197,9 +196,8 @@ async def detect_peaks(
             specs_to_fit = []
         else:
             # Get mz/spectrum pairs to fit from segmented spectrum
-            specs_to_fit = [
-                (mz[chunk], sum_spec[chunk]) for chunk in segment_spec(sum_spec)
-            ]
+            seg_spec_indices = segment_spec(sum_spec)
+            specs_to_fit = [(mz[chunk], sum_spec[chunk]) for chunk in seg_spec_indices]
     if instrument_type == "tof":
         specs_to_fit = [
             (
@@ -409,14 +407,14 @@ def fit_peaks(
         params.add(f"peak{p}hei", value=phei[p] / ymax, min=0, vary=fit_hei)
         params.add(f"peak{p}res", value=pres[p], min=0, vary=fit_res)
     # Check if number of varying parameters hit the limit
-    num_of_params = npeaks * sum([fit_pos, fit_hei, fit_res])
+    num_of_params = npeaks * np.sum([fit_pos, fit_hei, fit_res])
     if num_of_params > len(x):
         return None, None
     # Fit
     minner = lmfit.Minimizer(
         peak_kernel_residual, params, fcn_args=(x, yn, ps), ftol=1e-6, xtol=1e-6
     )
-    fit = minner.minimize(method="least_squares", max_nfev=max_iter)
+    fit = minner.minimize(method="least_s", max_nfev=max_iter)
     # Rescale fit results
     fit.residual *= ymax
     for par in fit.params:
@@ -474,6 +472,11 @@ def fit_n_peaks(
     """
     if not len(y):
         return None, None
+
+    # Convert peak shape
+    peak_shape["x"] = np.array(peak_shape["x"], dtype=np.float32)
+    peak_shape["y"] = np.array(peak_shape["y"], dtype=np.float32)
+
     spec_norm = np.linalg.norm(y)
     residual_norm = spec_norm
     prev_fit = None
@@ -593,14 +596,13 @@ def gen_peak(x, ppos, phei, pres, ps, trim_borders=False):
     sigma = ppos / pres / SIGMA_MULTIPLIER
 
     # Rescale peak shape
-    xi = np.array(ps["x"]) * sigma + ppos
-    yi = np.array(ps["y"]) / np.max(ps["y"]) * phei
+    xi = ps["x"] * sigma + ppos
+    yi = ps["y"] / np.max(ps["y"]) * phei
 
     # Interpolate to a new x scale
-    spline = interp1d(xi, yi, fill_value="extrapolate")
-    peak = spline(x)
+    peak = np.interp(x, xi, yi)
 
-    peak[np.isnan(peak)] = 0
+    peak = np.nan_to_num(peak, nan=0.0)
     peak[peak < 0] = 0
 
     if trim_borders:
@@ -631,16 +633,16 @@ def gen_peak_kernel(params, x, ps):
     array
         Peak kernel in domain 'x'.
     """
+    npeaks = params["npeaks"].value
+    peaks = np.zeros((npeaks, len(x)))
 
-    kernel = np.zeros((len(x),))
-    npeaks = params["npeaks"]
-    for p in range(int(npeaks)):
-        ppos = params[f"peak{p}pos"]
-        phei = params[f"peak{p}hei"]
-        pres = params[f"peak{p}res"]
-        peak = gen_peak(x, ppos, phei, pres, ps)
-        kernel += peak
-    return kernel
+    for p in range(npeaks):
+        ppos = params[f"peak{p}pos"].value
+        phei = params[f"peak{p}hei"].value
+        pres = params[f"peak{p}res"].value
+        peaks[p] = gen_peak(x, ppos, phei, pres, ps)
+
+    return np.sum(peaks, axis=0)
 
 
 def get_peaks(sample_file, intensity_mode="area"):
