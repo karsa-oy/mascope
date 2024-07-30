@@ -1,38 +1,21 @@
 <script setup>
-import DataTable from 'primevue/datatable'
-import Column from 'primevue/column'
+// testing playground
+// http://localhost:5173/test
 
-import { useSample } from '@/stores/data/sample'
-
-const sample = useSample()
+// do NOT commit changes to this route
 </script>
 
 <template>
   <main>
-    <section>
-      <h4>sample item</h4>
-      <DataTable
-        dataKey="sample_item_id"
-        :value="sample.list"
-        v-model:selection="sample.selected"
-        :metaKeySelection="false"
-        selectionMode="multiple"
-        scrollable
-        scrollHeight="300px"
-      >
-        <Column field="sample_item_id" />
-        <Column field="sample_item_name" />
-      </DataTable>
-    </section>
+    <h1>Test Route</h1>
+    <!--testing playground-->
   </main>
 </template>
 
 <style scoped>
+/** testing playground */
 main {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-}
-section {
   padding: 1rem;
+  width: 100%;
 }
 </style>
