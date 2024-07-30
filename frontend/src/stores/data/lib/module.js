@@ -8,7 +8,7 @@ export const defineModule = ({
   key, // data key (normally id)
   subscribe = false, // socket io subscription
   useParent = null, // optional parent module
-  multiselect = false, // enable multiselection,
+  multiselect = false, // enable multiselection
   autofocus = false, // focused first element on load
   reloadSelfOn = null, // events to reload the module on
   reloadChildrenOn = null, // events to reload child modules on

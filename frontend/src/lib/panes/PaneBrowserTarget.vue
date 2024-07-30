@@ -2,7 +2,6 @@
 import { ref, reactive, computed, watchEffect } from 'vue'
 
 import Panel from 'primevue/panel'
-import ScrollPanel from 'primevue/scrollpanel'
 import Button from 'primevue/button'
 import TabMenu from 'primevue/tabmenu'
 import DataTable from 'primevue/datatable'
