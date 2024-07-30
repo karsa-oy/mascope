@@ -117,6 +117,10 @@
     max-height: calc(100% - 1rem) !important;
   }
 
+  .browser .p-panel-content {
+    padding-right: 0.5rem;
+  }
+
   .browser .p-panel-header {
     padding: 0 0.5rem;
   }
@@ -158,6 +162,13 @@
   .browser .spinner .p-progressspinner::before {
     height: 15px;
     padding: 0;
+  }
+
+  .browser .scroller {
+    height: 100%;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    padding-right: 1rem;
   }
 
   /* chart */

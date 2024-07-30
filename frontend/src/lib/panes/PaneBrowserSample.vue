@@ -3,7 +3,6 @@ import { useConfirm } from 'primevue/useconfirm'
 
 import { ref, reactive, computed, watch, watchEffect } from 'vue'
 
-import ScrollPanel from 'primevue/scrollpanel'
 import Panel from 'primevue/panel'
 import Button from 'primevue/button'
 import TabMenu from 'primevue/tabmenu'
@@ -474,7 +473,7 @@ watch(
         "
       />
     </template>
-    <ScrollPanel>
+    <div class="scroller">
       <DataTable
         :value="tree"
         v-model:expandedRows="batch.expanded"
@@ -610,7 +609,7 @@ watch(
       </DataTable>
       <ContextMenu ref="batchContextMenu" :model="menu.batch" />
       <ContextMenu ref="itemContextMenu" :model="menu.item" />
-    </ScrollPanel>
+    </div>
   </Panel>
   <DialogSampleBatchOp v-model:action="dialog.batch.op" :batch="batch.context" />
   <DialogSampleItemOp v-model:action="dialog.item.op" :item="item.context" />

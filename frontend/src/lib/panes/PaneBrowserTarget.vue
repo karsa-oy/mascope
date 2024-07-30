@@ -250,7 +250,7 @@ watchEffect(() => {
         "
       />
     </template>
-    <ScrollPanel>
+    <div class="scroller">
       <!-- collections -->
       <DataTable
         :value="tree"
@@ -404,7 +404,7 @@ watchEffect(() => {
       </DataTable>
       <ContextMenu ref="collectionContextMenu" :model="menu.collection" />
       <ContextMenu ref="compoundContextMenu" :model="menu.compound" />
-    </ScrollPanel>
+    </div>
   </Panel>
   <DialogTargetCollectionOp v-model:action="dialog.collection" :collection="context.collection" />
   <DialogTargetCompoundUpdate v-model:visible="dialog.compound" :compound="context.compound" />
