@@ -14,7 +14,7 @@ import { useChartData } from './data'
 const app = useApp()
 const data = useChartData()
 
-const log = ref(false)
+const log = ref(true)
 
 const inferType = (field) => {
   const withField = app.data.sample.list.filter((item) => field in item)
