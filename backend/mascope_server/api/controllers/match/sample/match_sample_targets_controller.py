@@ -86,47 +86,58 @@ async def get_match_sample_collections(
         sample_item_id=sample_item_id,
     )
 
-    # Merging: Combine target collections data with match collections data
-    match_data = {
-        item["target_collection_id"]: item for item in match_collections["data"]
-    }
-    match_sample_collections = []
-    for collection in target_collections["data"]:
-        collection.update(
-            match_data.get(
-                collection["target_collection_id"],
-                {
-                    "match_collection_id": None,
-                    "sample_item_id": sample_item_id,
-                    "match_score": None,
-                    "match_category": None,
-                    "sample_peak_area_sum": None,
-                    "sample_peak_interference_sum": None,
-                    "match_collection_utc_created": None,
-                    "match_collection_utc_modified": None,
-                },
-            )
-        )
-        match_sample_collections.append(collection)
-
-    # Sorting and pagination logic
-    match_sample_collections_sorted = sorted(
-        match_sample_collections,
-        key=lambda x: (
-            x["target_collection_id"],
-            x["match_category"],
-            x["match_score"],
-        ),
-        reverse=(order == "desc"),
+    # Merging: Combine target ions DataFrame with match ions DataFrame
+    target_collections_df = pd.DataFrame(target_collections["data"])
+    match_collections_df = pd.DataFrame(match_collections["data"]).set_index(
+        "target_collection_id"
     )
-    match_sample_collections_paginated = match_sample_collections_sorted[
+    match_sample_collections_df = pd.merge(
+        target_collections_df,
+        match_collections_df,
+        left_on="target_collection_id",
+        right_index=True,
+        how="left",
+    )
+
+    # Replace match_score and match_category NaN for sorting and ensure match_category remains integer
+    match_sample_collections_df["match_score"] = match_sample_collections_df[
+        "match_score"
+    ].fillna(-1)
+    match_sample_collections_df["match_category"] = (
+        match_sample_collections_df["match_category"].fillna(-1).astype(int)
+    )
+
+    # Sorting data
+    sort_ascending = [(order != "desc"), (order != "desc"), (order != "desc")]
+    match_sample_collections_df = match_sample_collections_df.sort_values(
+        by=["target_collection_id", "match_category", "match_score"],
+        ascending=sort_ascending,
+    )
+
+    # Pagination logic
+    match_sample_collections_df = match_sample_collections_df.iloc[
         page * limit : (page + 1) * limit
     ]
 
+    # Replace -1 back to None for match_category and match_score if it was originally NaN
+    match_sample_collections_df["match_score"] = match_sample_collections_df[
+        "match_score"
+    ].replace(-1, None)
+    match_sample_collections_df["match_category"] = match_sample_collections_df[
+        "match_category"
+    ].replace(-1, None)
+
+    # Replace all other NaN and NaT with None for JSON compatibility
+    match_sample_collections_df = match_sample_collections_df.replace(
+        [np.nan, pd.NaT], None
+    )
+
+    logger.debug(match_sample_collections_df)
+
     return {
-        "results": len(match_sample_collections_sorted),
-        "message": f"Successfully retrieved target collection matches for sample '{sample_item_name}'.",
-        "data": match_sample_collections_paginated,
+        "results": len(match_sample_collections_df),
+        "message": f"Successfully retrieved target ion matches for sample '{sample_item_name}'.",
+        "data": match_sample_collections_df.to_dict(orient="records"),
     }
 
 
@@ -191,45 +202,54 @@ async def get_match_sample_compounds(
         sample_item_id=sample_item_id,
     )
 
-    # Merging: Combine target compounds data with match compounds data
-    match_data = {item["target_compound_id"]: item for item in match_compounds["data"]}
-    match_sample_compounds = []
-    for compound in target_compounds["data"]:
-        compound.update(
-            match_data.get(
-                compound["target_compound_id"],
-                {
-                    "match_compound_id": None,
-                    "sample_item_id": sample_item_id,
-                    "match_score": None,
-                    "match_category": None,
-                    "sample_peak_area_sum": None,
-                    "sample_peak_interference_sum": None,
-                    "match_compound_utc_created": None,
-                    "match_compound_utc_modified": None,
-                },
-            )
-        )
-        match_sample_compounds.append(compound)
-
-    # Sorting and pagination logic
-    match_sample_compounds_sorted = sorted(
-        match_sample_compounds,
-        key=lambda x: (
-            x["target_collection_id"],
-            x["match_category"],
-            x["match_score"],
-        ),
-        reverse=(order == "desc"),
+    # Create DataFrames and merge
+    target_compounds_df = pd.DataFrame(target_compounds["data"])
+    match_compounds_df = pd.DataFrame(match_compounds["data"]).set_index(
+        "target_compound_id"
     )
-    match_sample_compounds_paginated = match_sample_compounds_sorted[
+    match_sample_compounds_df = target_compounds_df.merge(
+        match_compounds_df, left_on="target_compound_id", right_index=True, how="left"
+    )
+
+    # Handle NaN values for sorting and convert them to None for JSON serialization
+    match_sample_compounds_df["match_score"] = match_sample_compounds_df[
+        "match_score"
+    ].fillna(-1)
+    match_sample_compounds_df["match_category"] = (
+        match_sample_compounds_df["match_category"].fillna(-1).astype(int)
+    )
+
+    # Sorting data based on provided order criteria
+    sort_ascending = [(order != "desc"), (order != "desc"), (order != "desc")]
+    match_sample_compounds_df = match_sample_compounds_df.sort_values(
+        by=["target_collection_id", "match_category", "match_score"],
+        ascending=sort_ascending,
+    )
+
+    # Pagination logic
+    match_sample_compounds_df = match_sample_compounds_df.iloc[
         page * limit : (page + 1) * limit
     ]
 
+    # Replace -1 back to None for match_category and match_score if it was originally NaN
+    match_sample_compounds_df["match_score"] = match_sample_compounds_df[
+        "match_score"
+    ].replace(-1, None)
+    match_sample_compounds_df["match_category"] = match_sample_compounds_df[
+        "match_category"
+    ].replace(-1, None)
+
+    # Replace all other NaN and NaT with None for JSON compatibility
+    match_sample_compounds_df = match_sample_compounds_df.replace(
+        [np.nan, pd.NaT], None
+    )
+
+    logger.debug(match_sample_compounds_df)
+
     return {
-        "results": len(match_sample_compounds_sorted),
+        "results": len(match_sample_compounds_df),
         "message": f"Successfully retrieved target compound matches for sample '{sample_item_name}'.",
-        "data": match_sample_compounds_paginated,
+        "data": match_sample_compounds_df.to_dict(orient="records"),
     }
 
 
