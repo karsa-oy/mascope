@@ -265,7 +265,7 @@ def api_route(
                 return api_e_response_json(e)
             except Exception as e:
                 context_message = (
-                    error_message or f"Failed to {beautify_func_name(func.__name__, 3)}"
+                    error_message or f"Error in {beautify_func_name(func.__name__)}"
                 )
                 return handle_exception(e, context_message)
 
