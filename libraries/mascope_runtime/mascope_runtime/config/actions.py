@@ -50,7 +50,7 @@ def load(config_path):
 
 
 def autoload():
-    config_name = state.config_temp or state.config_active
+    config_name = state.temp or state.default
     # helpers
     config_file = lambda name: (
         path(name) if (name and os.path.exists(path(name))) else None
@@ -76,13 +76,13 @@ def list():
     table.add_column("File", style="magenta", no_wrap=True)
     table.add_column("Status", style="cyan", no_wrap=True)
     configs = os.listdir(config_dir)
-    not_active = not f"mascope.{state.config_active}.toml" in configs
+    not_active = not f"mascope.{state.default}.toml" in configs
     for conf in configs:
         if pattern.match(conf):
             with open(os.path.join(config_dir, conf), "rb") as f:
                 config = tomllib.load(f)
                 name = conf.split(".")[1]
-                active = "active" if name == state.config_active else None
+                active = "active" if name == state.default else None
                 default = (
                     "default"
                     if (
@@ -92,11 +92,6 @@ def list():
                     else None
                 )
                 status = active or default
-                print(
-                    name,
-                    "*" if (not_active and default) else None,
-                    ("*" if active else None),
-                )
                 selected = (
                     ("*" if (not_active and default) else None)
                     or ("*" if active else None)
