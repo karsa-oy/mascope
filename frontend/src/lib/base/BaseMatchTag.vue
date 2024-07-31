@@ -31,9 +31,9 @@ const formatter = new Intl.NumberFormat('en-US', {
 })
 
 const score = computed(() =>
-  props.row?.match_score && !isNaN(props.row?.match_score)
+  props.row?.match_score != null && !isNaN(props.row?.match_score)
     ? formatter.format(props.row.match_score)
-    : formatter.format(0)
+    : null
 )
 
 const severity = computed(() => {
@@ -56,7 +56,7 @@ const zeroScored = computed(() => props.score == '00.00%')
 
 <template>
   <Tag
-    v-if="row?.match_score !== null"
+    v-if="score"
     :key="score"
     v-tooltip.right="tooltip"
     :value="text ? `Match score: ${score}` : score"
