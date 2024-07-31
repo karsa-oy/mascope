@@ -16,7 +16,7 @@ export const useChart = defineStore('app.ui.chart', () => {
   function clear() {
     list.value.forEach((chart) => {
       chart.clear()
-      console.log(`[Chart]: cleared ${chart.name} data`)
+      console.log(`[chart]: cleared ${chart.name} data`)
     })
   }
 

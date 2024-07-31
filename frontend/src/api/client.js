@@ -126,7 +126,7 @@ async function initApi() {
 // helpers
 
 function log(...args) {
-  console.log('[API]', ...args)
+  console.log('[api]', ...args)
 }
 
 async function initSocket() {
