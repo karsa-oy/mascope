@@ -122,6 +122,21 @@ export const defineModule = ({
         () => {
           focused.value = null
         }
+    // internal
+    const refocus = (focusedId) => {
+      if (focusedId) {
+        // refocus
+        const focusValid =
+          focusedId && records.value.map((record) => record[key]).includes(focusedId)
+        const defaultId = autofocus ? records.value[0] : null
+        const id = focusValid ? focusedId : defaultId
+        if (id) {
+          focus({ [key]: id })
+        } else {
+          unfocus()
+        }
+      }
+    }
 
     // LOADING
 
@@ -136,6 +151,7 @@ export const defineModule = ({
 
     // hook
     const reload = async (parent) => {
+      const focusedId = focused.value ? focused.value[key] : null
       log(`load triggered by ${parent?.name ?? 'mount'}`)
       loading.value = true
       if (parent) {
@@ -159,6 +175,7 @@ export const defineModule = ({
         log('child data loaded')
       }
       loading.value = false
+      refocus(focusedId)
     }
 
     // load on init
@@ -241,15 +258,7 @@ export const defineModule = ({
           records.value.push(record)
         })
       }
-      // refocus
-      const focusValid = focusedId && records.value.map((record) => record[key]).includes(focusedId)
-      const defaultId = singleselect ? records.value[0] : null
-      const id = focusValid ? focusedId : defaultId
-      if (id) {
-        focus({ [key]: id })
-      } else {
-        unfocus()
-      }
+      refocus(focusedId)
     })
 
     // API

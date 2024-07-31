@@ -14,7 +14,7 @@ import { useSample } from './sample'
 const defineMatch = (level) => {
   return defineModule({
     name: `match.${level.toLowerCase()}`,
-    key: `match_${level.toLowerCase()}_id`,
+    key: `target_${level.toLowerCase()}_id`,
     useParent: () => ({
       // 'virtual' parent ensures matches react
       // to batch and sample selections

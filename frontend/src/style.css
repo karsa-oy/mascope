@@ -135,8 +135,8 @@
     padding-left: 1.5rem !important;
   }
 
-  .browser .p-datatable-row-toggle-icon {
-    z-index: 50 !important;
+  .browser .p-datatable-row-expansion {
+    z-index: 100;
   }
 
   .browser .match-column {

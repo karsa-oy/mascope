@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, computed, watchEffect } from 'vue'
+import { ref, reactive, computed, watch } from 'vue'
 
 import Panel from 'primevue/panel'
 import Button from 'primevue/button'
@@ -25,11 +25,29 @@ const app = useApp()
 
 const emit = defineEmits(['focused'])
 
-const expanded = reactive({
-  collections: {},
-  compounds: {},
-  ions: {}
-})
+const expanded = computed(() => ({
+  collection: app.data.match.collection.focused
+    ? {
+        [app.data.match.collection.focused.target_collection_id]: true
+      }
+    : {},
+  compound: app.data.match.compound.focused
+    ? {
+        [app.data.match.compound.focused.target_compound_id]: true
+      }
+    : {},
+  ion: app.data.match.ion.focused
+    ? {
+        [app.data.match.ion.focused.target_ion_id]: true
+      }
+    : {},
+  isotope: app.data.match.isotope.focused
+    ? {
+        [app.data.match.isotope.focused.target_isotope_id]: true
+      }
+    : {}
+}))
+
 const context = reactive({
   collection: null,
   compound: null
@@ -169,64 +187,61 @@ async function showMatch(row) {
     emit('focused')
   }
 }
-watchEffect(() => {
-  if (!app.data.match.compound.focused) {
-    app.ui.matchVisualized.unset()
-  }
-})
 
-watchEffect(() => {
-  const collection_id = app.data.match.collection.focused?.target_collection_id
-  if (collection_id && !(collection_id in expanded.collections)) {
-    expanded.collections = { [collection_id]: true }
-  }
-})
+// match refocus logic
 
-watchEffect(() => {
-  if (app.data.match.collection.focused) {
-    const collectionId = app.data.match.collection.focused.target_collection_id
-    expanded.collections = { [collectionId]: true }
-    app.data.match.compound.focused = null
-    app.data.match.ion.focused = null
-    app.data.match.isotope.focused = null
-  } else {
-    expanded.collections = {}
-    app.data.match.compound.focused = null
-    app.data.match.ion.focused = null
-    app.data.match.isotope.focused = null
-  }
-})
-watchEffect(() => {
-  if (app.data.match.compound.focused) {
-    if (
-      app.data.match.ion.focused?.target_compound_id !==
-      app.data.match.compound.focused.target_compound_id
-    ) {
-      app.data.match.ion.focused = null
-      app.data.match.isotope.focused = null
+watch(
+  computed(() => app.data.match.collection.focused),
+  (collection) => {
+    if (!collection) {
+      // unfocus child if unfocused
+      app.data.match.compound.unfocus()
     }
   }
-})
-watchEffect(() => {
-  if (app.data.match.ion.focused) {
-    app.data.match.compound.focused = app.data.match.compound.list.find(
-      ({ target_compound_id }) =>
-        app.data.match.ion.focused.target_compound_id == target_compound_id
-    )
-    if (
-      app.data.match.isotope.focused?.target_ion_id !== app.data.match.ion.focused.target_ion_id
-    ) {
-      app.data.match.isotope.focused = null
+)
+watch(
+  computed(() => app.data.match.compound.focused),
+  (compound) => {
+    if (compound) {
+      // focus parent if focused
+      app.data.match.collection.focus(compound)
+      // unfocus unrelated ions
+      if (app.data.match.ion.focused?.target_compound_id !== compound.target_compound_id) {
+        app.data.match.ion.unfocus()
+      }
+    } else {
+      // unfocus child if unfocused
+      app.data.match.ion.unfocus()
+      // and unset visualized match
+      app.ui.matchVisualized.unset()
     }
   }
-})
-watchEffect(() => {
-  if (app.data.match.isotope.focused) {
-    app.data.match.ion.focused = app.data.match.ion.list.find(
-      ({ target_ion_id }) => app.data.match.isotope.focused.target_ion_id == target_ion_id
-    )
+)
+watch(
+  computed(() => app.data.match.ion.focused),
+  (ion) => {
+    if (ion) {
+      // focus parent if focused
+      app.data.match.compound.focus(ion)
+      // unfocus unrelated isotopes
+      if (app.data.match.isotope.focused?.target_ion_id !== ion.target_ion_id) {
+        app.data.match.isotope.unfocus()
+      }
+    } else {
+      // unfocus child if unfocused
+      app.data.match.isotope.unfocus()
+    }
   }
-})
+)
+watch(
+  computed(() => app.data.match.isotope.focused),
+  (isotope) => {
+    if (isotope) {
+      // focus parent in focused
+      app.data.match.ion.focus(isotope)
+    }
+  }
+)
 </script>
 
 <template v-if="collections">
@@ -253,7 +268,7 @@ watchEffect(() => {
       <!-- collections -->
       <DataTable
         :value="tree"
-        v-model:expandedRows="expanded.collections"
+        :expandedRows="expanded.collection"
         dataKey="target_collection_id"
         v-model:selection="app.data.match.collection.focused"
         selectionMode="single"
@@ -279,7 +294,11 @@ watchEffect(() => {
         <Column header="Collection" field="target_collection_name" sortable>
           <template #body="{ data }">
             <span
-              :class="`pi pi-chevron-${data.target_collection_id in expanded.collections ? 'down' : 'right'}`"
+              :class="`pi pi-chevron-${
+                data.target_collection_id == app.data.match.collection.focused?.target_collection_id
+                  ? 'down'
+                  : 'right'
+              }`"
               style="font-size: smaller; margin-right: 0.5rem"
             />
             {{ data.target_collection_name }}
@@ -295,7 +314,7 @@ watchEffect(() => {
           <DataTable
             v-if="data.children.length > 0"
             :value="data.children"
-            v-model:expandedRows="expanded.compounds"
+            :expandedRows="expanded.compound"
             dataKey="target_compound_id"
             v-model:selection="app.data.match.compound.focused"
             selectionMode="single"
@@ -318,8 +337,19 @@ watchEffect(() => {
                 />
               </template>
             </Column>
-            <Column expander style="width: 1ch" />
-            <Column header="Compound" field="target_compound_formula" sortable />
+            <Column header="Compound" field="target_compound_formula" sortable>
+              <template #body="{ data }">
+                <span
+                  :class="`pi pi-chevron-${
+                    data.target_compound_id == app.data.match.compound.focused?.target_compound_id
+                      ? 'down'
+                      : 'right'
+                  }`"
+                  style="font-size: smaller; margin-right: 0.5rem"
+                />
+                {{ data.target_compound_formula }}
+              </template>
+            </Column>
             <Column header="Name" sortable>
               <template #body="{ data }">
                 {{ data.target_compound_name }}
@@ -330,7 +360,7 @@ watchEffect(() => {
               <DataTable
                 v-if="data.children.length > 0"
                 :value="data.children"
-                v-model:expandedRows="expanded.ions"
+                :expandedRows="expanded.ion"
                 dataKey="target_ion_id"
                 v-model:selection="app.data.match.ion.focused"
                 selectionMode="single"
@@ -351,10 +381,20 @@ watchEffect(() => {
                     />
                   </template>
                 </Column>
-                <Column expander style="width: 1ch" />
-                <Column header="Ion" field="target_ion_formula" sortable />
+                <Column header="Ion" field="target_ion_formula" sortable>
+                  <template #body="{ data }">
+                    <span
+                      :class="`pi pi-chevron-${
+                        data.target_ion_id == app.data.match.ion.focused?.target_ion_id
+                          ? 'down'
+                          : 'right'
+                      }`"
+                      style="font-size: smaller; margin-right: 0.5rem"
+                    />
+                    {{ data.target_ion_formula }}
+                  </template>
+                </Column>
                 <Column header="Mechanism" field="ionization_mechanism" sortable />
-
                 <template #expansion="{ data }">
                   <!-- isotopes   -->
                   <DataTable
