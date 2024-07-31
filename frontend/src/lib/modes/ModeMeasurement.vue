@@ -9,7 +9,7 @@ import { watchEffect } from 'vue'
 
 const app = useApp()
 
-app.acquisition.mode = false
+app.data.acquisition.mode = false
 
 const dialog = reactive({
   sampleItem: null
@@ -17,27 +17,27 @@ const dialog = reactive({
 
 watchEffect(() => {
   if (!app.data.batch.focused) {
-    app.acquisition.mode = false
+    app.data.acquisition.mode = false
   }
 })
 </script>
 
 <template>
   <div id="measurement-mode" class="hidden">
-    {{ app.acquisition.mode ? 'active' : '' }}
+    {{ app.data.acquisition.mode ? 'active' : '' }}
   </div>
   <SelectButton
-    v-model="app.acquisition.mode"
+    v-model="app.data.acquisition.mode"
     :options="[
       {
         id: 'stop-measuring',
-        tooltip: app.acquisition.mode ? 'Pause' : 'Paused',
+        tooltip: app.data.acquisition.mode ? 'Pause' : 'Paused',
         value: false,
         icon: 'pi pi-pause'
       },
       {
         id: 'start-measuring',
-        tooltip: app.acquisition.mode ? 'Measuring' : 'Measure',
+        tooltip: app.data.acquisition.mode ? 'Measuring' : 'Measure',
         value: true,
         icon: 'pi pi-play'
       }
@@ -45,7 +45,7 @@ watchEffect(() => {
     optionLabel="tooltip"
     optionValue="value"
     dataKey="value"
-    :class="app.acquisition.mode ? 'measure-mode' : ''"
+    :class="app.data.acquisition.mode ? 'measure-mode' : ''"
     style="height: 32px"
     :disabled="!app.data.batch.focused"
     :allowEmpty="false"

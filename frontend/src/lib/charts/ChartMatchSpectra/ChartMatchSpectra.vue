@@ -34,10 +34,10 @@ const isotopes = computed(() => {
     const traces = data.traces?.slice(start, end)
 
     let match_category = 0
-    if (isotope.match_score > app.filterParams.current.possible_match_threshold) {
+    if (isotope.match_score > app.data.filterParams.current.possible_match_threshold) {
       match_category = 1
     }
-    if (isotope.match_score > app.filterParams.current.probable_match_threshold) {
+    if (isotope.match_score > app.data.filterParams.current.probable_match_threshold) {
       match_category = 2
     }
 
@@ -99,7 +99,7 @@ const error = new Intl.NumberFormat('en-US', {
             <Tag
               :value="`Intensity: ${area.format(isotope.sample_peak_area)}`"
               :severity="
-                isotope.sample_peak_area < app.filterParams.current.peak_min_intensity
+                isotope.sample_peak_area < app.data.filterParams.current.peak_min_intensity
                   ? 'warn'
                   : 'info'
               "
@@ -107,7 +107,7 @@ const error = new Intl.NumberFormat('en-US', {
             <Tag
               :value="`mz error: ${error.format(isotope.match_mz_error)}`"
               :severity="
-                Math.abs(isotope.match_mz_error) > app.filterParams.current.mz_tolerance
+                Math.abs(isotope.match_mz_error) > app.data.filterParams.current.mz_tolerance
                   ? 'warn'
                   : 'info'
               "
@@ -117,7 +117,7 @@ const error = new Intl.NumberFormat('en-US', {
               :value="`Abundance error: ${error.format(isotope.match_abundance_error)}`"
               :severity="
                 Math.abs(isotope.match_abundance_error) >
-                app.filterParams.current.isotope_ratio_tolerance
+                app.data.filterParams.current.isotope_ratio_tolerance
                   ? 'warn'
                   : 'info'
               "

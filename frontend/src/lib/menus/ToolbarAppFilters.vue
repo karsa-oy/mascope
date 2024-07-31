@@ -228,12 +228,12 @@ function parseTimestamp(timestamp) {
           text
           @click="
             (event) => {
-              app.notification.drawer = true
+              app.ui.notification.drawer = true
             }
           "
         />
         <Drawer
-          v-model:visible="app.notification.drawer"
+          v-model:visible="app.ui.notification.drawer"
           header="Notifications"
           position="right"
           style="width: 350px"
@@ -252,7 +252,7 @@ function parseTimestamp(timestamp) {
                 status,
                 message,
                 timestamp
-              } in app.notification.log.filter(({ type, status, message }) =>
+              } in app.ui.notification.log.filter(({ type, status, message }) =>
                 `${beautifySnakeCase(type)} ${status} ${message}`.includes(log.query)
               )"
               :key="process_id"

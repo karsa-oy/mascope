@@ -23,7 +23,7 @@ function color(type) {
 
 <template>
   <div id="progress">
-    <template v-for="process of app.notification.progress" :key="process.process_id">
+    <template v-for="process of app.ui.notification.progress" :key="process.process_id">
       <div
         v-if="process.progress > 0"
         v-tooltip.top="`${beautifySnakeCase(process.type)}: ${process.message}`"

@@ -23,7 +23,7 @@ async function initApi() {
       return await http[method](body)
     } catch (error) {
       console.error(`Failed to ${method}:`, error)
-      app.notification.push({
+      app.ui.notification.push({
         type: strToSnakeCase(method),
         status: 'error',
         message: error.message
@@ -37,7 +37,7 @@ async function initApi() {
       const app = useApp()
       const { data, status } = await apiResponse({ method, body })
       if (status === 201) {
-        app.notification.push({
+        app.ui.notification.push({
           type: strToSnakeCase(method),
           status: 'success',
           message: data.message,
@@ -66,7 +66,7 @@ async function initApi() {
       const app = useApp()
       const { data, status } = await apiResponse({ method, body })
       if (status === 200) {
-        app.notification.push({
+        app.ui.notification.push({
           type: strToSnakeCase(method),
           status: 'success',
           message: data.message,
@@ -88,7 +88,7 @@ async function initApi() {
       const app = useApp()
       const { data, status } = await apiResponse({ method, body })
       if (status === 200) {
-        app.notification.push({
+        app.ui.notification.push({
           type: strToSnakeCase(method),
           status: 'success',
           message: data.message,

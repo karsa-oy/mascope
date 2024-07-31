@@ -35,18 +35,18 @@ const search = ref('')
 
 const acquisitions = computed(
   () =>
-    app.acquisition.list?.filter(({ filename }) =>
+    app.data.acquisition.list?.filter(({ filename }) =>
       filename.toLowerCase().includes(search.value.toLowerCase())
     ) ?? []
 )
 
 watchEffect(() => {
-  if (app.acquisition.pending.filename && app.acquisition.mode && props.active) {
+  if (app.data.acquisition.pending.filename && app.data.acquisition.mode && props.active) {
     dialog.sampleItem = 'create_pending'
   }
 })
 watch(
-  computed(() => app.acquisition.time),
+  computed(() => app.data.acquisition.time),
   () => {
     selected.files = []
   },
@@ -59,18 +59,18 @@ watch(
     <menu style="gap: 2rem">
       <Select
         props.inputId="time"
-        v-model="app.acquisition.time.mode"
+        v-model="app.data.acquisition.time.mode"
         :options="['Last 24 hours', 'Last 7 days', 'Last 30 days', 'Last 90 days']"
         style="flex-direction: row-reverse"
-        :disabled="app.acquisition.mode"
+        :disabled="app.data.acquisition.mode"
       />
       <DatePicker
-        v-model="app.acquisition.time.range"
+        v-model="app.data.acquisition.time.range"
         selectionMode="range"
         inputId="range"
         showTime
         showIcon
-        :class="app.acquisition.time.mode == 'range' ? '' : 'inactive'"
+        :class="app.data.acquisition.time.mode == 'range' ? '' : 'inactive'"
         style="flex-grow: 1"
       />
       <IconField style="flex-grow: 1">
@@ -84,7 +84,9 @@ watch(
           label="Process"
           icon="pi pi-file-import"
           :disabled="
-            selected.files?.length == 0 || !app.data.batch.focused || !app.acquisition.list.length
+            selected.files?.length == 0 ||
+            !app.data.batch.focused ||
+            !app.data.acquisition.list.length
           "
           @click="
             () => {

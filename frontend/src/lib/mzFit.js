@@ -63,7 +63,7 @@ export const useMzFit = (sample) => {
     })
   }
 
-  app.notification.on('calibration_mz_fit', (payload) => {
+  app.ui.notification.on('calibration_mz_fit', (payload) => {
     status.value = payload?.status
     if (payload?.status === 'success') {
       current.value = payload?.data?.fit

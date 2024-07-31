@@ -5,7 +5,6 @@ import { api } from '@/api'
 import { alarmsList } from '@/lib/constants'
 
 import { useData } from '../data'
-import { useFilterParams } from '../filterParams'
 import { useChart } from './chart'
 
 // MATCH VISUALIZATION
@@ -43,8 +42,7 @@ export const useMatchVisualized = defineStore('app.ui.matchVisualized', () => {
     if (sampleId == cache.sampleId && ionId == cache.ionId && collectionId == cache.collectionId) {
       return
     }
-    const filterParams = useFilterParams()
-    if (params) await filterParams.set(params)
+    if (params) await data.filterParams.set(params)
     await loadMatches({ sampleId, ionId, collectionId })
     await activate({ sampleId, ionId })
     // cache
@@ -76,7 +74,6 @@ export const useMatchVisualized = defineStore('app.ui.matchVisualized', () => {
   async function loadMatches({ sampleId, ionId, collectionId } = {}) {
     const target_ion_id = ionId ?? ion.value?.target_ion_id
     if (!target_ion_id) return
-    const filterParams = useFilterParams()
     const sampleIon = await api.request.read({
       method: 'getSampleIonMatches',
       body: {
@@ -84,7 +81,7 @@ export const useMatchVisualized = defineStore('app.ui.matchVisualized', () => {
         params: {
           target_ion_id,
           target_collection_id: collectionId ?? ion.value?.target_collection_id,
-          filter_params: filterParams.current,
+          filter_params: data.filterParams.current,
           alarms_list: alarmsList
         }
       }
@@ -120,7 +117,6 @@ export const useMatchVisualized = defineStore('app.ui.matchVisualized', () => {
 
   async function activate({ sampleId, ionId } = {}) {
     if (!ion.value) return
-    const filterParams = useFilterParams()
     const chart = useChart()
 
     chart.clear()
@@ -130,9 +126,9 @@ export const useMatchVisualized = defineStore('app.ui.matchVisualized', () => {
       body: {
         sample_item_id: sampleId ?? ion.value.sample_item_id,
         target_ion_id: ionId ?? ion.value.target_ion_id,
-        min_isotope_abundance: filterParams.current.min_isotope_abundance,
-        peak_min_intensity: filterParams.current.peak_min_intensity,
-        mz_tolerance: filterParams.current.mz_tolerance
+        min_isotope_abundance: data.filterParams.current.min_isotope_abundance,
+        peak_min_intensity: data.filterParams.current.peak_min_intensity,
+        mz_tolerance: data.filterParams.current.mz_tolerance
       }
     })
   }

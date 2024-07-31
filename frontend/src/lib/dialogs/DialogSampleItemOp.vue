@@ -86,7 +86,9 @@ function init(active) {
   template.selected = initial.value
   // reset inputs
   input.filename =
-    action.value !== 'create_pending' ? original.value?.filename : app.acquisition.pending.filename
+    action.value !== 'create_pending'
+      ? original.value?.filename
+      : app.data.acquisition.pending.filename
   input.instrument = original.value?.instrument
   input.filterId = original.value?.filter_id ?? null
   input.type = original.value?.sample_item_type ?? null
@@ -148,11 +150,11 @@ async function save() {
       ...sample_item
     })
   } else if (props.action == 'create_pending') {
-    if (!(app.acquisition.ready.filename == input.filename)) {
+    if (!(app.data.acquisition.ready.filename == input.filename)) {
       // submitted before conversion completed
-      app.acquisition.pending.sample = {
+      app.data.acquisition.pending.sample = {
         ...sample_item,
-        filename: app.acquisition.pending.filename
+        filename: app.data.acquisition.pending.filename
       }
     } else {
       // submitted after conversion completed
@@ -160,9 +162,9 @@ async function save() {
         ...sample_item,
         filename: input.filename
       })
-      app.acquisition.ready.filename = null
+      app.data.acquisition.ready.filename = null
     }
-    app.acquisition.pending.filename = null
+    app.data.acquisition.pending.filename = null
   } else if (props.action == 'update') {
     await app.data.sample.update({
       ...props.item, // To include sample_item_id

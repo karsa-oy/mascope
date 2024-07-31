@@ -20,7 +20,7 @@ const dialog = reactive({
 
 async function submit(rating) {
   const possibleMatch =
-    app.ui.matchVisualized.ion.match_score >= app.filterParams.current.possible_match_threshold
+    app.ui.matchVisualized.ion.match_score >= app.data.filterParams.current.possible_match_threshold
   if ((rating == 0 && possibleMatch) || rating == 1 || (rating == 1 && !possibleMatch)) {
     dialog.rating = rating
     dialog.visible = true

@@ -47,7 +47,7 @@ const tabs = computed(() => [
 ])
 
 watch(
-  computed(() => app.acquisition.mode),
+  computed(() => app.data.acquisition.mode),
   (scenthound) => {
     if (scenthound) {
       app.ui.tab.active = 'acquisitions'

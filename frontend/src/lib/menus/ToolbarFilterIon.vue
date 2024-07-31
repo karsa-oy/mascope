@@ -21,12 +21,12 @@ const isSaving = ref(false)
 const isotopeSettings = ref()
 const peakSettings = ref()
 
-onMounted(() => app.filterParams.init())
+onMounted(() => app.data.filterParams.init())
 
 function undoChanges() {
   // Revert filter parameters to their initial values
-  Object.keys(app.filterParams.initial).forEach((key) => {
-    app.filterParams.current[key] = app.filterParams.initial[key]
+  Object.keys(app.data.filterParams.initial).forEach((key) => {
+    app.data.filterParams.current[key] = app.data.filterParams.initial[key]
   })
   app.ui.matchVisualized.reset()
 }
@@ -39,9 +39,9 @@ async function saveParams() {
     acceptLabel: 'Save',
     accept: async () => {
       isSaving.value = true
-      await app.filterParams.save()
+      await app.data.filterParams.save()
       isSaving.value = false
-      app.filterParams.init()
+      app.data.filterParams.init()
       await app.ui.matchVisualized.reset()
     },
     rejectLabel: 'Cancel',
@@ -56,10 +56,10 @@ function deleteParams() {
     acceptIcon: 'pi pi-trash',
     acceptLabel: 'Delete',
     accept: async () => {
-      app.filterParams.reset()
-      await app.filterParams.remove()
+      app.data.filterParams.reset()
+      await app.data.filterParams.remove()
       await app.ui.matchVisualized.reset()
-      app.filterParams.init()
+      app.data.filterParams.init()
     },
     rejectLabel: 'Cancel',
     rejectIcon: 'pi pi-times'
@@ -67,7 +67,7 @@ function deleteParams() {
 }
 
 async function resetParams() {
-  await app.filterParams.reset()
+  await app.data.filterParams.reset()
   await app.ui.matchVisualized.reset()
 }
 
@@ -76,19 +76,19 @@ const items = computed(() => [
     label: 'Save params',
     icon: 'pi pi-save',
     command: saveParams,
-    disabled: !app.filterParams.changed
+    disabled: !app.data.filterParams.changed
   },
   {
     label: 'Revert changes',
     icon: 'pi pi-undo',
     command: undoChanges,
-    disabled: !app.filterParams.changed
+    disabled: !app.data.filterParams.changed
   },
   {
     label: 'Set defaults',
     icon: 'pi pi-file-import',
     command: resetParams,
-    disabled: app.filterParams.default
+    disabled: app.data.filterParams.default
   },
   {
     label: 'Delete filtering params',
@@ -208,7 +208,7 @@ const items = computed(() => [
           @change="app.ui.matchVisualized.reset"
           :range="{
             min: 0,
-            max: app.filterParams.current.probable_match_threshold,
+            max: app.data.filterParams.current.probable_match_threshold,
             step: 0.05
           }"
         />
@@ -217,7 +217,7 @@ const items = computed(() => [
           v-model:param="filterParams.current.probable_match_threshold"
           @change="app.ui.matchVisualized.reset"
           :range="{
-            min: app.filterParams.current.possible_match_threshold,
+            min: app.data.filterParams.current.possible_match_threshold,
             max: 1,
             step: 0.05
           }"

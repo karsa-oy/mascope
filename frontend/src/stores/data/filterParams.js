@@ -3,9 +3,9 @@ import { defineStore } from 'pinia'
 
 import { api } from '@/api'
 
-import { useUi } from './ui'
+import { useUi } from '../ui'
 
-export const useFilterParams = defineStore('app.filterParams', () => {
+export const useFilterParams = defineStore('app.data.filterParams', () => {
   const ui = useUi()
 
   const defaults = {

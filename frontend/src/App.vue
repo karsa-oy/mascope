@@ -17,7 +17,7 @@ const app = useApp()
 const ready = computed(() => app.data.workspace.focused && app.data.instrument.focused)
 
 // toaster
-app.notification.on('*', ({ status, type, message }) => {
+app.ui.notification.on('*', ({ status, type, message }) => {
   if (status !== 'pending') {
     const severity =
       {
@@ -33,7 +33,7 @@ app.notification.on('*', ({ status, type, message }) => {
 })()
 
 // focus new workspace
-app.notification.on('create_workspace', ({ status, data }) => {
+app.ui.notification.on('create_workspace', ({ status, data }) => {
   if (status == 'success') {
     const createdWorkspace = app.data.workspace.list.find(
       (workspace) => workspace.workspace_id == data.response.data.workspace_id
@@ -54,7 +54,7 @@ app.notification.on('create_workspace', ({ status, data }) => {
       <strong>Loading...</strong>
     </div>
   </div>
-  <Toast position="bottom-right" v-if="!app.notification.drawer" />
+  <Toast position="bottom-right" v-if="!app.ui.notification.drawer" />
   <ConfirmDialog />
 </template>
 

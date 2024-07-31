@@ -3,12 +3,15 @@ import { defineStore } from 'pinia'
 
 import { api } from '@/api'
 
-import { useData } from './data'
-import { useNotification } from './notification'
+import { useSample } from './sample'
+import { useInstrument } from './instrument'
 
-export const useAcquisition = defineStore('app.acquisition', () => {
-  const notification = useNotification()
-  const data = useData()
+import { useUi } from '../ui'
+
+export const useAcquisition = defineStore('app.data.acquisition', () => {
+  const ui = useUi()
+  const sample = useSample()
+  const instrument = useInstrument()
 
   const mode = ref(false)
   const list = ref([])
@@ -42,11 +45,11 @@ export const useAcquisition = defineStore('app.acquisition', () => {
   })
 
   const mzCalibration = ref(null)
-  const orbi = computed(() => data.instrument.focused.toLowerCase().includes('orbi'))
+  const orbi = computed(() => instrument.focused.toLowerCase().includes('orbi'))
   // instrument
 
   watch(
-    computed(() => data.instrument.focused),
+    computed(() => instrument.focused),
     async () => {
       mzCalibration.value = null
       pending.filename = null
@@ -80,7 +83,7 @@ export const useAcquisition = defineStore('app.acquisition', () => {
         body: {
           datetime_min: range.min.toISOString(),
           datetime_max: range.max.toISOString(),
-          instrument: data.instrument.focused,
+          instrument: instrument.focused,
           sort: 'datetime_utc',
           order: 'asc'
         }
@@ -96,7 +99,7 @@ export const useAcquisition = defineStore('app.acquisition', () => {
       await api.request.read({
         method: 'getRecentSampleFiles',
         body: {
-          instrument: data.instrument.focused,
+          instrument: instrument.focused,
           sort: 'datetime_utc',
           order: 'asc',
           days
@@ -108,7 +111,7 @@ export const useAcquisition = defineStore('app.acquisition', () => {
     }
   }
 
-  notification.on('instrument_acquisition', ({ process_id, data, status }) => {
+  ui.notification.on('instrument_acquisition', ({ process_id, data, status }) => {
     if (mode.value) {
       // acquisition started
       if (process_id !== pending.measurement) {
@@ -123,7 +126,7 @@ export const useAcquisition = defineStore('app.acquisition', () => {
     }
   })()
 
-  notification.on('instrument_conversion', ({ process_id, data, status }) => {
+  ui.notification.on('instrument_conversion', ({ process_id, data, status }) => {
     if (mode.value) {
       // conversion started
       if (process_id !== pending.conversion) {
@@ -140,10 +143,10 @@ export const useAcquisition = defineStore('app.acquisition', () => {
   })()
 
   // measurement mode
-  notification.on('create_sample_file', async () => {
+  ui.notification.on('create_sample_file', async () => {
     load()
     if (pending.sample) {
-      await data.sample.process(pending.sample)
+      await sample.process(pending.sample)
       pending.sample = null
     } else {
       ready.filename = pending.filename
@@ -157,7 +160,7 @@ export const useAcquisition = defineStore('app.acquisition', () => {
       await api.request.read({
         method: 'getMzCalibration',
         body: {
-          instrument: data.instrument.focused?.instrument
+          instrument: instrument.focused?.instrument
         }
       })
     )?.data
