@@ -1,4 +1,6 @@
 <script setup>
+import { ref, reactive, computed, watch, watchEffect, onMounted, onBeforeUnmount } from 'vue'
+
 import Dialog from 'primevue/dialog'
 import FloatLabel from 'primevue/floatlabel'
 import SelectButton from 'primevue/selectbutton'
@@ -18,8 +20,6 @@ import InlineMessage from 'primevue/inlinemessage'
 import Listbox from 'primevue/listbox'
 import Avatar from 'primevue/avatar'
 import { useConfirm } from 'primevue/useconfirm'
-
-import { ref, reactive, computed, watch, watchEffect, onMounted, onBeforeUnmount } from 'vue'
 
 import { api } from '@/api'
 import { useApp } from '@/stores'
@@ -189,7 +189,7 @@ watchEffect(async () => {
   if (!selected.source || selected.source == 'Selection') {
     return
   } else if (selected.source === 'All') {
-    pending = app.data.target.collections.list
+    pending = app.data.target.compound.list
   } else if (selected.source) {
     const id = app.data.target.collection.list.find(
       ({ target_collection_name }) => target_collection_name == selected.source
