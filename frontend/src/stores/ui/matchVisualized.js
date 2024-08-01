@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 
 import { api } from '@/api'
 import { alarmsList } from '@/lib/constants'
+import { debounce } from '@/lib/utils'
 
 import { useData } from '../data'
 import { useChart } from './chart'
@@ -147,7 +148,7 @@ export const useMatchVisualized = defineStore('app.ui.matchVisualized', () => {
     hash,
     filterParams,
     // actions
-    set,
+    set: debounce(set),
     reset,
     unset
   }
