@@ -14,7 +14,7 @@ const toast = useToast()
 
 const app = useApp()
 
-const ready = computed(() => app.data.workspace.focused && app.data.instrument.focused)
+const ready = computed(() => app.data.workspace.list.length > 0)
 
 // toaster
 app.ui.notification.on('*', ({ status, type, message }) => {
