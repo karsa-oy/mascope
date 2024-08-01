@@ -15,11 +15,12 @@ import InputText from 'primevue/inputtext'
 import { ref, reactive, computed, watch, watchEffect } from 'vue'
 
 import { BaseKarsaLogo } from '@/lib/base'
-import { ModeMeasurement } from '@/lib/modes'
 import { DialogWorkspaceOp } from '@/lib/dialogs'
 import { beautifySnakeCase } from '@/lib/utils'
 
 import { useApp } from '@/stores'
+
+import AcquisitionMode from './AcquisitionMode.vue'
 
 const app = useApp()
 
@@ -192,7 +193,7 @@ function parseTimestamp(timestamp) {
     </template>
     <template #end>
       <div class="row">
-        <ModeMeasurement />
+        <AcquisitionMode />
         <label for="instrument-selector" class="hidden">Instrument selector</label>
         <Select
           inputId="instrument-selector"

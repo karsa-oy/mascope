@@ -9,7 +9,7 @@ import Button from 'primevue/button'
 import Panel from 'primevue/panel'
 import Dialog from 'primevue/dialog'
 
-import { ToolbarTemplate } from '@/lib/menus'
+import { ToolbarTemplate } from '@/lib/toolbars'
 import { clone, strToSnakeCase, beautifySnakeCase, genId } from '@/lib/utils'
 import { useApp } from '@/stores'
 

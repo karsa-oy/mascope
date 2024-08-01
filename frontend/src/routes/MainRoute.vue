@@ -10,7 +10,7 @@ import Tab from 'primevue/tab'
 import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 
-import { ToolbarAppFilters } from '@/lib/menus'
+import { ToolbarAppFilters } from '@/lib/toolbars'
 import {
   PaneProgress,
   PaneBrowserSample,
