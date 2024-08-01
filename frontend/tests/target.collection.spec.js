@@ -1,6 +1,6 @@
 import { expect, mergeTests } from '@playwright/test'
 
-import { workspace, sample, target } from '../fixtures'
+import { workspace, sample, target } from './fixtures'
 
 const test = mergeTests(workspace, sample, target)
 

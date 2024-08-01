@@ -1,15 +1,15 @@
 import { expect, mergeTests } from '@playwright/test'
 
-import { workspace, sample, instrument } from '../fixtures'
+import { workspace, sample, instrument } from './fixtures'
 
 const test = mergeTests(workspace, sample, instrument)
 
-test.describe('sample batch ops', () => {
-  test('create sample batch', async ({ freshBatch }) => {
+test.describe('batch ops', () => {
+  test('create batch', async ({ freshBatch }) => {
     // validate
     await expect(freshBatch.browserRow).toContainText(freshBatch.name)
   })
-  test('rename sample batch', async ({ page, freshBatch, sampleBrowser }) => {
+  test('rename batch', async ({ page, freshBatch, sampleBrowser }) => {
     await freshBatch.browserRow.click({ button: 'right' })
     await page.getByLabel('edit batch').first().click({ delay: 50 })
     const dialog = page.getByLabel('edit sample batch')
@@ -28,7 +28,7 @@ test.describe('sample batch ops', () => {
     // validate
     await expect(sampleBrowser.content).not.toContainText(freshBatch.name)
   })
-  test('import sample items (create)', async ({
+  test('import samples (create)', async ({
     page,
     freshBatch,
     sampleBrowser,

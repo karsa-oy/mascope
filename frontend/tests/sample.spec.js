@@ -1,11 +1,11 @@
 import { expect, mergeTests } from '@playwright/test'
 
-import { workspace, sample, instrument } from '../fixtures'
+import { workspace, sample, instrument } from './fixtures'
 
 const test = mergeTests(workspace, instrument, sample)
 
-test.describe('sample item ops', () => {
-  test('process sample item (create)', async ({
+test.describe('sample ops', () => {
+  test('process sample (create)', async ({
     page,
     freshBatch,
     instrumentSelector,
