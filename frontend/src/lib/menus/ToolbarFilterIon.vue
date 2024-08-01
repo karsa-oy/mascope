@@ -144,13 +144,13 @@ const items = computed(() => [
       <div class="row" style="padding: 1rem; gap: 0.5rem">
         <BaseParamField
           label="m/z tolerance [ppm]"
-          v-model:param="filterParams.current.mz_tolerance"
+          v-model:param="app.data.filterParams.current.mz_tolerance"
           @change="app.ui.matchVisualized.reset"
           :range="{ min: 0, max: 100, step: 1 }"
         />
         <BaseParamField
           label="Min. isotope abundance"
-          v-model:param="filterParams.current.min_isotope_abundance"
+          v-model:param="app.data.filterParams.current.min_isotope_abundance"
           @change="app.ui.matchVisualized.reset"
           :range="{ min: 0, max: 1, step: 0.01 }"
           disabled
@@ -158,13 +158,13 @@ const items = computed(() => [
         />
         <BaseParamField
           label="Isotope ratio tolerance"
-          v-model:param="filterParams.current.isotope_ratio_tolerance"
+          v-model:param="app.data.filterParams.current.isotope_ratio_tolerance"
           @change="app.ui.matchVisualized.reset"
           :range="{ min: 0, max: 1, step: 0.05 }"
         />
         <BaseParamField
           label="Min. isotope correlation"
-          v-model:param="filterParams.current.min_isotope_correlation"
+          v-model:param="app.data.filterParams.current.min_isotope_correlation"
           @change="app.ui.matchVisualized.reset"
           :range="{ min: 0, max: 1, step: 0.1 }"
         />
@@ -198,13 +198,13 @@ const items = computed(() => [
       <div class="row" style="padding: 1rem; gap: 0.5rem">
         <BaseParamField
           label="Min. peak intensity"
-          v-model:param="filterParams.current.peak_min_intensity"
+          v-model:param="app.data.filterParams.current.peak_min_intensity"
           @change="app.ui.matchVisualized.reset"
           :range="{ min: 0, max: 10000, step: 500 }"
         />
         <BaseParamField
           label="Possible match [%]"
-          v-model:param="filterParams.current.possible_match_threshold"
+          v-model:param="app.data.filterParams.current.possible_match_threshold"
           @change="app.ui.matchVisualized.reset"
           :range="{
             min: 0,
@@ -214,7 +214,7 @@ const items = computed(() => [
         />
         <BaseParamField
           label="Probable match [%]"
-          v-model:param="filterParams.current.probable_match_threshold"
+          v-model:param="app.data.filterParams.current.probable_match_threshold"
           @change="app.ui.matchVisualized.reset"
           :range="{
             min: app.data.filterParams.current.possible_match_threshold,
