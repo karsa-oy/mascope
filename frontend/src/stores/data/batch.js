@@ -11,6 +11,7 @@ export const useBatch = defineModule({
   key: 'sample_batch_id',
   useParent: useWorkspace,
   subscribe: true,
+  reloadSelfOn: 'sample_batch_reload',
   reloadChildrenOn: 'sample_batch_reload',
   load: async (workspace_id) =>
     (

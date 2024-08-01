@@ -15,6 +15,7 @@ const defineMatch = (level) => {
   return defineModule({
     name: `match.${level.toLowerCase()}`,
     key: `target_${level.toLowerCase()}_id`,
+    reloadSelfOn: 'sample_batch_reload',
     useParent: () => ({
       // 'virtual' parent ensures matches react
       // to batch and sample selections
