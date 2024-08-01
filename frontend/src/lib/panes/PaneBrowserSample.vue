@@ -511,7 +511,7 @@ watch(
               text
               @click="
                 (event) => {
-                  batchOptionsPopover.show(event)
+                  batchOptionsPopover.toggle(event)
                 }
               "
               v-tooltip.right="'Batch options'"
