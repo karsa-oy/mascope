@@ -201,7 +201,7 @@ export function batchExportCsv() {
     { field: 'Parameters', value: '' }
   ]
   const batchParams = {
-    ...batchStore.buildParams
+    ...app.data.batch.focused.buildParams
   }
   Object.entries(batchParams).forEach(([key, val]) =>
     batchRows.push({
@@ -251,52 +251,25 @@ export function batchExportCsv() {
     ' ',
     '_'
   )}.xlsx`
-  // Extend batchMatchCompounds with sample_item_type
-  const extendedMatchCompounds =
-    app.data.match.compound.list?.map((compound) => {
-      const sampleItem = batchStore.sampleItems.find(
-        (item) => item.sample_item_id === compound.sample_item_id
-      )
-      return {
-        ...compound,
-        sample_item_type: sampleItem?.sample_item_type
-      }
-    }) ?? []
-  // Extend batchMatchIons with sample_item_type, target_compound_name, and target_compound_formula
-  const extendedMatchIons =
-    batchStore.matchIons?.map((ion) => {
-      const sampleItem = batchStore.sampleItems.find(
-        (item) => item.sample_item_id === ion.sample_item_id
-      )
-      const targetCompound = batchStore.targetCompounds?.find(
-        (compound) => compound.target_compound_id === ion.target_compound_id
-      )
-      return {
-        ...ion,
-        sample_item_type: sampleItem?.sample_item_type,
-        target_compound_name: targetCompound?.target_compound_name,
-        target_compound_formula: targetCompound?.target_compound_formula
-      }
-    }) ?? []
   toSpreadsheet(filename, [
     {
       name: 'Batch',
-      rows: batchRows,
+      rows: app.data.batch.list,
       cols: batchCols
     },
     {
       name: 'Samples',
-      rows: batchStore.sampleItems,
+      rows: app.data.sample.list,
       cols: sampleItemCols
     },
     {
       name: 'Match compounds',
-      rows: extendedMatchCompounds,
+      rows: app.data.match.compound.list,
       cols: matchCompoundCols
     },
     {
       name: 'Match ions',
-      rows: extendedMatchIons,
+      rows: app.data.match.ion.list,
       cols: matchIonCols
     }
   ])
