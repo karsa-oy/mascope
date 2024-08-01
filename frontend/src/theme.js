@@ -1,7 +1,7 @@
 import Aura from '@primevue/themes/aura'
 import { definePreset } from '@primevue/themes'
 
-import palette from '@/assets/palette.json'
+import palette from '@/palette.json'
 
 const semantic = (color) =>
   Object.fromEntries(
