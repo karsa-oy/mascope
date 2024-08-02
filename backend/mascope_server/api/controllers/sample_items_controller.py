@@ -19,7 +19,7 @@ from ..utils.api_features import (
 from ..exceptions import NotFoundException
 from .match.match_controller import match_compute_sample
 from .calibration_controller import calibration_mz_calibrate_sample
-from .samples_controller import get_sample
+from mascope_server.api.controllers.samples_controller import get_sample
 from ..models.models import (
     SampleBatch,
     SampleItem,

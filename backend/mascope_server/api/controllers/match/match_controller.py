@@ -27,7 +27,10 @@ from mascope_server.api.controllers.match.match_data_ops import (
 from mascope_server.api.controllers.match.match_aggregate_controller import (
     aggregate_and_create_matches,
 )
-from mascope_server.api.controllers.samples_controller import get_sample, get_samples
+from mascope_server.api.controllers.samples_controller import (
+    get_samples,
+    get_sample,
+)
 from mascope_server.api.controllers.target_compounds_controller import (
     get_target_compounds,
 )
@@ -56,7 +59,9 @@ from mascope_server.api.models.pydantic_models.user_notification_pydantic_model 
 )
 
 import mascope_runtime as runtime
-logger = runtime.logger.service('backend')
+
+logger = runtime.logger.service("backend")
+
 
 # -------------------------------------------------------------------
 # Sample level
@@ -460,7 +465,7 @@ async def rematch_batches(
     # Step 1: Collect total items and individual batch items count
     for sample_batch in rematch_batches_body.sample_batches:
         sample_items_info = await get_samples(
-            sample_batch_id=sample_batch.sample_batch_id, batch_matches_info=False
+            sample_batch_id=sample_batch.sample_batch_id
         )
         total_number_of_items += sample_items_info["results"]
         items_per_batch.append(sample_items_info["results"])

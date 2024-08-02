@@ -223,16 +223,16 @@ export function createHttpClient() {
     // Samples
     getAllSamples: async (params) => {
       try {
-        return await client.get('/samples/new', { params })
+        return await client.get('/samples', { params })
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error || `Failed to get batch samples data: ${error}`
         throw new Error(userErrorMessage)
       }
     },
-    getSample: async ({ sampleId, body }) => {
+    getSample: async ({ sampleId }) => {
       try {
-        return await client.post(`/sample/${sampleId}`, body)
+        return await client.get(`/sample/${sampleId}`)
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error || `Failed to get the sample data: ${error}`

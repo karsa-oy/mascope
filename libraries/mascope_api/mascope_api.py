@@ -204,7 +204,7 @@ def get_batch_samples_records(
         match_ions=match_ions,
         match_isotopes=match_isotopes,
     )
-    resp = api_post(mascope_url, "samples", data=data)
+    resp = api_post(mascope_url, "samples/old", data=data)
     assert (
         resp.status_code == 200
     ), f"get_batch_samples_records('{batch_name}') response error {resp.status_code}"
@@ -375,7 +375,7 @@ def get_sample_batch_data(
         match_isotopes=match_isotopes,
     )
 
-    resp = api_post(mascope_url, "samples", data=request_body)
+    resp = api_post(mascope_url, "samples/old", data=request_body)
     content = {} if not resp or resp.status_code != 200 else json.loads(resp.content)
 
     match_data = content.get("data", [])
@@ -406,7 +406,7 @@ def get_sample_items(mascope_url: str, sample_batch_id: str) -> list:
     body = dict(
         sample_batch_id=sample_batch_id,
     )
-    resp = api_post(mascope_url, "samples", data=body)
+    resp = api_post(mascope_url, "samples/old", data=body)
     content = None if not resp or resp.status_code != 200 else json.loads(resp.content)
     sample_items = content and content["data"] or []
     return [
