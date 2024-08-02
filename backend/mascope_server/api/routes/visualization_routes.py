@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, BackgroundTasks, Depends
 from mascope_server.db.id import gen_id
 from ..utils.api_features import api_route
-from ..controllers.sample_items_controller import get_sample
+from ..controllers.sample_items_controller import get_sample_item
 from ..controllers.target_ions_controller import get_target_ion
 from ..controllers.visualization_controller import visualize_ion_focus
 from ..models.pydantic_models.visualization_pydantic_model import (
@@ -21,7 +21,7 @@ async def visualization_ion_focus_route(
     query_params: GetVisualizationIonFocusQueryParams = Depends(),
 ):
     # Verify the existance
-    sample = await get_sample(query_params.sample_item_id)
+    sample = await get_sample_item(query_params.sample_item_id)
     sample_item_name = sample["sample_item_name"]
     ion = await get_target_ion(query_params.target_ion_id)
     target_ion_formula = ion["target_ion_formula"]

@@ -1,9 +1,9 @@
 import { useConfirm } from 'primevue/useconfirm'
 
-import { useBatchStore } from '@/stores'
+import { useApp } from '@/stores'
 
 export function useSampleBatchDeleteDialog() {
-  const batchStore = useBatchStore()
+  const app = useApp()
   const confirm = useConfirm()
 
   return (batch) =>
@@ -21,7 +21,7 @@ export function useSampleBatchDeleteDialog() {
         severity: 'danger'
       },
       accept: () => {
-        batchStore.deleteBatch(batch)
+        app.data.batch.delete(batch)
       }
     })
 }

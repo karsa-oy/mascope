@@ -3,6 +3,8 @@ import { computed } from 'vue'
 
 import Tag from 'primevue/tag'
 
+import { alarmsList } from '@/lib/constants'
+
 const props = defineProps({
   row: {
     type: Object,
@@ -29,9 +31,9 @@ const formatter = new Intl.NumberFormat('en-US', {
 })
 
 const score = computed(() =>
-  props.row?.match_score && !isNaN(props.row?.match_score)
+  props.row?.match_score != null && !isNaN(props.row?.match_score)
     ? formatter.format(props.row.match_score)
-    : formatter.format(0)
+    : null
 )
 
 const severity = computed(() => {
@@ -44,16 +46,22 @@ const severity = computed(() => {
       return 'success'
   }
 })
+
+const nonAlarmTarget = computed(
+  () =>
+    'target_collection_type' in props.row && !alarmsList.includes(props.row.target_collection_type)
+)
+const zeroScored = computed(() => props.score == '00.00%')
 </script>
 
 <template>
   <Tag
-    v-if="row?.match_score !== null"
+    v-if="score"
     :key="score"
     v-tooltip.right="tooltip"
     :value="text ? `Match score: ${score}` : score"
     :severity="severity"
-    :class="!row.alarm_mode || score == '00.00%' ? 'pale' : ''"
+    :class="nonAlarmTarget || zeroScored ? 'pale' : ''"
     :style="style"
   />
 </template>

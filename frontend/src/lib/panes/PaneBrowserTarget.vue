@@ -1,8 +1,7 @@
 <script setup>
-import { ref, reactive, computed, watchEffect } from 'vue'
+import { ref, reactive, computed, watch } from 'vue'
 
 import Panel from 'primevue/panel'
-import ScrollPanel from 'primevue/scrollpanel'
 import Button from 'primevue/button'
 import TabMenu from 'primevue/tabmenu'
 import DataTable from 'primevue/datatable'
@@ -18,28 +17,37 @@ import {
   DialogTargetCompoundUpdate
 } from '@/lib/dialogs'
 
-import { useSampleStore, useBatchStore, useFocusedMatch, useTargetsStore } from '@/stores'
+import { useApp } from '@/stores'
 
 const confirm = useConfirm()
 
-const targetsStore = useTargetsStore()
-const sampleStore = useSampleStore()
-const batchStore = useBatchStore()
-const focusedMatch = useFocusedMatch()
+const app = useApp()
 
 const emit = defineEmits(['focused'])
 
-const expanded = reactive({
-  collections: {},
-  compounds: {},
-  ions: {}
-})
-const selected = reactive({
-  collection: null,
-  compound: null,
-  ion: null,
-  isotope: null
-})
+const expanded = computed(() => ({
+  collection: app.data.match.collection.focused
+    ? {
+        [app.data.match.collection.focused.target_collection_id]: true
+      }
+    : {},
+  compound: app.data.match.compound.focused
+    ? {
+        [app.data.match.compound.focused.target_compound_id]: true
+      }
+    : {},
+  ion: app.data.match.ion.focused
+    ? {
+        [app.data.match.ion.focused.target_ion_id]: true
+      }
+    : {},
+  isotope: app.data.match.isotope.focused
+    ? {
+        [app.data.match.isotope.focused.target_isotope_id]: true
+      }
+    : {}
+}))
+
 const context = reactive({
   collection: null,
   compound: null
@@ -55,58 +63,17 @@ const formatter = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 2
 })
 
-const collections = computed(() =>
-  sampleStore.active && sampleStore.matchCollections && sampleStore.matchCollections.length > 0
-    ? sampleStore.matchCollections
-    : batchStore.targetCollections
-)
-const compounds = computed(() => {
-  if (!sampleStore.active || !sampleStore.matchCompounds) {
-    return batchStore.targetCompounds
-  }
-  return batchStore.targetCompounds.map((target) => {
-    const match = sampleStore.matchCompounds.find(
-      (mc) => mc.target_compound_id === target.target_compound_id
-    )
-    return match ? { ...target, ...match } : target
-  })
-})
-const ions = computed(() => {
-  if (!sampleStore.active || !sampleStore.matchIons) {
-    return batchStore.targetIons
-  }
-  return batchStore.targetIons.map((target) => {
-    const match = sampleStore.matchIons.find((mi) => mi.target_ion_id === target.target_ion_id)
-    return match ? { ...target, ...match } : target
-  })
-})
-const isotopes = computed(() => {
-  if (!sampleStore.active || !sampleStore.matchIsotopes) {
-    return batchStore.targetIsotopes
-  }
-  const matchIsotopeIds = new Set(sampleStore.matchIsotopes.map((mi) => mi.target_isotope_id))
-  const isotopes = batchStore.targetIsotopes
-    .filter(({ target_isotope_id }) => matchIsotopeIds.has(target_isotope_id))
-    .map((targetIsotope) => {
-      const matchIsotope = sampleStore.matchIsotopes.find(
-        (mis) => mis.target_isotope_id === targetIsotope.target_isotope_id
-      )
-
-      return matchIsotope ? { ...targetIsotope, ...matchIsotope } : targetIsotope
-    })
-  return isotopes
-})
 const tree = computed(() =>
   // collections
-  collections.value.map((coll) => ({
+  app.data.match.collection.list.map((coll) => ({
     ...coll,
     // compounds
-    children: compounds.value
+    children: app.data.match.compound.list
       .filter((comp) => comp.target_collection_id == coll.target_collection_id)
       .map((comp) => ({
         ...comp,
         // ions
-        children: ions.value
+        children: app.data.match.ion.list
           .filter(
             (ion) =>
               ion.target_compound_id == comp.target_compound_id &&
@@ -115,7 +82,7 @@ const tree = computed(() =>
           .map((ion) => ({
             ...ion,
             // isotopes
-            children: isotopes.value.filter(
+            children: app.data.match.isotope.list.filter(
               (iso) =>
                 iso.target_ion_id == ion.target_ion_id &&
                 iso.target_collection_id == coll.target_collection_id
@@ -187,7 +154,7 @@ const menu = computed(() => ({
             label: 'Remove'
           },
           accept: () => {
-            targetsStore.updateCollection({
+            app.data.target.collection.update({
               target_collection_id: collection.target_collection_id,
               target_collection_name: collection.target_collection_name,
               target_collection_type: collection.target_collection_type,
@@ -205,73 +172,76 @@ const menu = computed(() => ({
 async function showMatch(row) {
   const ionId =
     row?.target_ion_id ??
-    sampleStore.matchIons?.find((ion) => ion.target_compound_id === row.target_compound_id)
+    app.data.match.ion.list?.find((ion) => ion.target_compound_id === row.target_compound_id)
       ?.target_ion_id
-  if (ionId && sampleStore.active && focusedMatch.ion?.target_ion_id !== ionId) {
-    await focusedMatch.load({
-      sampleId: sampleStore.active.sample_item_id,
+  if (ionId && app.data.sample.focused && app.ui.matchVisualized.ion?.target_ion_id !== ionId) {
+    await app.ui.matchVisualized.set({
+      sampleId: app.data.sample.focused.sample_item_id,
       ionId,
       collectionId: row?.target_collection_id,
       // pass the ion specific filter params if available to the loadSampleIon function
-      params: sampleStore.matchIons.find((ion) => ion.target_ion_id === ionId)?.filter_params[
-        sampleStore.active.instrument
+      params: app.data.match.ion.list.find((ion) => ion.target_ion_id === ionId)?.filter_params[
+        app.data.sample.focused.instrument
       ]
     })
     emit('focused')
   }
 }
-watchEffect(() => {
-  if (!selected.compound) {
-    focusedMatch.unload()
-  }
-})
 
-watchEffect(() => {
-  const collection_id = selected.collection?.target_collection_id
-  if (collection_id && !(collection_id in expanded.collections)) {
-    expanded.collections = { [collection_id]: true }
-  }
-})
+// match refocus logic
 
-watchEffect(() => {
-  if (selected.collection) {
-    const collectionId = selected.collection.target_collection_id
-    expanded.collections = { [collectionId]: true }
-    selected.compound = null
-    selected.ion = null
-    selected.isotope = null
-  } else {
-    expanded.collections = {}
-    selected.compound = null
-    selected.ion = null
-    selected.isotope = null
-  }
-})
-watchEffect(() => {
-  if (selected.compound) {
-    if (selected.ion?.target_compound_id !== selected.compound.target_compound_id) {
-      selected.ion = null
-      selected.isotope = null
+watch(
+  computed(() => app.data.match.collection.focused),
+  (collection) => {
+    if (!collection) {
+      // unfocus child if unfocused
+      app.data.match.compound.unfocus()
     }
   }
-})
-watchEffect(() => {
-  if (selected.ion) {
-    selected.compound = compounds.value.find(
-      ({ target_compound_id }) => selected.ion.target_compound_id == target_compound_id
-    )
-    if (selected.isotope?.target_ion_id !== selected.ion.target_ion_id) {
-      selected.isotope = null
+)
+watch(
+  computed(() => app.data.match.compound.focused),
+  (compound) => {
+    if (compound) {
+      // focus parent if focused
+      app.data.match.collection.focus(compound)
+      // unfocus unrelated ions
+      if (app.data.match.ion.focused?.target_compound_id !== compound.target_compound_id) {
+        app.data.match.ion.unfocus()
+      }
+    } else {
+      // unfocus child if unfocused
+      app.data.match.ion.unfocus()
+      // and unset visualized match
+      app.ui.matchVisualized.unset()
     }
   }
-})
-watchEffect(() => {
-  if (selected.isotope) {
-    selected.ion = ions.value.find(
-      ({ target_ion_id }) => selected.isotope.target_ion_id == target_ion_id
-    )
+)
+watch(
+  computed(() => app.data.match.ion.focused),
+  (ion) => {
+    if (ion) {
+      // focus parent if focused
+      app.data.match.compound.focus(ion)
+      // unfocus unrelated isotopes
+      if (app.data.match.isotope.focused?.target_ion_id !== ion.target_ion_id) {
+        app.data.match.isotope.unfocus()
+      }
+    } else {
+      // unfocus child if unfocused
+      app.data.match.isotope.unfocus()
+    }
   }
-})
+)
+watch(
+  computed(() => app.data.match.isotope.focused),
+  (isotope) => {
+    if (isotope) {
+      // focus parent in focused
+      app.data.match.ion.focus(isotope)
+    }
+  }
+)
 </script>
 
 <template v-if="collections">
@@ -294,13 +264,13 @@ watchEffect(() => {
         "
       />
     </template>
-    <ScrollPanel>
+    <div class="scroller">
       <!-- collections -->
       <DataTable
         :value="tree"
-        v-model:expandedRows="expanded.collections"
+        :expandedRows="expanded.collection"
         dataKey="target_collection_id"
-        v-model:selection="selected.collection"
+        v-model:selection="app.data.match.collection.focused"
         selectionMode="single"
         :metaKeySelection="false"
         contextMenu
@@ -316,7 +286,6 @@ watchEffect(() => {
           </template>
           <template #body="{ data }">
             <BaseMatchTag
-              v-if="data.match_score >= 0 && sampleStore.active?.matched == 1"
               :row="data"
               :tooltip="`Peak intensity: ${formatter.format(data?.sample_peak_area_sum)}`"
             />
@@ -325,7 +294,11 @@ watchEffect(() => {
         <Column header="Collection" field="target_collection_name" sortable>
           <template #body="{ data }">
             <span
-              :class="`pi pi-chevron-${data.target_collection_id in expanded.collections ? 'down' : 'right'}`"
+              :class="`pi pi-chevron-${
+                data.target_collection_id == app.data.match.collection.focused?.target_collection_id
+                  ? 'down'
+                  : 'right'
+              }`"
               style="font-size: smaller; margin-right: 0.5rem"
             />
             {{ data.target_collection_name }}
@@ -341,9 +314,9 @@ watchEffect(() => {
           <DataTable
             v-if="data.children.length > 0"
             :value="data.children"
-            v-model:expandedRows="expanded.compounds"
+            :expandedRows="expanded.compound"
             dataKey="target_compound_id"
-            v-model:selection="selected.compound"
+            v-model:selection="app.data.match.compound.focused"
             selectionMode="single"
             :metaKeySelection="false"
             v-model:contextMenuSelection="context.compound"
@@ -359,14 +332,24 @@ watchEffect(() => {
               </template>
               <template #body="{ data }">
                 <BaseMatchTag
-                  v-if="data.match_score >= 0 && sampleStore.active?.matched == 1"
                   :row="data"
                   :tooltip="`Peak intensity: ${formatter.format(data?.sample_peak_area_sum)}`"
                 />
               </template>
             </Column>
-            <Column expander style="width: 1ch" />
-            <Column header="Compound" field="target_compound_formula" sortable />
+            <Column header="Compound" field="target_compound_formula" sortable>
+              <template #body="{ data }">
+                <span
+                  :class="`pi pi-chevron-${
+                    data.target_compound_id == app.data.match.compound.focused?.target_compound_id
+                      ? 'down'
+                      : 'right'
+                  }`"
+                  style="font-size: smaller; margin-right: 0.5rem"
+                />
+                {{ data.target_compound_formula }}
+              </template>
+            </Column>
             <Column header="Name" sortable>
               <template #body="{ data }">
                 {{ data.target_compound_name }}
@@ -377,9 +360,9 @@ watchEffect(() => {
               <DataTable
                 v-if="data.children.length > 0"
                 :value="data.children"
-                v-model:expandedRows="expanded.ions"
+                :expandedRows="expanded.ion"
                 dataKey="target_ion_id"
-                v-model:selection="selected.ion"
+                v-model:selection="app.data.match.ion.focused"
                 selectionMode="single"
                 :metaKeySelection="false"
                 @rowSelect="(e) => showMatch(e.data)"
@@ -393,23 +376,32 @@ watchEffect(() => {
                   </template>
                   <template #body="{ data }">
                     <BaseMatchTag
-                      v-if="data.match_score >= 0 && sampleStore.active?.matched == 1"
                       :row="data"
                       :tooltip="`Peak intensity: ${formatter.format(data?.sample_peak_area_sum)}`"
                     />
                   </template>
                 </Column>
-                <Column expander style="width: 1ch" />
-                <Column header="Ion" field="target_ion_formula" sortable />
+                <Column header="Ion" field="target_ion_formula" sortable>
+                  <template #body="{ data }">
+                    <span
+                      :class="`pi pi-chevron-${
+                        data.target_ion_id == app.data.match.ion.focused?.target_ion_id
+                          ? 'down'
+                          : 'right'
+                      }`"
+                      style="font-size: smaller; margin-right: 0.5rem"
+                    />
+                    {{ data.target_ion_formula }}
+                  </template>
+                </Column>
                 <Column header="Mechanism" field="ionization_mechanism" sortable />
-
                 <template #expansion="{ data }">
                   <!-- isotopes   -->
                   <DataTable
                     v-if="data.children.length > 0"
                     :value="data.children"
                     dataKey="target_isotope_id"
-                    v-model:selection="selected.isotope"
+                    v-model:selection="app.data.match.isotope.focused"
                     selectionMode="single"
                     :metaKeySelection="false"
                     @rowSelect="(e) => showMatch(e.data)"
@@ -423,9 +415,8 @@ watchEffect(() => {
                       </template>
                       <template #body="{ data }">
                         <BaseMatchTag
-                          v-if="data.match_score >= 0 && sampleStore.active?.matched == 1"
                           :row="data"
-                          :tooltip="`Peak intensity: ${formatter.format(data?.sample_peak_area_sum)}`"
+                          :tooltip="`Peak intensity: ${formatter.format(data?.sample_peak_area)}`"
                         />
                       </template>
                     </Column>
@@ -452,7 +443,7 @@ watchEffect(() => {
       </DataTable>
       <ContextMenu ref="collectionContextMenu" :model="menu.collection" />
       <ContextMenu ref="compoundContextMenu" :model="menu.compound" />
-    </ScrollPanel>
+    </div>
   </Panel>
   <DialogTargetCollectionOp v-model:action="dialog.collection" :collection="context.collection" />
   <DialogTargetCompoundUpdate v-model:visible="dialog.compound" :compound="context.compound" />

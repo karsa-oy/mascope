@@ -4,6 +4,7 @@
 @layer override {
   * {
     box-sizing: border-box;
+    scrollbar-width: thin;
   }
 
   html,
@@ -77,7 +78,7 @@
 
   /* forms */
 
-  .p-float-label {
+  .p-floatlabel {
     margin: 1.75rem 0;
   }
 
@@ -117,6 +118,10 @@
     max-height: calc(100% - 1rem) !important;
   }
 
+  .browser .p-panel-content {
+    padding-right: 0.5rem;
+  }
+
   .browser .p-panel-header {
     padding: 0 0.5rem;
   }
@@ -131,8 +136,8 @@
     padding-left: 1.5rem !important;
   }
 
-  .browser .p-datatable-row-toggle-icon {
-    z-index: 50 !important;
+  .browser .p-datatable-row-expansion {
+    z-index: 100;
   }
 
   .browser .match-column {
@@ -158,6 +163,13 @@
   .browser .spinner .p-progressspinner::before {
     height: 15px;
     padding: 0;
+  }
+
+  .browser .scroller {
+    height: 100%;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    padding-right: 1rem;
   }
 
   /* chart */
@@ -188,4 +200,10 @@
     height: 100%;
     max-height: 100% !important;
   }
+}
+
+/* notification drawer */
+
+.p-drawer-content .p-message {
+  margin: 1rem 0;
 }

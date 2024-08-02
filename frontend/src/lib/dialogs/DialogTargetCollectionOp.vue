@@ -1,4 +1,6 @@
 <script setup>
+import { ref, reactive, computed, watch, watchEffect, onMounted, onBeforeUnmount } from 'vue'
+
 import Dialog from 'primevue/dialog'
 import FloatLabel from 'primevue/floatlabel'
 import SelectButton from 'primevue/selectbutton'
@@ -19,21 +21,16 @@ import Listbox from 'primevue/listbox'
 import Avatar from 'primevue/avatar'
 import { useConfirm } from 'primevue/useconfirm'
 
-import { ref, reactive, computed, watch, watchEffect, onMounted, onBeforeUnmount } from 'vue'
-
-import BaseClipboardContext from '@/lib/base/BaseClipboardContext.vue'
-
 import { api } from '@/api'
-import { useAppStore, useTargetsStore, useWorkspaceStore, useBatchStore } from '@/stores'
+import { useApp } from '@/stores'
 import { fromSpreadsheet, equals } from '@/lib/table'
+import { BaseClipboardContext } from '@/lib/base'
 import { clone } from '@/lib/utils'
+import { collectionTypes } from '@/lib/constants'
 
 const confirm = useConfirm()
 
-const appStore = useAppStore()
-const targetsStore = useTargetsStore()
-const workspaceStore = useWorkspaceStore()
-const batchStore = useBatchStore()
+const app = useApp()
 
 const action = defineModel('action')
 
@@ -42,7 +39,7 @@ const props = defineProps({
     type: Object
   }
 })
-const original = computed(() => props.collection ?? targetsStore.active)
+const original = computed(() => props.collection ?? app.data.target.collection.focused)
 
 // dialog visibility reactivity
 const visible = ref(false)
@@ -192,12 +189,12 @@ watchEffect(async () => {
   if (!selected.source || selected.source == 'Selection') {
     return
   } else if (selected.source === 'All') {
-    pending = targetsStore.getAllCompounds
+    pending = app.data.target.compound.list
   } else if (selected.source) {
-    const id = targetsStore.getAllCollections.find(
+    const id = app.data.target.collection.list.find(
       ({ target_collection_name }) => target_collection_name == selected.source
     ).target_collection_id
-    const collection = await targetsStore.getTargetCollection(id)
+    const collection = await app.data.target.collection.read(id)
     pending = collection?.target_compounds ?? []
   }
   if (pending.length) {
@@ -235,10 +232,10 @@ function loadCompounds(data) {
     compounds.selected.push(...reconciled.filter(unselected))
   }
 }
-function loadSpreadsheet({ data }) {
+function loadSpreadsheet({ rows }) {
   let prexisting = []
-  data.forEach((compound) => {
-    const record = targetsStore.targetCompoundsAll.find(
+  rows.forEach((compound) => {
+    const record = app.data.target.compound.list.find(
       (comp) => comp.target_compound_formula === compound.target_compound_formula
     )
     if (record) {
@@ -259,7 +256,15 @@ watchEffect(() => loadBatches(selected.workspace))
 
 async function loadBatches(workspace) {
   if (workspace) {
-    const latest = await workspaceStore.getWorkspaceBatches(workspace.workspace_id)
+    const latest = (
+      await api.request.read({
+        method: 'getAllBatches',
+        body: {
+          workspace_id: workspace.workspace_id
+        },
+        errorMessage: `Failed to load the workspace batches.`
+      })
+    ).data
     // reconcile with existing data
     batches.loaded = latest.map(
       (batch) =>
@@ -292,7 +297,7 @@ function execute() {
 
   switch (action.value) {
     case 'create': {
-      targetsStore.createCollection({
+      app.data.target.collection.create({
         ...common,
         target_compound_ids,
         sample_batch_ids,
@@ -301,7 +306,7 @@ function execute() {
       break
     }
     case 'update': {
-      targetsStore.updateCollection({
+      app.data.target.collection.update({
         ...common,
         target_collection_id,
         target_compound_ids,
@@ -310,7 +315,7 @@ function execute() {
       break
     }
     case 'update_batches': {
-      targetsStore.updateCollection({
+      app.data.target.collection.update({
         ...common,
         target_collection_id,
         sample_batch_ids
@@ -326,7 +331,7 @@ function execute() {
         acceptIcon: 'pi pi-trash',
         acceptLabel: 'Delete',
         accept: () => {
-          targetsStore.deleteCollection({
+          app.data.target.collection.delete({
             collectionId: info.id,
             collectionName: info.name,
             deleteOrphanCompounds: deleteOrphans.value
@@ -390,13 +395,13 @@ async function init(mode) {
       info.name = ''
       info.desc = ''
       info.type = 'TARGETS'
-      selected.workspace = workspaceStore.active
-      batches.selected = batchStore.active ? [batchStore.active] : []
+      selected.workspace = app.data.workspace.focused
+      batches.selected = app.data.batch.focused ? [app.data.batch.focused] : []
       break
     }
     case 'update_batches': {
       selected.tab = 'batches'
-      selected.workspace = workspaceStore.active
+      selected.workspace = app.data.workspace.focused
       batches.selected = (
         await api.request.read({
           method: 'getTargetCollection',
@@ -418,7 +423,7 @@ async function init(mode) {
 
 const addCompound = () => {
   loadSpreadsheet({
-    data: [
+    rows: [
       {
         target_compound_formula: add.formula,
         target_compound_name: add.name,
@@ -464,7 +469,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onEnter))
         </FloatLabel>
         <SelectButton
           v-model="info.type"
-          :options="targetsStore.collectionTypes"
+          :options="collectionTypes"
           :allowEmpty="false"
           :disabled="action == 'update_batches'"
         />
@@ -483,7 +488,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onEnter))
                 :options="[
                   'Selection',
                   'All',
-                  ...targetsStore.getAllCollections
+                  ...app.data.target.collection.list
                     .filter((coll) =>
                       action !== 'create'
                         ? coll.target_collection_id !== original.target_collection_id
@@ -537,7 +542,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onEnter))
                 <BaseClipboardContext
                   v-if="selected.source == 'Selection'"
                   info="You can also add compounds by pasting spreadsheet cells"
-                  @validated="loadSpreadsheet"
+                  @validated="(data) => loadSpreadsheet({ rows: data })"
                   :parse="
                     (text) => {
                       const { rows } = fromSpreadsheet(text, [
@@ -709,11 +714,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onEnter))
                 dataKey="workspace_id"
                 optionLabel="label"
                 :options="
-                  appStore.workspaces
+                  app.data.workspace.list
                     .sort((a, b) => {
                       // ensure the current workspace comes first
-                      if (a.workspace_id == workspaceStore.active.workspace_id) return -1
-                      if (b.workspace_id == workspaceStore.active.workspace_id) return 1
+                      if (a.workspace_id == app.data.workspace.focused.workspace_id) return -1
+                      if (b.workspace_id == app.data.workspace.focused.workspace_id) return 1
                       return 0
                     })
                     .map((workspace, index) => ({

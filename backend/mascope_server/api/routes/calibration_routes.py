@@ -3,7 +3,7 @@ from mascope_server.db.id import gen_id
 from ..utils.api_features import api_route
 from ..exceptions import NotFoundException
 
-from ..controllers.sample_items_controller import get_sample
+from ..controllers.sample_items_controller import get_sample_item
 from ..controllers.sample_files_controller import get_sample_files
 from ..controllers.sample_batches_controller import get_sample_batch
 from ..controllers.calibration_controller import (
@@ -43,7 +43,7 @@ async def calibration_mz_fit_route(
     ),
 ):
     # Verify the existance of sample item
-    sample = await get_sample(sample_item_id)
+    sample = await get_sample_item(sample_item_id)
     sample_item_name = sample["sample_item_name"]
 
     # Get data for notifications
@@ -108,7 +108,7 @@ async def calibration_mz_calibrate_sample_route(
     background_tasks: BackgroundTasks,
 ):
     # Verify the existance of sample item
-    sample = await get_sample(sample_item_id)
+    sample = await get_sample_item(sample_item_id)
     sample_item_name = sample["sample_item_name"]
 
     # Get data for notifications

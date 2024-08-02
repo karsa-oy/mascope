@@ -55,32 +55,6 @@ const handleError = (error) => {
   return Promise.reject(error)
 }
 
-const workspacesBaseUrl = '/workspaces'
-const batchesBaseUrl = '/sample_batches'
-const samplesBaseUrl = '/samples'
-const filesBaseUrl = '/sample_files'
-const itemsBaseUrl = '/sample_items'
-const calibrationBaseUrl = '/calibration'
-const matchBaseUrl = '/match'
-const matchAggregateBaseUrl = '/match/aggregate'
-const matchIsotopesBaseUrl = '/match/isotopes'
-const matchInterferencesBaseUrl = '/match/interferences'
-const matchIonsBaseUrl = '/match/ions'
-const matchCompoundsBaseUrl = '/match/compounds'
-const matchCollectionsBaseUrl = '/match/collections'
-const matchSamplesBaseUrl = '/match/samples'
-const matchRatingsBaseUrl = '/match/ratings'
-const targetCollectionsBaseUrl = '/target_collections'
-const targetCollectionsInSampleBatchBaseUrl = '/target_collections_in_sample_batch'
-const targetCompoundsBaseUrl = '/target_compounds'
-const targetCompoundsInTargetCollectionBaseUrl = '/target_compound_in_target_collections'
-const targetIonsBaseUrl = '/target_ions'
-const ionizationMechanismsBaseUrl = '/ionization_mechanisms'
-const targetIsotopesBaseUrl = '/target_isotopes'
-const instrumentFunctionsBaseUrl = '/instrument_functions'
-const attributeTemplatesBaseUrl = '/attribute_templates'
-const visualizationBaseUrl = '/visualization'
-
 export function createHttpClient() {
   const client = axios.create({
     baseURL: `${url}/api`,
@@ -105,11 +79,11 @@ export function createHttpClient() {
   client.interceptors.response.use(logResponse, handleError)
 
   return {
-    ...client,
+    client,
     // Workspaces
     getAllWorkspaces: async (params = {}) => {
       try {
-        return await client.get(workspacesBaseUrl, { params })
+        return await client.get('/workspaces', { params })
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error || `Failed to get all workspaces: ${error}`
@@ -118,7 +92,7 @@ export function createHttpClient() {
     },
     getWorkspace: async ({ workspaceId }) => {
       try {
-        return await client.get(`${workspacesBaseUrl}/${workspaceId}`)
+        return await client.get(`/workspaces/${workspaceId}`)
       } catch (error) {
         const userErrorMessage = error?.response?.data?.error || `Failed to get workspace: ${error}`
         throw new Error(userErrorMessage)
@@ -126,7 +100,7 @@ export function createHttpClient() {
     },
     createWorkspace: async (newWorkspace) => {
       try {
-        return await client.post(workspacesBaseUrl, newWorkspace)
+        return await client.post('/workspaces', newWorkspace)
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error ||
@@ -136,7 +110,7 @@ export function createHttpClient() {
     },
     deleteWorkspace: async (workspace) => {
       try {
-        return await client.delete(`${workspacesBaseUrl}/${workspace.workspace_id}`)
+        return await client.delete(`/workspaces/${workspace.workspace_id}`)
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error ||
@@ -146,7 +120,7 @@ export function createHttpClient() {
     },
     updateWorkspace: async ({ workspaceId, body }) => {
       try {
-        return await client.patch(`${workspacesBaseUrl}/${workspaceId}`, body)
+        return await client.patch(`/workspaces/${workspaceId}`, body)
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error ||
@@ -157,14 +131,14 @@ export function createHttpClient() {
     // Sample batches
     getAllBatches: async (params = {}) => {
       try {
-        return await client.get(batchesBaseUrl, { params })
+        return await client.get('/sample_batches', { params })
       } catch (error) {
         console.error('Failed to get all sample batches: ', error)
       }
     },
     getBatch: async ({ batchId }) => {
       try {
-        return await client.get(`${batchesBaseUrl}/${batchId}`)
+        return await client.get(`/sample_batches/${batchId}`)
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error || `Failed to get sample batch: ${error}`
@@ -173,7 +147,7 @@ export function createHttpClient() {
     },
     getBatchTargets: async ({ batchId, body }) => {
       try {
-        return await client.post(`${batchesBaseUrl}/${batchId}/targets`, body)
+        return await client.post(`/sample_batches/${batchId}/targets`, body)
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error || `Failed to get batch targets data: ${error}`
@@ -182,7 +156,7 @@ export function createHttpClient() {
     },
     createBatch: async (newBatch) => {
       try {
-        return await client.post(batchesBaseUrl, newBatch)
+        return await client.post('/sample_batches', newBatch)
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error ||
@@ -192,7 +166,7 @@ export function createHttpClient() {
     },
     deleteBatch: async ({ sample_batch_id, sample_batch_name }) => {
       try {
-        return await client.delete(`${batchesBaseUrl}/${sample_batch_id}`)
+        return await client.delete(`/sample_batches/${sample_batch_id}`)
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error ||
@@ -202,7 +176,7 @@ export function createHttpClient() {
     },
     updateBatch: async ({ batchId, body }) => {
       try {
-        return await client.patch(`${batchesBaseUrl}/${batchId}`, body)
+        return await client.patch(`/sample_batches/${batchId}`, body)
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error ||
@@ -212,7 +186,7 @@ export function createHttpClient() {
     },
     importSamplesToBatch: async ({ batch, body }) => {
       try {
-        return await client.post(`${batchesBaseUrl}/${batch.sample_batch_id}/import`, body)
+        return await client.post(`/sample_batches/${batch.sample_batch_id}/import`, body)
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error || `Failed to import samples: ${error}`
@@ -221,7 +195,7 @@ export function createHttpClient() {
     },
     copySampleBatch: async ({ batchId, body }) => {
       try {
-        return await client.post(`${batchesBaseUrl}/${batchId}/copy`, body)
+        return await client.post(`/sample_batches/${batchId}/copy`, body)
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error || `Failed to copy sample batch: ${error}`
@@ -230,7 +204,7 @@ export function createHttpClient() {
     },
     recalibrateSampleBatch: async ({ batchId, body }) => {
       try {
-        return await client.post(`${calibrationBaseUrl}/mz_calibrate/batch/${batchId}`, body)
+        return await client.post(`/calibration/mz_calibrate/batch/${batchId}`, body)
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error || `Failed to calibrate sample batch: ${error}`
@@ -239,7 +213,7 @@ export function createHttpClient() {
     },
     batchExportPeakData: async ({ sample_batch_id }) => {
       try {
-        return await client.get(`${batchesBaseUrl}/${sample_batch_id}/export_peaks`)
+        return await client.get(`/sample_batches/${sample_batch_id}/export_peaks`)
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error || `Failed to export sample batch peaks: ${error}`
@@ -247,19 +221,18 @@ export function createHttpClient() {
       }
     },
     // Samples
-    getAllSamples: async (body) => {
+    getAllSamples: async (params) => {
       try {
-        return await client.post(samplesBaseUrl, body)
+        return await client.get('/samples', { params })
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error || `Failed to get batch samples data: ${error}`
         throw new Error(userErrorMessage)
       }
     },
-
-    getSample: async ({ sampleId, body }) => {
+    getSample: async ({ sampleId }) => {
       try {
-        return await client.post(`${samplesBaseUrl}/${sampleId}`, body)
+        return await client.get(`/sample/${sampleId}`)
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error || `Failed to get the sample data: ${error}`
@@ -267,9 +240,9 @@ export function createHttpClient() {
       }
     },
 
-    getSampleIonMatches: async ({ sampleId, body }) => {
+    getSampleIonMatches: async ({ sampleId, params }) => {
       try {
-        return await client.post(`${samplesBaseUrl}/${sampleId}/ion_matches`, body)
+        return await client.post(`/samples/${sampleId}/ion_matches`, params)
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error || `Failed to get sample ion match data: ${error}`
@@ -279,7 +252,7 @@ export function createHttpClient() {
 
     getBatchMatchFilter: async (batchId) => {
       try {
-        return await client.get(`${samplesBaseUrl}/batch_match_filter/${batchId}`)
+        return await client.get(`/sample/batch_match_filter/${batchId}`)
       } catch (error) {
         console.error('Failed to initialize batch match filter: ', error)
       }
@@ -287,7 +260,7 @@ export function createHttpClient() {
 
     getSampleMatchFilter: async (sampleItemId, body) => {
       try {
-        return await client.post(`${samplesBaseUrl}/${sampleItemId}/sample_match_filter`, body)
+        return await client.post(`/sample/${sampleItemId}/sample_match_filter`, body)
       } catch (error) {
         console.error('Failed to initialize sample match filter: ', error)
       }
@@ -296,7 +269,7 @@ export function createHttpClient() {
     // Sample Files
     getAllSampleFiles: async (params = {}) => {
       try {
-        return await client.get(filesBaseUrl, { params })
+        return await client.get('/sample_files', { params })
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error || `Failed to get all sample files: ${error}`
@@ -305,7 +278,7 @@ export function createHttpClient() {
     },
     getRecentSampleFiles: async (params = {}) => {
       try {
-        return await client.get(`${filesBaseUrl}/recent`, { params })
+        return await client.get(`/sample_files/recent`, { params })
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error || `Failed to get recent acquisitions: ${error}`
@@ -314,35 +287,35 @@ export function createHttpClient() {
     },
     getSampleFile: async (sample_file_id) => {
       try {
-        return await client.get(`${filesBaseUrl}/${sample_file_id}`)
+        return await client.get(`/sample_files/${sample_file_id}`)
       } catch (error) {
         console.error('Failed to get sample file: ', error)
       }
     },
     createSampleFile: async (newSampleFile) => {
       try {
-        return await client.post(filesBaseUrl, newSampleFile)
+        return await client.post('/sample_files', newSampleFile)
       } catch (error) {
         console.error('Failed to create sample file: ', error)
       }
     },
     deleteSampleFile: async (sample_file_id) => {
       try {
-        return await client.delete(`${filesBaseUrl}/${sample_file_id}`)
+        return await client.delete(`/sample_files/${sample_file_id}`)
       } catch (error) {
         console.error('Failed to delete sample file: ', error)
       }
     },
     updateSampleFile: async (sample_file_id, updatedSampleFile) => {
       try {
-        return await client.patch(`${filesBaseUrl}/${sample_file_id}`, updatedSampleFile)
+        return await client.patch(`/sample_files/${sample_file_id}`, updatedSampleFile)
       } catch (error) {
         console.error('Failed to update sample file: ', error)
       }
     },
     getSampleSpectrum: async ({ sample_file_id }) => {
       try {
-        return await client.get(`${filesBaseUrl}/${sample_file_id}/spectrum`)
+        return await client.get(`/sample_files/${sample_file_id}/spectrum`)
       } catch (error) {
         console.error('Failed to get sample spectrum: ', error)
       }
@@ -351,14 +324,14 @@ export function createHttpClient() {
     // Sample Items
     getAllSampleItems: async (params = {}) => {
       try {
-        return await client.get(itemsBaseUrl, { params })
+        return await client.get('/sample_items', { params })
       } catch (error) {
         console.error('Failed to get all sample items: ', error)
       }
     },
     getSampleItem: async (sample_item_id) => {
       try {
-        return await client.get(`${itemsBaseUrl}/${sample_item_id}`)
+        return await client.get(`/sample_items/${sample_item_id}`)
       } catch (error) {
         console.error('Failed to get sample item: ', error)
       }
@@ -366,7 +339,7 @@ export function createHttpClient() {
 
     createSampleItem: async (sample) => {
       try {
-        return await client.post(itemsBaseUrl, sample)
+        return await client.post('/sample_items', sample)
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error ||
@@ -374,12 +347,11 @@ export function createHttpClient() {
         throw new Error(userErrorMessage)
       }
     },
-    processSampleItem: async ({ sample, alarms, params }) => {
+    processSampleItem: async ({ sample, params }) => {
       try {
-        return await client.post(`${itemsBaseUrl}/process`, {
+        return await client.post(`/sample_items/process`, {
           sample_item: sample,
-          mz_calibration_params: params,
-          alarms_list: alarms
+          mz_calibration_params: params
         })
       } catch (error) {
         const userErrorMessage =
@@ -390,7 +362,7 @@ export function createHttpClient() {
     },
     updateSampleItem: async ({ sampleId, body }) => {
       try {
-        return await client.patch(`${itemsBaseUrl}/${sampleId}`, body)
+        return await client.patch(`/sample_items/${sampleId}`, body)
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error ||
@@ -400,7 +372,7 @@ export function createHttpClient() {
     },
     deleteSampleItem: async ({ sampleId }) => {
       try {
-        return await client.delete(`${itemsBaseUrl}/${sampleId}`)
+        return await client.delete(`/sample_items/${sampleId}`)
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error || `Failed to delete sample item: ${error}`
@@ -409,7 +381,7 @@ export function createHttpClient() {
     },
     copySampleItem: async ({ sampleId, body }) => {
       try {
-        return await client.post(`${itemsBaseUrl}/${sampleId}/copy`, body)
+        return await client.post(`/sample_items/${sampleId}/copy`, body)
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error || `Failed to copy sample item: ${error}`
@@ -420,7 +392,7 @@ export function createHttpClient() {
     // Calibration
     getMzCalibration: async (params) => {
       try {
-        return await client.get(`${calibrationBaseUrl}/mz_calibration`, {
+        return await client.get(`/calibration/mz_calibration`, {
           params
         })
       } catch (error) {
@@ -436,7 +408,7 @@ export function createHttpClient() {
             sample_item_id: sampleId
           }
         }
-        return await client.post(`${calibrationBaseUrl}/mz_fit`, body, config)
+        return await client.post(`/calibration/mz_fit`, body, config)
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error || `Failed to mz fit sample '${sampleName}': ${error}`
@@ -453,7 +425,7 @@ export function createHttpClient() {
         }
         const body = { fit }
 
-        return await client.post(`${calibrationBaseUrl}/mz_apply`, body, config)
+        return await client.post(`/calibration/mz_apply`, body, config)
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error ||
@@ -464,7 +436,7 @@ export function createHttpClient() {
 
     calibrationMzCalibrateSample: async ({ sampleId, sampleName, body }) => {
       try {
-        return await client.post(`${calibrationBaseUrl}/mz_calibrate/sample/${sampleId}`, body)
+        return await client.post(`/calibration/mz_calibrate/sample/${sampleId}`, body)
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error || `Failed to m/z calibrate sample '${sampleName}': ${error}`
@@ -474,10 +446,7 @@ export function createHttpClient() {
 
     calibrationMzCalibrateBatch: async ({ batch, body }) => {
       try {
-        return await client.post(
-          `${calibrationBaseUrl}/mz_calibrate/batch/${batch.sample_batch_id}`,
-          body
-        )
+        return await client.post(`/calibration/mz_calibrate/batch/${batch.sample_batch_id}`, body)
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error ||
@@ -489,7 +458,7 @@ export function createHttpClient() {
     // Match
     rematchBatch: async ({ batchId, body = {} }) => {
       try {
-        return await client.post(`${matchBaseUrl}/rematch/batch/${batchId}`, body)
+        return await client.post(`/match/rematch/batch/${batchId}`, body)
       } catch (error) {
         const userErrorMessage = error?.response?.data?.error || `Failed to rematch batch: ${error}`
         throw new Error(userErrorMessage)
@@ -498,7 +467,7 @@ export function createHttpClient() {
 
     matchSampleCompute: async ({ sampleId, body = {} }) => {
       try {
-        return await client.post(`${matchBaseUrl}/compute/sample/${sampleId}`, body)
+        return await client.post(`/match/compute/sample/${sampleId}`, body)
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error || `Failed to compute mathes for sample: ${error}`
@@ -508,7 +477,7 @@ export function createHttpClient() {
 
     rematchSample: async ({ sampleId, body = {} }) => {
       try {
-        return await client.post(`${matchBaseUrl}/rematch/sample/${sampleId}`, body)
+        return await client.post(`/match/rematch/sample/${sampleId}`, body)
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error || `Failed to rematch sample: ${error}`
@@ -519,7 +488,7 @@ export function createHttpClient() {
     // MatchIsotopes
     getAllMatchIsotopes: async (params = {}) => {
       try {
-        return await client.get(`${matchIsotopesBaseUrl}`, { params })
+        return await client.get(`/match/isotopes`, { params })
       } catch (error) {
         const userErrorMessage = error?.response?.data?.error || `Failed to get matches: ${error}`
         throw new Error(userErrorMessage)
@@ -527,7 +496,7 @@ export function createHttpClient() {
     },
     getMatchIsotope: async (matchId) => {
       try {
-        return await client.get(`${matchIsotopesBaseUrl}/${matchId}`)
+        return await client.get(`/match/isotopes/${matchId}`)
       } catch (error) {
         console.error('Failed to get match isotope: ', error)
       }
@@ -536,14 +505,14 @@ export function createHttpClient() {
     // Match interferences
     getAllMatchInterferences: async (params = {}) => {
       try {
-        return await client.get(`${matchInterferencesBaseUrl}`, { params })
+        return await client.get(`/match/interferences`, { params })
       } catch (error) {
         console.error('Failed to get all match interferences: ', error)
       }
     },
     getMatchInterference: async (interferenceId) => {
       try {
-        return await client.get(`${matchInterferencesBaseUrl}/${interferenceId}`)
+        return await client.get(`/match/interferences/${interferenceId}`)
       } catch (error) {
         console.error('Failed to get match interference by id: ', error)
       }
@@ -552,7 +521,7 @@ export function createHttpClient() {
     // Match Ratings
     submitMatchRating: async (newMatchRating) => {
       try {
-        return await client.post(matchRatingsBaseUrl, newMatchRating)
+        return await client.post('/match/ratings', newMatchRating)
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error || `Failed to submit match rating: ${error}`
@@ -563,7 +532,7 @@ export function createHttpClient() {
     // Target collections
     getAllTargetCollections: async (params = {}) => {
       try {
-        return await client.get(`${targetCollectionsBaseUrl}`, { params })
+        return await client.get(`/target_collections`, { params })
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error || `Failed to get all target collections: ${error}`
@@ -573,7 +542,7 @@ export function createHttpClient() {
 
     getTargetCollection: async (collectionId) => {
       try {
-        return await client.get(`${targetCollectionsBaseUrl}/${collectionId}`)
+        return await client.get(`/target_collections/${collectionId}`)
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error || `Failed to get target collection: ${error}`
@@ -583,7 +552,7 @@ export function createHttpClient() {
 
     createTargetCollection: async (newCollection) => {
       try {
-        return await client.post(targetCollectionsBaseUrl, newCollection)
+        return await client.post('/target_collections', newCollection)
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error ||
@@ -594,7 +563,7 @@ export function createHttpClient() {
 
     updateTargetCollection: async ({ collectionId, body }) => {
       try {
-        return await client.patch(`${targetCollectionsBaseUrl}/${collectionId}`, body)
+        return await client.patch(`/target_collections/${collectionId}`, body)
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error ||
@@ -605,7 +574,7 @@ export function createHttpClient() {
 
     deleteTargetCollection: async ({ collectionId, collectionName, deleteOrphanCompounds }) => {
       try {
-        return await client.delete(`${targetCollectionsBaseUrl}/${collectionId}`, {
+        return await client.delete(`/target_collections/${collectionId}`, {
           params: {
             delete_orphan_compounds: deleteOrphanCompounds
           }
@@ -621,7 +590,7 @@ export function createHttpClient() {
     // Target Collections in Sample Batch
     getAllTargetCollectionsInSampleBatchByParams: async (params = {}) => {
       try {
-        return await client.get(targetCollectionsInSampleBatchBaseUrl, {
+        return await client.get('/target_collections_in_sample_batch', {
           params
         })
       } catch (error) {
@@ -632,7 +601,7 @@ export function createHttpClient() {
     // Target compounds
     getAllTargetCompounds: async (params = {}) => {
       try {
-        return await client.get(`${targetCompoundsBaseUrl}`, { params })
+        return await client.get(`/target_compounds`, { params })
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error || `Failed to get all target compounds: ${error}`
@@ -642,7 +611,7 @@ export function createHttpClient() {
 
     getTargetCompound: async (targetCompoundId) => {
       try {
-        return await client.get(`${targetCompoundsBaseUrl}/${targetCompoundId}`)
+        return await client.get(`/target_compounds/${targetCompoundId}`)
       } catch (error) {
         console.error('Failed to get target compound by id: ', error)
       }
@@ -650,21 +619,21 @@ export function createHttpClient() {
 
     createTargetCompounds: async (targetCompounds) => {
       try {
-        return await client.post(targetCompoundsBaseUrl, targetCompounds)
+        return await client.post('/target_compounds', targetCompounds)
       } catch (error) {
         console.error('Failed to create target compounds: ', error)
       }
     },
     updateTargetCompounds: async (targetCompounds) => {
       try {
-        return await client.patch(targetCompoundsBaseUrl, targetCompounds)
+        return await client.patch('/target_compounds', targetCompounds)
       } catch (error) {
         console.error('Failed to update target compounds: ', error)
       }
     },
     deleteTargetCompound: async (targetCompoundId) => {
       try {
-        return await client.delete(`${targetCompoundsBaseUrl}/${targetCompoundId}`)
+        return await client.delete(`/target_compounds/${targetCompoundId}`)
       } catch (error) {
         console.error('Failed to delete target compound: ', error)
       }
@@ -673,7 +642,7 @@ export function createHttpClient() {
     // Target compound in target collections
     getAllTargetCompoundsInTargetCollection: async (params = {}) => {
       try {
-        return await client.get(`${targetCompoundsInTargetCollectionBaseUrl}`, {
+        return await client.get('/target_compound_in_target_collections', {
           params
         })
       } catch (error) {
@@ -684,7 +653,7 @@ export function createHttpClient() {
     // Target ions
     getAllTargetIons: async (params = {}) => {
       try {
-        return await client.get(`${targetIonsBaseUrl}`, { params })
+        return await client.get('/target_ions', { params })
       } catch (error) {
         console.error('Failed to get all target ions: ', error)
       }
@@ -692,21 +661,21 @@ export function createHttpClient() {
 
     getTargetIon: async (targetIonId) => {
       try {
-        return await client.get(`${targetIonsBaseUrl}/${targetIonId}`)
+        return await client.get(`/target_ions/${targetIonId}`)
       } catch (error) {
         console.error('Failed to get target ion: ', error)
       }
     },
     updateTargetIon: async (data) => {
       try {
-        return await client.patch(`${targetIonsBaseUrl}/${data.target_ion_id}`, data.body)
+        return await client.patch(`/target_ions/${data.target_ion_id}`, data.body)
       } catch (error) {
         console.error(`Failed to update target ion ${data.target_ion_formula}`, error)
       }
     },
     saveTargetIonFilterParams: async (data) => {
       try {
-        const response = await client.patch(`${targetIonsBaseUrl}/${data.target_ion_id}`, data.body)
+        const response = await client.patch(`/target_ions/${data.target_ion_id}`, data.body)
         // TEMP the message forming should move to api route
         const successMessage = `Filtering parameters for '${data.target_ion_formula}' saved successfully!`
         response.data.message = successMessage
@@ -718,7 +687,7 @@ export function createHttpClient() {
     },
     deleteTargetIonFilterParams: async (data) => {
       try {
-        const response = await client.patch(`${targetIonsBaseUrl}/${data.target_ion_id}`, data.body)
+        const response = await client.patch(`/target_ions/${data.target_ion_id}`, data.body)
         // TEMP the message forming should move to api route
         const successMessage = `Filtering parameters for '${data.body.delete_instrument_filters}' instrument were deleted successfully!`
         response.data.message = successMessage
@@ -732,7 +701,7 @@ export function createHttpClient() {
     // Ionization mechanisms
     getAllIonizationMechanisms: async (params = {}) => {
       try {
-        return await client.get(`${ionizationMechanismsBaseUrl}`, {
+        return await client.get('/ionization_mechanisms', {
           params
         })
       } catch (error) {
@@ -744,7 +713,7 @@ export function createHttpClient() {
 
     getIonizationMechanism: async (ionizationMechanismId) => {
       try {
-        return await client.get(`${ionizationMechanismsBaseUrl}/${ionizationMechanismId}`)
+        return await client.get(`/ionization_mechanisms/${ionizationMechanismId}`)
       } catch (error) {
         console.error('Failed to get ionization mechanism by id: ', error)
       }
@@ -752,14 +721,14 @@ export function createHttpClient() {
     // Target isotopes
     getAllTargetIsotopes: async (params = {}) => {
       try {
-        return await client.get(`${targetIsotopesBaseUrl}`, { params })
+        return await client.get(`/target_isotopes`, { params })
       } catch (error) {
         console.error('Failed to get all target isotopes: ', error)
       }
     },
     getTargetIsotope: async (isotopeId) => {
       try {
-        return await client.get(`${targetIsotopesBaseUrl}/${isotopeId}`)
+        return await client.get(`/target_isotopes/${isotopeId}`)
       } catch (error) {
         console.error('Failed to get target isotope by id: ', error)
       }
@@ -768,7 +737,7 @@ export function createHttpClient() {
     // Instrument functions
     getAllInstrumentFunctions: async (params = {}) => {
       try {
-        return await client.get(`${instrumentFunctionsBaseUrl}`, {
+        return await client.get(`/instrument_functions`, {
           params
         })
       } catch (error) {
@@ -779,7 +748,7 @@ export function createHttpClient() {
     },
     getInstrumentFunction: async (params = {}) => {
       try {
-        return await client.get(`${instrumentFunctionsBaseUrl}/`, {
+        return await client.get(`/instrument_functions/`, {
           params
         })
       } catch (error) {
@@ -790,7 +759,7 @@ export function createHttpClient() {
     // Attribute templates
     getAllAttributeTemplates: async (params = {}) => {
       try {
-        return await client.get(`${attributeTemplatesBaseUrl}`, { params })
+        return await client.get(`/attribute_templates`, { params })
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error || `Failed to get attribute templates: ${error}`
@@ -799,7 +768,7 @@ export function createHttpClient() {
     },
     getAttributeTemplate: async (templateId) => {
       try {
-        return await client.get(`${attributeTemplatesBaseUrl}/${templateId}`)
+        return await client.get(`/attribute_templates/${templateId}`)
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error ||
@@ -809,7 +778,7 @@ export function createHttpClient() {
     },
     createAttributeTemplate: async (newTemplate) => {
       try {
-        return await client.post(attributeTemplatesBaseUrl, newTemplate)
+        return await client.post('/attribute_templates', newTemplate)
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error ||
@@ -820,7 +789,7 @@ export function createHttpClient() {
 
     updateAttributeTemplate: async ({ templateId, body }) => {
       try {
-        return await client.patch(`${attributeTemplatesBaseUrl}/${templateId}`, body)
+        return await client.patch(`/attribute_templates/${templateId}`, body)
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error ||
@@ -831,7 +800,7 @@ export function createHttpClient() {
 
     deleteAttributeTemplate: async ({ templateId, templateName }) => {
       try {
-        return await client.delete(`${attributeTemplatesBaseUrl}/${templateId}`)
+        return await client.delete(`/attribute_templates/${templateId}`)
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error ||
@@ -839,11 +808,10 @@ export function createHttpClient() {
         throw new Error(userErrorMessage)
       }
     },
-
     // Visualization
     getVisualizationIonFocus: async (params = {}) => {
       try {
-        return await client.get(`${visualizationBaseUrl}/ion_focus`, {
+        return await client.get(`/visualization/ion_focus`, {
           params
         })
       } catch (error) {
@@ -851,6 +819,88 @@ export function createHttpClient() {
           error?.response?.data?.error ||
           `Failed to visualize ion '${params.target_ion_id}' focus for sample '${params.sample_item_id}': ${error}`
         throw new Error(userErrorMessage)
+      }
+    },
+    // Batch Matches
+    getBatchMatchCollections: async ({ sample_batch_id, params = {} }) => {
+      try {
+        return await client.get(`/match/batch/${sample_batch_id}/collections`, { params })
+      } catch (error) {
+        throw new Error(
+          error?.response?.data?.error ??
+            `Failed to retrieve batch match collections (batch id ${sample_batch_id}): ${error}`
+        )
+      }
+    },
+    getBatchMatchCompounds: async ({ sample_batch_id, params = {} }) => {
+      try {
+        return await client.get(`/match/batch/${sample_batch_id}/compounds`, { params })
+      } catch (error) {
+        throw new Error(
+          error?.response?.data?.error ??
+            `Failed to retrieve batch match compounds (batch id ${sample_batch_id}): ${error}`
+        )
+      }
+    },
+    getBatchMatchIons: async ({ sample_batch_id, params = {} }) => {
+      try {
+        return await client.get(`/match/batch/${sample_batch_id}/ions`, { params })
+      } catch (error) {
+        throw new Error(
+          error?.response?.data?.error ??
+            `Failed to retrieve batch match ions (batch id ${sample_batch_id}): ${error}`
+        )
+      }
+    },
+    getBatchMatchIsotopes: async ({ sample_batch_id, params = {} }) => {
+      try {
+        return await client.get(`/match/batch/${sample_batch_id}/isotopes`, { params })
+      } catch (error) {
+        throw new Error(
+          error?.response?.data?.error ??
+            `Failed to retrieve batch match isotopes (batch id ${sample_batch_id}): ${error}`
+        )
+      }
+    },
+    // Sample Matches
+    getSampleMatchCollections: async ({ sample_item_id, params = {} }) => {
+      try {
+        return await client.get(`/match/sample/${sample_item_id}/collections`, { params })
+      } catch (error) {
+        throw new Error(
+          error?.response?.data?.error ??
+            `Failed to retrieve sample match collections (sample id ${sample_item_id}): ${error}`
+        )
+      }
+    },
+    getSampleMatchCompounds: async ({ sample_item_id, params = {} }) => {
+      try {
+        return await client.get(`/match/sample/${sample_item_id}/compounds`, { params })
+      } catch (error) {
+        throw new Error(
+          error?.response?.data?.error ??
+            `Failed to retrieve sample match compounds (sample id ${sample_item_id}): ${error}`
+        )
+      }
+    },
+    getSampleMatchIons: async ({ sample_item_id, params = {} }) => {
+      try {
+        return await client.get(`/match/sample/${sample_item_id}/ions`, { params })
+      } catch (error) {
+        throw new Error(
+          error?.response?.data?.error ??
+            `Failed to retrieve sample match ions (sample id ${sample_item_id}): ${error}`
+        )
+      }
+    },
+    getSampleMatchIsotopes: async ({ sample_item_id, params = {} }) => {
+      try {
+        return await client.get(`/match/sample/${sample_item_id}/isotopes`, { params })
+      } catch (error) {
+        throw new Error(
+          error?.response?.data?.error ??
+            `Failed to retrieve sample match isotopes (sample id ${sample_item_id}): ${error}`
+        )
       }
     }
   }

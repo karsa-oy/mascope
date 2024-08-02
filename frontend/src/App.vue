@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted } from 'vue'
+import { computed } from 'vue'
 
 import ProgressSpinner from 'primevue/progressspinner'
 import ConfirmDialog from 'primevue/confirmdialog'
@@ -8,48 +8,47 @@ import { useToast } from 'primevue/usetoast'
 
 import { beautifySnakeCase } from '@/lib/utils'
 import { BaseKarsaLogo } from '@/lib/base'
-import { useAppStore, useNotification, useKeyStore } from '@/stores'
+import { useApp } from '@/stores'
 
 const toast = useToast()
 
-const appStore = useAppStore()
-const keyStore = useKeyStore()
+const app = useApp()
 
-const notification = useNotification()
-
-// init
-
-appStore.load()
-
-onMounted(() => {
-  // add event listeners
-  window.addEventListener('keydown', (event) => {
-    keyStore.down(event)
-  })
-  window.addEventListener('keyup', (event) => {
-    keyStore.up(event)
-  })
-})
+const ready = computed(() => app.data.workspace.list.length > 0)
 
 // toaster
-notification.on('*', ({ status, type, message }) => {
-  if (status !== 'pending') {
-    const severity =
-      {
-        warning: 'warn'
-      }[status] ?? status
-    toast.add({
-      severity,
-      summary: `${beautifySnakeCase(type)} ${status}`,
-      detail: message,
-      life: status === 'error' ? 10000 : 3000
-    })
-  }
-})()
+app.ui.notification
+  .on('*', ({ status, type, message }) => {
+    if (status !== 'pending') {
+      const severity =
+        {
+          warning: 'warn'
+        }[status] ?? status
+      toast.add({
+        severity,
+        summary: `${beautifySnakeCase(type)} ${status}`,
+        detail: message,
+        life: status === 'error' ? 10000 : 3000
+      })
+    }
+  })
+  .unmount()
+
+// focus new workspace
+app.ui.notification
+  .on('create_workspace', ({ status, data }) => {
+    if (status == 'success') {
+      const createdWorkspace = app.data.workspace.list.find(
+        (workspace) => workspace.workspace_id == data.response.data.workspace_id
+      )
+      app.data.workspace.focus(createdWorkspace)
+    }
+  })
+  .unmount()
 </script>
 
 <template>
-  <div id="app" v-if="appStore.ready">
+  <div id="app" v-if="ready">
     <RouterView />
   </div>
   <div id="loading" v-else>
@@ -59,7 +58,7 @@ notification.on('*', ({ status, type, message }) => {
       <strong>Loading...</strong>
     </div>
   </div>
-  <Toast position="bottom-right" v-if="!notification.drawer" />
+  <Toast position="bottom-right" v-if="!app.ui.notification.drawer" />
   <ConfirmDialog />
 </template>
 

@@ -1,6 +1,5 @@
 from typing import Optional
 import pandas as pd
-import numpy as np
 from mascope_server.api.utils.api_features import api_controller
 from mascope_server.api.controllers.samples_controller import get_sample
 from mascope_server.api.controllers.sample_items_controller import get_sample_item
@@ -28,6 +27,7 @@ from mascope_server.api.controllers.match.match_interferences_controller import 
     get_match_interferences,
 )
 from mascope_server.api.controllers.match.match_data_ops import apply_filter_params
+from mascope_server.api.controllers.match.util import sort_and_paginate_match_sample_df
 import mascope_runtime as runtime
 
 logger = runtime.logger.service("backend")
@@ -86,50 +86,35 @@ async def get_match_sample_collections(
         sample_item_id=sample_item_id,
     )
 
-    # Merging: Combine target ions DataFrame with match ions DataFrame
-    target_collections_df = pd.DataFrame(target_collections["data"])
-    match_collections_df = pd.DataFrame(match_collections["data"]).set_index(
-        "target_collection_id"
-    )
-    match_sample_collections_df = pd.merge(
-        target_collections_df,
-        match_collections_df,
-        left_on="target_collection_id",
-        right_index=True,
-        how="left",
-    )
+    # Merging: Combine target collections data with match collections data
+    match_collections_data = {
+        item["target_collection_id"]: item for item in match_collections["data"]
+    }
+    match_sample_collections = []
+    for collection in target_collections["data"]:
+        collection.update(
+            match_collections_data.get(
+                collection["target_collection_id"],
+                {
+                    "match_collection_id": None,
+                    "sample_item_id": sample_item_id,
+                    "match_score": None,
+                    "match_category": None,
+                    "sample_peak_area_sum": None,
+                    "sample_peak_interference_sum": None,
+                    "match_collection_utc_created": None,
+                    "match_collection_utc_modified": None,
+                },
+            )
+        )
+        match_sample_collections.append(collection)
 
-    # Replace match_score and match_category NaN for sorting and ensure match_category remains integer
-    match_sample_collections_df["match_score"] = match_sample_collections_df[
-        "match_score"
-    ].fillna(-1)
-    match_sample_collections_df["match_category"] = (
-        match_sample_collections_df["match_category"].fillna(-1).astype(int)
-    )
+    # Convert to pandas dataframe for sorting and pagination
+    match_sample_collections_df = pd.DataFrame(match_sample_collections)
 
-    # Sorting data
-    sort_ascending = [(order != "desc"), (order != "desc"), (order != "desc")]
-    match_sample_collections_df = match_sample_collections_df.sort_values(
-        by=["target_collection_id", "match_category", "match_score"],
-        ascending=sort_ascending,
-    )
-
-    # Pagination logic
-    match_sample_collections_df = match_sample_collections_df.iloc[
-        page * limit : (page + 1) * limit
-    ]
-
-    # Replace -1 back to None for match_category and match_score if it was originally NaN
-    match_sample_collections_df["match_score"] = match_sample_collections_df[
-        "match_score"
-    ].replace(-1, None)
-    match_sample_collections_df["match_category"] = match_sample_collections_df[
-        "match_category"
-    ].replace(-1, None)
-
-    # Replace all other NaN and NaT with None for JSON compatibility
-    match_sample_collections_df = match_sample_collections_df.replace(
-        [np.nan, pd.NaT], None
+    # Sort and paginate the DataFrame
+    match_sample_collections_df = sort_and_paginate_match_sample_df(
+        match_sample_collections_df, order, page, limit
     )
 
     logger.debug(match_sample_collections_df)
@@ -202,46 +187,35 @@ async def get_match_sample_compounds(
         sample_item_id=sample_item_id,
     )
 
-    # Create DataFrames and merge
-    target_compounds_df = pd.DataFrame(target_compounds["data"])
-    match_compounds_df = pd.DataFrame(match_compounds["data"]).set_index(
-        "target_compound_id"
-    )
-    match_sample_compounds_df = target_compounds_df.merge(
-        match_compounds_df, left_on="target_compound_id", right_index=True, how="left"
-    )
+    # Merging: Combine target compounds data with match compounds data
+    match_compounds_data = {
+        item["target_compound_id"]: item for item in match_compounds["data"]
+    }
+    match_sample_compounds = []
+    for compound in target_compounds["data"]:
+        compound.update(
+            match_compounds_data.get(
+                compound["target_compound_id"],
+                {
+                    "match_compound_id": None,
+                    "sample_item_id": sample_item_id,
+                    "match_score": None,
+                    "match_category": None,
+                    "sample_peak_area_sum": None,
+                    "sample_peak_interference_sum": None,
+                    "match_compound_utc_created": None,
+                    "match_compound_utc_modified": None,
+                },
+            )
+        )
+        match_sample_compounds.append(compound)
 
-    # Handle NaN values for sorting and convert them to None for JSON serialization
-    match_sample_compounds_df["match_score"] = match_sample_compounds_df[
-        "match_score"
-    ].fillna(-1)
-    match_sample_compounds_df["match_category"] = (
-        match_sample_compounds_df["match_category"].fillna(-1).astype(int)
-    )
+    # Convert to pandas dataframe for sorting and pagination
+    match_sample_compounds_df = pd.DataFrame(match_sample_compounds)
 
-    # Sorting data based on provided order criteria
-    sort_ascending = [(order != "desc"), (order != "desc"), (order != "desc")]
-    match_sample_compounds_df = match_sample_compounds_df.sort_values(
-        by=["target_collection_id", "match_category", "match_score"],
-        ascending=sort_ascending,
-    )
-
-    # Pagination logic
-    match_sample_compounds_df = match_sample_compounds_df.iloc[
-        page * limit : (page + 1) * limit
-    ]
-
-    # Replace -1 back to None for match_category and match_score if it was originally NaN
-    match_sample_compounds_df["match_score"] = match_sample_compounds_df[
-        "match_score"
-    ].replace(-1, None)
-    match_sample_compounds_df["match_category"] = match_sample_compounds_df[
-        "match_category"
-    ].replace(-1, None)
-
-    # Replace all other NaN and NaT with None for JSON compatibility
-    match_sample_compounds_df = match_sample_compounds_df.replace(
-        [np.nan, pd.NaT], None
+    # Sort and paginate the DataFrame
+    match_sample_compounds_df = sort_and_paginate_match_sample_df(
+        match_sample_compounds_df, order, page, limit
     )
 
     logger.debug(match_sample_compounds_df)
@@ -321,43 +295,34 @@ async def get_match_sample_ions(
         sample_item_id=sample_item_id,
     )
 
-    # Merging: Combine target ions DataFrame with match ions DataFrame
-    target_ions_df = pd.DataFrame(target_ions["data"])
-    match_ions_df = pd.DataFrame(match_ions["data"]).set_index("target_ion_id")
-    match_sample_ions_df = pd.merge(
-        target_ions_df,
-        match_ions_df,
-        left_on="target_ion_id",
-        right_index=True,
-        how="left",
+    # Merging: Combine target ions data with match ions data
+    match_ions_data = {item["target_ion_id"]: item for item in match_ions["data"]}
+    match_sample_ions = []
+    for ion in target_ions["data"]:
+        ion.update(
+            match_ions_data.get(
+                ion["target_ion_id"],
+                {
+                    "match_ion_id": None,
+                    "sample_item_id": sample_item_id,
+                    "match_score": None,
+                    "match_category": None,
+                    "sample_peak_area_sum": None,
+                    "sample_peak_interference_sum": None,
+                    "match_ion_utc_created": None,
+                    "match_ion_utc_modified": None,
+                },
+            )
+        )
+        match_sample_ions.append(ion)
+
+    # Convert to pandas dataframe for sorting and pagination
+    match_sample_ions_df = pd.DataFrame(match_sample_ions)
+
+    # Sort and paginate the DataFrame
+    match_sample_ions_df = sort_and_paginate_match_sample_df(
+        match_sample_ions_df, order, page, limit
     )
-
-    # Replace match_score and match_category NaN for sorting and ensure match_category remains integer
-    match_sample_ions_df["match_score"] = match_sample_ions_df["match_score"].fillna(-1)
-    match_sample_ions_df["match_category"] = (
-        match_sample_ions_df["match_category"].fillna(-1).astype(int)
-    )
-
-    # Sorting data
-    sort_ascending = [(order != "desc"), (order != "desc"), (order != "desc")]
-    match_sample_ions_df = match_sample_ions_df.sort_values(
-        by=["target_collection_id", "match_category", "match_score"],
-        ascending=sort_ascending,
-    )
-
-    # Pagination logic
-    match_sample_ions_df = match_sample_ions_df.iloc[page * limit : (page + 1) * limit]
-
-    # Replace -1 back to None for match_category and match_score if it was originally NaN
-    match_sample_ions_df["match_score"] = match_sample_ions_df["match_score"].replace(
-        -1, None
-    )
-    match_sample_ions_df["match_category"] = match_sample_ions_df[
-        "match_category"
-    ].replace(-1, None)
-
-    # Replace all other NaN and NaT with None for JSON compatibility
-    match_sample_ions_df = match_sample_ions_df.replace([np.nan, pd.NaT], None)
 
     logger.debug(match_sample_ions_df)
 
@@ -388,7 +353,7 @@ async def get_match_sample_isotopes(
     2. Fetch target isotopes based on the filter parameters including batch, ion, and collection IDs.
     3. If no target isotopes are found, return a response indicating no data.
     4. Fetch matched isotopes and interference data based on the sample item ID.
-    5. Merge target isotope data with matched isotopes and interference data using DataFrames.
+    5. Merge target isotope data with matched isotopes and interference data.
     6. Add sample instrument data to each merged record.
     7. Apply filtering parameters to adjust the match score and categorize matches.
     8. Sort the filtered DataFrame based on 'target_collection_id', 'match_category', and 'match_score', handling NaNs appropriately.
@@ -436,59 +401,56 @@ async def get_match_sample_isotopes(
     # Fetch match isotopes and interferences for the sample item
     match_isotopes = await get_match_isotopes(sample_item_id=sample_item_id)
     match_interferences = await get_match_interferences(sample_item_id=sample_item_id)
+    match_isotopes_data = {
+        item["target_isotope_id"]: item for item in match_isotopes["data"]
+    }
+    match_interferences_data = {
+        item["target_isotope_id"]: item for item in match_interferences["data"]
+    }
 
-    # Create DataFrames
-    target_df = pd.DataFrame(target_isotopes["data"])
-    match_iso_df = pd.DataFrame(match_isotopes["data"]).set_index("target_isotope_id")
-    interference_df = pd.DataFrame(match_interferences["data"]).set_index(
-        "target_isotope_id"
-    )
+    # Merge target isotopes with match isotopes data
+    match_sample_isotopes = []
+    for isotope in target_isotopes["data"]:
+        match_isotope_data = match_isotopes_data.get(
+            isotope["target_isotope_id"],
+            {
+                "match_isotope_id": None,
+                "sample_item_id": sample_item_id,
+                "sample_peak_id": None,
+                "sample_peak_mz": None,
+                "sample_peak_area": None,
+                "sample_peak_area_relative": None,
+                "sample_peak_tof": None,
+                "match_abundance_error": None,
+                "match_mz_error": None,
+                "match_isotope_correlation": None,
+                "match_score": None,
+                "match_isotope_utc_created": None,
+                "match_isotope_utc_modified": None,
+            },
+        )
+        isotope.update(match_isotope_data)
+        match_interference_data = match_interferences_data.get(
+            isotope["target_isotope_id"],
+            {
+                "sample_peak_interference": None,
+            },
+        )
+        isotope.update(match_interference_data)
+        # Add instrument data to each record for filtering logic
+        isotope["instrument"] = instrument
+        match_sample_isotopes.append(isotope)
 
-    # Merge DataFrames
-    match_sample_isotopes_df = pd.merge(
-        target_df,
-        match_iso_df,
-        left_on="target_isotope_id",
-        right_index=True,
-        how="left",
-    ).merge(interference_df, left_on="target_isotope_id", right_index=True, how="left")
-
-    # Add instrument data to each record for filtering logic
-    match_sample_isotopes_df["instrument"] = instrument
+    # Convert to DataFrame for filtering
+    match_sample_isotopes_df = pd.DataFrame(match_sample_isotopes)
 
     # Apply filtering to filter the match_score and assign match_category
     match_sample_isotopes_df = apply_filter_params(match_sample_isotopes_df)
 
-    # Replace match_score and match_category NaN for sorting and ensure match_category remains integer
-    match_sample_isotopes_df["match_score"] = match_sample_isotopes_df[
-        "match_score"
-    ].fillna(-1)
-    match_sample_isotopes_df["match_category"] = (
-        match_sample_isotopes_df["match_category"].fillna(-1).astype(int)
+    # Sort and paginate the DataFrame
+    match_sample_isotopes_df = sort_and_paginate_match_sample_df(
+        match_sample_isotopes_df, order, page, limit
     )
-
-    # Sorting data
-    sort_ascending = [(order != "desc"), (order != "desc"), (order != "desc")]
-    match_sample_isotopes_df = match_sample_isotopes_df.sort_values(
-        by=["target_collection_id", "match_category", "match_score"],
-        ascending=sort_ascending,
-    )
-
-    # Pagination logic
-    match_sample_isotopes_df = match_sample_isotopes_df.iloc[
-        page * limit : (page + 1) * limit
-    ]
-
-    # Replace -1 back to None for match_category and match_score if it was originally NaN
-    match_sample_isotopes_df["match_score"] = match_sample_isotopes_df[
-        "match_score"
-    ].replace(-1, None)
-    match_sample_isotopes_df["match_category"] = match_sample_isotopes_df[
-        "match_category"
-    ].replace(-1, None)
-
-    # Replace all other NaN and NaT with None for JSON compatibility
-    match_sample_isotopes_df = match_sample_isotopes_df.replace([np.nan, pd.NaT], None)
 
     logger.debug(match_sample_isotopes_df)
 

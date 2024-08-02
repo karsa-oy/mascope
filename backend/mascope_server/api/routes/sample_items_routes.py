@@ -110,7 +110,6 @@ async def process_sample_item_route(
         process_sample_item,
         sample_item=body.sample_item,
         mz_calibration_params=body.mz_calibration_params,
-        alarms_list=body.alarms_list,
         independent_transaction=True,
         sid=sid,
         process_id=process_id,

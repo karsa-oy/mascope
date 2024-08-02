@@ -1,16 +1,16 @@
 from fastapi import APIRouter, Query, Depends
 from mascope_server.api.utils.api_features import api_route
-from mascope_server.api.controllers.samples_controller import (
-    get_sample,
-    get_samples,
+from mascope_server.api.controllers.samples_ops_controller import (
+    get_sample_aggregate_matches,
+    get_samples_aggregate_matches,
     init_batch_match_filter,
     init_sample_match_filter,
     get_sample_ion_matches,
     get_sample_compound_matches,
 )
-from mascope_server.api.controllers.samples_controller_new import (
-    get_samples_new,
-    get_sample_new,
+from mascope_server.api.controllers.samples_controller import (
+    get_samples,
+    get_sample,
 )
 from mascope_server.api.models.pydantic_models.sample_pydantic_model import (
     GetSamplesBody,
@@ -24,28 +24,28 @@ from mascope_server.api.models.pydantic_models.sample_pydantic_model import (
 samples_router = APIRouter()
 
 
-@samples_router.get("/api/samples/new", tags=["Samples Loading"])
-@api_route()
-async def get_samples_new_route(
-    query_params: GetSamplesQueryParams = Depends(),
-):
-    return await get_samples_new(**query_params.model_dump())
-
-
-@samples_router.get("/api/samples/new/{sample_item_id}")
-@api_route()
-async def get_sample_new_route(
-    sample_item_id: str,
-):
-    return await get_sample_new(sample_item_id=sample_item_id)
-
-
-@samples_router.post("/api/samples")
+@samples_router.get("/api/samples", tags=["Samples Loading"])
 @api_route()
 async def get_samples_route(
+    query_params: GetSamplesQueryParams = Depends(),
+):
+    return await get_samples(**query_params.model_dump())
+
+
+@samples_router.get("/api/samples/{sample_item_id}")
+@api_route()
+async def get_sample_route(
+    sample_item_id: str,
+):
+    return await get_sample(sample_item_id=sample_item_id)
+
+
+@samples_router.post("/api/samples/old")
+@api_route()
+async def get_samples_aggregate_matches_route(
     body: GetSamplesBody,
 ):
-    result = await get_samples(**body.model_dump())
+    result = await get_samples_aggregate_matches(**body.model_dump())
 
     # Default message
     message = "Samples with no match info"
@@ -70,13 +70,15 @@ async def get_samples_route(
     return response
 
 
-@samples_router.post("/api/samples/{sample_item_id}")
+@samples_router.post("/api/samples/old/{sample_item_id}")
 @api_route()
-async def get_sample_route(
+async def get_sample_aggregate_matches_route(
     sample_item_id: str,
     body: GetSampleBody,
 ):
-    sample_data = await get_sample(sample_item_id=sample_item_id, **body.model_dump())
+    sample_data = await get_sample_aggregate_matches(
+        sample_item_id=sample_item_id, **body.model_dump()
+    )
 
     if sample_data and body.sample_matches_info:
         if sample_data and sample_data.get("matched", 0) > 0:

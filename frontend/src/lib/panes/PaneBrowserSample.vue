@@ -3,7 +3,6 @@ import { useConfirm } from 'primevue/useconfirm'
 
 import { ref, reactive, computed, watch, watchEffect } from 'vue'
 
-import ScrollPanel from 'primevue/scrollpanel'
 import Panel from 'primevue/panel'
 import Button from 'primevue/button'
 import TabMenu from 'primevue/tabmenu'
@@ -27,14 +26,11 @@ import {
 
 import { beautifySnakeCase } from '@/lib/utils'
 import { batchExportCsv } from '@/lib/table'
-import { useWorkspaceStore, useSampleStore, useBatchStore, useFocusedMatch } from '@/stores'
+import { useApp } from '@/stores'
 
 const confirm = useConfirm()
 
-const workspaceStore = useWorkspaceStore()
-const sampleStore = useSampleStore()
-const batchStore = useBatchStore()
-const focusedMatch = useFocusedMatch()
+const app = useApp()
 
 const dialog = reactive({
   batch: {
@@ -50,12 +46,10 @@ const dialog = reactive({
 
 const batch = reactive({
   expanded: {},
-  selected: null,
   context: null,
   pasted: null
 })
 const item = reactive({
-  selected: null,
   context: null,
   pasted: null
 })
@@ -71,16 +65,24 @@ const pending = reactive({
 const batchOptionsPopover = ref()
 
 watch(
-  computed(() => batch.selected),
+  computed(() => app.data.batch.focused),
   async (selected) => {
     if (selected) {
-      const batchId = batch.selected.sample_batch_id
+      const batchId = app.data.batch.focused.sample_batch_id
       batch.expanded = { [batchId]: true }
-      await batchStore.load(selected.sample_batch_id)
+      app.data.batch.focus(selected)
       handlePending()
     } else {
       batch.expanded = {}
-      batchStore.unload()
+      app.data.batch.unfocus()
+    }
+  }
+)
+watch(
+  computed(() => Object.keys(batch.expanded).length == 0),
+  async (collapsed) => {
+    if (collapsed) {
+      app.data.sample.unfocus()
     }
   }
 )
@@ -90,41 +92,41 @@ function handlePending() {
     pending.batchExport = false
   }
   if (pending.peakExport) {
-    batchStore.exportPeaks(batchStore.active)
+    app.data.batch.exportPeaks(app.data.batch.focused)
     pending.peakExport = false
   }
 }
 watch(
-  computed(() => item.selected),
+  computed(() => app.data.sample.focused),
   (selected) => {
-    if (selected?.sample_item_id == sampleStore.active?.sample_item_id) {
+    if (selected?.sample_item_id == app.data.sample.focused?.sample_item_id) {
       return
     }
     if (selected) {
-      sampleStore.load(selected)
+      app.data.sample.focus(selected)
     } else {
-      sampleStore.unload()
+      app.data.sample.unfocus()
     }
   }
 )
 watch(
-  computed(() => sampleStore.active),
+  computed(() => app.data.sample.focused),
   (active) => {
-    if (active?.sample_item_id == item.selected?.sample_item_id) {
+    if (active?.sample_item_id == app.data.sample.focused?.sample_item_id) {
       return
     }
     if (active) {
-      item.selected = active
+      app.data.sample.focused = active
     } else {
-      item.selected = null
+      app.data.sample.focused = null
     }
   }
 )
 watch(
-  computed(() => workspaceStore.active),
+  computed(() => app.data.workspace.focused),
   () => {
-    batch.selected = null
-    item.selected = null
+    app.data.batch.focused = null
+    app.data.sample.focused = null
   }
 )
 
@@ -135,10 +137,10 @@ const formatter = new Intl.NumberFormat('en-US', {
 
 // computed
 const tree = computed(() => {
-  return workspaceStore.batches.map((batch) => ({
+  return app.data.batch.list.map((batch) => ({
     ...batch,
     children:
-      batchStore.sampleItems?.filter((sample) => sample.sample_batch_id == batch.sample_batch_id) ??
+      app.data.sample.list?.filter((sample) => sample.sample_batch_id == batch.sample_batch_id) ??
       []
   }))
 })
@@ -195,10 +197,10 @@ const menu = computed(() => ({
 
       icon: 'pi pi-file-export',
       command: () => {
-        if (batch.selected?.sample_batch_id == batch.context.sample_batch_id) {
+        if (app.data.batch.focused?.sample_batch_id == batch.context.sample_batch_id) {
           batchExportCsv()
         } else {
-          batch.selected = batch.context
+          app.data.batch.focused = batch.context
           pending.batchExport = true
         }
       },
@@ -210,14 +212,14 @@ const menu = computed(() => ({
       command: () => {
         confirm.require({
           header: 'Export batch peak data',
-          message: `Export peak data for batch "${batchStore.active.sample_batch_name}"?`,
+          message: `Export peak data for batch "${app.data.batch.focused.sample_batch_name}"?`,
           acceptIcon: 'pi pi-file-export',
           acceptLabel: 'Export',
           accept: () => {
-            if (batch.selected?.sample_batch_id == batch.context.sample_batch_id) {
-              batchStore.exportPeaks(batchStore.active)
+            if (app.data.batch.focused?.sample_batch_id == batch.context.sample_batch_id) {
+              app.data.batch.exportPeaks(app.data.batch.focused)
             } else {
-              batch.selected = batch.context
+              app.data.batch.focused = batch.context
               pending.peakExport = true
             }
           },
@@ -239,7 +241,7 @@ const menu = computed(() => ({
     {
       label: 'Rematch batch',
       icon: 'pi pi-replay',
-      command: () => batchStore.rematchBatch(batch.context),
+      command: () => app.data.batch.rematch(batch.context),
       visible: batch.context !== null
     }
   ],
@@ -273,16 +275,15 @@ const menu = computed(() => ({
         confirm.require({
           header: 'Deleting item',
           message: `Delete sample "${item.context.sample_item_name}"
-          from batch "${batchStore.active.sample_batch_name}"?`,
+          from batch "${app.data.batch.focused.sample_batch_name}"?`,
           acceptIcon: 'pi pi-trash',
           acceptLabel: 'Delete',
           accept: async () => {
-            const itemId = item.context.sample_item_id
             // unload if necessary
-            if (itemId == sampleStore.active?.sample_item_id) {
-              sampleStore.unload()
+            if (item.context.sample_item_id == app.data.sample.focused?.sample_item_id) {
+              app.data.sample.unfocus()
             }
-            await sampleStore.deleteSampleItem(itemId)
+            await app.data.sample.delete(item.context)
           },
           rejectLabel: 'Cancel',
           rejectIcon: 'pi pi-times'
@@ -301,7 +302,7 @@ const menu = computed(() => ({
       label: `Rematch item`,
       icon: 'pi pi-replay',
       command: async () => {
-        await sampleStore.matchSampleRematch(item.context)
+        await app.data.sample.rematch(item.context)
       }
     }
   ]
@@ -335,9 +336,9 @@ async function parseClipboard() {
 }
 async function pasteBatch() {
   if (batch.pasted) {
-    await batchStore.copyBatch({
+    await app.data.batch.copy({
       sample_batch_id: batch.pasted.sample_batch_id,
-      workspace_id: workspaceStore.active.workspace_id,
+      workspace_id: app.data.workspace.focused.workspace_id,
       sample_batch_name: generateCopyName(batch.pasted.sample_batch_name),
       sample_batch_description: batch.pasted.sample_batch_description
     })
@@ -345,7 +346,7 @@ async function pasteBatch() {
 }
 async function pasteItem(context) {
   if (item.pasted) {
-    await sampleStore.copySample({
+    await app.data.sample.copy({
       sample_item_id: item.pasted.sample_item_id,
       sample_batch_id: context.sample_batch_id,
       sample_item_name: generateCopyName(item.pasted.sample_item_name)
@@ -361,18 +362,18 @@ const itemPreventDefault = (event) => {
 }
 
 watchEffect(async () => {
-  if (item.selected) {
-    await focusedMatch.load({
-      sampleId: item.selected.sample_item_id
+  if (app.data.sample.focused) {
+    await app.ui.matchVisualized.set({
+      sampleId: app.data.sample.focused.sample_item_id
     })
   } else {
-    focusedMatch.unload({ target: false })
+    app.ui.matchVisualized.unset({ target: false })
   }
 })
 
 const batchColumnTab = ref('All')
 const inferType = (field) => {
-  const withField = batchStore.sampleItems.filter((item) => field in item)
+  const withField = app.data.sample.list.filter((item) => field in item)
   const types = [
     ...new Set(withField.map((item) => (item[field] ? typeof item[field] : 'null')))
   ].filter((type) => type !== 'null')
@@ -398,7 +399,7 @@ const batchDefaultColumns = [
 const batchAvailableColumns = computed(() => {
   const standard = [
     ...new Set(
-      batchStore.sampleItems
+      app.data.sample.list
         ?.map((item) => Object.keys(item ?? {}))
         .flat()
         .filter((field) => field !== 'sample_item_attributes')
@@ -406,7 +407,7 @@ const batchAvailableColumns = computed(() => {
   ].map((field) => ({ field, kind: 'standard' }))
   const custom = [
     ...new Set(
-      batchStore.sampleItems?.map((item) => Object.keys(item?.sample_item_attributes ?? {})).flat()
+      app.data.sample.list?.map((item) => Object.keys(item?.sample_item_attributes ?? {})).flat()
     )
   ].map((field) => ({ field, kind: 'custom' }))
   return [...standard, { field: 'time', kind: 'custom', label: 'Time' }, ...custom]
@@ -423,12 +424,12 @@ const batchSelectedColumns = ref(batchDefaultColumns)
 
 watch(batchSelectedColumns, (cols) => {
   localStorage.setItem(
-    `mascope-sample-columns-${batch.selected.sample_batch_id}`,
+    `mascope-sample-columns-${app.data.batch.focused.sample_batch_id}`,
     JSON.stringify(cols)
   )
 })
 watch(
-  computed(() => batch.selected),
+  computed(() => app.data.batch.focused),
   (selected) => {
     if (selected) {
       const storedColumns = localStorage.getItem(
@@ -440,7 +441,7 @@ watch(
 )
 </script>
 
-<template v-if="workspaceStore.batches">
+<template v-if="app.data.batch.list">
   <Panel
     class="browser"
     style="border: none"
@@ -472,12 +473,12 @@ watch(
         "
       />
     </template>
-    <ScrollPanel>
+    <div class="scroller">
       <DataTable
         :value="tree"
         v-model:expandedRows="batch.expanded"
         dataKey="sample_batch_id"
-        v-model:selection="batch.selected"
+        v-model:selection="app.data.batch.focused"
         selectionMode="single"
         :metaKeySelection="false"
         contextMenu
@@ -493,24 +494,24 @@ watch(
         size="small"
       >
         <Column header="Batch" field="sample_batch_name" sortable>
-          <template #body="slotProps">
+          <template #body="{ data }">
             <span
-              :class="`pi pi-chevron-${slotProps.data.sample_batch_id in batch.expanded ? 'down' : 'right'}`"
+              :class="`pi pi-chevron-${data.sample_batch_id in batch.expanded ? 'down' : 'right'}`"
               style="font-size: smaller; margin-right: 0.5rem"
             />
-            {{ slotProps.data.sample_batch_name }}
+            {{ data.sample_batch_name }}
           </template>
         </Column>
         <Column style="width: 4rem">
-          <template #body="slotProps">
+          <template #body="{ data }">
             <Button
-              v-if="slotProps.data.sample_batch_id in batch.expanded"
+              v-if="data.sample_batch_id in batch.expanded"
               icon="pi pi-ellipsis-h"
               severity="secondary"
               text
               @click="
                 (event) => {
-                  batchOptionsPopover.show(event)
+                  batchOptionsPopover.toggle(event)
                 }
               "
               v-tooltip.right="'Batch options'"
@@ -550,14 +551,15 @@ watch(
             </Popover>
           </template>
         </Column>
-        <template #expansion="slotProps">
-          <div v-if="!batchStore.loading" style="min-height: 2rem">
+        <template #expansion="{ data }">
+          <div v-if="!app.data.sample.loading" style="min-height: 2rem">
             <DataTable
-              v-if="slotProps.data.children.length > 0"
-              :value="slotProps.data.children"
-              v-model:selection="item.selected"
+              v-if="data.children.length > 0 && app.data.batch.focused"
+              :value="data.children"
+              v-model:selection="app.data.sample.focused"
               selectionMode="single"
               :metaKeySelection="false"
+              dataKey="sample_item_id"
               sortField="index"
               contextMenu
               v-model:contextMenuSelection="item.context"
@@ -570,7 +572,7 @@ watch(
               size="small"
               reorderableColumns
               stateStorage="local"
-              :stateKey="`mascope-sample-table-${slotProps.data.sample_batch_id}`"
+              :stateKey="`mascope-sample-table-${data.sample_batch_id}`"
             >
               <Column field="match_score" sortable class="match-column">
                 <template #header>
@@ -578,7 +580,6 @@ watch(
                 </template>
                 <template #body="{ data }">
                   <BaseMatchTag
-                    v-if="data.matched == 1"
                     :row="data"
                     :tooltip="`Peak intensity: ${formatter.format(data?.sample_peak_area_sum)}`"
                   />
@@ -608,7 +609,7 @@ watch(
       </DataTable>
       <ContextMenu ref="batchContextMenu" :model="menu.batch" />
       <ContextMenu ref="itemContextMenu" :model="menu.item" />
-    </ScrollPanel>
+    </div>
   </Panel>
   <DialogSampleBatchOp v-model:action="dialog.batch.op" :batch="batch.context" />
   <DialogSampleItemOp v-model:action="dialog.item.op" :item="item.context" />

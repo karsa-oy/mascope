@@ -12,11 +12,9 @@ import InputText from 'primevue/inputtext'
 
 import { DialogSampleItemOp, DialogSampleBatchImport } from '@/lib/dialogs'
 
-import { useAppStore, useBatchStore, useInstrumentStore } from '@/stores'
+import { useApp } from '@/stores'
 
-const appStore = useAppStore()
-const batchStore = useBatchStore()
-const instrumentStore = useInstrumentStore()
+const app = useApp()
 
 const props = defineProps({
   active: {
@@ -37,18 +35,18 @@ const search = ref('')
 
 const acquisitions = computed(
   () =>
-    instrumentStore.acquisitions?.filter(({ filename }) =>
+    app.data.acquisition.list?.filter(({ filename }) =>
       filename.toLowerCase().includes(search.value.toLowerCase())
     ) ?? []
 )
 
 watchEffect(() => {
-  if (instrumentStore.pending.filename && appStore.mode.measuring && props.active) {
+  if (app.data.acquisition.pending.filename && app.data.acquisition.mode && props.active) {
     dialog.sampleItem = 'create_pending'
   }
 })
 watch(
-  computed(() => instrumentStore.time),
+  computed(() => app.data.acquisition.time),
   () => {
     selected.files = []
   },
@@ -61,18 +59,18 @@ watch(
     <menu style="gap: 2rem">
       <Select
         props.inputId="time"
-        v-model="instrumentStore.time.mode"
+        v-model="app.data.acquisition.time.mode"
         :options="['Last 24 hours', 'Last 7 days', 'Last 30 days', 'Last 90 days']"
         style="flex-direction: row-reverse"
-        :disabled="appStore.mode.measuring"
+        :disabled="app.data.acquisition.mode"
       />
       <DatePicker
-        v-model="instrumentStore.time.range"
+        v-model="app.data.acquisition.time.range"
         selectionMode="range"
         inputId="range"
         showTime
         showIcon
-        :class="instrumentStore.time.mode == 'range' ? '' : 'inactive'"
+        :class="app.data.acquisition.time.mode == 'range' ? '' : 'inactive'"
         style="flex-grow: 1"
       />
       <IconField style="flex-grow: 1">
@@ -87,8 +85,8 @@ watch(
           icon="pi pi-file-import"
           :disabled="
             selected.files?.length == 0 ||
-            !batchStore.active ||
-            !instrumentStore.acquisitions?.length
+            !app.data.batch.focused ||
+            !app.data.acquisition.list.length
           "
           @click="
             () => {

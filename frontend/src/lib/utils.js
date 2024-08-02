@@ -38,7 +38,7 @@ export function clone(object) {
   return object ? JSON.parse(JSON.stringify(object)) : object
 }
 
-export function debounce(callback, timeout = 1000) {
+export function debounce(callback, timeout = 500) {
   let timeoutId = null
   return (...args) => {
     clearTimeout(timeoutId)

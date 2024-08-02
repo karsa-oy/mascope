@@ -2,12 +2,10 @@ import { ref, reactive } from 'vue'
 
 import { api } from '@/api'
 
-import { useNotification } from '@/stores'
+import { useApp } from '@/stores'
 
-export const useMzFit = (sample) => {
-  const notification = useNotification()
-
-  if (sample) load(sample)
+export const useMzFit = ({ unmount } = { unmount: false }) => {
+  const app = useApp()
 
   // state
   const active = ref(null)
@@ -63,7 +61,7 @@ export const useMzFit = (sample) => {
     })
   }
 
-  notification.on('calibration_mz_fit', (payload) => {
+  const handler = app.ui.notification.on('calibration_mz_fit', (payload) => {
     status.value = payload?.status
     if (payload?.status === 'success') {
       current.value = payload?.data?.fit
@@ -73,7 +71,10 @@ export const useMzFit = (sample) => {
       error.value = payload?.message
       stats.value = payload?.data?.stats
     }
-  })()
+  })
+  if (unmount) {
+    handler.unmount()
+  }
 
   return reactive({
     // state

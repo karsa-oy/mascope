@@ -5,7 +5,7 @@ import * as prettier from 'prettier'
 // PARAMETERS
 
 // output path
-const jsonPath = './src/assets/palette.json'
+const jsonPath = './src/palette.json'
 
 // input colors
 const colors = {

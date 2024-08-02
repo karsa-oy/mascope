@@ -6,10 +6,9 @@ import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Button from 'primevue/button'
 
-import { useAppStore, useWorkspaceStore } from '@/stores'
+import { useApp } from '@/stores'
 
-const appStore = useAppStore()
-const workspaceStore = useWorkspaceStore()
+const app = useApp()
 
 const action = defineModel('action')
 
@@ -20,7 +19,7 @@ const props = defineProps({
 })
 
 const original = computed(() =>
-  action.value == 'create' ? null : workspaceStore.active ?? props.workspace
+  action.value == 'create' ? null : app.data.workspace.focused ?? props.workspace
 )
 
 const info = reactive({
@@ -61,14 +60,14 @@ const executeLabel = computed(() => {
 async function execute() {
   switch (action.value) {
     case 'create': {
-      await workspaceStore.createWorkspace({
+      await app.data.workspace.create({
         workspace_name: info.name,
         workspace_description: info.desc
       })
       break
     }
     case 'edit': {
-      workspaceStore.updateWorkspace({
+      app.data.workspace.update({
         workspace_id: original.value.workspace_id,
         workspace_name: info.name,
         workspace_description: info.desc
@@ -76,13 +75,13 @@ async function execute() {
       break
     }
     case 'delete': {
-      const nextWorkspace = appStore.workspaces.find(
+      const nextWorkspace = app.data.workspace.list.find(
         ({ workspace_id }) => workspace_id !== original.value.workspace_id
       )
       if (nextWorkspace) {
         const prevWorkspace = original.value
-        await workspaceStore.load(nextWorkspace.workspace_id)
-        workspaceStore.deleteWorkspace(prevWorkspace)
+        app.data.workspace.focus(nextWorkspace.workspace_id)
+        app.data.workspace.delete(prevWorkspace)
       } else {
         info.message =
           'You cannot delete the last remaining workspace in the database. Create a new workspace before deleting this one.'

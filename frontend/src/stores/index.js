@@ -1,11 +1,7 @@
-export * from './app'
-export * from './batch'
-export * from './instrument'
-export * from './key'
-export * from './notification'
-export * from './sample'
-export * from './targets'
-export * from './workspace'
-export * from './filterParams'
-export * from './focusedMatch'
-export * from './dashboard'
+import { useData } from './data'
+import { useUi } from './ui'
+
+export const useApp = () => ({
+  data: useData(),
+  ui: useUi()
+})

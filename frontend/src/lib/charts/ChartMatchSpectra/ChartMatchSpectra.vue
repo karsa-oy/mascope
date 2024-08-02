@@ -8,11 +8,11 @@ import BaseChartPlotly from '../BaseChartPlotly.vue'
 
 import { BaseMatchTag } from '@/lib/base'
 import { clone } from '@/lib/utils'
-import { useFocusedMatch, useFilterParams } from '@/stores'
+import { useApp } from '@/stores'
 
-import { useData } from './data'
+import { useChartData } from './data.js'
 
-const filterParams = useFilterParams()
+const app = useApp()
 
 const props = defineProps({
   settings: {
@@ -22,9 +22,8 @@ const props = defineProps({
 })
 
 const isotopes = computed(() => {
-  const focusedMatch = useFocusedMatch()
-  const data = useData()
-  return clone(focusedMatch.isotopes).map((isotope) => {
+  const data = useChartData()
+  return clone(app.ui.matchVisualized.isotopes).map((isotope) => {
     const start = data.traces?.findIndex(
       (trace) => trace.target_isotope_id === isotope.target_isotope_id
     )
@@ -35,10 +34,10 @@ const isotopes = computed(() => {
     const traces = data.traces?.slice(start, end)
 
     let match_category = 0
-    if (isotope.match_score > filterParams.current.possible_match_threshold) {
+    if (isotope.match_score > app.data.filterParams.current.possible_match_threshold) {
       match_category = 1
     }
-    if (isotope.match_score > filterParams.current.probable_match_threshold) {
+    if (isotope.match_score > app.data.filterParams.current.probable_match_threshold) {
       match_category = 2
     }
 
@@ -91,18 +90,24 @@ const error = new Intl.NumberFormat('en-US', {
             :layout="layout"
             hideTitle
           />
-          <div class="row" style="flex-wrap: wrap; max-width: 35ch; justify-content: center">
+          <div
+            id="chart-spectrum-controls"
+            class="row"
+            style="flex-wrap: wrap; max-width: 35ch; justify-content: center"
+          >
             <BaseMatchTag :row="isotope" text />
             <Tag
               :value="`Intensity: ${area.format(isotope.sample_peak_area)}`"
               :severity="
-                isotope.sample_peak_area < filterParams.current.peak_min_intensity ? 'warn' : 'info'
+                isotope.sample_peak_area < app.data.filterParams.current.peak_min_intensity
+                  ? 'warn'
+                  : 'info'
               "
             />
             <Tag
               :value="`mz error: ${error.format(isotope.match_mz_error)}`"
               :severity="
-                Math.abs(isotope.match_mz_error) > filterParams.current.mz_tolerance
+                Math.abs(isotope.match_mz_error) > app.data.filterParams.current.mz_tolerance
                   ? 'warn'
                   : 'info'
               "
@@ -112,7 +117,7 @@ const error = new Intl.NumberFormat('en-US', {
               :value="`Abundance error: ${error.format(isotope.match_abundance_error)}`"
               :severity="
                 Math.abs(isotope.match_abundance_error) >
-                filterParams.current.isotope_ratio_tolerance
+                app.data.filterParams.current.isotope_ratio_tolerance
                   ? 'warn'
                   : 'info'
               "
@@ -123,3 +128,9 @@ const error = new Intl.NumberFormat('en-US', {
     </ScrollPanel>
   </div>
 </template>
+
+<style scoped>
+#chart-spectrum-controls :global(fieldset) {
+  margin: 0 !important;
+}
+</style>

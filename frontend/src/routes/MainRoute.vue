@@ -10,7 +10,7 @@ import Tab from 'primevue/tab'
 import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 
-import { ToolbarAppFilters } from '@/lib/menus'
+import { ToolbarAppFilters } from '@/lib/toolbars'
 import {
   PaneProgress,
   PaneBrowserSample,
@@ -20,26 +20,9 @@ import {
 } from '@/lib/panes'
 import { ChartBatchOverview, ChartSampleSpectrum } from '@/lib/charts'
 
-import {
-  useAppStore,
-  useBatchStore,
-  useFocusedMatch,
-  useInstrumentStore,
-  useWorkspaceStore,
-  useSampleStore,
-  useTargetsStore,
-  useDashboard
-} from '@/stores'
+import { useApp } from '@/stores'
 
-const appStore = useAppStore()
-const workspaceStore = useWorkspaceStore()
-const batchStore = useBatchStore()
-const sampleStore = useSampleStore()
-const focusedMatch = useFocusedMatch()
-const instrumentStore = useInstrumentStore()
-const targetsStore = useTargetsStore()
-
-const dashboard = useDashboard()
+const app = useApp()
 
 const tabs = computed(() => [
   {
@@ -49,54 +32,46 @@ const tabs = computed(() => [
   {
     label: 'Spectrum',
     icon: 'pi pi-chart-bar',
-    disabled: !sampleStore.active
+    disabled: !app.data.sample.focused
   },
   {
     label: 'Match',
     icon: 'pi pi-wave-pulse',
-    disabled: !focusedMatch.ion
+    disabled: !app.ui.matchVisualized.ion
   },
   {
     label: 'Acquisitions',
     icon: 'pi pi-hourglass',
-    disabled: !instrumentStore.active
+    disabled: !app.data.instrument.focused
   }
 ])
 
 watch(
-  computed(() => appStore.mode.measuring),
+  computed(() => app.data.acquisition.mode),
   (scenthound) => {
     if (scenthound) {
-      dashboard.tab = 'acquisitions'
+      app.ui.tab.active = 'acquisitions'
     }
   }
 )
 watch(
-  computed(() => focusedMatch.ion),
+  computed(() => app.ui.matchVisualized.ion),
   (focused) => {
-    if (focused && dashboard.tab !== 'spectrum') {
-      dashboard.tab = 'match'
+    if (focused && app.ui.tab.active !== 'spectrum') {
+      app.ui.tab.active = 'match'
     } else {
-      if (dashboard.tab == 'match') {
-        dashboard.tab = 'batch'
+      if (app.ui.tab.active == 'match') {
+        app.ui.tab.active = 'batch'
       }
     }
   }
 )
 watch(
-  computed(() => sampleStore.active),
+  computed(() => app.data.sample.focused),
   (sample) => {
-    if (!sample && dashboard.tab == 'spectrum') {
-      dashboard.tab = 'batch'
+    if (!sample && app.ui.tab.active == 'spectrum') {
+      app.ui.tab.active = 'batch'
     }
-  }
-)
-watch(
-  computed(() => workspaceStore.active),
-  () => {
-    batchStore.unload()
-    sampleStore.unload()
-    targetsStore.unload()
   }
 )
 </script>
@@ -112,8 +87,8 @@ watch(
       stateKey="mascope-dashboard-split"
       @resize="
         ({ sizes }) => {
-          appStore.split.left = sizes[0]
-          appStore.split.right = sizes[1]
+          app.ui.split.left = sizes[0]
+          app.ui.split.right = sizes[1]
         }
       "
     >
@@ -129,7 +104,7 @@ watch(
       </SplitterPanel>
       <SplitterPanel :size="80">
         <Panel id="charts" class="browser" style="border: none">
-          <Tabs v-model:value="dashboard.tab">
+          <Tabs v-model:value="app.ui.tab.active">
             <TabList>
               <Tab
                 v-for="{ icon, label, disabled } in tabs"
@@ -144,18 +119,18 @@ watch(
             </TabList>
             <TabPanels>
               <TabPanel value="batch">
-                <ChartBatchOverview v-if="batchStore.active" />
+                <ChartBatchOverview v-if="app.data.batch.focused" />
               </TabPanel>
               <TabPanel value="spectrum">
                 <ChartSampleSpectrum />
               </TabPanel>
               <TabPanel value="match">
-                <PaneTabMatch v-if="focusedMatch.ion" />
+                <PaneTabMatch v-if="app.ui.matchVisualized.ion" />
               </TabPanel>
               <TabPanel value="acquisitions">
                 <PaneTabAcquisitions
-                  v-if="instrumentStore.active"
-                  :active="dashboard.tab == 'acquisitions'"
+                  v-if="app.data.instrument.focused"
+                  :active="app.ui.tab.active == 'acquisitions'"
                 />
               </TabPanel>
             </TabPanels>

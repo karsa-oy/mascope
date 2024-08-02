@@ -3,7 +3,6 @@ from typing import Optional, Dict
 from datetime import timezone, datetime as dt
 import re
 from .calibration_pydantic_model import CalibrationMzFitParams
-from .sample_pydantic_model import AlarmsList
 
 # TODO_configuration possible item types
 APP_ITEM_TYPES = [
@@ -92,7 +91,7 @@ class SampleItemCopyBody(BaseModel):
     sample_item_name: str = Field(..., description="Name of the new sample item")
 
 
-class SampleItemProcessBody(AlarmsList):
+class SampleItemProcessBody(BaseModel):
     sample_item: SampleItemCreate = Field(
         ..., description="Sample item to be processed (created, calibrated, matched)"
     )

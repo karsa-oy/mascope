@@ -20,13 +20,13 @@ import { ref, reactive, computed, watch } from 'vue'
 import { BaseClipboardContext } from '@/lib/base'
 import { fromSpreadsheet, parseAutosamplerCsv, parseGenericCsv } from '@/lib/table'
 import { genId } from '@/lib/utils'
+import { sampleTypes } from '@/lib/constants'
 
-import { useBatchStore, useSampleStore } from '@/stores'
+import { useApp } from '@/stores'
 
 const confirm = useConfirm()
 
-const batchStore = useBatchStore()
-const sampleStore = useSampleStore()
+const app = useApp()
 
 const visible = defineModel('visible')
 
@@ -49,11 +49,11 @@ const generated = reactive({
   filterId: null
 })
 const filters = computed(() => {
-  return batchStore.active
+  return app.data.batch.focused
     ? [
         null,
         ...(generated.filterId ? [generated.filterId] : []),
-        ...new Set(batchStore.sampleItems.map(({ filter_id }) => filter_id).filter((f) => f))
+        ...new Set(app.data.sample.list.map(({ filter_id }) => filter_id).filter((f) => f))
       ]
     : generated
 })
@@ -69,7 +69,7 @@ const validation = reactive({
   }
 })
 const title = computed(() => {
-  const name = batchStore.active?.sample_batch_name ?? 'selected'
+  const name = app.data.batch.focused?.sample_batch_name ?? 'selected'
   return imported.type == 'autosampler'
     ? `Import autosampler sample data to "${name}" batch`
     : `Import spreadsheet sample data to "${name}" batch`
@@ -142,7 +142,7 @@ function preprocess() {
     imported.items = imported.parsed.map((parsed, i) => {
       const item = {
         filename: acquisitions[i]?.filename ?? null,
-        sample_batch_id: batchStore.active.sample_batch_id,
+        sample_batch_id: app.data.batch.focused.sample_batch_id,
         filter_id: imported.filterId,
         sample_item_attributes: {}
       }
@@ -163,7 +163,7 @@ function preprocess() {
   if (imported.type === 'general') {
     imported.items = imported.parsed.map((parsed, index) => ({
       ...parsed,
-      sample_batch_id: batchStore.active.sample_batch_id,
+      sample_batch_id: app.data.batch.focused.sample_batch_id,
       filename: acquisitions[index]?.filename ?? null
     }))
   }
@@ -259,12 +259,12 @@ function validateRows() {
     key++
     let failures = []
     // Validate sample type
-    if (!sampleStore.sampleTypes.includes(item.sample_item_type)) {
+    if (!sampleTypes.includes(item.sample_item_type)) {
       failures.push(
         `Sample type '${item.sample_item_type}' isn't recognized, please use one of the accepted types.`
       )
       // Add recommendation info if not already present
-      const allowedTypes = `Please use one of the allowed sample types: ${sampleStore.sampleTypes.join(
+      const allowedTypes = `Please use one of the allowed sample types: ${sampleTypes.join(
         ', '
       )}. You can leave this field empty, sample type will be set to UNKNOWN. `
       if (!validation.rows.issues.includes(allowedTypes)) {
@@ -423,13 +423,13 @@ function autoswitchTab(passed) {
             () => {
               confirm.require({
                 header: 'Import samples',
-                message: `Are you sure you want to import ${imported.items.length} samples into the batch '${batchStore.active?.sample_batch_name}'?`,
+                message: `Are you sure you want to import ${imported.items.length} samples into the batch '${app.data.batch.focused?.sample_batch_name}'?`,
                 rejectLabel: 'Cancel',
                 acceptLabel: 'Import',
                 accept: () => {
                   if (!validation.rows.passed) return
-                  batchStore.importItems({
-                    batch: batchStore.active,
+                  app.data.batch.importSamples({
+                    batch: app.data.batch.focused,
                     sample_items: imported.items
                   })
                   visible = false

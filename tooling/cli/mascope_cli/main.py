@@ -21,7 +21,7 @@ def main(config: Optional[str] = None):
     """
     Mascope development CLI
     """
-    runtime.state.config_temp = config
+    runtime.state.temp = config
 
 @app.command()
 def modules(installable: bool = False, runnable: bool = False):

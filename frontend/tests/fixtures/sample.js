@@ -2,7 +2,7 @@ import { default as base } from './workspace'
 
 export default base.extend({
   sampleBrowser: async ({ page }, use) => {
-    const panel = page.locator('.k-browser', { hasText: 'samples' })
+    const panel = page.locator('.browser', { hasText: 'samples' })
     const header = panel.locator('.p-panel-header')
     const content = panel.locator('.p-panel-content')
     const button = panel.getByLabel('create batch')

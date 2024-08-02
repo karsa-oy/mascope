@@ -2,16 +2,15 @@
 import { computed } from 'vue'
 import Tag from 'primevue/tag'
 
+import { useApp } from '@/stores'
+
 import BaseChartPlotly from '../BaseChartPlotly.vue'
 
-import { useData } from './data'
+import { useChartData } from './data.js'
 
-import { useFocusedMatch, useFilterParams } from '@/stores'
+const app = useApp()
 
-const focusedMatch = useFocusedMatch()
-const filterParams = useFilterParams()
-
-const data = useData()
+const data = useChartData()
 
 const layout = computed(() => ({
   xaxis: {
@@ -45,10 +44,10 @@ const corr = new Intl.NumberFormat('en-US', {
     <span>
       isotope correlation coefficient:
       <Tag
-        :value="corr.format(focusedMatch.isotopes[0].match_isotope_correlation)"
+        :value="corr.format(app.ui.matchVisualized.isotopes[0].match_isotope_correlation)"
         :severity="
-          Math.abs(focusedMatch.isotopes[0].match_isotope_correlation) >
-          filterParams.current.min_isotope_correlation
+          Math.abs(app.ui.matchVisualized.isotopes[0].match_isotope_correlation) >
+          app.data.filterParams.current.min_isotope_correlation
             ? 'info'
             : 'warn'
         "

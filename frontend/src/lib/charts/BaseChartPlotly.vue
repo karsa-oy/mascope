@@ -2,9 +2,9 @@
 import { ref, computed, onMounted, watchEffect } from 'vue'
 import * as Plotly from 'plotly.js-basic-dist'
 
-import { useAppStore } from '@/stores'
+import { useApp } from '@/stores'
 
-const appStore = useAppStore()
+const app = useApp()
 
 const props = defineProps({
   id: {
@@ -88,7 +88,7 @@ onMounted(() => {
 })
 
 watchEffect(() => {
-  if (!ready.value || !props.data || !props.layout || !props.layout || !appStore.split.right) return
+  if (!ready.value || !props.data || !props.layout || !props.layout || !app.ui.split.right) return
   Plotly.react(plot.value, props.data, derived.value.layout, derived.value.config)
 })
 </script>

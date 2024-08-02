@@ -1,6 +1,6 @@
 import * as xlsx from 'xlsx'
 
-import { useBatchStore, useWorkspaceStore } from '@/stores'
+import { useApp } from '@/stores'
 
 import { beautifySnakeCase, strToSnakeCase, genId } from './utils'
 
@@ -148,9 +148,9 @@ export function parseGenericCsv(cols, rows) {
 /*
  *  Compare records or record arrays by a field
  *
- *  e.g. equals(appStore.workspaces, selected.workspaces, workspace_id)
+ *  e.g. equals(app.data.workspace.list, selected.workspaces, workspace_id)
  *  will check that the selected workspace ids match those in the store
- *  and equals(sampleStore.active, selected.sample, sample_item_id) will
+ *  and equals(app.data.sample.focused, selected.sample, sample_item_id) will
  *  check that the selected sample has the same id as the active one.
  */
 export function equals(first, second, field) {
@@ -177,31 +177,31 @@ export function equals(first, second, field) {
 
 // methods
 export function batchExportCsv() {
-  const workspaceStore = useWorkspaceStore()
-  const batchStore = useBatchStore()
+  const app = useApp()
 
   const batchCols = [
     { field: 'field', label: 'Batch' },
     { field: 'value', label: '' }
   ]
   let batchRows = [
-    { field: 'Name', value: batchStore.active.sample_batch_name },
+    { field: 'Name', value: app.data.batch.focused.sample_batch_name },
     {
       field: 'Description',
-      value: batchStore.active.sample_batch_description
+      value: app.data.batch.focused.sample_batch_description
     },
-    { field: 'Workspace', value: workspaceStore.active.workspace_name },
+    { field: 'Workspace', value: app.data.workspace.focused.workspace_name },
     { field: '', value: '' },
     {
       field: 'Target collections',
       value:
-        batchStore.targetCollections?.map((row) => row.target_collection_name).join(', ') ?? 'none'
+        app.data.match.collection.list?.map((row) => row.target_collection_name).join(', ') ??
+        'none'
     },
     { field: '', value: '' },
     { field: 'Parameters', value: '' }
   ]
   const batchParams = {
-    ...batchStore.buildParams
+    ...app.data.batch.focused.buildParams
   }
   Object.entries(batchParams).forEach(([key, val]) =>
     batchRows.push({
@@ -247,56 +247,29 @@ export function batchExportCsv() {
     { field: 'match_score', label: 'Match score' }
   ]
   const datetimestamp = new Date().toJSON().slice(0, -5).replace(/[-:]/g, '')
-  const filename = `${datetimestamp}_${batchStore.active.sample_batch_name.replaceAll(
+  const filename = `${datetimestamp}_${app.data.batch.focused.sample_batch_name.replaceAll(
     ' ',
     '_'
   )}.xlsx`
-  // Extend batchMatchCompounds with sample_item_type
-  const extendedMatchCompounds =
-    batchStore.matchCompounds?.map((compound) => {
-      const sampleItem = batchStore.sampleItems.find(
-        (item) => item.sample_item_id === compound.sample_item_id
-      )
-      return {
-        ...compound,
-        sample_item_type: sampleItem?.sample_item_type
-      }
-    }) ?? []
-  // Extend batchMatchIons with sample_item_type, target_compound_name, and target_compound_formula
-  const extendedMatchIons =
-    batchStore.matchIons?.map((ion) => {
-      const sampleItem = batchStore.sampleItems.find(
-        (item) => item.sample_item_id === ion.sample_item_id
-      )
-      const targetCompound = batchStore.targetCompounds?.find(
-        (compound) => compound.target_compound_id === ion.target_compound_id
-      )
-      return {
-        ...ion,
-        sample_item_type: sampleItem?.sample_item_type,
-        target_compound_name: targetCompound?.target_compound_name,
-        target_compound_formula: targetCompound?.target_compound_formula
-      }
-    }) ?? []
   toSpreadsheet(filename, [
     {
       name: 'Batch',
-      rows: batchRows,
+      rows: app.data.batch.list,
       cols: batchCols
     },
     {
       name: 'Samples',
-      rows: batchStore.sampleItems,
+      rows: app.data.sample.list,
       cols: sampleItemCols
     },
     {
       name: 'Match compounds',
-      rows: extendedMatchCompounds,
+      rows: app.data.match.compound.list,
       cols: matchCompoundCols
     },
     {
       name: 'Match ions',
-      rows: extendedMatchIons,
+      rows: app.data.match.ion.list,
       cols: matchIonCols
     }
   ])

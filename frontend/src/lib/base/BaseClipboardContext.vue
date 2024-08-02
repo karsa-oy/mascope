@@ -1,11 +1,7 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref } from 'vue'
 
 import Message from 'primevue/message'
-
-import { useKeyStore } from '@/stores'
-
-const keyStore = useKeyStore()
 
 const data = defineModel('data')
 const status = defineModel('status')
@@ -47,35 +43,32 @@ const show = (severity, message) => {
   }, 3500)
 }
 
-watch(keyStore, process)
 async function process() {
-  if (keyStore.state.control && keyStore.state.v) {
-    navigator.permissions.query({ name: 'clipboard-read' })
-    let text = await navigator.clipboard.readText()
-    let result
-    try {
-      result = props.parse(text)
-    } catch (err) {
-      console.warn('Failed to parse clipboard paste', err)
-      show('error', 'Failed to process the data you pasted')
-      return
-    }
-    const { valid, severity, message } = props.validate(result)
-    show(severity, message)
-    if (valid) {
-      data.value = result
-      emit('validated', {
-        data: data.value,
-        severity,
-        message
-      })
-    } else {
-      emit('invalidated', {
-        data: data.value,
-        severity,
-        message
-      })
-    }
+  navigator.permissions.query({ name: 'clipboard-read' })
+  let text = await navigator.clipboard.readText()
+  let result
+  try {
+    result = props.parse(text)
+  } catch (err) {
+    console.warn('Failed to parse clipboard paste', err)
+    show('error', 'Failed to process the data you pasted')
+    return
+  }
+  const { valid, severity, message } = props.validate(result)
+  show(severity, message)
+  if (valid) {
+    data.value = result
+    emit('validated', {
+      data: data.value,
+      severity,
+      message
+    })
+  } else {
+    emit('invalidated', {
+      data: data.value,
+      severity,
+      message
+    })
   }
 }
 
@@ -89,7 +82,7 @@ setTimeout(
 </script>
 
 <template>
-  <div class="grid">
+  <div class="grid" @paste="process">
     <slot />
     <template v-if="alive || persistMessage">
       <Message v-if="status" :severity="status.severity">

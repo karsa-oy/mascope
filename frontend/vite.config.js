@@ -1,10 +1,9 @@
 import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
-import { ViteToml } from 'vite-plugin-toml'
 
 export default defineConfig({
-  plugins: [ViteToml(), vue()],
+  plugins: [vue()],
   resolve: {
     alias: {
       // This alias configuration helps in resolving paths relative to the src directory.

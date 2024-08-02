@@ -46,7 +46,7 @@ class SampleFileUpdate(BaseModel):
         ..., description="m/z calibration function parameters of the sample file"
     )
     tic: float = Field(..., description="TIC of the sample file")
-    polarity: str = Field(None, description="Polarity of the sample file")
+    polarity: str = Field("", description="Polarity of the sample file")
 
 
 class GetSampleFilesQueryParams(BaseModel):

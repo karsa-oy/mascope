@@ -1,14 +1,15 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 
-import { useDashboard } from '@/stores'
+import { useApp } from '@/stores'
 
-export const useData = defineStore('matchTimeseriesChartData', () => {
+export const useChartData = defineStore('chart.match.timeseries', () => {
   const traces = ref([])
   const length = ref()
 
-  const dashboard = useDashboard()
-  dashboard.register({
+  const app = useApp()
+
+  app.ui.chart.register({
     name: 'ChartMatchSpectra',
     clear: () => {
       traces.value = []

@@ -15,7 +15,7 @@ export default base.extend({
   },
   acquisitionsTab: async ({ page }, use) => {
     const panel = page.locator('#acquisitions')
-    const open = () => page.getByLabel('Acquisitions').click({ delay: 100 })
+    const open = () => page.getByRole('tab', { name: 'Acquisitions' }).click({ delay: 100 })
     const datetime = page.locator('#range')
     const filter = async (range) => {
       await datetime.fill(range)
@@ -61,8 +61,8 @@ export default base.extend({
   },
   // eslint-disable-next-line no-empty-pattern
   orbi: async ({ page }, use) => {
-    const converterDir = process.env.MASCOPE_PRIVATE_CONVERTER_DIR
-    const testfileDir = process.env.MASCOPE_PRIVATE_TESTFILE_DIR
+    const converterDir = path.resolve('../runtime/data/streams')
+    const testfileDir = path.resolve('../runtime/data/testfiles')
     const testfile = (await fs.readdir(testfileDir)).find((file) =>
       file.split('_')[0].toLowerCase().includes('orbi')
     )
