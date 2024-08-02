@@ -155,7 +155,6 @@ export const defineModule = ({
     // hook
     const reload = async (parent) => {
       const oldFocusedId = focused.value ? focused.value[key] : null
-      unfocus()
       log(`load triggered by ${parent?.name ?? 'mount'}`)
       loading.value = true
       if (parent) {
