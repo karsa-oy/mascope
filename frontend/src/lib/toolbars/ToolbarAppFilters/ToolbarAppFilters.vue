@@ -199,6 +199,7 @@ function parseTimestamp(timestamp) {
           inputId="instrument-selector"
           v-model="app.data.instrument.focused"
           :options="app.data.instrument.list"
+          dataKey="instrument"
           optionLabel="instrument"
           appendTo="self"
         >

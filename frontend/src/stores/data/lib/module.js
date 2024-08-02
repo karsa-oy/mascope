@@ -22,7 +22,7 @@ export const defineModule = ({
     // CONFIG
 
     const prefix = `[app.data.${name.replaceAll('_', ' ')}]`
-    const log = (message) => console.log(`${prefix} ${message}`)
+    const log = (message, ...rest) => console.log(`${prefix} ${message}`, ...rest)
 
     const singleselect = !multiselect
     const parent = useParent ? useParent() : null
@@ -135,8 +135,6 @@ export const defineModule = ({
         } else {
           unfocus()
         }
-      } else {
-        unfocus()
       }
       return focused.value ? focused.value[key] : null
     }
@@ -165,6 +163,7 @@ export const defineModule = ({
       records.value.forEach((record, index) => (record.index = (index + 1).toString()))
       log('data loaded')
       if (autofocus && records.value.length > 0) {
+        log('autofocusing first record', records.value[0])
         focus(records.value[0])
       }
       const newFocusedId = refocus(oldFocusedId)
