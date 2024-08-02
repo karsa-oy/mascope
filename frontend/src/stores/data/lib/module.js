@@ -105,30 +105,29 @@ export const defineModule = ({
         }
     const unfocus = multiselect
       ? (arg) => {
-          if (active(arg)) {
+          if (arg) {
+            if (active(arg)) {
+              selected.value = []
+            }
+          } else {
             selected.value = []
           }
         }
       : // singleselect
         (arg) => {
-          if (active(arg)) {
+          if (arg) {
+            if (active(arg)) {
+              focused.value = null
+            }
+          } else {
             focused.value = null
           }
-        }
-    const clear = multiselect
-      ? () => {
-          selected.value = []
-        }
-      : // singleselect
-        () => {
-          focused.value = null
         }
     // internal
     const refocus = (focusedId) => {
       if (focusedId) {
         // refocus
-        const focusValid =
-          focusedId && records.value.map((record) => record[key]).includes(focusedId)
+        const focusValid = records.value.map((record) => record[key]).includes(focusedId)
         const defaultId = autofocus ? records.value[0] : null
         const id = focusValid ? focusedId : defaultId
         if (id) {
@@ -136,7 +135,10 @@ export const defineModule = ({
         } else {
           unfocus()
         }
+      } else {
+        unfocus()
       }
+      return focused.value ? focused.value[key] : null
     }
 
     // LOADING
@@ -152,7 +154,8 @@ export const defineModule = ({
 
     // hook
     const reload = async (parent) => {
-      const focusedId = focused.value ? focused.value[key] : null
+      const oldFocusedId = focused.value ? focused.value[key] : null
+      unfocus()
       log(`load triggered by ${parent?.name ?? 'mount'}`)
       loading.value = true
       if (parent) {
@@ -162,21 +165,18 @@ export const defineModule = ({
       }
       records.value.forEach((record, index) => (record.index = (index + 1).toString()))
       log('data loaded')
-      if (selected.value.length > 0) {
-        clear()
-        log('selection cleared')
-      }
       if (autofocus && records.value.length > 0) {
         focus(records.value[0])
       }
+      const newFocusedId = refocus(oldFocusedId)
       // propegate to children
       if (children.value.length > 0) {
-        const focusedId = focused.value ? focused.value[key] : null
-        await Promise.all(children.value.map(({ reload }) => reload({ name, focusedId })))
+        await Promise.all(
+          children.value.map(({ reload }) => reload({ name, focusedId: newFocusedId }))
+        )
         log('child data loaded')
       }
       loading.value = false
-      refocus(focusedId)
     }
 
     // load on init
@@ -217,7 +217,6 @@ export const defineModule = ({
           : [name, func]
       )
     )
-    console.log(wrappedOps)
 
     // event triggered reloading
 
@@ -296,7 +295,6 @@ export const defineModule = ({
       unselect,
       focus,
       unfocus,
-      clear,
       // children
       name,
       register,

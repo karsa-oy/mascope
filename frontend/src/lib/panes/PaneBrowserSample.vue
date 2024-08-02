@@ -554,7 +554,7 @@ watch(
         <template #expansion="{ data }">
           <div v-if="!app.data.sample.loading" style="min-height: 2rem">
             <DataTable
-              v-if="data.children.length > 0"
+              v-if="data.children.length > 0 && app.data.batch.focused"
               :value="data.children"
               v-model:selection="app.data.sample.focused"
               selectionMode="single"
