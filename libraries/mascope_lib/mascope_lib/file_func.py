@@ -249,11 +249,10 @@ class zarr_sdk:
         filename_base = item.props["filename"]
         filename_sum_signal = filename_to_zarr_path(filename_base, "sum_signal")
         # Interpolate missing values in mz dimension using linear method.
-        sum_signal = (
-            item.signal.interpolate_na(dim="mz", method="linear")
-            .sum(dim="time")
-            .compute()
-        )
+        signal = item.signal.interpolate_na(dim="mz", method="linear")
+        # Data points may not be interpolated if previous value is nan
+        # Fill the remaining nan values with zeros and get sum signal
+        sum_signal = signal.fillna(0).sum(dim="time").compute()
         sum_signal_array = ExtendableDataArray(
             path=filename_sum_signal, array_module=np
         )

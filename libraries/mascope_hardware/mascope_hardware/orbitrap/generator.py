@@ -12,6 +12,7 @@ from multiprocessing import Event, Lock, Queue
 from queue import Empty
 from threading import Thread
 from time import sleep
+from numba import jit
 
 import numpy as np
 from ThermoFisher.CommonCore.Data import Business as ThermoBusiness
@@ -20,7 +21,7 @@ from .util import net2np_array
 
 import mascope_runtime as runtime
 
-logger = runtime.logger.service('hardware-lib')
+logger = runtime.logger.service("hardware-lib")
 
 
 def strip_filepath(filepath):
@@ -123,6 +124,7 @@ class RawStreamer(Thread):
         # Map .NET arrays into numpy arrays
         mz = net2np_array(scan.Positions).astype(np.float32)
         spec = net2np_array(scan.Intensities).astype(np.float32)
+
         # Round mz values based on the mz precision
         mz, spec = self._set_mz_precision(mz, spec)
         # Combine data for output
@@ -247,8 +249,9 @@ class RawStreamer(Thread):
 
         return np.array(mz_grid, dtype=np.float32)
 
-    def _set_mz_precision(self, mz, spec):
-        """Rounds mz values to the nearest values of the precomputed mz grid
+    def _set_mz_precision(self, mz: np.ndarray, spec: np.ndarray) -> tuple:
+        """Aligns m/z values to the nearest values in a precomputed m/z grid
+        and aggregates corresponding intensities.
 
         :param mz: mz scale
         :type mz: array-like
@@ -257,20 +260,21 @@ class RawStreamer(Thread):
         :return: a tuple of updated mz scale and counts
         :rtype: tuple
         """
-        # Find the indices of the closest values from self._mz_grid
-        closest_indices = np.searchsorted(self._mz_grid, mz.astype(np.float32))
-        # Filter out of bounds indices
-        closest_indices[np.where(closest_indices == len(self._mz_grid))] = (
-            len(self._mz_grid) - 1
-        )
-        # Get the closest mz values from self._mz_grid
-        mz_closest = self._mz_grid[closest_indices]
-        # Get unique mz values and their corresponding indices
-        unique_mz, inverse_indices = np.unique(mz_closest, return_inverse=True)
-        # Accumulate the intensities for each unique mz value
-        unique_mz_intensities = np.bincount(inverse_indices, weights=spec)
+        mz = mz.astype(np.float32)
+        indices = np.searchsorted(self._mz_grid, mz)
+        indices = np.clip(indices, 0, len(self._mz_grid) - 1)
 
-        return unique_mz.astype(np.float32), unique_mz_intensities.astype(np.float32)
+        left_mzs = self._mz_grid[indices - 1]
+        right_mzs = self._mz_grid[indices]
+
+        left_diff = np.abs(left_mzs - mz)
+        right_diff = np.abs(right_mzs - mz)
+
+        closest_mzs = np.where(left_diff < right_diff, left_mzs, right_mzs)
+        unique_mz, inverse_indices = np.unique(closest_mzs, return_inverse=True)
+        aggregated_intensities = np.bincount(inverse_indices, weights=spec)
+
+        return unique_mz.astype(np.float32), aggregated_intensities.astype(np.float32)
 
     def _wait_for_queues(self):
         """Wait for tick event to be set before continuing streaming
