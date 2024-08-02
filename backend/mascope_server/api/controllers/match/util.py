@@ -44,9 +44,7 @@ async def fetch_sample_item_ids(
         if sample_item_id:
             sample_item = await session.get(SampleItem, sample_item_id)
             if not sample_item:
-                raise NotFoundException(
-                    f"No sample item found with ID '{sample_item_id}'."
-                )
+                logger.warning(f"No sample item found with ID '{sample_item_id}'.")
             sample_item_ids.append(sample_item_id)
             sample_ref = f"sample '{sample_item.sample_item_name}'"
         elif sample_batch_id:
@@ -58,8 +56,7 @@ async def fetch_sample_item_ids(
                 error_msg = (
                     f"No sample items found for sample batch ID '{sample_batch_id}'."
                 )
-                logger.error(error_msg)
-                raise NotFoundException(error_msg)
+                logger.warning(error_msg)
             sample_item_ids = [item.sample_item_id for item in sample_items]
             batch = await session.get(SampleBatch, sample_batch_id)
             sample_ref = (
