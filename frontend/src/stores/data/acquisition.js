@@ -45,7 +45,7 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
   })
 
   const mzCalibration = ref(null)
-  const orbi = computed(() => instrument.focused.toLowerCase().includes('orbi'))
+  const orbi = computed(() => instrument.focused.instrument.toLowerCase().includes('orbi'))
   // instrument
 
   watch(
