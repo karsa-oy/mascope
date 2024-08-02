@@ -11,6 +11,7 @@ export const useSample = defineModule({
   name: 'sample',
   key: 'sample_item_id',
   useParent: useBatch,
+  unfocusBefore: ['delete'],
   load: async (sample_batch_id) =>
     (
       await api.request.read({

@@ -12,6 +12,7 @@ export const defineModule = ({
   autofocus = false, // focused first element on load
   reloadSelfOn = null, // events to reload the module on
   reloadChildrenOn = null, // events to reload child modules on
+  unfocusBefore = [], // unofucus before running these ops
   // api
   load, // async func, may accept parent record
   read, // get one record by id
@@ -202,6 +203,22 @@ export const defineModule = ({
       )
     }
 
+    // unfocus before calling certain methods
+    const wrappedOps = Object.fromEntries(
+      Object.entries(ops).map(([name, func]) =>
+        unfocusBefore.includes(name)
+          ? [
+              name,
+              (...args) => {
+                unfocus()
+                return func(...args)
+              }
+            ]
+          : [name, func]
+      )
+    )
+    console.log(wrappedOps)
+
     // event triggered reloading
 
     if (!parent) {
@@ -285,6 +302,6 @@ export const defineModule = ({
       register,
       // api
       read,
-      ...ops
+      ...wrappedOps
     }
   })
