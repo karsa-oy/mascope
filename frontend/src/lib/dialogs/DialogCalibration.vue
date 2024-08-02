@@ -19,7 +19,7 @@ import { useApp } from '@/stores'
 import { useMzFit } from '@/lib/mzFit'
 import { PaneSettingsCalibration } from '@/lib/panes'
 
-const mzFit = useMzFit()
+const mzFit = useMzFit({ unmount: true })
 
 const app = useApp()
 

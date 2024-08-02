@@ -209,7 +209,7 @@ async function execute() {
     case 'update_targets': {
       await app.data.batch.update(updated.value)
       if (!equals(selected.calibrants, initial.calibrants, 'target_collection_id')) {
-        const mzFit = useMzFit()
+        const mzFit = useMzFit({ unmount: true })
         await api.request.process({
           method: 'recalibrateSampleBatch',
           body: {

@@ -1,6 +1,8 @@
 import { ref, reactive, watchEffect, computed, onBeforeUnmount } from 'vue'
 import { defineStore } from 'pinia'
 
+import { api } from '@/api'
+
 import { genId } from '@/lib/utils'
 
 export const useNotification = defineStore('app.ui.notification', () => {
@@ -13,9 +15,8 @@ export const useNotification = defineStore('app.ui.notification', () => {
   })
   const drawer = ref(false)
 
-  async function onUserNotification(notification) {
-    push(notification)
-  }
+  api.socket.on('user_notification', (notification) => push(notification))
+
   function push(notification) {
     const id = genId()
     state.latest = {
@@ -34,11 +35,17 @@ export const useNotification = defineStore('app.ui.notification', () => {
     types.forEach((type) => {
       state.watchers.push({ id, type, callback })
     })
-    const destructor = () =>
+    // In order to prevent memory leaks, we should remove
+    // listeners when unmounting components. We return a
+    // hook to allow removing listeners in components. This
+    // should NOT be used in stores.
+    const unmount = () =>
       onBeforeUnmount(() => {
         state.watchers = state.watchers.filter((watcher) => watcher.id !== id)
       })
-    return destructor
+    return {
+      unmount
+    }
   }
 
   const findRoot = (process_id) => {
@@ -88,7 +95,7 @@ export const useNotification = defineStore('app.ui.notification', () => {
         }
       }
     }
-  })()
+  })
 
   watchEffect(() => {
     state.watchers.forEach(({ type, callback }) => {
@@ -105,8 +112,6 @@ export const useNotification = defineStore('app.ui.notification', () => {
     push,
     latest: computed(() => state.latest),
     log: computed(() => state.log),
-    progress: computed(() => state.progress),
-    // listeners
-    onUserNotification
+    progress: computed(() => state.progress)
   }
 })

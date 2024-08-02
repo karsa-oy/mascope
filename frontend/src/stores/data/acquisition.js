@@ -124,7 +124,7 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
         }
       }
     }
-  })()
+  })
 
   ui.notification.on('instrument_conversion', ({ process_id, data, status }) => {
     if (mode.value) {
@@ -140,7 +140,7 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
         }
       }
     }
-  })()
+  })
 
   // measurement mode
   ui.notification.on('create_sample_file', async () => {
@@ -151,7 +151,7 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
     } else {
       ready.filename = pending.filename
     }
-  })()
+  })
 
   // mz calibration
 

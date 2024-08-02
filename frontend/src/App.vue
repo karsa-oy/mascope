@@ -17,30 +17,34 @@ const app = useApp()
 const ready = computed(() => app.data.workspace.list.length > 0)
 
 // toaster
-app.ui.notification.on('*', ({ status, type, message }) => {
-  if (status !== 'pending') {
-    const severity =
-      {
-        warning: 'warn'
-      }[status] ?? status
-    toast.add({
-      severity,
-      summary: `${beautifySnakeCase(type)} ${status}`,
-      detail: message,
-      life: status === 'error' ? 10000 : 3000
-    })
-  }
-})()
+app.ui.notification
+  .on('*', ({ status, type, message }) => {
+    if (status !== 'pending') {
+      const severity =
+        {
+          warning: 'warn'
+        }[status] ?? status
+      toast.add({
+        severity,
+        summary: `${beautifySnakeCase(type)} ${status}`,
+        detail: message,
+        life: status === 'error' ? 10000 : 3000
+      })
+    }
+  })
+  .unmount()
 
 // focus new workspace
-app.ui.notification.on('create_workspace', ({ status, data }) => {
-  if (status == 'success') {
-    const createdWorkspace = app.data.workspace.list.find(
-      (workspace) => workspace.workspace_id == data.response.data.workspace_id
-    )
-    app.data.workspace.focus(createdWorkspace)
-  }
-})()
+app.ui.notification
+  .on('create_workspace', ({ status, data }) => {
+    if (status == 'success') {
+      const createdWorkspace = app.data.workspace.list.find(
+        (workspace) => workspace.workspace_id == data.response.data.workspace_id
+      )
+      app.data.workspace.focus(createdWorkspace)
+    }
+  })
+  .unmount()
 </script>
 
 <template>
