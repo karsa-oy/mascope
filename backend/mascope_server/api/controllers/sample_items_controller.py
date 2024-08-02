@@ -14,7 +14,6 @@ from mascope_server.db.id import gen_id
 from ..utils.api_features import (
     api_controller,
     api_controller_background_task,
-    emit_user_notification,
     send_progress_user_notification,
 )
 from ..exceptions import NotFoundException
@@ -186,19 +185,13 @@ async def create_sample_item(
         await session.commit()
         await session.refresh(new_sample_item)
 
-        # Step 4: Emit create_sample_item event if independent transaction
-        # TODO_notifications refactor onSampleItemCreated
-        notification = UserNotification(
-            process_id=gen_id(8),
-            type="create_sample_item",
-            status="success",
-            message=f"Sample item record '{new_sample_item.sample_item_name}' created.",
-            data={
-                "sample_item_id": new_sample_item.sample_item_id,
-            },
+        # Step 4: Emit socket.io events
+        # TODO_invalidation
+        await sio.emit(
+            "sample_batch_reload",
+            room=new_sample_item.sample_batch_id,
+            namespace="/",
         )
-        await emit_user_notification(notification, new_sample_item.sample_batch_id)
-
     # Step 5: Return the new sample item details
     return {
         "data": new_sample_item.to_dict(),
@@ -248,7 +241,7 @@ async def update_sample_item(
         await session.refresh(existing_sample_item)
 
     # Step 5: Emit socket.io events
-    # TODO_reload do we need to reload the entire batch?
+    # TODO_invalidation
     await sio.emit(
         "sample_batch_reload",
         room=existing_sample_item.sample_batch_id,
