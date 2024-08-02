@@ -49,7 +49,7 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
   // instrument
 
   watch(
-    computed(() => instrument.focused),
+    computed(() => instrument.focused?.instrument),
     async () => {
       mzCalibration.value = null
       pending.filename = null
@@ -83,7 +83,7 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
         body: {
           datetime_min: range.min.toISOString(),
           datetime_max: range.max.toISOString(),
-          instrument: instrument.focused,
+          instrument: instrument.focused?.instrument,
           sort: 'datetime_utc',
           order: 'asc'
         }
@@ -99,7 +99,7 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
       await api.request.read({
         method: 'getRecentSampleFiles',
         body: {
-          instrument: instrument.focused,
+          instrument: instrument.focused?.instrument,
           sort: 'datetime_utc',
           order: 'asc',
           days
