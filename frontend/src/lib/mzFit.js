@@ -4,7 +4,7 @@ import { api } from '@/api'
 
 import { useApp } from '@/stores'
 
-export const useMzFit = ({ unmount = false }) => {
+export const useMzFit = ({ unmount } = { unmount: false }) => {
   const app = useApp()
 
   // state
