@@ -3,7 +3,6 @@ import { defineModule } from './lib/module'
 import { api } from '@/api'
 
 import { useMzFit } from '@/lib/mzFit'
-import { alarmsList } from '@/lib/constants'
 
 import { useBatch } from './batch'
 
@@ -19,8 +18,7 @@ export const useSample = defineModule({
         body: {
           sample_batch_id,
           batch_matches_info: true,
-          sort: 'datetime_utc',
-          alarms_list: alarmsList
+          sort: 'datetime_utc'
         }
       })
     )?.data,
@@ -60,8 +58,7 @@ export const useSample = defineModule({
       method: 'processSampleItem',
       body: {
         sample,
-        params: mzFit.params,
-        alarms: alarmsList
+        params: mzFit.params
       }
     })
   },

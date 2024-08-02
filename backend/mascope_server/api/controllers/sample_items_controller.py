@@ -458,7 +458,6 @@ async def copy_sample_item(
 async def process_sample_item(
     sample_item: SampleItemCreate,
     mz_calibration_params: CalibrationMzFitParams = CalibrationMzFitParams(),
-    alarms_list: AlarmsList = AlarmsList(),
     independent_transaction: bool = False,
     sid=None,
     process_id=None,
@@ -481,8 +480,6 @@ async def process_sample_item(
     :type sample_item: SampleItemCreate
     :param mz_calibration_params: Calibration parameters to use, defaults to a preconfigured set.
     :type mz_calibration_params: CalibrationMzFitParams, optional
-    :param alarms_list: List of alarms to apply, defaults to standard settings.
-    :type alarms_list: AlarmsList, optional
     :param independent_transaction: Indicates whether this operation should be treated as a standalone transaction.
     :type independent_transaction: bool, optional
     :param sid: Session ID for client-specific communications, defaults to None.
@@ -558,8 +555,6 @@ async def process_sample_item(
     # Step 4: Fetch updated sample details including match data
     sample = await get_sample(
         sample_item_id=sample_item_id,
-        alarms_list=alarms_list,
-        sample_matches_info=True,
     )
 
     # Step 5: Return rematched sample and message

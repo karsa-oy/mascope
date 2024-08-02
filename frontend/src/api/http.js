@@ -347,12 +347,11 @@ export function createHttpClient() {
         throw new Error(userErrorMessage)
       }
     },
-    processSampleItem: async ({ sample, alarms, params }) => {
+    processSampleItem: async ({ sample, params }) => {
       try {
         return await client.post(`/sample_items/process`, {
           sample_item: sample,
-          mz_calibration_params: params,
-          alarms_list: alarms
+          mz_calibration_params: params
         })
       } catch (error) {
         const userErrorMessage =
