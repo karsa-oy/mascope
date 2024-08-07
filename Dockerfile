@@ -18,6 +18,9 @@ RUN pip install poetry
 WORKDIR /app
 
 # build libraries
+WORKDIR /app/libraries/mascope_runtime
+COPY ./libraries/mascope_runtime .
+RUN poetry build
 
 WORKDIR /app/libraries/mascope_hardware
 COPY ./libraries/mascope_hardware .
@@ -35,6 +38,9 @@ COPY ./backend/ .
 RUN poetry install
 
 FROM python:3.12-alpine
+
+RUN apk update
+RUN apk add nginx
 
 WORKDIR /app
 

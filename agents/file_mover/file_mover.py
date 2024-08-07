@@ -14,7 +14,8 @@ from watchdog.observers import Observer
 
 import mascope_runtime as runtime
 
-logger = runtime.logger.service('file-mover')
+logger = runtime.logger.service("file-mover")
+
 
 def parent_func_name() -> str:
     """Return the name of a parent function calling a class method
@@ -221,9 +222,12 @@ class SampleMover:
                 try:
                     fname = self.jobs.get_nowait()
                     logger.debug(fname)
-                    if self.seconds_since_last_access(fname) < config.file_mover.timeout:
+                    if (
+                        self.seconds_since_last_access(fname)
+                        < config.file_mover.timeout
+                    ):
                         self.jobs.put(fname)
-                        logger.debug(fname, 'back')
+                        logger.debug(fname, "back")
                         continue
                     self.copy(fname)
                 except Empty:
@@ -245,14 +249,15 @@ def run() -> None:
 
     Start `SampleMover` thread and wait until it finishes
     """
-    config = runtime.config.autoload()
+    config = runtime.mount()
     assert all(
-        map(lambda d: os.path.isdir(d), [config.file_mover.source, config.file_mover.target])
+        map(
+            lambda d: os.path.isdir(d),
+            [config.file_mover.source, config.file_mover.target],
+        )
     ), "Invalid source or target folder"
     mover = SampleMover(
-        config.file_mover.source,
-        config.file_mover.target,
-        config.file_mover.mask
+        config.file_mover.source, config.file_mover.target, config.file_mover.mask
     )
     mover.watcher.run_as_daemon()
     mover.run_until_complete(config)

@@ -29,7 +29,7 @@ def LoadLibrary():
     the_os = arch2os.get(platform.architecture(), "")
 
     # container overrides
-    is_docker = os.environ.get("MASCOPE_PRIVATE_ENV") == "docker"
+    is_docker = False
     the_os = "linux_x86_64" if is_docker else the_os
     libname = "libtwtool.so" if is_docker else libnames[sys.platform]
 

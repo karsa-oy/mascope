@@ -1,0 +1,25 @@
+[meta]
+description = 'The Karsa internal development runtime'
+platform = 'windows_x64'
+
+[server]
+port = 8090
+database = './database'
+filestreams = './filestreams'
+filestore = './filestore'
+
+[file_converter]
+threads = 1
+ping = false
+
+[tof_agent]
+host = 'localhost'
+port = 8090
+source = './virtualized/tof_agent'
+target = './filestreams'
+
+[file_mover]
+mask = '*.raw'
+timeout = 10
+source = './virtualized/file_mover'
+target = './filestreams'

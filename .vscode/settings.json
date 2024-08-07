@@ -3,4 +3,10 @@
         "editor.defaultFormatter": "ms-python.black-formatter"
     },
     "editor.formatOnSave": true,
+    "search.exclude": {
+        "**/.legacy": true,
+        "**/node_modules": true,
+        "**/__pycache__": true,
+        "**/runtime": true
+    }
 }

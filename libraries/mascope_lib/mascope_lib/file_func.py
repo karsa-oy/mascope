@@ -16,7 +16,7 @@ from .structs import ExtendableDataArray
 from .util import parse_path_from_item_filename
 
 logger = runtime.logger.service("standard-lib")
-config = runtime.config.autoload()
+config = runtime.mount()
 
 
 class zarr_sdk:

@@ -1073,7 +1073,7 @@ async def sample_batch_export_peaks(
 
     dt_str = datetime.now().isoformat().replace("-", "").replace(":", "").split(".")[0]
 
-    peakfile_path = config.server.streams
+    peakfile_path = config.server.filestreams
     peakfile_filename = (
         dt_str
         + "_peaks_"

@@ -1,4 +1,3 @@
-/state.json
-
-/configs/*
-!/configs/mascope.dev.toml
+state.json
+*/*
+!dev/**

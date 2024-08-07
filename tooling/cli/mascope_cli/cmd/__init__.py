@@ -1,2 +1,2 @@
 from .dev import dev
-from .config import config
+from .runtime import runtime

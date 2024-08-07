@@ -25,9 +25,10 @@ from mascope_server.config import config
 from mascope_lib.peak import detect_peaks
 
 import mascope_runtime as runtime
-logger = runtime.logger.service('backend')
 
-instrument_dir = config.server.streams
+logger = runtime.logger.service("backend")
+
+instrument_dir = config.server.filestore
 
 
 def sample_file_op(sample_filepath: str, sample_filename: str) -> None:

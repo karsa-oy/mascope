@@ -12,9 +12,10 @@ from datetime import datetime
 from mascope_server.config import config
 
 import mascope_runtime as runtime
-logger = runtime.logger.service('backend')
 
-instrument_dir = config.server.streams
+logger = runtime.logger.service("backend")
+
+instrument_dir = config.server.filestore
 
 
 def sample_file_array_op(sample_filepath: str, sample_file_array: str) -> None:

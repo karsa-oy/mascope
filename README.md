@@ -60,10 +60,10 @@ When pulling the latest changes from github, we often need to ensure our develop
 To reinstall the `mascope` cli and development environment, run:
 
 ```
-.\tooling\scripts\windows_dev_setup.ps1 -Update
+.\tooling\scripts\windows_dev_setup.ps1 -UpdateAll
 ```
 
-This is much quicker than the full install, since it doesn't install the global dev tools.
+This is much quicker than the full install, since it doesn't install the global dev tools. To shorten the update, you can also update only the CLI with `-UpdateCli` or only the dev env with `-UpdateDevEnv` to save time.
 
 # Frontend
 

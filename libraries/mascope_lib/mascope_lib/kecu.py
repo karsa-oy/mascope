@@ -6,7 +6,7 @@ from mascope_lib.file_func import load_array, load_file, filename_to_zarr_path
 from mascope_lib.util import parse_path_from_item_filename
 import mascope_runtime as runtime
 
-config = runtime.config.autoload()
+config = runtime.mount()
 
 
 def csv_to_xarr(csv_path: str, filename: str) -> xr.core.dataarray.DataArray:

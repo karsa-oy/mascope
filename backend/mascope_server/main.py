@@ -107,9 +107,9 @@ def run():
     """Entry point to run Mascope server"""
     uvicorn.run(
         "mascope_server.main:app",
-        host="0.0.0.0" if config.env.mode == "development" else "127.0.0.1",
+        host="0.0.0.0" if config.meta.mode == "development" else "127.0.0.1",
         port=config.server.port,
-        reload=(config.env.mode == "development"),
+        reload=(config.meta.mode == "development"),
         log_level="info",
     )
 

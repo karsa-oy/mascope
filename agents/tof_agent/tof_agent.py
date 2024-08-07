@@ -10,8 +10,8 @@ from mascope_hardware.tofwerk.tof_streamer import TofDaqStreamer
 
 import mascope_runtime as runtime
 
-logger = runtime.logger.service('tof-agent')
-sio_logger = runtime.logger.service('tof-agent', markup=False)
+logger = runtime.logger.service("tof-agent")
+sio_logger = runtime.logger.service("tof-agent", markup=False)
 
 
 async def streamer_processor(streamer):
@@ -138,8 +138,8 @@ def run():
     global shutdown_event
     global target_path
 
-    config = runtime.config.autoload()
-    
+    config = runtime.mount()
+
     host = config.tof_agent.host
     port = config.tof_agent.port
     target_path = config.tof_agent.target

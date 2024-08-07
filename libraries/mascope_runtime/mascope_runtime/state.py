@@ -7,7 +7,8 @@ state_path = os.path.join(mascope_path, "runtime", "state.json")
 def ensure_state_json():
     if not os.path.exists(state_path):
         with open(state_path, "x") as f:
-            json.dump({"default": "dev", "temp": None}, f, indent=2)
+            defaults = {"default": None, "temp": None}
+            json.dump(defaults, f, indent=2)
 
 
 class MascopeState(object):

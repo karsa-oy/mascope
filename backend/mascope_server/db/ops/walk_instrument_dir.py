@@ -19,7 +19,7 @@ from datetime import datetime
 
 from mascope_server.config import config
 
-instrument_dir = config.server.streams
+instrument_dir = config.server.filestore
 
 
 def sample_file_op(sample_filepath: str, sample_filename: str) -> None:

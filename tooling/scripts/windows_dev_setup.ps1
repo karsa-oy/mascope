@@ -1,12 +1,16 @@
 #Requires -Version 7.0 -PSEdition Core
 
 param (
-    [switch]$update = $false
+    [switch]$UpdateAll = $false,
+    [switch]$UpdateCli = $false,
+    [switch]$UpdateDevEnv = $false
 )
 
 $Main = {
 
-    if ( !$update ) {    
+    $Updating = $UpdateAll -or $UpdateCli -or $UpdateDevEnv
+
+    if ( !$Updating) {    
         Write-Output @"
 
     +-----------------------------------------+
@@ -32,10 +36,14 @@ $Main = {
 
 "@    
     }
-    Install-MascopeCli
-    Install-MascopeDevEnv
+    if ($UpdateCli -or $UpdateAll) {
+        Install-MascopeCli
+    }
+    if ($UpdateAll -or $UpdateDevEnv) {
+        Install-MascopeDevEnv
+    }
 
-    if (!$update) {
+    if (!$Updating) {
         Write-Output @"
 
     +-------------------------------+
