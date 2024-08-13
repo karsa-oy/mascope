@@ -87,7 +87,7 @@ def select_sample_batch(ctx):
     print("Select Sample Batch")
     resp = api_get(
         ctx["mascope_url"],
-        f"sample_batches?workspace_id={ctx['workspace']['workspace_id']}&sort=sample_batch_name",
+        f"sample/batches?workspace_id={ctx['workspace']['workspace_id']}&sort=sample_batch_name",
     )
     # print(resp.status_code, resp.content)
     content = None if resp.status_code != 200 else json.loads(resp.content)
@@ -116,7 +116,7 @@ def multi_select_sample_batches(ctx):
     print("Select Sample Batches")
     resp = api_get(
         ctx["mascope_url"],
-        f"sample_batches?workspace_id={ctx['workspace']['workspace_id']}&sort=sample_batch_name",
+        f"sample/batches?workspace_id={ctx['workspace']['workspace_id']}&sort=sample_batch_name",
     )
     # print(resp.status_code, resp.content)
     content = None if resp.status_code != 200 else json.loads(resp.content)
@@ -322,7 +322,7 @@ def get_sample_batches(mascope_url: str, workspace_id: str) -> list:
     """
     resp = api_get(
         mascope_url,
-        f"sample_batches?workspace_id={workspace_id}",
+        f"sample/batches?workspace_id={workspace_id}",
     )
     content = None if not resp or resp.status_code != 200 else json.loads(resp.content)
     batches = content and content["data"] or []
@@ -426,7 +426,7 @@ def get_sample_file_peaks(mascope_url: str, sample_file_id: str) -> dict:
         "intensity": peak intensity (area)
     :rtype: dict
     """
-    resp = api_get(mascope_url, f"sample_files/{sample_file_id}/peaks")
+    resp = api_get(mascope_url, f"sample/files/{sample_file_id}/peaks")
     content = None if not resp or resp.status_code != 200 else json.loads(resp.content)
     return content["data"] if content is not None else None
 
@@ -437,7 +437,7 @@ def get_sample_file_peak_timeseries(
     peak_mz: float,
     peak_mz_tolerance_ppm: float = None,
 ) -> dict:
-    """Call /api/sample_files/{sample_file_id}/peaks/timeseries endpoint
+    """Call /api/sample/files/{sample_file_id}/peaks/timeseries endpoint
 
     :param mascope_url: Mascope server URL
     :type mascope_url: str
@@ -463,7 +463,7 @@ def get_sample_file_peak_timeseries(
         else {"peak_mz": peak_mz}
     )
     resp = api_post(
-        mascope_url, f"sample_files/{sample_file_id}/peaks/timeseries", body
+        mascope_url, f"sample/files/{sample_file_id}/peaks/timeseries", body
     )
     content = None if not resp or resp.status_code != 200 else json.loads(resp.content)
     return content["data"] if content is not None else None
@@ -509,7 +509,7 @@ def get_sample_file_spectrum(
 
     # Make the GET request to the API endpoint with query parameters
     resp = api_get(
-        mascope_url, f"sample_files/{sample_file_id}/spectrum?{query_params_str}"
+        mascope_url, f"sample/files/{sample_file_id}/spectrum?{query_params_str}"
     )
     content = None if not resp or resp.status_code != 200 else json.loads(resp.content)
     return content["data"] if content is not None else None
@@ -620,8 +620,10 @@ def get_sample_compound_matches(
     if filter_params is not None:
         body["filter_params"] = filter_params
 
-    # Make the POST request to the samples/compound_matches endpoint for the specified sample
-    resp = api_post(mascope_url, f"samples/{sample_item_id}/compound_matches", body)
+    # Make the POST request for the specified sample
+    resp = api_post(
+        mascope_url, f"match/aggregate/sample/{sample_item_id}/compound", body
+    )
 
     # Handle the successfull response
     if resp is not None and resp.status_code == 200:

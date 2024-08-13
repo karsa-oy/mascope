@@ -21,10 +21,13 @@ from mascope_lib.peak import detect_peaks
 import pytest
 from tests.config import *
 
-from mascope_server.api.controllers.match.match_data_ops import compute_match_isotopes
+from mascope_server.api.controllers.match.lib.match_compute import (
+    compute_match_isotopes,
+)
 
 import mascope_runtime as runtime
-logger = runtime.logger.service('backend')
+
+logger = runtime.logger.service("backend")
 
 # Load targets
 with open(TARGETS_PATH, encoding="utf8") as file:

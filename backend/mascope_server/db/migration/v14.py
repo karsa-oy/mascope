@@ -2,16 +2,12 @@ import os
 import shutil
 import asyncio
 from sqlalchemy import text, select
-
-from mascope_server.api.controllers.match.match_aggregate_controller import (
+from mascope_server.db import configure_database_engine, async_session
+from mascope_server.db.models import SampleBatch
+from mascope_server.api.controllers.match.aggregate.match_aggregate_controller import (
     aggregate_and_create_matches,
 )
-from mascope_server.api.models.models import SampleBatch
-
 from mascope_server.config import config
-
-from mascope_server.db import configure_database_engine, async_session
-
 import mascope_runtime as runtime
 
 logger = runtime.logger.service("backend")

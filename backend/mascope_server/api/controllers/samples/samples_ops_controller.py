@@ -1,0 +1,1321 @@
+"""
+TODO this module is only used in mascope_api, after refactoring to use new match loading schema, it can be removed
+Refactor API wrapper to use new match loading schema #463
+"""
+
+from datetime import datetime
+from typing import List, Optional, Tuple
+import pandas as pd
+from sqlalchemy import (
+    asc,
+    desc,
+    and_,
+    select,
+    func,
+    cast,
+    Float,
+    literal,
+)
+from mascope_server.db import async_session
+from mascope_server.db.models import (
+    Sample,
+    SampleBatch,
+    MatchIsotope,
+    TargetCompound,
+    TargetIon,
+    IonizationMechanism,
+    TargetIsotope,
+    MatchInterference,
+    TargetCompoundInTargetCollection,
+    TargetCollection,
+    TargetCollectionInSampleBatch,
+)
+from mascope_server.api.lib.api_features import api_controller
+from mascope_server.api.lib.exceptions.api_exceptions import NotFoundException
+from mascope_server.api.controllers.match.lib.match_filter import apply_filter_params
+from mascope_server.api.models.samples.sample_pydantic_model import AlarmsList
+from mascope_server.api.models.match.match_pydantic_model import FilterParams
+
+import mascope_runtime as runtime
+
+logger = runtime.logger.service("backend")
+
+# TODO_configuration
+# Default Filter Parameters
+DEFAULT_MZ_TOLERANCE = 15
+DEFAULT_MIN_ISOTOPE_ABUNDANCE = 0.15
+DEFAULT_ISOTOPE_RATIO_TOLERANCE = 0.15
+DEFAULT_PEAK_MIN_INTENSITY = 0.0
+DEFAULT_MIN_ISOTOPE_CORRELATION = 0.8
+DEFAULT_PROBABLE_MATCH_THRESHOLD = 0.8
+DEFAULT_POSSIBLE_MATCH_THRESHOLD = 0.7
+
+
+# -------------------------------------------------------------------
+# Utility Functions
+# -------------------------------------------------------------------
+
+
+def aggregate_params(df: pd.DataFrame) -> pd.Series:
+    """Aggregation function no get the aggregated parameters.
+
+    Set match_score, match_category and alarm_mode of the top row (the most alarming row).
+    Sums sample_peak_area_sum/sample_peak_interference_sum for the group.
+
+    :param df: The DataFrame containing the data to be aggregated.
+    :type df: pd.DataFrame
+    :return: A Pandas Series containing the aggregated values.
+    :rtype: pd.Series
+    """
+    top_row = df.iloc[0]
+    return pd.Series(
+        {
+            "match_score": top_row["match_score"],
+            "match_category": top_row["match_category"],
+            "alarm_mode": top_row["alarm_mode"],
+            "sample_peak_area_sum": df["sample_peak_area_sum"].sum(),
+            "sample_peak_interference_sum": df["sample_peak_interference_sum"].sum(),
+        }
+    )
+
+
+# -------------------------------------------------------------------
+# Main Logic Functions
+# -------------------------------------------------------------------
+
+
+async def set_ions_match_category(
+    match_ions_df: pd.DataFrame, filter_params: Optional[FilterParams] = None
+) -> pd.DataFrame:
+    """Set the match_category field for each ion in the DataFrame.
+
+    This function determines the match_category for each ion based on match score and predefined thresholds.
+    It uses provided filters, if no filters are provided then set the ion-specific filters are used, otherwise defaults used as a fall back thresholds.
+
+    :param match_ions_df: DataFrame containing ion data with match scores.
+    :type match_ions_df: pd.DataFrame
+    :param filter_params: Optional ion-specific filter parameters.
+    :type filter_params: Optional[FilterParams]
+    :return: DataFrame with match_category field set for each ion.
+    :rtype: pd.DataFrame
+    """
+    for index, row in match_ions_df.iterrows():
+        # Default thresholds
+        probable_match_threshold = DEFAULT_PROBABLE_MATCH_THRESHOLD
+        possible_match_threshold = DEFAULT_POSSIBLE_MATCH_THRESHOLD
+
+        # Override with provided filter parameters if available
+        if filter_params:
+            probable_match_threshold = filter_params.probable_match_threshold
+            possible_match_threshold = filter_params.possible_match_threshold
+
+        # Use ion-specific filters if available and no filter_params provided
+        instrument = row["instrument"]
+        filter_params_ion = row.get("filter_params")
+        if not filter_params and filter_params_ion and instrument in filter_params_ion:
+            ion_filters = filter_params_ion[row["instrument"]]
+            probable_match_threshold = ion_filters["probable_match_threshold"]
+            possible_match_threshold = ion_filters["possible_match_threshold"]
+        # Determine match_category
+        match_score = row["match_score"]
+        match_ions_df.at[index, "match_category"] = (
+            2
+            if match_score >= probable_match_threshold
+            else (
+                1
+                if possible_match_threshold <= match_score < probable_match_threshold
+                else 0
+            )
+        )
+
+    match_ions_df["match_category"] = match_ions_df["match_category"].astype(int)
+
+    return match_ions_df
+
+
+async def set_alarm_mode(
+    dataframe: pd.DataFrame, alarms_list: List[str]
+) -> pd.DataFrame:
+    """
+    Set the alarm_mode field for each entry in the DataFrame based on the list of provided alarms_list.
+
+    :param dataframe: DataFrame containing sample/batch match filter data.
+    :param alarms_list: List of collection types that should have alarm_mode set to True.
+    :type dataframe: pd.DataFrame
+    :type alarms_list: List[str]
+    :return: DataFrame with alarm_mode field set.
+    :rtype: pd.DataFrame
+    """
+    # Set alarm_mode based on whether the target_collection_type is in the alarms_list
+    dataframe["alarm_mode"] = dataframe["target_collection_type"].apply(
+        lambda x: True if x in alarms_list else False
+    )
+    return dataframe
+
+
+async def aggregate_match_isotopes(
+    match_filter_df: pd.DataFrame,
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """Aggregate fields for matchIsotopes from the provided sample/batch match filter dataframe.
+
+    This function processes the sample/batch match filter dataframe to aggregate isotope data.
+    It prepares two DataFrames:
+    1) match_isotopes_data_df with detailed data for further aggregation,
+    2) match_isotopes_df with reduced data for frontend display.
+
+    :param match_filter_df: DataFrame containing sample/batch match filter data to aggregate.
+    :type match_filter_df: pd.DataFrame
+    :return: Tuple of DataFrames with aggregated matchIsotopes data.
+    :rtype: (pd.DataFrame, pd.DataFrame)
+
+    (compute_match_isotopes, apply_filter_params, optionally compute_match_interferences and combine data, aggregate_match_isotopes)
+    """
+    # Select relevant columns for detailed aggregation (backend processing)
+    match_isotopes_data_df = match_filter_df.loc[
+        :,
+        [
+            "match_score",
+            "match_category",
+            "alarm_mode",
+            "mz",
+            "match_mz_error",
+            "relative_abundance",
+            "match_abundance_error",
+            "match_isotope_correlation",
+            "sample_peak_area",
+            "sample_peak_area_relative",
+            "sample_peak_mz",
+            "sample_peak_tof",
+            "sample_peak_interference",
+            "instrument",
+            "filename",
+            "sample_item_name",
+            "sample_item_id",
+            "sample_item_type",
+            "target_isotope_id",
+            "target_ion_id",
+            "target_ion_formula",
+            "target_ion_mechanism",
+            "filter_params",
+            "target_compound_id",
+            "target_collection_id",
+            "target_collection_name",
+            "target_collection_description",
+            "target_collection_type",
+            "target_compound_name",
+            "target_compound_formula",
+        ],
+    ]
+
+    # Prepare a simplified DataFrame for frontend
+    match_isotopes_df = match_isotopes_data_df.drop(
+        columns=[
+            "target_collection_id",
+            "target_collection_name",
+            "target_collection_description",
+            "target_collection_type",
+            "alarm_mode",
+            "target_compound_name",
+            "target_compound_formula",
+            "target_ion_formula",
+            "target_ion_mechanism",
+            "filter_params",
+            "sample_item_type",
+        ]
+    ).drop_duplicates(subset=["target_isotope_id", "sample_item_id"])
+
+    return match_isotopes_data_df, match_isotopes_df
+
+
+async def aggregate_match_ions(
+    isotopes_df: pd.DataFrame, filter_params: Optional[FilterParams] = None
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """Aggregate fields for matchIons from isotopes dataframe.
+     Provided filters are passed to set_ions_match_category, if none filter_params are provided, stored ion-specidic or default params will be applied.
+
+    This function groups the isotopes dataframe by by target_ion_id and other related field.
+
+    It prepares two DataFrames:
+    1) match_ions_data_df with detailed data for further aggregation,
+    2) match_ions_df with reduced data for frontend display.
+
+    The match_score is calculated as a weighted sum of individual isotopes' match scores, weighted by their relative abundance.
+    The sample_peak_area and sample_peak_interference are summed across all isotopes in the group, the _sum is added to the field name.
+
+    :param isotopes_df: DataFrame containing isotope data to aggregate.
+    :type isotopes_df: pd.DataFrame
+    :param filter_params: Optional ion-specific filter parameters to set_ions_match_category.
+    :type filter_params: Optional[FilterParams]
+    :return: Tuple of DataFrames with aggregated matchIons data.
+    :rtype: (pd.DataFrame, pd.DataFrame)
+    """
+    match_ions_data_df = (
+        isotopes_df.groupby(
+            [
+                "target_ion_formula",
+                "instrument",
+                "target_compound_formula",
+                "target_compound_name",
+                "target_ion_mechanism",
+                "target_ion_id",
+                "target_compound_id",
+                "filename",
+                "sample_item_name",
+                "sample_item_type",
+                "sample_item_id",
+                "target_collection_id",
+                "target_collection_name",
+                "target_collection_description",
+                "target_collection_type",
+                "alarm_mode",
+            ]
+        )
+        .agg(
+            {
+                "match_score": lambda x: (
+                    x * isotopes_df.loc[x.index, "relative_abundance"]
+                ).sum(),
+                "sample_peak_area": "sum",
+                "sample_peak_interference": "sum",
+                "filter_params": "first",
+            }
+        )
+        .reset_index()
+        .rename(
+            columns={
+                "sample_peak_area": "sample_peak_area_sum",
+                "sample_peak_interference": "sample_peak_interference_sum",
+            }
+        )
+    )
+
+    # Prepare a simplified DataFrame for frontend
+    # Drop duplicates for matchIons based on target_ion_id for each sample, so each sample would have the unique matchIons
+    # (even of there is some compound in the different collections of the batch)
+    match_ions_df = match_ions_data_df.drop(
+        columns=[
+            "target_collection_id",
+            "target_collection_name",
+            "target_collection_description",
+            "target_collection_type",
+            "alarm_mode",
+            "target_compound_name",
+            "target_compound_formula",
+            "sample_item_type",
+        ]
+    ).drop_duplicates(subset=["target_ion_id", "sample_item_id"])
+
+    # set match_category field for ions
+    match_ions_data_df = await set_ions_match_category(
+        match_ions_data_df, filter_params
+    )
+    match_ions_df = await set_ions_match_category(match_ions_df, filter_params)
+
+    return match_ions_data_df, match_ions_df
+
+
+async def aggregate_match_compounds(
+    ions_df: pd.DataFrame,
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """Aggregate fields for matchCompounds from ions dataframe.
+
+    This function sorts the ions dataframe by match_category and match_score in descending order
+    and then groups by target_compound_id and other relevant fields to compute the aggregated
+    values for match_score, match_category, sample_peak_area_sum, and sample_peak_interference_sum.
+    It preserves the highest match_score of ion from the most alarming match_category (the most alarming ion)
+    and sums up the sample_peak_area_sum and sample_peak_interference_sum for the entire group.
+
+    It prepares two DataFrames:
+    1) match_compounds_data_df with detailed data for further aggregation,
+    2) match_compounds_df with reduced data for frontend display.
+
+    :param ions_df: DataFrame containing ion data to aggregate.
+    :type ions_df: pd.DataFrame
+    :return: pandas DataFrame with aggregated matchCompounds data.
+    :rtype: pd.DataFrame
+    """
+    match_compounds_data_df = (
+        ions_df.sort_values(
+            by=["match_category", "match_score"], ascending=[False, False]
+        )
+        .groupby(
+            [
+                "target_compound_id",
+                "target_compound_name",
+                "target_compound_formula",
+                "filename",
+                "sample_item_id",
+                "sample_item_name",
+                "sample_item_type",
+                "target_collection_id",
+                "target_collection_name",
+                "target_collection_description",
+                "target_collection_type",
+            ]
+        )
+        .apply(aggregate_params)
+        .reset_index()
+    )
+    # Explicitly cast match_category to int
+    match_compounds_data_df["match_category"] = match_compounds_data_df[
+        "match_category"
+    ].astype(int)
+
+    # Prepare a simplified DataFrame for frontend
+    # Each sample would have the unique matchCompounds (even of there is some compound in the different collections of the batch)
+    match_compounds_df = match_compounds_data_df.drop(
+        columns=[
+            "target_collection_id",
+            "target_collection_name",
+            "target_collection_description",
+            "target_collection_type",
+            "alarm_mode",
+            "sample_item_type",
+        ]
+    ).drop_duplicates(subset=["target_compound_id", "sample_item_id"])
+
+    return match_compounds_data_df, match_compounds_df
+
+
+async def aggregate_match_collections(compounds_df: pd.DataFrame) -> pd.DataFrame:
+    """Aggregate fields for matchCollections from compounds dataframe.
+
+    This function sorts the compounds dataframe by match_category and match_score in descending order
+    and then groups by target_collection_id and other relevant fields to compute the aggregated
+    values for match_score, match_category, sample_peak_area_sum, and sample_peak_interference_sum.
+    It preserves the highest match_score of compound from the most alarming match_category (the most alarming compound in collection)
+    and sums up the sample_peak_area_sum and sample_peak_interference_sum for the entire group.
+
+    :param compounds_df: DataFrame containing compound data to aggregate.
+    :type compounds_df: pd.DataFrame
+    :return: DataFrame with aggregated matchCollections data.
+    :rtype: pd.DataFrame
+    """
+    match_collections_df = (
+        compounds_df.sort_values(
+            by=["match_category", "match_score"], ascending=[False, False]
+        )
+        .groupby(
+            [
+                "sample_item_id",
+                "target_collection_id",
+                "target_collection_name",
+                "target_collection_description",
+                "target_collection_type",
+            ]
+        )
+        .apply(aggregate_params)
+        .reset_index()
+    )
+    # Explicitly cast match_category to int
+    match_collections_df["match_category"] = match_collections_df[
+        "match_category"
+    ].astype(int)
+
+    return match_collections_df
+
+
+async def aggregate_match_samples(compounds_df: pd.DataFrame) -> pd.DataFrame:
+    """Aggregate fields for matchSamples from compounds dataframe.
+
+    This function sorts the compounds dataframe by  alarm_mode, match_category and match_score in descending order
+    and then groups by sample_item_id and other relevant fields to compute the aggregated
+    values for match_score, match_category, sample_peak_area_sum, and sample_peak_interference_sum.
+    It preserves the highest match_score of compound where alarm_mode and match_category is the highest (the most alarming compound of sample)
+    and sums up the sample_peak_area_sum and sample_peak_interference_sum for the entire group.
+
+    :param compounds_df: DataFrame containing compound data to aggregate.
+    :type compounds_df: pd.DataFrame
+    :return: pandas DataFrame with aggregated matchSamples data.
+    :rtype: pd.DataFrame
+    """
+    match_samples_df = (
+        compounds_df.sort_values(
+            by=["alarm_mode", "match_category", "match_score"],
+            ascending=[False, False, False],
+        )
+        .drop_duplicates(subset=["target_compound_id", "sample_item_id"])
+        .groupby(
+            [
+                "filename",
+                "sample_item_id",
+                "sample_item_name",
+            ]
+        )
+        .apply(aggregate_params)
+        .reset_index()
+    )
+    # Cast match_category to int
+    match_samples_df["match_category"] = match_samples_df["match_category"].astype(int)
+
+    return match_samples_df
+
+
+async def compile_samples_df(
+    samples_df: pd.DataFrame,
+    match_samples_df: pd.DataFrame,
+) -> pd.DataFrame:
+    """Compile samples dataframe data (from database SampleView) with aggregated match results.
+
+    This function merges the samples dataframe with the aggregated match results from the match_samples dataframe.
+    It adds the match_score, match_category, sample_peak_area_sum, and sample_peak_interference_sum fields to each sample.
+    The 'matched' field is calculated to indicate whether the sample has any match results.
+
+    The aggregation logic in match_samples_df ensures that each sample's aggregated fields represent:
+      - The highest match_score of compound from the most alarming match_category (the most alarming compound of sample)
+      - The sum of sample_peak_area and sample_peak_interference for all compounds of the sample
+
+    NaN values in aggregated fields are replaced with 0, indicating no matches or data for those fields.
+
+    :param samples_df: DataFrame containing original database sample data.
+    :type samples_df: pd.DataFrame
+    :param match_samples_df: DataFrame containing aggregated match results for samples.
+    :type match_samples_df: pd.DataFrame
+    :return: DataFrame with sample data and aggregated match results.
+    :rtype: pd.DataFrame
+    """
+    # Select relevant columns from match_samples_df
+    match_samples_df_short = match_samples_df[
+        [
+            "sample_item_id",
+            "match_score",
+            "match_category",
+            "alarm_mode",
+            "sample_peak_area_sum",
+            "sample_peak_interference_sum",
+        ]
+    ]
+
+    # Merge with samples_df
+    samples_df = pd.merge(
+        samples_df, match_samples_df_short, how="left", on="sample_item_id"
+    )
+
+    # Add matched column
+    samples_df["matched"] = samples_df["match_score"].apply(
+        lambda x: 0 if pd.isna(x) else 1
+    )
+
+    # Replace NaNs with 0
+    samples_df[
+        [
+            "tic",
+            "match_score",
+            "match_category",
+            "sample_peak_area_sum",
+            "sample_peak_interference_sum",
+            "alarm_mode",
+        ]
+    ] = samples_df[
+        [
+            "tic",
+            "match_score",
+            "match_category",
+            "sample_peak_area_sum",
+            "sample_peak_interference_sum",
+            "alarm_mode",
+        ]
+    ].fillna(
+        0
+    )
+
+    return samples_df
+
+
+# -------------------------------------------------------------------
+# Controller or Route Handlers
+# -------------------------------------------------------------------
+
+
+@api_controller()
+async def get_samples_aggregate_matches(
+    sample_item_id: str = None,
+    sample_item_id_active: str = None,
+    sample_file_id: str = None,
+    sample_batch_id: str = None,
+    filename: str = None,
+    instrument: str = None,
+    sample_item_type: str = None,
+    datetime_min: datetime = None,
+    datetime_max: datetime = None,
+    sort: str = "datetime_utc",
+    order: str = "asc",
+    page: int = 0,
+    limit: int = 10000,
+    batch_matches_info: bool = False,
+    match_samples: bool = False,
+    match_compounds: bool = False,
+    match_ions: bool = False,
+    match_isotopes: bool = False,
+    alarms_list: AlarmsList = AlarmsList(),
+) -> dict:
+    """
+    Retrieves samples (compinded sample item and sample file info) based on various filter criteria and pagination settings.
+    Additionally, it can compute match information for the samples and return it as requested.
+
+    Steps:
+    1. Construct the base query with filters based on provided parameters.
+    2. Apply sorting and pagination to the query.
+    3. Execute the query and fetch results.
+    4. Format the fetched samples into a dataframe for easier manipulation.
+    5. If batch match info is requested, compute and merge match data with sample data.
+    6. Optionally add detailed match information based on match_samples, match_compounds, match_ions, and match_isotopes flags.
+
+    :param sample_item_id: Filter by sample item ID.
+    :type sample_item_id: str, optional
+    :param sample_item_id_active: Used to mark the active sample item in the response.
+    :type sample_item_id_active: str, optional
+    :param sample_file_id: Filter by sample file ID.
+    :type sample_file_id: str, optional
+    :param sample_batch_id: Filter by sample batch ID; required for batch match info.
+    :type sample_batch_id: str, optional, required for batch match data
+    :param filename: Filter by filename.
+    :type filename: str, optional
+    :param instrument: Filter by instrument name.
+    :type instrument: str, optional
+    :param sample_item_type: Filter by sample item type.
+    :type sample_item_type: str, optional
+    :param datetime_min: Filter samples after this datetime of the sample file.
+    :type datetime_min: datetime, optional
+    :param datetime_max: Filter samples before this datetime of the sample file.
+    :type datetime_max: datetime, optional
+    :param sort: Column to sort the results by.
+    :type sort: str, optional
+    :param order: Sort order ('asc' or 'desc').
+    :type order: str, optional
+    :param page: Pagination page number.
+    :type page: int, optional
+    :param limit: Number of results per page.
+    :type limit: int, optional
+    :param batch_matches_info: Flag indicating if batch match info should be computed.
+    :type batch_matches_info: bool, optional
+    :param match_samples, match_compounds, match_ions, match_isotopes: Flags for including detailed match info.
+    :type match_samples: bool, optional
+    :type match_ions: bool, optional
+    :type match_isotopes: bool, optional
+    :param alarms_list: List of collection types to set alarm mode to true.
+    :type alarms_list: List[str], optional
+    :return: A dictionary containing the total number of results, the formatted sample data, and optionally match information.
+    :rtype: dict
+    """
+    async with async_session() as session:
+        # Step 1: Construct base query with filters
+        stmt = select(Sample)
+        # Query filters
+        if sample_item_id:
+            stmt = stmt.filter(Sample.sample_item_id == sample_item_id)
+
+        if sample_file_id:
+            stmt = stmt.filter(Sample.sample_file_id == sample_file_id)
+
+        if sample_batch_id:
+            stmt = stmt.filter(Sample.sample_batch_id == sample_batch_id)
+
+        if filename:
+            stmt = stmt.filter(Sample.filename == filename)
+
+        if instrument:
+            stmt = stmt.filter(Sample.instrument == instrument)
+
+        if sample_item_type:
+            stmt = stmt.filter(Sample.sample_item_type == sample_item_type)
+
+        if datetime_min and datetime_max:
+            stmt = stmt.where(
+                and_(
+                    cast(func.julianday(Sample.datetime_utc), Float)
+                    >= func.julianday(datetime_min),
+                    cast(func.julianday(Sample.datetime_utc), Float)
+                    <= func.julianday(datetime_max),
+                )
+            )
+
+        # Step 2: Apply sorting and pagination
+        if sort:
+            if order == "desc":
+                stmt = stmt.order_by(desc(getattr(Sample, sort)))
+            else:
+                stmt = stmt.order_by(asc(getattr(Sample, sort)))
+
+        # Get total count
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total = await session.scalar(count_stmt)
+
+        # Get paginated results
+        stmt = stmt.offset(page * limit).limit(limit)
+
+        # Step 3: Execute query and fetch results
+        result = await session.execute(stmt)
+        samples = result.scalars().all()
+
+        # Step 4: Format samples into dataframe
+        samples_df = pd.DataFrame([sample.to_dict() for sample in samples])
+
+        #  Add 'selection' field
+        if sample_item_id_active is not None:
+            samples_df["selection"] = samples_df["sample_item_id"].apply(
+                lambda x: 3 if x == sample_item_id_active else 0
+            )
+        else:
+            samples_df["selection"] = 0
+
+        # Step 5: Compute and merge batch match info if requested
+        if sample_batch_id and batch_matches_info:
+            # Calculate and add fields match_score, sample_peak_area_sum, sample_peak_interference_sum, matched
+            batch_match_filter_dict = await init_batch_match_filter(sample_batch_id)
+
+            # Convert the result to a dataframe
+            batch_match_filter_df = pd.DataFrame(batch_match_filter_dict)
+
+            # Calculate matchIsotopes, matchIons, matchCompounds, matchCollections
+
+            # If batch_match_filter_df is empty, assign None to relevant fields and continue
+            if batch_match_filter_df.empty:
+                samples_df[
+                    [
+                        "match_score",
+                        "match_category",
+                        "sample_peak_area_sum",
+                        "sample_peak_interference_sum",
+                        "matched",
+                    ]
+                ] = (
+                    None,
+                    0,
+                    None,
+                    None,
+                    0,
+                )
+                result_dict = {
+                    "results": total,
+                    "data": samples_df.to_dict("records"),
+                }
+                return result_dict
+
+            # 1) Set the alarm_mode based on alarms_list
+            batch_match_filter_df = await set_alarm_mode(
+                batch_match_filter_df, alarms_list
+            )
+
+            # 2) Aggregate fields for matchIsotopes
+            match_isotopes_data_df, match_isotopes_df = await aggregate_match_isotopes(
+                batch_match_filter_df
+            )
+
+            # 3) Aggregate fields for matchIons
+            match_ions_data_df, match_ions_df = await aggregate_match_ions(
+                match_isotopes_data_df
+            )
+
+            # 4) Aggregate fields for matchCompounds
+            (
+                match_compounds_data_df,
+                match_compounds_df,
+            ) = await aggregate_match_compounds(match_ions_data_df)
+
+            # 5)  Aggregate fields for matchSamples
+            # Calculate and add fields match_score, sample_peak_area_sum, sample_peak_interference_sum, matched
+            match_samples_df = await aggregate_match_samples(match_compounds_data_df)
+
+            # 6)  Merge fields for samples data
+            samples_df = await compile_samples_df(samples_df, match_samples_df)
+
+        result_dict = {
+            "results": total,
+            "data": samples_df.to_dict("records"),
+        }
+
+        # Conditionally add match data to the result if batch_matches_info is True
+        if batch_matches_info and sample_batch_id:
+            batch_matches_info_dict = {"matches": {}}
+
+            # Add each match type conditionally
+            if match_samples:
+                batch_matches_info_dict["matches"]["match_samples"] = len(
+                    match_samples_df
+                )
+                batch_matches_info_dict["match_samples"] = match_samples_df.sort_values(
+                    by=["match_category", "match_score"], ascending=[False, False]
+                ).to_dict("records")
+
+            if match_compounds:
+                batch_matches_info_dict["matches"]["match_compounds"] = len(
+                    match_compounds_df
+                )
+                batch_matches_info_dict["match_compounds"] = (
+                    match_compounds_df.sort_values(
+                        by=["match_category", "match_score"], ascending=[False, False]
+                    ).to_dict("records")
+                )
+
+            if match_ions:
+                batch_matches_info_dict["matches"]["match_ions"] = len(match_ions_df)
+                batch_matches_info_dict["match_ions"] = match_ions_df.sort_values(
+                    by=["match_category", "match_score"], ascending=[False, False]
+                ).to_dict("records")
+
+            if match_isotopes:
+                batch_matches_info_dict["matches"]["match_isotopes"] = len(
+                    match_isotopes_df
+                )
+                batch_matches_info_dict["match_isotopes"] = (
+                    match_isotopes_df.sort_values(
+                        by=["match_category", "match_score"], ascending=[False, False]
+                    ).to_dict("records")
+                )
+
+            result_dict["batch_matches_info"] = batch_matches_info_dict
+
+        return result_dict
+
+
+@api_controller()
+async def get_sample_aggregate_matches(
+    sample_item_id: str,
+    alarms_list: AlarmsList = AlarmsList(),
+    sample_matches_info: bool = False,
+) -> dict:
+    """
+    Retrieves detailed information for a specific sample, optionally  including aggregated  match data.
+
+    This function fetches the sample based on its unique identifier and conditionally computes matching data for  isotopes, ions,
+    compounds, and collections, dependent on the association of the sample with target entities.
+
+    MatchIsotope calculations can be omitted based on the `sample_matches_info` parameter.
+    Default is True for http requests, False when called from other controllers.
+
+    Steps:
+    1. Fetch the sample using the provided sample item ID to ensure it exists.
+    2. If no match information is required, return the basic sample data immediately.
+    3. Initialize match filtering for the sample and convert results to a DataFrame for further processing.
+    4. Process the DataFrame to include additional match data as specified, applying alarm mode settings and aggregating data across different match categories.
+    5. Compile the comprehensive sample data including all requested match information and return it in a structured dictionary format.
+
+    :param sample_item_id: Unique identifier for the sample.
+    :type sample_item_id: str
+    :param alarms_list: :param alarms_list: List of collection types that set alarm_mode to true. By default, targets are alarming, diagnostics and calibrants are not, defaults to None
+    :type alarms_list: List[str], optional
+    :param sample_matches_info: Flag to determine if match information should be included, defaults to False.
+    :type sample_matches_info: bool, optional
+    :raises NotFoundException: If the sample with the specified item ID is not found.
+    :return: A dictionary containing the sample information. If `sample_matches_info` is True, additional match data is included.
+    :rtype: dict
+    """
+    async with async_session() as session:
+        # Step 1: Fetch sample to verify its existence
+        sample = await session.get(Sample, sample_item_id)
+        if not sample:
+            raise NotFoundException(f"Sample with ID '{sample_item_id}' not found")
+
+        sample_dict = sample.to_dict()
+
+        # Step 2: Return only basic sample data if match information is not requested.
+        if not sample_matches_info:
+            return sample_dict
+
+        # Step 3: Initialize sample match filter and fetch match data.
+        sample_match_filter_dict = await init_sample_match_filter(sample.sample_item_id)
+
+        # Convert the result to a dataframe
+        sample_match_filter_df = pd.DataFrame(sample_match_filter_dict)
+
+        # If sample_match_filter_df is empty, return the sample dictionary with empty fields
+        if sample_match_filter_df.empty:
+            sample_dict.update(
+                {
+                    "match_score": 0,
+                    "match_category": 0,
+                    "sample_peak_area_sum": 0,
+                    "sample_peak_interference_sum": 0,
+                    "matched": 0,
+                    "selection": 3,
+                    "match_collections": [],
+                    "match_compounds": [],
+                    "match_ions": [],
+                    "match_isotopes": [],
+                }
+            )
+            return sample_dict
+
+        # Step 4: Process the DataFrame to include additional match data as specified,
+        # applying alarm mode settings and aggregating data across different match categories.
+
+        # Set the alarm_mode based on alarms_list
+        sample_match_filter_df = await set_alarm_mode(
+            sample_match_filter_df, alarms_list
+        )
+
+        # Aggregate fields for matchIsotopes
+        match_isotopes_data_df, match_isotopes_df = await aggregate_match_isotopes(
+            sample_match_filter_df
+        )
+
+        # Aggregate fields for matchIons
+        match_ions_data_df, match_ions_df = await aggregate_match_ions(
+            match_isotopes_data_df
+        )
+
+        # Aggregate fields for matchCompounds
+        match_compounds_data_df, match_compounds_df = await aggregate_match_compounds(
+            match_ions_data_df
+        )
+
+        # Aggregate fields for matchCollections
+        match_collections_df = await aggregate_match_collections(
+            match_compounds_data_df
+        )
+
+        # Step 5: Compile the final sample data dictionary.
+        # Aggregate fields for sample_df
+        # Convert sample into dataframe
+        sample_df = pd.DataFrame([sample_dict])
+
+        # Calculate and add fields match_score, sample_peak_area_sum, sample_peak_interference_sum, matched, selection
+        match_samples_df = await aggregate_match_samples(match_compounds_data_df)
+
+        #  Merge fields for samples data
+        sample_df = await compile_samples_df(sample_df, match_samples_df)
+
+        # Add the selection field
+        sample_df["selection"] = 3
+
+        sample_dict = sample_df.to_dict(orient="records")[0]
+
+        # Add the matches field as a dictionary
+        matches = {
+            "matches": {
+                "match_isotopes": len(match_isotopes_df),
+                "match_ions": len(match_ions_df),
+                "match_compounds": len(match_compounds_df),
+                "match_collections": len(match_collections_df),
+            }
+        }
+
+        sample_dict.update(matches)
+
+        # Add the aggregated dataframes to the sample dictionary
+        sample_dict["match_collections"] = match_collections_df.sort_values(
+            by=["match_category", "match_score"], ascending=[False, False]
+        ).to_dict("records")
+        sample_dict["match_compounds"] = match_compounds_df.sort_values(
+            by=["match_category", "match_score"], ascending=[False, False]
+        ).to_dict("records")
+        sample_dict["match_ions"] = match_ions_df.sort_values(
+            by=["match_category", "match_score"], ascending=[False, False]
+        ).to_dict("records")
+        sample_dict["match_isotopes"] = match_isotopes_df.sort_values(
+            by="mz", ascending=True
+        ).to_dict("records")
+
+        return sample_dict
+
+
+@api_controller()
+async def init_batch_match_filter(
+    sample_batch_id: str, include_match_interference: bool = True
+) -> list:
+    """
+    Initializes and applies a batch-level match filter across all samples within a specified batch.
+    This function aggregates isotopic level match data for all samples in the batch, applying ion-specific
+    or default filtering parameters to each isotopic match. The result includes filtered match data.
+
+    This function is used for aggregating batch-level match data. It is utilized in the get_samples_aggregate_matches endpoint to
+    include aggregated match data (`batch_matches_info`) within the response.
+
+    Steps:
+    1. Verify the existence of the specified sample batch.
+    2. Construct and execute structured queries to fetch relevant match data across the batch:
+       a. Fetch basic sample information.
+       b. Fetch associated target information including collections, compounds, ions, and isotopes.
+       c. Combine these to fetch relevant match data.
+    3. Optionally include match interference data if requested.
+    4. Apply filtering criteria based on ion-specific parameters or default values to each isotopic match.
+    5. Convert the filtered DataFrame to a list of dictionaries for the final output.
+
+    :param sample_batch_id: ID of the sample batch for which to initialize and apply the match filter.
+    :type sample_batch_id: str
+    :param include_match_interference: Flag indicating whether to include match interference data.
+    :rtype: bool
+    :return: A list of dictionaries containing the filtered isotopic match data for the entire batch.
+    :rtype: List[Dict]
+    :raises NotFoundException: If the specified sample batch does not exist.
+    """
+    async with async_session() as session:
+        # Verify existence of the sample batch
+        sample_batch = await session.get(SampleBatch, sample_batch_id)
+        if not sample_batch:
+            raise NotFoundException(
+                f"Sample batch with ID '{sample_batch_id}' not found"
+            )
+
+        # Step 2: Extract ion mechanisms from sample batch's build parameters
+        build_params = sample_batch.build_params
+        sample_batch_ion_mechanisms = build_params.get("ion_mechanisms", [])
+
+        # Query for fetching basic samples information
+        sample_query = select(
+            Sample.sample_item_id,
+            Sample.filename,
+            Sample.instrument,
+            Sample.sample_item_name,
+            Sample.sample_item_type,
+        ).where(Sample.sample_batch_id == sample_batch_id)
+
+        sample_result = await session.execute(sample_query)
+        samples_df = pd.DataFrame([row._asdict() for row in sample_result.fetchall()])
+
+        if samples_df.empty:
+            logger.warning(
+                f"No samples found in the batch '{sample_batch.sample_batch_name}'"
+            )
+            return {}
+
+        sample_item_ids = samples_df["sample_item_id"].tolist()
+
+        # Query to get relevant Target data
+        target_query = (
+            select(
+                TargetCollection.target_collection_id,
+                TargetCollection.target_collection_name,
+                TargetCollection.target_collection_description,
+                TargetCollection.target_collection_type,
+                TargetCompound.target_compound_id,
+                TargetCompound.target_compound_formula,
+                TargetCompound.target_compound_name,
+                TargetIon.target_ion_id,
+                TargetIon.target_ion_formula,
+                TargetIon.filter_params,
+                IonizationMechanism.ionization_mechanism.label("target_ion_mechanism"),
+                TargetIsotope.target_isotope_id,
+                TargetIsotope.mz,
+                TargetIsotope.relative_abundance,
+            )
+            .select_from(TargetCollectionInSampleBatch)
+            .where(TargetCollectionInSampleBatch.sample_batch_id == sample_batch_id)
+            .join(
+                TargetCollection,
+                TargetCollection.target_collection_id
+                == TargetCollectionInSampleBatch.target_collection_id,
+            )
+            .join(
+                TargetCompoundInTargetCollection,
+                TargetCompoundInTargetCollection.target_collection_id
+                == TargetCollection.target_collection_id,
+            )
+            .join(
+                TargetCompound,
+                TargetCompound.target_compound_id
+                == TargetCompoundInTargetCollection.target_compound_id,
+            )
+            .join(
+                TargetIon,
+                TargetIon.target_compound_id == TargetCompound.target_compound_id,
+            )
+            .join(
+                IonizationMechanism,
+                IonizationMechanism.ionization_mechanism_id
+                == TargetIon.ionization_mechanism_id,
+            )
+            .where(
+                IonizationMechanism.ionization_mechanism_id.in_(
+                    sample_batch_ion_mechanisms
+                ),
+            )
+            .join(
+                TargetIsotope,
+                TargetIsotope.target_ion_id == TargetIon.target_ion_id,
+            )
+        )
+
+        target_result = await session.execute(target_query)
+        targets_df = pd.DataFrame([row._asdict() for row in target_result.fetchall()])
+        if targets_df.empty:
+            logger.info(
+                f"No targets found in the batch '{sample_batch.sample_batch_name}'"
+            )
+            return {}
+
+        target_isotope_ids = targets_df["target_isotope_id"].tolist()
+
+        # Fetch match isotopes
+        match_query = (
+            select(
+                MatchIsotope.sample_item_id,
+                MatchIsotope.target_isotope_id,
+                MatchIsotope.match_mz_error,
+                MatchIsotope.match_abundance_error,
+                MatchIsotope.match_isotope_correlation,
+                MatchIsotope.sample_peak_area,
+                MatchIsotope.sample_peak_area_relative,
+                MatchIsotope.sample_peak_mz,
+                MatchIsotope.sample_peak_tof,
+                MatchIsotope.match_score,
+            )
+            .select_from(MatchIsotope)
+            .where(
+                and_(
+                    MatchIsotope.sample_item_id.in_(sample_item_ids),
+                    MatchIsotope.target_isotope_id.in_(target_isotope_ids),
+                )
+            )
+        )
+
+        match_result = await session.execute(match_query)
+        matches_df = pd.DataFrame(match_result.fetchall())
+
+        # Fetch match interference if the flag is true
+        if include_match_interference:
+            match_interference_query = (
+                select(
+                    MatchInterference.sample_peak_interference,
+                    MatchInterference.sample_item_id,
+                    MatchInterference.target_isotope_id,
+                )
+                .select_from(MatchInterference)
+                .where(
+                    and_(
+                        MatchInterference.sample_item_id.in_(sample_item_ids),
+                        MatchInterference.target_isotope_id.in_(target_isotope_ids),
+                    )
+                )
+            )
+
+            match_interference_result = await session.execute(match_interference_query)
+            match_interference_df = pd.DataFrame(match_interference_result.fetchall())
+
+            if match_interference_df.empty:
+                logger.info(
+                    f"No match interference found for the sample batch '{sample_batch.sample_batch_name}'"
+                )
+                return {}
+
+            # Merge interference data into the matches DataFrame
+            matches_df = pd.merge(
+                matches_df,
+                match_interference_df,
+                on=["sample_item_id", "target_isotope_id"],
+                how="left",
+            )
+
+        # Merge DataFrames
+        if matches_df.empty:
+            logger.info(
+                f"No matches found for the sample batch '{sample_batch.sample_batch_name}'"
+            )
+            return {}
+        combined_sample_matches_df = pd.merge(
+            matches_df, samples_df, on="sample_item_id", how="inner"
+        )
+        batch_match_data_df = pd.merge(
+            combined_sample_matches_df, targets_df, on="target_isotope_id", how="inner"
+        )
+
+        # Define the desired column order
+        column_order = [
+            "sample_item_id",
+            "filename",
+            "instrument",
+            "sample_item_name",
+            "sample_item_type",
+            "target_collection_id",
+            "target_collection_name",
+            "target_collection_description",
+            "target_collection_type",
+            "target_compound_id",
+            "target_compound_formula",
+            "target_compound_name",
+            "target_ion_id",
+            "target_ion_formula",
+            "filter_params",
+            "target_ion_mechanism",
+            "target_isotope_id",
+            "mz",
+            "relative_abundance",
+            "match_mz_error",
+            "match_abundance_error",
+            "match_isotope_correlation",
+            "sample_peak_area",
+            "sample_peak_area_relative",
+            "sample_peak_mz",
+            "sample_peak_tof",
+            "match_score",
+        ]
+        if include_match_interference:
+            column_order.append("sample_peak_interference")
+
+        # Reorder the columns according to the defined order and sort the DataFrame by 'mz'
+        batch_match_data_df = (
+            batch_match_data_df[column_order]
+            .sort_values(by="mz", kind="mergesort")
+            .reset_index(drop=True)
+        )
+
+        # Step 4: Apply filtering match_score, sample_peak_area
+        batch_match_data_filtered_df = apply_filter_params(batch_match_data_df)
+
+        return batch_match_data_filtered_df.to_dict("records")
+
+
+@api_controller()
+async def init_sample_match_filter(
+    sample_item_id: str,
+    filter_params: FilterParams = None,
+    target_ion_id: str = None,
+) -> list:
+    """
+    Initializes and applies the sample match filter for a specific sample item, representing isotope-level data.
+    This function fetches isotope match data for a given sample item, applies filtering based on provided
+    ion-specific parameters or default values, and returns the filtered match data.
+
+
+    Filter params are ion-specific. If filter_params are not provided the stored ion-specific or DEFAULT filters are used
+    for match_score/sample_peak_area filtering and setting match_category
+
+    Steps:
+    1. Verify the existence of the specified sample item.
+    2. If a target ion ID is provided, verify its existence and use the provided filter parameters.
+    3. Construct and execute a database query to fetch relevant isotopic match data.
+    4. Convert query result to DataFrame.
+    5. Apply filtering based on provided filter parameters or using the stored ion-specific or DEFAULT filter parameters.
+    6. Convert the filtered DataFrame to a list of dictionaries.
+
+    :param sample_item_id: ID of the sample item for which to initialize the match filter.
+    :type sample_item_id: str
+    :param filter_params: Optional ion-specific filter parameters for match score and sample peak area filtering.
+    :type filter_params: FilterParams, optional
+    :param target_ion_id: Optional target ion ID to filter the matches at an isotopic level.
+    :type target_ion_id: str, optional
+    :return: A list of dictionaries containing the filtered isotopic match data.
+    :rtype: List[Dict]
+    :raises NotFoundException: If the specified sample item or target ion does not exist.
+    """
+    # Set min_isotope_abundance filter parameter to the provided one or to the DEFAULT value for query
+    min_isotope_abundance = (
+        filter_params.min_isotope_abundance
+        if filter_params
+        else DEFAULT_MIN_ISOTOPE_ABUNDANCE
+    )
+
+    async with async_session() as session:
+        # Step 1: Fetch sample item to verify its existence
+        sample = await session.get(Sample, sample_item_id)
+        if not sample:
+            raise NotFoundException(f"Sample with ID '{sample_item_id}' not found")
+
+        # Step 2: Fetch target ion to verify its existence (if target_ion_id is provided)
+        if target_ion_id is not None:
+            ion = await session.get(TargetIon, target_ion_id)
+            if not ion:
+                raise NotFoundException(
+                    f"Target ion with ID '{target_ion_id}' not found"
+                )
+
+        # Step 3: Construct and execute query to fetch match data
+        stmt = (
+            select(
+                TargetIsotope.mz,
+                MatchIsotope.match_mz_error,
+                MatchIsotope.match_abundance_error,
+                MatchIsotope.match_isotope_correlation,
+                MatchIsotope.sample_item_id,
+                MatchIsotope.sample_peak_area,
+                MatchIsotope.sample_peak_area_relative,
+                MatchIsotope.sample_peak_mz,
+                MatchIsotope.sample_peak_tof,
+                MatchInterference.sample_peak_interference,
+                TargetIsotope.relative_abundance,
+                Sample.filename,
+                Sample.instrument,
+                Sample.sample_item_name,
+                Sample.sample_item_type,
+                TargetCollection.target_collection_id,
+                TargetCollection.target_collection_name,
+                TargetCollection.target_collection_description,
+                TargetCollection.target_collection_type,
+                TargetCompound.target_compound_formula,
+                TargetCompound.target_compound_id,
+                TargetCompound.target_compound_name,
+                TargetIon.target_ion_formula,
+                TargetIon.target_ion_id,
+                TargetIon.filter_params,
+                IonizationMechanism.ionization_mechanism.label("target_ion_mechanism"),
+                TargetIsotope.target_isotope_id,
+                literal(2).label("selection"),
+                MatchIsotope.match_score,
+            )
+            .select_from(Sample)
+            .where(
+                Sample.sample_item_id == sample_item_id,
+            )
+            .join(MatchIsotope, Sample.sample_item_id == MatchIsotope.sample_item_id)
+            .join(
+                MatchInterference,
+                and_(
+                    Sample.sample_item_id == MatchInterference.sample_item_id,
+                    MatchIsotope.target_isotope_id
+                    == MatchInterference.target_isotope_id,
+                ),
+            )
+            .join(
+                TargetIsotope,
+                MatchIsotope.target_isotope_id == TargetIsotope.target_isotope_id,
+            )
+            .join(TargetIon, TargetIsotope.target_ion_id == TargetIon.target_ion_id)
+            .join(
+                IonizationMechanism,
+                TargetIon.ionization_mechanism_id
+                == IonizationMechanism.ionization_mechanism_id,
+            )
+            .join(
+                TargetCompound,
+                TargetIon.target_compound_id == TargetCompound.target_compound_id,
+            )
+            .join(
+                TargetCompoundInTargetCollection,
+                TargetCompound.target_compound_id
+                == TargetCompoundInTargetCollection.target_compound_id,
+            )
+            .join(
+                TargetCollection,
+                TargetCompoundInTargetCollection.target_collection_id
+                == TargetCollection.target_collection_id,
+            )
+            .join(
+                TargetCollectionInSampleBatch,
+                TargetCollection.target_collection_id
+                == TargetCollectionInSampleBatch.target_collection_id,
+            )
+            .where(
+                and_(
+                    TargetCollectionInSampleBatch.sample_batch_id
+                    == Sample.sample_batch_id,
+                    MatchIsotope.sample_item_id == sample_item_id,
+                    TargetIsotope.relative_abundance >= min_isotope_abundance,
+                )
+            )
+            .order_by(TargetIsotope.mz)
+        )
+
+        if target_ion_id is not None:
+            # Apply target_ion_id filter if provided
+            stmt = stmt.where(TargetIon.target_ion_id == target_ion_id)
+
+        result = await session.execute(stmt)
+        sample_match_filter = result.fetchall()
+
+        # Step 4: Convert query result to DataFrame
+        sample_match_filter_df = pd.DataFrame(
+            [row._asdict() for row in sample_match_filter]
+        )
+
+        # Step 5: Apply filtering criteria, filtering match_score, sample_peak_area, and setting match_category
+        filtered_sample_match_filter_df = apply_filter_params(
+            sample_match_filter_df, filter_params
+        )
+
+        # Step 6: Convert the filtered DataFrame to a list of dictionaries
+        filtered_sample_match_filter_dicts = filtered_sample_match_filter_df.to_dict(
+            "records"
+        )
+
+        return filtered_sample_match_filter_dicts

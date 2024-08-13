@@ -1,0 +1,177 @@
+"""
+Functionalities related to the m/z fitting calibration processes. 
+"""
+
+import numpy as np
+import pandas as pd
+
+from mascope_hardware.tofwerk.calibration import mz_calibrate
+from mascope_hardware.tofwerk.lib.TwTool import TwTof2Mass
+
+from mascope_lib.file_func import (
+    get_zarr_var_shape,
+    load_coord,
+    update_props,
+    update_zarr_array_coord,
+    remove_duplicate_mz_values,
+)
+from mascope_lib.peak import calculate_tic
+from zarr.errors import PathNotFoundError
+from mascope_server.api.lib.api_features import (
+    api_controller,
+    send_progress_user_notification,
+)
+from mascope_server.api.controllers.match.lib.match_compute import (
+    compute_match_isotopes,
+)
+from mascope_server.api.controllers.target.isotopes.target_isotopes_controller import (
+    get_target_isotopes,
+)
+from mascope_server.api.controllers.target.associations.target_compound_in_target_collection_controller import (
+    get_target_compound_in_target_collection,
+)
+from mascope_server.api.lib.notifications.api_notification_pydantic_model import (
+    UserNotification,
+)
+import mascope_runtime as runtime
+
+logger = runtime.logger.service("backend")
+
+
+@api_controller()
+async def mz_fit(
+    filename,
+    calibration_collection_id,
+    ionization_mechanism_ids,
+    peak_intensity_min,
+    isotope_abundance_min,
+    match_score_min,
+    refine_window,
+    notification: UserNotification,
+):
+    """
+    Main function to fit m/z. Fits the mass-to-charge ratio (m/z) for a given sample file.
+
+    :param ...:  parameters.
+    :return: fit, stats, error.
+    """
+    fit = None
+    stats = None
+    error = None
+
+    # calculate tic
+    await send_progress_user_notification(notification, 0.25)
+
+    tic = calculate_tic(filename)
+    if tic < 1e6:
+        error = "TIC is too low! Check ionization device."
+        return fit, stats, error
+
+    await send_progress_user_notification(notification, 0.35)
+
+    # Compute matches for calibration compounds
+    # Fetch target compounds in the calibration collection
+    target_compounds_result = await get_target_compound_in_target_collection(
+        target_collection_id=calibration_collection_id,
+    )
+    target_compound_ids = [
+        item["target_compound_id"] for item in target_compounds_result["data"]
+    ]
+
+    # Fetch target isotopes for specific filters
+    target_isotopes_result = await get_target_isotopes(
+        target_compound_ids=target_compound_ids,
+        ionization_mechanism_ids=ionization_mechanism_ids,
+    )
+    target_isotopes_df = pd.DataFrame(target_isotopes_result["data"])
+    match_isotope_df = await compute_match_isotopes(
+        filename=filename,
+        target_isotopes_df=target_isotopes_df,
+        min_isotope_abundance=isotope_abundance_min,
+    )
+
+    # Filter matches
+    good_matches_df = match_isotope_df[
+        (match_isotope_df.relative_abundance >= isotope_abundance_min)
+        & (match_isotope_df.sample_peak_area >= peak_intensity_min)
+        & (abs(match_isotope_df.match_mz_error) <= refine_window)
+        & (match_isotope_df.match_score >= match_score_min)
+    ]
+    n_relevant_isotopes = len(
+        match_isotope_df[(match_isotope_df.relative_abundance >= isotope_abundance_min)]
+    )
+    calibrant_signal_intensity = good_matches_df["sample_peak_area"]
+    calibrant_to_tic = calibrant_signal_intensity / tic
+    await send_progress_user_notification(notification, 0.75)
+
+    if (
+        n_relevant_isotopes > 3
+        and len(good_matches_df) > 3
+        and (n_relevant_isotopes - len(good_matches_df) <= 2)
+    ):
+        # Fit mz calibration
+        fit, stats = mz_calibrate(
+            good_matches_df["sample_peak_tof"],
+            good_matches_df["sample_peak_mz"],
+            good_matches_df["mz"],
+        )
+        calibration_df = good_matches_df.copy().assign(
+            calibration_mz=stats["new_mz"],
+            calibration_mz_error=stats["post_dmz"],
+            mz_error_diff=abs(stats["post_dmz"]) - abs(stats["pre_dmz"]),
+            calibrant_to_tic=calibrant_to_tic,
+        )
+        mz_error_tolerance = 10
+        calibration_inaccurate = (
+            abs(calibration_df["calibration_mz_error"]) > mz_error_tolerance
+        ).any()
+        if calibration_inaccurate:
+            error = "Calibration inaccurate"
+        stats = calibration_df.to_dict("records")
+        summary_row = {
+            "match_mz_error": abs(calibration_df["match_mz_error"]).mean(),
+            "calibration_mz_error": abs(calibration_df["calibration_mz_error"]).mean(),
+            "mz_error_diff": sum(calibration_df["mz_error_diff"]),
+            "calibrant_to_tic": sum(calibration_df["calibrant_to_tic"]),
+        }
+        stats.append(summary_row)
+
+        await send_progress_user_notification(notification, 0.95)
+    else:
+        # Not enough calibration peaks
+        fit = None
+        stats = good_matches_df.to_dict("records")
+        error = "Not enough calibration peaks"
+
+    return fit, stats, error
+
+
+def signal_mz_calibration_update(fit, filename):
+    mode = fit["mode"]
+    par = fit["par"]
+    # Calculate new mz axis
+    nbr_samples = get_zarr_var_shape(filename, "signal")[0]
+    par = np.array(par, dtype=np.double)
+    new_mz = np.array([TwTof2Mass(tof, mode, par) for tof in range(nbr_samples)])
+    new_mz = remove_duplicate_mz_values(new_mz)
+    new_range = [new_mz[0], new_mz[-1]]
+
+    # Update zarr file coordinates and props
+    logger.info("Calibrating file: %s", filename)
+    if nbr_samples != get_zarr_var_shape(filename, "signal")[0]:
+        raise Exception("Number of TOF samples does not match")
+    update_props(filename, {"range": new_range, "mz_calibration": fit})
+    # Write new mz coordinates to zarr file
+    update_zarr_array_coord(filename, "signal", "mz", new_mz)
+    try:
+        update_zarr_array_coord(filename, "sum_signal", "mz", new_mz)
+    except PathNotFoundError:
+        pass
+    try:
+        peak_tofs = load_coord(filename, "peak_areas", "tof")
+        new_peak_mzs = new_mz[peak_tofs.astype(int)]
+        update_zarr_array_coord(filename, "peak_areas", "mz", new_peak_mzs)
+        update_zarr_array_coord(filename, "peak_heights", "mz", new_peak_mzs)
+    except PathNotFoundError:
+        pass
+    return new_mz

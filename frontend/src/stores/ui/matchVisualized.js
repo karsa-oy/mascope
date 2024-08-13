@@ -76,14 +76,13 @@ export const useMatchVisualized = defineStore('app.ui.matchVisualized', () => {
     const target_ion_id = ionId ?? ion.value?.target_ion_id
     if (!target_ion_id) return
     const sampleIon = await api.request.read({
-      method: 'getSampleIonMatches',
+      method: 'getAggregateSampleMatchIon',
       body: {
         sampleId: sampleId ?? ion.value?.sample_item_id,
-        params: {
+        body: {
           target_ion_id,
           target_collection_id: collectionId ?? ion.value?.target_collection_id,
-          filter_params: data.filterParams.current,
-          alarms_list: alarmsList
+          filter_params: data.filterParams.current
         }
       }
     })

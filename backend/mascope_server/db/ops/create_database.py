@@ -8,10 +8,10 @@ from mascope_server.db import (
     configure_database_engine,
     async_session,
 )
-from mascope_server.api.models.models import Base, Sample
+from mascope_server.db.models import Base, Sample
+from mascope_server.config import config
 import mascope_runtime as runtime
 
-from mascope_server.config import config
 
 logger = runtime.logger.service("backend")
 

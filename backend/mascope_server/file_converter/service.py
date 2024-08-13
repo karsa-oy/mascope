@@ -60,7 +60,7 @@ def create_sample_file_db_record(data):
 
     headers = {"Content-Type": "application/json"}
 
-    url = f"http://{host}:{port}/api/sample_files"
+    url = f"http://{host}:{port}/api/sample/files"
 
     response = requests.post(url, headers=headers, json=sample_file_db_record)
     if response.status_code != 201:

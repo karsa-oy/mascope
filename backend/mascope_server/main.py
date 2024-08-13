@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from mascope_server.api_sio import sio
-from mascope_server.api.exceptions import handle_exception
+from mascope_server.api.lib.exceptions.api_exceptions import handle_exception
 from mascope_server.api.routes import routers
 
 from mascope_server.config import config

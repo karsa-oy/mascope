@@ -1,46 +1,17 @@
 """
 Match Controller
 
-This module contains all the functionalities and endpoints related to the matching/rematching processes and related operations. 
+This module contains all the functionalities and endpoints related to 
+the matching/rematching processes and related operations. 
 """
 
-# -------------------------------------------------------------------
-# Imports
-# -------------------------------------------------------------------
 import asyncio
 from typing import List, Optional
 import pandas as pd
 from sqlalchemy import select, delete
 from mascope_server.db import async_session
 from mascope_server.db.id import gen_id
-from mascope_server.api.utils.api_features import (
-    api_controller,
-    api_controller_background_task,
-    send_progress_user_notification,
-)
-from mascope_server.api.exceptions import ApiException, NotFoundException
-from mascope_server.api.controllers.match.match_data_ops import (
-    compute_and_create_sample_match_isotope_data,
-    filter_existing_sample_match_isotope_data,
-    remove_matches,
-)
-from mascope_server.api.controllers.match.match_aggregate_controller import (
-    aggregate_and_create_matches,
-)
-from mascope_server.api.controllers.samples_controller import (
-    get_samples,
-    get_sample,
-)
-from mascope_server.api.controllers.target_compounds_controller import (
-    get_target_compounds,
-)
-from mascope_server.api.controllers.target_isotopes_controller import (
-    get_target_isotopes,
-)
-from mascope_server.api.controllers.match.util import (
-    fetch_target_isotopes_for_match_compute,
-)
-from mascope_server.api.models.models import (
+from mascope_server.db.models import (
     Sample,
     SampleBatch,
     MatchInterference,
@@ -50,11 +21,40 @@ from mascope_server.api.models.models import (
     MatchCollection,
     MatchSample,
 )
-from mascope_server.api.models.pydantic_models.match_pydantic_model import (
+from mascope_server.api.lib.api_features import (
+    api_controller,
+    api_controller_background_task,
+    send_progress_user_notification,
+)
+from mascope_server.api.lib.exceptions.api_exceptions import ApiException, NotFoundException
+from mascope_server.api.controllers.match.lib.match_compute import (
+    compute_and_create_sample_match_isotope_data,
+)
+from mascope_server.api.controllers.match.lib.match_remove import remove_matches
+from mascope_server.api.controllers.match.lib.match_filter import (
+    filter_existing_sample_match_isotope_data,
+)
+from mascope_server.api.controllers.target.lib.fetch.target_isotopes_fetch import (
+    fetch_target_isotopes_for_match_compute,
+)
+from mascope_server.api.controllers.match.aggregate.match_aggregate_controller import (
+    aggregate_and_create_matches,
+)
+from mascope_server.api.controllers.samples.samples_controller import (
+    get_samples,
+    get_sample,
+)
+from mascope_server.api.controllers.target.compounds.target_compounds_controller import (
+    get_target_compounds,
+)
+from mascope_server.api.controllers.target.isotopes.target_isotopes_controller import (
+    get_target_isotopes,
+)
+from mascope_server.api.models.match.match_pydantic_model import (
     RematchBatchesBody,
     MatchComputeSample,
 )
-from mascope_server.api.models.pydantic_models.user_notification_pydantic_model import (
+from mascope_server.api.lib.notifications.api_notification_pydantic_model import (
     UserNotification,
 )
 
@@ -118,7 +118,7 @@ async def rematch_sample(
         - If `added_*` parameters are provided, the function computes new matches related to these parameters.
         - If no `added_*` or `removed_*` parameters are provided, the function removes all existing matches and computes new matches for all targets.
     """
-    logger.info(f"...Rematching sample: {sample_item_id} ...")
+    logger.info("...Rematching sample: %s ...", sample_item_id)
     # Step 1: Remove existing matches based on provided removed parameters
     if removed_target_compound_ids or removed_ionization_mechanism_ids:
         await match_remove_sample(
@@ -215,7 +215,9 @@ async def match_remove_sample(
             raise NotFoundException(f"Sample with ID '{sample_item_id}' not found")
     sample_item_name = sample.sample_item_name
     logger.info(
-        f"...Removing matches for sample '{sample_item_name}' with ID '{sample_item_id}' ..."
+        "...Removing matches for sample '%s' with ID '%s' ...",
+        sample_item_name,
+        sample_item_id,
     )
 
     # Step 2: Remove match data and associated sample item.
@@ -363,7 +365,7 @@ async def match_compute_sample(
             added_target_compound_ids,
             added_ionization_mechanism_ids,
         )
-        logger.info(f"Match computing is specifed for the list of {applied_filters}")
+        logger.info("Match computing is specified for the list of %s", applied_filters)
         target_isotopes_df = pd.DataFrame(target_isotopes)
     else:
         # Fetch all target isotopes for the sample's batch
@@ -372,7 +374,8 @@ async def match_compute_sample(
         )
         target_isotopes_df = pd.DataFrame(target_isotopes_result["data"])
         logger.info(
-            f"Computing match isotopes and interferences for all sample target isotopes. Total isotopes: {len(target_isotopes_df)}"
+            "Computing match isotopes and interferences for all sample target isotopes. Total isotopes: %d",
+            len(target_isotopes_df),
         )
 
     # Check if there are already records in matches and match interferences for the target isotopes.
@@ -382,7 +385,9 @@ async def match_compute_sample(
 
     # Step 4: Process sample for match computation.
     logger.info(
-        f"...Computing match isotopes and interferences for sample {sample_item_name}: {sample_item_id} ..."
+        "...Computing match isotopes and interferences for sample %s: %s ...",
+        sample_item_name,
+        sample_item_id,
     )
 
     # Skip computation if no new target isotopes are found for this sample item
@@ -535,7 +540,7 @@ async def rematch_batches(
                 )
             else:
                 # Log critical error and re-raise exception to stop rematching all batches
-                logger.error(f"Critical Error in rematch_batch: {e.user_message}")
+                logger.error("Critical Error in rematch_batch: %s", e.user_message)
                 raise e from e
 
         # Step 4: Aggregate failed samples from the batch for reporting
@@ -648,7 +653,9 @@ async def rematch_batch(
             )
     sample_batch_name = sample_batch.sample_batch_name
     logger.info(
-        f"...Rematching sample batch '{sample_batch_name}' with ID '{sample_batch_id}' ..."
+        "...Rematching sample batch '%s' with ID '%s' ...",
+        sample_batch_name,
+        sample_batch_id,
     )
     # Prepare progress user notification.
     notification = UserNotification(
@@ -782,7 +789,9 @@ async def match_remove_batch(
 
     sample_batch_name = sample_batch.sample_batch_name
     logger.info(
-        f"...Removing matches for sample batch '{sample_batch_name}' with ID '{sample_batch_id}' ..."
+        "...Removing matches for sample batch '%s' with ID '%s' ...",
+        sample_batch_name,
+        sample_batch_id,
     )
 
     # Step 2: Remove match data and associated sample batch.
@@ -880,7 +889,9 @@ async def match_compute_batch(
     ]
 
     logger.info(
-        f"...Computing match isotopes and interferences for sample batch '{sample_batch_name}' with ID '{sample_batch_id}' ..."
+        "...Computing match isotopes and interferences for sample batch '%s' with ID '%s' ...",
+        sample_batch_name,
+        sample_batch_id,
     )
     # Step 3: Identify target isotopes for computation.
     #   If compounds/ion_mechanisms were added get isotopes with specific filters.
@@ -899,7 +910,7 @@ async def match_compute_batch(
                 added_ionization_mechanism_ids,
             )
         )
-        logger.info(f"Match computing is specifed for the list of {applied_filters}")
+        logger.info("Match computing is specifed for the list of %s", applied_filters)
         target_isotopes_df = pd.DataFrame(target_isotopes)
     else:
         # Fetch all target isotopes for the sample's batch
@@ -908,7 +919,8 @@ async def match_compute_batch(
         )
         target_isotopes_df = pd.DataFrame(target_isotopes_result["data"])
         logger.info(
-            f"Computing match isotopes and interferences for all batch target isotopes. Total isotopes: {len(target_isotopes_df)}"
+            "Computing match isotopes and interferences for all batch target isotopes. Total isotopes: %d",
+            len(target_isotopes_df),
         )
 
     # Step 4: Process each sample item for match computation and send progress user notification.
@@ -945,7 +957,9 @@ async def match_compute_batch(
 
         try:
             logger.info(
-                f"...Computing match isotopes and interferences for sample '{sample.sample_item_name}' with ID {sample.sample_item_id} ..."
+                "...Computing match isotopes and interferences for sample '%s' with ID '%s' ...",
+                sample.sample_item_name,
+                sample.sample_item_id,
             )
             # Gather sample information
             # Check if 'verified' exists in mz_calibration. If not, provide a default value of False
@@ -979,7 +993,7 @@ async def match_compute_batch(
             )
         except Exception as e:
             # If an exception occurs during sample match computation, log the error and add the sample to the failed list
-            logger.info(f"Processing sample '{sample.sample_item_name}' failed: {e}")
+            logger.info("Processing sample '%s' failed: %s", sample.sample_item_name, e)
             samples_compute_failed.append(
                 {
                     "sample_item": {

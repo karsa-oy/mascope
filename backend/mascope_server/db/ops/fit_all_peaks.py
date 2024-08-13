@@ -18,7 +18,7 @@ import os
 
 from datetime import datetime
 
-from mascope_server.api.controllers.instrument_functions_controller import (
+from mascope_server.api.controllers.instrument_functions.lib.instrument_functions_fetch import (
     read_instrument_functions,
 )
 from mascope_server.config import config

@@ -1,10 +1,11 @@
 import os
 import shutil
 
-from ..ops.restore import run_db_restore
-from ..ops.maintenance import run_db_maintenance
+from mascope_server.db.ops.restore import run_db_restore
+from mascope_server.db.ops.maintenance import run_db_maintenance
 
 from mascope_server.config import config
+
 
 def run():
     # Step 1: Setup new database
