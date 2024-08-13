@@ -1,4 +1,18 @@
-# Available tests
+# General info
+
+Tests are stored in the `backend/tests` folder. If the Python test file is not specified, every function with a name starting with "test_" will be run. 
+
+# Run tests
+
+To run the peak detection testing, from the `Mascope\backend` folder type in the terminal:
+
+> pytest --log-cli-level=INFO tests/test_peak_fitting.py
+
+`--log-cli` flag is required for showing logger messages.
+
+Another way to run tests is to use the built-in VS Code [testing module](https://code.visualstudio.com/docs/python/testing). In this case, command line arguments can be set up in VS Code settings in a workspace. Search `@id:python.testing.pytestArgs pytest` in settings and add the `--log-cli-level=INFO` item.
+
+# !!Everything below is deprecated!!
 
 Currently, the signal processing pipeline is tested:
 * File conversion: all files are converted within the plausible time frame
