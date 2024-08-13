@@ -40,6 +40,44 @@ def strip_filepath(filepath):
     return os.path.splitext(os.path.basename(filepath))[0]
 
 
+@jit
+def precompute_grid(mz_min, mz_max, points_per_fwhm=4, resolution_coeff=1.715e6):
+    """Precompute mz grid based on the resolution function: `resolution_coeff / sqrt(mz)`
+
+    :param mz_min: left m/z range border
+    :type mz_min: float
+    :param mz_max: right m/z range border
+    :type mz_max: float
+    :param points_per_fwhm: number of data points per FWHM of the peak, defaults to 4
+    :type points_per_fwhm: float, optional
+    :param resolution_coeff: Resolution function coefficient, defaults to 1.715e6
+    :type resolution_coeff: float, optional
+    :return: computed mz grid
+    :rtype: numpy.ndarray
+    """
+
+    # Check if values are correct else return None
+    if not 10 < mz_min < mz_max < np.finfo(np.float64).max:
+        return None
+    # Expand mz range
+    mz_min -= 10
+    mz_max += 10
+    # Set starting mz value
+    mz = mz_min
+    # Initialize list with mz grid
+    mz_grid = [mz_min]
+    while mz < mz_max:
+        resolution = resolution_coeff / np.sqrt(mz)
+        fwhm = mz / resolution
+        # Step to the next point of the grid
+        step = fwhm / points_per_fwhm
+        # Add a new point to the mz grid
+        mz += step
+        mz_grid.append(mz)
+
+    return np.array(mz_grid, dtype=np.float32)
+
+
 class RawStreamer(Thread):
     def __init__(self, file_queue=Queue(), shutdown_event=Event(), lock=Lock()):
         logger.info("RawStreamer initializing")
@@ -215,40 +253,6 @@ class RawStreamer(Thread):
         ).GetEnumerator()
         return scan_enumerator.MoveNext()
 
-    def _precompute_grid(self, points_per_fwhm=4, resolution_coeff=1.715e6):
-        """Precompute mz grid based on the resolution function: `resolution_coeff / sqrt(mz)`
-
-        :param points_per_fwhm: number of data points per FWHM of the peak, defaults to 4
-        :type points_per_fwhm: float, optional
-        :param resolution_coeff: Resolution function coefficient, defaults to 1.715e6
-        :type resolution_coeff: float, optional
-        :return: computed mz grid
-        :rtype: numpy.ndarray
-        """
-        # Get mz range from the file
-        mz_min = self.raw.RunHeaderEx.LowMass
-        mz_max = self.raw.RunHeaderEx.HighMass
-        # Check if values are correct else return None
-        if not (10 < mz_min < mz_max < np.finfo(np.float64).max):
-            return None
-        # Expand mz range
-        mz_min -= 10
-        mz_max += 10
-        # Set starting mz value
-        mz = mz_min
-        # Initialize list with mz grid
-        mz_grid = [mz_min]
-        while mz < mz_max:
-            resolution = resolution_coeff / np.sqrt(mz)
-            fwhm = mz / resolution
-            # Step to the next point of the grid
-            step = fwhm / points_per_fwhm
-            # Add a new point to the mz grid
-            mz += step
-            mz_grid.append(mz)
-
-        return np.array(mz_grid, dtype=np.float32)
-
     def _set_mz_precision(self, mz: np.ndarray, spec: np.ndarray) -> tuple:
         """Aligns m/z values to the nearest values in a precomputed m/z grid
         and aggregates corresponding intensities.
@@ -315,8 +319,11 @@ class RawStreamer(Thread):
                 # No file to stream, keep waiting
                 continue
 
+            # Get mz range from the file
+            mz_min = self.raw.RunHeaderEx.LowMass
+            mz_max = self.raw.RunHeaderEx.HighMass
             # Precompute mz grid
-            self._mz_grid = self._precompute_grid()
+            self._mz_grid = precompute_grid(mz_min, mz_max)
             # Check if precomputation
             if self._mz_grid is None:
                 logger.error(
