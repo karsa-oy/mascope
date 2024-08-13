@@ -17,6 +17,7 @@ from time import sleep
 import numpy as np
 
 import mascope_runtime as runtime
+from mascope_lib.file_func import remove_duplicate_mz_values
 
 from .generator import BaseGenerator
 from .instrument import KInstrument
@@ -30,7 +31,7 @@ from .lib.TwH5 import (
     TwH5Desc,
 )
 
-logger = runtime.logger.service('hardware-lib')
+logger = runtime.logger.service("hardware-lib")
 
 
 class H5Streamer(BaseGenerator, KInstrument):
@@ -65,7 +66,9 @@ class H5Streamer(BaseGenerator, KInstrument):
         mz = np.zeros((self.desc.nbrSamples,), dtype=np.double)
         with self.lock:
             TwGetSpecXaxisFromH5(self.desc.currentDataFileName, mz, 1, None, 0, 0)
-        return mz.astype(np.float32)
+        # Deal with duplicates keeping the mz scale length
+        mz_unique = remove_duplicate_mz_values(mz.astype(np.float32))
+        return mz_unique
 
     @property
     def mz_calibration(self):

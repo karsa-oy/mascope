@@ -286,6 +286,21 @@ def get_sum_signal(filename: str) -> xarray.core.dataarray.DataArray:
     return sum_signal
 
 
+def remove_duplicate_mz_values(mz):
+    # Sometimes TOF signal mz coordinate contains multiple zeros at the beginning
+    # This may cause duplicate coordinate value error in some functions
+    # This function fixes the coordinate vector by setting arbitrary small values for
+    # the zero coordinates
+    mz_unique = mz
+    mz_below_10_mask = mz < 10
+    if (np.diff(mz[mz_below_10_mask]) == 0).any():
+        mz_below_10_maxi = mz_below_10_mask.sum()
+        mz_unique[mz_below_10_mask] = np.linspace(
+            0, mz[mz_below_10_maxi], mz_below_10_maxi, endpoint=False
+        )
+    return mz_unique
+
+
 def filename_to_zarr_path(base_filename, variable):
     """Derive full path to a zarr data array from sample filename and the desired variable
 
