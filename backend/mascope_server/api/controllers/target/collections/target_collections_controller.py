@@ -1,3 +1,4 @@
+# pylint: disable=line-too-long
 # -------------------------------------------------------------------
 # Imports
 # -------------------------------------------------------------------
@@ -19,6 +20,9 @@ from mascope_server.api.lib.api_features import api_controller
 from mascope_server.api.lib.exceptions.api_exceptions import NotFoundException
 from mascope_server.api.controllers.target.lib.fetch.target_compounds_fetch import (
     fetch_batches_compounds,
+)
+from mascope_server.api.controllers.target.lib.fetch.target_collections_fetch import (
+    fetch_target_collection,
 )
 from mascope_server.api.controllers.target.lib.filter.target_compounds_filter import (
     compare_batches_compounds,
@@ -278,7 +282,7 @@ async def create_target_collection(
 
         # Step 4: Verify that provided target compound ids to associate with collection exists in the database
         verified_target_compound_ids = []
-        if target_compound_ids:
+        if target_compound_ids and len(target_compound_ids) > 0:
             stmt = select(TargetCompound.target_compound_id).where(
                 TargetCompound.target_compound_id.in_(target_compound_ids)
             )
@@ -352,7 +356,7 @@ async def create_target_collection(
     # Get the rematch data for the batches affected by changes in tne new collection compounds/batches associations
     rematch_batches_data = []
     sample_batches_to_reaggregate = []
-    if affected_batches_to_rematch:
+    if affected_batches_to_rematch and len(affected_batches_to_rematch) > 0:
         # add all affected batches to the reload set
         sample_batches_to_reload.update(affected_batches_to_rematch)
 
@@ -374,7 +378,7 @@ async def create_target_collection(
     # Handle the case of adding/removing duplicated componds, meaning the low lvl match data is unchanged for
     # sample (match_isotope, match_ion, match_compound) but top lvl match aggregates (match_collection, match_sample)
     # may be different, so need to rematch.
-    if sample_batches_to_reaggregate:
+    if sample_batches_to_reaggregate and len(sample_batches_to_reaggregate) > 0:
         for sample_batch_id in sample_batches_to_reaggregate:
             await aggregate_and_recreate_matches(
                 sample_batch_id=sample_batch_id,
@@ -383,7 +387,7 @@ async def create_target_collection(
             )
 
     # Check if there's any data to process for rematch
-    if rematch_batches_data:
+    if rematch_batches_data and len(rematch_batches_data) > 0:
         # get the rematched sample batches
         rematched_batches = {
             rematch_batch.sample_batch_id for rematch_batch in rematch_batches_data
@@ -405,7 +409,7 @@ async def create_target_collection(
 
     # Step 9: Emit reload events for affected batches and inform clients about collection changes
     # We have excluded the batches that have been rematched since they will be reloaded as part of rematch process
-    if sample_batches_to_reload:
+    if sample_batches_to_reload and len(sample_batches_to_reload) > 0:
         # Reload the affected sample batches where collection was added but no rematch was needed
         for sample_batch_id in sample_batches_to_reload:
             await sio.emit(
@@ -417,30 +421,14 @@ async def create_target_collection(
     # Emit global target reload event to inform all clients.
     await sio.emit("targets_all_reload", namespace="/")
 
-    # Step 10: Return the new target collection
-    # Ensure new target collection is returned with updated associations
-    async with async_session() as session:
-        stmt = (
-            select(TargetCollection)
-            .options(
-                joinedload(TargetCollection.sample_batch),
-                joinedload(TargetCollection.target_compound),
-            )
-            .where(
-                TargetCollection.target_collection_id
-                == new_target_collection.target_collection_id
-            )
-        )
-        result = await session.execute(stmt)
-        new_target_collection_with_associations = result.unique().scalar_one_or_none()
-    if not new_target_collection_with_associations:
-        raise NotFoundException(
-            f"Target collection with ID '{new_target_collection.target_collection_id}' not found after it should have been created"
-        )
+    # Step 10: Return the new target collection with updated associations
+    target_collection = await fetch_target_collection(
+        new_target_collection.target_collection_id
+    )
 
     return {
-        "data": new_target_collection_with_associations,
-        "message": f"Target collection '{new_target_collection.target_collection_name}' was created.",
+        "data": target_collection,
+        "message": f"Target collection '{target_collection.target_collection_name}' was created.",
         "message_logs": message_logs,
     }
 
@@ -491,10 +479,12 @@ async def update_target_collection(
 
     # Initialize set of all batches ids that needs a sio reload emit and flag to trigger targets reload
     sample_batches_to_reload = set()
+    # sample_batches_to_reaggregate = set()
     targets_all_reload = False
     message_logs = {}
     # Unpack update fields
     target_collection_name_update = target_collection_update_body.target_collection_name
+    target_collection_type_update = target_collection_update_body.target_collection_type
     sample_batches_update = (
         target_collection_update_body.sample_batch_ids
         if target_collection_update_body.sample_batch_ids is not None
@@ -513,22 +503,9 @@ async def update_target_collection(
 
     # Step 2. Fetch the existing target collection data, reference as existing_
     async with async_session() as session:
-        # Retrieves the current state of the target_collection from the database.
-        stmt = (
-            select(TargetCollection)
-            .options(
-                joinedload(TargetCollection.sample_batch),
-                joinedload(TargetCollection.target_compound),
-            )
-            .where(TargetCollection.target_collection_id == target_collection_id)
+        existing_target_collection = await fetch_target_collection(
+            target_collection_id, session
         )
-        result = await session.execute(stmt)
-        existing_target_collection = result.unique().scalar_one_or_none()
-        if not existing_target_collection:
-            raise NotFoundException(
-                f"Target collection with ID '{target_collection_id}'not found"
-            )
-
         existing_sample_batches = {
             association.sample_batch_id
             for association in existing_target_collection.sample_batch
@@ -580,10 +557,11 @@ async def update_target_collection(
             created_target_compound_ids + verified_target_compound_ids
         )
 
-        # Step 6:  Determine if changes to associated sample batches or target compounds require a rematch.
+        # Step 6:  Determine if changes to associated sample batches or target compounds or target collection type change require a rematch.
         # Initialize flags for determining if a there are associations changes and rematch is needed
         changed_compounds = False  # because of changed compounds in collection
         changed_batches = False  # because of changed batches
+        changed_collection_type = False  # because of changed target_collection_type
 
         if sample_batches_update is not None and (
             set(sample_batches_update) != existing_sample_batches
@@ -625,6 +603,16 @@ async def update_target_collection(
             # Get compounds for each affected batch before update
             affected_batches_compounds_before_update = await fetch_batches_compounds(
                 existing_sample_batches, True
+            )
+
+        if target_collection_type_update and (
+            target_collection_type_update
+            != existing_target_collection.target_collection_type
+        ):
+            changed_collection_type = True
+            message_logs["changed_collection_type_info"] = (
+                f"Target collection type was changed from '{existing_target_collection.target_collection_type}' "
+                f"to '{target_collection_type_update}'."
             )
 
         # Step 7: Update the target collection
@@ -687,7 +675,7 @@ async def update_target_collection(
         removed_batches_rematch_data = []
         added_batches_to_reaggregate = []
         removed_batches_to_reaggregate = []
-        if added_sample_batches:
+        if added_sample_batches and len(added_sample_batches) > 0:
             # add all added batches to the reload set
             sample_batches_to_reload.update(added_sample_batches)
 
@@ -706,7 +694,7 @@ async def update_target_collection(
             message = f"Target collection '{target_collection_name_update}' was added to {len(added_sample_batches)} sample batch{'' if len(added_sample_batches) == 1 else 'es'}."
             message_logs["added_to_batches_info"] = message
 
-        if removed_sample_batches:
+        if removed_sample_batches and len(removed_sample_batches) > 0:
             # add all removed batches to the reload set
             sample_batches_to_reload.update(removed_sample_batches)
 
@@ -752,10 +740,24 @@ async def update_target_collection(
         # add all affected batches to the reload set
         sample_batches_to_reload.update(existing_sample_batches)
 
+    # Handle the case of target_collection_type changes.
+    if changed_collection_type:
+        # If collection type changes, all affected batches need reaggregation
+        sample_batches_to_reaggregate = list(existing_sample_batches)
+
+        if changed_compounds:
+            # Exclude batches that will be rematched from reaggregation
+            sample_batches_to_reaggregate = [
+                batch_id
+                for batch_id in sample_batches_to_reaggregate
+                if batch_id
+                not in [batch.sample_batch_id for batch in rematch_batches_data]
+            ]
+
     # Handle the case of adding/removing duplicated componds, meaning the low lvl match data is unchanged for
     # sample (match_isotope, match_ion, match_compound) but top lvl match aggregates (match_collection, match_sample)
     # may be different, so need to rematch.
-    if sample_batches_to_reaggregate:
+    if sample_batches_to_reaggregate and len(sample_batches_to_reaggregate) > 0:
         for sample_batch_id in sample_batches_to_reaggregate:
             await aggregate_and_recreate_matches(
                 sample_batch_id=sample_batch_id,
@@ -764,7 +766,7 @@ async def update_target_collection(
             )
 
     # Check if there's any data to process for rematch
-    if rematch_batches_data:
+    if rematch_batches_data and len(rematch_batches_data) > 0:
         # get the rematched sample batches
         rematched_batches = {
             rematch_batch.sample_batch_id for rematch_batch in rematch_batches_data
@@ -787,7 +789,7 @@ async def update_target_collection(
     # Step 10: Emit reload events for affected batches and inform clients about collection changes
 
     # We have excluded the batches that have been rematched since they will be reloaded as part of rematch process
-    if sample_batches_to_reload:
+    if sample_batches_to_reload and len(sample_batches_to_reload) > 0:
         # Reload the affected sample batches where collection fields were updated or if some compounds were changed
         for sample_batch_id in sample_batches_to_reload:
             await sio.emit(
@@ -857,24 +859,9 @@ async def delete_target_collection(
     sample_batches_to_reload = set()
     orphan_compound_ids = []  # List to hold IDs of orphan compounds
 
-    # Step 1. Fetch the  target collection data and verify the existence
-    # Retrieves the current state of the target_collection from the database.
     async with async_session() as session:
-        stmt = (
-            select(TargetCollection)
-            .options(
-                joinedload(TargetCollection.sample_batch),
-                joinedload(TargetCollection.target_compound),
-            )
-            .where(TargetCollection.target_collection_id == target_collection_id)
-        )
-        result = await session.execute(stmt)
-        target_collection = result.unique().scalar_one_or_none()
-        if not target_collection:
-            raise NotFoundException(
-                f"Target collection with ID '{target_collection_id}'not found"
-            )
-
+        # Step 1. Fetch the  target collection data and verify the existence
+        target_collection = await fetch_target_collection(target_collection_id, session)
         affected_sample_batches = {
             association.sample_batch_id
             for association in target_collection.sample_batch
@@ -885,7 +872,7 @@ async def delete_target_collection(
         }
 
         # Step 2: Get associated sample batches compounds before deletion for potential rematch
-        if affected_sample_batches:
+        if affected_sample_batches and len(affected_sample_batches) > 0:
             batches_compounds_before_deletion = await fetch_batches_compounds(
                 affected_sample_batches, True
             )
@@ -914,7 +901,7 @@ async def delete_target_collection(
     # Step 5: Rematch affected sample batches if necessary
     rematch_batches_data = []
     sample_batches_to_reaggregate = []
-    if affected_sample_batches:
+    if affected_sample_batches and len(affected_sample_batches) > 0:
         # add all affected batches to the reload set
         sample_batches_to_reload.update(affected_sample_batches)
 
@@ -936,7 +923,7 @@ async def delete_target_collection(
     # Handle the case of adding/removing duplicated componds, meaning the low lvl match data is unchanged for
     # sample (match_isotope, match_ion, match_compound) but top lvl match aggregates (match_collection, match_sample)
     # may be different, so need to rematch.
-    if sample_batches_to_reaggregate:
+    if sample_batches_to_reaggregate and len(sample_batches_to_reaggregate) > 0:
         for sample_batch_id in sample_batches_to_reaggregate:
             await aggregate_and_recreate_matches(
                 sample_batch_id=sample_batch_id,
@@ -945,7 +932,7 @@ async def delete_target_collection(
             )
 
     # Check if there's any data to process for rematch
-    if rematch_batches_data:
+    if rematch_batches_data and len(rematch_batches_data) > 0:
         # get the rematched sample batches
         rematched_batches = {
             rematch_batch.sample_batch_id for rematch_batch in rematch_batches_data

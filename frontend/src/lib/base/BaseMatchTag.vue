@@ -47,10 +47,17 @@ const severity = computed(() => {
   }
 })
 
-const nonAlarmTarget = computed(
-  () =>
-    'target_collection_type' in props.row && !alarmsList.includes(props.row.target_collection_type)
-)
+const alarmMode = computed(() => {
+  //  Check if the target_collection_type is in alarmsList, relevent for target browser match tags.
+  const targetCollectionType = alarmsList.includes(props.row.target_collection_type)
+  // Check if any match_collection_types are in alarmsList, relevent for sample browser match tags.
+  const matchCollectionTypes = props.row.match_collection_types?.some((type) =>
+    alarmsList.includes(type)
+  )
+
+  return targetCollectionType || matchCollectionTypes
+})
+
 const zeroScored = computed(() => props.score == '00.00%')
 </script>
 
@@ -61,7 +68,7 @@ const zeroScored = computed(() => props.score == '00.00%')
     v-tooltip.right="tooltip"
     :value="text ? `Match score: ${score}` : score"
     :severity="severity"
-    :class="nonAlarmTarget || zeroScored ? 'pale' : ''"
+    :class="alarmMode || zeroScored ? '' : 'pale'"
     :style="style"
   />
 </template>

@@ -14,7 +14,7 @@ from mascope_server.db.models import (
 )
 from mascope_server.api.lib.api_features import api_controller
 from mascope_server.api.lib.exceptions.api_exceptions import NotFoundException
-from mascope_server.api.controllers.target.lib.fetch.target_collections_fetch import (
+from mascope_server.api.controllers.target.lib.fetch.target_fetch import (
     fetch_compound_collections_and_batches,
 )
 from mascope_server.api.controllers.ionization_mechanisms.ionization_mechanisms_controller import (

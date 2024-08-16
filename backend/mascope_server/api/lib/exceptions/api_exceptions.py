@@ -95,3 +95,21 @@ def handle_exception(
     if response_type == "http":
         return api_e_response_json(processed_exception)
     # other response types like "sio" can be added here
+
+
+def raise_api_warning(message: str, tech_message: dict):
+    """
+    Raises an ApiException with a status code of 200, indicating a warning during operation.
+
+    :param message: The user-facing warning message.
+    :type message: str
+    :param tech_message: The technical details to include in the warning.
+    :type tech_message: dict
+    :raises ApiException: Always raises an ApiException with the provided message and tech details.
+    """
+    logger.warning(message)
+    raise ApiException(
+        user_message=message,
+        tech_message=tech_message,
+        status_code=200,
+    )

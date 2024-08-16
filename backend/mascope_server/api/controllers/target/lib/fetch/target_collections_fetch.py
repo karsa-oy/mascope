@@ -1,34 +1,54 @@
 from sqlalchemy import select
+from sqlalchemy.orm import joinedload
 from mascope_server.db import async_session
 from mascope_server.db.models import (
-    TargetCompoundInTargetCollection,
-    TargetCollectionInSampleBatch,
+    TargetCollection,
 )
+from mascope_server.api.lib.exceptions.api_exceptions import NotFoundException
 
 import mascope_runtime as runtime
 
 logger = runtime.logger.service("backend")
 
 
-async def fetch_compound_collections_and_batches(target_compound_id: str):
-    async with async_session() as session:
-        # Get the target collections for this compound
-        target_collections = await session.execute(
-            select(TargetCompoundInTargetCollection.target_collection_id).where(
-                TargetCompoundInTargetCollection.target_compound_id
-                == target_compound_id
-            )
-        )
-        target_collections_ids = {tc[0] for tc in target_collections}
+async def fetch_target_collection(
+    target_collection_id: str, session=None
+) -> TargetCollection:
+    """
+    Retrieves a target collection from the database by its ID, including its associated sample batches
+    and target compounds. This function is used to ensure the correct retrieval of a target collection
+    along with its relationships for operations like creation, update, and deletion.
 
-        # Get all affected sample batches
-        sample_batches = await session.execute(
-            select(TargetCollectionInSampleBatch.sample_batch_id).where(
-                TargetCollectionInSampleBatch.target_collection_id.in_(
-                    target_collections_ids
-                )
-            )
-        )
-        sample_batches_ids = {sb[0] for sb in sample_batches}
+    :param target_collection_id: The ID of the target collection to fetch.
+    :type target_collection_id: str
+    :param session: An optional existing session to use for the query.
+    :type session: sqlalchemy.ext.asyncio.AsyncSession, optional
+    :return: The target collection with its associated sample batches and target compounds.
+    :rtype: TargetCollection
+    :raises NotFoundException: If the target collection with the specified ID is not found.
+    """
+    close_session = False
+    if session is None:
+        session = async_session()
+        close_session = True
 
-        return sample_batches_ids, target_collections_ids
+    stmt = (
+        select(TargetCollection)
+        .options(
+            joinedload(TargetCollection.sample_batch),
+            joinedload(TargetCollection.target_compound),
+        )
+        .where(TargetCollection.target_collection_id == target_collection_id)
+    )
+    result = await session.execute(stmt)
+    target_collection = result.unique().scalar_one_or_none()
+
+    if close_session:
+        await session.close()
+
+    if not target_collection:
+        raise NotFoundException(
+            f"Target collection with ID '{target_collection_id}' not found"
+        )
+
+    return target_collection

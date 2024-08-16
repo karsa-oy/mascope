@@ -54,7 +54,7 @@ def create_db_backup(db_path, operation):
         backup_dir, f"{timestamp}_{operation}_backup_mascope.v{current_version}.db"
     )
     shutil.copyfile(db_path, backup_db_path)
-    logger.info(f"Backup created at {backup_db_path}")
+    logger.info("Backup created at %s", backup_db_path)
     return backup_db_path
 
 
@@ -85,20 +85,20 @@ async def migrate(current_version, target_version):
         except Exception as error:
             logger.error(error)
         migration_label = f"from v{current_version} to v{next_version}"
-        logger.info(f"Attempting to migrate mascope database {migration_label}")
+        logger.info("Attempting to migrate mascope database %s", migration_label)
         try:
             await run_migration_script(migration)
         except Exception as error:
-            logger.error(f"Migration {migration_label} failed!")
+            logger.error("Migration %s failed!", migration_label)
             failed_db_path = os.path.join(db_dir, f"mascope.v{next_version}.db")
             debug_db_path = os.path.join(db_dir, "mascope.debug.db")
             if os.path.exists(failed_db_path):
                 os.rename(failed_db_path, debug_db_path)
             logger.error(error)
-            logger.error(f"A copy failed target database is found at {debug_db_path}")
+            logger.error("A copy failed target database is found at %s", debug_db_path)
             raise RuntimeError("Database migration failed")
         else:
-            logger.info(f"Migration {migration_label} succeded!")
+            logger.info("Migration %s succeded!", migration_label)
             current_version = get_current_db_version()
     if current_version == target_version:
         logger.info("Migration pathway succesful: database is now up-to-date.")
@@ -134,12 +134,12 @@ async def init_db():
         logger.info("Initializing mascope database")
         current_version = get_current_db_version()
         target_version = get_available_db_version()
-        logger.info(f"Detected mascope database version: v{current_version}")
+        logger.info("Detected mascope database version: v%s", current_version)
         if current_version == target_version:
             logger.info("No database migration needed.")
             configure_database_engine(current_version)
         else:
-            logger.info(f"This version of mascope requires: v{target_version}")
+            logger.info("This version of mascope requires: v%s", target_version)
             await migrate(current_version, target_version)
     except Exception as error:
         logger.error(error)
@@ -153,4 +153,4 @@ async def test_database_connection():
             await session.execute(text("SELECT 1"))
         logger.info("Database connection established successfully.")
     except Exception as e:
-        logger.error("Error while establishing the database connection: ", e)
+        logger.error("Error while establishing the database connection: %s", e)

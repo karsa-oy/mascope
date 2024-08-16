@@ -38,3 +38,37 @@ async def fetch_batches_compounds(
         ]
 
     return batches_compounds_dict
+
+
+async def fetch_sample_batch_compounds(
+    sample_batch_id: str, show_duplicates: bool = False
+) -> List[str]:
+    """
+    Fetches the target compounds associated with a specific sample batch ID.
+
+    :param sample_batch_id: The ID of the sample batch to fetch target compounds for.
+    :type sample_batch_id: str
+    :param show_duplicates: Flag indicating whether to show target collections with potential duplicates.
+    :type show_duplicates: bool, optional
+    :return: A list of target compound IDs associated with the sample batch.
+    :rtype: List[str]
+    :raises NotFoundException: If the sample batch has no associated target compounds.
+    """
+    # Fetch target compounds for the given sample batch ID
+    batch_target_compounds_result = await get_target_compounds(
+        sample_batch_id=sample_batch_id, show_target_collection=show_duplicates
+    )
+
+    # Extract target compound IDs from the result
+    batch_target_compounds_ids = [
+        compound["target_compound_id"]
+        for compound in batch_target_compounds_result["data"]
+    ]
+
+    # Log the warning if no compounds are found
+    if not batch_target_compounds_ids:
+        logger.warning(
+            "No target compounds found for sample batch with ID '%s'", sample_batch_id
+        )
+
+    return batch_target_compounds_ids
