@@ -15,8 +15,6 @@ from mascope_server.db.models import (
     SampleBatch,
     SampleItem,
     SampleFile,
-    MatchIsotope,
-    MatchInterference,
 )
 from mascope_server.api.lib.api_features import (
     api_controller,
@@ -24,6 +22,9 @@ from mascope_server.api.lib.api_features import (
     send_progress_user_notification,
 )
 from mascope_server.api.lib.exceptions.api_exceptions import NotFoundException
+from mascope_server.api.controllers.sample.lib.sample_items_copy import (
+    copy_sample_item_match_data,
+)
 from mascope_server.api.controllers.match.match_controller import match_compute_sample
 from mascope_server.api.controllers.calibration.calibration_controller import (
     calibration_mz_calibrate_sample,
@@ -345,12 +346,16 @@ async def copy_sample_item(
                 f"Sample batch with ID '{sample_batch_id}' not found"
             )
 
-        # Step 2: Fetch and validate the original sample item along with related MatchIsotope and MatchInterference records
+        # Step 2: Fetch and validate the original sample item along with related match records
         stmt = (
             select(SampleItem)
             .options(
                 joinedload(SampleItem.match_isotope),
                 joinedload(SampleItem.match_interference),
+                joinedload(SampleItem.match_ion),
+                joinedload(SampleItem.match_compound),
+                joinedload(SampleItem.match_collection),
+                joinedload(SampleItem.match_sample),
             )
             .filter(SampleItem.sample_item_id == sample_item_id)
         )
@@ -383,39 +388,9 @@ async def copy_sample_item(
             not independent_transaction
             or original_sample_item.sample_batch_id == sample_batch_id
         ):
-            # Copy related MatchIsotope records
-            for match_isotope in original_sample_item.match_isotope:
-                new_match_isotope_data = {
-                    c.name: getattr(match_isotope, c.name)
-                    for c in MatchIsotope.__table__.columns
-                    if c.name != "match_isotope_id"
-                }
-                new_match_isotope_data.update(
-                    {
-                        "match_isotope_id": gen_id(32),
-                        "sample_item_id": new_sample_item_id,
-                    }
-                )
-                new_match_isotope = MatchIsotope(**new_match_isotope_data)
-                session.add(new_match_isotope)
-
-            # Copy related MatchInterference records
-            for match_interference in original_sample_item.match_interference:
-                new_match_interference_data = {
-                    c.name: getattr(match_interference, c.name)
-                    for c in MatchInterference.__table__.columns
-                    if c.name != "match_interference_id"
-                }
-                new_match_interference_data.update(
-                    {
-                        "match_interference_id": gen_id(32),
-                        "sample_item_id": new_sample_item_id,
-                    }
-                )
-                new_match_interference = MatchInterference(
-                    **new_match_interference_data
-                )
-                session.add(new_match_interference)
+            await copy_sample_item_match_data(
+                original_sample_item, new_sample_item_id, session
+            )
 
         # Step 5: Commit the transaction
         await session.commit()
