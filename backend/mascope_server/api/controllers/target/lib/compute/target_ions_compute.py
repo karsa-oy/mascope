@@ -53,19 +53,36 @@ def generate_target_ions_from_composition(
     target_isotopes = []
 
     # generate and create ion records
+    target_compound_formula = target_compound.target_compound_formula.rstrip()
     for ionization_mechanism in ionization_mechanisms:
         mechanism = ionization_mechanism.ionization_mechanism
+        # Handle the special case when generating ions for empty formula "()"
+        if target_compound_formula == "()":
+            if mechanism == "-" or mechanism == "+":
+                # Electron transfer does not apply
+                continue
+            if mechanism.startswith("-"):
+                # Cannot abstract from empty formula
+                continue
         try:
             # get and save ions
             raw_ion = Formula(
                 "("
-                + target_compound.target_compound_formula.rstrip()
+                + target_compound_formula
                 + mechanism[:-1]  # remove polarity sign before parenthesis
                 + ")"
                 + mechanism[-1]  # add polarity sign at the end
             )
         except ValueError as e:
-            raise ValueError("Failed to parse ion formula: %s" % e)
+            # Failed to create a target ion for the combination of target compound and ionization mechanism
+            logger.warning(
+                "Failed to parse ion formula for compound %s and mechanism %s: %s",
+                target_compound_formula,
+                mechanism,
+                e,
+            )
+            # Try to create ions with other mechanisms
+            continue
         else:
             # construct and save ion row
             ion = TargetIon(
