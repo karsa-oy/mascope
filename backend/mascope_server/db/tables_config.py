@@ -654,7 +654,7 @@ table_configs = {
 }
 
 
-# Previous version of the schema configuration.
+# Previous versions of the schema configuration.
 table_configs_v13 = {
     "workspace": {
         "columns": {
@@ -1010,7 +1010,6 @@ table_configs_v13 = {
             );
         """,
     },
-    # TODO_db issue #376
     "sample_item": {
         "columns": {
             "sample_item_id": ("VARCHAR(16)", 1, None, 1),
@@ -1049,7 +1048,6 @@ table_configs_v13 = {
             "idx_sample_item_sample_batch ON sample_item (sample_batch_id)",
         ],
     },
-    # TODO_db issue #376
     "sample_file": {
         "columns": {
             "sample_file_id": ("VARCHAR(16)", 1, None, 1),
@@ -1076,6 +1074,904 @@ table_configs_v13 = {
             mz_calibration JSON,
             tic FLOAT,
             polarity VARCHAR(1)
+        );
+    """,
+    },
+    "sample_batch": {
+        "columns": {
+            "sample_batch_id": ("VARCHAR(16)", 1, None, 1),
+            "workspace_id": ("VARCHAR(16)", 1, None, 0),
+            "sample_batch_name": ("VARCHAR", 1, None, 0),
+            "sample_batch_description": ("TEXT", 0, None, 0),
+            "build_params": ("JSON", 0, None, 0),
+            "sample_batch_utc_created": ("TIMESTAMP", 0, None, 0),
+            "sample_batch_utc_modified": ("TIMESTAMP", 0, None, 0),
+        },
+        "fks": {
+            "workspace_id": ("workspace", "workspace_id", "NO ACTION", "CASCADE"),
+        },
+        "create_sql": """
+            CREATE TABLE sample_batch (
+                sample_batch_id VARCHAR(16) NOT NULL PRIMARY KEY,
+                workspace_id VARCHAR(16) NOT NULL 
+                    REFERENCES workspace(workspace_id) ON DELETE CASCADE,
+                sample_batch_name VARCHAR NOT NULL,
+                sample_batch_description TEXT,
+                build_params JSON,
+                sample_batch_utc_created TIMESTAMP,
+                sample_batch_utc_modified TIMESTAMP
+            );
+        """,
+    },
+}
+
+table_configs_v12 = {
+    "workspace": {
+        "columns": {
+            "workspace_id": ("VARCHAR(16)", 1, None, 1),
+            "workspace_name": ("VARCHAR(256)", 1, None, 0),
+            "workspace_description": ("TEXT", 0, None, 0),
+            "workspace_utc_created": ("TIMESTAMP", 0, None, 0),
+            "workspace_utc_modified": ("TIMESTAMP", 0, None, 0),
+        },
+        "fks": {},
+        "create_sql": """
+            CREATE TABLE workspace (
+                workspace_id VARCHAR(16) NOT NULL PRIMARY KEY,
+                workspace_name VARCHAR(256) NOT NULL,
+                workspace_description TEXT,
+                workspace_utc_created TIMESTAMP,
+                workspace_utc_modified TIMESTAMP
+            );
+        """,
+    },
+    "attribute_template": {
+        "columns": {
+            "attribute_template_id": ("VARCHAR(16)", 1, None, 1),
+            "name": ("VARCHAR(256)", 1, None, 0),
+            "type": ("VARCHAR(64)", 0, None, 0),
+            "template": ("JSON", 0, None, 0),
+        },
+        "fks": {},
+        "create_sql": """
+            CREATE TABLE attribute_template (
+                attribute_template_id VARCHAR(16) NOT NULL PRIMARY KEY,
+                name VARCHAR(256) NOT NULL,
+                type VARCHAR(64),
+                template JSON
+            );
+        """,
+    },
+    "instrument_function": {
+        "columns": {
+            "instrument_function_id": ("VARCHAR(32)", 1, None, 1),
+            "instrument": ("VARCHAR(64)", 1, None, 0),
+            "datetime_utc": ("TIMESTAMP", 0, None, 0),
+            "peakshape": ("JSON", 0, None, 0),
+            "resolution_function": ("JSON", 0, None, 0),
+        },
+        "fks": {},
+        "create_sql": """
+            CREATE TABLE instrument_function (
+                instrument_function_id VARCHAR(32) NOT NULL PRIMARY KEY,
+                instrument VARCHAR(64) NOT NULL,
+                datetime_utc TIMESTAMP,
+                peakshape JSON,
+                resolution_function JSON
+            );
+        """,
+    },
+    "ionization_mechanism": {
+        "columns": {
+            "ionization_mechanism_id": ("VARCHAR(16)", 1, None, 1),
+            "ionization_mechanism_polarity": ("VARCHAR(1)", 1, None, 0),
+            "ionization_mechanism": ("VARCHAR", 0, None, 0),
+            "reagent": ("VARCHAR", 0, None, 0),
+        },
+        "fks": {},
+        "create_sql": """
+            CREATE TABLE ionization_mechanism (
+                ionization_mechanism_id VARCHAR(16) NOT NULL PRIMARY KEY,
+                ionization_mechanism_polarity VARCHAR(1) NOT NULL,
+                ionization_mechanism VARCHAR,
+                reagent VARCHAR
+            );
+        """,
+    },
+    "target_compound": {
+        "columns": {
+            "target_compound_id": ("VARCHAR(16)", 1, None, 1),
+            "target_compound_name": ("TEXT", 0, None, 0),
+            "target_compound_formula": ("VARCHAR(256)", 1, None, 0),
+            "cas_number": ("VARCHAR(12)", 0, None, 0),
+        },
+        "fks": {},
+        "create_sql": """
+            CREATE TABLE target_compound (
+                target_compound_id VARCHAR(16) NOT NULL PRIMARY KEY,
+                target_compound_name TEXT,
+                target_compound_formula VARCHAR(256) NOT NULL,
+                cas_number VARCHAR(12)
+            );
+        """,
+    },
+    "target_collection": {
+        "columns": {
+            "target_collection_id": ("VARCHAR(16)", 1, None, 1),
+            "target_collection_name": ("VARCHAR(256)", 1, None, 0),
+            "target_collection_description": ("TEXT", 0, None, 0),
+            "target_collection_type": ("VARCHAR(64)", 1, "'TARGETS'", 0),
+        },
+        "fks": {},
+        "create_sql": """
+            CREATE TABLE target_collection (
+                target_collection_id VARCHAR(16) NOT NULL PRIMARY KEY,
+                target_collection_name VARCHAR(256) NOT NULL,
+                target_collection_description TEXT,
+                target_collection_type VARCHAR(64) NOT NULL DEFAULT 'TARGETS'
+            );
+        """,
+    },
+    "target_ion": {
+        "columns": {
+            "target_ion_id": ("VARCHAR(16)", 1, None, 1),
+            "target_compound_id": ("VARCHAR(16)", 1, None, 0),
+            "ionization_mechanism_id": ("VARCHAR(16)", 1, None, 0),
+            "target_ion_formula": ("VARCHAR(256)", 1, None, 0),
+            "filter_params": ("JSON", 0, None, 0),
+        },
+        "fks": {
+            "ionization_mechanism_id": (
+                "ionization_mechanism",
+                "ionization_mechanism_id",
+                "NO ACTION",
+                "CASCADE",
+            ),
+            "target_compound_id": (
+                "target_compound",
+                "target_compound_id",
+                "NO ACTION",
+                "CASCADE",
+            ),
+        },
+        "create_sql": """
+            CREATE TABLE target_ion (
+                target_ion_id VARCHAR(16) NOT NULL PRIMARY KEY,
+                target_compound_id VARCHAR(16) NOT NULL
+                    REFERENCES target_compound(target_compound_id) ON DELETE CASCADE,
+                ionization_mechanism_id VARCHAR(16) NOT NULL
+                    REFERENCES ionization_mechanism(ionization_mechanism_id) ON DELETE CASCADE,
+                target_ion_formula VARCHAR(256) NOT NULL,
+                filter_params JSON
+            );
+        """,
+        "indexes": [
+            "idx_target_ion_ionization_mechanism ON target_ion (ionization_mechanism_id)"  # ok
+        ],
+    },
+    "target_isotope": {
+        "columns": {
+            "target_isotope_id": ("VARCHAR(16)", 1, None, 1),
+            "target_ion_id": ("VARCHAR(16)", 1, None, 0),
+            "mz": ("FLOAT", 1, None, 0),
+            "relative_abundance": ("FLOAT", 1, None, 0),
+        },
+        "fks": {
+            "target_ion_id": (
+                "target_ion",
+                "target_ion_id",
+                "NO ACTION",
+                "CASCADE",
+            ),
+        },
+        "create_sql": """
+            CREATE TABLE target_isotope (
+                target_isotope_id VARCHAR(16) NOT NULL PRIMARY KEY,
+                target_ion_id VARCHAR(16) NOT NULL
+                    REFERENCES target_ion(target_ion_id) ON DELETE CASCADE,
+                mz FLOAT NOT NULL,
+                relative_abundance FLOAT NOT NULL
+                    CHECK (relative_abundance BETWEEN 0 AND 1)
+            );
+        """,
+    },
+    "target_collection_in_sample_batch": {
+        "columns": {
+            "target_collection_id": ("VARCHAR(16)", 1, None, 1),
+            "sample_batch_id": ("VARCHAR(16)", 1, None, 2),
+        },
+        "fks": {
+            "sample_batch_id": (
+                "sample_batch",
+                "sample_batch_id",
+                "NO ACTION",
+                "CASCADE",
+            ),
+            "target_collection_id": (
+                "target_collection",
+                "target_collection_id",
+                "NO ACTION",
+                "CASCADE",
+            ),
+        },
+        "create_sql": """
+            CREATE TABLE target_collection_in_sample_batch (
+                target_collection_id VARCHAR(16) NOT NULL
+                    REFERENCES target_collection(target_collection_id) ON DELETE CASCADE,
+                sample_batch_id VARCHAR(16) NOT NULL
+                    REFERENCES sample_batch(sample_batch_id) ON DELETE CASCADE,
+                PRIMARY KEY
+                    (target_collection_id, sample_batch_id)
+            );
+        """,
+    },
+    "target_compound_in_target_collection": {
+        "columns": {
+            "target_compound_id": ("VARCHAR(16)", 1, None, 1),
+            "target_collection_id": ("VARCHAR(16)", 1, None, 2),
+        },
+        "fks": {
+            "target_collection_id": (
+                "target_collection",
+                "target_collection_id",
+                "NO ACTION",
+                "CASCADE",
+            ),
+            "target_compound_id": (
+                "target_compound",
+                "target_compound_id",
+                "NO ACTION",
+                "CASCADE",
+            ),
+        },
+        "create_sql": """
+            CREATE TABLE target_compound_in_target_collection (
+                target_compound_id VARCHAR(16) NOT NULL
+                    REFERENCES target_compound(target_compound_id) ON DELETE CASCADE,
+                target_collection_id VARCHAR(16) NOT NULL
+                    REFERENCES target_collection(target_collection_id) ON DELETE CASCADE,
+                PRIMARY KEY
+                    (target_compound_id, target_collection_id)
+            );
+        """,
+    },
+    "match": {
+        "columns": {
+            "match_id": ("VARCHAR(32)", 1, None, 1),
+            "target_isotope_id": ("VARCHAR(16)", 1, None, 0),
+            "sample_item_id": ("VARCHAR(16)", 1, None, 0),
+            "sample_peak_id": ("INT", 1, None, 0),
+            "sample_peak_mz": ("FLOAT", 1, None, 0),
+            "sample_peak_area": ("FLOAT", 1, None, 0),
+            "sample_peak_area_relative": ("FLOAT", 1, None, 0),
+            "sample_peak_tof": ("FLOAT", 1, None, 0),
+            "match_abundance_error": ("FLOAT", 1, None, 0),
+            "match_mz_error": ("FLOAT", 1, None, 0),
+            "match_score": ("FLOAT", 1, None, 0),
+            "match_isotope_correlation": ("FLOAT", 1, None, 0),
+        },
+        "fks": {
+            "sample_item_id": (
+                "sample_item",
+                "sample_item_id",
+                "NO ACTION",
+                "CASCADE",
+            ),
+            "target_isotope_id": (
+                "target_isotope",
+                "target_isotope_id",
+                "NO ACTION",
+                "CASCADE",
+            ),
+        },
+        "create_sql": """
+            CREATE TABLE match (
+                match_id VARCHAR(32) NOT NULL PRIMARY KEY,
+                target_isotope_id VARCHAR(16) NOT NULL
+                    REFERENCES target_isotope(target_isotope_id) ON DELETE CASCADE,
+                sample_item_id VARCHAR(16) NOT NULL
+                    REFERENCES sample_item(sample_item_id) ON DELETE CASCADE,
+                sample_peak_id INTEGER NOT NULL,
+                sample_peak_mz FLOAT NOT NULL,
+                sample_peak_area FLOAT NOT NULL,
+                sample_peak_area_relative FLOAT NOT NULL,
+                sample_peak_tof FLOAT NOT NULL,
+                match_abundance_error FLOAT NOT NULL,
+                match_mz_error FLOAT NOT NULL,
+                match_score FLOAT NOT NULL
+                    CHECK (match_score BETWEEN 0 AND 1),
+                match_isotope_correlation FLOAT NOT NULL
+            );
+        """,
+        "indexes": [
+            "idx_match_sample_item ON match (sample_item_id)",
+        ],
+    },
+    "match_interference": {
+        "columns": {
+            "match_interference_id": ("VARCHAR(32)", 1, None, 1),
+            "target_isotope_id": ("VARCHAR(16)", 1, None, 0),
+            "sample_item_id": ("VARCHAR(16)", 1, None, 0),
+            "sample_peak_interference": ("FLOAT", 1, None, 0),
+        },
+        "fks": {
+            "target_isotope_id": (
+                "target_isotope",
+                "target_isotope_id",
+                "NO ACTION",
+                "CASCADE",
+            ),
+            "sample_item_id": (
+                "sample_item",
+                "sample_item_id",
+                "NO ACTION",
+                "CASCADE",
+            ),
+        },
+        "create_sql": """
+            CREATE TABLE match_interference (
+                match_interference_id VARCHAR(32) NOT NULL PRIMARY KEY,
+                target_isotope_id VARCHAR(16) NOT NULL
+                    REFERENCES target_isotope(target_isotope_id) ON DELETE CASCADE,
+                sample_item_id VARCHAR(16) NOT NULL
+                    REFERENCES sample_item(sample_item_id) ON DELETE CASCADE,
+                sample_peak_interference FLOAT NOT NULL
+            );
+        """,
+        "indexes": [
+            "idx_match_interference_sample_item ON match_interference (sample_item_id)",
+        ],
+    },
+    "match_rating": {
+        "columns": {
+            "match_rating_id": ("VARCHAR(32)", 1, None, 1),
+            "sample_item_id": ("VARCHAR(16)", 1, None, 0),
+            "target_ion_id": ("VARCHAR(16)", 1, None, 0),
+            "match_rating_utc_created": ("TIMESTAMP", 0, None, 0),
+            "rating": ("INT", 1, None, 0),
+            "checklist": ("JSON", 0, None, 0),
+            "environment": ("JSON", 0, None, 0),
+        },
+        "fks": {
+            "target_ion_id": (
+                "target_ion",
+                "target_ion_id",
+                "NO ACTION",
+                "CASCADE",
+            ),
+            "sample_item_id": (
+                "sample_item",
+                "sample_item_id",
+                "NO ACTION",
+                "CASCADE",
+            ),
+        },
+        "create_sql": """
+            CREATE TABLE match_rating (
+                match_rating_id VARCHAR(32) NOT NULL PRIMARY KEY,
+                sample_item_id VARCHAR(16) NOT NULL
+                    REFERENCES sample_item(sample_item_id) ON DELETE CASCADE,
+                target_ion_id VARCHAR(16) NOT NULL
+                    REFERENCES target_ion(target_ion_id) ON DELETE CASCADE,
+                match_rating_utc_created TIMESTAMP,
+                rating INTEGER NOT NULL CHECK (rating BETWEEN 0 AND 2),
+                checklist JSON,
+                environment JSON
+            );
+        """,
+    },
+    "sample_item": {
+        "columns": {
+            "sample_item_id": ("VARCHAR(16)", 1, None, 1),
+            "sample_batch_id": ("VARCHAR(16)", 1, None, 0),
+            "filename": ("VARCHAR(256)", 1, None, 0),
+            "sample_item_name": ("VARCHAR(256)", 1, None, 0),
+            "sample_item_type": ("VARCHAR(64)", 1, None, 0),
+            "sample_item_attributes": ("JSON", 0, None, 0),
+            "sample_item_utc_created": ("TIMESTAMP", 0, None, 0),
+            "sample_item_utc_modified": ("TIMESTAMP", 0, None, 0),
+            "filter_id": ("VARCHAR(6)", 0, None, 0),
+        },
+        "fks": {
+            "sample_batch_id": (
+                "sample_batch",
+                "sample_batch_id",
+                "NO ACTION",
+                "CASCADE",
+            )
+        },
+        "create_sql": """
+            CREATE TABLE sample_item (
+                sample_item_id VARCHAR(16) NOT NULL PRIMARY KEY,
+                sample_batch_id VARCHAR(16) NOT NULL
+                    REFERENCES sample_batch(sample_batch_id) ON DELETE CASCADE,
+                filename VARCHAR(256) NOT NULL,
+                sample_item_name VARCHAR(256) NOT NULL,
+                sample_item_type VARCHAR(64) NOT NULL,
+                sample_item_attributes JSON,
+                sample_item_utc_created TIMESTAMP,
+                sample_item_utc_modified TIMESTAMP,
+                filter_id VARCHAR(6)
+            );
+        """,
+        "indexes": [
+            "idx_sample_item_sample_batch ON sample_item (sample_batch_id)",
+        ],
+    },
+    "sample_file": {
+        "columns": {
+            "sample_file_id": ("VARCHAR(16)", 1, None, 1),
+            "filename": ("VARCHAR(256)", 1, None, 0),
+            "instrument": ("VARCHAR(64)", 0, None, 0),
+            "datetime": ("TIMESTAMP", 0, None, 0),
+            "datetime_utc": ("TIMESTAMP", 0, None, 0),
+            "length": ("FLOAT", 0, None, 0),
+            "range": ("JSON", 0, None, 0),
+            "mz_calibration": ("JSON", 0, None, 0),
+            "tic": ("FLOAT", 0, None, 0),
+            "polarity": ("VARCHAR(1)", 0, None, 0),
+        },
+        "fks": {},
+        "create_sql": """
+        CREATE TABLE sample_file (
+            sample_file_id VARCHAR(16) NOT NULL PRIMARY KEY,
+            filename VARCHAR(256) NOT NULL UNIQUE,
+            instrument VARCHAR(64),
+            datetime TIMESTAMP,
+            datetime_utc TIMESTAMP,
+            length FLOAT,
+            range JSON,
+            mz_calibration JSON,
+            tic FLOAT,
+            polarity VARCHAR(1)
+        );
+    """,
+    },
+    "sample_batch": {
+        "columns": {
+            "sample_batch_id": ("VARCHAR(16)", 1, None, 1),
+            "workspace_id": ("VARCHAR(16)", 1, None, 0),
+            "sample_batch_name": ("VARCHAR", 1, None, 0),
+            "sample_batch_description": ("TEXT", 0, None, 0),
+            "build_params": ("JSON", 0, None, 0),
+            "sample_batch_utc_created": ("TIMESTAMP", 0, None, 0),
+            "sample_batch_utc_modified": ("TIMESTAMP", 0, None, 0),
+        },
+        "fks": {
+            "workspace_id": ("workspace", "workspace_id", "NO ACTION", "CASCADE"),
+        },
+        "create_sql": """
+            CREATE TABLE sample_batch (
+                sample_batch_id VARCHAR(16) NOT NULL PRIMARY KEY,
+                workspace_id VARCHAR(16) NOT NULL 
+                    REFERENCES workspace(workspace_id) ON DELETE CASCADE,
+                sample_batch_name VARCHAR NOT NULL,
+                sample_batch_description TEXT,
+                build_params JSON,
+                sample_batch_utc_created TIMESTAMP,
+                sample_batch_utc_modified TIMESTAMP
+            );
+        """,
+    },
+}
+
+table_configs_v11 = {
+    "workspace": {
+        "columns": {
+            "workspace_id": ("VARCHAR(16)", 1, None, 1),
+            "workspace_name": ("VARCHAR(256)", 1, None, 0),
+            "workspace_description": ("TEXT", 0, None, 0),
+            "workspace_utc_created": ("TIMESTAMP", 0, None, 0),
+            "workspace_utc_modified": ("TIMESTAMP", 0, None, 0),
+        },
+        "fks": {},
+        "create_sql": """
+            CREATE TABLE workspace (
+                workspace_id VARCHAR(16) NOT NULL PRIMARY KEY,
+                workspace_name VARCHAR(256) NOT NULL,
+                workspace_description TEXT,
+                workspace_utc_created TIMESTAMP,
+                workspace_utc_modified TIMESTAMP
+            );
+        """,
+    },
+    "attribute_template": {
+        "columns": {
+            "attribute_template_id": ("VARCHAR(16)", 1, None, 1),
+            "name": ("VARCHAR(256)", 1, None, 0),
+            "type": ("VARCHAR(64)", 0, None, 0),
+            "template": ("JSON", 0, None, 0),
+        },
+        "fks": {},
+        "create_sql": """
+            CREATE TABLE attribute_template (
+                attribute_template_id VARCHAR(16) NOT NULL PRIMARY KEY,
+                name VARCHAR(256) NOT NULL,
+                type VARCHAR(64),
+                template JSON
+            );
+        """,
+    },
+    "instrument_function": {
+        "columns": {
+            "instrument_function_id": ("VARCHAR(32)", 1, None, 1),
+            "instrument": ("VARCHAR(64)", 1, None, 0),
+            "datetime_utc": ("TIMESTAMP", 0, None, 0),
+            "peakshape": ("JSON", 0, None, 0),
+            "resolution_function": ("JSON", 0, None, 0),
+        },
+        "fks": {},
+        "create_sql": """
+            CREATE TABLE instrument_function (
+                instrument_function_id VARCHAR(32) NOT NULL PRIMARY KEY,
+                instrument VARCHAR(64) NOT NULL,
+                datetime_utc TIMESTAMP,
+                peakshape JSON,
+                resolution_function JSON
+            );
+        """,
+    },
+    "ionization_mechanism": {
+        "columns": {
+            "ionization_mechanism_id": ("VARCHAR(16)", 1, None, 1),
+            "ionization_mechanism_polarity": ("VARCHAR(1)", 1, None, 0),
+            "ionization_mechanism": ("VARCHAR", 0, None, 0),
+            "reagent": ("VARCHAR", 0, None, 0),
+        },
+        "fks": {},
+        "create_sql": """
+            CREATE TABLE ionization_mechanism (
+                ionization_mechanism_id VARCHAR(16) NOT NULL PRIMARY KEY,
+                ionization_mechanism_polarity VARCHAR(1) NOT NULL,
+                ionization_mechanism VARCHAR,
+                reagent VARCHAR
+            );
+        """,
+    },
+    "target_compound": {
+        "columns": {
+            "target_compound_id": ("VARCHAR(16)", 1, None, 1),
+            "target_compound_name": ("TEXT", 0, None, 0),
+            "target_compound_formula": ("VARCHAR(256)", 1, None, 0),
+            "cas_number": ("VARCHAR(12)", 0, None, 0),
+        },
+        "fks": {},
+        "create_sql": """
+            CREATE TABLE target_compound (
+                target_compound_id VARCHAR(16) NOT NULL PRIMARY KEY,
+                target_compound_name TEXT,
+                target_compound_formula VARCHAR(256) NOT NULL,
+                cas_number VARCHAR(12)
+            );
+        """,
+    },
+    "target_collection": {
+        "columns": {
+            "target_collection_id": ("VARCHAR(16)", 1, None, 1),
+            "target_collection_name": ("VARCHAR(256)", 1, None, 0),
+            "target_collection_description": ("TEXT", 0, None, 0),
+            "target_collection_type": ("VARCHAR(64)", 1, "'TARGETS'", 0),
+        },
+        "fks": {},
+        "create_sql": """
+            CREATE TABLE target_collection (
+                target_collection_id VARCHAR(16) NOT NULL PRIMARY KEY,
+                target_collection_name VARCHAR(256) NOT NULL,
+                target_collection_description TEXT,
+                target_collection_type VARCHAR(64) NOT NULL DEFAULT 'TARGETS'
+            );
+        """,
+    },
+    "target_ion": {
+        "columns": {
+            "target_ion_id": ("VARCHAR(16)", 1, None, 1),
+            "target_compound_id": ("VARCHAR(16)", 1, None, 0),
+            "ionization_mechanism_id": ("VARCHAR(16)", 1, None, 0),
+            "target_ion_formula": ("VARCHAR(256)", 1, None, 0),
+            "filter_params": ("JSON", 0, None, 0),
+        },
+        "fks": {
+            "ionization_mechanism_id": (
+                "ionization_mechanism",
+                "ionization_mechanism_id",
+                "NO ACTION",
+                "CASCADE",
+            ),
+            "target_compound_id": (
+                "target_compound",
+                "target_compound_id",
+                "NO ACTION",
+                "CASCADE",
+            ),
+        },
+        "create_sql": """
+            CREATE TABLE target_ion (
+                target_ion_id VARCHAR(16) NOT NULL PRIMARY KEY,
+                target_compound_id VARCHAR(16) NOT NULL
+                    REFERENCES target_compound(target_compound_id) ON DELETE CASCADE,
+                ionization_mechanism_id VARCHAR(16) NOT NULL
+                    REFERENCES ionization_mechanism(ionization_mechanism_id) ON DELETE CASCADE,
+                target_ion_formula VARCHAR(256) NOT NULL,
+                filter_params JSON
+            );
+        """,
+        "indexes": [
+            "idx_target_ion_ionization_mechanism ON target_ion (ionization_mechanism_id)"  # ok
+        ],
+    },
+    "target_isotope": {
+        "columns": {
+            "target_isotope_id": ("VARCHAR(16)", 1, None, 1),
+            "target_ion_id": ("VARCHAR(16)", 1, None, 0),
+            "mz": ("FLOAT", 1, None, 0),
+            "relative_abundance": ("FLOAT", 1, None, 0),
+        },
+        "fks": {
+            "target_ion_id": (
+                "target_ion",
+                "target_ion_id",
+                "NO ACTION",
+                "CASCADE",
+            ),
+        },
+        "create_sql": """
+            CREATE TABLE target_isotope (
+                target_isotope_id VARCHAR(16) NOT NULL PRIMARY KEY,
+                target_ion_id VARCHAR(16) NOT NULL
+                    REFERENCES target_ion(target_ion_id) ON DELETE CASCADE,
+                mz FLOAT NOT NULL,
+                relative_abundance FLOAT NOT NULL
+                    CHECK (relative_abundance BETWEEN 0 AND 1)
+            );
+        """,
+    },
+    "target_collection_in_sample_batch": {
+        "columns": {
+            "target_collection_id": ("VARCHAR(16)", 1, None, 1),
+            "sample_batch_id": ("VARCHAR(16)", 1, None, 2),
+        },
+        "fks": {
+            "sample_batch_id": (
+                "sample_batch",
+                "sample_batch_id",
+                "NO ACTION",
+                "CASCADE",
+            ),
+            "target_collection_id": (
+                "target_collection",
+                "target_collection_id",
+                "NO ACTION",
+                "CASCADE",
+            ),
+        },
+        "create_sql": """
+            CREATE TABLE target_collection_in_sample_batch (
+                target_collection_id VARCHAR(16) NOT NULL
+                    REFERENCES target_collection(target_collection_id) ON DELETE CASCADE,
+                sample_batch_id VARCHAR(16) NOT NULL
+                    REFERENCES sample_batch(sample_batch_id) ON DELETE CASCADE,
+                PRIMARY KEY
+                    (target_collection_id, sample_batch_id)
+            );
+        """,
+    },
+    "target_compound_in_target_collection": {
+        "columns": {
+            "target_compound_id": ("VARCHAR(16)", 1, None, 1),
+            "target_collection_id": ("VARCHAR(16)", 1, None, 2),
+        },
+        "fks": {
+            "target_collection_id": (
+                "target_collection",
+                "target_collection_id",
+                "NO ACTION",
+                "CASCADE",
+            ),
+            "target_compound_id": (
+                "target_compound",
+                "target_compound_id",
+                "NO ACTION",
+                "CASCADE",
+            ),
+        },
+        "create_sql": """
+            CREATE TABLE target_compound_in_target_collection (
+                target_compound_id VARCHAR(16) NOT NULL
+                    REFERENCES target_compound(target_compound_id) ON DELETE CASCADE,
+                target_collection_id VARCHAR(16) NOT NULL
+                    REFERENCES target_collection(target_collection_id) ON DELETE CASCADE,
+                PRIMARY KEY
+                    (target_compound_id, target_collection_id)
+            );
+        """,
+    },
+    "match": {
+        "columns": {
+            "match_id": ("VARCHAR(32)", 1, None, 1),
+            "target_isotope_id": ("VARCHAR(16)", 1, None, 0),
+            "sample_item_id": ("VARCHAR(16)", 1, None, 0),
+            "sample_peak_id": ("INT", 1, None, 0),
+            "sample_peak_mz": ("FLOAT", 1, None, 0),
+            "sample_peak_area": ("FLOAT", 1, None, 0),
+            "sample_peak_area_relative": ("FLOAT", 1, None, 0),
+            "sample_peak_tof": ("FLOAT", 1, None, 0),
+            "match_abundance_error": ("FLOAT", 1, None, 0),
+            "match_mz_error": ("FLOAT", 1, None, 0),
+            "match_score": ("FLOAT", 1, None, 0),
+            "match_isotope_correlation": ("FLOAT", 1, None, 0),
+        },
+        "fks": {
+            "sample_item_id": (
+                "sample_item",
+                "sample_item_id",
+                "NO ACTION",
+                "CASCADE",
+            ),
+            "target_isotope_id": (
+                "target_isotope",
+                "target_isotope_id",
+                "NO ACTION",
+                "CASCADE",
+            ),
+        },
+        "create_sql": """
+            CREATE TABLE match (
+                match_id VARCHAR(32) NOT NULL PRIMARY KEY,
+                target_isotope_id VARCHAR(16) NOT NULL
+                    REFERENCES target_isotope(target_isotope_id) ON DELETE CASCADE,
+                sample_item_id VARCHAR(16) NOT NULL
+                    REFERENCES sample_item(sample_item_id) ON DELETE CASCADE,
+                sample_peak_id INTEGER NOT NULL,
+                sample_peak_mz FLOAT NOT NULL,
+                sample_peak_area FLOAT NOT NULL,
+                sample_peak_area_relative FLOAT NOT NULL,
+                sample_peak_tof FLOAT NOT NULL,
+                match_abundance_error FLOAT NOT NULL,
+                match_mz_error FLOAT NOT NULL,
+                match_score FLOAT NOT NULL
+                    CHECK (match_score BETWEEN 0 AND 1),
+                match_isotope_correlation FLOAT NOT NULL
+            );
+        """,
+        "indexes": [
+            "idx_match_sample_item ON match (sample_item_id)",
+        ],
+    },
+    "match_interference": {
+        "columns": {
+            "match_interference_id": ("VARCHAR(32)", 1, None, 1),
+            "target_isotope_id": ("VARCHAR(16)", 1, None, 0),
+            "sample_item_id": ("VARCHAR(16)", 1, None, 0),
+            "sample_peak_interference": ("FLOAT", 1, None, 0),
+        },
+        "fks": {
+            "target_isotope_id": (
+                "target_isotope",
+                "target_isotope_id",
+                "NO ACTION",
+                "CASCADE",
+            ),
+            "sample_item_id": (
+                "sample_item",
+                "sample_item_id",
+                "NO ACTION",
+                "CASCADE",
+            ),
+        },
+        "create_sql": """
+            CREATE TABLE match_interference (
+                match_interference_id VARCHAR(32) NOT NULL PRIMARY KEY,
+                target_isotope_id VARCHAR(16) NOT NULL
+                    REFERENCES target_isotope(target_isotope_id) ON DELETE CASCADE,
+                sample_item_id VARCHAR(16) NOT NULL
+                    REFERENCES sample_item(sample_item_id) ON DELETE CASCADE,
+                sample_peak_interference FLOAT NOT NULL
+            );
+        """,
+        "indexes": [
+            "idx_match_interference_sample_item ON match_interference (sample_item_id)",
+        ],
+    },
+    "match_rating": {
+        "columns": {
+            "match_rating_id": ("VARCHAR(32)", 1, None, 1),
+            "sample_item_id": ("VARCHAR(16)", 1, None, 0),
+            "target_ion_id": ("VARCHAR(16)", 1, None, 0),
+            "match_rating_utc_created": ("TIMESTAMP", 0, None, 0),
+            "rating": ("INT", 1, None, 0),
+            "checklist": ("JSON", 0, None, 0),
+            "environment": ("JSON", 0, None, 0),
+        },
+        "fks": {
+            "target_ion_id": (
+                "target_ion",
+                "target_ion_id",
+                "NO ACTION",
+                "CASCADE",
+            ),
+            "sample_item_id": (
+                "sample_item",
+                "sample_item_id",
+                "NO ACTION",
+                "CASCADE",
+            ),
+        },
+        "create_sql": """
+            CREATE TABLE match_rating (
+                match_rating_id VARCHAR(32) NOT NULL PRIMARY KEY,
+                sample_item_id VARCHAR(16) NOT NULL
+                    REFERENCES sample_item(sample_item_id) ON DELETE CASCADE,
+                target_ion_id VARCHAR(16) NOT NULL
+                    REFERENCES target_ion(target_ion_id) ON DELETE CASCADE,
+                match_rating_utc_created TIMESTAMP,
+                rating INTEGER NOT NULL CHECK (rating BETWEEN 0 AND 2),
+                checklist JSON,
+                environment JSON
+            );
+        """,
+    },
+    "sample_item": {
+        "columns": {
+            "sample_item_id": ("VARCHAR(16)", 1, None, 1),
+            "sample_batch_id": ("VARCHAR(16)", 1, None, 0),
+            "filename": ("VARCHAR(256)", 1, None, 0),
+            "sample_item_name": ("VARCHAR(256)", 1, None, 0),
+            "sample_item_type": ("VARCHAR(64)", 1, None, 0),
+            "sample_item_attributes": ("JSON", 0, None, 0),
+            "sample_item_utc_created": ("TIMESTAMP", 0, None, 0),
+            "sample_item_utc_modified": ("TIMESTAMP", 0, None, 0),
+            "filter_id": ("VARCHAR(6)", 0, None, 0),
+        },
+        "fks": {
+            "sample_batch_id": (
+                "sample_batch",
+                "sample_batch_id",
+                "NO ACTION",
+                "CASCADE",
+            )
+        },
+        "create_sql": """
+            CREATE TABLE sample_item (
+                sample_item_id VARCHAR(16) NOT NULL PRIMARY KEY,
+                sample_batch_id VARCHAR(16) NOT NULL
+                    REFERENCES sample_batch(sample_batch_id) ON DELETE CASCADE,
+                filename VARCHAR(256) NOT NULL,
+                sample_item_name VARCHAR(256) NOT NULL,
+                sample_item_type VARCHAR(64) NOT NULL,
+                sample_item_attributes JSON,
+                sample_item_utc_created TIMESTAMP,
+                sample_item_utc_modified TIMESTAMP,
+                filter_id VARCHAR(6)
+            );
+        """,
+        "indexes": [
+            "idx_sample_item_sample_batch ON sample_item (sample_batch_id)",
+        ],
+    },
+    "sample_file": {
+        "columns": {
+            "sample_file_id": ("VARCHAR(16)", 1, None, 1),
+            "filename": ("VARCHAR(256)", 1, None, 0),
+            "instrument": ("VARCHAR(64)", 0, None, 0),
+            "datetime": ("TIMESTAMP", 0, None, 0),
+            "datetime_utc": ("TIMESTAMP", 0, None, 0),
+            "length": ("FLOAT", 0, None, 0),
+            "range": ("JSON", 0, None, 0),
+            "mz_calibration": ("JSON", 0, None, 0),
+            "tic": ("FLOAT", 0, None, 0),
+        },
+        "fks": {},
+        "create_sql": """
+        CREATE TABLE sample_file (
+            sample_file_id VARCHAR(16) NOT NULL PRIMARY KEY,
+            filename VARCHAR(256) NOT NULL UNIQUE,
+            instrument VARCHAR(64),
+            datetime TIMESTAMP,
+            datetime_utc TIMESTAMP,
+            length FLOAT,
+            range JSON,
+            mz_calibration JSON,
+            tic FLOAT
         );
     """,
     },
