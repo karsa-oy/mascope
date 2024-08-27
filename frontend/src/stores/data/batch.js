@@ -11,8 +11,7 @@ export const useBatch = defineModule({
   key: 'sample_batch_id',
   useParent: useWorkspace,
   subscribe: true,
-  reloadSelfOn: 'sample_batch_reload',
-  reloadChildrenOn: 'sample_batch_reload',
+  reloadOn: 'sample_batch_reload',
   load: async (workspace_id) =>
     (
       await api.request.read({
@@ -64,7 +63,7 @@ export const useBatch = defineModule({
         batch,
         body: {
           sample_items,
-          params: mzFit.params
+          mz_calibration_params: mzFit.mzCalibrationParams
         }
       }
     })
@@ -74,6 +73,12 @@ export const useBatch = defineModule({
       method: 'rematchBatch',
       body: { batchId: sample_batch_id }
     }),
+  aggregateBatchMatches: async ({ sample_batch_id }) => {
+    return await api.request.read({
+      method: 'getBatchAndAggregatedMatches',
+      body: { sample_batch_id }
+    })
+  },
   exportPeaks: async ({ sample_batch_id }) =>
     await api.request.process({
       method: 'batchExportPeakData',

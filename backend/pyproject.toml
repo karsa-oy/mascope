@@ -40,6 +40,7 @@ uvicorn = "^0.30"
 watchdog = "^4.0"
 websocket-client = "^1.8"
 zarr = "^2.18"
+pyarrow = "^17.0.0"
 
 [tool.poetry.group.dev.dependencies]
 austin-dist = "^3.6"

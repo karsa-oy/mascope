@@ -314,6 +314,9 @@ table_configs = {
                 match_sample_utc_modified TIMESTAMP
             );
     """,
+        "indexes": [
+            "idx_match_sample_sample_item ON match_sample (sample_item_id)",
+        ],
     },
     "match_collection": {
         "columns": {
@@ -353,6 +356,9 @@ table_configs = {
                 match_collection_utc_modified TIMESTAMP
             );
     """,
+        "indexes": [
+            "idx_match_collection_sample_item ON match_collection (sample_item_id)",
+        ],
     },
     "match_compound": {
         "columns": {
@@ -392,6 +398,9 @@ table_configs = {
                 match_compound_utc_modified TIMESTAMP
             );
     """,
+        "indexes": [
+            "idx_match_compound_sample_item ON match_compound (sample_item_id)",
+        ],
     },
     "match_ion": {
         "columns": {
@@ -426,6 +435,9 @@ table_configs = {
                 match_ion_utc_modified TIMESTAMP
             );
     """,
+        "indexes": [
+            "idx_match_ion_sample_item ON match_ion (sample_item_id)",
+        ],
     },
     "match_isotope": {
         "columns": {

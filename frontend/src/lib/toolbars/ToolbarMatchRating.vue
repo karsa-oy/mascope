@@ -18,10 +18,32 @@ const dialog = reactive({
   rating: -1
 })
 
-async function submit(rating) {
-  const possibleMatch =
-    app.ui.matchVisualized.ion.match_score >= app.data.filterParams.current.possible_match_threshold
-  if ((rating == 0 && possibleMatch) || rating == 1 || (rating == 1 && !possibleMatch)) {
+/**
+ * Submits a match rating for the currently visualized ion match.
+ * Checks for unsaved filter parameter changes and prompts the user to save or discard them.
+ * Proceeds to submit the rating to the API if conditions are met.
+ *
+ * @param {number} rating - The rating to be submitted (0 = No Detection, 1 = Ambiguous, 2 = Detection)
+ */
+async function submitRating(rating) {
+  if (app.data.filterParams.changed) {
+    handleUnsavedFilterParams()
+  } else {
+    processRatingSubmission(rating)
+  }
+}
+
+/**
+ * Processes the rating submission by either opening a dialog for ambiguous or mismatched ratings,
+ * or directly submitting the rating to the API.
+ *
+ * @param {number} rating - The rating to be submitted
+ */
+async function processRatingSubmission(rating) {
+  const matchScore = app.ui.matchVisualized.ion.match_score
+  const possibleMatch = matchScore >= app.data.filterParams.current.possible_match_threshold
+
+  if (rating === 1 || (rating === 0 && possibleMatch) || (rating === 2 && !possibleMatch)) {
     dialog.rating = rating
     dialog.visible = true
   } else {
@@ -37,6 +59,35 @@ async function submit(rating) {
       }
     })
   }
+}
+
+/**
+ * Handles the scenario where there are unsaved filter parameter changes.
+ * Prompts the user to either save the changes or discard them before proceeding with the rating submission.
+ */
+function handleUnsavedFilterParams() {
+  confirm.require({
+    header: 'Unsaved filtering settings',
+    message:
+      'You have unsaved changes in your filtering isotope/peak parameters. Please save or discard them before submitting a rating.',
+    acceptProps: {
+      icon: 'pi pi-save',
+      label: 'Save changes'
+    },
+    rejectProps: {
+      icon: 'pi pi-times',
+      label: 'Discard changes',
+      severity: 'secondary'
+    },
+    accept: async () => {
+      await app.data.filterParams.save()
+      await app.ui.matchVisualized.reset()
+    },
+    reject: async () => {
+      await app.data.filterParams.reset()
+      await app.ui.matchVisualized.reset()
+    }
+  })
 }
 </script>
 
@@ -65,7 +116,7 @@ async function submit(rating) {
             icon="pi pi-times-circle"
             @click="
               () => {
-                submit(0)
+                submitRating(0)
                 acceptCallback()
               }
             "
@@ -76,7 +127,7 @@ async function submit(rating) {
             icon="pi pi-question-circle"
             @click="
               () => {
-                submit(1)
+                submitRating(1)
                 acceptCallback()
               }
             "
@@ -87,7 +138,7 @@ async function submit(rating) {
             icon="pi pi-check-circle"
             @click="
               () => {
-                submit(2)
+                submitRating(2)
                 acceptCallback()
               }
             "

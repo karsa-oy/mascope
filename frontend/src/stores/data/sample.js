@@ -17,7 +17,6 @@ export const useSample = defineModule({
         method: 'getAllSamples',
         body: {
           sample_batch_id,
-          batch_matches_info: true,
           sort: 'datetime_utc'
         }
       })
@@ -58,7 +57,7 @@ export const useSample = defineModule({
       method: 'processSampleItem',
       body: {
         sample,
-        params: mzFit.params
+        mz_calibration_params: mzFit.mzCalibrationParams
       }
     })
   },

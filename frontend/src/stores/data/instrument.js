@@ -6,7 +6,6 @@ export const useInstrument = defineModule({
   name: 'instrument',
   key: 'instrument',
   subscribe: true,
-  autofocus: true,
   load: async () =>
     await api.request
       .read({

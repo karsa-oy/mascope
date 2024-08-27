@@ -1,5 +1,7 @@
 import * as xlsx from 'xlsx'
 
+import { api } from '@/api'
+
 import { useApp } from '@/stores'
 
 import { beautifySnakeCase, strToSnakeCase, genId } from './utils'
@@ -175,21 +177,71 @@ export function equals(first, second, field) {
   }
 }
 
-// methods
-export function batchExportCsv() {
+/**
+ * Exports the sample batch and associated match data to an Excel spreadsheet.
+ *
+ * This function gathers data from the focused sample batch, including the batch details,
+ * samples, and match data for compounds and ions. The data is then formatted into multiple sheets
+ * within an Excel workbook and saved as a file.
+ *
+ * Steps:
+ * 1. Verifies that a batch is currently focused; if not, logs an error and exits.
+ * 2. Fetches detailed match data and batch parameters for the focused batch using API calls.
+ * 3. Structures the batch, sample, compound, and ion data into rows and columns for Excel sheets.
+ * 4. Generates a filename using the current date and time, ensuring a unique file name.
+ * 5. Calls `toSpreadsheet` to create and save the Excel file with the collected data.
+ *
+ * @async
+ * @function batchExportCsv
+ * @returns {Promise<void>} - This function does not return a value but triggers a file download.
+ */
+export async function batchExportCsv() {
   const app = useApp()
+
+  if (!app.data.batch.focused) {
+    console.error('No batch is currently focused.')
+    return
+  }
+
+  const focusedBatch = app.data.batch.focused
+  const batchMatchData = await app.data.batch.aggregateBatchMatches(focusedBatch)
+  const batch = batchMatchData.sample_batch
+
+  const samples = (
+    await api.request.read({
+      method: 'getAllSamples',
+      body: {
+        sample_batch_id: focusedBatch.sample_batch_id,
+        sort: 'datetime_utc'
+      }
+    })
+  )?.data
+
+  // Lookup the calibration collection name
+  const calibrationCollectionName =
+    app.data.target.collection.list.find(
+      (collection) => collection.target_collection_id === batch.build_params.calibration_collection
+    )?.target_collection_name || batch.build_params.calibration_collection
+
+  // Lookup the ion mechanism names
+  const ionMechanismNames = (batch.build_params.ion_mechanisms || [])
+    .map(
+      (id) =>
+        app.data.mechanism.list.find((mechanism) => mechanism.ionization_mechanism_id === id)
+          ?.ionization_mechanism
+    )
+    .filter(Boolean)
+    .join(', ')
 
   const batchCols = [
     { field: 'field', label: 'Batch' },
     { field: 'value', label: '' }
   ]
-  let batchRows = [
-    { field: 'Name', value: app.data.batch.focused.sample_batch_name },
-    {
-      field: 'Description',
-      value: app.data.batch.focused.sample_batch_description
-    },
-    { field: 'Workspace', value: app.data.workspace.focused.workspace_name },
+
+  const batchRows = [
+    { field: 'Name', value: batch.sample_batch_name },
+    { field: 'Description', value: batch.sample_batch_description },
+    { field: 'Workspace', value: app.data.workspace.focused?.workspace_name || 'N/A' },
     { field: '', value: '' },
     {
       field: 'Target collections',
@@ -198,17 +250,11 @@ export function batchExportCsv() {
         'none'
     },
     { field: '', value: '' },
-    { field: 'Parameters', value: '' }
+    { field: 'Parameters', value: '' },
+    { field: 'Calibration collection', value: calibrationCollectionName },
+    { field: 'Ion mechanisms', value: ionMechanismNames }
   ]
-  const batchParams = {
-    ...app.data.batch.focused.buildParams
-  }
-  Object.entries(batchParams).forEach(([key, val]) =>
-    batchRows.push({
-      field: key.replaceAll('_', ' '),
-      value: JSON.stringify(val)
-    })
-  )
+
   const sampleItemCols = [
     { field: 'sample_item_name', label: 'Sample name' },
     { field: 'filename', label: 'Filename' },
@@ -218,6 +264,7 @@ export function batchExportCsv() {
     { field: 'filter_id', label: 'Filter ID' },
     { field: 'match_score', label: 'Match score' }
   ]
+
   const matchCompoundCols = [
     { field: 'sample_item_name', label: 'Sample name' },
     { field: 'filename', label: 'Filename' },
@@ -225,12 +272,10 @@ export function batchExportCsv() {
     { field: 'target_compound_name', label: 'Compound name' },
     { field: 'target_compound_formula', label: 'Compound formula' },
     { field: 'sample_peak_area_sum', label: 'Sample peak intensity' },
-    {
-      field: 'sample_peak_interference_max',
-      label: 'Sample peak interference'
-    },
+    { field: 'sample_peak_interference_sum', label: 'Sample peak interference' },
     { field: 'match_score', label: 'Match score' }
   ]
+
   const matchIonCols = [
     { field: 'sample_item_name', label: 'Sample name' },
     { field: 'filename', label: 'Filename' },
@@ -240,36 +285,32 @@ export function batchExportCsv() {
     { field: 'target_ion_mechanism', label: 'Ionization mechanism' },
     { field: 'target_ion_formula', label: 'Ion formula' },
     { field: 'sample_peak_area_sum', label: 'Sample peak intensity' },
-    {
-      field: 'sample_peak_interference_sum',
-      label: 'Sample peak interference'
-    },
+    { field: 'sample_peak_interference_sum', label: 'Sample peak interference' },
     { field: 'match_score', label: 'Match score' }
   ]
+
   const datetimestamp = new Date().toJSON().slice(0, -5).replace(/[-:]/g, '')
-  const filename = `${datetimestamp}_${app.data.batch.focused.sample_batch_name.replaceAll(
-    ' ',
-    '_'
-  )}.xlsx`
+  const filename = `${datetimestamp}_${batch.sample_batch_name.replaceAll(' ', '_')}.xlsx`
+
   toSpreadsheet(filename, [
     {
       name: 'Batch',
-      rows: app.data.batch.list,
+      rows: batchRows,
       cols: batchCols
     },
     {
       name: 'Samples',
-      rows: app.data.sample.list,
+      rows: samples,
       cols: sampleItemCols
     },
     {
       name: 'Match compounds',
-      rows: app.data.match.compound.list,
+      rows: batchMatchData.match_compounds,
       cols: matchCompoundCols
     },
     {
       name: 'Match ions',
-      rows: app.data.match.ion.list,
+      rows: batchMatchData.match_ions,
       cols: matchIonCols
     }
   ])

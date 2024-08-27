@@ -421,7 +421,35 @@ async function init(mode) {
   loadBatches(selected.workspace)
 }
 
+/**
+ * Checks if any of the 'add compound' input fields are focused.
+ * If none of the relevant fields are focused, it collapses the add compound panel.
+ *
+ * @param {Event} event - The blur event that triggers this function.
+ */
+function addCheckFocus(event) {
+  // Get the active element (the currently focused element)
+  const activeElement = document.activeElement
+
+  // Check if the active element is not any of the inputs in the panel
+  if (
+    activeElement.id !== 'add-compound-formula' &&
+    activeElement.id !== 'add-compound-name' &&
+    activeElement.id !== 'add-compound-cas'
+  ) {
+    add.expanded = false
+  }
+}
+
+/**
+ * Adds a new compound to the list.
+ * This function first checks if the 'Formula' input is not empty,
+ * then it adds the compound, and finally, it resets the input fields.
+ */
 const addCompound = () => {
+  if (!add.formula.trim()) {
+    return // Prevent adding if formula is empty
+  }
   loadSpreadsheet({
     rows: [
       {
@@ -431,6 +459,7 @@ const addCompound = () => {
       }
     ]
   })
+  // Reset input fields
   add.formula = ''
   add.name = ''
   add.cas = ''
@@ -521,28 +550,46 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onEnter))
                       v-model="add.formula"
                       id="add-compound-formula"
                       style="width: 100%"
+                      @focus="add.expanded = true"
+                      @blur="addCheckFocus"
+                      :invalid="!add.formula.trim() && add.expanded"
                     />
                     <label for="add-compound-formula">Formula*</label>
                   </FloatLabel>
-                  <Button label="Add" icon="pi pi-plus" @click="addCompound" />
+                  <Button
+                    label="Add"
+                    icon="pi pi-plus"
+                    @click="addCompound"
+                    :disabled="!add.formula.trim()"
+                  />
                 </div>
                 <div
                   :class="`row expandable ${add.expanded ? 'expanded' : 'collapsed'}`"
                   style="padding-left: 5ch"
                 >
                   <FloatLabel>
-                    <InputText v-model="add.name" id="add-compound-name" />
+                    <InputText
+                      v-model="add.name"
+                      id="add-compound-name"
+                      @focus="add.expanded = true"
+                      @blur="addCheckFocus"
+                    />
                     <label for="add-compound-name">Name</label>
                   </FloatLabel>
                   <FloatLabel>
-                    <InputText v-model="add.cas" id="add-compound-cas" />
+                    <InputText
+                      v-model="add.cas"
+                      id="add-compound-cas"
+                      @focus="add.expanded = true"
+                      @blur="addCheckFocus"
+                    />
                     <label for="add-compound-cas">CAS Number</label>
                   </FloatLabel>
                 </div>
                 <BaseClipboardContext
                   v-if="selected.source == 'Selection'"
                   info="You can also add compounds by pasting spreadsheet cells"
-                  @validated="(data) => loadSpreadsheet({ rows: data })"
+                  @validated="({ data }) => loadSpreadsheet({ rows: data })"
                   :parse="
                     (text) => {
                       const { rows } = fromSpreadsheet(text, [

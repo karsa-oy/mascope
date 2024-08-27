@@ -10,7 +10,7 @@ from mascope_server.config import config
 
 import mascope_runtime as runtime
 
-logger = runtime.logger.service('backend')
+logger = runtime.logger.service("backend")
 
 # patch asyncio to supported run_until_complete
 # when an event loop is already running

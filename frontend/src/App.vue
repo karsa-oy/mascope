@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 
 import ProgressSpinner from 'primevue/progressspinner'
 import ConfirmDialog from 'primevue/confirmdialog'
@@ -24,15 +24,52 @@ app.ui.notification
         {
           warning: 'warn'
         }[status] ?? status
+
+      const duration = status === 'error' ? 10000 : status === 'warning' ? 7000 : 3000
+
       toast.add({
         severity,
         summary: `${beautifySnakeCase(type)} ${status}`,
         detail: message,
-        life: status === 'error' ? 10000 : 3000
+        life: duration
       })
     }
   })
   .unmount()
+
+/**
+ * Watch for when workspace data is loaded, then focus on the saved workspace.
+ * If the saved workspace is not available, fallback to the first workspace in the list.
+ */
+watch(
+  () => app.data.workspace.list.length,
+  (newLength) => {
+    if (newLength > 0) {
+      const savedWorkspaceId = localStorage.getItem('mascope-workspace')
+      const workspaceIdToFocus = savedWorkspaceId || app.data.workspace.list[0]?.workspace_id // Fallback to the first workspace ID
+      if (workspaceIdToFocus) {
+        app.data.workspace.focus({ workspace_id: workspaceIdToFocus })
+      }
+    }
+  }
+)
+
+/**
+ * Watch for when instrument data is loaded, then focus on the saved instrument.
+ * If the saved instrument is not available, fallback to the first instrument in the list.
+ */
+watch(
+  () => app.data.instrument.list.length,
+  (newLength) => {
+    if (newLength > 0) {
+      const savedInstrumentName = localStorage.getItem('mascope-instrument')
+      const instrumentToFocus = savedInstrumentName || app.data.instrument.list[0]?.instrument // Fallback to the first instrument
+      if (instrumentToFocus) {
+        app.data.instrument.focus({ instrument: instrumentToFocus })
+      }
+    }
+  }
+)
 
 // focus new workspace
 app.ui.notification

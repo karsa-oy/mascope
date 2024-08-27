@@ -68,13 +68,13 @@ function init(active) {
   if (active) {
     // reset state
     state.tab = 'calibration'
-    state.previous = { ...mzFit.params }
+    state.previous = { ...mzFit.mzCalibrationParams }
     refit()
   }
 }
 
 const unsynced = computed(() =>
-  Object.keys(state.previous).some((key) => state.previous[key] !== mzFit.params[key])
+  Object.keys(state.previous).some((key) => state.previous[key] !== mzFit.mzCalibrationParams[key])
 )
 
 watch(previewSample, refit)
@@ -92,7 +92,7 @@ async function refit() {
   if (sample && visible.value) {
     await mzFit.compute(sample)
   }
-  state.previous = { ...mzFit.params }
+  state.previous = { ...mzFit.mzCalibrationParams }
 }
 
 const calibration = computed(() => ({
@@ -137,7 +137,18 @@ const formatter = new Intl.NumberFormat('en-US', {
       </TabList>
       <TabPanels>
         <TabPanel value="calibration">
-          <div class="row">
+          <div class="column">
+            <!-- Show warning message if it exists -->
+            <div class="message-container">
+              <Message
+                v-if="mzFit.status === 'warning'"
+                severity="warn"
+                style="inline-size: 400px; overflow-wrap: anywhere; margin-bottom: 1rem"
+                :closable="true"
+              >
+                {{ mzFit.error }}
+              </Message>
+            </div>
             <Listbox
               v-if="samples"
               v-model:modelValue="previewSample"
@@ -177,14 +188,14 @@ const formatter = new Intl.NumberFormat('en-US', {
             </DataTable>
             <div v-else class="center" style="height: 200px; width: 100%; overflow: hidden">
               <ProgressSpinner v-if="!(mzFit.status == 'error')" />
-              <Message v-else severity="warn" style="inline-size: 400px; overflow-wrap: anywhere">
+              <Message v-else severity="error" style="inline-size: 400px; overflow-wrap: anywhere">
                 {{ mzFit.error ?? 'Calibration failed due to an unknown error.' }}
               </Message>
             </div>
           </div>
         </TabPanel>
         <TabPanel value="settings">
-          <PaneSettingsCalibration v-model:params="mzFit.params" />
+          <PaneSettingsCalibration v-model:mzCalibrationParams="mzFit.mzCalibrationParams" />
         </TabPanel>
       </TabPanels>
     </Tabs>
@@ -192,7 +203,7 @@ const formatter = new Intl.NumberFormat('en-US', {
       <Button label="Cancel" @click="() => (visible = false)" severity="secondary" />
       <Button
         label="Save"
-        :disabled="!mzFit.current"
+        :disabled="!mzFit.current || !mzFit.stats || mzFit.status === 'error'"
         @click="
           async () => {
             if (batch) {
@@ -200,12 +211,11 @@ const formatter = new Intl.NumberFormat('en-US', {
                 method: 'recalibrateSampleBatch',
                 body: {
                   batchId: original.sample_batch_id,
-                  body: mzFit.params
+                  body: mzFit.mzCalibrationParams
                 }
               })
             } else {
               await mzFit.apply(original)
-              await app.data.sample.rematch(original)
             }
             visible = false
           }
@@ -221,6 +231,12 @@ const formatter = new Intl.NumberFormat('en-US', {
   flex-flow: row nowrap;
   justify-content: space-around;
   gap: 0.5rem;
+}
+
+.message-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 :deep(.p-panel-header) {

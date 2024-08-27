@@ -1,3 +1,6 @@
+from sqlalchemy import (
+    select,
+)
 from mascope_server.db.models import (
     MatchIsotope,
     MatchInterference,
@@ -7,10 +10,19 @@ from mascope_server.db.models import (
     MatchSample,
 )
 from mascope_server.db.id import gen_id
+from mascope_server.api.lib.notifications.api_notification_pydantic_model import (
+    UserNotification,
+)
+from mascope_server.api.lib.notifications.api_notification import (
+    send_progress_user_notification,
+)
 
 
 async def copy_sample_item_match_data(
-    original_sample_item, new_sample_item_id, session
+    original_sample_item_id: str,
+    new_sample_item_id: str,
+    session,
+    notification: UserNotification = None,
 ):
     """
     Copies all match-related records (MatchIsotope, MatchInterference, MatchIon, MatchCompound, MatchCollection, MatchSample)
@@ -19,106 +31,43 @@ async def copy_sample_item_match_data(
     This function performs the copying operation in the context of the given session, but it does not commit the changes.
     The calling function is responsible for committing the session if needed.
 
-    :param original_sample_item: The original sample item from which match data will be copied.
-    :type original_sample_item: SampleItem
+    :param original_sample_item_id: The ID of the original sample item from which match data will be copied.
+    :type original_sample_item_id: str
     :param new_sample_item_id: The ID of the new sample item to which match data will be copied.
     :type new_sample_item_id: str
     :param session: The SQLAlchemy session to use for database operations.
     :type session: sqlalchemy.ext.asyncio.AsyncSession
+    :param notification: Optional notification for sending progress user notifications of match copying.
+    :type notification: UserNotification, optional
     """
 
-    # Copy related MatchIsotope records
-    for match_isotope in original_sample_item.match_isotope:
-        new_match_isotope_data = {
-            c.name: getattr(match_isotope, c.name)
-            for c in MatchIsotope.__table__.columns
-            if c.name != "match_isotope_id"
-        }
-        new_match_isotope_data.update(
-            {
-                "match_isotope_id": gen_id(32),
-                "sample_item_id": new_sample_item_id,
-            }
-        )
-        new_match_isotope = MatchIsotope(**new_match_isotope_data)
-        session.add(new_match_isotope)
+    async def copy_match_records(model, progress_increment):
+        query = select(model).filter(model.sample_item_id == original_sample_item_id)
+        result = await session.execute(query)
+        match_records = result.scalars().all()
 
-    # Copy related MatchInterference records
-    for match_interference in original_sample_item.match_interference:
-        new_match_interference_data = {
-            c.name: getattr(match_interference, c.name)
-            for c in MatchInterference.__table__.columns
-            if c.name != "match_interference_id"
-        }
-        new_match_interference_data.update(
-            {
-                "match_interference_id": gen_id(32),
-                "sample_item_id": new_sample_item_id,
+        for match_record in match_records:
+            new_record_data = {
+                c.name: getattr(match_record, c.name)
+                for c in model.__table__.columns
+                if c.name != f"{model.__tablename__}_id"
             }
-        )
-        new_match_interference = MatchInterference(**new_match_interference_data)
-        session.add(new_match_interference)
+            new_record_data.update(
+                {
+                    f"{model.__tablename__}_id": gen_id(32),
+                    "sample_item_id": new_sample_item_id,
+                }
+            )
+            new_record = model(**new_record_data)
+            session.add(new_record)
 
-    # Copy related MatchIon records
-    for match_ion in original_sample_item.match_ion:
-        new_match_ion_data = {
-            c.name: getattr(match_ion, c.name)
-            for c in MatchIon.__table__.columns
-            if c.name != "match_ion_id"
-        }
-        new_match_ion_data.update(
-            {
-                "match_ion_id": gen_id(32),
-                "sample_item_id": new_sample_item_id,
-            }
-        )
-        new_match_ion = MatchIon(**new_match_ion_data)
-        session.add(new_match_ion)
+        if notification:
+            await send_progress_user_notification(notification, progress_increment)
 
-    # Copy related MatchCompound records
-    for match_compound in original_sample_item.match_compound:
-        new_match_compound_data = {
-            c.name: getattr(match_compound, c.name)
-            for c in MatchCompound.__table__.columns
-            if c.name != "match_compound_id"
-        }
-        new_match_compound_data.update(
-            {
-                "match_compound_id": gen_id(32),
-                "sample_item_id": new_sample_item_id,
-            }
-        )
-        new_match_compound = MatchCompound(**new_match_compound_data)
-        session.add(new_match_compound)
-
-    # Copy related MatchCollection records
-    for match_collection in original_sample_item.match_collection:
-        new_match_collection_data = {
-            c.name: getattr(match_collection, c.name)
-            for c in MatchCollection.__table__.columns
-            if c.name != "match_collection_id"
-        }
-        new_match_collection_data.update(
-            {
-                "match_collection_id": gen_id(32),
-                "sample_item_id": new_sample_item_id,
-            }
-        )
-        new_match_collection = MatchCollection(**new_match_collection_data)
-        session.add(new_match_collection)
-
-    # Copy related MatchSample records
-    for match_sample in original_sample_item.match_sample:
-        new_match_sample_data = {
-            c.name: getattr(match_sample, c.name)
-            for c in MatchSample.__table__.columns
-            if c.name != "match_sample_id"
-        }
-        new_match_sample_data.update(
-            {
-                "match_sample_id": gen_id(32),
-                "sample_item_id": new_sample_item_id,
-            }
-        )
-        new_match_sample = MatchSample(**new_match_sample_data)
-        session.add(new_match_sample)
+    # Copy each type of match record with progress tracking
+    await copy_match_records(MatchIsotope, 0.25)
+    await copy_match_records(MatchInterference, 0.5)
+    await copy_match_records(MatchIon, 0.75)
+    await copy_match_records(MatchCompound, 0.85)
+    await copy_match_records(MatchCollection, 0.9)
+    await copy_match_records(MatchSample, 0.95)

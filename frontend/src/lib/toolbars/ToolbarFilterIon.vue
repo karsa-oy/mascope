@@ -35,17 +35,22 @@ async function saveParams() {
   confirm.require({
     header: 'Saving filtering parameters',
     message: `Are you sure you want to save current ${app.ui.matchVisualized.ion.target_ion_formula} filtering parameters for ${app.ui.matchVisualized.ion.instrument} instrument?`,
-    acceptIcon: 'pi pi-save',
-    acceptLabel: 'Save',
+    acceptProps: {
+      icon: 'pi pi-save',
+      label: 'Save'
+    },
+    rejectProps: {
+      icon: 'pi pi-times',
+      label: 'Cancel',
+      severity: 'secondary'
+    },
     accept: async () => {
       isSaving.value = true
       await app.data.filterParams.save()
       isSaving.value = false
       app.data.filterParams.init()
       await app.ui.matchVisualized.reset()
-    },
-    rejectLabel: 'Cancel',
-    rejectIcon: 'pi pi-times'
+    }
   })
 }
 
@@ -73,7 +78,7 @@ async function resetParams() {
 
 const items = computed(() => [
   {
-    label: 'Save params',
+    label: 'Save parameters',
     icon: 'pi pi-save',
     command: saveParams,
     disabled: !app.data.filterParams.changed
@@ -91,7 +96,7 @@ const items = computed(() => [
     disabled: app.data.filterParams.default
   },
   {
-    label: 'Delete filtering params',
+    label: 'Delete filtering parameters',
     icon: 'pi pi-trash',
     command: deleteParams,
     disabled:

@@ -1,3 +1,4 @@
+# pylint: disable=line-too-long
 """
 This module contains all the functionalities related to the calibration processes. It provides endpoints and
 background tasks to process calibration and related operations.
@@ -13,11 +14,11 @@ from mascope_server.api_sio import sio
 from mascope_server.api.lib.api_features import (
     api_controller,
     api_controller_background_task,
-    send_progress_user_notification,
 )
 from mascope_server.api.lib.exceptions.api_exceptions import (
     ApiException,
     NotFoundException,
+    raise_api_warning,
 )
 from mascope_server.api.controllers.calibration.lib.calibration_mz_fit import (
     mz_fit,
@@ -32,7 +33,10 @@ from mascope_server.api.models.sample.files.sample_file_pydantic_model import (
     SampleFileUpdate,
 )
 from mascope_server.api.models.calibration.calibration_pydantic_model import (
-    CalibrationMzFitParams,
+    MzCalibrationParams,
+)
+from mascope_server.api.lib.notifications.api_notification import (
+    send_progress_user_notification,
 )
 from mascope_server.api.lib.notifications.api_notification_pydantic_model import (
     UserNotification,
@@ -91,7 +95,7 @@ async def get_mz_calibration(
 )
 async def calibration_mz_fit(
     sample_item_id: str,
-    params: CalibrationMzFitParams,
+    mz_calibration_params: MzCalibrationParams,
     independent_transaction: bool = False,
     sid: str = None,
     process_id=None,
@@ -101,10 +105,10 @@ async def calibration_mz_fit(
     Start m/z fit calibration for a given sample item based on the calibration parameters.
 
     :param sample_item_id: ID of the sample item.
-    :param params: Calibration parameters.
+    :param mz_calibration_params: Calibration parameters.
     :param background_tasks: Optional background task parameter.
     """
-    # Step 2: Retrieve sample and batch data
+    # Step 1: Retrieve sample and batch data
     async with async_session() as session:
         sample = await session.get(SampleItem, sample_item_id)
         if not sample:
@@ -119,7 +123,7 @@ async def calibration_mz_fit(
 
     build_params = sample_batch.build_params
 
-    # Step 3: Prepare progress user notification.
+    # Step 2: Prepare progress user notification.
     notification = UserNotification(
         process_id=process_id,
         parent_id=parent_id,
@@ -138,21 +142,26 @@ async def calibration_mz_fit(
     )
 
     # Step 3: m/z fit the sample file
-    fit, stats, error = await mz_fit(
+    fit, stats, error, warning = await mz_fit(
         filename=sample.filename,
         calibration_collection_id=build_params["calibration_collection"],
         ionization_mechanism_ids=build_params["ion_mechanisms"],
-        peak_intensity_min=params.peak_intensity_min,
-        isotope_abundance_min=params.isotope_abundance_min,
-        match_score_min=params.match_score_min,
-        refine_window=params.refine_window,
+        peak_intensity_min=mz_calibration_params.peak_intensity_min,
+        isotope_abundance_min=mz_calibration_params.isotope_abundance_min,
+        match_score_min=mz_calibration_params.match_score_min,
+        refine_window=mz_calibration_params.refine_window,
         notification=notification,
     )
 
-    # Raise an error if the m/z fit failed, error user notification will be send in wrapper
+    # Step 4: Handle errors and warnings
     if error is not None:
+        # Raise an error if the m/z fit failed, error user notification will be send in wrapper
+        error_message = (
+            f"m/z fitting for sample '{sample.sample_item_name}' failed: {error}"
+        )
+        logger.error(error)
         raise ApiException(
-            f"Failed to m/z fit sample '{sample.sample_item_name}'. {error}",
+            error_message,
             {
                 "data": {
                     "fit": fit,
@@ -162,12 +171,27 @@ async def calibration_mz_fit(
             },
             422,
         )
+    elif warning is not None:
+        warning_message = (
+            f"m/z fitting sample '{sample.sample_item_name}' warning: {warning}"
+        )
+        raise_api_warning(
+            warning_message,
+            {
+                "data": {
+                    "fit": fit,
+                    "stats": stats,
+                    "warning": warning,
+                }
+            },
+        )
 
-    # Step 4: Return m/z fit result data and message
+    # Step 5: Return m/z fit result data and message
     data = {
         "fit": fit,
         "stats": stats,
         "error": error,
+        "warning": warning,
     }
     return {
         "data": data,
@@ -258,7 +282,6 @@ async def calibration_mz_apply(
     sample_file["range"] = new_range
     # Ensure polarity is a valid string
     sample_file["polarity"] = sample_file.get("polarity") or ""
-    logger.info(sample_file)
     await update_sample_file(
         sample_file["sample_file_id"], SampleFileUpdate(**sample_file)
     )
@@ -323,7 +346,7 @@ async def calibration_mz_apply(
 )
 async def calibration_mz_calibrate_sample(
     sample_item_id: str,
-    params: CalibrationMzFitParams,
+    mz_calibration_params: MzCalibrationParams,
     independent_transaction: bool = False,
     sid: str = None,
     process_id=None,
@@ -342,8 +365,8 @@ async def calibration_mz_calibrate_sample(
 
     :param sample_item_id: The ID of the sample to be calibrated.
     :type sample_item_id: str
-    :param params: The calibration parameters to be used for the calibration process.
-    :type params: CalibrationMzFitParams
+    :param mz_calibration_params: The calibration parameters to be used for the calibration process.
+    :type mz_calibration_params: MzCalibrationParams
     :raises NotFoundException: If the sample with the given ID is not found in the database.
     :raises ValueError: If the sample does not have a valid filename associated with it.
     :raises ApiException: For any exceptions that occur during the calibration process.
@@ -376,9 +399,11 @@ async def calibration_mz_calibrate_sample(
 
     await send_progress_user_notification(notification, 0.1)
 
+    # Step 3: Perform m/z fit
+    # If error/warning occure during the m/z fit it would interrupt the calibration and raise ApiException
     calibration_mz_fit_data = await calibration_mz_fit(
         sample_item_id=sample_item_id,
-        params=params,
+        mz_calibration_params=mz_calibration_params,
         independent_transaction=False,
         sid=sid,
         process_id=gen_id(8),
@@ -388,6 +413,7 @@ async def calibration_mz_calibrate_sample(
 
     await send_progress_user_notification(notification, 0.3)
 
+    # Step 4: Apply m/z calibration
     calibration_mz_apply_data = await calibration_mz_apply(
         fit=fit,
         filename=sample.filename,
@@ -405,8 +431,8 @@ async def calibration_mz_calibrate_sample(
         for sample_batch_id in sample_batch_ids:
             await sio.emit("sample_batch_reload", room=sample_batch_id, namespace="/")
 
-    # Step 4: Return rematched sample and message
-    return {
+    # Step 5: Return rematched sample and message
+    response_data = {
         "data": {
             "affected_sample_batch_ids": list(sample_batch_ids),
         },
@@ -419,6 +445,8 @@ async def calibration_mz_calibrate_sample(
         },
     }
 
+    return response_data
+
 
 @api_controller_background_task(
     success_notification_rooms=["sid"],
@@ -426,7 +454,7 @@ async def calibration_mz_calibrate_sample(
 )
 async def calibration_mz_calibrate_batch(
     sample_batch_id: str,
-    params: CalibrationMzFitParams,
+    mz_calibration_params: MzCalibrationParams,
     independent_transaction: bool = False,
     sid: str = None,
     process_id=None,
@@ -446,8 +474,8 @@ async def calibration_mz_calibrate_batch(
 
     :param sample_batch_id: The ID of the sample batch to be calibrated.
     :type sample_batch_id: str
-    :param params: Calibration parameters to be used for the calibration process.
-    :type params: CalibrationMzFitParams
+    :param mz_calibration_params: Calibration parameters to be used for the calibration process.
+    :type mz_calibration_params: MzCalibrationParams
     :param independent_transaction: Flag indicating if the operation is an independent transaction, default to False.
     :type independent_transaction: bool
     :raises NotFoundException: Raised if the sample batch or any samples within it are not found.
@@ -500,7 +528,7 @@ async def calibration_mz_calibrate_batch(
             calibration_mz_calibrate_sample_data = (
                 await calibration_mz_calibrate_sample(
                     sample_item_id=sample.sample_item_id,
-                    params=params,
+                    mz_calibration_params=mz_calibration_params,
                     independent_transaction=False,
                     sid=sid,
                     process_id=gen_id(8),
@@ -554,16 +582,13 @@ async def calibration_mz_calibrate_batch(
     # Step 4: If there are any failed to calibrate samples, raise a warning(200) exception
     # with the list of failed to calibrate samples included in the error detail (tech_message)
     if samples_calibrate_failed:
-        # raise warning user_notifications (ApiException with 200 code)
-        user_message = f"Failed to calibrate {len(samples_calibrate_failed)} sample{'s' if len(samples_calibrate_failed) != 1 else ''} in sample batch '{sample_batch_name}'."
-
-        raise ApiException(
-            user_message,
+        warning_message = f"Failed to calibrate {len(samples_calibrate_failed)} sample{'s' if len(samples_calibrate_failed) != 1 else ''} in sample batch '{sample_batch_name}'."
+        raise_api_warning(
+            warning_message,
             {
                 "sample_batch_id": sample_batch_id,
                 "samples_calibrate_failed": samples_calibrate_failed,
             },
-            200,
         )
 
     # Step 5: Return rematched batch and message

@@ -71,7 +71,7 @@ watch(
       const batchId = app.data.batch.focused.sample_batch_id
       batch.expanded = { [batchId]: true }
       app.data.batch.focus(selected)
-      handlePending()
+      await handlePending()
     } else {
       batch.expanded = {}
       app.data.batch.unfocus()
@@ -86,13 +86,13 @@ watch(
     }
   }
 )
-function handlePending() {
+async function handlePending() {
   if (pending.batchExport) {
-    batchExportCsv()
+    await batchExportCsv()
     pending.batchExport = false
   }
   if (pending.peakExport) {
-    app.data.batch.exportPeaks(app.data.batch.focused)
+    await app.data.batch.exportPeaks(app.data.batch.focused)
     pending.peakExport = false
   }
 }
@@ -148,7 +148,7 @@ const tree = computed(() => {
 const menu = computed(() => ({
   batch: [
     {
-      label: 'Paste item',
+      label: 'Paste sample',
       icon: 'pi pi-clipboard',
       command: () => pasteItem(batch.context),
       visible: item.pasted !== null && batch.context !== null
@@ -196,9 +196,9 @@ const menu = computed(() => ({
       label: 'Export batch',
 
       icon: 'pi pi-file-export',
-      command: () => {
+      command: async () => {
         if (app.data.batch.focused?.sample_batch_id == batch.context.sample_batch_id) {
-          batchExportCsv()
+          await batchExportCsv()
         } else {
           app.data.batch.focused = batch.context
           pending.batchExport = true
@@ -247,7 +247,7 @@ const menu = computed(() => ({
   ],
   item: [
     {
-      label: 'Paste item',
+      label: 'Paste sample',
       icon: 'pi pi-clipboard',
       visible: item.pasted !== null,
       command: () => pasteItem(item.context)
@@ -257,49 +257,55 @@ const menu = computed(() => ({
       visible: item.pasted !== null
     },
     {
-      label: `Edit item`,
+      label: `Edit sample`,
       icon: 'pi pi-file-edit',
       command: () => {
         dialog.item.op = 'update'
       }
     },
     {
-      label: 'Copy item',
+      label: 'Copy sample',
       icon: 'pi pi-copy',
       command: () => copy(item.context)
     },
     {
-      label: `Delete item`,
+      label: `Delete sample`,
       icon: 'pi pi-trash',
       command: () => {
         confirm.require({
-          header: 'Deleting item',
-          message: `Delete sample "${item.context.sample_item_name}"
+          header: `Deleting sample '${item.context.sample_item_name}'`,
+          message: `Delete sample '${item.context.sample_item_name}'
           from batch "${app.data.batch.focused.sample_batch_name}"?`,
-          acceptIcon: 'pi pi-trash',
-          acceptLabel: 'Delete',
+          icon: 'pi pi-exclamation-triangle',
+          rejectProps: {
+            label: 'Cancel',
+            severity: 'secondary'
+          },
+          acceptProps: {
+            icon: 'pi pi-trash',
+            label: 'Delete',
+            severity: 'danger'
+          },
           accept: async () => {
             // unload if necessary
             if (item.context.sample_item_id == app.data.sample.focused?.sample_item_id) {
               app.data.sample.unfocus()
             }
             await app.data.sample.delete(item.context)
-          },
-          rejectLabel: 'Cancel',
-          rejectIcon: 'pi pi-times'
+          }
         })
       }
     },
     { separator: true },
     {
-      label: `Recalibrate item`,
+      label: `Recalibrate sample`,
       icon: 'pi pi-replay',
       command: () => {
         dialog.item.calibration = true
       }
     },
     {
-      label: `Rematch item`,
+      label: `Rematch sample`,
       icon: 'pi pi-replay',
       command: async () => {
         await app.data.sample.rematch(item.context)

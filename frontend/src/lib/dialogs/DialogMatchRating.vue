@@ -162,7 +162,7 @@ const peak = new Intl.NumberFormat('en-US', {
 </script>
 
 <template>
-  <Dialog v-model:visible="visible" :header="title" style="max-width: 800px">
+  <Dialog v-model:visible="visible" :header="title" style="width: 35%">
     <Tabs value="questions">
       <TabList>
         <Tab value="questions">Questions</Tab>
@@ -236,53 +236,55 @@ const peak = new Intl.NumberFormat('en-US', {
           </ScrollPanel>
         </TabPanel>
         <TabPanel value="isotopes">
-          <DataTable
-            :value="isotopes"
-            dataKey="target_isotope_id"
-            sortField="match_score"
-            :sortOrder="-1"
-            scrollable
-            scrollHeight="300px"
-            v-model:expandedRows="expandedIsotopes"
-          >
-            <Column expander style="width: 3ch" />
-            <Column field="match_score" sortable class="match-column">
-              <template #header>
-                <span class="pi pi-verified" />
+          <ScrollPanel style="width: 100%; height: 40vh">
+            <DataTable
+              :value="isotopes"
+              dataKey="target_isotope_id"
+              sortField="match_score"
+              :sortOrder="-1"
+              scrollable
+              scrollHeight="300px"
+              v-model:expandedRows="expandedIsotopes"
+            >
+              <Column expander style="width: 3ch" />
+              <Column field="match_score" sortable class="match-column">
+                <template #header>
+                  <span class="pi pi-verified" />
+                </template>
+                <template #body="{ data }">
+                  <BaseMatchTag
+                    :row="data"
+                    :tooltip="`Peak intensity: ${peak.format(data?.sample_peak_area_sum)}`"
+                  />
+                </template>
+              </Column>
+              <Column style="width: 4ch" />
+              <Column header="mz" field="mz" style="width: 15ch" sortable>
+                <template #body="{ data }">
+                  {{ peak.format(data.mz) }}
+                </template>
+              </Column>
+              <Column header="r.a." field="relative_abundance" sortable>
+                <template #body="{ data }">
+                  {{ peak.format(data.relative_abundance) }}
+                </template>
+              </Column>
+              <Column header="Failures" field="failure_count" sortable />
+              <template #expansion="{ data }">
+                <section style="padding-left: 3rem">
+                  <ul v-if="data.failures.length">
+                    <li v-for="filter in data.failures" :key="filter.filter">
+                      {{ filter.message }}
+                      <span v-if="filter.threshold !== 'N/A'">
+                        ({{ filter.filter }} is {{ filter.threshold }})
+                      </span>
+                    </li>
+                  </ul>
+                  <p v-else>No failures detected</p>
+                </section>
               </template>
-              <template #body="{ data }">
-                <BaseMatchTag
-                  :row="data"
-                  :tooltip="`Peak intensity: ${peak.format(data?.sample_peak_area_sum)}`"
-                />
-              </template>
-            </Column>
-            <Column style="width: 4ch" />
-            <Column header="mz" field="mz" style="width: 15ch" sortable>
-              <template #body="{ data }">
-                {{ peak.format(data.mz) }}
-              </template>
-            </Column>
-            <Column header="r.a." field="relative_abundance" sortable>
-              <template #body="{ data }">
-                {{ peak.format(data.relative_abundance) }}
-              </template>
-            </Column>
-            <Column header="Failures" field="failure_count" sortable />
-            <template #expansion="{ data }">
-              <section style="padding-left: 3rem">
-                <ul v-if="data.failures.length">
-                  <li v-for="filter in data.failures" :key="filter.filter">
-                    {{ filter.message }}
-                    <span v-if="filter.threshold !== 'N/A'">
-                      ({{ filter.filter }} is {{ filter.threshold }})
-                    </span>
-                  </li>
-                </ul>
-                <p v-else>No failures detected</p>
-              </section>
-            </template>
-          </DataTable>
+            </DataTable>
+          </ScrollPanel>
         </TabPanel>
       </TabPanels>
     </Tabs>

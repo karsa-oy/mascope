@@ -43,6 +43,12 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
       time.mode = 'Last 24 hours'
     }
   })
+  // Clear or reset notifications when mode changes
+  watchEffect(() => {
+    if (!mode.value) {
+      ui.notification.clearLatest()
+    }
+  })
 
   const mzCalibration = ref(null)
   const orbi = computed(() => instrument.focused.instrument.toLowerCase().includes('orbi'))

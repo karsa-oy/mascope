@@ -6,9 +6,7 @@ export const useWorkspace = defineModule({
   name: 'workspace',
   key: 'workspace_id',
   subscribe: true,
-  autofocus: true,
-  reloadSelfOn: 'workspace_reload',
-  reloadChildrenOn: 'workspace_reload',
+  reloadOn: 'workspace_reload',
   load: async () =>
     (
       await api.request.read({

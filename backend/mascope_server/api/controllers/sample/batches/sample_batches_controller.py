@@ -35,9 +35,12 @@ from mascope_server.config import config
 from mascope_server.api.lib.api_features import (
     api_controller,
     api_controller_background_task,
-    send_progress_user_notification,
 )
-from mascope_server.api.lib.exceptions.api_exceptions import NotFoundException
+from mascope_server.api.lib.exceptions.api_exceptions import (
+    NotFoundException,
+    ApiException,
+    raise_api_warning,
+)
 from mascope_server.api.controllers.match.match_controller import rematch_batch
 from mascope_server.api.controllers.target.compounds.target_compounds_controller import (
     get_target_compounds,
@@ -61,7 +64,10 @@ from mascope_server.api.models.sample.items.sample_item_pydantic_model import (
     SampleItemCreate,
 )
 from mascope_server.api.models.calibration.calibration_pydantic_model import (
-    CalibrationMzFitParams,
+    MzCalibrationParams,
+)
+from mascope_server.api.lib.notifications.api_notification import (
+    send_progress_user_notification,
 )
 from mascope_server.api.lib.notifications.api_notification_pydantic_model import (
     UserNotification,
@@ -755,7 +761,7 @@ async def delete_sample_batch(
 async def import_sample_items(
     sample_batch_id: str,
     sample_items: List[SampleItemCreate],
-    params: CalibrationMzFitParams,
+    mz_calibration_params: MzCalibrationParams,
     calibrate_batch: bool = True,
     independent_transaction: bool = False,
     sid: str = None,
@@ -777,8 +783,8 @@ async def import_sample_items(
     :type sample_batch_id: str
     :param sample_items: List of sample items to be created and imported.
     :type sample_items: List[SampleItemCreate]
-    :param params: Calibration parameters for the batch. If not provided, default values are used.
-    :type params: CalibrationMzFitParams
+    :param mz_calibration_params: Calibration parameters for the batch. If not provided, default values are used.
+    :type mz_calibration_params: MzCalibrationParams
     :param calibrate_batch: A boolean flag to control whether the batch should undergo calibration, defaults to True
     :type calibrate_batch: bool, optional
     :param independent_transaction: Flag to indicate if the operation should be treated as an independent transaction, defaults to False
@@ -822,21 +828,35 @@ async def import_sample_items(
 
     # Step 3: Optionally calibrate batch if calibrate_batch flag is True and instrument is TOF
     if calibrate_batch and instrument_type == "tof":
-        calibration_mz_calibrate_batch_data = await calibration_mz_calibrate_batch(
-            sample_batch_id=sample_batch_id,
-            params=params,
-            independent_transaction=False,
-            sid=sid,
-            process_id=gen_id(8),
-            parent_id=process_id,
-        )
-        affected_sample_batch_ids = calibration_mz_calibrate_batch_data["data"].get(
-            "affected_sample_batch_ids", None
-        )
-        notification.message = f"Sample batch'{sample_batch_name}' m/z calibrated."
-        if len(affected_sample_batch_ids):
-            notification.message += f" Calibration affected {len(affected_sample_batch_ids)} other sample batch{'es' if (len(affected_sample_batch_ids)) > 1 else ''}."
-        await send_progress_user_notification(notification, 0.6)
+        warning = None
+        samples_calibrate_failed = []
+        try:
+            calibration_mz_calibrate_batch_data = await calibration_mz_calibrate_batch(
+                sample_batch_id=sample_batch_id,
+                mz_calibration_params=mz_calibration_params,
+                independent_transaction=False,
+                sid=sid,
+                process_id=gen_id(8),
+                parent_id=process_id,
+            )
+            affected_sample_batch_ids = calibration_mz_calibrate_batch_data["data"].get(
+                "affected_sample_batch_ids", None
+            )
+            notification.message = f"Sample batch'{sample_batch_name}' m/z calibrated."
+            if len(affected_sample_batch_ids):
+                notification.message += f" Calibration affected {len(affected_sample_batch_ids)} other sample batch{'es' if (len(affected_sample_batch_ids)) > 1 else ''}."
+            await send_progress_user_notification(notification, 0.6)
+        except ApiException as e:
+            if e.status_code == 200:
+                # This is a warning, proceed to ramtch, the not-calibrated samples will be not matched
+                # since the calibration is not verified
+                samples_calibrate_failed = e.tech_message.get(
+                    "samples_calibrate_failed", []
+                )
+                warning = e.user_message
+            else:
+                # This is a critical error, re-raise it
+                raise
 
     # Step 4: Compute matches for the batch, this would reload the current batch, the other affected_sample_batch_ids reloaded in the calibration_mz_calibrate_batch
     await rematch_batch(
@@ -849,6 +869,16 @@ async def import_sample_items(
 
     notification.message = f"Sample batch'{sample_batch_name}' rematched."
     await send_progress_user_notification(notification, 0.95)
+
+    # Step 5: Raise a warning if encountered during batch calibration
+    if warning:
+        raise_api_warning(
+            warning,
+            {
+                "sample_batch_id": sample_batch_id,
+                "samples_calibrate_failed": samples_calibrate_failed,
+            },
+        )
 
     # Step 4: Return the status message
     return {
@@ -942,7 +972,22 @@ async def copy_sample_batch(
     new_sample_batch = create_sample_batch_result["data"]
 
     # Step 5: Copy sample items associated with the original sample batch
-    for sample_item in original_sample_batch.sample_item:
+    total_samples = len(original_sample_batch.sample_item)
+    for item_index, sample_item in enumerate(original_sample_batch.sample_item):
+        notification = UserNotification(
+            process_id=process_id,
+            type="copy_sample_batch",
+            status="pending",
+            message=f"Copying sample {item_index + 1}/{total_samples} to new batch.",
+            data={
+                "sample_batch_id": new_sample_batch["sample_batch_id"],
+                "_room_ids": [sid],
+                "_sid": sid,
+                "_total_samples": total_samples,
+                "_item_index": item_index,
+            },
+        )
+        await send_progress_user_notification(notification, 0.2)
         await copy_sample_item(
             sample_item_id=sample_item.sample_item_id,
             sample_item_name=sample_item.sample_item_name,
@@ -951,6 +996,7 @@ async def copy_sample_batch(
             process_id=gen_id(8),
             parent_id=process_id,
         )
+        await send_progress_user_notification(notification, 0.9)
 
     # Step 6: Return the copied batch and message
     sample_batch_name = new_sample_batch["sample_batch_name"]
@@ -1085,7 +1131,7 @@ async def sample_batch_export_peaks(
 
     dt_str = datetime.now().isoformat().replace("-", "").replace(":", "").split(".")[0]
 
-    peakfile_path = config.server.filestreams
+    peakfile_path = config.server.filestore
     peakfile_filename = (
         dt_str
         + "_peaks_"

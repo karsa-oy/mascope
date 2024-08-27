@@ -8,8 +8,8 @@ export function useSampleBatchDeleteDialog() {
 
   return (batch) =>
     confirm.require({
-      message: `Are you sure you want to delete the batch '${batch.sample_batch_name}'?`,
       header: `Delete sample batch '${batch.sample_batch_name}'`,
+      message: `Are you sure you want to delete the batch '${batch.sample_batch_name}'?`,
       icon: 'pi pi-exclamation-triangle',
       rejectProps: {
         label: 'Cancel',

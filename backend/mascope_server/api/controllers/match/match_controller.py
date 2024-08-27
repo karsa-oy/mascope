@@ -24,7 +24,6 @@ from mascope_server.db.models import (
 from mascope_server.api.lib.api_features import (
     api_controller,
     api_controller_background_task,
-    send_progress_user_notification,
 )
 from mascope_server.api.lib.exceptions.api_exceptions import (
     ApiException,
@@ -51,6 +50,9 @@ from mascope_server.api.controllers.samples.samples_controller import (
 from mascope_server.api.models.match.match_pydantic_model import (
     RematchBatchesBody,
     MatchComputeSample,
+)
+from mascope_server.api.lib.notifications.api_notification import (
+    send_progress_user_notification,
 )
 from mascope_server.api.lib.notifications.api_notification_pydantic_model import (
     UserNotification,

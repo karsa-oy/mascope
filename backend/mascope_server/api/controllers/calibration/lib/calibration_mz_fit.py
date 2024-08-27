@@ -19,7 +19,6 @@ from mascope_lib.peak import calculate_tic
 from zarr.errors import PathNotFoundError
 from mascope_server.api.lib.api_features import (
     api_controller,
-    send_progress_user_notification,
 )
 from mascope_server.api.controllers.match.lib.match_compute import (
     compute_match_isotopes,
@@ -30,12 +29,20 @@ from mascope_server.api.controllers.target.isotopes.target_isotopes_controller i
 from mascope_server.api.controllers.target.associations.target_compound_in_target_collection_controller import (
     get_target_compound_in_target_collection,
 )
+from mascope_server.api.lib.notifications.api_notification import (
+    send_progress_user_notification,
+)
 from mascope_server.api.lib.notifications.api_notification_pydantic_model import (
     UserNotification,
 )
 import mascope_runtime as runtime
 
 logger = runtime.logger.service("backend")
+
+# TODO_configuration
+# Default calibration parameters
+MZ_ERROR_TOLERANCE = 10
+TIC_THRESHOLD = 1e6
 
 
 @api_controller()
@@ -48,29 +55,31 @@ async def mz_fit(
     match_score_min,
     refine_window,
     notification: UserNotification,
+    mz_error_tolerance: int = MZ_ERROR_TOLERANCE,
+    tic_threshold: float = TIC_THRESHOLD,
 ):
     """
     Main function to fit m/z. Fits the mass-to-charge ratio (m/z) for a given sample file.
 
     :param ...:  parameters.
-    :return: fit, stats, error.
+    :return: fit, stats, error, warning.
     """
     fit = None
     stats = None
     error = None
+    warning = None
 
     # calculate tic
     await send_progress_user_notification(notification, 0.25)
 
     tic = calculate_tic(filename)
-    if tic < 1e6:
+    if tic < tic_threshold:
         error = "TIC is too low! Check ionization device."
-        return fit, stats, error
+        return fit, stats, error, warning
 
     await send_progress_user_notification(notification, 0.35)
 
     # Compute matches for calibration compounds
-    # Fetch target compounds in the calibration collection
     target_compounds_result = await get_target_compound_in_target_collection(
         target_collection_id=calibration_collection_id,
     )
@@ -121,12 +130,11 @@ async def mz_fit(
             mz_error_diff=abs(stats["post_dmz"]) - abs(stats["pre_dmz"]),
             calibrant_to_tic=calibrant_to_tic,
         )
-        mz_error_tolerance = 10
         calibration_inaccurate = (
             abs(calibration_df["calibration_mz_error"]) > mz_error_tolerance
         ).any()
         if calibration_inaccurate:
-            error = "Calibration inaccurate"
+            warning = "Calibration inaccurate"
         stats = calibration_df.to_dict("records")
         summary_row = {
             "match_mz_error": abs(calibration_df["match_mz_error"]).mean(),
@@ -143,7 +151,7 @@ async def mz_fit(
         stats = good_matches_df.to_dict("records")
         error = "Not enough calibration peaks"
 
-    return fit, stats, error
+    return fit, stats, error, warning
 
 
 def signal_mz_calibration_update(fit, filename):

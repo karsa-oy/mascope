@@ -2,7 +2,7 @@ import re
 from typing import Optional, Dict
 from pydantic import BaseModel, Field, field_validator, model_validator
 from mascope_server.api.models.calibration.calibration_pydantic_model import (
-    CalibrationMzFitParams,
+    MzCalibrationParams,
 )
 
 # TODO_configuration possible item types
@@ -98,4 +98,4 @@ class SampleItemProcessBody(BaseModel):
     sample_item: SampleItemCreate = Field(
         ..., description="Sample item to be processed (created, calibrated, matched)"
     )
-    mz_calibration_params: CalibrationMzFitParams = CalibrationMzFitParams()
+    mz_calibration_params: MzCalibrationParams = MzCalibrationParams()

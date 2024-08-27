@@ -211,6 +211,16 @@ export function createHttpClient() {
         throw new Error(userErrorMessage)
       }
     },
+    getBatchAndAggregatedMatches: async ({ sample_batch_id }) => {
+      try {
+        return await client.get(`/match/aggregate/batch/${sample_batch_id}/all`)
+      } catch (error) {
+        const userErrorMessage =
+          error?.response?.data?.error || `Failed to get aggregated matches for batch: ${error}`
+        throw new Error(userErrorMessage)
+      }
+    },
+
     batchExportPeakData: async ({ sample_batch_id }) => {
       try {
         return await client.get(`/sample/batches/${sample_batch_id}/export_peaks`)
@@ -321,11 +331,11 @@ export function createHttpClient() {
         throw new Error(userErrorMessage)
       }
     },
-    processSampleItem: async ({ sample, params }) => {
+    processSampleItem: async ({ sample, mz_calibration_params }) => {
       try {
         return await client.post(`/sample/items/process`, {
           sample_item: sample,
-          mz_calibration_params: params
+          mz_calibration_params: mz_calibration_params
         })
       } catch (error) {
         const userErrorMessage =

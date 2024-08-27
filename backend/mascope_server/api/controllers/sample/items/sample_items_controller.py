@@ -6,7 +6,6 @@ from sqlalchemy import (
     desc,
     func,
 )
-from sqlalchemy.orm import joinedload
 from mascope_lib.file_func import get_instrument_type
 from mascope_server.api_sio import sio
 from mascope_server.db import async_session
@@ -19,9 +18,10 @@ from mascope_server.db.models import (
 from mascope_server.api.lib.api_features import (
     api_controller,
     api_controller_background_task,
-    send_progress_user_notification,
 )
-from mascope_server.api.lib.exceptions.api_exceptions import NotFoundException
+from mascope_server.api.lib.exceptions.api_exceptions import (
+    NotFoundException,
+)
 from mascope_server.api.controllers.sample.lib.sample_items_copy import (
     copy_sample_item_match_data,
 )
@@ -35,7 +35,10 @@ from mascope_server.api.models.sample.items.sample_item_pydantic_model import (
     SampleItemUpdate,
 )
 from mascope_server.api.models.calibration.calibration_pydantic_model import (
-    CalibrationMzFitParams,
+    MzCalibrationParams,
+)
+from mascope_server.api.lib.notifications.api_notification import (
+    send_progress_user_notification,
 )
 from mascope_server.api.lib.notifications.api_notification_pydantic_model import (
     UserNotification,
@@ -139,7 +142,11 @@ async def get_sample_item(sample_item_id: str) -> dict:
     return sample_item.to_dict()
 
 
-@api_controller()
+@api_controller(
+    emit_reload_events=[
+        ("sample_batch_reload", "sample_batch_id"),
+    ],
+)
 async def create_sample_item(
     sample_item: SampleItemCreate, independent_transaction: bool = False
 ) -> dict:
@@ -151,8 +158,7 @@ async def create_sample_item(
     1. Verify that the sample file with the given filename exists in the database.
     2. Create a new sample item object with the provided details and a generated ID.
     3. Add the new sample item to the session and commit the changes to the database.
-    4. Emit a signal to inform clients about the creation of the new sample item.
-    5. Return the details of the created sample item.
+    4. Return the details of the created sample item.
 
     :param sample_item: Sample item creation details from the request body.
     :type sample_item: SampleItemCreate
@@ -185,14 +191,7 @@ async def create_sample_item(
         await session.commit()
         await session.refresh(new_sample_item)
 
-        # Step 4: Emit socket.io events
-        # TODO_invalidation
-        await sio.emit(
-            "sample_batch_reload",
-            room=new_sample_item.sample_batch_id,
-            namespace="/",
-        )
-    # Step 5: Return the new sample item details
+    # Step 4: Return the new sample item details
     return {
         "data": new_sample_item.to_dict(),
         "message": f"Sample item '{new_sample_item.sample_item_name}' was created.",
@@ -337,7 +336,6 @@ async def copy_sample_item(
     :rtype: dict
     """
     async with async_session() as session:
-
         # Step 1: Validate the batch into which the sample is being copied.
         batch = await session.get(SampleBatch, sample_batch_id)
 
@@ -347,18 +345,7 @@ async def copy_sample_item(
             )
 
         # Step 2: Fetch and validate the original sample item along with related match records
-        stmt = (
-            select(SampleItem)
-            .options(
-                joinedload(SampleItem.match_isotope),
-                joinedload(SampleItem.match_interference),
-                joinedload(SampleItem.match_ion),
-                joinedload(SampleItem.match_compound),
-                joinedload(SampleItem.match_collection),
-                joinedload(SampleItem.match_sample),
-            )
-            .filter(SampleItem.sample_item_id == sample_item_id)
-        )
+        stmt = select(SampleItem).filter(SampleItem.sample_item_id == sample_item_id)
         result = await session.execute(stmt)
         original_sample_item = result.scalars().first()
 
@@ -388,8 +375,27 @@ async def copy_sample_item(
             not independent_transaction
             or original_sample_item.sample_batch_id == sample_batch_id
         ):
+
+            # Prepare progress user notification for match copying
+            notification = UserNotification(
+                process_id=process_id,
+                parent_id=parent_id,
+                type="copy_sample_item",
+                status="pending",
+                message=f"Copying match records for sample '{sample_item_name}'.",
+                data={
+                    "sample_item_id": new_sample_item_id,
+                    "sample_batch_id": sample_batch_id,
+                    "_room_ids": [sid],
+                    "_sid": sid,
+                },
+            )
+
             await copy_sample_item_match_data(
-                original_sample_item, new_sample_item_id, session
+                original_sample_item.sample_item_id,
+                new_sample_item_id,
+                session,
+                notification,
             )
 
         # Step 5: Commit the transaction
@@ -427,11 +433,12 @@ async def copy_sample_item(
     success_notification_rooms=["sid"],
     success_reload=[("sample_batch_reload", "sample_batch_id")],
     error_notification_rooms=["sid"],
+    error_reload=[("sample_batch_reload", "sample_batch_id")],
     # error_notification_rooms=["sample_batch_id"],  # TEMP for postman testing
 )
 async def process_sample_item(
     sample_item: SampleItemCreate,
-    mz_calibration_params: CalibrationMzFitParams = CalibrationMzFitParams(),
+    mz_calibration_params: MzCalibrationParams = MzCalibrationParams(),
     independent_transaction: bool = False,
     sid=None,
     process_id=None,
@@ -453,7 +460,7 @@ async def process_sample_item(
     :param sample_item: Details of the sample item to be created.
     :type sample_item: SampleItemCreate
     :param mz_calibration_params: Calibration parameters to use, defaults to a preconfigured set.
-    :type mz_calibration_params: CalibrationMzFitParams, optional
+    :type mz_calibration_params: MzCalibrationParams, optional
     :param independent_transaction: Indicates whether this operation should be treated as a standalone transaction.
     :type independent_transaction: bool, optional
     :param sid: Session ID for client-specific communications, defaults to None.
@@ -481,8 +488,11 @@ async def process_sample_item(
     await send_progress_user_notification(notification, 0.1)
 
     # Step 1: Create the sample item
-    # (not enitting sample_item_created since by default independent_transaction is False)
-    create_sample_result = await create_sample_item(sample_item)
+    # TODO_invalidation
+    # Set independent_transaction to true to trigger sample_batch_reload after creating the sample item record
+    create_sample_result = await create_sample_item(
+        sample_item=sample_item, independent_transaction=True
+    )
     created_sample_item = create_sample_result.get("data")
     sample_item_id = created_sample_item["sample_item_id"]
 
@@ -501,12 +511,11 @@ async def process_sample_item(
     if get_instrument_type(created_sample_item["filename"]) == "tof":
         await calibration_mz_calibrate_sample(
             sample_item_id=sample_item_id,
-            params=mz_calibration_params,
+            mz_calibration_params=mz_calibration_params,
             sid=sid,
             process_id=gen_id(8),
             parent_id=process_id,
         )
-
         notification.message = (
             f"Sample '{sample_item.sample_item_name}' m/z calibrated."
         )
@@ -532,7 +541,7 @@ async def process_sample_item(
     )
 
     # Step 5: Return rematched sample and message
-    return {
+    response_data = {
         "data": sample,
         "message": f"Sample '{sample['sample_item_name']}' was successfully processed.",
         "_notification_data": {
@@ -541,3 +550,5 @@ async def process_sample_item(
             "sample_batch_id": sample["sample_batch_id"],
         },
     }
+
+    return response_data

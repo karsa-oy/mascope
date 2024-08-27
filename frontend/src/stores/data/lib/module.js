@@ -9,9 +9,7 @@ export const defineModule = ({
   subscribe = false, // socket io subscription
   useParent = null, // optional parent module
   multiselect = false, // enable multiselection
-  autofocus = false, // focused first element on load
-  reloadSelfOn = null, // events to reload the module on
-  reloadChildrenOn = null, // events to reload child modules on
+  reloadOn = null, // events to reload the module on
   unfocusBefore = [], // unofucus before running these ops
   // api
   load, // async func, may accept parent record
@@ -59,6 +57,7 @@ export const defineModule = ({
     const focused = singleselect
       ? ref(null)
       : computed(() => (selected.value?.length == 1 ? selected.value[0] : null))
+    const focusedId = computed(() => (focused.value ? focused.value[key] : null))
     const active = (arg) =>
       arg ? selected.value.map((record) => record[key]).includes(arg[key]) : false
 
@@ -128,8 +127,7 @@ export const defineModule = ({
       if (focusedId) {
         // refocus
         const focusValid = records.value.map((record) => record[key]).includes(focusedId)
-        const defaultId = autofocus ? records.value[0] : null
-        const id = focusValid ? focusedId : defaultId
+        const id = focusValid ? focusedId : null
         if (id) {
           focus({ [key]: id })
         } else {
@@ -151,21 +149,17 @@ export const defineModule = ({
     }
 
     // hook
-    const reload = async (parent) => {
+    const reload = async (trigger) => {
       const oldFocusedId = focused.value ? focused.value[key] : null
-      log(`load triggered by ${parent?.name ?? 'mount'}`)
+      log(`load triggered by ${trigger?.event ?? trigger?.name ?? 'mount'}`)
       loading.value = true
-      if (parent) {
-        records.value = parent?.focusedId ? await load(parent.focusedId) : []
+      if (trigger?.name) {
+        records.value = trigger?.focusedId ? await load(trigger.focusedId) : []
       } else {
         records.value = await load()
       }
       records.value.forEach((record, index) => (record.index = (index + 1).toString()))
       log('data loaded')
-      if (autofocus && records.value.length > 0) {
-        log('autofocusing first record', records.value[0])
-        focus(records.value[0])
-      }
       const newFocusedId = refocus(oldFocusedId)
       // propegate to children
       if (children.value.length > 0) {
@@ -219,14 +213,23 @@ export const defineModule = ({
     // event triggered reloading
 
     if (!parent) {
-      api.socket.on(`org_reload`, reload)
-    } else {
-      if (parent.reloadChildrenOn) {
-        api.socket.on(parent.reloadChildrenOn, reload)
-      }
+      api.socket.on(`org_reload`, () => reload({ event: 'org_reload' }))
     }
-    if (reloadSelfOn) {
-      api.socket.on(reloadSelfOn, reload)
+
+    // Hook the module to reload its data under specific conditions
+    if (reloadOn) {
+      api.socket.on(
+        reloadOn,
+        // Check if the parent is a virtual parent (used for special cases like match data)
+        parent && parent.name.includes('virtual')
+          ? reload // For virtual parents, reload without passing trigger arguments
+          : () =>
+              reload({
+                name: parent?.name,
+                focusedId: parent?.focusedId, // Pass the focused ID of the parent
+                event: reloadOn // Include the event that triggered the reload
+              })
+      )
     }
 
     // EVENTS
@@ -235,10 +238,12 @@ export const defineModule = ({
     if (subscribe) {
       watch(focused, (next, prev) => {
         if (prev) {
-          api.emit('unsubscribe', prev[key])
+          log('unsubscribing')
+          api.socket.emit('unsubscribe', prev[key])
         }
         if (next) {
-          api.emit('subscribe', next[key])
+          log('subscribing')
+          api.socket.emit('subscribe', next[key])
         }
       })
     }
@@ -284,10 +289,10 @@ export const defineModule = ({
       // options
       multiselect,
       singleselect,
-      reloadChildrenOn,
       // selection
       selected,
       focused,
+      focusedId,
       active,
       select,
       unselect,

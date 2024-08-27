@@ -2,7 +2,7 @@ from typing import Optional, List
 from mascope_lib.file_func import get_instrument_type
 from pydantic import BaseModel, Field, field_validator, model_validator
 from mascope_server.api.models.calibration.calibration_pydantic_model import (
-    CalibrationMzFitParams,
+    MzCalibrationParams,
 )
 from mascope_server.api.models.sample.items.sample_item_pydantic_model import (
     SampleItemCreate,
@@ -78,7 +78,7 @@ class SampleBatchImportSamplesBody(BaseModel):
     sample_items: List[SampleItemCreate] = Field(
         ..., description="Sample items to be created and imported to the sample batch"
     )
-    params: CalibrationMzFitParams = CalibrationMzFitParams()
+    mz_calibration_params: MzCalibrationParams = MzCalibrationParams()
     calibrate_batch: bool = Field(
         default=True,
         description="Flag to control whether the batch should be calibrated.",

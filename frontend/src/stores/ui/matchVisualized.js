@@ -34,19 +34,48 @@ export const useMatchVisualized = defineStore('app.ui.matchVisualized', () => {
   )
 
   // actions
+  /**
+   * Sets the match visualization state based on the provided sample, ion, and collection IDs.
+   *
+   * - If a new sample is selected, filter parameters are reset to defaults.
+   * - If any of the identifiers change (sample, ion, or collection), the corresponding matches are loaded, and the visualization is activated.
+   * - If parameters are provided, they override the default filter parameters.
+   *
+   * @param {Object} options - The parameters for setting the matchVisualized.
+   * @param {string|null} [options.sampleId] - The ID of the sample to visualize.
+   * @param {string|null} [options.ionId] - The ID of the ion to visualize.
+   * @param {string|null} [options.collectionId] - The ID of the collection to visualize.
+   * @param {Object|null} [options.params] - Optional filter parameters to apply.
+   */
   async function set({
     sampleId = cache.sampleId,
     ionId = cache.ionId,
     collectionId = cache.collectionId,
     params = null
   }) {
-    if (sampleId == cache.sampleId && ionId == cache.ionId && collectionId == cache.collectionId) {
+    const sampleChanged = sampleId !== cache.sampleId
+    const ionChanged = ionId !== cache.ionId
+    const collectionChanged = collectionId !== cache.collectionId
+
+    // Return early if nothing has changed
+    if (!sampleChanged && !ionChanged && !collectionChanged) {
       return
     }
-    if (params) await data.filterParams.set(params)
+    // Reset filter parameters if the sample has changed
+    if (sampleChanged) {
+      await data.filterParams.reset()
+    }
+
+    // Apply new filter parameters if provided
+    if (params) {
+      await data.filterParams.set(params)
+    }
+
+    // Load matches and activate visualization
     await loadMatches({ sampleId, ionId, collectionId })
     await activate({ sampleId, ionId })
-    // cache
+
+    // Update cache to reflect the new state
     cache.sampleId = sampleId
     cache.ionId = ionId
     cache.collectionId = collectionId

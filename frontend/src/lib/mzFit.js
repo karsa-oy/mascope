@@ -7,18 +7,21 @@ import { useApp } from '@/stores'
 export const useMzFit = ({ unmount } = { unmount: false }) => {
   const app = useApp()
 
+  //  TODO_configuration default calibration parameters
+  const DEFAULT_MZ_CALIBRATION_PARAMS = {
+    match_score_min: 0,
+    min_isotope_abundance: 0.15,
+    peak_intensity_min: 0, //1000,
+    refine_window: 100
+  }
+
   // state
   const active = ref(null)
   const status = ref(null)
   const current = ref(null)
   const error = ref(null)
   const stats = ref(null)
-  const params = reactive({
-    match_score_min: 0,
-    min_isotope_abundance: 0.15,
-    peak_intensity_min: 0, //1000,
-    refine_window: 100
-  })
+  const mzCalibrationParams = reactive({ ...DEFAULT_MZ_CALIBRATION_PARAMS })
 
   async function load(sample) {
     current.value =
@@ -45,7 +48,7 @@ export const useMzFit = ({ unmount } = { unmount: false }) => {
       body: {
         sampleId: sample_item_id,
         sampleName: sample_item_name,
-        body: params
+        body: mzCalibrationParams
       }
     })
   }
@@ -69,7 +72,15 @@ export const useMzFit = ({ unmount } = { unmount: false }) => {
     }
     if (payload?.status === 'error') {
       error.value = payload?.message
-      stats.value = payload?.data?.stats
+      // Critical errors prevent further steps
+      stats.value = null
+      current.value = null
+    }
+    if (payload?.status === 'warning') {
+      error.value = payload?.message
+      // Allow further steps if stats are available
+      current.value = payload?.error?.detail?.data?.fit
+      stats.value = payload?.error?.detail?.data?.stats
     }
   })
   if (unmount) {
@@ -82,7 +93,7 @@ export const useMzFit = ({ unmount } = { unmount: false }) => {
     current,
     error,
     stats,
-    params,
+    mzCalibrationParams,
     // actions
     load,
     unload,

@@ -1,7 +1,9 @@
 from sqlalchemy import text
 
 import mascope_runtime as runtime
-logger = runtime.logger.service('backend')
+
+logger = runtime.logger.service("backend")
+
 
 async def explain_query_plan(session, query):
     """

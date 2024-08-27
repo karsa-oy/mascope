@@ -6,7 +6,8 @@ from mascope_server.config import config
 
 import mascope_runtime as runtime
 
-logger = runtime.logger.service('backend')
+logger = runtime.logger.service("backend")
+
 
 def run():
     # STEP 1 - setup new database

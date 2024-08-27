@@ -6,7 +6,6 @@ from mascope_lib.chemistry import match_mz
 from mascope_server.db.id import gen_id
 from mascope_server.api.lib.api_features import (
     api_controller,
-    send_progress_user_notification,
 )
 from mascope_server.api.controllers.match.isotopes.match_isotopes_controller import (
     create_match_isotopes,
@@ -25,6 +24,9 @@ from mascope_server.api.models.match.interferences.match_interferences_pydantic_
 )
 from mascope_server.api.models.match.isotopes.match_isotopes_pydantic_model import (
     MatchIsotopeBase,
+)
+from mascope_server.api.lib.notifications.api_notification import (
+    send_progress_user_notification,
 )
 from mascope_server.api.lib.notifications.api_notification_pydantic_model import (
     UserNotification,

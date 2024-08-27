@@ -141,7 +141,7 @@ async def import_sample_items_route(
         import_sample_items,
         sample_batch_id=sample_batch_id,
         sample_items=body.sample_items,
-        params=body.params,
+        mz_calibration_params=body.mz_calibration_params,
         calibrate_batch=body.calibrate_batch,
         independent_transaction=True,
         sid=sid,

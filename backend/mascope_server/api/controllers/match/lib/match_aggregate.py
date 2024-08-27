@@ -242,13 +242,7 @@ async def aggregate_match_ions(
     # (even of there is same compound=>ion present in different target collections of the sample)
     match_ions_df = match_ions_data_df.drop(
         columns=[
-            "sample_item_type",
-            "filename",
-            "target_ion_formula",
-            "target_ion_mechanism",
             "target_compound_id",
-            "target_compound_name",
-            "target_compound_formula",
             "target_collection_id",
             "target_collection_name",
             "target_collection_description",
@@ -354,7 +348,6 @@ async def aggregate_match_compounds(
             "target_collection_name",
             "target_collection_description",
             "target_collection_type",
-            "sample_item_type",
         ]
     ).drop_duplicates(subset=["target_compound_id", "sample_item_id"])
 

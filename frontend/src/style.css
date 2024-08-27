@@ -43,8 +43,9 @@
   .p-contextmenu-item-link > .pi {
     margin-right: 0.3rem;
   }
-  
-  .hiddenlabel .p-button-label, .hidden {
+
+  .hiddenlabel .p-button-label,
+  .hidden {
     display: none;
   }
 
@@ -70,7 +71,6 @@
     display: grid;
     place-items: center;
   }
-
 
   .p-splitter-gutter {
     opacity: 0.4;
@@ -206,4 +206,19 @@
 
 .p-drawer-content .p-message {
   margin: 1rem 0;
+}
+
+/* Notification button */
+
+.notification-button .p-badge {
+  position: absolute;
+  bottom: 0.5rem;
+  right: 1.2rem;
+  padding: 0.25rem;
+  transform: translate(50%, 50%);
+}
+
+/* Hide the badge if it's empty (i.e., no content) */
+.notification-button.hidden-badge .p-badge {
+  visibility: hidden;
 }

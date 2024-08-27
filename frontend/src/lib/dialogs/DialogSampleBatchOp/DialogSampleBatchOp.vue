@@ -214,7 +214,7 @@ async function execute() {
           method: 'recalibrateSampleBatch',
           body: {
             batchId: original.value.sample_batch_id,
-            body: mzFit.params
+            body: mzFit.mzCalibrationParams
           }
         })
       }

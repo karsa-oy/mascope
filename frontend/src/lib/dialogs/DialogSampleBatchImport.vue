@@ -134,7 +134,8 @@ watch(
   preprocess
 )
 function preprocess() {
-  const acquisitions = [...props.files].sort((a, b) => (b.datetime < a.datetime ? 1 : -1))
+  // Sort acquisitions by datetime in descending order
+  const acquisitions = [...props.files].sort((a, b) => b.datetime - a.datetime)
   if (imported.type === 'autosampler') {
     if (!imported.filterId) {
       imported.filterId = generated.filterId = genId(6, false)

@@ -114,6 +114,14 @@ async def run():
             """
             )
         )
+
+        # Create indexes if needed
+        await session.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS idx_match_sample_sample_item ON match_sample (sample_item_id);"
+            )
+        )
+
         # Create match_collection table
         await session.execute(
             text(
@@ -136,6 +144,14 @@ async def run():
             """
             )
         )
+
+        # Create indexes if needed
+        await session.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS idx_match_collection_sample_item ON match_collection (sample_item_id);"
+            )
+        )
+
         # Create match_compound table
         await session.execute(
             text(
@@ -159,6 +175,13 @@ async def run():
             )
         )
 
+        # Create indexes if needed
+        await session.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS idx_match_compound_sample_item ON match_compound (sample_item_id);"
+            )
+        )
+
         # Create match_ion table
         await session.execute(
             text(
@@ -179,6 +202,13 @@ async def run():
                 match_ion_utc_modified TIMESTAMP
             );
         """
+            )
+        )
+
+        # Create indexes if needed
+        await session.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS idx_match_ion_sample_item ON match_ion (sample_item_id);"
             )
         )
 

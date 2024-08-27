@@ -21,7 +21,7 @@ from mascope_server.api.controllers.calibration.calibration_controller import (
 )
 from mascope_server.api.models.calibration.calibration_pydantic_model import (
     GetMzCalibrationQueryParams,
-    CalibrationMzFitParams,
+    MzCalibrationParams,
     CalibrationMzApplyBody,
 )
 
@@ -42,7 +42,7 @@ async def get_sample_mz_calibration_route(
 )
 async def calibration_mz_fit_route(
     request: Request,
-    body: CalibrationMzFitParams,
+    mz_calibration_params: MzCalibrationParams,
     background_tasks: BackgroundTasks,
     sample_item_id: str = Query(
         ..., description="The sample item ID to query for sample mz_calibration"
@@ -59,7 +59,7 @@ async def calibration_mz_fit_route(
     background_tasks.add_task(
         calibration_mz_fit,
         sample_item_id=sample_item_id,
-        params=body,
+        mz_calibration_params=mz_calibration_params,
         independent_transaction=True,
         sid=sid,
         process_id=process_id,
@@ -110,7 +110,7 @@ async def calibration_mz_apply_route(
 async def calibration_mz_calibrate_sample_route(
     request: Request,
     sample_item_id: str,
-    body: CalibrationMzFitParams,
+    mz_calibration_params: MzCalibrationParams,
     background_tasks: BackgroundTasks,
 ):
     # Verify the existance of sample item
@@ -124,7 +124,7 @@ async def calibration_mz_calibrate_sample_route(
     background_tasks.add_task(
         calibration_mz_calibrate_sample,
         sample_item_id=sample_item_id,
-        params=body,
+        mz_calibration_params=mz_calibration_params,
         independent_transaction=True,
         sid=sid,
         process_id=process_id,
@@ -142,7 +142,7 @@ async def calibration_mz_calibrate_sample_route(
 async def calibration_mz_calibrate_batch_route(
     request: Request,
     sample_batch_id: str,
-    body: CalibrationMzFitParams,
+    mz_calibration_params: MzCalibrationParams,
     background_tasks: BackgroundTasks,
 ):
     # Verify the existance of sample batch
@@ -156,7 +156,7 @@ async def calibration_mz_calibrate_batch_route(
     background_tasks.add_task(
         calibration_mz_calibrate_batch,
         sample_batch_id=sample_batch_id,
-        params=body,
+        mz_calibration_params=mz_calibration_params,
         independent_transaction=True,
         sid=sid,
         process_id=process_id,

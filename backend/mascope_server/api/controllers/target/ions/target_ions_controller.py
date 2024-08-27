@@ -301,6 +301,7 @@ async def create_target_ions(
     }
 
 
+@api_controller()
 async def update_target_ion(target_ion_id: str, target_ion_update: TargetIonUpdate):
     async with async_session() as session:
         target_ion = await session.get(TargetIon, target_ion_id)

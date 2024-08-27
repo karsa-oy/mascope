@@ -376,6 +376,9 @@ class MatchSample(Base):
     # Define relationships
     sample_item = relationship("SampleItem", back_populates="match_sample")
 
+    # Define indexes
+    __table_args__ = (Index("idx_match_sample_sample_item", "sample_item_id"),)
+
 
 class MatchCollection(Base):
     __tablename__ = "match_collection"
@@ -407,6 +410,9 @@ class MatchCollection(Base):
         "TargetCollection", back_populates="match_collection"
     )
 
+    # Define indexes
+    __table_args__ = (Index("idx_match_collection_sample_item", "sample_item_id"),)
+
 
 class MatchCompound(Base):
     __tablename__ = "match_compound"
@@ -436,6 +442,9 @@ class MatchCompound(Base):
     sample_item = relationship("SampleItem", back_populates="match_compound")
     target_compound = relationship("TargetCompound", back_populates="match_compound")
 
+    # Define indexes
+    __table_args__ = (Index("idx_match_compound_sample_item", "sample_item_id"),)
+
 
 class MatchIon(Base):
     __tablename__ = "match_ion"
@@ -464,6 +473,9 @@ class MatchIon(Base):
     # Define relationships
     sample_item = relationship("SampleItem", back_populates="match_ion")
     target_ion = relationship("TargetIon", back_populates="match_ion")
+
+    # Define indexes
+    __table_args__ = (Index("idx_match_ion_sample_item", "sample_item_id"),)
 
 
 class MatchRating(Base):
