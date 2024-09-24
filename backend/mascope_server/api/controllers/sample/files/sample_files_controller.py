@@ -9,6 +9,7 @@ from sqlalchemy import (
 from mascope_lib.file_func import load_file
 from mascope_lib.peak import detect_peaks, get_peaks
 from mascope_lib.file_func import get_instrument_type
+from mascope_server.app import sio
 from mascope_server.db import async_session
 from mascope_server.db.id import gen_id
 from mascope_server.db.models import SampleFile
@@ -31,9 +32,8 @@ from mascope_server.api.lib.notifications.api_notification_pydantic_model import
     UserNotification,
 )
 
-import mascope_runtime as runtime
 
-logger = runtime.logger.service("backend")
+from mascope_server.runtime import runtime
 
 # ---------------------
 # Sample file CRUD controllers
@@ -369,7 +369,10 @@ async def compute_all_sample_file_peaks(
 
     # Return completion message and peak details.
     message = f"Detected {len(list_of_peaks)} peaks for file '{filename}'"
-    logger.info(message)
+    runtime.logger.info(message)
+
+    await sio.emit("peak_reload", room=sample_file_id, namespace="/")
+
     return {
         "message": message,
         "_notification_data": {
@@ -491,7 +494,7 @@ async def get_sample_file_spectrum(
     filename = sample_file["filename"]
 
     # Step 2: Load the sample file and determine whether to use the full signal or a time slice and calculate the corresponding spectrum DataArray
-    logger.info("Loading file: %s" % filename)
+    runtime.logger.info(f"Loading file: {filename}")
     time_data_points = None
 
     # Step 3: If a time range is specified, finds the closest matching time coordinates in the dataset and slices the dataset to this time range.

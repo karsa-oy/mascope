@@ -183,11 +183,13 @@ async def get_match_batch_ions(
     #   - target_compound_id - target_ions for particular target_compound (unique)
     #   - target_collection_id - target_ions for particular target_collection (unique)
     #   - show_target_collection - add target collection id and adds potential compount duplicates
+    #   - show_ionization_mechanism - add ionization mechanism details
     target_ions = await get_target_ions(
         sample_batch_id=sample_batch_id,
         target_compound_id=target_compound_id,
         target_collection_id=target_collection_id,
         show_target_collection=True,
+        show_ionization_mechanism=True,
     )
     if not target_ions["data"]:
         return {

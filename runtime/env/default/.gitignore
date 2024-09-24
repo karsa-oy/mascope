@@ -1,0 +1,10 @@
+# Ignore the dev and prod configuration files
+dev.mascope.toml
+prod.mascope.toml
+
+# Ignore the contents of the following directories
+logs/*
+agents/*
+database/*
+filestore/*
+filestreams/*

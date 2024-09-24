@@ -1,20 +1,86 @@
 import inspect
 import os
 import time
+import sys
+import textwrap
+
 from multiprocessing import Event, Queue
 from ntpath import basename
 from queue import Empty
 from shutil import SameFileError, copy2
-
 from threading import Thread
 
 import watchdog
+
 from watchdog.events import PatternMatchingEventHandler
 from watchdog.observers import Observer
 
-import mascope_runtime as runtime
+from mascope_runtime import MascopeRuntimeModule
 
-logger = runtime.logger.service("file-mover")
+
+# check if we are running in a pyinstaller bundle
+bundled = getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS")
+
+
+def mkdir(*args):
+    path = os.path.join(*args)
+    if not os.path.exists(path):
+        os.makedirs(path)
+    return path
+
+
+# default configuration
+# created in production as an initial
+# template for users to modify
+default_config = textwrap.dedent(
+    """\
+    [meta]
+    # meta
+    log_level = 'info'
+    # settings
+    description = "The default runtime env"
+    api_port = 8090
+    filestore = './filestore'
+
+    [file-mover]
+    # meta
+    log_level = 'info'
+    log_path = './logs'
+    # settings
+    mask = '*.raw'
+    timeout = 10
+    source = './data'
+    target = './filestreams'
+    """
+)
+
+
+if bundled:
+    # prod mode
+    # set MASCOPE_PATH as %AppData%\Mascope\TOF_Agent
+    mascope_path = mkdir(os.environ["APPDATA"], "Mascope", "FileMover")
+    os.environ.setdefault("MASCOPE_PATH", mascope_path)
+    # setup runtime environment
+    env_path = mkdir(mascope_path, "runtime", "env", "prod")
+    data_path = mkdir(env_path, "data")
+    mkdir(env_path, "logs")
+    # init config files if they don't exists
+    config_paths = [
+        os.path.join(env_path, "base.mascope.toml"),
+        os.path.join(env_path, "prod.mascope.toml"),
+    ]
+    for path in config_paths:
+        if not os.path.exists(path):
+            with open(path, "w") as file:
+                file.write(default_config)
+    # initialize the runtime in production mode
+    runtime = MascopeRuntimeModule(
+        "file-mover", env="prod", mode="prod", path=mascope_path
+    )
+else:
+    # dev mode
+    # runtime state inherited from the CLI
+    runtime = MascopeRuntimeModule("file-mover")
 
 
 def parent_func_name() -> str:
@@ -57,7 +123,7 @@ class FSWatcher:
             except AttributeError:
                 pass
             except Exception as e:
-                logger.error(f"Exception {e.__class__.__name__}({str(e)})")
+                runtime.logger.error(f"Exception {e.__class__.__name__}({str(e)})")
 
         def on_modified(self, event: watchdog.events.FileSystemEvent) -> None:
             """File modified
@@ -70,7 +136,7 @@ class FSWatcher:
             except AttributeError:
                 pass
             except Exception as e:
-                logger.error(f"Exception {e.__class__.__name__}({str(e)})")
+                runtime.logger.error(f"Exception {e.__class__.__name__}({str(e)})")
 
         def on_deleted(self, event: watchdog.events.FileSystemEvent) -> None:
             """File deleted
@@ -83,7 +149,7 @@ class FSWatcher:
             except AttributeError:
                 pass
             except Exception as e:
-                logger.error(f"Exception {e.__class__.__name__}({str(e)})")
+                runtime.logger.error(f"Exception {e.__class__.__name__}({str(e)})")
 
         def on_moved(self, event: watchdog.events.FileSystemEvent) -> None:
             """File moved
@@ -96,13 +162,13 @@ class FSWatcher:
             except AttributeError:
                 pass
             except Exception as e:
-                logger.error(f"Exception {e.__class__.__name__}({str(e)})")
+                runtime.logger.error(f"Exception {e.__class__.__name__}({str(e)})")
             try:
                 self.client.on_filesystem_object_deleted(event.src_path)
             except AttributeError:
                 pass
             except Exception as e:
-                logger.error(f"Exception {e.__class__.__name__}({str(e)})")
+                runtime.logger.error(f"Exception {e.__class__.__name__}({str(e)})")
 
     def __init__(self, client, target_attrs, recursive=False):
         self.client = client
@@ -120,7 +186,7 @@ class FSWatcher:
             self.handler, self.target_attrs["path"], recursive=self.recursive
         )
         self.observer.start()
-        logger.info(f"started watching {self.target_attrs['path']}")
+        runtime.logger.info(f"started watching {self.target_attrs['path']}")
 
     def stop(self) -> None:
         """Stop watching.
@@ -129,7 +195,7 @@ class FSWatcher:
         """
         self.observer.stop()
         self.observer.join()
-        logger.info("stopped")
+        runtime.logger.info("stopped")
 
     def run(self) -> None:
         """Main loop
@@ -141,10 +207,10 @@ class FSWatcher:
             try:
                 time.sleep(1)
             except KeyboardInterrupt:
-                logger.critical("KeyboardInterrupt")
+                runtime.logger.critical("KeyboardInterrupt")
                 self.client.shutdown_event.set()
             except Exception as e:
-                logger.critical(f"Exception {e.__class__.__name__}({str(e)})")
+                runtime.logger.critical(f"Exception {e.__class__.__name__}({str(e)})")
                 pass
         self.stop()
 
@@ -174,7 +240,7 @@ class SampleMover:
         :param fname: File path
         :type fname: str
         """
-        logger.info(fname)
+        runtime.logger.info(fname)
         # Wait until the file is ready
         filesize = -1
         while True:
@@ -185,7 +251,7 @@ class SampleMover:
                 os.rename(fname, fname)
                 break
             except PermissionError:
-                logger.error("PermissionError, retrying...")
+                runtime.logger.error("PermissionError, retrying...")
                 time.sleep(1)
         self.jobs.put(fname)
 
@@ -207,9 +273,9 @@ class SampleMover:
         """
         dst_fname = os.path.join(self.target_dir, basename(fname))
         copy2(fname, dst_fname)
-        logger.info(dst_fname)
+        runtime.logger.info(dst_fname)
 
-    def run_until_complete(self, config):
+    def run_until_complete(self):
         """Main loop
 
         :param config: Configuration
@@ -221,13 +287,10 @@ class SampleMover:
                 fname = None
                 try:
                     fname = self.jobs.get_nowait()
-                    logger.debug(fname)
-                    if (
-                        self.seconds_since_last_access(fname)
-                        < config.file_mover.timeout
-                    ):
+                    runtime.logger.debug(fname)
+                    if self.seconds_since_last_access(fname) < runtime.config.timeout:
                         self.jobs.put(fname)
-                        logger.debug(fname, "back")
+                        runtime.logger.debug(fname, "back")
                         continue
                     self.copy(fname)
                 except Empty:
@@ -237,9 +300,9 @@ class SampleMover:
                 except SameFileError:
                     continue
         except KeyboardInterrupt as e:
-            logger.critical(f"{e.__class__.__name__}({str(e)})")
+            runtime.logger.critical(f"{e.__class__.__name__}({str(e)})")
         except Exception as e:
-            logger.critical(f"{e.__class__.__name__}({str(e)})")
+            runtime.logger.critical(f"{e.__class__.__name__}({str(e)})")
         finally:
             self.shutdown_event.set()
 
@@ -249,18 +312,17 @@ def run() -> None:
 
     Start `SampleMover` thread and wait until it finishes
     """
-    config = runtime.mount()
     assert all(
         map(
             lambda d: os.path.isdir(d),
-            [config.file_mover.source, config.file_mover.target],
+            [runtime.config.source, runtime.config.target],
         )
     ), "Invalid source or target folder"
     mover = SampleMover(
-        config.file_mover.source, config.file_mover.target, config.file_mover.mask
+        runtime.config.source, runtime.config.target, runtime.config.mask
     )
     mover.watcher.run_as_daemon()
-    mover.run_until_complete(config)
+    mover.run_until_complete()
 
 
 if __name__ == "__main__":

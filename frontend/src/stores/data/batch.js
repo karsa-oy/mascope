@@ -12,7 +12,7 @@ export const useBatch = defineModule({
   useParent: useWorkspace,
   subscribe: true,
   reloadOn: 'sample_batch_reload',
-  load: async (workspace_id) =>
+  load: async ({ workspace_id }) =>
     (
       await api.request.read({
         method: 'getAllBatches',

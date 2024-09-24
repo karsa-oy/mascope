@@ -2,6 +2,7 @@ from functools import wraps
 from typing import Callable, Any, Dict, List, Tuple
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
+
 from mascope_lib.util import beautify_func_name
 from mascope_server.db.id import gen_id
 from mascope_server.api.lib.exceptions.api_exceptions import (

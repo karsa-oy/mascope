@@ -5,9 +5,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy.exc import SQLAlchemyError
 
-import mascope_runtime as runtime
-
-logger = runtime.logger.service("backend")
+from mascope_server.runtime import runtime
 
 
 class ApiException(Exception):
@@ -31,7 +29,6 @@ class DuplicateException(HTTPException):
 def process_exception(e: Exception, context_message: str) -> ApiException:
     error_message = f"{context_message}. {str(e)}."
     traceback_info = traceback.format_exc()
-    logger.error(f"{type(e).__name__}. {error_message}\n\n{traceback_info}")
     # Construct the technical message with structured JSON
     tech_message_details = {
         "error_message": error_message.replace("\n", "; "),
@@ -66,6 +63,9 @@ def process_exception(e: Exception, context_message: str) -> ApiException:
     else:
         user_message = f"{context_message}. Unexpected error. {str(e)}."
         status_code = 500  # Internal Server Error
+
+    with runtime.logger.contextualize(status_code=status_code):
+        runtime.logger.exception(e)
 
     return ApiException(user_message, tech_message, status_code)
 
@@ -107,7 +107,7 @@ def raise_api_warning(message: str, tech_message: dict):
     :type tech_message: dict
     :raises ApiException: Always raises an ApiException with the provided message and tech details.
     """
-    logger.warning(message)
+    runtime.logger.warning(message)
     raise ApiException(
         user_message=message,
         tech_message=tech_message,

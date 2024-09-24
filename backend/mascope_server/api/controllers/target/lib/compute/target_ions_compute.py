@@ -13,9 +13,7 @@ from mascope_server.db.models import (
 from mascope_server.api.models.target.compounds.target_compound_pydantic_model import (
     TargetCompoundBase,
 )
-import mascope_runtime as runtime
-
-logger = runtime.logger.service("backend")
+from mascope_server.runtime import runtime
 
 
 def charge_string(raw_ion: Formula) -> str:
@@ -75,11 +73,8 @@ def generate_target_ions_from_composition(
             )
         except ValueError as e:
             # Failed to create a target ion for the combination of target compound and ionization mechanism
-            logger.warning(
-                "Failed to parse ion formula for compound %s and mechanism %s: %s",
-                target_compound_formula,
-                mechanism,
-                e,
+            runtime.logger.warning(
+                f"Failed to parse ion formula for compound {target_compound_formula} and mechanism {mechanism}: {e}"
             )
             # Try to create ions with other mechanisms
             continue

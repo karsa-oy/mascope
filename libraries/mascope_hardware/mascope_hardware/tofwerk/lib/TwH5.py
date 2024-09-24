@@ -1,53 +1,38 @@
 """Python bindings to Tofwerk's TwH5 DLL
 """
 
+import platform
 import ctypes as ct
 import os
 
 # from .TofDaq import TPeakPar  #TODO: commented out since not used and not compatible with linux
-import platform
-import sys
-
-import mascope_runtime as runtime
 
 import numpy as np
 from numpy.ctypeslib import ndpointer
 
-logger = runtime.logger.service('hardware-lib')
-
-libname = {
-    "linux": "libtwh5.so",
-    "linux2": "libtwh5.so",
-    "darwin": "libtwh5.dylib",
-    "win32": "TwH5Dll.dll",
-}
-libpath = ""
-if platform.architecture() == ("32bit", "EPL"):
-    libpath = "linux_x86_64"
-if platform.architecture() == ("64bit", "EPL"):
-    libpath = "linux_x86_64"
-if platform.architecture() == ("64bit", "ELF"):
-    libpath = "linux_x86_64"
-
-if platform.architecture() == ("32bit", ""):
-    libpath = "macos_x86_64"
-if platform.architecture() == ("64bit", ""):
-    libpath = "macos_x86_64"
-
-if platform.architecture() == ("32bit", "WindowsPE"):
-    libpath = "windows_x86"
-if platform.architecture() == ("64bit", "WindowsPE"):
-    libpath = "windows_x64"
+from mascope_hardware.runtime import hardware_runtime
 
 
-h5lib = ct.cdll.LoadLibrary(
-    os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "dlls",
-        libpath,
-        libname[sys.platform],
-    )
-)
+def LoadLibrary():
+    config = hardware_runtime.config.tofwerk_dll
+    [libdir, libfile] = {
+        "Linux": ["linux_x86_64", "libtwh5.so"],
+        "Windows": ["windows_x64", "TwH5Dll.dll"],
+        "Darwin": ["macos_x86_64", "libtwh5.dylib"],  # broken?
+    }[
+        (
+            config  # use provided platform config
+            if config != "Auto"  # unless its auto (the default)
+            else platform.system()  # in which case infer platform
+        )
+    ]
+    basepath = os.path.dirname(os.path.realpath(__file__))
+    libpath = os.path.join(basepath, "dlls", libdir, libfile)
+    toollib = ct.cdll.LoadLibrary(libpath)
+    return toollib
+
+
+h5lib = LoadLibrary()
 
 
 class TwH5Desc(ct.Structure):
@@ -110,7 +95,7 @@ def TwGetH5Descriptor(filename, h5Descriptor):
     try:
         geth5descriptor.argtypes = [ct.c_char_p, ct.POINTER(TwH5Desc)]
     except Exception as e:
-        logger.error(e)
+        hardware_runtime.logger.error(e)
     return geth5descriptor(filename, ct.pointer(h5Descriptor))
 
 
@@ -836,9 +821,11 @@ def TwGetEventListDataFromH5(
             * (writeEndIndex - writeStartIndex + 1)
         )
         data = [
-            np.ctypeslib.as_array(dataBuffer[i], shape=(dataLength[i],))
-            if dataLength[i] > 0
-            else np.empty((0,), dtype=np.uint32)
+            (
+                np.ctypeslib.as_array(dataBuffer[i], shape=(dataLength[i],))
+                if dataLength[i] > 0
+                else np.empty((0,), dtype=np.uint32)
+            )
             for i in range(nbrSpectra)
         ]
         for i in range(nbrSpectra):

@@ -24,15 +24,15 @@ import AcquisitionMode from './AcquisitionMode.vue'
 
 const app = useApp()
 
+// Setup initial state
 const saved = {
-  workspace: app.data.workspace.list.find(
-    ({ workspace_id }) => workspace_id == localStorage.getItem('mascope-workspace')
-  ),
-  instrument: app.data.instrument.list.find(
-    ({ instrument }) => instrument == localStorage.getItem('mascope-instrument')
-  )
+  workspace: null,
+  instrument: null
 }
+const initialWorkspaceLoad = ref(true) // Track initial workspace loading
+const initialInstrumentLoad = ref(true) // Track initial instrument loading
 
+// Reactive data
 const dialog = reactive({
   workspace: null
 })
@@ -44,6 +44,53 @@ const menu = ref()
 const log = reactive({
   query: ''
 })
+
+// Initial loading
+/**
+ * Watch for when workspace data is initially loaded, then focus on the saved workspace.
+ * If the saved workspace is not available, fallback to the first workspace in the list.
+ * The watcher only triggers on the first load and is then disabled to avoid conflicts.
+ */
+watch(
+  () => app.data.workspace.list.length,
+  (newLength) => {
+    if (initialWorkspaceLoad.value && newLength > 0) {
+      saved.workspace = app.data.workspace.list.find(
+        ({ workspace_id }) => workspace_id === localStorage.getItem('mascope-workspace')
+      )
+      filter.workspace = saved.workspace ?? app.data.workspace.list[0]
+      if (
+        filter.workspace &&
+        filter.workspace.workspace_id !== app.data.workspace.focused?.workspace_id
+      ) {
+        app.data.workspace.focus(filter.workspace)
+      }
+      initialWorkspaceLoad.value = false // Stop watching after the first load
+    }
+  },
+  { immediate: true }
+)
+
+/**
+ * Watch for when instrument data is loaded, then focus on the saved instrument.
+ * If the saved instrument is not available, fallback to the first instrument in the list.
+ * The watcher only triggers on the first load and is then disabled to avoid conflicts.
+ */
+watch(
+  () => app.data.instrument.list.length,
+  (newLength) => {
+    if (initialInstrumentLoad.value && newLength > 0) {
+      saved.instrument = app.data.instrument.list.find(
+        ({ instrument }) => instrument === localStorage.getItem('mascope-instrument')
+      )
+      if (saved.instrument) {
+        app.data.instrument.focused = saved.instrument
+      }
+      initialInstrumentLoad.value = false // Disable the watcher after the first load
+    }
+  },
+  { immediate: true }
+)
 
 // notification badge logic
 
@@ -82,13 +129,9 @@ const hiddenBadge = computed(() => {
   return app.ui.notification.recentWarnings === 0 && app.ui.notification.recentErrors === 0
 })
 
-// initial load
-app.data.workspace.focus(filter.workspace)
-
-if (saved.instrument) {
-  app.data.instrument.focused = saved.instrument
-}
-
+/**
+ * Focus the workspace when changed in the toolbar, updating localStorage.
+ */
 watch(
   computed(() => filter.workspace),
   (workspace) => {
@@ -100,6 +143,10 @@ watch(
     }
   }
 )
+
+/**
+ * Sync selected workspace in the toolbar with the focused workspace in app state.
+ */
 watch(
   computed(() => app.data.workspace.focused),
   (workspace) => {
@@ -108,6 +155,10 @@ watch(
     }
   }
 )
+
+/**
+ * Sync focused instrument with the saved one in localStorage.
+ */
 watch(
   computed(() => app.data.instrument.focused),
   (instrument) => {
@@ -188,7 +239,7 @@ function parseTimestamp(timestamp) {
             text
             @click="
               (event) => {
-                menu.show(event)
+                menu.toggle(event)
               }
             "
             class="hiddenlabel"
@@ -226,7 +277,9 @@ function parseTimestamp(timestamp) {
       </div>
     </template>
     <template #center>
-      <BaseKarsaLogo />
+      <div class="logo-container">
+        <BaseKarsaLogo />
+      </div>
     </template>
     <template #end>
       <div class="row">
@@ -351,5 +404,15 @@ function parseTimestamp(timestamp) {
 
 :deep(.p-scrollpanel-content) {
   padding-bottom: 0.8rem;
+}
+
+/* Ensure the logo is centered and doesn't get pushed */
+.logo-container {
+  display: flex;
+  justify-content: center;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none; /* Prevents the logo from affecting layout interactions */
 }
 </style>

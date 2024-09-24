@@ -35,6 +35,10 @@ class GetTargetIonsQueryParams(BaseModel):
         False,
         description="Flag to include target collection ID, also duplicate compounds present in several collections will be shown.",
     )
+    show_ionization_mechanism: bool = Field(
+        False,
+        description="Flag to to include ionization mechanism details.",
+    )
     sort: Optional[str] = Field(None, description="Field to sort by.")
     order: Optional[str] = Field(
         None, description="Order of sorting ('asc' or 'desc')."

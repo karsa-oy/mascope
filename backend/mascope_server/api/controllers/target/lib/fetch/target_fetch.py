@@ -10,9 +10,7 @@ from mascope_server.api.controllers.target.isotopes.target_isotopes_controller i
     get_target_isotopes,
 )
 
-import mascope_runtime as runtime
-
-logger = runtime.logger.service("backend")
+from mascope_server.runtime import runtime
 
 
 async def fetch_targets_for_match_remove(

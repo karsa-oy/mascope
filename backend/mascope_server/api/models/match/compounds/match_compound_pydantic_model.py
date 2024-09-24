@@ -29,7 +29,8 @@ class GetMatchCompoundsQueryParams(BaseModel):
         None, description="Filter compounds by target compound ID"
     )
     match_category: Optional[int] = Field(
-        None, description="Filter compounds by match category"
+        None,
+        description="Filter compounds to include specified match category and higher",
     )
     show_target_collection: bool = Field(
         False,

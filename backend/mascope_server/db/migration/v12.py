@@ -2,12 +2,14 @@ import os
 import sqlite3
 import shutil
 
-from mascope_server.config import config
+
+from mascope_server.runtime import runtime
+
 
 def run():
     # STEP 1 - setup new database
-    old_db_path = os.path.join(config.server.database, "mascope.v11.db")
-    new_db_path = os.path.join(config.server.database, "mascope.v12.db")
+    old_db_path = os.path.join(runtime.config.database, "mascope.v11.db")
+    new_db_path = os.path.join(runtime.config.database, "mascope.v12.db")
     shutil.copyfile(old_db_path, new_db_path)
     new_conn = sqlite3.connect(database=new_db_path)
     with new_conn:

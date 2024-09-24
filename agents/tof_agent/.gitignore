@@ -1,3 +1,2 @@
 build
-bin.spec
-tof_agent.zip
+*.spec

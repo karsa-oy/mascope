@@ -5,9 +5,7 @@ from mascope_server.api.controllers.match.interferences.match_interferences_cont
     get_match_interferences,
 )
 
-import mascope_runtime as runtime
-
-logger = runtime.logger.service("backend")
+from mascope_server.runtime import runtime
 
 
 async def filter_existing_sample_match_isotope_data(target_isotopes_df, sample_item_id):

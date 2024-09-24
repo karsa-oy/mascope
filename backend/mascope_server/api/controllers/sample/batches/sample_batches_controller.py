@@ -13,7 +13,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import joinedload
 
-from mascope_lib.file_func import get_instrument_type
+from mascope_lib.file_func import get_filestore_path, get_instrument_type
 from mascope_lib.peak import detect_peaks, get_peaks
 
 from mascope_server.db import async_session
@@ -30,8 +30,7 @@ from mascope_server.db.models import (
     IonizationMechanism,
     TargetIsotope,
 )
-from mascope_server.api_sio import sio
-from mascope_server.config import config
+from mascope_server.app import sio
 from mascope_server.api.lib.api_features import (
     api_controller,
     api_controller_background_task,
@@ -73,9 +72,8 @@ from mascope_server.api.lib.notifications.api_notification_pydantic_model import
     UserNotification,
 )
 
-import mascope_runtime as runtime
 
-logger = runtime.logger.service("backend")
+from mascope_server.runtime import runtime
 
 
 @api_controller()
@@ -1098,7 +1096,7 @@ async def sample_batch_export_peaks(
 
             await send_progress_user_notification(notification, 1)
         except Exception as e:
-            logger.error(repr(e))
+            runtime.logger.error(repr(e))
             continue
 
         peak_data.extend(
@@ -1131,18 +1129,18 @@ async def sample_batch_export_peaks(
 
     dt_str = datetime.now().isoformat().replace("-", "").replace(":", "").split(".")[0]
 
-    peakfile_path = config.server.filestore
+    peakfile_path = get_filestore_path()
     peakfile_filename = (
         dt_str
         + "_peaks_"
         + sample_batch["sample_batch_name"].replace(" ", "_")
         + ".parquet"
     )
-    logger.info(f"Writing peak data to file {peakfile_filename}")
+    runtime.logger.info(f"Writing peak data to file {peakfile_filename}")
     batch_peak_df.to_parquet(
         os.path.join(peakfile_path, peakfile_filename), index=False
     )
-    logger.info("Write complete")
+    runtime.logger.info("Write complete")
 
     # Step 6: Return the status message
     return {

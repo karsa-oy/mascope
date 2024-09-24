@@ -14,9 +14,8 @@ from time import sleep
 
 import numpy as np
 
-import mascope_runtime as runtime
+from mascope_hardware.runtime import hardware_runtime
 
-logger = runtime.logger.service('hardware-lib')
 
 from .generator import BaseGenerator
 from .lib.TofDaq import (
@@ -71,16 +70,16 @@ class TofDaqStreamer(BaseGenerator):
             Exception is raised if TofDaq Recorder is not running, or if
             fetching 'TwSharedMemoryDesc' fails for another reason.
         """
-        logger.info("TofDaqStreamer initializing")
+        hardware_runtime.logger.info("TofDaqStreamer initializing")
         BaseGenerator.__init__(self)
 
         # Initialize TW API related structures 'desc' and 'ptr'
-        count=0
-        warning_timeout=60
+        count = 0
+        warning_timeout = 60
         while not TwTofDaqRunning() and not shutdown_event.is_set():
             if count % warning_timeout == 0:
-                logger.warning("[blink orange1]TofDaq Recorder not running[/blink orange1]")
-            count+=1
+                hardware_runtime.logger.warning("TofDaq Recorder not running")
+            count += 1
             sleep(1)
         self.desc = TSharedMemoryDesc()  # TW shared memory descriptor
         ret = TwGetDescriptor(self.desc)
@@ -210,7 +209,7 @@ class TofDaqStreamer(BaseGenerator):
         bufTime = np.zeros((1,), dtype=np.float64)
 
         def RecorderStarted():
-            logger.info("recorder started")
+            hardware_runtime.logger.info("recorder started")
 
         def FirstDaqActive():
             nonlocal myTotalBufsProcessed
@@ -218,7 +217,7 @@ class TofDaqStreamer(BaseGenerator):
                 self.desc
             )  # just update descriptor without waiting for data
             myTotalBufsProcessed = 0
-            logger.info("acquisition started")
+            hardware_runtime.logger.info("acquisition started")
 
             # custom
             # custom ends
@@ -246,7 +245,9 @@ class TofDaqStreamer(BaseGenerator):
                     ) * self.interval  # [s]
                     # Feed coordinates
                     self._feed_coordinates()
-                    logger.info("TofDaqStreamer started: %s" % self.filename)
+                    hardware_runtime.logger.info(
+                        f"TofDaqStreamer started: {self.filename}"
+                    )
                     self.active.set()
                 if self.desc.totalBufsProcessed > 0:
                     for b in range(myTotalBufsProcessed, self.desc.totalBufsProcessed):
@@ -261,19 +262,19 @@ class TofDaqStreamer(BaseGenerator):
                             self.desc.iWrite * self.desc.nbrBufs
                         ) + self.desc.iBuf
                         if new_speci - self.speci > 1:
-                            logger.warning("Skipped a spec!")
+                            hardware_runtime.logger.warning("Skipped a spec!")
                         self.speci = new_speci
-                        logger.info(self.speci)
+                        hardware_runtime.logger.info(self.speci)
                         self._get_and_feed_data()
                         # custom code ends here
                     myTotalBufsProcessed = self.desc.totalBufsProcessed
             elif ret == 8:
                 pass
             else:
-                logger.warning("Unexpected return value: %s" % ret)
+                hardware_runtime.logger.warning(f"Unexpected return value: {ret}")
 
         def DaqEnded():
-            logger.info("acquisition stopped/ended")
+            hardware_runtime.logger.info("acquisition stopped/ended")
             # custom
             # Clear active flag
             self.active.clear()
@@ -283,7 +284,7 @@ class TofDaqStreamer(BaseGenerator):
             # custom ends
 
         def RecorderClosed():
-            logger.info("recorder closed")
+            hardware_runtime.logger.info("recorder closed")
 
         while not self.shutdown_event.is_set():
             isRecorderRunning = TwTofDaqRunning()
@@ -321,7 +322,7 @@ class TofDaqStreamer(BaseGenerator):
         Loop until 'self.shutdown_event' is set.
         """
 
-        logger.info("TofDaqStreamer running")
+        hardware_runtime.logger.info("TofDaqStreamer running")
         timeout_counter = 0
         # Main loop
         while not self.shutdown_event.is_set():
@@ -360,7 +361,7 @@ class TofDaqStreamer(BaseGenerator):
                     self.active.clear()
                     # Reset self
                     self._finalize()
-                    logger.info("TofDaqStreamer finished")
+                    hardware_runtime.logger.info("TofDaqStreamer finished")
             # New data
             elif ret == 4:
                 # Reset timeout counter
@@ -372,10 +373,12 @@ class TofDaqStreamer(BaseGenerator):
                 continue
             # Unexpected return value
             else:
-                logger.warning("Unexpected return value: %s" % TwRetVal(ret).name)
+                hardware_runtime.logger.warning(
+                    f"Unexpected return value: {TwRetVal(ret).name}"
+                )
                 sleep(1)
         # Out of main loop
-        logger.info("TofDaqStreamer exiting")
+        hardware_runtime.logger.info("TofDaqStreamer exiting")
         self.shutdown()
 
     def start_acquisition(self):

@@ -1,7 +1,7 @@
 from typing import List, Optional
 from sqlalchemy import asc, desc, func, select
 from sqlalchemy.orm import joinedload
-from mascope_server.api_sio import sio
+from mascope_server.app import sio
 from mascope_server.db import async_session
 from mascope_server.db.models import (
     IonizationMechanism,
@@ -28,9 +28,6 @@ from mascope_server.api.models.target.compounds.target_compound_pydantic_model i
 from mascope_server.api.models.target.ions.target_ion_pydantic_model import (
     TargetIonUpdate,
 )
-import mascope_runtime as runtime
-
-logger = runtime.logger.service("backend")
 
 
 @api_controller()
@@ -40,6 +37,7 @@ async def get_target_ions(
     sample_batch_id: Optional[str] = None,
     target_collection_id: Optional[str] = None,
     show_target_collection: bool = False,
+    show_ionization_mechanism: bool = False,
     target_compound_ids: Optional[List[str]] = None,
     ionization_mechanism_ids: Optional[List[str]] = None,
     target_ion_formula: str = None,
@@ -58,10 +56,11 @@ async def get_target_ions(
     2. Apply filters based on target compound ID, ionization mechanism ID, compound list, and ionization mechanism list.
     3. If additional context such as sample batch or target collection details are requested, enhance the query to join
        with related tables and filter further based on these details.
-    4. If 'show_target_collection' is true, join with the target collection table to include these details in the results.
-    5. Apply ordering and sorting to the query.
-    6. Execute the query with pagination.
-    7. Format the fetched data into a list of dictionaries suitable for JSON serialization and return alongside total results count.
+    4,5. If 'show_target_collection' or 'show_ionization_mechanism' is true, join with the respective tables to include
+       these details in the results.
+    6. Apply ordering and sorting to the query.
+    7. Execute the query with pagination.
+    8. Format the fetched data into a list of dictionaries suitable for JSON serialization and return alongside total results count.
 
     :param target_compound_id: Filter by specific target compound ID, defaults to None.
     :type target_compound_id: Optional[str]
@@ -73,6 +72,8 @@ async def get_target_ions(
     :type target_collection_id: Optional[str]
     :param show_target_collection: Include detailed target collection data in the results, defaults to False.
     :type show_target_collection: bool
+    :param show_ionization_mechanism: Include ionization mechanism data in the results, defaults to False.
+    :type show_ionization_mechanism: bool
     :param target_compound_ids: List of target compound IDs for broader filtering, defaults to None.
     :type target_compound_ids: Optional[List[str]]
     :param ionization_mechanism_ids: List of ionization mechanism IDs for broader filtering, defaults to None.
@@ -166,7 +167,18 @@ async def get_target_ions(
                     TargetCollection.target_collection_type,
                 )
 
-        # Step 5: Apply sorting
+        # Step 5: Join IonizationMechanism if show_ionization_mechanism is True
+        if show_ionization_mechanism:
+            stmt = stmt.join(
+                IonizationMechanism,
+                IonizationMechanism.ionization_mechanism_id
+                == TargetIon.ionization_mechanism_id,
+            )
+            stmt = stmt.add_columns(
+                IonizationMechanism.ionization_mechanism.label("ionization_mechanism"),
+            )
+
+        # Step 6: Apply sorting
         if sort:
             if order == "desc":
                 stmt = stmt.order_by(desc(getattr(TargetIon, sort)))
@@ -177,12 +189,11 @@ async def get_target_ions(
         total = await session.scalar(
             select(func.count()).select_from(stmt)  # pylint: disable=not-callable
         )
-        # Step 4: Apply pagination
+        # Step 7: Execute the query with pagination.
         stmt = stmt.offset(page * limit).limit(limit)
-        # Step 6: Execute the query
         result = await session.execute(stmt)
 
-    # Step 7: Construct the response data
+    # Step 8: Construct the response data
     data = []
     for row in result.all():
         # When show_target_collection is true, include target_collection_id
@@ -191,6 +202,8 @@ async def get_target_ions(
             ion_data["target_collection_id"] = row.target_collection_id
             ion_data["target_collection_name"] = row.target_collection_name
             ion_data["target_collection_type"] = row.target_collection_type
+        if show_ionization_mechanism:
+            ion_data["ionization_mechanism"] = row.ionization_mechanism
         data.append(ion_data)
 
     return {

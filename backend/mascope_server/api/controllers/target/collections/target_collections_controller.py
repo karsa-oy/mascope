@@ -7,7 +7,7 @@ from fastapi import BackgroundTasks
 from sqlalchemy import asc, desc, func, select
 from sqlalchemy.orm import joinedload
 
-from mascope_server.api_sio import sio
+from mascope_server.app import sio
 from mascope_server.db import async_session
 from mascope_server.db.id import gen_id
 from mascope_server.db.models import (

@@ -25,9 +25,7 @@ from mascope_server.api.controllers.match.samples.match_samples_controller impor
     delete_match_samples,
 )
 
-import mascope_runtime as runtime
-
-logger = runtime.logger.service("backend")
+from mascope_server.runtime import runtime
 
 
 @api_controller()
@@ -124,7 +122,9 @@ async def remove_matches(
     delete_matches_message = (
         "all matches" if len(descriptions) == 6 else ", ".join(descriptions)
     )
-    logger.info("Removing %s. %s", delete_matches_message, filtered_targets_message)
+    runtime.logger.info(
+        f"Removing {delete_matches_message}. {filtered_targets_message}"
+    )
 
     message_logs = []
     for delete_func, description, params in delete_operations:

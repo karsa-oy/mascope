@@ -2,7 +2,6 @@ import { ref, computed, reactive, watch } from 'vue'
 import { defineStore } from 'pinia'
 
 import { api } from '@/api'
-import { alarmsList } from '@/lib/constants'
 import { debounce } from '@/lib/utils'
 
 import { useData } from '../data'
@@ -39,7 +38,7 @@ export const useMatchVisualized = defineStore('app.ui.matchVisualized', () => {
    *
    * - If a new sample is selected, filter parameters are reset to defaults.
    * - If any of the identifiers change (sample, ion, or collection), the corresponding matches are loaded, and the visualization is activated.
-   * - If parameters are provided, they override the default filter parameters.
+   * - If parameters are provided, they override the current filter parameters.
    *
    * @param {Object} options - The parameters for setting the matchVisualized.
    * @param {string|null} [options.sampleId] - The ID of the sample to visualize.
@@ -61,8 +60,8 @@ export const useMatchVisualized = defineStore('app.ui.matchVisualized', () => {
     if (!sampleChanged && !ionChanged && !collectionChanged) {
       return
     }
-    // Reset filter parameters if the sample has changed
-    if (sampleChanged) {
+    // Reset filter parameters if the sample has changed and no new filter_parames to set are provided
+    if (sampleChanged && !params) {
       await data.filterParams.reset()
     }
 

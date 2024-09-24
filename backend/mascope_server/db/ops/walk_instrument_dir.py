@@ -17,9 +17,14 @@ import os
 
 from datetime import datetime
 
-from mascope_server.config import config
+import mascope_lib.runtime as lib_runtime
 
-instrument_dir = config.server.filestore
+lib_runtime.init()
+
+from mascope_lib.file_func import get_filestore_path
+
+
+instrument_dir = get_filestore_path()
 
 
 def sample_file_op(sample_filepath: str, sample_filename: str) -> None:
@@ -69,6 +74,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     sample_filename_pattern = args.filename_pattern
 
+    print(f"Walking through the filestore at {instrument_dir}")
     for dirpath, dirnames, filenames in os.walk(instrument_dir):
         # Check if we are in a date directory
         try:
@@ -78,6 +84,7 @@ if __name__ == "__main__":
             continue
         # We are in a date directory, dirnames are sample files
         for sample_filename in fnmatch.filter(dirnames, sample_filename_pattern):
+            print(f"Processing {sample_filename}")
             sample_filepath = os.path.join(dirpath, sample_filename)
             # Sample file
             sample_file_op(sample_filepath, sample_filename)

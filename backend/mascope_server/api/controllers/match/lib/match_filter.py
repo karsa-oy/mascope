@@ -3,9 +3,7 @@ from mascope_server.api.models.match.match_pydantic_model import (
     FilterParams,
 )
 
-import mascope_runtime as runtime
-
-logger = runtime.logger.service("backend")
+from mascope_server.runtime import runtime
 
 
 def apply_filter_params(

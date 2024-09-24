@@ -3,9 +3,7 @@ import os
 import numpy as np
 from scipy.stats import skewnorm, poisson
 import xarray as xr
-import mascope_runtime as runtime
-
-logger = runtime.logger.service("backend")
+from mascope_server.runtime import runtime
 
 
 # Precompute sigma multiplier for peak generation
@@ -206,7 +204,7 @@ class SpectraGenerator:
     def to_zarr(self, path: str):
         """Save spectrum to zarr file at path"""
         if self.spec is None:
-            logger.warning("Nothing to save. Generate spectrum first!")
+            runtime.logger.warning("Nothing to save. Generate spectrum first!")
 
         # Create main xarray.Dataset and add metadata
         ds = xr.Dataset(coords={"mz": self.mz_grid}, attrs=self.params.to_dict())

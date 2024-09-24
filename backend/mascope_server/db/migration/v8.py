@@ -4,11 +4,8 @@ import os
 import sqlite3
 import shutil
 
-from mascope_server.config import config
 
-import mascope_runtime as runtime
-
-logger = runtime.logger.service("backend")
+from mascope_server.runtime import runtime
 
 # patch asyncio to supported run_until_complete
 # when an event loop is already running
@@ -17,12 +14,12 @@ nest_asyncio.apply()
 
 def run():
     # STEP 1 - setup new database
-    old_db_path = os.path.join(config.server.database, "mascope.v7.db")
-    new_db_path = os.path.join(config.server.database, "mascope.v8.db")
+    old_db_path = os.path.join(runtime.config.database, "mascope.v7.db")
+    new_db_path = os.path.join(runtime.config.database, "mascope.v8.db")
     shutil.copyfile(old_db_path, new_db_path)
     new_conn = sqlite3.connect(database=new_db_path)
     with new_conn:
-        logger.info("Create view sample_view")
+        runtime.logger.info("Create view sample_view")
         new_conn.execute(
             """
             CREATE VIEW sample_view AS

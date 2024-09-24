@@ -36,9 +36,8 @@ from mascope_server.api.controllers.match.lib.match_filter import apply_filter_p
 from mascope_server.api.models.samples.sample_pydantic_model import AlarmsList
 from mascope_server.api.models.match.match_pydantic_model import FilterParams
 
-import mascope_runtime as runtime
 
-logger = runtime.logger.service("backend")
+from mascope_server.runtime import runtime
 
 # TODO_configuration
 # Default Filter Parameters
@@ -965,7 +964,7 @@ async def init_batch_match_filter(
         samples_df = pd.DataFrame([row._asdict() for row in sample_result.fetchall()])
 
         if samples_df.empty:
-            logger.warning(
+            runtime.logger.warning(
                 f"No samples found in the batch '{sample_batch.sample_batch_name}'"
             )
             return {}
@@ -1030,7 +1029,7 @@ async def init_batch_match_filter(
         target_result = await session.execute(target_query)
         targets_df = pd.DataFrame([row._asdict() for row in target_result.fetchall()])
         if targets_df.empty:
-            logger.info(
+            runtime.logger.info(
                 f"No targets found in the batch '{sample_batch.sample_batch_name}'"
             )
             return {}
@@ -1084,7 +1083,7 @@ async def init_batch_match_filter(
             match_interference_df = pd.DataFrame(match_interference_result.fetchall())
 
             if match_interference_df.empty:
-                logger.info(
+                runtime.logger.info(
                     f"No match interference found for the sample batch '{sample_batch.sample_batch_name}'"
                 )
                 return {}
@@ -1099,7 +1098,7 @@ async def init_batch_match_filter(
 
         # Merge DataFrames
         if matches_df.empty:
-            logger.info(
+            runtime.logger.info(
                 f"No matches found for the sample batch '{sample_batch.sample_batch_name}'"
             )
             return {}

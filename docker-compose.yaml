@@ -1,0 +1,37 @@
+services:
+  backend:
+    command: "api-server"
+    build:
+      dockerfile: backend/Dockerfile
+      context: .
+    tty: true
+    ports:
+      - 8090:8090
+    volumes:
+      - ./runtime/env/${MASCOPE_ENV:-default}:/app/runtime/env/prod
+      - ${MASCOPE_FILESTORE}:/app/runtime/env/prod/filestore
+    environment:
+      - MASCOPE_LOGLEVEL
+      - MASCOPE_TIMEZONE
+  file_converter:
+    command: "file-converter"
+    build:
+      dockerfile: backend/Dockerfile
+      context: .
+    tty: true
+    volumes:
+      - ./runtime/env/${MASCOPE_ENV:-default}:/app/runtime/env/prod
+      - ${MASCOPE_FILESTORE}:/app/runtime/env/prod/filestore
+    environment:
+      - MASCOPE_LOGLEVEL
+      - MASCOPE_TIMEZONE
+  frontend:
+    build:
+      context: frontend
+      args:
+        - MASCOPE_RUNTIME
+    environment:
+      - MASCOPE_TIMEZONE
+    tty: true
+    ports:
+      - 443:443

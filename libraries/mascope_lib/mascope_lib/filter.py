@@ -1,8 +1,7 @@
 import numpy as np
 
-import mascope_runtime as runtime
 
-logger = runtime.logger.service('standard-lib')
+from mascope_lib.runtime import lib_runtime
 
 
 def smooth(x, window_len=11, window="hanning"):
@@ -52,7 +51,7 @@ def smooth(x, window_len=11, window="hanning"):
         )
 
     s = np.r_[x[window_len - 1 : 0 : -1], x, x[-2 : -window_len - 1 : -1]]
-    logger.debug(f'length s: {len(s)}')
+    lib_runtime.logger.debug(f"length s: {len(s)}")
     if window == "flat":  # moving average
         w = np.ones(window_len, "d")
     else:

@@ -5,16 +5,15 @@ from scipy.stats import norm, skewnorm
 import numpy as np
 import pytest
 from test_utils.dataset_generator import GenerationParams, SpectraGenerator
+from mascope_lib.file_func import get_filestore_path
 from mascope_lib.peak import fit_n_peaks, segment_spec
 import xarray as xarr
-import mascope_runtime as runtime
 from sklearn.metrics import auc, roc_curve, roc_auc_score
 import warnings
 
 warnings.filterwarnings("ignore")
 
-logger = runtime.logger.service("backend")
-config = runtime.mount()
+from mascope_server.runtime import runtime
 
 
 def min_max_scaling(array):
@@ -79,7 +78,7 @@ def create_temp_folder(folder_name="temp"):
         path to the created temp folder
     """
     # Get path to filestore
-    base_path = config.server.filestore
+    base_path = get_filestore_path()
     # Recreate path to the temp folder
     temp_path = os.path.join(base_path, folder_name)
 
@@ -96,7 +95,7 @@ def create_temp_folder(folder_name="temp"):
 def test_peak_fitting():
     """Test peak fitting performance"""
     temp_path = create_temp_folder()
-    logger.info("Temp folder was created")
+    runtime.logger.info("Temp folder was created")
 
     # Set artificial spectra generation parameters
     tof_params = GenerationParams("tof", n_peaks=20)
@@ -105,7 +104,7 @@ def test_peak_fitting():
     # Init spectra generators
     tof_generator = SpectraGenerator(tof_params)
     orbi_generator = SpectraGenerator(orbi_params)
-    logger.info("Generation parameters set. Generating spectra...")
+    runtime.logger.info("Generation parameters set. Generating spectra...")
 
     # Generate several spectra for each MS type
     for _ in range(1):
@@ -117,10 +116,10 @@ def test_peak_fitting():
         tof_generator.to_zarr(path=temp_path)
         orbi_generator.to_zarr(path=temp_path)
 
-    logger.info("Spectra were generated. Performing peak fitting...")
+    runtime.logger.info("Spectra were generated. Performing peak fitting...")
 
     for file_path in glob(os.path.join(temp_path, "*")):
-        logger.info("File %s:", file_path)
+        runtime.logger.info(f"File {file_path}:")
 
         zarr_file = xarr.open_zarr(file_path)
 
@@ -170,7 +169,9 @@ def test_peak_fitting():
                 fitted_peaks.append(i)
                 r_squared.append(r_squared_val)
 
-        logger.info("Mean R-squared during the fitting was %.2f", np.mean(r_squared))
+        runtime.logger.info(
+            f"Mean R-squared during the fitting was {np.mean(r_squared):.2f}"
+        )
 
         # Convert fitted peaks to numpy array
         fitted_peaks = np.asarray(fitted_peaks)
@@ -187,10 +188,8 @@ def test_peak_fitting():
         errors = np.abs(np.subtract.outer(true_pos, fitted_pos))
         min_errors = np.min(errors, axis=1) / true_pos * 10**6
 
-        logger.warning(
-            "%i peaks are off by more than %i ppm",
-            len(min_errors[min_errors > error_ppm]),
-            error_ppm,
+        runtime.logger.warning(
+            f"{len(min_errors[min_errors > error_ppm])} peaks are off by more than {error_ppm} ppm"
         )
 
         # TODO decide if we want to continue with ROC curve and AUC
@@ -211,18 +210,16 @@ def test_peak_fitting():
 
         # try:
         #     roc_auc = roc_auc_score(binary_labels, errors_proba)
-        #     logger.info("AUC score is %.2f", roc_auc)
+        #     runtime.logger.info("AUC score is %.2f", roc_auc)
         # except ValueError:
-        #     logger.info(
+        #     runtime.logger.info(
         #         "AUC score was not estimated, all fitted peaks within %.2f ppm error",
         #         error_ppm,
         #     )
 
         if len(fitted_pos) != len(true_pos):
-            logger.warning(
-                "%s peaks expected but %s found!",
-                len(true_pos),
-                len(fitted_pos),
+            runtime.logger.warning(
+                f"{len(true_pos)} peaks expected but {len(fitted_pos)} found!"
             )
 
             # undectection
@@ -238,14 +235,11 @@ def test_peak_fitting():
                 diff_mask[close_pos_inds] = False
                 diff_peaks = fitted_hei[diff_mask]
 
-            logger.warning(
+            runtime.logger.warning(
+                f"""
+                Undetected/excessive peak heights:
+                    min={np.min(diff_peaks):.2e}
+                    mean={np.mean(diff_peaks):.2e}
+                    max={np.max(diff_peaks):.2e}
                 """
-                Undetected/exessive peak heights:
-                    min=%.2e
-                    mean=%.2e
-                    max=%.2e
-                """,
-                np.min(diff_peaks),
-                np.mean(diff_peaks),
-                np.max(diff_peaks),
             )

@@ -3,9 +3,7 @@ from mascope_server.api.controllers.target.compounds.target_compounds_controller
     get_target_compounds,
 )
 
-import mascope_runtime as runtime
-
-logger = runtime.logger.service("backend")
+from mascope_server.runtime import runtime
 
 
 async def fetch_batches_compounds(
@@ -67,8 +65,8 @@ async def fetch_sample_batch_compounds(
 
     # Log the warning if no compounds are found
     if not batch_target_compounds_ids:
-        logger.warning(
-            "No target compounds found for sample batch with ID '%s'", sample_batch_id
+        runtime.logger.warning(
+            f"No target compounds found for sample batch with ID '{sample_batch_id}'"
         )
 
     return batch_target_compounds_ids

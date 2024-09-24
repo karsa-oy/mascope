@@ -53,7 +53,7 @@ def binary_search_for_left_range(mz_values, left_range):
     """
     l = len(mz_values)
     if mz_values[l - 1] < left_range:
-        raise ValueError("No value bigger than %s" % left_range)
+        raise ValueError(f"No value bigger than {left_range}")
     low = 0
     high = l - 1
     while low <= high:
@@ -74,7 +74,7 @@ def binary_search_for_right_range(mz_values, right_range):
     """
     l = len(mz_values)
     if mz_values[0] > right_range:
-        raise ValueError("No value smaller than %s" % right_range)
+        raise ValueError(f"No value smaller than {right_range}")
     low = 0
     high = l - 1
     while low <= high:

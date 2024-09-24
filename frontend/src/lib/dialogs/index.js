@@ -1,5 +1,6 @@
 export { default as DialogSampleBatchOp } from './DialogSampleBatchOp'
 export { default as DialogMatchRating } from './DialogMatchRating.vue'
+export { default as DialogMechanismsOp } from './DialogMechanismsOp.vue'
 export * from './dialogSampleBatchDelete.js'
 export { default as DialogCalibration } from './DialogCalibration.vue'
 export { default as DialogSampleItemOp } from './DialogSampleItemOp.vue'

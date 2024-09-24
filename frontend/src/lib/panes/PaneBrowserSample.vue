@@ -1,7 +1,7 @@
 <script setup>
 import { useConfirm } from 'primevue/useconfirm'
 
-import { ref, reactive, computed, watch, watchEffect } from 'vue'
+import { ref, reactive, computed, watch } from 'vue'
 
 import Panel from 'primevue/panel'
 import Button from 'primevue/button'
@@ -310,6 +310,13 @@ const menu = computed(() => ({
       command: async () => {
         await app.data.sample.rematch(item.context)
       }
+    },
+    {
+      label: `Compute all peaks`,
+      icon: 'pi pi-wave-pulse',
+      command: async () => {
+        await app.data.peak.computeAll(item.context)
+      }
     }
   ]
 }))
@@ -367,15 +374,72 @@ const itemPreventDefault = (event) => {
   itemContextMenu.value.show(event.originalEvent)
 }
 
-watchEffect(async () => {
-  if (app.data.sample.focused) {
-    await app.ui.matchVisualized.set({
-      sampleId: app.data.sample.focused.sample_item_id
-    })
-  } else {
-    app.ui.matchVisualized.unset({ target: false })
+/**
+ * Watches for changes in the focused sample and updates the match visualization accordingly.
+ *
+ * This watcher reacts whenever `app.data.sample.focused` changes:
+ * - Scenario 1: Match Tab is active (app.ui.matchVisualized.ion is set)
+ *   - If a new sample is focused and there's an ion currently visualized in the Match tab,
+ *     the function retrieves the corresponding data from `app.ui.matchVisualized.ion`.
+ *   - The match visualization is then updated with the new sample ID,  visualised ion ID, collection ID, and its filter parameters.
+ *
+ * - Scenario 2: Target selection in Target Browser (app.ui.matchVisualized.ion is inactive):
+ *   - If no ion is currently visualized but there is a selected ion in the Target browser,
+ *     it retrieves the focused ion and the appropriate filter parameters from `app.data.match.ion.selected`.
+ *   - If a compound is selected instead, it finds the corresponding ion from the loaded ions and retrieves its filter parameters.
+ *   - The match visualization is then triggered with the selected sample, ion, and selected collection details.
+ *
+ * - Unsetting the Match Visualization:
+ *   - If no sample is focused, the match visualization tab is cleared by calling `unset`.
+ *
+ * @param {Object|null} newFocusedSample - The new sample that has been focused, or null if no sample is focused.
+ */
+watch(
+  () => app.data.sample.focused,
+  async (newFocusedSample) => {
+    if (!newFocusedSample) {
+      // If no sample is focused, unset the match visualization
+      return app.ui.matchVisualized.unset({ target: false })
+    }
+
+    const { instrument, sample_item_id: sampleId } = newFocusedSample
+    let ionId = null
+    let collectionId = null
+    let filterParams = null
+
+    if (app.ui.matchVisualized.ion) {
+      // Scenario 1: Match Tab is Active, use currently visualized ion details
+      ;({ target_ion_id: ionId, target_collection_id: collectionId } = app.ui.matchVisualized.ion)
+      filterParams = app.ui.matchVisualized.ion?.filter_params?.[instrument] || null
+    } else if (app.data.match.ion.selected.length > 0) {
+      // Scenario 2: Match Tab is Not Active but a Match Ion is Selected
+      const selectedIon = app.data.match.ion.selected[0]
+      ionId = app.data.match.ion.focusedId
+      collectionId = app.data.match.collection.focusedId
+      filterParams = selectedIon?.filter_params?.[instrument] || null
+    } else if (app.data.match.compound.selected.length > 0) {
+      // Scenario 2: Match Tab is Not Active but a Match Compound is Selected
+      const ion = app.data.match.ion.list?.find(
+        (ion) => ion.target_compound_id === app.data.match.compound.focusedId
+      )
+      if (ion) {
+        ionId = ion.target_ion_id
+        collectionId = app.data.match.collection.focusedId
+        filterParams = ion.filter_params?.[instrument] || null
+      }
+    }
+
+    if (ionId && collectionId) {
+      // Set the match visualization with the new sample ID, ion ID, collection ID, and filter params
+      await app.ui.matchVisualized.set({
+        sampleId: sampleId,
+        ionId,
+        collectionId,
+        params: filterParams
+      })
+    }
   }
-})
+)
 
 const batchColumnTab = ref('All')
 const inferType = (field) => {

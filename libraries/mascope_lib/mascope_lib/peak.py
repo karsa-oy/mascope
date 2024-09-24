@@ -15,11 +15,11 @@ from scipy.signal._peak_finding_utils import _select_by_peak_distance
 from scipy.stats import norm
 from scipy.integrate import simpson
 
-import mascope_runtime as runtime
+
+from mascope_lib.runtime import lib_runtime
 
 from .file_func import load_file, zarr_sdk, get_instrument_type, get_sum_signal
 
-logger = runtime.logger.service("standard-lib")
 
 # Precompute sigma multiplier for peak generation
 SIGMA_MULTIPLIER = 2 * np.sqrt(2 * np.log(2))
@@ -117,7 +117,7 @@ async def detect_peaks(
     return_peak_mzs=False,
     instrument_type="tof",
 ):
-    logger.info(f"Detecting peaks for file {filename}")
+    lib_runtime.logger.info(f"Detecting peaks for file {filename}")
     if if_exists not in ["fail", "append", "replace"]:
         raise ValueError(
             """
@@ -158,10 +158,10 @@ async def detect_peaks(
 
     if len(u_list) == 0:
         # Nothing to fit
-        logger.info("Nothing to fit")
+        lib_runtime.logger.info("Nothing to fit")
         return sample_file_data
 
-    logger.info(f"Fitting unit masses: {u_list}")
+    lib_runtime.logger.info(f"Fitting unit masses: {u_list}")
 
     sum_spec = get_sum_signal(filename)
     mz = sum_spec.mz
@@ -228,7 +228,7 @@ async def detect_peaks(
         fit, peaks = await future
         if fit:
             new_peaks.extend(peaks)
-        logger.info(f"Peak detection progress: {(i+1)/len(futures):.2f}")
+        lib_runtime.logger.info(f"Peak detection progress: {(i+1)/len(futures):.2f}")
     executor.shutdown()
     sample_file_data = sample_file_data.assign_coords(
         tof=("mz", np.arange(len(sample_file_data.mz)).astype(np.float32))
@@ -281,7 +281,7 @@ async def detect_peaks(
     peak_profiles_norm = peak_profiles / peak_profiles.sum(dim="time")
     peak_profiles_area = peak_profiles_norm * peak_areas.reshape(-1, 1)
     peak_profiles_height = peak_profiles_norm * peak_heights.reshape(-1, 1)
-    logger.info(f"Writing peaks to file {filename}")
+    lib_runtime.logger.info(f"Writing peaks to file {filename}")
     overwrite_peak_dataset = if_exists in {"append", "replace"}
     zarr_sdk.write_peaks(
         peak_profiles_area,
@@ -289,7 +289,7 @@ async def detect_peaks(
         sample_file_data,
         overwrite_peak_dataset,
     )
-    logger.info("Complete")
+    lib_runtime.logger.info("Complete")
     sample_file_data = load_file(
         filename, vars=["peak_areas"], prev_dataset=sample_file_data
     )
@@ -474,8 +474,8 @@ def fit_n_peaks(
         return None, None
 
     # Convert peak shape
-    peak_shape["x"] = np.array(peak_shape["x"], dtype=np.float32)
-    peak_shape["y"] = np.array(peak_shape["y"], dtype=np.float32)
+    peak_shape["x"] = np.array(peak_shape["x"], dtype=np.float64)
+    peak_shape["y"] = np.array(peak_shape["y"], dtype=np.float64)
 
     spec_norm = np.linalg.norm(y)
     residual_norm = spec_norm

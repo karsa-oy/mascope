@@ -11,11 +11,10 @@ import h5py
 import numpy as np
 import pandas as pd
 
-import mascope_runtime as runtime
-
 from .spectra import KSpectra
 
-logger = runtime.logger.service('hardware-lib')
+from mascope_hardware.runtime import hardware_runtime
+
 
 class KEvent(KSpectra):
     """Class providing an API to read and visualize
@@ -455,6 +454,6 @@ class KEvent(KSpectra):
         try:
             target_list = pd.read_hdf(self.filename, "/Karsa/target_list")
         except KeyError:
-            logger.error("Target list not saved in file")
+            hardware_runtime.logger.error("Target list not saved in file")
             target_list = pd.DataFrame()
         return target_list

@@ -6,11 +6,11 @@ import { api } from '@/api'
 export const defineModule = ({
   name, // module name (snake_case)
   key, // data key (normally id)
-  subscribe = false, // socket io subscription
-  useParent = null, // optional parent module
-  multiselect = false, // enable multiselection
+  useParent = null, // optionally define a parent module
+  subscribe = false, // make socket io subscription for key
   reloadOn = null, // events to reload the module on
   unfocusBefore = [], // unofucus before running these ops
+  multiselect = false, // ⚠️ currently not in use
   // api
   load, // async func, may accept parent record
   read, // get one record by id
@@ -134,7 +134,7 @@ export const defineModule = ({
           unfocus()
         }
       }
-      return focused.value ? focused.value[key] : null
+      return focused.value
     }
 
     // LOADING
@@ -154,18 +154,16 @@ export const defineModule = ({
       log(`load triggered by ${trigger?.event ?? trigger?.name ?? 'mount'}`)
       loading.value = true
       if (trigger?.name) {
-        records.value = trigger?.focusedId ? await load(trigger.focusedId) : []
+        records.value = trigger?.focused ? await load(trigger.focused) : []
       } else {
         records.value = await load()
       }
       records.value.forEach((record, index) => (record.index = (index + 1).toString()))
       log('data loaded')
-      const newFocusedId = refocus(oldFocusedId)
+      const newFocused = refocus(oldFocusedId)
       // propegate to children
       if (children.value.length > 0) {
-        await Promise.all(
-          children.value.map(({ reload }) => reload({ name, focusedId: newFocusedId }))
-        )
+        await Promise.all(children.value.map(({ reload }) => reload({ name, focused: newFocused })))
         log('child data loaded')
       }
       loading.value = false
@@ -182,17 +180,14 @@ export const defineModule = ({
 
     // reload children on refocus
     if (singleselect) {
-      watch(
-        computed(() => (focused.value ? focused.value[key] : null)),
-        (focusedId) => {
-          children.value.forEach(({ reload }) =>
-            reload({
-              name,
-              focusedId
-            })
-          )
-        }
-      )
+      watch(focused, (focused) => {
+        children.value.forEach(({ reload }) =>
+          reload({
+            name,
+            focused
+          })
+        )
+      })
     }
 
     // unfocus before calling certain methods
@@ -226,7 +221,7 @@ export const defineModule = ({
           : () =>
               reload({
                 name: parent?.name,
-                focusedId: parent?.focusedId, // Pass the focused ID of the parent
+                focused: parent?.focused, // Pass the parent's focused record
                 event: reloadOn // Include the event that triggered the reload
               })
       )
@@ -236,14 +231,18 @@ export const defineModule = ({
 
     // manage socket room subscription
     if (subscribe) {
+      let room = (record) => record[key]
+      if (typeof subscribe === 'function') {
+        room = subscribe
+      }
       watch(focused, (next, prev) => {
         if (prev) {
           log('unsubscribing')
-          api.socket.emit('unsubscribe', prev[key])
+          api.socket.emit('unsubscribe', room(prev))
         }
         if (next) {
           log('subscribing')
-          api.socket.emit('subscribe', next[key])
+          api.socket.emit('subscribe', room(next))
         }
       })
     }

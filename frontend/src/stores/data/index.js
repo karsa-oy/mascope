@@ -6,6 +6,7 @@ import { useWorkspace } from './workspace'
 import { useSample } from './sample'
 import { useBatch } from './batch'
 import { useTargetCollection, useTargetCompound } from './target'
+import { usePeak } from './peak'
 
 // semistandard
 import { useMatchCollection, useMatchCompound, useMatchIon, useMatchIsotope } from './match'
@@ -22,6 +23,7 @@ export const useData = () => ({
   template: useTemplate(),
   batch: useBatch(),
   sample: useSample(),
+  peak: usePeak(),
   target: {
     collection: useTargetCollection(),
     compound: useTargetCompound()

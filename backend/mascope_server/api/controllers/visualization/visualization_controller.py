@@ -7,13 +7,12 @@ from mascope_lib.file_func import load_file
 from mascope_lib.peak import filter_peaks, get_peaks
 from mascope_server.db import async_session
 from mascope_server.db.models import Sample, TargetIsotope
-from mascope_server.api_sio import sio
+from mascope_server.app import sio
 from mascope_server.api.lib.exceptions.api_exceptions import NotFoundException
 from mascope_server.api.lib.api_features import api_controller_background_task
 
-import mascope_runtime as runtime
 
-logger = runtime.logger.service("backend")
+from mascope_server.runtime import runtime
 
 # TODO_configuration shift traces color
 COLOR_OFFSET = 5
@@ -82,7 +81,7 @@ async def visualize_ion_focus(
             )
 
     # Step 2: Load the sample file and prepare data slice
-    logger.info("Loading file: %s" % filename)
+    runtime.logger.info(f"Loading file: {filename}")
     sample_file = load_file(filename, vars=["sum_signal", "signal", "peak_heights"])
 
     # Step 3: Convert target ion data to DataFrame and prepare data
@@ -98,7 +97,7 @@ async def visualize_ion_focus(
     main_isotope_height = 0
     sum_timeseries = None
     for i, mz in enumerate(mzs):
-        logger.info("{:d}/{:d}: {:3f}".format(i + 1, len(mzs), mz))
+        runtime.logger.info("{:d}/{:d}: {:3f}".format(i + 1, len(mzs), mz))
         spectrum_traces = []
         timeseries_traces = []
         dmz = 0.5
@@ -111,22 +110,27 @@ async def visualize_ion_focus(
         isotope_sum_spectrum = isotope_slice.sum_signal
         # Check if the spectrum slice is empty
         if isotope_sum_spectrum.size == 0:
-            logger.warning(
+            # No signal in the requested range, plot 0-line still
+            runtime.logger.warning(
                 f"No data found in the mz range {mz_range} for requested mz {mz}"
             )
-            continue  # Skip this iteration or adjust the range
-        isotope_height = isotope_sum_spectrum.dropna(dim="mz").sel(
-            mz=mz, method="nearest"
-        )
-        # Sum spectrum traces
-        sum_spectrum_mz = isotope_sum_spectrum.mz.values.astype(np.float32)
-        sum_spectrum_y = isotope_sum_spectrum.values.astype(np.float32)
-        if i == 0:
-            # Set signal normalization constant
-            main_isotope_height = float(isotope_height)
-        isotope_expected_height = main_isotope_height * (
-            rel_abu / rel_abus[main_isotope_i]
-        )
+            sum_spectrum_mz = np.array(list(mz_range), dtype=np.float32)
+            sum_spectrum_y = np.array([0, 0], dtype=np.float32)
+            isotope_expected_height = 0
+        else:
+            # Prepare signal to be plotted
+            isotope_height = isotope_sum_spectrum.dropna(dim="mz").sel(
+                mz=mz, method="nearest"
+            )
+            # Sum spectrum traces
+            sum_spectrum_mz = isotope_sum_spectrum.mz.values.astype(np.float32)
+            sum_spectrum_y = isotope_sum_spectrum.values.astype(np.float32)
+            if i == 0:
+                # Set signal normalization constant
+                main_isotope_height = float(isotope_height)
+            isotope_expected_height = main_isotope_height * (
+                rel_abu / rel_abus[main_isotope_i]
+            )
         # MS signal trace
         spectrum_traces.append(
             {
@@ -143,7 +147,9 @@ async def visualize_ion_focus(
         )
         # Peak traces (vertical lines)
         peaks = get_peaks(isotope_slice, "height").sum(dim="time").compute()
+        runtime.logger.debug(f"Peaks in the range {mz_range}: {peaks.mz}")
         peaks = filter_peaks(peaks, intensity=peak_min_intensity)
+        runtime.logger.debug(f"Peaks above threshold {peak_min_intensity}: {peaks.mz}")
         for peak in peaks:
             peak_mz = peak.mz.item()
             match = True if abs((peak_mz - mz) / mz * 1e6) <= mz_tolerance else False
@@ -163,12 +169,13 @@ async def visualize_ion_focus(
             if match:
                 # Timeseries trace
                 try:
-                    match_timeseries = isotope_slice.signal.dropna(dim="mz").sel(
+                    # Fill gaps in the timeseries (nans) with 0
+                    match_timeseries = isotope_slice.signal.sel(
                         mz=peak_mz, method="nearest"
-                    )
+                    ).fillna(0)
                 except KeyError as e:
-                    logger.warning(
-                        f"Failed to find mz {peak_mz} in the dataset. Error: {e}"
+                    runtime.logger.warning(
+                        f"Failed to find mz {peak_mz} in the dataset: {isotope_slice.signal.mz}. Error: {e}"
                     )
                     continue
 
@@ -190,6 +197,7 @@ async def visualize_ion_focus(
                     sum_timeseries = match_timeseries
                 elif i > 0 and sum_timeseries is not None:
                     sum_timeseries += match_timeseries
+
         # Target mz trace (red vertical line)
         spectrum_traces.append(
             {

@@ -11,9 +11,9 @@ import zarr
 from watchdog.events import PatternMatchingEventHandler
 from watchdog.observers import Observer
 
-import mascope_runtime as runtime
 
-logger = runtime.logger.service('standard-lib')
+from mascope_lib.runtime import lib_runtime
+
 
 class AttrDict(dict):
     """Dict object that allows accessing values like attributes
@@ -285,7 +285,9 @@ class FSWatcher:
             super().__init__(patterns=mask)
 
         def log(self, *arg):
-            logger.info(f"[{self.__class__.__name__}.{inspect.stack()[1].function}]", *arg)
+            lib_runtime.logger.info(
+                f"[{self.__class__.__name__}.{inspect.stack()[1].function}]", *arg
+            )
 
         def on_created(self, event):
             try:
@@ -331,7 +333,9 @@ class FSWatcher:
                 pass
 
     def log(self, *arg):
-        logger.info(f"[{self.__class__.__name__}.{inspect.stack()[1].function}]", *arg)
+        lib_runtime.logger.info(
+            f"[{self.__class__.__name__}.{inspect.stack()[1].function}]", *arg
+        )
 
     def __init__(self, client, target_attrs, recursive=False):
         self.client = client

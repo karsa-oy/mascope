@@ -10,13 +10,10 @@ import numpy as np
 import xarray
 import zarr
 
-import mascope_runtime as runtime
+from mascope_lib.runtime import lib_runtime
 
 from .structs import ExtendableDataArray
 from .util import parse_path_from_item_filename
-
-logger = runtime.logger.service("standard-lib")
-config = runtime.mount()
 
 
 class zarr_sdk:
@@ -26,7 +23,7 @@ class zarr_sdk:
         try:
             final_length = float(item["signal"].time[-1] + item["signal_period"][-1])
         except Exception as e:
-            logger.error(
+            lib_runtime.logger.error(
                 f"""
                 [finalize_signal_dataset] Warning: {e.__class__.__name__}({str(e)})
             """
@@ -64,6 +61,7 @@ class zarr_sdk:
         #   update_signal_dataset - update_tps_dataset
         #   - finalize_signal_dataset
         # Returns acquisition item shared through the acquisiiton api
+        base_path = get_filestore_path()
         value = data["value"]
         filename = value.get("filename")
         mz = np.frombuffer(value["mz"], dtype=np.float32)
@@ -73,7 +71,6 @@ class zarr_sdk:
         polarity = value.get("polarity")
         sample_interval = value.get("sample_interval")
 
-        base_path = config.server.filestore
         try:
             data_path = parse_path_from_item_filename(filename, base_path)
         except Exception as e:
@@ -149,7 +146,7 @@ class zarr_sdk:
     def update_centroid_dataset(data, item):
         value = data["value"]
         ti = np.array([value["t"]], dtype=np.float32)
-        logger.debug(ti.item())
+        lib_runtime.logger.debug(ti.item())
         c_y = np.frombuffer(value["peak_intensity"], dtype=np.float32)
         c_y = c_y.reshape(-1, 1)
         c_mz = np.frombuffer(value["peak_mz"], dtype=np.float32)
@@ -162,11 +159,11 @@ class zarr_sdk:
 
     @staticmethod
     def update_signal_dataset(data, item):
-        base_path = config.server.filestore
+        base_path = get_filestore_path()
         value = data["value"]
         ti = np.array([value["t"]], dtype=np.float32)
         period = np.array([value["period"]], dtype=np.float32)
-        logger.debug(ti.item())
+        lib_runtime.logger.debug(ti.item())
         spec = np.frombuffer(value["spec"], dtype=np.float32)
         spec = spec.reshape(-1, 1)
         if "mz" in value:
@@ -266,6 +263,23 @@ class zarr_sdk:
         )
 
 
+def get_filestore_path() -> str:
+    """Return path to the filestore
+
+    In `prod` mode, return the path inside the container, otherwise return the
+    path specified in the config `meta.filestore`
+
+    :return: Filestore path
+    :rtype: str
+    """
+    base_path = (
+        "/app/runtime/env/prod/filestore"
+        if lib_runtime.mode == "prod"
+        else lib_runtime.meta.filestore
+    )
+    return base_path
+
+
 def get_sum_signal(filename: str) -> xarray.core.dataarray.DataArray:
     """Calculates the sum spectrum of a given filename
 
@@ -311,7 +325,7 @@ def filename_to_zarr_path(base_filename, variable):
     :return: Full path
     :rtype: str
     """
-    base_path = config.server.filestore
+    base_path = get_filestore_path()
     sample_data_path = parse_path_from_item_filename(base_filename, base_path)
     zarr_filename = variable + os.extsep + "zarr"
     return os.path.join(sample_data_path, zarr_filename)
@@ -417,7 +431,7 @@ def load_array(base_filename, var, prev_array=None):
     :rtype: xarray.Dataset
     """
 
-    logger.debug("Loading array %s : %s" % (base_filename, var))
+    lib_runtime.logger.debug(f"Loading array {base_filename} : {var}")
     var_path = filename_to_zarr_path(base_filename, var)
     if not os.path.exists(var_path):
         raise FileNotFoundError(var_path)
@@ -475,16 +489,17 @@ def load_file(base_filename, vars=None, prev_dataset=None):
     :rtype: xarray.Dataset
     """
 
-    base_path = config.server.filestore
+    base_path = get_filestore_path()
     filepath = parse_path_from_item_filename(base_filename, base_path)
     if not os.path.exists(filepath):
+        lib_runtime.logger.warning(f"File not found: {filepath}")
         raise FileNotFoundError(filepath)
     if vars is None:
         # Get all saved variable names
         zarrs = get_file_data_vars(filepath)
         vars = [zarr.strip(".zarr") for zarr in zarrs]
     # Load arrays from mfzarrs
-    logger.info(f"Loading {vars} from {base_filename}")
+    lib_runtime.logger.info(f"Loading {vars} from {base_filename}")
     datasets = []
     zarr_groups = {}
     # Load requested data arrays
@@ -497,8 +512,8 @@ def load_file(base_filename, vars=None, prev_dataset=None):
         try:
             var_dataset = load_array(base_filename, var, prev_item)
         except FileNotFoundError as e:
-            logger.error(f"[load_file] Error {base_filename}/{var}:")
-            logger.error(f"    {e.__class__.__name__}({str(e)})")
+            lib_runtime.logger.error(f"[load_file] Error {base_filename}/{var}:")
+            lib_runtime.logger.error(f"    {e.__class__.__name__}({str(e)})")
             continue
         datasets.append(var_dataset)
         zarr_groups[var] = var_dataset.attrs.get("zarr_groups", [])
@@ -542,12 +557,12 @@ def open_mfzarr(path, sync=None, mode="r", concat_dim="time", prev_array=None):
     if prev_array is not None:
         prev_groups = prev_array.attrs.get("zarr_groups", [])
         for g in prev_groups:
-            logger.debug("group %s already loaded" % g)
+            lib_runtime.logger.debug(f"group {g} already loaded")
             groups.remove(g)
     if not groups:
-        logger.debug("no new groups")
+        lib_runtime.logger.debug("no new groups")
         return prev_array
-    logger.debug("loading groups: %s" % groups)
+    lib_runtime.logger.debug(f"loading groups: {groups}")
     x = xarray.concat(
         [
             xarray.open_zarr(path, g, consolidated=False, synchronizer=sync)
@@ -604,7 +619,7 @@ def update_props(base_filename, props_to_update):
     :param props_to_update: Properties to update,
     :type props_to_update: dict
     """
-    base_path = config.server.filestore
+    base_path = get_filestore_path()
     sample_data_path = parse_path_from_item_filename(base_filename, base_path)
     # Update properties
     prop_path = os.path.join(sample_data_path, ".props")
@@ -623,7 +638,7 @@ def write_props(base_filename, props):
     :param props: Properties to write
     :type props: dict
     """
-    base_path = config.server.filestore
+    base_path = get_filestore_path()
     sample_data_path = parse_path_from_item_filename(base_filename, base_path)
     # Write properties
     prop_path = os.path.join(sample_data_path, ".props")

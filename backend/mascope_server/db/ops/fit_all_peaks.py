@@ -18,17 +18,21 @@ import os
 
 from datetime import datetime
 
+from mascope_server.app import sio  # This is here to circumvent circular import error
+from mascope_server.db import init_db
 from mascope_server.api.controllers.instrument_functions.lib.instrument_functions_fetch import (
     read_instrument_functions,
 )
-from mascope_server.config import config
+import mascope_lib.runtime as lib_runtime
+
+lib_runtime.init()
+
+from mascope_lib.file_func import get_filestore_path
 from mascope_lib.peak import detect_peaks
 
-import mascope_runtime as runtime
 
-logger = runtime.logger.service("backend")
-
-instrument_dir = config.server.filestore
+instrument_dir = get_filestore_path()
+loop = None
 
 
 def sample_file_op(sample_filepath: str, sample_filename: str) -> None:
@@ -39,9 +43,10 @@ def sample_file_op(sample_filepath: str, sample_filename: str) -> None:
     :param sample_filename: Name of the sample file
     :type sample_filename: str
     """
+    global loop
     try:
         add_peak_threshold = 0.9
-        loop = asyncio.get_event_loop()
+
         instrument_functions = loop.run_until_complete(
             read_instrument_functions(sample_filename)
         )
@@ -54,7 +59,7 @@ def sample_file_op(sample_filepath: str, sample_filename: str) -> None:
             )
         )
     except Exception as e:
-        logger.error(f"Failed to process sample file {sample_filename}: {e}")
+        print(f"Failed to process sample file {sample_filename}: {e}")
 
 
 def sample_file_array_op(sample_filepath: str, sample_file_array: str) -> None:
@@ -92,6 +97,14 @@ if __name__ == "__main__":
     args = parser.parse_args()
     sample_filename_pattern = args.filename_pattern
 
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(init_db())
+
+    print(f"Walking through the filestore at {instrument_dir}")
     for dirpath, dirnames, filenames in os.walk(instrument_dir):
         # Check if we are in a date directory
         try:
@@ -101,7 +114,7 @@ if __name__ == "__main__":
             continue
         # We are in a date directory, dirnames are sample files
         for sample_filename in fnmatch.filter(dirnames, sample_filename_pattern):
-            logger.debug(sample_filename)
+            print(f"Processing {sample_filename}")
             sample_filepath = os.path.join(dirpath, sample_filename)
             sample_file_op(sample_filepath, sample_filename)
             # Directories and files inside the sample file

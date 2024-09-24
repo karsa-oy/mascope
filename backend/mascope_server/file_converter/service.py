@@ -1,5 +1,3 @@
-# TODO: TwTool must load library before H5Streamer;
-# can be fixed later by refactoring H5Streamer dependencies
 import os
 
 from datetime import timedelta
@@ -11,22 +9,36 @@ from time import sleep
 import requests
 import socketio
 
-from mascope_hardware.orbitrap.generator import RawStreamer
-from mascope_hardware.tofwerk.h5_streamer import H5Streamer
-from mascope_hardware.tofwerk.lib.TwTool import *
+import mascope_lib.runtime as lib_runtime
+
+lib_runtime.init()
 
 from mascope_lib.file_func import zarr_sdk
 from mascope_lib.peak import calculate_tic
 from mascope_lib.structs import AttrDict
 from mascope_lib.util import timestamp_from_filename
 
-from mascope_server.config import config
+import mascope_hardware.runtime as hardware_runtime
+
+hardware_runtime.init()
+
+# the order of the next two import matters; if the order is
+# reversed, we get a mysterious error:
+#        ValueError: Index 'mz' must be monotonically increasing
+from mascope_hardware.tofwerk.h5_streamer import H5Streamer  # this comes first
+from mascope_hardware.orbitrap.generator import RawStreamer  # and this comes second
+
+
+from mascope_runtime import MascopeRuntimeModule
 
 from .watcher import FSWatcher
 
-import mascope_runtime as runtime
 
-logger = runtime.logger.service("backend")
+runtime = MascopeRuntimeModule("file-converter")
+
+
+host = runtime.config.server if runtime.mode == "prod" else "localhost"
+url = f"http://{host}:{runtime.meta.api_port}"
 
 
 def create_sample_file_db_record(data):
@@ -37,7 +49,7 @@ def create_sample_file_db_record(data):
     :raises Exception: HTTP request failed
     """
     filename = data["filename"]
-    logger.info(f"Creating sample file record for file: {filename}")
+    runtime.logger.info(f"Creating sample file record for file: {filename}")
     instrument_name = filename.split("_")[0]
     committed_length = data["committed_length"]
     date = timestamp_from_filename(filename)
@@ -60,9 +72,9 @@ def create_sample_file_db_record(data):
 
     headers = {"Content-Type": "application/json"}
 
-    url = f"http://{host}:{port}/api/sample/files"
-
-    response = requests.post(url, headers=headers, json=sample_file_db_record)
+    response = requests.post(
+        f"{url}/api/sample/files", headers=headers, json=sample_file_db_record
+    )
     if response.status_code != 201:
         raise Exception(
             f"Failed to create database record! Status code: {response.status_code}"
@@ -88,7 +100,7 @@ def process_stream(streamer):
 
         def cleanup():
             """Clean-up routine on stream canceled"""
-            logger.info("Canceling...")
+            runtime.logger.info("Canceling...")
             streamer.cancel_event.set()
             # Clear queues
             streamer.spec_queue.get()  # data
@@ -106,7 +118,7 @@ def process_stream(streamer):
             "progress": streamer.progress,
         }
         if spec_i is None:
-            logger.info("Signal termination detected, finalizing dataset")
+            runtime.logger.info("Signal termination detected, finalizing dataset")
             zarr_sdk.finalize_signal_dataset({"value": data}, sample_file)
             data.update(
                 {
@@ -118,34 +130,36 @@ def process_stream(streamer):
                 }
             )
             filepath = data.pop("source_filepath")
-            logger.info("Deleting file from streams folder")
+            runtime.logger.info("Deleting file from streams folder")
             try:
                 os.remove(filepath)
             except FileNotFoundError as e:
-                logger.error(
-                    f"Failed to delete file {filepath} from the streams folder: {e}"
+                runtime.logger.error(
+                    f"Failed to delete file {filepath} from the streams folder"
                 )
+                runtime.logger.exception(e)
 
             # Send request to Mascope backend to create sample file record in the db
             try:
                 create_sample_file_db_record(data)
             except Exception as e:
-                logger.error(f"Failed to create database record: {e}")
+                runtime.logger.error(f"Failed to create database record")
+                runtime.logger.exception(e)
             try:
                 sio.emit(
                     "instrument_conversion_finished",
                     notification_data,
                 )
             except Exception as e:
-                logger.error(f"Failed to emit notification: {e}")
+                runtime.logger.error(f"Failed to emit notification")
+                runtime.logger.exception(e)
         elif spec_i < 0:
             # New file
             try:
                 sample_file = zarr_sdk.init_signal_dataset({"value": data})
             except Exception as e:
-                logger.error(
-                    f"Error starting {data['filename']}: {e.__class__.__name__}({str(e)})"
-                )
+                runtime.logger.error(f"Failed to start {data['filename']}")
+                runtime.logger.exception(e)
                 cleanup()
                 return False
             sample_file = AttrDict(sample_file)
@@ -153,15 +167,17 @@ def process_stream(streamer):
             try:
                 sio.emit("instrument_conversion_started", notification_data)
             except Exception as e:
-                logger.error(f"Failed to emit notification: {e}")
+                runtime.logger.error(f"Failed to emit notification")
+                runtime.logger.exception(e)
         else:
             # New data to existing file
             zarr_sdk.update_signal_dataset({"value": data}, sample_file)
             try:
-                logger.info(notification_data["progress"])
+                runtime.logger.info(notification_data["progress"])
                 sio.emit("instrument_conversion_progress", notification_data)
             except Exception as e:
-                logger.error(f"Failed to emit notification: {e}")
+                runtime.logger.error(f"Failed to emit notification")
+                runtime.logger.exception(e)
         return True
 
     def handle_tps_data(data):
@@ -231,8 +247,7 @@ def process_stream(streamer):
 def main():
     """Main loop of the service. Connect socket.io and then do nothing."""
     global sio
-    url = f"http://{host}:{port}"
-    logger.info(f"Connecting to {url}...")
+    runtime.logger.info(f"Attempting to connect to {url}...")
     while not shutdown_event.is_set():
         # Keep trying to connect to socket.io server
         try:
@@ -241,18 +256,18 @@ def main():
         except:
             # Connection timed out, wait before retry
             sleep(1)
+    runtime.logger.info(f"Connection established to {url}")
     # socket.io connection established
     while not shutdown_event.is_set():
         # Wait for shutdown event
         sleep(1)
 
 
-host = None
-port = None
 cache = None
 raw_file_queue = Queue()
 h5_file_queue = Queue()
 shutdown_event = Event()
+
 sio = socketio.Client(logger=False, ssl_verify=False)
 
 
@@ -261,48 +276,57 @@ def run():
 
     :raises Exception: Parsing command line arguments failed
     """
-    global host
-    global port
     global cache
     global raw_file_queue
     global h5_file_queue
     global shutdown_event
 
-    host = "localhost"
-    port = config.server.port
-
-    # Validate streamer type
-    for pattern in config.file_converter.patterns:
-        if pattern not in ["*.raw", "*.h5"]:
-            raise Exception(f"Unknown file converter pattern: {pattern}")
+    if not os.path.exists(runtime.config.source):
+        runtime.logger.info(
+            f"Creating missing source directory {runtime.config.source}"
+        )
+        os.makedirs(runtime.config.source)
 
     # Initialize streamer thread(s)
     cache = dict()
     streamer_lock = Lock()
-    raw_streamers = (
-        [
-            RawStreamer(
-                file_queue=raw_file_queue,
-                shutdown_event=shutdown_event,
-                lock=streamer_lock,
-            )
-            for _ in range(config.file_converter.threads)
-        ]
-        if "*.raw" in config.file_converter.patterns
-        else []
+
+    # tof streamers
+    h5_streamers = [
+        H5Streamer(
+            file_queue=h5_file_queue,
+            shutdown_event=shutdown_event,
+            lock=streamer_lock,
+        )
+        for _ in range(runtime.config.h5_threads)
+    ]
+    h5_fs_watcher = FSWatcher(
+        path=runtime.config.source,
+        pattern="*.h5",
+        file_queue=h5_file_queue,
+        interval=runtime.config.interval,  # default 3
+        shutdown_event=shutdown_event,
     )
-    h5_streamers = (
-        [
-            H5Streamer(
-                file_queue=h5_file_queue,
-                shutdown_event=shutdown_event,
-                lock=streamer_lock,
-            )
-            for _ in range(config.file_converter.threads)
-        ]
-        if "*.h5" in config.file_converter.patterns
-        else []
+    h5_fs_watcher.start()
+
+    # orbi streamers
+    raw_streamers = [
+        RawStreamer(
+            file_queue=raw_file_queue,
+            shutdown_event=shutdown_event,
+            lock=streamer_lock,
+        )
+        for _ in range(runtime.config.raw_threads)
+    ]
+    raw_fs_watcher = FSWatcher(
+        path=runtime.config.source,
+        pattern="*.raw",
+        file_queue=raw_file_queue,
+        interval=runtime.config.interval,  # default 3
+        shutdown_event=shutdown_event,
     )
+    raw_fs_watcher.start()
+
     streamers = [*raw_streamers, *h5_streamers]
 
     # Start streamer thread(s)
@@ -310,30 +334,6 @@ def run():
         streamer.start()
         streamer_processor = Thread(target=process_stream, args=(streamer,))
         streamer_processor.start()
-
-    if not os.path.exists(config.file_converter.source):
-        logger.info(f"Creating missing source directory {config.file_converter.source}")
-        os.makedirs(config.file_converter.source)
-
-    # Initialize file system watchers
-    raw_fs_watcher = FSWatcher(
-        path=config.file_converter.source,
-        patterns=["*.raw"],
-        file_queue=raw_file_queue,
-        recursive=config.file_converter.recursive,  # default False
-        ping=config.file_converter.ping,  # default False
-        shutdown_event=shutdown_event,
-    )
-    raw_fs_watcher.run_as_daemon()
-    h5_fs_watcher = FSWatcher(
-        path=config.file_converter.source,
-        patterns=["*.h5"],
-        file_queue=h5_file_queue,
-        recursive=config.file_converter.recursive,  # default False
-        ping=config.file_converter.ping,  # default False
-        shutdown_event=shutdown_event,
-    )
-    h5_fs_watcher.run_as_daemon()
 
     try:
         # Run main loop

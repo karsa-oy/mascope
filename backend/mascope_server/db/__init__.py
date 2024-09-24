@@ -9,14 +9,12 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import text
 
-from mascope_server.config import config
-import mascope_runtime as runtime
+from mascope_server.runtime import runtime
 
-logger = runtime.logger.service("backend")
 
 # Initialize global variables at module load
 ASYNC_SESSION = None  # Global variable for session
-db_dir = config.server.database
+db_dir = runtime.config.database
 
 
 # Database utility functions
@@ -30,8 +28,8 @@ def get_available_db_version():
 
 def get_current_db_version():
     v = 0
-    if os.path.exists(config.server.database):
-        files = os.listdir(config.server.database)
+    if os.path.exists(runtime.config.database):
+        files = os.listdir(runtime.config.database)
         databases = [f for f in files if re.search("mascope.v[0-9]+.db", f)]
         versions = [
             int(re.search("[0-9]+", database).group()) for database in databases
@@ -54,7 +52,7 @@ def create_db_backup(db_path, operation):
         backup_dir, f"{timestamp}_{operation}_backup_mascope.v{current_version}.db"
     )
     shutil.copyfile(db_path, backup_db_path)
-    logger.info("Backup created at %s", backup_db_path)
+    runtime.logger.info(f"Backup created at {backup_db_path}")
     return backup_db_path
 
 
@@ -66,16 +64,16 @@ async def run_migration_script(migration):
     # Check if the migration's 'run' function is a coroutine
     if inspect.iscoroutinefunction(migration.run):
         # If it is a coroutine, await its execution
-        logger.info("Running asynchronous migration script.")
+        runtime.logger.info("Running asynchronous migration script.")
         await migration.run()
     else:
         # Otherwise, run it as a synchronous function
-        logger.info("Running synchronous migration script.")
+        runtime.logger.info("Running synchronous migration script.")
         migration.run()
 
 
 async def migrate(current_version, target_version):
-    logger.info("Executing migration pathway")
+    runtime.logger.info("Executing migration pathway")
     if current_version == 0 and not os.path.exists(db_dir):
         os.mkdir(db_dir)
     while current_version < target_version:
@@ -83,25 +81,27 @@ async def migrate(current_version, target_version):
         try:
             migration = import_module(f"mascope_server.db.migration.v{next_version}")
         except Exception as error:
-            logger.error(error)
+            runtime.logger.error(error)
         migration_label = f"from v{current_version} to v{next_version}"
-        logger.info("Attempting to migrate mascope database %s", migration_label)
+        runtime.logger.info(f"Attempting to migrate mascope database {migration_label}")
         try:
             await run_migration_script(migration)
         except Exception as error:
-            logger.error("Migration %s failed!", migration_label)
+            runtime.logger.error(f"Migration {migration_label} failed!")
             failed_db_path = os.path.join(db_dir, f"mascope.v{next_version}.db")
             debug_db_path = os.path.join(db_dir, "mascope.debug.db")
             if os.path.exists(failed_db_path):
                 os.rename(failed_db_path, debug_db_path)
-            logger.error(error)
-            logger.error("A copy failed target database is found at %s", debug_db_path)
+            runtime.logger.error(error)
+            runtime.logger.error(
+                f"A copy failed target database is found at {debug_db_path}"
+            )
             raise RuntimeError("Database migration failed")
         else:
-            logger.info("Migration %s succeded!", migration_label)
+            runtime.logger.info(f"Migration {migration_label} succeded!")
             current_version = get_current_db_version()
     if current_version == target_version:
-        logger.info("Migration pathway succesful: database is now up-to-date.")
+        runtime.logger.info("Migration pathway succesful: database is now up-to-date.")
     return current_version
 
 
@@ -110,14 +110,17 @@ def configure_database_engine(version):
     db_path = os.path.join(db_dir, f"mascope.v{version}.db")
 
     database_url = f"sqlite+aiosqlite:///{db_path}"
+
+    # Set echo to True if log level is trace
+    trace_mode = runtime.config.log_level.lower() == "trace"
+
     engine = create_async_engine(
         database_url,
         pool_pre_ping=True,  # Check connection liveness before using a connection from the pool
-        # echo=True, # TODO_debug_mode Enable logging of all SQL queries for debugging purposes
+        echo=trace_mode,  # Enable logging of all SQL queries for trace debugging purposes
         connect_args={
             "timeout": 15
         },  # Set a timeout of 15 seconds for establishing connections and waiting for table locks
-        future=True,  # Use future flag to enable 2.0 style
     )
 
     global ASYNC_SESSION
@@ -131,18 +134,18 @@ def async_session():
 # Initialization and main interface functions
 async def init_db():
     try:
-        logger.info("Initializing mascope database")
+        runtime.logger.info("Initializing mascope database")
         current_version = get_current_db_version()
         target_version = get_available_db_version()
-        logger.info("Detected mascope database version: v%s", current_version)
+        runtime.logger.info(f"Detected mascope database version: v{current_version}")
         if current_version == target_version:
-            logger.info("No database migration needed.")
+            runtime.logger.info("No database migration needed.")
             configure_database_engine(current_version)
         else:
-            logger.info("This version of mascope requires: v%s", target_version)
+            runtime.logger.info(f"This version of mascope requires: v{target_version}")
             await migrate(current_version, target_version)
     except Exception as error:
-        logger.error(error)
+        runtime.logger.error(error)
     await test_database_connection()
 
 
@@ -151,6 +154,6 @@ async def test_database_connection():
         # create a new session and close it
         async with async_session() as session:
             await session.execute(text("SELECT 1"))
-        logger.info("Database connection established successfully.")
+        runtime.logger.info("Database connection established successfully.")
     except Exception as e:
-        logger.error("Error while establishing the database connection: %s", e)
+        runtime.logger.error(f"Error while establishing the database connection: {e}")

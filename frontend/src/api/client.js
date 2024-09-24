@@ -1,20 +1,16 @@
-import { io } from 'socket.io-client'
-
 import { createHttpClient } from './http.js'
 
-import { config } from '@/lib/config.js'
+import { runtime } from '@/lib/runtime.js'
 import { strToSnakeCase } from '@/lib/utils'
 import { useApp } from '@/stores'
 
-// LOAD ENV VARS
-const host = location.hostname
-const mode = import.meta.env.MODE
+import { initSocket } from './socket.js'
 
 export const api = await initApi()
 
 async function initApi() {
-  const [socket, emit] = await initSocket()
-  const http = createHttpClient(host, config.server.port)
+  const socket = await initSocket()
+  const http = createHttpClient(location.hostname, runtime.meta.api_port)
 
   // Catch errors, show error norification and return response from api
   async function apiResponse({ method, body = {} }) {
@@ -30,6 +26,8 @@ async function initApi() {
       })
     }
   }
+
+  const log = (...args) => console.log('[api]', ...args)
 
   const request = {
     // method to write the data to api (http_methods: POST, success_status: 201)
@@ -52,6 +50,7 @@ async function initApi() {
             }
           }
         })
+        return data
       }
     },
     // method to get the data from api (http_methods: GET,POST, success_status: 200)
@@ -109,7 +108,7 @@ async function initApi() {
     process: async ({ method, body = {} }) => {
       const { data, status } = await apiResponse({ method, body })
       if (status === 202) {
-        console.log('Progress notification', data)
+        log('Progress notification', data)
       }
     }
   }
@@ -117,32 +116,7 @@ async function initApi() {
   return {
     client: http.client,
     socket,
-    emit,
     request,
     log
   }
-}
-
-// helpers
-
-function log(...args) {
-  console.log('[api]', ...args)
-}
-
-async function initSocket() {
-  // init socket in `/` namespace
-  const url = mode === 'production' ? `ws://${host}` : `ws://${host}:${config.server.port}`
-  const socket = io(url)
-  log('initialized socket for', mode, ':', url, socket)
-  // create logged event emitter
-  const emit = (event, ...args) => {
-    log(`emitting event "${event}"`, ...args)
-    socket.emit(event, ...args)
-  }
-  // create logged event handler
-  const on = (event, callback, ...args) => {
-    socket.on(event, callback)
-    log(`handling event "${event}"`, ...args)
-  }
-  return [socket, emit, on]
 }

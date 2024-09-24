@@ -11,7 +11,8 @@ export const useSample = defineModule({
   key: 'sample_item_id',
   useParent: useBatch,
   unfocusBefore: ['delete'],
-  load: async (sample_batch_id) =>
+  subscribe: ({ sample_file_id }) => sample_file_id,
+  load: async ({ sample_batch_id }) =>
     (
       await api.request.read({
         method: 'getAllSamples',

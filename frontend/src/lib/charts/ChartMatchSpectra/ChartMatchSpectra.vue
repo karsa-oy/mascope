@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { ref, computed, watchEffect } from 'vue'
 
 import ScrollPanel from 'primevue/scrollpanel'
 import Tag from 'primevue/tag'
@@ -13,6 +13,8 @@ import { useApp } from '@/stores'
 import { useChartData } from './data.js'
 
 const app = useApp()
+
+const plots = ref({})
 
 const props = defineProps({
   settings: {
@@ -73,6 +75,16 @@ const error = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2
 })
+
+watchEffect(() => {
+  isotopes.value.forEach(({ target_isotope_id }) => {
+    console.log(target_isotope_id)
+    const plot = plots.value[target_isotope_id]
+    if (plot) {
+      plot.resetZoom()
+    }
+  })
+})
 </script>
 
 <template>
@@ -86,6 +98,7 @@ const error = new Intl.NumberFormat('en-US', {
           <BaseChartPlotly
             :id="`ChartMatchSpectrum-${isotope.target_isotope_id}`"
             :title="`Isotope ${error.format(isotope.mz)}`"
+            :ref="(el) => (plots[isotope.target_isotope_id] = el)"
             :data="isotope.traces"
             :layout="layout"
             hideTitle

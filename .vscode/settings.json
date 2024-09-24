@@ -1,12 +1,27 @@
 {
-    "[python]": {
-        "editor.defaultFormatter": "ms-python.black-formatter"
-    },
-    "editor.formatOnSave": true,
-    "search.exclude": {
-        "**/.legacy": true,
-        "**/node_modules": true,
-        "**/__pycache__": true,
-        "**/runtime": true
-    }
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.black-formatter"
+  },
+  "editor.formatOnSave": true,
+  // Respect .gitignore files for searches
+  "search.useIgnoreFiles": true,
+  // NOTE:
+  // This ensures that files and directories ignored by .gitignore are also excluded from search results.
+  // If you need to review or edit the .gitignore files in the project, use the following CLI command:
+  // mascope dev tools open-gitignore
+
+  "search.exclude": {
+    // Specific directories/files not covered by .gitignore, or those we want to exclude for performance or relevance reasons:
+    "**/.legacy": true, // Exclude legacy files
+    "runtime/testfiles/**": true, // Exclude test files directory within runtime
+    "**/__pycache__": true // Exclude Python cache directories
+  },
+  "python.analysis.exclude": [
+    "runtime/env",
+    ".legacy",
+    "**/node_modules",
+    "**/__pycache__",
+    "**/build",
+    ".git"
+  ]
 }

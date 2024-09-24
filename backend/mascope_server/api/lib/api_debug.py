@@ -1,8 +1,6 @@
 from sqlalchemy import text
 
-import mascope_runtime as runtime
-
-logger = runtime.logger.service("backend")
+from mascope_server.runtime import runtime
 
 
 async def explain_query_plan(session, query):
@@ -16,6 +14,6 @@ async def explain_query_plan(session, query):
         f"EXPLAIN QUERY PLAN {query.compile(compile_kwargs={'literal_binds': True})}"
     )
     result = await session.execute(explain_stmt)
-    logger.debug("Query plan:")
+    runtime.logger.debug("Query plan:")
     for row in result.fetchall():
-        logger.debug(row)
+        runtime.logger.debug(row)

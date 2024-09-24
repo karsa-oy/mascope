@@ -3,12 +3,16 @@ from sqlalchemy import (
     asc,
     desc,
     func,
+    delete,
 )
+from mascope_server.app import sio
 from mascope_server.db import async_session
 from mascope_server.db.id import gen_id
 from mascope_server.db.models import (
     IonizationMechanism,
     TargetCompound,
+    TargetIon,
+    TargetIsotope,
     SampleBatch,
 )
 from mascope_server.api.lib.api_features import api_controller
@@ -207,7 +211,13 @@ async def create_ionization_mechanism(
             f"Ionization mechanism with ID '{new_ionization_mechanism.ionization_mechanism_id}' not found after it should have been created"
         )
 
-    # Step 5: Return created ionization mechanism details
+    # Step 5: Emit the reload event
+    await sio.emit(
+        "ionization_mechanism_reload",
+        namespace="/",
+    )
+
+    # Step 6: Return created ionization mechanism details
     return new_ionization_mechanism.to_dict()
 
 
@@ -218,8 +228,9 @@ async def delete_ionization_mechanism(ionization_mechanism_id: str) -> dict:
 
     Steps:
     1. Retrieve the ionization mechanism along with any referencing sample batches.
-    2. If no sample batches use this ionization mechanism, delete it from the database.
-    3. If referenced, throw an APIException preventing deletion.
+    2. If no sample batches use this ionization mechanism, delete related TargetIsotope and TargetIon records.
+    3. Delete the ionization mechanism from the database.
+    4. If referenced, throw an ApiException preventing deletion.
 
     :param ionization_mechanism_id: The unique identifier of the ionization mechanism to delete.
     :type ionization_mechanism_id: str
@@ -233,24 +244,53 @@ async def delete_ionization_mechanism(ionization_mechanism_id: str) -> dict:
         ionization_mechanism = await session.get(
             IonizationMechanism, ionization_mechanism_id
         )
-    if not ionization_mechanism:
-        raise NotFoundException(
-            f"Ionization mechanism with ID '{ionization_mechanism_id}' not found"
+        if not ionization_mechanism:
+            raise NotFoundException(
+                f"Ionization mechanism with ID '{ionization_mechanism_id}' not found"
+            )
+
+        # Step 2: Retrieve the ionization mechanism and check for sample batch references
+        ionization_details = await get_ionization_mechanism(ionization_mechanism_id)
+        if ionization_details["sample_batches_count"] > 0:
+            raise ApiException(
+                f"Ionization mechanism '{ionization_mechanism.ionization_mechanism}' cannot be deleted as it is used in {ionization_details['sample_batches_count']} sample batches.",
+                {"sample_batches": ionization_details["sample_batches"]},
+                400,
+            )
+
+        # Step 3: Manually delete related TargetIsotope and TargetIon records
+
+        # Delete TargetIsotope records
+        delete_target_isotope_query = delete(TargetIsotope).where(
+            TargetIsotope.target_ion_id.in_(
+                select(TargetIon.target_ion_id).where(
+                    TargetIon.ionization_mechanism_id == ionization_mechanism_id
+                )
+            )
         )
 
-    # Step 2: Retrieve the ionization mechanism and check for sample batch references
-    ionization_details = await get_ionization_mechanism(ionization_mechanism_id)
-    if ionization_details["sample_batches_count"] > 0:
-        raise ApiException(
-            f"Ionization mechanism '{ionization_mechanism.ionization_mechanism}' cannot be deleted as it is used in {ionization_details['sample_batches_count']} sample batches.",
-            {"sample_batches": ionization_details["sample_batches"]},
-            400,
-        )
+        await session.execute(delete_target_isotope_query)
 
-    # Step 3: Delete the ionization mechanism
-    async with async_session() as session:
-        await session.delete(ionization_mechanism)
+        # Delete TargetIon records
+        delete_target_ion_query = delete(TargetIon).where(
+            TargetIon.ionization_mechanism_id == ionization_mechanism_id
+        )
+        await session.execute(delete_target_ion_query)
+
+        # Delete the IonizationMechanism record
+        delete_ionization_mechanism_query = delete(IonizationMechanism).where(
+            IonizationMechanism.ionization_mechanism_id == ionization_mechanism_id
+        )
+        await session.execute(delete_ionization_mechanism_query)
+
+        # Commit the transaction
         await session.commit()
+
+    # Step 4: Emit the reload event
+    await sio.emit(
+        "ionization_mechanism_reload",
+        namespace="/",
+    )
 
     return {
         "message": f"Ionization mechanism '{ionization_mechanism.ionization_mechanism}' was deleted successfully."

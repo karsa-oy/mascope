@@ -2,23 +2,20 @@ import os
 import sqlite3
 import shutil
 
-from mascope_server.config import config
 
-import mascope_runtime as runtime
-
-logger = runtime.logger.service("backend")
+from mascope_server.runtime import runtime
 
 
 def run():
     # STEP 1 - setup new database
-    old_db_path = os.path.join(config.server.database, "mascope.v9.db")
-    new_db_path = os.path.join(config.server.database, "mascope.v10.db")
+    old_db_path = os.path.join(runtime.config.database, "mascope.v9.db")
+    new_db_path = os.path.join(runtime.config.database, "mascope.v10.db")
     shutil.copyfile(old_db_path, new_db_path)
     new_conn = sqlite3.connect(database=new_db_path)
 
     with new_conn:
         # STEP 2 - Add new field filter_params to target_ion table
-        logger.info("Adding filter_params field to target_ion table")
+        runtime.logger.info("Adding filter_params field to target_ion table")
         new_conn.execute(
             """
             ALTER TABLE target_ion
@@ -27,8 +24,7 @@ def run():
         )
 
         # STEP 3 - Drop filter_params field from sample_batch table
-        logger.info("Dropping filter_params field from sample_batch table")
-        # Create backup table with copy of old data
+        runtime.logger.info("Dropping filter_params field from sample_batch table")
         new_conn.execute(
             "CREATE TABLE sample_batch_backup AS SELECT * FROM sample_batch;"
         )
@@ -59,7 +55,9 @@ def run():
         new_conn.execute("DROP TABLE sample_batch_backup;")
 
         # STEP 4 - Add new field target_collection_type to target_collection table
-        logger.info("Adding target_collection_type field to target_collection table")
+        runtime.logger.info(
+            "Adding target_collection_type field to target_collection table"
+        )
         new_conn.execute(
             """
             ALTER TABLE target_collection

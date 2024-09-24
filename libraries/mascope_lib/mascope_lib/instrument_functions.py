@@ -16,7 +16,7 @@ from dash import dcc, html
 from dash.dependencies import Input, Output
 
 # Set up logger
-logger = runtime.logger.service("backend")
+logger = lib_runtime.logger.service("backend")
 
 # Precompute sigma multiplier for peak generation
 SIGMA_MULTIPLIER = 2 * np.sqrt(2 * np.log(2))
@@ -283,10 +283,10 @@ def get_peak_shape(p_x: np.ndarray, p_ys: np.ndarray) -> dict:
     """
     if len(p_ys) < 10:
         logger.warning(
-            "Only %i peaks will be used to estimate meadian peak shape!", len(p_ys)
+            f"Only {len(p_ys)} peaks will be used to estimate median peak shape!"
         )
     else:
-        logger.info("Peak shape will be averaged from %i peaks", len(p_ys))
+        logger.info(f"Peak shape will be averaged from {len(p_ys)} peaks")
     # Calculate median peak shape
     p_median = np.median(np.array([p_y for p_y in p_ys]), axis=0)
 
@@ -372,16 +372,16 @@ def get_resolution_function(
             )
             a, b = fit_res[0]
             resolution_function = partial(r_tof, a=a, b=b)
-            logger.info("TOF resolution function coefficients: a=%.2e, b=%.2e", a, b)
+            logger.info(f"TOF resolution function coefficients: a={a:.2e}, b={b:.2e}")
 
         elif instrument_type == "orbi":
             fit_res = curve_fit(inverse_sqrt, mass, resolution)
             a = fit_res[0][0]
             resolution_function = partial(r_orb, a=a)
-            logger.info("Orbi resolution function coefficients: a=%.2e", a)
+            logger.info(f"Orbi resolution function coefficients: a={a:.2e}")
 
     except ValueError as e:
-        logger.error("Resolution function fitting failed: %s", e)
+        logger.error(f"Resolution function fitting failed: {e}")
         raise ValueError("Resolution function fitting failed") from e
 
     return resolution_function

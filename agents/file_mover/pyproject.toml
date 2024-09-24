@@ -15,7 +15,7 @@ mascope-file-mover = 'file_mover:run'
 
 [tool.poetry.dependencies]
 python = "~3.12"
-mascope_runtime = { path = '../../libraries/mascope_runtime', develop = true }
+mascope_runtime = { path = '../../runtime/lib/', develop = true }
 
 watchdog = "^4.0"
 

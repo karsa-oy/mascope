@@ -9,13 +9,14 @@ import shutil
 
 from datetime import datetime
 
-from mascope_server.config import config
+import mascope_lib.runtime as lib_runtime
 
-import mascope_runtime as runtime
+lib_runtime.init()
 
-logger = runtime.logger.service("backend")
+from mascope_lib.file_func import get_filestore_path
 
-instrument_dir = config.server.filestore
+
+instrument_dir = get_filestore_path()
 
 
 def sample_file_array_op(sample_filepath: str, sample_file_array: str) -> None:
@@ -26,7 +27,7 @@ def sample_file_array_op(sample_filepath: str, sample_file_array: str) -> None:
     :param sample_file_array: Name of the sample file array
     :type sample_file_array: str
     """
-    if len(fnmatch.filter([sample_file_array], "peak*")):
+    if len(fnmatch.filter([sample_file_array], "peak*")) > 0:
         shutil.rmtree(os.path.join(sample_filepath, sample_file_array))
 
 
@@ -54,6 +55,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     sample_filename_pattern = args.filename_pattern
 
+    print(f"Walking through the filestore at {instrument_dir}")
     for dirpath, dirnames, filenames in os.walk(instrument_dir):
         # Check if we are in a date directory
         try:
@@ -63,7 +65,7 @@ if __name__ == "__main__":
             continue
         # We are in a date directory, dirnames are sample files
         for sample_filename in fnmatch.filter(dirnames, sample_filename_pattern):
-            logger.info(sample_filename)
+            print(f"Processing {sample_filename}")
             sample_filepath = os.path.join(dirpath, sample_filename)
             # Directories and files inside the sample file
             _, sample_file_arrays, sample_file_attrs = next(os.walk(sample_filepath))

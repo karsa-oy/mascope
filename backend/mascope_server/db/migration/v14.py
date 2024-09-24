@@ -7,25 +7,23 @@ from mascope_server.db.models import SampleBatch
 from mascope_server.api.controllers.match.aggregate.match_aggregate_controller import (
     aggregate_and_create_matches,
 )
-from mascope_server.config import config
-import mascope_runtime as runtime
 
-logger = runtime.logger.service("backend")
+from mascope_server.runtime import runtime
 
 
 async def run():
     # Step 1: Setup new database
     new_version = 14
     # Define the database paths
-    old_db_path = os.path.join(config.server.database, "mascope.v13.db")
-    new_db_path = os.path.join(config.server.database, f"mascope.v{new_version}.db")
+    old_db_path = os.path.join(runtime.config.database, "mascope.v13.db")
+    new_db_path = os.path.join(runtime.config.database, f"mascope.v{new_version}.db")
     shutil.copyfile(old_db_path, new_db_path)  # Copy new version for migration
 
     # Update the engine to the new database (should update the global async_session, so no restart needed)
     configure_database_engine(new_version)
 
     # Step 2: Rename match table to match_isotope
-    logger.info("Renaming match table to match_isotope.")
+    runtime.logger.info("Renaming match table to match_isotope.")
     async with async_session() as session:  # Perform database operations using async_session
         # Create backup of the current match table
         await session.execute(text("CREATE TABLE match_backup AS SELECT * FROM match;"))
@@ -92,7 +90,7 @@ async def run():
         await session.commit()
 
     #  Step 3: Create new match_ tables
-    logger.info("Creating new match_ tables.")
+    runtime.logger.info("Creating new match_ tables.")
     async with async_session() as session:  # Perform database operations using async_session
         # Create match_sample table
         await session.execute(
@@ -222,21 +220,22 @@ async def run():
         sample_batches = result.scalars().all()
 
     total_batches = len(sample_batches)
-    logger.info(f"Aggregating and creating matches for {total_batches} sample batches.")
-
+    runtime.logger.info(
+        f"Aggregating and creating matches for {total_batches} sample batches."
+    )
     # Call the aggregate_and_create_matches for each batch
     for index, batch in enumerate(sample_batches, start=1):
         try:
-            logger.info(
+            runtime.logger.info(
                 f"Processing batch {index}/{total_batches}: {batch.sample_batch_name}"
             )
             await aggregate_and_create_matches(sample_batch_id=batch.sample_batch_id)
         except Exception as e:
-            logger.error(
+            runtime.logger.error(
                 f"Failed to aggregating and create matches for sample batch '{batch.sample_batch_name}': {str(e)}"
             )
 
-    logger.info(f"Migration to v{new_version} completed successfully.")
+    runtime.logger.info(f"Migration to v{new_version} completed successfully.")
 
 
 if __name__ == "__main__":

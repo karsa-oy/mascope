@@ -2,7 +2,7 @@ import nest_asyncio
 import os
 import sqlite3
 
-from mascope_server.config import config
+from mascope_server.runtime import runtime
 
 # patch asyncio to supported run_until_complete
 # when an event loop is already running
@@ -11,7 +11,7 @@ nest_asyncio.apply()
 
 def run():
     # STEP 1 - setup new database
-    db_path = os.path.join(config.server.database, "mascope.v1.db")
+    db_path = os.path.join(runtime.config.database, "mascope.v1.db")
     new_conn = sqlite3.connect(database=db_path)
 
     with new_conn:

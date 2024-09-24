@@ -32,9 +32,8 @@ from mascope_server.api.lib.notifications.api_notification_pydantic_model import
     UserNotification,
 )
 
-import mascope_runtime as runtime
 
-logger = runtime.logger.service("backend")
+from mascope_server.runtime import runtime
 
 # TODO_configuration
 # Default Filter Parameters
@@ -333,7 +332,7 @@ async def compute_and_create_sample_match_isotope_data(
         await send_progress_user_notification(notification, 0.25)
 
     # Step 2: Compute match interferences for the given sample and target isotopes.
-    logger.info("Computing match interferences for file: %s", filename)
+    runtime.logger.info(f"Computing match interferences for file: {filename}")
     match_interference_df = await compute_match_interferences(
         filename, target_isotopes_df
     )
@@ -344,7 +343,7 @@ async def compute_and_create_sample_match_isotope_data(
         await send_progress_user_notification(notification, 0.5)
 
     # Step 3: Compute match isotopes for the given sample and target isotopes.
-    logger.info("Computing match isotopes for file: %s", filename)
+    runtime.logger.info(f"Computing match isotopes for file: {filename}")
 
     match_isotope_df = await compute_match_isotopes(
         filename=filename,

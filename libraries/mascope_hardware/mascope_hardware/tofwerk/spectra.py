@@ -14,7 +14,6 @@ import h5py
 import numpy as np
 import scipy.sparse as sparse
 
-import mascope_runtime as runtime
 
 from .instrument import KInstrument
 from .lib.TofDaq import TwRetVal
@@ -31,7 +30,7 @@ from .lib.TwH5 import (
 )
 from .util import filetime2datetime
 
-logger = runtime.logger.service('hardware-lib')
+from mascope_hardware.runtime import hardware_runtime
 
 
 class KSpectra(KInstrument):
@@ -114,7 +113,9 @@ class KSpectra(KInstrument):
             # local datetime of datapoints
             self.dt_loc = np.asarray([dt0_loc + timedelta(seconds=ti) for ti in t])
         except Exception as e:
-            logger.error("Parsing local time from filename failed: %s" % e)
+            hardware_runtime.logger.error(
+                f"Parsing local time from filename failed: {e}"
+            )
             dt0_loc = dt1_loc = None
 
         self.filename = filename

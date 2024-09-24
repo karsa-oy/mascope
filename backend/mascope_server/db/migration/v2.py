@@ -6,11 +6,8 @@ import sqlite3
 
 from datetime import datetime
 
-from mascope_server.config import config
 
-import mascope_runtime as runtime
-
-logger = runtime.logger.service("backend")
+from mascope_server.runtime import runtime
 
 # patch asyncio to supported run_until_complete
 # when an event loop is already running
@@ -19,7 +16,7 @@ nest_asyncio.apply()
 
 def run():
     # STEP 1 - setup new database
-    db_path = os.path.join(config.server.database, "mascope.v2.db")
+    db_path = os.path.join(runtime.config.database, "mascope.v2.db")
     new_conn = sqlite3.connect(database=db_path)
     with new_conn:
         # Add datetime created and modified
@@ -207,11 +204,10 @@ def run():
         """
         )
         # STEP 2 - load v1 tables into pandas dataframes and write to v2
-        sqlite_path = os.path.join(config.server.database, "mascope.v1.db")
+        sqlite_path = os.path.join(runtime.config.database, "mascope.v1.db")
         old_conn = sqlite3.connect(sqlite_path)
         with old_conn:
-            logger.info("Transfering workspaces")
-
+            runtime.logger.info("Transfering workspaces")
             workspace_df = pd.read_sql(
                 """--sql
                 SELECT
@@ -232,8 +228,7 @@ def run():
 
             workspace_df.to_sql("workspace", new_conn, if_exists="append", index=False)
 
-            logger.info("Transfering samples and attributes templates")
-
+            runtime.logger.info("Transfering samples and attributes templates")
             sample_batch_df = pd.read_sql(
                 """--sql
                 SELECT
@@ -318,8 +313,7 @@ def run():
                 "attribute_template", new_conn, if_exists="append", index=False
             )
 
-            logger.info("Transfering targets and ionization mechanisms")
-
+            runtime.logger.info("Transfering targets and ionization mechanisms")
             # Rename mechanism_id -> ionization_mechanism_id,
             # polarity -> ionization_mechanism_polarity,
             # mechanism -> ionization_mechanism
@@ -430,8 +424,7 @@ def run():
                 index=False,
             )
 
-            logger.info("Transfering matches")
-
+            runtime.logger.info("Transfering matches")
             match_df = pd.read_sql(
                 """--sql
                 SELECT

@@ -274,7 +274,10 @@ class TargetIon(Base):
     )
     ionization_mechanism_id = Column(
         String(16),
-        ForeignKey("ionization_mechanism.ionization_mechanism_id", ondelete="CASCADE"),
+        ForeignKey(
+            "ionization_mechanism.ionization_mechanism_id",
+            ondelete="CASCADE",
+        ),
         nullable=False,
     )
     target_ion_formula = Column(String(256), nullable=False)
@@ -330,7 +333,10 @@ class TargetIsotope(Base):
     target_isotope_id = Column(String(16), nullable=False, primary_key=True)
     target_ion_id = Column(
         String(16),
-        ForeignKey("target_ion.target_ion_id", ondelete="CASCADE"),
+        ForeignKey(
+            "target_ion.target_ion_id",
+            ondelete="CASCADE",
+        ),
         nullable=False,
     )
     mz = Column(Float, nullable=False)

@@ -30,9 +30,8 @@ from mascope_server.api.models.match.compounds.match_compound_pydantic_model imp
     MatchCompoundBase,
 )
 
-import mascope_runtime as runtime
 
-logger = runtime.logger.service("backend")
+from mascope_server.runtime import runtime
 
 
 @api_controller()
@@ -67,7 +66,7 @@ async def get_match_compounds(
     :type sample_batch_id: Optional[str], optional
     :param target_compound_id: Filter matches by the associated target compound's ID, defaults to None.
     :type target_compound_id: Optional[str], optional
-    :param match_category: Filter matches by their category (e.g., confirmed, probable), defaults to None.
+    :param match_category: Filter matches to include specified category and higher (e.g., 1 includes categories 1 and higher), defaults to None.
     :type match_category: Optional[int], optional
     :param show_target_collection: Include additional data about the target collections, defaults to False.
     :type show_target_collection: bool, optional
@@ -94,7 +93,7 @@ async def get_match_compounds(
         if target_compound_id:
             query = query.filter(MatchCompound.target_compound_id == target_compound_id)
         if match_category is not None:
-            query = query.filter(MatchCompound.match_category == match_category)
+            query = query.filter(MatchCompound.match_category >= match_category)
 
         # Join with TargetCompound table to include target_compound data if requested
         if show_target_compound:
@@ -299,7 +298,7 @@ async def create_match_compounds(
             409,
         )
 
-    logger.info(message)
+    runtime.logger.info(message)
     return result
 
 
@@ -343,5 +342,5 @@ async def delete_match_compounds(
     if target_compound_ids:
         message += f" Limited by {len(target_compound_ids)} specified target compound{'s' if len(target_compound_ids) != 1 else ''}."
 
-    logger.info(message)
+    runtime.logger.info(message)
     return {"message": message}

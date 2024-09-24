@@ -14,7 +14,8 @@ import { BaseMatchTag } from '@/lib/base'
 import {
   DialogTargetCollectionOp,
   PopoverTargetCompoundAdd,
-  DialogTargetCompoundUpdate
+  DialogTargetCompoundUpdate,
+  DialogMechanismsOp
 } from '@/lib/dialogs'
 
 import { useApp } from '@/stores'
@@ -55,7 +56,8 @@ const context = reactive({
 
 const dialog = reactive({
   collection: null,
-  compound: false
+  compound: false,
+  mechanisms: false
 })
 
 const formatter = new Intl.NumberFormat('en-US', {
@@ -190,12 +192,28 @@ async function showMatch(row) {
 
 // match refocus logic
 
+/**
+ * Watcher that monitors changes of the focused target collection.
+ *
+ * It unfocuses all child elements (compounds, ions, isotopes) and unsets the visualized Match when:
+ *   1. A different collection is selected.
+ *   2. The current collection is deselected.
+ *
+ * @param {Object|null} collection - The currently focused collection.
+ * @param {Object|null} oldCollection - The previously focused collection.
+ */
 watch(
   computed(() => app.data.match.collection.focused),
-  (collection) => {
-    if (!collection) {
-      // unfocus child if unfocused
+  (collection, oldCollection) => {
+    // Unfocus all child elements when switching collections or deselecting the current collection
+    if (
+      !collection ||
+      (oldCollection && collection.target_collection_id !== oldCollection.target_collection_id)
+    ) {
       app.data.match.compound.unfocus()
+
+      // Unset the visualized match if the Match tab is active
+      if (app.ui.matchVisualized.ion) app.ui.matchVisualized.unset({ target: true })
     }
   }
 )
@@ -250,6 +268,19 @@ watch(
       <TabMenu :model="[{ label: 'Targets', icon: 'pi pi-bullseye' }]" />
     </template>
     <template #icons>
+      <Button
+        v-tooltip.left="'Edit mechanisms'"
+        label="Edit mechanisms"
+        class="hiddenlabel"
+        icon="pi pi-sliders-h"
+        text
+        size="small"
+        @click="
+          () => {
+            dialog.mechanisms = true
+          }
+        "
+      />
       <Button
         v-tooltip="'Create collection'"
         label="Create collection"
@@ -447,4 +478,5 @@ watch(
   </Panel>
   <DialogTargetCollectionOp v-model:action="dialog.collection" :collection="context.collection" />
   <DialogTargetCompoundUpdate v-model:visible="dialog.compound" :compound="context.compound" />
+  <DialogMechanismsOp v-model:visible="dialog.mechanisms" />
 </template>

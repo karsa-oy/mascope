@@ -19,9 +19,7 @@ from ThermoFisher.CommonCore.Data import Business as ThermoBusiness
 
 from .util import net2np_array
 
-import mascope_runtime as runtime
-
-logger = runtime.logger.service("hardware-lib")
+from mascope_hardware.runtime import hardware_runtime
 
 
 def strip_filepath(filepath):
@@ -80,8 +78,9 @@ def precompute_grid(mz_min, mz_max, points_per_fwhm=4, resolution_coeff=1.715e6)
 
 class RawStreamer(Thread):
     def __init__(self, file_queue=Queue(), shutdown_event=Event(), lock=Lock()):
-        logger.info("RawStreamer initializing")
         Thread.__init__(self)
+        self.log = hardware_runtime.logger.bind(key=self.name)
+        self.log.info(f"Initializing raw streamer ({self.name})")
         # Parameters
         self._mz_grid = None
         # Thermo Fischer RawFileReaderFactory
@@ -299,7 +298,7 @@ class RawStreamer(Thread):
         return False
 
     def run(self):
-        logger.info("RawStreamer running")
+        self.log.info(f"Running raw streamer ({self.name})")
         # Main loop
         while not self.shutdown_event.is_set():
             try:
@@ -313,7 +312,7 @@ class RawStreamer(Thread):
                         i_type = self.raw.GetInstrumentType(0)
                         self.raw.SelectInstrument(i_type, 1)
                 except Exception as e:
-                    logger.error(f"Failed to read file {file_to_stream}: {e}")
+                    self.log.error(f"Failed to read file {file_to_stream}: {e}")
                     continue
             except Empty:
                 # No file to stream, keep waiting
@@ -326,7 +325,7 @@ class RawStreamer(Thread):
             self._mz_grid = precompute_grid(mz_min, mz_max)
             # Check if precomputation
             if self._mz_grid is None:
-                logger.error(
+                self.log.error(
                     f"Failed to compute mz grid. File {self.filename} is likely damaged."
                 )
                 # Close raw file
@@ -336,7 +335,7 @@ class RawStreamer(Thread):
             # Start streaming
             # Feed coordinates
             self._feed_coordinates()
-            logger.info(f"Acquisition started: {self.filename}")
+            self.log.info(f"Acquisition started: {self.filename}")
             # Set active flag
             self.active.set()
             # Loop through the file and feed to queues
@@ -345,7 +344,7 @@ class RawStreamer(Thread):
                 self.raw.RunHeaderEx.LastSpectrum + 1,
             )
             for scan_no in all_scans:
-                logger.info(scan_no)
+                self.log.info(scan_no)
                 self.speci = scan_no - 1
                 # Update self and feed data into queue
                 self._get_and_feed_data(scan_no)
@@ -358,9 +357,9 @@ class RawStreamer(Thread):
                     break
             # Out of stream loop
             self._finalize()
-            logger.info("RawStream finished")
+            self.log.info("Streaming finished")
         # Out of main loop
-        logger.info("RawStreamer exiting")
+        self.log.info(f"Exiting raw streamer ({self.name})")
         self.shutdown()
 
     def shutdown(self):

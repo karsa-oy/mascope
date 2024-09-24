@@ -14,8 +14,8 @@ mascope-tof-agent = 'tof_agent:run'
 
 [tool.poetry.dependencies]
 python = "~3.12"
-mascope_hardware = { path = '../../libraries/mascope_hardware', develop = true }
-mascope_runtime = { path = '../../libraries/mascope_runtime', develop = true }
+mascope_hardware = { path = '../../libraries/mascope_hardware/', develop = true }
+mascope_runtime = { path = '../../runtime/lib/', develop = true }
 
 python-socketio = "^5.11"
 pyyaml = "^6.0"

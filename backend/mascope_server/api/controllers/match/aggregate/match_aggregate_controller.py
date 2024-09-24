@@ -65,9 +65,8 @@ from mascope_server.api.models.match.samples.match_sample_pydantic_model import 
     MatchSampleBase,
 )
 
-import mascope_runtime as runtime
 
-logger = runtime.logger.service("backend")
+from mascope_server.runtime import runtime
 
 
 @api_controller()
@@ -124,7 +123,7 @@ async def aggregate_match_isotope_filtered_data(
             message = (
                 f"No samples found in the batch '{sample_batch.sample_batch_name}'"
             )
-            logger.info(message)
+            runtime.logger.info(message)
             return samples_df
 
         sample_item_ids = samples_df["sample_item_id"].tolist()
@@ -191,8 +190,8 @@ async def aggregate_match_isotope_filtered_data(
         target_result = await session.execute(target_query)
         targets_df = pd.DataFrame([row._asdict() for row in target_result.fetchall()])
         if targets_df.empty:
-            logger.info(
-                "No targets found in the batch '%s'", sample_batch.sample_batch_name
+            runtime.logger.info(
+                f"No targets found in the batch '{sample_batch.sample_batch_name}'"
             )
             return targets_df
 
@@ -225,9 +224,8 @@ async def aggregate_match_isotope_filtered_data(
         match_isotopes_result = await session.execute(match_isotopes_query)
         match_isotopes_df = pd.DataFrame(match_isotopes_result.fetchall())
         if match_isotopes_df.empty:
-            logger.info(
-                "No match isotopes found for the sample batch '%s'",
-                sample_batch.sample_batch_name,
+            runtime.logger.info(
+                f"No match isotopes found for the sample batch '{sample_batch.sample_batch_name}'"
             )
             return match_isotopes_df
 
@@ -252,9 +250,8 @@ async def aggregate_match_isotope_filtered_data(
             match_interference_df = pd.DataFrame(match_interference_result.fetchall())
 
             if match_interference_df.empty:
-                logger.info(
-                    "No match interference found for the sample batch '%s'",
-                    sample_batch.sample_batch_name,
+                runtime.logger.info(
+                    f"No match interference found for the sample batch '{sample_batch.sample_batch_name}'"
                 )
                 return match_interference_df
 
@@ -487,9 +484,7 @@ async def aggregate_and_create_matches(
         )
         descriptions.append("match_samples")
 
-    description_str = ", ".join(descriptions)
-    logger.info("Creating %s for %s.", description_str, sample_ref)
-
+    runtime.logger.info(f"Creating {', '.join(descriptions)} for {sample_ref}.")
     # Process each type of match data if available
     for create_func, raw_data, model_cls in create_operations:
         if raw_data:  # Check if there is data to process

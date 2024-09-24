@@ -58,9 +58,8 @@ from mascope_server.api.lib.notifications.api_notification_pydantic_model import
     UserNotification,
 )
 
-import mascope_runtime as runtime
 
-logger = runtime.logger.service("backend")
+from mascope_server.runtime import runtime
 
 
 # -------------------------------------------------------------------
@@ -118,7 +117,7 @@ async def rematch_sample(
         - If `added_*` parameters are provided, the function computes new matches related to these parameters.
         - If no `added_*` or `removed_*` parameters are provided, the function removes all existing matches and computes new matches for all targets.
     """
-    logger.info("...Rematching sample: %s ...", sample_item_id)
+    runtime.logger.info(f"...Rematching sample: {sample_item_id} ...")
     # Step 1: Remove existing matches based on provided removed parameters
     if removed_target_compound_ids or removed_ionization_mechanism_ids:
         await match_remove_sample(
@@ -214,10 +213,8 @@ async def match_remove_sample(
         if not sample:
             raise NotFoundException(f"Sample with ID '{sample_item_id}' not found")
     sample_item_name = sample.sample_item_name
-    logger.info(
-        "...Removing matches for sample '%s' with ID '%s' ...",
-        sample_item_name,
-        sample_item_id,
+    runtime.logger.info(
+        f"...Removing matches for sample '{sample_item_name}' with ID '{sample_item_id}' ..."
     )
 
     # Step 2: Remove match data and associated sample item.
@@ -230,7 +227,7 @@ async def match_remove_sample(
     message = f"{remove_matches_reult['message']} for sample '{sample_item_name}'."
 
     # Step 4: Return sample batch data and message
-    logger.info(message)
+    runtime.logger.info(message)
     return {
         "data": sample.to_dict(),
         "message": message,
@@ -303,10 +300,8 @@ async def match_compute_sample(
         else True
     )
 
-    logger.info(
-        "...Computing match isotopes and interferences for sample %s: %s ...",
-        sample_item_name,
-        sample_item_id,
+    runtime.logger.info(
+        f"...Computing match isotopes and interferences for sample {sample_item_name}: {sample_item_id} ..."
     )
 
     # Step 2: Fetch target isotopes for match computation
@@ -507,7 +502,9 @@ async def rematch_batches(
                 )
             else:
                 # Log critical error and re-raise exception to stop rematching all batches
-                logger.error("Critical Error in rematch_batch: %s", e.user_message)
+                runtime.logger.error(
+                    f"Critical Error in rematch_batch: {e.user_message}"
+                )
                 raise e from e
 
         # Step 4: Aggregate failed samples from the batch for reporting
@@ -619,10 +616,8 @@ async def rematch_batch(
                 f"Sample batch with ID '{sample_batch_id}' not found"
             )
     sample_batch_name = sample_batch.sample_batch_name
-    logger.info(
-        "...Rematching sample batch '%s' with ID '%s' ...",
-        sample_batch_name,
-        sample_batch_id,
+    runtime.logger.info(
+        f"...Rematching sample batch '{sample_batch_name}' with ID '{sample_batch_id}' ..."
     )
     # Prepare progress user notification.
     notification = UserNotification(
@@ -776,10 +771,8 @@ async def match_remove_batch(
             )
 
     sample_batch_name = sample_batch.sample_batch_name
-    logger.info(
-        "...Removing matches for sample batch '%s' with ID '%s' ...",
-        sample_batch_name,
-        sample_batch_id,
+    runtime.logger.info(
+        f"...Removing matches for sample batch '{sample_batch_name}' with ID '{sample_batch_id}' ..."
     )
 
     # Step 2: Remove match data and associated sample batch.
@@ -794,7 +787,7 @@ async def match_remove_batch(
     )
 
     # Step 4: Return sample batch data and message
-    logger.info(message)
+    runtime.logger.info(message)
     return {
         "data": sample_batch.to_dict(),
         "message": message,
@@ -872,10 +865,8 @@ async def match_compute_batch(
         raise NotFoundException(f"Sample batch with ID '{sample_batch_id}' not found")
     sample_batch_name = sample_batch.sample_batch_name
 
-    logger.info(
-        "...Computing match isotopes and interferences for sample batch '%s' with ID '%s' ...",
-        sample_batch_name,
-        sample_batch_id,
+    runtime.logger.info(
+        f"...Computing match isotopes and interferences for sample batch '{sample_batch_name}' with ID '{sample_batch_id}' ..."
     )
 
     # Step 3: Identify target isotopes for computation.
@@ -925,10 +916,8 @@ async def match_compute_batch(
         )
 
         try:
-            logger.info(
-                "...Computing match isotopes and interferences for sample '%s' with ID '%s' ...",
-                sample.sample_item_name,
-                sample.sample_item_id,
+            runtime.logger.info(
+                f"...Computing match isotopes and interferences for sample '{sample.sample_item_name}' with ID {sample.sample_item_id} ..."
             )
             # Gather sample information
             # Check if 'verified' exists in mz_calibration. If not, provide a default value of False
@@ -966,10 +955,8 @@ async def match_compute_batch(
             )
         except ApiException as e:
             # If an exception occurs during sample match computation, log the error and add the sample to the failed list
-            logger.warning(
-                "Processing sample '%s' failed: %s",
-                sample.sample_item_name,
-                e.user_message,
+            runtime.logger.info(
+                f"Processing sample '{sample.sample_item_name}' failed: {e}"
             )
             samples_compute_failed.append(
                 {

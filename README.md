@@ -1,88 +1,502 @@
+_Karsa Mascope - developer documentation - last major update: August 2024_
+
+---
+
 # Mascope
 
-This is the primary developer documentation for Mascope.
+This monorepo contains the Mascope backend and frontend as well auxiliary services, libraries and tooling.
 
-- [Overview](#overview) - a birds-eye-view of the Mascope app
-- [Getting started](#getting-started) - installing and running the dev environment
-- [Frontend](#frontend) - the frontend
-  - [Technologies](#frontend-technologies) - our frontend stack
-  - [Folder structure](#frontend-folder-structure) - organization of the frontend code
-  - [Tests](#frontend-tests) - our frontend tests
+All developer docs are in this document:
 
-## Overview
+- **[🚀 Getting started](#getting-started)** - install and running - [windows](#windows) / [ubuntu](#ubuntu) / [cheatsheet](#cheatsheet)
+- **[🚂 Runtime](#runtime)** - devops toolchain - [api](#runtime-library) / [cli](#runtime-cli) / [modes](#runtime-modes) / [modules](#runtime-modules) / [envs](#runtime-environments) / [configs](#runtime-config) / [logging](#runtime-logging)
+- **[🤖 Agents](#agents)** - instrument agents - [file mover](#file-mover) / [tof agenet](#tof-agent)
+- **[📡 Backend](#backend)** - central server - [api](#backend-api) / [app](#backend-app) / [db](#backend-db) / [file converter](#backend-file-converter)
+- **[🖥️ Frontend](#frontend)** - user interface - [tech](#frontend-technologies) / [codebase](#frontend-codebase) / [stores](#frontend-stores) / [tests](#frontend-tests)
+- **[📚 Libraries](#libraries)** - shared packages - [mascope_api](#mascope-api) / [mascope_hardware](#mascope-hardware) / [mascope_lib](#mascope-lib)
+- **[📒 Notebooks](#notebooks)** - jupyter environment
+- **[📄 Documentation](#documentation)** - about the docs
 
-This monorepo contains the Mascope backend and frontend as well auxiliary services, libraries and tooling. The project is structured as follows:
+---
+
+The monorepo is structured as follows:
 
 ```
-mascope/
-  agents/          Instrument machine agents
-    file_mover          File mover (for Orbitrap)
-    ht300a              Autosampler
-    tof_agent           Tofwerk TOF
-  backend/         Main server (Python, FastAPI, SQLite)
-  frontend/        Web client (Javascript, Vue, PrimeVue)
-  libraries/       Shared libraries
-    mascope_api/        Public REST API wrapper
-    mascope_hardware/   Instrument interfaces
-    mascope_lib/        Chemistry and signal processing
-    mascope_runtime/    Config, logging and state
-  notebooks/        Jupyter environment
-  runtime/          Development runtime
-  tooling/          CLI and scripts
+mascope/           Monorepo root directory
+  agents/            Instrument machine agents
+  backend/           Main server (Python, FastAPI, SQLite)
+  frontend/          Web client (Javascript, Vue, PrimeVue)
+  libraries/         Shared libraries
+  notebooks/         Jupyter environment
+  runtime/           Config, logging, state and data
+  setup/             Installation scripts
+  testfiles/         Test data files (mostly .gitignored)
 ```
 
 Additionally, the `.legacy` folder persists some deprecated code and documentation, and the `.vscode` includes team VSCode configuration.
 
+Finally, you may place a folder named `tofdaq` in the project root, to have the TOF recorder software in a convenient place; it will be `.gitignore`d.
+
+---
+
 ## Getting Started
 
-Our development environment includes setup scripts and a comprehensive `mascope` command line tool. This section explains how to setup this environment.
+The Mascope runtime includes setup scripts and a comprehensive `mascope` command line tool. This section explains how to setup this environment.
 
-### Windows
+Our setup scripts will install low-level prerequisites (_Python 3.12_, _Node 22_, _Pipx_ and _Poetry_), package dependencies (via `poetry` and `npm`), the `mascope` cli.
+
+### Windows setup
 
 The only prerequisite is [Powershell 7](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows), which should be available on Windows 11 by default.
 
-#### Installation
-
-To install your development environment, run:
+To `install` your Mascope runtime, run:
 
 ```
-git clone git@github.com:karsa-oy/mascope.git && cd mascope && .\tooling\scripts\windows_dev_setup.ps1
+git clone git@github.com:karsa-oy/mascope.git && cd mascope && .\setup\windows.ps1 install
 ```
-
-The script will install our global dev tools _Python 3.12_, _Node 22_, _Pipx_ and _Poetry_, as well as dependencies for all our packages and the `mascope` cli.
 
 After installation, run `mascope --help` for usage instructions.
 
-#### Updating
-
-When pulling the latest changes from github, we often need to ensure our development environment is updated.
-
-To reinstall the `mascope` cli and development environment, run:
+To `update` the runtime, run:
 
 ```
-.\tooling\scripts\windows_dev_setup.ps1 -UpdateAll
+.\setup\windows.ps1 update
 ```
 
-This is much quicker than the full install, since it doesn't install the global dev tools. To shorten the update, you can also update only the CLI with `-UpdateCli` or only the dev env with `-UpdateDevEnv` to save time.
+This is much quicker than the full install, since it doesn't install the global dev tools. You can also pass modules as arguments to accelerate the update, e.g. `.\setup\windows.ps1 update cli`.
 
-# Frontend
+Similarly, there are `reinstall` and `uninstall` commands.
+
+### Ubuntu setup
+
+The only prerequisite is [Bash](https://www.gnu.org/software/bash/), which is available on Ubuntu. The script has been developed against Ubuntu 22.04 LTS, but should work on later versions as well.
+
+To `install` your Mascope runtime, run:
+
+```
+git clone git@github.com:karsa-oy/mascope.git && cd mascope && ./setup/ubuntu.sh install
+```
+
+After installation, run `mascope --help` for usage instructions.
+
+To `update` the runtime, run:
+
+```
+./setup/ubuntu.sh update
+```
+
+This is much quicker than the full install, since it doesn't install the global dev tools. You can also pass modules as arguments to accelerate the update, e.g. `./setup/ubuntu.sh update cli`.
+
+Similarly, there are `reinstall` and `uninstall` commands.
+
+### Adding dependencies
+
+When adding Python dependencies, you need to ensure to `update` Mascope with the appropriate script for your platform. Occassionally you can get away with updating only a subset of modules, but a full update is always safest.
+
+> ⚠️ When updating a depedency of one of our shared libraries, you must ensure to run `poetry lock` on _all_ dependent packages. The update will _not_ be propagated properly otherwise.
+
+If you run into issues, try to run a clean `reinstall` instead of an `update`. This would ensure a clean install and can resolve some lingering issues. To update a dependency, you can use `poetry` in the usual way, but be sure to then follow the previous steps in this section to propagate the change.
+
+Managing frontend dependencies is done in the standard way using `npm`.
+
+---
+
+## Cheatsheet
+
+### Dev
+
+Running in dev mode:
+
+```sh
+mascope dev run                                  # run the backend and frontend dev servers
+mascope dev run backend file-converter           # run specific modules in dev mode
+mascope --log-grep foo dev run                   # highlight log lines with foo
+mascope -g foo dev run                           # highlight log lines with foo
+mascope --log-level debug dev run                # set log level to debug
+mascope -l debug dev run                         # set log level to debug
+```
+
+### Prod
+
+Running in prod mode:
+
+```sh
+mascope prod up            # put up the prod containers
+mascope prod up --build    # force build before putting up containers
+mascope prod ps            # check production container status
+mascope prod down          # put down the prod containers
+mascope prod build         # build the production containers
+```
+
+### Env
+
+Manage runtime envs:
+
+```sh
+mascope env list           # list runtime env
+mascope env activate foo   # set foo as the active env
+mascope env default        # revert to the default env
+```
+
+---
+
+## Runtime
+
+Mascope's _runtime_ is a common framework underpining the app's devops toolchain. The runtime has a main interface:
+the `mascope` [CLI](#runtime-cli). Mascope developers can use the CLI to select Mascope [environments](#runtime-envs):
+these are folders containing the full state of a Mascope app (database, files, etc). Runtimes can be configured
+with a set of [configuration files](#runtime-config) global app options for libraries, servers, services and agents.
+
+The app can be run in two [modes](#runtime-modes): [dev](#runtime-dev) and [prod](#runtime-prod). Dev
+mode runs the app's modules with Poetry and Vite. Prod mode builds two docker containers: the backend
+and nginx reverse proxy serving the frontend bundle.
+
+```
+runtime/          Config, logging, state and data
+  cli/                CLI for managing Mascope and its runtime
+  env/                Runtime environments
+  lib/                Shared lib for accessing the runtime
+```
+
+### Runtime Library
+
+The runtime library exposes a Python API for initializing and using so-called _Mascope runtime modules_. The modules allow accessing runtime scope appropriate to the runtime module using it.
+
+When you instantiate a Mascope runtime instance for some module, you can access that module's private configuration, the global runtime configuration and the logger.
+
+```py
+# backend/mascope_server/runtime.py
+runtime = MascopeRuntimeModule('backend')
+
+# elsewhere
+from mascope_server.runtime import runtime
+
+# works
+print(runtime.meta.api_port) # global config is under .meta
+print(runtime.config.database) # backend specific config is under .config
+
+# throws
+print(runtime.file_converter.threads) # other modules are not exposed
+
+runtime.logger.debug("who broke my code?")
+runtime.logger.info("so normal, so boring....")
+runtime.logger.error("oh no! what happened?")
+```
+
+### Runtime CLI
+
+After following the [installation instructions](#getting-started) you can view the CLI's help by running
+`mascope --help`. You can view details of subcommands similarly, e.g. `mascope runtime --help`.
+
+The main subcommands are:
+
+```
+mascope dev       install and run the dev environment
+mascope prod      build and run prod deployments
+mascope env       select and manage app runtimes
+mascope modules   list the monorepo's registered modules
+mascope path      print the MASCOPE_PATH env var
+```
+
+The CLI relies on the environment variable `MASCOPE_PATH` to point to the repository path.
+
+#### Extending the CLI
+
+The CLI is written using [Typer](https://typer.tiangolo.com/), a type-hints based library for writing command line tools. These are called Typer _apps_ and can be nested to create grouped subcommands. In `mascope`, `modules` and `path` are simple commands (implemented directly in `runtime/cli/mascope_cli/main.py`), while `dev`, `prod` and `env` are subcommand apps found in the `cmd` folder.
+
+The best resource for learning about the Typer API is the [Typer docs Learn section](https://typer.tiangolo.com/tutorial/).
+
+### Runtime Modes
+
+The runtime can be executed in two major modes: `dev` and `prod`. While `dev` mode spins up a Vite dev server and runs Unicorn with HMR, `prod` builds a docker container and runs Uvicorn behind Nginx.
+
+#### Dev mode
+
+The development environment works by running dev server commands listed in the [modules](#runtime-modules).
+These run `poetry` or `vite` dev servers and script to run other operations or services. By default, running
+`mascope dev run` spins up the `backend` and `frontend` dev servers and joins their logs to one output.
+You can also specify other modules (run `mascope module --runnable` to see which). For an overview of
+the `dev` mode api, run `mascope dev --help`.
+
+#### Prod mode
+
+The production deployment for the mascope server - consisting of the `backend` and `frontend` (incl. proxy) modules - is deployed using `docker`. The docker files for these are in their respective folders. The whole thing is tied together with `docker compose`, allowing us to spin up the pair in tandem and automatically have them share a network (see `docker-compose.yaml` for config).
+
+See `mascope prod --help` for extensive documentation, but in short:
+
+```sh
+mascope prod build  # build the containers
+mascope prod up     # start the server (detatched)
+mascope prod logs   # attach to the logs
+mascope prod down   # stope the server
+```
+
+You can also run `mascope up --build` to build and run the containers.
+
+### Runtime Modules
+
+Since Mascope is a monorepo, and we require multimachine deployments, we need to think of Mascope as a set of modules. To list the modules registered in our runtime library, run `mascope modules`. Modules can be optionally installable, as for those which correspond to poetry or npm packages. They can also optionally be runnable, like the file converter service or the frontend dev server.
+
+Modules' _configuration_ is specified in the `base`, `dev` and `prod` files with `.mascope.toml`, _schema_ is defined in `runtime/lib` in the `config.py` file. The configuration of each module is scoped to that module and exposed to the module runtime.
+
+### Runtimes Envs
+
+The Mascope app requires multiple persistence mechanisms: SQLite, various files, configuration files and even a small state.json file. To facilitate ease of operations, these are organized in a single folder called a _runtime env_.
+
+To list available envs, run `mascope env list`. To activate an env _foo_, run `mascope env activate foo`. To revert to the _default_ env, run `mascope env default`.
+
+The `runtime/env` folder can contain multiple runtime environments. Only `default` - the team's standard development environment - is not `.gitignore`d. The folder structure looks like this:
+
+```py
+runtime/
+  env/
+    default/             # The built-in dev environment
+    foo/                 # Some custom environment
+      agents/              # Storage for instrument agents
+      database/            # The primary SQLite db and its backups
+      filestore/           # Stored raw and processed files
+      filestreams/         # Network drive to receive incoming files
+      ...                  # .mascope.toml config files
+```
+
+Some folders may be symbolically linked to a runtime to facilitate network drives.
+
+### Runtime Config
+
+The `mascope.toml` files inside a runtime configures the app. The configuration includes app wide settings (under `meta`) and [module](#runtime-modules) specific configuration settings. There are three files, that have the same schema:
+
+```py
+runtime/
+  env/
+    foo/
+      ...                  # Rest of the env's state
+      base.mascope.toml    # Baseline app config - applies always
+      dev.mascope.toml     # Development app config - overrides base in dev mode
+      prod.mascope.toml    # Production app config - overrides base in prod mode
+```
+
+For a complete and up-to-date list of options, refer to the default baseline configuration, found at `runtime/env/default/base.mascope.toml`. Here is an example of a small `dev.mascope.toml` you may use during development to override specific values:
+
+```toml
+[meta]
+description = "My weird overrides"
+log_level = "warning" # reduce overall log verbosity
+api_port = 9876 # change the API port
+filestore = "/home/mrfoo/secret/stash" # change the filestore path
+
+[backend]
+log_level = "debug" # debug the backend
+database = "/home/mrfoo/secret/base" # change the database path
+filestreams = "./foostreams"
+```
+
+Relative paths like `./database` are always resolved to the runtime environmemnt path before the configuration is injected to the application.
+
+### Runtime Logging
+
+Logging in the Mascope runtime leverages [Loguru](https://loguru.readthedocs.io/). The following log levels are available:
+
+- **TRACE**
+- **DEBUG**
+- **INFO**
+- **SUCCESS**
+- **WARNING**
+- **ERROR**
+- **CRITICAL**
+
+You can write messages using `runtime.logger`, which is a standard Loguru logger; all log levels are therefore methods of this object, i.e. you can do `runtime.logger.info("foo")` or `runtime.logger.critical("bar")`.
+
+In the command line, you can set the _terminal_ log level globally using the `--log-level` flag (`-l` for short):
+
+```sh
+mascope --log-level debug dev run
+mascope -l critical prod up
+```
+
+Log levels can also be set for each module individually by using the `log_level` option for that module, or globally by setting `log_level` for the `[meta]` configuration block. Module-specific settings will override this `[meta]` setting, while the `--log-level` command line option will override all configuration options. In all cases, they are not case-sensitive.
+
+If you want to highlight lines with certain key words, you can do the following:
+
+```sh
+mascope -g foo dev run
+```
+
+By default, lines with log level `success` or above are highlighted.
+
+Logging on `info` level to file is also performed. The logs are _structured_, meaning each line is a JSON object including the various metadata provided. You can set the log file directory using the `log_path` configuration option, but it defaults to a folder called `logs` inside the runtime environment.
+
+You can inject custom fields into the structure logs using [Loguru's bind method](https://loguru.readthedocs.io/en/stable/api/logger.html#loguru._logger.Logger.bind):
+
+```py
+modified_logger = runtime.logger.bind(some_metadata="foo")
+
+modified_logger.info("I include the metadata")
+```
+
+Our logger has a special `key` metadata field which will appear in the terminal logs as well as the file logs. Its intentended to identify entities like objects and processes more granularly than the file level. In the terminal logs, this field is appended after the Python module.
+
+For example the File converter streamer thread is used as a key:
+
+```py
+class FSWatcher(Thread):
+    def __init__(
+      # ...
+    ):
+        Thread.__init__(self)
+        self.log = runtime.logger.bind(key=self.name)
+```
+
+Which logs the thread's identifier after the module path, e.g. `mascope_hardware.orbitrap.generator:83 Thread-1`.
+
+---
+
+## Agents
+
+Agents are small Python programs installed with Pyinstaller on Windows instrument machines. They perform
+minimal transformations and move files to the server.
+
+```
+agents/          Instrument machine agents
+  file_mover/         File mover (for Orbitrap)
+  tof_agent/          Tofwerk TOF
+  ht300a/             Autosampler (not in use)
+```
+
+### File Mover
+
+The file-mover agent is responsible for moving files from instrument machines unchanged to the server. This is designed for use in Orbitrap machines.
+
+To run all services needed to emulate the Orbitrap acquisition workflow in development, run `mascope dev run orbi`.
+
+To build for production, run the following commands _on a Windows machine_:
+
+```
+cd agents/file_mover
+./build.ps1
+```
+
+Then run the executable found in `agents/file_mover/dist`.
+
+When you run this executable, the `MASCOPE_PATH` will be `%AppData%\Mascope\FileMover` and the runtime environment will therefore be `%AppData%\Mascope\FileMover\runtime\env\prod`
+
+You will need to run the agent once so that it initializes the directory structure, but it will fail to resolve some paths because the configuration needs to be updated. Then go to the env path listed above and update `prod.mascope.toml` with the real paths.
+
+### TOF Agent
+
+The tof agent agent is responsible for transforming and transfering files from TofWerk instrument machines
+to the server.
+
+To run all services needed to emulate the TofWerk acquisition workflow in development, run `mascope dev run tof`.
+
+To build for production, run the following commands _on a Windows machine_:
+
+```
+cd agents/tof_agent
+./build.ps1
+```
+
+Then run the executable found in `agents/file_mover/dist`.
+
+When you run this executable, the `MASCOPE_PATH` will be `%AppData%\Mascope\TofAgent` and the runtime environment will therefore be `%AppData%\Mascope\TofAgent\runtime\env\prod`.
+
+You will need to run the agent once so that it initializes the directory structure, but it will fail to resolve some paths because the configuration needs to be updated. Then go to the env path listed above and update `prod.mascope.toml` with the real paths.
+
+## Backend
+
+```
+backend/
+  mascope_server/
+    api/                Fast Routes, Socket Events & Pydantic Models
+    app/                Fast app, Socket server & app, Uvicorn launcher
+    db/                 SQLite init, schema, migrations and ops
+    file_converter/     File loading service
+
+```
+
+### Backend Tech
+
+The main tech stack for the backend is as follows:
+
+- [FastAPI](https://fastapi.tiangolo.com/) - HTTP/S REST API
+- [Uvicorn](https://www.uvicorn.org/) - Main web server
+- [SocketIO](https://python-socketio.readthedocs.io/en/latest/index.html) - WebSocket event API
+- [Pydantic](https://docs.pydantic.dev/dev/) - Data model validation
+- [SQLite](https://www.sqlite.org/docs.html) - In-process database
+  - [SQLAlchemy](https://docs.sqlalchemy.org/en/20/index.html) - Object Relational Model
+
+### Backend API
+
+Mascope's server API is built mainly with FastAPI, supplemented by a limited number of SocketIO events
+for enabling the frontend to react to changes in the backend. The `api` folder is organized as follows:
+
+```
+backend/
+  mascope_server/
+    api/
+      controllers/         business logic
+      events/              socketio event handlers
+      lib/                 shared code
+      models/              pydantic data models
+      routes/              fastapi routes
+```
+
+### Backend App
+
+To run the [API](#backend-api) we need to have multiple Python 'apps' and 'servers'.
+
+```mermaid
+flowchart LR
+    entry{Entrypoint}
+    fastapi[FastAPI App]
+    sio[SocketIO Server]
+    sio_app[SocketIO ASGI App]
+    uvicorn[Uvicorn Run]
+
+    entry --> uvicorn
+    uvicorn --> sio_app
+    sio_app --> fastapi
+    sio_app --> sio
+```
+
+In production, Uvicorn sits behind an [Nginx](https://nginx.org/en/docs/) reverse-proxy additionally:
+
+```mermaid
+flowchart LR
+    entry{Entrypoint}
+    nginx[Nginx Reverse Proxy]
+    uvicorn[Uvicorn Run]
+    etc([...])
+
+    entry --> nginx
+    nginx --> uvicorn
+    uvicorn --> etc
+```
+
+### Backend DB
+
+We use SQLite as our database, and the `db` folder includes a variety of scripts to help manage the database:
+
+```
+backend/
+  mascope_server/
+    db/
+      migration/        schema migration scripts
+      ops/              database maintenance operations
+      __init__.py       database initialization logic
+```
+
+### Backend File Converter
+
+The file converter is an independent service typically running on the same machine as the backend.
+It's responsible for transforming incoming data files and recording corresponding metadata to the
+database. Its a distinct [module](#runtime-modules) which is launched independently using the
+[CLI](#runtime-cli).
+
+---
+
+## Frontend
 
 Our frontend is a Single Page Application written in [Vue](https://vuejs.org/guide/introduction.html) and plain Javascript. It has been heavily refactored and redesigned in Q1/Q2 2024.
-
-## Frontend technologies
-
-The Mascope frontend is build with the following technologies:
-
-- [Vue 3](https://vuejs.org/guide/introduction.html) frontend framework, using:
-  - [Composition API](https://vuejs.org/guide/extras/composition-api-faq.html#what-is-composition-api)
-  - [Single File Components](https://vuejs.org/api/sfc-spec.html)
-  - [`<script setup>`](https://vuejs.org/api/sfc-script-setup.html#script-setup)
-- [Pinia](https://pinia.vuejs.org/introduction.html) stores with the [setup store syntax](https://pinia.vuejs.org/core-concepts/#Setup-Stores)
-- [PrimeVue](https://primevue.org/introduction/) as the component library
-- [Vite](https://vitejs.dev/guide/) as the build tool + dev server
-- [Playwright](https://playwright.dev/docs/intro) for end-to-end tests
-
-## Frontend folder structure
 
 The frontend folder structure is as follows:
 
@@ -104,6 +518,21 @@ index.html    static template w/ font imports
 package.json  npm package w/ dependencies
 ...           other tooling configs
 ```
+
+### Frontend Tech
+
+The Mascope frontend is build with the following technologies:
+
+- [Vue 3](https://vuejs.org/guide/introduction.html) frontend framework, using:
+  - [Composition API](https://vuejs.org/guide/extras/composition-api-faq.html#what-is-composition-api)
+  - [Single File Components](https://vuejs.org/api/sfc-spec.html)
+  - [`<script setup>`](https://vuejs.org/api/sfc-script-setup.html#script-setup)
+- [Pinia stores](https://pinia.vuejs.org/introduction.html) with the [setup store syntax](https://pinia.vuejs.org/core-concepts/#Setup-Stores)
+- [PrimeVue](https://primevue.org/introduction/) as the component library
+- [Vite](https://vitejs.dev/guide/) as the build tool + dev server
+- [Playwright](https://playwright.dev/docs/intro) for end-to-end tests
+
+### Frontend Codebase
 
 The source code directory:
 
@@ -141,19 +570,188 @@ The source code directory:
   theme.js      Karsa theme = palette.js + PrimeVue Aura theme
 ```
 
-## Frontend tests
+### Frontend Stores
+
+The frontend uses [Pinia stores](https://pinia.vuejs.org/introduction.html) with the [setup store syntax](https://pinia.vuejs.org/core-concepts/#Setup-Stores), the recommended store library for Vue 3.
+
+Our stores are organized into two groups:
+
+- **Data stores** which reflect our backend data model reactively, and which _read/write access to the backend_ through API wrappers.
+- **UI stores** which model frontend concepts reactively, and which _optionally_ leverage _read-only access to the backend_ if needed.
+
+While the UI stores are implemented in a variety of ways, Data stores frequently leverage a _standard data module_ abstraction developed by our team to streamline aspects of data loading and selection. As a convenience, we offer a unified store API hook, which is namespaced by this grouping:
+
+```js
+import { useApp } from "@/stores";
+const app = useApp();
+
+// get all workspace
+app.data.workspace.list;
+// create a batch
+app.data.batch.create({
+  //...
+});
+// dark theme enabled
+app.ui.darkmode.active;
+// current visualized ion
+app.ui.matchVisualized.ion;
+```
+
+#### Standard data modules
+
+The so-called _standard data module_ abstraction can be found in `frontend/stores/data/lib/module.js`. It is used to implement several key data modules, including `workspace`, `batch`, `sample`, `target` and `mechanism`.
+
+The core idea of these modules is to define a _hierarchical data loading and selection model_. Modules are linked via parent-child relations, and selecting a parent will load the appropriate child data. For example, the `workspace` module is the parent of the `batch` store; if you select a different workspace, the batch data of that workspace needs to be loaded, while the old data needs to be unloaded.
+
+**_Using data modules_**
+
+As an example of the most common API options, lets use the `batch` module as an example for the rest of this section; the other modules share the same API, so you can use the same methods.
+
+A key concept in our data modules is `focus`. This is an API is designed for _single selection_: there is always at most 1 row focused. The API offers a two-way `v-model` binding to enable you to easily sync component and store state:
+
+```html
+<select
+  v-model="app.data.batch.focused"
+  :options="app.data.batch.list"
+  dataKey="sample_batch_id"
+  optionLabel="sample_batch_name"
+/>
+
+<span>{{app.data.batch.focused.sample_batch_name}}</span>
+<span v-if="app.data.batch.focused">
+  <!-- we also offer a `focusedId` helper: -->
+  {{app.data.batch.focused.sample_batch_id == app.data.batch.focusedId }}
+  <!-- i.e. this is always true if something is focused -->
+</span>
+```
+
+You can also impertively apply, remove and check focus by calling the `focus`, `unfocus` and `active` methods:
+
+```js
+app.data.batch.focus(someBatch); // often you would focus using a batch record
+app.data.batch.active(someBatch); // true
+app.data.batch.focus({ sample_batch_id }); // but only the id is actually needed
+app.data.batch.unfocus(); // unfocusing requires no arguments
+```
+
+The implentation has a currently unutilized feature to enable multiselection. This was implemented for future use. Since it shouldn't really be used at the moment, it will not be documented yet.
+
+**_Data module operatons_**
+
+In addition to selection, the data modules expose API methods as a convenience. These are _not_ standardized, although most modules include common operations like `create`, `update` and `delete`.
+
+> ⚠️ While calling API operations like create or delete will automatically update the frontend state, the operations do _not_ await this synchronization. In other words, awaiting `app.data.batch.create` doesn't guarantee the presence of a new record in `app.data.batch.list`. You must use Vue watchers to "await" the updated data and perform actions with it.
+
+**_Implementing data modules_**
+
+For creating new data modules, you import the `defineModule` constructor and create a new store hook, similar to how Pinia stores are normally made. A variety of options are available to configure the module:
+
+```js
+import { defineModule } from "./lib/module";
+import { useWorkspace } from "./workspace";
+import { api } from "@/api";
+import { useMzFit } from "@/lib/mzFit";
+
+export const useBatch = defineModule({
+  // Name maps to `app.data.batch` store      [required]
+  name: "batch",
+  // Unique row id enables data replacement   [required]
+  key: "sample_batch_id",
+  // Define the parent by passing its hook
+  useParent: useWorkspace,
+  // Subscribe to socket io rooms by key
+  // in this case, selecting a row will
+  // create a sub for its sample_batch_id
+  subscribe: true,
+  // Define events that trigger reload
+  // other then parent selection change
+  reloadOn: "sample_batch_reload",
+  // Load function fetching the data
+  // from the backend. If the module
+  // has a parent, the arg is its key;
+  // otherwise no arg is provided. The
+  // function should return the data.         [required]
+  load: async (workspace_id) =>
+    (
+      await api.request.read({
+        method: "getAllBatches",
+        body: { workspace_id },
+        errorMessage: `Failed to load the workspace batches.`,
+      })
+    ).data,
+  // Read a single record of the data
+  // by its key. This is needed to
+  // enable refreshing the data if
+  // it is updated                            [required]
+  read: async (sample_batch_id) =>
+    await api.request.read({
+      method: "getBatch",
+      body: { batchId: sample_batch_id },
+    }),
+  // We can also (optionally) define
+  // other standard CRUD operations
+  create: async (batch) =>
+    await api.request.create({
+      method: "createBatch",
+      body: batch,
+    }),
+  update: async (batch) =>
+    await api.request.update({
+      method: "updateBatch",
+      body: {
+        batchId: batch.sample_batch_id,
+        body: batch,
+      },
+    }),
+  delete: async (batch) =>
+    await api.request.process({
+      method: "deleteBatch",
+      body: batch,
+    }),
+  // And we can even define arbitrary custom
+  // operations, which are passed through to
+  // the store unchanged, e.g:
+  importSamples: async ({ batch, sample_items }) => {
+    const mzFit = useMzFit();
+    return await api.request.process({
+      method: "importSamplesToBatch",
+      body: {
+        batch,
+        body: {
+          sample_items,
+          mz_calibration_params: mzFit.mzCalibrationParams,
+        },
+      },
+    });
+  },
+  // etc.
+});
+```
+
+Two additional options are available but not listed:
+
+- `unfocusBefore` allows you define an array of operations before which the module should be unfocused; for example, the `sample` module is unfocused before the `delete` operation to prevent certain bugs.
+- `multiselect` allows enabling multiselection in the module; ⚠️ this is added for future features and is currently not in use in the codebase.
+
+When implementing new modules, we need to remember to the add the hook into the `useData` hook in `stores/data/index.js`. This will then include it under the
+`app.data` namespace in the `useApp` hook.
+
+**_Semistandard: the Match modules_**
+
+The match collection, compound, ion and isotope modules are implemented in a _semistandard_ way. They leverage the `defineModule` abstraction, but do so in a slightly hacky way. This was deemed the lesser of all evils. For more information, read the comments in the file: `frontend/stores/data/match.js`.
+
+### Frontend Tests
 
 Our frontend currently only has a handful of tests written in [Playwright](https://playwright.dev/docs/intro).
 These are end-to-end tests which work by running headless browsers and emulating real user behavior like clicks.
 The test then checks that certain elements are or are not visible in the page.
 
-### Running the tests
+#### Running the tests
 
 To run the tests, you can run one of the following commands:
 
 ```
-command               arg           usecase                description
-
+COMMAND               ARG           USECASE                DESCRIPTION
 npm run test          optional      test feature branch    run all tests on chrome only
 npm run test:full     optional      test prod release      run all tests on chrome, safari & firefox
 npm run test:only     required      debug failed tests     run one test
@@ -166,10 +764,75 @@ Here, the argument is a string with the name of the test or a keyword (playwrigh
 execute all tests matching the string). You can also run the tests directly with playwright,
 refer to the Playwright docs for more details.
 
-### Flakey tests
+#### Flakey tests
 
 _⚠️ The tests tend to be quite flakey, and ofter rerunning them will make a failed test pass._
 
 Use the debugging methods listed above when facing flakey tests. Often tests will be less flakey when
 you run them in headed mode, and when you don't run them concurrently (this is why we configured Playwright
 to use only one worker).
+
+---
+
+## Libraries
+
+A set of shared libraries facilitate code sharing across the monorepo (excluding the frontend, which is in
+Javascript). In addition to the three libraries listed here, the [Runtime Library](#runtime-library)
+
+```
+  libraries/       Shared libraries
+    mascope_api/        Public REST API wrapper
+    mascope_hardware/   Instrument interfaces
+    mascope_lib/        Chemistry and signal processing
+```
+
+### Mascope API
+
+This library exposes a public Python SDK for end-users to leverage especially in Jupyter notebooks.
+
+### Mascope Hardware
+
+This library exposes interfaces to proprietary mass spectroscapy instruments.
+
+Before importing anything else, you must initialize the library:
+
+```py
+import mascope_hardware.runtime as hardware_runtime
+hardware_runtime.init()
+
+from mascope_lib import foo, bar, baz
+```
+
+This needs to happen only one per package; for example, in the backend it is done in `backend/mascope_server/runtime.py`.
+
+### Mascope Lib
+
+This library exposes Karsa propreitary standard internal functions and algorithms.
+
+Similar to the hardware lib, before importing anything else, you must initialize the library:
+
+```py
+import mascope_lib.runtime as lib_runtime
+lib_runtime.init()
+
+from mascope_lib import foo, bar, baz
+```
+
+This needs to happen only one per package; for example, in the backend it is done in `backend/mascope_server/runtime.py`.
+
+---
+
+## Notebooks
+
+The notebooks module provides a set of Jupyter notebooks along with a Poetry environment that includes
+Jupyter lab. To use it, run `mascope dev run lab` and navigate to `localhost:8888`.
+
+---
+
+## Documentation
+
+The primary documentation of Mascope is this document. Effort should be made to keep this document up-to-date. In our Python codebase, we generally try to maintain docstrings. The frontend has no systematic effort at
+in-code documentation, but is usually well commented, especially for challenging sections of code.
+
+When running `mascope dev run`, autogenerated OpenAPI docs are available at `localhost:8090/docs` (Swagger) and `localhost:8090/redoc` (Redoc). For even better devex, you can also use [Postman](https://www.postman.com/) to
+access API documentation. The staging server docs are [also hosted online](https://documenter.getpostman.com/view/27329225/2sA3kSn2t9).

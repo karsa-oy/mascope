@@ -4,11 +4,8 @@ import sys
 
 from mascope_server.db import get_current_db_version, create_db_backup
 from mascope_server.db.tables_config import get_table_configs
-from mascope_server.config import config
 
-import mascope_runtime as runtime
-
-logger = runtime.logger.service("backend")
+from mascope_server.runtime import runtime
 
 
 def create_table_backup(cursor, table_name):
@@ -81,8 +78,8 @@ def delete_orphaned_records(conn, table_name):
         )
         deleted_count = cursor.rowcount
         if deleted_count > 0:
-            logger.warning(
-                f"🗑️ Deleted {deleted_count} orphaned sample_batch records due to invalid workspace_id."
+            runtime.logger.info(
+                f"Deleted {deleted_count} orphaned sample_batch records due to invalid workspace_id."
             )
     elif table_name == "target_compound_in_target_collection":
         cursor.execute(
@@ -93,8 +90,8 @@ def delete_orphaned_records(conn, table_name):
         )
         deleted_count = cursor.rowcount
         if deleted_count > 0:
-            logger.warning(
-                f"🗑️ Deleted {deleted_count} orphaned target_compound_in_target_collection records due to invalid target_compound_id."
+            runtime.logger.info(
+                f"Deleted {deleted_count} orphaned target_compound_in_target_collection records due to invalid target_compound_id."
             )
 
     elif table_name == "target_collection_in_sample_batch":
@@ -106,8 +103,8 @@ def delete_orphaned_records(conn, table_name):
         )
         deleted_count = cursor.rowcount
         if deleted_count > 0:
-            logger.warning(
-                f"🗑️ Deleted {deleted_count} orphaned target_collection_in_sample_batch records due to invalid sample_batch_id."
+            runtime.logger.warning(
+                f"Deleted {deleted_count} orphaned target_collection_in_sample_batch records due to invalid sample_batch_id."
             )
 
     elif table_name in ["match", "match_isotope", "match_interference"]:
@@ -119,8 +116,8 @@ def delete_orphaned_records(conn, table_name):
         )
         deleted_count = cursor.rowcount
         if deleted_count > 0:
-            logger.warning(
-                f"🗑️ Deleted {deleted_count} orphaned {table_name} records due to invalid sample_item_id."
+            runtime.logger.info(
+                f"Deleted {deleted_count} orphaned {table_name} records due to invalid sample_item_id."
             )
 
     # Disable foreign key constraints temporarily to allow for orphans data restore
@@ -144,7 +141,7 @@ def create_indexes(conn, table_name, schema_info):
             # Execute index creation if it doesn't already exist
             if index_name not in existing_indexes:
                 cursor.execute(f"CREATE INDEX IF NOT EXISTS {index_sql}")
-                logger.info(f"Index {index_name} created.")
+                runtime.logger.info(f"Index {index_name} created.")
 
 
 def restore_table(conn, table_name, schema_info):
@@ -194,21 +191,22 @@ def restore_table(conn, table_name, schema_info):
     cursor.execute(f"PRAGMA foreign_key_list({table_name})")
     current_fks = {fk[3]: (fk[2], fk[4], fk[5], fk[6]) for fk in cursor.fetchall()}
 
-    logger.debug("Current columns: %s", current_columns)
-    logger.debug("Correct columns: %s", schema_info["columns"])
-    logger.debug("Current foreign keys: %s", current_fks)
-    logger.debug("Correct foreign keys: %s", schema_info["fks"])
-
+    runtime.logger.debug(f"Current columns: {current_columns}")
+    runtime.logger.debug(f"Correct columns: {schema_info["columns"]}")
+    runtime.logger.debug(f"Current foreign keys: {current_fks}")
+    runtime.logger.debug(f"Correct foreign keys: {schema_info["fks"]}")
     if current_columns != schema_info["columns"] or current_fks != schema_info["fks"]:
-        logger.warning(f"Schema mismatch detected, restoring {table_name}.")
+        runtime.logger.warning(f"⚙️ Schema mismatch detected, restoring {table_name}.")
         create_table_backup(cursor, table_name)
         update_backup_table(cursor, table_name)
         drop_table(cursor, table_name)
         cursor.execute(schema_info["create_sql"])  # create table with correct schema
         restore_data_from_backup(cursor, table_name, schema_info["columns"].keys())
-        logger.info(f"Schema restoration of {table_name} completed.")
+        runtime.logger.info(f"Schema restoration of {table_name} completed.")
     else:
-        logger.info(f"✅ Schema of {table_name} is correct, no restoration needed.")
+        runtime.logger.info(
+            f"✅ Schema of {table_name} is correct, no restoration needed."
+        )
 
 
 def run_db_restore():
@@ -224,8 +222,7 @@ def run_db_restore():
     Uses separate database connections for each major step to ensure changes are applied correctly and
     to manage database transactions effectively.
     """
-    # Step 1: Back up the current database.
-    data_path = config.server.database
+    data_path = runtime.config.database
     current_version = get_current_db_version()
     db_path = os.path.join(data_path, f"mascope.v{current_version}.db")
     create_db_backup(db_path, "restore")
@@ -238,7 +235,7 @@ def run_db_restore():
     # Step 2: Validate that all specified tables have configurations
     for table_name in tables_to_restore:
         if table_name not in table_configs:
-            logger.error(
+            runtime.logger.error(
                 f"No configuration found for '{table_name}'. Please check your table name or define its configuration."
             )
             return  # Exit the function if a table configuration is missing
@@ -250,14 +247,14 @@ def run_db_restore():
             conn.commit()
 
     # Step 4: Delete orphaned records after restoring schema
-    logger.info(f"Checking for orphaned records...")
+    runtime.logger.info("Checking for orphaned records...")
     for table_name in tables_to_restore:
         with sqlite3.connect(db_path) as conn:
             delete_orphaned_records(conn, table_name)
             conn.commit()
 
     # Step 5: Create indexes after restoring schema and cleaning up orphans
-    logger.info(f"Checking for missing indexes...")
+    runtime.logger.info("Checking for missing indexes...")
     for table_name in tables_to_restore:
         with sqlite3.connect(db_path) as conn:
             create_indexes(conn, table_name, table_configs[table_name])

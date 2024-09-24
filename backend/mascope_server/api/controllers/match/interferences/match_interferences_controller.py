@@ -16,9 +16,8 @@ from mascope_server.api.models.match.interferences.match_interferences_pydantic_
     MatchInterferenceBase,
 )
 
-import mascope_runtime as runtime
 
-logger = runtime.logger.service("backend")
+from mascope_server.runtime import runtime
 
 
 @api_controller()
@@ -182,7 +181,7 @@ async def delete_match_interferences(
     if target_isotope_ids:
         message += f" Limited by {len(target_isotope_ids)} specified target isotope{'s' if len(target_isotope_ids) != 1 else ''}."
 
-    logger.info(message)
+    runtime.logger.info(message)
     return {"message": message}
 
 
@@ -207,7 +206,7 @@ async def create_match_interferences(
     :rtype: dict
     :raises DuplicateException: If match interferences already exist for the given sample item and isotopes.
     """
-    logger.info("Saving match interferences to database")
+    runtime.logger.info("Saving match interferences to database")
     sample_item_id = match_interferences[0].sample_item_id
     target_isotope_ids = [mi.target_isotope_id for mi in match_interferences]
     async with async_session() as session:
@@ -240,7 +239,7 @@ async def create_match_interferences(
     message = (
         f"{len(new_match_interferences)} match interference(s) created successfully."
     )
-    logger.info(message)
+    runtime.logger.info(message)
     return {
         "message": message,
         "data": [interference.to_dict() for interference in new_match_interferences],

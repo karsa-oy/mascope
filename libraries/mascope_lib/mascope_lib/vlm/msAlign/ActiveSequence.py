@@ -1,5 +1,5 @@
-import mascope_runtime as runtime
-logger = runtime.logger.service('standard-lib')
+from mascope_lib.runtime import lib_runtime
+
 
 class ActiveSequence:
     def __init__(
@@ -71,11 +71,11 @@ class ActiveSequence:
         new_size = float(len(self._the_list))
         if new_size == 0:
             self.mz_avg = 0
-            logger.debug(self.mz_avg)
+            lib_runtime.logger.debug(self.mz_avg)
         else:
             if self.ref_spec is None:
                 self.mz_avg = (old_size * self.mz_avg - self.mz_lb) / new_size
-            logger.debug(self.mz_avg)
+            lib_runtime.logger.debug(self.mz_avg)
 
     def insert(self, heap, peak):
         if heap.empty():

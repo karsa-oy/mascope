@@ -25,9 +25,8 @@ from mascope_server.api.controllers.match.lib.match_compute import (
     compute_match_isotopes,
 )
 
-import mascope_runtime as runtime
+from mascope_server.runtime import runtime
 
-logger = runtime.logger.service("backend")
 
 # Load targets
 with open(TARGETS_PATH, encoding="utf8") as file:
@@ -81,7 +80,7 @@ def clean_folder(folder):
             elif os.path.isdir(file_path):
                 shutil.rmtree(file_path)
         except OSError as e:
-            logger.error(f"Failed to delete {file_path}. Reason: {e}")
+            runtime.logger.error(f"Failed to delete {file_path}. Reason: {e}")
 
 
 def run_convertion_server(st: str):

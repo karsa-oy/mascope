@@ -1,12 +1,10 @@
 from copy import deepcopy
-from mascope_server.api_sio import sio
+from mascope_server.app import sio
 from mascope_server.api.lib.notifications.api_notification_pydantic_model import (
     UserNotification,
 )
 
-import mascope_runtime as runtime
-
-logger = runtime.logger.service("backend")
+from mascope_server.runtime import runtime
 
 
 # TODO_notification delete after refactoring
@@ -126,7 +124,6 @@ async def emit_user_notification(
     :param sid: Optional. The session ID of the client. Used to send direct messages if needed.
     """
     notification_dict = notification.model_dump(exclude_none=True)
-    logger.debug(notification)
     if room_id:
         await sio.emit(
             "user_notification", notification_dict, room=room_id, namespace="/"

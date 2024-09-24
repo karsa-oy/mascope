@@ -101,8 +101,8 @@ import re
 import sys
 from functools import reduce
 
-import mascope_runtime as runtime
-logger = runtime.logger.service('standard-lib')
+
+from mascope_lib.runtime import lib_runtime
 
 try:
     from elements import ELECTRON, ELEMENTS, Isotope
@@ -1188,31 +1188,31 @@ def test(verbose=False):
         ("CuSO4.5H2O", "CuH10O9S", 249.68),
     ]:
         if verbose:
-            logger.info(f"Trying Formula('{data[0]}') ...", end="")
+            lib_runtime.logger.info(f"Trying Formula('{data[0]}') ...", end="")
         try:
             f = Formula(data[0])
             f.empirical
             f.mass
             f.spectrum
         except FormulaError as exc:
-            logger.error(exc)
+            lib_runtime.logger.error(exc)
             continue
         if data[1] and f.empirical != data[1]:
-            logger.error(
+            lib_runtime.logger.error(
                 "Failure for {}:\n    Expected '{}', got '{}':".format(
                     data[0], data[1], f.empirical
                 )
             )
             continue
         if data[2] and abs(f.mass - data[2]) > 0.1:
-            logger.error(
+            lib_runtime.logger.error(
                 "Failure for {}:\n    Expected {}, got {}".format(
                     data[0], data[2], f.mass
                 )
             )
             continue
         if verbose:
-            logger.info("ok")
+            lib_runtime.logger.info("ok")
 
     # these formulas are expected to fail
     for data in [
@@ -1236,14 +1236,16 @@ def test(verbose=False):
         "Ox: 0.26, 30Si: 0.74",
     ]:
         if verbose:
-            logger.info(f"Trying Formula('{data}') ...", end="")
+            lib_runtime.logger.info(f"Trying Formula('{data}') ...", end="")
         try:
             f = Formula(data).empirical
         except FormulaError as exc:
             if verbose:
-                logger.error("ok\nExpected error:", exc)
+                lib_runtime.logger.error(f"ok\nExpected error: {exc}")
         else:
-            logger.error(f"Failure expected for '{data}', got '{Formula(data).formula}'")
+            lib_runtime.logger.error(
+                f"Failure expected for '{data}', got '{Formula(data).formula}'"
+            )
 
 
 def main(argv=None):
@@ -1286,10 +1288,10 @@ def main(argv=None):
     try:
         results = analyze(formula)
     except Exception as exc:
-        logger.error("\nError: \n  ", exc, sep="")
+        lib_runtime.logger.error("\nError: \n  ", exc, sep="")
         raise exc
     else:
-        logger.info("\n", results, sep="")
+        lib_runtime.logger.info("\n", results, sep="")
 
 
 if __name__ == "__main__":

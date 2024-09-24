@@ -28,7 +28,7 @@ class UserNotification(BaseModel):
         None,
         description="Optional data payload containing additional information or results.",
     )
-    error: Optional[Dict[str, str]] = Field(
+    error: Optional[Dict[str, Any]] = Field(
         None, description="Optional details about an error if the status is 'error'."
     )
 

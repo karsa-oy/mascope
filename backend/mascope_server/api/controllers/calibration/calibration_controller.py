@@ -8,9 +8,9 @@ background tasks to process calibration and related operations.
 from sqlalchemy import select, func, and_
 from sqlalchemy.orm import joinedload
 from mascope_server.db import async_session
+from mascope_server.app import sio
 from mascope_server.db.id import gen_id
 from mascope_server.db.models import Sample, SampleBatch, SampleItem
-from mascope_server.api_sio import sio
 from mascope_server.api.lib.api_features import (
     api_controller,
     api_controller_background_task,
@@ -41,9 +41,8 @@ from mascope_server.api.lib.notifications.api_notification import (
 from mascope_server.api.lib.notifications.api_notification_pydantic_model import (
     UserNotification,
 )
-import mascope_runtime as runtime
 
-logger = runtime.logger.service("backend")
+from mascope_server.runtime import runtime
 
 
 @api_controller()
@@ -159,7 +158,7 @@ async def calibration_mz_fit(
         error_message = (
             f"m/z fitting for sample '{sample.sample_item_name}' failed: {error}"
         )
-        logger.error(error)
+        runtime.logger.error(error)
         raise ApiException(
             error_message,
             {
@@ -282,6 +281,7 @@ async def calibration_mz_apply(
     sample_file["range"] = new_range
     # Ensure polarity is a valid string
     sample_file["polarity"] = sample_file.get("polarity") or ""
+    runtime.logger.info(sample_file)
     await update_sample_file(
         sample_file["sample_file_id"], SampleFileUpdate(**sample_file)
     )
@@ -377,7 +377,7 @@ async def calibration_mz_calibrate_sample(
     if not sample:
         raise NotFoundException(f"Sample item with ID '{sample_item_id}' not found")
 
-    logger.info("...m/z calibrating sample '%s' ...", sample.sample_item_name)
+    runtime.logger.info(f"...m/z calibrating sample '{sample.sample_item_name}' ...")
 
     # Step 2: Prepare progress user notification.
     notification = UserNotification(
@@ -499,7 +499,7 @@ async def calibration_mz_calibrate_batch(
     if not samples:
         raise NotFoundException(f"Sample batch '{sample_batch_name}' has no samples")
 
-    logger.info("...m/z calibrating batch: '%s' ...", sample_batch_name)
+    runtime.logger.info(f"...m/z calibrating batch: '{sample_batch_name}' ...")
     # Prepare progress user notification.
     notification = UserNotification(
         process_id=process_id,
@@ -542,10 +542,8 @@ async def calibration_mz_calibrate_batch(
             sample_batch_ids_to_reload.update(affected_sample_batch_ids)
         except ApiException as e:
             # If an exception occurs during sample calibration, log the error and add the sample to the failed list
-            logger.error(
-                f"Calibrating sample '%s' failed: %s",
-                sample.sample_item_name,
-                e.user_message,
+            runtime.logger.error(
+                f"Calibrating sample '{sample.sample_item_name}' failed: {e}"
             )
             samples_calibrate_failed.append(
                 {

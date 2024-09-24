@@ -356,7 +356,8 @@ const invalidated = computed(() => {
         info.desc !== original.value.target_collection_description ||
         info.type !== original.value.target_collection_type
       const compoundsChanged = !equals(compounds.initial, compounds.selected, 'target_compound_id')
-      return !(infoChanged || compoundsChanged)
+      const compoundsCreated = compounds.created.length > 0 // Check if new compounds were added
+      return !(infoChanged || compoundsChanged || compoundsCreated)
     }
     case 'update_batches':
       return equals(batches.initial, batches.selected, 'sample_batch_id')

@@ -35,9 +35,7 @@ from mascope_server.api.lib.notifications.api_notification import (
 from mascope_server.api.lib.notifications.api_notification_pydantic_model import (
     UserNotification,
 )
-import mascope_runtime as runtime
-
-logger = runtime.logger.service("backend")
+from mascope_server.runtime import runtime
 
 # TODO_configuration
 # Default calibration parameters
@@ -165,7 +163,7 @@ def signal_mz_calibration_update(fit, filename):
     new_range = [new_mz[0], new_mz[-1]]
 
     # Update zarr file coordinates and props
-    logger.info("Calibrating file: %s", filename)
+    runtime.logger.info(f"Calibrating file: {filename}")
     if nbr_samples != get_zarr_var_shape(filename, "signal")[0]:
         raise Exception("Number of TOF samples does not match")
     update_props(filename, {"range": new_range, "mz_calibration": fit})

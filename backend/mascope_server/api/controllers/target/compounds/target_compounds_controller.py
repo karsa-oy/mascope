@@ -2,7 +2,7 @@ from typing import List, Optional
 from fastapi import HTTPException
 from sqlalchemy import asc, desc, func, select, or_, and_
 from mascope_lib.util import norm
-from mascope_server.api_sio import sio
+from mascope_server.app import sio
 from mascope_server.db import async_session
 from mascope_server.db.id import gen_id
 from mascope_server.db.models import (

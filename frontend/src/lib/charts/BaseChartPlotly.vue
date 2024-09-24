@@ -34,6 +34,19 @@ const emit = defineEmits('click')
 const plot = ref(null)
 const ready = ref(false)
 
+// reset chart zoom to autorange
+const resetZoom = () => {
+  if (plot.value) {
+    Plotly.relayout(plot.value, {
+      'xaxis.autorange': true,
+      'yaxis.autorange': true
+    })
+  }
+}
+defineExpose({
+  resetZoom
+})
+
 const derived = computed(() => ({
   layout: Object.assign(
     {

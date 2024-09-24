@@ -11,8 +11,7 @@ export default defineConfig({
     }
   },
   server: {
-    // Note: Configures the server to listen on all network interfaces. This setting is needed for accessing
-    // the development server (http://192.168.1.249:5173/) not just locally, but also over a local area network.
+    // expose dev server to local network
     host: '0.0.0.0'
   },
   build: {
@@ -20,5 +19,5 @@ export default defineConfig({
     cssCodeSplit: false,
     target: 'esnext'
   },
-  envPrefix: 'MASCOPE_' // Prefix for environment variables used in the project.
+  envPrefix: 'MASCOPE_'
 })

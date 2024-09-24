@@ -33,9 +33,7 @@ from mascope_server.api.controllers.match.aggregate.match_aggregate_controller i
 )
 from mascope_server.api.models.match.match_pydantic_model import FilterParams
 
-import mascope_runtime as runtime
-
-logger = runtime.logger.service("backend")
+from mascope_server.runtime import runtime
 
 
 @api_controller()

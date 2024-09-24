@@ -10,9 +10,7 @@ from mascope_server.api.controllers.target.isotopes.target_isotopes_controller i
     get_target_isotopes,
 )
 
-import mascope_runtime as runtime
-
-logger = runtime.logger.service("backend")
+from mascope_server.runtime import runtime
 
 
 async def fetch_batch_target_isotopes_for_match_compute(
@@ -88,9 +86,8 @@ async def fetch_batch_target_isotopes_for_match_compute(
             )
 
         target_isotopes_df = pd.DataFrame(target_isotopes)
-        logger.info(
-            "Match isotopes computing is specified for the list of %s",
-            ", ".join(applied_filters),
+        runtime.logger.info(
+            f"Match isotopes computing is specified for the list of { ", ".join(applied_filters)}"
         )
     # Step 3: Fetch all target isotopes if no specific additions
     else:
@@ -98,9 +95,8 @@ async def fetch_batch_target_isotopes_for_match_compute(
             sample_batch_id=sample_batch_id,
         )
         target_isotopes_df = pd.DataFrame(target_isotopes_result["data"])
-        logger.info(
-            "Match isotopes computing for all associated target isotopes. Total isotopes: %d",
-            len(target_isotopes_df),
+        runtime.logger.info(
+            f"Match isotopes computing for all associated target isotopes. Total isotopes: {len(target_isotopes_df)}"
         )
 
     return target_isotopes_df

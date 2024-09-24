@@ -3,7 +3,6 @@ name = "mascope_lib"
 version = "0.1.0"
 description = "Mascope's internal library"
 authors = ["Oskari Kausiala <oskari.kausiala@karsa.fi>"]
-readme = "README.md"
 
 [build-system]
 requires = ["poetry-core"]
@@ -11,21 +10,21 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.dependencies]
 python = "~3.12"
-mascope_runtime = { path = '../mascope_runtime', develop = true }
+mascope_runtime = { path = '../../runtime/lib/', develop = true }
 
 colorcet = "^3.1"
-dask = "^2024.6.2"
+dask = "==2024.7.0"
 datashader = "^0.16"
 datetime-glob = "^1.0"
 h5py = "^3.11"
 lmfit = "^1.3"
-numpy = "^1.6"
+numpy = "^1.26"
 pandas = "^2.2"
 pillow = "^10.3"
 sparse = "^0.15"
 watchdog = "^4.0"
-xarray = "^2024.6.0"
-zarr = "^2.18"
+xarray = "==2024.6.0"
+zarr = "==2.18.2"
 scipy = "^1.13"
 
 [tool.poetry.group.dev.dependencies]

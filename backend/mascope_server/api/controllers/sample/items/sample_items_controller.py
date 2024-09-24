@@ -7,7 +7,7 @@ from sqlalchemy import (
     func,
 )
 from mascope_lib.file_func import get_instrument_type
-from mascope_server.api_sio import sio
+from mascope_server.app import sio
 from mascope_server.db import async_session
 from mascope_server.db.id import gen_id
 from mascope_server.db.models import (

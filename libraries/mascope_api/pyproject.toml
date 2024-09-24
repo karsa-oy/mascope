@@ -3,7 +3,6 @@ name = "mascope_api"
 version = "0.1.0"
 description = "Mascope's public API library, wrapping the app's REST API."
 authors = ["Oskari Kausiala <oskari.kausiala@karsa.fi>"]
-readme = "README.md"
 packages = [{ include = "mascope_api.py" }]
 
 [build-system]

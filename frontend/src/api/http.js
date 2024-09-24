@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { api } from './client.js'
 
-import { config } from '@/lib/config.js'
+import { runtime } from '@/lib/runtime.js'
 
 // Create the URL
 
@@ -10,7 +10,7 @@ const host = location.hostname
 const mode = import.meta.env.MODE
 
 // production api server is routed to api_port via nginx reverse proxy
-let url = mode === 'production' ? `http://${host}` : `http://${host}:${config.server.port}`
+let url = mode === 'production' ? `https://${host}` : `http://${host}:${runtime.meta.api_port}`
 
 const getSessionId = () => {
   // get session id for emitting sio finished events
@@ -304,7 +304,20 @@ export function createHttpClient() {
         console.error('Failed to get sample spectrum: ', error)
       }
     },
-
+    getSamplePeaks: async ({ sample_file_id }) => {
+      try {
+        return await client.get(`/sample/files/${sample_file_id}/peaks`)
+      } catch (error) {
+        console.error('Failed to get sample peaks: ', error)
+      }
+    },
+    computeAllSamplePeaks: async ({ sample_file_id }) => {
+      try {
+        return await client.get(`/sample/files/${sample_file_id}/peaks/compute`)
+      } catch (error) {
+        console.error('Failed to compute sample peaks: ', error)
+      }
+    },
     // Sample Items
     getAllSampleItems: async (params = {}) => {
       try {
@@ -788,12 +801,31 @@ export function createHttpClient() {
         throw new Error(userErrorMessage)
       }
     },
-
     getIonizationMechanism: async (ionizationMechanismId) => {
       try {
         return await client.get(`/ionization_mechanisms/${ionizationMechanismId}`)
       } catch (error) {
         console.error('Failed to get ionization mechanism by id: ', error)
+      }
+    },
+    createIonizationMechanism: async (body) => {
+      try {
+        return await client.post(`/ionization_mechanisms`, body)
+      } catch (error) {
+        const userErrorMessage =
+          error?.response?.data?.error ??
+          `Failed to create ionization mechanism ${body.ionization_mechanism}:": ${error}`
+        throw new Error(userErrorMessage)
+      }
+    },
+    deleteIonizationMechanism: async (ionizationMechanismId) => {
+      try {
+        return await client.delete(`/ionization_mechanisms/${ionizationMechanismId}`)
+      } catch (error) {
+        const userErrorMessage =
+          error?.response?.data?.error ??
+          `Failed to delete ionization mechanism by id ${ionizationMechanismId}:": ${error}`
+        throw new Error(userErrorMessage)
       }
     },
     // Target isotopes

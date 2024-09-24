@@ -36,9 +36,6 @@ from mascope_server.api.controllers.match.lib.match_filter import apply_filter_p
 from mascope_server.api.controllers.match.lib.match_util import (
     sort_and_paginate_match_sample_df,
 )
-import mascope_runtime as runtime
-
-logger = runtime.logger.service("backend")
 
 
 @api_controller()
@@ -124,8 +121,6 @@ async def get_match_sample_collections(
     match_sample_collections_df = sort_and_paginate_match_sample_df(
         match_sample_collections_df, order, page, limit
     )
-
-    logger.debug(match_sample_collections_df)
 
     return {
         "results": len(match_sample_collections_df),
@@ -226,8 +221,6 @@ async def get_match_sample_compounds(
         match_sample_compounds_df, order, page, limit
     )
 
-    logger.debug(match_sample_compounds_df)
-
     return {
         "results": len(match_sample_compounds_df),
         "message": f"Successfully retrieved target compound matches for sample '{sample_item_name}'.",
@@ -285,11 +278,13 @@ async def get_match_sample_ions(
     #   - target_compound_id - target_ions for particular target_compound (unique)
     #   - target_collection_id - target_ions for particular target_collection (unique)
     #   - show_target_collection - add target collection id and adds potential compount duplicates
+    #   - show_ionization_mechanism - add ionization mechanism details
     target_ions = await get_target_ions(
         sample_batch_id=sample_batch_id,
         target_compound_id=target_compound_id,
         target_collection_id=target_collection_id,
         show_target_collection=True,
+        show_ionization_mechanism=True,
     )
     if not target_ions["data"]:
         return {
@@ -331,8 +326,6 @@ async def get_match_sample_ions(
     match_sample_ions_df = sort_and_paginate_match_sample_df(
         match_sample_ions_df, order, page, limit
     )
-
-    logger.debug(match_sample_ions_df)
 
     return {
         "results": len(match_sample_ions_df),
@@ -459,8 +452,6 @@ async def get_match_sample_isotopes(
     match_sample_isotopes_df = sort_and_paginate_match_sample_df(
         match_sample_isotopes_df, order, page, limit
     )
-
-    logger.debug(match_sample_isotopes_df)
 
     return {
         "results": len(match_sample_isotopes_df),

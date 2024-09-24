@@ -105,24 +105,20 @@ async def get_instrument_function(
         # Step 2: Construct query based on parameters
         if filename:
             # Fetch instrument function by filename
-            stmt = select(SampleFile.datetime_utc, SampleFile.instrument).filter(
-                SampleFile.filename == filename
-            )
+            stmt = select(SampleFile).filter(SampleFile.filename == filename)
             results = await session.execute(stmt)
-            sample_file = results.first()
+            sample_file = results.scalars().first()
             if not sample_file:
                 raise NotFoundException(
                     f"Sample file with filename {filename} not found"
                 )
 
-            file_timestamp, instrument = sample_file
             stmt = (
                 select(InstrumentFunction)
                 .filter(
-                    InstrumentFunction.instrument == instrument,
-                    InstrumentFunction.datetime_utc <= file_timestamp,
+                    InstrumentFunction.instrument == sample_file.instrument,
+                    InstrumentFunction.datetime_utc <= sample_file.datetime_utc,
                 )
-                .order_by(desc(InstrumentFunction.datetime_utc))
                 .order_by(desc(InstrumentFunction.datetime_utc))
             )
         elif instrument_function_id:

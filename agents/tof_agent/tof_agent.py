@@ -1,17 +1,90 @@
 import asyncio
 import os
 import shutil
-import socketio
+import sys
+import textwrap
 
 from multiprocessing import Event
 from queue import Empty
+import socketio
+
+
+from mascope_runtime import MascopeRuntimeModule
+from mascope_hardware.runtime import init as init_hardware_runtime
+
+# check if we are running in a pyinstaller bundle
+bundled = getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS")
+
+
+def mkdir(*args):
+    path = os.path.join(*args)
+    if not os.path.exists(path):
+        os.makedirs(path)
+    return path
+
+
+# default configuration
+# created in production as an initial
+# template for users to modify
+default_config = textwrap.dedent(
+    """\
+    [meta]
+    # meta
+    log_level = 'info'
+    # settings
+    description = "The default runtime env"
+    api_port = 8090
+    filestore = './filestore'
+
+    [tof-agent]
+    # meta
+    log_level = 'info'
+    log_path = './logs'
+    # settings
+    host = 'localhost'
+    target = './filestreams'
+
+    [hardware-lib]
+    # meta
+    log_level = 'info'
+    log_path = './logs'
+    # settings
+    tofwerk_dll = 'Auto'
+    #  TofWerk DLL selection - 'Auto', 'Windows', 'Linux' or 'Darwin' (= MacOs)
+    """
+)
+
+
+if bundled:
+    # prod mode
+    # set MASCOPE_PATH as %AppData%\Mascope\TOF_Agent
+    mascope_path = mkdir(os.environ["APPDATA"], "Mascope", "TofAgent")
+    os.environ.setdefault("MASCOPE_PATH", mascope_path)
+    # setup runtime environment
+    env_path = mkdir(mascope_path, "runtime", "env", "prod")
+    data_path = mkdir(env_path, "data")
+    mkdir(env_path, "logs")
+    # init config files if they don't exists
+    config_paths = [
+        os.path.join(env_path, "base.mascope.toml"),
+        os.path.join(env_path, "prod.mascope.toml"),
+    ]
+    for path in config_paths:
+        if not os.path.exists(path):
+            with open(path, "w") as file:
+                file.write(default_config)
+    # initialize the runtime in production mode
+    opts = dict(env="prod", mode="prod", path=mascope_path)
+    runtime = MascopeRuntimeModule(module="tof-agent", **opts)
+    init_hardware_runtime(**opts)
+else:
+    # dev mode
+    # runtime state inherited from the CLI
+    runtime = MascopeRuntimeModule("tof-agent")
+    init_hardware_runtime()
+
 
 from mascope_hardware.tofwerk.tof_streamer import TofDaqStreamer
-
-import mascope_runtime as runtime
-
-logger = runtime.logger.service("tof-agent")
-sio_logger = runtime.logger.service("tof-agent", markup=False)
 
 
 async def streamer_processor(streamer):
@@ -29,7 +102,7 @@ async def streamer_processor(streamer):
         }
         if spec_i is None:
             # File finished
-            logger.info("File finished")
+            runtime.logger.info("File finished")
             raw_filename = data["source_filepath"]
             global target_path
             while True:
@@ -40,7 +113,7 @@ async def streamer_processor(streamer):
                     )
                     break
                 except Exception as e:
-                    logger.error("Failed to copy acquired file: %s" % e)
+                    runtime.logger.error(f"Failed to copy acquired file: {e}")
                     await sio.sleep(1)
             if sio.connected:
                 await sio.emit(
@@ -49,7 +122,7 @@ async def streamer_processor(streamer):
                 )
         elif spec_i < 0:
             # New file
-            logger.info("New file: %s" % filename)
+            runtime.logger.info(f"New file: {filename}")
             if sio.connected:
                 await sio.emit(
                     "instrument_acquisition_started",
@@ -62,7 +135,7 @@ async def streamer_processor(streamer):
                     "instrument_acquisition_progress",
                     notification_data,
                 )
-        logger.info("%.2f" % streamer.progress)
+        runtime.logger.info(f"{streamer.progress:.2f}")
         return True
 
     async def handle_tps_data(data):
@@ -113,10 +186,10 @@ async def main():
     elif host:
         url = f"http://{host}"
     if not url:
-        logger.warning("Mascope host not defined, running in offline mode")
+        runtime.logger.warning("Mascope host not defined, running in offline mode")
     while url and not shutdown_event.is_set():
         try:
-            logger.info(f"Connecting to {url}")
+            runtime.logger.info(f"Connecting to {url}")
             await sio.connect(url)
             break
         except:
@@ -138,11 +211,9 @@ def run():
     global shutdown_event
     global target_path
 
-    config = runtime.mount()
-
-    host = config.tof_agent.host
-    port = config.tof_agent.port
-    target_path = config.tof_agent.target
+    port = runtime.meta.api_port
+    host = runtime.config.host
+    target_path = runtime.config.target
 
     streamer = TofDaqStreamer(
         shutdown_event=shutdown_event,
@@ -157,7 +228,7 @@ def run():
     except KeyboardInterrupt:
         shutdown_event.set()
     except Exception as e:
-        logger.error(e)
+        runtime.logger.error(e)
         shutdown_event.set()
 
 

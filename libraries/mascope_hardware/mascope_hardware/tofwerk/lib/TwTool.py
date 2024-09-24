@@ -1,41 +1,31 @@
 """Python bindings to Tofwerk's TwTool DLL
 """
 
+import platform
 import ctypes as ct
 import os
-import platform
-import sys
 
 import numpy as np
 from numpy.ctypeslib import ndpointer
 
+from mascope_hardware.runtime import hardware_runtime
+
 
 def LoadLibrary():
-    arch2os = {
-        ("32bit", "EPL"): "linux_x86_64",
-        ("64bit", "EPL"): "linux_x86_64",
-        ("64bit", "ELF"): "linux_x86_64",
-        ("32bit", ""): "macos_x86_64",
-        ("64bit", ""): "macos_x86_64",
-        ("32bit", "WindowsPE"): "windows_x86",
-        ("64bit", "WindowsPE"): "windows_x64",
-    }
-    libnames = {
-        "linux": "libtwtool.so",
-        "linux2": "libtwtool.so",
-        "darwin": "libtwtool.dylib",
-        "win32": "TwToolDll.dll",
-    }
-    the_os = arch2os.get(platform.architecture(), "")
-
-    # container overrides
-    is_docker = False
-    the_os = "linux_x86_64" if is_docker else the_os
-    libname = "libtwtool.so" if is_docker else libnames[sys.platform]
-
-    libpath = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "dlls", the_os, libname
-    )
+    config = hardware_runtime.config.tofwerk_dll
+    [libdir, libfile] = {
+        "Linux": ["linux_x86_64", "libtwtool.so"],
+        "Windows": ["windows_x64", "TwToolDll.dll"],
+        "Darwin": ["macos_x86_64", "libtwtool.dylib"],  # broken?
+    }[
+        (
+            config  # use provided platform config
+            if config != "Auto"  # unless its auto (the default)
+            else platform.system()  # in which case infer platform
+        )
+    ]
+    basepath = os.path.dirname(os.path.realpath(__file__))
+    libpath = os.path.join(basepath, "dlls", libdir, libfile)
     toollib = ct.cdll.LoadLibrary(libpath)
     return toollib
 

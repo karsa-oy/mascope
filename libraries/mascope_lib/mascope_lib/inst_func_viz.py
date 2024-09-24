@@ -7,7 +7,7 @@ from mascope_lib.peak import gen_peak
 import mascope_runtime as runtime
 
 # Set up logger
-logger = runtime.logger.service("backend")
+logger = lib_runtime.logger.service("backend")
 
 subtitles = ("FWHM", "Chosen peak", "Resolution function")
 

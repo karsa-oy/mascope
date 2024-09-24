@@ -1,9 +1,7 @@
 import pandas as pd
 import numpy as np
 
-import mascope_runtime as runtime
-
-logger = runtime.logger.service("backend")
+from mascope_server.runtime import runtime
 
 
 def sort_and_paginate_match_sample_df(

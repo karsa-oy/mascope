@@ -6,9 +6,7 @@ from mascope_server.db.models import (
 )
 from mascope_server.api.lib.exceptions.api_exceptions import NotFoundException
 
-import mascope_runtime as runtime
-
-logger = runtime.logger.service("backend")
+from mascope_server.runtime import runtime
 
 
 async def fetch_target_collection(
