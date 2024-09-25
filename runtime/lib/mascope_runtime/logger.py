@@ -129,13 +129,7 @@ def config_logger(module):
                 sink=sys.stdout,
                 format=formatter(module.root_path),
                 colorize=True,
-                level=(
-                    os.environ.get(
-                        "MASCOPE_LOGLEVEL", # cli level overrides anything
-                        module.config.log_level # otherwise use module level
-                    ) or module.meta.log_level # otherwise use the meta level
-                    or "info"  # and worst case fall back to info
-                ).upper(),
+                level=module.config.log_level.upper(),
                 enqueue=True,  # multiprocess safe
                 catch=True,
             ),

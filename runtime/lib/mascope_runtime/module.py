@@ -1,14 +1,17 @@
-from .config import MascopeMetaConfig, build_config, default_overlay
+from .config import MascopeMetaConfig, build_config
 from .state import MascopeRuntimeJsonState, MascopeRuntimeTempState
 from .exceptions import MascopeConfigNotFoundException, MascopeMissingPathException
 
 import os
+from textwrap import dedent
 from typing import Optional, List
 
+
+from .config import MascopeModuleConfig
 from .logger import config_logger
 
 
-class MascopeRuntimeModule[MascopeModuleConfig]:
+class MascopeRuntimeModule:
     module: str
     state: MascopeRuntimeJsonState | MascopeRuntimeTempState
     meta: MascopeMetaConfig
@@ -50,7 +53,15 @@ class MascopeRuntimeModule[MascopeModuleConfig]:
             )
             if not os.path.exists(layer_path):
                 with open(layer_path, "w") as file:
-                    file.write(default_overlay(self.state.mode))
+                    file.write(
+                        dedent(
+                            f"""
+                        # {layer} config overlay
+                        # Overrides base configuration in `{layer}` mode. Refer
+                        # to `base.mascope.toml` to see available options
+                        """
+                        ).strip()
+                    )
 
         base_config_path = os.path.join(
             self._root_path,
