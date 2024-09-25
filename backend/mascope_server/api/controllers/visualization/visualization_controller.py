@@ -169,10 +169,12 @@ async def visualize_ion_focus(
             if match:
                 # Timeseries trace
                 try:
-                    # Fill gaps in the timeseries (nans) with 0
-                    match_timeseries = isotope_slice.signal.sel(
-                        mz=peak_mz, method="nearest"
-                    ).fillna(0)
+                    # Drop rows with all NaNs and fill gaps in the timeseries (remaining NaNs) with 0
+                    match_timeseries = (
+                        isotope_slice.signal.dropna(dim="mz", how="all")
+                        .sel(mz=peak_mz, method="nearest")
+                        .fillna(0)
+                    )
                 except KeyError as e:
                     runtime.logger.warning(
                         f"Failed to find mz {peak_mz} in the dataset: {isotope_slice.signal.mz}. Error: {e}"
