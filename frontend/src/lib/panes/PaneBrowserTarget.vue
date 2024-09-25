@@ -203,7 +203,7 @@ async function showMatch(row) {
  * @param {Object|null} oldCollection - The previously focused collection.
  */
 watch(
-  computed(() => app.data.match.collection.focused),
+  () => app.data.match.collection.focused,
   (collection, oldCollection) => {
     // Unfocus all child elements when switching collections or deselecting the current collection
     if (
@@ -218,7 +218,7 @@ watch(
   }
 )
 watch(
-  computed(() => app.data.match.compound.focused),
+  () => app.data.match.compound.focused,
   (compound) => {
     if (compound) {
       // focus parent if focused
@@ -236,7 +236,7 @@ watch(
   }
 )
 watch(
-  computed(() => app.data.match.ion.focused),
+  () => app.data.match.ion.focused,
   (ion) => {
     if (ion) {
       // focus parent if focused
@@ -252,7 +252,7 @@ watch(
   }
 )
 watch(
-  computed(() => app.data.match.isotope.focused),
+  () => app.data.match.isotope.focused,
   (isotope) => {
     if (isotope) {
       // focus parent in focused
@@ -269,7 +269,7 @@ watch(
     </template>
     <template #icons>
       <Button
-        v-tooltip.left="'Edit mechanisms'"
+        v-tooltip.top="'Edit mechanisms'"
         label="Edit mechanisms"
         class="hiddenlabel"
         icon="pi pi-sliders-h"
@@ -282,7 +282,7 @@ watch(
         "
       />
       <Button
-        v-tooltip="'Create collection'"
+        v-tooltip.top="'Create collection'"
         label="Create collection"
         class="hiddenlabel"
         icon="pi pi-plus"

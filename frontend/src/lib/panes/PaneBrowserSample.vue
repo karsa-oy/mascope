@@ -65,7 +65,7 @@ const pending = reactive({
 const batchOptionsPopover = ref()
 
 watch(
-  computed(() => app.data.batch.focused),
+  () => app.data.batch.focused,
   async (selected) => {
     if (selected) {
       const batchId = app.data.batch.focused.sample_batch_id
@@ -79,7 +79,7 @@ watch(
   }
 )
 watch(
-  computed(() => Object.keys(batch.expanded).length == 0),
+  () => Object.keys(batch.expanded).length == 0,
   async (collapsed) => {
     if (collapsed) {
       app.data.sample.unfocus()
@@ -97,7 +97,7 @@ async function handlePending() {
   }
 }
 watch(
-  computed(() => app.data.sample.focused),
+  () => app.data.sample.focused,
   (selected) => {
     if (selected?.sample_item_id == app.data.sample.focused?.sample_item_id) {
       return
@@ -110,7 +110,7 @@ watch(
   }
 )
 watch(
-  computed(() => app.data.sample.focused),
+  () => app.data.sample.focused,
   (active) => {
     if (active?.sample_item_id == app.data.sample.focused?.sample_item_id) {
       return
@@ -123,7 +123,7 @@ watch(
   }
 )
 watch(
-  computed(() => app.data.workspace.focused),
+  () => app.data.workspace.focused,
   () => {
     app.data.batch.focused = null
     app.data.sample.focused = null
@@ -499,7 +499,7 @@ watch(batchSelectedColumns, (cols) => {
   )
 })
 watch(
-  computed(() => app.data.batch.focused),
+  () => app.data.batch.focused,
   (selected) => {
     if (selected) {
       const storedColumns = localStorage.getItem(
@@ -530,7 +530,19 @@ watch(
     </template>
     <template #icons>
       <Button
-        v-tooltip="'Create batch'"
+        v-tooltip.top="'Edit batch fields'"
+        icon="pi pi-sliders-h"
+        severity="secondary"
+        text
+        size="small"
+        @click="
+          (event) => {
+            batchOptionsPopover.toggle(event)
+          }
+        "
+      />
+      <Button
+        v-tooltip.top="'Create batch'"
         label="Create batch"
         class="hiddenlabel"
         icon="pi pi-plus"
@@ -570,55 +582,6 @@ watch(
               style="font-size: smaller; margin-right: 0.5rem"
             />
             {{ data.sample_batch_name }}
-          </template>
-        </Column>
-        <Column style="width: 4rem">
-          <template #body="{ data }">
-            <Button
-              v-if="data.sample_batch_id in batch.expanded"
-              icon="pi pi-ellipsis-h"
-              severity="secondary"
-              text
-              @click="
-                (event) => {
-                  batchOptionsPopover.toggle(event)
-                }
-              "
-              v-tooltip.right="'Batch options'"
-            />
-            <Popover ref="batchOptionsPopover" contentStyle="height: fit-content;">
-              <div class="row" style="margin-bottom: 0.5rem">
-                <SelectButton
-                  v-model="batchColumnTab"
-                  :options="['All', 'Selected']"
-                  :allowEmpty="false"
-                />
-                <Button
-                  icon="pi pi-replay"
-                  severity="secondary"
-                  label="Reset"
-                  iconPos="right"
-                  text
-                  @click="batchSelectedColumns = batchDefaultColumns"
-                  v-tooltip.right="'Reset columns'"
-                />
-              </div>
-              <Listbox
-                v-model="batchSelectedColumns"
-                :options="
-                  batchAvailableColumns.filter(({ field }) =>
-                    batchColumnTab == 'Selected'
-                      ? batchSelectedColumns.map(({ field }) => field).includes(field)
-                      : true
-                  )
-                "
-                multiple
-                optionLabel="label"
-                filter
-                dataKey="field"
-                style="height: 230px"
-              />
-            </Popover>
           </template>
         </Column>
         <template #expansion="{ data }">
@@ -681,6 +644,35 @@ watch(
       <ContextMenu ref="itemContextMenu" :model="menu.item" />
     </div>
   </Panel>
+  <Popover ref="batchOptionsPopover" contentStyle="height: fit-content;">
+    <div class="row" style="margin-bottom: 0.5rem">
+      <SelectButton v-model="batchColumnTab" :options="['All', 'Selected']" :allowEmpty="false" />
+      <Button
+        icon="pi pi-replay"
+        severity="secondary"
+        label="Reset"
+        iconPos="right"
+        text
+        @click="batchSelectedColumns = batchDefaultColumns"
+        v-tooltip.right="'Reset columns'"
+      />
+    </div>
+    <Listbox
+      v-model="batchSelectedColumns"
+      :options="
+        batchAvailableColumns.filter(({ field }) =>
+          batchColumnTab == 'Selected'
+            ? batchSelectedColumns.map(({ field }) => field).includes(field)
+            : true
+        )
+      "
+      multiple
+      optionLabel="label"
+      filter
+      dataKey="field"
+      style="height: 230px"
+    />
+  </Popover>
   <DialogSampleBatchOp v-model:action="dialog.batch.op" :batch="batch.context" />
   <DialogSampleItemOp v-model:action="dialog.item.op" :item="item.context" />
   <DialogCalibration v-model:visible="dialog.batch.calibration" :context="batch.context" />
