@@ -16,7 +16,7 @@ import SelectButton from 'primevue/selectbutton'
 
 import { generateCopyName } from '@/api'
 
-import { BaseMatchTag } from '@/lib/base'
+import { BaseMatchTag, BaseCopyableField } from '@/lib/base'
 import {
   DialogSampleBatchOp,
   DialogSampleItemOp,
@@ -182,7 +182,7 @@ const menu = computed(() => ({
     {
       label: 'Copy batch',
       icon: 'pi pi-copy',
-      command: () => copy(batch.context),
+      command: () => copyContext(batch.context),
       visible: batch.context !== null
     },
     {
@@ -266,7 +266,7 @@ const menu = computed(() => ({
     {
       label: 'Copy sample',
       icon: 'pi pi-copy',
-      command: () => copy(item.context)
+      command: () => copyContext(item.context)
     },
     {
       label: `Delete sample`,
@@ -321,7 +321,7 @@ const menu = computed(() => ({
   ]
 }))
 
-async function copy(context) {
+async function copyContext(context) {
   const clipboard = JSON.stringify(context)
   try {
     await navigator.clipboard.writeText(clipboard)
@@ -530,18 +530,6 @@ watch(
     </template>
     <template #icons>
       <Button
-        v-tooltip.top="'Edit batch fields'"
-        icon="pi pi-sliders-h"
-        severity="secondary"
-        text
-        size="small"
-        @click="
-          (event) => {
-            batchOptionsPopover.toggle(event)
-          }
-        "
-      />
-      <Button
         v-tooltip.top="'Create batch'"
         label="Create batch"
         class="hiddenlabel"
@@ -577,11 +565,31 @@ watch(
       >
         <Column header="Batch" field="sample_batch_name" sortable>
           <template #body="{ data }">
-            <span
-              :class="`pi pi-chevron-${data.sample_batch_id in batch.expanded ? 'down' : 'right'}`"
-              style="font-size: smaller; margin-right: 0.5rem"
+            <div class="row" style="justify-content: flex-start">
+              <span
+                :class="`pi pi-chevron-${data.sample_batch_id in batch.expanded ? 'down' : 'right'}`"
+                style="font-size: smaller; margin-right: 0.5rem"
+              />
+              <BaseCopyableField :field="data.sample_batch_name" />
+            </div>
+          </template>
+        </Column>
+        <Column>
+          <template #body="{ data }">
+            <Button
+              v-if="data.sample_batch_id in batch.expanded"
+              v-tooltip.top="'Edit batch fields'"
+              icon="pi pi-ellipsis-h"
+              severity="secondary"
+              text
+              size="small"
+              @click="
+                (event) => {
+                  event.stopPropagation()
+                  batchOptionsPopover.toggle(event)
+                }
+              "
             />
-            {{ data.sample_batch_name }}
           </template>
         </Column>
         <template #expansion="{ data }">
@@ -620,7 +628,13 @@ watch(
               </Column>
 
               <template v-for="{ field, label, kind } in batchSelectedColumns" :key="field">
-                <Column v-if="kind == 'standard'" :field="field" :header="label" sortable />
+                <Column v-if="kind == 'standard'" :field="field" :header="label" sortable>
+                  <template #body="{ data }">
+                    <span class="field">
+                      <BaseCopyableField :field="data[field]" />
+                    </span>
+                  </template>
+                </Column>
                 <Column
                   v-if="kind == 'custom'"
                   field="sample_item_attributes"
@@ -628,7 +642,7 @@ watch(
                   sortable
                 >
                   <template #body="{ data }">
-                    <span>{{ data.sample_item_attributes[field] }}</span>
+                    <BaseCopyableField :field="data.sample_item_attributes[field]" />
                   </template>
                 </Column>
               </template>

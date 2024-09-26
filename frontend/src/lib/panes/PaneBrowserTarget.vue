@@ -10,7 +10,7 @@ import ProgressSpinner from 'primevue/progressspinner'
 import ContextMenu from 'primevue/contextmenu'
 import { useConfirm } from 'primevue/useconfirm'
 
-import { BaseMatchTag } from '@/lib/base'
+import { BaseMatchTag, BaseCopyableField } from '@/lib/base'
 import {
   DialogTargetCollectionOp,
   PopoverTargetCompoundAdd,
@@ -324,15 +324,18 @@ watch(
         </Column>
         <Column header="Collection" field="target_collection_name" sortable>
           <template #body="{ data }">
-            <span
-              :class="`pi pi-chevron-${
-                data.target_collection_id == app.data.match.collection.focused?.target_collection_id
-                  ? 'down'
-                  : 'right'
-              }`"
-              style="font-size: smaller; margin-right: 0.5rem"
-            />
-            {{ data.target_collection_name }}
+            <div class="row" style="justify-content: flex-start">
+              <span
+                :class="`pi pi-chevron-${
+                  data.target_collection_id ==
+                  app.data.match.collection.focused?.target_collection_id
+                    ? 'down'
+                    : 'right'
+                }`"
+                style="font-size: smaller; margin-right: 0.5rem"
+              />
+              <BaseCopyableField :field="data.target_collection_name" />
+            </div>
           </template>
         </Column>
         <Column>
@@ -370,20 +373,22 @@ watch(
             </Column>
             <Column header="Compound" field="target_compound_formula" sortable>
               <template #body="{ data }">
-                <span
-                  :class="`pi pi-chevron-${
-                    data.target_compound_id == app.data.match.compound.focused?.target_compound_id
-                      ? 'down'
-                      : 'right'
-                  }`"
-                  style="font-size: smaller; margin-right: 0.5rem"
-                />
-                {{ data.target_compound_formula }}
+                <div class="row" style="justify-content: flex-start">
+                  <span
+                    :class="`pi pi-chevron-${
+                      data.target_compound_id == app.data.match.compound.focused?.target_compound_id
+                        ? 'down'
+                        : 'right'
+                    }`"
+                    style="font-size: smaller; margin-right: 0.5rem"
+                  />
+                  <BaseCopyableField :field="data.target_compound_formula" />
+                </div>
               </template>
             </Column>
             <Column header="Name" sortable>
               <template #body="{ data }">
-                {{ data.target_compound_name }}
+                <BaseCopyableField :field="data.target_compound_name" />
               </template>
             </Column>
             <template #expansion="{ data }">
@@ -414,18 +419,24 @@ watch(
                 </Column>
                 <Column header="Ion" field="target_ion_formula" sortable>
                   <template #body="{ data }">
-                    <span
-                      :class="`pi pi-chevron-${
-                        data.target_ion_id == app.data.match.ion.focused?.target_ion_id
-                          ? 'down'
-                          : 'right'
-                      }`"
-                      style="font-size: smaller; margin-right: 0.5rem"
-                    />
-                    {{ data.target_ion_formula }}
+                    <div class="row" style="justify-content: flex-start">
+                      <span
+                        :class="`pi pi-chevron-${
+                          data.target_ion_id == app.data.match.ion.focused?.target_ion_id
+                            ? 'down'
+                            : 'right'
+                        }`"
+                        style="font-size: smaller; margin-right: 0.5rem"
+                      />
+                      <BaseCopyableField :field="data.target_ion_formula" />
+                    </div>
                   </template>
                 </Column>
-                <Column header="Mechanism" field="ionization_mechanism" sortable />
+                <Column header="Mechanism" field="ionization_mechanism" sortable>
+                  <template #body="{ data }">
+                    <BaseCopyableField :field="data.ionization_mechanism" />
+                  </template>
+                </Column>
                 <template #expansion="{ data }">
                   <!-- isotopes   -->
                   <DataTable
@@ -454,12 +465,12 @@ watch(
                     <Column style="width: 4ch" />
                     <Column header="mz" field="mz" style="width: 15ch" sortable>
                       <template #body="{ data }">
-                        {{ formatter.format(data.mz) }}
+                        <BaseCopyableField :field="formatter.format(data.mz)" />
                       </template>
                     </Column>
                     <Column header="r.a." field="relative_abundance" sortable>
                       <template #body="{ data }">
-                        {{ formatter.format(data.relative_abundance) }}
+                        <BaseCopyableField :field="formatter.format(data.relative_abundance)" />
                       </template>
                     </Column>
                   </DataTable>
