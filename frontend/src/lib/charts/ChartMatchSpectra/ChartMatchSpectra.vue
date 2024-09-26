@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watchEffect } from 'vue'
+import { ref, computed, watch } from 'vue'
 
 import ScrollPanel from 'primevue/scrollpanel'
 import Tag from 'primevue/tag'
@@ -16,25 +16,32 @@ const app = useApp()
 
 const plots = ref({})
 
-const props = defineProps({
+const { settings } = defineProps({
   settings: {
     type: Object,
     required: true
   }
 })
 
-const isotopes = computed(() => {
+// transform raw visualiation data into seperate charts
+const isotopeCharts = computed(() => {
+  // use the visualization's store
   const data = useChartData()
+  // create an array corresponding to visualized isotopes
   return clone(app.ui.matchVisualized.isotopes).map((isotope) => {
+    // split up the chart's traces by isotope
     const start = data.traces?.findIndex(
       (trace) => trace.target_isotope_id === isotope.target_isotope_id
     )
     const nextStart = data.traces?.findIndex(
       ({ target_isotope_id }, index) => target_isotope_id && index > start
     )
-    const end = nextStart !== -1 ? nextStart : data.traces?.length
-    const traces = data.traces?.slice(start, end)
-
+    const end =
+      nextStart !== -1 // if next isotope found
+        ? nextStart // use it as the end of isotope trace data
+        : data.traces?.length // otherwise use all remaining data
+    const isotopeTraces = data.traces?.slice(start, end)
+    // compute match category for this isotope
     let match_category = 0
     if (isotope.match_score > app.data.filterParams.current.possible_match_threshold) {
       match_category = 1
@@ -42,21 +49,31 @@ const isotopes = computed(() => {
     if (isotope.match_score > app.data.filterParams.current.probable_match_threshold) {
       match_category = 2
     }
-
+    // return chart data
     return {
+      // all match isotope fields
       ...isotope,
-      traces,
+      // and our computed data
+      traces: isotopeTraces,
       match_category
     }
   })
 })
 
+// auto vs manual scale
+const scale = computed(
+  () =>
+    settings.intensityScale // if user set the scale
+      ? { range: [0, settings.intensityScale] } // use set scale
+      : {} // otherwise auto set scale
+)
+// standard plotly layout
 const layout = computed(() => ({
   yaxis: {
     title: 'Signal intensity [cps]',
     gridcolor: '#33333399',
     rangemode: 'nonnegative',
-    ...(props.settings.intensityScale ? { range: [0, props.settings.intensityScale] } : {})
+    ...scale.value
   },
   xaxis: {
     title: 'm/z [Th]',
@@ -76,30 +93,50 @@ const error = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 2
 })
 
-watchEffect(() => {
-  isotopes.value.forEach(({ target_isotope_id }) => {
-    console.log(target_isotope_id)
-    const plot = plots.value[target_isotope_id]
-    if (plot) {
-      plot.resetZoom()
-    }
-  })
-})
+// reset chart zoom when changing targets
+watch(
+  // follow visualization, not focused target
+  () => app.ui.matchVisualized.ion.target_ion_id,
+  (visualized) => {
+    // reset zoom for all isotope charts
+    isotopeCharts.value.forEach((_, index) => {
+      // use isotope index to preserve chart
+      // correspondence between position & zoom
+      const plot = plots.value[index]
+      if (visualized && plot) {
+        console.log('[chart] resetting match spectra zoom')
+        plot.resetZoom()
+      }
+    })
+  }
+)
 </script>
 
 <template>
   <div>
     <ScrollPanel>
       <div class="row" style="gap: 1rem; justify-content: flex-start; padding: 0 2rem">
-        <figure v-for="isotope of isotopes" :key="isotope.target_isotope_id">
-          <h3 :style="`color: ${isotope.traces[0]?.line.color}; margin: 0`">
-            Isotope {{ error.format(isotope.mz) }}
+        <figure
+          v-for="(isotopeChart, index) of isotopeCharts"
+          :key="isotopeChart.target_isotope_id"
+        >
+          <h3 :style="`color: ${isotopeChart.traces[0]?.line.color}; margin: 0`">
+            Isotope {{ error.format(isotopeChart.mz) }}
           </h3>
+          <!--
+            This chart uses a *function ref* to enable dynamically
+            assigning refs to a reactive object. We use the `index`
+            rather than the `target_isotope_id` to ensure that we
+            can persist or reset zoom correctly as we switch targets
+            and samples.
+
+            See https://vuejs.org/guide/essentials/template-refs.html#function-refs
+          -->
           <BaseChartPlotly
-            :id="`ChartMatchSpectrum-${isotope.target_isotope_id}`"
-            :title="`Isotope ${error.format(isotope.mz)}`"
-            :ref="(el) => (plots[isotope.target_isotope_id] = el)"
-            :data="isotope.traces"
+            :id="`ChartMatchSpectrum-${isotopeChart.target_isotope_id}`"
+            :title="`Isotope ${error.format(isotopeChart.mz)}`"
+            :ref="(el) => (plots[index] = el)"
+            :data="isotopeChart.traces"
             :layout="layout"
             hideTitle
           />
@@ -108,28 +145,28 @@ watchEffect(() => {
             class="row"
             style="flex-wrap: wrap; max-width: 35ch; justify-content: center"
           >
-            <BaseMatchTag :row="isotope" text />
+            <BaseMatchTag :row="isotopeChart" text />
             <Tag
-              :value="`Intensity: ${area.format(isotope.sample_peak_area)}`"
+              :value="`Intensity: ${area.format(isotopeChart.sample_peak_area)}`"
               :severity="
-                isotope.sample_peak_area < app.data.filterParams.current.peak_min_intensity
+                isotopeChart.sample_peak_area < app.data.filterParams.current.peak_min_intensity
                   ? 'warn'
                   : 'info'
               "
             />
             <Tag
-              :value="`mz error: ${error.format(isotope.match_mz_error)}`"
+              :value="`mz error: ${error.format(isotopeChart.match_mz_error)}`"
               :severity="
-                Math.abs(isotope.match_mz_error) > app.data.filterParams.current.mz_tolerance
+                Math.abs(isotopeChart.match_mz_error) > app.data.filterParams.current.mz_tolerance
                   ? 'warn'
                   : 'info'
               "
             />
 
             <Tag
-              :value="`Abundance error: ${error.format(isotope.match_abundance_error)}`"
+              :value="`Abundance error: ${error.format(isotopeChart.match_abundance_error)}`"
               :severity="
-                Math.abs(isotope.match_abundance_error) >
+                Math.abs(isotopeChart.match_abundance_error) >
                 app.data.filterParams.current.isotope_ratio_tolerance
                   ? 'warn'
                   : 'info'
