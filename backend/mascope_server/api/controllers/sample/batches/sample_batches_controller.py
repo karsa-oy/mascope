@@ -9,7 +9,6 @@ from sqlalchemy import (
     desc,
     select,
     func,
-    literal,
 )
 from sqlalchemy.orm import joinedload
 
@@ -23,12 +22,6 @@ from mascope_server.db.models import (
     SampleBatch,
     SampleItem,
     TargetCollectionInSampleBatch,
-    TargetCollection,
-    TargetCompoundInTargetCollection,
-    TargetCompound,
-    TargetIon,
-    IonizationMechanism,
-    TargetIsotope,
 )
 from mascope_server.app import sio
 from mascope_server.api.lib.api_features import (
@@ -41,8 +34,17 @@ from mascope_server.api.lib.exceptions.api_exceptions import (
     raise_api_warning,
 )
 from mascope_server.api.controllers.match.match_controller import rematch_batch
+from mascope_server.api.controllers.target.collections.target_collections_controller import (
+    get_target_collections,
+)
 from mascope_server.api.controllers.target.compounds.target_compounds_controller import (
     get_target_compounds,
+)
+from mascope_server.api.controllers.target.ions.target_ions_controller import (
+    get_target_ions,
+)
+from mascope_server.api.controllers.target.isotopes.target_isotopes_controller import (
+    get_target_isotopes,
 )
 from mascope_server.api.controllers.sample.items.sample_items_controller import (
     create_sample_item,
@@ -58,7 +60,6 @@ from mascope_server.api.models.sample.batches.sample_batch_pydantic_model import
     SampleBatchCreateBody,
     SampleBatchUpdateBody,
 )
-from mascope_server.api.models.samples.sample_pydantic_model import AlarmsList
 from mascope_server.api.models.sample.items.sample_item_pydantic_model import (
     SampleItemCreate,
 )
@@ -171,259 +172,73 @@ async def get_sample_batch(sample_batch_id: str) -> dict:
 
 
 @api_controller()
-async def get_batch_targets(
-    sample_batch_id: str,
-    alarms_list: AlarmsList = AlarmsList(),
-) -> dict:
+async def get_batch_targets(sample_batch_id: str, deduplicate: bool = False) -> dict:
     """
     Retrieves targets associated with a specific sample batch, including collections, compounds, ions, and isotopes.
 
     Steps:
-    1. Retrieve the sample batch by ID to verify its existence.
-    2. Extract ion mechanisms from the sample batch's build parameters.
-    3. Fetch target collections associated with the sample batch and construct their dictionary representations, including an alarm mode flag.
-    4. Fetch target compounds associated with the fetched target collections, enrich them with collection-specific data, and construct their dictionary representations.
-    5. Fetch target ions associated with the fetched target compounds and relevant ion mechanisms, enrich them with collection-specific data, and construct their dictionary representations.
-    6. Fetch target isotopes associated with the fetched target ions and enrich them with collection-specific data to construct their dictionary representations.
-    7. Return a comprehensive dictionary including counts and details for collections, compounds, ions, and isotopes.
+    1. Retrieve target collections, compounds, ions, and isotopes using the existing controllers.
+    2. Optionally deduplicate the results based on the deduplicate flag.
+    3. Return a comprehensive dictionary including counts and details for target collections, compounds, ions, and isotopes.
 
     :param sample_batch_id: ID of the sample batch for which targets are being retrieved.
     :type sample_batch_id: str
-    :param alarms_list: List of alarm modes to consider, defaults to ["TARGETS"].
-    :type alarms_list: List[str], optional
-    :raises NotFoundException: If the specified sample batch does not exist.
-    :return: A dictionary containing counts and details of associated targets.
+    :param deduplicate: Flag to indicate whether duplicates should be removed.
+    :type deduplicate: bool
+    :return: A dictionary containing counts and details of associated targets, with a success message.
     :rtype: dict
     """
-    async with async_session() as session:
-        # Step 1: Verify existence of sample batch
-        sample_batch = await session.get(SampleBatch, sample_batch_id)
+    # Step 1: Verify existence of sample batch
+    sample_batch = await get_sample_batch(sample_batch_id)
+    sample_batch_name = sample_batch["sample_batch_name"]
 
-        if not sample_batch:
-            raise NotFoundException(
-                f"Sample batch with ID '{sample_batch_id}' not found"
-            )
+    # Step 2: Fetch target collections
+    collections_response = await get_target_collections(sample_batch_id=sample_batch_id)
+    target_collections = collections_response["data"]
 
-        # Step 2: Extract ion mechanisms from sample batch's build parameters
-        build_params = sample_batch.build_params
-        ion_mechanisms = build_params["ion_mechanisms"]
+    # Step 3: Fetch target compounds
+    compounds_response = await get_target_compounds(
+        sample_batch_id=sample_batch_id,
+        show_target_collection=not deduplicate,
+    )
+    target_compounds = compounds_response["data"]
 
-        # Step 3: Fetch TargetCollections associated with the sample_batch_id
-        target_collections = await session.execute(
-            select(
-                TargetCollection,
-            )
-            .join(
-                TargetCollectionInSampleBatch,
-                TargetCollectionInSampleBatch.target_collection_id
-                == TargetCollection.target_collection_id,
-            )
-            .filter(TargetCollectionInSampleBatch.sample_batch_id == sample_batch_id)
-        )
-        target_collections = target_collections.scalars().all()
+    # Step 4: Fetch target ions
+    ions_response = await get_target_ions(
+        sample_batch_id=sample_batch_id,
+        show_target_collection=not deduplicate,
+    )
+    target_ions = ions_response["data"]
 
-        # Fetch the required target_collection_ids
-        target_collection_ids = [tc.target_collection_id for tc in target_collections]
+    # Step 5: Fetch target isotopes
+    isotopes_response = await get_target_isotopes(
+        sample_batch_id=sample_batch_id,
+        show_target_collection=not deduplicate,
+    )
+    target_isotopes = isotopes_response["data"]
 
-        target_collections_dict = []
-        for collection in target_collections:
-            # Set the alarm_mode based on collection type
-            target_collections_dict.append(
-                {
-                    **collection.to_dict(),
-                    # Determine alarm_mode based on collection type and alarms_list
-                    "alarm_mode": collection.target_collection_type in alarms_list,
-                    "selection": 0,
-                }
-            )
-
-        # Create a lookup dictionary for collection alarm_mode
-        collection_alarm_mode_lookup = {
-            collection["target_collection_id"]: collection["alarm_mode"]
-            for collection in target_collections_dict
-        }
-
-        # Step 4: Fetch TargetCompounds associated with the fetched TargetCollections and add the associated target_collection_id
-        target_compounds_query = await session.execute(
-            select(TargetCompound)
-            .join(
-                TargetCompoundInTargetCollection,
-                TargetCompoundInTargetCollection.target_compound_id
-                == TargetCompound.target_compound_id,
-            )
-            .filter(
-                TargetCompoundInTargetCollection.target_collection_id.in_(
-                    [tc.target_collection_id for tc in target_collections]
-                )
-            )
-        )
-        target_compounds = target_compounds_query.scalars().all()
-
-        associations_list = []
-
-        associations = await session.execute(
-            select(
-                TargetCompoundInTargetCollection.target_compound_id,
-                TargetCompoundInTargetCollection.target_collection_id,
-            ).filter(
-                TargetCompoundInTargetCollection.target_collection_id.in_(
-                    target_collection_ids
-                )
-            )
-        )
-
-        for association in associations:
-            compound_id = association.target_compound_id
-            collection_id = association.target_collection_id
-            associations_list.append((compound_id, collection_id))
-
-        # Convert target_compounds to a dictionary for faster lookup
-        target_compounds_dict_lookup = {
-            tc.target_compound_id: tc for tc in target_compounds
-        }
-
-        target_compounds_dict = []
-        for compound_id, collection_id in associations_list:
-            tc = target_compounds_dict_lookup.get(compound_id)
-            if tc:
-                target_compounds_dict.append(
-                    {
-                        **tc.to_dict(),
-                        "target_collection_id": collection_id,
-                        "alarm_mode": collection_alarm_mode_lookup.get(
-                            collection_id, False
-                        ),
-                        "selection": 0,
-                    }
-                )
-
-        # Step 5: Fetch TargetIons associated with the fetched TargetCompounds, ion_mechanisms, and relevant TargetCollections
-        target_ions_query = (
-            select(TargetIon)
-            .distinct(TargetIon.target_ion_id)
-            .join(
-                TargetCompoundInTargetCollection,
-                TargetIon.target_compound_id
-                == TargetCompoundInTargetCollection.target_compound_id,
-            )
-            .join(
-                IonizationMechanism,
-                TargetIon.ionization_mechanism_id
-                == IonizationMechanism.ionization_mechanism_id,
-            )
-            .filter(
-                TargetCompoundInTargetCollection.target_collection_id.in_(
-                    target_collection_ids
-                ),
-                TargetIon.target_compound_id.in_(
-                    [tc.target_compound_id for tc in target_compounds]
-                ),
-                IonizationMechanism.ionization_mechanism_id.in_(ion_mechanisms),
-            )
-        )
-        target_ions_result = await session.execute(target_ions_query)
-        target_ions = target_ions_result.scalars().all()
-
-        # Create a lookup dictionary for target_compound_id -> target_collection_id
-        target_compound_to_collections = {}
-        for compound_id, collection_id in associations_list:
-            if compound_id in target_compound_to_collections:
-                target_compound_to_collections[compound_id].append(collection_id)
-            else:
-                target_compound_to_collections[compound_id] = [collection_id]
-
-        # Fetch all ionization mechanisms and create a lookup dictionary for them
-        ion_mechanisms_query = await session.execute(
-            select(
-                IonizationMechanism.ionization_mechanism_id,
-                IonizationMechanism.ionization_mechanism,
-            )
-        )
-        ion_mechanisms_associations = {
-            im.ionization_mechanism_id: im.ionization_mechanism
-            for im in ion_mechanisms_query
-        }
-
-        # Create TargetIons dictionary including the new fields
-        target_ions_dict = []
-        for ti in target_ions:
-            # Get all target_collection_ids for the current ion's compound
-            collection_ids = target_compound_to_collections.get(
-                ti.target_compound_id, []
-            )
-            # Create a separate entry for each collection the ion's compound belongs to
-            for collection_id in collection_ids:
-                target_ions_dict.append(
-                    {
-                        **ti.to_dict(),
-                        "target_collection_id": collection_id,
-                        "alarm_mode": collection_alarm_mode_lookup.get(
-                            collection_id, False
-                        ),
-                        "ionization_mechanism": ion_mechanisms_associations.get(
-                            ti.ionization_mechanism_id
-                        ),
-                        "selection": 0,
-                    }
-                )
-        # Step 6: Fetch TargetIsotopes associated with the fetched TargetIons
-        target_isotopes = await session.execute(
-            select(
-                TargetIsotope,
-                literal(0).label("selection"),
-            ).filter(
-                TargetIsotope.target_ion_id.in_(
-                    [ti.target_ion_id for ti in target_ions]
-                )
-            )
-        )
-        target_isotopes = target_isotopes.scalars().all()
-
-        # Create a lookup dictionary for target_ion_id -> list of target_collection_ids
-        target_ion_to_collections = {}
-        for ti in target_ions_dict:
-            ion_id = ti["target_ion_id"]
-            collection_id = ti["target_collection_id"]
-            if ion_id in target_ion_to_collections:
-                target_ion_to_collections[ion_id].add(collection_id)
-            else:
-                target_ion_to_collections[ion_id] = {collection_id}
-
-        # Now use this lookup to create TargetIsotopes dictionary
-        target_isotopes_dict = []
-        for isotope in target_isotopes:
-            # Get all target_collection_ids for the current isotope's ion
-            collection_ids = list(
-                target_ion_to_collections.get(isotope.target_ion_id, [])
-            )
-            # Create a separate entry for each collection the isotope's ion belongs to
-            for collection_id in collection_ids:
-                target_isotopes_dict.append(
-                    {
-                        **isotope.to_dict(),
-                        "target_collection_id": collection_id,
-                        "alarm_mode": collection_alarm_mode_lookup.get(
-                            collection_id, False
-                        ),
-                        "selection": 0,
-                    }
-                )
-
-        # Step 7: Compile all fetched and processed data into a single response dictionary
-        data = {
-            "target_collections_count": len(target_collections_dict),
-            "target_compounds_count": len(target_compounds_dict),
-            "target_ions_count": len(target_ions_dict),
-            "target_isotopes_count": len(target_isotopes_dict),
-            "target_collections": target_collections_dict,
-            "target_compounds": target_compounds_dict,
-            "target_ions": target_ions_dict,
-            "target_isotopes": target_isotopes_dict,
-        }
-
-        return {
-            "data": data,
-        }
+    # Step 6: Compile response
+    return {
+        "message": (
+            f"Sample batch '{sample_batch_name}' targets:"
+            f"{len(target_collections)} collections, "
+            f"{len(target_compounds)} compounds, "
+            f"{len(target_ions)} ions, "
+            f"{len(target_isotopes)} isotopes."
+        ),
+        "result": {
+            "target_collections": len(target_collections),
+            "target_compounds": len(target_compounds),
+            "target_ions": len(target_ions),
+            "target_isotopes": len(target_isotopes),
+        },
+        "data": {
+            "target_collections": target_collections,
+            "target_compounds": list(target_compounds),
+            "target_ions": list(target_ions),
+            "target_isotopes": list(target_isotopes),
+        },
+    }
 
 
 @api_controller(

@@ -12,11 +12,11 @@ from mascope_server.api.controllers.sample.batches.sample_batches_controller imp
     copy_sample_batch,
     sample_batch_export_peaks,
 )
-from mascope_server.api.models.samples.sample_pydantic_model import AlarmsList
 from mascope_server.api.models.sample.batches.sample_batch_pydantic_model import (
     SampleBatchCreateBody,
     SampleBatchUpdateBody,
     GetSampleBatchesQueryParams,
+    GetSampleBatchTargetsQueryParams,
     SampleBatchImportSamplesBody,
     SampleBatchCopyBody,
 )
@@ -40,16 +40,13 @@ async def get_sample_batch_route(
     return await get_sample_batch(sample_batch_id)
 
 
-@sample_batches_router.post("/api/sample/batches/{sample_batch_id}/targets")
-@api_route(
-    include_message=True,
-    success_message="Sample batch targets fetched successfully",
-)
-async def get_batch_targets_route(sample_batch_id: str, body: AlarmsList):
-    return await get_batch_targets(
-        sample_batch_id,
-        body.alarms_list,
-    )
+@sample_batches_router.get("/api/sample/batches/{sample_batch_id}/targets")
+@api_route()
+async def get_batch_targets_route(
+    sample_batch_id: str,
+    query_params: GetSampleBatchTargetsQueryParams = Depends(),
+):
+    return await get_batch_targets(sample_batch_id, **query_params.model_dump())
 
 
 @sample_batches_router.post("/api/sample/batches")

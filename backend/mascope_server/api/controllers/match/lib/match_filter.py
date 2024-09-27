@@ -3,8 +3,6 @@ from mascope_server.api.models.match.match_pydantic_model import (
     FilterParams,
 )
 
-from mascope_server.runtime import runtime
-
 
 def apply_filter_params(
     match_isotope_df, filter_params: FilterParams = None

@@ -5,7 +5,7 @@ import { useSample } from './sample'
 
 export const usePeak = defineModule({
   name: 'peak',
-  key: 'peak_id',
+  key: 'mz',
   useParent: useSample,
   reloadOn: 'peak_reload',
   load: async ({ sample_file_id }) => {
@@ -18,11 +18,11 @@ export const usePeak = defineModule({
       })
     )?.data
     if (data) {
-      const { mz, intensity } = data
-      const records = mz.map((value, i) => ({
-        peak_id: i,
-        mz: value,
-        intensity: intensity[i]
+      const { mz, area, height } = data
+      const records = mz.map((mz, i) => ({
+        mz: mz,
+        area: area[i],
+        height: height[i]
       }))
       return records
     } else {

@@ -1,20 +1,11 @@
-from fastapi import APIRouter, Query, Depends
+from fastapi import APIRouter, Depends
 from mascope_server.api.lib.api_features import api_route
-from mascope_server.api.controllers.samples.samples_ops_controller import (
-    get_sample_aggregate_matches,
-    get_samples_aggregate_matches,
-    init_batch_match_filter,
-    init_sample_match_filter,
-)
 from mascope_server.api.controllers.samples.samples_controller import (
     get_samples,
     get_sample,
 )
 from mascope_server.api.models.samples.sample_pydantic_model import (
-    GetSamplesBody,
     GetSamplesQueryParams,
-    GetSampleBody,
-    GetSampleMatchFilterBody,
 )
 
 samples_router = APIRouter()
@@ -34,112 +25,3 @@ async def get_sample_route(
     sample_item_id: str,
 ):
     return await get_sample(sample_item_id=sample_item_id)
-
-
-@samples_router.post("/api/samples/old")
-@api_route()
-async def get_samples_aggregate_matches_route(
-    body: GetSamplesBody,
-):
-    result = await get_samples_aggregate_matches(**body.model_dump())
-
-    # Default message
-    message = "Samples with no match info"
-    # Check if batch match filter was initialized and there are sample matches
-    if body.sample_batch_id and body.batch_matches_info:
-        matched_samples = any(sample.get("matched", 0) > 0 for sample in result["data"])
-        message = (
-            "Batch match filter successfully initialized"
-            if matched_samples
-            else "No matches found for the batch"
-        )
-    response = {
-        "results": result["results"],
-        "message": message,
-        "data": result["data"],
-    }
-
-    # Conditionally add batch_matches_info
-    if "batch_matches_info" in result:
-        response["batch_matches_info"] = result["batch_matches_info"]
-
-    return response
-
-
-@samples_router.post("/api/samples/old/{sample_item_id}")
-@api_route()
-async def get_sample_aggregate_matches_route(
-    sample_item_id: str,
-    body: GetSampleBody,
-):
-    sample_data = await get_sample_aggregate_matches(
-        sample_item_id=sample_item_id, **body.model_dump()
-    )
-
-    if sample_data and body.sample_matches_info:
-        if sample_data and sample_data.get("matched", 0) > 0:
-            message = "Sample and match information retrieved successfully"
-        else:
-            message = "Sample retrieved successfully, no matches found for the sample"
-    else:
-        message = "Sample retrieved successfully"
-
-    return {
-        "message": message,
-        "data": sample_data,
-    }
-
-
-@samples_router.get("/api/samples/batch_match_filter/{sample_batch_id}")
-@api_route()
-async def batch_match_filter_route(
-    sample_batch_id: str,
-    include_match_interference: bool = Query(
-        True, description="Include match interference data in the response"
-    ),
-):
-    batch_match_filter_data = await init_batch_match_filter(
-        sample_batch_id, include_match_interference
-    )
-    message = (
-        "Batch match filter successfully initialized"
-        if len(batch_match_filter_data) > 0
-        else "No matches found for the batch"
-    )
-    return {
-        "results": len(batch_match_filter_data),
-        "message": message,
-        "data": batch_match_filter_data,
-    }
-
-
-@samples_router.post("/api/samples/{sample_item_id}/sample_match_filter")
-@api_route()
-async def sample_match_filter_route(
-    sample_item_id: str,
-    body: GetSampleMatchFilterBody,
-):
-    data = await init_sample_match_filter(
-        sample_item_id=sample_item_id,
-        filter_params=body.filter_params,
-        target_ion_id=body.target_ion_id,
-    )
-
-    if body.target_ion_id and body.filter_params:
-        message = (
-            "Sample match filter for target ion successfully initialized"
-            if len(data) > 0
-            else "No matches found for the specified target ion in the sample"
-        )
-    else:
-        message = (
-            "Sample match filter successfully initialized"
-            if len(data) > 0
-            else "No matches found for the sample"
-        )
-
-    return {
-        "results": len(data),
-        "message": message,
-        "data": data,
-    }

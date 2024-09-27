@@ -73,6 +73,26 @@ class GetRecentSampleFilesQueryParams(GetSampleFilesQueryParams):
     )
 
 
+class GetSampleFilePeaksQueryParams(BaseModel):
+    areas: bool = Field(
+        True,
+        description="Include peak areas in the response. Represents the integrated area under the curve for each peak, reflecting the total intensity over time.",
+    )
+    heights: bool = Field(
+        True,
+        description="Include peak heights in the response. Represents the maximum intensity at the apex of each peak, showing the peak's highest intensity value.",
+    )
+
+    @model_validator(mode="after")
+    @classmethod
+    def validate_peak_variables(cls, values):
+        if not values.areas and not values.heights:
+            raise ValueError(
+                "You need to request either peak areas, peak heights, or both. At least one of 'areas' or 'heights' must be set to True. "
+            )
+        return values
+
+
 class GetSampleFilePeakTimeseriesBody(BaseModel):
     peak_mz: float
     peak_mz_tolerance_ppm: Optional[float] = 1

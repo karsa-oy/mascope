@@ -267,44 +267,103 @@ async def update_sample_file(
 
 
 @api_controller()
-async def get_sample_file_peaks(sample_file_id: str) -> dict:
+async def get_sample_file_peaks(
+    sample_file_id: str, areas: bool, heights: bool
+) -> dict:
     """
-    Retrieves peaks from a specified sample file.
+    Retrieves peaks from a specified sample file, with options to include areas and/or heights.
 
     Steps:
     1. Fetch the sample file details using the provided ID.
-    2. Load the sample file data from its filename.
-    3. Extract peaks from the sample file.
-    4. Format and return the peak data.
+    2. Validate whether peak areas and/or heights are requested.
+    3. Load the sample file data based on the selected options (areas, heights).
+    4. Extract and format the peak data for each requested type.
+    5. Return the data in a columnar format with a message.
 
-    :param sample_file_id: Sample file ID
+    :param sample_file_id: The ID of the sample file.
     :type sample_file_id: str
-    :raises NotFoundException: If the instrument sample file with the given filename is not found.
-    :return: Dictionary with keys:
-        "mz": list of m/z of the peaks in sample file
-        "intensity": peak intensity (area)
+    :param areas: If True, include peak areas in the response.
+    :type areas: bool
+    :param heights: If True, include peak heights in the response.
+    :type heights: bool
+    :raises NotFoundException: If the sample file is not found or hasn't been processed (no peak data available).
+    :return: A dictionary with the peak data dict in columnar format:
+        - "mz": list of mass/charge (m/z) values for each peak.
+        - "area": list of peak areas (if requested).
+        - "height": list of peak heights (if requested).
     :rtype: dict
     """
-    # Step 1: Fetch the sample file details using the provided ID.
-    sample_file = await get_sample_file(sample_file_id)
-    filename = sample_file["filename"]
 
-    # Step 2: Load the sample file
+    # Step 1: Fetch the sample file details
+    sample_file = await get_sample_file(sample_file_id)
+    filename = sample_file.get("filename")
+
+    # Step 2: Load the appropriate peak data based on the query params
+    vars_to_load = []
+    if areas:
+        vars_to_load.append("peak_areas")
+    if heights:
+        vars_to_load.append("peak_heights")
+
     try:
-        sample_file = load_file(filename, vars=["peak_areas"])
+        sample_file_data = load_file(filename, vars=vars_to_load)
     except FileNotFoundError as e:
-        raise NotFoundException(f"Sample file with name '{filename}' not found") from e
-    # Step 3: Extract peaks
-    if "peak_areas" not in sample_file:
-        raise NotFoundException(f"No peak areas found in sample file '{filename}'")
-    peaks = get_peaks(sample_file, "area").sum(dim="time")
-    # Step 4: Format and return data
+        raise NotFoundException(
+            f"Sample file with name '{filename}' was not found or has not been processed"
+        ) from e
+
+    # Step 3: Prepare the data structure for response
+    response_data = {}
+
+    # Step 4: Extract and format the data
+    if areas:
+        if "peak_areas" not in sample_file_data:
+            raise NotFoundException(
+                f"No peak areas found in sample file '{filename}', file may not have been processed"
+            )
+        peak_areas = get_peaks(sample_file_data, "area").sum(dim="time")
+        response_data["mz"] = list(peak_areas.mz.values.astype(float))
+        response_data["area"] = list(peak_areas.values.astype(float))
+
+    if heights:
+        if "peak_heights" not in sample_file_data:
+            raise NotFoundException(
+                f"No peak heights found in sample file '{filename}', file may not have been processed"
+            )
+        peak_heights = get_peaks(sample_file_data, "height").sum(dim="time")
+        # If 'mz' was not populated from areas, populate it from heights
+        if "mz" not in response_data:
+            response_data["mz"] = list(peak_heights.mz.values.astype(float))
+        response_data["height"] = list(peak_heights.values.astype(float))
+
+    # Step 5: Format the response for the case where no peaks were detected
+    if not response_data["mz"]:
+        message = (
+            f"No peaks found in sample file '{filename}'. "
+            f"The file was processed, but no peaks were detected in the target m/z range. "
+            f"Consider adjusting the targets or computing all peaks."
+        )
+        return {
+            "message": message,
+            "total": 0,
+            "data": {
+                "mz": [],
+                "area": [] if areas else None,
+                "height": [] if heights else None,
+            },
+        }
+
+    # Step 6: Remove empty fields from the response (if only one type is requested)
+    if not areas:
+        response_data.pop("area", None)
+    if not heights:
+        response_data.pop("height", None)
+
+    message = f"Successfully loaded {len(response_data['mz'])} peaks from sample file '{filename}'"
     return {
-        "total": len(peaks.mz.values),
-        "data": {
-            "mz": list(peaks.mz.values.astype(float)),
-            "intensity": list(peaks.values.astype(float)),
-        },
+        "message": message,
+        "total": len(response_data["mz"]),
+        "data": response_data,
     }
 
 

@@ -19,6 +19,7 @@ from mascope_server.api.models.sample.files.sample_file_pydantic_model import (
     SampleFileUpdate,
     GetSampleFilesQueryParams,
     GetRecentSampleFilesQueryParams,
+    GetSampleFilePeaksQueryParams,
     GetSampleFilePeakTimeseriesBody,
     GetSpectrumQueryParams,
 )
@@ -87,8 +88,10 @@ async def delete_sample_file_route(sample_file_id: str):
     "/api/sample/files/{sample_file_id}/peaks", tags=["Sample File Peaks"]
 )
 @api_route()
-async def get_sample_file_peaks_route(sample_file_id: str):
-    return await get_sample_file_peaks(sample_file_id)
+async def get_sample_file_peaks_route(
+    sample_file_id: str, query_params: GetSampleFilePeaksQueryParams = Depends()
+):
+    return await get_sample_file_peaks(sample_file_id, **query_params.model_dump())
 
 
 @sample_files_router.get(

@@ -1,9 +1,7 @@
 from typing import List, Optional
 from sqlalchemy import asc, desc, func, select, delete, and_
 from mascope_server.db import async_session
-from mascope_server.db.models import (
-    MatchInterference,
-)
+from mascope_server.db.models import MatchInterference, SampleItem
 from mascope_server.api.lib.api_features import api_controller
 from mascope_server.api.lib.exceptions.api_exceptions import (
     NotFoundException,
@@ -24,6 +22,7 @@ from mascope_server.runtime import runtime
 async def get_match_interferences(
     target_isotope_id: Optional[str] = None,
     sample_item_id: Optional[str] = None,
+    sample_batch_id: Optional[str] = None,
     min_sample_peak_interference: Optional[float] = None,
     max_sample_peak_interference: Optional[float] = None,
     sort: Optional[str] = None,
@@ -46,6 +45,8 @@ async def get_match_interferences(
     :type target_isotope_id: Optional[str], optional
     :param sample_item_id: Filter by sample item ID, defaults to None.
     :type sample_item_id: Optional[str], optional
+    :param sample_batch_id: Filter by sample batch ID, defaults to None.
+    :type sample_batch_id: Optional[str], optional
     :param min_sample_peak_interference: Minimum sample peak interference value for filtering, defaults to None.
     :type min_sample_peak_interference: Optional[float], optional
     :param max_sample_peak_interference: Maximum sample peak interference value for filtering, defaults to None.
@@ -70,6 +71,11 @@ async def get_match_interferences(
             stmt = stmt.filter(MatchInterference.target_isotope_id == target_isotope_id)
         if sample_item_id:
             stmt = stmt.filter(MatchInterference.sample_item_id == sample_item_id)
+        if sample_batch_id:
+            stmt = stmt.join(
+                SampleItem,
+                SampleItem.sample_item_id == MatchInterference.sample_item_id,
+            ).where(SampleItem.sample_batch_id == sample_batch_id)
         if min_sample_peak_interference is not None:
             stmt = stmt.filter(
                 MatchInterference.sample_peak_interference

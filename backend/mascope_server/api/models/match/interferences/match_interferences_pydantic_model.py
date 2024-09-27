@@ -21,6 +21,9 @@ class GetMatchInterferencesQueryParams(BaseModel):
     sample_item_id: Optional[str] = Field(
         None, description="Filter by the ID of the sample item"
     )
+    sample_batch_id: Optional[str] = Field(
+        None, description="The ID of the sample batch to filter match interferences by."
+    )
     min_sample_peak_interference: Optional[float] = Field(
         None, description="Filter by the Minimum sample peak interference"
     )

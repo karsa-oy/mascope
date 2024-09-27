@@ -74,6 +74,13 @@ class GetSampleBatchesQueryParams(BaseModel):
     limit: int = Field(10000, description="Number of results per page.")
 
 
+class GetSampleBatchTargetsQueryParams(BaseModel):
+    deduplicate: Optional[bool] = Field(
+        False,
+        description="Drop the potential duplicates (added to several target collections). Target collection info added if deduplicate is False.",
+    )
+
+
 class SampleBatchImportSamplesBody(BaseModel):
     sample_items: List[SampleItemCreate] = Field(
         ..., description="Sample items to be created and imported to the sample batch"

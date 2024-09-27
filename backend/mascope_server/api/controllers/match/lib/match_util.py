@@ -1,8 +1,6 @@
 import pandas as pd
 import numpy as np
 
-from mascope_server.runtime import runtime
-
 
 def sort_and_paginate_match_sample_df(
     df: pd.DataFrame, order: str, page: int, limit: int
@@ -54,3 +52,28 @@ def sort_and_paginate_match_sample_df(
     df = df.replace([np.nan, pd.NaT], None)
 
     return df
+
+
+def deduplicate_match_df(df: pd.DataFrame, id_keys: tuple) -> pd.DataFrame:
+    """
+    Deduplicate match items in a DataFrame based on target_collection_type priority.
+    Priority: TARGETS > DIAGNOSTICS > CALIBRANTS.
+
+    :param df: DataFrame of match items to deduplicate.
+    :type df: pd.DataFrame
+    :param id_keys: Keys to identify unique items (e.g., 'target_compound_id', 'sample_item_id').
+    :type id_keys: tuple
+    :return: Deduplicated DataFrame with highest priority items kept.
+    :rtype: pd.DataFrame
+    """
+    collection_priority = {"TARGETS": 1, "DIAGNOSTICS": 2, "CALIBRANTS": 3}
+
+    def prioritize_group(group):
+        # Sort the group by target_collection_type priority
+        return group.sort_values(
+            by="target_collection_type", key=lambda col: col.map(collection_priority)
+        ).head(1)
+
+    # Apply deduplication
+    deduplicated_df = df.groupby(list(id_keys), as_index=False).apply(prioritize_group)
+    return deduplicated_df.reset_index(drop=True)

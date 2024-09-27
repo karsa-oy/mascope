@@ -2,9 +2,7 @@ from datetime import datetime, timezone
 from typing import List, Optional
 from sqlalchemy import asc, desc, func, select, delete, and_
 from mascope_server.db import async_session
-from mascope_server.db.models import (
-    MatchIsotope,
-)
+from mascope_server.db.models import MatchIsotope, SampleItem
 from mascope_server.api.lib.api_features import api_controller
 from mascope_server.api.lib.exceptions.api_exceptions import (
     NotFoundException,
@@ -24,6 +22,7 @@ from mascope_server.runtime import runtime
 @api_controller()
 async def get_match_isotopes(
     sample_item_id: Optional[str] = None,
+    sample_batch_id: Optional[str] = None,
     target_isotope_id: Optional[str] = None,
     sort: str = None,
     order: str = None,
@@ -43,6 +42,8 @@ async def get_match_isotopes(
 
     :param sample_item_id: Filter by sample item ID, defaults to None.
     :type sample_item_id: Optional[str], optional
+    :param sample_batch_id: Filter by sample batch ID, defaults to None.
+    :type sample_batch_id: Optional[str], optional
     :param target_isotope_id: Filter by target isotope ID, defaults to None.
     :type target_isotope_id: Optional[str], optional
     :param sort: Column to sort by, defaults to None.
@@ -65,6 +66,10 @@ async def get_match_isotopes(
             stmt = stmt.filter(MatchIsotope.sample_item_id == sample_item_id)
         if target_isotope_id:
             stmt = stmt.filter(MatchIsotope.target_isotope_id == target_isotope_id)
+        if sample_batch_id:
+            stmt = stmt.join(
+                SampleItem, SampleItem.sample_item_id == MatchIsotope.sample_item_id
+            ).where(SampleItem.sample_batch_id == sample_batch_id)
 
         # Step 3: Apply sorting
         if sort:

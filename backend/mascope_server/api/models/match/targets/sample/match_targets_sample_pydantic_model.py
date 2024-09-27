@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional
 
 # TODO_configuration Default Filter Parameters
 DEFAULT_MIN_ISOTOPE_ABUNDANCE = 0.15
@@ -17,6 +17,10 @@ class SortingPaginationQueryParams(BaseModel):
 class GetMatchSampleCompoundsQueryParams(SortingPaginationQueryParams):
     target_collection_id: Optional[str] = Field(
         None, description="The ID of the target collection to filter compounds by."
+    )
+    deduplicate: Optional[bool] = Field(
+        False,
+        description="Drop the potential duplicates (added to several target collections). The target collection info is preserved based on collection type priority 'TARGETS' > 'DIAGNOSTICS' > 'CALIBRANTS'",
     )
 
 

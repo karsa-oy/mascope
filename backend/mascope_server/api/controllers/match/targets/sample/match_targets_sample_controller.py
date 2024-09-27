@@ -34,8 +34,13 @@ from mascope_server.api.controllers.match.interferences.match_interferences_cont
 )
 from mascope_server.api.controllers.match.lib.match_filter import apply_filter_params
 from mascope_server.api.controllers.match.lib.match_util import (
+    deduplicate_match_df,
     sort_and_paginate_match_sample_df,
 )
+
+# TODO_configuration
+# Default Filter Parameters
+DEFAULT_MIN_ISOTOPE_ABUNDANCE = 0.15
 
 
 @api_controller()
@@ -124,7 +129,7 @@ async def get_match_sample_collections(
 
     return {
         "results": len(match_sample_collections_df),
-        "message": f"Successfully retrieved target ion matches for sample '{sample_item_name}'.",
+        "message": f"Successfully retrieved target collections match data for sample '{sample_item_name}'.",
         "data": match_sample_collections_df.to_dict(orient="records"),
     }
 
@@ -133,6 +138,7 @@ async def get_match_sample_collections(
 async def get_match_sample_compounds(
     sample_item_id: str,
     target_collection_id: Optional[str] = None,
+    deduplicate: bool = False,
     order: Optional[str] = None,
     page: int = 0,
     limit: int = 10000,
@@ -155,6 +161,8 @@ async def get_match_sample_compounds(
     :type sample_item_id: str
     :param target_collection_id: Filter compounds by target collection, defaults to None.
     :type target_collection_id: Optional[str], optional
+    :param deduplicate: Flag to indicate whether compound deduplication should be applied.
+    :type deduplicate: bool
     :param order: Column name to sort by, defaults to None.
     :type order: Optional[str], optional
     :param page: Page number for pagination, defaults to 0.
@@ -172,7 +180,7 @@ async def get_match_sample_compounds(
     # Fetch target compounds with filters:
     #   - sample_batch_id - target_compounds for the sample batch (unique)
     #   - target_collection_id - target_compounds for particular target_collection (unique)
-    #   - show_target_collection - add target collection id and adds potential compount duplicates
+    #   - show_target_collection - add target collection id and adds potential compound duplicates
     target_compounds = await get_target_compounds(
         sample_batch_id=sample_batch_id,
         target_collection_id=target_collection_id,
@@ -216,6 +224,12 @@ async def get_match_sample_compounds(
     # Convert to pandas dataframe for sorting and pagination
     match_sample_compounds_df = pd.DataFrame(match_sample_compounds)
 
+    # Deduplicate if required
+    if deduplicate:
+        match_sample_compounds_df = deduplicate_match_df(
+            match_sample_compounds_df, id_keys=("target_compound_id", "sample_item_id")
+        )
+
     # Sort and paginate the DataFrame
     match_sample_compounds_df = sort_and_paginate_match_sample_df(
         match_sample_compounds_df, order, page, limit
@@ -223,7 +237,7 @@ async def get_match_sample_compounds(
 
     return {
         "results": len(match_sample_compounds_df),
-        "message": f"Successfully retrieved target compound matches for sample '{sample_item_name}'.",
+        "message": f"Successfully retrieved target compounds match data for sample '{sample_item_name}'.",
         "data": match_sample_compounds_df.to_dict(orient="records"),
     }
 
@@ -233,6 +247,7 @@ async def get_match_sample_ions(
     sample_item_id: str,
     target_compound_id: Optional[str] = None,
     target_collection_id: Optional[str] = None,
+    deduplicate: bool = False,
     order: Optional[str] = "desc",
     page: int = 0,
     limit: int = 10000,
@@ -259,6 +274,8 @@ async def get_match_sample_ions(
     :type target_compound_id: Optional[str], optional
     :param target_collection_id: Optional filter by target collection ID.
     :type target_collection_id: Optional[str], optional
+    :param deduplicate: Flag to indicate whether ion deduplication should be applied.
+    :type deduplicate: bool
     :param order: Sorting order ('asc' or 'desc'), default to 'desc'.
     :type order: Optional[str], optional
     :param page: Page number for pagination.
@@ -322,6 +339,12 @@ async def get_match_sample_ions(
     # Convert to pandas dataframe for sorting and pagination
     match_sample_ions_df = pd.DataFrame(match_sample_ions)
 
+    # Deduplicate if required
+    if deduplicate:
+        match_sample_ions_df = deduplicate_match_df(
+            match_sample_ions_df, id_keys=("target_ion_id", "sample_item_id")
+        )
+
     # Sort and paginate the DataFrame
     match_sample_ions_df = sort_and_paginate_match_sample_df(
         match_sample_ions_df, order, page, limit
@@ -329,7 +352,7 @@ async def get_match_sample_ions(
 
     return {
         "results": len(match_sample_ions_df),
-        "message": f"Successfully retrieved target ion matches for sample '{sample_item_name}'.",
+        "message": f"Successfully retrieved target ions match data for sample '{sample_item_name}'.",
         "data": match_sample_ions_df.to_dict(orient="records"),
     }
 
@@ -338,8 +361,9 @@ async def get_match_sample_ions(
 async def get_match_sample_isotopes(
     sample_item_id: str,
     target_ion_id: Optional[str] = None,
-    min_relative_abundance: Optional[str] = None,
+    min_relative_abundance: Optional[str] = DEFAULT_MIN_ISOTOPE_ABUNDANCE,
     target_collection_id: Optional[str] = None,
+    deduplicate: bool = False,
     order: Optional[str] = "desc",
     page: int = 0,
     limit: int = 10000,
@@ -356,7 +380,7 @@ async def get_match_sample_isotopes(
     4. Fetch matched isotopes and interference data based on the sample item ID.
     5. Merge target isotope data with matched isotopes and interference data.
     6. Add sample instrument data to each merged record.
-    7. Apply filtering parameters to adjust the match score and categorize matches.
+    7. Apply filtering parameters to adjust the match score and categorize match data.
     8. Sort the filtered DataFrame based on 'target_collection_id', 'match_category', and 'match_score', handling NaNs appropriately.
     9. Paginate the sorted data and prepare it for output by replacing placeholders for absent data with None.
     10. Return the paginated data along with success or informative messages.
@@ -365,10 +389,12 @@ async def get_match_sample_isotopes(
     :type sample_item_id: str
     :param target_ion_id: Filter isotopes by target ion ID, defaults to None.
     :type target_ion_id: Optional[str], optional
-    :param min_relative_abundance: Filter isotopes by minimum relative abundance, defaults to None.
+    :param min_relative_abundance: Filter isotopes by minimum relative abundance, defaults to DEFAULT_MIN_ISOTOPE_ABUNDANCE.
     :type min_relative_abundance: Optional[str], optional
     :param target_collection_id: Filter isotopes by target collection ID, defaults to None.
     :type target_collection_id: Optional[str], optional
+    :param deduplicate: Flag to indicate whether isotopes deduplication should be applied.
+    :type deduplicate: bool
     :param order: Sorting order ('asc' or 'desc'), default to 'desc'.
     :type order: Optional[str], optional
     :param page: Page number for pagination, defaults to 0.
@@ -448,6 +474,12 @@ async def get_match_sample_isotopes(
     # Apply filtering to filter the match_score and assign match_category
     match_sample_isotopes_df = apply_filter_params(match_sample_isotopes_df)
 
+    # Deduplicate if required
+    if deduplicate:
+        match_sample_isotopes_df = deduplicate_match_df(
+            match_sample_isotopes_df, id_keys=("target_isotope_id", "sample_item_id")
+        )
+
     # Sort and paginate the DataFrame
     match_sample_isotopes_df = sort_and_paginate_match_sample_df(
         match_sample_isotopes_df, order, page, limit
@@ -455,6 +487,6 @@ async def get_match_sample_isotopes(
 
     return {
         "results": len(match_sample_isotopes_df),
-        "message": f"Successfully retrieved target isotopes matches for sample '{sample['sample_item_name']}'.",
+        "message": f"Successfully retrieved target isotopes match data for sample '{sample['sample_item_name']}'.",
         "data": match_sample_isotopes_df.to_dict(orient="records"),
     }
