@@ -240,6 +240,11 @@ function validateColumns(cols) {
   }
 }
 
+const friendlyType = (sample) => `'${sample.sample_item_type.replaceAll('_', ' ').toLowerCase()}'`
+const friendlyTypes = sampleTypes
+  .map((type) => `'${type.replaceAll('_', ' ').toLowerCase()}'`)
+  .join(', ')
+
 function validateRows() {
   validation.rows.issues = []
   let key = 0
@@ -262,28 +267,33 @@ function validateRows() {
     // Validate sample type
     if (!sampleTypes.includes(item.sample_item_type)) {
       failures.push(
-        `Sample type '${item.sample_item_type}' isn't recognized, please use one of the accepted types.`
+        `Sample type '${friendlyType(item)}' isn't recognized,` +
+          `please use one of the accepted types: ${friendlyTypes}.`
       )
       // Add recommendation info if not already present
-      const allowedTypes = `Please use one of the allowed sample types: ${sampleTypes.join(
-        ', '
-      )}. You can leave this field empty, sample type will be set to UNKNOWN. `
+      const allowedTypes =
+        `Please use one of the allowed sample types: ${friendlyTypes}.` +
+        ` You can leave this field empty, sample type will be set to 'unknown'. `
       if (!validation.rows.issues.includes(allowedTypes)) {
         validation.rows.issues.push(allowedTypes)
       }
     }
     // Validate filter ID presence based on sample type
     if (['INSTRUMENT_BACKGROUND', 'ONLINE'].includes(item.sample_item_type) && item.filter_id) {
-      failures.push(`Filter ID should not be provided for sample type '${item.sample_item_type}'.`)
+      failures.push(`Filter ID should not be provided for sample type '${friendlyType(item)}'.`)
     } else if (
       !['INSTRUMENT_BACKGROUND', 'ONLINE'].includes(item.sample_item_type) &&
       !item.filter_id
     ) {
-      failures.push(`Filter ID must be provided for sample type '${item.sample_item_type}'.`)
+      failures.push(`Filter ID must be provided for sample type '${friendlyType(item)}'.`)
     }
     // Validate filter ID format if present
     if (item.filter_id && !/^[0-9A-Z]{6}$/.test(item.filter_id)) {
-      failures.push(`The filter ID '${item.filter_id}' is incorrectly formatted.`)
+      failures.push(
+        `The filter ID '${item.filter_id}' is incorrectly formatted: ` +
+          `filter ID must be consist of exactly 6 letters and/or numbers,` +
+          ` e.g XYZ123, 420fyi, 1a2B3c, 123456, QWERTY.`
+      )
 
       // Add recommendation info if not already present
       const allowedFilterIdInfo = `Filter ID: ensure it is exactly 6 characters long and only contains uppercase letters and numbers.

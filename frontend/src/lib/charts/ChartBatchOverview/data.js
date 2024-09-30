@@ -63,20 +63,20 @@ export const useChartData = defineStore('chart.batch.overview', () => {
 
       for (let sampleId of sampleIds) {
         let itemMatches = compounds.filter((row) => row.sample_item_id === sampleId)
-        let sampleItemCompoundStats = itemMatches
+        let sampleCompoundStats = itemMatches
           .filter((match) => match.target_compound_id === compoundId)
           .map((compoundMatch) => ({
             match_category: compoundMatch.match_category,
             intensity: compoundMatch.sample_peak_area_sum
           }))[0]
 
-        if (sampleItemCompoundStats) {
+        if (sampleCompoundStats) {
           intensities.push(
-            sampleItemCompoundStats.match_category > 0 ? sampleItemCompoundStats.intensity : null
+            sampleCompoundStats.match_category > 0 ? sampleCompoundStats.intensity : null
           )
           // Update the maximum match category for this compound
-          if (sampleItemCompoundStats.match_category > compoundMaxMatchCategory) {
-            compoundMaxMatchCategory = sampleItemCompoundStats.match_category
+          if (sampleCompoundStats.match_category > compoundMaxMatchCategory) {
+            compoundMaxMatchCategory = sampleCompoundStats.match_category
           }
         } else {
           intensities.push(null)

@@ -208,7 +208,7 @@ const formatter = new Intl.NumberFormat('en-US', {
           async () => {
             if (batch) {
               await api.request.process({
-                method: 'recalibrateSampleBatch',
+                method: 'recalibrateBatch',
                 body: {
                   batchId: original.sample_batch_id,
                   body: mzFit.mzCalibrationParams

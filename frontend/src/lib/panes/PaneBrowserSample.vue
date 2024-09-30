@@ -18,10 +18,10 @@ import { generateCopyName } from '@/api'
 
 import { BaseMatchTag, BaseCopyableField } from '@/lib/base'
 import {
-  DialogSampleBatchOp,
-  DialogSampleItemOp,
+  DialogBatchOp,
+  DialogSampleOp,
   DialogCalibration,
-  useSampleBatchDeleteDialog
+  useBatchDeleteDialog
 } from '@/lib/dialogs'
 
 import { beautifySnakeCase } from '@/lib/utils'
@@ -35,7 +35,7 @@ const app = useApp()
 const dialog = reactive({
   batch: {
     op: null,
-    delete: useSampleBatchDeleteDialog(),
+    delete: useBatchDeleteDialog(),
     calibration: false
   },
   item: {
@@ -687,8 +687,8 @@ watch(
       style="height: 230px"
     />
   </Popover>
-  <DialogSampleBatchOp v-model:action="dialog.batch.op" :batch="batch.context" />
-  <DialogSampleItemOp v-model:action="dialog.item.op" :item="item.context" />
+  <DialogBatchOp v-model:action="dialog.batch.op" :batch="batch.context" />
+  <DialogSampleOp v-model:action="dialog.item.op" :item="item.context" />
   <DialogCalibration v-model:visible="dialog.batch.calibration" :context="batch.context" />
   <DialogCalibration v-model:visible="dialog.item.calibration" :context="item.context" />
 </template>

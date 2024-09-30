@@ -193,7 +193,7 @@ export function createHttpClient() {
         throw new Error(userErrorMessage)
       }
     },
-    copySampleBatch: async ({ batchId, body }) => {
+    copyBatch: async ({ batchId, body }) => {
       try {
         return await client.post(`/sample/batches/${batchId}/copy`, body)
       } catch (error) {
@@ -202,7 +202,7 @@ export function createHttpClient() {
         throw new Error(userErrorMessage)
       }
     },
-    recalibrateSampleBatch: async ({ batchId, body }) => {
+    recalibrateBatch: async ({ batchId, body }) => {
       try {
         return await client.post(`/calibration/mz_calibrate/batch/${batchId}`, body)
       } catch (error) {
@@ -231,7 +231,7 @@ export function createHttpClient() {
       }
     },
     // Samples
-    getAllSamples: async (params) => {
+    getBatchSamples: async (params) => {
       try {
         return await client.get('/samples', { params })
       } catch (error) {
@@ -240,16 +240,6 @@ export function createHttpClient() {
         throw new Error(userErrorMessage)
       }
     },
-    getSample: async ({ sampleId }) => {
-      try {
-        return await client.get(`/samples/${sampleId}`)
-      } catch (error) {
-        const userErrorMessage =
-          error?.response?.data?.error || `Failed to get the sample data: ${error}`
-        throw new Error(userErrorMessage)
-      }
-    },
-
     // Sample Files
     getAllSampleFiles: async (params = {}) => {
       try {
@@ -319,22 +309,14 @@ export function createHttpClient() {
       }
     },
     // Sample Items
-    getAllSampleItems: async (params = {}) => {
+    getAllSamples: async (params = {}) => {
       try {
         return await client.get('/sample/items', { params })
       } catch (error) {
         console.error('Failed to get all sample items: ', error)
       }
     },
-    getSampleItem: async (sample_item_id) => {
-      try {
-        return await client.get(`/sample/items/${sample_item_id}`)
-      } catch (error) {
-        console.error('Failed to get sample item: ', error)
-      }
-    },
-
-    createSampleItem: async (sample) => {
+    createSample: async (sample) => {
       try {
         return await client.post('/sample/items', sample)
       } catch (error) {
@@ -344,7 +326,7 @@ export function createHttpClient() {
         throw new Error(userErrorMessage)
       }
     },
-    processSampleItem: async ({ sample, mz_calibration_params }) => {
+    processSample: async ({ sample, mz_calibration_params }) => {
       try {
         return await client.post(`/sample/items/process`, {
           sample_item: sample,
@@ -357,7 +339,7 @@ export function createHttpClient() {
         throw new Error(userErrorMessage)
       }
     },
-    updateSampleItem: async ({ sampleId, body }) => {
+    updateSample: async ({ sampleId, body }) => {
       try {
         return await client.patch(`/sample/items/${sampleId}`, body)
       } catch (error) {
@@ -367,7 +349,7 @@ export function createHttpClient() {
         throw new Error(userErrorMessage)
       }
     },
-    deleteSampleItem: async ({ sampleId }) => {
+    deleteSample: async ({ sampleId }) => {
       try {
         return await client.delete(`/sample/items/${sampleId}`)
       } catch (error) {
@@ -376,7 +358,7 @@ export function createHttpClient() {
         throw new Error(userErrorMessage)
       }
     },
-    copySampleItem: async ({ sampleId, body }) => {
+    copySample: async ({ sampleId, body }) => {
       try {
         return await client.post(`/sample/items/${sampleId}/copy`, body)
       } catch (error) {
@@ -679,7 +661,7 @@ export function createHttpClient() {
     },
 
     // Target Collections in Sample Batch
-    getAllTargetCollectionsInSampleBatchByParams: async (params = {}) => {
+    getAllTargetCollectionsInBatchByParams: async (params = {}) => {
       try {
         return await client.get('/target/associations/target_collections_in_sample_batch', {
           params

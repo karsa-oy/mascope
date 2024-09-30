@@ -3,7 +3,7 @@ import { reactive } from 'vue'
 
 import SelectButton from 'primevue/selectbutton'
 
-import { DialogSampleItemOp } from '@/lib/dialogs'
+import { DialogSampleOp } from '@/lib/dialogs'
 import { useApp } from '@/stores'
 import { watchEffect } from 'vue'
 
@@ -12,7 +12,7 @@ const app = useApp()
 app.data.acquisition.mode = false
 
 const dialog = reactive({
-  sampleItem: null
+  sample: null
 })
 
 watchEffect(() => {
@@ -60,7 +60,7 @@ watchEffect(() => {
       <label :for="option.id" class="hidden">{{ option.id.replace('-', ' ') }}</label>
     </template>
   </SelectButton>
-  <DialogSampleItemOp v-model:action="dialog.sampleItem" />
+  <DialogSampleOp v-model:action="dialog.sample" />
 </template>
 
 <style scoped>

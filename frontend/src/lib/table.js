@@ -123,16 +123,24 @@ export function parseGenericCsv(cols, rows) {
 
   // Map over the filtered non-empty rows
   return validRows.map((row) => {
+    // Parse the sample type field
+    const parsed_sample_type = row[cols[1].field]
+      .trim() // remove leading/trailing whitespace
+      .replace(/\s\s+/g, ' ') // replace duplicate spaces with one space
+      .replace(' ', '_') // replace spaces with underscores
+      .toUpperCase() // capitalize
     // Determine if filter_id should be generated
     const checkTypesToGenerateFilterId = !['INSTRUMENT_BACKGROUND', 'ONLINE'].includes(
-      row[cols[1].field]
+      parsed_sample_type
     )
 
-    const newSampleItem = {
+    const newSample = {
       sample_item_name: row[cols[0].field],
-      sample_item_type: row[cols[1].field] ? row[cols[1].field].trim() : 'UNKNOWN',
+      sample_item_type: row[cols[1].field] ? parsed_sample_type : 'UNKNOWN',
       // Generate filter_id only if the type is not "INSTRUMENT_BACKGROUND" or "ONLINE", for "INSTRUMENT_BACKGROUND" or "ONLINE" set filter_id to null
-      filter_id: checkTypesToGenerateFilterId ? row[cols[2].field] || genId(6, false) : null,
+      filter_id: checkTypesToGenerateFilterId
+        ? (row[cols[2].field]?.toUpperCase() ?? genId(6, false))
+        : null,
       sample_item_attributes: {}
     }
 
@@ -140,10 +148,10 @@ export function parseGenericCsv(cols, rows) {
     cols.slice(3).forEach((col) => {
       const attrKey = strToSnakeCase(col.label.trim())
       // Ensure that if the attribute is empty, we set it to a default or empty string
-      newSampleItem.sample_item_attributes[attrKey] =
+      newSample.sample_item_attributes[attrKey] =
         col.field && row[col.field].trim() ? row[col.field].trim() : ''
     })
-    return newSampleItem
+    return newSample
   })
 }
 
@@ -255,7 +263,7 @@ export async function batchExportCsv() {
     { field: 'Ion mechanisms', value: ionMechanismNames }
   ]
 
-  const sampleItemCols = [
+  const sampleCols = [
     { field: 'sample_item_name', label: 'Sample name' },
     { field: 'filename', label: 'Filename' },
     { field: 'datetime', label: 'Datetime' },
@@ -301,7 +309,7 @@ export async function batchExportCsv() {
     {
       name: 'Samples',
       rows: samples,
-      cols: sampleItemCols
+      cols: sampleCols
     },
     {
       name: 'Match compounds',

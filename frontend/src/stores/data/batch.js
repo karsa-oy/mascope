@@ -45,7 +45,7 @@ export const useBatch = defineModule({
     }),
   copy: async ({ sample_batch_id, workspace_id, sample_batch_name, sample_batch_description }) =>
     await api.request.process({
-      method: 'copySampleBatch',
+      method: 'copyBatch',
       body: {
         batchId: sample_batch_id,
         body: {

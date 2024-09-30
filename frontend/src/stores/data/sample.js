@@ -15,7 +15,7 @@ export const useSample = defineModule({
   load: async ({ sample_batch_id }) =>
     (
       await api.request.read({
-        method: 'getAllSamples',
+        method: 'getBatchSamples',
         body: {
           sample_batch_id,
           sort: 'datetime_utc'
@@ -27,23 +27,23 @@ export const useSample = defineModule({
   },
   create: async (sample) =>
     await api.request.create({
-      method: 'createSampleItem',
+      method: 'createSample',
       body: sample
     }),
   update: async (sample) =>
     await api.request.update({
-      method: 'updateSampleItem',
+      method: 'updateSample',
       body: { sampleId: sample.sample_item_id, body: sample }
     }),
   delete: async ({ sample_item_id }) => {
     return await api.request.delete({
-      method: 'deleteSampleItem',
+      method: 'deleteSample',
       body: { sampleId: sample_item_id }
     })
   },
   copy: async ({ sample_item_id, sample_batch_id, sample_item_name }) =>
     await api.request.process({
-      method: 'copySampleItem',
+      method: 'copySample',
       body: {
         sampleId: sample_item_id,
         body: {
@@ -55,7 +55,7 @@ export const useSample = defineModule({
   process: async (sample) => {
     const mzFit = useMzFit()
     return await api.request.process({
-      method: 'processSampleItem',
+      method: 'processSample',
       body: {
         sample,
         mz_calibration_params: mzFit.mzCalibrationParams

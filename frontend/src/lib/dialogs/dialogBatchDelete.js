@@ -2,7 +2,7 @@ import { useConfirm } from 'primevue/useconfirm'
 
 import { useApp } from '@/stores'
 
-export function useSampleBatchDeleteDialog() {
+export function useBatchDeleteDialog() {
   const app = useApp()
   const confirm = useConfirm()
 

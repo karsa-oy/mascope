@@ -207,7 +207,7 @@ async function execute() {
       if (!equals(selected.calibrants, initial.calibrants, 'target_collection_id')) {
         const mzFit = useMzFit({ unmount: true })
         await api.request.process({
-          method: 'recalibrateSampleBatch',
+          method: 'recalibrateBatch',
           body: {
             batchId: original.value.sample_batch_id,
             body: mzFit.mzCalibrationParams

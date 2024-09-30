@@ -10,7 +10,7 @@ import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
 import InputText from 'primevue/inputtext'
 
-import { DialogSampleItemOp, DialogSampleBatchImport } from '@/lib/dialogs'
+import { DialogSampleOp, DialogBatchImport } from '@/lib/dialogs'
 
 import { useApp } from '@/stores'
 
@@ -23,7 +23,7 @@ const props = defineProps({
 })
 
 const dialog = reactive({
-  sampleItem: null,
+  sample: null,
   batchImport: false
 })
 
@@ -42,7 +42,7 @@ const acquisitions = computed(
 
 watchEffect(() => {
   if (app.data.acquisition.pending.filename && app.data.acquisition.mode && props.active) {
-    dialog.sampleItem = 'create_pending'
+    dialog.sample = 'create_pending'
   }
 })
 watch(
@@ -91,7 +91,7 @@ watch(
           @click="
             () => {
               if (selected.files?.length == 1) {
-                dialog.sampleItem = 'create'
+                dialog.sample = 'create'
               } else if (selected.files?.length > 1) {
                 dialog.batchImport = true
               }
@@ -127,8 +127,8 @@ watch(
     <div v-else class="center" style="min-height: 150px">
       <i>No acquisitions found</i>
     </div>
-    <DialogSampleItemOp v-model:action="dialog.sampleItem" :item="selected.files[0]" />
-    <DialogSampleBatchImport v-model:visible="dialog.batchImport" :files="selected.files" />
+    <DialogSampleOp v-model:action="dialog.sample" :item="selected.files[0]" />
+    <DialogBatchImport v-model:visible="dialog.batchImport" :files="selected.files" />
   </div>
 </template>
 

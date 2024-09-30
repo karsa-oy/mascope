@@ -118,10 +118,10 @@ const layout = computed(() => ({
 function onClick({ points }) {
   if (!points) return
   // Select sample item corresponding to clicked data point
-  let sampleItemIndex = points[0].pointIndex
-  let sampleItem = app.data.sample.list[sampleItemIndex]
-  if (sampleItem) {
-    app.data.sample.focus(sampleItem)
+  let sampleIndex = points[0].pointIndex
+  let sample = app.data.sample.list[sampleIndex]
+  if (sample) {
+    app.data.sample.focus(sample)
   } else {
     app.data.sample.unfocus()
   }
