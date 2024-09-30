@@ -145,9 +145,9 @@ export function createHttpClient() {
         throw new Error(userErrorMessage)
       }
     },
-    getBatchTargets: async ({ batchId, body }) => {
+    getBatchTargets: async ({ batchId, params = {} }) => {
       try {
-        return await client.post(`/sample/batches/${batchId}/targets`, body)
+        return await client.get(`/sample/batches/${batchId}/targets`, params)
       } catch (error) {
         const userErrorMessage =
           error?.response?.data?.error || `Failed to get batch targets data: ${error}`

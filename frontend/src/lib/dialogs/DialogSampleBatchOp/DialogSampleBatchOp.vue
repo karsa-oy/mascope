@@ -17,7 +17,6 @@ import { api } from '@/api'
 import { equals } from '@/lib/table'
 import { clone } from '@/lib/utils'
 import { useMzFit } from '@/lib/mzFit'
-import { alarmsList } from '@/lib/constants'
 
 import { useApp } from '@/stores'
 
@@ -150,10 +149,7 @@ async function init(value) {
       await api.request.read({
         method: 'getBatchTargets',
         body: {
-          batchId: original.value.sample_batch_id,
-          body: {
-            alarms_list: alarmsList
-          }
+          batchId: original.value.sample_batch_id
         }
       })
     )?.data?.target_collections
