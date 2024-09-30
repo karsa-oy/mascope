@@ -32,7 +32,10 @@ def main():
 dev_app.add_typer(dev_tools_app, name="tools")
 
 @dev_app.command()
-def run(modules: Annotated[List[str], typer.Argument()]=None, kill_others: bool=False, all: bool=False):
+def run(
+        modules: Annotated[List[str], typer.Argument()]=None,
+        host: Annotated[Optional[bool], typer.Option("--host", "-h")] = False
+    ):
     """
     Run your development environment
 
@@ -41,11 +44,10 @@ def run(modules: Annotated[List[str], typer.Argument()]=None, kill_others: bool=
     run 'mascope modules --runnable'.
 
     """
-    runnable=[pkg['name'] for pkg in runtime.pkgs if pkg['run']] if all else []
     # select processes
     selected=[mod
         for mod in runtime.pkgs
-        if mod['name'] in (modules or runnable or ['backend', 'frontend'])
+        if mod['name'] in (modules or ['backend', 'frontend'])
     ]
     if not len(selected):
         [tag] = modules
@@ -64,12 +66,13 @@ def run(modules: Annotated[List[str], typer.Argument()]=None, kill_others: bool=
         "meta": frontend_runtime.meta.model_dump(),
         "config": frontend_runtime.config.model_dump()
     })
+    if host:
+        os.environ['MASCOPE_DEVHOST'] = 'HOST'
     # construct arguments
     names=f'--names {','.join(map(lambda proc: f'{proc['name']}', selected))}'
     cmds=f'{" ".join(map(run_module, selected))}'
-    options='--kill-others' if kill_others else ''
     # run command
-    command=f'{concurrently} --raw {options} {names} {cmds}'
+    command=f'{concurrently} --raw {names} {cmds}'
     print(f"Running command: {command}")
     lib.run(command)
 

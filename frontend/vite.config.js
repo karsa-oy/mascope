@@ -11,8 +11,8 @@ export default defineConfig({
     }
   },
   server: {
-    // expose dev server to local network
-    host: '0.0.0.0'
+    // expose dev server to local network if option is set
+    host: process.env.MASCOPE_DEVHOST ? '0.0.0.0' : 'localhost'
   },
   build: {
     chunkSizeWarningLimit: 600,
