@@ -47,18 +47,42 @@ export const useChartData = defineStore('chart.sample.spectrum', () => {
       })
     )?.data
     if (data) {
-      traces.value = [
-        {
-          name: 'spectrum',
+      traces.value = app.data.peak.list
+        .map(({ mz, height, area }) => ({
+          name: '',
+          type: 'scatter',
+          mode: 'lines',
+          line: {
+            color: 'grey'
+          },
+          x: [...Array(5).keys()].map(() => mz), // *
+          y: [...Array(5).keys()].map((index) => height * (index / 4)), // *
+          hovertemplate: [
+            '<i>Peak</i>',
+            `mz: <b>${mz.toFixed(4)}</b>`,
+            `height: <b>${height.toExponential(3)}</b>`,
+            `area: <b>${area.toExponential(3)}</b>`
+          ].join('<br>')
+          // * Plotly's hover tooltip only appears
+          // when hovering near a point, so we
+          // generate 5 points to make it easy
+          // for the user to trigger the tooltop
+          // along the whole marker line.
+        }))
+        .concat({
+          name: '',
           line: {
             color: 'rgb(252, 79, 48)'
           },
           mode: 'lines',
           type: 'scatter',
           x: new Float32Array(data.mz),
-          y: new Float32Array(data.intensity)
-        }
-      ]
+          y: new Float32Array(data.intensity),
+          hovertemplate: ['<i>Signal</i>', 'mz: <b>%{x:.4f}</b>', 'height: <b>%{y:.3e}</b>'].join(
+            '<br>'
+          )
+        })
+
       length.value = data.intensity.length
     }
     loading.value = false

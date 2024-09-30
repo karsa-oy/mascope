@@ -294,9 +294,9 @@ export function createHttpClient() {
         console.error('Failed to get sample spectrum: ', error)
       }
     },
-    getSamplePeaks: async ({ sample_file_id }) => {
+    getSamplePeaks: async ({ sample_file_id, heights = true, areas = true }) => {
       try {
-        return await client.get(`/sample/files/${sample_file_id}/peaks`)
+        return await client.get(`/sample/files/${sample_file_id}/peaks`, { areas, heights })
       } catch (error) {
         console.error('Failed to get sample peaks: ', error)
       }
