@@ -1,4 +1,4 @@
-import { ref, computed, watchEffect } from 'vue'
+import { ref, watch } from 'vue'
 import { defineStore } from 'pinia'
 
 import { useApp } from '@/stores'
@@ -19,13 +19,12 @@ export const useChartData = defineStore('chart.sample.spectrum', () => {
     }
   })
 
-  const activeFileId = computed(() => app.data.sample.focused?.sample_file_id)
-
-  watchEffect(async () => {
-    if (activeFileId.value) {
-      if (activeFileId.value !== loadedFileId.value && app.ui.tab.active == 'spectrum') {
-        await load(activeFileId.value)
-        loadedFileId.value = activeFileId.value
+  watch([() => app.ui.tab.active, () => app.data.peak.list], async ([tab, peaks]) => {
+    const activeFileId = app.data.sample.focused?.sample_file_id
+    if (activeFileId) {
+      if (activeFileId !== loadedFileId.value && tab == 'spectrum') {
+        await load(activeFileId, peaks)
+        loadedFileId.value = activeFileId
       }
     } else {
       traces.value = []
@@ -36,7 +35,7 @@ export const useChartData = defineStore('chart.sample.spectrum', () => {
     }
   })
 
-  async function load(sampleFileId) {
+  async function load(sampleFileId, peaks) {
     loading.value = true
     const data = (
       await api.request.read({
@@ -47,7 +46,7 @@ export const useChartData = defineStore('chart.sample.spectrum', () => {
       })
     )?.data
     if (data) {
-      traces.value = app.data.peak.list
+      traces.value = peaks
         .map(({ mz, height, area }) => ({
           name: '',
           type: 'scatter',
