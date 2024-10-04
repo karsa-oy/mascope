@@ -55,17 +55,23 @@ const initial = reactive({
     name: '',
     desc: ''
   },
-  calibrants: [],
-  mechanisms: []
+  mechanisms: {
+    matching: [],
+    calibration: []
+  },
+  calibrants: []
 })
 const selected = reactive({
   info: {
     name: '',
     desc: ''
   },
-  calibrants: null, // single collection
-  mechanisms: [], // multiple mechanisms
-  targets: [] // multiple collections
+  mechanisms: {
+    matching: [], // matching mechanisms
+    calibration: [] // calibration mechanisms
+  },
+  calibrants: null, // single calibration collection
+  targets: [] // multiple target collections
 })
 
 // computed
@@ -84,7 +90,10 @@ const updated = computed(() => {
     workspace_id: app.data.workspace.focused.workspace_id,
     build_params: {
       calibration_collection: selected.calibrants.target_collection_id,
-      ion_mechanisms: selected.mechanisms.map((row) => row.ionization_mechanism_id)
+      ion_mechanisms: selected.mechanisms.matching.map((mech) => mech.ionization_mechanism_id),
+      calibration_ion_mechanisms: selected.mechanisms.calibration.map(
+        (mech) => mech.ionization_mechanism_id
+      )
     },
     target_collection_ids: selected.targets.map((row) => row.target_collection_id)
   }
@@ -110,13 +119,18 @@ const changed = computed(() =>
       selected.info.desc !== initial.info.desc ||
       !equals(selected.targets, initial.targets, 'target_collection_id') ||
       !equals(selected.calibrants, initial.calibrants, 'target_collection_id') ||
-      !equals(selected.mechanisms, initial.mechanisms, 'ionization_mechanism_id')
+      !equals(selected.mechanisms.matching, initial.mechanisms.matching, 'ionization_mechanism_id') ||
+      !equals(
+        selected.mechanisms.calibration,
+        initial.mechanisms.calibration,
+        'ionization_mechanism_id'
+      )
     : false
 )
 const invalid = computed(() => {
   switch (action.value) {
     case 'create': {
-      return !selected.info.name || !selected.calibrants || !(selected.mechanisms?.length > 0)
+      return !selected.info.name || !selected.calibrants || !(selected.mechanisms.matching?.length > 0)
     }
     case 'update': {
       const infoValid = selected.info.name.length > 0
@@ -141,8 +155,13 @@ async function init(value) {
     selected.info.name = original.value.sample_batch_name
     selected.info.desc = original.value.sample_batch_description
     // init ionization mechanisms
-    selected.mechanisms = app.data.mechanism.list.filter((mech) =>
+    selected.mechanisms.matching = app.data.mechanism.list.filter((mech) =>
       original.value.build_params?.ion_mechanisms?.includes(mech.ionization_mechanism_id)
+    )
+    selected.mechanisms.calibration = app.data.mechanism.list.filter((mech) =>
+      original.value.build_params?.calibration_ion_mechanisms?.includes(
+        mech.ionization_mechanism_id
+      )
     )
     // init target collections with batch collections
     const batchCollections = (
@@ -168,7 +187,7 @@ async function init(value) {
     selected.info.name = ''
     selected.info.desc = ''
     // init ionization mechanisms
-    selected.mechanisms = app.data.mechanism.list.filter(
+    selected.mechanisms.matching = app.data.mechanism.list.filter(
       (mech) => mech.ionization_mechanism === '+Br-'
     )
     // init target collections with defaults
@@ -186,7 +205,8 @@ async function init(value) {
   }
   // save initial state
   initial.info = clone(selected.info)
-  initial.mechanisms = clone(selected.mechanisms)
+  initial.mechanisms.matching = clone(selected.mechanisms.matching)
+  initial.mechanisms.calibration = clone(selected.mechanisms.calibration)
   initial.targets = clone(selected.targets)
   initial.calibrants = clone(selected.calibrants)
   // set initial tab
@@ -265,7 +285,10 @@ async function execute() {
         </TabPanel>
 
         <TabPanel value="mechanisms">
-          <PaneSelectMechanisms v-model:selected="selected.mechanisms" />
+          <PaneSelectMechanisms
+            v-model:matchingMechanisms="selected.mechanisms.matching"
+            v-model:calibrationMechanisms="selected.mechanisms.calibration"
+          />
         </TabPanel>
 
         <TabPanel value="calibrants">

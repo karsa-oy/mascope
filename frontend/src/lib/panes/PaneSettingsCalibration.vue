@@ -17,7 +17,7 @@ const mzCalibrationParams = defineModel('mzCalibrationParams')
   />
   <BaseParamField
     label="Min. isotope abundance"
-    v-model:param="mzCalibrationParams.min_isotope_abundance"
+    v-model:param="mzCalibrationParams.isotope_abundance_min"
     :range="{ min: 0, max: 1, step: 0.05 }"
   />
   <BaseParamField

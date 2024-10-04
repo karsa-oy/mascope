@@ -141,10 +141,20 @@ async def calibration_mz_fit(
     )
 
     # Step 3: m/z fit the sample file
+    calibration_mechs = build_params.get("calibration_ion_mechanisms")
+    matching_mechs = build_params["ion_mechanisms"]
+    if calibration_mechs:
+        runtime.logger.debug(
+            "Calibrating mz fit using calibration ionization mechanisms"
+        )
+        mechanisms = calibration_mechs
+    else:
+        runtime.logger.debug("Calibrating mz fit using matching ionization mechanisms")
+        mechanisms = matching_mechs
     fit, stats, error, warning = await mz_fit(
         filename=sample.filename,
         calibration_collection_id=build_params["calibration_collection"],
-        ionization_mechanism_ids=build_params["ion_mechanisms"],
+        ionization_mechanism_ids=mechanisms,
         peak_intensity_min=mz_calibration_params.peak_intensity_min,
         isotope_abundance_min=mz_calibration_params.isotope_abundance_min,
         match_score_min=mz_calibration_params.match_score_min,

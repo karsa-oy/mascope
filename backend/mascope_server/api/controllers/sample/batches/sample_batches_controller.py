@@ -406,6 +406,17 @@ async def update_sample_batch(
 
         existing_sample_batch.sample_batch_utc_modified = datetime.now(timezone.utc)
 
+        # ensure batch reload is triggered if calibration
+        # mechanisms are changed
+        existing_calibration_mechanisms = set(
+            existing_sample_batch.build_params["calibration_ion_mechanisms"]
+        )
+        new_calibration_mechanisms = set(
+            sample_batch_update_body.build_params.calibration_ion_mechanisms
+        )
+        if existing_calibration_mechanisms != new_calibration_mechanisms:
+            sample_batch_reload = True
+
         # Update build_params and associations with target collections
         existing_sample_batch.build_params = (
             sample_batch_update_body.build_params.model_dump()

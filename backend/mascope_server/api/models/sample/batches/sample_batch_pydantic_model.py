@@ -14,7 +14,10 @@ class BuildParams(BaseModel):
         ..., description="ID of the calibration collection"
     )
     ion_mechanisms: List[str] = Field(
-        ..., description="List of ionisation mechanism IDs"
+        ..., description="List of ionisation mechanism IDs for matching"
+    )
+    calibration_ion_mechanisms: Optional[List[str]] = Field(
+        [], description="List of ionisation mechanism IDs for calibration"
     )
 
     @field_validator("calibration_collection")

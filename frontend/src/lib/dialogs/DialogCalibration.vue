@@ -39,7 +39,7 @@ watchEffect(async () => {
   samples.value = batch.value
     ? (
         await api.request.read({
-          method: 'getAllSamples',
+          method: 'getBatchSamples',
           body: {
             sample_batch_id: batch.value.sample_batch_id,
             batch_matches_info: false,

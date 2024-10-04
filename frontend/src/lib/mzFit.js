@@ -10,7 +10,7 @@ export const useMzFit = ({ unmount } = { unmount: false }) => {
   //  TODO_configuration default calibration parameters
   const DEFAULT_MZ_CALIBRATION_PARAMS = {
     match_score_min: 0,
-    min_isotope_abundance: 0.15,
+    isotope_abundance_min: 0.15,
     peak_intensity_min: 0, //1000,
     refine_window: 100
   }
