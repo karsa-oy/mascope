@@ -108,13 +108,18 @@ Managing frontend dependencies is done in the standard way using `npm`.
 Running in dev mode:
 
 ```sh
-mascope dev run                                  # run the backend and frontend dev servers
-mascope dev run backend file-converter           # run specific modules in dev mode
-mascope --log-grep foo dev run                   # highlight log lines with foo
-mascope -g foo dev run                           # highlight log lines with foo
-mascope --log-level debug dev run                # set log level to debug
-mascope -l debug dev run                         # set log level to debug
+mascope dev run                               # run the backend & frontend
+mascope dev run --reload                      # HMR for the backend on Windows
+mascope dev run --host                        # Expose dev server to the network
+mascope dev run backend file-converter        # run specific modules in dev mode
+mascope --log-grep foo dev run                # highlight log lines with foo
+mascope -g foo dev run                        # highlight log lines with foo
+mascope --log-level debug dev run             # set log level to debug
+mascope -l debug dev run                      # set log level to debug
 ```
+
+Due to upstream issues with Windows and Python, we cannot enable the backend's HMR in the same terminal when running the dev server. Use the `--reload` flag
+to enable reloading by launching the backend in a new tab of Windows Terminal
 
 ### Prod
 
@@ -212,11 +217,8 @@ The runtime can be executed in two major modes: `dev` and `prod`. While `dev` mo
 
 #### Dev mode
 
-The development environment works by running dev server commands listed in the [modules](#runtime-modules).
-These run `poetry` or `vite` dev servers and script to run other operations or services. By default, running
-`mascope dev run` spins up the `backend` and `frontend` dev servers and joins their logs to one output.
-You can also specify other modules (run `mascope module --runnable` to see which). For an overview of
-the `dev` mode api, run `mascope dev --help`.
+The development environment works by running dev server commands listed in the [modules](#runtime-modules). These run `poetry` or `vite` dev servers and script to run other operations or services. By default, running
+`mascope dev run` spins up the `backend` and `frontend` dev servers and joins their logs to one output. To enable HMR for the `backend` on Windows, run `mascope dev run --reload`. You can also specify other modules (run `mascope module --runnable` to see which). For an overview of the `dev` mode api, run `mascope dev --help`.
 
 #### Prod mode
 
