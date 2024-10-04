@@ -27,15 +27,19 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
 
   const time = reactive({
     mode: 'Last 24 hours',
-    range: null
+    range: {
+      min: null,
+      max: null
+    }
   })
   const days = computed(() =>
     time.mode == 'range' ? null : time.mode == 'Last 24 hours' ? 1 : Number(time.mode.split(' ')[1])
   )
   watchEffect(() => {
-    const range = time.range
-    if (range && range[0] && range[1]) {
+    if (time.range.min || time.range.max) {
       time.mode = 'range'
+    } else {
+      time.mode = 'Last 24 hours'
     }
   })
   watchEffect(() => {
@@ -72,13 +76,7 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
     if (time.mode.startsWith('Last')) {
       await loadRecent(days.value)
     } else if (time.mode == 'range') {
-      const [min, max] = time.range
-      if (min && max) {
-        await loadRange({
-          min,
-          max
-        })
-      }
+      await loadRange(time.range)
     }
   }
 
@@ -87,8 +85,8 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
       await api.request.read({
         method: 'getAllSampleFiles',
         body: {
-          datetime_min: range.min.toISOString(),
-          datetime_max: range.max.toISOString(),
+          datetime_min: range.min?.toISOString(),
+          datetime_max: range.max?.toISOString(),
           instrument: instrument.focused?.instrument,
           sort: 'datetime_utc',
           order: 'asc'

@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta, timezone
-from fastapi import APIRouter, BackgroundTasks, Request, Depends
+
+from fastapi import APIRouter, BackgroundTasks, Request, Depends, UploadFile
+
 from mascope_server.db.id import gen_id
 from mascope_server.api.lib.api_features import api_route
 
@@ -9,6 +11,7 @@ from mascope_server.api.controllers.sample.files.sample_files_controller import 
     create_sample_file,
     delete_sample_file,
     update_sample_file,
+    sample_file_upload,
     get_sample_file_peaks,
     compute_all_sample_file_peaks,
     get_sample_file_peak_timeseries,
@@ -17,6 +20,7 @@ from mascope_server.api.controllers.sample.files.sample_files_controller import 
 from mascope_server.api.models.sample.files.sample_file_pydantic_model import (
     SampleFileCreate,
     SampleFileUpdate,
+    SampleFileUpload,
     GetSampleFilesQueryParams,
     GetRecentSampleFilesQueryParams,
     GetSampleFilePeaksQueryParams,
@@ -120,7 +124,7 @@ async def compute_all_sample_file_peaks_route(
         process_id=process_id,
     )
     return {
-        "message": f"Computina all peaks data for sample file '{filename}', please wait.",
+        "message": f"Computing all peaks data for sample file '{filename}', please wait.",
         "process_id": process_id,
     }
 
@@ -148,3 +152,21 @@ async def get_sample_file_spectrum_route(
     query_params: GetSpectrumQueryParams = Depends(),
 ):
     return await get_sample_file_spectrum(sample_file_id, **query_params.model_dump())
+
+
+@sample_files_router.post("/api/sample/files/upload")
+@api_route(status_code=201)
+async def sample_file_upload_route(file: UploadFile = Depends(SampleFileUpload)):
+    """
+    Uploads a sample file to the server.
+
+    This route takes an uploaded file from a form field and saves it in the `filestreams` directory
+    on the server. It validates the file's size and extension before uploading.
+
+    :param file: The file to be uploaded, provided in a form field.
+    :type file: UploadFile
+    :return: A JSON response indicating the success or failure of the upload.
+    :rtype: JSONResponse
+    """
+    # Access the file using file.file
+    return await sample_file_upload(file.file)

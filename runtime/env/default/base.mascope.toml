@@ -16,7 +16,7 @@ filestore = './filestore'
 [backend]
 # meta
 pkg_path = './backend'
-tags = ['server', 'tof', 'orbi', 'lab', 'all']
+tags = ['server', 'tof', 'orbi', 'file', 'lab', 'all']
 log_path = './logs'
 # settings
 database = './database'
@@ -30,7 +30,7 @@ run = "poetry run mascope-api"
 [file-converter]
 # meta
 pkg_path = './backend'
-tags = ['server', 'tof', 'orbi', 'all']
+tags = ['server', 'tof', 'orbi', 'file', 'all']
 log_path = './logs'
 # settings
 server = 'backend'
@@ -76,7 +76,7 @@ run = "poetry run mascope-file-mover"
 [frontend]
 # meta
 pkg_path = './frontend'
-tags = ['lab', 'orbi', 'tof', 'all']
+tags = ['lab', 'orbi', 'tof', 'file', 'all']
 log_path = './logs'
 # scripts
 install = "npm install"

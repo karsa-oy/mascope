@@ -3,14 +3,9 @@ import { api } from './client.js'
 
 import { runtime } from '@/lib/runtime.js'
 
-// Create the URL
-
-// LOAD ENV VARS
-const host = location.hostname
-const mode = import.meta.env.MODE
-
-// production api server is routed to api_port via nginx reverse proxy
-let url = mode === 'production' ? `https://${host}` : `http://${host}:${runtime.meta.api_port}`
+//  TODO_configuration default response timeout parameters
+const API_RESPONSE_TIMEOUT = 20_000 // 20 seconds
+const FILE_UPLOAD_TIMEOUT = 600_000 // 10 minutes
 
 const getSessionId = () => {
   // get session id for emitting sio finished events
@@ -57,8 +52,8 @@ const handleError = (error) => {
 
 export function createHttpClient() {
   const client = axios.create({
-    baseURL: `${url}/api`,
-    timeout: 20000
+    baseURL: `${runtime.api_path}/api`,
+    timeout: API_RESPONSE_TIMEOUT
   })
 
   // Request interceptor to add X-SID header to every request, 'X-' prefix is a convention for custom headers
@@ -308,6 +303,26 @@ export function createHttpClient() {
         console.error('Failed to compute sample peaks: ', error)
       }
     },
+    uploadSampleFile: async ({ file, progressCallback }) => {
+      try {
+        return await client.postForm(
+          '/sample/files/upload',
+          { file },
+          {
+            timeout: FILE_UPLOAD_TIMEOUT,
+            // Use the provided progress callback
+            onUploadProgress: (progressEvent) => {
+              progressCallback(progressEvent)
+            }
+          }
+        )
+      } catch (error) {
+        const userErrorMessage =
+          error?.response?.data?.error || `Failed to upload sample file: ${error}`
+        throw new Error(userErrorMessage)
+      }
+    },
+
     // Sample Items
     getAllSamples: async (params = {}) => {
       try {

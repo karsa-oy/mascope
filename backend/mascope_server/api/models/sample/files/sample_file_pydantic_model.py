@@ -1,6 +1,12 @@
 from typing import Optional, Dict, List, Annotated
 from datetime import datetime as dt
 from pydantic import BaseModel, Field, field_validator, model_validator
+from fastapi import UploadFile
+from fastapi.exceptions import RequestValidationError
+
+# TODO_configuration Default sample file upload params
+FILE_UPLOAD_EXTENSIONS = {".h5", ".raw"}
+FILE_UPLOAD_SIZE_LIMIT = 200 * 1024 * 1024  # 200 MB
 
 
 class SampleFileBase(BaseModel):
@@ -48,6 +54,43 @@ class SampleFileUpdate(BaseModel):
     )
     tic: float = Field(..., description="TIC of the sample file")
     polarity: str = Field("", description="Polarity of the sample file")
+
+
+class SampleFileUpload(BaseModel):
+    file: UploadFile = Field(..., description="The uploaded file")
+
+    @field_validator("file")
+    @classmethod
+    def validate_extension(cls, file: UploadFile):
+        if not any(file.filename.endswith(ext) for ext in FILE_UPLOAD_EXTENSIONS):
+            # Raise a RequestValidationError directly
+            raise RequestValidationError(
+                [
+                    {
+                        "loc": ("file",),
+                        "msg": f"Invalid file extension, allowed extensions: {', '.join(FILE_UPLOAD_EXTENSIONS)}",
+                        "type": "value_error.file_extension",
+                    }
+                ]
+            )
+        return file
+
+    @field_validator("file")
+    @classmethod
+    def validate_size(cls, file: UploadFile):
+        if hasattr(file, "size") and file.size > FILE_UPLOAD_SIZE_LIMIT:
+            size_limit_mb = FILE_UPLOAD_SIZE_LIMIT / 1024 / 1024
+            # Raise a RequestValidationError directly
+            raise RequestValidationError(
+                [
+                    {
+                        "loc": ("file",),
+                        "msg": f"File exceeds the size limit of {size_limit_mb} MB.",
+                        "type": "value_error.file_size",
+                    }
+                ]
+            )
+        return file
 
 
 class GetSampleFilesQueryParams(BaseModel):

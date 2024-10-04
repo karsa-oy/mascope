@@ -5,6 +5,7 @@ import { api } from '@/api'
 import { useMzFit } from '@/lib/mzFit'
 
 import { useBatch } from './batch'
+import { useUi } from '../ui'
 
 export const useSample = defineModule({
   name: 'sample',
@@ -39,6 +40,12 @@ export const useSample = defineModule({
     return await api.request.delete({
       method: 'deleteSample',
       body: { sampleId: sample_item_id }
+    })
+  },
+  upload: async (files) => {
+    return await api.request.upload({
+      method: 'uploadSampleFile',
+      files: files
     })
   },
   copy: async ({ sample_item_id, sample_batch_id, sample_item_name }) =>

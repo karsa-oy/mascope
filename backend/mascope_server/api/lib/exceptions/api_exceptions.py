@@ -52,7 +52,7 @@ def process_exception(e: Exception, context_message: str) -> ApiException:
     elif isinstance(e, RequestValidationError):
         error_messages = [error["msg"] for error in e.errors()]
         combined_error_message = "; ".join(error_messages)
-        user_message = f"{context_message}. Validation error. {combined_error_message}"
+        user_message = f"{context_message}. {combined_error_message}"
         status_code = 422  # Unprocessable entity
     elif isinstance(e, AttributeError):
         user_message = error_message

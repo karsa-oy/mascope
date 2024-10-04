@@ -1,4 +1,6 @@
+import os
 from datetime import datetime
+from fastapi import UploadFile
 import numpy as np
 from sqlalchemy import (
     select,
@@ -259,6 +261,46 @@ async def update_sample_file(
 
         # Step 5: Return updated sample file
         return sample_file.to_dict()
+
+
+# ---------------------
+# Sample file upload
+# ---------------------
+
+
+# TODO_configuration Default sample file upload params
+FILE_UPLOAD_CHUNK_SIZE = 2 * 1024 * 1024  # 2 MB
+
+
+@api_controller()
+async def sample_file_upload(file: UploadFile) -> dict:
+    """
+    Handles the upload of a sample file and saves it to the `filestreams` directory.
+
+    The file is read in chunks to avoid high memory usage and stored in the specified
+    directory as defined in the runtime configuration.
+
+    :param file: The uploaded file to be processed.
+    :type file: UploadFile
+    :return: A dictionary containing the success message.
+    :rtype: dict
+    """
+    path = os.path.join(runtime.config.filestreams, file.filename)
+
+    try:
+        with open(path, "wb") as f:
+            # read the file in chunks to ensure it doesn't fill memory
+            while contents := file.file.read(FILE_UPLOAD_CHUNK_SIZE):
+                f.write(contents)
+    except Exception as e:
+        raise RuntimeError(f"Failed to upload file {file.filename}: {e}") from e
+    finally:
+        file.file.close()
+
+    message = f"Successfully uploaded file {file.filename}"
+    runtime.logger.info(message)
+
+    return {"message": message}
 
 
 # ---------------------
