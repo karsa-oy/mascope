@@ -98,8 +98,14 @@ export const defineModule = ({
         }
       : // singleselect
         (arg) => {
-          if (!active(arg)) {
-            focused.value = records.value.find((record) => record[key] == arg[key])
+          if (typeof arg === 'function') {
+            // allow predicates to focus with arbitrary conditions
+            focused.value = records.value.find(arg)
+          } else {
+            // but normally, focus using a record or key field
+            if (!active(arg)) {
+              focused.value = records.value.find((record) => record[key] == arg[key])
+            }
           }
         }
     const unfocus = multiselect

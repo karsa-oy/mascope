@@ -26,12 +26,32 @@ class GetMatchIonsQueryParams(BaseModel):
     target_ion_id: Optional[str] = Field(
         None, description="Filter match ions by target ion ID"
     )
-    match_category: Optional[int] = Field(
-        None, description="Filter match ions by match category"
+    ionization_mechanism_id: Optional[str] = Field(
+        None, description="Filter match ions by ionization mechanism ID"
+    )
+    match_category_min: Optional[int] = Field(
+        None,
+        description="Filter match ions by match_category to include match ions with specified match category and higher",
+    )
+    deduplicate: Optional[bool] = Field(
+        False,
+        description="Drop the potential duplicate ions (parent compounds added to several target collections) when show_target_collection. The target collection info is preserved based on collection type priority 'TARGETS' > 'DIAGNOSTICS' > 'CALIBRANTS'",
     )
     show_target_collection: bool = Field(
         False,
         description="Flag to include target collection ID, also duplicate compounds present in several collections will be shown.",
+    )
+    show_target_compound: bool = Field(
+        False,
+        description="Flag to include target compound details.",
+    )
+    show_target_ion: bool = Field(
+        False,
+        description="Flag to include target ion details.",
+    )
+    show_ionization_mechanism: bool = Field(
+        False,
+        description="Flag to to include ionization mechanism details.",
     )
     sort: Optional[str] = Field(
         None, description="The column name to sort the results by."

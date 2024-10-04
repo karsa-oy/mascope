@@ -28,9 +28,13 @@ class GetMatchCompoundsQueryParams(BaseModel):
     target_compound_id: Optional[str] = Field(
         None, description="Filter compounds by target compound ID"
     )
-    match_category: Optional[int] = Field(
+    match_category_min: Optional[int] = Field(
         None,
-        description="Filter compounds to include specified match category and higher",
+        description="Filter match compounds by match_category to include match compounds with specified match category and higher",
+    )
+    deduplicate: Optional[bool] = Field(
+        False,
+        description="Drop the potential duplicate compounds (added to several target collections) when show_target_collection. The target collection info is preserved based on collection type priority 'TARGETS' > 'DIAGNOSTICS' > 'CALIBRANTS'",
     )
     show_target_collection: bool = Field(
         False,

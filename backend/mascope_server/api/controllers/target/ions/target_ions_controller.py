@@ -175,7 +175,7 @@ async def get_target_ions(
                 == TargetIon.ionization_mechanism_id,
             )
             stmt = stmt.add_columns(
-                IonizationMechanism.ionization_mechanism.label("ionization_mechanism"),
+                IonizationMechanism.ionization_mechanism,
             )
 
         # Step 6: Apply sorting

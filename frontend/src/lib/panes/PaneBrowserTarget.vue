@@ -29,22 +29,22 @@ const emit = defineEmits(['focused'])
 const expanded = computed(() => ({
   collection: app.data.match.collection.focused
     ? {
-        [app.data.match.collection.focused.target_collection_id]: true
+        [app.data.match.collection.focused.match_key]: true
       }
     : {},
   compound: app.data.match.compound.focused
     ? {
-        [app.data.match.compound.focused.target_compound_id]: true
+        [app.data.match.compound.focused.match_key]: true
       }
     : {},
   ion: app.data.match.ion.focused
     ? {
-        [app.data.match.ion.focused.target_ion_id]: true
+        [app.data.match.ion.focused.match_key]: true
       }
     : {},
   isotope: app.data.match.isotope.focused
     ? {
-        [app.data.match.isotope.focused.target_isotope_id]: true
+        [app.data.match.isotope.focused.match_key]: true
       }
     : {}
 }))
@@ -71,23 +71,19 @@ const tree = computed(() =>
     ...coll,
     // compounds
     children: app.data.match.compound.list
-      .filter((comp) => comp.target_collection_id == coll.target_collection_id)
+      .filter((comp) => comp.parent_key == coll.match_key)
       .map((comp) => ({
         ...comp,
         // ions
         children: app.data.match.ion.list
-          .filter(
-            (ion) =>
-              ion.target_compound_id == comp.target_compound_id &&
-              ion.target_collection_id == coll.target_collection_id
-          )
+          .filter((ion) => ion.parent_key == comp.match_key)
           .map((ion) => ({
             ...ion,
             // isotopes
             children: app.data.match.isotope.list.filter(
-              (iso) =>
-                iso.target_ion_id == ion.target_ion_id &&
-                iso.target_collection_id == coll.target_collection_id
+              // the isotope level is atypical so we need to manually
+              // construct the parent key
+              (iso) => iso.parent_key == `${ion.target_collection_id}__${ion.target_ion_id}`
             )
           }))
       }))
@@ -193,6 +189,24 @@ async function showMatch(row) {
 // match refocus logic
 
 /**
+ * Utility function to allow scrolling to targets in the watchers below
+ *
+ * A lock prevents race conditions when focusing one level of the hierarchy
+ * is propegated to other levels, ensuring only the initially focused level
+ * is scrolled to.
+ */
+let lock = false
+function scrollTo({ match_key }) {
+  if (!lock) {
+    lock = true
+    setTimeout(() => {
+      document.getElementById(match_key)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      lock = false
+    }, 1000)
+  }
+}
+
+/**
  * Watcher that monitors changes of the focused target collection.
  *
  * It unfocuses all child elements (compounds, ions, isotopes) and unsets the visualized Match when:
@@ -205,15 +219,15 @@ async function showMatch(row) {
 watch(
   () => app.data.match.collection.focused,
   (collection, oldCollection) => {
+    const changedCollection =
+      collection?.target_collection_id !== oldCollection?.target_collection_id
     // Unfocus all child elements when switching collections or deselecting the current collection
-    if (
-      !collection ||
-      (oldCollection && collection.target_collection_id !== oldCollection.target_collection_id)
-    ) {
-      app.data.match.compound.unfocus()
-
+    if (!collection || changedCollection) {
       // Unset the visualized match if the Match tab is active
       if (app.ui.matchVisualized.ion) app.ui.matchVisualized.unset({ target: true })
+    }
+    if (collection) {
+      scrollTo(collection)
     }
   }
 )
@@ -222,11 +236,12 @@ watch(
   (compound) => {
     if (compound) {
       // focus parent if focused
-      app.data.match.collection.focus(compound)
+      app.data.match.collection.focus((coll) => coll.match_key == compound.parent_key)
       // unfocus unrelated ions
-      if (app.data.match.ion.focused?.target_compound_id !== compound.target_compound_id) {
+      if (app.data.match.ion.focused?.parent_key !== compound.match_key) {
         app.data.match.ion.unfocus()
       }
+      scrollTo(compound)
     } else {
       // unfocus child if unfocused
       app.data.match.ion.unfocus()
@@ -240,11 +255,12 @@ watch(
   (ion) => {
     if (ion) {
       // focus parent if focused
-      app.data.match.compound.focus(ion)
+      app.data.match.compound.focus((comp) => comp.match_key == ion.parent_key)
       // unfocus unrelated isotopes
-      if (app.data.match.isotope.focused?.target_ion_id !== ion.target_ion_id) {
+      if (app.data.match.isotope.parent_key !== ion.match_key) {
         app.data.match.isotope.unfocus()
       }
+      scrollTo(ion)
     } else {
       // unfocus child if unfocused
       app.data.match.isotope.unfocus()
@@ -256,7 +272,8 @@ watch(
   (isotope) => {
     if (isotope) {
       // focus parent in focused
-      app.data.match.ion.focus(isotope)
+      app.data.match.ion.focus((ion) => ion.match_key == isotope.parent_key)
+      scrollTo(isotope)
     }
   }
 )
@@ -300,7 +317,7 @@ watch(
       <DataTable
         :value="tree"
         :expandedRows="expanded.collection"
-        dataKey="target_collection_id"
+        dataKey="match_key"
         v-model:selection="app.data.match.collection.focused"
         selectionMode="single"
         :metaKeySelection="false"
@@ -324,7 +341,7 @@ watch(
         </Column>
         <Column header="Collection" field="target_collection_name" sortable>
           <template #body="{ data }">
-            <div class="row" style="justify-content: flex-start">
+            <div :id="data.match_key" class="row" style="justify-content: flex-start">
               <span
                 :class="`pi pi-chevron-${
                   data.target_collection_id ==
@@ -349,7 +366,7 @@ watch(
             v-if="data.children.length > 0"
             :value="data.children"
             :expandedRows="expanded.compound"
-            dataKey="target_compound_id"
+            dataKey="match_key"
             v-model:selection="app.data.match.compound.focused"
             selectionMode="single"
             :metaKeySelection="false"
@@ -373,7 +390,7 @@ watch(
             </Column>
             <Column header="Compound" field="target_compound_formula" sortable>
               <template #body="{ data }">
-                <div class="row" style="justify-content: flex-start">
+                <div :id="data.match_key" class="row" style="justify-content: flex-start">
                   <span
                     :class="`pi pi-chevron-${
                       data.target_compound_id == app.data.match.compound.focused?.target_compound_id
@@ -397,7 +414,7 @@ watch(
                 v-if="data.children.length > 0"
                 :value="data.children"
                 :expandedRows="expanded.ion"
-                dataKey="target_ion_id"
+                dataKey="match_key"
                 v-model:selection="app.data.match.ion.focused"
                 selectionMode="single"
                 :metaKeySelection="false"
@@ -419,7 +436,7 @@ watch(
                 </Column>
                 <Column header="Ion" field="target_ion_formula" sortable>
                   <template #body="{ data }">
-                    <div class="row" style="justify-content: flex-start">
+                    <div :id="data.match_key" class="row" style="justify-content: flex-start">
                       <span
                         :class="`pi pi-chevron-${
                           data.target_ion_id == app.data.match.ion.focused?.target_ion_id
@@ -434,7 +451,42 @@ watch(
                 </Column>
                 <Column header="Mechanism" field="ionization_mechanism" sortable>
                   <template #body="{ data }">
-                    <BaseCopyableField :field="data.ionization_mechanism" />
+                    <BaseCopyableField :field="data.ionization_mechanism">
+                      <Button
+                        v-tooltip.bottom="{ value: 'Filter by mechanism', showDelay: 2000 }"
+                        icon="pi pi-filter"
+                        :severity="
+                          app.ui.filter.mechanism?.ionization_mechanism ===
+                          data.ionization_mechanism
+                            ? 'info'
+                            : 'secondary'
+                        "
+                        text
+                        size="small"
+                        :class="
+                          app.ui.filter.mechanism?.ionization_mechanism ===
+                          data.ionization_mechanism
+                            ? 'active-filter'
+                            : ''
+                        "
+                        @click="
+                          (event) => {
+                            event.stopPropagation()
+                            if (
+                              app.ui.filter.mechanism?.ionization_mechanism ===
+                              data.ionization_mechanism
+                            ) {
+                              app.ui.filter.mechanism = null // Remove the filter if already applied
+                            } else {
+                              app.ui.filter.mechanism = {
+                                ionization_mechanism: data.ionization_mechanism,
+                                ionization_mechanism_id: data.ionization_mechanism_id
+                              }
+                            }
+                          }
+                        "
+                      />
+                    </BaseCopyableField>
                   </template>
                 </Column>
                 <template #expansion="{ data }">
@@ -442,7 +494,7 @@ watch(
                   <DataTable
                     v-if="data.children.length > 0"
                     :value="data.children"
-                    dataKey="target_isotope_id"
+                    dataKey="match_key"
                     v-model:selection="app.data.match.isotope.focused"
                     selectionMode="single"
                     :metaKeySelection="false"
@@ -456,6 +508,7 @@ watch(
                         <span class="pi pi-verified" />
                       </template>
                       <template #body="{ data }">
+                        <div :id="data.match_key" style="height: 100%" />
                         <BaseMatchTag
                           :row="data"
                           :tooltip="`Peak intensity: ${formatter.format(data?.sample_peak_area)}`"
@@ -491,3 +544,11 @@ watch(
   <DialogTargetCompoundUpdate v-model:visible="dialog.compound" :compound="context.compound" />
   <DialogMechanismsOp v-model:visible="dialog.mechanisms" />
 </template>
+
+<style scoped>
+.active-filter {
+  visibility: visible !important;
+  color: var(--p-button-text-info-color);
+  opacity: 0.7;
+}
+</style>

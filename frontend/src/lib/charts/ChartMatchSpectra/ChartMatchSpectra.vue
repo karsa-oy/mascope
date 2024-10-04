@@ -147,7 +147,7 @@ watch(
           >
             <BaseMatchTag :row="isotopeChart" text />
             <Tag
-              :value="`Intensity: ${area.format(isotopeChart.sample_peak_area)}`"
+              :value="`Peak area: ${area.format(isotopeChart.sample_peak_area)}`"
               :severity="
                 isotopeChart.sample_peak_area < app.data.filterParams.current.peak_min_intensity
                   ? 'warn'

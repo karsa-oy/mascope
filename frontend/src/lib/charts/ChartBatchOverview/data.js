@@ -8,43 +8,55 @@ export const useChartData = defineStore('chart.batch.overview', () => {
   const app = useApp()
   const traces = ref([])
   const theme = computed(() => (app.ui.darkmode.active ? glasbey.dark : glasbey.light))
-  const hovertemplate = `
-    <b># %{x}</b>
-    <br>
-    <b>%{text}</b>
-    <br>
-    y: %{y:,.0f}
-    <br>
-    %{customdata}
-    `
 
   /**
    * Loads compounds of sample_batch from the API filtered by match_category and populates the chart data.
    * @param {String} sample_batch_id - The ID of the selected sample batch.
    */
-  const load = async (sample_batch_id) => {
+  const load = async (sample_batch_id, filters) => {
     unload() // Clear traces before loading new data
 
-    let compounds
+    let matches, level, queryParams
+    if (!filters) {
+      level = 'compound'
+      queryParams = {
+        deduplicate: true,
+        show_target_collection: true,
+        show_target_compound: true,
+        sort: 'match_compound_utc_created',
+        order: 'desc'
+      }
+    } else {
+      level = 'ion'
+      queryParams = {
+        ionization_mechanism_id: filters.mechanism.ionization_mechanism_id,
+        deduplicate: true,
+        show_target_collection: true,
+        show_target_compound: true,
+        show_target_ion: true,
+        show_ionization_mechanism: true,
+        sort: 'match_ion_utc_created',
+        order: 'desc'
+      }
+    }
     try {
-      compounds = // API call includes filter for match_category (1 and 2 only)
+      matches = // API call includes filter for match_category (1 and 2 only)
         (
-          await api.client.get(`/match/compounds`, {
+          await api.client.get(`/match/${level}s`, {
             params: {
               sample_batch_id,
-              show_target_compound: true,
-              match_category: 1
+              match_category_min: 1,
+              ...queryParams
             }
           })
         )?.data?.data
     } catch (error) {
-      throw new Error(`chart.batch.overview - failed to load match compounds: ${error}`)
+      throw new Error(`chart.batch.overview - failed to load match ${level}s: ${error}`)
     }
-
     //  Generate color mapping for target compounds
-    let compoundIds = [...new Set(compounds.map((compound) => compound.target_compound_id) ?? [])]
+    let targetIds = [...new Set(matches.map((match) => match[`target_${level}_id`]) ?? [])]
     let colors = Object.fromEntries(
-      compoundIds.map((compoundId, index) => [[compoundId], theme.value[index]])
+      targetIds.map((targetId, index) => [[targetId], theme.value[index]])
     )
 
     // X-axis data: sample IDs
@@ -56,27 +68,25 @@ export const useChartData = defineStore('chart.batch.overview', () => {
     const sampleNames = samples.map((sample) => sample.sample_item_name)
 
     // Loop through filtered target compounds and make traces
-    for (let compoundId of compoundIds) {
+    for (let targetId of targetIds) {
       // Y-axis data: intensities (sample_peak_area_sum)
       const intensities = []
-      let compoundMaxMatchCategory = 1 // Start with minimum match category
+      let matchMaxMatchCategory = 1 // Start with minimum match category
 
       for (let sampleId of sampleIds) {
-        let itemMatches = compounds.filter((row) => row.sample_item_id === sampleId)
-        let sampleCompoundStats = itemMatches
-          .filter((match) => match.target_compound_id === compoundId)
+        let itemMatches = matches.filter((row) => row.sample_item_id === sampleId)
+        let sampleStats = itemMatches
+          .filter((match) => match[`target_${level}_id`] === targetId)
           .map((compoundMatch) => ({
             match_category: compoundMatch.match_category,
             intensity: compoundMatch.sample_peak_area_sum
           }))[0]
 
-        if (sampleCompoundStats) {
-          intensities.push(
-            sampleCompoundStats.match_category > 0 ? sampleCompoundStats.intensity : null
-          )
+        if (sampleStats) {
+          intensities.push(sampleStats.match_category > 0 ? sampleStats.intensity : null)
           // Update the maximum match category for this compound
-          if (sampleCompoundStats.match_category > compoundMaxMatchCategory) {
-            compoundMaxMatchCategory = sampleCompoundStats.match_category
+          if (sampleStats.match_category > matchMaxMatchCategory) {
+            matchMaxMatchCategory = sampleStats.match_category
           }
         } else {
           intensities.push(null)
@@ -87,21 +97,63 @@ export const useChartData = defineStore('chart.batch.overview', () => {
       if (intensities.every((intensity) => intensity === null)) continue
 
       // Assign symbol based on the maximum match category for this compound
-      let compoundSymbol = compoundMaxMatchCategory === 2 ? 'square' : 'square-open'
-      let color = colors[compoundId]
+      let matchSymbol = matchMaxMatchCategory === 2 ? 'square' : 'square-open'
+      let color = colors[targetId]
 
-      // Get compound information for naming
-      let compound = compounds.find((target) => target.target_compound_id === compoundId)
-      let compoundName = compound.target_compound_name.trim()
-        ? compound.target_compound_name
-        : compound.target_compound_formula
+      // Get match information for naming
+      let match = matches.find((match) => match[`target_${level}_id`] === targetId)
+      let matchName
+      if (level == 'compound') {
+        matchName = match.target_compound_name.trim()
+          ? match.target_compound_name
+          : match.target_compound_formula
+      } else if (level == 'ion') {
+        matchName = `${
+          match.target_compound_name.trim()
+            ? match.target_compound_name
+            : match.target_compound_formula
+        }: ${match.target_ion_formula}`
+      }
 
-      // Add trace for the compound
+      // Create the matchData object target IDs
+      let match_key
+      switch (level) {
+        case 'compound':
+          match_key = `${match.target_collection_id}_${match.target_compound_id}`
+          break
+        case 'ion':
+          match_key = `${match.target_collection_id}_${match.target_compound_id}_${match.target_ion_id}`
+          break
+      }
+      const matchData = {
+        level,
+        match_key
+      }
+
+      const hovertemplate = `
+        <i>Match ${level}</i>
+        <b># %{x}</b>
+        <br>
+        <b>${matchName}</b>
+        ${
+          level === 'ion' && match.ionization_mechanism
+            ? `<br>
+        Ionization mechanism: ${match.ionization_mechanism}`
+            : ''
+        }
+        <br>
+        <b>%{text}</b>
+        <br>
+        Peak area sum: %{y:,.0f}
+        <br>
+        %{customdata}
+      `
+      // Add trace for the match
       traces.value.push({
-        name: compoundName,
-        target_compound_id: compoundId,
+        name: matchName,
         x: sampleIds,
         y: intensities,
+        matchData, // Include matchData
         customdata: customData,
         text: sampleNames,
         hovertemplate,
@@ -110,7 +162,7 @@ export const useChartData = defineStore('chart.batch.overview', () => {
         marker: {
           color,
           size: 10,
-          symbol: compoundSymbol
+          symbol: matchSymbol
         }
       })
     }
@@ -122,7 +174,15 @@ export const useChartData = defineStore('chart.batch.overview', () => {
       y: ticValues,
       customdata: app.data.sample.list?.map((item) => item.datetime) ?? [],
       text: app.data.sample.list?.map((item) => item.sample_item_name) ?? [],
-      hovertemplate,
+      hovertemplate: `
+        <b># %{x}</b>
+        <br>
+        <b>%{text}</b>
+        <br>
+        y: %{y:,.0f}
+        <br>
+        %{customdata}
+      `,
       mode: 'markers',
       type: 'scatter',
       marker: {
@@ -161,29 +221,26 @@ export const useChartData = defineStore('chart.batch.overview', () => {
    *   - `newValues[1]` (`sampleList`): The current list of loaded samples.
    */
   watch(
-    [() => app.data.batch.focused?.sample_batch_id, () => app.data.sample.list],
-    async ([batchId, sampleList]) => {
-      // If no batch is selected, unload the chart data
-      if (!batchId) {
+    [
+      () => app.data.batch.focused?.sample_batch_id, // focused batch
+      () => app.data.sample.list, // loaded samples
+      () => app.ui.filter.mechanism // filtered mechanism
+    ],
+    async ([batchId, sampleList, mechanismFilter]) => {
+      // requirements
+      const batchFocused = batchId
+      const samplesExist = sampleList?.length
+      const samplesReady = sampleList?.every((sample) => sample.sample_batch_id === batchId)
+      // either load or unload, based on requirements
+      if (!batchFocused || !samplesExist || !samplesReady) {
+        // unload chart if any dependency is unmet
         unload()
         return
+      } else {
+        const filters = mechanismFilter ? { mechanism: mechanismFilter } : null
+        // load the chart if all requirements are met
+        await load(batchId, filters)
       }
-
-      // If no samples, unload the chart data
-      if (!sampleList?.length) {
-        unload()
-        return
-      }
-
-      // Check that samples belong to the currently selected batch
-      const samplesReady = sampleList.every((sample) => sample.sample_batch_id === batchId)
-      if (!samplesReady) {
-        unload()
-        return
-      }
-
-      // Reload the chart if batchId changes or the samples are ready and different
-      await load(batchId)
     },
     { immediate: true, deep: true }
   )

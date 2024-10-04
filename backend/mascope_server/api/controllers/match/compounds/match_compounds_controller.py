@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from typing import List, Optional
+import pandas as pd
 from collections import defaultdict
 from sqlalchemy import (
     select,
@@ -11,7 +12,7 @@ from mascope_server.db import async_session
 from mascope_server.db.id import gen_id
 from mascope_server.db.models import (
     MatchCompound,
-    SampleItem,
+    Sample,
     TargetCompound,
     TargetCompoundInTargetCollection,
     TargetCollectionInSampleBatch,
@@ -23,6 +24,7 @@ from mascope_server.api.lib.exceptions.api_exceptions import (
     NotFoundException,
     ApiException,
 )
+from mascope_server.api.controllers.match.lib.match_util import deduplicate_match_df
 from mascope_server.api.controllers.sample.lib.sample_items_fetch import (
     fetch_sample_item_ids,
 )
@@ -39,7 +41,8 @@ async def get_match_compounds(
     sample_item_id: Optional[str] = None,
     sample_batch_id: Optional[str] = None,
     target_compound_id: Optional[str] = None,
-    match_category: Optional[int] = None,
+    match_category_min: Optional[int] = None,
+    deduplicate: bool = False,
     show_target_collection: bool = False,
     show_target_compound: bool = False,
     sort: Optional[str] = None,
@@ -59,6 +62,7 @@ async def get_match_compounds(
     5. Count the total entries that match the criteria for pagination purposes.
     6. Limit the query for pagination and fetch the results.
     7. Format the fetched data into a dictionary for the response.
+    8. If deduplication is requested and `show_target_collection` is True, deduplicate the compounds.
 
     :param sample_item_id: Filter matches by the associated sample item's ID, defaults to None.
     :type sample_item_id: Optional[str], optional
@@ -66,8 +70,10 @@ async def get_match_compounds(
     :type sample_batch_id: Optional[str], optional
     :param target_compound_id: Filter matches by the associated target compound's ID, defaults to None.
     :type target_compound_id: Optional[str], optional
-    :param match_category: Filter matches to include specified category and higher (e.g., 1 includes categories 1 and higher), defaults to None.
-    :type match_category: Optional[int], optional
+    :param match_category_min: Filter by match_category to include specified category and higher (e.g., 1 includes categories 1 and higher), defaults to None.
+    :type match_category_min:int, optional
+    :param deduplicate: Flag to indicate whether compound deduplication should be applied when show_target_collection is True, defaults to False.
+    :type deduplicate: bool
     :param show_target_collection: Include additional data about the target collections, defaults to False.
     :type show_target_collection: bool, optional
     :param show_target_compound: Include additional data about the target compounds, defaults to False.
@@ -92,8 +98,8 @@ async def get_match_compounds(
             query = query.filter(MatchCompound.sample_item_id == sample_item_id)
         if target_compound_id:
             query = query.filter(MatchCompound.target_compound_id == target_compound_id)
-        if match_category is not None:
-            query = query.filter(MatchCompound.match_category >= match_category)
+        if match_category_min is not None:
+            query = query.filter(MatchCompound.match_category >= match_category_min)
 
         # Join with TargetCompound table to include target_compound data if requested
         if show_target_compound:
@@ -107,8 +113,8 @@ async def get_match_compounds(
 
         if sample_batch_id:
             query = query.join(
-                SampleItem, SampleItem.sample_item_id == MatchCompound.sample_item_id
-            ).where(SampleItem.sample_batch_id == sample_batch_id)
+                Sample, Sample.sample_item_id == MatchCompound.sample_item_id
+            ).where(Sample.sample_batch_id == sample_batch_id)
 
         # Join with TargetCompoundInTargetCollection to include target_collection data
         if show_target_collection:
@@ -124,7 +130,7 @@ async def get_match_compounds(
                     == TargetCompoundInTargetCollection.target_collection_id,
                 )
                 .where(
-                    SampleItem.sample_batch_id
+                    Sample.sample_batch_id
                     == TargetCollectionInSampleBatch.sample_batch_id
                 )
                 .join(
@@ -170,6 +176,16 @@ async def get_match_compounds(
             match_compound_data["target_collection_name"] = row.target_collection_name
             match_compound_data["target_collection_type"] = row.target_collection_type
         data.append(match_compound_data)
+
+    # Step 8: Deduplicate if requested and `show_target_collection` is True
+    if deduplicate and show_target_collection:
+        data_df = pd.DataFrame(data)
+        data_df = deduplicate_match_df(
+            data_df, id_keys=("target_compound_id", "sample_item_id")
+        )
+        data = data_df.to_dict(orient="records")
+        # Update total after deduplication
+        total = len(data)
 
     return {"results": total, "data": data}
 

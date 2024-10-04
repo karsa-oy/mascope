@@ -32,7 +32,7 @@ async def get_match_collections(
     sample_item_id: Optional[str] = None,
     sample_batch_id: Optional[str] = None,
     target_collection_id: Optional[str] = None,
-    match_category: Optional[int] = None,
+    match_category_min: Optional[int] = None,
     sort: Optional[str] = None,
     order: Optional[str] = None,
     page: int = 0,
@@ -56,8 +56,8 @@ async def get_match_collections(
     :type sample_batch_id: Optional[str], optional
     :param target_collection_id: Filter match collections by the ID of the target collection, defaults to None.
     :type target_collection_id: Optional[str], optional
-    :param match_category: Filter by the category of the match, defaults to None.
-    :type match_category: Optional[int], optional
+    :param match_category_min: Filter by match_category to include specified category and higher (e.g., 1 includes categories 1 and higher), defaults to None.
+    :type match_category_min:int, optional
     :param sort: Column to sort the results by, defaults to None.
     :type sort: Optional[str], optional
     :param order: Sort order, either 'asc' for ascending or 'desc' for descending, defaults to None.
@@ -80,8 +80,8 @@ async def get_match_collections(
             query = query.filter(
                 MatchCollection.target_collection_id == target_collection_id
             )
-        if match_category is not None:
-            query = query.filter(MatchCollection.match_category == match_category)
+        if match_category_min is not None:
+            query = query.filter(MatchCollection.match_category == match_category_min)
         if sample_batch_id:
             query = query.join(
                 SampleItem, SampleItem.sample_item_id == MatchCollection.sample_item_id

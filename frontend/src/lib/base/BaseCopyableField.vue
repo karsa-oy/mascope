@@ -33,6 +33,7 @@ async function copyField(text) {
         }
       "
     />
+    <slot></slot>
   </span>
 </template>
 
@@ -43,11 +44,11 @@ async function copyField(text) {
   align-items: center;
 }
 
-.field > button {
+.field > :deep(button) {
   visibility: hidden;
 }
 
-.field:hover > button {
+.field:hover > :deep(button) {
   visibility: visible;
 }
 

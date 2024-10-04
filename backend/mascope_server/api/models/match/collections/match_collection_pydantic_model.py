@@ -30,8 +30,9 @@ class GetMatchCollectionsQueryParams(BaseModel):
     target_collection_id: Optional[str] = Field(
         None, description="Filter collections by target collection ID"
     )
-    match_category: Optional[int] = Field(
-        None, description="Filter collections by match category"
+    match_category_min: Optional[int] = Field(
+        None,
+        description="Filter match collections by match_category to include match collections with specified match category and higher",
     )
     sort: Optional[str] = Field(
         None, description="The column name to sort the results by."

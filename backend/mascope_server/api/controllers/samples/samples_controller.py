@@ -32,7 +32,7 @@ async def get_samples(
     sample_item_type: str = None,
     datetime_min: datetime = None,
     datetime_max: datetime = None,
-    match_category: Optional[int] = None,
+    match_category_min: Optional[int] = None,
     sort: str = "datetime_utc",
     order: str = "asc",
     page: int = 0,
@@ -65,8 +65,8 @@ async def get_samples(
     :type datetime_min: datetime, optional
     :param datetime_max: Filter samples before this datetime of the sample file.
     :type datetime_max: datetime, optional
-    :param match_category: Filter by match category.
-    :type match_category: int, optional
+    :param match_category_min: Filter by match_category to include specified category and higher (e.g., 1 includes categories 1 and higher), defaults to None.
+    :type match_category_min:int, optional
     :param sort: Column to sort the results by.
     :type sort: str, optional
     :param order: Sort order ('asc' or 'desc').
@@ -129,8 +129,8 @@ async def get_samples(
                     <= func.julianday(datetime_max),
                 )
             )
-        if match_category is not None:
-            stmt = stmt.filter(MatchSample.match_category == match_category)
+        if match_category_min is not None:
+            stmt = stmt.filter(MatchSample.match_category >= match_category_min)
 
         # Step 2: Apply sorting and pagination
         if sort:

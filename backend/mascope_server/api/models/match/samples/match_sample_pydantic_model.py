@@ -21,8 +21,9 @@ class GetMatchSamplesQueryParams(BaseModel):
     sample_batch_id: Optional[str] = Field(
         None, description="The ID of the sample batch to filter match samples by."
     )
-    match_category: Optional[int] = Field(
-        None, description="Filter match samples by match category"
+    match_category_min: Optional[int] = Field(
+        None,
+        description="Filter match samples by match_category to include match samples with specified match category and higher",
     )
     sort: Optional[str] = Field(
         None, description="The column name to sort the results by."

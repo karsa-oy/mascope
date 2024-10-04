@@ -24,7 +24,7 @@ const layout = computed(() => ({
     gridwidth: 1
   },
   yaxis: {
-    title: 'Intensity [cps]',
+    title: 'Signal intensity [cps]',
     showgrid: true,
     rangemode: 'nonnegative',
     gridcolor: '#33333399',

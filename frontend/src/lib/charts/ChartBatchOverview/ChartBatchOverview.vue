@@ -3,6 +3,7 @@ import { ref, computed, watchEffect } from 'vue'
 
 import ToggleSwitch from 'primevue/toggleswitch'
 import Select from 'primevue/select'
+import Chip from 'primevue/chip'
 
 import BaseChartPlotly from '../BaseChartPlotly.vue'
 
@@ -104,7 +105,7 @@ const layout = computed(() => ({
     ...xAxis.value
   },
   yaxis: {
-    title: 'Intensity',
+    title: 'Signal intensity [cps]',
     type: log.value ? 'log' : 'lin',
     showgrid: true,
     gridcolor: '#33333399',
@@ -117,30 +118,53 @@ const layout = computed(() => ({
 
 function onClick({ points }) {
   if (!points) return
-  // Select sample item corresponding to clicked data point
-  let sampleIndex = points[0].pointIndex
-  let sample = app.data.sample.list[sampleIndex]
+  // Select sample corresponding to the clicked data point
+  const sampleIndex = points[0].pointIndex
+  const sample = app.data.sample.list[sampleIndex]
+
   if (sample) {
     app.data.sample.focus(sample)
   } else {
     app.data.sample.unfocus()
+  }
+
+  // Focus on the corresponding compound/ion using the trace index
+  const traceIndex = points[0].curveNumber
+  const trace = data.traces[traceIndex]
+
+  // Guard for matchData availability
+  if (!trace.matchData) return
+
+  const { level, match_key } = trace.matchData
+  if (level && level === 'compound') {
+    app.data.match.compound.focus({ match_key })
+  } else if (level && level === 'ion') {
+    app.data.match.ion.focus({ match_key })
   }
 }
 </script>
 
 <template>
   <figure>
-    <div class="row">
+    <div class="row" style="justify-content: space-between; width: 100%">
       <Select
         v-model:modelValue="xField"
         :options="xFields"
         optionLabel="label"
         dataKey="field"
-        style="z-index: 100"
         filter
       />
-      <ToggleSwitch v-model="log" style="margin-left: 1rem" />
-      <span> log scale </span>
+      <Chip
+        v-if="app.ui.filter.mechanism"
+        icon="pi pi-filter"
+        :label="app.ui.filter.mechanism.ionization_mechanism"
+        removable
+        @remove="app.ui.filter.mechanism = null"
+      />
+      <div class="row">
+        <ToggleSwitch v-model="log" style="margin-left: 1rem" />
+        <span> log scale </span>
+      </div>
     </div>
     <BaseChartPlotly
       id="ChartSampleIntensity"
@@ -151,15 +175,3 @@ function onClick({ points }) {
     />
   </figure>
 </template>
-
-<style scoped>
-figure {
-  position: relative;
-}
-
-.row {
-  position: absolute;
-  left: 1rem;
-  top: 1rem;
-}
-</style>

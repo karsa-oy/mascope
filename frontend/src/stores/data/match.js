@@ -14,7 +14,7 @@ import { useSample } from './sample'
 const defineMatch = (level) => {
   return defineModule({
     name: `match.${level.toLowerCase()}`,
-    key: `target_${level.toLowerCase()}_id`,
+    key: `match_key`,
     reloadOn: 'sample_batch_reload',
     useParent: () => ({
       // 'virtual' parent ensures matches react
@@ -42,7 +42,7 @@ const defineMatch = (level) => {
               sample_item_id: sample.focused.sample_item_id
             }
           })
-        ).data
+        ).data.map(generateKey(level))
       } else if (batch.focused) {
         // If a batch is focused, load batch level matches
         return (
@@ -52,7 +52,7 @@ const defineMatch = (level) => {
               sample_batch_id: batch.focused.sample_batch_id
             }
           })
-        ).data
+        ).data.map(generateKey(level))
       } else {
         // Otherwise unload the data
         return []
@@ -65,6 +65,49 @@ export const useMatchCollection = defineMatch('Collection')
 export const useMatchCompound = defineMatch('Compound')
 export const useMatchIon = defineMatch('Ion')
 export const useMatchIsotope = defineMatch('Isotope')
+
+// generate unique keys to ensure we can identify
+// records of the level correctly
+// TODO: move this to the backend and clean it up
+function generateKey(level) {
+  switch (level) {
+    case 'Collection':
+      return (record) => {
+        const { target_collection_id } = record
+        return {
+          ...record,
+          match_key: target_collection_id
+        }
+      }
+    case 'Compound':
+      return (record) => {
+        const { target_collection_id, target_compound_id } = record
+        return {
+          ...record,
+          parent_key: target_collection_id,
+          match_key: `${target_collection_id}_${target_compound_id}`
+        }
+      }
+    case 'Ion':
+      return (record) => {
+        const { target_collection_id, target_compound_id, target_ion_id } = record
+        return {
+          ...record,
+          parent_key: `${target_collection_id}_${target_compound_id}`,
+          match_key: `${target_collection_id}_${target_compound_id}_${target_ion_id}`
+        }
+      }
+    case 'Isotope':
+      return (record) => {
+        const { target_collection_id, target_ion_id, target_isotope_id } = record
+        return {
+          ...record,
+          parent_key: `${target_collection_id}__${target_ion_id}`,
+          match_key: `${target_collection_id}__${target_ion_id}_${target_isotope_id}`
+        }
+      }
+  }
+}
 
 // Footnote: reasoning for the irregular implementation
 

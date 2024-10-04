@@ -29,8 +29,9 @@ class GetSamplesQueryParams(BaseModel):
     datetime_max: Optional[datetime] = Field(
         None, description="Maximum datetime of the sample file to filter results by."
     )
-    match_category: Optional[int] = Field(
-        None, description="Filter match samples by match category"
+    match_category_min: Optional[int] = Field(
+        None,
+        description="Filter samples by match_category to include samples with specified match category and higher",
     )
     sort: Optional[str] = Field(
         "datetime_utc",

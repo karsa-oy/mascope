@@ -30,7 +30,7 @@ from mascope_server.runtime import runtime
 async def get_match_samples(
     sample_item_id: Optional[str] = None,
     sample_batch_id: Optional[str] = None,
-    match_category: Optional[int] = None,
+    match_category_min: Optional[int] = None,
     sort: Optional[str] = None,
     order: Optional[str] = None,
     page: int = 0,
@@ -52,8 +52,8 @@ async def get_match_samples(
     :type sample_item_id: Optional[str], optional
     :param sample_batch_id: Filter match samples by sample batch ID, defaults to None.
     :type sample_batch_id: Optional[str], optional
-    :param match_category: Filter by the category of the match, defaults to None.
-    :type match_category: Optional[int], optional
+    :param match_category_min: Filter by match_category to include specified category and higher (e.g., 1 includes categories 1 and higher), defaults to None.
+    :type match_category_min:int, optional
     :param sort: Column to sort the results by, defaults to None.
     :type sort: Optional[str], optional
     :param order: Sort order, either 'asc' or 'desc', defaults to None.
@@ -72,8 +72,8 @@ async def get_match_samples(
         # Step 2: Apply filters
         if sample_item_id:
             query = query.filter(MatchSample.sample_item_id == sample_item_id)
-        if match_category is not None:
-            query = query.filter(MatchSample.match_category == match_category)
+        if match_category_min is not None:
+            query = query.filter(MatchSample.match_category == match_category_min)
         if sample_batch_id:
             query = query.join(
                 SampleItem, SampleItem.sample_item_id == MatchSample.sample_item_id

@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from typing import List, Optional
 from collections import defaultdict
+import pandas as pd
 from sqlalchemy import (
     select,
     delete,
@@ -11,11 +12,13 @@ from mascope_server.db import async_session
 from mascope_server.db.id import gen_id
 from mascope_server.db.models import (
     MatchIon,
-    SampleItem,
-    TargetIon,
+    Sample,
     TargetCompoundInTargetCollection,
     TargetCollectionInSampleBatch,
     TargetCollection,
+    TargetCompound,
+    TargetIon,
+    IonizationMechanism,
 )
 from mascope_server.api.lib.api_features import api_controller
 from mascope_server.api.lib.exceptions.api_exceptions import (
@@ -23,6 +26,7 @@ from mascope_server.api.lib.exceptions.api_exceptions import (
     NotFoundException,
     ApiException,
 )
+from mascope_server.api.controllers.match.lib.match_util import deduplicate_match_df
 from mascope_server.api.controllers.sample.lib.sample_items_fetch import (
     fetch_sample_item_ids,
 )
@@ -39,25 +43,39 @@ async def get_match_ions(
     sample_item_id: Optional[str] = None,
     sample_batch_id: Optional[str] = None,
     target_ion_id: Optional[str] = None,
-    match_category: Optional[int] = None,
+    ionization_mechanism_id: Optional[str] = None,
+    match_category_min: Optional[int] = None,
+    deduplicate: bool = False,
     show_target_collection: bool = False,
+    show_target_compound: bool = False,
+    show_target_ion: bool = False,
+    show_ionization_mechanism: bool = False,
     sort: Optional[str] = None,
     order: Optional[str] = None,
     page: int = 0,
     limit: int = 10000,
 ) -> dict:
     """
-    Retrieves a list of matched ions based on specified filtering criteria, which can include related
-    target collection data if required. The function supports sorting and pagination.
+    Retrieves a list of matched ions based on specified filtering criteria, supporting optional inclusion
+    of related data (e.g., target collections, compounds, ions, and ionization mechanisms). The function
+    supports sorting and pagination.
 
     Steps:
-    1. Construct a query to fetch match ions from the database.
-    2. Apply filters based on provided sample item ID, sample batch ID, target ion ID, and match category.
-    3. If requested, join with target collection tables to include relevant collection data.
-    4. Apply sorting if specified by the sort column and order.
-    5. Count the total matched ions for pagination purposes.
-    6. Limit the query for pagination and execute it to fetch the results.
-    7. Format the fetched data into a list of dictionaries suitable for the response.
+    1. Construct the main query for fetching matched ions from the database.
+    2. Apply filters based on the provided `sample_item_id`, `target_ion_id`, and `match_category_min`.
+    3. Join the `Sample` table if `sample_batch_id` is provided to filter matches by sample batch.
+    4. Join the `TargetIon` table if required based on `ionization_mechanism_id`, `show_target_ion`,
+    `show_ionization_mechanism`, or `show_target_collection` flags.
+    5. Apply the filter for `ionization_mechanism_id` if provided.
+    6. Join the `TargetCompound` table and add target compound details if `show_target_compound` is True.
+    7. Add target ion details if `show_target_ion` is True.
+    8. Join the `IonizationMechanism` table and add ionization mechanism details if `show_ionization_mechanism` is True.
+    9. Join with target collection tables if `show_target_collection` is True to include related collection data.
+    10. Apply sorting based on the specified `sort` column and `order` direction.
+    11. Count the total number of matched ions for pagination.
+    12. Limit the query for pagination and execute it to fetch the results.
+    13. Format the fetched data into a list of dictionaries for the response.
+    14. If deduplication is requested and `show_target_collection` is True, deduplicate the ions.
 
     :param sample_item_id: Filter matches by the sample item ID, defaults to None.
     :type sample_item_id: Optional[str], optional
@@ -65,10 +83,20 @@ async def get_match_ions(
     :type sample_batch_id: Optional[str], optional
     :param target_ion_id: Filter matches by the target ion ID, defaults to None.
     :type target_ion_id: Optional[str], optional
-    :param match_category: Filter matches by their category, defaults to None.
-    :type match_category: Optional[int], optional
+    :param ionization_mechanism_id: Filter matches by the ionization mechanism ID, defaults to None.
+    :type ionization_mechanism_id: Optional[str], optional
+    :param match_category_min: Filter by match_category to include specified category and higher (e.g., 1 includes categories 1 and higher), defaults to None.
+    :type match_category_min:int, optional
+    :param deduplicate: Flag to indicate whether ion deduplication should be applied when `show_target_collection` is True, defaults to False.
+    :type deduplicate: bool
     :param show_target_collection: Whether to include target collection details, defaults to False.
     :type show_target_collection: bool, optional
+    :param show_target_compound: Include additional data about the target compounds, defaults to False.
+    :type show_target_compound: bool, optional
+    :param show_target_ion: Include additional data about the target ions, defaults to False.
+    :type show_target_ion: bool, optional
+    :param show_ionization_mechanism: Include ionization mechanism data in the results, defaults to False.
+    :type show_ionization_mechanism: bool
     :param sort: Column name to sort by, defaults to None.
     :type sort: Optional[str], optional
     :param order: Order of sorting, 'asc' for ascending or 'desc' for descending, defaults to None.
@@ -89,18 +117,66 @@ async def get_match_ions(
             query = query.filter(MatchIon.sample_item_id == sample_item_id)
         if target_ion_id:
             query = query.filter(MatchIon.target_ion_id == target_ion_id)
-        if match_category is not None:
-            query = query.filter(MatchIon.match_category == match_category)
+        if match_category_min is not None:
+            query = query.filter(MatchIon.match_category >= match_category_min)
+
+        # Step 3: Join with Sample table if sample_batch_id is specified
         if sample_batch_id:
             query = query.join(
-                SampleItem, SampleItem.sample_item_id == MatchIon.sample_item_id
-            ).where(SampleItem.sample_batch_id == sample_batch_id)
+                Sample, Sample.sample_item_id == MatchIon.sample_item_id
+            ).where(Sample.sample_batch_id == sample_batch_id)
 
-        # Step 3: Join with target collection if requested
+        # Step 4: Join TargetIon if requested
+        if (
+            ionization_mechanism_id
+            or show_target_collection
+            or show_target_compound
+            or show_target_ion
+            or show_ionization_mechanism
+        ):
+            query = query.join(
+                TargetIon, TargetIon.target_ion_id == MatchIon.target_ion_id
+            )
+
+        # Step 5: Apply filter for ionization mechanism if provided
+        if ionization_mechanism_id:
+            query = query.filter(
+                TargetIon.ionization_mechanism_id == ionization_mechanism_id
+            )
+
+        # Step 6: Add target compound columns if requested
+        if show_target_compound:
+            query = query.join(
+                TargetCompound,
+                TargetCompound.target_compound_id == TargetIon.target_compound_id,
+            ).add_columns(
+                TargetCompound.target_compound_name,
+                TargetCompound.target_compound_formula,
+            )
+
+        # Step 7: Add target ion columns
+        if show_target_ion:
+            query = query.add_columns(
+                TargetIon.target_compound_id,
+                TargetIon.target_ion_formula,
+                TargetIon.filter_params,
+            )
+
+        # Step 8: Join IonizationMechanism and add columns if requested
+        if show_ionization_mechanism:
+            query = query.join(
+                IonizationMechanism,
+                IonizationMechanism.ionization_mechanism_id
+                == TargetIon.ionization_mechanism_id,
+            )
+            query = query.add_columns(
+                IonizationMechanism.ionization_mechanism,
+            )
+
+        # Step 9: Join with TargetCollection and add columns if requested
         if show_target_collection:
             query = (
-                query.join(TargetIon, TargetIon.target_ion_id == MatchIon.target_ion_id)
-                .join(
+                query.join(
                     TargetCompoundInTargetCollection,
                     TargetCompoundInTargetCollection.target_compound_id
                     == TargetIon.target_compound_id,
@@ -111,7 +187,7 @@ async def get_match_ions(
                     == TargetCompoundInTargetCollection.target_collection_id,
                 )
                 .where(
-                    SampleItem.sample_batch_id
+                    Sample.sample_batch_id
                     == TargetCollectionInSampleBatch.sample_batch_id
                 )
                 .join(
@@ -126,7 +202,8 @@ async def get_match_ions(
                 )
                 .distinct()
             )
-        # Step 4: Apply sorting if specified
+
+        # Step 10: Apply sorting
         if sort:
             sort_expression = getattr(MatchIon, sort, None)
             if sort_expression:
@@ -135,17 +212,17 @@ async def get_match_ions(
                 else:
                     query = query.order_by(sort_expression.asc())
 
-        # Step 5: Count total
+        # Step 11: Count total
         count_stmt = select(func.count()).select_from(  # pylint: disable=not-callable
             query.subquery()
         )
         total = await session.scalar(count_stmt)
 
-        # Step 6: Execute the paginated query
+        # Step 12: Execute the paginated query
         query = query.offset(page * limit).limit(limit)
         result = await session.execute(query)
 
-    # Step 7: Construct response data
+    # Step 13: Construct response data
     data = []
     for row in result.all():
         ion_data = row.MatchIon.to_dict()
@@ -153,7 +230,26 @@ async def get_match_ions(
             ion_data["target_collection_id"] = row.target_collection_id
             ion_data["target_collection_name"] = row.target_collection_name
             ion_data["target_collection_type"] = row.target_collection_type
+        if show_target_compound:
+            ion_data["target_compound_name"] = row.target_compound_name
+            ion_data["target_compound_formula"] = row.target_compound_formula
+        if show_target_ion:
+            ion_data["target_compound_id"] = row.target_compound_id
+            ion_data["target_ion_formula"] = row.target_ion_formula
+            ion_data["filter_params"] = row.filter_params
+        if show_ionization_mechanism:
+            ion_data["ionization_mechanism"] = row.ionization_mechanism
         data.append(ion_data)
+
+    # Step 14: Deduplicate if requested and `show_target_collection` is True
+    if deduplicate and show_target_collection:
+        data_df = pd.DataFrame(data)
+        data_df = deduplicate_match_df(
+            data_df, id_keys=("target_ion_id", "sample_item_id")
+        )
+        data = data_df.to_dict(orient="records")
+        # Update total after deduplication
+        total = len(data)
 
     return {"results": total, "data": data}
 
