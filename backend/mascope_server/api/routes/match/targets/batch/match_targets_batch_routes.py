@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from mascope_server.api.lib.api_features import api_route
 from mascope_server.api.controllers.match.targets.batch.match_targets_batch_controller import (
-    get_batch_match_data,
+    get_batch_data,
     get_match_batch_collections,
     get_match_batch_compounds,
     get_match_batch_ions,
@@ -22,10 +22,10 @@ match_targets_batch_router = APIRouter()
     tags=["Batch Match Loading"],
 )
 @api_route()
-async def get_batch_match_data_route(
+async def get_batch_data_route(
     sample_batch_id: str,
 ):
-    return await get_batch_match_data(sample_batch_id=sample_batch_id)
+    return await get_batch_data(sample_batch_id=sample_batch_id)
 
 
 @match_targets_batch_router.get(

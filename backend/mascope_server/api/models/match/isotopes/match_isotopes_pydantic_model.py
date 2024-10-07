@@ -40,6 +40,10 @@ class GetMatchesQueryParams(BaseModel):
     target_isotope_id: Optional[str] = Field(
         None, description="Filter by the ID of the target isotope"
     )
+    show_target_isotope: bool = Field(
+        False,
+        description="Flag to include target isotope details.",
+    )
     sort: Optional[str] = Field(None, description="Field to sort by")
     order: Optional[str] = Field(None, description="Order of sorting ('asc' or 'desc')")
     page: int = Field(0, description="Pagination page number")

@@ -9,9 +9,6 @@ from mascope_server.api.controllers.sample.batches.sample_batches_controller imp
     get_sample_batch,
 )
 from mascope_server.api.controllers.samples.samples_controller import get_samples
-from mascope_server.api.controllers.match.samples.match_samples_controller import (
-    get_match_samples,
-)
 from mascope_server.api.controllers.match.compounds.match_compounds_controller import (
     get_match_compounds,
 )
@@ -39,15 +36,15 @@ from mascope_server.api.controllers.target.isotopes.target_isotopes_controller i
 
 
 @api_controller()
-async def get_batch_match_data(
+async def get_batch_data(
     sample_batch_id: str,
 ) -> dict:
     """
-    Retrieve detailed match data for all samples in a batch.
+    Retrieve detailed data for all samples in a batch, including compounds, ions, and isotopes.
 
-    This function fetches all samples in a batch and retrieves match data for
-    compounds, ions, isotopes, match interferences, and match samples, optionally
-    applying deduplication based on collection priority.
+    This function fetches all samples in a batch and retrieves combined data for
+    compounds, ions, isotopes, match interferences, and samples, optionally applying deduplication
+    based on collection priority.
 
     This function is used in the `mascope_api` library, serving as a wrapper for Jupyter
     notebooks, enabling easy retrieval of batch match data in batch selector widgets.
@@ -55,14 +52,14 @@ async def get_batch_match_data(
     Steps:
     1. Fetch the sample batch using the provided sample batch ID.
     2. Fetch all the samples within the batch.
-    3. Retrieve match samples, match compounds, match ions, match isotopes, and match interferences for the batch.
+    3. Retrieve samples and targets joined with match data - compounds, ions, isotopes and interferences for the batch.
     4. Merge match interference data into the match isotopes.
     5. Combine all match data and prepare a structured response.
 
     :param sample_batch_id: Unique identifier of the sample batch.
     :type sample_batch_id: str
     :raises NotFoundException: If the sample batch with the specified item ID is not found.
-    :return: A dictionary containing the batch information and combined match data for compounds, ions, and isotopes.
+    :return: A dictionary containing the batch information, samples and combined target/match data for compounds, ions, and isotopes.
     :rtype: dict
     """
     async with async_session() as session:
@@ -82,44 +79,45 @@ async def get_batch_match_data(
                 "message": f"No samples found for sample batch '{sample_batch.sample_batch_name}'.",
                 "result": {
                     "samples": 0,
-                    "match_samples": 0,
-                    "match_compounds": 0,
-                    "match_ions": 0,
-                    "match_isotopes": 0,
+                    "compounds": 0,
+                    "ions": 0,
+                    "isotopes": 0,
                 },
                 "data": {
                     "sample_batch": sample_batch.to_dict(),
-                    "samples": [],
-                    "match_samples": [],
-                    "match_compounds": [],
-                    "match_ions": [],
-                    "match_isotopes": [],
+                    "samples": [],  # combination of samples (sample_item + sample_file) and match_samples
+                    "compounds": [],  # combination of match_compounds and target_compounds
+                    "ions": [],  # combination of match_ions and target_ions
+                    "isotopes": [],  # combination of match_isotopes, match_interferences, and target_isotopes
                 },
             }
 
-        # Step 3: Fetch match data for the batch using sample_batch_id
-        match_samples_result = await get_match_samples(sample_batch_id=sample_batch_id)
-        match_samples = match_samples_result.get("data", [])
-
+        # Step 3: Fetch match data joined with targets for the batch using sample_batch_id
         match_compounds_result = await get_match_compounds(
-            sample_batch_id=sample_batch_id
+            sample_batch_id=sample_batch_id,
+            show_target_compound=True,
         )
-        match_compounds = match_compounds_result.get("data", [])
+        compounds = match_compounds_result.get("data", [])
 
-        match_ions_result = await get_match_ions(sample_batch_id=sample_batch_id)
-        match_ions = match_ions_result.get("data", [])
+        match_ions_result = await get_match_ions(
+            sample_batch_id=sample_batch_id,
+            show_target_ion=True,
+            show_ionization_mechanism=True,
+        )
+        ions = match_ions_result.get("data", [])
 
         match_isotopes_result = await get_match_isotopes(
-            sample_batch_id=sample_batch_id
+            sample_batch_id=sample_batch_id,
+            show_target_isotope=True,
         )
-        match_isotopes = match_isotopes_result.get("data", [])
+        isotopes = match_isotopes_result.get("data", [])
 
         match_interferences_result = await get_match_interferences(
             sample_batch_id=sample_batch_id
         )
         match_interferences = match_interferences_result.get("data", [])
 
-        # Step 4: Merge sample_peak_interference into match isotopes
+        # Step 4: Merge sample_peak_interference into isotopes
         # Create a mapping from (sample_item_id, target_isotope_id) to sample_peak_interference
         match_interferences_dict = {
             (
@@ -129,8 +127,8 @@ async def get_batch_match_data(
             for interference in match_interferences
         }
 
-        # Update match_isotopes with sample_peak_interference
-        for isotope in match_isotopes:
+        # Update isotopes with sample_peak_interference
+        for isotope in isotopes:
             key = (isotope["sample_item_id"], isotope["target_isotope_id"])
             sample_peak_interference = match_interferences_dict.get(key, None)
             isotope["sample_peak_interference"] = sample_peak_interference
@@ -140,24 +138,22 @@ async def get_batch_match_data(
             sample["sample_batch_name"] = sample_batch.sample_batch_name
 
         # Step 6: Prepare the final output
-        message = f"Successfully retrieved match data for sample batch '{sample_batch.sample_batch_name}'."
+        message = f"Successfully retrieved data for sample batch '{sample_batch.sample_batch_name}'."
 
         return {
             "message": message,
             "result": {
                 "samples": len(samples),
-                "match_samples": len(match_samples),
-                "match_compounds": len(match_compounds),
-                "match_ions": len(match_ions),
-                "match_isotopes": len(match_isotopes),
+                "compounds": len(compounds),
+                "ions": len(ions),
+                "isotopes": len(isotopes),
             },
             "data": {
                 "sample_batch": sample_batch.to_dict(),
                 "samples": samples,
-                "match_samples": match_samples,
-                "match_compounds": match_compounds,
-                "match_ions": match_ions,
-                "match_isotopes": match_isotopes,
+                "compounds": compounds,
+                "ions": ions,
+                "isotopes": isotopes,
             },
         }
 

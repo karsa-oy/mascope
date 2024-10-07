@@ -178,16 +178,16 @@ def get_sample_batches(mascope_url: str, workspace_id: str) -> list:
     return batches
 
 
-def get_sample_batch_match_data(
+def get_sample_batch_data(
     mascope_url: str,
     sample_batch_id: str,
 ) -> dict:
     """
-    Retrieve detailed match data for all samples in a sample batch.
+    Retrieve detailed data for all samples in a sample batch.
 
-    This function interacts with the Mascope API to fetch comprehensive match data
-    for a given sample batch. It retrieves match data for samples, compounds, ions,
-    isotopes, and interferences, and combines the interference data with the isotopes.
+    This function interacts with the Mascope API to fetch comprehensive data
+    for a given sample batch. It retrieves data for samples and combinned match/targets data
+    for compounds, ions, isotopes and interferences (included to isotopes).
 
     :param mascope_url: The base URL of the Mascope instance.
     :type mascope_url: str
@@ -196,15 +196,14 @@ def get_sample_batch_match_data(
     :return: A dictionary containing:
              - `result`: Summary statistics about the retrieved data.
              - `sample_batch`: Information about the sample batch.
-             - `samples`: A list of samples within the batch.
-             - `match_samples`: Match data at the sample level.
-             - `match_compounds`: Match data for compounds.
-             - `match_ions`: Match data for ions.
-             - `match_isotopes`: Match data for isotopes, including `sample_peak_interference`.
+             - `samples`: A list of samples within the batch. Combination of samples (sample_item + sample_file) and match_samples
+             - `compounds`: Data for compounds. Combination of match_compounds and target_compounds
+             - `ions`: Data for ions. Combination of match_ions and target_ions
+             - `isotopes`: Data for isotopes. Combination of match_isotopes, match_interferences, and target_isotopes
              Returns an empty dictionary if the request fails or no data is found.
     :rtype: dict
     """
-    # Step 1: Call the API to get the batch match data
+    # Step 1: Call the API to get the batch data (stored in database)
     resp = api_get(mascope_url, f"match/targets/batch/{sample_batch_id}")
 
     if not resp:
@@ -214,29 +213,27 @@ def get_sample_batch_match_data(
         return {}
 
     # Step 2: Parse the response content
-    batch_match_data = json.loads(resp.content)
-    if not batch_match_data:
-        print(f"No match data returned for sample batch with ID {sample_batch_id}.")
+    batch_data = json.loads(resp.content)
+    if not batch_data:
+        print(f"No data returned for sample batch with ID {sample_batch_id}.")
         return {}
 
     # Step 3: Extract relevant information from the aggregate match data
-    result = batch_match_data.get("result", {})
-    sample_batch = batch_match_data.get("data", {}).get("sample_batch", {})
-    samples = batch_match_data.get("data", {}).get("samples", [])
-    match_samples = batch_match_data.get("data", {}).get("match_samples", [])
-    match_compounds = batch_match_data.get("data", {}).get("match_compounds", [])
-    match_ions = batch_match_data.get("data", {}).get("match_ions", [])
-    match_isotopes = batch_match_data.get("data", {}).get("match_isotopes", [])
+    result = batch_data.get("result", {})
+    sample_batch = batch_data.get("data", {}).get("sample_batch", {})
+    samples = batch_data.get("data", {}).get("samples", [])
+    compounds = batch_data.get("data", {}).get("compounds", [])
+    ions = batch_data.get("data", {}).get("ions", [])
+    isotopes = batch_data.get("data", {}).get("isotopes", [])
 
     # Step 4: Build the response structure
     response = {
         "result": result,
         "sample_batch": sample_batch,
         "samples": samples,
-        "match_samples": match_samples,  # TODO match_samples can be removed and use samples instead
-        "match_compounds": match_compounds,
-        "match_ions": match_ions,
-        "match_isotopes": match_isotopes,
+        "compounds": compounds,
+        "ions": ions,
+        "isotopes": isotopes,
     }
 
     return response

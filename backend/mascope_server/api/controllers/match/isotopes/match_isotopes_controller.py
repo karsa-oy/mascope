@@ -2,7 +2,11 @@ from datetime import datetime, timezone
 from typing import List, Optional
 from sqlalchemy import asc, desc, func, select, delete, and_
 from mascope_server.db import async_session
-from mascope_server.db.models import MatchIsotope, SampleItem
+from mascope_server.db.models import (
+    MatchIsotope,
+    SampleItem,
+    TargetIsotope,
+)
 from mascope_server.api.lib.api_features import api_controller
 from mascope_server.api.lib.exceptions.api_exceptions import (
     NotFoundException,
@@ -24,21 +28,24 @@ async def get_match_isotopes(
     sample_item_id: Optional[str] = None,
     sample_batch_id: Optional[str] = None,
     target_isotope_id: Optional[str] = None,
+    show_target_isotope: bool = False,
     sort: str = None,
     order: str = None,
     page: int = 0,
     limit: int = 1000000,
 ) -> dict:
     """
-    Retrieves a paginated list of matches, optionally filtered by sample item ID and target isotope ID, and sorted by a specified column.
+    Retrieves a paginated list of matched isotopes, optionally filtered by sample item ID, target isotope ID, and sorted by a specified column.
+    Supports optional inclusion of related target isotope data (e.g., mz, relative_abundance, and target_ion_id).
 
     Steps:
-    1. Construct a SQLAlchemy query to select all matches.
-    2. Apply filtering based on provided parameters.
-    3. Apply sorting based on the provided sort and order parameters.
-    4. Apply pagination based on the provided page and limit parameters.
-    5. Execute the query and fetch the results.
-    6. Convert the results into a list of dictionaries for JSON serialization.
+    1. Construct a SQLAlchemy query to select all matched isotopes.
+    2. Apply filtering based on the provided parameters (`sample_item_id`, `target_isotope_id`, `sample_batch_id`).
+    3. Optionally join with the `TargetIsotope` table to include related target isotope data if `show_target_isotope` is True.
+    4. Apply sorting based on the specified `sort` column and `order`.
+    5. Count the total number of matched isotopes for pagination.
+    6. Limit the query for pagination and execute it to fetch the results.
+    7. Format the fetched data into a list of dictionaries for the response.
 
     :param sample_item_id: Filter by sample item ID, defaults to None.
     :type sample_item_id: Optional[str], optional
@@ -46,19 +53,21 @@ async def get_match_isotopes(
     :type sample_batch_id: Optional[str], optional
     :param target_isotope_id: Filter by target isotope ID, defaults to None.
     :type target_isotope_id: Optional[str], optional
+    :param show_target_isotope: Include additional data about the target isotopes, defaults to False.
+    :type show_target_isotope: bool, optional
     :param sort: Column to sort by, defaults to None.
     :type sort: str, optional
-    :param order: Sorting order, defaults to None.
+    :param order: Sorting order, 'asc' for ascending or 'desc', defaults to None.
     :type order: str, optional
     :param page: Page number for pagination, defaults to 0.
     :type page: int, optional
     :param limit: Number of items per page, defaults to a large number.
     :type limit: int, optional
-    :return: A dictionary with the total count and a list of matches.
+    :return: A dictionary with the total count and a list of matched isotopes.
     :rtype: dict
     """
     async with async_session() as session:
-        # Step 1: Construct a SQLAlchemy query to select all matches.
+        # Step 1: Construct a SQLAlchemy query to select all matched isotopes
         stmt = select(MatchIsotope)
 
         # Step 2: Apply filters if specified
@@ -71,7 +80,18 @@ async def get_match_isotopes(
                 SampleItem, SampleItem.sample_item_id == MatchIsotope.sample_item_id
             ).where(SampleItem.sample_batch_id == sample_batch_id)
 
-        # Step 3: Apply sorting
+        # Step 3: Join with TargetIsotope if requested
+        if show_target_isotope:
+            stmt = stmt.join(
+                TargetIsotope,
+                TargetIsotope.target_isotope_id == MatchIsotope.target_isotope_id,
+            ).add_columns(
+                TargetIsotope.mz,
+                TargetIsotope.relative_abundance,
+                TargetIsotope.target_ion_id,
+            )
+
+        # Step 4: Apply sorting
         if sort:
             sort_expression = (
                 desc(getattr(MatchIsotope, sort))
@@ -80,18 +100,33 @@ async def get_match_isotopes(
             )
             stmt = stmt.order_by(sort_expression)
 
-        # Step 4: Apply pagination
+        # Step 5: Count total
         total = await session.scalar(
             select(func.count()).select_from(stmt)  # pylint: disable=not-callable
         )
+
+        # Step 6: Apply pagination
         stmt = stmt.offset(page * limit).limit(limit)
 
-        # Step 5: Execute query
+        # Step 7: Execute query
         result = await session.execute(stmt)
-    matches = result.scalars().all()
+        result = result.all()
 
-    # Step 6: Return results
-    return {"results": total, "data": [match.to_dict() for match in matches]}
+    # Step 8: Construct response data
+    data = []
+    for row in result:
+        match_isotope_data = row.MatchIsotope.to_dict()
+        if show_target_isotope:
+            match_isotope_data.update(
+                {
+                    "mz": row.mz,
+                    "relative_abundance": row.relative_abundance,
+                    "target_ion_id": row.target_ion_id,
+                }
+            )
+        data.append(match_isotope_data)
+
+    return {"results": total, "data": data}
 
 
 @api_controller()

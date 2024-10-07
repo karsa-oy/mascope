@@ -79,10 +79,10 @@ async def get_batch_and_aggregated_matches(
             "message": message,
             "result": {
                 "samples": len(samples),
-                "match_isotopes": len(match_isotopes),
-                "match_ions": len(match_ions),
-                "match_compounds": len(match_compounds),
                 "match_samples": len(match_samples),
+                "match_compounds": len(match_compounds),
+                "match_ions": len(match_ions),
+                "match_isotopes": len(match_isotopes),
             },
             "data": {
                 "sample_batch": sample_batch.to_dict(),

@@ -212,12 +212,12 @@ export async function batchExportCsv() {
   }
 
   const focusedBatch = app.data.batch.focused
-  const batchMatchData = await app.data.batch.aggregateBatchMatches(focusedBatch)
+  const batchMatchData = (await app.data.batch.aggregateBatchMatches(focusedBatch)).data
   const batch = batchMatchData.sample_batch
 
   const samples = (
     await api.request.read({
-      method: 'getAllSamples',
+      method: 'getBatchSamples',
       body: {
         sample_batch_id: focusedBatch.sample_batch_id,
         sort: 'datetime_utc'
@@ -290,7 +290,7 @@ export async function batchExportCsv() {
     { field: 'sample_item_type', label: 'Sample type' },
     { field: 'target_compound_name', label: 'Compound name' },
     { field: 'target_compound_formula', label: 'Compound formula' },
-    { field: 'target_ion_mechanism', label: 'Ionization mechanism' },
+    { field: 'ionization_mechanism', label: 'Ionization mechanism' },
     { field: 'target_ion_formula', label: 'Ion formula' },
     { field: 'sample_peak_area_sum', label: 'Sample peak intensity' },
     { field: 'sample_peak_interference_sum', label: 'Sample peak interference' },

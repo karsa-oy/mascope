@@ -113,7 +113,7 @@ async def aggregate_sample_match_ion(
                 "target_compound_formula",
                 "target_ion_formula",
                 "filter_params",
-                "target_ion_mechanism",
+                "ionization_mechanism",
             ]
         )
 
