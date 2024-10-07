@@ -9,6 +9,8 @@ from rich.table import Table
 
 from .runtime import runtime
 
+from mascope_runtime.version import get_version
+
 from . import cmd
 
 app = typer.Typer()
@@ -27,6 +29,7 @@ def main(
     """
     Mascope development CLI
     """
+    os.environ["MASCOPE_VERSION"] = get_version()
     runtime.state.override("env", env)
     if log_level:
         os.environ["MASCOPE_LOGLEVEL"] = log_level.upper()

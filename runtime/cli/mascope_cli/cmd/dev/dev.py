@@ -69,7 +69,8 @@ def run(
         "mode": frontend_runtime.mode,
         "env": frontend_runtime.env,
         "meta": frontend_runtime.meta.model_dump(),
-        "config": frontend_runtime.config.model_dump()
+        "config": frontend_runtime.config.model_dump(),
+        "version": os.environ['MASCOPE_VERSION']
     })
     # if --host set, expose dev server to network
     if host:

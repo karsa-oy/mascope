@@ -60,6 +60,7 @@ def main(args: Annotated[Optional[List[str]], typer.Argument()] = None) -> None:
                     "env": runtime.env,
                     "meta": runtime.meta.model_dump(),
                     "config": runtime.config.model_dump(),
+                    "version": os.environ["MASCOPE_VERSION"],
                 }
             ),
             MASCOPE_FILESTORE=runtime.meta.filestore,

@@ -17,6 +17,7 @@ import { ref, reactive, computed, watch, watchEffect } from 'vue'
 import { BaseKarsaLogo } from '@/lib/base'
 import { DialogWorkspaceOp } from '@/lib/dialogs'
 import { beautifySnakeCase } from '@/lib/utils'
+import { runtime } from '@/lib/runtime'
 
 import { useApp } from '@/stores'
 
@@ -278,7 +279,9 @@ function parseTimestamp(timestamp) {
     </template>
     <template #center>
       <div class="logo-container">
-        <BaseKarsaLogo />
+        <BaseKarsaLogo>
+          <span class="version">{{ runtime.version }}</span>
+        </BaseKarsaLogo>
       </div>
     </template>
     <template #end>
@@ -412,7 +415,14 @@ function parseTimestamp(timestamp) {
   justify-content: center;
   position: absolute;
   left: 50%;
+  top: 25px;
   transform: translateX(-50%);
   pointer-events: none; /* Prevents the logo from affecting layout interactions */
+}
+
+.version {
+  opacity: 0.3;
+  pointer-events: none; /* Prevents the logo from affecting layout interactions */
+  font-size: 10px;
 }
 </style>
