@@ -1,0 +1,6 @@
+export { default as PaneBrowserSample } from './PaneBrowserSample.vue'
+export { default as PaneBrowserTarget } from './PaneBrowserTarget.vue'
+export { default as PaneProgress } from './PaneProgress.vue'
+export { default as PaneSettingsCalibration } from './PaneSettingsCalibration.vue'
+export { default as PaneTabAcquisitions } from './PaneTabAcquisitions.vue'
+export { default as PaneTabMatch } from './PaneTabMatch.vue'

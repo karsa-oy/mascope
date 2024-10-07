@@ -1,0 +1,224 @@
+/** forms **/
+@layer override, primevue;
+
+@layer override {
+  * {
+    box-sizing: border-box;
+    scrollbar-width: thin;
+  }
+
+  html,
+  body {
+    overflow: hidden;
+    font-size: 13px;
+    height: 100vh;
+    max-height: 100vh;
+    margin: 0;
+    padding: 0;
+  }
+
+  * {
+    font-family: Inter, sans-serif;
+  }
+
+  * {
+    --p-listbox-background: var(--p-panel-background);
+    /* form input */
+    --p-form-field-color: var(--p-dialog-color);
+    --p-select-background: var(--p-panel-background);
+    --p-select-color: var(--p-dialog-color);
+    --p-select-border-color: var(--p-panel-border-color);
+    --p-inputtext-background: var(--p-panel-background);
+    --p-inputtext-color: var(--p-dialog-color);
+    --p-inputtext-border-color: var(--p-panel-border-color);
+    --p-checkbox-background: var(--p-panel-background);
+    --p-checkbox-border-color: var(--p-panel-border-color);
+  }
+
+  label {
+    color: var(--p-dialog-color);
+    opacity: 0.75;
+  }
+
+  .p-contextmenu-item-link > .pi {
+    margin-right: 0.3rem;
+  }
+
+  .hiddenlabel .p-button-label,
+  .hidden {
+    display: none;
+  }
+
+  body {
+    background-color: var(--p-panel-background);
+  }
+
+  .row {
+    display: flex;
+    flex-flow: row nowrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+  .col {
+    display: flex;
+    flex-flow: column nowrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+  .center {
+    display: grid;
+    place-items: center;
+  }
+
+  .p-splitter-gutter {
+    opacity: 0.4;
+  }
+
+  /* forms */
+
+  .p-floatlabel {
+    margin: 1.75rem 0;
+  }
+
+  /* dialogs */
+
+  .p-dialog menu {
+    padding: 0;
+    display: flex;
+    flex-flow: row;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin: 0;
+  }
+
+  .p-dialog menu > * {
+    margin: 0;
+  }
+
+  /* sample and target browsers */
+
+  .browser {
+    height: 100%;
+    max-height: max-content;
+  }
+
+  .browser .p-scrollpanel {
+    height: calc(100% - 1rem) !important;
+    max-height: calc(100% - 1rem) !important;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .browser .p-panel-content-container,
+  .browser .p-panel-content {
+    height: calc(100% - 1rem) !important;
+    max-height: calc(100% - 1rem) !important;
+  }
+
+  .browser .p-panel-content {
+    padding-right: 0.5rem;
+  }
+
+  .browser .p-panel-header {
+    padding: 0 0.5rem;
+  }
+
+  .browser .p-panel-header .p-menuitem-link {
+    padding: 0.8rem !important;
+    font-size: small;
+  }
+
+  .browser .p-datatable-row-expansion > td {
+    padding: 0 !important;
+    padding-left: 1.5rem !important;
+  }
+
+  .browser .p-datatable-row-expansion {
+    z-index: 100;
+  }
+
+  .browser .match-column {
+    width: 8ch;
+  }
+
+  .browser .spinner {
+    display: flex;
+    flex-flow: row nowrap;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    padding-left: 2rem;
+  }
+  .browser .spinner .p-progressspinner {
+    width: 15px;
+    height: 15px;
+    padding: 0;
+    margin: 0;
+    flex-shrink: 1;
+  }
+  .browser .spinner .p-progressspinner::before {
+    height: 15px;
+    padding: 0;
+  }
+
+  .browser .scroller {
+    height: 100%;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    padding-right: 1rem;
+  }
+
+  /* chart */
+
+  figure {
+    margin: 0;
+    padding: 0.5rem;
+    display: grid;
+    place-items: center;
+  }
+
+  /* measurement mode */
+
+  .measure-mode .p-togglebutton.p-togglebutton-checked::before {
+    --dark: var(--p-sky-400);
+    --light: var(--p-sky-200);
+  }
+  .darkmode .measure-mode .p-togglebutton.p-togglebutton-checked::before {
+    --dark: var(--p-sky-800);
+    --light: var(--p-sky-600);
+  }
+
+  .p-confirmdialog-message {
+    max-width: 400px;
+  }
+
+  .p-listbox-list-container {
+    height: 100%;
+    max-height: 100% !important;
+  }
+}
+
+/* notification drawer */
+
+.p-drawer-content .p-message {
+  margin: 1rem 0;
+}
+
+/* Notification button */
+
+.notification-button .p-badge {
+  position: absolute;
+  bottom: 0.5rem;
+  right: 1.2rem;
+  padding: 0.25rem;
+  transform: translate(50%, 50%);
+}
+
+/* Hide the badge if it's empty (i.e., no content) */
+.notification-button.hidden-badge .p-badge {
+  visibility: hidden;
+}

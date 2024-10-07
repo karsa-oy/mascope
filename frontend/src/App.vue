@@ -1,69 +1,71 @@
+<script setup>
+import { computed } from 'vue'
+
+import ProgressSpinner from 'primevue/progressspinner'
+import ConfirmDialog from 'primevue/confirmdialog'
+import Toast from 'primevue/toast'
+import { useToast } from 'primevue/usetoast'
+
+import { beautifySnakeCase } from '@/lib/utils'
+import { BaseKarsaLogo } from '@/lib/base'
+import { useApp } from '@/stores'
+
+const toast = useToast()
+
+const app = useApp()
+
+const ready = computed(() => app.data.workspace.list.length > 0)
+
+// toaster
+app.ui.notification
+  .on('*', ({ status, type, message }) => {
+    if (status !== 'pending') {
+      const severity =
+        {
+          warning: 'warn'
+        }[status] ?? status
+
+      const duration = status === 'error' ? 10000 : status === 'warning' ? 7000 : 3000
+
+      toast.add({
+        severity,
+        summary: `${beautifySnakeCase(type)} ${status}`,
+        detail: message,
+        life: duration
+      })
+    }
+  })
+  .unmount()
+</script>
+
 <template>
-  <div id="app">
-    <div v-if="appReady">
-      <router-view></router-view>
-    </div>
-    <section v-else>
-      <b-loading :is-full-page="true"> Loading... </b-loading>
-    </section>
+  <div id="app" v-if="ready">
+    <RouterView />
   </div>
+  <div id="loading" v-else>
+    <div class="col">
+      <BaseKarsaLogo />
+      <ProgressSpinner />
+      <strong>Loading...</strong>
+    </div>
+  </div>
+  <Toast position="bottom-right" v-if="!app.ui.notification.drawer" />
+  <ConfirmDialog />
 </template>
 
-<style lang="scss">
-@import "./assets/style.scss";
+<style>
+@import './style.css';
+
+#loading {
+  width: 100vw;
+  height: 100vh;
+  display: grid;
+  place-items: center;
+}
+.col {
+  gap: 5rem;
+}
+strong {
+  opacity: 0.5;
+}
 </style>
-
-<script>
-import { call, get } from "vuex-pathify";
-import { mapMutations, mapActions } from "vuex";
-
-export default {
-  data: function () {
-    return {};
-  },
-  computed: {
-    ...get({
-      appMode: "app/mode",
-      appPushNotification: "app/pushNotification@message",
-      appReady: "app/ready",
-    }),
-    isDevelopmentMode() {
-      return this.appMode === "development";
-    },
-  },
-  created() {
-    // add event listeners
-    window.addEventListener("keydown", (event) => {
-      this.keydown(event);
-    });
-    window.addEventListener("keyup", (event) => {
-      this.keyup(event);
-    });
-    // Return to home page at reload
-    if (this.$route.path !== "/") this.$router.push("/");
-    if (this.isDevelopmentMode) {
-      this.showWarningNotification({
-        notification: "inDevelopment",
-      });
-    }
-  },
-  methods: {
-    ...call({
-      keydown: "key/down",
-      keyup: "key/up",
-    }),
-    ...mapMutations({
-      activateNotification: "notification/activate",
-    }),
-    ...mapActions("notification", ["showWarningNotification"]),
-  },
-  watch: {
-    appPushNotification: {
-      handler() {
-        this.$buefy.dialog.alert(this.appPushNotification);
-      },
-      deep: true,
-    },
-  },
-};
-</script>

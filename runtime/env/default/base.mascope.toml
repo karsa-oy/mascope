@@ -1,0 +1,122 @@
+
+# MASCOPE DEFAULT BASE CONFIG
+
+# Each section may also have
+# log_level =  "trace", "debug", "info", "warning", "success", "error" or "critical"
+
+[meta]
+# settings
+description = "The default runtime env"
+api_port = 8090
+filestore = './filestore'
+
+# SERVER
+
+
+[backend]
+# meta
+pkg_path = './backend'
+tags = ['server', 'tof', 'orbi', 'file', 'lab', 'all']
+log_path = './logs'
+# settings
+database = './database'
+filestreams = './filestreams'
+# scripts
+install = "poetry install"
+uninstall = "poetry env remove --all"
+run = "poetry run mascope-api"
+
+
+[file-converter]
+# meta
+pkg_path = './backend'
+tags = ['server', 'tof', 'orbi', 'file', 'all']
+log_path = './logs'
+# settings
+server = 'backend'
+source = './filestreams'
+raw_threads = 1
+h5_threads = 1
+# scripts
+run = "poetry run mascope-file-converter"
+
+# AGENTS
+
+[tof-agent]
+# meta
+pkg_path = './agents/tof_agent'
+tags = ['agents', 'tof', 'all']
+log_path = './logs'
+# settings
+host = 'localhost'
+source = './agents/tof_agent'
+target = './filestreams'
+# scripts
+install = "poetry install"
+uninstall = "poetry env remove --all"
+run = "poetry run mascope-tof-agent"
+
+[file-mover]
+# meta
+pkg_path = './agents/file_mover'
+tags = ['agents', 'orbi', 'all']
+log_path = './logs'
+# settings
+mask = '*.raw'
+timeout = 10
+source = './agents/file_mover'
+target = './filestreams'
+# scripts
+install = "poetry install"
+uninstall = "poetry env remove --all"
+run = "poetry run mascope-file-mover"
+
+# CLIENTS
+
+[frontend]
+# meta
+pkg_path = './frontend'
+tags = ['lab', 'orbi', 'tof', 'file', 'all']
+log_path = './logs'
+# scripts
+install = "npm install"
+run = "npm run dev"
+
+[notebooks]
+# meta
+pkg_path = './notebooks'
+tags = ['lab']
+log_path = './logs'
+# scripts
+install = "poetry install"
+uninstall = "poetry env remove --all"
+run = "poetry run jupyter lab"
+
+[cli]
+# meta
+pkg_path = './runtime/cli'
+log_path = './logs'
+
+
+# LIBRARIES
+
+[standard-lib]
+# meta
+pkg_path = './libraries/mascope_lib'
+tags = ['lib']
+log_path = './logs'
+
+[hardware-lib]
+# meta
+pkg_path = './libraries/mascope_hardware'
+tags = ['lib']
+log_path = './logs'
+# settings
+tofwerk_dll = 'Auto'
+#  TofWerk DLL selection - 'Auto', 'Windows', 'Linux' or 'Darwin' (= MacOs)
+
+[api-lib]
+# meta
+pkg_path = './libraries/mascope_api'
+tags = ['lib']
+log_path = './logs'

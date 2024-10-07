@@ -1,40 +1,23 @@
-import { defineConfig, loadEnv } from "vite";
-import { createVuePlugin } from "vite-plugin-vue2";
-import path from "path";
+import { fileURLToPath, URL } from 'node:url'
+import { defineConfig } from 'vite'
+import vue from '@vitejs/plugin-vue'
 
-export default ({ mode }) => {
-  const dotEnvPath = path.resolve(process.cwd() + "/..");
-  process.env = Object.assign(
-    process.env,
-    loadEnv(mode, dotEnvPath, "MASCOPE_PUBLIC_")
-  );
-
-  return defineConfig({
-    plugins: [createVuePlugin()],
-    server: {
-      port: process.env.MASCOPE_PUBLIC_PORT,
-      fs: {
-        strict: false,
-        allow: ["/data/database/"],
-      },
-    },
-    resolve: {
-      alias: [
-        {
-          find: "$lib",
-          replacement: path.resolve(__dirname, "src/lib/"),
-        },
-        {
-          find: "$api",
-          replacement: path.resolve(__dirname, "src/api.js"),
-        },
-      ],
-    },
-    build: {
-      chunkSizeWarningLimit: 600,
-      cssCodeSplit: false,
-      target: "esnext",
-    },
-    envPrefix: "MASCOPE_PUBLIC_",
-  });
-};
+export default defineConfig({
+  plugins: [vue()],
+  resolve: {
+    alias: {
+      // This alias configuration helps in resolving paths relative to the src directory.
+      '@': fileURLToPath(new URL('./src', import.meta.url))
+    }
+  },
+  server: {
+    // expose dev server to local network if option is set
+    host: process.env.MASCOPE_DEVHOST ? '0.0.0.0' : 'localhost'
+  },
+  build: {
+    chunkSizeWarningLimit: 600,
+    cssCodeSplit: false,
+    target: 'esnext'
+  },
+  envPrefix: 'MASCOPE_'
+})

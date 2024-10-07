@@ -6,72 +6,46 @@
   },
   "description": "Karsa Mascope",
   "homepage": "https://www.karsa.fi",
-  "license": "To be added; check the list https://spdx.org/licenses/",
-  "version": "1.2",
+  "version": "2.0",
   "private": true,
+  "type": "module",
   "scripts": {
+    "dev": "vite",
     "serve": "vite --open",
-    "preview": "vite preview --open --port 8080",
-    "build": "vite build --out-dir dist",
-    "lint": "eslint src",
-    "lint:fix": "eslint src --fix"
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "npx playwright test --project=chromium",
+    "test:full": "npx playwright test",
+    "test:only": "npx playwright test --project=chromium --retries=0 -g",
+    "test:headed": "npx playwright test --project=chromium --headed --trace off --timeout 0 --reporter list --project=chromium --retries=0 -g",
+    "test:trace": "npx playwright test --project=chromium --trace on --project=chromium --retries=0 -g",
+    "test:gen": "npx playwright codegen http://localhost:5173/",
+    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore",
+    "format": "prettier --write src/",
+    "palette": "node scripts/palette.js"
   },
-  "repository": {
-    "type": "git",
-    "url": "https://gitlab.com/karsa_group/mascope"
-  },
-  "autoDownload": true,
   "dependencies": {
-    "@mdi/font": "^6.5.95",
-    "@mdi/js": "^6.5.95",
-    "@vue/compiler-sfc": "^3.2.37",
-    "alasql": "^1.7.3",
-    "axios": "^1.4.0",
-    "buefy": "^0.9.4",
-    "jquery-csv": "^1.0.21",
-    "json2csv": "^5.0.6",
-    "lodash.clonedeep": "^4.5.0",
-    "plotly.js-dist-min": "^2.12.1",
-    "sass": "^1.66.1",
-    "socket.io-client": "^4.4.1",
-    "underscore": "^1.11.0",
-    "vite": "^2.9.14",
-    "vite-plugin-vue2": "^2.0.1",
-    "vue": "^2.6.10",
-    "vue-material-design-icons": "^4.4.0",
-    "vue-multiselect": "^2.1.6",
-    "vue-resize-directive": "^1.2.0",
-    "vue-router": "^3.1.5",
-    "vue-socket.io": "^3.0.10",
-    "vuex": "^3.6.2",
-    "vuex-pathify": "^1.5.1",
-    "vuex-persist": "^3.1.3",
-    "xlsx": "^0.18.3"
+    "@primevue/themes": "^4.0.7",
+    "axios": "^1.7.7",
+    "pinia": "^2.2.2",
+    "plotly.js-basic-dist": "^2.35.2",
+    "primeicons": "^7.0.0",
+    "primevue": "^4.0.7",
+    "socket.io-client": "^4.7.5",
+    "vue": "^3.5.6",
+    "vue-router": "^4.4.5",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.2/xlsx-0.20.2.tgz"
   },
   "devDependencies": {
-    "eslint": "^5.16.0",
-    "eslint-plugin-vue": "^5.0.0",
-    "vue-template-compiler": "^2.6.10"
-  },
-  "eslintConfig": {
-    "root": true,
-    "env": {
-      "node": true
-    },
-    "extends": [
-      "plugin:vue/essential",
-      "eslint:recommended"
-    ],
-    "rules": {
-      "no-console": 0,
-      "no-debugger": 0
-    },
-    "parserOptions": {
-      "parser": "babel-eslint"
-    }
-  },
-  "browserslist": [
-    "> 1%",
-    "last 2 versions"
-  ]
+    "@playwright/test": "^1.47.1",
+    "@rushstack/eslint-patch": "^1.10.4",
+    "@types/node": "^20.16.5",
+    "@vitejs/plugin-vue": "^5.1.4",
+    "@vue/eslint-config-prettier": "^9.0.0",
+    "chroma-js": "^2.6.0",
+    "eslint": "^8.57.1",
+    "eslint-plugin-vue": "^9.28.0",
+    "prettier": "^3.3.3",
+    "vite": "^5.4.6"
+  }
 }

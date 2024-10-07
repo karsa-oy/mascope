@@ -1,11 +1,13 @@
-agents/tof_service/build/
-frontend/dist
+dist
 log
-notes.*
-.vagrant
+
 __pycache__
-/.env
 *.tar.gz
 .debug_env
 
-backend/backend/service/file_converter_config/test.yaml
+.vscode/extensions.json
+.vscode/tasks.json
+
+/.env
+
+tofdaq

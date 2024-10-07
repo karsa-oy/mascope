@@ -1,0 +1,24 @@
+[tool.poetry]
+name = "file-mover"
+version = "1.0"
+description = "User-friendly chemical detection platform"
+authors = ["Karsa Oy <support@karsa.fi>"]
+license = "Proprietary"
+include = ["file_mover"]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+mascope-file-mover = 'file_mover:run'
+
+[tool.poetry.dependencies]
+python = "~3.12"
+mascope_runtime = { path = '../../runtime/lib/', develop = true }
+
+watchdog = "^4.0"
+
+[tool.poetry.group.dev.dependencies]
+deptry = "^0.16"
+pyinstaller = "^6.8"

@@ -1,70 +1,48 @@
-import Vue from "vue";
-import store from "./store";
-import { api, apiLog } from "$api";
+import { createApp } from 'vue'
+import { createPinia } from 'pinia'
 
-// API
+import PrimeVue from 'primevue/config'
 
-Vue.prototype.$api = api;
-apiLog("registered API with Vue prototype");
+import Tooltip from 'primevue/tooltip'
+import ConfirmationService from 'primevue/confirmationservice'
+import ToastService from 'primevue/toastservice'
+import Ripple from 'primevue/ripple'
 
-// Buefy framework
+import 'primeicons/primeicons.css'
 
-import Buefy from "buefy"; // components
-import "@mdi/font/css/materialdesignicons.min.css"; // material design icons
+import { apiPlugin } from '@/api'
 
-Vue.use(Buefy);
-Vue.config.productionTip = false;
+import App from './App.vue'
+import router from './routes'
+import Karsa from './theme.js'
 
-// Routes
+const app = createApp(App)
 
-import VueRouter from "vue-router";
+// routing
+app.use(router)
 
-import ThePageHome from "./components/ThePageHome.vue";
-import ThePageBatchOverview from "./components/ThePageBatchOverview.vue";
-//import ThePageSampleSignal from "./components/ThePageSampleSignal.vue";
-import ThePageSampleManagement from "./components/ThePageSampleManagement.vue";
-//import ThePageSettings from "./components/ThePageSettings.vue";
-import ThePageScenthound from "./components/ThePageScenthound.vue";
+// prime
+app.use(PrimeVue, {
+  // theme
+  theme: {
+    preset: Karsa,
+    options: {
+      prefix: 'p',
+      darkModeSelector: '.darkmode',
+      cssLayer: true
+    }
+  },
+  ripple: true
+})
+app.use(ConfirmationService)
+app.use(ToastService)
+app.directive('tooltip', Tooltip)
+app.directive('ripple', Ripple)
 
-Vue.use(VueRouter);
+// store
+const pinia = createPinia()
+pinia.use(apiPlugin)
+app.use(pinia)
 
-const router = new VueRouter({
-  mode: process.env.NODE_ENV == "production" ? "hash" : "history",
-  routes: [
-    {
-      path: "/",
-      component: ThePageHome,
-    },
-    {
-      path: "/batch-overview",
-      component: ThePageBatchOverview,
-      //  }, {
-      //    path: '/sample-signal',
-      //    component: ThePageSampleSignal
-    },
-    {
-      path: "/sample-management",
-      component: ThePageSampleManagement,
-      //  }, {
-      //    path: '/settings',
-      //    component: ThePageSettings
-    },
-    {
-      path: "/scenthound",
-      component: ThePageScenthound,
-      //  }, {
-      //    path: "*",
-      //    redirect: '/'
-    },
-  ],
-});
-
-// App
-
-import App from "./App.vue";
-
-new Vue({
-  router,
-  store,
-  render: (h) => h(App),
-}).$mount("#app");
+// init
+app.mount('#app')
