@@ -115,7 +115,7 @@ def config_logger(module):
     logger.configure(  # create fresh config
         handlers=[
             dict(  # FILE HANDLER
-                sink=os.path.join(module.config.log_path, f"{{time:YYYY-MM-DD}}.{module.module}.log"),
+                sink=os.path.join(module.config.log_path, f"{{time:YYYY-MM-DD}}.{module.name}.log"),
                 format=formatter(module.root_path),
                 level="INFO",  # avoid large file size
                 enqueue=True,  # multiprocess safe
@@ -143,6 +143,6 @@ def config_logger(module):
             dict(name="ERROR", color="<red><bold>"),
             dict(name="CRITICAL", color="<RED><bold>"),
         ],
-        extra=dict(mod=module.module, key="", status_code="", method=""),
+        extra=dict(mod=module.name, key="", status_code="", method=""),
     )
     return logger

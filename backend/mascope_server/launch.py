@@ -1,7 +1,6 @@
 import argparse
 
 from .app import run as run_api_server
-from .file_converter.service import run as run_file_converter
 
 
 def launch():
@@ -13,4 +12,6 @@ def launch():
     if args.action == "api-server":
         run_api_server()
     elif args.action == "file-converter":
+        from .file_converter.service import run as run_file_converter
+
         run_file_converter()

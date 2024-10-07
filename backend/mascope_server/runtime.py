@@ -1,8 +1,10 @@
-import mascope_hardware.runtime as hardware_runtime
 import mascope_lib.runtime as lib_runtime
 
-hardware_runtime.init()
 lib_runtime.init()
+
+import mascope_hardware.runtime as hardware_runtime
+
+hardware_runtime.init()
 
 # Import this here to avoid "free(): invalid pointer" error on Linux
 from mascope_hardware.tofwerk.lib.TwTool import *

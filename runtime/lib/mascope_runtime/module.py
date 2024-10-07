@@ -23,13 +23,13 @@ class MascopeRuntimeModule:
 
     def __init__(
         self,
-        module: str,
+        name: str,
         env: Optional[str] = None,
         mode: Optional[str] = None,
         modules: Optional[List[str]] = None,
         path: Optional[str] = None,
     ) -> None:
-        self.module = module
+        self.name = name
         resolved_path = path or os.environ.get("MASCOPE_PATH")
         if not resolved_path:
             raise MascopeMissingPathException()
@@ -88,7 +88,7 @@ class MascopeRuntimeModule:
             ],
         )
         self.meta = full_config.meta
-        self.config = getattr(full_config, self.module.replace("-", "_"))
+        self.config = getattr(full_config, self.name.replace("-", "_"))
 
         def get_pkgs(mod):
             return dict(

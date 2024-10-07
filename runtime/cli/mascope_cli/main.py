@@ -33,8 +33,12 @@ def main(
     runtime.state.override("env", env)
     if log_level:
         os.environ["MASCOPE_LOGLEVEL"] = log_level.upper()
+    else:
+        os.environ.pop("MASCOPE_LOGLEVEL") if "MASCOPE_LOGLEVEL" in os.environ else ...
     if grep:
         os.environ["MASCOPE_LOGGREP"] = grep
+    else:
+        os.environ.pop("MASCOPE_LOGGREP") if "MASCOPE_LOGGREP" in os.environ else ...
 
 
 @app.command()

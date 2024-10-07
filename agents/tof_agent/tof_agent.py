@@ -75,7 +75,7 @@ if bundled:
                 file.write(default_config)
     # initialize the runtime in production mode
     opts = dict(env="prod", mode="prod", path=mascope_path)
-    runtime = MascopeRuntimeModule(module="tof-agent", **opts)
+    runtime = MascopeRuntimeModule("tof-agent", **opts)
     init_hardware_runtime(**opts)
 else:
     # dev mode
