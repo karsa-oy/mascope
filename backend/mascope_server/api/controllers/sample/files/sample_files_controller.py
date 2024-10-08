@@ -508,7 +508,7 @@ async def get_sample_file_peak_timeseries(
     :raises HTTPException: Raised if sample file is not found
     :return: Dictionary with keys:
         "mz": m/z of the peak in sample file (None if no peak within tolerance)
-        "intensity": peak height at time points (empty if no peak within tolerance)
+        "height": peak height at time points (empty if no peak within tolerance)
         "time": time coordinates (empty if no peak within tolerance)
     :rtype: dict
     """
@@ -536,7 +536,7 @@ async def get_sample_file_peak_timeseries(
             "total": 0,
             "data": {
                 "mz": None,
-                "intensity": [],
+                "height": [],
                 "time": [],
             },
         }
@@ -545,7 +545,7 @@ async def get_sample_file_peak_timeseries(
         "total": len(peak_timeseries.time.values),
         "data": {
             "mz": peak_mz_data,
-            "intensity": list(peak_timeseries.values.astype(float)),
+            "height": list(peak_timeseries.values.astype(float)),
             "time": list(peak_timeseries.time.values.astype(float)),
         },
     }

@@ -409,7 +409,7 @@ async def update_sample_batch(
         # ensure batch reload is triggered if calibration
         # mechanisms are changed
         existing_calibration_mechanisms = set(
-            existing_sample_batch.build_params["calibration_ion_mechanisms"]
+            existing_sample_batch.build_params.get("calibration_ion_mechanisms", [])
         )
         new_calibration_mechanisms = set(
             sample_batch_update_body.build_params.calibration_ion_mechanisms
@@ -949,7 +949,7 @@ async def sample_batch_export_peaks(
             "filter id",
             "filename",
             "mz",
-            "intensity",
+            "area",
         ),
     )
 

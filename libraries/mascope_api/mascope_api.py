@@ -445,7 +445,7 @@ def get_sample_file_peak_timeseries(
     :type peak_mz_tolerance_ppm: float, optional
     :return: A dictionary with keys:
         - "mz": m/z of the peak in sample file (None if no peak within tolerance)
-        - "intensity": list of peak intensity at time points (empty if no peak within tolerance)
+        - "height": list of peak intensity at time points (empty if no peak within tolerance)
         - "time": list of time coordinates (empty if no peak within tolerance)
         Returns None if no timeseries data is found or if an error occurs.
     :rtype: dict or None
