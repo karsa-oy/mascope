@@ -949,7 +949,7 @@ async def sample_batch_export_peaks(
             "filter id",
             "filename",
             "mz",
-            "intensity",
+            "area",
         ),
     )
 
