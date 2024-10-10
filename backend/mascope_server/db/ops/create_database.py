@@ -4,10 +4,10 @@ from sqlalchemy import text
 from mascope_server.db import (
     get_available_db_version,
     get_current_db_version,
-    create_db_backup,
     configure_database_engine,
     async_session,
 )
+from mascope_server.db.ops.backup import create_db_backup
 
 from mascope_server.runtime import runtime
 from mascope_server.db.models import Base, Sample
@@ -27,9 +27,17 @@ async def create_database():
         if not os.path.exists(db_path):
             runtime.logger.error("Existing database file not found.")
             return
-        create_db_backup(db_path, "create_database")
-        os.remove(db_path)
-        runtime.logger.info(f"Removed previous database file: {db_path}")
+
+        # Create the backup
+        await create_db_backup()
+
+        # Remove the old database
+        try:
+            os.remove(db_path)
+            runtime.logger.info(f"Removed previous database file: {db_path}")
+        except PermissionError as e:
+            runtime.logger.error(f"Failed to remove the database file: {e}")
+            return
     # configure the database connection which will create a new database file (also updates the global async_session)
     configure_database_engine(last_version)
 

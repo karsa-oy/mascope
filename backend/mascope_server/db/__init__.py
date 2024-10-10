@@ -1,8 +1,6 @@
 import os
 import re
-import shutil
 import inspect
-from datetime import datetime
 from importlib import import_module
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
@@ -37,23 +35,6 @@ def get_current_db_version():
         if len(versions) > 0:
             v = max(versions)
     return v
-
-
-def create_db_backup(db_path, operation):
-    """Creates a timestamped backup of the database."""
-    data_path = os.path.dirname(db_path)
-    current_version = get_current_db_version()
-    backup_dir = os.path.join(data_path, "backup")
-    if not os.path.exists(backup_dir):
-        os.makedirs(backup_dir)
-
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_db_path = os.path.join(
-        backup_dir, f"{timestamp}_{operation}_backup_mascope.v{current_version}.db"
-    )
-    shutil.copyfile(db_path, backup_db_path)
-    runtime.logger.info(f"Backup created at {backup_db_path}")
-    return backup_db_path
 
 
 # Migration functions
