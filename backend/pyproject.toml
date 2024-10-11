@@ -14,6 +14,7 @@ build-backend = "poetry.core.masonry.api"
 mascope-api = 'mascope_server.main:run'
 mascope-file-converter = 'mascope_server.file_converter.service:run'
 mascope-launch = 'mascope_server.launch:launch'
+mascope-db-backup = 'mascope_server.db.ops.backup:run_db_backup'
 mascope-db-create = 'mascope_server.db.ops.create_database:run'
 mascope-db-restore = 'mascope_server.db.ops.restore:run_db_restore'
 mascope-db-maintenance = 'mascope_server.db.ops.maintenance:run_db_maintenance'

@@ -10,8 +10,8 @@ RUN apk add openssl
 RUN openssl \
     req -x509 \
     -nodes \
-    -subj "/CN=mascope.com" \
-    -addext "subjectAltName=DNS:mascope.com" \
+    -subj "/CN=mascope.app" \
+    -addext "subjectAltName=DNS:mascope.app" \
     -days 90 \
     -newkey rsa:2048 -keyout /tmp/self-signed.key \
     -out /tmp/self-signed.crt
