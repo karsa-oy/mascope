@@ -116,18 +116,23 @@ export const useChartData = defineStore('chart.batch.overview', () => {
       }
 
       // Create the matchData object target IDs
-      let match_key
+      let match_key, all_matches
       switch (level) {
         case 'compound':
           match_key = `${match.target_collection_id}_${match.target_compound_id}`
+          all_matches = [...app.data.match.compound.list]
           break
         case 'ion':
           match_key = `${match.target_collection_id}_${match.target_compound_id}_${match.target_ion_id}`
+          all_matches = [...app.data.match.ion.list]
           break
       }
       const matchData = {
         level,
-        match_key
+        match_key,
+        collection_ids: all_matches
+          .filter((match) => match[`target_${level}_id`] === targetId)
+          .map(({ target_collection_id }) => target_collection_id)
       }
 
       const hovertemplate = `
@@ -255,7 +260,23 @@ export const useChartData = defineStore('chart.batch.overview', () => {
     })
   })
 
+  const filteredTraces = computed(
+    () =>
+      app.ui.filter.collections.length
+        ? traces.value.filter(
+            ({ matchData }) =>
+              matchData // TIC has no match data
+                ? matchData.collection_ids.some((collId) =>
+                    app.ui.filter.collections
+                      .map(({ target_collection_id }) => target_collection_id)
+                      .includes(collId)
+                  ) // normal data filtered by collection
+                : true // TIC is always shown
+          )
+        : traces.value // show all traces if no filter exists
+  )
+
   return {
-    traces
+    traces: filteredTraces
   }
 })

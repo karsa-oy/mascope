@@ -8,12 +8,12 @@ export const useFilter = defineStore('app.ui.filter', () => {
 
   // state
   const mechanism = ref(null)
+  const collections = ref([])
 
-  // automatically clear filter under certain conditions
+  // autoremoval of mechanism filters
   watch(
-    () => data.batch.focused,
-    (batch) => {
-      const batchMechanisms = batch?.build_params?.ionization_mechanisms ?? []
+    () => data.batch.focused?.build_params?.ionization_mechanisms ?? [],
+    (batchMechanisms) => {
       const noMechanisms = batchMechanisms.length == 0
       const filterMechanismNotInBatch = !(mechanism.value in batchMechanisms)
       if (noMechanisms || filterMechanismNotInBatch) {
@@ -21,8 +21,18 @@ export const useFilter = defineStore('app.ui.filter', () => {
       }
     }
   )
+  // autoremoval of collection filters
+  watch(
+    () => data.match.collection.list?.map(({ target_collection_id }) => target_collection_id) ?? [],
+    (activeCollectionIds) => {
+      collections.value = collections.value.filter(({ target_collection_id }) =>
+        activeCollectionIds.includes(target_collection_id)
+      )
+    }
+  )
 
   return {
-    mechanism
+    mechanism,
+    collections
   }
 })

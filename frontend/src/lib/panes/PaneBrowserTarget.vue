@@ -351,7 +351,43 @@ watch(
                 }`"
                 style="font-size: smaller; margin-right: 0.5rem"
               />
-              <BaseCopyableField :field="data.target_collection_name" />
+              <BaseCopyableField :field="data.target_collection_name">
+                <Button
+                  v-tooltip.bottom="{ value: 'Filter by mechanism', showDelay: 2000 }"
+                  icon="pi pi-filter"
+                  :severity="
+                    app.ui.filter.collections.includes(data.target_collection_id)
+                      ? 'info'
+                      : 'secondary'
+                  "
+                  text
+                  size="small"
+                  :class="
+                    app.ui.filter.collections
+                      .map(({ target_collection_id }) => target_collection_id)
+                      .includes(data.target_collection_id)
+                      ? 'active-filter'
+                      : ''
+                  "
+                  @click="
+                    (event) => {
+                      event.stopPropagation()
+                      if (
+                        app.ui.filter.collections
+                          .map(({ target_collection_id }) => target_collection_id)
+                          .includes(data.target_collection_id)
+                      ) {
+                        app.ui.filter.collections = app.ui.filter.collections.filter(
+                          ({ target_collection_id }) =>
+                            target_collection_id !== data.target_collection_id
+                        ) // Remove the filter if already applied
+                      } else {
+                        app.ui.filter.collections.push(data)
+                      }
+                    }
+                  "
+                />
+              </BaseCopyableField>
             </div>
           </template>
         </Column>
@@ -403,7 +439,7 @@ watch(
                 </div>
               </template>
             </Column>
-            <Column header="Name" sortable>
+            <Column header="Name" field="target_compound_name" sortable>
               <template #body="{ data }">
                 <BaseCopyableField :field="data.target_compound_name" />
               </template>

@@ -1,5 +1,5 @@
 <template>
-  <div class="column">
+  <div class="col">
     <div class="row" style="opacity: 0.5">
       <svg
         height="12px"
@@ -66,7 +66,9 @@
       </svg>
       <b style="font-size: 15px; margin-left: 2px">Mascope</b>
     </div>
-    <slot></slot>
+    <div class="content">
+      <slot></slot>
+    </div>
   </div>
 </template>
 
@@ -77,11 +79,18 @@ div {
   padding: 0;
 }
 
-.column {
-  gap: 5px;
+.col {
+  gap: 0;
+  justify-content: center;
 }
 
 .row {
   justify-content: center;
+}
+
+.content {
+  padding: 0;
+  margin: 0;
+  padding-right: 19px;
 }
 </style>

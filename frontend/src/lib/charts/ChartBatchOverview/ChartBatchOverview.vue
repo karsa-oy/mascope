@@ -145,14 +145,22 @@ function onClick({ points }) {
 </script>
 
 <template>
-  <figure>
-    <div class="row" style="justify-content: space-between; width: 100%">
-      <Select
-        v-model:modelValue="xField"
-        :options="xFields"
-        optionLabel="label"
-        dataKey="field"
-        filter
+  <figure style="position: relative">
+    <div
+      class="row"
+      style="justify-content: flex-start; width: 100%; position: absolute; top: 0; z-index: 100"
+    >
+      <Chip
+        v-for="coll in app.ui.filter.collections"
+        icon="pi pi-filter"
+        :label="coll.target_collection_name"
+        removable
+        @remove="
+          app.ui.filter.collections = app.ui.filter.collections.filter(
+            ({ target_collection_id }) => target_collection_id !== coll.target_collection_id
+          )
+        "
+        :key="coll.target_collection_id"
       />
       <Chip
         v-if="app.ui.filter.mechanism"
@@ -161,10 +169,6 @@ function onClick({ points }) {
         removable
         @remove="app.ui.filter.mechanism = null"
       />
-      <div class="row">
-        <ToggleSwitch v-model="log" style="margin-left: 1rem" />
-        <span> log scale </span>
-      </div>
     </div>
     <BaseChartPlotly
       id="ChartSampleIntensity"
@@ -174,4 +178,26 @@ function onClick({ points }) {
       @click="onClick"
     />
   </figure>
+  <div
+    class="row"
+    :style="`
+      justify-content: space-between;
+      width: calc(${app.ui.split.right}vw - 4rem);
+      position: absolute;
+      bottom: 35px;
+      right: 2rem;
+    `"
+  >
+    <div class="row">
+      <ToggleSwitch v-model="log" style="margin-left: 1rem" />
+      <span> log scale </span>
+    </div>
+    <Select
+      v-model:modelValue="xField"
+      :options="xFields"
+      optionLabel="label"
+      dataKey="field"
+      filter
+    />
+  </div>
 </template>

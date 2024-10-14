@@ -614,6 +614,12 @@ watch(
               reorderableColumns
               stateStorage="local"
               :stateKey="`mascope-sample-table-${data.sample_batch_id}`"
+              @stateRestore="
+                () => {
+                  // don't restore selection
+                  app.data.sample.unfocus()
+                }
+              "
             >
               <Column field="match_score" sortable class="match-column">
                 <template #header>
