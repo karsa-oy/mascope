@@ -593,13 +593,14 @@ watch(
           </template>
         </Column>
         <template #expansion="{ data }">
+          <!-- samples -->
           <div v-if="!app.data.sample.loading" style="min-height: 2rem">
             <DataTable
               v-if="data.children.length > 0 && app.data.batch.focused"
               :value="data.children"
-              v-model:selection="app.data.sample.focused"
-              selectionMode="single"
-              :metaKeySelection="false"
+              v-model:selection="app.data.sample.selected"
+              selectionMode="multiple"
+              :metaKeySelection="true"
               dataKey="sample_item_id"
               sortField="index"
               contextMenu

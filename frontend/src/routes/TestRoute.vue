@@ -3,12 +3,15 @@
 // http://localhost:5173/test
 
 // do NOT commit changes to this route
+
+import { useApp } from '@/stores'
+
+const app = useApp()
 </script>
 
 <template>
   <main>
     <h1>Test Route</h1>
-    <!--testing playground-->
   </main>
 </template>
 

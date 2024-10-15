@@ -25,10 +25,6 @@ export const defineModule = ({
     const singleselect = !multiselect
     const parent = useParent ? useParent() : null
 
-    if (parent && parent.multiselect) {
-      throw new Error(`${prefix} parent module parent (${parent.name}) cannot be multiselectable`)
-    }
-
     // DATA
 
     // raw data

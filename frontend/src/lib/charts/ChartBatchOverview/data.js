@@ -1,4 +1,4 @@
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watchEffect, onMounted, toRaw } from 'vue'
 import { defineStore } from 'pinia'
 import { api } from '@/api/client.js'
 import { useApp } from '@/stores'
@@ -6,17 +6,61 @@ import { glasbey } from '../colors.js'
 
 export const useChartData = defineStore('chart.batch.overview', () => {
   const app = useApp()
-  const traces = ref([])
   const theme = computed(() => (app.ui.darkmode.active ? glasbey.dark : glasbey.light))
 
-  /**
-   * Loads compounds of sample_batch from the API filtered by match_category and populates the chart data.
-   * @param {String} sample_batch_id - The ID of the selected sample batch.
-   */
-  const load = async (sample_batch_id, filters) => {
-    unload() // Clear traces before loading new data
+  const batch = ref(null)
+  const match = ref({
+    level: null,
+    data: null
+  })
 
-    let matches, level, queryParams
+  // Listen for `sample_batch_reload` event and reload data
+  onMounted(() => {
+    api.socket.on('sample_batch_reload', async () => {
+      if (app.data.batch.focused) {
+        // force reload by ensuring reactivity change
+        batch.value = null
+        batch.value = app.data.batch.focused
+      }
+    })
+  })
+
+  /**
+   * Select batch to visualize based on specific requirements
+   *
+   * @watch
+   * @param {[number|null, Array]} newValues - The new values of the watched sources.
+   *   - `newValues[0]` (`batchId`): The currently selected batch ID.
+   *   - `newValues[1]` (`sampleList`): The current list of loaded samples.
+   */
+  watchEffect(async () => {
+    // requirements
+    const batchFocused = app.data.batch.focused
+    const samplesExist = app.data.sample.list?.length
+    const samplesReady = app.data.sample.list?.every(
+      (sample) => sample.sample_batch_id === batchFocused?.sample_batch_id
+    )
+    // either load or unload, based on requirements
+    if (!batchFocused || !samplesExist || !samplesReady) {
+      // unload chart if any dependency is unmet
+      batch.value = null
+      return
+    } else {
+      // load the chart if all requirements are met
+      batch.value = batchFocused
+    }
+  })
+
+  /**
+   * Load match data for the visualized batch, using filters if they exist
+   */
+  watchEffect(() => {
+    if (!batch.value) {
+      return
+    }
+    const filters = app.ui.filter.mechanism ? { mechanism: app.ui.filter.mechanism } : null
+
+    let data, level, queryParams
     if (!filters) {
       level = 'compound'
       queryParams = {
@@ -40,32 +84,49 @@ export const useChartData = defineStore('chart.batch.overview', () => {
       }
     }
     try {
-      matches = // API call includes filter for match_category (1 and 2 only)
-        (
-          await api.client.get(`/match/${level}s`, {
-            params: {
-              sample_batch_id,
-              match_category_min: 1,
-              ...queryParams
-            }
-          })
-        )?.data?.data
+      // API call includes filter for match_category (1 and 2 only)
+      api.client
+        .get(`/match/${level}s`, {
+          params: {
+            sample_batch_id: batch.value.sample_batch_id,
+            match_category_min: 1,
+            ...queryParams
+          }
+        })
+        .then((response) => {
+          data = response?.data?.data
+          match.value = { data, level }
+        })
     } catch (error) {
       throw new Error(`chart.batch.overview - failed to load match ${level}s: ${error}`)
     }
+  })
+  /**
+   * Filter samples based on selection
+   */
+  const samples = computed(
+    () =>
+      app.data.sample.selected.length > 1 // if multiselecting
+        ? app.data.sample.selected // filter chart to selection
+        : (app.data.sample.list ?? []) // otherwise show everything
+  )
+  /**
+   * Render visualization traces based on match data
+   */
+  const rawTraces = computed(() => {
+    if (!match.value || !match.value?.data || !match.value?.data.length) {
+      return []
+    }
+    const { data, level } = toRaw(match.value)
+    const result = []
     //  Generate color mapping for target compounds
-    let targetIds = [...new Set(matches.map((match) => match[`target_${level}_id`]) ?? [])]
-    let colors = Object.fromEntries(
+    const targetIds = [...new Set(data.map((match) => match[`target_${level}_id`]) ?? [])]
+    const colors = Object.fromEntries(
       targetIds.map((targetId, index) => [[targetId], theme.value[index]])
     )
 
     // X-axis data: sample IDs
-    const samples = app.data.sample.list ?? []
-    const sampleIds = samples.map((sample) => sample.sample_item_id)
-
-    // Prepare data for hover information
-    const customData = samples.map((sample) => sample.datetime)
-    const sampleNames = samples.map((sample) => sample.sample_item_name)
+    const sampleIds = samples.value.map((sample) => sample.sample_item_id)
 
     // Loop through filtered target compounds and make traces
     for (let targetId of targetIds) {
@@ -74,7 +135,7 @@ export const useChartData = defineStore('chart.batch.overview', () => {
       let matchMaxMatchCategory = 1 // Start with minimum match category
 
       for (let sampleId of sampleIds) {
-        let itemMatches = matches.filter((row) => row.sample_item_id === sampleId)
+        let itemMatches = data.filter((row) => row.sample_item_id === sampleId)
         let sampleStats = itemMatches
           .filter((match) => match[`target_${level}_id`] === targetId)
           .map((compoundMatch) => ({
@@ -97,83 +158,88 @@ export const useChartData = defineStore('chart.batch.overview', () => {
       if (intensities.every((intensity) => intensity === null)) continue
 
       // Assign symbol based on the maximum match category for this compound
-      let matchSymbol = matchMaxMatchCategory === 2 ? 'square' : 'square-open'
-      let color = colors[targetId]
+      const matchSymbol = matchMaxMatchCategory === 2 ? 'square' : 'square-open'
+      const color = colors[targetId]
 
       // Get match information for naming
-      let match = matches.find((match) => match[`target_${level}_id`] === targetId)
-      let matchName
-      if (level == 'compound') {
-        matchName = match.target_compound_name.trim()
-          ? match.target_compound_name
-          : match.target_compound_formula
-      } else if (level == 'ion') {
-        matchName = `${
-          match.target_compound_name.trim()
-            ? match.target_compound_name
-            : match.target_compound_formula
-        }: ${match.target_ion_formula}`
-      }
+      const {
+        target_compound_name,
+        target_compound_formula,
+        target_ion_formula,
+        target_ion_id,
+        target_compound_id,
+        target_collection_id,
+        ionization_mechanism
+      } =
+        data.find(
+          // match correlating with the target
+          (match) => match[`target_${level}_id`] === targetId
+        ) ?? {}
 
-      // Create the matchData object target IDs
-      let match_key, all_matches
+      // level specific match data
+      let name, match_key, all_matches
       switch (level) {
-        case 'compound':
-          match_key = `${match.target_collection_id}_${match.target_compound_id}`
+        case 'compound': {
+          name = target_compound_name.trim() ? target_compound_name : target_compound_formula
+          match_key = `${target_collection_id}_${target_compound_id}`
           all_matches = [...app.data.match.compound.list]
           break
-        case 'ion':
-          match_key = `${match.target_collection_id}_${match.target_compound_id}_${match.target_ion_id}`
+        }
+        case 'ion': {
+          const compound_prefix = target_compound_name.trim()
+            ? target_compound_name
+            : target_compound_formula
+          name = `${compound_prefix}: ${target_ion_formula}`
+          match_key = `${target_collection_id}_${target_compound_id}_${target_ion_id}`
           all_matches = [...app.data.match.ion.list]
           break
-      }
-      const matchData = {
-        level,
-        match_key,
-        collection_ids: all_matches
-          .filter((match) => match[`target_${level}_id`] === targetId)
-          .map(({ target_collection_id }) => target_collection_id)
-      }
-
-      const hovertemplate = `
-        <i>Match ${level}</i>
-        <b># %{x}</b>
-        <br>
-        <b>${matchName}</b>
-        ${
-          level === 'ion' && match.ionization_mechanism
-            ? `<br>
-        Ionization mechanism: ${match.ionization_mechanism}`
-            : ''
         }
-        <br>
-        <b>%{text}</b>
-        <br>
-        Peak area sum: %{y:,.0f}
-        <br>
-        %{customdata}
-      `
+      }
       // Add trace for the match
-      traces.value.push({
-        name: matchName,
+      result.push({
+        name,
         x: sampleIds,
         y: intensities,
-        matchData, // Include matchData
-        customdata: customData,
-        text: sampleNames,
-        hovertemplate,
         mode: 'markers',
         type: 'scatter',
         marker: {
           color,
           size: 10,
           symbol: matchSymbol
-        }
+        },
+        // selection metadata
+        matchData: {
+          level: level,
+          match_key,
+          collection_ids: all_matches
+            .filter((match) => match[`target_${level}_id`] === targetId)
+            .map(({ target_collection_id }) => target_collection_id)
+        },
+        // tooltip
+        customdata: samples.value.map((sample) => sample.datetime),
+        text: samples.value.map((sample) => sample.sample_item_name),
+        hovertemplate: `
+          <i>Match ${level}</i>
+          <b># %{x}</b>
+          <br>
+          <b>${name}</b>
+          ${
+            level === 'ion' && ionization_mechanism
+              ? `<br>Ionization mechanism: ${ionization_mechanism}`
+              : ''
+          }
+          <br>
+          <b>%{text}</b>
+          <br>
+          Peak area sum: %{y:,.0f}
+          <br>
+          %{customdata}
+        `
       })
     }
     // Make trace for TIC
-    const ticValues = samples.map((sample) => sample.tic) ?? []
-    traces.value.push({
+    const ticValues = samples.value.map((sample) => sample.tic) ?? []
+    result.push({
       name: 'TIC',
       x: sampleIds,
       y: ticValues,
@@ -196,74 +262,16 @@ export const useChartData = defineStore('chart.batch.overview', () => {
         symbol: 'diamond'
       }
     })
-  }
-
-  /**
-   * Clears the chart data by resetting the `traces` array.
-   * This function is called to unload the chart when:
-   * - No batch is selected.
-   * - There are no samples.
-   * - The samples do not belong to the currently selected batch.
-   */
-  const unload = () => {
-    traces.value = []
-  }
-
-  /**
-   * Watches for changes in both batch selection and loaded samples to update the chart data.
-   * - If no batch is selected or the sample list is empty, it unloads the chart data.
-   * - Checks that all samples belong to the currently selected batch.
-   *   - If not, it unloads the chart data.
-   * - When samples are ready and belong to the current batch, it calls `load` to reload the chart data.
-   *
-   * The watcher is configured with:
-   * - `immediate: true` to run immediately upon setup.
-   * - `deep: true` to react to changes within the `sampleList` array.
-   *
-   * @watch
-   * @param {[number|null, Array]} newValues - The new values of the watched sources.
-   *   - `newValues[0]` (`batchId`): The currently selected batch ID.
-   *   - `newValues[1]` (`sampleList`): The current list of loaded samples.
-   */
-  watch(
-    [
-      () => app.data.batch.focused?.sample_batch_id, // focused batch
-      () => app.data.sample.list, // loaded samples
-      () => app.ui.filter.mechanism // filtered mechanism
-    ],
-    async ([batchId, sampleList, mechanismFilter]) => {
-      // requirements
-      const batchFocused = batchId
-      const samplesExist = sampleList?.length
-      const samplesReady = sampleList?.every((sample) => sample.sample_batch_id === batchId)
-      // either load or unload, based on requirements
-      if (!batchFocused || !samplesExist || !samplesReady) {
-        // unload chart if any dependency is unmet
-        unload()
-        return
-      } else {
-        const filters = mechanismFilter ? { mechanism: mechanismFilter } : null
-        // load the chart if all requirements are met
-        await load(batchId, filters)
-      }
-    },
-    { immediate: true, deep: true }
-  )
-
-  // Listen for `sample_batch_reload` event and reload data
-  onMounted(() => {
-    api.socket.on('sample_batch_reload', async () => {
-      const batchId = app.data.batch.focused?.sample_batch_id
-      if (batchId) {
-        await load(batchId)
-      }
-    })
+    return result
   })
 
-  const filteredTraces = computed(
+  /**
+   * Filter traces by collection
+   */
+  const traces = computed(
     () =>
       app.ui.filter.collections.length
-        ? traces.value.filter(
+        ? rawTraces.value.filter(
             ({ matchData }) =>
               matchData // TIC has no match data
                 ? matchData.collection_ids.some((collId) =>
@@ -273,10 +281,10 @@ export const useChartData = defineStore('chart.batch.overview', () => {
                   ) // normal data filtered by collection
                 : true // TIC is always shown
           )
-        : traces.value // show all traces if no filter exists
+        : rawTraces.value // show all traces if no filter exists
   )
 
   return {
-    traces: filteredTraces
+    traces
   }
 })
