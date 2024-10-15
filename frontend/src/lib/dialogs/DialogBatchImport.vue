@@ -79,8 +79,9 @@ const title = computed(() => {
 const columns = computed(() => {
   if (imported.items.length === 0) return []
   const core = [
-    { field: 'sample_item_name', label: 'Sample Name' },
+    { field: 'datetime', label: 'Datetime' },
     { field: 'filename', label: 'Filename' },
+    { field: 'sample_item_name', label: 'Sample Name' },
     { field: 'sample_item_type', label: 'Sample Type' },
     { field: 'filter_id', label: 'Filter ID' }
   ]
@@ -135,7 +136,7 @@ watch(
 )
 function preprocess() {
   // Sort acquisitions by datetime in descending order
-  const acquisitions = [...props.files].sort((a, b) => b.datetime - a.datetime)
+  const acquisitions = [...props.files].sort((a, b) => new Date(a.datetime) - new Date(b.datetime))
   if (imported.type === 'autosampler') {
     if (!imported.filterId) {
       imported.filterId = generated.filterId = genId(6, false)
@@ -163,9 +164,10 @@ function preprocess() {
   }
   if (imported.type === 'general') {
     imported.items = imported.parsed.map((parsed, index) => ({
+      datetime: acquisitions[index]?.datetime ?? null,
+      filename: acquisitions[index]?.filename ?? null,
       ...parsed,
-      sample_batch_id: app.data.batch.focused.sample_batch_id,
-      filename: acquisitions[index]?.filename ?? null
+      sample_batch_id: app.data.batch.focused.sample_batch_id
     }))
   }
   validateRows()
