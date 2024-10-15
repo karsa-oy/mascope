@@ -95,7 +95,7 @@ watch(
     auto
   >
     <template #header="{ chooseCallback }">
-      <menu style="gap: 1rem; align-items: baseline">
+      <menu style="gap: 1rem; align-items: baseline; height: fit-content">
         <Select
           props.inputId="time"
           v-model="app.data.acquisition.time.mode"
@@ -199,9 +199,13 @@ menu {
   flex-flow: row nowrap;
   gap: 0.5rem;
   justify-content: space-between;
-  align-content: stretch;
   align-items: center;
   padding: 0;
+  margin: 0;
+}
+
+menu > :deep(*) {
+  margin-bottom: 0;
 }
 
 menu :deep(*) {

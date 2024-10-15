@@ -103,7 +103,7 @@ watch(
         </Splitter>
       </SplitterPanel>
       <SplitterPanel :size="80">
-        <Panel id="charts" class="browser" style="border: none">
+        <Panel id="charts">
           <Tabs v-model:value="app.ui.tab.active">
             <TabList>
               <Tab
@@ -163,7 +163,14 @@ article {
 }
 #charts {
   grid-area: charts;
+  border: none;
+  height: calc(100% -10rem);
 }
+
+#charts :deep(.p-panel-header) {
+  display: none;
+}
+
 menu {
   padding: 0;
   margin: 0;
