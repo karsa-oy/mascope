@@ -130,6 +130,17 @@ async function parse(text) {
   }
 }
 
+const filesPreview = computed(() =>
+  [...props.files]
+    .sort((a, b) => new Date(a.datetime) - new Date(b.datetime))
+    .map((file) => ({
+      ...file,
+      sample_item_name: '',
+      sample_item_type: '',
+      filter_id: ''
+    }))
+)
+
 watch(
   computed(() => imported.filterId),
   preprocess
@@ -348,11 +359,39 @@ function autoswitchTab(passed) {
       </TabList>
       <TabPanels>
         <TabPanel value="data">
-          <BaseClipboardContext
-            info="Paste sample spreadsheet cells with 'name', 'type', 'filter id' columns, and (optionally) extra fields. Include headers and verify the row count matches your selection."
-            :parse="parse"
-            :persistMessage="imported.items.length == 0"
-          >
+          <BaseClipboardContext :parse="parse" :persistMessage="imported.items.length == 0">
+            <template v-slot:info>
+              <div id="preview">
+                <Panel>
+                  <ScrollPanel style="height: 25vh; max-width: 80vw">
+                    <DataTable
+                      :value="filesPreview"
+                      scrollable
+                      scrollHeight="300px"
+                      tableStyle="max-width: 70vw"
+                    >
+                      <Column
+                        v-for="col of [
+                          { field: 'datetime', label: 'Datetime' },
+                          { field: 'filename', label: 'Filename' },
+                          { field: 'sample_item_name', label: 'Sample Name' },
+                          { field: 'sample_item_type', label: 'Sample Type' },
+                          { field: 'filter_id', label: 'Filter ID' }
+                        ]"
+                        :key="col.field"
+                        :field="col.field"
+                        :header="col.label"
+                      />
+                    </DataTable>
+                  </ScrollPanel>
+                  <Message severity="secondary" icon="pi pi-clipboard">
+                    Paste sample spreadsheet cells with 'name', 'type', 'filter id' columns, and
+                    (optionally) extra fields. Include headers and verify the row count matches your
+                    selection.
+                  </Message>
+                </Panel>
+              </div>
+            </template>
             <p v-if="imported.type">
               Please check carefully the details of the samples parsed from the
               {{ imported.type == 'autosampler' ? 'autosample report' : 'spreedsheet input:' }}
@@ -374,7 +413,6 @@ function autoswitchTab(passed) {
                 </DataTable>
               </ScrollPanel>
             </Panel>
-            <i v-else style="position: absolute; top: 1rem">No spreadsheet data pasted</i>
           </BaseClipboardContext>
         </TabPanel>
         <TabPanel value="issues">
@@ -476,5 +514,16 @@ function autoswitchTab(passed) {
 :deep(.p-message) {
   max-width: 500px;
   margin: 0.5rem auto;
+}
+
+#preview {
+  position: relative;
+}
+
+#preview :deep(.p-message) {
+  position: absolute;
+  right: 2rem;
+  top: 5rem;
+  z-index: 10;
 }
 </style>
