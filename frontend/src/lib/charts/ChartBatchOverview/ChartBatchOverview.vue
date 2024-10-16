@@ -142,6 +142,13 @@ function onClick({ points }) {
     app.data.match.ion.focus({ match_key })
   }
 }
+
+const anyFilters = computed(
+  () =>
+    app.ui.filter.collections.length ||
+    app.ui.filter.mechanism ||
+    app.data.sample.selected.length > 1
+)
 </script>
 
 <template>
@@ -150,9 +157,10 @@ function onClick({ points }) {
       class="row"
       style="justify-content: flex-start; width: 100%; position: absolute; top: 0; z-index: 100"
     >
+      <span v-if="anyFilters" class="pi pi-filter" style="opacity: 0.5" />
       <Chip
         v-for="coll in app.ui.filter.collections"
-        icon="pi pi-filter"
+        icon="pi pi-bullseye"
         :label="coll.target_collection_name"
         removable
         @remove="
@@ -164,10 +172,17 @@ function onClick({ points }) {
       />
       <Chip
         v-if="app.ui.filter.mechanism"
-        icon="pi pi-filter"
+        icon="pi pi-cog"
         :label="app.ui.filter.mechanism.ionization_mechanism"
         removable
         @remove="app.ui.filter.mechanism = null"
+      />
+      <Chip
+        v-if="app.data.sample.selected.length > 1"
+        icon="pi pi-tags"
+        :label="`${app.data.sample.selected.length} samples`"
+        removable
+        @remove="app.data.sample.unfocus()"
       />
     </div>
     <BaseChartPlotly
