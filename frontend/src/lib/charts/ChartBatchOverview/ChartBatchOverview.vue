@@ -90,8 +90,8 @@ const toField =
     return formatted
   }
 const xAxis = computed(() => ({
-  tickvals: app.data.sample.list?.map((_, i) => i) ?? [],
-  ticktext: app.data.sample.list?.map(toField(xField.value ?? 'index')) ?? []
+  tickvals: data.samples.map((_, i) => i),
+  ticktext: data.samples.map(toField(xField.value ?? 'index'))
 }))
 
 const layout = computed(() => ({

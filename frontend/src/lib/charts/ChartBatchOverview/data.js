@@ -107,7 +107,7 @@ export const useChartData = defineStore('chart.batch.overview', () => {
   const samples = computed(
     () =>
       app.data.sample.selected.length > 1 // if multiselecting
-        ? app.data.sample.selected // filter chart to selection
+        ? app.data.sample.selected.sort((a, b) => Number(a.index) - Number(b.index)) // filter chart to selection
         : (app.data.sample.list ?? []) // otherwise show everything
   )
   /**
@@ -118,107 +118,98 @@ export const useChartData = defineStore('chart.batch.overview', () => {
       return []
     }
     const { data, level } = toRaw(match.value)
-    const result = []
     //  Generate color mapping for target compounds
     const targetIds = [...new Set(data.map((match) => match[`target_${level}_id`]) ?? [])]
     const colors = Object.fromEntries(
       targetIds.map((targetId, index) => [[targetId], theme.value[index]])
     )
+    // build traces
+    const traces = targetIds
+      .map((targetId) => {
+        // Loop through filtered target compounds and make traces
+        const targetMatches = data.filter((match) => match[`target_${level}_id`] === targetId)
+        const targetMaxMatchCategory = Math.max(
+          ...targetMatches.map(({ match_category }) => match_category)
+        )
+        // Y-axis - sample_peak_area_sum
+        const intensities = samples.value // iterate through filtered samples
+          .map(
+            // find the match for each, if it exists
+            ({ sample_item_id }) =>
+              targetMatches.find((match) => match.sample_item_id === sample_item_id)
+          )
+          .map(
+            // get the intensity from the record, if its valid
+            (match) => (match && match.match_category > 0 ? match.sample_peak_area_sum : null)
+          )
 
-    // X-axis data: sample IDs
-    const sampleIds = samples.value.map((sample) => sample.sample_item_id)
+        // skip if no valid intensity data
+        if (intensities.every((intensity) => intensity === null)) {
+          return null
+        }
 
-    // Loop through filtered target compounds and make traces
-    for (let targetId of targetIds) {
-      // Y-axis data: intensities (sample_peak_area_sum)
-      const intensities = []
-      let matchMaxMatchCategory = 1 // Start with minimum match category
+        // Assign symbol based on the maximum match category for this compound
+        const matchSymbol = targetMaxMatchCategory === 2 ? 'square' : 'square-open'
+        const color = colors[targetId]
 
-      for (let sampleId of sampleIds) {
-        let itemMatches = data.filter((row) => row.sample_item_id === sampleId)
-        let sampleStats = itemMatches
-          .filter((match) => match[`target_${level}_id`] === targetId)
-          .map((compoundMatch) => ({
-            match_category: compoundMatch.match_category,
-            intensity: compoundMatch.sample_peak_area_sum
-          }))[0]
+        // Get match information for naming
+        const {
+          target_compound_name,
+          target_compound_formula,
+          target_ion_formula,
+          target_ion_id,
+          target_compound_id,
+          target_collection_id,
+          ionization_mechanism
+        } =
+          data.find(
+            // match correlating with the target
+            (match) => match[`target_${level}_id`] === targetId
+          ) ?? {}
 
-        if (sampleStats) {
-          intensities.push(sampleStats.match_category > 0 ? sampleStats.intensity : null)
-          // Update the maximum match category for this compound
-          if (sampleStats.match_category > matchMaxMatchCategory) {
-            matchMaxMatchCategory = sampleStats.match_category
+        // level specific match data
+        let name, match_key, all_matches
+        switch (level) {
+          case 'compound': {
+            name = target_compound_name.trim() ? target_compound_name : target_compound_formula
+            match_key = `${target_collection_id}_${target_compound_id}`
+            all_matches = [...app.data.match.compound.list]
+            break
           }
-        } else {
-          intensities.push(null)
+          case 'ion': {
+            const compound_prefix = target_compound_name.trim()
+              ? target_compound_name
+              : target_compound_formula
+            name = `${compound_prefix}: ${target_ion_formula}`
+            match_key = `${target_collection_id}_${target_compound_id}_${target_ion_id}`
+            all_matches = [...app.data.match.ion.list]
+            break
+          }
         }
-      }
-
-      // Skip if no valid intensity data
-      if (intensities.every((intensity) => intensity === null)) continue
-
-      // Assign symbol based on the maximum match category for this compound
-      const matchSymbol = matchMaxMatchCategory === 2 ? 'square' : 'square-open'
-      const color = colors[targetId]
-
-      // Get match information for naming
-      const {
-        target_compound_name,
-        target_compound_formula,
-        target_ion_formula,
-        target_ion_id,
-        target_compound_id,
-        target_collection_id,
-        ionization_mechanism
-      } =
-        data.find(
-          // match correlating with the target
-          (match) => match[`target_${level}_id`] === targetId
-        ) ?? {}
-
-      // level specific match data
-      let name, match_key, all_matches
-      switch (level) {
-        case 'compound': {
-          name = target_compound_name.trim() ? target_compound_name : target_compound_formula
-          match_key = `${target_collection_id}_${target_compound_id}`
-          all_matches = [...app.data.match.compound.list]
-          break
-        }
-        case 'ion': {
-          const compound_prefix = target_compound_name.trim()
-            ? target_compound_name
-            : target_compound_formula
-          name = `${compound_prefix}: ${target_ion_formula}`
-          match_key = `${target_collection_id}_${target_compound_id}_${target_ion_id}`
-          all_matches = [...app.data.match.ion.list]
-          break
-        }
-      }
-      // Add trace for the match
-      result.push({
-        name,
-        x: sampleIds,
-        y: intensities,
-        mode: 'markers',
-        type: 'scatter',
-        marker: {
-          color,
-          size: 10,
-          symbol: matchSymbol
-        },
-        // selection metadata
-        matchData: {
-          level: level,
-          match_key,
-          collection_ids: all_matches
-            .filter((match) => match[`target_${level}_id`] === targetId)
-            .map(({ target_collection_id }) => target_collection_id)
-        },
-        // tooltip
-        customdata: samples.value.map((sample) => sample.datetime),
-        text: samples.value.map((sample) => sample.sample_item_name),
-        hovertemplate: `
+        // Add trace for the match
+        return {
+          name,
+          x: samples.value.map((sample) => sample.sample_item_id),
+          y: intensities,
+          mode: 'markers',
+          type: 'scatter',
+          marker: {
+            color,
+            size: 10,
+            symbol: matchSymbol
+          },
+          // selection metadata
+          matchData: {
+            level: level,
+            match_key,
+            collection_ids: all_matches
+              .filter((match) => match[`target_${level}_id`] === targetId)
+              .map(({ target_collection_id }) => target_collection_id)
+          },
+          // tooltip
+          customdata: samples.value.map((sample) => sample.datetime),
+          text: samples.value.map((sample) => sample.sample_item_name),
+          hovertemplate: `
           <i>Match ${level}</i>
           <b># %{x}</b>
           <br>
@@ -235,16 +226,17 @@ export const useChartData = defineStore('chart.batch.overview', () => {
           <br>
           %{customdata}
         `
+        }
       })
-    }
-    // Make trace for TIC
-    const ticValues = samples.value.map((sample) => sample.tic) ?? []
-    result.push({
+      .filter((trace) => trace !== null)
+
+    traces.push({
+      // Make trace for TIC
       name: 'TIC',
-      x: sampleIds,
-      y: ticValues,
-      customdata: app.data.sample.list?.map((item) => item.datetime) ?? [],
-      text: app.data.sample.list?.map((item) => item.sample_item_name) ?? [],
+      x: samples.value.map((sample) => sample.sample_item_id),
+      y: samples.value.map((sample) => sample.tic),
+      customdata: samples.value.map((item) => item.datetime),
+      text: samples.value.map((item) => item.sample_item_name),
       hovertemplate: `
         <b># %{x}</b>
         <br>
@@ -262,7 +254,7 @@ export const useChartData = defineStore('chart.batch.overview', () => {
         symbol: 'diamond'
       }
     })
-    return result
+    return traces
   })
 
   /**
@@ -285,6 +277,7 @@ export const useChartData = defineStore('chart.batch.overview', () => {
   )
 
   return {
+    samples,
     traces
   }
 })
