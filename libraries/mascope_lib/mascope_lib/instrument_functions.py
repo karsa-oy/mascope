@@ -9,14 +9,9 @@ from lmfit.models import SplineModel, SkewedGaussianModel
 from lmfit.model import ModelResult
 from mascope_lib.file_func import get_instrument_type, get_sum_signal, load_array
 from mascope_lib.peak import detect_peaks
-from mascope_lib.inst_func_viz import vizualize, update_chosen_peak
-import mascope_runtime as runtime
-import dash
-from dash import dcc, html
-from dash.dependencies import Input, Output
+import mascope_lib.runtime as lib_runtime
 
-# Set up logger
-logger = lib_runtime.logger.service("backend")
+lib_runtime.init()
 
 # Precompute sigma multiplier for peak generation
 SIGMA_MULTIPLIER = 2 * np.sqrt(2 * np.log(2))
@@ -282,17 +277,17 @@ def get_peak_shape(p_x: np.ndarray, p_ys: np.ndarray) -> dict:
     :rtype: dict
     """
     if len(p_ys) < 10:
-        logger.warning(
+        lib_runtime.logger.warning(
             f"Only {len(p_ys)} peaks will be used to estimate median peak shape!"
         )
     else:
-        logger.info(f"Peak shape will be averaged from {len(p_ys)} peaks")
+        lib_runtime.logger.info(f"Peak shape will be averaged from {len(p_ys)} peaks")
     # Calculate median peak shape
     p_median = np.median(np.array([p_y for p_y in p_ys]), axis=0)
 
     # Check if p_median is empty
     if p_median.all() == np.nan:
-        logger.error("Median peak shape is empty")
+        lib_runtime.logger.error("Median peak shape is empty")
 
     # Shift x-values so that the max y is at x=0
     max_index = np.argmax(p_median)
@@ -372,16 +367,18 @@ def get_resolution_function(
             )
             a, b = fit_res[0]
             resolution_function = partial(r_tof, a=a, b=b)
-            logger.info(f"TOF resolution function coefficients: a={a:.2e}, b={b:.2e}")
+            lib_runtime.logger.info(
+                f"TOF resolution function coefficients: a={a:.2e}, b={b:.2e}"
+            )
 
         elif instrument_type == "orbi":
             fit_res = curve_fit(inverse_sqrt, mass, resolution)
             a = fit_res[0][0]
-            resolution_function = partial(r_orb, a=a)
-            logger.info(f"Orbi resolution function coefficients: a={a:.2e}")
+            resolution_function = partial(r_orbi, a=a)
+            lib_runtime.logger.info(f"Orbi resolution function coefficients: a={a:.2e}")
 
     except ValueError as e:
-        logger.error(f"Resolution function fitting failed: {e}")
+        lib_runtime.logger.error(f"Resolution function fitting failed: {e}")
         raise ValueError("Resolution function fitting failed") from e
 
     return resolution_function
@@ -428,7 +425,7 @@ def r_tof(mz: float | np.ndarray, a: float, b: float):
     return mz / (a * mz + b)
 
 
-def r_orb(
+def r_orbi(
     mz: float | np.ndarray,
     a: float,
 ):
@@ -470,6 +467,12 @@ def inverse_sqrt(x, a):
 
 
 if __name__ == "__main__":
+    import dash
+    from dash import dcc, html
+    from dash.dependencies import Input, Output
+
+    from mascope_lib.inst_func_viz import vizualize, update_chosen_peak
+
     # Parse arguments
     parser = ArgumentParser()
     parser.add_argument(
@@ -571,5 +574,5 @@ if __name__ == "__main__":
         app.run_server()
 
     except ValueError as err:
-        logger.error("Check the filename")
+        lib_runtime.logger.error("Check the filename")
         raise ValueError from err
