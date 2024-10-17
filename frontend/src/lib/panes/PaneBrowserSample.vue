@@ -54,9 +54,6 @@ const item = reactive({
   pasted: null
 })
 
-const batchContextMenu = ref()
-const itemContextMenu = ref()
-
 const pending = reactive({
   batchExport: false,
   peakExport: false
@@ -145,181 +142,205 @@ const tree = computed(() => {
   }))
 })
 
-const menu = computed(() => ({
-  batch: [
-    {
-      label: 'Paste sample',
-      icon: 'pi pi-clipboard',
-      command: () => pasteItem(batch.context),
-      visible: item.pasted !== null && batch.context !== null
-    },
-    {
-      label: 'Paste batch',
-      icon: 'pi pi-clipboard',
-      command: () => pasteBatch(),
-      visible: batch.pasted !== null
-    },
-    {
-      separator: true,
-      visible: (batch.pasted !== null || item.pasted !== null) && batch.context !== null
-    },
-    {
-      label: 'Edit batch',
-      icon: 'pi pi-pen-to-square',
-      command: () => {
-        dialog.batch.op = 'update'
-      },
-      visible: batch.context !== null
-    },
-    {
-      label: 'Edit batch targets',
-      icon: 'pi pi-bullseye',
-      command: () => {
-        dialog.batch.op = 'update_targets'
-      },
-      visible: batch.context !== null
-    },
-    {
-      label: 'Copy batch',
-      icon: 'pi pi-copy',
-      command: () => copyContext(batch.context),
-      visible: batch.context !== null
-    },
-    {
-      label: 'Delete batch',
-      icon: 'pi pi-trash',
-      command: () => dialog.batch.delete(batch.context),
-      visible: batch.context !== null
-    },
-    { separator: true, visible: batch.context !== null },
-    {
-      label: 'Export batch',
+// batch context menu
 
-      icon: 'pi pi-file-export',
-      command: async () => {
-        if (app.data.batch.focused?.sample_batch_id == batch.context.sample_batch_id) {
-          await batchExportCsv()
-        } else {
-          app.data.batch.focused = batch.context
-          pending.batchExport = true
-        }
-      },
-      visible: batch.context !== null
+// component ref
+const batchContextMenu = ref()
+
+// prevent default event handling
+const handleBatchRightClick = (event) => {
+  batchContextMenu.value.show(event.originalEvent)
+}
+
+const batchMenuEntries = computed(() => [
+  {
+    label: 'Paste sample',
+    icon: 'pi pi-clipboard',
+    command: () => pasteItem(batch.context),
+    visible: item.pasted !== null && batch.context !== null
+  },
+  {
+    label: 'Paste batch',
+    icon: 'pi pi-clipboard',
+    command: () => pasteBatch(),
+    visible: batch.pasted !== null
+  },
+  {
+    separator: true,
+    visible: (batch.pasted !== null || item.pasted !== null) && batch.context !== null
+  },
+  {
+    label: 'Edit batch',
+    icon: 'pi pi-pen-to-square',
+    command: () => {
+      dialog.batch.op = 'update'
     },
-    {
-      label: 'Export peaks',
-      icon: 'pi pi-file-export',
-      command: () => {
-        confirm.require({
-          header: 'Export batch peak data',
-          message: `Export peak data for batch "${app.data.batch.focused.sample_batch_name}"?`,
-          acceptIcon: 'pi pi-file-export',
-          acceptLabel: 'Export',
-          accept: () => {
-            if (app.data.batch.focused?.sample_batch_id == batch.context.sample_batch_id) {
-              app.data.batch.exportPeaks(app.data.batch.focused)
-            } else {
-              app.data.batch.focused = batch.context
-              pending.peakExport = true
-            }
-          },
-          rejectLabel: 'Cancel',
-          rejectIcon: 'pi pi-times'
-        })
-      },
-      visible: batch.context !== null
+    visible: batch.context !== null
+  },
+  {
+    label: 'Edit batch targets',
+    icon: 'pi pi-bullseye',
+    command: () => {
+      dialog.batch.op = 'update_targets'
     },
-    { separator: true, visible: batch.context !== null },
-    {
-      label: `Recalibrate batch`,
-      icon: 'pi pi-replay',
-      command: () => {
-        dialog.batch.calibration = true
-      },
-      visible: batch.context !== null
-    },
-    {
-      label: 'Rematch batch',
-      icon: 'pi pi-replay',
-      command: () => app.data.batch.rematch(batch.context),
-      visible: batch.context !== null
-    }
-  ],
-  item: [
-    {
-      label: 'Paste sample',
-      icon: 'pi pi-clipboard',
-      visible: item.pasted !== null,
-      command: () => pasteItem(item.context)
-    },
-    {
-      separator: true,
-      visible: item.pasted !== null
-    },
-    {
-      label: `Edit sample`,
-      icon: 'pi pi-file-edit',
-      command: () => {
-        dialog.item.op = 'update'
+    visible: batch.context !== null
+  },
+  {
+    label: 'Copy batch',
+    icon: 'pi pi-copy',
+    command: () => copyContext(batch.context),
+    visible: batch.context !== null
+  },
+  {
+    label: 'Delete batch',
+    icon: 'pi pi-trash',
+    command: () => dialog.batch.delete(batch.context),
+    visible: batch.context !== null
+  },
+  { separator: true, visible: batch.context !== null },
+  {
+    label: 'Export batch',
+
+    icon: 'pi pi-file-export',
+    command: async () => {
+      if (app.data.batch.focused?.sample_batch_id == batch.context.sample_batch_id) {
+        await batchExportCsv()
+      } else {
+        app.data.batch.focused = batch.context
+        pending.batchExport = true
       }
     },
-    {
-      label: 'Copy sample',
-      icon: 'pi pi-copy',
-      command: () => copyContext(item.context)
-    },
-    {
-      label: `Delete sample`,
-      icon: 'pi pi-trash',
-      command: () => {
-        confirm.require({
-          header: `Deleting sample '${item.context.sample_item_name}'`,
-          message: `Delete sample '${item.context.sample_item_name}'
-          from batch "${app.data.batch.focused.sample_batch_name}"?`,
-          icon: 'pi pi-exclamation-triangle',
-          rejectProps: {
-            label: 'Cancel',
-            severity: 'secondary'
-          },
-          acceptProps: {
-            icon: 'pi pi-trash',
-            label: 'Delete',
-            severity: 'danger'
-          },
-          accept: async () => {
-            // unload if necessary
-            if (item.context.sample_item_id == app.data.sample.focused?.sample_item_id) {
-              app.data.sample.unfocus()
-            }
-            await app.data.sample.delete(item.context)
+    visible: batch.context !== null
+  },
+  {
+    label: 'Export peaks',
+    icon: 'pi pi-file-export',
+    command: () => {
+      confirm.require({
+        header: 'Export batch peak data',
+        message: `Export peak data for batch "${app.data.batch.focused.sample_batch_name}"?`,
+        acceptIcon: 'pi pi-file-export',
+        acceptLabel: 'Export',
+        accept: () => {
+          if (app.data.batch.focused?.sample_batch_id == batch.context.sample_batch_id) {
+            app.data.batch.exportPeaks(app.data.batch.focused)
+          } else {
+            app.data.batch.focused = batch.context
+            pending.peakExport = true
           }
-        })
-      }
+        },
+        rejectLabel: 'Cancel',
+        rejectIcon: 'pi pi-times'
+      })
     },
-    { separator: true },
-    {
-      label: `Recalibrate sample`,
-      icon: 'pi pi-replay',
-      command: () => {
-        dialog.item.calibration = true
-      }
+    visible: batch.context !== null
+  },
+  { separator: true, visible: batch.context !== null },
+  {
+    label: `Recalibrate batch`,
+    icon: 'pi pi-replay',
+    command: () => {
+      dialog.batch.calibration = true
     },
-    {
-      label: `Rematch sample`,
-      icon: 'pi pi-replay',
-      command: async () => {
-        await app.data.sample.rematch(item.context)
-      }
-    },
-    {
-      label: `Compute all peaks`,
-      icon: 'pi pi-wave-pulse',
-      command: async () => {
-        await app.data.peak.computeAll(item.context)
-      }
+    visible: batch.context !== null
+  },
+  {
+    label: 'Rematch batch',
+    icon: 'pi pi-replay',
+    command: () => app.data.batch.rematch(batch.context),
+    visible: batch.context !== null
+  }
+])
+
+// sample context menu
+
+// component ref
+const sampleContextMenu = ref()
+
+// prevent default event handling
+const handleSampleRightClick = (event) => {
+  // disable context menu for multiselection
+  if (app.data.sample.focused) {
+    sampleContextMenu.value.show(event.originalEvent)
+  }
+}
+
+const sampleMenuEntries = computed(() => [
+  {
+    label: 'Paste sample',
+    icon: 'pi pi-clipboard',
+    visible: item.pasted !== null,
+    command: () => pasteItem(item.context)
+  },
+  {
+    separator: true,
+    visible: item.pasted !== null
+  },
+  {
+    label: `Edit sample`,
+    icon: 'pi pi-file-edit',
+    command: () => {
+      dialog.item.op = 'update'
     }
-  ]
-}))
+  },
+  {
+    label: 'Copy sample',
+    icon: 'pi pi-copy',
+    command: () => copyContext(item.context)
+  },
+  {
+    label: `Delete sample`,
+    icon: 'pi pi-trash',
+    command: () => {
+      confirm.require({
+        header: `Deleting sample '${item.context.sample_item_name}'`,
+        message: `Delete sample '${item.context.sample_item_name}'
+          from batch "${app.data.batch.focused.sample_batch_name}"?`,
+        icon: 'pi pi-exclamation-triangle',
+        rejectProps: {
+          label: 'Cancel',
+          severity: 'secondary'
+        },
+        acceptProps: {
+          icon: 'pi pi-trash',
+          label: 'Delete',
+          severity: 'danger'
+        },
+        accept: async () => {
+          // unload if necessary
+          if (item.context.sample_item_id == app.data.sample.focused?.sample_item_id) {
+            app.data.sample.unfocus()
+          }
+          await app.data.sample.delete(item.context)
+        }
+      })
+    }
+  },
+  { separator: true },
+  {
+    label: `Recalibrate sample`,
+    icon: 'pi pi-replay',
+    command: () => {
+      dialog.item.calibration = true
+    }
+  },
+  {
+    label: `Rematch sample`,
+    icon: 'pi pi-replay',
+    command: async () => {
+      await app.data.sample.rematch(item.context)
+    }
+  },
+  {
+    label: `Compute all peaks`,
+    icon: 'pi pi-wave-pulse',
+    command: async () => {
+      await app.data.peak.computeAll(item.context)
+    }
+  }
+])
+
+// copy-paste
 
 async function copyContext(context) {
   const clipboard = JSON.stringify(context)
@@ -364,15 +385,6 @@ async function pasteItem(context) {
       sample_batch_id: context.sample_batch_id,
       sample_item_name: generateCopyName(item.pasted.sample_item_name)
     })
-  }
-}
-
-const batchPreventDefault = (event) => {
-  batchContextMenu.value.show(event.originalEvent)
-}
-const itemPreventDefault = (event) => {
-  if (app.data.sample.focused) {
-    itemContextMenu.value.show(event.originalEvent)
   }
 }
 
@@ -557,7 +569,7 @@ watch(
         v-model:contextMenuSelection="batch.context"
         @rowContextmenu="
           (e) => {
-            batchPreventDefault(e)
+            handleBatchRightClick(e)
             parseClipboard()
           }
         "
@@ -609,7 +621,7 @@ watch(
               v-model:contextMenuSelection="item.context"
               @rowContextmenu="
                 (e) => {
-                  itemPreventDefault(e)
+                  handleSampleRightClick(e)
                   parseClipboard()
                 }
               "
@@ -663,8 +675,8 @@ watch(
           <div class="spinner" v-else><ProgressSpinner strokeWidth="5px" />loading...</div>
         </template>
       </DataTable>
-      <ContextMenu ref="batchContextMenu" :model="menu.batch" />
-      <ContextMenu ref="itemContextMenu" :model="menu.item" />
+      <ContextMenu ref="batchContextMenu" :model="batchMenuEntries" />
+      <ContextMenu ref="sampleContextMenu" :model="sampleMenuEntries" />
     </div>
   </Panel>
   <Popover ref="batchOptionsPopover" contentStyle="height: fit-content;">
