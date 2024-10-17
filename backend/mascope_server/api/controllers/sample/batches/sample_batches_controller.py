@@ -651,8 +651,8 @@ async def import_sample_items(
     await send_progress_user_notification(notification, 0.2)
 
     # Step 3: Optionally calibrate batch if calibrate_batch flag is True and instrument is TOF
+    warning = None
     if calibrate_batch and instrument_type == "tof":
-        warning = None
         samples_calibrate_failed = []
         try:
             calibration_mz_calibrate_batch_data = await calibration_mz_calibrate_batch(
@@ -695,7 +695,7 @@ async def import_sample_items(
     await send_progress_user_notification(notification, 0.95)
 
     # Step 5: Raise a warning if encountered during batch calibration
-    if warning:
+    if warning is not None:
         raise_api_warning(
             warning,
             {
