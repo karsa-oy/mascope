@@ -75,6 +75,57 @@ export function createHttpClient() {
 
   return {
     client,
+    // Authentication methods
+    login: async ({ username, password }) => {
+      try {
+        const params = new URLSearchParams()
+        params.append('grant_type', 'password')
+        params.append('username', username)
+        params.append('password', password)
+
+        return await client.post('/auth/login', params, {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          withCredentials: true // Important: include this to send and receive cookies
+        })
+      } catch (error) {
+        const userErrorMessage = error?.response?.data?.detail || `Login failed: ${error.message}`
+        throw new Error(userErrorMessage)
+      }
+    },
+
+    logout: async () => {
+      try {
+        return await client.post(
+          '/auth/logout',
+          {},
+          {
+            withCredentials: true // Send cookies with the logout request
+          }
+        )
+      } catch (error) {
+        const userErrorMessage = error?.response?.data?.detail || `Logout failed: ${error.message}`
+        throw new Error(userErrorMessage)
+      }
+    },
+
+    register: async ({ email, password, username, role_id }) => {
+      try {
+        return await client.post('/auth/register', {
+          email,
+          password,
+          is_active: true,
+          is_superuser: false,
+          is_verified: false,
+          username,
+          role_id
+        })
+      } catch (error) {
+        const userErrorMessage =
+          error?.response?.data?.detail || `Registration failed: ${error.message}`
+        throw new Error(userErrorMessage)
+      }
+    },
+
     // Workspaces
     getAllWorkspaces: async (params = {}) => {
       try {
