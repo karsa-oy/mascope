@@ -371,7 +371,9 @@ const batchPreventDefault = (event) => {
   batchContextMenu.value.show(event.originalEvent)
 }
 const itemPreventDefault = (event) => {
-  itemContextMenu.value.show(event.originalEvent)
+  if (app.data.sample.focused) {
+    itemContextMenu.value.show(event.originalEvent)
+  }
 }
 
 /**
