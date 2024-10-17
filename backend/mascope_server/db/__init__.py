@@ -2,8 +2,9 @@ import os
 import re
 import inspect
 from importlib import import_module
+from typing import AsyncGenerator
 
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import text
 
@@ -11,7 +12,7 @@ from mascope_server.runtime import runtime
 
 
 # Initialize global variables at module load
-ASYNC_SESSION = None  # Global variable for session
+ASYNC_SESSION_MAKER = None  # Global async session maker
 db_dir = runtime.config.database
 
 
@@ -88,13 +89,22 @@ async def migrate(current_version, target_version):
 
 # Database configuration and session management
 def configure_database_engine(version):
+    """
+    Configures the database engine and sets up the global session maker using SQLAlchemy's async_sessionmaker.
+    This function is called during initialization to establish a connection with the database.
+
+    :param version: The current version of the database to configure the connection.
+    :type version: int
+    """
     db_path = os.path.join(db_dir, f"mascope.v{version}.db")
 
+    # Define the database URL using SQLite and async mode
     database_url = f"sqlite+aiosqlite:///{db_path}"
 
-    # Set echo to True if log level is trace
+    #  Enable detailed logging if trace mode is enabled
     trace_mode = runtime.config.log_level.lower() == "trace"
 
+    # Create the async engine for SQLAlchemy
     engine = create_async_engine(
         database_url,
         pool_pre_ping=True,  # Check connection liveness before using a connection from the pool
@@ -104,21 +114,87 @@ def configure_database_engine(version):
         },  # Set a timeout of 15 seconds for establishing connections and waiting for table locks
     )
 
-    global ASYNC_SESSION
-    ASYNC_SESSION = sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+    # Define the global session maker using async_sessionmaker
+    global ASYNC_SESSION_MAKER
+    ASYNC_SESSION_MAKER = async_sessionmaker(engine, expire_on_commit=False)
 
 
-def async_session():
-    return ASYNC_SESSION()
+def async_session() -> AsyncSession:
+    """
+    Session getter for manual session management.
+
+    This function returns a new SQLAlchemy session that needs to be manually handled.
+    It is useful for scenarios where we need fine-grained control over the session's lifecycle,
+    such as flushing manually or performing tasks outside the session block.
+
+    Key points:
+    - Requires manual management (you must use `async with`).
+    - Offers flexibility for doing tasks outside the session (e.g., logging or computation).
+    - Useful for batch processing where manual flushes or commits are required.
+
+    Example usage:
+        async with async_session() as session:
+            # Perform operations within the session block
+            session.flush()  # Optionally flush without committing
+
+    :return: A new SQLAlchemy async session.
+    :rtype: AsyncSession
+    """
+    return ASYNC_SESSION_MAKER()
+
+
+async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
+    """
+    Dependency-injected session for FastAPI route handlers.
+
+    This function yields a session that is automatically managed by FastAPI's dependency injection system.
+    It ensures that the session is opened at the start of the request and closed when the request finishes.
+
+    Key points:
+    - Automatically manages session lifecycle (opened and closed at the correct time).
+    - Integrates with FastAPI `Depends()` to inject the session into routes.
+    - Suitable for typical request-response workflows where session lifecycle should be automated.
+
+    Example usage in a FastAPI route:
+        from fastapi import Depends
+
+        @app.get("/items")
+        async def get_items(session: AsyncSession = Depends(get_async_session)):
+            # Perform operations within the session
+
+    :yield: Yields an active SQLAlchemy session for database interactions.
+    :rtype: AsyncGenerator[AsyncSession, None]
+    """
+    async with ASYNC_SESSION_MAKER() as session:
+        yield session
 
 
 # Initialization and main interface functions
 async def init_db():
+    """
+    Initialize the database by checking its version and performing any necessary migrations.
+
+    This function determines the current database version, compares it to the target version,
+    and applies the necessary migration scripts to bring the database up to date. It also
+    configures the database engine and tests the connection.
+
+    Steps:
+    1. Determine the current and target database versions.
+    2. Apply database migrations if necessary.
+    3. Configure the database engine for the detected version.
+    4. Test the database connection to ensure it is properly initialized.
+
+    :raises Exception: If any error occurs during the migration or initialization process.
+    """
     try:
         runtime.logger.info("Initializing mascope database")
+
+        # Get the current and target database versions
         current_version = get_current_db_version()
         target_version = get_available_db_version()
+
         runtime.logger.info(f"Detected mascope database version: v{current_version}")
+
         if current_version == target_version:
             runtime.logger.info("No database migration needed.")
             configure_database_engine(current_version)
@@ -127,6 +203,8 @@ async def init_db():
             await migrate(current_version, target_version)
     except Exception as error:
         runtime.logger.error(error)
+
+    # Test the database connection after initialization
     await test_database_connection()
 
 
