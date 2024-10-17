@@ -1,6 +1,8 @@
+from datetime import datetime, timezone
 from sqlalchemy import (
     TIMESTAMP,
     Column,
+    Boolean,
     Index,
     Float,
     ForeignKey,
@@ -10,34 +12,65 @@ from sqlalchemy import (
     JSON,
     text,
 )
-from sqlalchemy.orm import relationship
+
+from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.sql.schema import CheckConstraint
 from sqlalchemy.ext.declarative import declarative_base
+from fastapi_users.db import (
+    SQLAlchemyBaseUserTable,
+)
 
 
 class BaseMixin(object):
     def to_dict(
         self,
-        include_tic=False,
-        include_intensity=False,
-        compounds=None,
-        include_selection=False,
     ):
         data = {c.name: getattr(self, c.name) for c in self.__table__.columns}
-        if include_tic and hasattr(self, "tic"):
-            data["tic"] = self.tic
-        if include_intensity and compounds:
-            compounds = compounds.split(",")
-            compounds_intensity = {}
-            for compound in compounds:
-                compounds_intensity[compound] = getattr(self, compound, 0)
-            data["compounds_intensity"] = compounds_intensity
-        if include_selection:
-            data["selection"] = 0
         return data
 
 
 Base = declarative_base(cls=BaseMixin)
+
+
+class User(SQLAlchemyBaseUserTable[int], Base):
+    __tablename__ = "user"
+
+    # User table fields required for FastAPI Users. Kept unchanged for easier compatibility.
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    email: Mapped[str] = mapped_column(
+        String(length=320), unique=True, index=True, nullable=False
+    )
+    hashed_password: Mapped[str] = mapped_column(String(length=1024), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_superuser: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    # Custom fields
+    username: Mapped[str] = mapped_column(
+        String(length=100), unique=True, nullable=False
+    )
+    role_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("role.role_id", ondelete="SET NULL"), nullable=True
+    )
+    registered_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP, default=datetime.now(timezone.utc), nullable=False
+    )
+
+    # Define relationships
+    role = relationship("Role", back_populates="users")
+
+
+class Role(Base):
+    __tablename__ = "role"
+
+    role_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(
+        String(length=50), unique=True, nullable=False
+    )  # Role name (e.g., "admin", "user")
+    permissions: Mapped[dict] = mapped_column(JSON, nullable=True)
+
+    # Define relationships
+    users = relationship("User", back_populates="role")
 
 
 class Workspace(Base):
