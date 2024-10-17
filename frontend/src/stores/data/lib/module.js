@@ -181,16 +181,14 @@ export const defineModule = ({
     }
 
     // reload children on refocus
-    if (singleselect) {
-      watch(focused, (focused) => {
-        children.value.forEach(({ reload }) =>
-          reload({
-            name,
-            focused
-          })
-        )
-      })
-    }
+    watch(focused, (focused) => {
+      children.value.forEach(({ reload }) =>
+        reload({
+          name,
+          focused
+        })
+      )
+    })
 
     // unfocus before calling certain methods
     const wrappedOps = Object.fromEntries(
