@@ -1,5 +1,7 @@
 from pydantic import BaseModel
 
+from mascope_server.runtime import runtime
+
 
 # TODO_configuration for auth
 class AuthConfig(BaseModel):
@@ -24,8 +26,8 @@ class AuthConfig(BaseModel):
         3600  # Lifetime of the cookie in seconds (matches JWT expiration)
     )
     COOKIE_SECURE: bool = (
-        False  # In production, should be True to ensure cookies are sent only over HTTPS
-    )
+        runtime.mode == "prod"
+    )  # to send cookies only over HTTPS, True if in production, False if in dev
     COOKIE_HTTP_ONLY: bool = (
         True  # Set cookies as HTTPOnly to prevent access from JavaScript
     )
