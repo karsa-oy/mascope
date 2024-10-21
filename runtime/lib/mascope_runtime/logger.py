@@ -11,6 +11,7 @@ from rich.traceback import Traceback
 
 highlight = re.compile("SUCCESS|WARNING|ERROR|CRITICAL")
 
+
 def style(msg, *tags):
     # wrap style tags around msg
     start = ""
@@ -27,6 +28,7 @@ def formatter(root_path):
     Factory that produces a format function given a
     root_path (MASCOPE_PATH) value.
     """
+
     def format_record(record):
         # STATUS
 
@@ -70,10 +72,11 @@ def formatter(root_path):
         head_text = f"{record["level"]} {record["extra"]["status_code"]} {record["extra"]["method"]}"
 
         # message
-        envpath = os.path.join(root_path, 'runtime', 'env', os.environ.get("MASCOPE_ENV", "prod"))
-        record["extra"]["parsed_message"] = (record["message"]
-            .replace(envpath, '$env')
-            .replace(root_path, '$mascope')
+        envpath = os.path.join(
+            root_path, "runtime", "env", os.environ.get("MASCOPE_ENV", "prod")
+        )
+        record["extra"]["parsed_message"] = (
+            record["message"].replace(envpath, "$env").replace(root_path, "$mascope")
         )
         message = "{extra[parsed_message]: <60}"
         message_text = f"{record["message"]}"
@@ -111,29 +114,35 @@ def formatter(root_path):
 
 
 def config_logger(module):
-    logger.remove()  # clear other settings
-    logger.configure(  # create fresh config
-        handlers=[
-            dict(  # FILE HANDLER
-                sink=os.path.join(module.config.log_path, f"{{time:YYYY-MM-DD}}.{module.name}.log"),
-                format=formatter(module.root_path),
-                level="INFO",  # avoid large file size
-                enqueue=True,  # multiprocess safe
-                serialize=True,  # output as JSON
-                rotation=datetime.time(
-                    0, 0, 0, tzinfo=datetime.timezone.utc
-                ),  # rotate daily at midnight UTC
-                retention=datetime.timedelta(days=14),  # retain two weeks of files
-            ),
-            dict(  # TERMINAL HANDLER
-                sink=sys.stdout,
-                format=formatter(module.root_path),
-                colorize=True,
-                level=module.config.log_level.upper(),
-                enqueue=True,  # multiprocess safe
-                catch=True,
-            ),
-        ],
+    # setup log path
+    log_path = os.path.join(module.config.log_path, module.mode)
+    os.makedirs(log_path, exist_ok=True)
+    # define logging handlers
+    file_handler = dict(
+        sink=os.path.join(log_path, f"{{time:YYYY-MM-DD}}.{module.name}.log"),
+        format=formatter(module.root_path),
+        level="INFO",  # avoid large file size
+        enqueue=True,  # multiprocess safe
+        serialize=True,  # output as JSON
+        rotation=datetime.time(
+            0, 0, 0, tzinfo=datetime.timezone.utc
+        ),  # rotate daily at midnight UTC
+        retention=datetime.timedelta(days=14),  # retain two weeks of files
+    )
+    terminal_handler = dict(
+        sink=sys.stdout,
+        format=formatter(module.root_path),
+        colorize=True,
+        level=module.config.log_level.upper(),
+        enqueue=True,  # multiprocess safe
+        catch=True,
+    )
+    # create fresh config
+    logger.remove()  # remove old settings
+    logger.configure(  # apply new settings
+        handlers=[file_handler, terminal_handler]
+        if module.name != "cli"
+        else [terminal_handler],
         levels=[
             dict(name="TRACE", color="<magenta>"),
             dict(name="DEBUG", color="<magenta>"),
