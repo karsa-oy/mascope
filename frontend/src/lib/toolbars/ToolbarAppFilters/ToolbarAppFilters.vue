@@ -15,7 +15,7 @@ import InputText from 'primevue/inputtext'
 import { ref, reactive, computed, watch, watchEffect } from 'vue'
 
 import { BaseKarsaLogo } from '@/lib/base'
-import { DialogWorkspaceOp } from '@/lib/dialogs'
+import { DialogWorkspaceOp, PopoverUserMenu } from '@/lib/dialogs'
 import { beautifySnakeCase } from '@/lib/utils'
 import { runtime } from '@/lib/runtime'
 
@@ -328,6 +328,7 @@ function parseTimestamp(timestamp) {
               }
             "
           />
+          <PopoverUserMenu/>
         </div>
         <Drawer
           v-model:visible="app.ui.notification.drawer"
