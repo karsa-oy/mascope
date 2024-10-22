@@ -75,6 +75,19 @@ export function createHttpClient() {
   return {
     client,
     // Authentication methods
+    me: async () => {
+      try {
+        const resp = await client.get('/users/me', { withCredentials: true })
+        return resp
+      } catch (error) {
+        if (error?.response?.statusText !== 'Unauthorized') {
+          const userErrorMessage = error?.response?.data?.detail
+            ?? `Auth user identification failed: ${error.message}`
+          throw new Error(userErrorMessage)
+        }
+      }
+    },
+
     login: async ({ username, password }) => {
       try {
         const params = new URLSearchParams()
