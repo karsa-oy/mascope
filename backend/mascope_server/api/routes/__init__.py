@@ -1,4 +1,5 @@
 from mascope_server.api.auth.routes import auth_router
+from mascope_server.api.users.routes import users_router
 from mascope_server.api.routes.attribute_templates.attribute_templates_routes import (
     attribute_templates_router,
 )
@@ -76,6 +77,7 @@ from mascope_server.api.new.params import params_router
 
 routers = [
     auth_router,
+    users_router,
     workspace_router,
     sample_batches_router,
     samples_router,

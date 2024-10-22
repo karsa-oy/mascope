@@ -9,9 +9,9 @@ from typing import Optional
 
 from fastapi import Request
 from fastapi_users import BaseUserManager, IntegerIDMixin
-from fastapi_users import exceptions, models, schemas
+from fastapi_users import exceptions, models
 from mascope_server.api.auth.config import auth_settings
-from mascope_server.api.auth.schemas import UserCreate
+from mascope_server.api.users.schemas import UserCreate
 from mascope_server.db.models import User
 
 from mascope_server.runtime import runtime
