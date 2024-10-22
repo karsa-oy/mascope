@@ -40,7 +40,7 @@
     opacity: 0.75;
   }
 
-  .p-contextmenu-item-link > .pi {
+  .p-contextmenu-item-link>.pi {
     margin-right: 0.3rem;
   }
 
@@ -60,6 +60,7 @@
     justify-content: space-between;
     gap: 0.5rem;
   }
+
   .col {
     display: flex;
     flex-flow: column nowrap;
@@ -67,6 +68,7 @@
     justify-content: space-between;
     gap: 0.5rem;
   }
+
   .center {
     display: grid;
     place-items: center;
@@ -94,7 +96,7 @@
     margin: 0;
   }
 
-  .p-dialog menu > * {
+  .p-dialog menu>* {
     margin: 0;
   }
 
@@ -104,7 +106,7 @@
     height: 100%;
     position: relative;
   }
-  
+
   .browser .scroller {
     height: 100%;
     overflow-y: auto;
@@ -135,7 +137,7 @@
     font-size: small;
   }
 
-  .browser .p-datatable-row-expansion > td {
+  .browser .p-datatable-row-expansion>td {
     padding: 0 !important;
     padding-left: 1.5rem !important;
   }
@@ -157,6 +159,7 @@
     padding: 0.5rem;
     padding-left: 2rem;
   }
+
   .browser .spinner .p-progressspinner {
     width: 15px;
     height: 15px;
@@ -164,11 +167,12 @@
     margin: 0;
     flex-shrink: 1;
   }
+
   .browser .spinner .p-progressspinner::before {
     height: 15px;
     padding: 0;
   }
-  
+
 
   /* chart */
 
@@ -185,6 +189,7 @@
     --dark: var(--p-sky-400);
     --light: var(--p-sky-200);
   }
+
   .darkmode .measure-mode .p-togglebutton.p-togglebutton-checked::before {
     --dark: var(--p-sky-800);
     --light: var(--p-sky-600);

@@ -17,7 +17,6 @@ fast = FastAPI()
 # logging middleware
 @fast.middleware("http")
 async def logger_middleware(request: Request, call_next):
-
     # Make the request and receive a response
     response = await call_next(request)
 

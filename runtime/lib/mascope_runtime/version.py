@@ -13,7 +13,6 @@ def exec(cmd: str):
             .replace("\n", "")
         )
     except Exception:
-        # ignore errors, return nothing
         return None
 
 
