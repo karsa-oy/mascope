@@ -1,9 +1,10 @@
 from typing import Optional
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import Field
+from mascope_server.api.models.base_pydantic_model import QueryParamsModel
 
 
-class GetSamplesQueryParams(BaseModel):
+class GetSamplesQueryParams(QueryParamsModel):
     sample_item_id: Optional[str] = Field(
         None, description="ID of the specific sample item to filter results by."
     )

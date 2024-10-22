@@ -1,6 +1,7 @@
-from pydantic import BaseModel, Field
 from typing import Optional, Dict, List
-from datetime import timezone, datetime as dt
+from datetime import datetime as dt
+from pydantic import BaseModel, Field
+from mascope_server.api.models.base_pydantic_model import QueryParamsModel
 
 
 class IsotopeRating(BaseModel):
@@ -50,7 +51,7 @@ class MatchRatingUpdate(MatchRatingBase):
     pass
 
 
-class GetMatchRatingsQueryParams(BaseModel):
+class GetMatchRatingsQueryParams(QueryParamsModel):
     sample_item_id: Optional[str] = Field(None, description="ID of the sample item")
     target_ion_id: Optional[str] = Field(None, description="ID of the target ion")
     rating: Optional[int] = Field(None, description="Rating value between 0 and 2")

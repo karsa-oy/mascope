@@ -1,9 +1,10 @@
 from typing import Optional, List
 from datetime import datetime
 from pydantic import BaseModel, Field, model_validator
+from mascope_server.api.models.base_pydantic_model import QueryParamsModel
 
 
-class GetInstrumentFunctionsQueryParams(BaseModel):
+class GetInstrumentFunctionsQueryParams(QueryParamsModel):
     instrument: Optional[str] = Field(None, description="Filter by instrument name.")
     sort: Optional[str] = Field(None, description="Field to sort by.")
     order: Optional[str] = Field(
@@ -13,7 +14,7 @@ class GetInstrumentFunctionsQueryParams(BaseModel):
     limit: int = Field(10000, description="Number of items per page.")
 
 
-class GetInstrumentFunctionQueryParams(BaseModel):
+class GetInstrumentFunctionQueryParams(QueryParamsModel):
     filename: Optional[str] = Field(
         None,
         description="When filename is used, the endpoint returns the latest instrument function for the specified file's instrument, as of the file's creation date and time.",

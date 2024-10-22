@@ -1,7 +1,8 @@
-from pydantic import BaseModel, Field
+from pydantic import Field
+from mascope_server.api.models.base_pydantic_model import QueryParamsModel
 
 
-class GetVisualizationIonFocusQueryParams(BaseModel):
+class GetVisualizationIonFocusQueryParams(QueryParamsModel):
     sample_item_id: str = Field(..., description="ID of the sample item")
     target_ion_id: str = Field(..., description="ID of the target ion")
     min_isotope_abundance: float = Field(

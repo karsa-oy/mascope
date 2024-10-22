@@ -1,5 +1,6 @@
 from typing import Optional
 from pydantic import BaseModel, Field
+from mascope_server.api.models.base_pydantic_model import QueryParamsModel
 
 
 class TargetCompoundBase(BaseModel):
@@ -39,7 +40,7 @@ class TargetCompoundUpdate(BaseModel):
     )
 
 
-class GetTargetCompoundsQueryParams(BaseModel):
+class GetTargetCompoundsQueryParams(QueryParamsModel):
     target_compound_name: Optional[str] = Field(
         None, description="The name of the target compound to filter by."
     )
@@ -67,7 +68,7 @@ class GetTargetCompoundsQueryParams(BaseModel):
     limit: int = Field(10000, description="The number of results per page.")
 
 
-class GetTargetCompoundInTargetCollectionQueryParams(BaseModel):
+class GetTargetCompoundInTargetCollectionQueryParams(QueryParamsModel):
     target_compound_id: Optional[str] = Field(
         None,
         description="The target compound ID filter for which you want to fetch the assosiated target collections ids.",

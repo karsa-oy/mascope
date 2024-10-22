@@ -1,8 +1,9 @@
 from typing import List, Optional
-from pydantic import BaseModel, Field
+from pydantic import Field
+from mascope_server.api.models.base_pydantic_model import QueryParamsModel
 
 
-class GetTargetIsotopesQueryParams(BaseModel):
+class GetTargetIsotopesQueryParams(QueryParamsModel):
     target_ion_id: Optional[str] = Field(None, description="Filter by target ion ID.")
     min_mz: Optional[float] = Field(
         None, description="Minimum m/z value for filtering."

@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from mascope_server.api.models.target.compounds.target_compound_pydantic_model import (
     TargetCompoundBase,
 )
+from mascope_server.api.models.base_pydantic_model import QueryParamsModel
 
 # TODO_configuration possible collection types
 APP_COLLECTION_TYPES = ["TARGETS", "DIAGNOSTICS", "CALIBRANTS"]
@@ -90,7 +91,7 @@ class TargetCollectionUpdateBody(TargetCollectionBase):
         return values
 
 
-class GetTargetCollectionsQueryParams(BaseModel):
+class GetTargetCollectionsQueryParams(QueryParamsModel):
     target_collection_type: Optional[str] = Field(
         None,
         description="The target collection type for which you want to fetch the target collections.",
@@ -114,7 +115,7 @@ class GetTargetCollectionsQueryParams(BaseModel):
     limit: int = Field(10000, description="The number of results per page.")
 
 
-class GetTargetCollectionsInSampleBatchQueryParams(BaseModel):
+class GetTargetCollectionsInSampleBatchQueryParams(QueryParamsModel):
     sample_batch_id: Optional[str] = Field(
         None,
         description="The sample batch ID filter for which you want to fetch the assosiated target collections ids.",

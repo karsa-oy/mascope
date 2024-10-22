@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from mascope_server.api.models.calibration.calibration_pydantic_model import (
     MzCalibrationParams,
 )
+from mascope_server.api.models.base_pydantic_model import QueryParamsModel
 
 # TODO_configuration possible item types
 APP_ITEM_TYPES = [
@@ -67,7 +68,7 @@ class SampleItemUpdate(SampleItemBase):
     pass
 
 
-class GetSampleItemsQueryParams(BaseModel):
+class GetSampleItemsQueryParams(QueryParamsModel):
     sample_batch_id: Optional[str] = Field(
         None,
         description="The sample batch ID for which you want to fetch the sample items.",

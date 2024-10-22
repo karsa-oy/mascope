@@ -1,5 +1,6 @@
 from typing import Optional, Dict
 from pydantic import BaseModel, Field
+from mascope_server.api.models.base_pydantic_model import QueryParamsModel
 from mascope_server.api.models.match.match_pydantic_model import FilterParams
 
 
@@ -15,7 +16,7 @@ class TargetIonUpdate(BaseModel):
         from_attributes = True
 
 
-class GetTargetIonsQueryParams(BaseModel):
+class GetTargetIonsQueryParams(QueryParamsModel):
     target_compound_id: Optional[str] = Field(
         None, description="Filter by target compound ID."
     )

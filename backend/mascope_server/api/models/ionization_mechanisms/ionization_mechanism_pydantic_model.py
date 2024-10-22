@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import Optional
+from mascope_server.api.models.base_pydantic_model import QueryParamsModel
 
 
 class IonizationMechanismCreate(BaseModel):
@@ -16,12 +17,13 @@ class IonizationMechanismCreate(BaseModel):
     )
 
 
-class GetIonizationMechanismsQueryParams(BaseModel):
+class GetIonizationMechanismsQueryParams(QueryParamsModel):
     ionization_mechanism_polarity: Optional[str] = Field(
         None, description="Filter by the polarity of the ionization mechanism."
     )
     ionization_mechanism: Optional[str] = Field(
-        None, description="Filter by the description of the ionization mechanism."
+        None,
+        description="Filter by the chemical formula modification of the ionization mechanism.",
     )
     reagent: Optional[str] = Field(
         None, description="Filter by the reagent used in the ionization process."

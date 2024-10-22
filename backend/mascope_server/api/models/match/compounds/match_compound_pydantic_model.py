@@ -1,5 +1,6 @@
 from typing import Optional, List
 from pydantic import BaseModel, Field
+from mascope_server.api.models.base_pydantic_model import QueryParamsModel
 from mascope_server.api.models.match.match_pydantic_model import (
     FilterSamplePayload,
 )
@@ -18,7 +19,7 @@ class MatchCompoundBase(BaseModel):
     )
 
 
-class GetMatchCompoundsQueryParams(BaseModel):
+class GetMatchCompoundsQueryParams(QueryParamsModel):
     sample_item_id: Optional[str] = Field(
         None, description="Filter compounds by sample item ID"
     )

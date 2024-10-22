@@ -1,5 +1,6 @@
 from typing import List, Optional
 from pydantic import BaseModel, Field, field_validator
+from mascope_server.api.models.base_pydantic_model import QueryParamsModel
 
 
 class TemplateField(BaseModel):
@@ -52,7 +53,7 @@ class AttributeTemplateUpdateBody(AttributeTemplateBase):
     pass
 
 
-class GetAttributeTemplatesQueryParams(BaseModel):
+class GetAttributeTemplatesQueryParams(QueryParamsModel):
     sort: Optional[str] = Field(
         "name", description="The column name by which you want to sort the results."
     )

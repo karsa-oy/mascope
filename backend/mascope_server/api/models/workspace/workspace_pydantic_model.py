@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import Optional
+from mascope_server.api.models.base_pydantic_model import QueryParamsModel
 
 
 class WorkspaceBase(BaseModel):
@@ -17,7 +18,7 @@ class WorkspaceUpdate(WorkspaceBase):
     workspace_name: Optional[str] = Field(None, description="Name of the workspace")
 
 
-class GetWorkspacesQueryParams(BaseModel):
+class GetWorkspacesQueryParams(QueryParamsModel):
     sort: Optional[str] = Field(
         "workspace_utc_created",
         description="Column name by which you want to sort the results. The column name should be one of the columns in the workspace table.",
