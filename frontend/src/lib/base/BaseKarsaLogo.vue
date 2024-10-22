@@ -1,3 +1,7 @@
+<script setup>
+import { runtime } from '@/lib/runtime'
+</script>
+
 <template>
   <div class="col">
     <div class="row" style="opacity: 0.5">
@@ -66,9 +70,7 @@
       </svg>
       <b style="font-size: 15px; margin-left: 2px">Mascope</b>
     </div>
-    <div class="content">
-      <slot></slot>
-    </div>
+    <span class="version">{{ runtime.version }}</span>
   </div>
 </template>
 
@@ -88,9 +90,9 @@ div {
   justify-content: center;
 }
 
-.content {
-  padding: 0;
-  margin: 0;
-  padding-right: 19px;
+.version {
+  opacity: 0.3;
+  pointer-events: none; /* Prevents the logo from affecting layout interactions */
+  font-size: 10px;
 }
 </style>

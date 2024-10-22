@@ -38,6 +38,8 @@ def get_version():
     else:
         prefix = f"{branch}-v"
     # get the latest commit date and short hash
-    commit_id = exec('git log -1 --date=format:"%Y.%m.%d" --format="%ad-%h"')
+    date_and_commit_hash = exec('git log -1 --date=format:"%Y.%m.%d" --format="%ad-%h"')
     # combine them to form the version string
-    return f"{prefix}{commit_id}" if commit_id else "unknown-version"
+    return (
+        f"{prefix}{date_and_commit_hash}" if date_and_commit_hash else "unknown-version"
+    )

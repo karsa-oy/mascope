@@ -278,11 +278,7 @@ function parseTimestamp(timestamp) {
       </div>
     </template>
     <template #center>
-      <div class="logo-container">
-        <BaseKarsaLogo>
-          <span class="version">{{ runtime.version }}</span>
-        </BaseKarsaLogo>
-      </div>
+      <BaseKarsaLogo/>
     </template>
     <template #end>
       <div class="row">
@@ -409,20 +405,4 @@ function parseTimestamp(timestamp) {
   padding-bottom: 0.8rem;
 }
 
-/* Ensure the logo is centered and doesn't get pushed */
-.logo-container {
-  display: flex;
-  justify-content: center;
-  position: absolute;
-  left: 50%;
-  top: 25px;
-  transform: translateX(-50%);
-  pointer-events: none; /* Prevents the logo from affecting layout interactions */
-}
-
-.version {
-  opacity: 0.3;
-  pointer-events: none; /* Prevents the logo from affecting layout interactions */
-  font-size: 10px;
-}
 </style>
