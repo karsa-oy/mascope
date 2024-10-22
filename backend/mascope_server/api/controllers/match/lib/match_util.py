@@ -66,6 +66,10 @@ def deduplicate_match_df(df: pd.DataFrame, id_keys: tuple) -> pd.DataFrame:
     :return: Deduplicated DataFrame with highest priority items kept.
     :rtype: pd.DataFrame
     """
+    # Check if DataFrame is empty
+    if df.empty:
+        return df
+
     collection_priority = {"TARGETS": 1, "DIAGNOSTICS": 2, "CALIBRANTS": 3}
 
     def prioritize_group(group):
