@@ -1,20 +1,23 @@
 <script setup>
 import { computed } from 'vue'
 
-import ProgressSpinner from 'primevue/progressspinner'
 import ConfirmDialog from 'primevue/confirmdialog'
 import Toast from 'primevue/toast'
 import { useToast } from 'primevue/usetoast'
+import Panel from 'primevue/panel'
+import Tabs from 'primevue/tabs'
+import TabList from 'primevue/tablist'
+import Tab from 'primevue/tab'
+import TabPanels from 'primevue/tabpanels'
+import TabPanel from 'primevue/tabpanel'
 
 import { beautifySnakeCase } from '@/lib/utils'
 import { BaseKarsaLogo } from '@/lib/base'
 import { useApp } from '@/stores'
-
-const toast = useToast()
+import { PaneLogin, PaneSignup } from '@/lib/panes'
 
 const app = useApp()
-
-const ready = computed(() => app.data.workspace.list.length > 0)
+const toast = useToast()
 
 // toaster
 app.ui.notification
@@ -36,18 +39,32 @@ app.ui.notification
     }
   })
   .unmount()
+
+  app.auth.identify()
 </script>
 
 <template>
-  <div id="app" v-if="ready">
-    <RouterView />
-  </div>
-  <div id="loading" v-else>
-    <div class="col">
-      <BaseKarsaLogo />
-      <ProgressSpinner />
-      <strong>Loading...</strong>
-    </div>
+  <!-- App Routes -->
+  <RouterView v-if="app.auth.user"/>
+  <!-- Login / Signup Screen  -->
+  <div v-else class="center" style="min-height: 80vh">
+      <Panel style="width: 500px">
+        <BaseKarsaLogo />
+        <Tabs value="login">
+            <TabList>
+                <Tab value="login">Login</Tab>
+                <Tab value="signup">Sign up</Tab>
+            </TabList>
+            <TabPanels>
+                <TabPanel value="login">
+                  <PaneLogin/>
+                </TabPanel>
+                <TabPanel value="signup">
+                  <PaneSignup/>
+                </TabPanel>
+            </TabPanels>
+        </Tabs>
+      </Panel>
   </div>
   <Toast position="bottom-right" v-if="!app.ui.notification.drawer" />
   <ConfirmDialog />
