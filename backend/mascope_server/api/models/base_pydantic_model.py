@@ -7,11 +7,18 @@ class QueryParamsModel(BaseModel):
     Handles common behaviors like decoding '+' signs in query parameters.
     """
 
-    @field_validator("*", mode="before")
+    @field_validator(
+        "ionization_mechanism_polarity",
+        "ionization_mechanism",
+        "reagent",
+        "filename",
+        check_fields=False,  # allows the validator to work across models without requiring these fields
+        mode="before",
+    )
     @classmethod
     def decode_plus_sign(cls, value):
         """
-        Automatically decode '+' signs for any string field in the query parameters.
+        Automatically decode '+' signs for specific string fields in the query parameters.
         """
         if isinstance(value, str) and value:
             return value.replace(" ", "+")
