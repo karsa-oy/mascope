@@ -50,7 +50,9 @@ async def logger_middleware(request: Request, call_next):
 # cors middleware
 fast.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # allow all origins
+    allow_origins=[
+        "http://localhost:5173",
+    ],  # TODO fix this
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
