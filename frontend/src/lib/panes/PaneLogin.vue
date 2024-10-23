@@ -31,8 +31,8 @@ const disabled = computed(() => invalid.value.email || invalid.value.password)
       <InputText
         id="login-email"
         v-model="input.email"
-        :invalid="invalid.email"
-        style="width: 100%"
+        :invalid="input.email && invalid.email"
+        fluid
         required
       />
       <label for="login-email">Email</label>
@@ -41,9 +41,14 @@ const disabled = computed(() => invalid.value.email || invalid.value.password)
       <Password
         id="login-password"
         v-model="input.password"
-        :invalid="invalid.password"
-        style="width: 100%"
+        :invalid="input.password && invalid.password"
+        fluid
         required
+        @keyup.enter="() => {
+          if (!disabled) {
+            auth.login(input)
+          }
+        }"
       />
       <label for="login-password">Password</label>
     </FloatLabel>
@@ -52,12 +57,7 @@ const disabled = computed(() => invalid.value.email || invalid.value.password)
       label="Login"
       icon="pi pi-sign-in"
       :disabled="disabled"
+      style="margin-top: 2rem;"
     />
   </div>
 </template>
-
-<style scoped>
-  :deep(.p-password-input) {
-    width: 100%;
-  }
-</style>

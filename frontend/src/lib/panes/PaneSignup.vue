@@ -7,7 +7,7 @@ import Button from 'primevue/button'
 
 import { useAuth } from '@/stores/auth'
 
-import { reactive, computed } from 'vue'
+import { reactive, computed, defineEmits } from 'vue'
 
 const auth = useAuth()
 
@@ -26,6 +26,17 @@ const invalid = computed(() => ({
 }))
 
 const disabled = computed(() => invalid.value.email || invalid.value.username || invalid.value.password)
+
+const emit = defineEmits(['signup'])
+
+const signup = async () => {
+  if (!disabled.value) {
+    const { status } = await auth.signup(input)
+    if (status == 'success') {
+      emit('signup')
+    }
+  }
+}
 </script>
 
 
@@ -36,7 +47,7 @@ const disabled = computed(() => invalid.value.email || invalid.value.username ||
         <InputText
           id="signup-email"
           v-model="input.email"
-          :invalid="invalid.email"
+          :invalid="input.email && invalid.email"
           required 
         />
         <label for="signup-email">Email</label>
@@ -52,7 +63,7 @@ const disabled = computed(() => invalid.value.email || invalid.value.username ||
         <InputText
           id="signup-username"
           v-model="input.username"
-          :invalid="invalid.username"
+          :invalid="input.username && invalid.username"
           required
         />
         <label for="signup-username">Full Name</label>
@@ -68,7 +79,7 @@ const disabled = computed(() => invalid.value.email || invalid.value.username ||
         <Password
           id="signup-password"
           v-model="input.password"
-          :invalid="invalid.password"
+          :invalid="input.password && invalid.password"
           required 
         />
         <label for="signup-password">Password</label>
@@ -84,8 +95,9 @@ const disabled = computed(() => invalid.value.email || invalid.value.username ||
         <Password
           id="signup-confirm-password"
           v-model="input.confirmPassword"
-          :invalid="invalid.password"
+          :invalid="input.confirmPassword && invalid.password"
           required
+          @keyup.enter="signup"
         />
         <label for="signup-confirm-password">Confirm Password</label>
       </FloatLabel>
@@ -97,10 +109,11 @@ const disabled = computed(() => invalid.value.email || invalid.value.username ||
     </div>
   </div>
   <Button
-    @click="auth.signup(input)"
+    @click="signup"
     label="Sign up" 
     icon="pi pi-check"
-    style="width: 100%"
     :disabled="disabled"
+    fluid
+    style="margin-top: 2rem;"
   />
 </template>

@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { ref, watch} from 'vue'
 
 import ConfirmDialog from 'primevue/confirmdialog'
 import Toast from 'primevue/toast'
@@ -8,8 +8,6 @@ import Panel from 'primevue/panel'
 import Tabs from 'primevue/tabs'
 import TabList from 'primevue/tablist'
 import Tab from 'primevue/tab'
-import TabPanels from 'primevue/tabpanels'
-import TabPanel from 'primevue/tabpanel'
 
 import { beautifySnakeCase } from '@/lib/utils'
 import { BaseKarsaLogo } from '@/lib/base'
@@ -41,6 +39,12 @@ app.ui.notification
   .unmount()
 
   app.auth.identify()
+
+  const tab = ref('login')
+
+  const gotoLogin = () => {
+    tab.value = "login"
+  }
 </script>
 
 <template>
@@ -50,20 +54,24 @@ app.ui.notification
   <div v-else class="center" style="min-height: 80vh">
       <Panel style="width: 500px">
         <BaseKarsaLogo />
-        <Tabs value="login">
-            <TabList>
-                <Tab value="login">Login</Tab>
-                <Tab value="signup">Sign up</Tab>
-            </TabList>
-            <TabPanels>
-                <TabPanel value="login">
-                  <PaneLogin/>
-                </TabPanel>
-                <TabPanel value="signup">
-                  <PaneSignup/>
-                </TabPanel>
-            </TabPanels>
+        <Tabs v-model:value="tab">
+          <TabList>
+            <Tab value="login">
+              <a v-ripple @click="tab = 'login'" class="row">
+                  <i class="pi pi-sign-in" />
+                  <span>Login</span>
+              </a>
+            </Tab>
+            <Tab value="signup">
+              <a v-ripple @click="tab = 'signup'" class="row">
+                  <i class="pi pi-signup" />
+                  <span>Sign up</span>
+              </a>
+            </Tab>
+          </TabList>
         </Tabs>
+        <PaneLogin v-if="tab == 'login'"/>
+        <PaneSignup v-if="tab == 'signup'" @signup="gotoLogin"/>
       </Panel>
   </div>
   <Toast position="bottom-right" v-if="!app.ui.notification.drawer" />
