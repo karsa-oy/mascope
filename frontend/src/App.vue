@@ -68,7 +68,7 @@ app.ui.notification
             </Tab>
             <Tab value="signup">
               <a v-ripple @click="tab = 'signup'" class="row">
-                  <i class="pi pi-signup" />
+                  <i class="pi pi-user-plus" />
                   <span>Sign up</span>
               </a>
             </Tab>
