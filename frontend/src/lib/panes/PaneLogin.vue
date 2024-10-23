@@ -18,7 +18,7 @@ const input = reactive({
 
 const invalid = computed(() => ({
   email: input.email?.length < 5 || !input.email?.includes('@'),
-  password: input.password?.length < 8
+  password: !(input.password?.length > 0)
 }))
 
 const disabled = computed(() => invalid.value.email || invalid.value.password)

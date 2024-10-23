@@ -22,7 +22,7 @@ const invalid = computed(() => ({
   email: !input.email || input.email?.length < 5 || !input.email?.includes('@'),
   username: !input.username || input.username?.length < 5,
   password: !input.password || input.password !== input.confirmPassword 
-    || input.password?.length < 8
+    || !(input.password?.length > 0)
 }))
 
 const disabled = computed(() => invalid.value.email || invalid.value.username || invalid.value.password)
