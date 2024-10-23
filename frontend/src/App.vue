@@ -58,7 +58,7 @@ app.ui.notification
   >
       <Panel style="width: 500px">
         <BaseKarsaLogo />
-        <Tabs v-model:value="tab">
+        <Tabs v-model:value="tab" style="margin-bottom: 2rem;">
           <TabList>
             <Tab value="login">
               <a v-ripple @click="tab = 'login'" class="row">
