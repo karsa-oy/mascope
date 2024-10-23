@@ -9,11 +9,11 @@ export const useAuth = defineStore('app.auth', () => {
 
   const ui = useUi()
 
-  const user = ref()
+  const user = ref(null)
 
   const identify = async () => {
     try {
-      user.value = (await api.http.me())?.data;
+      user.value = (await api.http.me())?.data ?? false;
     } catch (e) {
       ui.notification.push({
         type: 'user_identification',
@@ -21,7 +21,7 @@ export const useAuth = defineStore('app.auth', () => {
         message: `Failed to identify user: ${e.message}`
       })
       console.error(e)
-      user.value = null
+      user.value = false
     }
   }
 

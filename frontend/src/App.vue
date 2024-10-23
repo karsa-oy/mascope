@@ -8,6 +8,7 @@ import Panel from 'primevue/panel'
 import Tabs from 'primevue/tabs'
 import TabList from 'primevue/tablist'
 import Tab from 'primevue/tab'
+  import ProgressSpinner from 'primevue/progressspinner'
 
 import { beautifySnakeCase } from '@/lib/utils'
 import { BaseKarsaLogo } from '@/lib/base'
@@ -51,7 +52,10 @@ app.ui.notification
   <!-- App Routes -->
   <RouterView v-if="app.auth.user"/>
   <!-- Login / Signup Screen  -->
-  <div v-else class="center" style="min-height: 80vh">
+  <div 
+    v-else-if="app.auth.user == false" 
+    class="center" style="min-height: 80vh"
+  >
       <Panel style="width: 500px">
         <BaseKarsaLogo />
         <Tabs v-model:value="tab">
@@ -73,6 +77,11 @@ app.ui.notification
         <PaneLogin v-if="tab == 'login'"/>
         <PaneSignup v-if="tab == 'signup'" @signup="gotoLogin"/>
       </Panel>
+  </div>
+  <div v-else class="col" style="min-height: 80vh; justify-content: center">
+    <BaseKarsaLogo />
+    <ProgressSpinner />
+    <strong>Identifying user...</strong>
   </div>
   <Toast position="bottom-right" v-if="!app.ui.notification.drawer" />
   <ConfirmDialog />
