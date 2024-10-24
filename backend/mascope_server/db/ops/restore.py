@@ -1,12 +1,132 @@
 import os
-import sqlite3
 import sys
+import sqlite3
+import asyncio
 
 from mascope_server.db import get_current_db_version
-from mascope_server.db.ops.backup import run_db_backup
+from mascope_server.db.ops.backup import create_db_backup
 from mascope_server.db.tables_config import get_table_configs
 
 from mascope_server.runtime import runtime
+
+
+# -----------------------------
+# Async entry point for restoration
+# -----------------------------
+
+
+async def db_restore(tables_to_restore=None):
+    """
+    Asynchronously orchestrates the schema restoration process for specified database tables.
+    If `tables_to_restore` is None, all tables will be restored.
+
+    1. Backs up the current database.
+    2. Validates that all specified tables have configurations.
+    3. Restores the schema for each table to ensure it matches the expected configuration.
+    4. Deletes any orphaned records that do not comply with foreign key constraints.
+    5. Creates necessary indexes if they do not exist.
+
+    Uses separate database connections for each major step to ensure changes are applied correctly and
+    to manage database transactions effectively.
+
+    :param tables_to_restore: List of tables to restore, defaults to restoring all tables.
+    """
+    await create_db_backup()
+
+    # Determine the current version and paths
+    data_path = runtime.config.database
+    current_version = get_current_db_version()
+    db_path = os.path.join(data_path, f"mascope.v{current_version}.db")
+
+    # Get table configs for current version or most recent config
+    table_configs = get_table_configs()
+
+    # Default to all tables if no specific tables are provided
+    if tables_to_restore is None:
+        tables_to_restore = list(table_configs.keys())
+
+    # Step 2: Validate that all specified tables have configurations
+    for table_name in tables_to_restore:
+        if table_name not in table_configs:
+            runtime.logger.error(
+                f"No configuration found for '{table_name}'. Please check your table name or define its configuration."
+            )
+            return  # Exit the function if a table configuration is missing
+
+    # Step 3: Restore the schema of each table
+    loop = asyncio.get_running_loop()  # Get the current event loop
+    for table_name in tables_to_restore:
+        await loop.run_in_executor(
+            None, restore_table_sync, db_path, table_name, table_configs[table_name]
+        )
+
+    # Step 4: Delete orphaned records after restoring schema
+    runtime.logger.info("Checking for orphaned records...")
+    for table_name in tables_to_restore:
+        await loop.run_in_executor(
+            None, delete_orphaned_records_sync, db_path, table_name
+        )
+
+    # Step 5: Create indexes after restoring schema and cleaning up orphans
+    runtime.logger.info("Checking for missing indexes...")
+    for table_name in tables_to_restore:
+        await loop.run_in_executor(
+            None, create_indexes_sync, db_path, table_name, table_configs[table_name]
+        )
+
+
+# -----------------------------
+# CLI entry point for synchronous execution
+# -----------------------------
+
+
+def run_db_restore():
+    """
+    Orchestrates the schema restoration process for specified database tables in synchronous mode.
+    This function wraps the async restore function using asyncio.run.
+    """
+    # Extract table names from CLI arguments or restore all tables
+    tables_to_restore = sys.argv[1:] if len(sys.argv) > 1 else None
+
+    # Run the async function in a sync environment
+    asyncio.run(db_restore(tables_to_restore))
+
+
+# -----------------------------
+# Sync to async helper functions
+# -----------------------------
+
+
+def restore_table_sync(db_path, table_name, schema_info):
+    """
+    Synchronously restore a table schema.
+    """
+    with sqlite3.connect(db_path) as conn:
+        restore_table(conn, table_name, schema_info)
+        conn.commit()
+
+
+def delete_orphaned_records_sync(db_path, table_name):
+    """
+    Synchronously delete orphaned records based on foreign key constraints.
+    """
+    with sqlite3.connect(db_path) as conn:
+        delete_orphaned_records(conn, table_name)
+        conn.commit()
+
+
+def create_indexes_sync(db_path, table_name, schema_info):
+    """
+    Synchronously create indexes.
+    """
+    with sqlite3.connect(db_path) as conn:
+        create_indexes(conn, table_name, schema_info)
+        conn.commit()
+
+
+# -----------------------------
+# Utility functions for database operations
+# -----------------------------
 
 
 def create_table_backup(cursor, table_name):
@@ -80,7 +200,7 @@ def delete_orphaned_records(conn, table_name):
         deleted_count = cursor.rowcount
         if deleted_count > 0:
             runtime.logger.info(
-                f"Deleted {deleted_count} orphaned sample_batch records due to invalid workspace_id."
+                f"🗑️ Deleted {deleted_count} orphaned sample_batch records due to invalid workspace_id."
             )
     elif table_name == "target_compound_in_target_collection":
         cursor.execute(
@@ -92,7 +212,7 @@ def delete_orphaned_records(conn, table_name):
         deleted_count = cursor.rowcount
         if deleted_count > 0:
             runtime.logger.info(
-                f"Deleted {deleted_count} orphaned target_compound_in_target_collection records due to invalid target_compound_id."
+                f"🗑️ Deleted {deleted_count} orphaned target_compound_in_target_collection records due to invalid target_compound_id."
             )
 
     elif table_name == "target_collection_in_sample_batch":
@@ -105,7 +225,7 @@ def delete_orphaned_records(conn, table_name):
         deleted_count = cursor.rowcount
         if deleted_count > 0:
             runtime.logger.warning(
-                f"Deleted {deleted_count} orphaned target_collection_in_sample_batch records due to invalid sample_batch_id."
+                f"🗑️ Deleted {deleted_count} orphaned target_collection_in_sample_batch records due to invalid sample_batch_id."
             )
 
     elif table_name in ["match", "match_isotope", "match_interference"]:
@@ -118,7 +238,7 @@ def delete_orphaned_records(conn, table_name):
         deleted_count = cursor.rowcount
         if deleted_count > 0:
             runtime.logger.info(
-                f"Deleted {deleted_count} orphaned {table_name} records due to invalid sample_item_id."
+                f"🗑️ Deleted {deleted_count} orphaned {table_name} records due to invalid sample_item_id."
             )
 
     # Disable foreign key constraints temporarily to allow for orphans data restore
@@ -128,6 +248,8 @@ def delete_orphaned_records(conn, table_name):
 def create_indexes(conn, table_name, schema_info):
     """
     Creates indexes for the specified table based on the provided schema information.
+        - If the index name starts with 'ix_', it creates a UNIQUE index.
+        - For any other case, it defaults to creating a regular index.
     """
     cursor = conn.cursor()
     if "indexes" in schema_info:
@@ -139,10 +261,16 @@ def create_indexes(conn, table_name, schema_info):
 
         for index_sql in schema_info["indexes"]:
             index_name = index_sql.split(" ")[0]
-            # Execute index creation if it doesn't already exist
+            # Check if the index already exists
             if index_name not in existing_indexes:
-                cursor.execute(f"CREATE INDEX IF NOT EXISTS {index_sql}")
-                runtime.logger.info(f"Index {index_name} created.")
+                # If the index is prefixed with 'ix_', it is a unique index
+                if index_name.startswith("ix_"):
+                    cursor.execute(f"CREATE UNIQUE INDEX IF NOT EXISTS {index_sql}")
+                    runtime.logger.info(f"🆕 Unique index {index_name} created.")
+                # Otherwise, create a regular index
+                else:
+                    cursor.execute(f"CREATE INDEX IF NOT EXISTS {index_sql}")
+                    runtime.logger.info(f"🆕 Index {index_name} created.")
 
 
 def restore_table(conn, table_name, schema_info):
@@ -208,58 +336,3 @@ def restore_table(conn, table_name, schema_info):
         runtime.logger.info(
             f"✅ Schema of {table_name} is correct, no restoration needed."
         )
-
-
-def run_db_restore():
-    """
-    Orchestrates the schema restoration process for specified database tables.
-
-    1. Backs up the current database.
-    2. Validates that all specified tables have configurations.
-    3. Restores the schema for each table to ensure it matches the expected configuration.
-    4. Deletes any orphaned records that do not comply with foreign key constraints.
-    5. Creates necessary indexes if they do not exist.
-
-    Uses separate database connections for each major step to ensure changes are applied correctly and
-    to manage database transactions effectively.
-    """
-    # Create the backup before performing restore operations
-    run_db_backup()
-
-    # Determine the current version and paths
-    data_path = runtime.config.database
-    current_version = get_current_db_version()
-    db_path = os.path.join(data_path, f"mascope.v{current_version}.db")
-
-    # Get table configs for current version or most recent config
-    table_configs = get_table_configs(current_version)
-    # Restore schema for specified tables or all configured tables
-    tables_to_restore = sys.argv[1:] if len(sys.argv) > 1 else table_configs.keys()
-
-    # Step 2: Validate that all specified tables have configurations
-    for table_name in tables_to_restore:
-        if table_name not in table_configs:
-            runtime.logger.error(
-                f"No configuration found for '{table_name}'. Please check your table name or define its configuration."
-            )
-            return  # Exit the function if a table configuration is missing
-
-    # Step 3: Restore the schema of each table
-    for table_name in tables_to_restore:
-        with sqlite3.connect(db_path) as conn:
-            restore_table(conn, table_name, table_configs[table_name])
-            conn.commit()
-
-    # Step 4: Delete orphaned records after restoring schema
-    runtime.logger.info("Checking for orphaned records...")
-    for table_name in tables_to_restore:
-        with sqlite3.connect(db_path) as conn:
-            delete_orphaned_records(conn, table_name)
-            conn.commit()
-
-    # Step 5: Create indexes after restoring schema and cleaning up orphans
-    runtime.logger.info("Checking for missing indexes...")
-    for table_name in tables_to_restore:
-        with sqlite3.connect(db_path) as conn:
-            create_indexes(conn, table_name, table_configs[table_name])
-            conn.commit()

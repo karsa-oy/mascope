@@ -1,26 +1,58 @@
 import os
 import sqlite3
+import asyncio
 
 from mascope_server.db import get_current_db_version
-from mascope_server.db.ops.backup import run_db_backup
+from mascope_server.db.ops.backup import create_db_backup
 
 from mascope_server.runtime import runtime
 
 
-def run_db_maintenance():
+# -----------------------------
+# Async entry point for maintenance
+# -----------------------------
+
+
+async def db_maintenance():
     """
-    Executes maintenance operations on the database. This includes backing up the database,
-    vacuuming to defragment, analyzing to optimize query plans, and checking database integrity.
+    Asynchronously performs maintenance operations on the database.
+    This includes creating a backup, vacuuming to defragment the database, analyzing for query optimization,
+    and checking database integrity.
     """
-    # Create the backup before performing maintenance operations
-    run_db_backup()
+    await create_db_backup()
 
     # Determine the current version and paths
     data_path = runtime.config.database
     current_version = get_current_db_version()
     db_path = os.path.join(data_path, f"mascope.v{current_version}.db")
 
-    # Connect to the original database
+    # Perform the maintenance tasks asynchronously
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(None, perform_maintenance, db_path)
+
+
+# -----------------------------
+# Sync wrapper for CLI or synchronous environments
+# -----------------------------
+
+
+def run_db_maintenance():
+    """
+    Synchronously performs database maintenance by wrapping the async method.
+    This is useful for CLI environments where sync is preferred.
+    """
+    asyncio.run(db_maintenance())
+
+
+# -----------------------------
+# Helper functions for maintenance operation
+# -----------------------------
+
+
+def perform_maintenance(db_path):
+    """
+    Performs the maintenance operations such as VACUUM, ANALYZE, and checking the database integrity.
+    """
     conn = sqlite3.connect(db_path)
     with conn:
         # Perform a VACUUM operation to rebuild the database and optimize disk space
@@ -53,13 +85,12 @@ def log_indexes(conn):
     auto_index_count = 0
 
     for table in tables:
-        # TODO_debug_mode
         runtime.logger.debug(f"Indexes for table {table[0]}:")
         cursor.execute(f"PRAGMA index_list({table[0]})")
         indexes = cursor.fetchall()
         for index in indexes:
             runtime.logger.info(index)
-            if "idx_" in index[1]:
+            if "idx_" in index[1] or "ix_" in index[1]:
                 manual_index_count += 1
             elif "sqlite_autoindex_" in index[1]:
                 auto_index_count += 1
