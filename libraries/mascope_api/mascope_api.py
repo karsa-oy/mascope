@@ -506,7 +506,7 @@ def get_sample_file_spectrum(
     :return: A dictionary with keys:
         - "mz": list of m/z values
         - "intensity": list of intensity values
-        - Optional: "total" and "spectrum_count" if available.
+        - Optional: "results" and "spectrum_count" if available.
         Returns None if no spectrum data is found or if an error occurs.
     :rtype: dict or None
     """

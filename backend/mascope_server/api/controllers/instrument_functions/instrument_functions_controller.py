@@ -63,7 +63,7 @@ async def get_instrument_functions(
 
         # Step 6: Convert results to dictionary
         return {
-            "total": total,
+            "results": total,
             "data": [
                 instrument_function.to_dict()
                 for instrument_function in instrument_functions
