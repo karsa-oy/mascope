@@ -346,12 +346,9 @@ class TargetIon(Base):
 class IonizationMechanism(Base):
     __tablename__ = "ionization_mechanism"
     ionization_mechanism_id = Column(String(16), nullable=False, primary_key=True)
-    ionization_mechanism_polarity = Column(
-        String(1),
-        nullable=False,
-    )
-    ionization_mechanism = Column(String)
-    reagent = Column(String)
+    ionization_mechanism_polarity = Column(String(1), nullable=False)
+    ionization_mechanism = Column(String, nullable=False, unique=True)
+    reagent = Column(String, nullable=True)
 
     # Define relationships
     target_ion = relationship(
