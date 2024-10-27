@@ -16,7 +16,12 @@ from mascope_server.api.models.instrument_functions.instrument_function_pydantic
 
 @api_controller()
 async def get_instrument_functions(
-    instrument: str, sort: str, order: str, page: int, limit: int
+    instrument: str = None,
+    method_file: str = None,
+    sort: str = None,
+    order: str = None,
+    page: int = 0,
+    limit: int = 10000,
 ) -> dict:
     """
     Retrieves a paginated list of instrument functions, optionally filtered by instrument and sorted by a specified column.
@@ -30,6 +35,7 @@ async def get_instrument_functions(
     6. Convert the results into a list of dictionaries for JSON serialization.
 
     :param instrument: Filter by instrument name.
+    :param method_file: Filter by method file name.
     :param sort: Column name to sort by.
     :param order: Sorting order ('asc' for ascending, 'desc' for descending).
     :param page: Page number for pagination.
@@ -39,9 +45,11 @@ async def get_instrument_functions(
     async with async_session() as session:
         stmt = select(InstrumentFunction)
 
-        # Step 2: Apply instrument filter if specified
+        # Step 2: Apply filter if specified
         if instrument:
             stmt = stmt.filter(InstrumentFunction.instrument == instrument)
+        if method_file:
+            stmt = stmt.filter(InstrumentFunction.method_file == method_file)
 
         # Step 3: Apply sorting
         if sort:
