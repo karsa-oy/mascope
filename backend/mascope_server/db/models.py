@@ -185,8 +185,14 @@ class SampleItem(Base):
 class SampleFile(Base):
     __tablename__ = "sample_file"
     sample_file_id = Column(String(16), nullable=False, primary_key=True)
+    instrument_function_id = Column(
+        String(32),
+        ForeignKey("instrument_function.instrument_function_id", ondelete="SET NULL"),
+        nullable=True,
+    )
     filename = Column(String(256), nullable=False, unique=True)
     instrument = Column(String(64))
+    method_file = Column(String(256), nullable=True)
     datetime = Column(TIMESTAMP)
     datetime_utc = Column(TIMESTAMP)
     length = Column(Float)
@@ -196,8 +202,10 @@ class SampleFile(Base):
     polarity = Column(String(1))
 
     # Define relationships
-    # TODO_db issue #376
-    # sample_item = relationship("SampleItem", back_populates="sample_file")
+    instrument_function = relationship(
+        "InstrumentFunction", back_populates="sample_file"
+    )
+    # sample_item = relationship("SampleItem", back_populates="sample_file") # TODO_db issue #376
 
 
 class TargetCollection(Base):
@@ -608,9 +616,13 @@ class InstrumentFunction(Base):
     __tablename__ = "instrument_function"
     instrument_function_id = Column(String(32), nullable=False, primary_key=True)
     instrument = Column(String(64), nullable=False)
-    datetime_utc = Column(TIMESTAMP)
+    method_file = Column(String(256), nullable=False)
+    datetime_utc = Column(TIMESTAMP, nullable=False)
     peakshape = Column(JSON)
     resolution_function = Column(JSON)
+
+    # Define relationships
+    sample_file = relationship("SampleFile", back_populates="instrument_function")
 
 
 class Sample(Base):
@@ -619,10 +631,16 @@ class Sample(Base):
     # All columns are read-only as this is a view, not a base table
     sample_item_id = Column(String(16), primary_key=True)
     sample_file_id = Column(String(16))
+    instrument_function_id = Column(
+        String(32),
+        ForeignKey("instrument_function.instrument_function_id", ondelete="SET NULL"),
+        nullable=True,
+    )
     sample_batch_id = Column(String(16), ForeignKey("sample_batch.sample_batch_id"))
     sample_item_name = Column(String(256))
     filename = Column(String(256))
     instrument = Column(String(64))
+    method_file = Column(String(256))
     sample_item_type = Column(String(64))
     sample_item_attributes = Column(JSON)
     filter_id = Column(String(6))

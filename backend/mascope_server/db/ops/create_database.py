@@ -59,22 +59,24 @@ async def create_database():
             SELECT
                 sample_item.sample_item_id,
                 sample_file.sample_file_id,
+                sample_file.instrument_function_id,
                 sample_item.sample_batch_id,
                 sample_item.sample_item_name,
+                sample_file.filename,
                 sample_file.instrument,
-                sample_item.filename,
+                sample_file.method_file,
                 sample_item.sample_item_type,
                 sample_item.sample_item_attributes,
                 sample_item.filter_id,
                 sample_file.length,
                 sample_file.tic,
+                sample_file.polarity,
                 sample_file.range,
                 sample_file.mz_calibration,
                 sample_file.datetime,
                 sample_file.datetime_utc,
                 sample_item.sample_item_utc_created,
-                sample_item.sample_item_utc_modified,
-                sample_file.polarity
+                sample_item.sample_item_utc_modified
             FROM
                 sample_item
             JOIN

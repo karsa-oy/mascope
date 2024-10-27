@@ -65,20 +65,23 @@ table_configs = {
         "columns": {
             "instrument_function_id": ("VARCHAR(32)", 1, None, 1),
             "instrument": ("VARCHAR(64)", 1, None, 0),
-            "datetime_utc": ("TIMESTAMP", 0, None, 0),
+            "method_file": ("VARCHAR(256)", 1, None, 0),
+            "datetime_utc": ("TIMESTAMP", 1, None, 0),
             "peakshape": ("JSON", 0, None, 0),
             "resolution_function": ("JSON", 0, None, 0),
         },
         "fks": {},
         "create_sql": """
             CREATE TABLE instrument_function (
-                instrument_function_id VARCHAR(32) NOT NULL PRIMARY KEY,
-                instrument VARCHAR(64) NOT NULL,
-                datetime_utc TIMESTAMP,
-                peakshape JSON,
-                resolution_function JSON
+                instrument_function_id VARCHAR(32) NOT NULL, 
+                instrument VARCHAR(64) NOT NULL, 
+                method_file VARCHAR(256) NOT NULL, 
+                datetime_utc TIMESTAMP NOT NULL, 
+                peakshape JSON, 
+                resolution_function JSON, 
+                PRIMARY KEY (instrument_function_id)
             );
-        """,
+    """,
     },
     "ionization_mechanism": {
         "columns": {
@@ -581,8 +584,10 @@ table_configs = {
     "sample_file": {
         "columns": {
             "sample_file_id": ("VARCHAR(16)", 1, None, 1),
+            "instrument_function_id": ("VARCHAR(32)", 0, None, 0),
             "filename": ("VARCHAR(256)", 1, None, 0),
             "instrument": ("VARCHAR(64)", 0, None, 0),
+            "method_file": ("VARCHAR(256)", 0, None, 0),
             "datetime": ("TIMESTAMP", 0, None, 0),
             "datetime_utc": ("TIMESTAMP", 0, None, 0),
             "length": ("FLOAT", 0, None, 0),
@@ -591,21 +596,33 @@ table_configs = {
             "tic": ("FLOAT", 0, None, 0),
             "polarity": ("VARCHAR(1)", 0, None, 0),
         },
-        "fks": {},
+        "fks": {
+            "instrument_function_id": (
+                "instrument_function",
+                "instrument_function_id",
+                "NO ACTION",
+                "SET NULL",
+            ),
+        },
         "create_sql": """
-        CREATE TABLE sample_file (
-            sample_file_id VARCHAR(16) NOT NULL PRIMARY KEY,
-            filename VARCHAR(256) NOT NULL UNIQUE,
-            instrument VARCHAR(64),
-            datetime TIMESTAMP,
-            datetime_utc TIMESTAMP,
-            length FLOAT,
-            range JSON,
-            mz_calibration JSON,
-            tic FLOAT,
-            polarity VARCHAR(1)
-        );
-    """,
+            CREATE TABLE sample_file (
+                sample_file_id VARCHAR(16) NOT NULL, 
+                instrument_function_id VARCHAR(32), 
+                filename VARCHAR(256) NOT NULL, 
+                instrument VARCHAR(64), 
+                method_file VARCHAR(256), 
+                datetime TIMESTAMP, 
+                datetime_utc TIMESTAMP, 
+                length FLOAT, 
+                range JSON, 
+                mz_calibration JSON, 
+                tic FLOAT, 
+                polarity VARCHAR(1), 
+                PRIMARY KEY (sample_file_id), 
+                FOREIGN KEY(instrument_function_id) REFERENCES instrument_function (instrument_function_id) ON DELETE SET NULL, 
+                UNIQUE (filename)
+            );
+        """,
     },
     "sample_batch": {
         "columns": {
