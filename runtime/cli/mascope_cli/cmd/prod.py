@@ -1,4 +1,8 @@
-import typer, os, json, platform, time
+import typer
+import os
+import json
+import platform
+import time
 
 from typing import Optional, List
 from typing_extensions import Annotated
@@ -35,6 +39,19 @@ What follows is the output `docker compose --help`:
 def main(args: Annotated[Optional[List[str]], typer.Argument()] = None) -> None:
     """
     Manage the mascope production environment
+
+    This is a thin wrapper around `docker compose`, which resolves the
+    docker compose file and sets a variety of environment variables
+    to inject the runtime env and config, timezone and host paths into
+    the containers.
+
+    Because it is a thin wrapper, it exposes the full compose CLI API:
+    you can run any docker compose subcommand in almost exactly the
+    same way as you can normally.
+
+    Note: this docstring is not actually show in the help, unlike usual
+    commands in the CLI. Instead, we print the `long_help` (see above)
+    and then print `docker compose --help`.
     """
     if len(args) == 1 and args[0] == "--help":
         print(long_help)

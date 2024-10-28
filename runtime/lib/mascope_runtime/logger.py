@@ -1,3 +1,7 @@
+# for typehints
+from __future__ import annotations
+import loguru
+
 from loguru import logger
 
 import datetime
@@ -9,10 +13,19 @@ import re
 from rich.console import Console
 from rich.traceback import Traceback
 
+from typing import List, Callable
+
 highlight = re.compile("SUCCESS|WARNING|ERROR|CRITICAL")
 
 
-def style(msg, *tags):
+def style(msg: str, *tags: List[str]) -> str:
+    """
+    Helper for styling log messages
+
+    :param msg: the message to style
+    :param tags: list of tags to apply to the message
+    :return: styled message string
+    """
     # wrap style tags around msg
     start = ""
     for tag in tags:
@@ -23,13 +36,16 @@ def style(msg, *tags):
     return f"{start}{msg}{end}"
 
 
-def formatter(root_path):
+def formatter(root_path: str) -> Callable[[loguru.Record], str]:
     """
     Factory that produces a format function given a
     root_path (MASCOPE_PATH) value.
+
+    :param root_path: the MASCOPE_PATH
+    :return: the record formatting function
     """
 
-    def format_record(record):
+    def format_record(record: loguru.Record):
         # STATUS
 
         # code
@@ -49,17 +65,31 @@ def formatter(root_path):
             return start <= status_code and status_code < start + 100
 
         # color
-        status_style = lambda msg: style(msg, "magenta")
+
         if response(100):
-            status_style = lambda msg: style(msg, "blue")
+            # informational response
+            def status_style(msg):
+                return style(msg, "blue")
         elif response(200):
-            status_style = lambda msg: style(msg, "green")
+            # successful response
+            def status_style(msg):
+                return style(msg, "green")
         elif response(300):
-            status_style = lambda msg: style(msg, "cyan")
+            # redirection response
+            def status_style(msg):
+                return style(msg, "cyan")
         elif response(400):
-            status_style = lambda msg: style(msg, "bold", "yellow")
+            # client error response
+            def status_style(msg):
+                return style(msg, "bold", "yellow")
         elif response(500):
-            status_style = lambda msg: style(msg, "bold", "red")
+            # server error response
+            def status_style(msg):
+                return style(msg, "bold", "red")
+        else:
+            # other
+            def status_style(msg):
+                return style(msg, "magenta")
 
         # FIELDS
 
@@ -113,7 +143,16 @@ def formatter(root_path):
     return format_record
 
 
-def config_logger(module):
+# module is not typed to prevent circular import
+def config_logger(module: any) -> loguru.Logger:
+    """
+    Configure the loguru logger, setting file and terminal logging
+    handlers, log level formatting and other settings. Clears all
+    previous configuration.
+
+    :param module: the runtime module to configure the logging for
+    :return: the loguru logger
+    """
     # setup log path
     log_path = os.path.join(module.config.log_path, module.mode)
     os.makedirs(log_path, exist_ok=True)

@@ -124,9 +124,9 @@ function write_intro() {
     if [[ $action == 'install' ]]; then    
         echo "
 
-    +-------------------------------+
-    | 🚀 MASCOPE UBUNTU INSTALL  🚀 |
-    +-------------------------------+
+    +------------------------------+
+    | 🚀 MASCOPE NIXOS INSTALL  🚀 |
+    +------------------------------+
 
     Installing mascope modules
 
@@ -135,9 +135,9 @@ function write_intro() {
     if [[ $action == 'update' ]]; then
         echo "
 
-    +-----------------------------+
-    | 🚀 MASCOPE UBUNTU UPDATE 🚀 |
-    +-----------------------------+
+    +----------------------------+
+    | 🚀 MASCOPE NIXOS UPDATE 🚀 |
+    +----------------------------+
 
     Updating mascope modules
     "
@@ -145,9 +145,9 @@ function write_intro() {
     if [[ $action == 'uninstall' ]]; then
         echo "
 
-    +--------------------------------+
-    | 🚀 MASCOPE UBUNTU UNINSTALL 🚀 |
-    +--------------------------------+
+    +-------------------------------+
+    | 🚀 MASCOPE NIXOS UNINSTALL 🚀 |
+    +-------------------------------+
 
     Uninstalling mascope modules
 
@@ -156,9 +156,9 @@ function write_intro() {
     if [[ $action == 'reinstall' ]]; then
         echo "
 
-    +--------------------------------+
-    | 🚀 MASCOPE UBUNTU REINSTALL 🚀 |
-    +--------------------------------+
+    +-------------------------------+
+    | 🚀 MASCOPE NIXOS REINSTALL 🚀 |
+    +-------------------------------+
 
     Reinstalling mascope modules
     "
@@ -170,9 +170,9 @@ function write_outro() {
     if [[ $action == 'install' ]]; then    
         echo "
 
-    +------------------------------------------+
-    | 🎉 MASCOPE UBUNTU INSTALL SUCCESSFUL! 🎉 |
-    +------------------------------------------+
+    +-----------------------------------------+
+    | 🎉 MASCOPE NIXOS INSTALL SUCCESSFUL! 🎉 |
+    +-----------------------------------------+
 
     Logging you into a new terminal session to ensure access to
     the new command. Run 'mascope --help' and open the README.md 
@@ -182,9 +182,9 @@ function write_outro() {
     if [[ $action == 'update' ]]; then
         echo "
 
-    +-----------------------------------------+
-    | 🎉 MASCOPE UBUNTU UPDATE SUCCESSFUL! 🎉 |
-    +-----------------------------------------+
+    +----------------------------------------+
+    | 🎉 MASCOPE NIXOS UPDATE SUCCESSFUL! 🎉 |
+    +----------------------------------------+
 
     Run 'mascope --help' and open the README.md for documentation.
     "
@@ -192,18 +192,18 @@ function write_outro() {
     if [[ $action == 'uninstall' ]]; then
         echo "
 
-    +--------------------------------------------+
-    | 🎉 MASCOPE UBUNTU UNINSTALL SUCCESSFUL! 🎉 |
-    +--------------------------------------------+
+    +-------------------------------------------+
+    | 🎉 MASCOPE NIXOS UNINSTALL SUCCESSFUL! 🎉 |
+    +-------------------------------------------+
 
     "
     fi
     if [[ $action == 'reinstall' ]]; then
         echo "
 
-    +--------------------------------------------+
-    | 🎉 MASCOPE UBUNTU REINSTALL SUCCESSFUL! 🎉 |
-    +--------------------------------------------+
+    +-------------------------------------------+
+    | 🎉 MASCOPE NIXOS REINSTALL SUCCESSFUL! 🎉 |
+    +-------------------------------------------+
 
     Logging you into a new terminal session to ensure access to
     the new command. Run 'mascope --help' and open the README.md 

@@ -1,10 +1,9 @@
 import typer
-import rich
 from shutil import copytree
-import tomllib, os, zipfile
+import os
+import zipfile
 from typing import Optional, Annotated
 
-from rich.pretty import pprint
 from rich.console import Console
 from rich.table import Table
 
@@ -12,7 +11,6 @@ from mascope_cli.runtime import runtime
 
 from mascope_runtime import MascopeRuntimeModule
 
-pretty = lambda obj: pprint(obj, indent_guides=False, expand_all=True)
 
 env_app = typer.Typer()
 
@@ -21,6 +19,10 @@ env_app = typer.Typer()
 def main():
     """
     Manage your mascope runtime environments
+
+    Runtime envs are folders in the `runtime/env` directory under your MASCOPE_PATH.
+    They contain all the state needed to run Mascope apps and/or services, e.g. the
+    database, file stores and file streaming folders.
     """
 
 
@@ -28,8 +30,6 @@ def main():
 def list():
     """
     List available envs
-
-    Envs are stored in your `runtime/env` directory.
     """
     table = Table()
     table.add_column("Name", style="cyan", no_wrap=True)
@@ -64,9 +64,9 @@ def list():
 
 
 @env_app.command()
-def activate(env: str):
+def activate(env: Annotated[str, typer.Argument(help="The environment to activate")]):
     """
-    Activate an env
+    Activate an env, so that it is used in all subsequent commands
     """
     runtime.state.env = env
     runtime.logger.info(f"Mascope env set to '{env}'")
@@ -75,47 +75,6 @@ def activate(env: str):
 @env_app.command()
 def default():
     """
-    Revert to the default env
+    Activates the default env
     """
     runtime.state.env = "default"
-
-
-# BROKEN - TODO: FIX
-@env_app.command()
-def copy(
-    source: Annotated[str, typer.Argument()],
-    target: Annotated[Optional[str], typer.Argument()] = None,
-):
-    """
-    Copy a runtime
-    """
-    target = target or f"{source}_copy"
-    source_path = os.path.join(runtime.state.root_path, "runtime", "env", source)
-    target_path = os.path.join(runtime.state.root_path, "runtime", "env", target)
-
-    def log(path, names):
-        runtime.logger.info("Copying %s" % path.replace(source_path, ""))
-        return []
-
-    copytree(source_path, target_path, dirs_exist_ok=True, ignore=log)
-
-# BROKEN - TODO: FIX
-@env_app.command()
-def export(
-    env: Annotated[str, typer.Argument()],
-    target: Annotated[Optional[str], typer.Argument()] = None,
-):
-    """
-    Export a runtime to a zip archive
-    """
-    source_path = os.path.join(runtime.state.root_path, "runtime", "env", env)
-    target_path = target or f"./{env}.mascope.zip"
-    with zipfile.ZipFile(target_path, "w", zipfile.ZIP_DEFLATED) as f:
-        for root, _, files in os.walk(source_path):
-            for file in files:
-                f.write(
-                    os.path.join(root, file),
-                    os.path.relpath(
-                        os.path.join(root, file), os.path.join(source_path, "..")
-                    ),
-                )

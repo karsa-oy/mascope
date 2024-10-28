@@ -1,8 +1,7 @@
 class MascopeMissingPathException(Exception):
     def __init__(self):
         super().__init__(
-            f"""
-
+            """
     MASCOPE_PATH environment variable is not set: please set it with to 
     a path containing a valid Mascope runtime directory.
 
