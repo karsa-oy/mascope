@@ -1,7 +1,7 @@
 import re
 from typing import Optional, List
 from datetime import datetime
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, model_validator
 from mascope_server.api.models.base_pydantic_model import QueryParamsModel
 
 
@@ -68,23 +68,3 @@ class InstrumentFunctionCreateBody(BaseModel):
         ...,
         description="Parameters defining the resolution function, which is used to scale the width of peaks accurately during peak fitting.",
     )
-
-    @field_validator("method_file")
-    @classmethod
-    def validate_method_file(cls, value):
-        # Ensure that the method_file starts with exactly 8 digits
-        if not re.match(r"^\d{8}", value):
-            raise ValueError(
-                "The method_file must start with a date in YYYYMMDD format (e.g., '20240528')."
-            )
-
-        # Extract first 8 digits and check if it forms a valid date
-        date_part = value[:8]
-        try:
-            datetime.strptime(date_part, "%Y%m%d")
-        except ValueError as e:
-            raise ValueError(
-                "The method_file must start with a valid date in YYYYMMDD format (e.g., '20240528')."
-            ) from e
-
-        return value
