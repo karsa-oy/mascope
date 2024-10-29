@@ -57,6 +57,7 @@ def create_sample_file_db_record(data):
     mz_calibration = data.get("mz_calibration")
     tic = calculate_tic(filename)
     polarity = data.get("polarity")
+    method_file = data.get("method_file")
 
     sample_file_db_record = {
         "filename": filename,
@@ -69,6 +70,8 @@ def create_sample_file_db_record(data):
         "tic": tic,
         "polarity": polarity,
     }
+    if method_file:
+        sample_file_db_record["method_file"] = method_file
 
     headers = {"Content-Type": "application/json"}
 
@@ -127,6 +130,7 @@ def process_stream(streamer):
                     "mz_calibration": sample_file.props["mz_calibration"],
                     "utc_offset": sample_file.props["utc_offset"],
                     "polarity": sample_file.props["polarity"],
+                    "method_file": sample_file.props["method_file"],
                 }
             )
             filepath = data.pop("source_filepath")

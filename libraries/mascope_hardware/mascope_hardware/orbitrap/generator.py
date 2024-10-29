@@ -106,6 +106,18 @@ class RawStreamer(Thread):
         return strip_filepath(self.raw.FileName) if self.raw else None
 
     @property
+    def method_file(self) -> str | None:
+        """Instrument method file name from the raw file
+
+        :return: Instrument method file name
+        :rtype: str | None
+        """
+        if self.raw:
+            method_file = self.raw.SampleInformation.InstrumentMethodFile
+            return method_file if method_file else None
+        return None
+
+    @property
     def interval(self) -> float:
         """Mean measurement interval in seconds, i.e. length of one spectrum in the sample
 
@@ -185,6 +197,7 @@ class RawStreamer(Thread):
                 "mz": self.mz.tobytes(),
                 "t_range": [0, self.length],
                 "polarity": "-",
+                "method_file": self.method_file,
             }
             self.spec_queue.put(coordinates)
         if self._has_positive_scans():
@@ -194,6 +207,7 @@ class RawStreamer(Thread):
                 "mz": self.mz.tobytes(),
                 "t_range": [0, self.length],
                 "polarity": "+",
+                "method_file": self.method_file,
             }
             self.spec_queue.put(coordinates)
 
