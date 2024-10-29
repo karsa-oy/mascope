@@ -21,6 +21,17 @@ export function capitalizeFirstLetter(str) {
   return str[0].toUpperCase() + str.slice(1)
 }
 
+/**
+ * Beautify an upper case SNAKE_CASE string by converting it to a capitalized, readable label.
+ * e.g., 'FILTER_REGENERATION' -> 'Filter Regeneration'
+ */
+export function beautifyConstant(str) {
+  return str
+    .split('_')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ')
+}
+
 // ==== End string manipulation functions ====
 
 export function genId(len, case_sensitive = true) {

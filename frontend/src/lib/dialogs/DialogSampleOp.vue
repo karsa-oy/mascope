@@ -10,8 +10,13 @@ import Panel from 'primevue/panel'
 import Dialog from 'primevue/dialog'
 
 import { ToolbarTemplate } from '@/lib/toolbars'
-import { clone, strToSnakeCase, beautifySnakeCase, genId } from '@/lib/utils'
+import { clone, strToSnakeCase, beautifySnakeCase, beautifyConstant, genId } from '@/lib/utils'
 import { useApp } from '@/stores'
+import {
+  sampleTypesFilterIdRequired,
+  sampleTypesFilterIdOptional,
+  sampleTypesFilterIdNotAllowed
+} from '@/lib/constants'
 
 const app = useApp()
 
@@ -126,6 +131,21 @@ const filters = computed(() => {
     : [generated.filterId]
 })
 
+// Determine sample item type options based on filterId and type constraints
+const sampleTypeOptions = computed(() => {
+  if (input.filterId) {
+    return sampleTypesFilterIdRequired.concat(sampleTypesFilterIdOptional).map((type) => ({
+      label: beautifyConstant(type),
+      value: type
+    }))
+  } else {
+    return sampleTypesFilterIdOptional.concat(sampleTypesFilterIdNotAllowed).map((type) => ({
+      label: beautifyConstant(type),
+      value: type
+    }))
+  }
+})
+
 async function save() {
   const sample_item = {
     sample_item_name: input.fields.find((field) => field.label == 'sample_item_name').value,
@@ -182,7 +202,7 @@ watchEffect(() => {
   }
 })
 watchEffect(() => {
-  if (input.type == 'INSTRUMENT_BACKGROUND') {
+  if (sampleTypesFilterIdNotAllowed.includes(input.type)) {
     input.filterId = null
   }
 })
@@ -205,12 +225,18 @@ watchEffect(() => {
 
           <div class="item-filter">
             <FloatLabel>
-              <Select inputId="item-filter-id" v-model="input.filterId" :options="filters" />
+              <Select
+                inputId="item-filter-id"
+                v-model="input.filterId"
+                :options="filters"
+                :disabled="sampleTypesFilterIdNotAllowed.includes(input.type)"
+              />
               <label for="item-filter-id">Filter ID</label>
             </FloatLabel>
             <Button
               @click="input.filterId = generated.filterId = genId(6, false)"
               icon="pi pi-sparkles"
+              :disabled="sampleTypesFilterIdNotAllowed.includes(input.type)"
             />
           </div>
 
@@ -218,21 +244,7 @@ watchEffect(() => {
             <Select
               inputId="item-type"
               v-model="input.type"
-              :options="
-                input.filterId
-                  ? input.filterId == generated.filterId
-                    ? [
-                        { label: 'Filter Regeneration', value: 'FILTER_REGENERATION' },
-                        { label: 'Filter Background', value: 'FILTER_BACKGROUND' }
-                      ]
-                    : [
-                        { label: 'Sample', value: 'SAMPLE' },
-                        { label: 'Blank', value: 'BLANK' },
-                        { label: 'Filter Background', value: 'FILTER_BACKGROUND' },
-                        { label: 'Unknown', value: 'UNKNOWN' }
-                      ]
-                  : [{ label: 'Instrument Background', value: 'INSTRUMENT_BACKGROUND' }]
-              "
+              :options="sampleTypeOptions"
               dataKey="value"
               optionValue="value"
               optionLabel="label"

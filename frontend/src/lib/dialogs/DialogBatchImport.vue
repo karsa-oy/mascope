@@ -20,7 +20,12 @@ import { ref, reactive, computed, watch } from 'vue'
 import { BaseClipboardContext } from '@/lib/base'
 import { fromSpreadsheet, parseAutosamplerCsv, parseGenericCsv } from '@/lib/table'
 import { genId } from '@/lib/utils'
-import { sampleTypes } from '@/lib/constants'
+import {
+  sampleTypes,
+  sampleTypesFilterIdRequired,
+  sampleTypesFilterIdOptional,
+  sampleTypesFilterIdNotAllowed
+} from '@/lib/constants'
 
 import { useApp } from '@/stores'
 
@@ -292,12 +297,9 @@ function validateRows() {
       }
     }
     // Validate filter ID presence based on sample type
-    if (['INSTRUMENT_BACKGROUND', 'ONLINE'].includes(item.sample_item_type) && item.filter_id) {
+    if (sampleTypesFilterIdNotAllowed.includes(item.sample_item_type) && item.filter_id) {
       failures.push(`Filter ID should not be provided for sample type '${friendlyType(item)}'.`)
-    } else if (
-      !['INSTRUMENT_BACKGROUND', 'ONLINE'].includes(item.sample_item_type) &&
-      !item.filter_id
-    ) {
+    } else if (sampleTypesFilterIdRequired.includes(item.sample_item_type) && !item.filter_id) {
       failures.push(`Filter ID must be provided for sample type '${friendlyType(item)}'.`)
     }
     // Validate filter ID format if present
