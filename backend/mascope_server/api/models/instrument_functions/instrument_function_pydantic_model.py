@@ -1,8 +1,12 @@
 import re
 from typing import Optional, List
 from datetime import datetime
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_validator, field_validator
 from mascope_server.api.models.base_pydantic_model import QueryParamsModel
+
+
+# TODO move to configuration file
+DEFAULT_R_SQUARED_THRESHOLD = 0.95
 
 
 class GetInstrumentFunctionsQueryParams(QueryParamsModel):
@@ -68,3 +72,19 @@ class InstrumentFunctionCreateBody(BaseModel):
         ...,
         description="Parameters defining the resolution function, which is used to scale the width of peaks accurately during peak fitting.",
     )
+
+
+class InstrumentFunctionFitParams(BaseModel):
+    threshold: float = Field(
+        default=DEFAULT_R_SQUARED_THRESHOLD,
+        description="R-squared threshold filtering non-(skewed) Gaussian peaks from instrument function evaluation",
+    )
+
+    @field_validator("threshold")
+    @classmethod
+    def validate_threshold(cls, v):
+        if (v <= 0) or (v > 1):
+            raise ValueError(
+                "R-squared threshold must be between 0 and 1, inclusive of 1."
+            )
+        return v

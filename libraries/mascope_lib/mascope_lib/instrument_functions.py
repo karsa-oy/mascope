@@ -19,11 +19,19 @@ from mascope_lib.file_func import get_instrument_type, get_sum_signal, load_arra
 SIGMA_MULTIPLIER = 2 * np.sqrt(2 * np.log(2))
 
 
-def get_instrument_functions(filename: str, dmz=0.5, r_sq_thres=0.95) -> tuple:
+def fit_instrument_functions(filename: str, dmz=0.5, r_sq_thres=0.95) -> tuple:
     """Calculate instrument functions
 
     Compute the median peak shape from the normalized peak shapes (p_ys).
     Calculate the resolution function from pairs of peak positions (p_mzs) and FWHM (p_fwhms).
+
+    Structure of the returned statistics:
+    stats
+        | peakshape
+            | num_of_peaks: number of peak used for peakshape estimation
+        | resolution_function
+            | mz: m/z values of the peak used to fit resolution function
+            | fwhm: widths of the peak used to fit resolution function
 
     :param filename: Sample file name
     :type filename: str
@@ -31,13 +39,11 @@ def get_instrument_functions(filename: str, dmz=0.5, r_sq_thres=0.95) -> tuple:
     :type dmz: float, optional
     :param r_sq_thres: R-squared threshold for peak fitting, defaults to 0.95
     :type r_sq_thres: float, optional
-    :return: Tuple containing the peak shape and resolution function
+    :return: Tuple containing the peak shape as dict, resolution function as partial, statistics as dict
     :rtype: tuple
     """
-    # Define the MS
     instrument_type = get_instrument_type(filename)
 
-    # Extract averaged spectrum and mz values
     sum_signal = get_sum_signal(filename)
     spec = sum_signal.values
     mz = sum_signal.mz.values
@@ -47,13 +53,15 @@ def get_instrument_functions(filename: str, dmz=0.5, r_sq_thres=0.95) -> tuple:
         mz, spec, instrument_type, dmz, r_sq_thres
     )
 
-    # Calculate instrument functions
-    peak_shape = get_peak_shape(p_x, p_ys)
+    peak_shape, ps_stats = calculate_peakshape(p_x, p_ys)
+    resolution_function, resfun_stats = fit_resolution_function(
+        instrument_type, p_mzs, p_fwhms
+    )
 
-    # Get resolution function
-    resolution_function = get_resolution_function(instrument_type, p_mzs, p_fwhms)
+    # Merge peakshape and resolution function statistics
+    stats = ps_stats | resfun_stats
 
-    return peak_shape, resolution_function
+    return peak_shape, resolution_function, stats
 
 
 def process_peak_shapes(
@@ -94,8 +102,6 @@ def process_peak_shapes(
     :return: Tuple containing p_x, p_ys, p_mzs, and p_fwhms
     :rtype: tuple
     """
-
-    # Get peak indices
     peak_indices = choose_peaks(spec, n_peaks=n_peaks)
 
     p_x = np.linspace(-10, 10, 101)
@@ -201,7 +207,6 @@ def fit_gaussian(instrument_type, dmz, x: np.array, y: np.array) -> ModelResult:
     params.add("p_sigma", value=0.01)
     params.add("p_gamma", value=-0.1)
 
-    # Perform fitting
     fit = model.fit(y, params, x=x)
     return fit
 
@@ -218,7 +223,6 @@ def choose_peaks(spec: np.ndarray, n_peaks=100) -> np.ndarray:
     :return: Array of indices where peaks are located in the spectrum
     :rtype: np.ndarray
     """
-    # Find peaks
     peak_indices, _ = find_peaks(spec)
 
     # Extract the values at the peak indices
@@ -246,7 +250,6 @@ def calculate_center_of_mass(x: np.ndarray, y: np.ndarray) -> float:
     :return: The center of mass of the distribution
     :rtype: float
     """
-    # Calculate the center of mass
     center_of_mass = np.sum(x * y) / np.sum(y)
     return center_of_mass
 
@@ -261,11 +264,9 @@ def calculate_fwhm(x: np.ndarray, y: np.ndarray) -> float:
     :return: FWHM value
     :rtype: float
     """
-    # Find the peak
     peak_index = np.argmax(y)
     peak_value = y[peak_index]
 
-    # Calculate half maximum
     half_max = peak_value / 2.0
 
     # Find indices where y crosses the half maximum
@@ -286,7 +287,6 @@ def calculate_fwhm(x: np.ndarray, y: np.ndarray) -> float:
         x_left = f_left(half_max)
         x_right = f_right(half_max)
 
-        # Calculate FWHM
         fwhm = x_right - x_left
     else:
         fwhm = None
@@ -294,22 +294,28 @@ def calculate_fwhm(x: np.ndarray, y: np.ndarray) -> float:
     return fwhm
 
 
-def get_peak_shape(p_x: np.ndarray, p_ys: np.ndarray) -> dict:
+def calculate_peakshape(p_x: np.ndarray, p_ys: np.ndarray) -> tuple:
     """Calculate the meadian peak shape array from a 2D array of peaks
 
     :param p_x: array of normalized x-values corresponding to the peaks
     :type p_x: np.ndarray
     :param p_ys: 2D array where each row represents the y-values of a peak
     :type p_ys: np.ndarray
-    :return: Dictionary containing x and y values of the median peak shape
-    :rtype: dict
+    :return: Tuple with dictionaries containing x and y values of the median peak shape and statistics
+    :rtype: tuple
     """
-    if len(p_ys) < 10:
+    stats = {}
+    num_of_peaks = len(p_ys)
+    if num_of_peaks < 10:
         lib_runtime.logger.warning(
-            f"Only {len(p_ys)} peaks will be used to estimate median peak shape!"
+            f"Only {num_of_peaks} peaks will be used to estimate median peak shape!"
         )
     else:
-        lib_runtime.logger.info(f"Peak shape will be averaged from {len(p_ys)} peaks")
+        lib_runtime.logger.info(
+            f"Peak shape will be averaged from {num_of_peaks} peaks"
+        )
+    stats = {"num_of_peaks": num_of_peaks}
+
     # Calculate median peak shape
     p_median = np.median(np.array([p_y for p_y in p_ys]), axis=0)
 
@@ -330,12 +336,11 @@ def get_peak_shape(p_x: np.ndarray, p_ys: np.ndarray) -> dict:
     sigma = fwhm / SIGMA_MULTIPLIER
     y /= sigma
 
-    # Get peak shape
     peak_shape = {"x": x, "y": y}
-    return peak_shape
+    return peak_shape, {"peakshape": stats}
 
 
-def get_resolution_function(
+def fit_resolution_function(
     instrument_type: str, p_mzs: list | np.ndarray, p_fwhms: list | np.ndarray, ndev=1
 ) -> partial:
     """Calculate the resolution function for a given instrument type
@@ -352,17 +357,16 @@ def get_resolution_function(
     :type p_fwhms: list | np.ndarray
     :param ndev: Number of standard deviations used to filter out FWHM outliers
     :type ndev: int, optional
-    :return: The resolution function and the fitted FWHM vs m/z curve
+    :return: Resolution function as partial and dictionary with m/z and fitted FWHM lists
     :rtype: tuple
     """
-    # Convert m/z and FWHM values to numpy arrays
+    stats = {}
     p_mzs = np.array(p_mzs)
     p_fwhms = np.array(p_fwhms)
 
     # Fit FWHM vs m/z pairs
     p_fwhms_fit = fit_fwhm(instrument_type, p_mzs, p_fwhms)
 
-    # Get residuals and standard deviation
     residuals = p_fwhms - p_fwhms_fit
     std_dev = np.std(residuals)
     if instrument_type == "tof":
@@ -375,6 +379,9 @@ def get_resolution_function(
     mass = np.array(p_mzs)[~is_outlier]
 
     resolution = mass / p_fwhms_filt
+
+    stats["mz"] = mass.tolist()
+    stats["fwhm"] = p_fwhms_filt.tolist()
 
     # Fit resolution function based on the instrument type
     try:
@@ -407,7 +414,7 @@ def get_resolution_function(
         lib_runtime.logger.error(f"Resolution function fitting failed: {e}")
         raise ValueError("Resolution function fitting failed") from e
 
-    return resolution_function
+    return resolution_function, {"resolution_function": stats}
 
 
 def fit_fwhm(
@@ -512,7 +519,6 @@ if __name__ == "__main__":
 
     # Calculate instrument functions
     try:
-        # Define the MS
         instrument_type = get_instrument_type(args.filename)
 
         # Extract averaged spectrum and mz values
@@ -524,8 +530,6 @@ if __name__ == "__main__":
         p_x, p_ys, p_mzs, p_fwhms = process_peak_shapes(
             mz, spec, instrument_type, args.dmz, args.r_sq_thres
         )
-
-        # Convert values to numpy arrays
         p_mzs = np.array(p_mzs)
         p_fwhms = np.array(p_fwhms)
 
@@ -535,9 +539,8 @@ if __name__ == "__main__":
         # Number of std to filter out outliers in FWHM fit
         ndev = 1
 
-        # Calculate instrument functions
-        ps = get_peak_shape(p_x, p_ys)
-        res_fun = get_resolution_function(instrument_type, p_mzs, p_fwhms, ndev)
+        ps, _ = calculate_peakshape(p_x, p_ys)
+        res_fun, _ = fit_resolution_function(instrument_type, p_mzs, p_fwhms, ndev)
 
         # Fit peaks
         sample_file_data = asyncio.run(
@@ -551,8 +554,6 @@ if __name__ == "__main__":
                 instrument_type=instrument_type,
             )
         )
-
-        # Load sum signal
         sum_signal = get_sum_signal(args.filename)
 
         # Get fitted peak positions and heights

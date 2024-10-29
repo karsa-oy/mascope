@@ -100,7 +100,7 @@ def segment_spec(sum_spec):
         non_zero_indices[0] = non_zero_indices[0][1:]
     if non_zero_indices[-1][-1] == len(sum_spec):
         # Remove out-of-range index from the last chunk
-        non_zero_indices[-1][-1] = non_zero_indices[-1][:-1]
+        non_zero_indices[-1] = non_zero_indices[-1][:-1]
     # Remove short chunks
     non_zero_indices = [chunk for chunk in non_zero_indices if len(chunk) > 4]
     return non_zero_indices
