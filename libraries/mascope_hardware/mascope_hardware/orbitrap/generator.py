@@ -325,6 +325,7 @@ class RawStreamer(Thread):
                         )
                         i_type = self.raw.GetInstrumentType(0)
                         self.raw.SelectInstrument(i_type, 1)
+                        self.raw.IncludeReferenceAndExceptionData = True
                 except Exception as e:
                     self.log.error(f"Failed to read file {file_to_stream}: {e}")
                     continue
