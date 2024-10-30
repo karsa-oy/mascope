@@ -1,44 +1,60 @@
 import pandas as pd
-from mascope_server.api.models.match.match_pydantic_model import (
-    FilterParams,
-)
+
+from mascope_server.db import async_session
+from mascope_server.db.models import Sample
+
+from .schema import BaseMatchParams, TofMatchParams, OrbiMatchParams
 
 
-def apply_filter_params(
-    match_isotope_df, filter_params: FilterParams = None
+def instrument_default_match_params(instrument_name: str):
+    instrument = instrument_name.lower()
+    if "orbi" in instrument:
+        return OrbiMatchParams()
+    elif "tof" in instrument or "api" in instrument:
+        return TofMatchParams()
+    else:
+        raise ValueError(f"Failed to identify instrument type {instrument_name}")
+
+
+async def default_match_params(sample_item_id: str):
+    async with async_session() as session:
+        sample = await session.get(Sample, sample_item_id)
+    return instrument_default_match_params(sample.instrument)
+
+
+def apply_match_params(
+    match_isotope_df, match_params: BaseMatchParams = None
 ) -> pd.DataFrame:
     """
     Apply filtering logic to a isotope-lvl matches DataFrame.
 
     :param match_isotope_df: DataFrame containing match isotope data.
     :type match_isotope_df: pd.DataFrame
-    :param filter_params: Optional; Pydantic model of filtering parameters.
-    :type filter_params: FilterParams
+    :param match_params: Optional; Pydantic model of filtering parameters.
+    :type match_params: MatchParams
     :return: DataFrame with applied filters.
     :rtype: pd.DataFrame
     """
-    # Convert filter_params Pydantic model to dictionary if provided
-    provided_params = filter_params.model_dump() if filter_params else None
+    # Convert match_params Pydantic model to dictionary if provided
+    provided_params = match_params.model_dump() if match_params else None
 
     def get_params(row):
         """
-        Determine the filter parameters to use based on the priority:
-        1. Provided filter parameters
-        2. Ion-specific filter parameters for the sample instrument
-        3. Default filter parameters
+        Determine the match parameters to use based on the priority:
+        1. Provided match parameters
+        2. Ion-specific match parameters for the sample instrument
+        3. Default match parameters
         """
         # If provided_params are available, use them for all rows
         if provided_params:
             return provided_params
 
-        # If row-specific filter_params are available for the instrument, use them
+        # If row-specific match_params are available for the instrument, use them
         if "filter_params" in row and row["instrument"] in row["filter_params"]:
             return row["filter_params"][row["instrument"]]
 
-        # Define default filter parameters from the FilterParams Pydantic model
-        default_params = FilterParams().model_dump()
         # Fallback to default parameters
-        return default_params
+        return instrument_default_match_params(row["instrument"]).model_dump()
 
     def filter_row(row):
         """

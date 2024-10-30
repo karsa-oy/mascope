@@ -392,12 +392,12 @@ async function pasteItem(context) {
  * Watches for changes in the focused sample and updates the match visualization accordingly.
  *
  * This watcher reacts whenever `app.data.sample.focused` changes:
- * - Scenario 1: Match Tab is active (app.ui.matchVisualized.ion is set)
+ * - Scenario 1: Match Tab is active (app.data.match.visualized.ion is set)
  *   - If a new sample is focused and there's an ion currently visualized in the Match tab,
- *     the function retrieves the corresponding data from `app.ui.matchVisualized.ion`.
+ *     the function retrieves the corresponding data from `app.data.match.visualized.ion`.
  *   - The match visualization is then updated with the new sample ID,  visualised ion ID, collection ID, and its filter parameters.
  *
- * - Scenario 2: Target selection in Target Browser (app.ui.matchVisualized.ion is inactive):
+ * - Scenario 2: Target selection in Target Browser (app.data.match.visualized.ion is inactive):
  *   - If no ion is currently visualized but there is a selected ion in the Target browser,
  *     it retrieves the focused ion and the appropriate filter parameters from `app.data.match.ion.selected`.
  *   - If a compound is selected instead, it finds the corresponding ion from the loaded ions and retrieves its filter parameters.
@@ -410,46 +410,40 @@ async function pasteItem(context) {
  */
 watch(
   () => app.data.sample.focused,
-  async (newFocusedSample) => {
-    if (!newFocusedSample) {
+  async (focusedSample) => {
+    if (!focusedSample) {
       // If no sample is focused, unset the match visualization
-      return app.ui.matchVisualized.unset({ target: false })
+      return app.data.match.visualized.unset({ 
+        cacheTarget: true
+      })
     }
 
-    const { instrument, sample_item_id: sampleId } = newFocusedSample
+    const { instrument, sample_item_id: sampleId } = focusedSample
     let ionId = null
-    let collectionId = null
-    let filterParams = null
+    let collectionId = app.data.match.collection.focusedId
 
-    if (app.ui.matchVisualized.ion) {
-      // Scenario 1: Match Tab is Active, use currently visualized ion details
-      ;({ target_ion_id: ionId, target_collection_id: collectionId } = app.ui.matchVisualized.ion)
-      filterParams = app.ui.matchVisualized.ion?.filter_params?.[instrument] || null
-    } else if (app.data.match.ion.selected.length > 0) {
-      // Scenario 2: Match Tab is Not Active but a Match Ion is Selected
-      const selectedIon = app.data.match.ion.selected[0]
+    if (app.data.match.visualized.ion) {
+      // match visualized
+      ({ 
+        target_ion_id: ionId, 
+        target_collection_id: collectionId 
+      } = app.data.match.visualized.ion)
+    } else if (app.data.match.ion.focused) {
+      // no match visualized but match ion focused
       ionId = app.data.match.ion.focusedId
-      collectionId = app.data.match.collection.focusedId
-      filterParams = selectedIon?.filter_params?.[instrument] || null
-    } else if (app.data.match.compound.selected.length > 0) {
-      // Scenario 2: Match Tab is Not Active but a Match Compound is Selected
-      const ion = app.data.match.ion.list?.find(
+    } else if (app.data.match.compound.focused) {
+      // no match visualized but match compound focused
+      const ionId = app.data.match.ion.list?.find(
         (ion) => ion.target_compound_id === app.data.match.compound.focusedId
-      )
-      if (ion) {
-        ionId = ion.target_ion_id
-        collectionId = app.data.match.collection.focusedId
-        filterParams = ion.filter_params?.[instrument] || null
-      }
+      )?.target_ion_id
     }
 
     if (ionId && collectionId) {
       // Set the match visualization with the new sample ID, ion ID, collection ID, and filter params
-      await app.ui.matchVisualized.set({
-        sampleId: sampleId,
+      await app.data.match.visualized.set({
+        sampleId,
         ionId,
-        collectionId,
-        params: filterParams
+        collectionId
       })
     }
   }

@@ -37,7 +37,7 @@ const tabs = computed(() => [
   {
     label: 'Match',
     icon: 'pi pi-wave-pulse',
-    disabled: !app.ui.matchVisualized.ion
+    disabled: !app.data.match.visualized.ion
   },
   {
     label: 'Acquisitions',
@@ -55,7 +55,7 @@ watch(
   }
 )
 watch(
-  computed(() => app.ui.matchVisualized.ion),
+  computed(() => app.data.match.visualized.ion),
   (focused) => {
     if (focused && app.ui.tab.active !== 'spectrum') {
       app.ui.tab.active = 'match'
@@ -125,7 +125,7 @@ watch(
                 <ChartSampleSpectrum />
               </TabPanel>
               <TabPanel value="match">
-                <PaneTabMatch v-if="app.ui.matchVisualized.ion" />
+                <PaneTabMatch v-if="app.data.match.visualized.ion" />
               </TabPanel>
               <TabPanel value="acquisitions">
                 <PaneTabAcquisitions

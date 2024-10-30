@@ -32,7 +32,7 @@ from mascope_server.api.controllers.match.isotopes.match_isotopes_controller imp
 from mascope_server.api.controllers.match.interferences.match_interferences_controller import (
     get_match_interferences,
 )
-from mascope_server.api.controllers.match.lib.match_filter import apply_filter_params
+from mascope_server.api.new.match.params import apply_match_params
 from mascope_server.api.controllers.match.lib.match_util import (
     deduplicate_match_df,
     sort_and_paginate_match_sample_df,
@@ -417,7 +417,7 @@ async def get_match_sample_isotopes(
         sample_batch_id=sample_batch_id,
         target_collection_id=target_collection_id,
         show_target_collection=True,
-        show_filter_params=True,
+        show_match_params=True,
     )
     if not target_isotopes["data"]:
         return {
@@ -472,7 +472,7 @@ async def get_match_sample_isotopes(
     match_sample_isotopes_df = pd.DataFrame(match_sample_isotopes)
 
     # Apply filtering to filter the match_score and assign match_category
-    match_sample_isotopes_df = apply_filter_params(match_sample_isotopes_df)
+    match_sample_isotopes_df = apply_match_params(match_sample_isotopes_df)
 
     # Deduplicate if required
     if deduplicate:

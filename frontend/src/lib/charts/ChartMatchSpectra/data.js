@@ -25,7 +25,7 @@ export const useChartData = defineStore('chart.match.spectra', () => {
 
       // Check if the trace has target_isotope_id and update the corresponding isotope in activeIsotopes
       if (trace.target_isotope_id) {
-        const isotope = app.ui.matchVisualized.isotopes?.find(
+        const isotope = app.data.match.visualized.isotopes?.find(
           (iso) => iso.target_isotope_id === trace.target_isotope_id
         )
         if (isotope) {

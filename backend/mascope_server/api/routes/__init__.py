@@ -72,6 +72,7 @@ from mascope_server.api.routes.visualization.visualization_routes import (
 )
 from mascope_server.api.routes.workspace.workspace_routes import workspace_router
 
+from mascope_server.api.new.params import params_router
 
 routers = [
     auth_router,
@@ -100,6 +101,7 @@ routers = [
     match_isotopes_router,
     match_targets_sample_router,
     match_targets_batch_router,
+    params_router,
     attribute_templates_router,
     instrument_functions_router,
     visualization_router,

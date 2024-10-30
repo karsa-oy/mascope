@@ -28,7 +28,7 @@ const isotopeCharts = computed(() => {
   // use the visualization's store
   const data = useChartData()
   // create an array corresponding to visualized isotopes
-  return clone(app.ui.matchVisualized.isotopes).map((isotope) => {
+  return clone(app.data.match.visualized.isotopes).map((isotope) => {
     // split up the chart's traces by isotope
     const start = data.traces?.findIndex(
       (trace) => trace.target_isotope_id === isotope.target_isotope_id
@@ -43,10 +43,10 @@ const isotopeCharts = computed(() => {
     const isotopeTraces = data.traces?.slice(start, end)
     // compute match category for this isotope
     let match_category = 0
-    if (isotope.match_score > app.data.filterParams.current.possible_match_threshold) {
+    if (isotope.match_score > app.data.match.params.current.possible_match_threshold) {
       match_category = 1
     }
-    if (isotope.match_score > app.data.filterParams.current.probable_match_threshold) {
+    if (isotope.match_score > app.data.match.params.current.probable_match_threshold) {
       match_category = 2
     }
     // return chart data
@@ -96,7 +96,7 @@ const error = new Intl.NumberFormat('en-US', {
 // reset chart zoom when changing targets
 watch(
   // follow visualization, not focused target
-  () => app.ui.matchVisualized.ion.target_ion_id,
+  () => app.data.match.visualized.ion.target_ion_id,
   (visualized) => {
     // reset zoom for all isotope charts
     isotopeCharts.value.forEach((_, index) => {
@@ -149,7 +149,7 @@ watch(
             <Tag
               :value="`Peak area: ${area.format(isotopeChart.sample_peak_area)}`"
               :severity="
-                isotopeChart.sample_peak_area < app.data.filterParams.current.peak_min_intensity
+                isotopeChart.sample_peak_area < app.data.match.params.current.peak_min_intensity
                   ? 'warn'
                   : 'info'
               "
@@ -157,7 +157,7 @@ watch(
             <Tag
               :value="`mz error: ${error.format(isotopeChart.match_mz_error)}`"
               :severity="
-                Math.abs(isotopeChart.match_mz_error) > app.data.filterParams.current.mz_tolerance
+                Math.abs(isotopeChart.match_mz_error) > app.data.match.params.current.mz_tolerance
                   ? 'warn'
                   : 'info'
               "
@@ -167,7 +167,7 @@ watch(
               :value="`Abundance error: ${error.format(isotopeChart.match_abundance_error)}`"
               :severity="
                 Math.abs(isotopeChart.match_abundance_error) >
-                app.data.filterParams.current.isotope_ratio_tolerance
+                app.data.match.params.current.isotope_ratio_tolerance
                   ? 'warn'
                   : 'info'
               "

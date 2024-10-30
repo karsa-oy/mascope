@@ -75,7 +75,7 @@ async def compute_match_isotopes(
         - Matching is done on isotope-level. Ion, compound and collection level matches are aggregated from
         isotope-level matches on read sample operation; see the samples_controller.py for this aggregation.
 
-    TODO min_isotope_abundance will be passed from the filter_params
+    TODO min_isotope_abundance will be passed from the match_params
     """
     try:
         target_isotopes_df = target_isotopes_df[

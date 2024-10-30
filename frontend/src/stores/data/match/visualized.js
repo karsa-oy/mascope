@@ -4,13 +4,21 @@ import { defineStore } from 'pinia'
 import { api } from '@/api'
 import { debounce } from '@/lib/utils'
 
-import { useData } from '../data'
-import { useChart } from './chart'
+import { useUi } from '@/stores/ui'
+
+import { useWorkspace } from '../workspace'
+import { useSample } from '../sample'
+
+import { useMatchParams } from './params'
+import { useMatchIon } from './records'
 
 // MATCH VISUALIZATION
 
-export const useMatchVisualized = defineStore('app.ui.matchVisualized', () => {
-  const data = useData()
+export const useMatchVisualized = defineStore('app.data.match.visualized', () => {
+
+  const ui = useUi()
+  const matchParams = useMatchParams()
+  const sample = useSample()
 
   // state
   const ion = ref(null)
@@ -21,16 +29,7 @@ export const useMatchVisualized = defineStore('app.ui.matchVisualized', () => {
     collectionId: null
   })
 
-  const hash = computed(() => {
-    const sampleId = ion.value?.sample_item_id
-    const collectionId = ion.value?.target_collection_id
-    const ionId = ion.value?.target_ion_id
-    return sampleId && collectionId && ionId ? `${sampleId}_${collectionId}_${ionId}` : null
-  })
-
-  const filterParams = computed(() =>
-    hash.value ? ion.value?.filter_params[data.sample.focused.instrument] : null
-  )
+  const instrument = computed(() => sample.focused.instrument)
 
   // actions
   /**
@@ -40,18 +39,17 @@ export const useMatchVisualized = defineStore('app.ui.matchVisualized', () => {
    * - If any of the identifiers change (sample, ion, or collection), the corresponding matches are loaded, and the visualization is activated.
    * - If parameters are provided, they override the current filter parameters.
    *
-   * @param {Object} options - The parameters for setting the matchVisualized.
+   * @param {Object} options - The parameters for setting the match visualized.
    * @param {string|null} [options.sampleId] - The ID of the sample to visualize.
    * @param {string|null} [options.ionId] - The ID of the ion to visualize.
    * @param {string|null} [options.collectionId] - The ID of the collection to visualize.
-   * @param {Object|null} [options.params] - Optional filter parameters to apply.
    */
   async function set({
     sampleId = cache.sampleId,
     ionId = cache.ionId,
-    collectionId = cache.collectionId,
-    params = null
+    collectionId = cache.collectionId
   }) {
+    console.log(sampleId, ionId, collectionId)
     const sampleChanged = sampleId !== cache.sampleId
     const ionChanged = ionId !== cache.ionId
     const collectionChanged = collectionId !== cache.collectionId
@@ -60,14 +58,27 @@ export const useMatchVisualized = defineStore('app.ui.matchVisualized', () => {
     if (!sampleChanged && !ionChanged && !collectionChanged) {
       return
     }
+
+    // resolve ion filter params
+    const matchIon = useMatchIon()
+    const ionMatchParams = matchIon.list
+      .find((ion) => ion.target_ion_id === ionId)
+      ?.filter_params[sample.focused.instrument]
+
+
     // Reset filter parameters if the sample has changed and no new filter_parames to set are provided
-    if (sampleChanged && !params) {
-      await data.filterParams.reset()
+    if (sampleChanged && !ionMatchParams) {
+      await matchParams.reset({
+        instrument: instrument.value
+      })
     }
 
     // Apply new filter parameters if provided
-    if (params) {
-      await data.filterParams.set(params)
+    if (ionMatchParams) {
+      await matchParams.init({
+        params: ionMatchParams,
+        instrument: instrument.value
+      })
     }
 
     // Load matches and activate visualization
@@ -85,16 +96,18 @@ export const useMatchVisualized = defineStore('app.ui.matchVisualized', () => {
     await activate()
   }
 
-  async function unset({ sample = true, target = true } = {}) {
-    const chart = useChart()
-    chart.clear()
+  async function unset({ cacheSample = false, cacheTarget = false } = {}) {
+    if (!ion.value) {
+      return
+    }
+    ui.chart.clear()
     if (!ion.value) return
     ion.value = null
     isotopes.value = null
-    if (sample) {
+    if (!cacheSample) {
       cache.sampleId = null
     }
-    if (target) {
+    if (!cacheTarget) {
       cache.ionId = null
       cache.collectionId = null
     }
@@ -110,7 +123,7 @@ export const useMatchVisualized = defineStore('app.ui.matchVisualized', () => {
         body: {
           target_ion_id,
           target_collection_id: collectionId ?? ion.value?.target_collection_id,
-          filter_params: data.filterParams.current
+          match_params: matchParams.current
         }
       }
     })
@@ -145,24 +158,25 @@ export const useMatchVisualized = defineStore('app.ui.matchVisualized', () => {
 
   async function activate({ sampleId, ionId } = {}) {
     if (!ion.value) return
-    const chart = useChart()
 
-    chart.clear()
+    ui.chart.clear()
 
     await api.request.read({
       method: 'getVisualizationIonFocus',
       body: {
         sample_item_id: sampleId ?? ion.value.sample_item_id,
         target_ion_id: ionId ?? ion.value.target_ion_id,
-        min_isotope_abundance: data.filterParams.current.min_isotope_abundance,
-        peak_min_intensity: data.filterParams.current.peak_min_intensity,
-        mz_tolerance: data.filterParams.current.mz_tolerance
+        min_isotope_abundance: matchParams.current.min_isotope_abundance,
+        peak_min_intensity: matchParams.current.peak_min_intensity,
+        mz_tolerance: matchParams.current.mz_tolerance
       }
     })
   }
 
+  // clear when switching workspaces
+  const workspace = useWorkspace()
   watch(
-    computed(() => data.workspace.focused),
+    computed(() => workspace.focused),
     () => {
       unset()
     }
@@ -172,8 +186,6 @@ export const useMatchVisualized = defineStore('app.ui.matchVisualized', () => {
     // state
     ion,
     isotopes,
-    hash,
-    filterParams,
     // actions
     set: debounce(set),
     reset,

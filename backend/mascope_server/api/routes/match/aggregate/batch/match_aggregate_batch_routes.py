@@ -37,7 +37,7 @@ async def aggregate_batch_match_isotope_filtered_data_route(
     data = await aggregate_match_isotope_filtered_data(
         sample_batch_id=sample_batch_id,
         target_ion_id=body.target_ion_id,
-        filter_params=body.filter_params,
+        match_params=body.match_params,
         include_match_interference=body.include_match_interference,
     )
     if not data.empty:
@@ -69,7 +69,7 @@ async def aggregate_batch_matches_route(
     result = await aggregate_matches(
         sample_batch_id=sample_batch_id,
         target_ion_id=body.target_ion_id,
-        filter_params=body.filter_params,
+        match_params=body.match_params,
     )
     if result.get("results", 0) == 0:
         message = f"No match data found for batch '{sample_batch_name}'"
@@ -92,7 +92,7 @@ async def aggregate_and_create_batch_matches_route(
     result = await aggregate_and_create_matches(
         sample_batch_id=sample_batch_id,
         target_ion_id=body.target_ion_id,
-        filter_params=body.filter_params,
+        match_params=body.match_params,
         match_ions=body.match_ions,
         match_compounds=body.match_compounds,
         match_collections=body.match_collections,
@@ -127,7 +127,7 @@ async def aggregate_and_recreate_matches_route(
     result = await aggregate_and_recreate_matches(
         sample_batch_id=sample_batch_id,
         target_ion_id=body.target_ion_id,
-        filter_params=body.filter_params,
+        match_params=body.match_params,
         match_ions=body.match_ions,
         match_compounds=body.match_compounds,
         match_collections=body.match_collections,

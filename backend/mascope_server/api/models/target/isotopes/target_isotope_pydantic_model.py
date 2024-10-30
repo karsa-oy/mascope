@@ -34,9 +34,9 @@ class GetTargetIsotopesQueryParams(QueryParamsModel):
         False,
         description="Flag to include target collection ID, also duplicate compounds present in several collections will be shown.",
     )
-    show_filter_params: bool = Field(
+    show_match_params: bool = Field(
         False,
-        description="Flag to include filter_params of the isotope's parent target ion.",
+        description="Flag to include match_params of the isotope's parent target ion.",
     )
     sort: Optional[str] = Field(None, description="Field to sort by.")
     order: Optional[str] = Field(

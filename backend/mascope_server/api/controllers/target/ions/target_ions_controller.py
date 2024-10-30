@@ -321,35 +321,35 @@ async def update_target_ion(target_ion_id: str, target_ion_update: TargetIonUpda
         if not target_ion:
             raise NotFoundException(f"Target ion with ID '{target_ion_id}' not found")
 
-        existing_filter_params = target_ion.filter_params or {}
+        existing_match_params = target_ion.filter_params or {}
 
-        # Create a new dictionary for updated filter_params
-        new_filter_params = existing_filter_params.copy()
+        # Create a new dictionary for updated match params
+        new_match_params = existing_match_params.copy()
         affected_instruments = set()
 
         # Handle deletion of filter parameters for a specific instrument
-        if target_ion_update.delete_instrument_filters:
-            instrument_to_delete = target_ion_update.delete_instrument_filters
-            if instrument_to_delete in new_filter_params:
-                del new_filter_params[instrument_to_delete]
-                target_ion.filter_params = new_filter_params
+        if target_ion_update.delete_instrument_params:
+            instrument_to_delete = target_ion_update.delete_instrument_params
+            if instrument_to_delete in new_match_params:
+                del new_match_params[instrument_to_delete]
+                target_ion.filter_params = new_match_params
                 affected_instruments.add(instrument_to_delete)
 
         # Handle updating filter parameters
         else:
-            updated_filter_params = target_ion_update.filter_params
-            for instrument, update_params in updated_filter_params.items():
+            updated_match_params = target_ion_update.match_params
+            for instrument, update_params in updated_match_params.items():
                 update_params_dict = update_params.model_dump()
-                # Check for changes in filter_params
+                # Check for changes in match params
                 if (
-                    instrument not in existing_filter_params
-                    or existing_filter_params[instrument] != update_params_dict
+                    instrument not in existing_match_params
+                    or existing_match_params[instrument] != update_params_dict
                 ):
-                    new_filter_params[instrument] = update_params_dict
+                    new_match_params[instrument] = update_params_dict
                     affected_instruments.add(instrument)
 
-                    # Assign the new dictionary to target_ion.filter_params
-                    target_ion.filter_params = new_filter_params
+                    # update record params
+                    target_ion.filter_params = new_match_params
 
         # Commit and refresh if there are any changes
         if affected_instruments:

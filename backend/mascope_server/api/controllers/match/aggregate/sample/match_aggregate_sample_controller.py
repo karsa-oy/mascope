@@ -2,6 +2,7 @@ import pandas as pd
 from sqlalchemy import (
     select,
 )
+from typing import Optional
 from mascope_lib.util import norm
 from mascope_server.db.id import gen_id
 from mascope_server.db import async_session
@@ -17,7 +18,7 @@ from mascope_server.api.lib.exceptions.api_exceptions import NotFoundException
 from mascope_server.api.controllers.target.ions.target_ions_controller import (
     create_target_ions,
 )
-from mascope_server.api.controllers.match.lib.match_filter import apply_filter_params
+from mascope_server.api.new.match.params import apply_match_params
 from mascope_server.api.controllers.match.lib.match_compute import (
     compute_match_isotopes,
 )
@@ -31,9 +32,7 @@ from mascope_server.api.controllers.match.aggregate.match_aggregate_controller i
     aggregate_match_isotope_filtered_data,
     aggregate_matches,
 )
-from mascope_server.api.models.match.match_pydantic_model import FilterParams
-
-from mascope_server.runtime import runtime
+from mascope_server.api.new.match.params import BaseMatchParams, default_match_params
 
 
 @api_controller()
@@ -41,14 +40,14 @@ async def aggregate_sample_match_ion(
     sample_item_id: str,
     target_ion_id: str,
     target_collection_id: str,
-    filter_params: FilterParams,
+    match_params: BaseMatchParams,
 ) -> dict:
     """
     Aggregates ion-specific match information for a given sample item by fetching match data at the isotope level,
     applying the provided filter parameters, and returning aggregated match data for ions and isotopes.
 
     Key Points:
-    - Ion-specific `filter_params` are required; stored or default parameters are NOT used for filtering.
+    - Ion-specific `match_params` are required; stored or default parameters are NOT used for filtering.
     - The function directly processes the aggregated match isotope data without unnecessary intermediate steps.
 
     Steps:
@@ -65,8 +64,8 @@ async def aggregate_sample_match_ion(
     :type target_ion_id: str
     :param target_collection_id: ID of the target collection to filter out duplicates.
     :type target_collection_id: str
-    :param filter_params: Ion-specific filter parameters for match score and sample peak area filtering.
-    :type filter_params: FilterParams
+    :param match_params: Ion-specific filter parameters for match score and sample peak area filtering.
+    :type match_params: BaseMatchParams
     :return: Dictionary containing aggregated match information for ions and isotopes.
     :rtype: dict
     """
@@ -84,7 +83,7 @@ async def aggregate_sample_match_ion(
             await aggregate_match_isotope_filtered_data(
                 sample_item_id=sample.sample_item_id,
                 target_ion_id=target_ion_id,
-                filter_params=filter_params,
+                match_params=match_params,
             )
         )
 
@@ -119,7 +118,7 @@ async def aggregate_sample_match_ion(
 
         # Step 5: Aggregate fields for match ions and filter duplicates based on target_collection_id
         match_ions_data_df, _ = await aggregate_match_ions(
-            aggregated_match_isotope_filtered_data_df, filter_params
+            aggregated_match_isotope_filtered_data_df, match_params
         )
         match_ions_df = match_ions_data_df[
             match_ions_data_df["target_collection_id"] == target_collection_id
@@ -159,8 +158,8 @@ async def aggregate_sample_match_ion(
 async def aggregate_sample_match_compound(
     sample_item_id: str,
     target_compound_formula: str,
+    match_params: Optional[BaseMatchParams] = None,
     target_compound_name: str = "Unknown Compound",
-    filter_params: FilterParams = FilterParams(),
 ) -> dict:
     """
     Retrieves matches for compounds within a sample based on a target compound formula,
@@ -179,15 +178,20 @@ async def aggregate_sample_match_compound(
     :type sample_item_id: str
     :param target_compound_formula: Chemical formula of the target compound.
     :type target_compound_formula: str
-    :param target_compound_name: The name of the target compound, defaults to FilterParams()
+    :param target_compound_name: The name of the target compound
     :type target_compound_name: str
-    :param filter_params: Parameters to filter the match results, affecting which matches are considered significant, defaults to FilterParams()
-    :type filter_params: FilterParams
+    :param match_params: Parameters to filter the match results, affecting which matches are considered significant
+    :type match_params: BaseMatchParams
     :raises NotFoundException: Raised if the sample item or sample batch cannot be found.
     :raises ValueError: Raised if no ion mechanisms are defined for the sample batch.
     :return: A dictionary containing aggregated match compounds, ions, and isotopes, each as a list of dictionaries.
     :rtype: dict
     """
+    # match param defaults depend on instrument
+    # so we use a helper to infer them:
+    if not match_params:
+        match_params = await default_match_params(sample_item_id)
+    # data retrieval
     async with async_session() as session:
         # Step 1: Fetch sample related data and verify its existence
         sample = await session.get(Sample, sample_item_id)
@@ -256,13 +260,13 @@ async def aggregate_sample_match_compound(
         match_isotope_df = await compute_match_isotopes(
             filename=sample.filename,
             target_isotopes_df=target_isotopes_df,
-            min_isotope_abundance=filter_params.min_isotope_abundance,
+            min_isotope_abundance=match_params.min_isotope_abundance,
         )
 
         # Drop the 'index' column from the match_isotope_df DataFrame
         match_isotope_df = match_isotope_df.drop(columns=["index"])
         # Step 5: Apply filters to the computed isotope matches based on the provided parameters.
-        filtered_match_isotope_df = apply_filter_params(match_isotope_df, filter_params)
+        filtered_match_isotope_df = apply_match_params(match_isotope_df, match_params)
 
         # Step 6: Aggregate ion-level data from the filtered isotopes.
         match_ions_data_df = aggregate_match_ions_light(filtered_match_isotope_df)

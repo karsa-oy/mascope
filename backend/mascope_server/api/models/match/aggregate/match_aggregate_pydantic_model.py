@@ -1,6 +1,9 @@
 from typing import Optional
 from pydantic import BaseModel, Field
-from mascope_server.api.models.match.match_pydantic_model import FilterParams
+from mascope_server.api.new.match.params import (
+    TofMatchParams,
+    OrbiMatchParams,
+)
 from mascope_server.api.models.target.compounds.target_compound_pydantic_model import (
     TargetCompoundMatches,
 )
@@ -10,7 +13,7 @@ class AggregateMatchIsotopeFilteredDataBody(BaseModel):
     target_ion_id: str = Field(
         None, description="Filter targets by ID of the target ion"
     )
-    filter_params: FilterParams = Field(
+    match_params: TofMatchParams | OrbiMatchParams = Field(
         None,
         description="Ion-specific filter parameters, used for match_score and sample_peak_area filtering, setting match_category",
     )
@@ -24,8 +27,8 @@ class AggregateSampleMatchIonBody(BaseModel):
     target_collection_id: str = Field(
         ..., description="ID of the target collection to remove possible dublicates"
     )
-    filter_params: FilterParams = Field(
-        ...,
+    match_params: TofMatchParams | OrbiMatchParams = Field(
+        None,
         description="Ion-specific filter parameters, used for match_score and sample_peak_area filtering",
     )
 
@@ -34,7 +37,10 @@ class AggregateSampleMatchCompoundBody(BaseModel):
     target_compound: TargetCompoundMatches = Field(
         ..., description="Target compound with required formula and optional name"
     )
-    filter_params: FilterParams = FilterParams()
+    match_params: TofMatchParams | OrbiMatchParams = Field(
+        None,
+        description="Sample-specific filter parameters, used for match_score and sample_peak_area filtering",
+    )
 
 
 class AggregateAndCreateMatchesBody(AggregateMatchIsotopeFilteredDataBody):

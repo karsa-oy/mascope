@@ -42,12 +42,12 @@ const expandedIsotopes = ref()
 
 // computed
 const title = computed(() => {
-  const ionSumIntensity = peak.format(app.ui.matchVisualized.ion?.sample_peak_area_sum)
-  return `${app.data.sample.focused?.sample_item_name}: ${app.ui.matchVisualized.ion?.target_ion_formula} | Intensity: ${ionSumIntensity}`
+  const ionSumIntensity = peak.format(app.data.match.visualized.ion?.sample_peak_area_sum)
+  return `${app.data.sample.focused?.sample_item_name}: ${app.data.match.visualized.ion?.target_ion_formula} | Intensity: ${ionSumIntensity}`
 })
 const checklistEnabled = computed(() => {
   const possibleMatch =
-    app.ui.matchVisualized.ion.match_score >= app.data.filterParams.current.possible_match_threshold
+    app.data.match.visualized.ion.match_score >= app.data.match.params.current.possible_match_threshold
   return (
     (props.rating === '0' && possibleMatch) ||
     props.rating === '1' ||
@@ -64,40 +64,40 @@ const invalid = computed(
 )
 
 const isotopes = computed(() =>
-  app.ui.matchVisualized.isotopes.map((isotope) => {
+  app.data.match.visualized.isotopes.map((isotope) => {
     let failures = []
-    if (Math.abs(isotope.match_mz_error) > app.data.filterParams.current.mz_tolerance) {
+    if (Math.abs(isotope.match_mz_error) > app.data.match.params.current.mz_tolerance) {
       failures.push({
         filter: 'm/z tolerance',
         message: `Isotope m/z error is ${isotope.match_mz_error.toFixed(3)}`,
-        threshold: app.data.filterParams.current.mz_tolerance
+        threshold: app.data.match.params.current.mz_tolerance
       })
     }
     if (
       Math.abs(isotope.match_abundance_error) >
-      app.data.filterParams.current.isotope_ratio_tolerance
+      app.data.match.params.current.isotope_ratio_tolerance
     ) {
       failures.push({
         filter: 'Isotope ratio tolerance',
         message: `Match abundance error is ${isotope.match_abundance_error.toFixed(3)}`,
-        threshold: app.data.filterParams.current.isotope_ratio_tolerance
+        threshold: app.data.match.params.current.isotope_ratio_tolerance
       })
     }
-    if (isotope.sample_peak_area < app.data.filterParams.current.peak_min_intensity) {
+    if (isotope.sample_peak_area < app.data.match.params.current.peak_min_intensity) {
       failures.push({
         filter: 'Minimum peak intensity',
         message: `Sample peak area is ${isotope.sample_peak_area.toFixed(3)}`,
-        threshold: app.data.filterParams.current.peak_min_intensity
+        threshold: app.data.match.params.current.peak_min_intensity
       })
     }
     if (
       Math.max(isotope.match_isotope_correlation, 0) <
-      app.data.filterParams.current.min_isotope_correlation
+      app.data.match.params.current.min_isotope_correlation
     ) {
       failures.push({
         filter: 'Minimum isotope correlation',
         isotopeValue: `Match isotope correlation is ${isotope.match_isotope_correlation.toFixed(3)}`,
-        threshold: app.data.filterParams.current.min_isotope_correlation
+        threshold: app.data.match.params.current.min_isotope_correlation
       })
     }
     return { ...isotope, failures, failure_count: failures.length }
@@ -108,14 +108,14 @@ async function submit() {
     method: 'submitMatchRating',
     body: {
       sample_item_id: app.data.sample.focused.sample_item_id,
-      target_ion_id: app.ui.matchVisualized.ion.target_ion_id,
+      target_ion_id: app.data.match.visualized.ion.target_ion_id,
       rating: props.rating,
       environment: {
         mz_calibration: app.data.sample.focused.mz_calibration
       },
       checklist: checklistEnabled.value
         ? {
-            isotopes_rating: app.ui.matchVisualized.isotopes.map((isotope) => ({
+            isotopes_rating: app.data.match.visualized.isotopes.map((isotope) => ({
               isotope_rating: checklist.isotopeRating[isotope.mz],
               target_isotope_id: isotope.target_isotope_id
             })),
@@ -132,7 +132,7 @@ async function submit() {
 
 // watchers
 watch(
-  computed(() => app.ui.matchVisualized.isotopes),
+  computed(() => app.data.match.visualized.isotopes),
   (isotopes) => {
     if (isotopes) {
       isotopes.forEach((isotope) => {
@@ -150,7 +150,7 @@ function init(active) {
   checklist.timeseriesGoodMatch = null
   checklist.timeseriesExpectedBehavior = null
   checklist.comment = ''
-  app.ui.matchVisualized.isotopes.forEach((isotope) => {
+  app.data.match.visualized.isotopes.forEach((isotope) => {
     checklist.isotopeRating[isotope.mz] = 3
   })
 }
@@ -177,7 +177,7 @@ const peak = new Intl.NumberFormat('en-US', {
               1) Is there a clear peak in the signal corresponding target isotope?
             </p>
             <div
-              v-for="isotope in app.ui.matchVisualized.isotopes"
+              v-for="isotope in app.data.match.visualized.isotopes"
               :key="isotope.target_isotope_id"
               class="row"
               style="margin: 1rem; justify-content: flex-start; gap: 3rem"

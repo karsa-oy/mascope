@@ -595,8 +595,8 @@ app.data.batch.create({
 });
 // dark theme enabled
 app.ui.darkmode.active;
-// current visualized ion
-app.ui.matchVisualized.ion;
+// left split size
+app.ui.split.left;
 ```
 
 #### Standard data modules

@@ -40,7 +40,7 @@ async def aggregate_sample_match_isotope_filtered_data_route(
     data = await aggregate_match_isotope_filtered_data(
         sample_item_id=sample_item_id,
         target_ion_id=body.target_ion_id,
-        filter_params=body.filter_params,
+        match_params=body.match_params,
         include_match_interference=body.include_match_interference,
     )
     if not data.empty:
@@ -69,7 +69,7 @@ async def aggregate_sample_match_ion_route(
         sample_item_id=sample_item_id,
         target_ion_id=body.target_ion_id,
         target_collection_id=body.target_collection_id,
-        filter_params=body.filter_params,
+        match_params=body.match_params,
     )
 
 
@@ -85,7 +85,7 @@ async def aggregate_sample_match_compound_route(
         sample_item_id=sample_item_id,
         target_compound_formula=body.target_compound.target_compound_formula,
         target_compound_name=body.target_compound.target_compound_name,
-        filter_params=body.filter_params,
+        match_params=body.match_params,
     )
 
 
@@ -102,7 +102,7 @@ async def aggregate_sample_matches_route(
     result = await aggregate_matches(
         sample_item_id=sample_item_id,
         target_ion_id=body.target_ion_id,
-        filter_params=body.filter_params,
+        match_params=body.match_params,
     )
     if result.get("results", 0) == 0:
         message = f"No match data found for sample '{sample_item_name}'"
@@ -127,7 +127,7 @@ async def aggregate_and_create_sample_matches_route(
     result = await aggregate_and_create_matches(
         sample_item_id=sample_item_id,
         target_ion_id=body.target_ion_id,
-        filter_params=body.filter_params,
+        match_params=body.match_params,
     )
 
     errors = result.get("errors", [])

@@ -26,8 +26,8 @@ const dialog = reactive({
  * @param {number} rating - The rating to be submitted (0 = No Detection, 1 = Ambiguous, 2 = Detection)
  */
 async function submitRating(rating) {
-  if (app.data.filterParams.changed) {
-    handleUnsavedFilterParams()
+  if (app.data.match.params.changed) {
+    handleUnsavedMatchParams()
   } else {
     processRatingSubmission(rating)
   }
@@ -40,8 +40,8 @@ async function submitRating(rating) {
  * @param {number} rating - The rating to be submitted
  */
 async function processRatingSubmission(rating) {
-  const matchScore = app.ui.matchVisualized.ion.match_score
-  const possibleMatch = matchScore >= app.data.filterParams.current.possible_match_threshold
+  const matchScore = app.data.match.visualized.ion.match_score
+  const possibleMatch = matchScore >= app.data.match.params.current.possible_match_threshold
 
   if (rating === 1 || (rating === 0 && possibleMatch) || (rating === 2 && !possibleMatch)) {
     dialog.rating = rating
@@ -51,7 +51,7 @@ async function processRatingSubmission(rating) {
       method: 'submitMatchRating',
       body: {
         sample_item_id: app.data.sample.focused.sample_item_id,
-        target_ion_id: app.ui.matchVisualized.ion.target_ion_id,
+        target_ion_id: app.data.match.visualized.ion.target_ion_id,
         rating,
         environment: {
           mz_calibration: app.data.sample.focused.mz_calibration
@@ -65,11 +65,11 @@ async function processRatingSubmission(rating) {
  * Handles the scenario where there are unsaved filter parameter changes.
  * Prompts the user to either save the changes or discard them before proceeding with the rating submission.
  */
-function handleUnsavedFilterParams() {
+function handleUnsavedMatchParams() {
   confirm.require({
-    header: 'Unsaved filtering settings',
+    header: 'Unsaved match settings',
     message:
-      'You have unsaved changes in your filtering isotope/peak parameters. Please save or discard them before submitting a rating.',
+      'You have unsaved changes in your match isotope/peak parameters. Please save or discard them before submitting a rating.',
     acceptProps: {
       icon: 'pi pi-save',
       label: 'Save changes'
@@ -80,12 +80,12 @@ function handleUnsavedFilterParams() {
       severity: 'secondary'
     },
     accept: async () => {
-      await app.data.filterParams.save()
-      await app.ui.matchVisualized.reset()
+      await app.data.match.params.save()
+      await app.data.match.visualized.reset()
     },
     reject: async () => {
-      await app.data.filterParams.reset()
-      await app.ui.matchVisualized.reset()
+      await app.data.match.params.reset()
+      await app.data.match.visualized.reset()
     }
   })
 }
