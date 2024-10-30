@@ -35,23 +35,25 @@ const defineMatch = (level) => {
       if (sample.focused) {
         // If a sample is focused, load sample level matches
         return (
-          await api.request.read({
-            method: `getSampleMatch${level}s`,
-            body: {
-              sample_item_id: sample.focused.sample_item_id
+          await api.http.get(
+            `/match/targets/sample/${sample.focused.sample_item_id}/${level.toLowerCase()}s`,
+            {
+              use: 'read',
+              type: `load_sample_match_${level.toLowerCase()}s`
             }
-          })
-        ).data.map(generateKey(level))
+          )
+        ).map(generateKey(level))
       } else if (batch.focused) {
         // If a batch is focused, load batch level matches
         return (
-          await api.request.read({
-            method: `getBatchMatch${level}s`,
-            body: {
-              sample_batch_id: batch.focused.sample_batch_id
+          await api.http.get(
+            `/match/targets/batch/${batch.focused.sample_batch_id}/${level.toLowerCase()}s`,
+            {
+              use: 'read',
+              type: `load_batch_match_${level.toLowerCase()}s`
             }
-          })
-        ).data.map(generateKey(level))
+          )
+        ).map(generateKey(level))
       } else {
         // Otherwise unload the data
         return []

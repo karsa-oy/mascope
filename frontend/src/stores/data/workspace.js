@@ -7,33 +7,29 @@ export const useWorkspace = defineModule({
   key: 'workspace_id',
   subscribe: true,
   reloadOn: 'workspace_reload',
-  load: async () =>
-    (
-      await api.request.read({
-        method: 'getAllWorkspaces'
-      })
-    )?.data,
-  read: async (workspace_id) =>
-    await api.request.read({
-      method: 'getWorkspace',
-      body: { workspaceId: workspace_id }
+  load: () =>
+    api.http.get(`/workspaces`, {
+      use: 'read',
+      type: 'load_workspaces'
     }),
-  create: async (workspace) =>
-    await api.request.create({
-      method: 'createWorkspace',
-      body: workspace
+  read: (workspace_id) =>
+    api.http.get(`/workspaces/${workspace_id}`, {
+      use: 'read',
+      type: 'read_workspace'
     }),
-  update: async (workspace) =>
-    await api.request.update({
-      method: 'updateWorkspace',
-      body: {
-        workspaceId: workspace.workspace_id,
-        body: workspace
-      }
+  create: (workspace) =>
+    api.http.post(`/workspaces`, workspace, {
+      use: 'create',
+      type: 'create_workspace'
     }),
-  delete: async (workspace) =>
-    await api.request.delete({
-      method: 'deleteWorkspace',
-      body: workspace
+  update: (workspace) =>
+    api.http.patch(`/workspaces/${workspace.workspace_id}`, workspace, {
+      use: 'update',
+      type: 'update_workspace'
+    }),
+  delete: (workspace) =>
+    api.http.delete(`/workspaces/${workspace.workspace_id}`, {
+      use: 'delete',
+      type: 'delete_workspace'
     })
 })

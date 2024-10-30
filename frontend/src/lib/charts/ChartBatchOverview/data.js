@@ -85,7 +85,7 @@ export const useChartData = defineStore('chart.batch.overview', () => {
     }
     try {
       // API call includes filter for match_category (1 and 2 only)
-      api.client
+      api.http
         .get(`/match/${level}s`, {
           params: {
             sample_batch_id: batch.value.sample_batch_id,

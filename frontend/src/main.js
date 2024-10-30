@@ -10,8 +10,6 @@ import Ripple from 'primevue/ripple'
 
 import 'primeicons/primeicons.css'
 
-import { apiPlugin } from '@/api'
-
 import App from './App.vue'
 import router from './routes'
 import Karsa from './theme.js'
@@ -41,7 +39,6 @@ app.directive('ripple', Ripple)
 
 // store
 const pinia = createPinia()
-pinia.use(apiPlugin)
 app.use(pinia)
 
 // init

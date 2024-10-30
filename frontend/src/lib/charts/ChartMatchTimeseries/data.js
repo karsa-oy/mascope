@@ -2,6 +2,7 @@ import { ref } from 'vue'
 import { defineStore } from 'pinia'
 
 import { useApp } from '@/stores'
+import { api } from '@/api'
 
 export const useChartData = defineStore('chart.match.timeseries', () => {
   const traces = ref([])
@@ -18,7 +19,7 @@ export const useChartData = defineStore('chart.match.timeseries', () => {
     }
   })
 
-  async function onVisualizationSignalTimeseries(payload) {
+  api.socket.on('visualization_signal_timeseries', (payload) => {
     for (let trace of payload) {
       length.value = trace.x.length
       unit.value = trace.unit ? trace.unit : unit.value
@@ -26,6 +27,6 @@ export const useChartData = defineStore('chart.match.timeseries', () => {
       trace.y = new Float32Array(trace.y)
     }
     traces.value = [...traces.value, ...payload]
-  }
-  return { traces, onVisualizationSignalTimeseries, length, unit }
+  })
+  return { traces, length, unit }
 })

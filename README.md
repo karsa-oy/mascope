@@ -12,7 +12,7 @@ All developer docs are in this document:
 - **[🚂 Runtime](#runtime)** - devops toolchain - [api](#runtime-library) / [cli](#runtime-cli) / [modes](#runtime-modes) / [modules](#runtime-modules) / [envs](#runtime-environments) / [configs](#runtime-config) / [logging](#runtime-logging)
 - **[🤖 Agents](#agents)** - instrument agents - [file mover](#file-mover) / [tof agenet](#tof-agent)
 - **[📡 Backend](#backend)** - central server - [api](#backend-api) / [app](#backend-app) / [db](#backend-db) / [file converter](#backend-file-converter)
-- **[🖥️ Frontend](#frontend)** - user interface - [tech](#frontend-technologies) / [codebase](#frontend-codebase) / [stores](#frontend-stores) / [tests](#frontend-tests)
+- **[🖥️ Frontend](#frontend)** - user interface - [tech](#frontend-technologies) / [codebase](#frontend-codebase) / [api client](#frontend-api-client) / [stores](#frontend-stores) / [tests](#frontend-tests)
 - **[📚 Libraries](#libraries)** - shared packages - [mascope_api](#mascope-api) / [mascope_hardware](#mascope-hardware) / [mascope_lib](#mascope-lib)
 - **[📒 Notebooks](#notebooks)** - jupyter environment
 - **[📄 Documentation](#documentation)** - about the docs
@@ -106,7 +106,7 @@ Managing frontend dependencies is done in the standard way using `npm`.
 ### Dev
 
 Running in dev mode:
-
+https://axios-http.com/docs/api_intro
 ```sh
 mascope dev run                               # run the backend & frontend
 mascope dev run --reload                      # HMR for the backend on Windows
@@ -572,6 +572,114 @@ The source code directory:
   theme.js      Karsa theme = palette.js + PrimeVue Aura theme
 ```
 
+### Frontend API Client
+
+The frontend uses HTTP and WebSocket clients.These are combined into a single client which you can import like this:
+
+```js
+// import the client
+import { api } from '@/api'
+```
+
+#### Frontend HTTP Client
+
+The frontend HTTP API uses [Axios](https://axios-http.com/docs/intro), exposing its API as transparently as possible. For example, this is how you create a workspace with the client:
+
+```js
+// create a new workspace:
+api.http.post(           // method
+  `/workspaces`,              // path
+  { workspace_name: "Foo" },  // body
+  {                           // config
+    use: "create",
+    type: "create_workspace"
+  }
+)
+```
+
+Here, `post` is a standard Axios method, receiving the route _url_ path as the first argument, the request _body_ in the second argument and  _config_ options as the third argument. These options include two Mascope-specific custom fields: `use` and `type`; see the _Custom API_ section below for details. For all other options, see the Axios [request config docs](https://axios-http.com/docs/req_config).
+
+To pass _path parameters_, use a template string for the url path. To pass _query parameters_, use the _params_ field of the config argument:
+```js
+// load peaks with areas and heights
+const peaks = await api.http.get(
+  `/sample/files/${sample_file_id}/peaks`,
+  {
+    params: {
+      areas: true,
+      heights: true
+    },
+    use: "read",
+    type: "load_sample_peaks"
+  }
+)
+```
+
+The key methods used in our codebase at the moment are:
+```js
+api.http.get(url[, config])
+api.http.delete(url[, config])
+api.http.post(url[, data[, config]])
+api.http.patch(url[, data[, config]])
+api.http.postForm(url[, data[, config]])
+```
+But nothing stops you from using other Axios method; refer to the [Axios docs](https://axios-http.com/docs/api_intro) for details. Note here that their signatures differ, and that all arguments but the _url_ field are optional.
+
+The most common endpoints are wrapped a second time in the [store actions](#frontend-stores), providing a friendlier API for most usecases in the frontend. Typically, you would use these wrappers when they are available. If a new endpoint is added, it may make sense to add such a wrapper to the appropriate store.
+
+**Custom API**
+
+The only Mascope-specific API elements added are the `use` and `type` fields added to the _config_ object. The `type` argument should be a snake case title-like identifier for the call, and is rendered as the header of the notification toasts shown to users.
+
+The `use` argument allows specifying a so-called _handler_; this is a Mascope custom abstraction describing what to do with the response of the requestion: which status codes are considered successful, what to unpack from the response and return and what notifications - if any - to show the user. The handlers available currently are: *create*, *read*, *update*, *delete* and *process*. The latter is for long-running background processes emitting progress notifications, like rematching or recalibration.
+
+Handlers should be modified infrequently, as we hope to limit their number to handful of useful patterns. They are defined in `frontend/src/api/handlers.js`; as an example, this is how the `create` handler is implemented:
+```js
+import { useApp } from '@/stores'
+
+export default {
+  // ...
+  create: (response) => {
+    const { type, status, message, data } = unpack(response)
+    const app = useApp();
+    if (status == 201) {
+      // notify users
+      app.ui.notification.push({
+        type,
+        message,
+        status: "success",
+      })
+      return data
+    } else {
+      // warn developers is the response
+      // was not handled
+      unhandled(response)
+      return
+    }
+  },
+  // ...
+}
+```
+In rare cases, it makes sense to forego the handler in favor of creating custom handling logic for a specific usecase. For example, file upload is sufficiently idiosyncratic that is warrants a custom handler (see `frontend/src/stores/data/sample.js`).
+
+#### Frontend Socket Client
+
+The frontend socket API uses [SocketIO](https://socket.io/docs/v4/client-socket-instance/), exposing its API as transparently as possible. Basic event handling is done as follows:
+
+```js
+// log workspaces on reload event:
+api.socket.on('workspace_reload', async () => {
+  const workspaces = api.http.get(
+    `/workspaces`,
+    {
+      use: "read",
+      type: "load_workspaces"
+    }
+  )
+  console.log(workspaces)
+})
+```
+
 ### Frontend Stores
 
 The frontend uses [Pinia stores](https://pinia.vuejs.org/introduction.html) with the [setup store syntax](https://pinia.vuejs.org/core-concepts/#Setup-Stores), the recommended store library for Vue 3.
@@ -673,58 +781,59 @@ export const useBatch = defineModule({
   // has a parent, the arg is its key;
   // otherwise no arg is provided. The
   // function should return the data.         [required]
-  load: async (workspace_id) =>
-    (
-      await api.request.read({
-        method: "getAllBatches",
-        body: { workspace_id },
-        errorMessage: `Failed to load the workspace batches.`,
-      })
-    ).data,
-  // Read a single record of the data
-  // by its key. This is needed to
-  // enable refreshing the data if
-  // it is updated                            [required]
-  read: async (sample_batch_id) =>
-    await api.request.read({
-      method: "getBatch",
-      body: { batchId: sample_batch_id },
+  load: ({ workspace_id }) => api.http.get(
+    `/sample/batches`,
+    {
+      params: { workspace_id },
+      use: "read",
+      type: "load_batches"
     }),
   // We can also (optionally) define
-  // other standard CRUD operations
-  create: async (batch) =>
-    await api.request.create({
-      method: "createBatch",
-      body: batch,
-    }),
-  update: async (batch) =>
-    await api.request.update({
-      method: "updateBatch",
-      body: {
-        batchId: batch.sample_batch_id,
-        body: batch,
-      },
-    }),
-  delete: async (batch) =>
-    await api.request.process({
-      method: "deleteBatch",
-      body: batch,
-    }),
+  // standard CRUD operations
+  read: (sample_batch_id) => api.http.get(
+    `/sample/batches/${sample_batch_id}`,
+    {
+      use: "read",
+      type: "read_batch"
+    }
+  ),
+  create: (batch) => api.http.post(
+    `/sample/batches/`, batch,
+    {
+      use: "create",
+      type: "create_batch"
+    }
+  ),
+  update: (batch) => api.http.patch(
+    `/sample/batches/${batch.sample_batch_id}`, batch,
+    {
+      use: "update",
+      type: "update_batch"
+    }
+  ),
+  delete: ({ sample_batch_id }) => api.http.delete(
+    `/sample/batches/${sample_batch_id}`,
+    {
+      use: "process",
+      type: "delete_batch"
+    }
+  ),
   // And we can even define arbitrary custom
   // operations, which are passed through to
   // the store unchanged, e.g:
   importSamples: async ({ batch, sample_items }) => {
-    const mzFit = useMzFit();
-    return await api.request.process({
-      method: "importSamplesToBatch",
-      body: {
-        batch,
-        body: {
-          sample_items,
-          mz_calibration_params: mzFit.mzCalibrationParams,
-        },
+    const mzFit = useMzFit()
+    return await api.http.post(
+      `/sample/batches/${batch.sample_batch_id}/import`,
+      {
+        sample_items,
+        mz_calibration_params: mzFit.mzCalibrationParams
       },
-    });
+      {
+        use: "process",
+        type: "import_samples"
+      }
+    )
   },
   // etc.
 });

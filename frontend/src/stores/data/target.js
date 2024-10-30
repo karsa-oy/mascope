@@ -6,34 +6,30 @@ export const useTargetCollection = defineModule({
   name: 'target_collection',
   key: 'target_collection_id',
   reloadOn: 'targets_all_reload',
-  load: async () =>
-    (
-      await api.request.read({
-        method: 'getAllTargetCollections'
-      })
-    )?.data,
-  read: async (target_collection_id) =>
-    await api.request.read({
-      method: 'getTargetCollection',
-      body: target_collection_id
+  load: () =>
+    api.http.get(`/target/collections`, {
+      use: 'read',
+      type: 'load_target_collectoons'
     }),
-  create: async (collection) =>
-    await api.request.create({
-      method: 'createTargetCollection',
-      body: collection
+  read: (target_collection_id) =>
+    api.http.get(`/target/collections/${target_collection_id}`, {
+      use: 'read',
+      type: 'load_target_collectoons'
     }),
-  update: async (collection) =>
-    await api.request.update({
-      method: 'updateTargetCollection',
-      body: {
-        collectionId: collection.target_collection_id,
-        body: collection
-      }
+  create: (collection) =>
+    api.http.post(`/target/collections`, collection, {
+      use: 'create',
+      type: 'create_target_collection'
     }),
-  delete: async ({ collectionId, collectionName, deleteOrphanCompounds }) =>
-    await api.request.delete({
-      method: 'deleteTargetCollection',
-      body: { collectionId, collectionName, deleteOrphanCompounds }
+  update: (collection) =>
+    api.http.patch(`/target/collections/${collection.target_collection_id}`, collection, {
+      use: 'update',
+      type: 'update_target_collection'
+    }),
+  delete: ({ collectionId }) =>
+    api.http.delete(`/target/collections/${collectionId}`, {
+      use: 'delete',
+      type: 'delete_target_collection'
     })
 })
 
@@ -41,14 +37,9 @@ export const useTargetCompound = defineModule({
   name: 'target_compound',
   key: 'target_compound_id',
   reloadOn: 'targets_all_reload',
-  load: async () =>
-    (
-      await api.request.read({
-        method: 'getAllTargetCompounds',
-        body: {}
-      })
-    )?.data,
-  read: async () => {
-    // TODO
-  }
+  load: () =>
+    api.http.get(`/target/compounds`, {
+      use: 'read',
+      type: 'read_target_compounds'
+    })
 })

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch} from 'vue'
+import { ref, watch } from 'vue'
 
 import ConfirmDialog from 'primevue/confirmdialog'
 import Toast from 'primevue/toast'
@@ -8,7 +8,7 @@ import Panel from 'primevue/panel'
 import Tabs from 'primevue/tabs'
 import TabList from 'primevue/tablist'
 import Tab from 'primevue/tab'
-  import ProgressSpinner from 'primevue/progressspinner'
+import ProgressSpinner from 'primevue/progressspinner'
 
 import { beautifySnakeCase } from '@/lib/utils'
 import { BaseKarsaLogo } from '@/lib/base'
@@ -39,44 +39,41 @@ app.ui.notification
   })
   .unmount()
 
-  app.auth.identify()
+app.auth.identify()
 
-  const tab = ref('login')
+const tab = ref('login')
 
-  const gotoLogin = () => {
-    tab.value = "login"
-  }
+const gotoLogin = () => {
+  tab.value = 'login'
+}
 </script>
 
 <template>
   <!-- App Routes -->
-  <RouterView v-if="app.auth.user"/>
+  <RouterView v-if="app.auth.user" />
   <!-- Login / Signup Screen  -->
-  <div 
-    v-else-if="app.auth.user == false" 
-    class="center" style="min-height: 80vh"
-  >
-      <Panel style="width: 500px">
-        <BaseKarsaLogo />
-        <Tabs v-model:value="tab" style="margin-bottom: 2rem;">
-          <TabList>
-            <Tab value="login">
-              <a v-ripple @click="tab = 'login'" class="row">
-                  <i class="pi pi-sign-in" />
-                  <span>Login</span>
-              </a>
-            </Tab>
-            <Tab value="signup">
-              <a v-ripple @click="tab = 'signup'" class="row">
-                  <i class="pi pi-user-plus" />
-                  <span>Sign up</span>
-              </a>
-            </Tab>
-          </TabList>
-        </Tabs>
-        <PaneLogin v-if="tab == 'login'"/>
-        <PaneSignup v-if="tab == 'signup'" @signup="gotoLogin"/>
-      </Panel>
+  <div v-else-if="app.auth.user == false" class="center" style="min-height: 80vh">
+    <Panel style="width: 500px">
+      <BaseKarsaLogo />
+      <Tabs v-model:value="tab" style="margin-bottom: 2rem">
+        <TabList>
+          <Tab value="login">
+            <a v-ripple @click="tab = 'login'" class="row">
+              <i class="pi pi-sign-in" />
+              <span>Login</span>
+            </a>
+          </Tab>
+          <Tab value="signup">
+            <a v-ripple @click="tab = 'signup'" class="row">
+              <i class="pi pi-user-plus" />
+              <span>Sign up</span>
+            </a>
+          </Tab>
+        </TabList>
+      </Tabs>
+      <PaneLogin v-if="tab == 'login'" />
+      <PaneSignup v-if="tab == 'signup'" @signup="gotoLogin" />
+    </Panel>
   </div>
   <div v-else class="col" style="min-height: 80vh; justify-content: center">
     <BaseKarsaLogo />

@@ -47,17 +47,21 @@ async function processRatingSubmission(rating) {
     dialog.rating = rating
     dialog.visible = true
   } else {
-    await api.request.create({
-      method: 'submitMatchRating',
-      body: {
+    await api.http.post(
+      `/match_ratings`,
+      {
         sample_item_id: app.data.sample.focused.sample_item_id,
         target_ion_id: app.data.match.visualized.ion.target_ion_id,
         rating,
         environment: {
           mz_calibration: app.data.sample.focused.mz_calibration
         }
+      },
+      {
+        use: 'create',
+        type: 'match_rating'
       }
-    })
+    )
   }
 }
 

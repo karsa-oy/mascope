@@ -7,9 +7,10 @@ export const useInstrument = defineModule({
   key: 'instrument',
   subscribe: true,
   load: async () =>
-    await api.request
-      .read({
-        method: 'getAllInstrumentFunctions'
+    await api.http
+      .get(`/instrument_functions`, {
+        use: 'read',
+        type: 'load_instruments'
       })
-      .then((res) => extractDistinctValues(res.data, 'instrument'))
+      .then((data) => extractDistinctValues(data, 'instrument'))
 })

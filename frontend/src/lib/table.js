@@ -223,15 +223,14 @@ export async function batchExportCsv() {
   const batchMatchData = (await app.data.batch.aggregateBatchMatches(focusedBatch)).data
   const batch = batchMatchData.sample_batch
 
-  const samples = (
-    await api.request.read({
-      method: 'getBatchSamples',
-      body: {
-        sample_batch_id: focusedBatch.sample_batch_id,
-        sort: 'datetime_utc'
-      }
-    })
-  )?.data
+  const samples = await api.http.get(`/samples`, {
+    params: {
+      sample_batch_id: focusedBatch.sample_batch_id,
+      sort: 'datetime_utc'
+    },
+    use: 'read',
+    type: 'load_samples'
+  })
 
   // Lookup the calibration collection name
   const calibrationCollectionName =

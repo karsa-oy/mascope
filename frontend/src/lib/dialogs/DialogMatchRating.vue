@@ -47,7 +47,8 @@ const title = computed(() => {
 })
 const checklistEnabled = computed(() => {
   const possibleMatch =
-    app.data.match.visualized.ion.match_score >= app.data.match.params.current.possible_match_threshold
+    app.data.match.visualized.ion.match_score >=
+    app.data.match.params.current.possible_match_threshold
   return (
     (props.rating === '0' && possibleMatch) ||
     props.rating === '1' ||
@@ -104,9 +105,9 @@ const isotopes = computed(() =>
   })
 )
 async function submit() {
-  await api.request.create({
-    method: 'submitMatchRating',
-    body: {
+  await api.http.post(
+    `/match_ratings`,
+    {
       sample_item_id: app.data.sample.focused.sample_item_id,
       target_ion_id: app.data.match.visualized.ion.target_ion_id,
       rating: props.rating,
@@ -124,8 +125,12 @@ async function submit() {
             comment: checklist.comment
           }
         : null
+    },
+    {
+      use: 'create',
+      type: 'match_rating'
     }
-  })
+  )
   // close
   visible.value = false
 }

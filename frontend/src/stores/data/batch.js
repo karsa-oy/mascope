@@ -12,76 +12,76 @@ export const useBatch = defineModule({
   useParent: useWorkspace,
   subscribe: true,
   reloadOn: 'sample_batch_reload',
-  load: async ({ workspace_id }) =>
-    (
-      await api.request.read({
-        method: 'getAllBatches',
-        body: { workspace_id },
-        errorMessage: `Failed to load the workspace batches.`
-      })
-    ).data,
-  read: async (sample_batch_id) =>
-    await api.request.read({
-      method: 'getBatch',
-      body: { batchId: sample_batch_id }
+  load: ({ workspace_id }) =>
+    api.http.get(`/sample/batches`, {
+      params: { workspace_id },
+      use: 'read',
+      type: 'load_batches'
     }),
-  create: async (batch) =>
-    await api.request.create({
-      method: 'createBatch',
-      body: batch
+  read: (sample_batch_id) =>
+    api.http.get(`/sample/batches/${sample_batch_id}`, {
+      use: 'read',
+      type: 'read_batch'
     }),
-  update: async (batch) =>
-    await api.request.update({
-      method: 'updateBatch',
-      body: {
-        batchId: batch.sample_batch_id,
-        body: batch
+  create: (batch) =>
+    api.http.post(`/sample/batches/`, batch, {
+      use: 'create',
+      type: 'create_batch'
+    }),
+  update: (batch) =>
+    api.http.patch(`/sample/batches/${batch.sample_batch_id}`, batch, {
+      use: 'update',
+      type: 'update_batch'
+    }),
+  delete: ({ sample_batch_id }) =>
+    api.http.delete(`/sample/batches/${sample_batch_id}`, {
+      use: 'process',
+      type: 'delete_batch'
+    }),
+  copy: ({ sample_batch_id, workspace_id, sample_batch_name, sample_batch_description }) =>
+    api.http.post(
+      `/sample/batches/${sample_batch_id}/copy`,
+      {
+        workspace_id,
+        sample_batch_name,
+        sample_batch_description
+      },
+      {
+        use: 'process',
+        type: 'copy_batch'
       }
-    }),
-  delete: async (batch) =>
-    await api.request.process({
-      method: 'deleteBatch',
-      body: batch
-    }),
-  copy: async ({ sample_batch_id, workspace_id, sample_batch_name, sample_batch_description }) =>
-    await api.request.process({
-      method: 'copyBatch',
-      body: {
-        batchId: sample_batch_id,
-        body: {
-          workspace_id,
-          sample_batch_name,
-          sample_batch_description
-        }
-      }
-    }),
+    ),
   importSamples: async ({ batch, sample_items }) => {
     const mzFit = useMzFit()
-    return await api.request.process({
-      method: 'importSamplesToBatch',
-      body: {
-        batch,
-        body: {
-          sample_items,
-          mz_calibration_params: mzFit.mzCalibrationParams
-        }
+    return await api.http.post(
+      `/sample/batches/${batch.sample_batch_id}/import`,
+      {
+        sample_items,
+        mz_calibration_params: mzFit.mzCalibrationParams
+      },
+      {
+        use: 'process',
+        type: 'import_samples'
       }
-    })
+    )
   },
-  rematch: async ({ sample_batch_id }) =>
-    await api.request.process({
-      method: 'rematchBatch',
-      body: { batchId: sample_batch_id }
+  rematch: ({ sample_batch_id }) =>
+    api.http.post(
+      `/match/rematch/batch/${sample_batch_id}`,
+      {},
+      {
+        use: 'process',
+        type: 'rematch_batch'
+      }
+    ),
+  aggregateBatchMatches: ({ sample_batch_id }) =>
+    api.http.get(`/match/aggregate/batch/${sample_batch_id}/all`, {
+      use: 'process',
+      type: 'aggregate_batch_matches'
     }),
-  aggregateBatchMatches: async ({ sample_batch_id }) => {
-    return await api.request.read({
-      method: 'getBatchAndAggregatedMatches',
-      body: { sample_batch_id }
-    })
-  },
   exportPeaks: async ({ sample_batch_id }) =>
-    await api.request.process({
-      method: 'batchExportPeakData',
-      body: { sample_batch_id }
+    api.http.get(`/sample/batches/${sample_batch_id}/export_peaks`, {
+      use: 'process',
+      type: 'export_batch_peaks'
     })
 })

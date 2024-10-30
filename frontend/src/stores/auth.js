@@ -1,33 +1,39 @@
-import { ref } from "vue";
-import { defineStore } from "pinia";
+import { ref } from 'vue'
+import { defineStore } from 'pinia'
 
-import { api } from "@/api";
+import { api } from '@/api'
 
-import { useUi } from "./ui";
+import { useUi } from './ui'
 
 export const useAuth = defineStore('app.auth', () => {
-
   const ui = useUi()
 
   const user = ref(null)
 
   const identify = async () => {
     try {
-      user.value = (await api.http.me())?.data ?? false;
+      user.value =
+        (
+          await api.http.get('/users/me', {
+            type: 'identify_user'
+          })
+        )?.data ?? false
     } catch (e) {
-      ui.notification.push({
-        type: 'user_identification',
-        status: 'error',
-        message: `Failed to identify user: ${e.message}`
-      })
-      console.error(e)
       user.value = false
     }
   }
 
   const signup = async ({ username, email, password }) => {
     try {
-      const { status } = await api.http.register({ email, username, password })
+      const { status } = await api.http.post(
+        `/auth/register`,
+        {
+          email,
+          password,
+          username
+        },
+        { type: 'register_user' }
+      )
       if (status == 201) {
         return {
           status: 'success'
@@ -38,9 +44,10 @@ export const useAuth = defineStore('app.auth', () => {
         }
       }
     } catch (e) {
-      const message = e.message == 'REGISTER_USER_ALREADY_EXISTS'
-        ? "a user with this email already exists; please use a different email."
-        : e.message
+      const message =
+        e.message == 'REGISTER_USER_ALREADY_EXISTS'
+          ? 'a user with this email already exists; please use a different email.'
+          : e.message
       ui.notification.push({
         type: 'user_signup',
         status: 'error',
@@ -55,7 +62,14 @@ export const useAuth = defineStore('app.auth', () => {
   }
   const login = async ({ email, password }) => {
     try {
-      await api.http.login({ username: email, password })
+      const params = new URLSearchParams()
+      params.append('grant_type', 'password')
+      params.append('username', email)
+      params.append('password', password)
+      await api.http.post('/auth/login', params, {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        type: 'signin_user'
+      })
     } catch (e) {
       ui.notification.push({
         type: 'user_login',
@@ -68,12 +82,18 @@ export const useAuth = defineStore('app.auth', () => {
   }
   const logout = async () => {
     try {
-      await api.http.logout()
+      await api.http.post(
+        `/auth/logout`,
+        {},
+        {
+          type: 'signout_user'
+        }
+      )
     } catch (e) {
       ui.notification.push({
         type: 'user_logout',
         status: 'error',
-        message: `Failed to login: ${e.message}`
+        message: `Failed to logout: ${e.message}`
       })
       return
     }

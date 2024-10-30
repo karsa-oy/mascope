@@ -119,7 +119,11 @@ const changed = computed(() =>
       selected.info.desc !== initial.info.desc ||
       !equals(selected.targets, initial.targets, 'target_collection_id') ||
       !equals(selected.calibrants, initial.calibrants, 'target_collection_id') ||
-      !equals(selected.mechanisms.matching, initial.mechanisms.matching, 'ionization_mechanism_id') ||
+      !equals(
+        selected.mechanisms.matching,
+        initial.mechanisms.matching,
+        'ionization_mechanism_id'
+      ) ||
       !equals(
         selected.mechanisms.calibration,
         initial.mechanisms.calibration,
@@ -130,7 +134,9 @@ const changed = computed(() =>
 const invalid = computed(() => {
   switch (action.value) {
     case 'create': {
-      return !selected.info.name || !selected.calibrants || !(selected.mechanisms.matching?.length > 0)
+      return (
+        !selected.info.name || !selected.calibrants || !(selected.mechanisms.matching?.length > 0)
+      )
     }
     case 'update': {
       const infoValid = selected.info.name.length > 0
@@ -165,13 +171,11 @@ async function init(value) {
     )
     // init target collections with batch collections
     const batchCollections = (
-      await api.request.read({
-        method: 'getBatchTargets',
-        body: {
-          batchId: original.value.sample_batch_id
-        }
+      await api.http.get(`/sample/batches/${original.value.sample_batch_id}/targets`, {
+        use: 'read',
+        type: 'read_batch_collections'
       })
-    )?.data?.target_collections
+    )?.target_collections
     selected.targets = app.data.target.collection.list.filter((coll) =>
       batchCollections
         .map(({ target_collection_id }) => target_collection_id)
@@ -226,13 +230,14 @@ async function execute() {
       await app.data.batch.update(updated.value)
       if (!equals(selected.calibrants, initial.calibrants, 'target_collection_id')) {
         const mzFit = useMzFit({ unmount: true })
-        await api.request.process({
-          method: 'recalibrateBatch',
-          body: {
-            batchId: original.value.sample_batch_id,
-            body: mzFit.mzCalibrationParams
+        await api.http.post(
+          `/calibration/mz_calibrate/batch/${original.value.sample_batch_id}`,
+          mzFit.mzCalibrationParams,
+          {
+            use: 'process',
+            type: 'recalibrate_batch'
           }
-        })
+        )
       }
       break
     }

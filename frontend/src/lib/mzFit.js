@@ -25,9 +25,12 @@ export const useMzFit = ({ unmount } = { unmount: false }) => {
 
   async function load(sample) {
     current.value =
-      (await api.request.read({
-        method: 'getMzCalibration',
-        body: { sample_item_id: sample.sample_item_id }
+      (await api.http.get(`/calibration/mz_calibration`, {
+        params: {
+          sample_item_id: sample.sample_item_id
+        },
+        use: 'read',
+        type: 'read_mz_calibration'
       })) ?? current.value
     active.value = sample
   }
@@ -42,26 +45,25 @@ export const useMzFit = ({ unmount } = { unmount: false }) => {
 
   async function compute(sample) {
     await unload()
-    const { sample_item_id, sample_item_name } = sample ?? active.value
-    await api.request.process({
-      method: 'calibrationMzFit',
-      body: {
-        sampleId: sample_item_id,
-        sampleName: sample_item_name,
-        body: mzCalibrationParams
-      }
+    const { sample_item_id } = sample ?? active.value
+    await api.http.post(`/calibration/mz_fit`, mzCalibrationParams, {
+      params: { sample_item_id },
+      use: 'process',
+      type: 'mz_fit'
     })
   }
 
   async function apply(sample) {
     const { filename } = sample ?? active.value
-    await api.request.process({
-      method: 'calibrationMzApply',
-      body: {
-        fit: current.value,
-        filename
+    await api.http.post(
+      `/calibration/mz_apply`,
+      { fit: current.value },
+      {
+        params: { filename },
+        use: 'process',
+        type: 'apply_mz_fit'
       }
-    })
+    )
   }
 
   const handler = app.ui.notification.on('calibration_mz_fit', (payload) => {

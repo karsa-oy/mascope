@@ -70,9 +70,9 @@ watchEffect(() => {
           icon="pi pi-save"
           @click="
             () => {
-              api.request.update({
-                method: 'updateTargetCompounds',
-                body: [input]
+              api.http.patch(`/target/compounds`, [input], {
+                use: 'update',
+                type: 'update_target_compounds'
               })
               visible = false
             }

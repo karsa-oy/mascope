@@ -15,7 +15,6 @@ import { useMatchIon } from './records'
 // MATCH VISUALIZATION
 
 export const useMatchVisualized = defineStore('app.data.match.visualized', () => {
-
   const ui = useUi()
   const matchParams = useMatchParams()
   const sample = useSample()
@@ -49,7 +48,6 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
     ionId = cache.ionId,
     collectionId = cache.collectionId
   }) {
-    console.log(sampleId, ionId, collectionId)
     const sampleChanged = sampleId !== cache.sampleId
     const ionChanged = ionId !== cache.ionId
     const collectionChanged = collectionId !== cache.collectionId
@@ -61,10 +59,9 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
 
     // resolve ion filter params
     const matchIon = useMatchIon()
-    const ionMatchParams = matchIon.list
-      .find((ion) => ion.target_ion_id === ionId)
-      ?.filter_params[sample.focused.instrument]
-
+    const ionMatchParams = matchIon.list.find((ion) => ion.target_ion_id === ionId)?.filter_params[
+      sample.focused.instrument
+    ]
 
     // Reset filter parameters if the sample has changed and no new filter_parames to set are provided
     if (sampleChanged && !ionMatchParams) {
@@ -116,22 +113,23 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
   async function loadMatches({ sampleId, ionId, collectionId } = {}) {
     const target_ion_id = ionId ?? ion.value?.target_ion_id
     if (!target_ion_id) return
-    const sampleIon = await api.request.read({
-      method: 'getAggregateSampleMatchIon',
-      body: {
-        sampleId: sampleId ?? ion.value?.sample_item_id,
-        body: {
-          target_ion_id,
-          target_collection_id: collectionId ?? ion.value?.target_collection_id,
-          match_params: matchParams.current
-        }
+    const sampleIon = await api.http.post(
+      `/match/aggregate/sample/${sampleId ?? ion.value?.sample_item_id}/ion`,
+      {
+        target_ion_id,
+        target_collection_id: collectionId ?? ion.value?.target_collection_id,
+        match_params: matchParams.current
+      },
+      {
+        use: 'read',
+        type: 'load_matches'
       }
-    })
-    if (!sampleIon?.data) return
+    )
+    if (!sampleIon) return
     const existingIsotopes = isotopes.value
 
-    ion.value = sampleIon.data.match_ions[0]
-    isotopes.value = sampleIon.data.match_isotopes.map((isotope) => {
+    ion.value = sampleIon.match_ions[0]
+    isotopes.value = sampleIon.match_isotopes.map((isotope) => {
       let existingIsotope = null
       if (existingIsotopes) {
         existingIsotope = existingIsotopes.find(
@@ -161,15 +159,16 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
 
     ui.chart.clear()
 
-    await api.request.read({
-      method: 'getVisualizationIonFocus',
-      body: {
+    await api.http.get(`/visualization/ion_focus`, {
+      params: {
         sample_item_id: sampleId ?? ion.value.sample_item_id,
         target_ion_id: ionId ?? ion.value.target_ion_id,
         min_isotope_abundance: matchParams.current.min_isotope_abundance,
         peak_min_intensity: matchParams.current.peak_min_intensity,
         mz_tolerance: matchParams.current.mz_tolerance
-      }
+      },
+      use: 'read',
+      type: 'read_visualized_ion'
     })
   }
 

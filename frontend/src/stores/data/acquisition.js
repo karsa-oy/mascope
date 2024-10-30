@@ -81,35 +81,33 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
   }
 
   async function loadRange(range) {
-    const sampleFiles = await (
-      await api.request.read({
-        method: 'getAllSampleFiles',
-        body: {
-          datetime_min: range.min?.toISOString(),
-          datetime_max: range.max?.toISOString(),
-          instrument: instrument.focused?.instrument,
-          sort: 'datetime_utc',
-          order: 'asc'
-        }
-      })
-    )?.data
+    const sampleFiles = await api.http.get(`/sample/files`, {
+      params: {
+        datetime_min: range.min?.toISOString(),
+        datetime_max: range.max?.toISOString(),
+        instrument: instrument.focused?.instrument,
+        sort: 'datetime_utc',
+        order: 'asc'
+      },
+      use: 'read',
+      type: 'load_sample_file_range'
+    })
     if (sampleFiles) {
       list.value = sampleFiles
     }
   }
 
   async function loadRecent(days = 7) {
-    const recent = (
-      await api.request.read({
-        method: 'getRecentSampleFiles',
-        body: {
-          instrument: instrument.focused?.instrument,
-          sort: 'datetime_utc',
-          order: 'asc',
-          days
-        }
-      })
-    )?.data
+    const recent = await api.http.get(`/sample/files/recent`, {
+      params: {
+        instrument: instrument.focused?.instrument,
+        sort: 'datetime_utc',
+        order: 'asc',
+        days
+      },
+      use: 'read',
+      type: 'load_recent_sample_files'
+    })
     if (recent) {
       list.value = recent
     }
@@ -160,14 +158,13 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
   // mz calibration
 
   async function loadMzCalibration() {
-    const lastMzCalibration = (
-      await api.request.read({
-        method: 'getMzCalibration',
-        body: {
-          instrument: instrument.focused?.instrument
-        }
-      })
-    )?.data
+    const lastMzCalibration = await api.http.get(`/calibration/mz_calibration`, {
+      params: {
+        instrument: instrument.focused?.instrument
+      },
+      use: 'read',
+      type: 'load_mz_calibration'
+    })
     if (!lastMzCalibration) return
     mzCalibration.value = lastMzCalibration
   }

@@ -37,16 +37,15 @@ const samples = ref(null)
 const previewSample = ref()
 watchEffect(async () => {
   samples.value = batch.value
-    ? (
-        await api.request.read({
-          method: 'getBatchSamples',
-          body: {
-            sample_batch_id: batch.value.sample_batch_id,
-            batch_matches_info: false,
-            sort: 'datetime_utc'
-          }
-        })
-      )?.data
+    ? await api.http.get(`/samples`, {
+        params: {
+          sample_batch_id: batch.value.sample_batch_id,
+          batch_matches_info: false,
+          sort: 'datetime_utc'
+        },
+        use: 'read',
+        type: 'load_samples'
+      })
     : null
   previewSample.value = samples.value?.length > 0 ? { ...samples.value[0] } : null
 })
@@ -207,13 +206,14 @@ const formatter = new Intl.NumberFormat('en-US', {
         @click="
           async () => {
             if (batch) {
-              await api.request.process({
-                method: 'recalibrateBatch',
-                body: {
-                  batchId: original.sample_batch_id,
-                  body: mzFit.mzCalibrationParams
+              await api.http.post(
+                `/calibration/mz_calibrate/batch/${original.sample_batch_id}`,
+                mzFit.mzCalibrationParams,
+                {
+                  use: 'process',
+                  type: 'recalibrate_batch'
                 }
-              })
+              )
             } else {
               await mzFit.apply(original)
             }

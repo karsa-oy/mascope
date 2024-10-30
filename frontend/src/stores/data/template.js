@@ -5,26 +5,24 @@ import { api } from '@/api'
 export const useTemplate = defineModule({
   name: 'template',
   key: 'attribute_template_id',
-  load: async () =>
-    (
-      await api.request.read({
-        method: 'getAllAttributeTemplates'
-      })
-    )?.data,
-  create: async (template) => {
-    return await api.request.create({
-      method: 'createAttributeTemplate',
-      body: template
-    })
-  },
-  update: async (template) =>
-    await api.request.update({
-      method: 'updateAttributeTemplate',
-      body: { templateId: template.attribute_template_id, body: template }
+  load: () =>
+    api.http.get(`/attribute_templates`, {
+      use: 'read',
+      type: 'load_attribute_templates'
     }),
-  delete: async ({ attribute_template_id, name }) =>
-    await api.request.delete({
-      method: 'deleteAttributeTemplate',
-      body: { templateId: attribute_template_id, templateName: name }
+  create: (template) =>
+    api.http.post(`/attribute_templates`, template, {
+      use: 'create',
+      type: 'create_attribute_template'
+    }),
+  update: (template) =>
+    api.http.patch(`/attribute_templates/${template.attribute_template_id}`, template, {
+      use: 'update',
+      type: 'update_attribute_template'
+    }),
+  delete: ({ attribute_template_id }) =>
+    api.http.delete(`/attribute_templates/${attribute_template_id}`, {
+      use: 'delete',
+      type: 'delete_attribute_template'
     })
 })

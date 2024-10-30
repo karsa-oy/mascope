@@ -1,19 +1,21 @@
 <script setup>
-  import { computed } from 'vue'
-  
-  import Dashboard from './Dashboard.vue'
-  import ProgressSpinner from 'primevue/progressspinner'
+import { computed } from 'vue'
 
-  import { useApp } from '@/stores'
+import { BaseKarsaLogo } from '@/lib/base'
 
-  const app = useApp()  
-  const ready = computed(() => app.data.workspace.list.length > 0)
+import Dashboard from './Dashboard.vue'
+import ProgressSpinner from 'primevue/progressspinner'
+
+import { useApp } from '@/stores'
+
+const app = useApp()
+const ready = computed(() => app.data.workspace.list.length > 0)
 </script>
 
 <template>
   <!-- App Dashboard  -->
   <div id="app" v-if="ready">
-    <Dashboard/>
+    <Dashboard />
   </div>
   <!-- Loading Spinner  -->
   <div id="loading" v-else>

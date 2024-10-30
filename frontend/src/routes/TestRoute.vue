@@ -4,9 +4,16 @@
 
 // do NOT commit changes to this route
 
-import { useApp } from '@/stores'
+import { api } from '@/api'
 
-const app = useApp()
+api.http
+  .get('/workspaces', {
+    headers: {
+      use: 'read',
+      type: 'read_workspaces'
+    }
+  })
+  .then(console.log)
 </script>
 
 <template>

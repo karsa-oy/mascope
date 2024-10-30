@@ -38,14 +38,10 @@ export const useChartData = defineStore('chart.sample.spectrum', () => {
 
   async function load(sampleFileId, peaks) {
     loading.value = true
-    const data = (
-      await api.request.read({
-        method: 'getSampleSpectrum',
-        body: {
-          sample_file_id: sampleFileId
-        }
-      })
-    )?.data
+    const data = await api.http.get(`/sample/files/${sampleFileId}/spectrum`, {
+      use: 'read',
+      type: 'get_spectrum'
+    })
     if (data) {
       traces.value = peaks
         .map(({ mz, height, area }) => ({

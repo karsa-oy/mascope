@@ -256,15 +256,13 @@ watchEffect(() => loadBatches(selected.workspace))
 
 async function loadBatches(workspace) {
   if (workspace) {
-    const latest = (
-      await api.request.read({
-        method: 'getAllBatches',
-        body: {
-          workspace_id: workspace.workspace_id
-        },
-        errorMessage: `Failed to load the workspace batches.`
-      })
-    ).data
+    const latest = await api.http.get(`/sample/batches`, {
+      params: {
+        workspace_id: workspace.workspace_id
+      },
+      use: 'read',
+      type: 'load_batches'
+    })
     // reconcile with existing data
     batches.loaded = latest.map(
       (batch) =>
@@ -404,9 +402,9 @@ async function init(mode) {
       selected.tab = 'batches'
       selected.workspace = app.data.workspace.focused
       batches.selected = (
-        await api.request.read({
-          method: 'getTargetCollection',
-          body: original.value.target_collection_id
+        await api.http.get(`/target/collections/${original.value.target_collection_id}`, {
+          use: 'read',
+          type: 'read_target_collection'
         })
       )?.sample_batches
       break

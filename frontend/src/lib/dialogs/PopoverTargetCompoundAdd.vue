@@ -59,9 +59,9 @@ const addCompound = () => {
 
 const confirmation = async () => {
   let count = (
-    await api.request.read({
-      method: 'getTargetCollection',
-      body: props.collection.target_collection_id
+    await api.http.get(`/target/collections/${props.collection.target_collection_id}`, {
+      use: 'read',
+      type: 'read_target_collections'
     })
   )?.sample_batches.length
   if (count > 1) {

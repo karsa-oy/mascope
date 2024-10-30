@@ -9,14 +9,14 @@ export const usePeak = defineModule({
   useParent: useSample,
   reloadOn: 'peak_reload',
   load: async ({ sample_file_id }) => {
-    const data = (
-      await api.request.read({
-        method: 'getSamplePeaks',
-        body: {
-          sample_file_id
-        }
-      })
-    )?.data
+    const data = await api.http.get(`/sample/files/${sample_file_id}/peaks`, {
+      params: {
+        areas: true,
+        heights: true
+      },
+      use: 'read',
+      type: 'load_sample_peaks'
+    })
     if (data) {
       const { mz, area, height } = data
       const records = mz.map((mz, i) => ({
@@ -29,13 +29,9 @@ export const usePeak = defineModule({
       return []
     }
   },
-  computeAll: async ({ sample_file_id }) =>
-    (
-      await api.request.read({
-        method: 'computeAllSamplePeaks',
-        body: {
-          sample_file_id
-        }
-      })
-    )?.data
+  computeAll: ({ sample_file_id }) =>
+    api.http.get(`/sample/files/${sample_file_id}/peaks/compute`, {
+      use: 'read',
+      type: 'compute_all_sample_peaks'
+    })
 })

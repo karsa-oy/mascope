@@ -3,6 +3,8 @@ import { defineStore } from 'pinia'
 
 import { useApp } from '@/stores'
 
+import { api } from '@/api'
+
 export const useChartData = defineStore('chart.match.spectra', () => {
   const traces = ref([])
   const length = ref()
@@ -18,7 +20,7 @@ export const useChartData = defineStore('chart.match.spectra', () => {
     }
   })
 
-  async function onVisualizationSignalSumSpectrum(payload) {
+  api.socket.on('visualization_signal_sum_spectrum', (payload) => {
     for (let trace of payload) {
       length.value = length.value + trace.x.length
       unit.value = trace.unit ? trace.unit : unit.value
@@ -43,6 +45,6 @@ export const useChartData = defineStore('chart.match.spectra', () => {
       }
     }
     traces.value = [...traces.value, ...payload]
-  }
-  return { traces, onVisualizationSignalSumSpectrum, length, unit }
+  })
+  return { traces, length, unit }
 })
