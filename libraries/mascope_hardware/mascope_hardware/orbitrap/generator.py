@@ -8,18 +8,19 @@ Created on Tue Apr 09 13:08:29 2019
 """
 
 import os
+from pathlib import Path
 from multiprocessing import Event, Lock, Queue
 from queue import Empty
 from threading import Thread
 from time import sleep
+from datetime import datetime
 from numba import jit
 
 import numpy as np
 from ThermoFisher.CommonCore.Data import Business as ThermoBusiness
 
-from .util import net2np_array
-
 from mascope_hardware.runtime import hardware_runtime
+from .util import net2np_array
 
 
 def strip_filepath(filepath):
@@ -97,13 +98,37 @@ class RawStreamer(Thread):
         # -1 when there is no active acquisition
 
     @property
-    def filename(self) -> str:
+    def timestamp(self) -> datetime:
+        """Timestamp in datetime format
+
+        :return: Timestamp
+        :rtype: datetime
+        """
+        if self.raw:
+            dotnet_datetime = self.raw.CreationDate
+
+            python_datetime = datetime(
+                year=dotnet_datetime.Year,
+                month=dotnet_datetime.Month,
+                day=dotnet_datetime.Day,
+                hour=dotnet_datetime.Hour,
+                minute=dotnet_datetime.Minute,
+                second=dotnet_datetime.Second,
+            )
+            return python_datetime
+
+    @property
+    def filename(self) -> str | None:
         """Base filename of the raw file currently being streamed
 
         :return: Base filename
         :rtype: str
         """
-        return strip_filepath(self.raw.FileName) if self.raw else None
+        if self.raw:
+            filename = strip_filepath(self.raw.FileName)
+            timestamp = self.timestamp.strftime("%Y.%m.%d-%Hh%Mm%Ss")
+            # Add timestamp to the filename
+            return filename.replace("_", f"_{timestamp}_", 1)
 
     @property
     def method_file(self) -> str | None:
@@ -222,6 +247,7 @@ class RawStreamer(Thread):
                         "i": None,
                         "source_filepath": self.raw.FileName,
                         "polarity": "-",
+                        "timestamp": self.timestamp.isoformat(),
                     }
                 )
             if self._has_positive_scans():
@@ -231,6 +257,7 @@ class RawStreamer(Thread):
                         "i": None,
                         "source_filepath": self.raw.FileName,
                         "polarity": "+",
+                        "timestamp": self.timestamp.isoformat(),
                     }
                 )
         # Reset self
@@ -327,7 +354,9 @@ class RawStreamer(Thread):
                         self.raw.SelectInstrument(i_type, 1)
                         self.raw.IncludeReferenceAndExceptionData = True
                 except Exception as e:
-                    self.log.error(f"Failed to read file {file_to_stream}: {e}")
+                    self.log.error(
+                        f"Failed to read file {Path(file_to_stream).name}: {e}"
+                    )
                     continue
             except Empty:
                 # No file to stream, keep waiting
@@ -341,7 +370,7 @@ class RawStreamer(Thread):
             # Check if precomputation
             if self._mz_grid is None:
                 self.log.error(
-                    f"Failed to compute mz grid. File {self.filename} is likely damaged."
+                    f"Failed to compute mz grid. File {Path(file_to_stream).name} is likely damaged."
                 )
                 # Close raw file
                 with self.lock:
@@ -350,7 +379,7 @@ class RawStreamer(Thread):
             # Start streaming
             # Feed coordinates
             self._feed_coordinates()
-            self.log.info(f"Acquisition started: {self.filename}")
+            self.log.info(f"Acquisition started: {Path(file_to_stream).name}")
             # Set active flag
             self.active.set()
             # Loop through the file and feed to queues

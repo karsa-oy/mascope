@@ -7,6 +7,52 @@ import datetime_glob
 from mascope_lib.runtime import lib_runtime
 
 
+FILENAME_DATETIME_PATTERNS = [
+    "*%Y.%m.%d*%Hh%Mm%Ss*",
+    "*%Y%m%d_%H%M_*",
+    "*%Y%m%d%H%M%S*",
+    "*%Y%m%d*%H%M%S*",
+    "*%Y%m%d*%H%M*",
+    "*%Y%m%d*",
+]
+
+
+def convert_datetime_pattern_to_regex(patterns) -> list:
+    """Convert datetime_glob patterns to regex
+
+    :param patterns: datetime_glob patterns
+    :type patterns: list
+    :return: Regex-compatible patterns
+    :rtype: list
+    """
+    # map patterns
+    strftime_to_regex = {
+        "%Y": r"\d{4}",  # Year with century as a decimal number.
+        "%m": r"\d{2}",  # Month as a zero-padded decimal number.
+        "%d": r"\d{2}",  # Day of the month as a zero-padded decimal number.
+        "%H": r"\d{2}",  # Hour (24-hour clock) as a zero-padded decimal number.
+        "%M": r"\d{2}",  # Minute as a zero-padded decimal number.
+        "%S": r"\d{2}",  # Second as a zero-padded decimal number.
+        "*": r".*",  # Wildcard for any sequence of characters
+        "h": "h",  # Literal characters
+        "s": "s",
+    }
+
+    regex_patterns = []
+    for pattern in patterns:
+        regex_pattern = pattern
+
+        # Replace each strftime directive or wildcard with the appropriate regex pattern
+        for strftime, regex in strftime_to_regex.items():
+            regex_pattern = regex_pattern.replace(strftime, regex)
+
+        # Remove wildcard from borders
+        regex_pattern = regex_pattern.strip(".*")
+
+        regex_patterns.append(regex_pattern)
+    return regex_patterns
+
+
 def ct_struct_to_dict(struct):
     """Convert ctypes struct to dict
 
@@ -40,14 +86,6 @@ def ct_struct_to_dict(struct):
 
 
 def timestamp_from_filename(filename):
-    FILENAME_DATETIME_PATTERNS = [
-        "*%Y.%m.%d*%Hh%Mm%Ss*",
-        "*%Y%m%d_%H%M_*",
-        "*%Y%m%d%H%M%S*",
-        "*%Y%m%d*%H%M%S*",
-        "*%Y%m%d*%H%M*",
-    ]
-
     for pattern in FILENAME_DATETIME_PATTERNS:
         matcher = datetime_glob.Matcher(pattern=pattern)
         dt = matcher.match(filename)
