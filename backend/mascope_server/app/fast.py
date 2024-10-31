@@ -47,17 +47,19 @@ async def logger_middleware(request: Request, call_next):
     return response
 
 
-# cors middleware
-fast.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-    ],  # TODO fix this
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["Process-ID"],  # expose custom process-id header
-)
+# Set CORS middleware only for development. In prod env frontend and backend share the same origin,
+# which negates strict CORS requirements as the browser handles requests under a unified origin
+if runtime.mode == "dev":
+    fast.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            "http://localhost:5173",  # dev environment: Local frontend
+        ],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+        expose_headers=["Process-ID"],  # expose custom process-id header
+    )
 
 # routing
 for router in routers:
