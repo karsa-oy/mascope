@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from mascope_server.api.auth.dependencies import current_active_user, admin_user
+from mascope_server.api.new.auth.dependencies import current_active_user, admin_user
 from mascope_server.api.lib.api_features import api_route
 from mascope_server.api.controllers.workspace.workspace_controller import (
     get_workspaces,

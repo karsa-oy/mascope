@@ -4,7 +4,7 @@ Route dependencies
 
 from fastapi import Depends, HTTPException, status
 from mascope_server.db.models import User
-from mascope_server.api.auth.auth_backend import fastapi_users, get_enabled_backends
+from mascope_server.api.new.auth.auth_backend import fastapi_users, get_enabled_backends
 
 # Dependencies for active, verified, and superuser users
 current_user = fastapi_users.current_user(get_enabled_backends=get_enabled_backends)

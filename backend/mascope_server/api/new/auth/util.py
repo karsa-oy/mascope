@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi_users.db import SQLAlchemyUserDatabase
 from mascope_server.db import get_async_session
 from mascope_server.db.models import User
-from mascope_server.api.auth.service import UserManager
+from mascope_server.api.new.auth.service import UserManager
 
 
 async def get_user_db(session: AsyncSession = Depends(get_async_session)):

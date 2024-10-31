@@ -1,6 +1,6 @@
 from fastapi import APIRouter
-from mascope_server.api.auth.auth_backend import fastapi_users, auth_backend_cookie
-from mascope_server.api.users.schemas import UserRead, UserCreate
+from mascope_server.api.new.auth.auth_backend import fastapi_users, auth_backend_cookie
+from mascope_server.api.new.users.schemas import UserRead, UserCreate
 
 # Create the APIRouter and define the common prefix and tags
 auth_router = APIRouter(prefix="/api/auth", tags=["Auth"])

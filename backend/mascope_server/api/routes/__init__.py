@@ -1,5 +1,5 @@
-from mascope_server.api.auth.routes import auth_router
-from mascope_server.api.users.routes import users_router
+from mascope_server.api.new.auth.routes import auth_router
+from mascope_server.api.new.users.routes import users_router
 from mascope_server.api.routes.attribute_templates.attribute_templates_routes import (
     attribute_templates_router,
 )

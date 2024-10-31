@@ -13,8 +13,8 @@ from fastapi_users.authentication import (
     AuthenticationBackend,
 )
 from mascope_server.db.models import User
-from mascope_server.api.auth.config import auth_settings
-from mascope_server.api.auth.util import get_user_manager
+from mascope_server.api.new.auth.config import auth_settings
+from mascope_server.api.new.auth.util import get_user_manager
 
 # Cookie-based authentication for web app (Mascope web-based interface)
 cookie_transport = CookieTransport(
