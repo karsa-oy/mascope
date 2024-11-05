@@ -88,9 +88,11 @@ setTimeout(
       <Message v-if="status" :severity="status.severity">
         {{ status.message }}
       </Message>
-      <Message v-else severity="secondary" icon="pi pi-clipboard">
-        {{ info }}
-      </Message>
+      <slot name="info">
+        <Message severity="secondary" icon="pi pi-clipboard">
+          {{ info }}
+        </Message>
+      </slot>
     </template>
   </div>
 </template>

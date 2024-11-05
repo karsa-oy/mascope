@@ -1,5 +1,6 @@
 from typing import Optional, List
 from pydantic import BaseModel, Field
+from mascope_server.api.models.base_pydantic_model import QueryParamsModel
 from mascope_server.api.models.match.match_pydantic_model import (
     FilterSamplePayload,
 )
@@ -20,7 +21,7 @@ class MatchCollectionBase(BaseModel):
     )
 
 
-class GetMatchCollectionsQueryParams(BaseModel):
+class GetMatchCollectionsQueryParams(QueryParamsModel):
     sample_item_id: Optional[str] = Field(
         None, description="Filter collections by sample item ID"
     )

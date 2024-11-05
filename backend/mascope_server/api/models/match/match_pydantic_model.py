@@ -1,62 +1,6 @@
 from typing import Optional, List
 from pydantic import BaseModel, Field, model_validator
 
-# TODO_configuration Default Filter Parameters
-DEFAULT_MZ_TOLERANCE = 15
-DEFAULT_MIN_ISOTOPE_ABUNDANCE = 0.15
-DEFAULT_ISOTOPE_RATIO_TOLERANCE = 0.15
-DEFAULT_PEAK_MIN_INTENSITY = 0.0
-DEFAULT_MIN_ISOTOPE_CORRELATION = 0.8
-DEFAULT_PROBABLE_MATCH_THRESHOLD = 0.8
-DEFAULT_POSSIBLE_MATCH_THRESHOLD = 0.7
-
-
-class FilterParams(BaseModel):
-    mz_tolerance: int = Field(
-        DEFAULT_MZ_TOLERANCE,
-        description="Tolerance for mass-to-charge ratio (m/z) error.",
-    )
-    isotope_ratio_tolerance: float = Field(
-        DEFAULT_ISOTOPE_RATIO_TOLERANCE,
-        description="Tolerance for the ratio of isotopic abundances.",
-    )
-    peak_min_intensity: float = Field(
-        DEFAULT_PEAK_MIN_INTENSITY,
-        description="Minimum peak intensity threshold for considering a match.",
-    )
-    min_isotope_abundance: float = Field(
-        DEFAULT_MIN_ISOTOPE_ABUNDANCE,
-        description="Minimum relative abundance of isotopes to consider in the match.",
-    )
-    min_isotope_correlation: float = Field(
-        DEFAULT_MIN_ISOTOPE_CORRELATION,
-        description="Minimum correlation of isotopic pattern required for a match.",
-    )
-    probable_match_threshold: float = Field(
-        DEFAULT_PROBABLE_MATCH_THRESHOLD,
-        description="Threshold score above which a match is considered probable.",
-    )
-    possible_match_threshold: float = Field(
-        DEFAULT_POSSIBLE_MATCH_THRESHOLD,
-        description="Threshold score above which a match is considered possible, but below the probable match threshold.",
-    )
-
-    @model_validator(mode="after")
-    @classmethod
-    def validate_thresholds(cls, values):
-        probable_match_threshold = values.probable_match_threshold
-        possible_match_threshold = values.possible_match_threshold
-
-        if (
-            possible_match_threshold is not None
-            and probable_match_threshold is not None
-        ):
-            if possible_match_threshold > probable_match_threshold:
-                raise ValueError(
-                    "Possible match threshold must be less than or equal to probable match threshold"
-                )
-        return values
-
 
 class MatchComputeSample(BaseModel):
     sample_item_id: str = Field(..., description="ID of the sample item")

@@ -41,7 +41,8 @@ uvicorn = "^0.30"
 websocket-client = "^1.8"
 zarr = "==2.18.2"
 pyarrow = "^17.0.0"
-python-multipart = "^0.0.10"
+python-multipart = "^0.0.9"
+fastapi-users = {extras = ["oauth", "sqlalchemy"], version = "^13.0.0"}
 
 [tool.poetry.group.dev.dependencies]
 austin-dist = "^3.6"

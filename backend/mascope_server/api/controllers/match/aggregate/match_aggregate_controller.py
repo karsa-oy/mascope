@@ -32,7 +32,7 @@ from mascope_server.api.controllers.match.lib.match_aggregate import (
     aggregate_match_collections,
     aggregate_match_samples,
 )
-from mascope_server.api.controllers.match.lib.match_filter import apply_filter_params
+from mascope_server.api.new.match.params import apply_match_params
 from mascope_server.api.controllers.match.lib.match_remove import remove_matches
 from mascope_server.api.controllers.sample.lib.sample_items_fetch import (
     fetch_sample_item_ids,
@@ -49,9 +49,6 @@ from mascope_server.api.controllers.match.collections.match_collections_controll
 from mascope_server.api.controllers.match.samples.match_samples_controller import (
     create_match_samples,
 )
-from mascope_server.api.models.match.match_pydantic_model import (
-    FilterParams,
-)
 from mascope_server.api.models.match.ions.match_ion_pydantic_model import (
     MatchIonBase,
 )
@@ -64,6 +61,7 @@ from mascope_server.api.models.match.collections.match_collection_pydantic_model
 from mascope_server.api.models.match.samples.match_sample_pydantic_model import (
     MatchSampleBase,
 )
+from mascope_server.api.new.match.params import BaseMatchParams
 
 
 from mascope_server.runtime import runtime
@@ -74,7 +72,7 @@ async def aggregate_match_isotope_filtered_data(
     sample_batch_id: str = None,
     sample_item_id: str = None,
     target_ion_id: str = None,
-    filter_params: FilterParams = None,
+    match_params: BaseMatchParams = None,
     include_match_interference: bool = True,
 ) -> pd.DataFrame:
     async with async_session() as session:
@@ -314,9 +312,9 @@ async def aggregate_match_isotope_filtered_data(
             .reset_index(drop=True)
         )
 
-        # Step 5: Apply filter_params (provided may be None) filtering match_score, sample_peak_area, setting match_category
-        aggregated_match_isotope_filtered_data_df = apply_filter_params(
-            aggregated_sample_match_isotope_data_df, filter_params
+        # Step 5: Apply match_params (provided may be None) filtering match_score, sample_peak_area, setting match_category
+        aggregated_match_isotope_filtered_data_df = apply_match_params(
+            aggregated_sample_match_isotope_data_df, match_params
         )
 
         return aggregated_match_isotope_filtered_data_df
@@ -327,7 +325,7 @@ async def aggregate_matches(
     sample_batch_id: str = None,
     sample_item_id: str = None,
     target_ion_id: str = None,
-    filter_params: FilterParams = None,
+    match_params: BaseMatchParams = None,
     match_isotopes: bool = False,
 ) -> dict:
     # Aggregate match isotopes filtered data
@@ -336,7 +334,7 @@ async def aggregate_matches(
             sample_batch_id=sample_batch_id,
             sample_item_id=sample_item_id,
             target_ion_id=target_ion_id,
-            filter_params=filter_params,
+            match_params=match_params,
         )
     )
     if aggregated_match_isotope_filtered_data_df.empty:
@@ -350,7 +348,7 @@ async def aggregate_matches(
 
     # Aggregate match ions
     match_ions_data_df, match_ions_df = await aggregate_match_ions(
-        aggregated_match_isotope_filtered_data_df
+        aggregated_match_isotope_filtered_data_df, match_params
     )
 
     # Aggregate fields for match compounds
@@ -407,7 +405,7 @@ async def aggregate_and_create_matches(
     sample_batch_id: str = None,
     sample_item_id: str = None,
     target_ion_id: str = None,
-    filter_params: FilterParams = None,
+    match_params: BaseMatchParams = None,
     match_ions: Optional[bool] = True,
     match_compounds: Optional[bool] = True,
     match_collections: Optional[bool] = True,
@@ -425,7 +423,7 @@ async def aggregate_and_create_matches(
     :param sample_batch_id: ID of the sample batch.
     :param sample_item_id: ID of the sample item.
     :param target_ion_id: ID of the target ion.
-    :param filter_params: Additional filter parameters.
+    :param match_params: Additional match parameters.
     :return: A dictionary with a message and log of actions taken.
     """
     try:
@@ -440,7 +438,7 @@ async def aggregate_and_create_matches(
         sample_batch_id=sample_batch_id,
         sample_item_id=sample_item_id,
         target_ion_id=target_ion_id,
-        filter_params=filter_params,
+        match_params=match_params,
     )
 
     if aggregated_result.get("results", 0) == 0:
@@ -528,7 +526,7 @@ async def aggregate_and_recreate_matches(
     sample_batch_id: str = None,
     sample_item_id: str = None,
     target_ion_id: str = None,
-    filter_params: FilterParams = None,
+    match_params: BaseMatchParams = None,
     match_ions: Optional[bool] = True,
     match_compounds: Optional[bool] = True,
     match_collections: Optional[bool] = True,
@@ -547,7 +545,7 @@ async def aggregate_and_recreate_matches(
     :param sample_batch_id: ID of the sample batch.
     :param sample_item_id: ID of the sample item.
     :param target_ion_id: ID of the target ion.
-    :param filter_params: Additional filter parameters.
+    :param match_params: Additional match parameters.
     :param match_ions: Controls the removal and recreation of ion match data.
     :param match_compounds: Controls the removal and recreation of compound match data.
     :param match_collections: Controls the removal and recreation of collection match data.
@@ -571,7 +569,7 @@ async def aggregate_and_recreate_matches(
         sample_batch_id=sample_batch_id,
         sample_item_id=sample_item_id,
         target_ion_id=target_ion_id,
-        filter_params=filter_params,
+        match_params=match_params,
         match_ions=match_ions,
         match_compounds=match_compounds,
         match_collections=match_collections,

@@ -1,10 +1,17 @@
+import re
 from typing import Optional, List
 from datetime import datetime
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_validator, field_validator
+from mascope_server.api.models.base_pydantic_model import QueryParamsModel
 
 
-class GetInstrumentFunctionsQueryParams(BaseModel):
+# TODO move to configuration file
+DEFAULT_R_SQUARED_THRESHOLD = 0.95
+
+
+class GetInstrumentFunctionsQueryParams(QueryParamsModel):
     instrument: Optional[str] = Field(None, description="Filter by instrument name.")
+    method_file: Optional[str] = Field(None, description="Filter by method file name.")
     sort: Optional[str] = Field(None, description="Field to sort by.")
     order: Optional[str] = Field(
         None, description="Order of sorting, can be either 'asc' or 'desc'."
@@ -13,7 +20,7 @@ class GetInstrumentFunctionsQueryParams(BaseModel):
     limit: int = Field(10000, description="Number of items per page.")
 
 
-class GetInstrumentFunctionQueryParams(BaseModel):
+class GetInstrumentFunctionQueryParams(QueryParamsModel):
     filename: Optional[str] = Field(
         None,
         description="When filename is used, the endpoint returns the latest instrument function for the specified file's instrument, as of the file's creation date and time.",
@@ -52,6 +59,10 @@ class PeakShape(BaseModel):
 
 class InstrumentFunctionCreateBody(BaseModel):
     instrument: str = Field(..., description="Instrument name")
+    method_file: str = Field(
+        ...,
+        description="Name of the method file associated with the instrument function. Must start with the date in YYYYMMDD format.",
+    )
     datetime_utc: datetime = Field(
         ...,
         description="UTC timestamp from which onwards the specified instrument functions are applied, until new instrument functions are generated.",
@@ -61,3 +72,19 @@ class InstrumentFunctionCreateBody(BaseModel):
         ...,
         description="Parameters defining the resolution function, which is used to scale the width of peaks accurately during peak fitting.",
     )
+
+
+class InstrumentFunctionFitParams(BaseModel):
+    threshold: float = Field(
+        default=DEFAULT_R_SQUARED_THRESHOLD,
+        description="R-squared threshold filtering non-(skewed) Gaussian peaks from instrument function evaluation",
+    )
+
+    @field_validator("threshold")
+    @classmethod
+    def validate_threshold(cls, v):
+        if (v <= 0) or (v > 1):
+            raise ValueError(
+                "R-squared threshold must be between 0 and 1, inclusive of 1."
+            )
+        return v

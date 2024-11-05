@@ -19,9 +19,8 @@ const logRequest = (request) => {
 }
 
 const logResponse = (response) => {
-  let logMessage = `[http] Response: ${response.status} ${
-    response.statusText
-  } from ${response.config.method.toUpperCase()} ${response.config.url}`
+  let logMessage = `[http] Response: ${response.status} ${response.statusText
+    } from ${response.config.method.toUpperCase()} ${response.config.url}`
   // Get process_id from headers
   if (response.headers['process-id']) {
     logMessage += ` | Process-ID: ${response.headers['process-id']}`
@@ -75,6 +74,57 @@ export function createHttpClient() {
 
   return {
     client,
+    // Authentication methods
+    login: async ({ username, password }) => {
+      try {
+        const params = new URLSearchParams()
+        params.append('grant_type', 'password')
+        params.append('username', username)
+        params.append('password', password)
+
+        return await client.post('/auth/login', params, {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          withCredentials: true // Important: include this to send and receive cookies
+        })
+      } catch (error) {
+        const userErrorMessage = error?.response?.data?.detail || `Login failed: ${error.message}`
+        throw new Error(userErrorMessage)
+      }
+    },
+
+    logout: async () => {
+      try {
+        return await client.post(
+          '/auth/logout',
+          {},
+          {
+            withCredentials: true // Send cookies with the logout request
+          }
+        )
+      } catch (error) {
+        const userErrorMessage = error?.response?.data?.detail || `Logout failed: ${error.message}`
+        throw new Error(userErrorMessage)
+      }
+    },
+
+    register: async ({ email, password, username, role_id }) => {
+      try {
+        return await client.post('/auth/register', {
+          email,
+          password,
+          is_active: true,
+          is_superuser: false,
+          is_verified: false,
+          username,
+          role_id
+        })
+      } catch (error) {
+        const userErrorMessage =
+          error?.response?.data?.detail || `Registration failed: ${error.message}`
+        throw new Error(userErrorMessage)
+      }
+    },
+
     // Workspaces
     getAllWorkspaces: async (params = {}) => {
       try {
@@ -530,7 +580,7 @@ export function createHttpClient() {
       } catch (error) {
         throw new Error(
           error?.response?.data?.error ??
-            `Failed to retrieve batch match collections (batch id ${sample_batch_id}): ${error}`
+          `Failed to retrieve batch match collections (batch id ${sample_batch_id}): ${error}`
         )
       }
     },
@@ -540,7 +590,7 @@ export function createHttpClient() {
       } catch (error) {
         throw new Error(
           error?.response?.data?.error ??
-            `Failed to retrieve batch match compounds (batch id ${sample_batch_id}): ${error}`
+          `Failed to retrieve batch match compounds (batch id ${sample_batch_id}): ${error}`
         )
       }
     },
@@ -550,7 +600,7 @@ export function createHttpClient() {
       } catch (error) {
         throw new Error(
           error?.response?.data?.error ??
-            `Failed to retrieve batch match ions (batch id ${sample_batch_id}): ${error}`
+          `Failed to retrieve batch match ions (batch id ${sample_batch_id}): ${error}`
         )
       }
     },
@@ -560,7 +610,7 @@ export function createHttpClient() {
       } catch (error) {
         throw new Error(
           error?.response?.data?.error ??
-            `Failed to retrieve batch match isotopes (batch id ${sample_batch_id}): ${error}`
+          `Failed to retrieve batch match isotopes (batch id ${sample_batch_id}): ${error}`
         )
       }
     },
@@ -571,7 +621,7 @@ export function createHttpClient() {
       } catch (error) {
         throw new Error(
           error?.response?.data?.error ??
-            `Failed to retrieve sample match collections (sample id ${sample_item_id}): ${error}`
+          `Failed to retrieve sample match collections (sample id ${sample_item_id}): ${error}`
         )
       }
     },
@@ -581,7 +631,7 @@ export function createHttpClient() {
       } catch (error) {
         throw new Error(
           error?.response?.data?.error ??
-            `Failed to retrieve sample match compounds (sample id ${sample_item_id}): ${error}`
+          `Failed to retrieve sample match compounds (sample id ${sample_item_id}): ${error}`
         )
       }
     },
@@ -591,7 +641,7 @@ export function createHttpClient() {
       } catch (error) {
         throw new Error(
           error?.response?.data?.error ??
-            `Failed to retrieve sample match ions (sample id ${sample_item_id}): ${error}`
+          `Failed to retrieve sample match ions (sample id ${sample_item_id}): ${error}`
         )
       }
     },
@@ -601,7 +651,7 @@ export function createHttpClient() {
       } catch (error) {
         throw new Error(
           error?.response?.data?.error ??
-            `Failed to retrieve sample match isotopes (sample id ${sample_item_id}): ${error}`
+          `Failed to retrieve sample match isotopes (sample id ${sample_item_id}): ${error}`
         )
       }
     },
@@ -761,27 +811,27 @@ export function createHttpClient() {
         console.error(`Failed to update target ion ${data.target_ion_formula}`, error)
       }
     },
-    saveTargetIonFilterParams: async (data) => {
+    saveTargetIonMatchParams: async (data) => {
       try {
         const response = await client.patch(`/target/ions/${data.target_ion_id}`, data.body)
         // TEMP the message forming should move to api route
-        const successMessage = `Filtering parameters for '${data.target_ion_formula}' saved successfully!`
+        const successMessage = `Match parameters for '${data.target_ion_formula}' saved successfully!`
         response.data.message = successMessage
         return response
       } catch (error) {
-        const userErrorMessage = `Failed to save filtering parameters: ${error?.response?.data?.error || error}. Please try again.`
+        const userErrorMessage = `Failed to save match parameters: ${error?.response?.data?.error || error}. Please try again.`
         throw new Error(userErrorMessage)
       }
     },
-    deleteTargetIonFilterParams: async (data) => {
+    deleteTargetIonMatchParams: async (data) => {
       try {
         const response = await client.patch(`/target/ions/${data.target_ion_id}`, data.body)
         // TEMP the message forming should move to api route
-        const successMessage = `Filtering parameters for '${data.body.delete_instrument_filters}' instrument were deleted successfully!`
+        const successMessage = `Match parameters for '${data.body.delete_instrument_filters}' instrument were deleted successfully!`
         response.data.message = successMessage
         return response
       } catch (error) {
-        const userErrorMessage = `Failed to delete filtering parameters: ${error?.response?.data?.error || error}. Please try again.`
+        const userErrorMessage = `Failed to delete match parameters: ${error?.response?.data?.error || error}. Please try again.`
         throw new Error(userErrorMessage)
       }
     },
@@ -926,6 +976,14 @@ export function createHttpClient() {
           error?.response?.data?.error ||
           `Failed to visualize ion '${params.target_ion_id}' focus for sample '${params.sample_item_id}': ${error}`
         throw new Error(userErrorMessage)
+      }
+    },
+    // params
+    getParams: async () => {
+      try {
+        return await client.get('/params')
+      } catch (error) {
+        throw new Error(error?.response?.data?.error ?? 'Failed to fetch params')
       }
     }
   }

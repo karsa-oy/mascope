@@ -4,17 +4,12 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from mascope_server.api.models.calibration.calibration_pydantic_model import (
     MzCalibrationParams,
 )
+from mascope_server.api.models.base_pydantic_model import QueryParamsModel
 
-# TODO_configuration possible item types
-APP_ITEM_TYPES = [
-    "FILTER_REGENERATION",
-    "FILTER_BACKGROUND",
-    "INSTRUMENT_BACKGROUND",
-    "BLANK",
-    "SAMPLE",
-    "UNKNOWN",
-    "ONLINE",  # At the moment not selectable from the UI
-]
+# TODO_configuration possible sample item types list, split by filter_id presence
+SAMPLE_TYPES_FILTER_ID_REQUIRED = ["FILTER_REGENERATION", "FILTER_BACKGROUND"]
+SAMPLE_TYPES_FILTER_ID_OPTIONAL = ["BLANK", "SAMPLE", "UNKNOWN"]
+SAMPLE_TYPES_FILTER_ID_NOT_ALLOWED = ["INSTRUMENT_BACKGROUND", "ONLINE"]
 
 # Regular expression for filter_id validation
 FILTER_ID_REGEX = r"^[0-9A-Z]{6}$"
@@ -28,35 +23,54 @@ class SampleItemBase(BaseModel):
     sample_item_attributes: Dict = Field(
         ..., description="Attributes of the sample item"
     )
-    filter_id: Optional[str] = Field(None, description="Filter ID of the sample item")
+    filter_id: Optional[str] = Field(
+        None, description="Optional filter_id of the sample item"
+    )
 
-    @model_validator(mode="after")
+    @field_validator("filter_id")
     @classmethod
-    def check_filter_id_based_on_item_type(cls, values):
-        item_type, filter_id = values.sample_item_type, values.filter_id
-        if item_type in ["INSTRUMENT_BACKGROUND", "ONLINE"] and filter_id is not None:
-            raise ValueError(
-                f"There must be no filter_id for sample type '{item_type}'"
-            )
-        elif item_type not in ["INSTRUMENT_BACKGROUND", "ONLINE"] and filter_id is None:
-            raise ValueError(
-                f"The filter_id must be provided for sample type '{item_type}'"
-            )
+    def validate_filter_id(cls, filter_id):
         if filter_id and not re.match(FILTER_ID_REGEX, filter_id):
             raise ValueError(
                 "Invalid filter_id format. Must be 6 characters long and contain only uppercase letters and numbers."
             )
-        return values
+        return filter_id
 
     @field_validator("sample_item_type")
     @classmethod
-    def check_item_type(cls, item):
-        if item not in APP_ITEM_TYPES:
-            allowed_types = ", ".join(APP_ITEM_TYPES)
+    def validate_sample_item_type(cls, sample_type):
+        """Ensure `sample_item_type` is one of the allowed types."""
+        all_sample_types = (
+            SAMPLE_TYPES_FILTER_ID_REQUIRED
+            + SAMPLE_TYPES_FILTER_ID_OPTIONAL
+            + SAMPLE_TYPES_FILTER_ID_NOT_ALLOWED
+        )
+        if sample_type not in all_sample_types:
+            allowed_types = ", ".join(all_sample_types)
             raise ValueError(
-                f"{item} is not a valid sample_item_type. Allowed types are {allowed_types}."
+                f"Invalid sample item type '{sample_type}'. Allowed types are: {allowed_types}."
             )
-        return item
+        return sample_type
+
+    @model_validator(mode="after")
+    @classmethod
+    def validate_sample_item_type_based_on_filter_id(cls, values):
+        """
+        Validates sample_item_type options based on filter_id presence:
+        - For types in SAMPLE_TYPES_FILTER_ID_REQUIRED, filter_id is mandatory.
+        - For types in SAMPLE_TYPES_FILTER_ID_NOT_ALLOWED, filter_id must be absent.
+        """
+        sample_type, filter_id = values.sample_item_type, values.filter_id
+
+        # Determine allowed types based on the presence or absence of filter_id
+        if sample_type in SAMPLE_TYPES_FILTER_ID_REQUIRED and not filter_id:
+            raise ValueError(f"Sample item type '{sample_type}' requires a filter ID.")
+        elif sample_type in SAMPLE_TYPES_FILTER_ID_NOT_ALLOWED and filter_id:
+            raise ValueError(
+                f"Sample item type '{sample_type}' cannot have a filter ID."
+            )
+
+        return values
 
 
 class SampleItemCreate(SampleItemBase):
@@ -67,7 +81,7 @@ class SampleItemUpdate(SampleItemBase):
     pass
 
 
-class GetSampleItemsQueryParams(BaseModel):
+class GetSampleItemsQueryParams(QueryParamsModel):
     sample_batch_id: Optional[str] = Field(
         None,
         description="The sample batch ID for which you want to fetch the sample items.",

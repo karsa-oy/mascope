@@ -100,7 +100,7 @@ def segment_spec(sum_spec):
         non_zero_indices[0] = non_zero_indices[0][1:]
     if non_zero_indices[-1][-1] == len(sum_spec):
         # Remove out-of-range index from the last chunk
-        non_zero_indices[-1][-1] = non_zero_indices[-1][:-1]
+        non_zero_indices[-1] = non_zero_indices[-1][:-1]
     # Remove short chunks
     non_zero_indices = [chunk for chunk in non_zero_indices if len(chunk) > 4]
     return non_zero_indices
@@ -263,14 +263,16 @@ async def detect_peaks(
     peak_mzs, unique_peak_index = np.unique(peak_mz_coord, return_index=True)
     all_peak_mzs = all_peak_mzs[unique_peak_index]
 
-    # Difference between fitted peak positions and binded to the mz grid
-    peak_mz_diff = np.abs(all_peak_mzs - peak_mzs)
-    # Recalculate peak position difference to ppm
-    peak_mz_diff_ppm = 1e6 * peak_mz_diff / all_peak_mzs
-    # Find where ppm difference is > 1 ppm
-    peak_mz_mask = np.where(peak_mz_diff_ppm > 1)
-    # Replace mz values where ppm > 1 with exact fitted peak positions
-    peak_mzs[peak_mz_mask] = all_peak_mzs[peak_mz_mask]
+    # TODO: Fix this block for TOF, see issue https://github.com/Karsa-Oy/Mascope/issues/573
+    if instrument_type == "orbi":
+        # Difference between fitted peak positions and binded to the mz grid
+        peak_mz_diff = np.abs(all_peak_mzs - peak_mzs)
+        # Recalculate peak position difference to ppm
+        peak_mz_diff_ppm = 1e6 * peak_mz_diff / all_peak_mzs
+        # Find where ppm difference is > 1 ppm
+        peak_mz_mask = np.where(peak_mz_diff_ppm > 1)
+        # Replace mz values where ppm > 1 with exact fitted peak positions
+        peak_mzs[peak_mz_mask] = all_peak_mzs[peak_mz_mask]
 
     peak_areas = all_peak_areas[unique_peak_index]
     peak_heights = all_peak_heights[unique_peak_index]

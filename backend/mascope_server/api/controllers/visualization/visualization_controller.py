@@ -1,15 +1,20 @@
 import asyncio
 import numpy as np
 import pandas as pd
+import xarray as xr
 from sqlalchemy import select
 from colorcet import glasbey_hv as colormap
 from mascope_lib.file_func import load_file
 from mascope_lib.peak import filter_peaks, get_peaks
+from mascope_lib.util import get_closest_non_nan
 from mascope_server.db import async_session
 from mascope_server.db.models import Sample, TargetIsotope
 from mascope_server.app import sio
 from mascope_server.api.lib.exceptions.api_exceptions import NotFoundException
 from mascope_server.api.lib.api_features import api_controller_background_task
+from mascope_server.api.controllers.instrument_functions.lib.instrument_functions_fetch import (
+    read_instrument_functions,
+)
 
 
 from mascope_server.runtime import runtime
@@ -169,11 +174,22 @@ async def visualize_ion_focus(
             if match:
                 # Timeseries trace
                 try:
-                    # Drop rows with all NaNs and fill gaps in the timeseries (remaining NaNs) with 0
-                    match_timeseries = (
-                        isotope_slice.signal.dropna(dim="mz", how="all")
-                        .sel(mz=peak_mz, method="nearest")
-                        .fillna(0)
+                    _, resolution_function = await read_instrument_functions(filename)
+                    fwhm = peak_mz / resolution_function(peak_mz)
+                    # Slice spectrum segment presumably containing target peak
+                    isotope_peak_slice = isotope_slice.signal.sel(
+                        mz=slice(peak_mz - fwhm / 2, peak_mz + fwhm / 2)
+                    ).compute()
+
+                    match_timeseries = xr.apply_ufunc(
+                        get_closest_non_nan,
+                        isotope_peak_slice,
+                        kwargs={
+                            "x": isotope_peak_slice.mz.values,
+                            "target": peak_mz,
+                        },
+                        input_core_dims=[["mz"]],
+                        vectorize=True,
                     )
                 except KeyError as e:
                     runtime.logger.warning(

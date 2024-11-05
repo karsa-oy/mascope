@@ -1,6 +1,6 @@
 import os
 
-from datetime import timedelta
+from datetime import timedelta, datetime
 from multiprocessing import Event, Lock, Queue
 from queue import Empty
 from threading import Thread
@@ -13,7 +13,7 @@ import mascope_lib.runtime as lib_runtime
 
 lib_runtime.init()
 
-from mascope_lib.file_func import zarr_sdk
+from mascope_lib.file_func import zarr_sdk, get_instrument_type
 from mascope_lib.peak import calculate_tic
 from mascope_lib.structs import AttrDict
 from mascope_lib.util import timestamp_from_filename
@@ -49,26 +49,36 @@ def create_sample_file_db_record(data):
     :raises Exception: HTTP request failed
     """
     filename = data["filename"]
+    instrument_type = get_instrument_type(filename)
     runtime.logger.info(f"Creating sample file record for file: {filename}")
     instrument_name = filename.split("_")[0]
     committed_length = data["committed_length"]
-    date = timestamp_from_filename(filename)
     utc_offset = timedelta(seconds=int(data["utc_offset"]))
     mz_calibration = data.get("mz_calibration")
     tic = calculate_tic(filename)
     polarity = data.get("polarity")
+    method_file = data.get("method_file")
+
+    if instrument_type == "tof":
+        date = timestamp_from_filename(filename).isoformat()
+    else:
+        date = data.get("timestamp")
+
+    date_utc = (datetime.fromisoformat(date) - utc_offset).isoformat()
 
     sample_file_db_record = {
         "filename": filename,
         "instrument": instrument_name,
-        "datetime": date.isoformat(),
-        "datetime_utc": (date - utc_offset).isoformat(),
+        "datetime": date,
+        "datetime_utc": date_utc,
         "length": committed_length,
         "range": data["range"],
         "mz_calibration": mz_calibration,
         "tic": tic,
         "polarity": polarity,
     }
+    if method_file:
+        sample_file_db_record["method_file"] = method_file
 
     headers = {"Content-Type": "application/json"}
 
@@ -127,6 +137,7 @@ def process_stream(streamer):
                     "mz_calibration": sample_file.props["mz_calibration"],
                     "utc_offset": sample_file.props["utc_offset"],
                     "polarity": sample_file.props["polarity"],
+                    "method_file": sample_file.props["method_file"],
                 }
             )
             filepath = data.pop("source_filepath")

@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends
+from mascope_server.api.auth.dependencies import current_active_user, admin_user
 from mascope_server.api.lib.api_features import api_route
 from mascope_server.api.controllers.workspace.workspace_controller import (
     get_workspaces,
@@ -26,6 +27,36 @@ async def get_workspaces_route(query_params: GetWorkspacesQueryParams = Depends(
 @api_route()
 async def get_workspace_route(workspace_id: str):
     return await get_workspace(workspace_id)
+
+
+# TODO test protected route
+@workspace_router.get("/api/workspaces/{workspace_id}/protected")
+@api_route()
+async def get_workspace_protected_route(
+    workspace_id: str,
+    user=Depends(current_active_user),  # Protect route by ensuring user is active
+):
+    # Pass the session and user to the controller function if needed
+    workspace = await get_workspace(workspace_id)
+    return {
+        "message": f"Hello {user.username}! This is a protected workspace route",
+        "workspace": workspace,
+    }
+
+
+# TODO test protected route for admins
+@workspace_router.get("/api/workspaces/{workspace_id}/admin")
+@api_route()
+async def get_workspace_admin_route(
+    workspace_id: str,
+    user=Depends(admin_user),  # Protect route by ensuring user is active and admin
+):
+    # Pass the session and user to the controller function if needed
+    workspace = await get_workspace(workspace_id)
+    return {
+        "message": f"Hello {user.username}! This is a admin protected workspace route",
+        "workspace": workspace,
+    }
 
 
 @workspace_router.patch("/api/workspaces/{workspace_id}")

@@ -387,7 +387,7 @@ async def get_sample_file_peaks(
         )
         return {
             "message": message,
-            "total": 0,
+            "results": 0,
             "data": {
                 "mz": [],
                 "area": [] if areas else None,
@@ -404,7 +404,7 @@ async def get_sample_file_peaks(
     message = f"Successfully loaded {len(response_data['mz'])} peaks from sample file '{filename}'"
     return {
         "message": message,
-        "total": len(response_data["mz"]),
+        "results": len(response_data["mz"]),
         "data": response_data,
     }
 
@@ -533,7 +533,7 @@ async def get_sample_file_peak_timeseries(
     if abs(mz_diff_ppm) > peak_mz_tolerance_ppm:
         # No peak found within given m/z tolerance
         return {
-            "total": 0,
+            "results": 0,
             "data": {
                 "mz": None,
                 "height": [],
@@ -542,7 +542,7 @@ async def get_sample_file_peak_timeseries(
         }
 
     return {
-        "total": len(peak_timeseries.time.values),
+        "results": len(peak_timeseries.time.values),
         "data": {
             "mz": peak_mz_data,
             "height": list(peak_timeseries.values.astype(float)),
@@ -633,7 +633,7 @@ async def get_sample_file_spectrum(
 
     # Step 7: Return the total count, optional spectrum count, and data
     return {
-        "total": len(mz_values),
+        "results": len(mz_values),
         **(
             {"spectrum_count": time_data_points} if time_data_points is not None else {}
         ),

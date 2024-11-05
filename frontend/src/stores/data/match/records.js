@@ -2,10 +2,9 @@ import { watch, computed } from 'vue'
 
 import { api } from '@/api'
 
-import { defineModule } from './lib'
-
-import { useBatch } from './batch'
-import { useSample } from './sample'
+import { defineModule } from '../lib'
+import { useBatch } from '../batch'
+import { useSample } from '../sample'
 
 // Matches are implemented as a semiregular module,
 // making it a bit different from the rest of the data

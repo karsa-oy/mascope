@@ -44,10 +44,10 @@ const corr = new Intl.NumberFormat('en-US', {
     <span>
       isotope correlation coefficient:
       <Tag
-        :value="corr.format(app.ui.matchVisualized.isotopes[0].match_isotope_correlation)"
+        :value="corr.format(app.data.match.visualized.isotopes[0].match_isotope_correlation)"
         :severity="
-          Math.abs(app.ui.matchVisualized.isotopes[0].match_isotope_correlation) >
-          app.data.filterParams.current.min_isotope_correlation
+          Math.abs(app.data.match.visualized.isotopes[0].match_isotope_correlation) >
+          app.data.match.params.current.min_isotope_correlation
             ? 'info'
             : 'warn'
         "

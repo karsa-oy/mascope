@@ -1,11 +1,12 @@
-from pydantic import BaseModel, Field
 from typing import Optional
+from pydantic import Field
+from mascope_server.api.models.base_pydantic_model import QueryParamsModel
 
 # TODO_configuration Default Filter Parameters
 DEFAULT_MIN_ISOTOPE_ABUNDANCE = 0.15
 
 
-class SortingPaginationQueryParams(BaseModel):
+class SortingPaginationQueryParams(QueryParamsModel):
     order: Optional[str] = Field(
         "desc",
         description="The sort order, either 'asc' for ascending or 'desc' for descending.",

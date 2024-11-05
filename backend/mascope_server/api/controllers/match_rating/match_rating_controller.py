@@ -106,7 +106,7 @@ async def get_match_ratings(
 
         # Step 7: Return serialized results
         return {
-            "total": total,
+            "results": total,
             "data": [match_rating.to_dict() for match_rating in match_ratings],
         }
 

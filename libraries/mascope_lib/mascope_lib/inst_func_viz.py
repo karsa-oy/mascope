@@ -4,10 +4,6 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from mascope_lib.peak import gen_peak
-import mascope_runtime as runtime
-
-# Set up logger
-logger = lib_runtime.logger.service("backend")
 
 subtitles = ("FWHM", "Chosen peak", "Resolution function")
 
@@ -64,8 +60,8 @@ def vizualize(
         [
             go.Scatter(x=p_mzs, y=p_fwhms, mode="markers", name="True FWHM"),
             go.Scatter(
-                x=p_mzs,
-                y=p_fwhms_fit,
+                x=p_mzs_sort,
+                y=p_fwhms_fit_sort,
                 mode="lines",
                 line=dict(dash="dash"),
                 name="Approximation",

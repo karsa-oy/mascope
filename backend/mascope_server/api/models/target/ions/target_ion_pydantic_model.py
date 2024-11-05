@@ -1,21 +1,22 @@
 from typing import Optional, Dict
 from pydantic import BaseModel, Field
-from mascope_server.api.models.match.match_pydantic_model import FilterParams
+from mascope_server.api.models.base_pydantic_model import QueryParamsModel
+from mascope_server.api.new.match.params import BaseMatchParams
 
 
 class TargetIonUpdate(BaseModel):
-    filter_params: Dict[str, FilterParams] = Field(
-        None, description="Ion-specific filter parameters"
+    match_params: Dict[str, BaseMatchParams] = Field(
+        None, description="Ion-specific match parameters"
     )
-    delete_instrument_filters: Optional[str] = Field(
-        None, description="Instrument name which filter parameteres to delete"
+    delete_instrument_params: Optional[str] = Field(
+        None, description="Instrument name which match parameteres to delete"
     )
 
     class Config:
         from_attributes = True
 
 
-class GetTargetIonsQueryParams(BaseModel):
+class GetTargetIonsQueryParams(QueryParamsModel):
     target_compound_id: Optional[str] = Field(
         None, description="Filter by target compound ID."
     )

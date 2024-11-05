@@ -12,7 +12,7 @@ const app = useApp()
 
 const compound = computed(() =>
   app.data.match.compound.list.find(
-    ({ target_compound_id }) => target_compound_id == app.ui.matchVisualized.ion?.target_compound_id
+    ({ target_compound_id }) => target_compound_id == app.data.match.visualized.ion?.target_compound_id
   )
 )
 
@@ -30,10 +30,10 @@ const settings = reactive({
   >
     <ScrollPanel style="height: calc(100vh - 150px); width: calc(100%-4rem)">
       <h1 style="text-align: center">
-        <BaseMatchTag :row="app.ui.matchVisualized.ion" :style="'font-size: large'" />
-        match: ion <i>{{ app.ui.matchVisualized.ion?.target_ion_formula }}</i>
+        <BaseMatchTag :row="app.data.match.visualized.ion" :style="'font-size: large'" />
+        match: ion <i>{{ app.data.match.visualized.ion?.target_ion_formula }}</i>
         for
-        <i>{{ app.ui.matchVisualized.ion?.sample_item_name }}</i> with target
+        <i>{{ app.data.match.visualized.ion?.sample_item_name }}</i> with target
         <i>{{ compound?.target_compound_formula }}</i>
       </h1>
       <ChartMatchSpectra :settings="settings" />

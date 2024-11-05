@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 from mascope_server.api.models.match.match_pydantic_model import (
     FilterSamplePayload,
 )
+from mascope_server.api.models.base_pydantic_model import QueryParamsModel
 
 
 class MatchIonBase(BaseModel):
@@ -16,7 +17,7 @@ class MatchIonBase(BaseModel):
     )
 
 
-class GetMatchIonsQueryParams(BaseModel):
+class GetMatchIonsQueryParams(QueryParamsModel):
     sample_item_id: Optional[str] = Field(
         None, description="Filter match ions by sample item ID"
     )

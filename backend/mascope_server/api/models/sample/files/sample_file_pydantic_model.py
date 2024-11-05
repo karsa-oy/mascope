@@ -3,6 +3,7 @@ from datetime import datetime as dt
 from pydantic import BaseModel, Field, field_validator, model_validator
 from fastapi import UploadFile
 from fastapi.exceptions import RequestValidationError
+from mascope_server.api.models.base_pydantic_model import QueryParamsModel
 
 # TODO_configuration Default sample file upload params
 FILE_UPLOAD_EXTENSIONS = {".h5", ".raw"}
@@ -12,6 +13,7 @@ FILE_UPLOAD_SIZE_LIMIT = 200 * 1024 * 1024  # 200 MB
 class SampleFileBase(BaseModel):
     filename: str = Field(..., description="Name of the sample file")
     instrument: str = Field(..., description="Instrument associated with the file")
+    method_file: Optional[str] = Field(None, description="Instrument method filename")
     datetime: dt = Field(
         ..., description="Datetime (local) of creation of the sample file"
     )
@@ -93,7 +95,7 @@ class SampleFileUpload(BaseModel):
         return file
 
 
-class GetSampleFilesQueryParams(BaseModel):
+class GetSampleFilesQueryParams(QueryParamsModel):
     datetime_min: Optional[dt] = Field(None, description="Minimum datetime filter")
     datetime_max: Optional[dt] = Field(None, description="Maximum datetime filter")
     instrument: Optional[str] = Field(None, description="Filter by instrument")
@@ -116,7 +118,7 @@ class GetRecentSampleFilesQueryParams(GetSampleFilesQueryParams):
     )
 
 
-class GetSampleFilePeaksQueryParams(BaseModel):
+class GetSampleFilePeaksQueryParams(QueryParamsModel):
     areas: bool = Field(
         True,
         description="Include peak areas in the response. Represents the integrated area under the curve for each peak, reflecting the total intensity over time.",
@@ -141,7 +143,7 @@ class GetSampleFilePeakTimeseriesBody(BaseModel):
     peak_mz_tolerance_ppm: Optional[float] = 1
 
 
-class GetSpectrumQueryParams(BaseModel):
+class GetSpectrumQueryParams(QueryParamsModel):
     t_min: Optional[Annotated[float, Field(ge=0)]] = Field(
         None, description="Start of the time range"
     )

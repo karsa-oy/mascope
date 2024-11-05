@@ -1,6 +1,8 @@
+from datetime import datetime, timezone
 from sqlalchemy import (
     TIMESTAMP,
     Column,
+    Boolean,
     Index,
     Float,
     ForeignKey,
@@ -10,34 +12,65 @@ from sqlalchemy import (
     JSON,
     text,
 )
-from sqlalchemy.orm import relationship
+
+from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.sql.schema import CheckConstraint
 from sqlalchemy.ext.declarative import declarative_base
+from fastapi_users.db import (
+    SQLAlchemyBaseUserTable,
+)
 
 
 class BaseMixin(object):
     def to_dict(
         self,
-        include_tic=False,
-        include_intensity=False,
-        compounds=None,
-        include_selection=False,
     ):
         data = {c.name: getattr(self, c.name) for c in self.__table__.columns}
-        if include_tic and hasattr(self, "tic"):
-            data["tic"] = self.tic
-        if include_intensity and compounds:
-            compounds = compounds.split(",")
-            compounds_intensity = {}
-            for compound in compounds:
-                compounds_intensity[compound] = getattr(self, compound, 0)
-            data["compounds_intensity"] = compounds_intensity
-        if include_selection:
-            data["selection"] = 0
         return data
 
 
 Base = declarative_base(cls=BaseMixin)
+
+
+class User(SQLAlchemyBaseUserTable[int], Base):
+    __tablename__ = "user"
+
+    # User table fields required for FastAPI Users. Kept unchanged for easier compatibility.
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    email: Mapped[str] = mapped_column(
+        String(length=320), unique=True, index=True, nullable=False
+    )
+    hashed_password: Mapped[str] = mapped_column(String(length=1024), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_superuser: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    # Custom fields
+    username: Mapped[str] = mapped_column(
+        String(length=100), unique=True, nullable=False
+    )
+    role_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("role.role_id", ondelete="SET NULL"), nullable=True
+    )
+    registered_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP, default=datetime.now(timezone.utc), nullable=False
+    )
+
+    # Define relationships
+    role = relationship("Role", back_populates="users")
+
+
+class Role(Base):
+    __tablename__ = "role"
+
+    role_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(
+        String(length=50), unique=True, nullable=False
+    )  # Role name (e.g., "admin", "user")
+    permissions: Mapped[dict] = mapped_column(JSON, nullable=True)
+
+    # Define relationships
+    users = relationship("User", back_populates="role")
 
 
 class Workspace(Base):
@@ -152,8 +185,14 @@ class SampleItem(Base):
 class SampleFile(Base):
     __tablename__ = "sample_file"
     sample_file_id = Column(String(16), nullable=False, primary_key=True)
+    instrument_function_id = Column(
+        String(32),
+        ForeignKey("instrument_function.instrument_function_id", ondelete="SET NULL"),
+        nullable=True,
+    )
     filename = Column(String(256), nullable=False, unique=True)
     instrument = Column(String(64))
+    method_file = Column(String(256), nullable=True)
     datetime = Column(TIMESTAMP)
     datetime_utc = Column(TIMESTAMP)
     length = Column(Float)
@@ -163,8 +202,10 @@ class SampleFile(Base):
     polarity = Column(String(1))
 
     # Define relationships
-    # TODO_db issue #376
-    # sample_item = relationship("SampleItem", back_populates="sample_file")
+    instrument_function = relationship(
+        "InstrumentFunction", back_populates="sample_file"
+    )
+    # sample_item = relationship("SampleItem", back_populates="sample_file") # TODO_db issue #376
 
 
 class TargetCollection(Base):
@@ -313,12 +354,9 @@ class TargetIon(Base):
 class IonizationMechanism(Base):
     __tablename__ = "ionization_mechanism"
     ionization_mechanism_id = Column(String(16), nullable=False, primary_key=True)
-    ionization_mechanism_polarity = Column(
-        String(1),
-        nullable=False,
-    )
-    ionization_mechanism = Column(String)
-    reagent = Column(String)
+    ionization_mechanism_polarity = Column(String(1), nullable=False)
+    ionization_mechanism = Column(String, nullable=False, unique=True)
+    reagent = Column(String, nullable=True)
 
     # Define relationships
     target_ion = relationship(
@@ -578,9 +616,13 @@ class InstrumentFunction(Base):
     __tablename__ = "instrument_function"
     instrument_function_id = Column(String(32), nullable=False, primary_key=True)
     instrument = Column(String(64), nullable=False)
-    datetime_utc = Column(TIMESTAMP)
+    method_file = Column(String(256), nullable=False)
+    datetime_utc = Column(TIMESTAMP, nullable=False)
     peakshape = Column(JSON)
     resolution_function = Column(JSON)
+
+    # Define relationships
+    sample_file = relationship("SampleFile", back_populates="instrument_function")
 
 
 class Sample(Base):
@@ -589,10 +631,16 @@ class Sample(Base):
     # All columns are read-only as this is a view, not a base table
     sample_item_id = Column(String(16), primary_key=True)
     sample_file_id = Column(String(16))
+    instrument_function_id = Column(
+        String(32),
+        ForeignKey("instrument_function.instrument_function_id", ondelete="SET NULL"),
+        nullable=True,
+    )
     sample_batch_id = Column(String(16), ForeignKey("sample_batch.sample_batch_id"))
     sample_item_name = Column(String(256))
     filename = Column(String(256))
     instrument = Column(String(64))
+    method_file = Column(String(256))
     sample_item_type = Column(String(64))
     sample_item_attributes = Column(JSON)
     filter_id = Column(String(6))

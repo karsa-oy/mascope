@@ -1,3 +1,4 @@
+from fastapi import HTTPException
 from sqlalchemy import (
     select,
     asc,
@@ -95,7 +96,7 @@ async def get_ionization_mechanisms(
 
         # Step 6: Return results
         return {
-            "total": total,
+            "results": total,
             "data": [
                 ionization_mechanism.to_dict()
                 for ionization_mechanism in ionization_mechanisms
@@ -161,31 +162,44 @@ async def create_ionization_mechanism(
     Creates a new ionization mechanism and generates corresponding ions for each existing target compound in the database.
 
     Steps:
-    1. Create a new ionization mechanism instance and add it to the session.
-    2. Fetch all target compounds from the database.
-    3. For each target compound, create target ions with the new ionization mechanism.
-    4. Commit the transaction to persist changes to the database.
-    5. Return the created ionization mechanism's details.
+    1. Check if the ionization mechanism already exists using the get_ionization_mechanisms function.
+    2. Create a new ionization mechanism instance and add it to the session.
+    3. Fetch all target compounds from the database.
+    4. For each target compound, create target ions with the new ionization mechanism.
+    5. Commit the transaction to persist changes to the database.
+    6. Return the created ionization mechanism's details with a success message.
 
     :param ionization_mechanism: Ionization mechanism to create
     :type ionization_mechanism: IonizationMechanismCreate
+    :raises HTTPException: If the ionization mechanism already exists.
     :raises NotFoundException: If the ionization mechanism is not found after creation.
     :return: Created ionization mechanism details.
     :rtype: dict
     """
-    # Step 1: Create a new ionization mechanism instance and add it to the session.
+    # Step 1: Check if the ionization mechanism already exists
+    existing_mechanisms = await get_ionization_mechanisms(
+        ionization_mechanism=ionization_mechanism.ionization_mechanism
+    )
+
+    if existing_mechanisms["results"] != 0:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Ionization mechanism '{ionization_mechanism.ionization_mechanism}' already exists",
+        )
+
+    # Step 2: Create a new ionization mechanism instance and add it to the session.
     async with async_session() as session:
         new_ionization_mechanism = IonizationMechanism(
             ionization_mechanism_id=gen_id(11), **ionization_mechanism.model_dump()
         )
         session.add(new_ionization_mechanism)
 
-        # Step 2: Fetch all target compounds
+        # Step 3: Fetch all target compounds
         stmt = select(TargetCompound)
         result = await session.execute(stmt)
         target_compounds = result.scalars().all()
 
-        # Step 3: Create target ions with new mechanism for each compound
+        # Step 4: Create target ions with new mechanism for each compound
         for target_compound in target_compounds:
             try:
                 # Try if target compound is given by mass (try to parse composition into float)
@@ -202,7 +216,7 @@ async def create_ionization_mechanism(
                 session=session,
             )
 
-        # Step 4: Commit the transaction
+        # Step 5: Commit the transaction
         await session.commit()
         await session.refresh(new_ionization_mechanism)
 
@@ -211,14 +225,17 @@ async def create_ionization_mechanism(
             f"Ionization mechanism with ID '{new_ionization_mechanism.ionization_mechanism_id}' not found after it should have been created"
         )
 
-    # Step 5: Emit the reload event
+    # Step 6: Emit the reload event
     await sio.emit(
         "ionization_mechanism_reload",
         namespace="/",
     )
 
-    # Step 6: Return created ionization mechanism details
-    return new_ionization_mechanism.to_dict()
+    # Step 7: Return created ionization mechanism details with a success message
+    return {
+        "message": f"Ionization mechanism '{new_ionization_mechanism.ionization_mechanism}' was created successfully.",
+        "data": new_ionization_mechanism.to_dict(),
+    }
 
 
 @api_controller()

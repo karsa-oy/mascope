@@ -1,9 +1,14 @@
-import os, tomllib
+import os
+import tomllib
 from pydantic import BaseModel
 from typing import Literal, List, Optional
 
 
 # PYDANTIC MODELS
+
+# Note: all relative paths like `./foo/bar` are resolved relative
+# to the runtime environment active, which defaults to
+#    $MASCOPE_PATH/runtime/env/default
 
 
 class MascopeMetaConfig(BaseModel):
@@ -13,10 +18,10 @@ class MascopeMetaConfig(BaseModel):
 
     log_level: Optional[
         Literal["trace", "debug", "info", "success", "warning", "error", "critical"]
-    ] = None
-    description: str = "Mascope configuration"
-    api_port: int = 8090
-    filestore: str = r"./filestore"
+    ] = None  # global log level to print to terminal at
+    description: str = "Mascope configuration"  # Description for `mascope env list`
+    api_port: int = 8090  # API port
+    filestore: str = r"./filestore"  # filestore path
 
 
 class MascopeModuleConfig(BaseModel):
@@ -25,16 +30,24 @@ class MascopeModuleConfig(BaseModel):
     shares these configuration options.
     """
 
-    name: str
-    tags: Optional[List[str]] = []
-    pkg_path: Optional[str] = None
-    log_path: Optional[str] = "./logs"
+    name: str  # name of the module, e.g. 'backend'
+    tags: Optional[List[str]] = []  # module groups to which the module should belong *
+    pkg_path: Optional[str] = None  # the path to the Poetry or NPM package, if any
+    log_path: Optional[str] = "./logs"  # path where to print log files
     log_level: Optional[
         Literal["trace", "debug", "info", "success", "warning", "error", "critical"]
-    ] = None
-    install: Optional[str] = None
-    uninstall: Optional[str] = None
-    run: Optional[str] = None
+    ] = None  # module log level to print to terminal at
+    install: Optional[str] = None  # command to install the module, if any
+    uninstall: Optional[str] = None  # commmand to uninstall the module, if any
+    run: Optional[str] = None  # command to run the module, if any
+
+    # * module groups allow you to easily run multiple modules.
+    # For example, a common scenario is testing TOF acquisition
+    # workflows. In `runtime/env/default/base.mascope.toml` we
+    # have configured the `backend`, `frontend`, `tof_agent`,
+    # and `file_converter` modules with the `tof` tag. This
+    # means you can run `mascope dev run tof` and it will spin
+    # up all of the services.
 
 
 class MascopeBackendConfig(MascopeModuleConfig):
@@ -42,8 +55,8 @@ class MascopeBackendConfig(MascopeModuleConfig):
     Backend module specific configuration options
     """
 
-    database: str = r"./database"
-    filestreams: str = r"./filestreams"
+    database: str = r"./database"  # path to the database folder
+    filestreams: str = r"./filestreams"  # path to the file streams folder
 
 
 class MascopeFileConverterConfig(MascopeModuleConfig):
@@ -51,11 +64,11 @@ class MascopeFileConverterConfig(MascopeModuleConfig):
     File converter module specific configuration options
     """
 
-    server: str = r"backend"
-    source: str = r"./filestreams"
-    raw_threads: int = 2
-    h5_threads: int = 2
-    interval: int = 3
+    server: str = r"backend"  # production host URL; the default works in our docker compose network
+    source: str = r"./filestreams"  # folder to monitor for files to convert
+    raw_threads: int = 2  # number of threads for converting Orbitrap files
+    h5_threads: int = 2  # number of threads for converting Tof files
+    interval: int = 3  # polling interval (s) when checking the file system
 
 
 class MascopeTofAgentConfig(MascopeModuleConfig):
@@ -63,9 +76,9 @@ class MascopeTofAgentConfig(MascopeModuleConfig):
     Tof Agent module specific configuration options
     """
 
-    host: str
-    source: str
-    target: str
+    host: str  # URL of the backend
+    source: str  # folder to monitor in the instrument machine
+    target: str  # folder to transfer samples to in the server
 
 
 class MascopeFileMoverConfig(MascopeModuleConfig):
@@ -73,10 +86,10 @@ class MascopeFileMoverConfig(MascopeModuleConfig):
     File Mover module specific configuration options
     """
 
-    mask: str = "*.raw"
-    timeout: int = 10
-    source: str
-    target: str
+    mask: str = "*.raw"  # file pattern to look for
+    timeout: int = 10  # timeout (s) for a file transfer operation
+    source: str  # folder to monitor in the instrument machine
+    target: str  # folder to transfer samples to in the server
 
 
 class MascopeFrontendConfig(MascopeModuleConfig):
@@ -116,7 +129,9 @@ class MascopeHardwareLibConfig(MascopeModuleConfig):
     Hardware Library module specific configuration options
     """
 
-    tofwerk_dll: Literal["Auto", "Linux", "Windows", "Darwin"] = "Auto"
+    tofwerk_dll: Literal["Auto", "Linux", "Windows", "Darwin"] = "Auto"  # *
+    # * Which TofWerk DLLs to use in the hardware library
+    # Defaults to automatically resolving the platform.
 
 
 class MascopeApiLibConfig(MascopeModuleConfig):
@@ -135,7 +150,9 @@ class MascopeRuntimeConfig(BaseModel):
     configuration objects.
     """
 
+    # global
     meta: MascopeMetaConfig
+    # services
     backend: Optional[MascopeBackendConfig] = None
     file_converter: Optional[MascopeFileConverterConfig] = None
     tof_agent: Optional[MascopeTofAgentConfig] = None
@@ -159,6 +176,10 @@ def resolve_path(base_path: str, value: any) -> any:
 
     Only applies to strings starting with ./
     Other values are returned unmodified.
+
+    :param base_path: the path relative to which to resolve
+    :param value: the value to resolve, which may be a path string
+    :return: resolved path or unchanged value
     """
     # only process strings
     if isinstance(value, str):
@@ -187,6 +208,11 @@ def resolve_paths(root_path: str, env_path: str, config: dict) -> dict:
     as the `root_path` argument. Meanwhile other relative path
     declarations are resolved against the currently active
     environment path, passed as `env_path`.
+
+    :param root_path: the root MASCOPE_PATH
+    :param env_path: the active runtime environment path
+    :param config: the configuration for which to resolve paths
+    :return: resolved configuration dictionary
     """
     new_config = {}
     for key, value in config.items():
@@ -215,6 +241,10 @@ def resolve_log_levels(config: dict, fallback: str = "info") -> dict:
       2. Module-specific config (log_level = "warning" in [backend])
       3. Global configuration (og_level = "critical" in [meta])
       4. The fallback (argument to this function)
+
+    :param config: the configuration dictionary
+    :param fallback: the fallback level if resolution fails
+    :return: configuration dictionary with resolved log levels
     """
     new_config = {}
     meta = config.get("meta")
@@ -245,7 +275,10 @@ def build_config(
     log levels using the `root_path` (MASCOPE_PATH) and the
     `env_path` (path to the environment).
 
-    Returns a validated Pydantic model of the configuration.
+    :param root_path: the root MASCOPE_PATH
+    :param env_path: the active runtime environment path
+    :param layers: list of config file paths to overlay
+    :return: resolved and validated config Pydantic model
     """
     config = {}
     for layer in layers:

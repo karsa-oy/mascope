@@ -1,5 +1,6 @@
-from pydantic import BaseModel, Field, model_validator
 from typing import Optional
+from pydantic import BaseModel, Field, model_validator
+from mascope_server.api.models.base_pydantic_model import QueryParamsModel
 
 
 # TODO_configuration default calibration parameters
@@ -9,7 +10,7 @@ DEFAULT_PEAK_INTENSITY_MIN = 1000.0
 DEFAULT_ISOTOPE_ABUNDANCE_MIN = 0.1
 
 
-class GetMzCalibrationQueryParams(BaseModel):
+class GetMzCalibrationQueryParams(QueryParamsModel):
     sample_item_id: Optional[str] = Field(
         None,
         description="Filter by the sample item ID for which you want to fetch m/z calibration.",

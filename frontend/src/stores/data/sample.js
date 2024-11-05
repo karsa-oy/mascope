@@ -5,11 +5,11 @@ import { api } from '@/api'
 import { useMzFit } from '@/lib/mzFit'
 
 import { useBatch } from './batch'
-import { useUi } from '../ui'
 
 export const useSample = defineModule({
   name: 'sample',
   key: 'sample_item_id',
+  multiselect: true,
   useParent: useBatch,
   unfocusBefore: ['delete'],
   subscribe: ({ sample_file_id }) => sample_file_id,

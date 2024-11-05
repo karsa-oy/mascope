@@ -25,7 +25,7 @@ async def get_target_isotopes(
     sample_batch_id: Optional[str] = None,
     target_collection_id: Optional[str] = None,
     show_target_collection: bool = False,
-    show_filter_params: bool = False,
+    show_match_params: bool = False,
     sort: str = None,
     order: str = None,
     page: int = 0,
@@ -64,8 +64,8 @@ async def get_target_isotopes(
     :type target_collection_id: Optional[str], optional
     :param show_target_collection: Whether to include target collection details in the response.
     :type show_target_collection: bool, optional
-    :param show_filter_params: Whether to include filter parameters from the parent target ion.
-    :type show_filter_params: bool, optional
+    :param show_match_params: Whether to include filter parameters from the parent target ion.
+    :type show_match_params: bool, optional
     :param sort: Column name to sort the results by.
     :type sort: str, optional
     :param order: Sort order, 'asc' for ascending and 'desc' for descending.
@@ -106,7 +106,7 @@ async def get_target_isotopes(
                 TargetIon.ionization_mechanism_id.in_(ionization_mechanism_ids)
             )
 
-        if show_filter_params:
+        if show_match_params:
             stmt = stmt.add_columns(
                 TargetIon.filter_params,
             )
@@ -188,7 +188,7 @@ async def get_target_isotopes(
     for row in result.all():
         # When show_target_collection is true, include target_collection_id
         isotope_data = row.TargetIsotope.to_dict()
-        if show_filter_params:
+        if show_match_params:
             isotope_data["filter_params"] = row.filter_params
         if show_target_collection:
             isotope_data["target_collection_id"] = row.target_collection_id

@@ -25,10 +25,6 @@ export const defineModule = ({
     const singleselect = !multiselect
     const parent = useParent ? useParent() : null
 
-    if (parent && parent.multiselect) {
-      throw new Error(`${prefix} parent module parent (${parent.name}) cannot be multiselectable`)
-    }
-
     // DATA
 
     // raw data
@@ -185,16 +181,14 @@ export const defineModule = ({
     }
 
     // reload children on refocus
-    if (singleselect) {
-      watch(focused, (focused) => {
-        children.value.forEach(({ reload }) =>
-          reload({
-            name,
-            focused
-          })
-        )
-      })
-    }
+    watch(focused, (focused) => {
+      children.value.forEach(({ reload }) =>
+        reload({
+          name,
+          focused
+        })
+      )
+    })
 
     // unfocus before calling certain methods
     const wrappedOps = Object.fromEntries(

@@ -125,10 +125,10 @@ def generate_target_ions_from_mass(
     target_ions = []
     target_isotopes = []
 
-    # generate and create ion records
+    # generate ion and isotope records
     for ionization_mechanism in ionization_mechanisms:
         mechanism = ionization_mechanism.ionization_mechanism
-        # construct and save ion row
+        # construct ion
         ion = TargetIon(
             target_ion_id=gen_id(16),
             target_compound_id=target_compound.target_compound_id,
@@ -136,17 +136,27 @@ def generate_target_ions_from_mass(
             target_ion_formula=(f"{target_compound_mass:.4f}" + mechanism),
             filter_params={},
         )
-
         target_ions.append(ion)
-        # construct and save isotope rows
-        raw_ion = Formula("(" + mechanism[1:-1] + ")" + mechanism[-1])
-        is_adduct = mechanism[0] == "+"
-        if is_adduct:
-            raw_isotopes = raw_ion.mz_spectrum().values()
+
+        # construct isotopes
+        if len(mechanism) > 1:
+            # Addition or abstraction mechanism
+            # Calculate isotopic pattern of the ionization mechanism
+            raw_ion = Formula("(" + mechanism[1:-1] + ")" + mechanism[-1])
+            is_adduct = mechanism[0] == "+"
+            if is_adduct:
+                # Addition mechanism
+                raw_isotopes = raw_ion.mz_spectrum().values()
+            else:
+                # Abstraction mechanism, no knowledge of the isotopic pattern
+                raw_isotopes = [
+                    (-raw_ion.mz, 1.0)  # pylint: disable=invalid-unary-operand-type
+                ]
         else:
-            raw_isotopes = [
-                (-raw_ion.mz, 1.0)  # pylint: disable=invalid-unary-operand-type
-            ]
+            # Special case: electron transfer
+            is_addition = mechanism[0] == "-"
+            me = 0.00054858  # mass of an electron [Da]
+            raw_isotopes = [(me if is_addition else -me, 1.0)]
 
         target_isotopes.extend(
             [

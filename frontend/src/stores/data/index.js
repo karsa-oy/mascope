@@ -8,12 +8,19 @@ import { useBatch } from './batch'
 import { useTargetCollection, useTargetCompound } from './target'
 import { usePeak } from './peak'
 
-// semistandard
-import { useMatchCollection, useMatchCompound, useMatchIon, useMatchIsotope } from './match'
+import {
+  // semistandard
+  useMatchCollection,
+  useMatchCompound,
+  useMatchIon,
+  useMatchIsotope,
+  // nonstandard
+  useMatchParams,
+  useMatchVisualized
+} from './match'
 
 // nonstandard
 import { useAcquisition } from './acquisition'
-import { useFilterParams } from './filterParams'
 
 export const useData = () => ({
   // standard
@@ -33,9 +40,10 @@ export const useData = () => ({
     collection: useMatchCollection(),
     compound: useMatchCompound(),
     ion: useMatchIon(),
-    isotope: useMatchIsotope()
+    isotope: useMatchIsotope(),
+    params: useMatchParams(),
+    visualized: useMatchVisualized()
   },
   // nonstandard
   acquisition: useAcquisition(),
-  filterParams: useFilterParams()
 })

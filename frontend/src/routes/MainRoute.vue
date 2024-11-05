@@ -37,7 +37,7 @@ const tabs = computed(() => [
   {
     label: 'Match',
     icon: 'pi pi-wave-pulse',
-    disabled: !app.ui.matchVisualized.ion
+    disabled: !app.data.match.visualized.ion
   },
   {
     label: 'Acquisitions',
@@ -55,7 +55,7 @@ watch(
   }
 )
 watch(
-  computed(() => app.ui.matchVisualized.ion),
+  computed(() => app.data.match.visualized.ion),
   (focused) => {
     if (focused && app.ui.tab.active !== 'spectrum') {
       app.ui.tab.active = 'match'
@@ -103,7 +103,7 @@ watch(
         </Splitter>
       </SplitterPanel>
       <SplitterPanel :size="80">
-        <Panel id="charts" class="browser" style="border: none">
+        <Panel id="charts">
           <Tabs v-model:value="app.ui.tab.active">
             <TabList>
               <Tab
@@ -125,7 +125,7 @@ watch(
                 <ChartSampleSpectrum />
               </TabPanel>
               <TabPanel value="match">
-                <PaneTabMatch v-if="app.ui.matchVisualized.ion" />
+                <PaneTabMatch v-if="app.data.match.visualized.ion" />
               </TabPanel>
               <TabPanel value="acquisitions">
                 <PaneTabAcquisitions
@@ -163,7 +163,14 @@ article {
 }
 #charts {
   grid-area: charts;
+  border: none;
+  height: calc(100% -10rem);
 }
+
+#charts :deep(.p-panel-header) {
+  display: none;
+}
+
 menu {
   padding: 0;
   margin: 0;

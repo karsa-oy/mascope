@@ -70,6 +70,7 @@ class zarr_sdk:
         mz_calibration = value.get("mz_calibration")
         polarity = value.get("polarity")
         sample_interval = value.get("sample_interval")
+        method_file = value.get("method_file")
 
         try:
             data_path = parse_path_from_item_filename(filename, base_path)
@@ -98,6 +99,7 @@ class zarr_sdk:
             "polarity": polarity,
             "sample_interval": sample_interval,
             "utc_offset": utc_offset,
+            "method_file": method_file,
         }
         write_props(filename, properties)
 

@@ -172,8 +172,8 @@ async function showMatch(row) {
     row?.target_ion_id ??
     app.data.match.ion.list?.find((ion) => ion.target_compound_id === row.target_compound_id)
       ?.target_ion_id
-  if (ionId && app.data.sample.focused && app.ui.matchVisualized.ion?.target_ion_id !== ionId) {
-    await app.ui.matchVisualized.set({
+  if (ionId && app.data.sample.focused && app.data.match.visualized.ion?.target_ion_id !== ionId) {
+    await app.data.match.visualized.set({
       sampleId: app.data.sample.focused.sample_item_id,
       ionId,
       collectionId: row?.target_collection_id,
@@ -196,11 +196,11 @@ async function showMatch(row) {
  * is scrolled to.
  */
 let lock = false
-function scrollTo({ match_key }) {
-  if (!lock) {
+function scrollTo(target) {
+  if (!lock && target) {
     lock = true
     setTimeout(() => {
-      document.getElementById(match_key)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      document.getElementById(target.match_key)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       lock = false
     }, 1000)
   }
@@ -221,10 +221,9 @@ watch(
   (collection, oldCollection) => {
     const changedCollection =
       collection?.target_collection_id !== oldCollection?.target_collection_id
-    // Unfocus all child elements when switching collections or deselecting the current collection
+    // conditionally unset match visualized
     if (!collection || changedCollection) {
-      // Unset the visualized match if the Match tab is active
-      if (app.ui.matchVisualized.ion) app.ui.matchVisualized.unset({ target: true })
+      app.data.match.visualized.unset()
     }
     if (collection) {
       scrollTo(collection)
@@ -246,7 +245,7 @@ watch(
       // unfocus child if unfocused
       app.data.match.ion.unfocus()
       // and unset visualized match
-      app.ui.matchVisualized.unset()
+      app.data.match.visualized.unset()
     }
   }
 )
@@ -275,6 +274,17 @@ watch(
       app.data.match.ion.focus((ion) => ion.match_key == isotope.parent_key)
       scrollTo(isotope)
     }
+  }
+)
+watch(
+  () => app.data.sample.focused,
+  (sample) => {
+    scrollTo(
+      app.data.match.isotope.focused
+      ?? app.data.match.ion.focused
+      ?? app.data.match.compound.focused
+      ?? app.data.match.collection.focused
+    )
   }
 )
 </script>
@@ -351,7 +361,43 @@ watch(
                 }`"
                 style="font-size: smaller; margin-right: 0.5rem"
               />
-              <BaseCopyableField :field="data.target_collection_name" />
+              <BaseCopyableField :field="data.target_collection_name">
+                <Button
+                  v-tooltip.bottom="{ value: 'Filter by mechanism', showDelay: 2000 }"
+                  icon="pi pi-filter"
+                  :severity="
+                    app.ui.filter.collections.includes(data.target_collection_id)
+                      ? 'info'
+                      : 'secondary'
+                  "
+                  text
+                  size="small"
+                  :class="
+                    app.ui.filter.collections
+                      .map(({ target_collection_id }) => target_collection_id)
+                      .includes(data.target_collection_id)
+                      ? 'active-filter'
+                      : ''
+                  "
+                  @click="
+                    (event) => {
+                      event.stopPropagation()
+                      if (
+                        app.ui.filter.collections
+                          .map(({ target_collection_id }) => target_collection_id)
+                          .includes(data.target_collection_id)
+                      ) {
+                        app.ui.filter.collections = app.ui.filter.collections.filter(
+                          ({ target_collection_id }) =>
+                            target_collection_id !== data.target_collection_id
+                        ) // Remove the filter if already applied
+                      } else {
+                        app.ui.filter.collections.push(data)
+                      }
+                    }
+                  "
+                />
+              </BaseCopyableField>
             </div>
           </template>
         </Column>
@@ -403,7 +449,7 @@ watch(
                 </div>
               </template>
             </Column>
-            <Column header="Name" sortable>
+            <Column header="Name" field="target_compound_name" sortable>
               <template #body="{ data }">
                 <BaseCopyableField :field="data.target_compound_name" />
               </template>

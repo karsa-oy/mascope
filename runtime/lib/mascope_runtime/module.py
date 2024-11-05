@@ -1,22 +1,50 @@
-from .config import MascopeMetaConfig, build_config
+from .config import MascopeMetaConfig, MascopeModuleConfig, build_config
 from .state import MascopeRuntimeJsonState, MascopeRuntimeTempState
 from .exceptions import MascopeConfigNotFoundException, MascopeMissingPathException
+from .logger import config_logger
 
 import os
 from textwrap import dedent
 from typing import Optional, List
 
 
-from .config import MascopeModuleConfig
-from .logger import config_logger
-
-
 class MascopeRuntimeModule:
-    module: str
+    """
+    A class representating an instance of the Mascope runtime
+    within a specific runtime module. Each module has exactly
+    one instance of its runtime module; this is enforced by a
+    singleton pattern (see the `init` function in each module).
+
+    The runtime module exposes the runtime lib and env for that
+    specific module. This includes global runtime state and
+    config as well as module-specific utilities.
+
+    Global:
+     - meta - global configuration from `mascope.toml` files
+     - mode - whether in "dev" or "prod" mode
+     - root_path - the current MASCOPE_PATH
+     - env - the currently active runtime env name
+     - env_path - path to the active runtime env
+     - pkgs - all available module packages
+     - modules - names of currently running modules
+
+    Module-specific:
+     - config - module-specific configuration from `mascope.toml` files
+     - logger - module-specific logger
+
+    The module bootstraps by:
+        1. Resolving environment variables set by the
+           install scripts and the CLI
+        2. Building and validating the config from the
+           `mascope.toml` files in the runtime env
+        3. Configurating a loguru logger
+    """
+
+    name: str
     state: MascopeRuntimeJsonState | MascopeRuntimeTempState
     meta: MascopeMetaConfig
     config: MascopeModuleConfig
-    pkgs: List[str]
+    pkgs: List[dict]
 
     _logger: any
     _root_path: str
@@ -68,7 +96,7 @@ class MascopeRuntimeModule:
             "runtime",
             "env",
             self.state.env,
-            f"base.mascope.toml",
+            "base.mascope.toml",
         )
         if not os.path.exists(base_config_path):
             raise MascopeConfigNotFoundException(

@@ -1,5 +1,6 @@
 from typing import Optional, List
 from pydantic import BaseModel, Field
+from mascope_server.api.models.base_pydantic_model import QueryParamsModel
 from mascope_server.api.models.match.match_pydantic_model import (
     FilterSamplePayload,
 )
@@ -30,7 +31,7 @@ class MatchIsotopeBase(BaseModel):
     match_score: float = Field(..., description="Score of the match")
 
 
-class GetMatchesQueryParams(BaseModel):
+class GetMatchesQueryParams(QueryParamsModel):
     sample_item_id: Optional[str] = Field(
         None, description="Filter by the ID of the sample item"
     )

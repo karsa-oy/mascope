@@ -3,6 +3,7 @@ import numpy as np
 from mascope_server.api.controllers.instrument_functions.instrument_functions_controller import (
     get_instrument_function,
 )
+from mascope_lib.instrument_functions import r_orbi
 
 
 async def read_instrument_functions(filename):
@@ -22,9 +23,15 @@ async def read_instrument_functions(filename):
     instrument_functions = await get_instrument_function(filename)
     peakshape = instrument_functions["peakshape"]
     R_p = instrument_functions["resolution_function"]
-    if len(R_p) == 2:
+    if len(R_p) == 1:
+        # Use native Orbitrap resolution function
+        p1 = R_p[0]
+        R = lambda m: r_orbi(m, p1)
+    elif len(R_p) == 2:
+        # Use resolution function from Junninen's thesis for TOF
         p1, p2 = R_p
         R = lambda m: m / (p1 * m + p2)
     elif len(R_p) == 3:
+        # Use 2nd order polynomial (backwards compatibility for Orbitrap) TODO: legacy
         R = np.poly1d(R_p)
     return peakshape, R

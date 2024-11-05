@@ -1,8 +1,9 @@
 from typing import List, Optional
-from pydantic import BaseModel, Field
+from pydantic import Field
+from mascope_server.api.models.base_pydantic_model import QueryParamsModel
 
 
-class GetTargetIsotopesQueryParams(BaseModel):
+class GetTargetIsotopesQueryParams(QueryParamsModel):
     target_ion_id: Optional[str] = Field(None, description="Filter by target ion ID.")
     min_mz: Optional[float] = Field(
         None, description="Minimum m/z value for filtering."
@@ -33,9 +34,9 @@ class GetTargetIsotopesQueryParams(BaseModel):
         False,
         description="Flag to include target collection ID, also duplicate compounds present in several collections will be shown.",
     )
-    show_filter_params: bool = Field(
+    show_match_params: bool = Field(
         False,
-        description="Flag to include filter_params of the isotope's parent target ion.",
+        description="Flag to include match_params of the isotope's parent target ion.",
     )
     sort: Optional[str] = Field(None, description="Field to sort by.")
     order: Optional[str] = Field(

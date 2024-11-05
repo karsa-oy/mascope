@@ -1,5 +1,6 @@
 from typing import Optional, List
 from pydantic import BaseModel, Field
+from mascope_server.api.models.base_pydantic_model import QueryParamsModel
 from mascope_server.api.models.match.match_pydantic_model import (
     FilterSamplePayload,
 )
@@ -14,7 +15,7 @@ class MatchInterferenceBase(BaseModel):
     sample_peak_interference: float = Field(..., description="Sample peak interference")
 
 
-class GetMatchInterferencesQueryParams(BaseModel):
+class GetMatchInterferencesQueryParams(QueryParamsModel):
     target_isotope_id: Optional[str] = Field(
         None, description="Filter by the ID of the target isotope"
     )

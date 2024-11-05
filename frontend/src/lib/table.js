@@ -5,6 +5,11 @@ import { api } from '@/api'
 import { useApp } from '@/stores'
 
 import { beautifySnakeCase, strToSnakeCase, genId } from './utils'
+import {
+  sampleTypesFilterIdRequired,
+  sampleTypesFilterIdOptional,
+  sampleTypesFilterIdNotAllowed
+} from '@/lib/constants'
 
 export function fromSpreadsheet(text, fields) {
   let lines = text.split(String.fromCharCode(10)).filter((line) => line.length)
@@ -129,18 +134,21 @@ export function parseGenericCsv(cols, rows) {
       .replace(/\s\s+/g, ' ') // replace duplicate spaces with one space
       .replace(' ', '_') // replace spaces with underscores
       .toUpperCase() // capitalize
-    // Determine if filter_id should be generated
-    const checkTypesToGenerateFilterId = !['INSTRUMENT_BACKGROUND', 'ONLINE'].includes(
-      parsed_sample_type
-    )
+
+    // Set filter_id based on the sample type requirements
+    let filter_id = null
+    if (sampleTypesFilterIdRequired.includes(parsed_sample_type)) {
+      filter_id = row[cols[2].field]?.toUpperCase() ?? genId(6, false)
+    } else if (sampleTypesFilterIdNotAllowed.includes(parsed_sample_type)) {
+      filter_id = null
+    } else if (sampleTypesFilterIdOptional.includes(parsed_sample_type)) {
+      filter_id = row[cols[2].field]?.toUpperCase() || null
+    }
 
     const newSample = {
       sample_item_name: row[cols[0].field],
       sample_item_type: row[cols[1].field] ? parsed_sample_type : 'UNKNOWN',
-      // Generate filter_id only if the type is not "INSTRUMENT_BACKGROUND" or "ONLINE", for "INSTRUMENT_BACKGROUND" or "ONLINE" set filter_id to null
-      filter_id: checkTypesToGenerateFilterId
-        ? (row[cols[2].field]?.toUpperCase() ?? genId(6, false))
-        : null,
+      filter_id: filter_id,
       sample_item_attributes: {}
     }
 

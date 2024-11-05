@@ -7,6 +7,7 @@ from mascope_server.api.models.calibration.calibration_pydantic_model import (
 from mascope_server.api.models.sample.items.sample_item_pydantic_model import (
     SampleItemCreate,
 )
+from mascope_server.api.models.base_pydantic_model import QueryParamsModel
 
 
 class BuildParams(BaseModel):
@@ -60,7 +61,7 @@ class SampleBatchUpdateBody(SampleBatchBase):
     )
 
 
-class GetSampleBatchesQueryParams(BaseModel):
+class GetSampleBatchesQueryParams(QueryParamsModel):
     workspace_id: Optional[str] = Field(
         None,
         description="Filter by the workspace ID for which you want to fetch the sample batches.",
@@ -77,7 +78,7 @@ class GetSampleBatchesQueryParams(BaseModel):
     limit: int = Field(10000, description="Number of results per page.")
 
 
-class GetSampleBatchTargetsQueryParams(BaseModel):
+class GetSampleBatchTargetsQueryParams(QueryParamsModel):
     deduplicate: Optional[bool] = Field(
         False,
         description="Drop the potential duplicates (added to several target collections). Target collection info added if deduplicate is False.",

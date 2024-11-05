@@ -223,6 +223,7 @@ async function initApi() {
 
   return {
     client: http.client,
+    http,
     socket,
     request,
     log

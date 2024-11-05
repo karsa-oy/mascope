@@ -1,8 +1,6 @@
 from typing import Optional, Tuple
 import pandas as pd
-from mascope_server.api.models.match.match_pydantic_model import (
-    FilterParams,
-)
+from mascope_server.api.new.match.params import BaseMatchParams
 
 # TODO_configuration
 # Default Filter Parameters
@@ -36,7 +34,7 @@ def aggregate_params(df: pd.DataFrame) -> pd.Series:
 
 
 async def set_ions_match_category(
-    match_ions_df: pd.DataFrame, filter_params: Optional[FilterParams] = None
+    match_ions_df: pd.DataFrame, match_params: Optional[BaseMatchParams] = None
 ) -> pd.DataFrame:
     """Set the match_category field for each ion in the DataFrame.
 
@@ -45,8 +43,8 @@ async def set_ions_match_category(
 
     :param match_ions_df: DataFrame containing ion data with match scores.
     :type match_ions_df: pd.DataFrame
-    :param filter_params: Optional ion-specific filter parameters.
-    :type filter_params: Optional[FilterParams]
+    :param match_params: Optional ion-specific filter parameters.
+    :type match_params: Optional[BaseMatchParams]
     :return: DataFrame with match_category field set for each ion.
     :rtype: pd.DataFrame
     """
@@ -56,15 +54,15 @@ async def set_ions_match_category(
         possible_match_threshold = DEFAULT_POSSIBLE_MATCH_THRESHOLD
 
         # Override with provided filter parameters if available
-        if filter_params:
-            probable_match_threshold = filter_params.probable_match_threshold
-            possible_match_threshold = filter_params.possible_match_threshold
+        if match_params:
+            probable_match_threshold = match_params.probable_match_threshold
+            possible_match_threshold = match_params.possible_match_threshold
 
-        # Use ion-specific filters if available and no filter_params provided
+        # Use ion-specific filters if available and no match_params provided
         instrument = row["instrument"]
-        filter_params_ion = row.get("filter_params")
-        if not filter_params and filter_params_ion and instrument in filter_params_ion:
-            ion_filters = filter_params_ion[row["instrument"]]
+        match_params_ion = row.get("filter_params")
+        if not match_params and match_params_ion and instrument in match_params_ion:
+            ion_filters = match_params_ion[row["instrument"]]
             probable_match_threshold = ion_filters["probable_match_threshold"]
             possible_match_threshold = ion_filters["possible_match_threshold"]
         # Determine match_category
@@ -120,7 +118,7 @@ async def aggregate_match_isotopes(
     :rtype: (pd.DataFrame, pd.DataFrame)
 
     TODO move to the match_aggregate module, use in get_sample_compound_matches controller
-    (compute_match_isotopes, apply_filter_params, optionally compute_match_interferences and combine data, aggregate_match_isotopes)
+    (compute_match_isotopes, apply_match_params, optionally compute_match_interferences and combine data, aggregate_match_isotopes)
     """
     # Select relevant columns for detailed aggregation (backend processing)
     match_isotopes_data_df = filtered_match_isotope_df.loc[
@@ -179,11 +177,11 @@ async def aggregate_match_isotopes(
 
 async def aggregate_match_ions(
     filtered_match_isotope_df: pd.DataFrame,
-    filter_params: Optional[FilterParams] = None,
+    match_params: Optional[BaseMatchParams] = None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Aggregate fields for match ions from aggreagated filtered match isotopes dataframe.
-    Provided filters are passed to set_ions_match_category, if none filter_params are provided, stored ion-specidic or default params will be applied.
+    Provided filters are passed to set_ions_match_category, if none match_params are provided, stored ion-specidic or default params will be applied.
 
     It prepares two DataFrames:
     1) match_ions_data_df with detailed data for correct further aggregation on collection/sample lvl,
@@ -194,8 +192,8 @@ async def aggregate_match_ions(
 
     :param filtered_match_isotope_df: DataFrame containing isotope data to aggregate.
     :type filtered_match_isotope_df: pd.DataFrame
-    :param filter_params: Optional ion-specific filter parameters to set_ions_match_category.
-    :type filter_params: Optional[FilterParams]
+    :param match_params: Optional ion-specific filter parameters to set_ions_match_category.
+    :type match_params: Optional[BaseMatchParams]
     :return: Tuple of DataFrames with aggregated match ions data.
     :rtype: (pd.DataFrame, pd.DataFrame)
     """
@@ -237,7 +235,7 @@ async def aggregate_match_ions(
             }
         )
     )
-    # Prepare a simplified DataFrame for storing in database (keep instrument and filter_params for correct set_ions_match_category)
+    # Prepare a simplified DataFrame for storing in database (keep instrument and match_params for correct set_ions_match_category)
     # Drop duplicates for match ions based on target_ion_id for each sample, so each sample would have the unique match ions
     # (even of there is same compound=>ion present in different target collections of the sample)
     match_ions_df = match_ions_data_df.drop(
@@ -251,10 +249,8 @@ async def aggregate_match_ions(
     ).drop_duplicates(subset=["target_ion_id", "sample_item_id"])
 
     # set match_category field for ions
-    match_ions_data_df = await set_ions_match_category(
-        match_ions_data_df, filter_params
-    )
-    match_ions_df = await set_ions_match_category(match_ions_df, filter_params)
+    match_ions_data_df = await set_ions_match_category(match_ions_data_df, match_params)
+    match_ions_df = await set_ions_match_category(match_ions_df, match_params)
 
     return match_ions_data_df, match_ions_df
 
@@ -264,7 +260,7 @@ def aggregate_match_ions_light(
 ) -> pd.DataFrame:
     """
     Aggregate fields for match ions from the lighter then in main pipeline (aggregate_match_ions) computed and filtered match isotope DataFrame.
-    Used in the aggregate_sample_match_compound to aggregate simple match_ions_data_df after compute_match_isotopes and apply_filter_params.
+    Used in the aggregate_sample_match_compound to aggregate simple match_ions_data_df after compute_match_isotopes and apply_match_params.
 
     This function groups the filtered match isotope DataFrame by 'target_ion_id' and aggregates relevant data,
     such as summing up 'sample_peak_area' and computing a weighted 'match_score'.
@@ -516,8 +512,6 @@ async def compile_samples_df(
             "sample_peak_area_sum",
             "sample_peak_interference_sum",
         ]
-    ].fillna(
-        0
-    )
+    ].fillna(0)
 
     return samples_df

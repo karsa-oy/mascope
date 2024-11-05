@@ -304,7 +304,7 @@ def get_sample_compound_matches(
     sample_item_id: str,
     target_compound_formula: str,
     target_compound_name: str = "Unknown Compound",
-    filter_params: dict = None,
+    match_params: dict = None,
 ) -> dict:
     """
     Retrieves matches for compounds within a sample based on a target compound formula,
@@ -318,9 +318,9 @@ def get_sample_compound_matches(
     :type target_compound_formula: str
     :param target_compound_name: The name of the target compound, defaults to "Unknown Compound"
     :type target_compound_name: str, optional
-    :param filter_params: Parameters to filter the match results, affecting which matches are considered significant.
-                          Should be a dictionary representing the FilterParams Pydantic model.
-    :type filter_params: dict, optional
+    :param match_params: Parameters to filter the match results, affecting which matches are considered significant.
+                          Should be a dictionary representing a MatchParams Pydantic model.
+    :type match_params: dict, optional
     :return: A dictionary containing the match data (compound->ions->isotopes).
              Returns None if no match data is found or if an error occurs.
     :rtype: dict
@@ -328,7 +328,7 @@ def get_sample_compound_matches(
     Example of target compound and filter parameters data:
         "target_compound_formula": "C6H12N2O6",
         "target_compound_name": "Formic acid", # compound name is optional
-        filter_params = {
+        "match_params": {
             "mz_tolerance": 72,
             "isotope_ratio_tolerance": 0.2,
             "peak_min_intensity": 0.0,
@@ -345,8 +345,8 @@ def get_sample_compound_matches(
             "target_compound_name": target_compound_name,
         }
     }
-    if filter_params is not None:
-        body["filter_params"] = filter_params
+    if match_params is not None:
+        body["match_params"] = match_params
 
     # Make the POST request for the specified sample
     resp = api_post(
@@ -506,7 +506,7 @@ def get_sample_file_spectrum(
     :return: A dictionary with keys:
         - "mz": list of m/z values
         - "intensity": list of intensity values
-        - Optional: "total" and "spectrum_count" if available.
+        - Optional: "results" and "spectrum_count" if available.
         Returns None if no spectrum data is found or if an error occurs.
     :rtype: dict or None
     """

@@ -1,0 +1,35 @@
+name: Mascope Release
+run-name: ${{ github.actor }} is releasing Mascope
+
+env:
+  BRANCH: master
+  
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  
+  # prep jobs
+  
+  release-tag:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+    outputs:
+      version: ${{ steps.make_version.outputs.version }}
+    steps:
+      # setup
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Create version tag
+        id: make_version
+        run: echo "version=$(git log -1 --date=format:"%Y.%m.%d" --format="%ad-%h")" >> "$GITHUB_OUTPUT"
+      - name: Push version tag
+        id: tag_version
+        uses: mathieudutour/github-tag-action@v6.2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          release_branches: ${{ env.BRANCH }}
+          custom_tag: ${{ steps.make_version.outputs.version }}

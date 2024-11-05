@@ -90,8 +90,8 @@ const toField =
     return formatted
   }
 const xAxis = computed(() => ({
-  tickvals: app.data.sample.list?.map((_, i) => i) ?? [],
-  ticktext: app.data.sample.list?.map(toField(xField.value ?? 'index')) ?? []
+  tickvals: data.samples.map((_, i) => i),
+  ticktext: data.samples.map(toField(xField.value ?? 'index'))
 }))
 
 const layout = computed(() => ({
@@ -142,29 +142,48 @@ function onClick({ points }) {
     app.data.match.ion.focus({ match_key })
   }
 }
+
+const anyFilters = computed(
+  () =>
+    app.ui.filter.collections.length ||
+    app.ui.filter.mechanism ||
+    app.data.sample.selected.length > 1
+)
 </script>
 
 <template>
-  <figure>
-    <div class="row" style="justify-content: space-between; width: 100%">
-      <Select
-        v-model:modelValue="xField"
-        :options="xFields"
-        optionLabel="label"
-        dataKey="field"
-        filter
+  <figure style="position: relative">
+    <div
+      class="row"
+      style="justify-content: flex-start; width: 100%; position: absolute; top: 0; z-index: 100"
+    >
+      <span v-if="anyFilters" class="pi pi-filter" style="opacity: 0.5" />
+      <Chip
+        v-for="coll in app.ui.filter.collections"
+        icon="pi pi-bullseye"
+        :label="coll.target_collection_name"
+        removable
+        @remove="
+          app.ui.filter.collections = app.ui.filter.collections.filter(
+            ({ target_collection_id }) => target_collection_id !== coll.target_collection_id
+          )
+        "
+        :key="coll.target_collection_id"
       />
       <Chip
         v-if="app.ui.filter.mechanism"
-        icon="pi pi-filter"
+        icon="pi pi-cog"
         :label="app.ui.filter.mechanism.ionization_mechanism"
         removable
         @remove="app.ui.filter.mechanism = null"
       />
-      <div class="row">
-        <ToggleSwitch v-model="log" style="margin-left: 1rem" />
-        <span> log scale </span>
-      </div>
+      <Chip
+        v-if="app.data.sample.selected.length > 1"
+        icon="pi pi-tags"
+        :label="`${app.data.sample.selected.length} samples`"
+        removable
+        @remove="app.data.sample.unfocus()"
+      />
     </div>
     <BaseChartPlotly
       id="ChartSampleIntensity"
@@ -174,4 +193,26 @@ function onClick({ points }) {
       @click="onClick"
     />
   </figure>
+  <div
+    class="row"
+    :style="`
+      justify-content: space-between;
+      width: calc(${app.ui.split.right}vw - 4rem);
+      position: absolute;
+      bottom: 35px;
+      right: 2rem;
+    `"
+  >
+    <div class="row">
+      <ToggleSwitch v-model="log" style="margin-left: 1rem" />
+      <span> log scale </span>
+    </div>
+    <Select
+      v-model:modelValue="xField"
+      :options="xFields"
+      optionLabel="label"
+      dataKey="field"
+      filter
+    />
+  </div>
 </template>
