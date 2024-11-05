@@ -1,6 +1,7 @@
 import fnmatch
 import os
 import re
+import numpy as np
 
 import datetime_glob
 
@@ -213,3 +214,22 @@ def map_to_snake_case(obj):
 
 def map_to_camel_case(obj):
     return map_keys(obj, to_camel_case)
+
+
+def get_closest_non_nan(y: np.ndarray, x: np.ndarray, target: float) -> float:
+    """Helper function to find non-NaN y corresponding to the closest x value to target in 1D array.
+
+    :param y: y-values
+    :type y: np.ndarray
+    :param x: x-values
+    :type x: np.ndarray
+    :param target: target x-value
+    :type target: float
+    :return: non-NaN y-value or 0 if all y-values are NaNs
+    :rtype: float
+    """
+    mask = ~np.isnan(y)
+    if not mask.any():
+        return 0  # No non-NaN values in slice
+    closest_idx = np.argmin(np.abs(x[mask] - target))
+    return y[mask][closest_idx]
