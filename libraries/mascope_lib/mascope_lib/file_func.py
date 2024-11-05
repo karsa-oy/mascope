@@ -282,24 +282,33 @@ def get_filestore_path() -> str:
     return base_path
 
 
-def get_sum_signal(filename: str) -> xarray.core.dataarray.DataArray:
+def get_sum_signal(
+    filename: str, average: bool = False
+) -> xarray.core.dataarray.DataArray:
     """Calculates the sum spectrum of a given filename
 
     :param filename: Name of the target file
     :type filename: str
-    :return: Sum signal/sum spectrum
+    :param average: Return avereage spectrum instead of sum. By default false (return sum).
+    :type average: bool
+    :return: Sum/average spectrum
     :rtype: xarray.core.dataarray.DataArray
     """
     try:
         # Load precomputed sum spectrum from zarr file
-        sum_signal = load_file(filename, vars=["sum_signal"]).sum_signal
+        sample_file = load_file(filename, vars=["sum_signal"])
+        sum_signal = sample_file.sum_signal
     except AttributeError:
         # Load file data from a given filename and extract the signal data.
         sample_file_data = load_file(filename, vars=["signal"])
         # Write missing sum spectrum to file
         zarr_sdk.write_sum_signal_dataset(sample_file_data)
-        sum_signal = load_file(filename, vars=["sum_signal"]).sum_signal
-    return sum_signal
+        sample_file = load_file(filename, vars=["sum_signal"])
+        sum_signal = sample_file.sum_signal
+    if average:
+        return sum_signal / sample_file.props["length"]
+    else:
+        return sum_signal
 
 
 def remove_duplicate_mz_values(mz):
