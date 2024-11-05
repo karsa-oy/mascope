@@ -242,7 +242,7 @@ export const useChartData = defineStore('chart.batch.overview', () => {
         <br>
         <b>%{text}</b>
         <br>
-        y: %{y:,.0f}
+        TIC: %{y:,.0f}
         <br>
         %{customdata}
       `,
