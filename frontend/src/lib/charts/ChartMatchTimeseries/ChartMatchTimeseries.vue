@@ -21,7 +21,7 @@ const layout = computed(() => ({
     gridwidth: 1
   },
   yaxis: {
-    title: 'Peak height [cps]',
+    title: `Peak intensity [${data?.unit}]`,
     showgrid: true,
     autorange: true,
     rangemode: 'tozero',

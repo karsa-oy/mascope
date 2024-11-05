@@ -6,6 +6,7 @@ import { useApp } from '@/stores'
 export const useChartData = defineStore('chart.match.spectra', () => {
   const traces = ref([])
   const length = ref()
+  const unit = ref('a.u.')
 
   const app = useApp()
 
@@ -20,6 +21,7 @@ export const useChartData = defineStore('chart.match.spectra', () => {
   async function onVisualizationSignalSumSpectrum(payload) {
     for (let trace of payload) {
       length.value = length.value + trace.x.length
+      unit.value = trace.unit ? trace.unit : unit.value
       trace.x = new Float32Array(trace.x)
       trace.y = new Float32Array(trace.y)
 
@@ -42,5 +44,5 @@ export const useChartData = defineStore('chart.match.spectra', () => {
     }
     traces.value = [...traces.value, ...payload]
   }
-  return { traces, onVisualizationSignalSumSpectrum, length }
+  return { traces, onVisualizationSignalSumSpectrum, length, unit }
 })

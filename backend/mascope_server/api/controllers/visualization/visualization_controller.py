@@ -4,7 +4,7 @@ import pandas as pd
 import xarray as xr
 from sqlalchemy import select
 from colorcet import glasbey_hv as colormap
-from mascope_lib.file_func import load_file
+from mascope_lib.file_func import get_instrument_type, load_file
 from mascope_lib.peak import filter_peaks, get_peaks
 from mascope_lib.util import get_closest_non_nan
 from mascope_server.db import async_session
@@ -88,6 +88,9 @@ async def visualize_ion_focus(
     # Step 2: Load the sample file and prepare data slice
     runtime.logger.info(f"Loading file: {filename}")
     sample_file = load_file(filename, vars=["sum_signal", "signal", "peak_heights"])
+    instrument_type = get_instrument_type(filename)
+    spectrum_unit = "ions" if instrument_type == "tof" else "a.u."
+    timeseries_unit = "ions/s" if instrument_type == "tof" else "a.u./s"
 
     # Step 3: Convert target ion data to DataFrame and prepare data
     target_ion_list = [ion.to_dict() for ion in target_ion_data]
@@ -148,6 +151,7 @@ async def visualize_ion_focus(
                 "fillcolor": "rgba({},{},{}, .3)".format(*colormap[i + COLOR_OFFSET]),
                 "x": sum_spectrum_mz.tobytes(),
                 "y": sum_spectrum_y.tobytes(),
+                "unit": spectrum_unit,
             }
         )
         # Peak traces (vertical lines)
@@ -169,6 +173,7 @@ async def visualize_ion_focus(
                     },
                     "x": [peak_mz, peak_mz],
                     "y": [0, peak_height],
+                    "unit": spectrum_unit,
                 }
             )
             if match:
@@ -209,6 +214,7 @@ async def visualize_ion_focus(
                         },
                         "x": timeseries_time.tobytes(),
                         "y": timeseries_y.tobytes(),
+                        "unit": timeseries_unit,
                     }
                 )
                 if i == 0 and sum_timeseries is None:
@@ -227,6 +233,7 @@ async def visualize_ion_focus(
                 },
                 "x": [float(mz), float(mz)],
                 "y": [0, isotope_expected_height],
+                "unit": spectrum_unit,
             }
         )
 
@@ -252,6 +259,7 @@ async def visualize_ion_focus(
             "line": {"color": "white"},
             "x": timeseries_time.tobytes(),
             "y": timeseries_y.tobytes(),
+            "unit": timeseries_unit,
         },
     ]
     await sio.emit("visualization_signal_timeseries", timeseries_traces, room=sid)

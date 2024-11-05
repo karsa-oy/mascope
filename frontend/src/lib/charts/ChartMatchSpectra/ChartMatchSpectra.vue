@@ -13,7 +13,7 @@ import { useApp } from '@/stores'
 import { useChartData } from './data.js'
 
 const app = useApp()
-
+const data = useChartData()
 const plots = ref({})
 
 const { settings } = defineProps({
@@ -25,8 +25,6 @@ const { settings } = defineProps({
 
 // transform raw visualiation data into seperate charts
 const isotopeCharts = computed(() => {
-  // use the visualization's store
-  const data = useChartData()
   // create an array corresponding to visualized isotopes
   return clone(app.data.match.visualized.isotopes).map((isotope) => {
     // split up the chart's traces by isotope
@@ -70,7 +68,7 @@ const scale = computed(
 // standard plotly layout
 const layout = computed(() => ({
   yaxis: {
-    title: 'Signal intensity [cps]',
+    title: `Signal intensity [${data?.unit}]`,
     gridcolor: '#33333399',
     rangemode: 'nonnegative',
     ...scale.value
