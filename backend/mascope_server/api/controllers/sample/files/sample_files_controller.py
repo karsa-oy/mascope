@@ -593,6 +593,9 @@ async def get_sample_file_spectrum(
     # Step 1: Fetch sample file info from the database
     sample_file = await get_sample_file(sample_file_id)
     filename = sample_file["filename"]
+    # Derive intensity units from instrument type
+    instrument_type = get_instrument_type(filename)
+    intensity_unit = ("ions" if instrument_type == "tof" else "a.u.",)
 
     # Step 2: Load the sample file and determine whether to use the full signal or a time slice and calculate the corresponding spectrum DataArray
     runtime.logger.info(f"Loading file: {filename}")
@@ -637,5 +640,9 @@ async def get_sample_file_spectrum(
         **(
             {"spectrum_count": time_data_points} if time_data_points is not None else {}
         ),
-        "data": {"mz": mz_values, "intensity": intensity_values},
+        "data": {
+            "mz": mz_values,
+            "intensity": intensity_values,
+            "intensity_unit": intensity_unit,
+        },
     }

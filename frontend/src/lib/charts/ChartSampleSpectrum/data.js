@@ -8,6 +8,7 @@ export const useChartData = defineStore('chart.sample.spectrum', () => {
   const traces = ref([])
   const loadedFileId = ref()
   const length = ref()
+  const unit = ref('a.u.')
   const loading = ref(false)
 
   const app = useApp()
@@ -81,11 +82,11 @@ export const useChartData = defineStore('chart.sample.spectrum', () => {
             '<br>'
           )
         })
-
+      unit.value = data.intensity_unit
       length.value = data.intensity.length
     }
     loading.value = false
   }
 
-  return { traces, length, loading }
+  return { traces, length, unit, loading }
 })
