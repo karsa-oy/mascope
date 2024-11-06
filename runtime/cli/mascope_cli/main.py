@@ -56,8 +56,12 @@ def main(
     are delegated to the specific commands. Type `mascope <cmd> --help` to
     learn more about one of the commands listed below.
     """
+    # construct the version string from git
     os.environ["MASCOPE_VERSION"] = get_version()
+    # override env with CLI option (null if not provided)
     runtime.state.override("env", env)
+    # use `dev` mode by default
+    runtime.state.mode = "dev"
     # set the log level shown in the terminal logs
     if log_level:
         os.environ["MASCOPE_LOGLEVEL"] = log_level.upper()
