@@ -3,17 +3,17 @@ import pandas as pd
 from mascope_server.db import async_session
 from mascope_server.db.models import Sample
 
+from mascope_lib.instrument import instrument_type
+
 from .schema import BaseMatchParams, TofMatchParams, OrbiMatchParams
 
 
 def instrument_default_match_params(instrument_name: str):
-    instrument = instrument_name.lower()
-    if "orbi" in instrument:
+    type = instrument_type(instrument_name)
+    if type == "orbi":
         return OrbiMatchParams()
-    elif "tof" in instrument or "api" in instrument:
+    elif type == "tof":
         return TofMatchParams()
-    else:
-        raise ValueError(f"Failed to identify instrument type {instrument_name}")
 
 
 async def default_match_params(sample_item_id: str):
