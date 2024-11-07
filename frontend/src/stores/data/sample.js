@@ -3,6 +3,9 @@ import { defineModule } from './lib/module'
 import { api } from '@/api'
 
 import { useMzFit } from '@/lib/mzFit'
+import { genId } from '@/lib/utils'
+
+import { useUi } from '../ui'
 
 import { useBatch } from './batch'
 
@@ -86,7 +89,7 @@ export const useSample = defineModule({
       }
     ),
   upload: async (files) => {
-    const app = useApp()
+    const ui = useUi()
     const mainProcessId = genId(8) // Generate a unique ID for the overall upload process
     let successes = 0 // Counter to track the number of successful uploads
     let errors = 0 // Counter to track the number of failed uploads
@@ -108,7 +111,7 @@ export const useSample = defineModule({
                 const percentCompleted = progressEvent.progress * 100 // Calculate progress percentage
 
                 // Update the progress for the current file
-                app.ui.notification.push({
+                ui.notification.push({
                   type: 'sample_file_upload',
                   process_id,
                   parent_id: mainProcessId,
@@ -123,7 +126,7 @@ export const useSample = defineModule({
           // If the upload is successful, send a success notification for this file
           if (response?.status === 201) {
             successes += 1
-            app.ui.notification.push({
+            ui.notification.push({
               type: 'sample_file_upload',
               process_id,
               parent_id: mainProcessId,
@@ -136,7 +139,7 @@ export const useSample = defineModule({
           // Handle upload errors for this specific file
           errors += 1
           const errorMessage = `Failed to upload file ${file.name}: ${error.message}`
-          app.ui.notification.push({
+          ui.notification.push({
             type: 'sample_file_upload',
             process_id,
             parent_id: mainProcessId,
@@ -151,7 +154,7 @@ export const useSample = defineModule({
     if (successes > 0 && errors === 0) {
       // All uploads were successful
       const s = successes > 1 ? 's' : ''
-      app.ui.notification.push({
+      ui.notification.push({
         type: 'sample_file_upload',
         status: 'success',
         process_id: mainProcessId,
@@ -161,7 +164,7 @@ export const useSample = defineModule({
     } else if (successes > 0 && errors > 0) {
       // Some uploads were successful, some failed
       const s = successes > 1 ? 's' : ''
-      app.ui.notification.push({
+      ui.notification.push({
         type: 'sample_file_upload',
         status: 'warning',
         process_id: mainProcessId,
@@ -170,7 +173,7 @@ export const useSample = defineModule({
       })
     } else if (errors > 0) {
       // All uploads failed
-      app.ui.notification.push({
+      ui.notification.push({
         type: 'sample_file_upload',
         status: 'error',
         process_id: mainProcessId,

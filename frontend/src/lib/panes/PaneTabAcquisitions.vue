@@ -11,16 +11,14 @@ import InputIcon from 'primevue/inputicon'
 import InputText from 'primevue/inputtext'
 import FileUpload from 'primevue/fileupload'
 import FloatLabel from 'primevue/floatlabel'
-import Dialog from 'primevue/dialog'
 
 import { runtime } from '@/lib/runtime'
-import { DialogSampleOp, DialogBatchImport } from '@/lib/dialogs'
+import { DialogSampleOp, DialogBatchImport, DialogFileUpload } from '@/lib/dialogs'
 
 import { useApp } from '@/stores'
 
 // TODO_configuration Default sample file upload params
 const FILE_UPLOAD_EXTENSIONS = ['.h5', '.raw']
-const FILE_UPLOAD_SIZE_LIMIT = 200 * 1024 * 1024 // 200 MB
 
 const app = useApp()
 
@@ -48,75 +46,7 @@ const acquisitions = computed(
     ) ?? []
 )
 
-const instrumentDialog = reactive({
-  active: false,
-  badFiles: [],
-  goodFiles: [],
-  instrument: null
-})
-
-// Validate file sizes before upload
-function validateUploadFiles(files) {
-  // size validation
-  const oversizedFiles = files.filter((file) => file.size > FILE_UPLOAD_SIZE_LIMIT)
-  if (oversizedFiles.length > 0) {
-    const n = oversizedFiles.length
-    const files = oversizedFiles.length > 1 ? 'files' : 'file'
-    const exceed = oversizedFiles.length > 1 ? 'exceed' : 'exceeds'
-    const max = FILE_UPLOAD_SIZE_LIMIT / (1024 * 1024)
-    app.ui.notification.push({
-      type: 'sample_file_upload',
-      status: 'warning',
-      message: `${n} ${files} ${exceed} the size limit of ${max} MB.`
-    })
-    return false
-  }
-  // instrument name validation
-  const isMisnamed = ({name}) => !app.data.instrument.list
-    // instrument names
-    .map(({instrument}) => instrument).includes(
-      // prefix
-      name.split('_')[0]
-    )
-  const misnamedFiles = files
-    .filter(isMisnamed)
-  if (misnamedFiles.length > 0) {
-    instrumentDialog.badFiles = misnamedFiles
-    instrumentDialog.goodFiles = files
-      .filter((f) => !isMisnamed(f))
-    instrumentDialog.active = true
-    return false
-  }
-  return true
-}
-
-// Handle file selection
-function uploadFiles(event) {
-  // Validate file sizes
-  if (validateUploadFiles(event.files)) {
-    // Proceed with upload if all files are valid
-    app.data.sample.upload(event.files)
-  }
-}
-
-
-const uploadFilesWithInstrument = () => {
-  const renamedFiles = instrumentDialog.badFiles.map(
-    (file) => {
-      const newFilename = `${instrumentDialog.instrument}_${file.name}`
-      return new File(
-        [file],
-        newFilename,
-        {type: file.type}
-      );
-    }
-  )
-  instrumentDialog.active = false
-  app.data.sample.upload([
-    ...renamedFiles,
-    ...instrumentDialog.goodFiles
-  ])
-}
+const uploadedFiles = ref([])
 
 watchEffect(() => {
   if (app.data.acquisition.pending.filename && app.data.acquisition.mode && props.active) {
@@ -137,7 +67,7 @@ watch(
     name="samplefile[]"
     :accept="FILE_UPLOAD_EXTENSIONS.join(',')"
     :url="`${runtime.api_path}/api/sample/files/upload`"
-    @select="uploadFiles"
+    @select="(event) => (uploadedFiles = event.files)"
     customUpload
     multiple
     auto
@@ -234,48 +164,7 @@ watch(
       </div>
       <DialogSampleOp v-model:action="dialog.sample" :item="selected.files[0]" />
       <DialogBatchImport v-model:visible="dialog.batchImport" :files="selected.files" />
-      <Dialog :visible="instrumentDialog.active" modal header="Select instrument for files">
-        <p>
-          The prefix following file names is not an
-          instrument in the database:
-        </p>
-        <ul>
-          <li v-for="file in instrumentDialog.badFiles" :key="file.name">
-            {{ file.name }}
-          </li>
-        </ul>
-        <p>
-          Please select an instrument to assign these files to:
-        </p>
-        <div class="center" style="width: 100%">
-        <FloatLabel>
-          <Select
-            inputId="file-instrument"
-            v-model="instrumentDialog.instrument"
-            :options="app.data.instrument.list"
-            dataKey="instrument"
-            optionLabel="instrument"
-            optionValue="instrument"
-            style="min-width: 200px"
-          />
-          <label for="file-instrument"> Instrument </label>
-        </FloatLabel>
-        </div>
-        <menu style="justify-content: flex-end">
-            <Button
-              label="Cancel"
-              icon="pi pi-times"
-              severity="secondary"
-              @click="instrumentDialog.active = false"
-            />
-            <Button
-              label="Save"
-              icon="pi pi-save"
-              :disabled="!instrumentDialog.instrument"
-              @click="uploadFilesWithInstrument"
-            />
-        </menu>
-      </Dialog>
+      <DialogFileUpload :files="uploadedFiles" />
       <i class="info-line">
         <span class="pi pi-file-arrow-up" /><span>Drag sample files here to upload them</span>
       </i>
