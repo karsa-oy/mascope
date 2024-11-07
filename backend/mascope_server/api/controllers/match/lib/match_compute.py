@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from mascope_lib.file_func import get_instrument_type, get_sum_signal
-from mascope_lib.peak import detect_peaks, get_peaks
+from mascope_lib.peak import calculate_signal_area, detect_peaks, get_peaks
 from mascope_lib.chemistry import match_mz
 from mascope_server.db.id import gen_id
 from mascope_server.api.lib.api_features import (
@@ -267,6 +267,7 @@ async def compute_match_interferences(
     try:
         # Step 1: Load the sample file and compute the summed spectrum
         sum_spectrum = get_sum_signal(filename)
+        instrument_type = get_instrument_type(filename)
 
         # Read instrument resolution function
         _, R = await read_instrument_functions(filename)
@@ -279,11 +280,27 @@ async def compute_match_interferences(
         def calc_raw_intensity(row):
             target_mz = row.mz
             dmz = (target_mz / R(target_mz)) / 2  # hwhm
-            target_raw_intensity = sum_spectrum.sel(
-                mz=slice(target_mz - dmz, target_mz + dmz)
-            ).sum(dim="mz")
+            if instrument_type == "tof":
+                # For the TOF, calculate signal area in the mz range
+                target_raw_intensity = calculate_signal_area(
+                    filename,
+                    mz_min=target_mz - dmz,
+                    mz_max=target_mz + dmz,
+                    sum_spectrum=sum_spectrum,
+                )
+            else:
+                # For the Orbitrap, calculate signal maximum intensity in the mz range
+                sum_spectrum_slice = sum_spectrum.sel(
+                    mz=slice(target_mz - dmz, target_mz + dmz)
+                )
+                if sum_spectrum_slice.shape[0] == 0:
+                    target_raw_intensity = 0
+                else:
+                    target_raw_intensity = (
+                        sum_spectrum_slice.max(dim="mz").compute().item()
+                    )
             row["match_interference_id"] = gen_id(length=32)
-            row["sample_peak_interference"] = target_raw_intensity.compute().item()
+            row["sample_peak_interference"] = target_raw_intensity
             return row
 
         isotope_interference_df = isotope_interference_df.apply(

@@ -14,7 +14,7 @@ import numpy as np
 from scipy.signal._peak_finding_utils import _select_by_peak_distance
 from scipy.stats import norm
 from scipy.integrate import simpson
-
+import xarray
 
 from mascope_lib.runtime import lib_runtime
 
@@ -48,6 +48,43 @@ def calculate_peak_area(
         return np.sum(peak_y) * sample_interval
     # calculate peak area in mz space
     return simpson(y=peak_y, x=x)
+
+
+def calculate_signal_area(
+    filename: str, mz_min: float, mz_max: float, sum_spectrum: xarray.DataArray = None
+) -> float:
+    """Calculate signal area in an mz range
+
+    Computes the area as "sum * sample interval" for TOF, and using Simpson's rule for Orbi
+
+    :param filename: Filename of the sample file
+    :type filename: str
+    :param mz_min: m/z range minimum
+    :type mz_min: float
+    :param mz_max: m/z range maximum
+    :type mz_max: float
+    :param sum_spectrum: Sum spectrum array, defaults to None. If None, load from file.
+    :type sum_spectrum: xarray.DataArray
+    :return: Return signal area
+    :rtype: float
+    """
+    if sum_spectrum is None:
+        sum_spectrum = get_sum_signal(filename)
+    instrument_type = get_instrument_type(filename)
+    sum_spectrum_slice = sum_spectrum.sel(mz=slice(mz_min, mz_max))
+    if sum_spectrum_slice.shape[0] == 0:
+        # No signal in the specified mz range
+        return 0
+    if instrument_type == "tof":
+        # default 0.25 for backwards compatibility
+        sample_interval = (
+            load_file(filename, vars=[]).attrs["props"].get("sample_interval", 0.25)
+        )
+        # return sum signal full integral in tof space
+        return sum_spectrum_slice.sum(dim="mz").compute().item() * sample_interval
+    else:
+        # return sum signal full integral in mz space
+        return simpson(y=sum_spectrum_slice.values, x=sum_spectrum_slice.mz.values)
 
 
 def calculate_tic(filename: str) -> float:
