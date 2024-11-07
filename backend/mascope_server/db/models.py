@@ -19,6 +19,9 @@ from sqlalchemy.ext.declarative import declarative_base
 from fastapi_users.db import (
     SQLAlchemyBaseUserTable,
 )
+from fastapi_users_db_sqlalchemy.access_token import (
+    SQLAlchemyBaseAccessTokenTable,
+)
 
 
 class BaseMixin(object):
@@ -53,11 +56,14 @@ class User(SQLAlchemyBaseUserTable[int], Base):
         Integer, ForeignKey("role.role_id", ondelete="SET NULL"), nullable=True
     )
     registered_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP, default=datetime.now(timezone.utc), nullable=False
+        TIMESTAMP, default=lambda: datetime.now(timezone.utc), nullable=False
     )
 
     # Define relationships
-    role = relationship("Role", back_populates="users")
+    role = relationship("Role", back_populates="user")
+    access_token = relationship(
+        "AccessToken", back_populates="user", cascade="all, delete, delete-orphan"
+    )
 
 
 class Role(Base):
@@ -70,7 +76,29 @@ class Role(Base):
     permissions: Mapped[dict] = mapped_column(JSON, nullable=True)
 
     # Define relationships
-    users = relationship("User", back_populates="role")
+    user = relationship("User", back_populates="role")
+
+
+class AccessToken(SQLAlchemyBaseAccessTokenTable[int], Base):
+    """
+    AccessToken model for storing access tokens linked to user accounts.
+    """
+
+    __tablename__ = "access_token"
+
+    token: Mapped[str] = mapped_column(String(length=43), primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("user.id", ondelete="CASCADE"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True),
+        index=True,
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+    # Define relationships
+    user = relationship("User", back_populates="access_token")
 
 
 class Workspace(Base):
