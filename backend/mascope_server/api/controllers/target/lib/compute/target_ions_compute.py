@@ -3,7 +3,9 @@ Functions for target ions and target isotopes generation.
 """
 
 from typing import List
+from IsoSpecPy import IsoThreshold
 from mascope_lib.molmass import Formula
+from mascope_lib.molmass.elements import ELECTRON
 from mascope_server.db.id import gen_id
 from mascope_server.db.models import (
     IonizationMechanism,
@@ -91,7 +93,15 @@ def generate_target_ions_from_composition(
             target_ions.append(ion)
 
             # construct and save isotope rows
-            raw_isotopes = raw_ion.mz_spectrum().values()
+            predicted_lines = IsoThreshold(formula=raw_ion.formula, threshold=0.1)
+
+            # Extract masses and probabilities, correct masses for the electron charge
+            masses = [
+                (float(m) - ELECTRON.mass * raw_ion.charge) / abs(raw_ion.charge)
+                for m in predicted_lines.masses
+            ]
+            probs = [float(p) for p in predicted_lines.probs]
+
             target_isotopes.extend(
                 [
                     TargetIsotope(
@@ -100,7 +110,7 @@ def generate_target_ions_from_composition(
                         mz=mz,
                         relative_abundance=rel_abu,
                     )
-                    for mz, rel_abu in raw_isotopes
+                    for mz, rel_abu in zip(masses, probs)
                 ]
             )
     return target_ions, target_isotopes

@@ -27,6 +27,8 @@ plotly = "^5.22"
 scipy = "^1.13"
 tqdm = "^4.66.4"
 voila = "^0.5.8"
+isospecpy = "^2.2.2"
+molmass = "^2024.10.25"
 
 [tool.poetry.group.dev.dependencies]
 deptry = "^0.16"

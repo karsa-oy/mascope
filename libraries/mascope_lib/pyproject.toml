@@ -28,6 +28,7 @@ xarray = "==2024.6.0"
 zarr = "==2.18.2"
 scipy = "^1.13"
 pywavelets = "^1.7.0"
+isospecpy = "^2.2.2"
 
 [tool.poetry.group.dev.dependencies]
 deptry = "^0.16"
