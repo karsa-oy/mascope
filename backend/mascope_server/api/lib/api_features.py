@@ -85,6 +85,7 @@ def api_route(
     include_message: bool = False,
     success_message: str = None,
     error_message: str = None,
+    jupyter_access: bool = False,
 ):
     """
     A decorator for route handler functions to standardize the response structure and handle exceptions.
@@ -112,11 +113,16 @@ def api_route(
     :type success_message: str, optional
     :param error_message: Custom error message to include in the response if include_message is True.
     :type error_message: str, optional
+    :param jupyter_access: Flag to indicate if the route allows access via an access token (for Jupyter or external access).
+                           If set to True, the endpoint is accessible via a Bearer token in addition to standard JWT authentication.
+    :type jupyter_access: bool, optional
     :return: The wrapped route handler function with standardized response formatting and exception handling.
     :rtype: Callable
     """
 
     def decorator(func: Callable):
+        func.jupyter_access = jupyter_access  # Attach attribute to function
+
         @wraps(func)
         async def wrapper(*args, **kwargs):
             try:

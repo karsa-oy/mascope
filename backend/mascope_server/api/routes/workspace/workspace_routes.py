@@ -31,7 +31,7 @@ async def get_workspace_route(workspace_id: str):
 
 # TODO test protected route
 @workspace_router.get("/api/workspaces/{workspace_id}/protected")
-@api_route()
+@api_route(jupyter_access=True)
 async def get_workspace_protected_route(
     workspace_id: str,
     user=Depends(current_active_user),  # Protect route by ensuring user is active
@@ -46,7 +46,7 @@ async def get_workspace_protected_route(
 
 # TODO test protected route for admins
 @workspace_router.get("/api/workspaces/{workspace_id}/admin")
-@api_route()
+@api_route(jupyter_access=True)
 async def get_workspace_admin_route(
     workspace_id: str,
     user=Depends(admin_user),  # Protect route by ensuring user is active and admin
