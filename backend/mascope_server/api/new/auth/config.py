@@ -54,5 +54,8 @@ class AuthConfig(BaseModel):
         "mascope-users:verify"  # Audience for email verification tokens
     )
 
+    # Access token-based authentication settings for Jupyter library API access
+    ACCESS_TOKEN_EXPIRATION_SECONDS: int = 3600  # Access token lifetime in seconds
+
 
 auth_settings = AuthConfig()
