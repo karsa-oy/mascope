@@ -103,7 +103,11 @@ async def compute_match_isotopes(
             if_exists="append",
             instrument_type=instrument_type,
         )
-        peaks = get_peaks(sample_file, "area")
+        # Use peak height as an intensity value for Orbitrap, peak area for TOF
+        if instrument_type == "orbi":
+            peaks = get_peaks(sample_file, "height")
+        if instrument_type == "tof":
+            peaks = get_peaks(sample_file, "area")
 
         # Step 2: - Prepare data
         # init match df from target isotopes
