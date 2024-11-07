@@ -18,6 +18,8 @@ current_superuser = fastapi_users.current_user(
     active=True, superuser=True, get_enabled_backends=get_enabled_backends
 )
 
+get_current_user_token = fastapi_users.authenticator.current_user_token(active=True)
+
 
 # Dependency to check if the user is an admin
 async def admin_user(user: User = Depends(current_active_user)) -> User:

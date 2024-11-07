@@ -1,97 +1,44 @@
-"""
-User management service module for Mascope Server authentication.
-
-This module contains the `UserManager` class that handles user creation, password management, and
-user event hooks such as registration, password reset requests, email verification, etc.
-"""
-
-from typing import Optional
-
-from fastapi import Request
-from fastapi_users import BaseUserManager, IntegerIDMixin
-from fastapi_users import exceptions, models
-from mascope_server.api.new.auth.config import auth_settings
-from mascope_server.api.new.users.schemas import UserCreate
-from mascope_server.db.models import User
-
-from mascope_server.runtime import runtime
+from fastapi import HTTPException, status
+from sqlalchemy import select
+from mascope_server.db import async_session
+from mascope_server.db.models import AccessToken
+from mascope_server.api.new.auth.auth_backend import auth_backend_access_token
 
 
-class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
+async def generate_access_token(user, strategy):
     """
-    Responsible for managing user-related operations, including registration,
-    password reset, email verification, and token management, etc.
+    Generates an access token for the specified user.
 
-    This class extends the FastAPI Users `BaseUserManager` and adds custom logic for handling
-    user management in the Mascope server. See BaseUserManager for more examples.
-
-    :param IntegerIDMixin: Mixin for managing users with integer-based IDs.
-    :param BaseUserManager: FastAPI Users' base user manager with core user handling logic.
-    :raises exceptions.UserAlreadyExists: Raised when trying to create a user that already exists.
-    :return: Instance of a newly created or managed user.
-    :rtype: models.UP
+    This function uses the access token authentication backend to log the user in
+    and return an access token, which is stored in the database.
     """
+    response = await auth_backend_access_token.login(strategy, user)
+    return response
 
-    reset_password_token_secret = auth_settings.RESET_PASSWORD_TOKEN_SECRET
-    reset_password_token_lifetime_seconds = (
-        auth_settings.RESET_PASSWORD_TOKEN_LIFETIME_SECONDS
-    )
-    reset_password_token_audience = auth_settings.RESET_PASSWORD_TOKEN_AUDIENCE
-    verification_token_secret = auth_settings.VERIFICATION_TOKEN_SECRET
-    verification_token_lifetime_seconds = (
-        auth_settings.VERIFICATION_TOKEN_LIFETIME_SECONDS
-    )
-    verification_token_audience = auth_settings.VERIFICATION_TOKEN_AUDIENCE
 
-    async def on_after_register(self, user: User, request: Optional[Request] = None):
-        runtime.logger.info(f"User {user.username} has registered.")
+async def remove_access_tokens(user, strategy):
+    """
+    Removes all access tokens associated with the specified user.
 
-    async def on_after_forgot_password(
-        self, user: User, token: str, request: Optional[Request] = None
-    ):
-        print(f"User {user.id} has forgot their password. Reset token: {token}")
-
-    async def on_after_request_verify(
-        self, user: User, token: str, request: Optional[Request] = None
-    ):
-        print(f"Verification requested for user {user.id}. Verification token: {token}")
-
-    async def create(
-        self,
-        user_create: UserCreate,
-        safe: bool = False,
-        request: Optional[Request] = None,
-    ) -> models.UP:
-        """
-        Create a user in database.
-
-        Triggers the on_after_register handler on success.
-
-        :param user_create: The UserCreate model to create.
-        :param safe: If True, sensitive values like is_superuser or is_verified
-        will be ignored during the creation, defaults to False.
-        :param request: Optional FastAPI request that
-        triggered the operation, defaults to None.
-        :raises UserAlreadyExists: A user already exists with the same e-mail.
-        :return: A new user.
-        """
-        await self.validate_password(user_create.password, user_create)
-
-        existing_user = await self.user_db.get_by_email(user_create.email)
-        if existing_user is not None:
-            raise exceptions.UserAlreadyExists()
-
-        user_dict = (
-            user_create.create_update_dict()
-            if safe
-            else user_create.create_update_dict_superuser()
+    This function retrieves all access tokens linked to the user and then logs out
+    each token using the access token authentication backend. If no tokens are found,
+    an HTTP 404 error is raised.
+    """
+    async with async_session() as session:
+        # Query all access tokens associated with the user
+        tokens_query = await session.execute(
+            select(AccessToken).where(AccessToken.user_id == user.id)
         )
-        password = user_dict.pop("password")
-        user_dict["hashed_password"] = self.password_helper.hash(password)
-        user_dict["role_id"] = 1
+        tokens = tokens_query.scalars().all()
 
-        created_user = await self.user_db.create(user_dict)
+        if not tokens:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No access tokens found for the current user.",
+            )
 
-        await self.on_after_register(created_user, request)
+        # Use the backend logout to destroy each token
+        for token in tokens:
+            await auth_backend_access_token.logout(strategy, user, token.token)
 
-        return created_user
+    return {"message": f"All access tokens for user {user.username} have been removed."}
