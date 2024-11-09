@@ -112,4 +112,5 @@ class SampleItemProcessBody(BaseModel):
     sample_item: SampleItemCreate = Field(
         ..., description="Sample item to be processed (created, calibrated, matched)"
     )
+    method_file: str = Field(..., description="The methodfile to use for this sample")
     mz_calibration_params: MzCalibrationParams = MzCalibrationParams()

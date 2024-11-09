@@ -43,6 +43,9 @@ class SampleFileCreate(SampleFileBase):
 class SampleFileUpdate(BaseModel):
     filename: str = Field(..., description="Name of the sample file")
     instrument: str = Field(..., description="Instrument associated with the file")
+    method_file: Optional[str] = Field(
+        None, description="The method file associated with the file"
+    )
     datetime: dt = Field(
         ..., description="Datetime (local) of creation of the sample file"
     )
@@ -51,8 +54,8 @@ class SampleFileUpdate(BaseModel):
     )
     length: float = Field(..., description="Length of the sample file")
     range: List[float] = Field(..., description="m/z range of the sample file")
-    mz_calibration: Dict = Field(
-        ..., description="m/z calibration function parameters of the sample file"
+    mz_calibration: Optional[Dict] = Field(
+        None, description="m/z calibration function parameters of the sample file"
     )
     tic: float = Field(..., description="TIC of the sample file")
     polarity: str = Field("", description="Polarity of the sample file")

@@ -16,6 +16,9 @@ from mascope_server.api.models.instrument_functions.instrument_function_pydantic
 )
 from mascope_lib.instrument_functions import fit_instrument_functions
 from mascope_lib.file_func import get_instrument_type
+from mascope_server.api.controllers.sample.lib.sample_file_fetch import (
+    fetch_sample_file,
+)
 
 
 @api_controller()
@@ -84,6 +87,26 @@ async def get_instrument_functions(
 
 
 @api_controller()
+async def get_method_files(filename: str):
+    sample_file = await fetch_sample_file(filename)
+    async with async_session() as session:
+        method_files = [
+            i[0]
+            for i in (
+                await session.execute(
+                    select(InstrumentFunction.method_file)
+                    .where(
+                        InstrumentFunction.instrument == sample_file.instrument,
+                        InstrumentFunction.datetime_utc <= sample_file.datetime_utc,
+                    )
+                    .distinct()
+                )
+            )
+        ]
+        return {"data": method_files}
+
+
+@api_controller()
 async def get_instrument_function(
     filename: str = None, instrument_function_id: str = None
 ) -> dict:
@@ -126,12 +149,24 @@ async def get_instrument_function(
                 )
 
             stmt = (
-                select(InstrumentFunction)
-                .filter(
-                    InstrumentFunction.instrument == sample_file.instrument,
-                    InstrumentFunction.datetime_utc <= sample_file.datetime_utc,
+                (
+                    select(InstrumentFunction)
+                    .filter(
+                        InstrumentFunction.method_file == sample_file.method_file,
+                        InstrumentFunction.instrument == sample_file.instrument,
+                        InstrumentFunction.datetime_utc <= sample_file.datetime_utc,
+                    )
+                    .order_by(desc(InstrumentFunction.datetime_utc))
                 )
-                .order_by(desc(InstrumentFunction.datetime_utc))
+                if sample_file.method_file
+                else (
+                    select(InstrumentFunction)
+                    .filter(
+                        InstrumentFunction.instrument == sample_file.instrument,
+                        InstrumentFunction.datetime_utc <= sample_file.datetime_utc,
+                    )
+                    .order_by(desc(InstrumentFunction.datetime_utc))
+                )
             )
         elif instrument_function_id:
             # Fetch instrument function by ID
@@ -213,9 +248,10 @@ async def delete_instrument_function(instrument_function_id: str):
         await session.commit()
 
 
-@api_controller
+@api_controller()
 async def instrument_functions_fit(
-    sample_file: SampleFile, params: InstrumentFunctionFitParams
+    sample_file: SampleFile,
+    params: InstrumentFunctionFitParams = InstrumentFunctionFitParams(),
 ) -> dict:
     """Fit instrument functions for the sample file.
 
@@ -255,13 +291,18 @@ async def instrument_functions_fit(
         resolution_function = [partial_coefficients["a"]]
 
     instrument_function_data = InstrumentFunctionCreateBody(
+        method_file="temporary",  # removed on return
         instrument=sample_file.instrument,
-        method_file=sample_file.method_file,
         datetime_utc=sample_file.datetime_utc,
         peakshape=peakshape,
         resolution_function=resolution_function,
     )
 
     return {
-        "data": {"instrument_functions": instrument_function_data, "statistics": stats}
+        "data": {
+            "instrument_functions": instrument_function_data.model_dump(
+                exclude="method_file"
+            ),
+            "statistics": stats,
+        }
     }

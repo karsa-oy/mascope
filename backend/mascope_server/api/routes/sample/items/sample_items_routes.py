@@ -111,6 +111,7 @@ async def process_sample_item_route(
     background_tasks.add_task(
         process_sample_item,
         sample_item=body.sample_item,
+        method_file=body.method_file,
         mz_calibration_params=body.mz_calibration_params,
         independent_transaction=True,
         sid=sid,
