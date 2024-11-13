@@ -96,10 +96,7 @@ async def compute_match_isotopes(
         # Step 1: - Load or detect peaks
         # Find peaks and write to file
         u_list = list(np.unique(np.round(target_isotopes_df.mz)))
-        # Check if instrument functions were passed
-        if instrument_functions is None:
-            instrument_functions = await read_instrument_functions(filename)
-        instrument_type = get_instrument_type(filename)
+
         # Assign peak fitting threshold depending on the instrument type
         # Correct intrument type unsured by get_instrument_type
         if instrument_type == "orbi":
