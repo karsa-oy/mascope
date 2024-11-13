@@ -32,7 +32,6 @@ from mascope_server.api.controllers.calibration.calibration_controller import (
 from mascope_server.api.controllers.samples.samples_controller import get_sample
 from mascope_server.api.controllers.sample.files.sample_files_controller import (
     update_sample_file,
-    get_sample_files,
 )
 from mascope_server.api.controllers.sample.lib.sample_file_fetch import (
     fetch_sample_file,
@@ -57,7 +56,7 @@ from mascope_server.api.lib.notifications.api_notification import (
     emit_user_notification,
 )
 from mascope_server.api.controllers.instrument_functions.instrument_functions_controller import (
-    get_instrument_functions,
+    get_instrument_function,
     instrument_functions_fit,
     create_instrument_function,
 )
@@ -512,15 +511,22 @@ async def process_sample_item(
     sample_file = await fetch_sample_file(filename=sample_item.filename)
 
     # Step 2: Create instrument function if its missing (for measurement mode)
-    instrument_functions = await get_instrument_functions(method_file=method_file)
-    if not instrument_functions:
+    try:
+        instrument_function = await get_instrument_function(
+            filename=sample_item.filename
+        )
+    except NotFoundException:
+        ...
+    if not instrument_function:
         # fit to the file
         new_instrument_function = (
             await instrument_functions_fit(sample_file=sample_file)
-        ).data.instrument_functions
+        ).data.instrument_functions.model_dump()
         # create instrument function record
         new_instrument_function["method_file"] = method_file
-        await create_instrument_function(new_instrument_function)
+        instrument_function_id = (
+            await create_instrument_function(new_instrument_function)
+        ).data["instrument_function_id"]
         # notify the user
         notification = UserNotification(
             process_id=gen_id(8),
@@ -535,11 +541,18 @@ async def process_sample_item(
         await emit_user_notification(
             notification, sample_file.instrument
         )  # is this the right room?
+    else:
+        instrument_function_id = instrument_function["instrument_function_id"]
 
     # Step 3: Update the sample file's method file
+    sample_file_fields = {
+        **sample_file.to_dict(),
+        "method_file": method_file,
+        "instrument_function_id": instrument_function_id,
+    }
     await update_sample_file(
         sample_file.sample_file_id,
-        SampleFileUpdate(**{**sample_file.to_dict(), "method_file": method_file}),
+        SampleFileUpdate(**sample_file_fields),
     )
 
     # Step 4: Create the sample item

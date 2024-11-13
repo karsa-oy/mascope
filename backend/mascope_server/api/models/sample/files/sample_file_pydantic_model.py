@@ -46,6 +46,9 @@ class SampleFileUpdate(BaseModel):
     method_file: Optional[str] = Field(
         None, description="The method file associated with the file"
     )
+    instrument_function_id: Optional[str] = Field(
+        None, description="The ID of the instrument function associated with the file"
+    )
     datetime: dt = Field(
         ..., description="Datetime (local) of creation of the sample file"
     )

@@ -61,12 +61,8 @@ class PeakShape(BaseModel):
     )
 
 
-class InstrumentFunctionCreateBody(BaseModel):
+class InstrumentFunctionBase(BaseModel):
     instrument: str = Field(..., description="Instrument name")
-    method_file: str = Field(
-        ...,
-        description="Name of the method file associated with the instrument function. Must start with the date in YYYYMMDD format.",
-    )
     datetime_utc: datetime = Field(
         ...,
         description="UTC timestamp from which onwards the specified instrument functions are applied, until new instrument functions are generated.",
@@ -75,6 +71,13 @@ class InstrumentFunctionCreateBody(BaseModel):
     resolution_function: List[float] = Field(
         ...,
         description="Parameters defining the resolution function, which is used to scale the width of peaks accurately during peak fitting.",
+    )
+
+
+class InstrumentFunctionCreateBody(InstrumentFunctionBase):
+    method_file: str = Field(
+        ...,
+        description="Name of the method file associated with the instrument function. Must start with the date in YYYYMMDD format.",
     )
 
 

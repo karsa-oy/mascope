@@ -11,6 +11,7 @@ from mascope_server.api.lib.api_features import api_controller
 from mascope_server.api.lib.exceptions.api_exceptions import NotFoundException
 from mascope_server.api.models.instrument_functions.instrument_function_pydantic_model import (
     InstrumentFunctionCreateBody,
+    InstrumentFunctionBase,
     PeakShape,
     InstrumentFunctionFitParams,
 )
@@ -88,6 +89,13 @@ async def get_instrument_functions(
 
 @api_controller()
 async def get_method_files(filename: str):
+    """
+    Retrieves valid method files for a file by its filename, filtering by
+    both instrument and datetime utc.
+
+    :param filename: The filename for which to retrieve method files
+    :return: A list of method file names
+    """
     sample_file = await fetch_sample_file(filename)
     async with async_session() as session:
         method_files = [
@@ -115,7 +123,8 @@ async def get_instrument_function(
 
     Steps:
     1. Validate input parameters to ensure that either a filename or an instrument_function_id is provided, but not both.
-    2. If a filename is provided, construct a query to fetch the latest instrument function for the instrument associated with the filename, as of the file's creation date and time. If an instrument_function_id is provided, construct a query to fetch the instrument function directly by its ID.
+    2A. If a filename is provided, construct a query to fetch the latest valid instrument function, filtering by method file is the sample file has one set.
+    2B. If an instrument_function_id is provided, construct a query to fetch the instrument function directly by its ID.
     3. Execute the query and fetch the result.
     4. Check if the instrument function exists. If not, raise a NotFoundException with an appropriate message based on the provided parameters.
     5. Return the instrument function's details as a dictionary, including relevant fields such as resolution, peak shape parameters, etc.
@@ -139,7 +148,7 @@ async def get_instrument_function(
 
         # Step 2: Construct query based on parameters
         if filename:
-            # Fetch instrument function by filename
+            # 2A: Fetch instrument function by filename
             stmt = select(SampleFile).filter(SampleFile.filename == filename)
             results = await session.execute(stmt)
             sample_file = results.scalars().first()
@@ -169,7 +178,7 @@ async def get_instrument_function(
                 )
             )
         elif instrument_function_id:
-            # Fetch instrument function by ID
+            # 2B: Fetch instrument function by ID
             stmt = select(InstrumentFunction).filter(
                 InstrumentFunction.instrument_function_id == instrument_function_id
             )
@@ -290,8 +299,7 @@ async def instrument_functions_fit(
     else:
         resolution_function = [partial_coefficients["a"]]
 
-    instrument_function_data = InstrumentFunctionCreateBody(
-        method_file="temporary",  # removed on return
+    instrument_function_data = InstrumentFunctionBase(
         instrument=sample_file.instrument,
         datetime_utc=sample_file.datetime_utc,
         peakshape=peakshape,
@@ -300,9 +308,7 @@ async def instrument_functions_fit(
 
     return {
         "data": {
-            "instrument_functions": instrument_function_data.model_dump(
-                exclude="method_file"
-            ),
+            "instrument_functions": instrument_function_data,
             "statistics": stats,
         }
     }
