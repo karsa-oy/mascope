@@ -23,11 +23,11 @@ const visible = defineModel('visible')
 
 const add = reactive({
   mechanism: '',
-  reagent: ''
+  reagent: null
 })
 const resetFields = () => {
   add.mechanism = ''
-  add.reagent = ''
+  add.reagent = null
 }
 
 const polarity = computed(() => add.mechanism.trim().slice(-1))
@@ -77,10 +77,12 @@ watch(
             app.data.mechanism.create({
               ionization_mechanism_polarity: polarity,
               ionization_mechanism: add.mechanism.trim(),
-              reagent: add.reagent.trim()
+              reagent: add.reagent?.trim() || null
             })
         "
-        :disabled="(!add.mechanism.trim() && !add.reagent.trim()) || !polarityValid"
+        :disabled="
+          (!add.mechanism.trim() && !(add.reagent && add.reagent.trim())) || !polarityValid
+        "
       />
     </menu>
     <section style="margin: 1rem 0">
