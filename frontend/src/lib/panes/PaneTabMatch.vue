@@ -12,12 +12,14 @@ const app = useApp()
 
 const compound = computed(() =>
   app.data.match.compound.list.find(
-    ({ target_compound_id }) => target_compound_id == app.data.match.visualized.ion?.target_compound_id
+    ({ target_compound_id }) =>
+      target_compound_id == app.data.match.visualized.ion?.target_compound_id
   )
 )
 
 const settings = reactive({
-  intensityScale: null
+  intensityScale: null,
+  yMode: 'sum'
 })
 </script>
 
@@ -40,7 +42,10 @@ const settings = reactive({
       <ChartMatchTimeseries />
       <div class="row match-tools">
         <ToolbarFilterIon />
-        <ToolbarMatchCharts v-model:scale="settings.intensityScale" />
+        <ToolbarMatchCharts
+          v-model:scale="settings.intensityScale"
+          v-model:yMode="settings.yMode"
+        />
         <ToolbarMatchRating />
       </div>
     </ScrollPanel>
