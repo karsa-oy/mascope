@@ -1,14 +1,14 @@
-import { defineModule } from "./lib/module";
+import { defineModule } from './lib/module'
 
-import { api } from "@/api";
+import { api } from '@/api'
 
 export const useInstrument = defineModule({
-  name: "instrument",
-  key: "instrument",
+  name: 'instrument',
+  key: 'instrument',
   subscribe: true,
   load: async () =>
     await api.http.get(`/instruments`, {
-      use: "read",
-      type: "load_instruments",
-    }),
-});
+      use: 'read',
+      type: 'load_instruments'
+    })
+})
