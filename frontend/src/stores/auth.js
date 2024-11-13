@@ -12,12 +12,15 @@ export const useAuth = defineStore('app.auth', () => {
 
   const identify = async () => {
     try {
-      user.value =
-        (
-          await api.http.get('/users/me', {
-            type: 'identify_user'
-          })
-        )?.data ?? false
+      const response = await api.http.get('/users/me', {
+        type: 'identify_user',
+        validateStatus: (status) => status < 500
+      })
+      if (response.status == 200) {
+        user.value = response.data
+      } else {
+        user.value = false
+      }
     } catch (e) {
       user.value = false
     }
@@ -25,18 +28,34 @@ export const useAuth = defineStore('app.auth', () => {
 
   const signup = async ({ username, email, password }) => {
     try {
-      const { status } = await api.http.post(
+      const { status, data, message } = await api.http.post(
         `/auth/register`,
         {
           email,
           password,
           username
         },
-        { type: 'register_user' }
+        {
+          type: 'register_user',
+          validateStatus: (status) => status < 500
+        }
       )
       if (status == 201) {
         return {
           status: 'success'
+        }
+      } else if (status == 400) {
+        const userMessage =
+          data.detail == 'REGISTER_USER_ALREADY_EXISTS'
+            ? 'a user with this email already exists; please use a different email.'
+            : message
+        ui.notification.push({
+          type: 'user_signup',
+          status: 'error',
+          message: `Signup failed: ${userMessage}`
+        })
+        return {
+          status: 'failure'
         }
       } else {
         return {
@@ -44,19 +63,9 @@ export const useAuth = defineStore('app.auth', () => {
         }
       }
     } catch (e) {
-      const message =
-        e.message == 'REGISTER_USER_ALREADY_EXISTS'
-          ? 'a user with this email already exists; please use a different email.'
-          : e.message
-      ui.notification.push({
-        type: 'user_signup',
-        status: 'error',
-        message: `Failed to sign up: ${message}`
-      })
       return {
         status: 'failure',
-        email,
-        message
+        email
       }
     }
   }
