@@ -28,14 +28,22 @@ const traces = computed(() => {
   // Scale trace y-values based on "sum / average" toggle
   if (app.data.sample.selected.length != 1) return []
   const sampleLength = app.data.sample.selected[0].length
-  return yMode.value == 'sum'
-    ? data.traces
-    : data.traces.map(function (trace) {
-        // Scale chart traces by dividing all y-values by sampleLength
-        const new_trace = structuredClone(toRaw(trace))
-        new_trace.y = trace.y.map((value) => value / sampleLength)
-        return new_trace
-      })
+  const newTraces =
+    yMode.value == 'sum'
+      ? data.traces
+      : data.traces.map(function (trace) {
+          // Scale chart traces by dividing all y-values by sampleLength
+          let newTrace = structuredClone(toRaw(trace))
+          newTrace.y = trace.y.map((value) => value / sampleLength)
+          // For peak traces, scale "customdata" containing [height, area]
+          if (newTrace.name == 'Peak') {
+            newTrace.customdata = trace.customdata.map(function (subarr) {
+              return subarr.map((value) => value / sampleLength)
+            })
+          }
+          return newTrace
+        })
+  return newTraces
 })
 
 const layout = computed(() => ({

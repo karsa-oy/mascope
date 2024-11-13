@@ -49,28 +49,34 @@ export const useChartData = defineStore('chart.sample.spectrum', () => {
     if (data) {
       traces.value = peaks
         .map(({ mz, height, area }) => ({
-          name: '',
+          name: 'Peak',
           type: 'scatter',
           mode: 'lines',
           line: {
             color: 'grey'
           },
-          x: [...Array(5).keys()].map(() => mz), // *
-          y: [...Array(5).keys()].map((index) => height * (index / 4)), // *
-          hovertemplate: [
-            '<i>Peak</i>',
-            `mz: <b>${mz.toFixed(4)}</b>`,
-            `height: <b>${height.toExponential(3)}</b>`,
-            `area: <b>${area.toExponential(3)}</b>`
-          ].join('<br>')
+          x: [...Array(3).keys()].map(() => mz), // *
+          y: [...Array(3).keys()].map((index) => height * (index / 2)), // *
+          customdata: [...Array(3).keys()].map(() => [height, area]), // **
+          hovertemplate:
+            [
+              '<i>Peak</i>',
+              `mz: <b>${mz.toFixed(4)}</b>`,
+              `height: <b>%{customdata[0]:.3e}</b>`,
+              `area: <b>%{customdata[1]:.3e}</b>`
+            ].join('<br>') + '<extra></extra>'
           // * Plotly's hover tooltip only appears
           // when hovering near a point, so we
-          // generate 5 points to make it easy
+          // generate 3 points to make it easy
           // for the user to trigger the tooltop
           // along the whole marker line.
+
+          // ** Add [height, area] into "customdata" to enable
+          // access in ChartSampleSpectrum when scaling for
+          // "average" instead of "sum".
         }))
         .concat({
-          name: '',
+          name: 'Signal',
           line: {
             color: 'rgb(252, 79, 48)'
           },
@@ -78,9 +84,9 @@ export const useChartData = defineStore('chart.sample.spectrum', () => {
           type: 'scatter',
           x: new Float32Array(data.mz),
           y: new Float32Array(data.intensity),
-          hovertemplate: ['<i>Signal</i>', 'mz: <b>%{x:.4f}</b>', 'height: <b>%{y:.3e}</b>'].join(
-            '<br>'
-          )
+          hovertemplate:
+            ['<i>Signal</i>', 'm/z: <b>%{x:.4f}</b>', `intensity: <b>%{y:.3e}</b>`].join('<br>') +
+            '<extra></extra>'
         })
       unit.value = data.intensity_unit
       length.value = data.intensity.length
