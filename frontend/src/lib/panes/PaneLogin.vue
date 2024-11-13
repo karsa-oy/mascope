@@ -24,7 +24,6 @@ const invalid = computed(() => ({
 const disabled = computed(() => invalid.value.email || invalid.value.password)
 </script>
 
-
 <template>
   <div class="fields" style="flex-flow: column">
     <FloatLabel>
@@ -44,11 +43,13 @@ const disabled = computed(() => invalid.value.email || invalid.value.password)
         :invalid="input.password && invalid.password"
         fluid
         required
-        @keyup.enter="() => {
-          if (!disabled) {
-            auth.login(input)
+        @keyup.enter="
+          () => {
+            if (!disabled) {
+              auth.login(input)
+            }
           }
-        }"
+        "
       />
       <label for="login-password">Password</label>
     </FloatLabel>
@@ -57,7 +58,7 @@ const disabled = computed(() => invalid.value.email || invalid.value.password)
       label="Login"
       icon="pi pi-sign-in"
       :disabled="disabled"
-      style="margin-top: 2rem;"
+      style="margin-top: 2rem"
     />
   </div>
 </template>

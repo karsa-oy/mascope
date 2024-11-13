@@ -26,23 +26,23 @@ const popover = ref()
   />
   <Popover ref="popover">
     <menu>
-      <h4>{{app.auth.user.username}}</h4>
-      <i>{{app.auth.user.email }}</i>
-      <Button label="Logout" @click="app.auth.logout"/>
+      <h4>{{ app.auth.user.username }}</h4>
+      <i>{{ app.auth.user.email }}</i>
+      <Button label="Logout" @click="app.auth.logout" />
     </menu>
   </Popover>
 </template>
 
 <style scoped>
-  menu {
-    display: flex;
-    flex-flow: column;
-    justify-content: flex-end;
-    text-align: right;
-    gap: 1rem;
-    padding: 0.5rem;
-  }
-  menu > :deep(*) {
-    margin: 0;
-  }
+menu {
+  display: flex;
+  flex-flow: column;
+  justify-content: flex-end;
+  text-align: right;
+  gap: 1rem;
+  padding: 0.5rem;
+}
+menu > :deep(*) {
+  margin: 0;
+}
 </style>

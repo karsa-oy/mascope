@@ -413,7 +413,7 @@ watch(
   async (focusedSample) => {
     if (!focusedSample) {
       // If no sample is focused, unset the match visualization
-      return app.data.match.visualized.unset({ 
+      return app.data.match.visualized.unset({
         cacheTarget: true
       })
     }
@@ -424,10 +424,8 @@ watch(
 
     if (app.data.match.visualized.ion) {
       // match visualized
-      ({ 
-        target_ion_id: ionId, 
-        target_collection_id: collectionId 
-      } = app.data.match.visualized.ion)
+      ;({ target_ion_id: ionId, target_collection_id: collectionId } =
+        app.data.match.visualized.ion)
     } else if (app.data.match.ion.focused) {
       // no match visualized but match ion focused
       ionId = app.data.match.ion.focusedId

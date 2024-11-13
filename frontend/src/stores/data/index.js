@@ -45,5 +45,5 @@ export const useData = () => ({
     visualized: useMatchVisualized()
   },
   // nonstandard
-  acquisition: useAcquisition(),
+  acquisition: useAcquisition()
 })

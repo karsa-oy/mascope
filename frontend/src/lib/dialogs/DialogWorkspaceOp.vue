@@ -19,7 +19,7 @@ const props = defineProps({
 })
 
 const original = computed(() =>
-  action.value == 'create' ? null : app.data.workspace.focused ?? props.workspace
+  action.value == 'create' ? null : (app.data.workspace.focused ?? props.workspace)
 )
 
 const info = reactive({

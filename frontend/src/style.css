@@ -40,7 +40,7 @@
     opacity: 0.75;
   }
 
-  .p-contextmenu-item-link>.pi {
+  .p-contextmenu-item-link > .pi {
     margin-right: 0.3rem;
   }
 
@@ -96,7 +96,7 @@
     margin: 0;
   }
 
-  .p-dialog menu>* {
+  .p-dialog menu > * {
     margin: 0;
   }
 
@@ -137,7 +137,7 @@
     font-size: small;
   }
 
-  .browser .p-datatable-row-expansion>td {
+  .browser .p-datatable-row-expansion > td {
     padding: 0 !important;
     padding-left: 1.5rem !important;
   }
@@ -172,7 +172,6 @@
     height: 15px;
     padding: 0;
   }
-
 
   /* chart */
 
@@ -221,11 +220,11 @@
     align-items: flex-start;
   }
 
-  .field> :deep(span) {
+  .field > :deep(span) {
     margin: 1rem 0 0.5rem 0;
   }
 
-  .field>small {
+  .field > small {
     margin-left: 0.3rem;
     max-width: 190px;
   }

@@ -278,7 +278,7 @@ function parseTimestamp(timestamp) {
       </div>
     </template>
     <template #center>
-      <BaseKarsaLogo/>
+      <BaseKarsaLogo />
     </template>
     <template #end>
       <div class="row">
@@ -328,7 +328,7 @@ function parseTimestamp(timestamp) {
               }
             "
           />
-          <PopoverUserMenu/>
+          <PopoverUserMenu />
         </div>
         <Drawer
           v-model:visible="app.ui.notification.drawer"
@@ -405,5 +405,4 @@ function parseTimestamp(timestamp) {
 :deep(.p-scrollpanel-content) {
   padding-bottom: 0.8rem;
 }
-
 </style>

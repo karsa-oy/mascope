@@ -1,73 +1,65 @@
 <script setup>
-import { ref, reactive, computed, watch, watchEffect } from "vue";
+import { ref, reactive, computed, watch, watchEffect } from 'vue'
 
-import Button from "primevue/button";
-import Select from "primevue/select";
-import DatePicker from "primevue/datepicker";
-import DataTable from "primevue/datatable";
-import Column from "primevue/column";
-import IconField from "primevue/iconfield";
-import InputIcon from "primevue/inputicon";
-import InputText from "primevue/inputtext";
-import FileUpload from "primevue/fileupload";
-import FloatLabel from "primevue/floatlabel";
+import Button from 'primevue/button'
+import Select from 'primevue/select'
+import DatePicker from 'primevue/datepicker'
+import DataTable from 'primevue/datatable'
+import Column from 'primevue/column'
+import IconField from 'primevue/iconfield'
+import InputIcon from 'primevue/inputicon'
+import InputText from 'primevue/inputtext'
+import FileUpload from 'primevue/fileupload'
+import FloatLabel from 'primevue/floatlabel'
 
-import { runtime } from "@/lib/runtime";
-import {
-  DialogSampleOp,
-  DialogBatchImport,
-  DialogFileUpload,
-} from "@/lib/dialogs";
+import { runtime } from '@/lib/runtime'
+import { DialogSampleOp, DialogBatchImport, DialogFileUpload } from '@/lib/dialogs'
 
-import { useApp } from "@/stores";
+import { useApp } from '@/stores'
 
 // TODO_configuration Default sample file upload params
-const FILE_UPLOAD_EXTENSIONS = [".h5", ".raw"];
+const FILE_UPLOAD_EXTENSIONS = ['.h5', '.raw']
 
-const app = useApp();
+const app = useApp()
 
 const props = defineProps({
   active: {
-    type: Boolean,
-  },
-});
+    type: Boolean
+  }
+})
 
 const dialog = reactive({
   sample: null,
-  batchImport: false,
-});
+  batchImport: false
+})
 
 const selected = reactive({
-  files: [],
-});
+  files: []
+})
 
-const search = ref("");
+const search = ref('')
 
 const acquisitions = computed(
   () =>
     app.data.acquisition.list?.filter(({ filename }) =>
-      filename.toLowerCase().includes(search.value.toLowerCase()),
-    ) ?? [],
-);
+      filename.toLowerCase().includes(search.value.toLowerCase())
+    ) ?? []
+)
 
-const uploadedFiles = ref([]);
+const uploadedFiles = ref([])
 
 watchEffect(() => {
-  if (
-    app.data.acquisition.pending.filename &&
-    app.data.acquisition.mode &&
-    props.active
-  ) {
-    dialog.sample = "create_pending";
+  if (app.data.acquisition.pending.filename && app.data.acquisition.mode && props.active) {
+    dialog.sample = 'create_pending'
   }
-});
+})
 watch(
   computed(() => app.data.acquisition.time),
   () => {
-    selected.files = [];
+    selected.files = []
   },
-  { deep: true },
-);
+  { deep: true }
+)
 </script>
 
 <template>
@@ -85,12 +77,7 @@ watch(
         <Select
           props.inputId="time"
           v-model="app.data.acquisition.time.mode"
-          :options="[
-            'Last 24 hours',
-            'Last 7 days',
-            'Last 30 days',
-            'Last 90 days',
-          ]"
+          :options="['Last 24 hours', 'Last 7 days', 'Last 30 days', 'Last 90 days']"
           style="flex-direction: row-reverse"
           :disabled="app.data.acquisition.mode"
           placeholder="Custom range"
@@ -103,10 +90,7 @@ watch(
             dateFormat="yy/mm/dd"
             showTime
             showIcon
-            :class="
-              'full ' +
-              (app.data.acquisition.time.mode == 'range' ? '' : 'inactive')
-            "
+            :class="'full ' + (app.data.acquisition.time.mode == 'range' ? '' : 'inactive')"
           />
         </FloatLabel>
         <FloatLabel>
@@ -117,10 +101,7 @@ watch(
             dateFormat="yy/mm/dd"
             showTime
             showIcon
-            :class="
-              'full ' +
-              (app.data.acquisition.time.mode == 'range' ? '' : 'inactive')
-            "
+            :class="'full ' + (app.data.acquisition.time.mode == 'range' ? '' : 'inactive')"
           />
         </FloatLabel>
         <FloatLabel>
@@ -129,18 +110,10 @@ watch(
             <InputIcon>
               <i class="pi pi-search" />
             </InputIcon>
-            <InputText
-              v-model="search"
-              placeholder="Search"
-              style="width: 100%"
-            />
+            <InputText v-model="search" placeholder="Search" style="width: 100%" />
           </IconField>
         </FloatLabel>
-        <Button
-          label="Upload"
-          icon="pi pi-file-arrow-up"
-          @click="chooseCallback"
-        />
+        <Button label="Upload" icon="pi pi-file-arrow-up" @click="chooseCallback" />
         <Button
           label="Process"
           icon="pi pi-file-plus"
@@ -152,9 +125,9 @@ watch(
           @click="
             () => {
               if (selected.files?.length == 1) {
-                dialog.sample = 'create';
+                dialog.sample = 'create'
               } else if (selected.files?.length > 1) {
-                dialog.batchImport = true;
+                dialog.batchImport = true
               }
             }
           "
@@ -187,23 +160,13 @@ watch(
         <template #paginatorend> <div style="min-width: 12ch" /> </template>
       </DataTable>
       <div v-else class="center" style="min-height: 150px">
-        <i class="info-line">
-          <span class="pi pi-inbox" /><span>No acquisitions found</span>
-        </i>
+        <i class="info-line"> <span class="pi pi-inbox" /><span>No acquisitions found</span> </i>
       </div>
-      <DialogSampleOp
-        v-model:action="dialog.sample"
-        :item="selected.files[0]"
-      />
-      <DialogBatchImport
-        v-model:visible="dialog.batchImport"
-        :files="selected.files"
-      />
+      <DialogSampleOp v-model:action="dialog.sample" :item="selected.files[0]" />
+      <DialogBatchImport v-model:visible="dialog.batchImport" :files="selected.files" />
       <DialogFileUpload :files="uploadedFiles" />
       <i class="info-line">
-        <span class="pi pi-file-arrow-up" /><span
-          >Drag sample files here to upload them</span
-        >
+        <span class="pi pi-file-arrow-up" /><span>Drag sample files here to upload them</span>
       </i>
     </template>
   </FileUpload>

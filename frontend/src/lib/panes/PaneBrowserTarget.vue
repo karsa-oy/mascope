@@ -200,7 +200,9 @@ function scrollTo(target) {
   if (!lock && target) {
     lock = true
     setTimeout(() => {
-      document.getElementById(target.match_key)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      document
+        .getElementById(target.match_key)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       lock = false
     }, 1000)
   }
@@ -280,10 +282,10 @@ watch(
   () => app.data.sample.focused,
   (sample) => {
     scrollTo(
-      app.data.match.isotope.focused
-      ?? app.data.match.ion.focused
-      ?? app.data.match.compound.focused
-      ?? app.data.match.collection.focused
+      app.data.match.isotope.focused ??
+        app.data.match.ion.focused ??
+        app.data.match.compound.focused ??
+        app.data.match.collection.focused
     )
   }
 )
