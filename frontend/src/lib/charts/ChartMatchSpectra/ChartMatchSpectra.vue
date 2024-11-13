@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, toRaw } from 'vue'
 
 import ScrollPanel from 'primevue/scrollpanel'
 import Tag from 'primevue/tag'
@@ -23,22 +23,39 @@ const { settings } = defineProps({
   }
 })
 
+const sampleLength = computed(() => {
+  return app.data.sample.selected.length != 1 ? null : app.data.sample.selected[0].length
+})
+
+const traces = computed(() => {
+  // Scale trace y-values based on "sum / average" toggle
+  if (sampleLength === null) return []
+  return settings.yMode == 'sum'
+    ? data.traces
+    : data.traces.map(function (trace) {
+        // Scale chart traces by dividing all y-values by sampleLength
+        let newTrace = structuredClone(toRaw(trace))
+        newTrace.y = trace.y.map((value) => value / sampleLength.value)
+        return newTrace
+      })
+})
+
 // transform raw visualiation data into seperate charts
 const isotopeCharts = computed(() => {
   // create an array corresponding to visualized isotopes
   return clone(app.data.match.visualized.isotopes).map((isotope) => {
     // split up the chart's traces by isotope
-    const start = data.traces?.findIndex(
+    const start = traces.value?.findIndex(
       (trace) => trace.target_isotope_id === isotope.target_isotope_id
     )
-    const nextStart = data.traces?.findIndex(
+    const nextStart = traces.value?.findIndex(
       ({ target_isotope_id }, index) => target_isotope_id && index > start
     )
     const end =
       nextStart !== -1 // if next isotope found
         ? nextStart // use it as the end of isotope trace data
-        : data.traces?.length // otherwise use all remaining data
-    const isotopeTraces = data.traces?.slice(start, end)
+        : traces?.length // otherwise use all remaining data
+    const isotopeTraces = traces.value?.slice(start, end)
     // compute match category for this isotope
     let match_category = 0
     if (isotope.match_score > app.data.match.params.current.possible_match_threshold) {
@@ -68,7 +85,7 @@ const scale = computed(
 // standard plotly layout
 const layout = computed(() => ({
   yaxis: {
-    title: `Signal intensity [${data?.unit}]`,
+    title: `Signal intensity [${data?.unit}${settings.yMode == 'sum' ? '' : '/s'}]`,
     gridcolor: '#33333399',
     rangemode: 'nonnegative',
     ...scale.value
@@ -145,7 +162,7 @@ watch(
           >
             <BaseMatchTag :row="isotopeChart" text />
             <Tag
-              :value="`Peak intensity: ${area.format(isotopeChart.sample_peak_area)}`"
+              :value="`Peak intensity: ${area.format(settings.yMode == 'sum' ? isotopeChart.sample_peak_area : isotopeChart.sample_peak_area / sampleLength)}`"
               :severity="
                 isotopeChart.sample_peak_area < app.data.match.params.current.peak_min_intensity
                   ? 'warn'
