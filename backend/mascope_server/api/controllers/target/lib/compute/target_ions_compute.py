@@ -93,7 +93,7 @@ def generate_target_ions_from_composition(
             target_ions.append(ion)
 
             # construct and save isotope rows
-            predicted_lines = IsoThreshold(formula=raw_ion.formula, threshold=0.1)
+            predicted_lines = IsoThreshold(formula=raw_ion.formula, threshold=0.01)
 
             # Extract masses and probabilities, correct masses for the electron charge
             masses = [

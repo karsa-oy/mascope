@@ -29,6 +29,7 @@ tqdm = "^4.66.4"
 voila = "^0.5.8"
 isospecpy = "^2.2.2"
 molmass = "^2024.10.25"
+fastapi-users = {extras = ["sqlalchemy"], version = "^14.0.0"}
 
 [tool.poetry.group.dev.dependencies]
 deptry = "^0.16"

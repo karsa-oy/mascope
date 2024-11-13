@@ -1,5 +1,7 @@
 import pandas as pd
 import numpy as np
+from functools import partial
+from typing import Optional
 from mascope_lib.file_func import get_instrument_type, get_sum_signal, load_file
 from mascope_lib.peak import calculate_signal_area, detect_peaks, get_peaks
 from mascope_lib.chemistry import match_mz
@@ -76,16 +78,27 @@ async def compute_match_isotopes(
     TODO min_isotope_abundance will be passed from the match_params
     """
     try:
+        # Check if instrument functions were passed
+        if instrument_functions is None:
+            instrument_functions = await read_instrument_functions(filename)
+        instrument_type = get_instrument_type(filename)
+
+        # Filter isotopes below threshold
         target_isotopes_df = target_isotopes_df[
             target_isotopes_df["relative_abundance"] >= min_isotope_abundance
         ].reset_index(drop=True)
+
+        # Leave only max isotope peaks among those within FWHM/2 distance from each other
+        target_isotopes_df = group_target_isotopes_df(
+            target_isotopes_df, instrument_functions[1]
+        )
 
         # Step 1: - Load or detect peaks
         # Find peaks and write to file
         u_list = list(np.unique(np.round(target_isotopes_df.mz)))
         # Check if instrument functions were passed
         if instrument_functions is None:
-            instrument_functions = await read_instrument_function(filename=filename)
+            instrument_functions = await read_instrument_functions(filename)
         instrument_type = get_instrument_type(filename)
         # Assign peak fitting threshold depending on the instrument type
         # Correct intrument type unsured by get_instrument_type
@@ -402,3 +415,78 @@ async def compute_and_create_sample_match_isotope_data(
     # Send progress user notificaton indicating completion of compute_and_create_sample_match_isotope_data process
     if notification:
         await send_progress_user_notification(notification, 0.95)
+
+
+# DATAFRAME EDITION
+def group_target_isotopes_df(
+    df: pd.DataFrame, resolution_function: partial, how: Optional[str] = "max"
+) -> pd.DataFrame:
+    """
+    Group target isotope m/z and relative abundance values in a DataFrame
+    to match instrument resolution, for each target_ion_id.
+
+    The width of the group/bin is defined as dmz = FWHM / 2 = m/z / resolution(mz) / 2.
+
+    :param df: DataFrame with columns "target_isotope_id", "target_ion_id", "mz", and "relative_abundance"
+    :type df: pd.DataFrame
+    :param resolution_function: Resolution function as R(mz)
+    :type resolution_function: partial
+    :param how:
+    :type how: str
+    :return: DataFrame with grouped "mz", "relative_abundance", and "target_isotope_id" values
+    :rtype: pd.DataFrame
+    """
+    # Initialize lists for grouped data
+    grouped_data = []
+
+    # Process each target_ion_id group independently
+    for target_ion_id, group_df in df.groupby("target_ion_id"):
+        mz = group_df["mz"].values
+        intensity = group_df["relative_abundance"].values
+        isotope_ids = group_df["target_isotope_id"].values
+
+        i = 0
+        while i < len(mz):
+            # Calculate bin width for the current m/z
+            dmz = mz[i] / resolution_function(mz[i]) / 2
+
+            # Determine bin limits
+            bin_mask = (mz >= mz[i]) & (mz < mz[i] + dmz)
+
+            # Extract values within the current bin
+            current_mz_bin = mz[bin_mask]
+            current_intensity_bin = intensity[bin_mask]
+            current_isotope_ids = isotope_ids[bin_mask]
+
+            # Identify the target_isotope_id with maximum intensity within the bin
+            max_intensity_idx = np.argmax(current_intensity_bin)
+            max_intensity_isotope_id = current_isotope_ids[max_intensity_idx]
+
+            if how == "max":
+                # Pick max peak from the bin
+                intensity_val = current_intensity_bin[max_intensity_idx]
+                mz_val = current_mz_bin[max_intensity_idx]
+            else:
+                # Sum intensity values for the group
+                intensity_val = np.sum(current_intensity_bin)
+
+                # Calculate center of mass for mz in the bin
+                mz_val = np.sum(current_mz_bin * current_intensity_bin) / intensity_val
+
+            # Append grouped data for the current bin
+            grouped_data.append(
+                {
+                    "target_isotope_id": max_intensity_isotope_id,
+                    "target_ion_id": target_ion_id,
+                    "mz": mz_val,
+                    "relative_abundance": intensity_val,
+                }
+            )
+
+            # Move to the next bin, skipping all processed values
+            i += np.sum(bin_mask)
+
+    # Convert grouped data into a DataFrame
+    grouped_df = pd.DataFrame(grouped_data)
+
+    return grouped_df
