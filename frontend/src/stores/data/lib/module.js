@@ -2,6 +2,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { defineStore } from 'pinia'
 
 import { api } from '@/api'
+import { useAuth } from '@/stores/auth'
 
 export const defineModule = ({
   name, // module name (snake_case)
@@ -172,10 +173,17 @@ export const defineModule = ({
     }
 
     // load on init
-    if (!parent) {
-      // root modules self init on mount
-      onMounted(() => reload())
-    } else {
+    onMounted(() => {
+      const auth = useAuth()
+      auth.onLogin(() => {
+        if (!parent) {
+          // root modules self init on mount
+          reload()
+        }
+      })
+    })
+
+    if (parent) {
       // child modules init with parent
       parent.register({ reload })
     }

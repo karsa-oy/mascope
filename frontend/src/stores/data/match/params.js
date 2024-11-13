@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 
 import { api } from '@/api'
 import { instrumentType } from '@/lib/utils'
+import { useAuth } from '@/stores/auth'
 
 import { useMatchVisualized } from './visualized'
 
@@ -11,13 +12,17 @@ export const useMatchParams = defineStore('app.data.match.params', () => {
 
   const defaults = ref()
 
-  api.http
-    .get('/params', {
-      type: 'read_params'
-    })
-    .then(({ data }) => {
-      defaults.value = data?.data?.params.match
-    })
+  const auth = useAuth()
+
+  auth.onLogin(() => {
+    api.http
+      .get('/params', {
+        type: 'read_params'
+      })
+      .then(({ data }) => {
+        defaults.value = data?.data?.params.match
+      })
+  })
 
   const type = ref()
   const current = ref()

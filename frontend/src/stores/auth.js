@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { defineStore } from 'pinia'
 
 import { api } from '@/api'
@@ -109,11 +109,29 @@ export const useAuth = defineStore('app.auth', () => {
     identify()
   }
 
+  // hooks
+
+  const handlers = ref([])
+
+  function onLogin(callback) {
+    handlers.value.push({ callback })
+  }
+
+  watch(
+    () => user.value,
+    (newUser, oldUser) => {
+      if (newUser && oldUser !== newUser) {
+        handlers.value.forEach(({ callback }) => callback())
+      }
+    }
+  )
+
   return {
     user,
     identify,
     signup,
     login,
-    logout
+    logout,
+    onLogin
   }
 })
