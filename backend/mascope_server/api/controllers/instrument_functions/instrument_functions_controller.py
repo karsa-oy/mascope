@@ -26,6 +26,7 @@ from mascope_server.api.controllers.sample.lib.sample_file_fetch import (
 async def get_instrument_functions(
     instrument: str = None,
     method_file: str = None,
+    datetime_utc: str = None,
     sort: str = None,
     order: str = None,
     page: int = 0,
@@ -44,6 +45,7 @@ async def get_instrument_functions(
 
     :param instrument: Filter by instrument name.
     :param method_file: Filter by method file name.
+    :param datetime_utc: Filter by datetime utc
     :param sort: Column name to sort by.
     :param order: Sorting order ('asc' for ascending, 'desc' for descending).
     :param page: Page number for pagination.
@@ -58,6 +60,8 @@ async def get_instrument_functions(
             stmt = stmt.filter(InstrumentFunction.instrument == instrument)
         if method_file:
             stmt = stmt.filter(InstrumentFunction.method_file == method_file)
+        if datetime_utc:
+            stmt = stmt.filter(InstrumentFunction.datetime_utc == datetime_utc)
 
         # Step 3: Apply sorting
         if sort:
@@ -204,6 +208,7 @@ async def create_instrument_function(
     Creates a new instrument function with the provided details.
 
     Steps:
+    1. Remove any conflicting instrument functions (with same method_file, instrument and datetime_utc)
     1. Construct a new InstrumentFunction object with the provided details and a generated unique ID.
     2. Add the new instrument function to the session and commit the changes to the database.
     3. Refresh the instance and return the details of the created instrument function as a dictionary.
@@ -213,18 +218,27 @@ async def create_instrument_function(
     :return: A dictionary containing the created instrument function data.
     :rtype: dict
     """
+    # Step 1: Delete conflicting instrument functions
+    deprecated_instrument_functions = await get_instrument_functions(
+        method_file=instrument_function_data.method_file,
+        instrument=instrument_function_data.instrument,
+        datetime_utc=instrument_function_data.datetime_utc,
+    )
+    for instrument_function in deprecated_instrument_functions["data"]:
+        await delete_instrument_function(instrument_function["instrument_function_id"])
+
     async with async_session() as session:
-        # Step 1: Construct new instrument function
+        # Step 2: Construct new instrument function
         new_instrument_function = InstrumentFunction(
             instrument_function_id=gen_id(32),
             **instrument_function_data.model_dump(),  # Unpack the Pydantic model's data
         )
 
-        # Step 2: Add to session and commit the changes to the database
+        # Step 3: Add to session and commit the changes to the database
         session.add(new_instrument_function)
         await session.commit()
 
-        # Step 3: Refresh the instance and return created instrument function
+        # Step 4: Refresh the instance and return created instrument function
         await session.refresh(new_instrument_function)
         return {"data": new_instrument_function.to_dict()}
 
