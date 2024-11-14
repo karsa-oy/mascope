@@ -76,7 +76,7 @@ const count = computed(() => ({
 }))
 
 const validInstrumentName = (name) => {
-  const re = new RegExp('^[a-zA-Z]+\w*$')
+  const re = new RegExp('^[a-zA-Z]+[0-9]*$')
   return re.test(name)
 }
 
@@ -135,7 +135,7 @@ const upload = () => {
       <p>
         <i>
           Valid TOF instrument names must include the word TOF or API (in lower or upper case) and
-          consist only of letters, numbers and underscores _.
+          consist only of letters and (optionally) numerical suffixes.
         </i>
       </p>
       <p>Please select or enter an instrument to assign these files to:</p>
@@ -185,7 +185,7 @@ const upload = () => {
       <p>
         <i>
           Valid OrbiTrap instrument names must include the word ORBI (in lower or upper case) and
-          consist only of letters, numbers and underscores _.
+          consist only of letters and (optionally) numerical suffixes.
         </i>
       </p>
       <p>Please select or enter an instrument to assign these files to:</p>
