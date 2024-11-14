@@ -41,8 +41,7 @@ const tabs = computed(() => [
   },
   {
     label: 'Acquisitions',
-    icon: 'pi pi-hourglass',
-    disabled: !app.data.instrument.focused
+    icon: 'pi pi-hourglass'
   }
 ])
 
@@ -128,10 +127,7 @@ watch(
                 <PaneTabMatch v-if="app.data.match.visualized.ion" />
               </TabPanel>
               <TabPanel value="acquisitions">
-                <PaneTabAcquisitions
-                  v-if="app.data.instrument.focused"
-                  :active="app.ui.tab.active == 'acquisitions'"
-                />
+                <PaneTabAcquisitions :active="app.ui.tab.active == 'acquisitions'" />
               </TabPanel>
             </TabPanels>
           </Tabs>
