@@ -37,7 +37,7 @@ from mascope_server.runtime import runtime
 
 # TODO_configuration
 # Default Filter Parameters
-DEFAULT_MIN_ISOTOPE_ABUNDANCE = 0.15
+DEFAULT_MIN_ISOTOPE_ABUNDANCE = 0.05
 
 # -------------------------------------------------------------------
 # Isotope level
@@ -417,7 +417,6 @@ async def compute_and_create_sample_match_isotope_data(
         await send_progress_user_notification(notification, 0.95)
 
 
-# DATAFRAME EDITION
 def group_target_isotopes_df(
     df: pd.DataFrame, resolution_function: partial, how: Optional[str] = "max"
 ) -> pd.DataFrame:

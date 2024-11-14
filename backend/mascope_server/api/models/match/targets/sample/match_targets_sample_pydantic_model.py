@@ -3,7 +3,7 @@ from pydantic import Field
 from mascope_server.api.models.base_pydantic_model import QueryParamsModel
 
 # TODO_configuration Default Filter Parameters
-DEFAULT_MIN_ISOTOPE_ABUNDANCE = 0.15
+DEFAULT_MIN_ISOTOPE_ABUNDANCE = 0.05
 
 
 class SortingPaginationQueryParams(QueryParamsModel):
