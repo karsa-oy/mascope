@@ -10,7 +10,10 @@ import ProgressSpinner from 'primevue/progressspinner'
 import Button from 'primevue/button'
 
 import { api } from '@/api'
+import { useApp } from '@/stores'
 import { BaseParamField } from '@/lib/base'
+
+const app = useApp()
 
 const props = defineProps({
   filename: {
@@ -49,7 +52,7 @@ api.http
 watchEffect(async () => {
   if (threshold.value !== undefined) {
     loading.value = true
-    fit.value = await api.http.post(
+    await api.http.post(
       `/instrument_functions/fit`,
       {
         filename: props.filename,
@@ -58,12 +61,16 @@ watchEffect(async () => {
         }
       },
       {
-        use: 'read',
+        use: 'process',
         type: 'fit_instrument_function'
       }
     )
-    loading.value = false
   }
+})
+
+app.ui.notification.on('instrument_functions_fit', ({ data }) => {
+  fit.value = data
+  loading.value = false
 })
 
 // charts

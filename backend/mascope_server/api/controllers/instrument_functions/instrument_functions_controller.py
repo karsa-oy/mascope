@@ -7,7 +7,10 @@ from sqlalchemy import (
 from mascope_server.db.id import gen_id
 from mascope_server.db import async_session
 from mascope_server.db.models import SampleFile, InstrumentFunction
-from mascope_server.api.lib.api_features import api_controller
+from mascope_server.api.lib.api_features import (
+    api_controller,
+    api_controller_background_task,
+)
 from mascope_server.api.lib.exceptions.api_exceptions import NotFoundException
 from mascope_server.api.models.instrument_functions.instrument_function_pydantic_model import (
     InstrumentFunctionCreateBody,
@@ -271,10 +274,16 @@ async def delete_instrument_function(instrument_function_id: str):
         await session.commit()
 
 
-@api_controller()
+@api_controller_background_task(
+    success_notification_rooms=["sid"],
+    error_notification_rooms=["sid"],
+)
 async def instrument_functions_fit(
     sample_file: SampleFile,
     params: InstrumentFunctionFitParams = InstrumentFunctionFitParams(),
+    independent_transaction: bool = False,
+    sid=None,
+    process_id=None,
 ) -> dict:
     """Fit instrument functions for the sample file.
 
@@ -320,9 +329,19 @@ async def instrument_functions_fit(
         resolution_function=resolution_function,
     )
 
+    instrument_functions = instrument_function_data.model_dump()
+    instrument_functions["datetime_utc"] = instrument_functions[
+        "datetime_utc"
+    ].isoformat()
+
     return {
+        "message": f"Instrument functions succesfully fitted for {sample_file.filename}",
         "data": {
             "instrument_functions": instrument_function_data,
             "statistics": stats,
-        }
+        },
+        "_notification_data": {
+            "instrument_functions": instrument_functions,
+            "statistics": stats,
+        },
     }

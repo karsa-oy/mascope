@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, BackgroundTasks, Request
+from mascope_server.db.id import gen_id
 from mascope_server.api.lib.api_features import api_route
 from mascope_server.api.controllers.sample.lib.sample_file_fetch import (
     fetch_sample_file,
@@ -80,8 +81,24 @@ async def delete_instrument_function_route(instrument_function_id: str):
 
 @instrument_functions_router.post("/api/instrument_functions/fit")
 @api_route(
-    status_code=200,
+    status_code=202,
 )
-async def fit_instrument_functions_route(body: FitInstrumentFunctionsBody):
+async def fit_instrument_functions_route(
+    request: Request,
+    body: FitInstrumentFunctionsBody,
+    background_tasks: BackgroundTasks,
+):
+    process_id = gen_id(8)
     sample_file = await fetch_sample_file(filename=body.filename)
-    return await instrument_functions_fit(sample_file=sample_file, params=body.params)
+    background_tasks.add_task(
+        instrument_functions_fit,
+        sample_file=sample_file,
+        params=body.params,
+        independent_transaction=True,
+        sid=request.headers.get("X-SID"),
+        process_id=process_id,
+    )
+    return {
+        "message": f"Fitting instrument functions for {body.filename}, this can take a moment.",
+        "process_id": process_id,
+    }
