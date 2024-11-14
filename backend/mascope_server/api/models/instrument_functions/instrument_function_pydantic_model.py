@@ -90,9 +90,9 @@ class InstrumentFunctionFitParams(BaseModel):
     @field_validator("threshold")
     @classmethod
     def validate_threshold(cls, v):
-        if not 0 < v <= 1:
+        if not 0 <= v < 1:
             raise ValueError(
-                "R-squared threshold must be between 0 and 1, inclusive of 1."
+                "R-squared threshold must be between 0 and 1, inclusive of 0."
             )
         return v
 

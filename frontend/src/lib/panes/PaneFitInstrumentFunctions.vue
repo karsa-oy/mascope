@@ -47,13 +47,15 @@ api.http
   })
 
 watchEffect(async () => {
-  if (threshold.value && threshold.value > 0) {
+  if (threshold.value !== undefined) {
     loading.value = true
     fit.value = await api.http.post(
       `/instrument_functions/fit`,
       {
         filename: props.filename,
-        threshold: threshold.value
+        params: {
+          threshold: threshold.value
+        }
       },
       {
         use: 'read',
@@ -94,12 +96,12 @@ const invalid = computed(() => !fit.value || !(methodfile.value?.length > 0))
 </script>
 
 <template>
-  <menu class="topbar" v-if="threshold">
+  <menu class="topbar" v-if="threshold !== undefined">
     <BaseParamField
       label="Threshold"
       :range="{
         min: 0,
-        max: 1,
+        max: 0.999,
         step: 0.001
       }"
       hasSlider
