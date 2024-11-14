@@ -7,7 +7,7 @@ import Button from 'primevue/button'
 
 import { useAuth } from '@/stores/auth'
 
-import { reactive, computed, defineEmits } from 'vue'
+import { reactive, computed } from 'vue'
 
 const auth = useAuth()
 
