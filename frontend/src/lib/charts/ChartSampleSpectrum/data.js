@@ -8,7 +8,7 @@ export const useChartData = defineStore('chart.sample.spectrum', () => {
   const traces = ref([])
   const loadedFileId = ref()
   const length = ref()
-  const unit = ref('a.u.')
+  const unit = ref('')
   const loading = ref(false)
 
   const app = useApp()

@@ -6,7 +6,7 @@ import { useApp } from '@/stores'
 export const useChartData = defineStore('chart.match.timeseries', () => {
   const traces = ref([])
   const length = ref()
-  const unit = ref('a.u.')
+  const unit = ref('')
 
   const app = useApp()
 

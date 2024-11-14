@@ -105,7 +105,7 @@ const layout = computed(() => ({
     ...xAxis.value
   },
   yaxis: {
-    title: 'Signal intensity [cps]',
+    title: 'Signal intensity',
     type: log.value ? 'log' : 'lin',
     showgrid: true,
     gridcolor: '#33333399',

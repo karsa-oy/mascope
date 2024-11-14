@@ -595,7 +595,7 @@ async def get_sample_file_spectrum(
     filename = sample_file["filename"]
     # Derive intensity units from instrument type
     instrument_type = get_instrument_type(filename)
-    intensity_unit = ("ions" if instrument_type == "tof" else "a.u.",)
+    intensity_unit = ("ions" if instrument_type == "tof" else "rel.",)
 
     # Step 2: Load the sample file and determine whether to use the full signal or a time slice and calculate the corresponding spectrum DataArray
     runtime.logger.info(f"Loading file: {filename}")
