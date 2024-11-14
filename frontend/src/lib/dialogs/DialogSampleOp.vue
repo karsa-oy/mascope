@@ -373,6 +373,7 @@ watchEffect(() => {
           @click="() => save()"
           :disabled="
             !input.type ||
+            !input.methodFile ||
             input.fields?.filter((f) => f?.required).length !=
               input.fields?.filter((f) => f?.required).filter((f) => f.value).length
           "
