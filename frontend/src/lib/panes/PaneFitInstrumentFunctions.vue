@@ -104,6 +104,7 @@ const invalid = computed(() => !fit.value || !(methodfile.value?.length > 0))
       }"
       hasSlider
       v-model:param="threshold"
+      :disabled="loading"
     />
     <FloatLabel>
       <InputText id="methodfile" v-model="methodfile" required />
