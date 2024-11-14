@@ -39,7 +39,7 @@ const settings = reactive({
         <i>{{ compound?.target_compound_formula }}</i>
       </h1>
       <ChartMatchSpectra :settings="settings" />
-      <ChartMatchTimeseries />
+      <ChartMatchTimeseries :settings="settings" />
       <div class="row match-tools">
         <ToolbarFilterIon />
         <ToolbarMatchCharts

@@ -90,7 +90,7 @@ async def visualize_ion_focus(
     sample_file = load_file(filename, vars=["sum_signal", "signal", "peak_heights"])
     instrument_type = get_instrument_type(filename)
     spectrum_unit = "ions" if instrument_type == "tof" else "a.u."
-    timeseries_unit = "ions/s" if instrument_type == "tof" else "a.u./s"
+    timeseries_unit = "ions" if instrument_type == "tof" else "a.u."
 
     # Step 3: Convert target ion data to DataFrame and prepare data
     target_ion_list = [ion.to_dict() for ion in target_ion_data]
@@ -204,14 +204,15 @@ async def visualize_ion_focus(
 
                 timeseries_time = match_timeseries.time.values.astype(np.float32)
                 timeseries_y = match_timeseries.values.astype(np.float32)
+                timeseries_rgb = colormap[i + COLOR_OFFSET]
                 timeseries_traces.append(
                     {
                         "name": "{:.4f}".format(mz),
                         "type": "scatter",
                         "mode": "lines",
-                        "line": {
-                            "color": "rgb({},{},{})".format(*colormap[i + COLOR_OFFSET])
-                        },
+                        "line": {"color": "rgb({},{},{})".format(*timeseries_rgb)},
+                        "fill": "tozeroy",
+                        "fillcolor": "rgba({},{},{},.3)".format(*timeseries_rgb),
                         "x": timeseries_time.tobytes(),
                         "y": timeseries_y.tobytes(),
                         "unit": timeseries_unit,
@@ -255,8 +256,8 @@ async def visualize_ion_focus(
             "name": "sum",
             "type": "scatter",
             "fill": "tozeroy",
-            "fillcolor": "rgba(255, 255, 255, .3)",
-            "line": {"color": "white"},
+            "fillcolor": "rgba(136, 136, 136, .3)",
+            "line": {"color": "rgb(136, 136, 136)"},
             "x": timeseries_time.tobytes(),
             "y": timeseries_y.tobytes(),
             "unit": timeseries_unit,
