@@ -412,7 +412,6 @@ async def compute_and_create_sample_match_isotope_data(
         await send_progress_user_notification(notification, 0.95)
 
 
-# DATAFRAME EDITION
 def group_target_isotopes_df(
     df: pd.DataFrame, resolution_function: partial, how: Optional[str] = "max"
 ) -> pd.DataFrame:
