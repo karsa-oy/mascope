@@ -104,7 +104,7 @@ const invalid = computed(() => !fit.value || !(methodfile.value?.length > 0))
         max: 0.999,
         step: 0.001
       }"
-      hasSlider
+      hideSlider
       v-model:param="threshold"
       :disabled="loading"
     />
