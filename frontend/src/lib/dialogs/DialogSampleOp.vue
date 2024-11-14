@@ -256,7 +256,7 @@ watchEffect(() => {
     contentStyle="flex-grow: 1; display: flex; flex-flow: column; gap: 0.5rem; justify-content: space-between"
   >
     <Panel>
-      <Tabs v-model:value="tab">
+      <Tabs v-model:value="tab" lazy>
         <TabList>
           <Tab value="sample-details">Sample Details</Tab>
           <Tab value="instrument-funcs" :disabled="!input.filename || action == 'create_pending'">
