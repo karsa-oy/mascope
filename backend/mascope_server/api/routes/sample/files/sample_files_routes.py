@@ -1,10 +1,8 @@
 from datetime import datetime, timedelta, timezone
-
 from fastapi import APIRouter, BackgroundTasks, Request, Depends, UploadFile
-
 from mascope_server.db.id import gen_id
+from mascope_server.api.new.auth.dependencies import guest_user, editor_user
 from mascope_server.api.lib.api_features import api_route
-
 from mascope_server.api.controllers.sample.files.sample_files_controller import (
     get_sample_files,
     get_sample_file,
@@ -28,23 +26,35 @@ from mascope_server.api.models.sample.files.sample_file_pydantic_model import (
     GetSpectrumQueryParams,
 )
 
-sample_files_router = APIRouter()
+sample_files_router = APIRouter(prefix="/api/sample/files", tags=["Sample Files"])
 
 
-@sample_files_router.get("/api/sample/files")
+@sample_files_router.get("")
 @api_route()
-async def get_sample_files_route(query_params: GetSampleFilesQueryParams = Depends()):
+async def get_sample_files_route(
+    query_params: GetSampleFilesQueryParams = Depends(), user=Depends(guest_user)
+):
+    """Retrieve a list of sample files with optional filtering and pagination.
+
+    :param query_params: Query parameters for filtering, sorting, and pagination.
+    :param user: Authenticated user with guest access.
+    :return: A dictionary with total count and list of sample files.
+    """
     return await get_sample_files(**query_params.model_dump())
 
 
-@sample_files_router.get("/api/sample/files/recent")
+@sample_files_router.get("/recent")
 @api_route()
 async def get_recent_sample_files_route(
-    query_params: GetRecentSampleFilesQueryParams = Depends(),
+    query_params: GetRecentSampleFilesQueryParams = Depends(), user=Depends(guest_user)
 ):
-    # Used datetime.now() with timezone.utc to get a timezone-aware UTC datetime
-    datetime_min = datetime.now(timezone.utc) - timedelta(days=query_params.days)
+    """Retrieve recent sample files within a specified date range.
 
+    :param query_params: Query parameters including date range in days.
+    :param user: Authenticated user with guest access.
+    :return: A dictionary with recent sample files matching criteria.
+    """
+    datetime_min = datetime.now(timezone.utc) - timedelta(days=query_params.days)
     query_params_dict = query_params.model_dump(exclude={"days"})
     # Update the dictionary with calculated datetime_min
     query_params_dict.update(
@@ -56,62 +66,116 @@ async def get_recent_sample_files_route(
     return await get_sample_files(**query_params_dict)
 
 
-@sample_files_router.get("/api/sample/files/{sample_file_id}")
+@sample_files_router.get("/{sample_file_id}")
 @api_route()
-async def get_sample_file_route(sample_file_id: str):
+async def get_sample_file_route(sample_file_id: str, user=Depends(guest_user)):
+    """Retrieve details of a specific sample file by ID.
+
+    :param sample_file_id: ID of the sample file to retrieve.
+    :param user: Authenticated user with guest access.
+    :return: Details of the specified sample file.
+    """
     return await get_sample_file(sample_file_id)
 
 
-@sample_files_router.post("/api/sample/files")
-@api_route(
-    status_code=201,
-    include_message=True,
-    success_message="Sample file created successfully",
-)
-async def create_sample_file_route(sample_file: SampleFileCreate):
+@sample_files_router.post("")
+@api_route(status_code=201)
+async def create_sample_file_route(
+    sample_file: SampleFileCreate,
+    #   user=Depends(editor_user) #TODO protect the route, figure how to authenticate request from the file_converter service.
+):
+    """Create a new sample file record.
+
+    :param sample_file: Data required for creating a sample file.
+    :param user: Authenticated user with editor access.
+    :return: The created sample file's details.
+    """
     return await create_sample_file(sample_file)
 
 
-@sample_files_router.patch("/api/sample/files/{sample_file_id}")
-@api_route(include_message=True, success_message="Sample file updated successfully")
-async def update_sample_file_route(sample_file_id: str, sample_file: SampleFileUpdate):
+@sample_files_router.patch("/{sample_file_id}")
+@api_route()
+async def update_sample_file_route(
+    sample_file_id: str, sample_file: SampleFileUpdate, user=Depends(editor_user)
+):
+    """Update details of an existing sample file.
+
+    :param sample_file_id: ID of the sample file to update.
+    :param sample_file: Data for updating the sample file.
+    :param user: Authenticated user with editor access.
+    :return: Updated details of the sample file.
+    """
     return await update_sample_file(sample_file_id, sample_file)
 
 
-@sample_files_router.delete("/api/sample/files/{sample_file_id}")
-@api_route(
-    include_data=False,
-    include_message=True,
-    success_message="Sample file deleted successfully",
-)
-async def delete_sample_file_route(sample_file_id: str):
+@sample_files_router.delete("/{sample_file_id}")
+@api_route()
+async def delete_sample_file_route(sample_file_id: str, user=Depends(editor_user)):
+    """Delete a specific sample file by ID.
+
+    :param sample_file_id: ID of the sample file to delete.
+    :param user: Authenticated user with editor access.
+    :return: Confirmation message on deletion.
+    """
     await delete_sample_file(sample_file_id)
 
 
-@sample_files_router.get(
-    "/api/sample/files/{sample_file_id}/peaks", tags=["Sample File Peaks"]
-)
-@api_route()
-async def get_sample_file_peaks_route(
-    sample_file_id: str, query_params: GetSampleFilePeaksQueryParams = Depends()
+@sample_files_router.post("/upload")
+@api_route(status_code=201)
+async def sample_file_upload_route(
+    file: UploadFile = Depends(SampleFileUpload), user=Depends(editor_user)
 ):
+    """
+    Uploads a sample file to the server.
+
+    This route takes an uploaded file from a form field and saves it in the `filestreams` directory
+    on the server. It validates the file's size and extension before uploading.
+
+    :param file: The file to be uploaded, provided in a form field.
+    :type file: UploadFile
+    :return: A JSON response indicating the success or failure of the upload.
+    :rtype: JSONResponse
+    """
+    # Access the file using file.file
+    return await sample_file_upload(file.file)
+
+
+@sample_files_router.get("/{sample_file_id}/peaks")
+@api_route(jupyter_access=True)
+async def get_sample_file_peaks_route(
+    sample_file_id: str,
+    query_params: GetSampleFilePeaksQueryParams = Depends(),
+    user=Depends(guest_user),
+):
+    """Retrieve peaks for a specific sample file.
+
+    :param sample_file_id: ID of the sample file.
+    :param query_params: Parameters for retrieving peaks.
+    :param user: Authenticated user with guest access.
+    :return: Peak data for the sample file.
+    """
     return await get_sample_file_peaks(sample_file_id, **query_params.model_dump())
 
 
-@sample_files_router.get(
-    "/api/sample/files/{sample_file_id}/peaks/compute", tags=["Sample File Peaks"]
-)
-@api_route(
-    status_code=202,
-)
+@sample_files_router.get("/{sample_file_id}/peaks/compute")
+@api_route(status_code=202)
 async def compute_all_sample_file_peaks_route(
     request: Request,
     sample_file_id: str,
     background_tasks: BackgroundTasks,
+    user=Depends(editor_user),
 ):
+    """Compute all peaks for a sample file asynchronously.
+
+    :param sample_file_id: ID of the sample file to compute peaks for.
+    :param request: The request object.
+    :param background_tasks: FastAPI background task manager.
+    :param user: Authenticated user with editor access.
+    :return: Process initiation message.
+    """
     # Verify the existance of sample file
-    sample_file = await get_sample_file(sample_file_id)
-    filename = sample_file["filename"]
+    sample_file_data = await get_sample_file(sample_file_id)
+    filename = sample_file_data.get("data").get("filename")
 
     sid = request.headers.get("X-SID")
     process_id = gen_id(8)
@@ -129,13 +193,18 @@ async def compute_all_sample_file_peaks_route(
     }
 
 
-@sample_files_router.post(
-    "/api/sample/files/{sample_file_id}/peaks/timeseries", tags=["Sample File Peaks"]
-)
-@api_route()
+@sample_files_router.post("/{sample_file_id}/peaks/timeseries")
+@api_route(jupyter_access=True)
 async def get_sample_file_peak_timeseries_route(
-    sample_file_id: str, body: GetSampleFilePeakTimeseriesBody
+    sample_file_id: str, body: GetSampleFilePeakTimeseriesBody, user=Depends(guest_user)
 ):
+    """Retrieve timeseries for a specific peak in a sample file.
+
+    :param sample_file_id: ID of the sample file.
+    :param body: Data including peak m/z and tolerance.
+    :param user: Authenticated user with guest access.
+    :return: Timeseries data for the specified peak.
+    """
     return await get_sample_file_peak_timeseries(
         sample_file_id=sample_file_id,
         peak_mz=body.peak_mz,
@@ -143,30 +212,18 @@ async def get_sample_file_peak_timeseries_route(
     )
 
 
-@sample_files_router.get(
-    "/api/sample/files/{sample_file_id}/spectrum", tags=["Sample File Spectrum"]
-)
-@api_route()
+@sample_files_router.get("/{sample_file_id}/spectrum")
+@api_route(jupyter_access=True)
 async def get_sample_file_spectrum_route(
     sample_file_id: str,
     query_params: GetSpectrumQueryParams = Depends(),
+    user=Depends(guest_user),
 ):
+    """Retrieve spectrum data for a sample file within a specific range.
+
+    :param sample_file_id: ID of the sample file.
+    :param query_params: Parameters for spectrum range.
+    :param user: Authenticated user with guest access.
+    :return: Spectrum data for the sample file.
+    """
     return await get_sample_file_spectrum(sample_file_id, **query_params.model_dump())
-
-
-@sample_files_router.post("/api/sample/files/upload")
-@api_route(status_code=201)
-async def sample_file_upload_route(file: UploadFile = Depends(SampleFileUpload)):
-    """
-    Uploads a sample file to the server.
-
-    This route takes an uploaded file from a form field and saves it in the `filestreams` directory
-    on the server. It validates the file's size and extension before uploading.
-
-    :param file: The file to be uploaded, provided in a form field.
-    :type file: UploadFile
-    :return: A JSON response indicating the success or failure of the upload.
-    :rtype: JSONResponse
-    """
-    # Access the file using file.file
-    return await sample_file_upload(file.file)

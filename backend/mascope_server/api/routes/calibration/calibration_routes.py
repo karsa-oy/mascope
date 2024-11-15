@@ -1,4 +1,5 @@
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
+from mascope_server.api.new.auth.dependencies import editor_user, guest_user
 from mascope_server.db.id import gen_id
 from mascope_server.api.lib.api_features import api_route
 from mascope_server.api.lib.exceptions.api_exceptions import NotFoundException
@@ -25,18 +26,28 @@ from mascope_server.api.models.calibration.calibration_pydantic_model import (
     CalibrationMzApplyBody,
 )
 
-calibration_router = APIRouter()
+calibration_router = APIRouter(prefix="/api/calibration", tags=["Calibration"])
 
 
-@calibration_router.get("/api/calibration/mz_calibration")
+@calibration_router.get("/mz_calibration")
 @api_route()
-async def get_sample_mz_calibration_route(
+async def get_mz_calibration_route(
     query_params: GetMzCalibrationQueryParams = Depends(),
+    user=Depends(guest_user),
 ):
+    """Retrieve the m/z calibration based on instrument or sample item ID.
+
+    :param query_params: Query parameters for instrument and sample item ID.
+    :type query_params: GetMzCalibrationQueryParams, optional
+    :param user: The current authenticated user, defaults to Depends(guest_user).
+    :type user: User, optional
+    :return: The m/z calibration data.
+    :rtype: dict
+    """
     return await get_mz_calibration(**query_params.model_dump())
 
 
-@calibration_router.post("/api/calibration/mz_fit")
+@calibration_router.post("/mz_fit")
 @api_route(
     status_code=202,
 )
@@ -47,9 +58,26 @@ async def calibration_mz_fit_route(
     sample_item_id: str = Query(
         ..., description="The sample item ID to query for sample mz_calibration"
     ),
+    user=Depends(editor_user),
 ):
+    """Initiate m/z fitting for a sample.
+
+    :param request: The request object.
+    :type request: Request
+    :param mz_calibration_params: Parameters for m/z calibration.
+    :type mz_calibration_params: MzCalibrationParams
+    :param background_tasks: Background tasks for async processing.
+    :type background_tasks: BackgroundTasks
+    :param sample_item_id: The sample item ID.
+    :type sample_item_id: str
+    :param user: The current authenticated editor, defaults to Depends(editor_user).
+    :type user: User, optional
+    :return: Message confirming start of m/z fit calibration.
+    :rtype: dict
+    """
     # Verify the existance of sample item
-    sample = await get_sample_item(sample_item_id)
+    sample_data = await get_sample_item(sample_item_id)
+    sample = sample_data.get("data")
     sample_item_name = sample["sample_item_name"]
 
     # Get data for notifications
@@ -70,7 +98,7 @@ async def calibration_mz_fit_route(
     }
 
 
-@calibration_router.post("/api/calibration/mz_apply")
+@calibration_router.post("/mz_apply")
 @api_route(
     status_code=202,
 )
@@ -79,7 +107,23 @@ async def calibration_mz_apply_route(
     body: CalibrationMzApplyBody,
     background_tasks: BackgroundTasks,
     filename: str = Query(..., description="The filename to aply m/z fit"),
+    user=Depends(editor_user),
 ):
+    """Apply m/z calibration to a sample file.
+
+    :param request: The request object.
+    :type request: Request
+    :param body: The calibration apply body.
+    :type body: CalibrationMzApplyBody
+    :param background_tasks: Background tasks for async processing.
+    :type background_tasks: BackgroundTasks
+    :param filename: The filename to apply m/z calibration.
+    :type filename: str
+    :param user: The current authenticated editor, defaults to Depends(editor_user).
+    :type user: User, optional
+    :return: Message confirming application of m/z calibration.
+    :rtype: dict
+    """
     # Verify the existance of sample file
     sample_file_data = await get_sample_files(filename=filename)
     if not sample_file_data["data"][0]:
@@ -103,7 +147,7 @@ async def calibration_mz_apply_route(
     }
 
 
-@calibration_router.post("/api/calibration/mz_calibrate/sample/{sample_item_id}")
+@calibration_router.post("/mz_calibrate/sample/{sample_item_id}")
 @api_route(
     status_code=202,
 )
@@ -112,9 +156,26 @@ async def calibration_mz_calibrate_sample_route(
     sample_item_id: str,
     mz_calibration_params: MzCalibrationParams,
     background_tasks: BackgroundTasks,
+    user=Depends(editor_user),
 ):
+    """m/z calibrate specific sample.
+
+    :param request: The request object.
+    :type request: Request
+    :param sample_item_id: The ID of the sample item.
+    :type sample_item_id: str
+    :param mz_calibration_params: Calibration parameters.
+    :type mz_calibration_params: MzCalibrationParams
+    :param background_tasks: Background tasks for async processing.
+    :type background_tasks: BackgroundTasks
+    :param user: The current authenticated editor, defaults to Depends(editor_user).
+    :type user: User, optional
+    :return: Message confirming start of sample calibration.
+    :rtype: dict
+    """
     # Verify the existance of sample item
-    sample = await get_sample_item(sample_item_id)
+    sample_data = await get_sample_item(sample_item_id)
+    sample = sample_data.get("data")
     sample_item_name = sample["sample_item_name"]
 
     # Get data for notifications
@@ -135,7 +196,7 @@ async def calibration_mz_calibrate_sample_route(
     }
 
 
-@calibration_router.post("/api/calibration/mz_calibrate/batch/{sample_batch_id}")
+@calibration_router.post("/mz_calibrate/batch/{sample_batch_id}")
 @api_route(
     status_code=202,
 )
@@ -144,9 +205,26 @@ async def calibration_mz_calibrate_batch_route(
     sample_batch_id: str,
     mz_calibration_params: MzCalibrationParams,
     background_tasks: BackgroundTasks,
+    user=Depends(editor_user),
 ):
+    """m/z calibrate all samples in a batch.
+
+    :param request: The request object.
+    :type request: Request
+    :param sample_batch_id: The sample batch ID.
+    :type sample_batch_id: str
+    :param mz_calibration_params: Calibration parameters.
+    :type mz_calibration_params: MzCalibrationParams
+    :param background_tasks: Background tasks for async processing.
+    :type background_tasks: BackgroundTasks
+    :param user: The current authenticated editor, defaults to Depends(editor_user).
+    :type user: User, optional
+    :return: Message confirming start of batch calibration.
+    :rtype: dict
+    """
     # Verify the existance of sample batch
-    sample_batch = await get_sample_batch(sample_batch_id)
+    sample_batch_result = await get_sample_batch(sample_batch_id)
+    sample_batch = sample_batch_result.get("data")
     sample_batch_name = sample_batch["sample_batch_name"]
 
     # Get data for notifications

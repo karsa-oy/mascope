@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Request, BackgroundTasks, Depends
 from mascope_server.db.id import gen_id
+from mascope_server.api.new.auth.dependencies import guest_user
 from mascope_server.api.lib.api_features import api_route
 from mascope_server.api.controllers.sample.items.sample_items_controller import (
     get_sample_item,
@@ -14,22 +15,31 @@ from mascope_server.api.models.visualization.visualization_pydantic_model import
     GetVisualizationIonFocusQueryParams,
 )
 
-visualization_router = APIRouter()
+visualization_router = APIRouter(prefix="/api/visualization", tags=["Visualization"])
 
 
-@visualization_router.get("/api/visualization/ion_focus")
-@api_route(
-    status_code=202,
-)
+@visualization_router.get("/ion_focus")
+@api_route(status_code=202)
 async def visualization_ion_focus_route(
     request: Request,
     background_tasks: BackgroundTasks,
     query_params: GetVisualizationIonFocusQueryParams = Depends(),
+    user=Depends(guest_user),
 ):
+    """Initiate a visualization task for focusing on a specific ion in a sample.
+
+    :param request: The request object containing client information.
+    :param background_tasks: Background task manager for running visualization tasks.
+    :param query_params: Query parameters for the ion focus visualization.
+    :param user: The authenticated user, defaults to Depends(guest_user).
+    :return: A dictionary with a message indicating task initiation and a process ID.
+    """
     # Verify the existance
-    sample = await get_sample_item(query_params.sample_item_id)
+    sample_data = await get_sample_item(query_params.sample_item_id)
+    sample = sample_data.get("data")
     sample_item_name = sample["sample_item_name"]
-    ion = await get_target_ion(query_params.target_ion_id)
+    ion_data = await get_target_ion(query_params.target_ion_id)
+    ion = ion_data.get("data")
     target_ion_formula = ion["target_ion_formula"]
 
     # Get data for notifications

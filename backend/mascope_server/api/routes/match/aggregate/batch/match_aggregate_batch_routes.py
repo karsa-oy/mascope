@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from mascope_server.api.lib.api_features import api_route
 from mascope_server.api.lib.exceptions.api_exceptions import ApiException
 from mascope_server.api.controllers.match.aggregate.match_aggregate_controller import (
@@ -17,21 +17,36 @@ from mascope_server.api.models.match.aggregate.match_aggregate_pydantic_model im
     AggregateMatchIsotopeFilteredDataBody,
     AggregateAndCreateMatchesBody,
 )
+from mascope_server.api.new.auth.dependencies import editor_user, guest_user
 
 
-match_aggregate_batch_router = APIRouter()
-
-
-@match_aggregate_batch_router.post(
-    "/api/match/aggregate/batch/{sample_batch_id}/isotope"
+match_aggregate_batch_router = APIRouter(
+    prefix="/api/match/aggregate/batch",
+    tags=["Match Aggregate Batch"],
 )
+
+
+@match_aggregate_batch_router.post("/{sample_batch_id}/isotope")
 @api_route()
 async def aggregate_batch_match_isotope_filtered_data_route(
     sample_batch_id: str,
     body: AggregateMatchIsotopeFilteredDataBody,
+    user=Depends(guest_user),
 ):
+    """Fetch filtered match isotope data for a specific sample batch.
+
+    :param sample_batch_id: The unique identifier of the sample batch.
+    :type sample_batch_id: str
+    :param body: Filter parameters for match isotope data.
+    :type body: AggregateMatchIsotopeFilteredDataBody
+    :param user: The current authenticated user with guest permissions.
+    :type user: User
+    :return: Filtered isotope match data with count and message.
+    :rtype: dict
+    """
     # Verify the existance of sample batch
-    sample_batch = await get_sample_batch(sample_batch_id)
+    sample_batch_result = await get_sample_batch(sample_batch_id)
+    sample_batch = sample_batch_result.get("data")
     sample_batch_name = sample_batch["sample_batch_name"]
 
     data = await aggregate_match_isotope_filtered_data(
@@ -56,14 +71,27 @@ async def aggregate_batch_match_isotope_filtered_data_route(
     }
 
 
-@match_aggregate_batch_router.post("/api/match/aggregate/batch/{sample_batch_id}")
+@match_aggregate_batch_router.post("/{sample_batch_id}")
 @api_route()
 async def aggregate_batch_matches_route(
     sample_batch_id: str,
     body: AggregateMatchIsotopeFilteredDataBody,
+    user=Depends(guest_user),
 ):
+    """Aggregate match data for a specific sample batch.
+
+    :param sample_batch_id: The unique identifier of the sample batch.
+    :type sample_batch_id: str
+    :param body: Aggregation parameters for match data.
+    :type body: AggregateMatchIsotopeFilteredDataBody
+    :param user: The current authenticated user with guest permissions.
+    :type user: User
+    :return: Aggregated match data with count and message.
+    :rtype: dict
+    """
     # Verify the existance of sample batch
-    sample_batch = await get_sample_batch(sample_batch_id)
+    sample_batch_result = await get_sample_batch(sample_batch_id)
+    sample_batch = sample_batch_result.get("data")
     sample_batch_name = sample_batch["sample_batch_name"]
 
     result = await aggregate_matches(
@@ -83,12 +111,24 @@ async def aggregate_batch_matches_route(
     }
 
 
-@match_aggregate_batch_router.post("/api/match/aggregate/batch/{sample_batch_id}/save")
+@match_aggregate_batch_router.post("/{sample_batch_id}/save")
 @api_route()
 async def aggregate_and_create_batch_matches_route(
     sample_batch_id: str,
     body: AggregateAndCreateMatchesBody,
+    user=Depends(editor_user),
 ):
+    """Aggregate and save new matches for a sample batch.
+
+    :param sample_batch_id: The unique identifier of the sample batch.
+    :type sample_batch_id: str
+    :param body: Parameters for creating matches.
+    :type body: AggregateAndCreateMatchesBody
+    :param user: The current authenticated user with editor permissions.
+    :type user: User
+    :return: Success message and any associated logs.
+    :rtype: dict
+    """
     result = await aggregate_and_create_matches(
         sample_batch_id=sample_batch_id,
         target_ion_id=body.target_ion_id,
@@ -116,14 +156,24 @@ async def aggregate_and_create_batch_matches_route(
     }
 
 
-@match_aggregate_batch_router.post(
-    "/api/match/aggregate/batch/{sample_batch_id}/resave"
-)
+@match_aggregate_batch_router.post("/{sample_batch_id}/resave")
 @api_route()
 async def aggregate_and_recreate_matches_route(
     sample_batch_id: str,
     body: AggregateAndCreateMatchesBody,
+    user=Depends(editor_user),
 ):
+    """Recreate matches for a sample batch.
+
+    :param sample_batch_id: The unique identifier of the sample batch.
+    :type sample_batch_id: str
+    :param body: Parameters for recreating matches.
+    :type body: AggregateAndCreateMatchesBody
+    :param user: The current authenticated user with editor permissions.
+    :type user: User
+    :return: Success message and any associated logs.
+    :rtype: dict
+    """
     result = await aggregate_and_recreate_matches(
         sample_batch_id=sample_batch_id,
         target_ion_id=body.target_ion_id,
@@ -151,9 +201,20 @@ async def aggregate_and_recreate_matches_route(
     }
 
 
-@match_aggregate_batch_router.get("/api/match/aggregate/batch/{sample_batch_id}/all")
-@api_route()
+@match_aggregate_batch_router.get("/{sample_batch_id}/all")
+@api_route(jupyter_access=True)
 async def get_batch_and_aggregated_matches_route(
     sample_batch_id: str,
+    user=Depends(guest_user),
 ):
+    """Retrieve all batch and aggregated match data for a sample batch.
+    May be used in the mascope_api lib for Jypter server.
+
+    :param sample_batch_id: The unique identifier of the sample batch.
+    :type sample_batch_id: str
+    :param user: The current authenticated user, defaults to Depends(guest_user).
+    :type user: User
+    :return: Batch and aggregated match data.
+    :rtype: dict
+    """
     return await get_batch_and_aggregated_matches(sample_batch_id=sample_batch_id)
