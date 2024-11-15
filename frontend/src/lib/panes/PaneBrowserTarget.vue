@@ -345,7 +345,7 @@ watch(
           <template #body="{ data }">
             <BaseMatchTag
               :row="data"
-              :tooltip="`Peak intensity: ${formatter.format(data?.sample_peak_area_sum)}`"
+              :tooltip="`Peak intensity sum: ${formatter.format(data?.sample_peak_area_sum)}`"
             />
           </template>
         </Column>
@@ -430,7 +430,7 @@ watch(
               <template #body="{ data }">
                 <BaseMatchTag
                   :row="data"
-                  :tooltip="`Peak intensity: ${formatter.format(data?.sample_peak_area_sum)}`"
+                  :tooltip="`Peak intensity sum: ${formatter.format(data?.sample_peak_area_sum)}`"
                 />
               </template>
             </Column>
@@ -476,7 +476,7 @@ watch(
                   <template #body="{ data }">
                     <BaseMatchTag
                       :row="data"
-                      :tooltip="`Peak intensity: ${formatter.format(data?.sample_peak_area_sum)}`"
+                      :tooltip="`Peak intensity sum: ${formatter.format(data?.sample_peak_area_sum)}`"
                     />
                   </template>
                 </Column>
@@ -557,7 +557,7 @@ watch(
                         <div :id="data.match_key" style="height: 100%" />
                         <BaseMatchTag
                           :row="data"
-                          :tooltip="`Peak intensity: ${formatter.format(data?.sample_peak_area)}`"
+                          :tooltip="`Peak intensity sum: ${formatter.format(data?.sample_peak_area)}`"
                         />
                       </template>
                     </Column>

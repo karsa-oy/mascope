@@ -637,7 +637,7 @@ watch(
                 <template #body="{ data }">
                   <BaseMatchTag
                     :row="data"
-                    :tooltip="`Peak intensity: ${formatter.format(data?.sample_peak_area_sum)}`"
+                    :tooltip="`Peak intensity sum: ${formatter.format(data?.sample_peak_area_sum)}`"
                   />
                 </template>
               </Column>
