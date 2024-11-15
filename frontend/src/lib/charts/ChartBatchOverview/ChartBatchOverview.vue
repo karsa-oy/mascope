@@ -124,6 +124,7 @@ const layout = computed(() => ({
   xaxis: {
     title: xField.value?.label,
     autorange: true,
+    automargin: true,
     showgrid: true,
     gridcolor: '#33333399',
     tickmode: 'array',
@@ -139,6 +140,7 @@ const layout = computed(() => ({
     rangemode: 'tozero',
     gridwidth: 1
   },
+  minreducedheight: 250,
   showlegend: true
 }))
 

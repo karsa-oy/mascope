@@ -225,7 +225,8 @@ export const useChartData = defineStore('chart.batch.overview', () => {
           Intensity: %{y:,.0f}
           <br>
           %{customdata}
-        `
+          <extra></extra>
+        ` // use "<extra></extra>" to get rid of extra block from the hoverbox
         }
       })
       .filter((trace) => trace !== null)
@@ -245,13 +246,14 @@ export const useChartData = defineStore('chart.batch.overview', () => {
         TIC: %{y:,.0f}
         <br>
         %{customdata}
-      `,
+        <extra></extra>
+      `, // use "<extra></extra>" to get rid of extra block from the hoverbox
       mode: 'markers',
       type: 'scatter',
       marker: {
-        color: app.ui.darkmode.active ? '#fff' : '#222',
+        color: app.ui.darkmode.active ? '#888' : '#222',
         size: 10,
-        symbol: 'diamond'
+        symbol: 'diamond-open'
       }
     })
     return traces
