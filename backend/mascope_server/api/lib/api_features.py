@@ -1,7 +1,8 @@
 from functools import wraps
-from typing import Callable, Any, Dict, List, Tuple
+from typing import Callable, List, Tuple
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
+from rich.pretty import pretty_repr
 
 from mascope_lib.util import beautify_func_name
 from mascope_server.db.id import gen_id
@@ -19,6 +20,8 @@ from mascope_server.api.lib.notifications.api_notification import (
 from mascope_server.api.lib.notifications.api_notification_pydantic_model import (
     UserNotification,
 )
+
+from mascope_server.runtime import runtime
 
 
 def api_controller(emit_reload_events: List[Tuple[str, str]] = [], error_message=None):
@@ -81,10 +84,6 @@ def api_controller(emit_reload_events: List[Tuple[str, str]] = [], error_message
 
 def api_route(
     status_code: int = 200,
-    include_data: bool = True,
-    include_message: bool = False,
-    success_message: str = None,
-    error_message: str = None,
     jupyter_access: bool = False,
 ):
     """
@@ -104,15 +103,6 @@ def api_route(
 
     :param status_code: HTTP status code to be used for successful responses, defaults to 200.
     :type status_code: int, optional
-    :param include_data: Flag to include the result of the route handler as encoded json object in the response, defaults to True.
-    :type include_data: bool, optional
-    :param include_message: Flag to include a success message in the response, defaults to False.
-    :type include_message: bool, optional
-    :param success_message: Custom success message to include in the response if include_message is True.
-                            Defaults to a generic "Operation successful" message if not provided.
-    :type success_message: str, optional
-    :param error_message: Custom error message to include in the response if include_message is True.
-    :type error_message: str, optional
     :param jupyter_access: Flag to indicate if the route allows access via an access token (for Jupyter or external access).
                            If set to True, the endpoint is accessible via a Bearer token in addition to standard JWT authentication.
     :type jupyter_access: bool, optional
@@ -121,47 +111,33 @@ def api_route(
     """
 
     def decorator(func: Callable):
-        func.jupyter_access = jupyter_access  # Attach attribute to function
+        # Attach access attributes to function
+        func.jupyter_access = jupyter_access
 
         @wraps(func)
         async def wrapper(*args, **kwargs):
             try:
+                # Log user information if available
+                user = kwargs.get("user")
+                if user:
+                    runtime.logger.trace(f"User:\n{pretty_repr(user.to_dict())}")
+
+                # Execute the function
                 result = await func(*args, **kwargs)
                 headers = {}
+                # Move process_id to headers
                 if result is not None and "process_id" in result:
-                    headers["Process-ID"] = result.pop(
-                        "process_id"
-                    )  # Move process_id to headers
+                    headers["Process-ID"] = result.pop("process_id")
 
-                content: Dict[str, Any] = {}
-                if include_data:
-                    content.update(jsonable_encoder(result))
-                if include_message:
-                    message = result.get("message") if result else None
-                    content["message"] = (
-                        message or success_message or "Operation successful"
-                    )
-                    message_logs = result.get("message_logs") if result else None
-                    if message_logs is not None:
-                        content["message_logs"] = message_logs
                 return JSONResponse(
                     status_code=status_code,
-                    content=content,
+                    content=jsonable_encoder(result),
                     headers=headers,
                 )
-
-                # TODO_notifications move message forming to controllers, example delete_sample_item
-                # return JSONResponse(
-                #     status_code=status_code,
-                #     content=jsonable_encoder(result),
-                #     headers=headers,
-                # )
             except ApiException as e:
                 return api_e_response_json(e)
             except Exception as e:
-                context_message = (
-                    error_message or f"Error in {beautify_func_name(func.__name__)}"
-                )
+                context_message = f"Error in {beautify_func_name(func.__name__)}"
                 return handle_exception(e, context_message)
 
         return wrapper
