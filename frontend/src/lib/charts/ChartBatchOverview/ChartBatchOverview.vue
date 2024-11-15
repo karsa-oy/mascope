@@ -1,6 +1,7 @@
 <script setup>
-import { ref, computed, watchEffect } from 'vue'
+import { ref, computed, watchEffect, toRaw } from 'vue'
 
+import SelectButton from 'primevue/selectbutton'
 import ToggleSwitch from 'primevue/toggleswitch'
 import Select from 'primevue/select'
 import Chip from 'primevue/chip'
@@ -15,7 +16,32 @@ import { useChartData } from './data'
 const app = useApp()
 const data = useChartData()
 
+const yMode = ref('sum')
 const log = ref(true)
+const unit = computed(() => {
+  // Adjust the y-axis unit based on "sum / average" toggle
+  return yMode.value == 'sum' ? '' : `per second`
+})
+
+const traces = computed(() => {
+  // Scale trace y-values based on "sum / average" toggle
+  // Collect sample lengths into an object {[sample_item_id]: sample.length}
+  const sampleLengths = app.data.sample.list.reduce(
+    (o, sample) => ({ ...o, [sample.sample_item_id]: sample.length }),
+    {}
+  )
+  const newTraces =
+    yMode.value == 'sum'
+      ? data.traces
+      : data.traces.map(function (trace) {
+          // Scale chart traces by dividing all y-values by sampleLength
+          let newTrace = structuredClone(toRaw(trace))
+          // Use x-coordinate (sample_item_id) to retrieve sample length
+          newTrace.y = trace.y.map((value, i) => value / sampleLengths[trace.x[i]])
+          return newTrace
+        })
+  return newTraces
+})
 
 const inferType = (field) => {
   const withField = app.data.sample.list.filter((item) => field in item)
@@ -105,7 +131,7 @@ const layout = computed(() => ({
     ...xAxis.value
   },
   yaxis: {
-    title: 'Signal intensity',
+    title: `Signal intensity ${unit.value}`,
     type: log.value ? 'log' : 'lin',
     showgrid: true,
     gridcolor: '#33333399',
@@ -188,7 +214,7 @@ const anyFilters = computed(
     <BaseChartPlotly
       id="ChartSampleIntensity"
       :title="app.data.batch.focused.sample_batch_name ?? ''"
-      :data="data.traces"
+      :data="traces"
       :layout="layout"
       @click="onClick"
     />
@@ -204,6 +230,7 @@ const anyFilters = computed(
     `"
   >
     <div class="row">
+      <SelectButton v-model="yMode" :options="['sum', 'average']" />
       <ToggleSwitch v-model="log" style="margin-left: 1rem" />
       <span> log scale </span>
     </div>

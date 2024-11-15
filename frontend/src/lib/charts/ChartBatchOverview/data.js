@@ -222,7 +222,7 @@ export const useChartData = defineStore('chart.batch.overview', () => {
           <br>
           <b>%{text}</b>
           <br>
-          Peak area sum: %{y:,.0f}
+          Intensity: %{y:,.0f}
           <br>
           %{customdata}
         `
