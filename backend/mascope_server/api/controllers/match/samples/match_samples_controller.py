@@ -101,7 +101,11 @@ async def get_match_samples(
         result = await session.execute(query)
     data = [item.to_dict() for item in result.scalars().all()]
 
-    return {"results": total, "data": data}
+    return {
+        "message": "Match samples retrieved successfully",
+        "results": total,
+        "data": data,
+    }
 
 
 @api_controller()
@@ -129,7 +133,7 @@ async def get_match_sample(match_sample_id: str) -> dict:
         raise NotFoundException(f"Match sample with ID '{match_sample_id}' not found")
 
     # Step 3: Return sample details
-    return sample.to_dict()
+    return {"message": "Match sample retrieved successfully", "data": sample.to_dict()}
 
 
 @api_controller()

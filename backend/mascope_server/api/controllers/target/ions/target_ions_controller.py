@@ -207,6 +207,7 @@ async def get_target_ions(
         data.append(ion_data)
 
     return {
+        "message": "Target ions retrieved successfully.",
         "results": total,
         "data": data,
     }
@@ -235,7 +236,10 @@ async def get_target_ion(target_ion_id: str) -> dict:
             raise NotFoundException(f"Target ion with ID '{target_ion_id}' not found")
 
         # Step 3: Return target ion details
-        return target_ion.to_dict()
+        return {
+            "message": "Target ion retrieved successfully.",
+            "data": target_ion.to_dict(),
+        }
 
 
 @api_controller()
@@ -388,4 +392,7 @@ async def update_target_ion(target_ion_id: str, target_ion_update: TargetIonUpda
                         namespace="/",
                     )
 
-        return target_ion.to_dict()
+        return {
+            "data": target_ion.to_dict(),
+            "message": f"Target ion `{target_ion.target_ion_formula}` updated successfully.",
+        }

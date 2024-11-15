@@ -197,6 +197,7 @@ async def get_target_isotopes(
         data.append(isotope_data)
 
     return {
+        "message": "Target isotopes retrieved successfully.",
         "results": total,
         "data": data,
     }
@@ -228,4 +229,7 @@ async def get_target_isotope(target_isotope_id: str) -> dict:
                 f"Target isotope with ID '{target_isotope_id}' not found"
             )
     # Step 3: Return target isotope details
-    return target_isotope.to_dict()
+    return {
+        "message": "Target isotope retrieved successfully.",
+        "data": target_isotope.to_dict(),
+    }

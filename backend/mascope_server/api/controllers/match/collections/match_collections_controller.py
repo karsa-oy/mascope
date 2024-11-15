@@ -108,7 +108,11 @@ async def get_match_collections(
         result = await session.execute(query)
     data = [item.to_dict() for item in result.scalars().all()]
 
-    return {"results": total, "data": data}
+    return {
+        "message": "Match collections retrieved successfully",
+        "results": total,
+        "data": data,
+    }
 
 
 @api_controller()
@@ -138,7 +142,10 @@ async def get_match_collection(match_collection_id: str) -> dict:
         )
 
     # Step 3: Return collection details
-    return collection.to_dict()
+    return {
+        "message": "Match collection retrieved successfully",
+        "data": collection.to_dict(),
+    }
 
 
 @api_controller()

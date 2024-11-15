@@ -23,7 +23,7 @@ async def fetch_sample_file(filename: str) -> dict:
     :rtype: dict
     """
     async with async_session() as session:
-        # Step 1: Fetch sample file by ID
+        # Step 1: Fetch sample file by filename
         result = await session.execute(
             select(SampleFile).where(SampleFile.filename == filename)
         )

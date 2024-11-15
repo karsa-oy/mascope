@@ -108,6 +108,7 @@ async def get_match_interferences(
 
     # Step 6: Return results
     return {
+        "message": "Match interferences retrieved successfully",
         "results": total,
         "data": [
             match_interference.to_dict() for match_interference in match_interferences
@@ -137,7 +138,10 @@ async def get_match_interference(match_interference_id: str) -> dict:
         raise NotFoundException(
             f"Match interference with ID '{match_interference_id}' not found"
         )
-    return match_interference.to_dict()
+    return {
+        "message": "Match interference retrieved successfully",
+        "data": match_interference.to_dict(),
+    }
 
 
 @api_controller()

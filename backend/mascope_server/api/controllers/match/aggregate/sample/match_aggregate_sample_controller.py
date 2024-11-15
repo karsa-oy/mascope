@@ -163,7 +163,7 @@ async def aggregate_sample_match_compound(
 ) -> dict:
     """
     Retrieves matches for compounds within a sample based on a target compound formula,
-    applying specified filter parameters to filter the matches.
+    applying specified match parameters to filter the matches.
 
     Steps:
     1. Verify the existence of the sample and its batch, extract ion mechanisms.

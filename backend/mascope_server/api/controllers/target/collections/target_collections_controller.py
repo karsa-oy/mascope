@@ -121,6 +121,7 @@ async def get_target_collections(
         target_collections = result.scalars().all()
 
         return {
+            "message": "Target collections retrieved successfully.",
             "results": total,
             "data": [
                 target_collection.to_dict() for target_collection in target_collections
@@ -196,7 +197,10 @@ async def get_target_collection(target_collection_id: str) -> dict:
         target_collection_dict["sample_batches"] = sample_batches
 
         # Step 5: Return target collection details
-        return target_collection_dict
+        return {
+            "message": f"Details for target collection '{target_collection.target_collection_name}' retrieved.",
+            "data": target_collection_dict,
+        }
 
 
 @api_controller()
@@ -427,8 +431,8 @@ async def create_target_collection(
     )
 
     return {
-        "data": target_collection,
         "message": f"Target collection '{target_collection.target_collection_name}' was created.",
+        "data": target_collection,
         "message_logs": message_logs,
     }
 
@@ -807,8 +811,8 @@ async def update_target_collection(
         )
 
     return {
-        "data": updated_target_collection,
         "message": f"Target collection '{updated_target_collection.target_collection_name}' was updated.",
+        "data": updated_target_collection,
         "message_logs": message_logs,
     }
 

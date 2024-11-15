@@ -76,7 +76,8 @@ async def get_match_sample_collections(
     :rtype: dict
     """
     # Get sample item data
-    sample = await get_sample_item(sample_item_id)
+    sample_data = await get_sample_item(sample_item_id)
+    sample = sample_data.get("data")
     sample_batch_id = sample["sample_batch_id"]
     sample_item_name = sample["sample_item_name"]
 
@@ -128,8 +129,8 @@ async def get_match_sample_collections(
     )
 
     return {
-        "results": len(match_sample_collections_df),
         "message": f"Successfully retrieved target collections match data for sample '{sample_item_name}'.",
+        "results": len(match_sample_collections_df),
         "data": match_sample_collections_df.to_dict(orient="records"),
     }
 
@@ -173,7 +174,8 @@ async def get_match_sample_compounds(
     :rtype: dict
     """
     # Get sample item data
-    sample = await get_sample_item(sample_item_id)
+    sample_data = await get_sample_item(sample_item_id)
+    sample = sample_data.get("data")
     sample_batch_id = sample["sample_batch_id"]
     sample_item_name = sample["sample_item_name"]
 
@@ -236,8 +238,8 @@ async def get_match_sample_compounds(
     )
 
     return {
-        "results": len(match_sample_compounds_df),
         "message": f"Successfully retrieved target compounds match data for sample '{sample_item_name}'.",
+        "results": len(match_sample_compounds_df),
         "data": match_sample_compounds_df.to_dict(orient="records"),
     }
 
@@ -286,7 +288,8 @@ async def get_match_sample_ions(
     :rtype: dict
     """
     # Get sample item data
-    sample = await get_sample_item(sample_item_id)
+    sample_data = await get_sample_item(sample_item_id)
+    sample = sample_data.get("data")
     sample_batch_id = sample["sample_batch_id"]
     sample_item_name = sample["sample_item_name"]
 
@@ -351,8 +354,8 @@ async def get_match_sample_ions(
     )
 
     return {
-        "results": len(match_sample_ions_df),
         "message": f"Successfully retrieved target ions match data for sample '{sample_item_name}'.",
+        "results": len(match_sample_ions_df),
         "data": match_sample_ions_df.to_dict(orient="records"),
     }
 
@@ -405,7 +408,8 @@ async def get_match_sample_isotopes(
     :rtype: dict
     """
     # Get sample item data
-    sample = await get_sample(sample_item_id)
+    sample_data = await get_sample(sample_item_id)
+    sample = sample_data.get("data")
     sample_batch_id = sample["sample_batch_id"]
     sample_item_name = sample["sample_item_name"]
     instrument = sample["instrument"]
@@ -486,7 +490,7 @@ async def get_match_sample_isotopes(
     )
 
     return {
-        "results": len(match_sample_isotopes_df),
         "message": f"Successfully retrieved target isotopes match data for sample '{sample['sample_item_name']}'.",
+        "results": len(match_sample_isotopes_df),
         "data": match_sample_isotopes_df.to_dict(orient="records"),
     }

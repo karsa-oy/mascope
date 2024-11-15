@@ -206,7 +206,12 @@ async def get_match_compounds(
         data = data_df.to_dict(orient="records")
         # Update total after deduplication
         total = len(data)
-    return {"results": total, "data": data}
+
+    return {
+        "message": "Match compounds retrieved successfully",
+        "results": total,
+        "data": data,
+    }
 
 
 @api_controller()
@@ -236,7 +241,10 @@ async def get_match_compound(match_compound_id: str) -> dict:
         )
 
     # Step 3: Return compound details
-    return compound.to_dict()
+    return {
+        "message": "Match compound retrieved successfully",
+        "data": compound.to_dict(),
+    }
 
 
 @api_controller()

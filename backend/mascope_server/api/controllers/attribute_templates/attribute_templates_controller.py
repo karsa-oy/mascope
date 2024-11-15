@@ -63,6 +63,7 @@ async def get_attribute_templates(
 
     # Step 4: Return results
     return {
+        "message": "Attribute templates retrieved successfully.",
         "results": total,
         "data": [template.to_dict() for template in attribute_templates],
     }
@@ -94,7 +95,10 @@ async def get_attribute_template(attribute_template_id: str):
                 f"AttributeTemplate with ID '{attribute_template_id}' not found"
             )
     # Step 3: Return attribute template details
-    return template.to_dict()
+    return {
+        "message": f"Attribute template '{template.name}' retrieved successfully.",
+        "data": template.to_dict(),
+    }
 
 
 @api_controller()
@@ -136,7 +140,10 @@ async def create_attribute_template(template_data: AttributeTemplateCreateBody):
     await sio.emit("org_reload", namespace="/")
 
     # Step 5: Return created template
-    return new_template.to_dict()
+    return {
+        "message": f"Attribute template '{new_template.name}' created successfully.",
+        "data": new_template.to_dict(),
+    }
 
 
 @api_controller()
@@ -181,7 +188,10 @@ async def update_attribute_template(
     await sio.emit("org_reload", namespace="/")
 
     # Step 5: Return the updated template as a dictionary.
-    return template.to_dict()
+    return {
+        "message": f"Attribute template '{template.name}' updated successfully.",
+        "data": template.to_dict(),
+    }
 
 
 @api_controller()
@@ -213,3 +223,7 @@ async def delete_attribute_template(attribute_template_id: str):
 
     # Step 3: Emit an "org_reload" event to notify clients about the deletion.
     await sio.emit("org_reload", namespace="/")
+
+    return {
+        "message": f"Attribute template '{template.name}' deleted successfully.",
+    }

@@ -159,7 +159,8 @@ async def rematch_sample(
         )  # Compute matches for all targets
 
     # Step 4: Return rematched sample and message
-    sample = await get_sample(sample_item_id)
+    sample_data = await get_sample(sample_item_id)
+    sample = sample_data.get("data")
     sample_item_name = sample["sample_item_name"]
     return {
         "data": sample,
@@ -287,7 +288,8 @@ async def match_compute_sample(
     :rtype: dict
     """
     # Step 1: Gather sample information
-    sample = await get_sample(sample_item_id)
+    sample_data = await get_sample(sample_item_id)
+    sample = sample_data.get("data")
     sample_item_name = sample["sample_item_name"]
     sample_batch_id = sample["sample_batch_id"]
     filename = sample["filename"]
@@ -374,7 +376,8 @@ async def match_compute_sample(
     await aggregate_and_create_matches(sample_item_id=sample_item_id)
 
     # Step 6: Return sample with computed match data and status message
-    sample = await get_sample(sample_item_id)
+    sample_data = await get_sample(sample_item_id)
+    sample = sample_data.get("data")
     sample_item_name = sample["sample_item_name"]
     return {
         "data": sample,

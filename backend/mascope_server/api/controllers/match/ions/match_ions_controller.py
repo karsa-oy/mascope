@@ -271,7 +271,11 @@ async def get_match_ions(
         # Update total after deduplication
         total = len(data)
 
-    return {"results": total, "data": data}
+    return {
+        "message": "Match ions retrieved successfully",
+        "results": total,
+        "data": data,
+    }
 
 
 @api_controller()
@@ -299,7 +303,10 @@ async def get_match_ion(match_ion_id: str) -> dict:
         raise NotFoundException(f"Match ion with ID '{match_ion_id}' not found")
 
     # Step 3: Return ion details
-    return ion.to_dict()
+    return {
+        "message": "Match ion retrieved successfully",
+        "data": ion.to_dict(),
+    }
 
 
 @api_controller()

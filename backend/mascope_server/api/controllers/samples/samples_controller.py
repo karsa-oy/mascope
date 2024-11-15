@@ -158,6 +158,7 @@ async def get_samples(
         data.append(sample_dict)
 
     return {
+        "message": "Samples retrieved successfully.",
         "results": total,
         "data": data,
     }
@@ -223,4 +224,7 @@ async def get_sample(
     if match_sample and match_collection_types:
         sample_data["match_collection_types"] = match_collection_types.split(",")
 
-    return sample_data
+    return {
+        "message": f"Sample '{sample.sample_item_name}' retrieved successfully.",
+        "data": sample_data,
+    }

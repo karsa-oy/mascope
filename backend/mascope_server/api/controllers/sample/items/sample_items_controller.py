@@ -127,6 +127,7 @@ async def get_sample_items(
 
         # Step 5: Return the total count and the list of sample items
         return {
+            "message": "Sample items retrieved successfully.",
             "results": total,
             "data": [sample_item.to_dict() for sample_item in sample_items],
         }
@@ -156,7 +157,10 @@ async def get_sample_item(sample_item_id: str) -> dict:
         if not sample_item:
             raise NotFoundException(f"Sample item with ID '{sample_item_id}' not found")
     # Step 3: Return sample item details
-    return sample_item.to_dict()
+    return {
+        "message": f"Sample item '{sample_item.sample_item_name}' retrieved successfully.",
+        "data": sample_item.to_dict(),
+    }
 
 
 @api_controller(
@@ -210,8 +214,8 @@ async def create_sample_item(
 
     # Step 4: Return the new sample item details
     return {
-        "data": new_sample_item.to_dict(),
         "message": f"Sample item '{new_sample_item.sample_item_name}' was created.",
+        "data": new_sample_item.to_dict(),
     }
 
 
@@ -264,8 +268,8 @@ async def update_sample_item(
         namespace="/",
     )
     return {
-        "data": existing_sample_item.to_dict(),
         "message": f"Sample '{existing_sample_item.sample_item_name}' was updated.",
+        "data": existing_sample_item.to_dict(),
     }
 
 
@@ -435,8 +439,8 @@ async def copy_sample_item(
 
     # Step 7: Return the copied samle and message
     return {
-        "data": new_sample_item.to_dict(),
         "message": f"Sample '{new_sample_item.sample_item_name}' was successfully copied to sample batch '{batch.sample_batch_name}'.",
+        "data": new_sample_item.to_dict(),
         "_notification_data": {
             "sample_item_id": new_sample_item_id,
             "sample_batch_id": sample_batch_id,
@@ -461,7 +465,7 @@ async def process_sample_item(
     process_id=None,
 ) -> dict:
     """
-    TODO_api_circular_import  destinguish sample and sample_item controller, should be mocveved to samples_controller.py?
+    TODO_api_circular_import  destinguish sample and sample_item controller, should be moved to samples_controller.py?
     Automates the process of sample item creation, calibration, and match computation
     as a single workflow. This process ensures that once a sample item is created, it is
     then calibrated and matches are computed without requiring manual intervention.
@@ -512,9 +516,10 @@ async def process_sample_item(
 
     # Step 2: Create instrument function if its missing (for measurement mode)
     try:
-        instrument_function = await get_instrument_function(
+        instrument_function_data = await get_instrument_function(
             filename=sample_item.filename
         )
+        instrument_function = instrument_function_data.get("data")
     except NotFoundException:
         ...
     if not instrument_function:
@@ -609,8 +614,8 @@ async def process_sample_item(
     )
 
     return {
-        "data": sample,
         "message": f"Sample '{sample['sample_item_name']}' was successfully processed.",
+        "data": sample,
         "_notification_data": {
             "sample_item_id": sample_item_id,
             "filename": sample["filename"],

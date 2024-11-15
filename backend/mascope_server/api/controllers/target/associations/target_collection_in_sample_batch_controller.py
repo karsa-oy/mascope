@@ -51,6 +51,7 @@ async def get_target_collections_in_sample_batch(
         target_collections_in_sample_batch = result.scalars().all()
 
         return {
+            "message": "Target collections in sample batch retrieved successfully.",
             "results": total,
             "data": [
                 target_collection_in_sample_batch.to_dict()

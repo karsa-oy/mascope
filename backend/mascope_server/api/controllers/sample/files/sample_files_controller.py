@@ -16,7 +16,7 @@ from mascope_server.db import async_session
 from mascope_server.db.id import gen_id
 from mascope_server.db.models import SampleFile
 from mascope_server.api.controllers.instrument_functions.lib.instrument_functions_fetch import (
-    read_instrument_functions,
+    read_instrument_function,
 )
 from mascope_server.api.lib.api_features import (
     api_controller,
@@ -116,6 +116,7 @@ async def get_sample_files(
 
         # Step 6: Return results
         return {
+            "message": "Sample files retrieved successfully.",
             "results": total,
             "data": [sample_file.to_dict() for sample_file in sample_files],
         }
@@ -146,7 +147,10 @@ async def get_sample_file(sample_file_id: str) -> dict:
             raise NotFoundException(f"Sample file with ID '{sample_file_id}' not found")
 
         # Step 3: Return sample file details
-        return sample_file.to_dict()
+        return {
+            "message": f"Sample file '{sample_file.filename}' retrieved successfully.",
+            "data": sample_file.to_dict(),
+        }
 
 
 @api_controller()
@@ -194,7 +198,10 @@ async def create_sample_file(sample_file: SampleFileCreate) -> dict:
         await emit_user_notification(notification, sample_file.instrument)
 
         # Step 5: Return created sample file
-        return new_sample_file.to_dict()
+        return {
+            "message": f"Sample file '{new_sample_file.filename}' created successfully.",
+            "data": new_sample_file.to_dict(),
+        }
 
 
 @api_controller()
@@ -219,6 +226,10 @@ async def delete_sample_file(sample_file_id: str):
         # Step 2: Delete and commit
         await session.delete(sample_file)
         await session.commit()
+
+    return {
+        "message": f"Sample file '{sample_file.filename}' deleted successfully.",
+    }
 
 
 @api_controller()
@@ -260,7 +271,10 @@ async def update_sample_file(
         await session.refresh(sample_file)
 
         # Step 5: Return updated sample file
-        return sample_file.to_dict()
+        return {
+            "message": f"Sample file '{sample_file.filename}' updated successfully.",
+            "data": sample_file.to_dict(),
+        }
 
 
 # ---------------------
@@ -337,8 +351,8 @@ async def get_sample_file_peaks(
     """
 
     # Step 1: Fetch the sample file details
-    sample_file = await get_sample_file(sample_file_id)
-    filename = sample_file.get("filename")
+    sample_file_data = await get_sample_file(sample_file_id)
+    filename = sample_file_data.get("data").get("filename")
 
     # Step 2: Load the appropriate peak data based on the query params
     vars_to_load = []
@@ -443,11 +457,11 @@ async def compute_all_sample_file_peaks(
     :rtype: dict
     """
     # Step 1: Fetch the sample file
-    sample_file = await get_sample_file(sample_file_id)
-    filename = sample_file["filename"]
+    sample_file_data = await get_sample_file(sample_file_id)
+    filename = sample_file_data.get("data").get("filename")
 
     # Step 2: Load instrument functions and determine instrument type.
-    instrument_functions = await read_instrument_functions(filename)
+    instrument_functions = await read_instrument_function(filename=filename)
     instrument_type = get_instrument_type(filename)
 
     # Step 3: Set threshold based on instrument type.
@@ -513,8 +527,8 @@ async def get_sample_file_peak_timeseries(
     :rtype: dict
     """
     # Step 1: Fetch the sample file details using the provided ID.
-    sample_file = await get_sample_file(sample_file_id)
-    filename = sample_file["filename"]
+    sample_file_data = await get_sample_file(sample_file_id)
+    filename = sample_file_data.get("data").get("filename")
     # Step 2: Load the sample file
     try:
         sample_file = load_file(filename, vars=["peak_heights"])
@@ -542,6 +556,7 @@ async def get_sample_file_peak_timeseries(
         }
 
     return {
+        "message": f"Successfully retrieved timeseries for peak m/z {peak_mz} in '{filename}'.",
         "results": len(peak_timeseries.time.values),
         "data": {
             "mz": peak_mz_data,
@@ -591,8 +606,8 @@ async def get_sample_file_spectrum(
     :rtype: dict
     """
     # Step 1: Fetch sample file info from the database
-    sample_file = await get_sample_file(sample_file_id)
-    filename = sample_file["filename"]
+    sample_file_data = await get_sample_file(sample_file_id)
+    filename = sample_file_data.get("data").get("filename")
     # Derive intensity units from instrument type
     instrument_type = get_instrument_type(filename)
     intensity_unit = ("ions" if instrument_type == "tof" else "rel.",)
@@ -634,8 +649,13 @@ async def get_sample_file_spectrum(
     mz_values = spectrum.mz.values.tolist()
     intensity_values = spectrum.values.tolist()
 
+    message = f"Retrieved spectrum data with {len(mz_values)} m/z points from sample file '{filename}'."
+    if time_data_points is not None:
+        message += f" Time range specified with {time_data_points} data points."
+
     # Step 7: Return the total count, optional spectrum count, and data
     return {
+        "message": message,
         "results": len(mz_values),
         **(
             {"spectrum_count": time_data_points} if time_data_points is not None else {}

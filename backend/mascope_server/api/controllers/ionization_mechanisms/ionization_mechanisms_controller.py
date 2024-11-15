@@ -96,6 +96,7 @@ async def get_ionization_mechanisms(
 
         # Step 6: Return results
         return {
+            "message": "Retrieved ionization mechanisms successfully.",
             "results": total,
             "data": [
                 ionization_mechanism.to_dict()
@@ -151,7 +152,10 @@ async def get_ionization_mechanism(ionization_mechanism_id: str) -> dict:
         ionization_mechanism_dict = ionization_mechanism.to_dict()
         ionization_mechanism_dict["sample_batches_count"] = len(affected_sample_batches)
         ionization_mechanism_dict["sample_batches"] = affected_sample_batches
-        return ionization_mechanism_dict
+        return {
+            "message": f"Ionization mechanism '{ionization_mechanism.ionization_mechanism}' retrieved successfully.",
+            "data": ionization_mechanism_dict,
+        }
 
 
 @api_controller()
@@ -267,7 +271,8 @@ async def delete_ionization_mechanism(ionization_mechanism_id: str) -> dict:
             )
 
         # Step 2: Retrieve the ionization mechanism and check for sample batch references
-        ionization_details = await get_ionization_mechanism(ionization_mechanism_id)
+        ionization_data = await get_ionization_mechanism(ionization_mechanism_id)
+        ionization_details = ionization_data.get("data")
         if ionization_details["sample_batches_count"] > 0:
             raise ApiException(
                 f"Ionization mechanism '{ionization_mechanism.ionization_mechanism}' cannot be deleted as it is used in {ionization_details['sample_batches_count']} sample batches.",

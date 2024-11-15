@@ -68,7 +68,11 @@ async def get_workspaces(
         )
 
     # Step 5: Return the total count and the list of workspaces
-    return {"results": total, "data": [workspace.to_dict() for workspace in workspaces]}
+    return {
+        "message": "Workspaces retrieved successfully",
+        "results": total,
+        "data": [workspace.to_dict() for workspace in workspaces],
+    }
 
 
 @api_controller()
@@ -96,7 +100,10 @@ async def get_workspace(workspace_id: str) -> dict:
             raise NotFoundException(f"Workspace with ID '{workspace_id}' not found")
 
     # Step 3: Return workspace details
-    return workspace.to_dict()
+    return {
+        "message": f"Workspace '{workspace.workspace_name}' retrieved successfully",
+        "data": workspace.to_dict(),
+    }
 
 
 @api_controller()
@@ -133,7 +140,10 @@ async def create_workspace(workspace: WorkspaceCreate) -> dict:
         await sio.emit("org_reload", namespace="/")
 
     # Step 4: Return the new workspace details
-    return new_workspace.to_dict()
+    return {
+        "message": f"Workspace '{new_workspace.workspace_name}' created successfully.",
+        "data": new_workspace.to_dict(),
+    }
 
 
 @api_controller()
@@ -178,7 +188,10 @@ async def update_workspace(workspace_id: str, workspace: WorkspaceUpdate) -> dic
     await sio.emit("org_reload", namespace="/")
     await sio.emit("workspace_reload", room=workspace_id, namespace="/")
 
-    return existing_workspace.to_dict()
+    return {
+        "message": f"Workspace '{existing_workspace.workspace_name}' created successfully.",
+        "data": existing_workspace.to_dict(),
+    }
 
 
 @api_controller()
@@ -208,3 +221,7 @@ async def delete_workspace(workspace_id: str):
     # Step 3: Emit socket.io events
     await sio.emit("org_reload", namespace="/")
     await sio.emit("workspace_reload", room=workspace_id, namespace="/")
+
+    return {
+        "message": f"Workspace '{workspace.workspace_name}' deleted successfully.",
+    }

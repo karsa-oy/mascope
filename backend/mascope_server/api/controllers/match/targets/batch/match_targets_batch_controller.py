@@ -166,7 +166,8 @@ async def get_match_batch_collections(
     limit: int = 10000,
 ):
     # Verify the existance of sample batch
-    sample_batch = await get_sample_batch(sample_batch_id)
+    sample_batch_result = await get_sample_batch(sample_batch_id)
+    sample_batch = sample_batch_result.get("data")
     sample_batch_name = sample_batch["sample_batch_name"]
 
     # Fetch target collections for the sample batch
@@ -224,8 +225,8 @@ async def get_match_batch_collections(
     ]
 
     return {
-        "results": len(match_batch_collections_sorted),
         "message": f"Successfully retrieved target collection matches for batch '{sample_batch_name}'.",
+        "results": len(match_batch_collections_sorted),
         "data": match_batch_collections_paginated,
     }
 
@@ -239,7 +240,8 @@ async def get_match_batch_compounds(
     limit: int = 10000,
 ):
     # Verify the existance of sample batch
-    sample_batch = await get_sample_batch(sample_batch_id)
+    sample_batch_result = await get_sample_batch(sample_batch_id)
+    sample_batch = sample_batch_result.get("data")
     sample_batch_name = sample_batch["sample_batch_name"]
 
     # Fetch target compounds for the sample batch with potential duplicates across collections
@@ -300,8 +302,8 @@ async def get_match_batch_compounds(
     ]
 
     return {
-        "results": len(match_batch_compounds_sorted),
         "message": f"Successfully retrieved target compound matches for batch '{sample_batch_name}'.",
+        "results": len(match_batch_compounds_sorted),
         "data": match_batch_compounds_paginated,
     }
 
@@ -316,7 +318,8 @@ async def get_match_batch_ions(
     limit: int = 10000,
 ):
     # Verify the existance of sample batch
-    sample_batch = await get_sample_batch(sample_batch_id)
+    sample_batch_result = await get_sample_batch(sample_batch_id)
+    sample_batch = sample_batch_result.get("data")
     sample_batch_name = sample_batch["sample_batch_name"]
 
     # Fetch target ions with filters:
@@ -383,8 +386,8 @@ async def get_match_batch_ions(
     ]
 
     return {
-        "results": len(match_batch_ions_sorted),
         "message": f"Successfully retrieved target ion matches for batch '{sample_batch_name}'.",
+        "results": len(match_batch_ions_sorted),
         "data": match_batch_ions_paginated,
     }
 
@@ -400,7 +403,8 @@ async def get_match_batch_isotopes(
     limit: int = 10000,
 ):
     # Verify the existance of sample batch
-    sample_batch = await get_sample_batch(sample_batch_id)
+    sample_batch_result = await get_sample_batch(sample_batch_id)
+    sample_batch = sample_batch_result.get("data")
     sample_batch_name = sample_batch["sample_batch_name"]
 
     # Fetch target isotopes for the sample batch with filter parameters
@@ -466,7 +470,7 @@ async def get_match_batch_isotopes(
     ]
 
     return {
-        "results": len(match_batch_isotopes_sorted),
         "message": f"Successfully retrieved target isotopes matches for batch '{sample_batch_name}'.",
+        "results": len(match_batch_isotopes_sorted),
         "data": match_batch_isotopes_paginated,
     }

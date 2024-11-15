@@ -6,7 +6,7 @@ from mascope_server.api.controllers.instrument_functions.instrument_functions_co
 from mascope_lib.instrument_functions import r_orbi
 
 
-async def read_instrument_functions(filename):
+async def read_instrument_function(filename):
     """
     Retrieves and processes instrument function parameters for a given sample file.
 
@@ -20,9 +20,10 @@ async def read_instrument_functions(filename):
              The resolution function R takes a mass (m) and returns the resolution at that mass.
     :rtype: tuple(dict, function)
     """
-    instrument_functions = await get_instrument_function(filename)
-    peakshape = instrument_functions["peakshape"]
-    R_p = instrument_functions["resolution_function"]
+    instrument_function_data = await get_instrument_function(filename=filename)
+    instrument_function = instrument_function_data.get("data")
+    peakshape = instrument_function["peakshape"]
+    R_p = instrument_function["resolution_function"]
     if len(R_p) == 1:
         # Use native Orbitrap resolution function
         p1 = R_p[0]

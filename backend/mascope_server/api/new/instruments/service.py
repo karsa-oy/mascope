@@ -6,23 +6,35 @@ from mascope_lib.instrument import resolve_instrument_type
 
 
 @api_controller()
-async def get_instruments():
+async def get_instruments() -> dict:
     """
     Retrieve all instruments in the database, using the sample file table's instrument column.
 
-    :return: A list of instruments.
+    Steps:
+    1. Query the database for distinct instrument names from the sample files.
+    2. Resolve each instrument name to its type using the `resolve_instrument_type` function.
+    3. Return the list of instruments and their resolved types along with the total count.
+
+    :return: A dictionary containing:
+        - message: A human-readable message summarizing the result.
+        - results: The total number of distinct instruments.
+        - data: A list of instruments with their names and resolved types.
+    :rtype: dict
     """
     async with async_session() as session:
-        instruments = [
-            {"instrument": i[0], "type": resolve_instrument_type(i[0])}
-            for i in (
-                (await session.execute(select(SampleFile.instrument).distinct()))
-                .columns(SampleFile.instrument)
-                .all()
-            )
+        # Step 1: Query distinct instrument names
+        result = await session.execute(select(SampleFile.instrument).distinct())
+        instruments = result.scalars().all()
+
+        # Step 2: Resolve instrument types
+        instrument_list = [
+            {"instrument": instrument, "type": resolve_instrument_type(instrument)}
+            for instrument in instruments
         ]
+
+        # Step 3: Construct response
         return {
-            "results": len(instruments),
-            "data": instruments,
-            "message": f"Retrieved {len(instruments)} instrument records",
+            "message": f"Retrieved {len(instrument_list)} instrument records",
+            "results": len(instrument_list),
+            "data": instrument_list,
         }

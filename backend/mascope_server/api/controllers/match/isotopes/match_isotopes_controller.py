@@ -126,7 +126,11 @@ async def get_match_isotopes(
             )
         data.append(match_isotope_data)
 
-    return {"results": total, "data": data}
+    return {
+        "message": "Match isotopes retrieved successfully",
+        "results": total,
+        "data": data,
+    }
 
 
 @api_controller()
@@ -154,7 +158,7 @@ async def get_match_isotope(match_isotope_id: str) -> dict:
         raise NotFoundException(f"MatchIsotope with ID '{match_isotope_id}' not found")
 
     # Step 3: Return match details
-    return match.to_dict()
+    return {"message": "Match isotope retrieved successfully", "data": match.to_dict()}
 
 
 @api_controller()

@@ -57,6 +57,7 @@ async def get_target_compound_in_target_collection(
         target_compound_in_target_collections = result.scalars().all()
 
         return {
+            "message": "Target compounds in target collection retrieved successfully.",
             "results": total,
             "data": [
                 entry.to_dict() for entry in target_compound_in_target_collections

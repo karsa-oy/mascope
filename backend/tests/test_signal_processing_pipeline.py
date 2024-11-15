@@ -170,7 +170,7 @@ def test_detect_peaks(filepath):
         resolution_function = get_test_resolution_function(filename)
         # TODO Get instrument functions from the database
         # peakshape, resolution_function = asyncio.run(
-        #     read_instrument_functions(filename=filename)
+        #     read_instrument_function(filename=filename)
         # )
 
         sample_file_data, all_peak_mzs = asyncio.run(
@@ -209,7 +209,7 @@ def test_matching(filepath):
         resolution_function = get_test_resolution_function(filename)
         # TODO Get instrument functions from the database
         # peakshape, resolution_function = asyncio.run(
-        #     read_instrument_functions(filename=filename)
+        #     read_instrument_function(filename=filename)
         # )
 
         match_isotope_df = asyncio.run(

@@ -86,6 +86,7 @@ async def get_instrument_functions(
 
         # Step 6: Convert results to dictionary
         return {
+            "message": "Instrument functions retrieved successfully.",
             "results": total,
             "data": [
                 instrument_function.to_dict()
@@ -119,7 +120,7 @@ async def get_method_files(filename: str):
             )
         ]
         return {
-            "message": f"Retrieved {len(method_files)} method files for file {filename}",
+            "message": f"Retrieved {len(method_files)} method files for file `{filename}`",
             "results": len(method_files),
             "data": method_files,
         }
@@ -204,7 +205,10 @@ async def get_instrument_function(
             raise NotFoundException(detail_message)
 
         # Step 5: Return details
-        return instrument_function.to_dict()
+        return {
+            "message": "Instrument function retrieved successfully.",
+            "data": instrument_function.to_dict(),
+        }
 
 
 @api_controller()
@@ -247,7 +251,10 @@ async def create_instrument_function(
 
         # Step 4: Refresh the instance and return created instrument function
         await session.refresh(new_instrument_function)
-        return {"data": new_instrument_function.to_dict()}
+        return {
+            "message": "Instrument function created successfully.",
+            "data": new_instrument_function.to_dict(),
+        }
 
 
 @api_controller()
@@ -276,6 +283,10 @@ async def delete_instrument_function(instrument_function_id: str):
         # Step 2: Delete the instrument function and commit changes
         await session.delete(instrument_function)
         await session.commit()
+
+    return {
+        "message": "Instrument function deleted successfully.",
+    }
 
 
 @api_controller_background_task(

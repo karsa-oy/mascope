@@ -54,7 +54,7 @@ from mascope_server.api.controllers.calibration.calibration_controller import (
     calibration_mz_calibrate_batch,
 )
 from mascope_server.api.controllers.instrument_functions.lib.instrument_functions_fetch import (
-    read_instrument_functions,
+    read_instrument_function,
 )
 from mascope_server.api.models.sample.batches.sample_batch_pydantic_model import (
     SampleBatchCreateBody,
@@ -137,6 +137,7 @@ async def get_sample_batches(
 
     # Step 6: Convert the results into a list of dictionaries for JSON serialization and return
     return {
+        "message": "Sample batches retrieved successfully",
         "results": total,
         "data": [sample_batch.to_dict() for sample_batch in sample_batches],
     }
@@ -168,7 +169,10 @@ async def get_sample_batch(sample_batch_id: str) -> dict:
                 f"Sample batch with ID '{sample_batch_id}' not found"
             )
     # Step 3: Return sample batch details
-    return sample_batch.to_dict()
+    return {
+        "message": f"Sample batch '{sample_batch.sample_batch_name}' retrieved successfully",
+        "data": sample_batch.to_dict(),
+    }
 
 
 @api_controller()
@@ -189,7 +193,8 @@ async def get_batch_targets(sample_batch_id: str, deduplicate: bool = False) -> 
     :rtype: dict
     """
     # Step 1: Verify existence of sample batch
-    sample_batch = await get_sample_batch(sample_batch_id)
+    sample_batch_result = await get_sample_batch(sample_batch_id)
+    sample_batch = sample_batch_result.get("data")
     sample_batch_name = sample_batch["sample_batch_name"]
 
     # Step 2: Fetch target collections
@@ -521,8 +526,8 @@ async def update_sample_batch(
             namespace="/",
         )
     return {
-        "data": updated_sample_batch.to_dict(),
         "message": f"Sample '{updated_sample_batch.sample_batch_name}' was updated.",
+        "data": updated_sample_batch.to_dict(),
     }
 
 
@@ -616,7 +621,8 @@ async def import_sample_items(
     :param sid: Session ID, used for emitting notifications to specific clients, defaults to None.
     :type sid: str, optional
     """
-    sample_batch = await get_sample_batch(sample_batch_id)
+    sample_batch_result = await get_sample_batch(sample_batch_id)
+    sample_batch = sample_batch_result.get("data")
     sample_batch_name = sample_batch["sample_batch_name"]
 
     # Step 1: Verify all sample items are for the same instrument
@@ -864,7 +870,8 @@ async def sample_batch_export_peaks(
     :param sid: Session ID for targeting specific clients when emitting events, defaults to None.
     :type sid: str, optional
     """
-    sample_batch = await get_sample_batch(sample_batch_id)
+    sample_batch_result = await get_sample_batch(sample_batch_id)
+    sample_batch = sample_batch_result.get("data")
     sample_batch_name = sample_batch["sample_batch_name"]
 
     async with async_session() as session:
@@ -896,7 +903,7 @@ async def sample_batch_export_peaks(
 
         try:
             filename = row["filename"]
-            instrument_functions = await read_instrument_functions(filename)
+            instrument_functions = await read_instrument_function(filename=filename)
             instrument_type = get_instrument_type(filename)
 
             await send_progress_user_notification(notification, 0.1)

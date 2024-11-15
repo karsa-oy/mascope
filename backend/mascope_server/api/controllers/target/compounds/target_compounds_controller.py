@@ -158,6 +158,7 @@ async def get_target_compounds(
         data.append(compound_data)
 
     return {
+        "message": "Target compounds retrieved successfully.",
         "results": total,
         "data": data,
     }
@@ -189,7 +190,10 @@ async def get_target_compound(target_compound_id: str) -> dict:
                 f"Target compound with ID '{target_compound_id}' not found"
             )
     # Step 3: Return target compound details
-    return target_compound.to_dict()
+    return {
+        "message": f"Details for target compound '{target_compound.target_compound_name}' retrieved.",
+        "data": target_compound.to_dict(),
+    }
 
 
 @api_controller()
@@ -649,3 +653,7 @@ async def delete_target_compound(
         await sio.emit("targets_all_reload", namespace="/")
     else:
         await session.flush()
+
+    return {
+        "message": f"Target compound '{target_compound.target_compound_name}' was deleted.",
+    }

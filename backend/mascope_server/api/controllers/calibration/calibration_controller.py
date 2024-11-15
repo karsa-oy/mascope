@@ -84,8 +84,10 @@ async def get_mz_calibration(
         result = await session.execute(stmt)
         mz_calibration = result.scalars().first()
 
-    # TODO_data wrapper
-    return mz_calibration or {}  # Return empty dict if mz_calibration is None
+    return {
+        "message": "m/z calibration retrieved successfully.",
+        "data": {"mz_calibration": mz_calibration} if mz_calibration else {},
+    }
 
 
 @api_controller_background_task(

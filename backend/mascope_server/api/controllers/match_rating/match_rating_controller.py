@@ -106,6 +106,7 @@ async def get_match_ratings(
 
         # Step 7: Return serialized results
         return {
+            "message": "Match ratings retrieved successfully.",
             "results": total,
             "data": [match_rating.to_dict() for match_rating in match_ratings],
         }
@@ -147,7 +148,10 @@ async def get_match_rating(match_rating_id: str) -> dict:
         )
 
         # Step 4: Return match rating details
-        return match_rating.to_dict()
+        return {
+            "message": f"Match rating '{match_rating_id}' retrieved successfully.",
+            "data": match_rating.to_dict(),
+        }
 
 
 @api_controller()
@@ -196,4 +200,7 @@ async def create_match_rating(match_rating: MatchRatingCreate) -> dict:
         new_match_rating.environment = json.loads(new_match_rating.environment)
 
         # Step 4: Return created match rating details
-        return new_match_rating.to_dict()
+        return {
+            "message": "Rating submitted successfully. Thanks for your feedback!",
+            "data": new_match_rating.to_dict(),
+        }
