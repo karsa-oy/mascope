@@ -24,11 +24,10 @@ async def fetch_sample_file(filename: str) -> dict:
     """
     async with async_session() as session:
         # Step 1: Fetch sample file by ID
-        sample_file = (
-            await session.execute(
-                select(SampleFile).where(SampleFile.filename == filename)
-            )
-        ).first()[0]
+        result = await session.execute(
+            select(SampleFile).where(SampleFile.filename == filename)
+        )
+        sample_file = result.scalar_one_or_none()
         # Step 2: Check existence
         if not sample_file:
             raise NotFoundException(f"Sample file with filename '{filename}' not found")
