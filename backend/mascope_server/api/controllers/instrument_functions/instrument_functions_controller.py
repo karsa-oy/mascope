@@ -118,7 +118,11 @@ async def get_method_files(filename: str):
                 )
             )
         ]
-        return {"data": method_files}
+        return {
+            "message": f"Retrieved {len(method_files)} method files for file {filename}",
+            "results": len(method_files),
+            "data": method_files,
+        }
 
 
 @api_controller()
