@@ -57,5 +57,9 @@ class AuthConfig(BaseModel):
     # Access token-based authentication settings for Jupyter library API access
     ACCESS_TOKEN_EXPIRATION_SECONDS: int = 3600  # Access token lifetime in seconds
 
+    # Role access levels for RBAC
+    # Role names correspond to the role_id values in the database (access_level)
+    ROLE_ACCESS_LEVELS: dict = {"Guest": 1, "Editor": 2, "Admin": 3, "Owner": 4}
+
 
 auth_settings = AuthConfig()
