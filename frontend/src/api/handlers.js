@@ -70,8 +70,9 @@ export default {
     if (status === 202) {
       console.log('[api:http] progress notification', data)
       // data is returned in sio user_notifications
+    } else {
+      unhandled(response)
     }
-    unhandled(response)
   }
 }
 
