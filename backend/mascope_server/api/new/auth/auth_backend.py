@@ -112,8 +112,8 @@ async def get_enabled_backends(request: Request) -> list[AuthenticationBackend]:
     :rtype: list[AuthenticationBackend]
     """
     # Debug: Inspecting request details for determining authentication method
-    runtime.logger.debug(f"Request scope:\n{pretty_repr(request.scope)}")
-    runtime.logger.debug(f"Request headers:\n{pretty_repr(dict(request.headers))}")
+    runtime.logger.trace(f"Request scope:\n{pretty_repr(request.scope)}")
+    runtime.logger.trace(f"Request headers:\n{pretty_repr(dict(request.headers))}")
 
     cookie_auth = request.cookies.get("mascope_auth")
     auth_header = request.headers.get("authorization")

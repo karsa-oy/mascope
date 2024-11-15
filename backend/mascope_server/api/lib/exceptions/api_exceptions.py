@@ -44,7 +44,15 @@ def process_exception(e: Exception, context_message: str) -> ApiException:
         user_message = e.user_message
         status_code = e.status_code
     elif isinstance(e, HTTPException):
-        user_message = f"{context_message}. {e.detail}."
+        if e.status_code == status.HTTP_401_UNAUTHORIZED:
+            user_message = f"{context_message}. Please log in to the Mascope."
+        elif (
+            e.status_code == status.HTTP_400_BAD_REQUEST
+            and str(e.detail) == "ErrorCode.LOGIN_BAD_CREDENTIALS"
+        ):
+            user_message = "Invalid login credentials. Please check email and password."
+        else:
+            user_message = f"{context_message}. {e.detail}"
         status_code = e.status_code
     elif isinstance(e, ValueError):
         user_message = error_message.replace("\n", "; ")

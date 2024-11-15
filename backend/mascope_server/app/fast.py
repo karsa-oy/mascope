@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -109,6 +109,28 @@ async def value_exception_handler(request: Request, exc: ValueError) -> JSONResp
     :rtype: JSONResponse
     """
     context_message = "Invalid value"
+    return handle_exception(exc, context_message, response_type="http")
+
+
+@fast.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+    """
+    Custom exception handler for HTTPException instances. This handler captures HTTP exceptions
+    like 403 Forbidden, 401 Unauthorized, and others, so they are processed in a unified format.
+
+    :param request: The request object.
+    :type request: Request
+    :param exc: The HTTPException instance to be handled.
+    :type exc: HTTPException
+    :return: A JSONResponse with structured error information.
+    :rtype: JSONResponse
+    """
+    if exc.status_code == status.HTTP_401_UNAUTHORIZED:
+        context_message = "Authorization failed"
+    elif exc.status_code == status.HTTP_403_FORBIDDEN:
+        context_message = "Access denied"
+    else:
+        context_message = f"An HTTP error occurred: {exc.status_code}"
     return handle_exception(exc, context_message, response_type="http")
 
 

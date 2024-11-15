@@ -2,8 +2,10 @@
 Route dependencies  
 """
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends
+from mascope_server.api.new.auth.exceptions import ForbiddenAccessException
 from mascope_server.db.models import User
+from mascope_server.api.new.auth.config import auth_settings
 from mascope_server.api.new.auth.auth_backend import fastapi_users, get_enabled_backends
 
 # Dependencies for active, verified, and superuser users
@@ -21,24 +23,37 @@ current_superuser = fastapi_users.current_user(
 get_current_user_token = fastapi_users.authenticator.current_user_token(active=True)
 
 
-# Dependency to check if the user is an admin
-async def admin_user(user: User = Depends(current_active_user)) -> User:
-    """
-    Custom dependency to ensure that the user has admin privileges.
+# Role-based access dependencies
+async def guest_user(user: User = Depends(current_active_user)) -> User:
+    return await role_based_access(user, "Guest")
 
-    This function checks if the current user has the "admin" role (role_id == 2).
-    If the user is not an admin, it raises a 403 HTTP exception.
+
+async def editor_user(user: User = Depends(current_active_user)) -> User:
+    return await role_based_access(user, "Editor")
+
+
+async def admin_user(user: User = Depends(current_active_user)) -> User:
+    return await role_based_access(user, "Admin")
+
+
+async def owner_user(user: User = Depends(current_active_user)) -> User:
+    return await role_based_access(user, "Owner")
+
+
+async def role_based_access(user: User, access: str) -> User:
+    """
+    Enforces role-based access control by comparing the user's role_id with the required access level.
 
     :param user: The current active user.
-    :type user: User
-    :raises HTTPException: If the user does not have the admin role.
-    :return: The user object, if the user is an admin.
-    :rtype: User
+    :param access: Name of the required role (e.g., "Admin", "Editor").
+    :raises HTTPException: If the user's role does not meet the required level.
+    :return: The user object if the role requirement is met.
     """
-    # Assuming the role is stored in user.role.name
-    if user.role_id is None or user.role_id != 2:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to access this resource.",
-        )
+    required_role_id = auth_settings.ROLE_ACCESS_LEVELS.get(access, None)
+    if (
+        user.role_id is None
+        or required_role_id is None
+        or user.role_id < required_role_id
+    ):
+        raise ForbiddenAccessException()
     return user
