@@ -93,7 +93,7 @@ async def fit_instrument_functions_route(
     background_tasks.add_task(
         instrument_functions_fit,
         sample_file=sample_file,
-        params=body.params,
+        instrument_function_params=body.instrument_function_params,
         independent_transaction=True,
         sid=request.headers.get("X-SID"),
         process_id=process_id,

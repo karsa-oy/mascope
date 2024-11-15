@@ -56,7 +56,7 @@ watchEffect(async () => {
       `/instrument_functions/fit`,
       {
         filename: props.filename,
-        params: {
+        instrument_function_params: {
           threshold: threshold.value
         }
       },

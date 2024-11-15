@@ -6,7 +6,7 @@ from mascope_server.api.models.base_pydantic_model import QueryParamsModel
 from mascope_server.api.new.instrument_functions.params import InstrumentFunctionParams
 
 
-params = InstrumentFunctionParams()
+instrument_function_params = InstrumentFunctionParams()
 
 
 class GetInstrumentFunctionsQueryParams(QueryParamsModel):
@@ -83,7 +83,7 @@ class InstrumentFunctionCreateBody(InstrumentFunctionBase):
 
 class InstrumentFunctionFitParams(BaseModel):
     threshold: float = Field(
-        default=params.threshold,
+        default=instrument_function_params.threshold,
         description="R-squared threshold filtering non-(skewed) Gaussian peaks from instrument function evaluation",
     )
 
@@ -99,7 +99,7 @@ class InstrumentFunctionFitParams(BaseModel):
 
 class FitInstrumentFunctionsBody(BaseModel):
     filename: str = Field(..., description="The filename of the file used for the fit")
-    params: InstrumentFunctionFitParams = Field(
+    instrument_function_params: InstrumentFunctionFitParams = Field(
         InstrumentFunctionFitParams(),
         description="The instrument function fitting parameters",
     )

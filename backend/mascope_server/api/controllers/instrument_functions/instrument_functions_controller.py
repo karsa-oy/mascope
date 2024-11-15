@@ -280,7 +280,7 @@ async def delete_instrument_function(instrument_function_id: str):
 )
 async def instrument_functions_fit(
     sample_file: SampleFile,
-    params: InstrumentFunctionFitParams = InstrumentFunctionFitParams(),
+    instrument_function_params: InstrumentFunctionFitParams = InstrumentFunctionFitParams(),
     independent_transaction: bool = False,
     sid=None,
     process_id=None,
