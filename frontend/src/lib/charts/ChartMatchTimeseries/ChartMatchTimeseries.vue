@@ -45,9 +45,9 @@ const traces = computed(() => {
   return settings.yMode == 'sum'
     ? data.traces.toReversed()
     : data.traces.map(function (trace) {
-        // Scale chart traces by dividing all y-values by sampleLength and time interval
+        // Scale chart traces by dividing all y-values by time interval
         let newTrace = structuredClone(toRaw(trace))
-        newTrace.y = trace.y.map((value, i) => value / sampleLength.value / timeIntervals.value[i])
+        newTrace.y = trace.y.map((value, i) => value / timeIntervals.value[i])
         newTrace.fill = 'none'
         return newTrace
       })
