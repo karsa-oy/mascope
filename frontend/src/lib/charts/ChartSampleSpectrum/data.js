@@ -64,7 +64,7 @@ export const useChartData = defineStore('chart.sample.spectrum', () => {
               `mz: <b>${mz.toFixed(4)}</b>`,
               `height: <b>%{customdata[0]:.3e}</b>`,
               `area: <b>%{customdata[1]:.3e}</b>`
-            ].join('<br>') + '<extra></extra>'
+            ].join('<br>') + '<extra></extra>' // use "<extra></extra>" to get rid of extra block from the hoverbox
           // * Plotly's hover tooltip only appears
           // when hovering near a point, so we
           // generate 3 points to make it easy
@@ -86,7 +86,7 @@ export const useChartData = defineStore('chart.sample.spectrum', () => {
           y: new Float32Array(data.intensity),
           hovertemplate:
             ['<i>Signal</i>', 'm/z: <b>%{x:.4f}</b>', `intensity: <b>%{y:.3e}</b>`].join('<br>') +
-            '<extra></extra>'
+            '<extra></extra>' // use "<extra></extra>" to get rid of extra block from the hoverbox
         })
       unit.value = data.intensity_unit
       length.value = data.intensity.length
