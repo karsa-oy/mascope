@@ -59,7 +59,7 @@ class AuthConfig(BaseModel):
 
     # Role access levels for RBAC
     # Role names correspond to the role_id values in the database (access_level)
-    ROLE_ACCESS_LEVELS: dict = {"Guest": 1, "Editor": 2, "Admin": 3, "Owner": 4}
+    ROLE_ACCESS_LEVELS: dict = {"guest": 100, "editor": 200, "admin": 300, "owner": 400}
 
 
 auth_settings = AuthConfig()

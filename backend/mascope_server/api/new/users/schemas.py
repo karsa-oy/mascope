@@ -70,7 +70,7 @@ class UserCreate(schemas.BaseUserCreate):
     )
     role_id: int = Field(
         default=1,
-        description="Role ID assigned to the user (e.g., '1' for regular users).",
+        description="Role ID assigned to the user (e.g., '100' for guest users).",
     )
 
     model_config = {"from_attributes": True}

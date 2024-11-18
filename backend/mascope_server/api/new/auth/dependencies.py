@@ -25,19 +25,19 @@ get_current_user_token = fastapi_users.authenticator.current_user_token(active=T
 
 # Role-based access dependencies
 async def guest_user(user: User = Depends(current_active_user)) -> User:
-    return await role_based_access(user, "Guest")
+    return await role_based_access(user, "guest")
 
 
 async def editor_user(user: User = Depends(current_active_user)) -> User:
-    return await role_based_access(user, "Editor")
+    return await role_based_access(user, "editor")
 
 
 async def admin_user(user: User = Depends(current_active_user)) -> User:
-    return await role_based_access(user, "Admin")
+    return await role_based_access(user, "admin")
 
 
 async def owner_user(user: User = Depends(current_active_user)) -> User:
-    return await role_based_access(user, "Owner")
+    return await role_based_access(user, "owner")
 
 
 async def role_based_access(user: User, access: str) -> User:
@@ -45,7 +45,7 @@ async def role_based_access(user: User, access: str) -> User:
     Enforces role-based access control by comparing the user's role_id with the required access level.
 
     :param user: The current active user.
-    :param access: Name of the required role (e.g., "Admin", "Editor").
+    :param access: Name of the required role (e.g., "admin", "editor").
     :raises HTTPException: If the user's role does not meet the required level.
     :return: The user object if the role requirement is met.
     """
