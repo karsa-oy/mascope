@@ -3,7 +3,10 @@ Route dependencies
 """
 
 from fastapi import Depends
-from mascope_server.api.new.auth.exceptions import ForbiddenAccessException
+from mascope_server.api.new.auth.exceptions import (
+    ForbiddenAccessException,
+    InvalidRoleException,
+)
 from mascope_server.db.models import User
 from mascope_server.api.new.auth.config import auth_settings
 from mascope_server.api.new.auth.auth_backend import fastapi_users, get_enabled_backends
@@ -50,10 +53,10 @@ async def role_based_access(user: User, access: str) -> User:
     :return: The user object if the role requirement is met.
     """
     required_role_id = auth_settings.ROLE_ACCESS_LEVELS.get(access, None)
-    if (
-        user.role_id is None
-        or required_role_id is None
-        or user.role_id < required_role_id
-    ):
+
+    if required_role_id is None:
+        raise InvalidRoleException()
+
+    if user.role_id is None or user.role_id < required_role_id:
         raise ForbiddenAccessException()
     return user

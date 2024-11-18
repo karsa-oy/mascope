@@ -130,7 +130,7 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
     elif exc.status_code == status.HTTP_403_FORBIDDEN:
         context_message = "Access denied"
     else:
-        context_message = f"An HTTP error occurred: {exc.status_code}"
+        context_message = "An HTTP error occurred"
     return handle_exception(exc, context_message, response_type="http")
 
 

@@ -3,6 +3,7 @@ from fastapi import HTTPException, status
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.encoders import jsonable_encoder
+from mascope_server.api.new.auth.exceptions import InvalidRoleException
 from sqlalchemy.exc import SQLAlchemyError
 
 from mascope_server.runtime import runtime
@@ -51,6 +52,8 @@ def process_exception(e: Exception, context_message: str) -> ApiException:
             and str(e.detail) == "ErrorCode.LOGIN_BAD_CREDENTIALS"
         ):
             user_message = "Invalid login credentials. Please check email and password."
+        elif isinstance(e, InvalidRoleException):
+            user_message = "The role is invalid. Please contact the administrator."
         else:
             user_message = f"{context_message}. {e.detail}"
         status_code = e.status_code
