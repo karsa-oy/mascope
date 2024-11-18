@@ -141,7 +141,7 @@ async def sample_file_upload_route(
 
 
 @sample_files_router.get("/{sample_file_id}/peaks")
-@api_route(jupyter_access=True)
+@api_route(token_access=True)
 async def get_sample_file_peaks_route(
     sample_file_id: str,
     query_params: GetSampleFilePeaksQueryParams = Depends(),
@@ -194,7 +194,7 @@ async def compute_all_sample_file_peaks_route(
 
 
 @sample_files_router.post("/{sample_file_id}/peaks/timeseries")
-@api_route(jupyter_access=True)
+@api_route(token_access=True)
 async def get_sample_file_peak_timeseries_route(
     sample_file_id: str, body: GetSampleFilePeakTimeseriesBody, user=Depends(guest_user)
 ):
@@ -213,7 +213,7 @@ async def get_sample_file_peak_timeseries_route(
 
 
 @sample_files_router.get("/{sample_file_id}/spectrum")
-@api_route(jupyter_access=True)
+@api_route(token_access=True)
 async def get_sample_file_spectrum_route(
     sample_file_id: str,
     query_params: GetSpectrumQueryParams = Depends(),

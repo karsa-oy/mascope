@@ -26,7 +26,7 @@ sample_batches_router = APIRouter(prefix="/api/sample/batches", tags=["Sample Ba
 
 
 @sample_batches_router.get("")
-@api_route(jupyter_access=True)
+@api_route(token_access=True)
 async def get_sample_batches_route(
     query_params: GetSampleBatchesQueryParams = Depends(),
     user=Depends(guest_user),

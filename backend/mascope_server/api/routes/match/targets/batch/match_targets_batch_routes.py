@@ -21,7 +21,7 @@ match_targets_batch_router = APIRouter(
 
 
 @match_targets_batch_router.get("/{sample_batch_id}")
-@api_route(jupyter_access=True)
+@api_route(token_access=True)
 async def get_batch_data_route(
     sample_batch_id: str,
     user=Depends(guest_user),

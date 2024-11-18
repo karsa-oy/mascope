@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends
 from mascope_server.api.lib.api_features import api_route
+from mascope_server.api.new.auth.dependencies import guest_user, editor_user
 from mascope_server.api.controllers.match_rating.match_rating_controller import (
     get_match_ratings,
     get_match_rating,
@@ -9,7 +10,6 @@ from mascope_server.api.models.match_rating.match_rating_pydantic_model import (
     MatchRatingCreate,
     GetMatchRatingsQueryParams,
 )
-from mascope_server.api.new.auth.dependencies import guest_user, editor_user
 
 match_rating_router = APIRouter(
     prefix="/api/match_ratings",
@@ -27,7 +27,7 @@ async def get_match_ratings_route(
 
     :param query_params: Query parameters for filtering, sorting, and pagination.
     :type query_params: GetMatchRatingsQueryParams
-    :param user: The current authenticated user, defaults to Depends(guest_user).
+    :param user: The current authenticated user with guest permissions.
     :type user: User
     :return: A dictionary containing total count and list of match ratings.
     :rtype: dict
@@ -45,7 +45,7 @@ async def get_match_rating_route(
 
     :param match_rating_id: Unique identifier of the match rating.
     :type match_rating_id: str
-    :param user: The current authenticated user, defaults to Depends(guest_user).
+    :param user: The current authenticated user with guest permissions.
     :type user: User
     :return: The requested match rating's details.
     :rtype: dict
@@ -59,13 +59,13 @@ async def get_match_rating_route(
 )
 async def create_match_rating_route(
     match_rating: MatchRatingCreate,
-    user=Depends(guest_user),
+    user=Depends(editor_user),
 ):
     """Submit a new match rating.
 
     :param match_rating: The match rating to create.
     :type match_rating: MatchRatingCreate
-    :param user: The current authenticated user, defaults to Depends(guest_user).
+    :param user: The current authenticated user with editor permissions.
     :type user: User
     :return: A dictionary with the created match rating details.
     :rtype: dict

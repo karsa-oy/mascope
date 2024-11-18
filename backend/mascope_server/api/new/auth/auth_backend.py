@@ -126,10 +126,10 @@ async def get_enabled_backends(request: Request) -> list[AuthenticationBackend]:
         runtime.logger.debug("Using web application authentication.")
         return [auth_backend_cookie]
 
-    # Access token-based authentication for Jupyter server access
+    # Access token-based authentication for token access (Jupyter server)
     if auth_header and not cookie_auth:
-        # Check if the endpoint allows Jupyter access token
-        if hasattr(route_func, "jupyter_access") and route_func.jupyter_access:
+        # Check if the endpoint allows for token access
+        if hasattr(route_func, "token_access") and route_func.token_access:
             runtime.logger.debug(
                 "Using Jupyter server or external API access authentication."
             )

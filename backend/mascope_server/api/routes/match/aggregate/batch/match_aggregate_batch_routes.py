@@ -202,7 +202,7 @@ async def aggregate_and_recreate_matches_route(
 
 
 @match_aggregate_batch_router.get("/{sample_batch_id}/all")
-@api_route(jupyter_access=True)
+@api_route(token_access=True)
 async def get_batch_and_aggregated_matches_route(
     sample_batch_id: str,
     user=Depends(guest_user),

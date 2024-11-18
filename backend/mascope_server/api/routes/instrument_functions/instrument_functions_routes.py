@@ -85,7 +85,7 @@ async def get_method_files_route(
 
 
 @instrument_functions_router.post("")
-@api_route(status_code=201, jupyter_access=True)
+@api_route(status_code=201, token_access=True)
 async def create_instrument_function_route(
     body: InstrumentFunctionCreateBody,
     user=Depends(editor_user),

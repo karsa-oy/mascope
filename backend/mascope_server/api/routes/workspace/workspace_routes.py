@@ -21,7 +21,7 @@ workspace_router = APIRouter(prefix="/api/workspaces", tags=["Workspace"])
 
 
 @workspace_router.get("")
-@api_route(jupyter_access=True)
+@api_route(token_access=True)
 async def get_workspaces_route(
     query_params: GetWorkspacesQueryParams = Depends(),
     user=Depends(guest_user),

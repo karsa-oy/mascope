@@ -101,7 +101,7 @@ async def aggregate_sample_match_ion_route(
 
 
 @match_aggregate_sample_router.post("/{sample_item_id}/compound")
-@api_route(jupyter_access=True)
+@api_route(token_access=True)
 async def aggregate_sample_match_compound_route(
     sample_item_id: str,
     body: AggregateSampleMatchCompoundBody,

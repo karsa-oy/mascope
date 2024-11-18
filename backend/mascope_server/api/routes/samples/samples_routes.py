@@ -13,7 +13,7 @@ samples_router = APIRouter(prefix="/api/samples", tags=["Samples Loading"])
 
 
 @samples_router.get("")
-@api_route(jupyter_access=True)
+@api_route(token_access=True)
 async def get_samples_route(
     query_params: GetSamplesQueryParams = Depends(), user=Depends(guest_user)
 ):
@@ -27,7 +27,7 @@ async def get_samples_route(
 
 
 @samples_router.get("/{sample_item_id}")
-@api_route(jupyter_access=True)
+@api_route(token_access=True)
 async def get_sample_route(sample_item_id: str, user=Depends(guest_user)):
     """Retrieve details of a specific sample by ID.
 

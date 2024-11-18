@@ -84,7 +84,7 @@ def api_controller(emit_reload_events: List[Tuple[str, str]] = [], error_message
 
 def api_route(
     status_code: int = 200,
-    jupyter_access: bool = False,
+    token_access: bool = False,
 ):
     """
     A decorator for route handler functions to standardize the response structure and handle exceptions.
@@ -103,16 +103,16 @@ def api_route(
 
     :param status_code: HTTP status code to be used for successful responses, defaults to 200.
     :type status_code: int, optional
-    :param jupyter_access: Flag to indicate if the route allows access via an access token (for Jupyter or external access).
+    :param token_access: Flag to indicate if the route allows access via an access token (for Jupyter or external access).
                            If set to True, the endpoint is accessible via a Bearer token in addition to standard JWT authentication.
-    :type jupyter_access: bool, optional
+    :type token_access: bool, optional
     :return: The wrapped route handler function with standardized response formatting and exception handling.
     :rtype: Callable
     """
 
     def decorator(func: Callable):
         # Attach access attributes to function
-        func.jupyter_access = jupyter_access
+        func.token_access = token_access
 
         @wraps(func)
         async def wrapper(*args, **kwargs):
