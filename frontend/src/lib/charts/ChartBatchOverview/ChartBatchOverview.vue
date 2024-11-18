@@ -35,7 +35,9 @@ const traces = computed(() => {
         // Scale chart traces by dividing all y-values by sampleLength
         let newTrace = structuredClone(toRaw(trace))
         // Use x-coordinate (sample_item_id) to retrieve sample length
-        newTrace.y = trace.y.map((value, i) => value / sampleLengths[trace.x[i]])
+        newTrace.y = trace.y.map((value, i) =>
+          value !== null ? value / sampleLengths[trace.x[i]] : null
+        )
         return newTrace
       })
 })
