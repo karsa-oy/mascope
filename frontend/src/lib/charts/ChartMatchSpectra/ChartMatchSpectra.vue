@@ -4,16 +4,16 @@ import { ref, computed, watch, toRaw } from 'vue'
 import ScrollPanel from 'primevue/scrollpanel'
 import Tag from 'primevue/tag'
 
-import BaseChartPlotly from '../BaseChartPlotly.vue'
-
 import { BaseMatchTag } from '@/lib/base'
 import { clone } from '@/lib/utils'
 import { useApp } from '@/stores'
 
+import BaseChartPlotly from '../BaseChartPlotly.vue'
 import { useChartData } from './data.js'
 
 const app = useApp()
 const data = useChartData()
+
 const plots = ref({})
 
 const { settings } = defineProps({
@@ -23,16 +23,18 @@ const { settings } = defineProps({
   }
 })
 
-const sampleLength = computed(() => {
-  return app.data.sample.selected.length != 1 ? null : app.data.sample.selected[0].length
-})
+const sampleLength = computed(() =>
+  app.data.sample.selected.length != 1 ? null : app.data.sample.selected[0].length
+)
 
 const traces = computed(() => {
   // Scale trace y-values based on "sum / average" toggle
-  if (sampleLength === null) return []
+  if (sampleLength === null) {
+    return []
+  }
   return settings.yMode == 'sum'
     ? data.traces
-    : data.traces.map(function (trace) {
+    : data.traces.map((trace) => {
         // Scale chart traces by dividing all y-values by sampleLength
         let newTrace = structuredClone(toRaw(trace))
         newTrace.y = trace.y.map((value) => value / sampleLength.value)

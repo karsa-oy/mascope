@@ -6,11 +6,10 @@ import ToggleSwitch from 'primevue/toggleswitch'
 import Select from 'primevue/select'
 import Chip from 'primevue/chip'
 
-import BaseChartPlotly from '../BaseChartPlotly.vue'
-
 import { beautifySnakeCase } from '@/lib/utils'
 import { useApp } from '@/stores'
 
+import BaseChartPlotly from '../BaseChartPlotly.vue'
 import { useChartData } from './data'
 
 const app = useApp()
@@ -18,10 +17,10 @@ const data = useChartData()
 
 const yMode = ref('sum')
 const log = ref(true)
-const unit = computed(() => {
+const unit = computed(() =>
   // Adjust the y-axis unit based on "sum / average" toggle
-  return yMode.value == 'sum' ? '' : `per second`
-})
+  yMode.value == 'sum' ? '' : `per second`
+)
 
 const traces = computed(() => {
   // Scale trace y-values based on "sum / average" toggle
@@ -30,17 +29,15 @@ const traces = computed(() => {
     (o, sample) => ({ ...o, [sample.sample_item_id]: sample.length }),
     {}
   )
-  const newTraces =
-    yMode.value == 'sum'
-      ? data.traces
-      : data.traces.map(function (trace) {
-          // Scale chart traces by dividing all y-values by sampleLength
-          let newTrace = structuredClone(toRaw(trace))
-          // Use x-coordinate (sample_item_id) to retrieve sample length
-          newTrace.y = trace.y.map((value, i) => value / sampleLengths[trace.x[i]])
-          return newTrace
-        })
-  return newTraces
+  return yMode.value == 'sum'
+    ? data.traces
+    : data.traces.map((trace) => {
+        // Scale chart traces by dividing all y-values by sampleLength
+        let newTrace = structuredClone(toRaw(trace))
+        // Use x-coordinate (sample_item_id) to retrieve sample length
+        newTrace.y = trace.y.map((value, i) => value / sampleLengths[trace.x[i]])
+        return newTrace
+      })
 })
 
 const inferType = (field) => {

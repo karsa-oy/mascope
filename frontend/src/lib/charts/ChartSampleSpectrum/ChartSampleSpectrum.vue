@@ -6,11 +6,9 @@ import ToggleSwitch from 'primevue/toggleswitch'
 import ProgressSpinner from 'primevue/progressspinner'
 
 import { BaseParamField } from '@/lib/base'
-
-import BaseChartPlotly from '../BaseChartPlotly.vue'
-
 import { useApp } from '@/stores'
 
+import BaseChartPlotly from '../BaseChartPlotly.vue'
 import { useChartData } from './data.js'
 
 const app = useApp()
@@ -19,31 +17,31 @@ const data = useChartData()
 const yMode = ref('sum')
 const scale = ref()
 const log = ref()
-const unit = computed(() => {
+const unit = computed(() =>
   // Adjust the y-axis unit based on "sum / average" toggle
-  return yMode.value == 'sum' ? data.unit : `${data.unit}/s`
-})
+  yMode.value == 'sum' ? data.unit : `${data.unit}/s`
+)
 
 const traces = computed(() => {
   // Scale trace y-values based on "sum / average" toggle
-  if (app.data.sample.selected.length != 1) return []
+  if (app.data.sample.selected.length != 1) {
+    return []
+  }
   const sampleLength = app.data.sample.selected[0].length
-  const newTraces =
-    yMode.value == 'sum'
-      ? data.traces
-      : data.traces.map(function (trace) {
-          // Scale chart traces by dividing all y-values by sampleLength
-          let newTrace = structuredClone(toRaw(trace))
-          newTrace.y = trace.y.map((value) => value / sampleLength)
-          // For peak traces, scale "customdata" containing [height, area]
-          if (newTrace.name == 'Peak') {
-            newTrace.customdata = trace.customdata.map(function (subarr) {
-              return subarr.map((value) => value / sampleLength)
-            })
-          }
-          return newTrace
-        })
-  return newTraces
+  return yMode.value == 'sum'
+    ? data.traces
+    : data.traces.map((trace) => {
+        // Scale chart traces by dividing all y-values by sampleLength
+        let newTrace = structuredClone(toRaw(trace))
+        newTrace.y = trace.y.map((value) => value / sampleLength)
+        // For peak traces, scale "customdata" containing [height, area]
+        if (newTrace.name == 'Peak') {
+          newTrace.customdata = trace.customdata.map((subarr) => {
+            return subarr.map((value) => value / sampleLength)
+          })
+        }
+        return newTrace
+      })
 })
 
 const layout = computed(() => ({

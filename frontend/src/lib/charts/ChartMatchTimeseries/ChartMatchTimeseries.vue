@@ -5,7 +5,6 @@ import Tag from 'primevue/tag'
 import { useApp } from '@/stores'
 
 import BaseChartPlotly from '../BaseChartPlotly.vue'
-
 import { useChartData } from './data.js'
 
 const app = useApp()
@@ -19,17 +18,19 @@ const { settings } = defineProps({
   }
 })
 
-const sampleLength = computed(() => {
+const sampleLength = computed(() =>
   // Length of the selected sample in seconds
-  return app.data.sample.selected.length != 1 ? null : app.data.sample.selected[0].length
-})
+  app.data.sample.selected.length != 1 ? null : app.data.sample.selected[0].length
+)
 
 const timeIntervals = computed(() => {
   // Interval between consecutive scans in the sample ("time resolution") in seconds
-  if (!data.traces.length) return []
+  if (!data.traces.length) {
+    return []
+  }
   const t = data.traces[0].x
   // Calculate intervals starting from the second time coordinate
-  const tDiff = t.slice(1).map(function (n, i) {
+  const tDiff = t.slice(1).map((n, i) => {
     return n - t[i]
   })
   return t[0] > 0
@@ -41,10 +42,12 @@ const timeIntervals = computed(() => {
 
 const traces = computed(() => {
   // Scale trace y-values based on "sum / average" toggle
-  if (sampleLength === null) return []
+  if (sampleLength.value === null) {
+    return []
+  }
   return settings.yMode == 'sum'
     ? data.traces.toReversed()
-    : data.traces.map(function (trace) {
+    : data.traces.map((trace) => {
         // Scale chart traces by dividing all y-values by time interval
         let newTrace = structuredClone(toRaw(trace))
         newTrace.y = trace.y.map((value, i) => value / timeIntervals.value[i])
