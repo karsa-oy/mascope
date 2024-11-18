@@ -442,6 +442,112 @@ backend/
       routes/              fastapi routes
 ```
 
+### API Authentication and Authorization
+
+Mascope employs **Role-Based Access Control (RBAC)** and two authentication methods—**Cookie-based JWT authentication** for web users and **Access Token-based authentication** for external applications like Jupyter.
+
+### **Cookie-based JWT authentication**
+
+Mascope's web application uses **JWT authentication** via cookies for secure session management. This approach provides seamless, session-like authentication for web users, but lucks the token admin cotrol.
+
+- **Transport**: Cookies are configured with `HttpOnly` and `Secure` flags (in production), preventing client-side JavaScript access and providing secure transmission over HTTPS.
+- **Token details**:
+  - JWT tokens are signed using the API private secret key.
+  - Cookies match the JWT expiration to simplify session management.
+
+Routes authenticated via cookies are primarily designed for web-based user interactions with Mascope's primary UI.
+
+### Access Token authentication
+
+To enable authenticated access for external applications, such as Jupyter servers and the public `mascope_api` library, **Access Token-based authentication** is implemented.
+
+- **Access Tokens**:
+  - Stored in the database and linked to a user via the `AccessToken` model.
+  - Tokens are issued with a defined lifetime, after which they expire and must be renewed.
+  - Tokens can be generated and revoked via dedicated routes under `/api/auth/access_token`.
+- **Endpoint compatibility**:
+  - Endpoints that support access token authentication are explicitly marked with `token_access=True` in the `api_route` decorator.
+  - The authentication system dynamically selects the appropriate backend (`auth_backend_access_token`) for such requests.
+- **Use cases**:
+  - Jupyter server integration, where tokens are passed via the `Authorization` header (`Bearer <access_token>`).
+  - Public libraries like `mascope_api` that rely on external access.
+
+### Authorization
+
+**Role-Based Access Control (RBAC)**
+
+Roles are dynamically created during database migrations based on the configuration in `auth/config.py`. Each role is assigned a numeric `role_id`, indicating its privilege level.
+
+The current roles include:
+
+- **`guest`**: Read-only access (includes Jupyter-accessible endpoints via bearer access tokens).
+- **`editor`**: Create, update, and delete permissions.
+- **`admin`**: Full administrative rights, including user management.
+- **`owner`**: Full permissions, including the ability to manage admins.
+
+**Role-Based endpoint dependencies**
+
+To secure routes, role-based dependencies are used. Examples:
+
+```python
+
+@fastapi_router.get("/api/resource")
+async def resource_route(user: User = Depends(admin_user)):
+    ...
+
+```
+
+Available dependencies: `guest_user`, `editor_user`, `admin_user`, and `owner_user`.
+
+### API Response Format
+
+Endpoints return responses in a unified structure to simplify client-side parsing. The structure includes:
+
+- `message` (required): Describes the operation result.
+- `results` (optional): Count of items (used for `get_all` endpoints).
+- `data` (optional): Contains the payload, omitted for certain actions (e.g., `DELETE`).
+
+**Example Success Response**:
+
+```json
+{
+  "message": "Retrieved 3 instrument records",
+  "results": 3,
+  "data": [
+    { "instrument": "KLTOF1", "type": "tof" },
+    { "instrument": "KORBI2", "type": "orbi" },
+    { "instrument": "MORBI", "type": "orbi" }
+  ]
+}
+```
+
+### Error handling
+
+Errors are uniformly formatted to separate user-friendly messages from developer-level details:
+
+**Example error response**:
+
+```json
+{
+  "error": "User-friendly error message", // For client-side notifications
+  "detail": {
+    "error_message": "Detailed technical error message with context.",
+    "traceback": "Stack trace for debugging (if available)."
+  }
+}
+```
+
+- `error`: Designed for client-side notifications. Display meaningful error messages directly to users.
+- `detail`: Provides debug-level context, including technical `error_message` and a `traceback` stack trace. This is intended for developer debugging or logging tools.
+
+### Documentation
+
+The FastAPI-powered backend provides API documentation at:
+
+- **Swagger UI**: Accessible at `/docs`, this interactive UI allows developers to test API endpoints directly from their browser, view example requests/responses, and understand required parameters.
+- **ReDoc**: Available at `/redoc`, this alternative interface provides a more structured, visually appealing API reference. It’s particularly useful for browsing the API’s capabilities in a hierarchical format.
+- **OpenAPI specification**: The raw OpenAPI JSON schema is available at `/openapi.json`, enabling integration with external tools and services for API exploration or client code generation.
+
 ### Backend App
 
 To run the [API](#backend-api) we need to have multiple Python 'apps' and 'servers'.
