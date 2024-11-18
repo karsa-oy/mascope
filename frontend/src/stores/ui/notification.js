@@ -1,4 +1,4 @@
-import { ref, reactive, watchEffect, watch, computed, onBeforeUnmount } from 'vue'
+import { ref, reactive, watch, computed, onBeforeUnmount } from 'vue'
 import { defineStore } from 'pinia'
 import { api } from '@/api'
 import { genId } from '@/lib/utils'
@@ -191,6 +191,7 @@ export const useNotification = defineStore('app.ui.notification', () => {
   function on(trigger, callback) {
     const id = genId()
     const types = Array.isArray(trigger) ? trigger : [trigger]
+    state.latest = null
     types.forEach((type) => {
       state.watchers.push({ id, type, callback })
     })
@@ -209,13 +210,18 @@ export const useNotification = defineStore('app.ui.notification', () => {
   }
 
   // Automatically trigger registered watchers when a new notification is received
-  watchEffect(() => {
-    state.watchers.forEach(({ type, callback }) => {
-      if (state.latest?.id && (type === state.latest.type || type === '*')) {
-        callback(state.latest)
+  watch(
+    () => state.latest,
+    (latest) => {
+      if (latest?.id) {
+        state.watchers.forEach(({ type, callback }) => {
+          if (type === latest.type || type === '*') {
+            callback(state.latest)
+          }
+        })
       }
-    })
-  })
+    }
+  )
 
   // Watch drawer state and clear badge when opened
   watch(drawer, (isOpen) => {

@@ -17,7 +17,7 @@ import Message from 'primevue/message'
 
 import { api } from '@/api'
 import { ToolbarTemplate } from '@/lib/toolbars'
-import { PaneFitInstrumentFunctions } from '@/lib/panes'
+import { PaneInstrumentFunctions } from '@/lib/panes'
 import { clone, strToSnakeCase, beautifySnakeCase, beautifyConstant, genId } from '@/lib/utils'
 import { useApp } from '@/stores'
 import {
@@ -76,24 +76,9 @@ const input = reactive({
   filename: null,
   filterId: null,
   instrument: null,
-  type: null,
-  methodFile: null
+  type: null
 })
-
-const methodFiles = ref([])
-async function loadMethodfiles() {
-  await api.http
-    .get(`/instrument_functions/method_files`, {
-      params: {
-        filename: input.filename
-      },
-      use: 'read',
-      type: 'load_method_files'
-    })
-    .then((method_files) => {
-      methodFiles.value = method_files
-    })
-}
+const instrumentFunctions = ref()
 
 const title = computed(
   () =>
@@ -127,17 +112,6 @@ async function init(active) {
     label,
     value
   }))
-  // method files
-  await loadMethodfiles()
-  input.methodFile = (
-    await api.http.get(`/sample/files`, {
-      params: {
-        filename: input.filename
-      },
-      use: 'read',
-      type: 'get_method_file'
-    })
-  )[0].method_file
 }
 // autofill fields when template is selected
 watch(template, autofill)
@@ -198,13 +172,17 @@ async function save() {
         ) ?? {}
     )
   }
+  const { existing_method_file, new_method_file, new_instrument_function } =
+    instrumentFunctions.value?.payload
   if (props.action == 'create') {
     await app.data.sample.process({
       sample: {
         filename: input.filename,
         ...sample_item
       },
-      method_file: input.methodFile
+      existing_method_file,
+      new_method_file,
+      new_instrument_function
     })
   } else if (props.action == 'create_pending') {
     if (!(app.data.acquisition.ready.filename == input.filename)) {
@@ -221,7 +199,9 @@ async function save() {
           ...sample_item,
           filename: input.filename
         },
-        method_file: input.methodFile
+        existing_method_file,
+        new_method_file,
+        new_instrument_function
       })
       app.data.acquisition.ready.filename = null
     }
@@ -246,17 +226,24 @@ watchEffect(() => {
     input.filterId = null
   }
 })
+
+const invalid = computed(() => {
+  const missingRequiredFields =
+    input.fields?.filter((f) => f?.required).length !=
+    input.fields?.filter((f) => f?.required).filter((f) => f.value).length
+  return !input.type || missingRequiredFields || instrumentFunctions.value?.invalid
+})
 </script>
 
 <template>
   <Dialog
     :header="title"
     v-model:visible="visible"
-    style="width: 800px"
+    style="width: 900px"
     contentStyle="flex-grow: 1; display: flex; flex-flow: column; gap: 0.5rem; justify-content: space-between"
   >
     <Panel>
-      <Tabs v-model:value="tab" lazy>
+      <Tabs v-model:value="tab">
         <TabList>
           <Tab value="sample-details">Sample Details</Tab>
           <Tab value="instrument-funcs" :disabled="!input.filename || action == 'create_pending'">
@@ -308,32 +295,44 @@ watchEffect(() => {
                 <label for="item-filename"> Filename </label>
               </FloatLabel>
 
-              <div class="input-group">
+              <div class="input-group" v-if="instrumentFunctions?.methodFile">
                 <FloatLabel>
                   <Select
                     inputId="method-file"
-                    v-model="input.methodFile"
-                    :options="methodFiles"
-                    :disabled="methodFiles.length == 0"
-                    :editable="action == 'create_pending'"
-                  />
+                    v-model="instrumentFunctions.methodFile.selected"
+                    :options="instrumentFunctions.methodFile.options"
+                    :invalid="instrumentFunctions.invalid"
+                  >
+                    <template #value="{ value }">
+                      {{
+                        instrumentFunctions?.methodFile.new?.length > 0
+                          ? `${instrumentFunctions?.methodFile.new} (new)`
+                          : value
+                      }}
+                    </template>
+                  </Select>
+
                   <label for="method-file"> Method file </label>
                 </FloatLabel>
                 <Button
                   @click="tab = 'instrument-funcs'"
-                  icon="pi pi-plus"
-                  :disabled="action == 'create_pending'"
+                  icon="pi pi-pen-to-square"
                   v-tooltip="'Add new method file'"
+                  :disabled="action == 'create_pending'"
                 />
               </div>
+              <FloatLabel v-if="action == 'create_pending' && instrumentFunctions?.creating">
+                <InputText
+                  id="pending-method-file"
+                  v-model="instrumentFunctions.methodFile.new"
+                  required
+                />
+                <label for="pending-method-file"> New method file </label>
+              </FloatLabel>
             </div>
           </ScrollPanel>
           <Message
-            v-if="
-              action == 'create_pending' &&
-              input.methodFile &&
-              !methodFiles.includes(input.methodFile)
-            "
+            v-if="action == 'create_pending' && instrumentFunctions.creating"
             severity="info"
             icon="pi pi-info-circle"
             style="
@@ -350,15 +349,11 @@ watchEffect(() => {
         </TabPanel>
         <TabPanel value="instrument-funcs">
           <ScrollPanel style="width: 100%; height: 50vh">
-            <PaneFitInstrumentFunctions
+            <PaneInstrumentFunctions
+              v-if="visible"
               :filename="input.filename"
-              @saved="
-                async (methodFile) => {
-                  tab = 'sample-details'
-                  await loadMethodfiles()
-                  input.methodFile = methodFile
-                }
-              "
+              :autofit="tab == 'instrument-funcs'"
+              v-model:data="instrumentFunctions"
             />
           </ScrollPanel>
         </TabPanel>
@@ -366,18 +361,16 @@ watchEffect(() => {
     </Panel>
     <menu>
       <ToolbarTemplate v-model:template="template.selected" :initial="initial" />
+      <Message
+        v-if="instrumentFunctions?.message"
+        :severity="instrumentFunctions?.message?.severity"
+        :icon="instrumentFunctions?.message?.icon"
+      >
+        {{ instrumentFunctions?.message?.contents }}
+      </Message>
       <menu>
         <Button label="Cancel" @click="() => (action = null)" severity="secondary" />
-        <Button
-          label="Save"
-          @click="() => save()"
-          :disabled="
-            !input.type ||
-            !input.methodFile ||
-            input.fields?.filter((f) => f?.required).length !=
-              input.fields?.filter((f) => f?.required).filter((f) => f.value).length
-          "
-        />
+        <Button label="Save" @click="() => save()" :disabled="invalid" />
       </menu>
     </menu>
   </Dialog>
@@ -416,6 +409,8 @@ watchEffect(() => {
 
 menu {
   margin-top: 1rem;
+  display: flex;
   justify-content: space-between;
+  align-items: flex-end;
 }
 </style>

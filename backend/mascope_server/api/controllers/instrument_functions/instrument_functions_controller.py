@@ -106,19 +106,21 @@ async def get_method_files(filename: str):
     """
     sample_file = await fetch_sample_file(filename)
     async with async_session() as session:
-        method_files = [
-            i[0]
-            for i in (
+        method_files = (
+            (
                 await session.execute(
-                    select(InstrumentFunction.method_file)
+                    select(InstrumentFunction)
                     .where(
                         InstrumentFunction.instrument == sample_file.instrument,
                         InstrumentFunction.datetime_utc <= sample_file.datetime_utc,
                     )
-                    .distinct()
+                    .group_by(InstrumentFunction.method_file)
+                    .having(func.max(InstrumentFunction.datetime_utc))
                 )
             )
-        ]
+            .scalars()
+            .all()
+        )
         return {
             "message": f"Retrieved {len(method_files)} method files for file `{filename}`",
             "results": len(method_files),
@@ -299,6 +301,7 @@ async def instrument_functions_fit(
     independent_transaction: bool = False,
     sid=None,
     process_id=None,
+    parent_id=None,
 ) -> dict:
     """Fit instrument functions for the sample file.
 

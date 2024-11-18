@@ -38,7 +38,7 @@ class UserNotification(BaseModel):
     @field_validator("status")
     @classmethod
     def validate_status(cls, v):
-        valid_statuses = ["success", "error", "pending", "warning"]
+        valid_statuses = ["success", "info", "error", "pending", "warning"]
         if v not in valid_statuses:
             raise ValueError(
                 f"Invalid status '{v}'. Valid statuses are {valid_statuses}."

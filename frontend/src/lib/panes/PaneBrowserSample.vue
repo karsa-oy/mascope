@@ -21,6 +21,7 @@ import {
   DialogBatchOp,
   DialogSampleOp,
   DialogCalibration,
+  DialogInstrumentFunction,
   useBatchDeleteDialog
 } from '@/lib/dialogs'
 
@@ -40,7 +41,8 @@ const dialog = reactive({
   },
   item: {
     op: null,
-    calibration: false
+    calibration: false,
+    instrumentFunction: false
   }
 })
 
@@ -336,6 +338,13 @@ const sampleMenuEntries = computed(() => [
     icon: 'pi pi-wave-pulse',
     command: async () => {
       await app.data.peak.computeAll(item.context)
+    }
+  },
+  {
+    label: `Refit instrument functions`,
+    icon: 'pi pi-wave-pulse',
+    command: () => {
+      dialog.item.instrumentFunction = true
     }
   }
 ])
@@ -704,6 +713,10 @@ watch(
   <DialogSampleOp v-model:action="dialog.item.op" :item="item.context" />
   <DialogCalibration v-model:visible="dialog.batch.calibration" :context="batch.context" />
   <DialogCalibration v-model:visible="dialog.item.calibration" :context="item.context" />
+  <DialogInstrumentFunction
+    v-model:visible="dialog.item.instrumentFunction"
+    :sample="item.context"
+  />
 </template>
 
 <style scoped>

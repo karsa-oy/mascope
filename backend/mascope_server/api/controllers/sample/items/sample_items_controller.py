@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from typing import Optional
 from fastapi import BackgroundTasks
 from sqlalchemy import (
     select,
@@ -30,15 +31,6 @@ from mascope_server.api.controllers.calibration.calibration_controller import (
     calibration_mz_calibrate_sample,
 )
 from mascope_server.api.controllers.samples.samples_controller import get_sample
-from mascope_server.api.controllers.sample.files.sample_files_controller import (
-    update_sample_file,
-)
-from mascope_server.api.controllers.sample.lib.sample_file_fetch import (
-    fetch_sample_file,
-)
-from mascope_server.api.models.sample.files.sample_file_pydantic_model import (
-    SampleFileUpdate,
-)
 from mascope_server.api.models.sample.items.sample_item_pydantic_model import (
     SampleItemCreate,
     SampleItemUpdate,
@@ -52,13 +44,11 @@ from mascope_server.api.lib.notifications.api_notification import (
 from mascope_server.api.lib.notifications.api_notification_pydantic_model import (
     UserNotification,
 )
-from mascope_server.api.lib.notifications.api_notification import (
-    emit_user_notification,
+from mascope_server.api.controllers.instrument_functions.process_instrument_function_controller import (
+    process_instrument_function,
 )
-from mascope_server.api.controllers.instrument_functions.instrument_functions_controller import (
-    get_instrument_function,
-    instrument_functions_fit,
-    create_instrument_function,
+from mascope_server.api.models.instrument_functions.instrument_function_pydantic_model import (
+    InstrumentFunctionBase,
 )
 
 
@@ -458,7 +448,9 @@ async def copy_sample_item(
 )
 async def process_sample_item(
     sample_item: SampleItemCreate,
-    method_file: str,
+    existing_method_file: Optional[str] = None,
+    new_method_file: Optional[str] = None,
+    new_instrument_function: Optional[InstrumentFunctionBase] = None,
     mz_calibration_params: MzCalibrationParams = MzCalibrationParams(),
     independent_transaction: bool = False,
     sid=None,
@@ -472,17 +464,21 @@ async def process_sample_item(
     NOTE that the sample_file record with the same filename should already exist in the database.
 
     Steps:
-    1. Get the sample file
-    2. Create instrument function is none exist for method file
-    3. Update sample file's method file
-    4. Create a new sample item using the provided details.
-    5. Perform m/z calibration on the newly created sample item if instrument is TOF
+    1. Process instrument functions for the sample file
+    2. Create a new sample item using the provided details.
+    3. Perform m/z calibration on the newly created sample item if instrument is TOF
         using provided calibration parameters.
-    6. Compute matches for the sample item, integrating any newly identified matches.
-    7. Fetch the final sample details including match data for verification and further processing.
+    4. Compute matches for the sample item, integrating any newly identified matches.
+    5. Fetch the final sample details including match data for verification and further processing.
 
     :param sample_item: Details of the sample item to be created.
     :type sample_item: SampleItemCreate
+    :param existing_method_file: A method file already in the instrument function table to use.
+    :type existing_method_file: str, optional
+    :param new_method_file: A new method file not in the instrument function table to create an instrument function for.
+    :type new_method_file: str, optional
+    :param new_instrument_function: A new instrument function to create a record for.
+    :type new_instrument_function: InstrumentFunctionBase, optional
     :param mz_calibration_params: Calibration parameters to use, defaults to a preconfigured set.
     :type mz_calibration_params: MzCalibrationParams, optional
     :param independent_transaction: Indicates whether this operation should be treated as a standalone transaction.
@@ -511,56 +507,22 @@ async def process_sample_item(
     )
     await send_progress_user_notification(notification, 0.1)
 
-    # Step 1: Get the sample file
-    sample_file = await fetch_sample_file(filename=sample_item.filename)
+    # Step 1: process instrument functions
 
-    # Step 2: Create instrument function if its missing (for measurement mode)
-    try:
-        instrument_function_data = await get_instrument_function(
-            filename=sample_item.filename
-        )
-        instrument_function = instrument_function_data.get("data")
-    except NotFoundException:
-        ...
-    if not instrument_function:
-        # fit to the file
-        new_instrument_function = (
-            await instrument_functions_fit(sample_file=sample_file)
-        ).data.instrument_functions.model_dump()
-        # create instrument function record
-        new_instrument_function["method_file"] = method_file
-        instrument_function_id = (
-            await create_instrument_function(new_instrument_function)
-        ).data["instrument_function_id"]
-        # notify the user
-        notification = UserNotification(
+    if new_method_file or existing_method_file:
+        await process_instrument_function(
+            filename=sample_item.filename,
+            existing_method_file=existing_method_file,
+            new_method_file=new_method_file,
+            new_instrument_function=new_instrument_function,
+            independent_transaction=False,
+            sid=sid,
             process_id=gen_id(8),
-            type="create_instrument_function",
-            status="info",
-            message=f"New instrument function was automatically fit and created for method file {method_file} with file {sample_file.filename}.",
-            data={
-                "filename": sample_file.filename,
-                "method_file": method_file,
-            },
+            parent_id=process_id,
         )
-        await emit_user_notification(
-            notification, sample_file.instrument
-        )  # is this the right room?
-    else:
-        instrument_function_id = instrument_function["instrument_function_id"]
 
-    # Step 3: Update the sample file's method file
-    sample_file_fields = {
-        **sample_file.to_dict(),
-        "method_file": method_file,
-        "instrument_function_id": instrument_function_id,
-    }
-    await update_sample_file(
-        sample_file.sample_file_id,
-        SampleFileUpdate(**sample_file_fields),
-    )
+    # Step 2: create the sample item
 
-    # Step 4: Create the sample item
     # TODO_invalidation
     # Set independent_transaction to true to trigger sample_batch_reload after creating the sample item record
     create_sample_result = await create_sample_item(
@@ -580,7 +542,7 @@ async def process_sample_item(
     }
     await send_progress_user_notification(notification, 0.2)
 
-    # Step 5: Calibrate the sample item if instrument is TOF
+    # Step 3: Calibrate the sample item if instrument is TOF
     if get_instrument_type(created_sample_item["filename"]) == "tof":
         await calibration_mz_calibrate_sample(
             sample_item_id=sample_item_id,
@@ -594,7 +556,7 @@ async def process_sample_item(
         )
         await send_progress_user_notification(notification, 0.6)
 
-    # Step 6: Compute matches if calibration is successful
+    # Step 4: Compute matches if calibration is successful
     await match_compute_sample(
         sample_item_id=sample_item_id,
         independent_transaction=False,
@@ -608,10 +570,12 @@ async def process_sample_item(
     )
     await send_progress_user_notification(notification, 0.9)
 
-    # Step 7: Fetch updated sample details including match data
-    sample = await get_sample(
-        sample_item_id=sample_item_id,
-    )
+    # Step 5: Fetch updated sample details including match data
+    sample = (
+        await get_sample(
+            sample_item_id=sample_item_id,
+        )
+    )["data"]
 
     return {
         "message": f"Sample '{sample['sample_item_name']}' was successfully processed.",

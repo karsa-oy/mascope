@@ -5,6 +5,9 @@ from mascope_server.api.models.calibration.calibration_pydantic_model import (
     MzCalibrationParams,
 )
 from mascope_server.api.models.base_pydantic_model import QueryParamsModel
+from mascope_server.api.models.instrument_functions.instrument_function_pydantic_model import (
+    InstrumentFunctionBase,
+)
 
 # TODO_configuration possible sample item types list, split by filter_id presence
 SAMPLE_TYPES_FILTER_ID_REQUIRED = ["FILTER_REGENERATION", "FILTER_BACKGROUND"]
@@ -112,5 +115,23 @@ class SampleItemProcessBody(BaseModel):
     sample_item: SampleItemCreate = Field(
         ..., description="Sample item to be processed (created, calibrated, matched)"
     )
-    method_file: str = Field(..., description="The methodfile to use for this sample")
+    existing_method_file: Optional[str] = Field(
+        None, description="An existing method file to use for this sample"
+    )
+    new_method_file: Optional[str] = Field(
+        None, description="A new method file to create and use for this sample"
+    )
+    new_instrument_function: Optional[InstrumentFunctionBase] = Field(
+        None,
+        description="Instrument functions to create and associate with the sample file",
+    )
     mz_calibration_params: MzCalibrationParams = MzCalibrationParams()
+
+    @model_validator(mode="after")
+    @classmethod
+    def validate_method_file_fields(cls, values):
+        if values.existing_method_file and values.new_method_file:
+            raise ValueError(
+                f"Process instrument function ({values.sample_item.filename}): expecting either an existing_method_file argument or a new_method_file_argument but not both."
+            )
+        return values

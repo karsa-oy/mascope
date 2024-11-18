@@ -54,14 +54,14 @@ export const useSample = defineModule({
         type: 'copy_sample'
       }
     ),
-  process: async ({ sample, method_file }) => {
+  process: async ({ sample, ...instrument_function_process }) => {
     const mzFit = useMzFit()
     return await api.http.post(
       `/sample/items/process`,
       {
         sample_item: sample,
-        method_file,
-        mz_calibration_params: mzFit.mzCalibrationParams
+        mz_calibration_params: mzFit.mzCalibrationParams,
+        ...instrument_function_process
       },
       {
         use: 'process',

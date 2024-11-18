@@ -13,12 +13,16 @@ from mascope_server.api.controllers.instrument_functions.instrument_functions_co
     delete_instrument_function,
     instrument_functions_fit,
 )
+from mascope_server.api.controllers.instrument_functions.process_instrument_function_controller import (
+    process_instrument_function,
+)
 from mascope_server.api.models.instrument_functions.instrument_function_pydantic_model import (
     GetInstrumentFunctionsQueryParams,
     GetInstrumentFunctionQueryParams,
     GetMethodFilesQueryParams,
     InstrumentFunctionCreateBody,
     FitInstrumentFunctionsBody,
+    ProcessInstrumentFunctionBody,
 )
 
 
@@ -151,5 +155,59 @@ async def fit_instrument_functions_route(
     )
     return {
         "message": f"Fitting instrument functions for {body.filename}, this can take a moment.",
+        "process_id": process_id,
+    }
+
+
+@instrument_functions_router.post("/process")
+@api_route(status_code=202)
+async def process_instrument_function_route(
+    request: Request,
+    body: ProcessInstrumentFunctionBody,
+    background_tasks: BackgroundTasks,
+    user=Depends(editor_user),
+):
+    """
+    Initiates processing of instrument functions for a given sample file and method file.
+
+    This route is used to process and associate instrument functions with a specified sample file.
+    Depending on the provided inputs, the route supports the following scenarios:
+
+    Scenarios:
+    1. Using an existing method file:
+      - Specify `existing_method_file` to use an existing method file from the database. If no new instrument
+        functions are provided, the latest instrument functions are associated with the sample file.
+    2. Creating a new method file with automated fit:
+      - Specify `new_method_file` without `new_instrument_function` to create a new method file and fit
+        instrument functions automatically.
+    3. Creating a new method file with user-provided fit:
+      - Specify both `new_method_file` and `new_instrument_function` to create a new method file and
+        associate user-provided instrument functions with the sample file.
+
+    :param request: The incoming HTTP request object.
+    :type request: Request
+    :param body: The request body containing details of the sample file, method file, and optional
+                 instrument functions.
+    :type body: ProcessInstrumentFunctionBody
+    :param background_tasks: The background task manager to queue the instrument function processing task.
+    :type background_tasks: BackgroundTasks
+    :param user: The authenticated user, restricted to editor-level access or higher.
+    :type user: User, optional
+    :return: A response containing a message and a unique process ID for tracking the background task.
+    :rtype: dict
+    """
+    process_id = gen_id(8)
+    background_tasks.add_task(
+        process_instrument_function,
+        filename=body.filename,
+        existing_method_file=body.existing_method_file,
+        new_method_file=body.new_method_file,
+        new_instrument_function=body.new_instrument_function,
+        independent_transaction=True,
+        sid=request.headers.get("X-SID"),
+        process_id=process_id,
+    )
+    return {
+        "message": f"Processing instrument functions for {body.filename}",
         "process_id": process_id,
     }

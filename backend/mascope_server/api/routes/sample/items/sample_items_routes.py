@@ -13,8 +13,8 @@ from mascope_server.api.controllers.sample.items.sample_items_controller import 
     copy_sample_item,
     process_sample_item,
 )
-from mascope_server.api.controllers.sample.files.sample_files_controller import (
-    get_sample_files,
+from mascope_server.api.controllers.sample.lib.sample_file_fetch import (
+    fetch_sample_file,
 )
 from mascope_server.api.models.sample.items.sample_item_pydantic_model import (
     SampleItemCreate,
@@ -147,9 +147,7 @@ async def process_sample_item_route(
     :return: A dictionary confirming the processing has started.
     """
     # Verify the existance of sample file
-    sample_file_data = await get_sample_files(filename=body.sample_item.filename)
-    if not sample_file_data["data"][0]:
-        raise NotFoundException(f"Sample file '{body.sample_item.filename}' not found")
+    await fetch_sample_file(filename=body.sample_item.filename)
 
     # Get data for notifications
     sid = request.headers.get("X-SID")
@@ -158,7 +156,9 @@ async def process_sample_item_route(
     background_tasks.add_task(
         process_sample_item,
         sample_item=body.sample_item,
-        method_file=body.method_file,
+        existing_method_file=body.existing_method_file,
+        new_method_file=body.new_method_file,
+        new_instrument_function=body.new_instrument_function,
         mz_calibration_params=body.mz_calibration_params,
         independent_transaction=True,
         sid=sid,
