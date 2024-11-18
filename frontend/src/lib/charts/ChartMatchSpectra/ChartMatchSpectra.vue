@@ -103,7 +103,7 @@ const layout = computed(() => ({
 }))
 
 const area = new Intl.NumberFormat('en-US', {
-  maximumFractionDigits: 0
+  maximumFractionDigits: 1
 })
 const error = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 2,
