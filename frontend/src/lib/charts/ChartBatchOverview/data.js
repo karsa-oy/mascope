@@ -160,7 +160,8 @@ export const useChartData = defineStore('chart.batch.overview', () => {
           target_ion_id,
           target_compound_id,
           target_collection_id,
-          ionization_mechanism
+          ionization_mechanism,
+          unit
         } =
           data.find(
             // match correlating with the target
@@ -207,7 +208,10 @@ export const useChartData = defineStore('chart.batch.overview', () => {
               .map(({ target_collection_id }) => target_collection_id)
           },
           // tooltip
-          customdata: samples.value.map((sample) => sample.datetime),
+          customdata: [...Array(samples.length).keys()].map((i) => [
+            samples.value[i].datetime,
+            unit
+          ]), // Add [datetime, unit] in customdata field to use in the hovertemplate
           text: samples.value.map((sample) => sample.sample_item_name),
           hovertemplate: `
           <i>Match ${level}</i>
@@ -222,9 +226,9 @@ export const useChartData = defineStore('chart.batch.overview', () => {
           <br>
           <b>%{text}</b>
           <br>
-          Intensity: %{y:,.0f}
+          Intensity: %{y:,.0f} %{customdata[1]}
           <br>
-          %{customdata}
+          %{customdata[0]}
           <extra></extra>
         ` // use "<extra></extra>" to get rid of extra block from the hoverbox
         }

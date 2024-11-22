@@ -38,6 +38,8 @@ const traces = computed(() => {
         newTrace.y = trace.y.map((value, i) =>
           value !== null ? value / sampleLengths[trace.x[i]] : null
         )
+        // Unit is in the second element of customdata. Append with "/s"
+        newTrace.customdata = trace.customdata.map((cd) => [cd[0], cd[1] + '/s'])
         return newTrace
       })
 })
@@ -131,7 +133,7 @@ const layout = computed(() => ({
     ...xAxis.value
   },
   yaxis: {
-    title: `Signal intensity ${unit.value}`,
+    title: `Intensity ${unit.value}`,
     type: log.value ? 'log' : 'lin',
     showgrid: true,
     gridcolor: '#33333399',
