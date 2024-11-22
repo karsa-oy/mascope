@@ -9,7 +9,7 @@ from sqlalchemy import (
     and_,
 )
 
-from mascope_lib.file_func import get_instrument_type
+from mascope_lib.instrument import resolve_instrument_type
 
 from mascope_server.db import async_session
 from mascope_server.db.id import gen_id
@@ -98,11 +98,9 @@ async def get_match_compounds(
 
         # Step 2: Apply basic fields filters if provided
         if sample_item_id:
-            query = (
-                query.filter(MatchCompound.sample_item_id == sample_item_id)
-                .join(Sample, Sample.sample_item_id == sample_item_id)
-                .add_columns(Sample.filename)
-            )
+            query = query.filter(MatchCompound.sample_item_id == sample_item_id)
+            if not sample_batch_id:
+                query = query.join(Sample, Sample.sample_item_id == sample_item_id)
         if target_compound_id:
             query = query.filter(MatchCompound.target_compound_id == target_compound_id)
         if match_category_min is not None:
@@ -119,13 +117,12 @@ async def get_match_compounds(
             )
 
         if sample_batch_id:
-            query = (
-                query.join(
-                    Sample, Sample.sample_item_id == MatchCompound.sample_item_id
-                )
-                .where(Sample.sample_batch_id == sample_batch_id)
-                .add_columns(Sample.filename)
-            )
+            query = query.join(
+                Sample, Sample.sample_item_id == MatchCompound.sample_item_id
+            ).where(Sample.sample_batch_id == sample_batch_id)
+
+        if sample_batch_id or sample_item_id:
+            query = query.add_columns(Sample.instrument)
 
         # Join with TargetCompoundInTargetCollection to include target_collection data
         if show_target_collection:
@@ -180,13 +177,16 @@ async def get_match_compounds(
     for row in result.all():
         match_compound_data = row.MatchCompound.to_dict()
 
-        # Resolve correct intensity units based on the instrument type of the sample
-        instrument_type = get_instrument_type(row.filename)
-        if instrument_type == "tof":
-            unit = "ions"
-        else:
-            unit = "rel."
-        match_compound_data["unit"] = unit
+        try:
+            # Resolve correct intensity units based on the instrument type of the sample
+            instrument_type = resolve_instrument_type(row.instrument)
+            if instrument_type == "tof":
+                unit = "ions"
+            else:
+                unit = "rel."
+            match_compound_data["unit"] = unit
+        except AttributeError:
+            pass
 
         if show_target_compound:
             match_compound_data["target_compound_name"] = row.target_compound_name

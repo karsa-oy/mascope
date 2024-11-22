@@ -9,7 +9,7 @@ from sqlalchemy import (
     and_,
 )
 
-from mascope_lib.file_func import get_instrument_type
+from mascope_lib.instrument import resolve_instrument_type
 
 from mascope_server.db import async_session
 from mascope_server.db.id import gen_id
@@ -117,11 +117,9 @@ async def get_match_ions(
 
         # Step 2: Apply filters based on input parameters
         if sample_item_id:
-            query = (
-                query.filter(MatchIon.sample_item_id == sample_item_id)
-                .join(Sample, Sample.sample_item_id == sample_item_id)
-                .add_columns(Sample.filename)
-            )
+            query = query.filter(MatchIon.sample_item_id == sample_item_id)
+            if not sample_batch_id:
+                query = query.join(Sample, Sample.sample_item_id == sample_item_id)
         if target_ion_id:
             query = query.filter(MatchIon.target_ion_id == target_ion_id)
         if match_category_min is not None:
@@ -129,11 +127,12 @@ async def get_match_ions(
 
         # Step 3: Join with Sample table if sample_batch_id is specified
         if sample_batch_id:
-            query = (
-                query.join(Sample, Sample.sample_item_id == MatchIon.sample_item_id)
-                .where(Sample.sample_batch_id == sample_batch_id)
-                .add_columns(Sample.filename)
-            )
+            query = query.join(
+                Sample, Sample.sample_item_id == MatchIon.sample_item_id
+            ).where(Sample.sample_batch_id == sample_batch_id)
+
+        if sample_batch_id or sample_item_id:
+            query = query.add_columns(Sample.instrument)
 
         # Step 4: Join TargetIon if requested
         if (
@@ -236,13 +235,16 @@ async def get_match_ions(
     for row in result.all():
         ion_data = row.MatchIon.to_dict()
 
-        # Resolve correct intensity units based on the instrument type of the sample
-        instrument_type = get_instrument_type(row.filename)
-        if instrument_type == "tof":
-            unit = "ions"
-        else:
-            unit = "rel."
-        ion_data["unit"] = unit
+        try:
+            # Resolve correct intensity units based on the instrument type of the sample
+            instrument_type = resolve_instrument_type(row.instrument)
+            if instrument_type == "tof":
+                unit = "ions"
+            else:
+                unit = "rel."
+            ion_data["unit"] = unit
+        except AttributeError:
+            pass
 
         if show_target_collection:
             ion_data["target_collection_id"] = row.target_collection_id
