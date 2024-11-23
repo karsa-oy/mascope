@@ -96,32 +96,6 @@ async function handlePending() {
   }
 }
 watch(
-  () => app.data.sample.focused,
-  (selected) => {
-    if (selected?.sample_item_id == app.data.sample.focused?.sample_item_id) {
-      return
-    }
-    if (selected) {
-      app.data.sample.focus(selected)
-    } else {
-      app.data.sample.unfocus()
-    }
-  }
-)
-watch(
-  () => app.data.sample.focused,
-  (active) => {
-    if (active?.sample_item_id == app.data.sample.focused?.sample_item_id) {
-      return
-    }
-    if (active) {
-      app.data.sample.focused = active
-    } else {
-      app.data.sample.focused = null
-    }
-  }
-)
-watch(
   () => app.data.workspace.focused,
   () => {
     app.data.batch.focused = null

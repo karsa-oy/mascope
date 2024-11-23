@@ -22,6 +22,7 @@ export const defineModule = ({
 
     const prefix = `[app.data.${name.replaceAll('_', ' ')}]`
     const log = (message, ...rest) => console.log(`${prefix} ${message}`, ...rest)
+    const debug = (message, ...rest) => console.debug(`${prefix} ${message}`, ...rest)
 
     const singleselect = !multiselect
     const parent = useParent ? useParent() : null
@@ -89,12 +90,14 @@ export const defineModule = ({
         }
     const focus = multiselect
       ? (arg) => {
+          debug('focusing', arg)
           if (!active(arg)) {
             selected.value = [records.value.find((record) => record[key] == arg[key])]
           }
         }
       : // singleselect
         (arg) => {
+          debug('focusing', arg)
           if (typeof arg === 'function') {
             // allow predicates to focus with arbitrary conditions
             focused.value = records.value.find(arg)
@@ -107,6 +110,7 @@ export const defineModule = ({
         }
     const unfocus = multiselect
       ? (arg) => {
+          debug('unfocusing')
           if (arg) {
             if (active(arg)) {
               selected.value = []
@@ -117,6 +121,7 @@ export const defineModule = ({
         }
       : // singleselect
         (arg) => {
+          debug('unfocusing')
           if (arg) {
             if (active(arg)) {
               focused.value = null
@@ -128,6 +133,7 @@ export const defineModule = ({
     // internal
     const refocus = (focusedId) => {
       if (focusedId) {
+        debug('refocusing', focusedId)
         // refocus
         const focusValid = records.value.map((record) => record[key]).includes(focusedId)
         const id = focusValid ? focusedId : null
@@ -154,7 +160,7 @@ export const defineModule = ({
     // hook
     const reload = async (trigger) => {
       const oldFocusedId = focused.value ? focused.value[key] : null
-      log(`load triggered by ${trigger?.event ?? trigger?.name ?? 'mount'}`)
+      log(`load triggered by ${trigger?.event ?? trigger?.name ?? 'unknown'}`)
       loading.value = true
       if (trigger?.name) {
         records.value = trigger?.focused ? await load(trigger.focused) : []
@@ -178,7 +184,7 @@ export const defineModule = ({
       auth.onLogin(() => {
         if (!parent) {
           // root modules self init on mount
-          reload()
+          reload({ event: 'initialization' })
         }
       })
     })
