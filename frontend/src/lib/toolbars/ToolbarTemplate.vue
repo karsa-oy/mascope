@@ -1,12 +1,12 @@
 <script setup>
+import { ref, computed, watchEffect } from 'vue'
+
 import FloatLabel from 'primevue/floatlabel'
 import Select from 'primevue/select'
 import Button from 'primevue/button'
 import { useConfirm } from 'primevue/useconfirm'
 
-import { ref, computed } from 'vue'
-
-import DialogTemplateCreate from '@/lib/dialogs/DialogTemplateCreate.vue'
+import { DialogTemplateCreate } from '@/lib/dialogs'
 import { useApp } from '@/stores'
 
 const confirm = useConfirm()
@@ -14,7 +14,7 @@ const confirm = useConfirm()
 const app = useApp()
 
 const props = defineProps({
-  initial: {
+  default: {
     type: Object,
     required: true
   }
@@ -24,9 +24,18 @@ const dialog = ref(false)
 const template = defineModel('template')
 
 const templates = computed(() => [
-  props.initial,
+  props.default,
   ...app.data.template.list.filter((temp) => temp.type == 'sample_item')
 ])
+
+watchEffect(() => {
+  const removed = !app.data.template.list
+    .map((temp) => temp.attribute_template_id)
+    .includes(template.value?.attribute_template_id)
+  if (removed) {
+    template.value = props.default
+  }
+})
 </script>
 
 <template>
@@ -41,7 +50,7 @@ const templates = computed(() => [
           rejectLabel: 'Cancel',
           acceptLabel: 'Delete',
           accept: () => {
-            sampleStore.template.delete(template)
+            app.data.template.delete(template)
           }
         })
       "

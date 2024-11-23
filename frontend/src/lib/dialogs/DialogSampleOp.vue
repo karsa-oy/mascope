@@ -49,8 +49,9 @@ watch(visible, (value) => {
 })
 const tab = ref('sample-details')
 
-const initial = computed(() => ({
+const defaultTemplate = computed(() => ({
   name: 'default',
+  attribute_template_id: 'default',
   type: 'sample_item',
   template: [
     // name is always required
@@ -69,7 +70,7 @@ const initial = computed(() => ({
 }))
 
 const template = reactive({
-  selected: initial.value
+  selected: defaultTemplate.value
 })
 const input = reactive({
   fields: template.selected.template,
@@ -95,7 +96,7 @@ async function init(active) {
   if (!active) return
   // reset state
   tab.value = 'sample-details'
-  template.selected = initial.value
+  template.selected = defaultTemplate.value
   // reset inputs
   input.filename =
     action.value !== 'create_pending'
@@ -360,7 +361,7 @@ const invalid = computed(() => {
       </Tabs>
     </Panel>
     <menu>
-      <ToolbarTemplate v-model:template="template.selected" :initial="initial" />
+      <ToolbarTemplate v-model:template="template.selected" :default="defaultTemplate" />
       <Message
         v-if="instrumentFunctions?.message"
         :severity="instrumentFunctions?.message?.severity"
