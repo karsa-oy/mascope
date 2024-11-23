@@ -28,8 +28,15 @@ async def get_instruments() -> dict:
 
         # Step 2: Resolve instrument types
         instrument_list = [
-            {"instrument": instrument, "type": resolve_instrument_type(instrument)}
-            for instrument in instruments
+            i
+            for i in [
+                {
+                    "instrument": instrument,
+                    "type": resolve_instrument_type(instrument, throw=False),
+                }
+                for instrument in instruments
+            ]
+            if i["type"]  # filter out invalid instrument names
         ]
 
         # Step 3: Construct response

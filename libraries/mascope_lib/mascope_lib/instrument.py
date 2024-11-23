@@ -1,4 +1,4 @@
-def resolve_instrument_type(instrument_name: str) -> str:
+def resolve_instrument_type(instrument_name: str, throw: bool = True) -> str:
     """Get instrument type (one of {"orbi", "tof"}) from an instrument name
 
     :param instrument_name: instrument name
@@ -13,7 +13,10 @@ def resolve_instrument_type(instrument_name: str) -> str:
     elif "tof" in name or "api" in name:
         instrument_type = "tof"
     else:
-        raise ValueError(
-            f"Failed to get instrument type for instrument {instrument_name}"
-        )
+        if throw:
+            raise ValueError(
+                f"Failed to get instrument type for instrument {instrument_name}"
+            )
+        else:
+            instrument_type = None
     return instrument_type
