@@ -240,6 +240,7 @@ class RawStreamer(Thread):
                 "t_range": [0, self.length],
                 "polarity": "-",
                 "method_file": self.method_file,
+                "tic": self.tic,
             }
             self.spec_queue.put(coordinates)
         if self._has_positive_scans():
@@ -250,6 +251,7 @@ class RawStreamer(Thread):
                 "t_range": [0, self.length],
                 "polarity": "+",
                 "method_file": self.method_file,
+                "tic": self.tic,
             }
             self.spec_queue.put(coordinates)
 
