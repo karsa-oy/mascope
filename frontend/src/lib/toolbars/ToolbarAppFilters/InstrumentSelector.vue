@@ -7,28 +7,24 @@ import { useApp } from '@/stores'
 
 const app = useApp()
 
-let saved = null
-const initialLoad = ref(true)
-
 /**
  * Watch for when instrument data is loaded, then focus on the saved instrument.
  * If the saved instrument is not available, fallback to the first instrument in the list.
- * The watcher only triggers on the first load and is then disabled to avoid conflicts.
+ * The watcher only triggers on the first load.
  */
 watch(
   () => app.data.instrument.list.length,
-  (newLength) => {
-    if (initialLoad.value && newLength > 0) {
-      saved = app.data.instrument.list.find(
+  (count) => {
+    if (count > 0) {
+      const saved = app.data.instrument.list.find(
         ({ instrument }) => instrument === localStorage.getItem('mascope-instrument')
       )
       if (saved) {
         app.data.instrument.focused = saved
       }
-      initialLoad.value = false // Disable the watcher after the first load
     }
   },
-  { immediate: true }
+  { once: true, immediate: true }
 )
 
 /**
