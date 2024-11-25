@@ -12,4 +12,3 @@ export { default as DialogTargetCompoundUpdate } from './DialogTargetCompoundUpd
 export { default as DialogTemplateCreate } from './DialogTemplateCreate.vue'
 export { default as DialogWorkspaceOp } from './DialogWorkspaceOp.vue'
 export { default as PopoverTargetCompoundAdd } from './PopoverTargetCompoundAdd.vue'
-export { default as PopoverUserMenu } from './PopoverUserMenu.vue'
