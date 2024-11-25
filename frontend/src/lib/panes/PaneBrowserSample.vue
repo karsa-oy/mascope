@@ -14,7 +14,7 @@ import Popover from 'primevue/popover'
 import Listbox from 'primevue/listbox'
 import SelectButton from 'primevue/selectbutton'
 
-import { generateCopyName } from '@/api'
+import { api, generateCopyName } from '@/api'
 
 import { BaseMatchTag, BaseCopyableField } from '@/lib/base'
 import {
@@ -436,6 +436,8 @@ watch(
   }
 )
 
+// batch column customization
+
 const batchColumnTab = ref('All')
 const inferType = (field) => {
   const withField = app.data.sample.list.filter((item) => field in item)
@@ -504,6 +506,16 @@ watch(
     }
   }
 )
+
+// monitor reloading events
+
+const reloading = ref(false)
+api.socket.on('sample_batch_reload', (e) => {
+  reloading.value = true
+  setTimeout(() => {
+    reloading.value = false
+  }, 2500)
+}) // see stateRestore hook in the sample DataTable below
 </script>
 
 <template v-if="app.data.batch.list">
@@ -612,8 +624,10 @@ watch(
               :stateKey="`mascope-sample-table-${data.sample_batch_id}`"
               @stateRestore="
                 () => {
-                  // don't restore selection
-                  app.data.sample.unfocus()
+                  // don't restore selection unless reloading
+                  if (!reloading) {
+                    app.data.sample.unfocus()
+                  }
                 }
               "
             >
