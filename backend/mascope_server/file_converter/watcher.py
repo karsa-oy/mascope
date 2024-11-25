@@ -43,7 +43,11 @@ class FSWatcher(Thread):
         # return a list of not-yet-ready files
         files_in_progress = []
         for filepath, filesize in filelist:
-            new_filesize = os.path.getsize(filepath)
+            try:
+                new_filesize = os.path.getsize(filepath)
+            except FileNotFoundError:
+                # File was deleted, move on
+                continue
             if filesize != new_filesize:
                 files_in_progress.append([filepath, new_filesize])
                 continue
