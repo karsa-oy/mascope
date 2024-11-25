@@ -1,11 +1,11 @@
 <script setup>
+import { ref, reactive, computed } from 'vue'
+
 import Popover from 'primevue/popover'
 import FloatLabel from 'primevue/floatlabel'
 import InputText from 'primevue/inputtext'
 import Button from 'primevue/button'
 import { useConfirm } from 'primevue/useconfirm'
-
-import { ref, reactive } from 'vue'
 
 import { api } from '@/api'
 import { useApp } from '@/stores'
@@ -51,7 +51,13 @@ const addCompound = () => {
       target_compound_ids: props.collection.children.map(
         ({ target_compound_id }) => target_compound_id
       ),
-      target_compounds_create: [input]
+      target_compounds_create: [
+        {
+          target_compound_formula: input.target_compound_formula.trim(),
+          target_compound_name: input.target_compound_name.trim(),
+          cas_number: input.cas_number.trim()
+        }
+      ]
     })
   }
   popover.value.hide()
@@ -84,6 +90,15 @@ const confirmation = async () => {
     addCompound()
   }
 }
+
+const invalidFormula = computed(() => {
+  const regex = /^(?:[A-Z][a-z]?\d*|\([^()]*(?:\(.*\))?[^()]*\)\d+)+$/
+  const trimmed = input.target_compound_formula?.trim()
+  return !regex.test(trimmed)
+  // See:
+  //   Debugger: https://regex101.com/r/Mbjq8C/1
+  //   Inspiration: https://stackoverflow.com/questions/23602175/regex-for-parsing-chemical-formulas#23602425
+})
 </script>
 
 <template>
@@ -105,27 +120,22 @@ const confirmation = async () => {
       <FloatLabel style="margin: 1rem 0">
         <InputText
           id="add-compound-formula"
-          :invalid="!input.target_compound_formula.trim()"
+          v-model="input.target_compound_formula"
+          :invalid="input.target_compound_formula.length > 0 && invalidFormula"
           required
           autofocus="true"
-          v-model="input.target_compound_formula"
         />
         <label for="add-compound-formula"> Formula </label>
       </FloatLabel>
       <FloatLabel style="margin: 1rem 0">
-        <InputText id="add-compound-name" required v-model="input.target_compound_name" />
+        <InputText id="add-compound-name" v-model="input.target_compound_name" />
         <label for="add-compound-name"> Name </label>
       </FloatLabel>
       <FloatLabel style="margin: 1rem 0">
-        <InputText id="add-compound-cas" required v-model="input.cas_number" />
+        <InputText id="add-compound-cas" v-model="input.cas_number" />
         <label for="add-compound-cas"> CAS </label>
       </FloatLabel>
-      <Button
-        label="Add"
-        style="width: 100%"
-        @click="confirmation"
-        :disabled="!input.target_compound_formula.trim()"
-      />
+      <Button label="Add" style="width: 100%" @click="confirmation" :disabled="invalidFormula" />
     </div>
   </Popover>
 </template>
