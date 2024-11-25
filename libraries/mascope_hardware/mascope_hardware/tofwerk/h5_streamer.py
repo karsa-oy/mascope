@@ -129,6 +129,7 @@ class H5Streamer(BaseGenerator, KInstrument):
                 "spec": spec.tobytes(),  # Serialized spectrum [float32]
                 "polarity": self.polarity,  # Ion polarity
             }
+            self.tic += spec.sum()
             # Feed
             self.spec_queue.put(spec_data)
 

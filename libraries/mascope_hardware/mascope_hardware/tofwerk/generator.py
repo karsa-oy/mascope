@@ -49,6 +49,7 @@ class BaseGenerator(Thread):
         self.sample_interval = None  # Tof sample interval [ns]
         self.single_ion_signal = None  # Single ion signal [mV*ns/ion]
         self.tof_frequency = None  # Tof frequency [Hz]
+        self.tic = None  # Cumulative TIC
         self.speci = -1  # Index of last received spectrum,
         # -1 when there is no active acquisition
         Thread.__init__(self)
@@ -124,6 +125,7 @@ class BaseGenerator(Thread):
                     "i": None,
                     "source_filepath": self.desc.currentDataFileName.decode(),
                     "polarity": self.polarity,
+                    "tic": self.tic,
                 }
             )
             # self.tps_queue.put({
@@ -140,6 +142,7 @@ class BaseGenerator(Thread):
         self.sample_interval = None
         self.single_ion_signal = None
         self.tof_frequency = None
+        self.tic = None
 
     def _update(self):
         """Update per acquisition attributes. If new data is available, feed into queues."""
@@ -164,6 +167,7 @@ class BaseGenerator(Thread):
             self.length = (
                 self.desc.nbrWrites * self.desc.nbrBufs
             ) * self.interval  # [s]
+            self.tic = 0
             # Feed coordinates
             self._feed_coordinates()
             hardware_runtime.logger.info(f"TofDaqStreamer started: {self.filename}")
