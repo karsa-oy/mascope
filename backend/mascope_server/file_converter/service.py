@@ -192,31 +192,6 @@ def process_stream(streamer):
                 runtime.logger.exception(e)
         return True
 
-    def handle_tps_data(data):
-        """Handle one point of TPS data from the streamer
-
-        :param data: TPS data object
-        :type data: dict
-        """
-        data.update({"filename": data["filename"].replace(" ", "_")})
-        filename = data["filename"]
-        spec_i = data["i"]
-        sample_file = cache.get(filename)
-        if sample_file is None:
-            return
-        if spec_i is None:
-            # File finished
-            pass
-        elif spec_i < 0:
-            # New file
-            try:
-                zarr_sdk.init_tps_dataset({"value": data}, sample_file)
-            except FileExistsError:
-                return
-        else:
-            # New data to existing file
-            zarr_sdk.update_tps_dataset({"value": data}, sample_file)
-
     def format_filename(generator_data: dict) -> str:
         """Format raw filename (from data acquisition software) into Mascope sample file name
 
