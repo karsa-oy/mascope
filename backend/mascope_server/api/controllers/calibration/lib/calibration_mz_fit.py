@@ -11,11 +11,11 @@ from mascope_hardware.tofwerk.lib.TwTool import TwTof2Mass
 from mascope_lib.file_func import (
     get_zarr_var_shape,
     load_coord,
+    load_file,
     update_props,
     update_zarr_array_coord,
     remove_duplicate_mz_values,
 )
-from mascope_lib.peak import calculate_tic
 from zarr.errors import PathNotFoundError
 from mascope_server.api.lib.api_features import (
     api_controller,
@@ -70,7 +70,10 @@ async def mz_fit(
     # calculate tic
     await send_progress_user_notification(notification, 0.25)
 
-    tic = calculate_tic(filename)
+    # Get TIC from sample file props
+    sample_file = load_file(filename, vars=[])
+    tic = sample_file.props.get("tic", np.inf)
+
     if tic < tic_threshold:
         error = "TIC is too low! Check ionization device."
         return fit, stats, error, warning
