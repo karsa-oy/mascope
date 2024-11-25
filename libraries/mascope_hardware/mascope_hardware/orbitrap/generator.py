@@ -143,8 +143,8 @@ class RawStreamer(Thread):
         return None
 
     @property
-    def tic(self) -> float | None:
-        """Total ion current (TIC)
+    def tic_neg(self) -> float | None:
+        """Total ion current in negative polarity (TIC)
 
         :return: TIC
         :rtype: float | None
@@ -152,11 +152,36 @@ class RawStreamer(Thread):
         if self.raw:
             num_of_scans = self.raw.RunHeaderEx.SpectraCount
             tic_per_scan = [
-                self.raw.GetScanStatsForScanNumber(i + 1).TIC
-                for i in range(num_of_scans)
+                scan_stats.TIC
+                for scan_stats in [
+                    self.raw.GetScanStatsForScanNumber(i + 1)
+                    for i in range(num_of_scans)
+                ]
+                if scan_stats.ScanType.split(" ")[1] == "-"
             ]
-            total_tic = np.sum(tic_per_scan)
-            return total_tic
+            total_tic_neg = np.sum(tic_per_scan)
+            return total_tic_neg
+        return None
+
+    @property
+    def tic_pos(self) -> float | None:
+        """Total ion current in positive polarity (TIC)
+
+        :return: TIC
+        :rtype: float | None
+        """
+        if self.raw:
+            num_of_scans = self.raw.RunHeaderEx.SpectraCount
+            tic_per_scan = [
+                scan_stats.TIC
+                for scan_stats in [
+                    self.raw.GetScanStatsForScanNumber(i + 1)
+                    for i in range(num_of_scans)
+                ]
+                if scan_stats.ScanType.split(" ")[1] == "+"
+            ]
+            total_tic_neg = np.sum(tic_per_scan)
+            return total_tic_neg
         return None
 
     @property
@@ -265,7 +290,7 @@ class RawStreamer(Thread):
                         "source_filepath": self.raw.FileName,
                         "polarity": "-",
                         "timestamp": self.timestamp.isoformat(),
-                        "tic": self.tic,
+                        "tic": self.tic_neg,
                     }
                 )
             if self._has_positive_scans():
@@ -276,7 +301,7 @@ class RawStreamer(Thread):
                         "source_filepath": self.raw.FileName,
                         "polarity": "+",
                         "timestamp": self.timestamp.isoformat(),
-                        "tic": self.tic,
+                        "tic": self.tic_pos,
                     }
                 )
         # Reset self
