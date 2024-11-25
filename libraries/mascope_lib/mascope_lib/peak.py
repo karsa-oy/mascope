@@ -101,13 +101,12 @@ def calculate_tic(filename: str) -> float:
     if instrument_type == "tof":
         # default 0.25 for backwards compatibility
         sample_interval = (
-            load_file(filename).attrs["props"].get("sample_interval", 0.25)
+            load_file(filename, vars=[]).attrs["props"].get("sample_interval", 0.25)
         )
         # return sum signal full integral in tof space
         return sum_spec.sum(dim="mz").compute().item() * sample_interval
     else:
-        # return sum signal full integral in mz space
-        return simpson(y=sum_spec.values, x=sum_spec.mz.values)
+        raise RuntimeError("Calculating TIC for an Orbitrap file is not supported")
 
 
 def segment_spec(sum_spec):
