@@ -14,7 +14,7 @@ import mascope_lib.runtime as lib_runtime
 lib_runtime.init()
 
 from mascope_lib.file_func import zarr_sdk, get_instrument_type
-from mascope_lib.peak import calculate_tic
+
 from mascope_lib.structs import AttrDict
 from mascope_lib.util import timestamp_from_filename
 
@@ -55,9 +55,9 @@ def create_sample_file_db_record(data):
     committed_length = data["committed_length"]
     utc_offset = timedelta(seconds=int(data["utc_offset"]))
     mz_calibration = data.get("mz_calibration")
-    tic = calculate_tic(filename)
     polarity = data.get("polarity")
     method_file = data.get("method_file")
+    tic = data.get("tic")
 
     if instrument_type == "tof":
         date = timestamp_from_filename(filename).isoformat()
@@ -138,6 +138,7 @@ def process_stream(streamer):
                     "utc_offset": sample_file.props["utc_offset"],
                     "polarity": sample_file.props["polarity"],
                     "method_file": sample_file.props["method_file"],
+                    "tic": sample_file.props["tic"],
                 }
             )
             filepath = data.pop("source_filepath")
