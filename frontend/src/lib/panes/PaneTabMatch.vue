@@ -5,7 +5,7 @@ import { computed, reactive } from 'vue'
 
 import { BaseMatchTag } from '@/lib/base'
 import { ChartMatchSpectra, ChartMatchTimeseries } from '@/lib/charts'
-import { ToolbarFilterIon, ToolbarMatchCharts, ToolbarMatchRating } from '@/lib/toolbars'
+import { ToolbarIonMatchParams, ToolbarMatchCharts, ToolbarMatchRating } from '@/lib/toolbars'
 import { useApp } from '@/stores'
 
 const app = useApp()
