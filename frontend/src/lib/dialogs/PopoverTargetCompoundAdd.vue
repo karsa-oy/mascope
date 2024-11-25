@@ -94,6 +94,7 @@ const confirmation = async () => {
     v-tooltip="'Add compound'"
     @click="
       (event) => {
+        event.stopPropagation()
         popover.toggle(event)
       }
     "
