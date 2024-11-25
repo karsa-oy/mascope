@@ -143,6 +143,23 @@ class RawStreamer(Thread):
         return None
 
     @property
+    def tic(self) -> float | None:
+        """Total ion current (TIC)
+
+        :return: TIC
+        :rtype: float | None
+        """
+        if self.raw:
+            num_of_scans = self.raw.RunHeaderEx.SpectraCount
+            tic_per_scan = [
+                self.raw.GetScanStatsForScanNumber(i + 1).TIC
+                for i in range(num_of_scans)
+            ]
+            total_tic = np.sum(tic_per_scan)
+            return total_tic
+        return None
+
+    @property
     def interval(self) -> float:
         """Mean measurement interval in seconds, i.e. length of one spectrum in the sample
 
