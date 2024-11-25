@@ -10,12 +10,9 @@ import { DialogWorkspaceOp } from '@/lib/dialogs'
 
 const app = useApp()
 
-let saved = null
-const initialLoad = ref(true)
-
 const menu = ref()
 const dialog = ref()
-const filter = ref(saved ?? app.data.workspace.list[0])
+const filter = ref()
 
 /**
  * Watch for when workspace data is initially loaded, then focus on the saved workspace.
@@ -24,19 +21,18 @@ const filter = ref(saved ?? app.data.workspace.list[0])
  */
 watch(
   () => app.data.workspace.list.length,
-  (newLength) => {
-    if (initialLoad.value && newLength > 0) {
-      saved = app.data.workspace.list.find(
+  (count) => {
+    if (count > 0) {
+      const saved = app.data.workspace.list.find(
         ({ workspace_id }) => workspace_id === localStorage.getItem('mascope-workspace')
       )
       filter.value = saved ?? app.data.workspace.list[0]
-      if (filter.value && filter.value.workspace_id !== app.data.workspace.focused?.workspace_id) {
+      if (filter.value) {
         app.data.workspace.focus(filter.value)
       }
-      initialLoad.value = false // Stop watching after the first load
     }
   },
-  { immediate: true }
+  { once: true, immediate: true }
 )
 
 /**

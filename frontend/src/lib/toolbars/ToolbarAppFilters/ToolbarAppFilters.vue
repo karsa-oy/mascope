@@ -21,7 +21,6 @@ const app = useApp()
 
 // Reactive data
 const settings = ref()
-const menu = ref()
 
 // Initial loading
 
