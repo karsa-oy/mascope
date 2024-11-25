@@ -322,12 +322,9 @@ function execute() {
     }
     case 'delete': {
       confirm.require({
+        icon: 'pi pi-exclamation-triangle',
         header: 'Delete collection',
         message: `Are you sure you want to delete '${info.name}' target collection?`,
-        rejectIcon: 'pi pi-times',
-        rejectLabel: 'Cancel',
-        acceptIcon: 'pi pi-trash',
-        acceptLabel: 'Delete',
         accept: () => {
           app.data.target.collection.delete({
             collectionId: info.id,
@@ -335,6 +332,16 @@ function execute() {
             deleteOrphanCompounds: deleteOrphans.value
           })
           action.value = null
+        },
+        acceptProps: {
+          icon: 'pi pi-trash',
+          label: 'Delete',
+          severity: 'danger'
+        },
+        rejectProps: {
+          icon: 'pi pi-times',
+          label: 'Cancel',
+          severity: 'secondary'
         }
       })
       break

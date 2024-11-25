@@ -140,17 +140,9 @@ const menu = computed(() => ({
             target_collection_id == context.compound.target_collection_id
         )
         confirm.require({
-          message: `Are you sure you want to remove the compound '${context.compound.target_compound_formula}' from the '${collection.target_collection_name}' collection?`,
-          header: `Remove target compound '${context.compound.target_compound_formula}'`,
           icon: 'pi pi-exclamation-triangle',
-          rejectProps: {
-            label: 'Cancel',
-            severity: 'secondary'
-          },
-          acceptProps: {
-            icon: 'pi pi-minus',
-            label: 'Remove'
-          },
+          header: `Remove target compound '${context.compound.target_compound_formula}'`,
+          message: `Are you sure you want to remove the compound '${context.compound.target_compound_formula}' from the '${collection.target_collection_name}' collection?`,
           accept: () => {
             app.data.target.collection.update({
               target_collection_id: collection.target_collection_id,
@@ -160,6 +152,14 @@ const menu = computed(() => ({
                 .map(({ target_compound_id }) => target_compound_id)
                 .filter((id) => id !== context.compound.target_compound_id)
             })
+          },
+          acceptProps: {
+            icon: 'pi pi-minus',
+            label: 'Remove'
+          },
+          rejectProps: {
+            label: 'Cancel',
+            severity: 'secondary'
           }
         })
       }

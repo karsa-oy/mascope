@@ -71,25 +71,26 @@ async function processRatingSubmission(rating) {
  */
 function handleUnsavedMatchParams() {
   confirm.require({
+    icon: 'pi pi-exclamation-triangle',
     header: 'Unsaved match settings',
     message:
       'You have unsaved changes in your match isotope/peak parameters. Please save or discard them before submitting a rating.',
+    accept: async () => {
+      await app.data.match.params.save()
+      await app.data.match.visualized.reset()
+    },
     acceptProps: {
       icon: 'pi pi-save',
       label: 'Save changes'
+    },
+    reject: async () => {
+      await app.data.match.params.reset()
+      await app.data.match.visualized.reset()
     },
     rejectProps: {
       icon: 'pi pi-times',
       label: 'Discard changes',
       severity: 'secondary'
-    },
-    accept: async () => {
-      await app.data.match.params.save()
-      await app.data.match.visualized.reset()
-    },
-    reject: async () => {
-      await app.data.match.params.reset()
-      await app.data.match.visualized.reset()
     }
   })
 }

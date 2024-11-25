@@ -193,10 +193,9 @@ const batchMenuEntries = computed(() => [
     icon: 'pi pi-file-export',
     command: () => {
       confirm.require({
+        icon: 'pi pi-info-circle',
         header: 'Export batch peak data',
         message: `Export peak data for batch "${app.data.batch.focused.sample_batch_name}"?`,
-        acceptIcon: 'pi pi-file-export',
-        acceptLabel: 'Export',
         accept: () => {
           if (app.data.batch.focused?.sample_batch_id == batch.context.sample_batch_id) {
             app.data.batch.exportPeaks(app.data.batch.focused)
@@ -205,8 +204,15 @@ const batchMenuEntries = computed(() => [
             pending.peakExport = true
           }
         },
-        rejectLabel: 'Cancel',
-        rejectIcon: 'pi pi-times'
+        acceptProps: {
+          icon: 'pi pi-file-export',
+          label: 'Export'
+        },
+        rejectProps: {
+          icon: 'pi pi-times',
+          label: 'Cancel',
+          severity: 'secondary'
+        }
       })
     },
     visible: batch.context !== null
@@ -269,25 +275,25 @@ const sampleMenuEntries = computed(() => [
     icon: 'pi pi-trash',
     command: () => {
       confirm.require({
+        icon: 'pi pi-exclamation-triangle',
         header: `Deleting sample '${item.context.sample_item_name}'`,
         message: `Delete sample '${item.context.sample_item_name}'
           from batch "${app.data.batch.focused.sample_batch_name}"?`,
-        icon: 'pi pi-exclamation-triangle',
-        rejectProps: {
-          label: 'Cancel',
-          severity: 'secondary'
-        },
-        acceptProps: {
-          icon: 'pi pi-trash',
-          label: 'Delete',
-          severity: 'danger'
-        },
         accept: async () => {
           // unload if necessary
           if (item.context.sample_item_id == app.data.sample.focused?.sample_item_id) {
             app.data.sample.unfocus()
           }
           await app.data.sample.delete(item.context)
+        },
+        acceptProps: {
+          icon: 'pi pi-trash',
+          label: 'Delete',
+          severity: 'danger'
+        },
+        rejectProps: {
+          label: 'Cancel',
+          severity: 'secondary'
         }
       })
     }

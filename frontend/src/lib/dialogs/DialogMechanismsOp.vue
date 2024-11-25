@@ -107,20 +107,20 @@ watch(
               @click="
                 () => {
                   confirm.require({
+                    icon: 'pi pi-exclamation-triangle',
                     header: `Delete ionization mechanism '${data.ionization_mechanism}'`,
                     message: `Are you sure you want to delete the ionization mechanism '${data.ionization_mechanism}'?`,
-                    icon: 'pi pi-exclamation-triangle',
-                    rejectProps: {
-                      label: 'Cancel',
-                      severity: 'secondary'
+                    accept: () => {
+                      app.data.mechanism.delete(data.ionization_mechanism_id)
                     },
                     acceptProps: {
                       icon: 'pi pi-trash',
                       label: 'Delete',
                       severity: 'danger'
                     },
-                    accept: () => {
-                      app.data.mechanism.delete(data.ionization_mechanism_id)
+                    rejectProps: {
+                      label: 'Cancel',
+                      severity: 'secondary'
                     }
                   })
                 }

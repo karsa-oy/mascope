@@ -66,18 +66,19 @@ const confirmation = async () => {
   )?.sample_batches.length
   if (count > 1) {
     confirm.require({
-      message: `Are you sure you want to add compound ${input.target_compound_formula.trim()} to a collection used in ${count} batches? Rematching may take a while.`,
-      header: `Add compound to ${count} batches`,
       icon: 'pi pi-exclamation-triangle',
-      rejectProps: {
-        label: 'Cancel',
-        severity: 'secondary'
-      },
+      header: `Add compound to ${count} batches`,
+      message: `Are you sure you want to add compound ${input.target_compound_formula.trim()} to a collection used in ${count} batches? Rematching may take a while.`,
+      accept: addCompound,
       acceptProps: {
         icon: 'pi pi-plus',
         label: 'Add'
       },
-      accept: addCompound
+      rejectProps: {
+        icon: 'pi pi-times',
+        label: 'Cancel',
+        severity: 'secondary'
+      }
     })
   } else {
     addCompound()

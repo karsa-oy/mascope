@@ -475,10 +475,9 @@ function autoswitchTab(passed) {
           @click="
             () => {
               confirm.require({
+                icon: 'pi pi-info-circle',
                 header: 'Import samples',
                 message: `Are you sure you want to import ${imported.items.length} samples into the batch '${app.data.batch.focused?.sample_batch_name}'?`,
-                rejectLabel: 'Cancel',
-                acceptLabel: 'Import',
                 accept: () => {
                   if (!validation.rows.passed) return
                   app.data.batch.importSamples({
@@ -486,6 +485,15 @@ function autoswitchTab(passed) {
                     sample_items: imported.items
                   })
                   visible = false
+                },
+                acceptProps: {
+                  icon: 'pi pi-file-import',
+                  label: 'Import'
+                },
+                rejectProps: {
+                  icon: 'pi pi-times',
+                  label: 'Cancel',
+                  severity: 'secondary'
                 }
               })
             }

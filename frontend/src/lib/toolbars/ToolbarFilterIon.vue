@@ -33,8 +33,16 @@ function undoChanges() {
 
 async function saveParams() {
   confirm.require({
-    header: 'Saving filtering parameters',
-    message: `Are you sure you want to save current ${app.data.match.visualized.ion.target_ion_formula} filtering parameters for ${app.data.match.visualized.ion.instrument} instrument?`,
+    icon: 'pi pi-info-circle',
+    header: 'Saving match parameters',
+    message: `Are you sure you want to save current ${app.data.match.visualized.ion.target_ion_formula} match parameters for ${app.data.match.visualized.ion.instrument} instrument?`,
+    accept: async () => {
+      isSaving.value = true
+      await app.data.match.params.save()
+      isSaving.value = false
+      app.data.match.params.init()
+      await app.data.match.visualized.reset()
+    },
     acceptProps: {
       icon: 'pi pi-save',
       label: 'Save'
@@ -43,31 +51,31 @@ async function saveParams() {
       icon: 'pi pi-times',
       label: 'Cancel',
       severity: 'secondary'
-    },
-    accept: async () => {
-      isSaving.value = true
-      await app.data.match.params.save()
-      isSaving.value = false
-      app.data.match.params.init()
-      await app.data.match.visualized.reset()
     }
   })
 }
 
 function deleteParams() {
   confirm.require({
-    header: 'Deleting filtering parameters',
-    message: `Are you sure you want to delete ${app.data.match.visualized.ion?.target_ion_formula} filtering parameters for ${app.data.match.visualized.ion?.instrument} instrument?`,
-    acceptIcon: 'pi pi-trash',
-    acceptLabel: 'Delete',
+    icon: 'pi pi-exclamation-triangle',
+    header: 'Deleting match parameters',
+    message: `Are you sure you want to delete ${app.data.match.visualized.ion?.target_ion_formula} match parameters for ${app.data.match.visualized.ion?.instrument} instrument?`,
     accept: async () => {
       app.data.match.params.reset()
       await app.data.match.params.remove()
       await app.data.match.visualized.reset()
       app.data.match.params.init()
     },
-    rejectLabel: 'Cancel',
-    rejectIcon: 'pi pi-times'
+    acceptProps: {
+      icon: 'pi pi-trash',
+      label: 'Delete',
+      severity: 'danger'
+    },
+    rejectProps: {
+      icon: 'pi pi-times',
+      label: 'Cancel',
+      severity: 'secondary'
+    }
   })
 }
 

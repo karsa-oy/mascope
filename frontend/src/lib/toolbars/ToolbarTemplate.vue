@@ -44,13 +44,21 @@ watchEffect(() => {
       :disabled="!template?.name || template.name == 'default'"
       @click="
         confirm.require({
+          icon: 'pi pi-exclamation-triangle',
           header: 'Delete template',
           message: `Are you sure you want to delete template ${template.name}?`,
-          icon: 'pi pi-exclamation-triangle',
-          rejectLabel: 'Cancel',
-          acceptLabel: 'Delete',
           accept: () => {
             app.data.template.delete(template)
+          },
+          acceptProps: {
+            icon: 'pi pi-trash',
+            label: 'Delete',
+            severity: 'danger'
+          },
+          rejectProps: {
+            icon: 'pi pi-times',
+            label: 'Cancel',
+            severity: 'secondary'
           }
         })
       "
