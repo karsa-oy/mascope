@@ -14,40 +14,47 @@ from mascope_lib.runtime import lib_runtime
 
 from .structs import ExtendableDataArray
 from .util import parse_path_from_item_filename
+from .instrument import resolve_instrument_type
 
 
 class zarr_sdk:
     @staticmethod
-    def finalize_signal_dataset(data, item):
-        filename = data["value"]["filename"]
+    def finalize_signal_dataset(data, sample_file):
+        filename = data["filename"]
         try:
-            final_length = float(item["signal"].time[-1] + item["signal_period"][-1])
+            final_length = float(
+                sample_file["signal"].time[-1] + sample_file["signal_period"][-1]
+            )
         except Exception as e:
             lib_runtime.logger.error(
                 f"""
                 [finalize_signal_dataset] Warning: {e.__class__.__name__}({str(e)})
             """
             )
-            final_length = item["props"]["length"]
+            final_length = sample_file["props"]["length"]
 
         # Update properties
-        final_length = min(final_length, item["props"]["length"])
-        item["props"].update({"committed_length": final_length})
-        item["props"].update({"length": final_length})
+        final_length = min(final_length, sample_file["props"]["length"])
+        sample_file["props"].update(
+            {
+                "committed_length": final_length,
+                "length": final_length,
+                "tic": data["tic"],
+            }
+        )
         # Write properties
-        update_props(filename, item["props"])
+        update_props(filename, sample_file["props"])
         # flush arrays
-        arrays = [item["signal"], item["signal_period"]]
+        arrays = [sample_file["signal"], sample_file["signal_period"]]
         for a in arrays:
             if isinstance(a, ExtendableDataArray):
                 a.flush()
         # write sum signal array
-        zarr_sdk.write_sum_signal_dataset(item)
+        zarr_sdk.write_sum_signal_dataset(sample_file)
 
     @staticmethod
     def init_centroid_dataset(data, item):
-        value = data["value"]
-        filename = filename_to_zarr_path(value["filename"], "centroids")
+        filename = filename_to_zarr_path(data["filename"], "centroids")
         centroid_array = ExtendableDataArray(path=filename, array_module=da)
         centroid_array.init_array(
             dims=("mz", "time"), coords=[[], []], name="centroids"
@@ -62,15 +69,14 @@ class zarr_sdk:
         #   - finalize_signal_dataset
         # Returns acquisition item shared through the acquisiiton api
         base_path = get_filestore_path()
-        value = data["value"]
-        filename = value.get("filename")
-        mz = np.frombuffer(value["mz"], dtype=np.float32)
-        single_ion_signal = value.get("single_ion_signal")
-        t_range = value["t_range"]
-        mz_calibration = value.get("mz_calibration")
-        polarity = value.get("polarity")
-        sample_interval = value.get("sample_interval")
-        method_file = value.get("method_file")
+        filename = data.get("filename")
+        mz = np.frombuffer(data["mz"], dtype=np.float32)
+        single_ion_signal = data.get("single_ion_signal")
+        t_range = data["t_range"]
+        mz_calibration = data.get("mz_calibration")
+        polarity = data.get("polarity")
+        sample_interval = data.get("sample_interval")
+        method_file = data.get("method_file")
 
         try:
             data_path = parse_path_from_item_filename(filename, base_path)
@@ -110,67 +116,16 @@ class zarr_sdk:
         }
 
     @staticmethod
-    def init_tps_dataset(data, item):
-        value = data["value"]
-        filename = filename_to_zarr_path(value["filename"], "tps")
-        if os.path.exists(filename):
-            raise FileExistsError(filename)
-        tps_info = value["tps_info"]
-        tps_array = ExtendableDataArray(path=filename, array_module=da)
-        tps_array.init_array(
-            dims=("parameter", "time"), coords=[tps_info, []], name="tps"
-        )
-        item.update({"tps": tps_array})
-
-    @staticmethod
-    def init_viz_dataset(filename_base, viz_type, item):
-        # initialize viz_type mfzarr
-        filename_viz = filename_to_zarr_path(filename_base, viz_type)
-        viz_array = ExtendableDataArray(
-            path=filename_viz,
-            array_module=np,
-            dtype=object,
-            chunk_size=1,
-        )
-        viz_array.init_array(dims=("time",), coords=[[]], name=viz_type)
-        viz_period = viz_type + "_period"
-        filename_viz_period = filename_to_zarr_path(filename_base, viz_period)
-        viz_period_array = ExtendableDataArray(
-            path=filename_viz_period,
-            array_module=np,
-            dtype=object,
-            chunk_size=1,
-        )
-        viz_period_array.init_array(dims=("time",), coords=[[]], name=viz_period)
-        item.update({viz_type: viz_array, viz_period: viz_period_array})
-
-    @staticmethod
-    def update_centroid_dataset(data, item):
-        value = data["value"]
-        ti = np.array([value["t"]], dtype=np.float32)
-        lib_runtime.logger.debug(ti.item())
-        c_y = np.frombuffer(value["peak_intensity"], dtype=np.float32)
-        c_y = c_y.reshape(-1, 1)
-        c_mz = np.frombuffer(value["peak_mz"], dtype=np.float32)
-        c_mz = c_mz.reshape(
-            -1,
-        )
-
-        # Extend data arrays (write to file)
-        item["centroids"].extend_array(c_y, [c_mz, ti], "time")
-
-    @staticmethod
     def update_signal_dataset(data, item):
         base_path = get_filestore_path()
-        value = data["value"]
-        ti = np.array([value["t"]], dtype=np.float32)
-        period = np.array([value["period"]], dtype=np.float32)
+        ti = np.array([data["t"]], dtype=np.float32)
+        period = np.array([data["period"]], dtype=np.float32)
         lib_runtime.logger.debug(ti.item())
-        spec = np.frombuffer(value["spec"], dtype=np.float32)
+        spec = np.frombuffer(data["spec"], dtype=np.float32)
         spec = spec.reshape(-1, 1)
-        if "mz" in value:
+        if "mz" in data:
             # mz coordinates provided with data (Orbitrap)
-            mz = np.frombuffer(value["mz"], dtype=np.float32)
+            mz = np.frombuffer(data["mz"], dtype=np.float32)
             mz = mz.reshape(
                 -1,
             )
@@ -187,19 +142,10 @@ class zarr_sdk:
             )
             item["props"].update({"committed_length": committed_length})
             prop_path = os.path.join(
-                parse_path_from_item_filename(value["filename"], base_path), ".props"
+                parse_path_from_item_filename(data["filename"], base_path), ".props"
             )
             with open(prop_path, "w") as f:
                 json.dump(item["props"], f, indent=4)
-
-    @staticmethod
-    def update_tps_dataset(data, item):
-        value = data["value"]
-        ti = np.array([value.get("t")], dtype=np.float32)
-        tps_data = np.frombuffer(value.get("data"), dtype=np.float32)
-        tps_data = tps_data.reshape(-1, 1)
-        tps_info = item["tps"]["parameter"]
-        item["tps"].extend_array(tps_data, [tps_info, ti], "time")
 
     @staticmethod
     def write_peaks(peak_areas, peak_heights, item, overwrite=False):
@@ -382,13 +328,7 @@ def get_instrument_type(filename: str) -> str:
     :rtype: str
     """
     instrument_name = get_instrument_name(filename)
-    if "orbi" in instrument_name.lower():
-        instrument_type = "orbi"
-    elif "tof" in instrument_name.lower() or "api" in instrument_name.lower():
-        instrument_type = "tof"
-    else:
-        raise ValueError(f"Failed to get instrument type for file {filename}")
-    return instrument_type
+    return resolve_instrument_type(instrument_name)
 
 
 def get_zarr_var_shape(base_filename, var, concat_dim=1):

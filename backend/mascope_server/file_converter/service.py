@@ -129,7 +129,7 @@ def process_stream(streamer):
         }
         if spec_i is None:
             runtime.logger.info("Signal termination detected, finalizing dataset")
-            zarr_sdk.finalize_signal_dataset({"value": data}, sample_file)
+            zarr_sdk.finalize_signal_dataset(data, sample_file)
             data.update(
                 {
                     "committed_length": sample_file.props["committed_length"],
@@ -168,7 +168,7 @@ def process_stream(streamer):
         elif spec_i < 0:
             # New file
             try:
-                sample_file = zarr_sdk.init_signal_dataset({"value": data})
+                sample_file = zarr_sdk.init_signal_dataset(data)
             except Exception as e:
                 runtime.logger.error(f"Failed to start {data['filename']}")
                 runtime.logger.exception(e)
@@ -183,7 +183,7 @@ def process_stream(streamer):
                 runtime.logger.exception(e)
         else:
             # New data to existing file
-            zarr_sdk.update_signal_dataset({"value": data}, sample_file)
+            zarr_sdk.update_signal_dataset(data, sample_file)
             try:
                 runtime.logger.info(notification_data["progress"])
                 sio.emit("instrument_conversion_progress", notification_data)
