@@ -151,15 +151,14 @@ class RawStreamer(Thread):
         """
         if self.raw:
             num_of_scans = self.raw.RunHeaderEx.SpectraCount
-            tic_per_scan = [
-                scan_stats.TIC
-                for scan_stats in [
-                    self.raw.GetScanStatsForScanNumber(i + 1)
-                    for i in range(num_of_scans)
-                ]
-                if scan_stats.ScanType.split(" ")[1] == "-"
-            ]
-            total_tic_neg = np.sum(tic_per_scan)
+            tics = np.zeros(num_of_scans)
+            for i in range(num_of_scans):
+                if (
+                    self.raw.GetFilterForScanNumber(i + 1).Polarity.ToString()
+                    == "Negative"
+                ):
+                    tics[i] = self.raw.GetScanStatsForScanNumber(i + 1).TIC
+            total_tic_neg = np.sum(tics)
             return total_tic_neg
         return None
 
@@ -172,16 +171,15 @@ class RawStreamer(Thread):
         """
         if self.raw:
             num_of_scans = self.raw.RunHeaderEx.SpectraCount
-            tic_per_scan = [
-                scan_stats.TIC
-                for scan_stats in [
-                    self.raw.GetScanStatsForScanNumber(i + 1)
-                    for i in range(num_of_scans)
-                ]
-                if scan_stats.ScanType.split(" ")[1] == "+"
-            ]
-            total_tic_neg = np.sum(tic_per_scan)
-            return total_tic_neg
+            tics = np.zeros(num_of_scans)
+            for i in range(num_of_scans):
+                if (
+                    self.raw.GetFilterForScanNumber(i + 1).Polarity.ToString()
+                    == "Positive"
+                ):
+                    tics[i] = self.raw.GetScanStatsForScanNumber(i + 1).TIC
+            total_tic_pos = np.sum(tics)
+            return total_tic_pos
         return None
 
     @property
