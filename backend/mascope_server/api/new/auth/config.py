@@ -2,6 +2,8 @@ from pydantic import BaseModel
 
 from mascope_server.runtime import runtime
 
+from mascope_server.api.new.auth.secrets import jwt_secret_key
+
 
 # TODO_configuration for auth
 class AuthConfig(BaseModel):
@@ -12,7 +14,7 @@ class AuthConfig(BaseModel):
 
     # Main JWT Token settings for user authentication
     JWT_SECRET_KEY: str = (
-        "SECRET"  # PRIVATE_KEY used for signing and verifying JWT tokens
+        jwt_secret_key  # PRIVATE_KEY used for signing and verifying JWT tokens
     )
     JWT_EXPIRATION_SECONDS: int = 3600  # Token lifetime in seconds (JWT expiration)
     JWT_AUDIENCE: list = ["mascope-users:auth"]  # Audience claim for token validation

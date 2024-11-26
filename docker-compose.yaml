@@ -11,8 +11,11 @@ services:
       - ./runtime/env/${MASCOPE_ENV:-default}:/app/runtime/env/prod
       - ${MASCOPE_FILESTORE}:/app/runtime/env/prod/filestore
     environment:
-      - MASCOPE_LOGLEVEL
-      - MASCOPE_TIMEZONE
+      MASCOPE_LOGLEVEL: ${MASCOPE_LOGLEVEL}
+      MASCOPE_TIMEZONE: ${MASCOPE_TIMEZONE}
+      JWT_SECRET_KEY_FILE: /run/secrets/jwt_secret_key
+    secrets:
+      - jwt_secret_key
   file_converter:
     command: "file-converter"
     build:
@@ -35,3 +38,7 @@ services:
     tty: true
     ports:
       - 443:443
+
+secrets:
+  jwt_secret_key:
+    file: secrets/jwt_secret_key.txt

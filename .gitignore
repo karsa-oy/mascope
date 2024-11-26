@@ -9,5 +9,6 @@ __pycache__
 .vscode/tasks.json
 
 /.env
+/secrets
 
 tofdaq

@@ -11,7 +11,7 @@ All developer docs are in this document:
 - **[🚀 Getting started](#getting-started)** - install and running - [windows](#windows) / [ubuntu](#ubuntu) / [cheatsheet](#cheatsheet)
 - **[🚂 Runtime](#runtime)** - devops toolchain - [api](#runtime-library) / [cli](#runtime-cli) / [modes](#runtime-modes) / [modules](#runtime-modules) / [envs](#runtime-environments) / [configs](#runtime-config) / [logging](#runtime-logging)
 - **[🤖 Agents](#agents)** - instrument agents - [file mover](#file-mover) / [tof agenet](#tof-agent)
-- **[📡 Backend](#backend)** - central server - [api](#backend-api) / [app](#backend-app) / [db](#backend-db) / [file converter](#backend-file-converter)
+- **[📡 Backend](#backend)** - central server - [api](#backend-api) / [auth](#backend-auth) / [app](#backend-app) / [db](#backend-db) / [file converter](#backend-file-converter)
 - **[🖥️ Frontend](#frontend)** - user interface - [tech](#frontend-technologies) / [codebase](#frontend-codebase) / [api client](#frontend-api-client) / [stores](#frontend-stores) / [tests](#frontend-tests)
 - **[📚 Libraries](#libraries)** - shared packages - [mascope_api](#mascope-api) / [mascope_hardware](#mascope-hardware) / [mascope_lib](#mascope-lib)
 - **[📒 Notebooks](#notebooks)** - jupyter environment
@@ -442,11 +442,11 @@ backend/
       routes/              fastapi routes
 ```
 
-### API Authentication and Authorization
+### Backend Auth
 
 Mascope employs **Role-Based Access Control (RBAC)** and two authentication methods—**Cookie-based JWT authentication** for web users and **Access Token-based authentication** for external applications like Jupyter.
 
-### **Cookie-based JWT authentication**
+#### Cookie-based JWT authentication
 
 Mascope's web application uses **JWT authentication** via cookies for secure session management. This approach provides seamless, session-like authentication for web users, but lucks the token admin cotrol.
 
@@ -457,7 +457,9 @@ Mascope's web application uses **JWT authentication** via cookies for secure ses
 
 Routes authenticated via cookies are primarily designed for web-based user interactions with Mascope's primary UI.
 
-### Access Token authentication
+The JWT secret key in production is stored at `${MASCOPE_PATH}/secrets/jwt_secret_key.txt` and deployed using Docker Compose secrets (see the compose file).
+
+#### Access Token authentication
 
 To enable authenticated access for external applications, such as Jupyter servers and the public `mascope_api` library, **Access Token-based authentication** is implemented.
 
@@ -472,7 +474,7 @@ To enable authenticated access for external applications, such as Jupyter server
   - Jupyter server integration, where tokens are passed via the `Authorization` header (`Bearer <access_token>`).
   - Public libraries like `mascope_api` that rely on external access.
 
-### Authorization
+#### Authorization
 
 **Role-Based Access Control (RBAC)**
 
