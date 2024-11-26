@@ -1,8 +1,8 @@
 from fastapi import HTTPException, status
 from sqlalchemy import select
-from mascope_server.api.lib.api_features import api_controller
 from mascope_server.db import async_session
 from mascope_server.db.models import AccessToken
+from mascope_server.api.lib.api_features import api_controller
 from mascope_server.api.new.auth.auth_backend import auth_backend_access_token
 
 
