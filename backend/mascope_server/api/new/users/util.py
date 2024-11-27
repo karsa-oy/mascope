@@ -1,9 +1,11 @@
 from fastapi import Depends
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi_users.db import SQLAlchemyUserDatabase
-from mascope_server.db import get_async_session
+from mascope_server.db import async_session, get_async_session
 from mascope_server.db.models import User
-from mascope_server.api.new.users.service import UserManager
+from mascope_server.api.new.users.service_user_manager import UserManager
+from mascope_server.api.new.users import exceptions
 
 
 async def get_user_db(session: AsyncSession = Depends(get_async_session)):
@@ -34,3 +36,21 @@ async def get_user_manager(user_db=Depends(get_user_db)):
     :rtype: UserManager
     """
     yield UserManager(user_db)
+
+
+async def check_username_exists(username: str) -> bool:
+    """
+    Check if a username already exists in the database.
+
+    :param username: The username to check.
+    :type username: str
+    :return: True if the username exists, False otherwise.
+    :rtype: bool
+    """
+    async with async_session() as session:
+        query = select(User).filter(User.username == username)
+        result = await session.execute(query)
+        existing_user = result.scalar_one_or_none()
+
+    if existing_user:
+        raise exceptions.UsernameAlreadyExistsException(username=username)
