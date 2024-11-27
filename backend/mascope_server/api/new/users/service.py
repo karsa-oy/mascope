@@ -1,98 +1,233 @@
 """
-User management service module for Mascope Server authentication.
+User management CRUD service module.
 
-This module contains the `UserManager` class that handles user creation, password management, and
-user event hooks such as registration, password reset requests, email verification, etc.
+This module provides core CRUD operations for user management in the Mascope server.
+It extends the FastAPI Users library by combining its user management functionality
+with custom operations and integrations, including role filtering, validation, etc.
 """
 
 from typing import Optional
-
-from fastapi import Request
-from fastapi_users import BaseUserManager, IntegerIDMixin
-from fastapi_users import exceptions, models
+from sqlalchemy import asc, desc, select, func
+from mascope_server.db import async_session
+from mascope_server.db.models import User, Role
+from mascope_server.api.lib.api_features import api_controller
+from mascope_server.api.lib.exceptions.api_exceptions import NotFoundException
 from mascope_server.api.new.auth.config import auth_settings
-from mascope_server.api.new.users.schemas import UserCreate
-from mascope_server.db.models import User
-from mascope_server.api.new.auth.config import auth_settings
+from mascope_server.api.new.users.service_user_manager import UserManager
+from mascope_server.api.new.users.schemas import UserCreate, UserRead, UserUpdate
+from mascope_server.api.new.users.util import check_username_exists
+from mascope_server.api.new.roles.exceptions import InvalidRoleException
 
-from mascope_server.runtime import runtime
 
-
-class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
+@api_controller()
+async def get_users(
+    role_name_min: Optional[str] = None,
+    role_name_max: Optional[str] = None,
+    page: int = 0,
+    limit: int = 10000,
+    sort: str = "registered_at",
+    order: str = "desc",
+) -> dict:
     """
-    Responsible for managing user-related operations, including registration,
-    password reset, email verification, and token management, etc.
+    Retrieves a paginated, sorted, and optionally filtered list of users.
 
-    This class extends the FastAPI Users `BaseUserManager` and adds custom logic for handling
-    user management in the Mascope server. See BaseUserManager for more examples.
-
-    :param IntegerIDMixin: Mixin for managing users with integer-based IDs.
-    :param BaseUserManager: FastAPI Users' base user manager with core user handling logic.
-    :raises exceptions.UserAlreadyExists: Raised when trying to create a user that already exists.
-    :return: Instance of a newly created or managed user.
-    :rtype: models.UP
+    :param role_name_min: Minimum role name for filtering (inclusive), defaults to None.
+    :type role_name_min: Optional[str]
+    :param role_name_max: Maximum role name for filtering (inclusive), defaults to None.
+    :type role_name_max: Optional[str]
+    :param page: Page number for pagination, defaults to 0.
+    :type page: int
+    :param limit: Number of results per page, defaults to 100.
+    :type limit: int
+    :param sort: Column name to sort by, defaults to "registered_at".
+    :type sort: str
+    :param order: Sort order, either 'asc' or 'desc', defaults to "desc".
+    :type order: str
+    :raises NotFoundException: If no users are found in the database.
+    :return: A dictionary containing the user list and metadata.
+    :rtype: dict
     """
+    async with async_session() as session:
+        # Step 1: Construct the base query with join to Role
+        query = select(User, Role.role_name).join(Role, Role.role_id == User.role_id)
 
-    reset_password_token_secret = auth_settings.RESET_PASSWORD_TOKEN_SECRET
-    reset_password_token_lifetime_seconds = (
-        auth_settings.RESET_PASSWORD_TOKEN_LIFETIME_SECONDS
-    )
-    reset_password_token_audience = auth_settings.RESET_PASSWORD_TOKEN_AUDIENCE
-    verification_token_secret = auth_settings.VERIFICATION_TOKEN_SECRET
-    verification_token_lifetime_seconds = (
-        auth_settings.VERIFICATION_TOKEN_LIFETIME_SECONDS
-    )
-    verification_token_audience = auth_settings.VERIFICATION_TOKEN_AUDIENCE
+        # Step 2: Apply filtering if specified
+        if role_name_min or role_name_max:
+            # Retrieve role levels from the configuration
+            role_access_levels = auth_settings.ROLE_ACCESS_LEVELS
 
-    async def on_after_register(self, user: User, request: Optional[Request] = None):
-        runtime.logger.info(f"User {user.username} has registered.")
+            if role_name_min:
+                min_access_level = role_access_levels.get(role_name_min, None)
+                if min_access_level is not None:
+                    query = query.filter(Role.role_id >= min_access_level)
 
-    async def on_after_forgot_password(
-        self, user: User, token: str, request: Optional[Request] = None
-    ):
-        print(f"User {user.id} has forgot their password. Reset token: {token}")
+            if role_name_max:
+                max_access_level = role_access_levels.get(role_name_max, None)
+                if max_access_level is not None:
+                    query = query.filter(Role.role_id <= max_access_level)
 
-    async def on_after_request_verify(
-        self, user: User, token: str, request: Optional[Request] = None
-    ):
-        print(f"Verification requested for user {user.id}. Verification token: {token}")
+        # Step 2: Apply sorting
+        if sort:
+            query = query.order_by(
+                desc(getattr(User, sort))
+                if order == "desc"
+                else asc(getattr(User, sort))
+            )
 
-    async def create(
-        self,
-        user_create: UserCreate,
-        safe: bool = False,
-        request: Optional[Request] = None,
-    ) -> models.UP:
-        """
-        Create a user in database.
-
-        Triggers the on_after_register handler on success.
-
-        :param user_create: The UserCreate model to create.
-        :param safe: If True, sensitive values like is_superuser or is_verified
-        will be ignored during the creation, defaults to False.
-        :param request: Optional FastAPI request that
-        triggered the operation, defaults to None.
-        :raises UserAlreadyExists: A user already exists with the same e-mail.
-        :return: A new user.
-        """
-        await self.validate_password(user_create.password, user_create)
-
-        existing_user = await self.user_db.get_by_email(user_create.email)
-        if existing_user is not None:
-            raise exceptions.UserAlreadyExists()
-
-        user_dict = (
-            user_create.create_update_dict()
-            if safe
-            else user_create.create_update_dict_superuser()
+        # Step 3: Get total count for pagination
+        count_query = select(func.count()).select_from(  # pylint: disable=not-callable
+            query.subquery()
         )
-        password = user_dict.pop("password")
-        user_dict["hashed_password"] = self.password_helper.hash(password)
-        user_dict["role_id"] = auth_settings.ROLE_ACCESS_LEVELS.get("guest", None)
+        total = await session.scalar(count_query)
 
-        created_user = await self.user_db.create(user_dict)
+        # Step 4: Apply pagination and execute the query
+        query = query.offset(page * limit).limit(limit)
+        result = await session.execute(query)
 
-        await self.on_after_register(created_user, request)
+        # Step 5: Construct the response data
+        users = []
+        for user, role_name in result.all():
+            user_data = user.to_dict()
+            user_data["role_name"] = role_name
+            users.append(UserRead.model_validate(user_data))
 
-        return created_user
+    return {
+        "message": f"Retrieved {len(users)} user records.",
+        "results": total,
+        "data": users,
+    }
+
+
+@api_controller()
+async def get_user(user_id: str) -> dict:
+    """
+    Retrieves a user by their ID.
+
+    :param user_id: The ID of the user to retrieve.
+    :type user_id: int
+    :raises NotFoundException: If the user does not exist.
+    :return: The user object.
+    """
+    async with async_session() as session:
+        query = (
+            select(User, Role.role_name)
+            .join(Role, Role.role_id == User.role_id)
+            .filter(User.id == user_id)
+        )
+        result = await session.execute(query)
+        user_row = result.one_or_none()
+
+        if not user_row:
+            raise NotFoundException(f"User with ID '{user_id}' not found.")
+
+        user, role_name = user_row
+        user_data = user.to_dict()
+        user_data["role_name"] = role_name
+
+        # Validate the user's role ID
+        role_access_levels = auth_settings.ROLE_ACCESS_LEVELS
+        if user.role_id is None or user.role_id not in role_access_levels.values():
+            raise InvalidRoleException(
+                detail=f"The user's role ID '{user.role_id}' is not defined in the configuration. Please check for configuration issues."
+            )
+
+        # Validate and return the user read data
+        validated_user = UserRead.model_validate(user_data)
+        return {
+            "message": f"User '{validated_user.username}' retrieved.",
+            "data": validated_user,
+        }
+
+
+@api_controller()
+async def register_user(
+    user_create: UserCreate,
+    user_manager: UserManager,
+) -> dict:
+    """
+    Registers a new user in Mascope.
+
+    :param user_create: The details of the user to be registered.
+    :type user_create: UserCreate
+    :param user_manager: The UserManager instance for user operations.
+    :type user_manager: UserManager
+    :raises UsernameAlreadyExistsException: If the username already exists.
+    :raises UserAlreadyExists: If a user with the same email already exists.
+    :return: The registered user's details.
+    :rtype: dict
+    """
+    # Step 1: Check if the username already exists
+    await check_username_exists(user_create.username)
+
+    # Step 2: Create the user
+    created_user = await user_manager.create(user_create, safe=True)
+
+    # Step 3: Validate and return the registered user's details
+    user = (await get_user(user_id=created_user.id))["data"]
+    return {
+        "message": f"User '{user.username}' registered successfully.",
+        "data": user,
+    }
+
+
+@api_controller()
+async def update_user(
+    user_id: int,
+    user_update: UserUpdate,
+    user_manager: UserManager,
+) -> dict:
+    """
+    Updates a user's details.
+
+    :param user_id: The ID of the user to update.
+    :type user_id: int
+    :param user_update: The updates to apply to the user.
+    :type user_update: UserUpdate
+    :param user_manager: The UserManager instance.
+    :type user_manager: UserManager
+    :param request: The current HTTP request.
+    :type request: Request
+    :raises NotFoundException: If the user does not exist.
+    :return: The updated user details.
+    """
+    # Step 1: Check if the new username already exists
+    if user_update.username:
+        await check_username_exists(user_update.username)
+
+    # Step 2: Retrieve the user
+    user = await user_manager.get(user_id)
+
+    # Step 3: Update the user
+    await user_manager.update(user_update, user)
+
+    # Step 4: Validate and return the updated user
+    user = (await get_user(user_id=user_id))["data"]
+    message = f"User '{user.username}' updated successfully."
+    if user_update.password is not None:
+        message += " Access tokens must be regenerated due to password change."
+    return {
+        "message": message,
+        "data": user,
+    }
+
+
+@api_controller()
+async def delete_user(user_id: int, user_manager: UserManager) -> dict:
+    """
+    Deletes a user by their ID.
+
+    :param user_id: The ID of the user to delete.
+    :type user_id: int
+    :param user_manager: The UserManager instance.
+    :type user_manager: UserManager
+    :raises NotFoundException: If the user does not exist.
+    :return: A success message.
+    :rtype: dict
+    """
+    # Step 1: Fetch the user
+    user = await user_manager.get(user_id)
+
+    # Step 2: Perform the delete operation
+    await user_manager.delete(user)
+
+    return {"message": f"User '{user.username}' deleted successfully."}
