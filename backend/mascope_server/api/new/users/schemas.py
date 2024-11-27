@@ -1,7 +1,9 @@
 from datetime import datetime
 from typing import Optional
-from pydantic import EmailStr, Field
+from pydantic import EmailStr, Field, field_validator, model_validator
 from fastapi_users import schemas
+from mascope_server.api.new.auth.config import auth_settings
+from mascope_server.api.models.base_pydantic_model import QueryParamsModel
 
 
 class UserRead(schemas.BaseUser[int]):
@@ -33,6 +35,9 @@ class UserRead(schemas.BaseUser[int]):
         ...,
         description="Role identifier of the user, linked to user role permissions.",
     )
+    role_name: Optional[str] = Field(
+        None, description="Name of the role assigned to the user."
+    )
     registered_at: datetime = Field(
         ..., description="Timestamp indicating when the user registered."
     )
@@ -40,6 +45,17 @@ class UserRead(schemas.BaseUser[int]):
     model_config = {
         "from_attributes": True  # Allows Pydantic to work with SQLAlchemy models
     }
+
+    @field_validator("role_name")
+    @classmethod
+    def validate_role_name(cls, role_name):
+        """
+        Validates that `role_name` exists in the configured roles.
+        """
+        role_access_levels = auth_settings.ROLE_ACCESS_LEVELS
+        if role_name not in role_access_levels:
+            raise ValueError(f"Invalid role name: '{role_name}'.")
+        return role_name
 
 
 class UserCreate(schemas.BaseUserCreate):
@@ -69,11 +85,67 @@ class UserCreate(schemas.BaseUserCreate):
         description="Username for display purposes. Note: This is not used for login.",
     )
     role_id: int = Field(
-        default=1,
+        ...,
         description="Role ID assigned to the user (e.g., '100' for guest users).",
     )
 
     model_config = {"from_attributes": True}
+
+    @field_validator("role_id")
+    @classmethod
+    def validate_role_id(cls, role_id):
+        """
+        Validates that the provided role_id exists in the configured ROLE_ACCESS_LEVELS.
+
+        :param role_id: The role ID provided for creation.
+        :raises ValueError: If the role ID is not defined in the configuration.
+        :return: The role ID if it is valid.
+        """
+        role_access_levels = auth_settings.ROLE_ACCESS_LEVELS
+
+        # Check if the role_id exists in the values of ROLE_ACCESS_LEVELS
+        if role_id not in role_access_levels.values():
+            raise ValueError(
+                f"The requested role with access level '{role_id}' is not defined in the configuration."
+            )
+
+        return role_id
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, username):
+        """
+        Validates that `username` is not an empty string.
+
+        :param username: The username provided for creation.
+        :raises ValueError: If the username is an empty string.
+        :return: The username if it is valid.
+        """
+        if username.strip() == "":
+            raise ValueError("The username cannot be an empty string.")
+        return username
+
+    @model_validator(mode="before")
+    @classmethod
+    def validate_allowed_fields(cls, values):
+        """
+        Validates that only allowed fields are included in the creation request.
+
+        :param values: Dictionary of fields being updated.
+        :type values: dict
+        :raises ValueError: If any field outside the allowed fields is included.
+        :return: Filtered dictionary containing only allowed fields.
+        :rtype: dict
+        """
+        allowed_fields = {"email", "password", "username", "role_id"}
+        invalid_fields = {key for key in values if key not in allowed_fields}
+
+        if invalid_fields:
+            raise ValueError(
+                f"You can not specify these fields for user registration: {', '.join(invalid_fields)}."
+            )
+        # Only keep allowed fields
+        return {key: value for key, value in values.items() if key in allowed_fields}
 
 
 class UserUpdate(schemas.BaseUserUpdate):
@@ -106,3 +178,173 @@ class UserUpdate(schemas.BaseUserUpdate):
     )
 
     model_config = {"from_attributes": True}
+
+    @field_validator("role_id")
+    @classmethod
+    def validate_role_id(cls, role_id):
+        """
+        Validates that the provided role_id exists in the configured ROLE_ACCESS_LEVELS.
+
+        :param role_id: The role ID provided for update.
+        :raises ValueError: If the role ID is not defined in the configuration.
+        :return: The role ID if it is valid.
+        """
+        role_access_levels = auth_settings.ROLE_ACCESS_LEVELS
+
+        # Check if the role_id exists in the values of ROLE_ACCESS_LEVELS
+        if role_id is not None and role_id not in role_access_levels.values():
+            raise ValueError(
+                f"The requested role with access level '{role_id}' is not defined in the configuration."
+            )
+
+        return role_id
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, username):
+        """
+        Validates that `username` is not an empty string.
+
+        :param username: The username provided for update.
+        :raises ValueError: If the username is an empty string.
+        :return: The username if it is valid.
+        """
+        if username is not None and username.strip() == "":
+            raise ValueError("The username cannot be an empty string.")
+        return username
+
+    @model_validator(mode="before")
+    @classmethod
+    def validate_allowed_fields(cls, values):
+        """
+        This validator checks that only allowed fields are included in the update request.
+        Any other fields provided in the payload will raise a validation error.
+
+        :param values: Dictionary of fields being updated.
+        :type values: dict
+        :raises ValueError: If any field outside the allowed fields is included.
+        :return: Filtered dictionary containing only allowed fields.
+        :rtype: dict
+        """
+        allowed_fields = {
+            "email",
+            "password",
+            "is_active",
+            "is_verified",
+            "username",
+            "role_id",
+        }
+        invalid_fields = {key for key in values if key not in allowed_fields}
+
+        if invalid_fields:
+            raise ValueError(
+                f"You can not update these fields for user: {', '.join(invalid_fields)}."
+            )
+        # Only keep allowed fields
+        return {key: value for key, value in values.items() if key in allowed_fields}
+
+
+class UserUpdateMe(schemas.BaseUserUpdate):
+    """
+    Schema for updating the current authenticated user.
+    Only `username` and `password` fields are accepted for update.
+
+    Any other fields included in the update request will raise a validation error.
+    """
+
+    username: Optional[str] = Field(
+        None,
+        description="Updated username for display purposes. Note: This is not used for login.",
+    )
+    password: Optional[str] = Field(
+        None,
+        description="New password for the user. If not provided, the password remains unchanged.",
+    )
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, username):
+        """
+        Validates that `username` is not an empty string.
+
+        :param username: The username provided for update.
+        :raises ValueError: If the username is an empty string.
+        :return: The username if it is valid.
+        """
+        if username is not None and username.strip() == "":
+            raise ValueError("The username cannot be an empty string.")
+        return username
+
+    @model_validator(mode="before")
+    @classmethod
+    def validate_allowed_fields(cls, values):
+        """
+        This validator checks that only `username` and `password` fields are accepted for update.
+        Any other fields provided in the payload will raise a validation error.
+
+        :param values: Dictionary of fields being updated.
+        :type values: dict
+        :raises ValueError: If any field other than `username` or `password` is included.
+        :return: Filtered dictionary containing only allowed fields.
+        :rtype: dict
+        """
+        allowed_fields = {"username", "password"}
+        invalid_fields = {key for key in values if key not in allowed_fields}
+
+        if invalid_fields:
+            raise ValueError(
+                f"You can not self-update these fields: {', '.join(invalid_fields)}."
+            )
+        # Only keep allowed fields
+        return {key: value for key, value in values.items() if key in allowed_fields}
+
+
+class GetUsersQueryParams(QueryParamsModel):
+    """
+    Query parameter model for retrieving users with pagination, sorting, and filtering options.
+    """
+
+    role_name_min: Optional[str] = Field(
+        None, description="Minimum role name to filter users (e.g., 'guest')."
+    )
+    role_name_max: Optional[str] = Field(
+        None, description="Maximum role name to filter users (e.g., 'admin')."
+    )
+    sort: Optional[str] = Field(
+        "registered_at",
+        description=(
+            "Column name by which you want to sort the results. The column name should match the columns in the user table."
+        ),
+    )
+    order: Optional[str] = Field(
+        "desc",
+        description="Sorting order: 'asc' for ascending or 'desc' for descending.",
+    )
+    page: int = Field(0, description="Page number for pagination.")
+    limit: int = Field(10000, description="Number of results per page.")
+
+    @model_validator(mode="after")
+    @classmethod
+    def validate_roles(cls, values):
+        role_access_levels = auth_settings.ROLE_ACCESS_LEVELS
+        role_name_min = values.role_name_min
+        role_name_max = values.role_name_max
+
+        # Validate role_name_min exists in configuration
+        if role_name_min and role_name_min not in role_access_levels:
+            raise ValueError(f"Invalid role_name_min: '{role_name_min}'.")
+
+        # Validate role_name_max exists in configuration
+        if role_name_max and role_name_max not in role_access_levels:
+            raise ValueError(f"Invalid role_name_max: '{role_name_max}'.")
+
+        # Validate role_name_min <= role_name_max based on access levels
+        if role_name_min and role_name_max:
+            min_level = role_access_levels[role_name_min]
+            max_level = role_access_levels[role_name_max]
+            if min_level > max_level:
+                raise ValueError(
+                    f"Invalid range: role_name_min '{role_name_min}' cannot have a higher access level than role_name_max '{role_name_max}'."
+                )
+
+        return values
