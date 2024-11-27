@@ -10,10 +10,10 @@ from mascope_server.api.new.auth.config import auth_settings
 
 
 async def run():
-    # Create the backup before migration
+    # Step 1: Create a backup before migration
     await create_db_backup()
 
-    # Step 1: Setup new database version
+    # Step 2: Setup new database version
     new_version = 17
     old_db_path = os.path.join(runtime.config.database, "mascope.v16.db")
     new_db_path = os.path.join(runtime.config.database, f"mascope.v{new_version}.db")
@@ -22,35 +22,29 @@ async def run():
     shutil.copyfile(old_db_path, new_db_path)
 
     # Update the engine to the new database (also updates global async_session)
-    configure_database_engine(new_version)
+    await configure_database_engine(new_version)
 
-    # Step 2: Create new AccessToken table
-    runtime.logger.info("Creating access_token table.")
+    # Step 3: Drop and recreate the Role table, create new AccessToken table
+    runtime.logger.info("Modifying role table, creating access_token table.")
+    role_access_levels = auth_settings.ROLE_ACCESS_LEVELS
     async with async_session() as session:
-        # Acquire connection
         connection = await session.connection()
-
+        await connection.run_sync(
+            Base.metadata.drop_all, tables=[Role.__table__]
+        )  # Drop the Role table if it exists
         # metadata.create_all() skips existing tables and only creates missing tables.
         await connection.run_sync(Base.metadata.create_all)
 
-        # Step 3: Create roles dynamically from `ROLE_ACCESS_LEVELS`
-        runtime.logger.info("Inserting roles into the database.")
-        role_access_levels = auth_settings.ROLE_ACCESS_LEVELS
-
-        # Clear existing roles before inserting new ones
-        await session.execute(delete(Role))
-
-        # Insert roles with explicitly defined role_id mapped to access_level
+        # Step 4: Insert roles dynamically from `ROLE_ACCESS_LEVELS`
+        # with explicitly defined role_id mapped to access_level
         await session.execute(
             insert(Role).values(
                 [
-                    {"role_id": access_level, "name": role}
+                    {"role_id": access_level, "role_name": role}
                     for role, access_level in role_access_levels.items()
                 ]
             )
         )
-
-        # Commit the transaction
         await session.commit()
 
 

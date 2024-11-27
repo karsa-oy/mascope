@@ -70,9 +70,9 @@ class Role(Base):
     __tablename__ = "role"
 
     role_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column(
+    role_name: Mapped[str] = mapped_column(
         String(length=50), unique=True, nullable=False
-    )  # Role name (e.g., "admin", "user")
+    )
     permissions: Mapped[dict] = mapped_column(JSON, nullable=True)
 
     # Define relationships

@@ -87,7 +87,7 @@ async def migrate(current_version, target_version):
 
 
 # Database configuration and session management
-def configure_database_engine(version):
+async def configure_database_engine(version):
     """
     Configures the database engine and sets up the global session maker using SQLAlchemy's async_sessionmaker.
     This function is called during initialization to establish a connection with the database.
@@ -196,7 +196,7 @@ async def init_db():
 
         if current_version == target_version:
             runtime.logger.info("No database migration needed.")
-            configure_database_engine(current_version)
+            await configure_database_engine(current_version)
         else:
             runtime.logger.info(f"This version of mascope requires: v{target_version}")
             await migrate(current_version, target_version)

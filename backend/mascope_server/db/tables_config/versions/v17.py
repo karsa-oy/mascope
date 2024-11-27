@@ -687,16 +687,16 @@ table_configs = {
     "role": {
         "columns": {
             "role_id": ("INTEGER", 1, None, 1),
-            "name": ("VARCHAR(50)", 1, None, 0),
+            "role_name": ("VARCHAR(50)", 1, None, 0),
             "permissions": ("JSON", 0, None, 0),
         },
         "fks": {},
         "create_sql": """
             CREATE TABLE role (
                 role_id INTEGER NOT NULL PRIMARY KEY,
-                name VARCHAR(50) NOT NULL,
+                role_name VARCHAR(50) NOT NULL,
                 permissions JSON,
-                UNIQUE (name)
+                UNIQUE (role_name)
             );
         """,
     },

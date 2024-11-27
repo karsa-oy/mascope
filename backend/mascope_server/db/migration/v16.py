@@ -28,7 +28,7 @@ async def run():
     shutil.copyfile(old_db_path, new_db_path)
 
     # Reconfigure the database engine to point to the new v16 database
-    configure_database_engine(new_version)
+    await configure_database_engine(new_version)
 
     # Step 2: Restore the schema of the ionization_mechanism table with its
     # updated definition (nullable reagent, unique constraint)
