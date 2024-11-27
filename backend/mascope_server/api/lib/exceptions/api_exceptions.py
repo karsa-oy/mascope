@@ -3,7 +3,7 @@ from fastapi import HTTPException, status
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.encoders import jsonable_encoder
-from mascope_server.api.new.auth.exceptions import InvalidRoleException
+from mascope_server.api.new.roles.exceptions import InvalidRoleException
 from sqlalchemy.exc import SQLAlchemyError
 
 from mascope_server.runtime import runtime

@@ -16,7 +16,9 @@ class AuthConfig(BaseModel):
     JWT_SECRET_KEY: str = (
         jwt_secret_key  # PRIVATE_KEY used for signing and verifying JWT tokens
     )
-    JWT_EXPIRATION_SECONDS: int = 3600  # Token lifetime in seconds (JWT expiration)
+    JWT_EXPIRATION_SECONDS: int = (
+        30 * 24 * 60 * 60
+    )  # Token lifetime - 30 days in seconds (JWT expiration)
     JWT_AUDIENCE: list = ["mascope-users:auth"]  # Audience claim for token validation
     JWT_ALGORITHM: str = (
         "HS256"  # Algorithm used for signing the JWT (HMAC with SHA-256)
@@ -25,8 +27,8 @@ class AuthConfig(BaseModel):
     # Cookie settings for web-based JWT storage
     COOKIE_NAME: str = "mascope_auth"  # Name of the authentication cookie
     COOKIE_MAX_AGE_SECONDS: int = (
-        3600  # Lifetime of the cookie in seconds (matches JWT expiration)
-    )
+        30 * 24 * 60 * 60
+    )  # Lifetime of the cookie - 30 days in seconds (matches JWT expiration)
     COOKIE_SECURE: bool = (
         runtime.mode == "prod"
     )  # to send cookies only over HTTPS, True if in production, False if in dev

@@ -3,13 +3,11 @@ Route dependencies
 """
 
 from fastapi import Depends
-from mascope_server.api.new.auth.exceptions import (
-    ForbiddenAccessException,
-    InvalidRoleException,
-)
 from mascope_server.db.models import User
 from mascope_server.api.new.auth.config import auth_settings
 from mascope_server.api.new.auth.auth_backend import fastapi_users, get_enabled_backends
+from mascope_server.api.new.auth.exceptions import ForbiddenAccessException
+from mascope_server.api.new.roles.exceptions import InvalidRoleException
 
 # Dependencies for active, verified, and superuser users
 current_user = fastapi_users.current_user(get_enabled_backends=get_enabled_backends)
@@ -39,7 +37,7 @@ async def admin_user(user: User = Depends(current_active_user)) -> User:
     return await role_based_access(user, "admin")
 
 
-async def owner_user(user: User = Depends(current_active_user)) -> User:
+async def owner_user(user: User = Depends(current_superuser)) -> User:
     return await role_based_access(user, "owner")
 
 
@@ -52,11 +50,22 @@ async def role_based_access(user: User, access: str) -> User:
     :raises HTTPException: If the user's role does not meet the required level.
     :return: The user object if the role requirement is met.
     """
-    required_role_id = auth_settings.ROLE_ACCESS_LEVELS.get(access, None)
-
+    role_access_levels = auth_settings.ROLE_ACCESS_LEVELS
+    # Get the required role level
+    required_role_id = role_access_levels.get(access, None)
     if required_role_id is None:
-        raise InvalidRoleException()
+        raise InvalidRoleException(
+            detail=f"The required role '{access}' is not defined in the configuration."
+        )
 
-    if user.role_id is None or user.role_id < required_role_id:
+    # Validate user's role_id
+    if user.role_id is None or user.role_id not in role_access_levels.values():
+        raise InvalidRoleException(
+            detail=f"The user's role ID '{user.role_id}' is not defined in the configuration. Please check for configuration issues."
+        )
+
+    # Enforce role-based access
+    if user.role_id < required_role_id:
         raise ForbiddenAccessException()
+
     return user
