@@ -208,7 +208,7 @@ export const useChartData = defineStore('chart.batch.overview', () => {
               .map(({ target_collection_id }) => target_collection_id)
           },
           // tooltip
-          customdata: [...Array(samples.length).keys()].map((i) => [
+          customdata: [...Array(samples.value.length).keys()].map((i) => [
             samples.value[i].datetime,
             unit
           ]), // Add [datetime, unit] in customdata field to use in the hovertemplate
