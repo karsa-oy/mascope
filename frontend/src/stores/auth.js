@@ -17,7 +17,7 @@ export const useAuth = defineStore('app.auth', () => {
         validateStatus: (status) => status < 500
       })
       if (response.status == 200) {
-        user.value = response.data
+        user.value = response.data.data
       } else {
         user.value = false
       }
