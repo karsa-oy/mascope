@@ -77,7 +77,7 @@ const xFields = computed(() => {
 const xField = ref()
 
 watchEffect(() => {
-  xField.value = xFields.value.find(({ field }) => field == 'index')
+  xField.value = xFields.value.find(({ field }) => field == 'sample_item_name')
 })
 
 const num = new Intl.NumberFormat('en-US', {
