@@ -14,6 +14,8 @@ import App from './App.vue'
 import router from './routes'
 import Karsa from './theme.js'
 
+import { useHelp } from './stores/ui/help'
+
 const app = createApp(App)
 
 // routing
@@ -40,6 +42,10 @@ app.directive('ripple', Ripple)
 // store
 const pinia = createPinia()
 app.use(pinia)
+
+// help
+const help = useHelp()
+app.directive('help', help.directive())
 
 // init
 app.mount('#app')

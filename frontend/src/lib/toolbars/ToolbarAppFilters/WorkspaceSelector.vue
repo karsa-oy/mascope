@@ -71,6 +71,17 @@ watch(
       optionLabel="workspace_name"
       style="flex-direction: row-reverse"
       appendTo="self"
+      v-tooltip.right="'Workspace'"
+      :pt="
+        app.ui.help.bottom_start(`
+          <h1>Workspace Selector</h1>
+
+          <p>Workspaces are the like folders that organize samples
+          and targets relating to specific projects in one place.
+          You can modify, create or delete workspaces by clicking
+          the ellipsis icon to the right of the dropdown.</p>
+    `)
+      "
     >
       <template #dropdownicon>
         <svg

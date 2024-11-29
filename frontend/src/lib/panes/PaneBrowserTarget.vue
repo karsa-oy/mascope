@@ -304,7 +304,22 @@ watch(
 </script>
 
 <template v-if="collections">
-  <Panel style="border: none" class="browser">
+  <Panel
+    style="border: none"
+    class="browser"
+    :pt="
+      app.ui.help.right(`
+        <h1>Target Browser</h1>
+
+        <p>Shows the targets and matches associated
+        with the currently selected batch, and provides
+        features for managing them.</p>
+
+        <p>Right click on collections and compounds to
+        perform actions.</p>
+      `)
+    "
+  >
     <template #header>
       <TabMenu :model="[{ label: 'Targets', icon: 'pi pi-bullseye' }]" />
     </template>

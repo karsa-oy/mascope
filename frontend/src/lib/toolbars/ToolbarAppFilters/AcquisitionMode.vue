@@ -49,6 +49,15 @@ watchEffect(() => {
     style="height: 32px"
     :disabled="!app.data.batch.focused"
     :allowEmpty="false"
+    :pt="
+      app.ui.help.bottom(`
+          <h1>Measurement mode controls</h1>
+
+          <p>Enable or disable measurement mode. In measurement
+          mode, sample acquisition automatically launches a dialog
+          to input data for incoming samples.</p>
+    `)
+    "
   >
     <template #option="{ option }">
       <div

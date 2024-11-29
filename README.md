@@ -12,7 +12,7 @@ All developer docs are in this document:
 - **[🚂 Runtime](#runtime)** - devops toolchain - [api](#runtime-library) / [cli](#runtime-cli) / [modes](#runtime-modes) / [modules](#runtime-modules) / [envs](#runtime-environments) / [configs](#runtime-config) / [logging](#runtime-logging)
 - **[🤖 Agents](#agents)** - instrument agents - [file mover](#file-mover) / [tof agenet](#tof-agent)
 - **[📡 Backend](#backend)** - central server - [api](#backend-api) / [auth](#backend-auth) / [app](#backend-app) / [db](#backend-db) / [file converter](#backend-file-converter)
-- **[🖥️ Frontend](#frontend)** - user interface - [tech](#frontend-technologies) / [codebase](#frontend-codebase) / [api client](#frontend-api-client) / [stores](#frontend-stores) / [tests](#frontend-tests)
+- **[🖥️ Frontend](#frontend)** - user interface - [tech](#frontend-technologies) / [codebase](#frontend-codebase) / [api client](#frontend-api-client) / [stores](#frontend-stores) / [help mode](#frontend-user-help) / [tests](#frontend-tests)
 - **[📚 Libraries](#libraries)** - shared packages - [mascope_api](#mascope-api) / [mascope_hardware](#mascope-hardware) / [mascope_lib](#mascope-lib)
 - **[📒 Notebooks](#notebooks)** - jupyter environment
 - **[📄 Documentation](#documentation)** - about the docs
@@ -958,6 +958,105 @@ When implementing new modules, we need to remember to the add the hook into the 
 **_Semistandard: the Match modules_**
 
 The match collection, compound, ion and isotope modules are implemented in a _semistandard_ way. They leverage the `defineModule` abstraction, but do so in a slightly hacky way. This was deemed the lesser of all evils. For more information, read the comments in the file: `frontend/stores/data/match.js`.
+
+### Frontend User Help
+
+The frontend includes a user 'help mode' feature, which can be toggled by users using a button in the top toolbar or by the keyboard shortcut `alt+h`. In help mode, detailed info cards are shown when a user hovers over a specific element or component on the page. The help feature state is managed in the `app.ui.help` store.
+
+Help cards are implemented using the [Floating UI](https://floating-ui.com/docs/getting-started) library, as well as custom code found in `frontend/src/lib/help` and the help store.
+
+You can add help cards in two ways: a [_Vue custom directive_](https://vuejs.org/guide/reusability/custom-directives.html#custom-directives) added to HTML elements, or a [_PrimeVue pass-through object_](https://primevue.org/passthrough/) passed to the `pt` prop in PrimeVue components. Help cards can be _positioned_ at the `top`, `bottom`, `left` or `right` of the target element. Optionally, an _alignment_ of `start` or `end` can be appended, e.g. `left_start` or `bottom_end`. This is useful when your card would otherwise overlow the edge of the viewport.
+
+Since overlays such as sidebars and modals can cause confusing interactions, the help card API includes a concept of _layers_. As a developer, you need to toggle layer activation when opening or closing dialogs and sidebars:
+
+```js
+const layer = 'my_sidebar'
+watchEffect(() => {
+  app.ui.help.set(sidebarActive.value ? layer : null)
+})
+```
+
+The layer needs to be passed to all help cards in the overlay. This will be elaborated below.
+
+#### User Help Directive
+
+The help directive is added globally in `main.js`; this means that for the _base_ layer (as opposed to _overlays_) you can simply do:
+```vue
+<menu v-help.right="`
+  <h1>Foo Bar Menu</h1>
+
+  <p>This HTML will be rendered
+  in the help card.</p>
+
+  <p>In <i>help mode</i>, the card
+  will be rendered when the user's
+  mouse is inside this element.</p>
+`">
+  <!-- etc. -->
+</menu>
+```
+
+To use directives in an overlay layer, you can instantiate a custom directive for your layer:
+
+```vue
+<script setup>
+  import { useApp } from '@/stores'
+
+  const app = useApp()
+
+  const layer = 'my_dialog'
+  const vHelpLayer = app.ui.help.directive(layer)
+</script>
+
+<template>
+  <div v-help-layer.bottom_end="`
+    <h1>This help card is in the
+    <i>my_dialog</i> layer</h1>
+  `">
+    <!-- etc. -->
+  </div>
+</template>
+```
+
+#### User Help Pass-Through Object
+
+PrimeVue components include a special [pass-through feature](https://primevue.org/passthrough/) that allows passing various props into elements _inside_ the components. Our help API leverages this to allow us to inject help cards into PrimeVue components via the `pt` prop:
+
+```vue
+  <Button
+    label="Push It!"
+    @click="doSomething"
+    :pt="
+      app.ui.help.right_end(`
+        <h1>Push it, push it some mooooore...</h1>
+      `)
+    "
+  />
+```
+
+The API is similar to the directives, but leverages an action inside the help store. To specify the layer, pass an `options` object with a `layer` field as a second argument:
+
+```vue
+<script setup>
+  import { useApp } from '@/stores'
+
+  const app = useApp()
+
+  const layer = 'my_dialog'
+</script>
+
+<template>
+  <Button
+    label="The Cake is a Lie!"
+    @click="bakeIt"
+    :pt="
+      app.ui.help.top(`
+        <h1>This is in the <i>my_dialog</i> layer</h1>
+      `, { layer })
+    "
+  />
+</template>
+```
 
 ### Frontend Tests
 

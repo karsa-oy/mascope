@@ -34,6 +34,13 @@ watchEffect(() => {
     localStorage.setItem('mascope-darkmode', 'false')
   }
 })
+
+const layer = 'user_sidebar'
+watchEffect(() => {
+  app.ui.help.set(drawer.value ? layer : null)
+})
+
+const vHelpLayer = app.ui.help.directive(layer)
 </script>
 
 <template>
@@ -47,9 +54,19 @@ watchEffect(() => {
         drawer = true
       }
     "
+    :pt="
+      app.ui.help.bottom_start(`
+          <h1>User Sidebar</h1>
+
+          <p>Manage your account, pick between light/dark theme
+          and generate API tokens.</p>
+
+          <p>Admin users can access admin features here.</p>
+    `)
+    "
   />
   <Drawer v-model:visible="drawer" header="Account" position="left" style="width: 350px">
-    <section>
+    <section v-help-layer.right="'Manage your sign-in details and session'">
       <div class="row">
         <div>
           <h4>
@@ -79,7 +96,7 @@ watchEffect(() => {
         </div>
       </div>
     </section>
-    <section>
+    <section v-help-layer.right="'Pick the theme for Mascope'">
       <h4>Theme</h4>
       <div class="row" style="width: fit-content">
         <span>Light</span>
@@ -89,16 +106,12 @@ watchEffect(() => {
         <span>Dark</span>
       </div>
     </section>
-    <section>
-      <h4>
-        API Token
-        <span
-          class="pi pi-question-circle"
-          v-tooltip="
-            'API tokens are used for Jupyter notebooks and other development tools. Tokens can only be viewed once for security reasons.'
-          "
-        />
-      </h4>
+    <section
+      v-help-layer.right="
+        'API tokens are used for Jupyter notebooks and other development tools. Tokens can only be viewed once for security reasons.'
+      "
+    >
+      <h4>API Token</h4>
       <div class="row">
         <Button
           icon="pi pi-id-card"
@@ -133,7 +146,10 @@ watchEffect(() => {
         </Message>
       </div>
     </section>
-    <section v-if="app.auth.user.role_id >= 300">
+    <section
+      v-if="app.auth.user.role_id >= 300"
+      v-help-layer.right="'Add, remove and modify users'"
+    >
       <h4>Admin</h4>
       <Button icon="pi pi-users" @click="() => (dialog.users = true)" label="Manage users" />
     </section>
