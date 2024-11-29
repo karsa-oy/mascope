@@ -1,7 +1,7 @@
 """
 User management service module for Mascope user management.
 
-This module contains the `UserManager` class extending FastAPI Users' base `UserManager`.
+This module contains the `UserManager` class extending FastAPI Users' class `BaseUserManager`.
 It implements core lifecycle hooks and logic for user management in the Mascope server,
 including registration, password updates, token management, and custom behaviors
 such as access token cleanup for external services like Jupyter.
@@ -15,7 +15,7 @@ from mascope_server.db.models import User
 from mascope_server.api.new.auth.config import auth_settings
 from mascope_server.api.new.users import exceptions
 from mascope_server.api.new.users.schemas import UserCreate
-from mascope_server.api.new.users.service_acess_token import delete_user_access_tokens
+from mascope_server.api.new.users.access_token.service import delete_user_access_tokens
 
 from mascope_server.runtime import runtime
 

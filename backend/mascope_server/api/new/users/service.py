@@ -13,7 +13,7 @@ from mascope_server.db.models import User, Role
 from mascope_server.api.lib.api_features import api_controller
 from mascope_server.api.lib.exceptions.api_exceptions import NotFoundException
 from mascope_server.api.new.auth.config import auth_settings
-from mascope_server.api.new.users.service_user_manager import UserManager
+from mascope_server.api.new.users.user_manager.service import UserManager
 from mascope_server.api.new.users.schemas import UserCreate, UserRead, UserUpdate
 from mascope_server.api.new.users.util import check_username_exists
 from mascope_server.api.new.roles.exceptions import InvalidRoleException

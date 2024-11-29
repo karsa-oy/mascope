@@ -43,5 +43,4 @@ async def owner_get_roles_route(
     :return: A dictionary containing filtered roles.
     :rtype: dict
     """
-    query_params.role_name_max = "admin"  # Restrict roles to 'admin' and below
     return await get_roles(**query_params.model_dump())

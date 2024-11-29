@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Body, Depends, Path, Request
 from mascope_server.api.lib.api_features import api_route
-from mascope_server.api.new.auth.config import auth_settings
 from mascope_server.api.new.auth.dependencies import owner_user
 from mascope_server.api.new.auth.exceptions import ForbiddenAccessException
 from mascope_server.api.new.users.util import get_user_manager
@@ -8,60 +7,17 @@ from mascope_server.api.new.users.exceptions import InvalidUsernameException
 from mascope_server.api.new.users.schemas import (
     UserCreate,
     UserUpdate,
-    GetUsersQueryParams,
 )
 from mascope_server.api.new.users.service import (
-    delete_user,
-    get_user,
     register_user,
     update_user,
-    get_users,
+    delete_user,
 )
-from mascope_server.api.new.users.service_acess_token import delete_user_access_tokens
-from mascope_server.api.new.users.service_password import reset_user_password
-from mascope_server.api.new.users.service_user_manager import UserManager
+from mascope_server.api.new.users.access_token.service import delete_user_access_tokens
+from mascope_server.api.new.users.password.service import reset_user_password
+from mascope_server.api.new.users.user_manager.service import UserManager
 
 owner_router = APIRouter(prefix="/api/users/owner", tags=["User Management Owner"])
-
-
-@owner_router.get("")
-@api_route()
-async def owner_get_users_route(
-    query_params: GetUsersQueryParams = Depends(),
-    current_user=Depends(owner_user),
-):
-    """
-    Owners can retrieve a list of all users including admins.
-
-    :param query_params: Query parameters for pagination and sorting.
-    :type query_params: GetUsersQueryParams
-    :param current_user: The current authenticated owner user.
-    :type current_user: User
-    :return: A dictionary containing the user list and metadata.
-    :rtype: dict
-    """
-    # Restrict the maximum role to 'admin'
-    query_params.role_name_max = "admin"
-    return await get_users(**query_params.model_dump())
-
-
-@owner_router.get("/{user_id}")
-@api_route()
-async def owner_get_user_route(
-    user_id: int = Path(..., description="ID of the user to retrieve"),
-    current_user=Depends(owner_user),
-):
-    """
-    Owners can retrieve any user's details.
-
-    :param user_id: The unique ID of the user to retrieve.
-    :type user_id: int
-    :param current_user: The current authenticated owner user.
-    :type current_user: User
-    :return: A dictionary containing the user's details.
-    :rtype: dict
-    """
-    return await get_user(user_id=user_id)
 
 
 @owner_router.post("/register")
@@ -73,7 +29,7 @@ async def owner_register_user_route(
     user_manager: UserManager = Depends(get_user_manager),
 ):
     """
-    Register a new user. Owners can register users with roles up to `admin`.
+    Register a new user. Owners can register users with any role.
 
     :param request: The current HTTP request.
     :type request: Request
@@ -83,7 +39,6 @@ async def owner_register_user_route(
     :type current_user: User
     :param user_manager: The UserManager instance for user operations.
     :type user_manager: UserManager
-    :raises ForbiddenAccessException: If the owner tries to register a user with a higher role.
     :return: A success message and the registered user's details.
     :rtype: dict
     """
@@ -92,14 +47,7 @@ async def owner_register_user_route(
     if "username" in body and body["username"] is None:
         raise InvalidUsernameException()
 
-    # Step 2: Restrict role changes, owner can assign up to admin
-    if user_create.role_id is not None:
-        max_role_id = auth_settings.ROLE_ACCESS_LEVELS["admin"]
-        if user_create.role_id > max_role_id:
-            raise ForbiddenAccessException(
-                detail="You can only assign roles up to 'admin'."
-            )
-    # Step 3: Create new user
+    # Step 2: Create new user
     return await register_user(user_create=user_create, user_manager=user_manager)
 
 
@@ -114,7 +62,7 @@ async def owner_update_user_route(
 ):
     """
     Update a user by ID. Owners can update any user's details, including Admins.
-    Owners can assign roles up to `admin`.
+    Owners can assign roles up to `owner`.
 
     :param user_id: The unique ID of the user to be updated.
     :type user_id: int
@@ -126,8 +74,7 @@ async def owner_update_user_route(
     :type user_manager: UserManager
     :param request: The current HTTP request.
     :type request: Request
-    :raises ForbiddenAccessException: If the owner attempts to update a user with a role
-        that is higher than their own.
+    :raises ForbiddenAccessException: If the owner attempts to update his own account. Use update self endpoint.
     :return: A dictionary containing a success message and the updated user details.
     :rtype: dict
     """
@@ -142,15 +89,7 @@ async def owner_update_user_route(
     if "username" in body and body["username"] is None:
         raise InvalidUsernameException()
 
-    # Step 3: Restrict role changes, owner can assign up to admin
-    if user_update.role_id is not None:
-        max_role_id = auth_settings.ROLE_ACCESS_LEVELS["admin"]
-        if user_update.role_id > max_role_id:
-            raise ForbiddenAccessException(
-                detail="You can only assign roles up to 'admin'."
-            )
-
-    # Step 4: Perform the update
+    # Step 3: Perform the update
     return await update_user(
         user_id=user_id,
         user_update=user_update,

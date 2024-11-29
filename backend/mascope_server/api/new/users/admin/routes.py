@@ -8,42 +8,18 @@ from mascope_server.api.new.users.util import get_user_manager
 from mascope_server.api.new.users.schemas import (
     UserCreate,
     UserUpdate,
-    GetUsersQueryParams,
 )
 from mascope_server.api.new.users.service import (
     get_user,
-    get_users,
     register_user,
     update_user,
     delete_user,
 )
-from mascope_server.api.new.users.service_acess_token import delete_user_access_tokens
-from mascope_server.api.new.users.service_password import reset_user_password
-from mascope_server.api.new.users.service_user_manager import UserManager
+from mascope_server.api.new.users.access_token.service import delete_user_access_tokens
+from mascope_server.api.new.users.password.service import reset_user_password
+from mascope_server.api.new.users.user_manager.service import UserManager
 
 admin_router = APIRouter(prefix="/api/users/admin", tags=["User Management Admin"])
-
-
-@admin_router.get("")
-@api_route()
-async def admin_get_users_route(
-    query_params: GetUsersQueryParams = Depends(),
-    current_user=Depends(admin_user),
-):
-    """
-    Admins can retrieve a list of all users up to admin role.
-
-    :param query_params: Query parameters for pagination and sorting.
-    :type query_params: GetUsersQueryParams
-    :param current_user: The current authenticated user with admin permissions.
-    :type current_user: User
-    :return: A dictionary containing the user list and metadata.
-    :rtype: dict
-    """
-    # Restrict the maximum role to 'editor'
-    query_params.role_name_max = "editor"
-
-    return await get_users(**query_params.model_dump())
 
 
 @admin_router.post("/register")

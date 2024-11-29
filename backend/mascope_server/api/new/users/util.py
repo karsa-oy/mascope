@@ -4,8 +4,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi_users.db import SQLAlchemyUserDatabase
 from mascope_server.db import async_session, get_async_session
 from mascope_server.db.models import User
-from mascope_server.api.new.users.service_user_manager import UserManager
-from mascope_server.api.new.users import exceptions
+from mascope_server.api.new.users.user_manager.service import UserManager
+from mascope_server.api.new.users.exceptions import UsernameAlreadyExistsException
 
 
 async def get_user_db(session: AsyncSession = Depends(get_async_session)):
@@ -53,4 +53,4 @@ async def check_username_exists(username: str) -> bool:
         existing_user = result.scalar_one_or_none()
 
     if existing_user:
-        raise exceptions.UsernameAlreadyExistsException(username=username)
+        raise UsernameAlreadyExistsException(username=username)

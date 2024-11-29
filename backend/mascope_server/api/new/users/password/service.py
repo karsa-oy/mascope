@@ -9,10 +9,10 @@ import string
 from mascope_server.api.lib.api_features import api_controller
 from mascope_server.api.new.users.schemas import UserUpdate
 from mascope_server.api.new.users.service import update_user
-from mascope_server.api.new.users.service_user_manager import UserManager
+from mascope_server.api.new.users.user_manager.service import UserManager
 
 
-def generate_random_password(length: int = 12) -> str:
+def generate_random_password(length: int = 16) -> str:
     """
     Generates a secure random password.
 
