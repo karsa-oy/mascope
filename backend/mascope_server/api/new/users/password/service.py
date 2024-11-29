@@ -14,13 +14,23 @@ from mascope_server.api.new.users.user_manager.service import UserManager
 
 def generate_random_password(length: int = 16) -> str:
     """
-    Generates a secure random password.
+    Generates a random password containing uppercase, lowercase, and digits.
 
     :param length: Length of the password.
     :return: A random password string.
     """
-    characters = string.ascii_letters + string.digits + string.punctuation
-    return "".join(secrets.choice(characters) for _ in range(length))
+    choices = [
+        secrets.choice(string.ascii_uppercase),
+        secrets.choice(string.ascii_lowercase),
+        secrets.choice(string.digits),
+    ]
+    characters = string.ascii_letters + string.digits
+    choices.extend(secrets.choice(characters) for _ in range(length - 3))
+
+    # Shuffle for randomness
+    secrets.SystemRandom().shuffle(choices)
+
+    return "".join(choices)
 
 
 @api_controller()
