@@ -19,7 +19,7 @@ from mascope_lib.file_func import get_instrument_type, get_sum_signal, load_arra
 SIGMA_MULTIPLIER = 2 * np.sqrt(2 * np.log(2))
 
 
-def fit_instrument_functions(filename: str, dmz=0.5, r_sq_thres=0.95) -> tuple:
+async def fit_instrument_functions(filename: str, dmz=0.5, r_sq_thres=0.95) -> tuple:
     """Calculate instrument functions
 
     Compute the median peak shape from the normalized peak shapes (p_ys).
@@ -49,12 +49,12 @@ def fit_instrument_functions(filename: str, dmz=0.5, r_sq_thres=0.95) -> tuple:
     mz = sum_signal.mz.values
 
     # Get x-domain, normalized peak shapes and associated peak positions and FWHMs
-    p_x, p_ys, p_mzs, p_fwhms = process_peak_shapes(
+    p_x, p_ys, p_mzs, p_fwhms = await process_peak_shapes(
         mz, spec, instrument_type, dmz, r_sq_thres
     )
 
     peak_shape, ps_stats = calculate_peakshape(p_x, p_ys)
-    resolution_function, resfun_stats = fit_resolution_function(
+    resolution_function, resfun_stats = await fit_resolution_function(
         instrument_type, p_mzs, p_fwhms
     )
 
@@ -64,7 +64,7 @@ def fit_instrument_functions(filename: str, dmz=0.5, r_sq_thres=0.95) -> tuple:
     return peak_shape, resolution_function, stats
 
 
-def process_peak_shapes(
+async def process_peak_shapes(
     mz: np.ndarray,
     spec: np.ndarray,
     instrument_type: str,
@@ -202,10 +202,10 @@ def fit_gaussian(instrument_type, dmz, x: np.array, y: np.array) -> ModelResult:
         model = model + bkg
 
     max_ind = np.argmax(y)
-    params.add("p_amplitude", value=y[max_ind])
-    params.add("p_center", value=x[max_ind])
+    params.add("p_amplitude", value=y[max_ind], min=0, max=y[max_ind])
+    params.add("p_center", value=x[max_ind], min=min(x), max=max(x))
     params.add("p_sigma", value=0.01)
-    params.add("p_gamma", value=-0.1)
+    params.add("p_gamma", value=-0.1, max=0)
 
     fit = model.fit(y, params, x=x)
     return fit
@@ -340,7 +340,7 @@ def calculate_peakshape(p_x: np.ndarray, p_ys: np.ndarray) -> tuple:
     return peak_shape, {"peakshape": stats}
 
 
-def fit_resolution_function(
+async def fit_resolution_function(
     instrument_type: str, p_mzs: list | np.ndarray, p_fwhms: list | np.ndarray, ndev=1
 ) -> partial:
     """Calculate the resolution function for a given instrument type
@@ -527,8 +527,8 @@ if __name__ == "__main__":
         mz = sum_signal.mz.values
 
         # Get x-domain, normalized peak shapes and associated peak positions and FWHMs
-        p_x, p_ys, p_mzs, p_fwhms = process_peak_shapes(
-            mz, spec, instrument_type, args.dmz, args.r_sq_thres
+        p_x, p_ys, p_mzs, p_fwhms = asyncio.run(
+            process_peak_shapes(mz, spec, instrument_type, args.dmz, args.r_sq_thres)
         )
         p_mzs = np.array(p_mzs)
         p_fwhms = np.array(p_fwhms)
@@ -540,7 +540,9 @@ if __name__ == "__main__":
         ndev = 1
 
         ps, _ = calculate_peakshape(p_x, p_ys)
-        res_fun, _ = fit_resolution_function(instrument_type, p_mzs, p_fwhms, ndev)
+        res_fun, _ = asyncio.run(
+            fit_resolution_function(instrument_type, p_mzs, p_fwhms, ndev)
+        )
 
         # Fit peaks
         sample_file_data = asyncio.run(
