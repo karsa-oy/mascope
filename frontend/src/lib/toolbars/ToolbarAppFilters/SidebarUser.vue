@@ -9,6 +9,7 @@ import Message from 'primevue/message'
 import { api } from '@/api'
 import { useApp } from '@/stores'
 import { BaseCopyableField } from '@/lib/base'
+import { beautifySnakeCase } from '@/lib/utils'
 
 const app = useApp()
 
@@ -44,7 +45,10 @@ watchEffect(() => {
       <div class="row">
         <div>
           <h4>{{ app.auth.user.username }}</h4>
-          <i>{{ app.auth.user.email }}</i>
+          <ul>
+            <li><i>Email:</i> {{ app.auth.user.email }}</li>
+            <li><i>Role:</i> {{ beautifySnakeCase(app.auth.user.role_name) }}</li>
+          </ul>
         </div>
         <Button
           icon="pi pi-sign-out"
@@ -129,5 +133,18 @@ watchEffect(() => {
 section:not(:first-child) {
   margin-top: 2rem;
   border-top: 1px solid var(--p-drawer-border-color);
+}
+
+ul {
+  list-style: none;
+  padding-left: 0.5em;
+
+  li {
+    margin: 0.7rem 0;
+
+    i {
+      margin-right: 0.2rem;
+    }
+  }
 }
 </style>
