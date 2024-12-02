@@ -26,7 +26,6 @@ import WorkspaceSelector from './WorkspaceSelector.vue'
         <AcquisitionMode />
         <InstrumentSelector />
         <SidebarNotifications />
-        <PopoverUserMenu />
       </div>
     </template>
   </Toolbar>

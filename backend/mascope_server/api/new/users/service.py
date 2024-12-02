@@ -194,12 +194,12 @@ async def update_user(
     :raises NotFoundException: If the user does not exist.
     :return: The updated user details.
     """
-    # Step 1: Check if the new username already exists
-    if user_update.username:
-        await check_username_exists(user_update.username)
-
-    # Step 2: Retrieve the user
+    # Step 1: Retrieve the user
     user = await user_manager.get(user_id)
+
+    # Step 2: Check if the new username already exists
+    if user_update.username and user_update.username != user.username:
+        await check_username_exists(user_update.username)
 
     # Step 3: Update the user
     await user_manager.update(user_update, user)

@@ -7,6 +7,8 @@ const { field } = defineProps({
   }
 })
 
+const emit = defineEmits(['copy'])
+
 async function copyField(text) {
   try {
     await navigator.clipboard.writeText(text)
@@ -30,6 +32,7 @@ async function copyField(text) {
         (event) => {
           event.stopPropagation()
           copyField(field)
+          emit('copy')
         }
       "
     />

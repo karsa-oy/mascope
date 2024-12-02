@@ -11,6 +11,7 @@ from typing import Any, Dict, Optional
 from fastapi import Request
 from fastapi_users import BaseUserManager, IntegerIDMixin
 from fastapi_users import models
+from mascope_server.app.socket import sio
 from mascope_server.db.models import User
 from mascope_server.api.new.auth.config import auth_settings
 from mascope_server.api.new.users import exceptions
@@ -18,6 +19,19 @@ from mascope_server.api.new.users.schemas import UserCreate
 from mascope_server.api.new.users.access_token.service import delete_user_access_tokens
 
 from mascope_server.runtime import runtime
+
+
+async def emit_user_events(user: Optional[User] = None):
+    """
+    Emit socket events for user changes, optionally also to
+    targeted to a specific user.
+
+    :param user: The FastAPI users' user model
+    """
+    await sio.emit("user_reload_all", namespace="/")
+    if user:
+        await sio.emit("user_reload_me", room=f"user-{user.id}", namespace="/")
+    return
 
 
 class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
@@ -87,6 +101,7 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
 
     async def on_after_register(self, user: User, request: Optional[Request] = None):
         runtime.logger.info(f"User {user.username} was registered.")
+        await emit_user_events(user)
 
     async def on_after_forgot_password(
         self, user: User, token: str, request: Optional[Request] = None
@@ -121,4 +136,17 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
         if "password" in update_dict:
             runtime.logger.info(f"User `{user.username}` password was changed.")
             await delete_user_access_tokens(user_id=user.id)
+        await emit_user_events(user)
         return  # pragma: no cover
+
+    async def on_after_delete(
+        self,
+        user: User,
+        request: Optional[Request] = None,
+    ):
+        """
+        Perform logic after successful user delete.
+
+        :param user: The deleted user
+        """
+        await emit_user_events(user)

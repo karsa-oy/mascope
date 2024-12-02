@@ -5,17 +5,22 @@ import Button from 'primevue/button'
 import Drawer from 'primevue/drawer'
 import ToggleSwitch from 'primevue/toggleswitch'
 import Message from 'primevue/message'
+import InputText from 'primevue/inputtext'
 
 import { api } from '@/api'
 import { useApp } from '@/stores'
 import { BaseCopyableField } from '@/lib/base'
 import { beautifySnakeCase } from '@/lib/utils'
+import { DialogUserManagement } from '@/lib/dialogs'
+import { prettyRoleName } from '@/lib/roles'
 
 const app = useApp()
 
 const drawer = ref()
 
 const token = ref()
+
+const dialog = ref(false)
 
 watchEffect(() => {
   if (app.ui.darkmode.active) {
@@ -46,8 +51,8 @@ watchEffect(() => {
         <div>
           <h4>{{ app.auth.user.username }}</h4>
           <ul>
-            <li><i>Email:</i> {{ app.auth.user.email }}</li>
-            <li><i>Role:</i> {{ beautifySnakeCase(app.auth.user.role_name) }}</li>
+            <li>📧 {{ app.auth.user.email }}</li>
+            <li>{{ prettyRoleName(app.auth.user) }}</li>
           </ul>
         </div>
         <Button
@@ -112,7 +117,12 @@ watchEffect(() => {
         </Message>
       </div>
     </section>
+    <section v-if="app.auth.user.role_id >= 300">
+      <h4>Admin</h4>
+      <Button icon="pi pi-users" @click="() => (dialog = true)" label="Manage users" />
+    </section>
   </Drawer>
+  <DialogUserManagement v-model:visible="dialog" />
 </template>
 
 <style scoped>

@@ -7,6 +7,7 @@ import { useSample } from './sample'
 import { useBatch } from './batch'
 import { useTargetCollection, useTargetCompound } from './target'
 import { usePeak } from './peak'
+import { useUser } from './user'
 
 import {
   // semistandard
@@ -35,6 +36,7 @@ export const useData = () => ({
     collection: useTargetCollection(),
     compound: useTargetCompound()
   },
+  user: useUser(),
   // semistandard
   match: {
     collection: useMatchCollection(),

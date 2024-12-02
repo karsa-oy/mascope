@@ -123,8 +123,15 @@ export const useAuth = defineStore('app.auth', () => {
       if (newUser && oldUser !== newUser) {
         handlers.value.forEach(({ callback }) => callback())
       }
+      if (oldUser) {
+        api.socket.emit('unsubscribe', `user-${oldUser.id}`)
+      }
+      if (newUser) {
+        api.socket.emit('subscribe', `user-${newUser.id}`)
+      }
     }
   )
+  api.socket.on('user_reload_me', identify)
 
   return {
     user,
