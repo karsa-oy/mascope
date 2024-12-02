@@ -109,29 +109,33 @@ async def get_user(user_id: str) -> dict:
     :return: The user object.
     """
     async with async_session() as session:
-        query = (
-            select(User, Role.role_name)
-            .join(Role, Role.role_id == User.role_id)
-            .filter(User.id == user_id)
-        )
-        result = await session.execute(query)
-        user_row = result.one_or_none()
-
-        if not user_row:
+        # Step 1: Retrieve the user by ID
+        user = await session.get(User, user_id)
+        if not user:
             raise NotFoundException(f"User with ID '{user_id}' not found.")
 
-        user, role_name = user_row
-        user_data = user.to_dict()
-        user_data["role_name"] = role_name
-
-        # Validate the user's role ID
+        # Step 2: Validate the user's role ID
         role_access_levels = auth_settings.ROLE_ACCESS_LEVELS
         if user.role_id is None or user.role_id not in role_access_levels.values():
             raise InvalidRoleException(
-                detail=f"The user's role ID '{user.role_id}' is not defined in the configuration. Please check for configuration issues."
+                detail=f"The user's role ID '{user.role_id}' is not defined in the configuration. Please check for configuration issues"
             )
 
-        # Validate and return the user read data
+        # Step 3: Fetch role name by joining with the Role table
+        query = select(Role.role_name).filter(Role.role_id == user.role_id)
+        result = await session.execute(query)
+        role_name = result.scalar_one_or_none()
+
+        if not role_name:
+            raise InvalidRoleException(
+                detail=f"The role ID '{user.role_id}' is not defined in the configuration. Please check for configuration issues"
+            )
+
+        # Step 4: Prepare and return the validated user data
+        user_data = user.to_dict()
+        user_data["role_name"] = role_name
+
+        # Step 5: Validate and return the user read data
         validated_user = UserRead.model_validate(user_data)
         return {
             "message": f"User '{validated_user.username}' retrieved.",
