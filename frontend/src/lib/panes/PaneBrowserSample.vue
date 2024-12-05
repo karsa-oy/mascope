@@ -417,11 +417,11 @@ watch(
         app.data.match.visualized.ion)
     } else if (app.data.match.ion.focused) {
       // no match visualized but match ion focused
-      ionId = app.data.match.ion.focusedId
+      ionId = app.data.match.ion.focused.target_ion_id
     } else if (app.data.match.compound.focused) {
       // no match visualized but match compound focused
       const ionId = app.data.match.ion.list?.find(
-        (ion) => ion.target_compound_id === app.data.match.compound.focusedId
+        (ion) => ion.target_compound_id === app.data.match.compound.target_compound_id
       )?.target_ion_id
     }
 
