@@ -5,6 +5,7 @@ export { default as DialogInstrumentFunction } from './DialogInstrumentFunction.
 export { default as DialogFileUpload } from './DialogFileUpload.vue'
 export { default as DialogMatchRating } from './DialogMatchRating.vue'
 export { default as DialogMechanismsOp } from './DialogMechanismsOp.vue'
+export { default as DialogPasswordChange } from './DialogPasswordChange.vue'
 export { default as DialogCalibration } from './DialogCalibration.vue'
 export { default as DialogSampleOp } from './DialogSampleOp.vue'
 export { default as DialogTargetCollectionOp } from './DialogTargetCollectionOp.vue'

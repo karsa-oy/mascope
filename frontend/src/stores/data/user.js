@@ -40,7 +40,7 @@ export const useUser = defineModule({
         type: 'register_user'
       })
     ),
-  update: ({ id, username, email, role_id, password }) => {
+  update: ({ id, username, email, role_id }) => {
     const app = useApp()
     return id && id !== app.auth.user.id
       ? sudo((role) =>
@@ -53,8 +53,21 @@ export const useUser = defineModule({
             }
           )
         )
-      : api.http.patch(`/users/me`, { username, password }, { use: 'update', type: 'update_user' })
+      : api.http.patch(`/users/me`, { username }, { use: 'update', type: 'update_user' })
   },
+  updateMeCreds: ({ currentPassword, newPassword, verifyNewPassword }) =>
+    api.http.patch(
+      `users/me/creds`,
+      {
+        current_password: currentPassword,
+        new_password: newPassword,
+        verify_new_password: verifyNewPassword
+      },
+      {
+        use: 'update',
+        type: 'update_password'
+      }
+    ),
   delete: (user) =>
     sudo((role) =>
       api.http.delete(`/users/${role}/${user.id}`, {

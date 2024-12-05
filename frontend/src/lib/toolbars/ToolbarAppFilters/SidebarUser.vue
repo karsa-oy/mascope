@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watchEffect } from 'vue'
+import { ref, reactive, watchEffect } from 'vue'
 
 import Button from 'primevue/button'
 import Drawer from 'primevue/drawer'
@@ -9,9 +9,9 @@ import InputText from 'primevue/inputtext'
 
 import { api } from '@/api'
 import { useApp } from '@/stores'
-import { BaseCopyableField } from '@/lib/base'
+import { BaseCopyableField, BaseEditableField } from '@/lib/base'
 import { beautifySnakeCase } from '@/lib/utils'
-import { DialogUserManagement } from '@/lib/dialogs'
+import { DialogUserManagement, DialogPasswordChange } from '@/lib/dialogs'
 import { prettyRoleName } from '@/lib/roles'
 
 const app = useApp()
@@ -20,7 +20,10 @@ const drawer = ref()
 
 const token = ref()
 
-const dialog = ref(false)
+const dialog = reactive({
+  users: false,
+  password: false
+})
 
 watchEffect(() => {
   if (app.ui.darkmode.active) {
@@ -49,18 +52,31 @@ watchEffect(() => {
     <section>
       <div class="row">
         <div>
-          <h4>{{ app.auth.user.username }}</h4>
+          <h4>
+            <BaseEditableField
+              :field="app.auth.user.username"
+              :save="(username) => app.data.user.update({ username })"
+            />
+          </h4>
           <ul>
             <li>📧 {{ app.auth.user.email }}</li>
             <li>{{ prettyRoleName(app.auth.user) }}</li>
           </ul>
         </div>
-        <Button
-          icon="pi pi-sign-out"
-          label="Logout"
-          @click="app.auth.logout"
-          style="margin-top: 1rem"
-        />
+        <div class="col" style="gap: 2rem; align-items: flex-end">
+          <Button
+            icon="pi pi-sign-out"
+            label="Logout"
+            @click="app.auth.logout"
+            style="margin-top: 1rem"
+          />
+          <Button
+            label="Change password"
+            @click="() => (dialog.password = true)"
+            severity="secondary"
+            text
+          />
+        </div>
       </div>
     </section>
     <section>
@@ -119,10 +135,11 @@ watchEffect(() => {
     </section>
     <section v-if="app.auth.user.role_id >= 300">
       <h4>Admin</h4>
-      <Button icon="pi pi-users" @click="() => (dialog = true)" label="Manage users" />
+      <Button icon="pi pi-users" @click="() => (dialog.users = true)" label="Manage users" />
     </section>
   </Drawer>
-  <DialogUserManagement v-model:visible="dialog" />
+  <DialogUserManagement v-model:visible="dialog.users" />
+  <DialogPasswordChange v-model:visible="dialog.password" />
 </template>
 
 <style scoped>
