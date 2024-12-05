@@ -129,6 +129,8 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
         context_message = "Authorization failed"
     elif exc.status_code == status.HTTP_403_FORBIDDEN:
         context_message = "Access denied"
+    elif exc.status_code == status.HTTP_400_BAD_REQUEST:
+        context_message = "Bad request"
     else:
         context_message = "An HTTP error occurred"
     return handle_exception(exc, context_message, response_type="http")

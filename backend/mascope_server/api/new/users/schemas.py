@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Optional
+from mascope_server.api.new.users.exceptions import InvalidFieldsException
 from pydantic import EmailStr, Field, field_validator, model_validator
 from fastapi_users import schemas
 from mascope_server.api.new.auth.config import auth_settings
@@ -141,11 +142,11 @@ class UserCreate(schemas.BaseUserCreate):
         invalid_fields = {key for key in values if key not in allowed_fields}
 
         if invalid_fields:
-            raise ValueError(
+            raise InvalidFieldsException(
                 f"You can not specify these fields for user registration: {', '.join(invalid_fields)}."
             )
-        # Only keep allowed fields
-        return {key: value for key, value in values.items() if key in allowed_fields}
+
+        return values
 
 
 class UserUpdate(schemas.BaseUserUpdate):
@@ -237,11 +238,11 @@ class UserUpdate(schemas.BaseUserUpdate):
         invalid_fields = {key for key in values if key not in allowed_fields}
 
         if invalid_fields:
-            raise ValueError(
+            raise InvalidFieldsException(
                 f"You can not update these fields for user: {', '.join(invalid_fields)}."
             )
-        # Only keep allowed fields
-        return {key: value for key, value in values.items() if key in allowed_fields}
+
+        return values
 
 
 class GetUsersQueryParams(QueryParamsModel):

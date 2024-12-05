@@ -35,3 +35,13 @@ class InvalidUsernameException(HTTPException):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="The username cannot be null or empty.",
         )
+
+
+class InvalidFieldsException(HTTPException):
+    """Exception raised when invalid fields are included to UserCreate, UserUpdate."""
+
+    def __init__(self, detail: str):
+        super().__init__(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=detail,
+        )
