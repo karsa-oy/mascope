@@ -167,24 +167,34 @@ const menu = computed(() => ({
   ]
 }))
 
-async function showMatch(row) {
-  const ionId =
-    row?.target_ion_id ??
-    app.data.match.ion.list?.find((ion) => ion.target_compound_id === row.target_compound_id)
-      ?.target_ion_id
-  if (ionId && app.data.sample.focused && app.data.match.visualized.ion?.target_ion_id !== ionId) {
-    await app.data.match.visualized.set({
-      sampleId: app.data.sample.focused.sample_item_id,
-      ionId,
-      collectionId: row?.target_collection_id,
-      // pass the ion specific filter params if available to the loadSampleIon function
-      params: app.data.match.ion.list.find((ion) => ion.target_ion_id === ionId)?.filter_params[
-        app.data.sample.focused.instrument
-      ]
-    })
-    emit('focused')
+watch(
+  () =>
+    app.data.match.isotope.focused ??
+    app.data.match.isotope.focused ??
+    app.data.match.compound.focused,
+  async (match) => {
+    const ionId =
+      match?.target_ion_id ??
+      app.data.match.ion.list?.find((ion) => ion.target_compound_id === match.target_compound_id)
+        ?.target_ion_id
+    if (
+      ionId &&
+      app.data.sample.focused &&
+      app.data.match.visualized.ion?.target_ion_id !== ionId
+    ) {
+      await app.data.match.visualized.set({
+        sampleId: app.data.sample.focused.sample_item_id,
+        ionId,
+        collectionId: match?.target_collection_id,
+        // pass the ion specific filter params if available to the loadSampleIon function
+        params: app.data.match.ion.list.find((ion) => ion.target_ion_id === ionId)?.filter_params[
+          app.data.sample.focused.instrument
+        ]
+      })
+      emit('focused')
+    }
   }
-}
+)
 
 // match refocus logic
 
@@ -420,7 +430,6 @@ watch(
             :metaKeySelection="false"
             v-model:contextMenuSelection="context.compound"
             @rowContextmenu="compoundPreventDefault"
-            @rowSelect="(e) => showMatch(e.data)"
             size="small"
             sortField="match_score"
             :sortOrder="-1"
@@ -466,7 +475,6 @@ watch(
                 v-model:selection="app.data.match.ion.focused"
                 selectionMode="single"
                 :metaKeySelection="false"
-                @rowSelect="(e) => showMatch(e.data)"
                 size="small"
                 sortField="match_score"
                 :sortOrder="-1"
@@ -546,7 +554,6 @@ watch(
                     v-model:selection="app.data.match.isotope.focused"
                     selectionMode="single"
                     :metaKeySelection="false"
-                    @rowSelect="(e) => showMatch(e.data)"
                     size="small"
                     sortField="match_score"
                     :sortOrder="-1"
