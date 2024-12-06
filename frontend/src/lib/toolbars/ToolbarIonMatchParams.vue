@@ -1,9 +1,10 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 
 import Button from 'primevue/button'
 import ContextMenu from 'primevue/contextmenu'
 import Popover from 'primevue/popover'
+import Slider from 'primevue/slider'
 
 import { useConfirm } from 'primevue/useconfirm'
 
@@ -114,6 +115,59 @@ const items = computed(() => [
         : true
   }
 ])
+
+const possibleMatchRange = computed({
+  get() {
+    console.log('g')
+    return [
+      app.data.match.params.current.possible_match_threshold,
+      app.data.match.params.current.probable_match_threshold
+    ]
+  },
+  set([a, b]) {
+    let possible, probable
+    if (a < b) {
+      possible = a
+      probable = b
+    } else if (b <= a) {
+      possible = b
+      probable = a
+    }
+    app.data.match.params.current.possible_match_threshold = possible
+    app.data.match.params.current.probable_match_threshold = probable
+  }
+})
+
+const matchRangeMiddle = computed(
+  () =>
+    (100 *
+      (app.data.match.params.current.possible_match_threshold +
+        app.data.match.params.current.probable_match_threshold)) /
+    2
+)
+
+const modifiedMatchIon = defineModel('modifiedMatchIon')
+
+watch(
+  () => [
+    app.data.match.visualized.ion,
+    app.data.match.params.current.possible_match_threshold,
+    app.data.match.params.current.probable_match_threshold
+  ],
+  ([visualizedIon, possible, probable]) => {
+    let match_category = 0
+    if (visualizedIon.match_score > possible) {
+      match_category = 1
+    }
+    if (visualizedIon.match_score > probable) {
+      match_category = 2
+    }
+    modifiedMatchIon.value = {
+      ...visualizedIon,
+      match_category
+    }
+  }
+)
 </script>
 
 <template>
@@ -208,33 +262,49 @@ const items = computed(() => [
       </template>
     </Button>
     <Popover ref="peakSettings">
-      <div class="row" style="padding: 1rem; gap: 0.5rem">
+      <div class="row" style="padding: 1rem; gap: 1rem; align-items: flex-start">
         <BaseParamField
           label="Min. peak intensity"
           v-model:param="app.data.match.params.current.peak_min_intensity"
           @change="app.data.match.visualized.reset"
           :range="{ min: 0, max: 10000, step: 500 }"
         />
-        <BaseParamField
-          label="Possible match [%]"
-          v-model:param="app.data.match.params.current.possible_match_threshold"
-          @change="app.data.match.visualized.reset"
-          :range="{
-            min: 0,
-            max: app.data.match.params.current.probable_match_threshold,
-            step: 0.05
-          }"
-        />
-        <BaseParamField
-          label="Probable match [%]"
-          v-model:param="app.data.match.params.current.probable_match_threshold"
-          @change="app.data.match.visualized.reset"
-          :range="{
-            min: app.data.match.params.current.possible_match_threshold,
-            max: 1,
-            step: 0.05
-          }"
-        />
+        <div class="col" style="gap: 0">
+          <div class="row" :key="matchRangeMiddle">
+            <BaseParamField
+              label="Possible match [%]"
+              v-model:param="app.data.match.params.current.possible_match_threshold"
+              @change="app.data.match.visualized.reset"
+              :range="{
+                min: 0,
+                max: app.data.match.params.current.probable_match_threshold,
+                step: 0.05
+              }"
+              hideSlider
+            />
+            <BaseParamField
+              label="Probable match [%]"
+              v-model:param="app.data.match.params.current.probable_match_threshold"
+              @change="app.data.match.visualized.reset"
+              :range="{
+                min: app.data.match.params.current.possible_match_threshold,
+                max: 1,
+                step: 0.05
+              }"
+              hideSlider
+            />
+          </div>
+          <div style="width: 100%" class="match-slider">
+            <Slider
+              v-model="possibleMatchRange"
+              range
+              :min="0"
+              :max="1"
+              :step="0.05"
+              :style="`background: linear-gradient(90deg, var(--p-button-success-background) ${matchRangeMiddle}%, var(--p-button-danger-background) ${matchRangeMiddle}%)`"
+            />
+          </div>
+        </div>
       </div>
     </Popover>
   </menu>
@@ -249,5 +319,18 @@ const items = computed(() => [
   flex-flow: column nowrap;
   align-items: stretch;
   gap: 0.5rem;
+  padding: 0.8rem 0 0.5rem 0;
+}
+
+.match-slider {
+  :deep(.p-slider-range) {
+    background: var(--p-button-warn-background);
+  }
+  :deep(:root) {
+  }
+
+  :deep(.p-slider) {
+    background: red !important;
+  }
 }
 </style>

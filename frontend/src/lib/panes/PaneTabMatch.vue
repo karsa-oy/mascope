@@ -1,7 +1,7 @@
 <script setup>
 import ScrollPanel from 'primevue/scrollpanel'
 
-import { computed, reactive } from 'vue'
+import { computed, ref, reactive } from 'vue'
 
 import { BaseMatchTag } from '@/lib/base'
 import { ChartMatchSpectra, ChartMatchTimeseries } from '@/lib/charts'
@@ -21,6 +21,8 @@ const settings = reactive({
   intensityScale: null,
   yMode: 'sum'
 })
+
+const modifiedMatchIon = ref()
 </script>
 
 <template>
@@ -31,8 +33,8 @@ const settings = reactive({
     `"
   >
     <ScrollPanel style="height: calc(100vh - 150px); width: calc(100%-4rem)">
-      <h1 style="text-align: center">
-        <BaseMatchTag :row="app.data.match.visualized.ion" :style="'font-size: large'" />
+      <h1 style="text-align: center" v-if="modifiedMatchIon">
+        <BaseMatchTag :row="modifiedMatchIon" :style="'font-size: large'" />
         match: ion <i>{{ app.data.match.visualized.ion?.target_ion_formula }}</i>
         for
         <i>{{ app.data.match.visualized.ion?.sample_item_name }}</i> with target
@@ -41,7 +43,7 @@ const settings = reactive({
       <ChartMatchSpectra :settings="settings" />
       <ChartMatchTimeseries :settings="settings" />
       <div class="row match-tools">
-        <ToolbarIonMatchParams />
+        <ToolbarIonMatchParams v-model:modifiedMatchIon="modifiedMatchIon" />
         <ToolbarMatchCharts
           v-model:scale="settings.intensityScale"
           v-model:yMode="settings.yMode"
