@@ -13,7 +13,7 @@ import ProgressSpinner from 'primevue/progressspinner'
 import { beautifySnakeCase } from '@/lib/utils'
 import { BaseKarsaLogo } from '@/lib/base'
 import { useApp } from '@/stores'
-import { PaneLogin, PaneSignup } from '@/lib/panes'
+import { PaneLogin } from '@/lib/panes'
 
 const app = useApp()
 const toast = useToast()
@@ -53,26 +53,10 @@ const gotoLogin = () => {
   <RouterView v-if="app.auth.user" />
   <!-- Login / Signup Screen  -->
   <div v-else-if="app.auth.user == false" class="center" style="min-height: 80vh">
-    <Panel style="width: 500px">
+    <Panel style="width: 400px">
       <BaseKarsaLogo />
-      <Tabs v-model:value="tab" style="margin-bottom: 2rem">
-        <TabList>
-          <Tab value="login">
-            <a v-ripple @click="tab = 'login'" class="row">
-              <i class="pi pi-sign-in" />
-              <span>Login</span>
-            </a>
-          </Tab>
-          <Tab value="signup">
-            <a v-ripple @click="tab = 'signup'" class="row">
-              <i class="pi pi-user-plus" />
-              <span>Sign up</span>
-            </a>
-          </Tab>
-        </TabList>
-      </Tabs>
-      <PaneLogin v-if="tab == 'login'" />
-      <PaneSignup v-if="tab == 'signup'" @signup="gotoLogin" />
+      <div style="margin-top: 2rem" />
+      <PaneLogin />
     </Panel>
   </div>
   <div v-else class="col" style="min-height: 80vh; justify-content: center">

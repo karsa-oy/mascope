@@ -26,6 +26,7 @@ const disabled = computed(() => invalid.value.email || invalid.value.password)
 
 <template>
   <div class="fields" style="flex-flow: column">
+    <h3 style="opacity: 0.7">Sign-in to Mascope</h3>
     <FloatLabel>
       <InputText
         id="login-email"

@@ -25,50 +25,6 @@ export const useAuth = defineStore('app.auth', () => {
       user.value = false
     }
   }
-
-  const signup = async ({ username, email, password }) => {
-    try {
-      const { status, data, message } = await api.http.post(
-        `/auth/register`,
-        {
-          email,
-          password,
-          username
-        },
-        {
-          type: 'register_user',
-          validateStatus: (status) => status < 500
-        }
-      )
-      if (status == 201) {
-        return {
-          status: 'success'
-        }
-      } else if (status == 400) {
-        const userMessage =
-          data.detail == 'REGISTER_USER_ALREADY_EXISTS'
-            ? 'a user with this email already exists; please use a different email.'
-            : message
-        ui.notification.push({
-          type: 'user_signup',
-          status: 'error',
-          message: `Signup failed: ${userMessage}`
-        })
-        return {
-          status: 'failure'
-        }
-      } else {
-        return {
-          status: 'failure'
-        }
-      }
-    } catch (e) {
-      return {
-        status: 'failure',
-        email
-      }
-    }
-  }
   const login = async ({ email, password }) => {
     try {
       const params = new URLSearchParams()
@@ -136,7 +92,6 @@ export const useAuth = defineStore('app.auth', () => {
   return {
     user,
     identify,
-    signup,
     login,
     logout,
     onLogin
