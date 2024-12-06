@@ -39,7 +39,7 @@ class UserUpdateMe(schemas.BaseUserUpdate):
     @classmethod
     def validate_allowed_fields(cls, values):
         """
-        This validator checks that only non-sensitive fields`username` are accepted for update.
+        This validator checks that only non-sensitive fields `username` are accepted for update.
         Any other fields provided in the payload will raise a validation error.
 
         :param values: Dictionary of fields being updated.
