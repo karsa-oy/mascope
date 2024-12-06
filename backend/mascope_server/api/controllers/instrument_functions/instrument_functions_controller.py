@@ -322,10 +322,12 @@ async def instrument_functions_fit(
     """
     instrument_type = get_instrument_type(sample_file.filename)
 
-    peakshape_numpy, resolution_function_partial, stats = (
-        await fit_instrument_functions(
-            sample_file.filename, r_sq_thres=params.threshold
-        )
+    (
+        peakshape_numpy,
+        resolution_function_partial,
+        stats,
+    ) = await fit_instrument_functions(
+        sample_file.filename, r_sq_thres=instrument_function_params.threshold
     )
 
     # Convert peakshape to lists to be serialized
