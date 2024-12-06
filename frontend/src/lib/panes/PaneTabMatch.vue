@@ -41,7 +41,7 @@ const settings = reactive({
       <ChartMatchSpectra :settings="settings" />
       <ChartMatchTimeseries :settings="settings" />
       <div class="row match-tools">
-        <ToolbarFilterIon />
+        <ToolbarIonMatchParams />
         <ToolbarMatchCharts
           v-model:scale="settings.intensityScale"
           v-model:yMode="settings.yMode"
