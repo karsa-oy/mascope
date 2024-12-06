@@ -37,6 +37,13 @@ const selected = reactive({
   files: []
 })
 
+watch(
+  () => app.data.instrument.focused,
+  () => {
+    selected.files = []
+  }
+)
+
 const search = ref('')
 
 const acquisitions = computed(
