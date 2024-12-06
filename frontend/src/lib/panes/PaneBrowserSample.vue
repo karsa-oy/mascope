@@ -125,6 +125,7 @@ const batchContextMenu = ref()
 
 // prevent default event handling
 const handleBatchRightClick = (event) => {
+  sampleContextMenu.value.hide()
   batchContextMenu.value.show(event.originalEvent)
 }
 
@@ -243,6 +244,7 @@ const sampleContextMenu = ref()
 const handleSampleRightClick = (event) => {
   // disable context menu for multiselection
   if (app.data.sample.focused) {
+    batchContextMenu.value.hide()
     sampleContextMenu.value.show(event.originalEvent)
   }
 }

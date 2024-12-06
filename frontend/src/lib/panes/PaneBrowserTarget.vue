@@ -92,10 +92,12 @@ const tree = computed(() =>
 
 const collectionContextMenu = ref()
 const collectionPreventDefault = (event) => {
+  compoundContextMenu.value.hide()
   collectionContextMenu.value.show(event.originalEvent)
 }
 const compoundContextMenu = ref()
 const compoundPreventDefault = (event) => {
+  collectionContextMenu.value.hide()
   compoundContextMenu.value.show(event.originalEvent)
 }
 
