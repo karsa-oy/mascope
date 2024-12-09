@@ -57,13 +57,14 @@ function handleClientError(error) {
   const { method, url, headers } = error.config
   const type = headers['X-Type']
   // log to console for developers
-  console.error(`[api:http] ${method} ${url} client failure:`, error)
+  const { detail, error: message } = error?.response?.data
+  console.error(`[api:http] ${method} ${url} client failure: ${detail?.error_message}`, error)
   // emit notification to users
   const app = useApp()
   app.ui.notification.push({
     type,
     status: 'error',
-    message: error.message
+    message
   })
   // throw
   return Promise.reject(error)
@@ -72,10 +73,10 @@ function handleClientError(error) {
 function handleServerError(error) {
   const { method, url, headers } = error?.config
   const type = headers['X-Type']
-  const { status, statusText } = error?.response
   // log to console for developers
+  const { detail, error: message } = error?.response?.data
   console.error(
-    `[api:http] ${type} ${method} ${url} server failure: ${status} ${statusText}`,
+    `[api:http] ${type} ${method} ${url} server failure: ${detail?.error_message}`,
     error
   )
   // emit notification to users
@@ -83,7 +84,7 @@ function handleServerError(error) {
   app.ui.notification.push({
     type,
     status: 'error',
-    message: error?.message
+    message
   })
   // throw
   return Promise.reject(error)

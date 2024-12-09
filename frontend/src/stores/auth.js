@@ -26,23 +26,15 @@ export const useAuth = defineStore('app.auth', () => {
     }
   }
   const login = async ({ email, password }) => {
-    try {
-      const params = new URLSearchParams()
-      params.append('grant_type', 'password')
-      params.append('username', email)
-      params.append('password', password)
-      await api.http.post('/auth/login', params, {
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        type: 'signin_user'
-      })
-    } catch (e) {
-      ui.notification.push({
-        type: 'user_login',
-        status: 'error',
-        message: `Failed to login: ${e.message}`
-      })
-      return
-    }
+    const params = new URLSearchParams()
+    params.append('grant_type', 'password')
+    params.append('username', email)
+    params.append('password', password)
+    await api.http.post('/auth/login', params, {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      type: 'signin_user',
+      use: 'read'
+    })
     identify()
   }
   const logout = async () => {
