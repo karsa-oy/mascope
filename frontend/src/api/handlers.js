@@ -73,6 +73,34 @@ export default {
     } else {
       unhandled(response)
     }
+  },
+  /**
+   * Authentication
+   */
+  auth: (response) => {
+    const { type, status, message, data } = unpack(response)
+    const app = useApp()
+    if (status == 200 || status == 204) {
+      // notify users
+      if (!type.includes('identify')) {
+        app.ui.notification.push({
+          type,
+          message: message ?? 'Signed in successfully',
+          status: 'success'
+        })
+      }
+      return data.data
+    } else if (status == 401) {
+      // notify users
+      app.ui.notification.push({
+        type: 'user_signed_out',
+        message: 'You are signed out, please log in',
+        status: 'warn'
+      })
+      return null
+    }
+    unhandled(response)
+    return data.data
   }
 }
 

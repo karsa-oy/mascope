@@ -11,19 +11,12 @@ export const useAuth = defineStore('app.auth', () => {
   const user = ref(null)
 
   const identify = async () => {
-    try {
-      const response = await api.http.get('/users/me', {
+    user.value =
+      (await api.http.get('/users/me', {
         type: 'identify_user',
+        use: 'auth',
         validateStatus: (status) => status < 500
-      })
-      if (response.status == 200) {
-        user.value = response.data.data
-      } else {
-        user.value = false
-      }
-    } catch (e) {
-      user.value = false
-    }
+      })) ?? false
   }
   const login = async ({ email, password }) => {
     const params = new URLSearchParams()
@@ -33,27 +26,19 @@ export const useAuth = defineStore('app.auth', () => {
     await api.http.post('/auth/login', params, {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       type: 'signin_user',
-      use: 'read'
+      use: 'auth'
     })
     identify()
   }
   const logout = async () => {
-    try {
-      await api.http.post(
-        `/auth/logout`,
-        {},
-        {
-          type: 'signout_user'
-        }
-      )
-    } catch (e) {
-      ui.notification.push({
-        type: 'user_logout',
-        status: 'error',
-        message: `Failed to logout: ${e.message}`
-      })
-      return
-    }
+    await api.http.post(
+      `/auth/logout`,
+      {},
+      {
+        type: 'signout_user',
+        user: 'auth'
+      }
+    )
     identify()
   }
 
