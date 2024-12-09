@@ -19,7 +19,7 @@ const props = defineProps({
 })
 
 const original = computed(() =>
-  action.value == 'create' ? null : (app.data.workspace.focused ?? props.workspace)
+  action.value == 'create' ? null : app.data.workspace.focused ?? props.workspace
 )
 
 const info = reactive({
@@ -149,6 +149,10 @@ function init() {
   info.desc = original.value?.workspace_description
   ;(info.message = null), (info.initial = original.value)
 }
+
+const invalid = computed(() =>
+  action.value == 'create' ? (info.name?.trim().length ?? 0) == 0 : false
+)
 </script>
 
 <template>
@@ -173,7 +177,7 @@ function init() {
     </section>
     <menu>
       <Button label="Cancel" @click="action = null" severity="secondary" />
-      <Button :label="executeLabel" @click="execute" v-if="!info.message" />
+      <Button :label="executeLabel" @click="execute" v-if="!info.message" :disabled="invalid" />
     </menu>
   </Dialog>
 </template>
