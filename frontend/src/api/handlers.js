@@ -90,12 +90,12 @@ export default {
         })
       }
       return data.data
-    } else if (status == 401) {
+    } else if (status == 401 && type !== 'identify_user') {
       // notify users
       app.ui.notification.push({
         type: 'user_signed_out',
-        message: 'You are signed out, please log in',
-        status: 'warn'
+        message: data?.error || 'Please sign in to the Mascope.',
+        status: 'warning'
       })
       return null
     }

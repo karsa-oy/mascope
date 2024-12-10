@@ -20,7 +20,7 @@ class UserRead(schemas.BaseUser[int]):
         ),
     )
     is_active: bool = Field(
-        ..., description="Indicates if the user account is active and can log in."
+        ..., description="Indicates if the user account is active and can sign in."
     )
     is_superuser: bool = Field(
         ..., description="Designates whether the user has superuser privileges."

@@ -25,7 +25,7 @@ export const useAuth = defineStore('app.auth', () => {
     params.append('password', password)
     await api.http.post('/auth/login', params, {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      type: 'signin_user',
+      type: 'user_sign_in',
       use: 'auth'
     })
     identify()
@@ -35,7 +35,7 @@ export const useAuth = defineStore('app.auth', () => {
       `/auth/logout`,
       {},
       {
-        type: 'signout_user',
+        type: 'user_sign_out',
         user: 'auth'
       }
     )
