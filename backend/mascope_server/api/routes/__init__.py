@@ -1,5 +1,8 @@
 from mascope_server.api.new.auth.routes import auth_router
 from mascope_server.api.new.users.routes import users_router
+from mascope_server.api.new.users.owner_registration.routes import (
+    owner_registration_router,
+)
 from mascope_server.api.new.users.me.routes import me_router
 from mascope_server.api.new.users.admin.routes import admin_router
 from mascope_server.api.new.users.owner.routes import owner_router
@@ -84,6 +87,7 @@ routers = [
     auth_router,
     me_router,
     users_router,
+    owner_registration_router,
     admin_router,
     owner_router,
     roles_router,

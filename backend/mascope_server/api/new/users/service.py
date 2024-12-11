@@ -16,6 +16,10 @@ from mascope_server.api.new.auth.config import auth_settings
 from mascope_server.api.new.users.user_manager.service import UserManager
 from mascope_server.api.new.users.schemas import UserCreate, UserRead, UserUpdate
 from mascope_server.api.new.users.util import check_username_exists
+from mascope_server.api.new.users.owner_registration.util import (
+    check_last_owner_deletion,
+    check_owner_role_change,
+)
 from mascope_server.api.new.roles.exceptions import InvalidRoleException
 
 
@@ -196,19 +200,24 @@ async def update_user(
     :param request: The current HTTP request.
     :type request: Request
     :raises NotFoundException: If the user does not exist.
+    :raises LastOwnerDowngradeException: If attempting to downgrade the last owner
     :return: The updated user details.
     """
     # Step 1: Retrieve the user
     user = await user_manager.get(user_id)
 
-    # Step 2: Check if the new username already exists
+    # Step 2: If role is being changed, validate owner downgrade
+    if user_update.role_id is not None:
+        await check_owner_role_change(user_id, user_update.role_id)
+
+    # Step 3: Check if the new username already exists
     if user_update.username and user_update.username != user.username:
         await check_username_exists(user_update.username)
 
-    # Step 3: Update the user
+    # Step 4: Update the user
     await user_manager.update(user_update, user)
 
-    # Step 4: Validate and return the updated user
+    # Step 5: Validate and return the updated user
     user = (await get_user(user_id=user_id))["data"]
     message = f"User '{user.username}' updated successfully."
     if user_update.password is not None:
@@ -229,13 +238,17 @@ async def delete_user(user_id: int, user_manager: UserManager) -> dict:
     :param user_manager: The UserManager instance.
     :type user_manager: UserManager
     :raises NotFoundException: If the user does not exist.
+    :raises LastOwnerDeletionException: If attempting to delete the last owner
     :return: A success message.
     :rtype: dict
     """
     # Step 1: Fetch the user
     user = await user_manager.get(user_id)
 
-    # Step 2: Perform the delete operation
+    # Step 2: Check if this would remove last owner
+    await check_last_owner_deletion(user_id)
+
+    # Step 3: Perform the delete operation
     await user_manager.delete(user)
 
     return {"message": f"User '{user.username}' deleted successfully."}

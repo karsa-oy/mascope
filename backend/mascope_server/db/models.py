@@ -10,9 +10,10 @@ from sqlalchemy import (
     String,
     Text,
     JSON,
+    func,
+    select,
     text,
 )
-
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.sql.schema import CheckConstraint
 from sqlalchemy.ext.declarative import declarative_base
@@ -22,6 +23,7 @@ from fastapi_users.db import (
 from fastapi_users_db_sqlalchemy.access_token import (
     SQLAlchemyBaseAccessTokenTable,
 )
+from mascope_server.api.new.auth.config import auth_settings
 
 
 class BaseMixin(object):
@@ -64,6 +66,26 @@ class User(SQLAlchemyBaseUserTable[int], Base):
     access_token = relationship(
         "AccessToken", back_populates="user", cascade="all, delete, delete-orphan"
     )
+
+    @classmethod
+    async def count_other_owners(cls, session, current_user_id: int) -> int:
+        """
+        Count number of owner users excluding specified user.
+
+        :param session: SQLAlchemy session
+        :param current_user_id: User ID to exclude from count
+        :return: Count of other owner users
+        """
+        query = (
+            select(func.count())  # pylint: disable=not-callable
+            .select_from(User)
+            .where(
+                User.role_id == auth_settings.ROLE_ACCESS_LEVELS["owner"],
+                User.id != current_user_id,
+            )
+        )
+        result = await session.execute(query)
+        return result.scalar()
 
 
 class Role(Base):
