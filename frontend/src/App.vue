@@ -1,22 +1,24 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { onMounted } from 'vue'
 
 import ConfirmDialog from 'primevue/confirmdialog'
 import Toast from 'primevue/toast'
 import { useToast } from 'primevue/usetoast'
 import Panel from 'primevue/panel'
-import Tabs from 'primevue/tabs'
-import TabList from 'primevue/tablist'
-import Tab from 'primevue/tab'
 import ProgressSpinner from 'primevue/progressspinner'
 
 import { beautifySnakeCase } from '@/lib/utils'
 import { BaseKarsaLogo } from '@/lib/base'
 import { useApp } from '@/stores'
-import { PaneLogin } from '@/lib/panes'
+import { PaneLogin, PaneOwnerSignup } from '@/lib/panes'
 
 const app = useApp()
 const toast = useToast()
+
+// Check owner registration status on component mount
+onMounted(async () => {
+  await app.auth.getOwnerRegistrationStatus()
+})
 
 // toaster
 app.ui.notification
@@ -40,23 +42,18 @@ app.ui.notification
   .unmount()
 
 app.auth.identify()
-
-const tab = ref('login')
-
-const gotoLogin = () => {
-  tab.value = 'login'
-}
 </script>
 
 <template>
   <!-- App Routes -->
   <RouterView v-if="app.auth.user" />
-  <!-- Login / Signup Screen  -->
+  <!-- Login / Owner Setup Screen  -->
   <div v-else-if="app.auth.user == false" class="center" style="min-height: 80vh">
-    <Panel style="width: 400px">
+    <Panel style="width: 500px">
       <BaseKarsaLogo />
       <div style="margin-top: 2rem" />
-      <PaneLogin />
+      <PaneOwnerSignup v-if="app.auth.ownerRegistrationStatus" />
+      <PaneLogin v-else />
     </Panel>
   </div>
   <div v-else class="col" style="min-height: 80vh; justify-content: center">

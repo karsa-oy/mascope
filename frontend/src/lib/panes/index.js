@@ -6,3 +6,4 @@ export { default as PaneSettingsCalibration } from './PaneSettingsCalibration.vu
 export { default as PaneTabAcquisitions } from './PaneTabAcquisitions.vue'
 export { default as PaneTabMatch } from './PaneTabMatch.vue'
 export { default as PaneLogin } from './PaneLogin.vue'
+export { default as PaneOwnerSignup } from './PaneOwnerSignup.vue'

@@ -80,18 +80,14 @@ export default {
   auth: (response) => {
     const { type, status, message, data } = unpack(response)
     const app = useApp()
-    if (status == 200 || status == 204) {
-      // notify users
-      if (!type.includes('identify')) {
-        app.ui.notification.push({
-          type,
-          message: message ?? 'Signed in successfully',
-          status: 'success'
-        })
-      }
-      return data.data
-    } else if (status == 401 && type !== 'identify_user') {
-      // notify users
+
+    // Handle owner registration check
+    if (type === 'owner_sign_up_status') {
+      return status === 200 ? { status } : null
+    }
+
+    // Handle unauthorized access
+    if (status === 401 && type !== 'identify_user') {
       app.ui.notification.push({
         type: 'user_signed_out',
         message: data?.error || 'Please sign in to the Mascope.',
@@ -99,6 +95,20 @@ export default {
       })
       return null
     }
+
+    // Handle successful responses
+    if (status === 200 || status === 204) {
+      if (type !== 'identify_user') {
+        app.ui.notification.push({
+          type,
+          message: message ?? 'Signed in successfully',
+          status: 'success'
+        })
+      }
+      return data.data
+    }
+
+    // Handle unexpected cases
     unhandled(response)
     return data.data
   }
@@ -107,7 +117,7 @@ export default {
 function unpack(response) {
   const { status, data, request, config } = response
   const { method, url } = request
-  const message = data?.message
+  const message = data?.data?.message ?? data?.message
   const type = config?.headers['X-Type']
   return { type, status, message, data, request, method, url }
 }

@@ -3,12 +3,9 @@ import { defineStore } from 'pinia'
 
 import { api } from '@/api'
 
-import { useUi } from './ui'
-
 export const useAuth = defineStore('app.auth', () => {
-  const ui = useUi()
-
   const user = ref(null)
+  const ownerRegistrationStatus = ref(false)
 
   const identify = async () => {
     user.value =
@@ -41,7 +38,31 @@ export const useAuth = defineStore('app.auth', () => {
     )
     identify()
   }
+  // Owner sign-up
+  const getOwnerRegistrationStatus = async () => {
+    try {
+      const response = await api.http.get('/users/owner-registration/status', {
+        type: 'owner_sign_up_status',
+        use: 'auth',
+        validateStatus: (status) => status < 500
+      })
+      ownerRegistrationStatus.value = response.status === 200
+    } catch (error) {
+      ownerRegistrationStatus.value = false
+    }
+  }
 
+  const ownerSignUp = async ({ email, username, password, serverSecret }) => {
+    await api.http.post(
+      '/users/owner-registration',
+      { email, username, password, server_secret: serverSecret },
+      {
+        type: 'owner_sign_up',
+        use: 'create'
+      }
+    )
+    getOwnerRegistrationStatus()
+  }
   // hooks
 
   const handlers = ref([])
@@ -68,9 +89,12 @@ export const useAuth = defineStore('app.auth', () => {
 
   return {
     user,
+    ownerRegistrationStatus,
     identify,
     login,
     logout,
+    getOwnerRegistrationStatus,
+    ownerSignUp,
     onLogin
   }
 })
