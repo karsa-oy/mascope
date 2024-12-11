@@ -147,6 +147,7 @@ async def get_user(user_id: str) -> dict:
 async def register_user(
     user_create: UserCreate,
     user_manager: UserManager,
+    safe: bool = True,
 ) -> dict:
     """
     Registers a new user in Mascope.
@@ -155,6 +156,9 @@ async def register_user(
     :type user_create: UserCreate
     :param user_manager: The UserManager instance for user operations.
     :type user_manager: UserManager
+    :param safe: If True, sensitive fields (is_superuser, is_active, is_verified)
+                will be restricted during creation, defaults to True
+    :type safe: bool
     :raises UsernameAlreadyExistsException: If the username already exists.
     :raises UserAlreadyExists: If a user with the same email already exists.
     :return: The registered user's details.
@@ -164,7 +168,7 @@ async def register_user(
     await check_username_exists(user_create.username)
 
     # Step 2: Create the user
-    created_user = await user_manager.create(user_create, safe=True)
+    created_user = await user_manager.create(user_create=user_create, safe=safe)
 
     # Step 3: Validate and return the registered user's details
     user = (await get_user(user_id=created_user.id))["data"]

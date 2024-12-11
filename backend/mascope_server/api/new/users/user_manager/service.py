@@ -13,6 +13,7 @@ from fastapi_users import BaseUserManager, IntegerIDMixin
 from fastapi_users import models
 from mascope_server.app.socket import sio
 from mascope_server.db.models import User
+from mascope_server.api.lib.exceptions.api_exceptions import NotFoundException
 from mascope_server.api.new.auth.config import auth_settings
 from mascope_server.api.new.users import exceptions
 from mascope_server.api.new.users.schemas import UserCreate
@@ -59,6 +60,21 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
         auth_settings.VERIFICATION_TOKEN_LIFETIME_SECONDS
     )
     verification_token_audience = auth_settings.VERIFICATION_TOKEN_AUDIENCE
+
+    async def get(self, id: models.ID) -> models.UP:
+        """
+        Get a user by id.
+
+        :param id: Id. of the user to retrieve.
+        :raises UserNotExists: The user does not exist.
+        :return: A user.
+        """
+        user = await self.user_db.get(id)
+
+        if user is None:
+            raise NotFoundException(f"User with ID '{id}' not found")
+
+        return user
 
     async def create(
         self,

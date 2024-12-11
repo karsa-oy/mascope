@@ -23,7 +23,7 @@ admin_router = APIRouter(prefix="/api/users/admin", tags=["User Management Admin
 
 
 @admin_router.post("/register")
-@api_route()
+@api_route(status_code=201)
 async def admin_register_user_route(
     request: Request,
     user_create: UserCreate = Body(...),

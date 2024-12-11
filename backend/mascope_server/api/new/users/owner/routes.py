@@ -21,7 +21,7 @@ owner_router = APIRouter(prefix="/api/users/owner", tags=["User Management Owner
 
 
 @owner_router.post("/register")
-@api_route()
+@api_route(status_code=201)
 async def owner_register_user_route(
     request: Request,
     user_create: UserCreate = Body(...),
