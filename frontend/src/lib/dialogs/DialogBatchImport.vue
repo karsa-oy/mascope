@@ -80,6 +80,17 @@ const title = computed(() => {
     : `Import spreadsheet sample data to "${name}" batch`
 })
 
+const filesPreview = computed(() =>
+  [...props.files]
+    .sort((a, b) => new Date(a.datetime) - new Date(b.datetime))
+    .map((file) => ({
+      ...file,
+      sample_item_name: '',
+      sample_item_type: '',
+      filter_id: ''
+    }))
+)
+
 // Sample Items Tab
 const columns = computed(() => {
   if (imported.items.length === 0) return []
@@ -134,17 +145,6 @@ async function parse(text) {
     preprocess()
   }
 }
-
-const filesPreview = computed(() =>
-  [...props.files]
-    .sort((a, b) => new Date(a.datetime) - new Date(b.datetime))
-    .map((file) => ({
-      ...file,
-      sample_item_name: '',
-      sample_item_type: '',
-      filter_id: ''
-    }))
-)
 
 watch(() => imported.filterId, preprocess)
 function preprocess() {
