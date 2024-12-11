@@ -146,10 +146,7 @@ const filesPreview = computed(() =>
     }))
 )
 
-watch(
-  computed(() => imported.filterId),
-  preprocess
-)
+watch(() => imported.filterId, preprocess)
 function preprocess() {
   // Sort acquisitions by datetime in descending order
   const acquisitions = [...props.files].sort((a, b) => new Date(a.datetime) - new Date(b.datetime))
@@ -336,15 +333,14 @@ function validateRows() {
 }
 
 watch(
-  computed(() => validation.rows.passed && validation.cols.passed),
-  autoswitchTab
-)
-function autoswitchTab(passed) {
-  if (tab.value == 'issues' && passed) {
-    // switch to data data
-    tab.value = 'data'
+  () => validation.rows.passed && validation.cols.passed,
+  (passed) => {
+    if (tab.value == 'issues' && passed) {
+      // switch to data data
+      tab.value = 'data'
+    }
   }
-}
+)
 </script>
 
 <template>
