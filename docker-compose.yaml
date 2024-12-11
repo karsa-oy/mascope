@@ -14,8 +14,10 @@ services:
       MASCOPE_LOGLEVEL: ${MASCOPE_LOGLEVEL}
       MASCOPE_TIMEZONE: ${MASCOPE_TIMEZONE}
       JWT_SECRET_KEY_FILE: /run/secrets/jwt_secret_key
+      SERVER_OWNER_SECRET_KEY_FILE: /run/secrets/server_owner_secret_key
     secrets:
       - jwt_secret_key
+      - server_owner_secret_key
   file_converter:
     command: "file-converter"
     build:
@@ -42,3 +44,5 @@ services:
 secrets:
   jwt_secret_key:
     file: secrets/jwt_secret_key.txt
+  server_owner_secret_key:
+    file: secrets/server_owner_secret_key.txt
