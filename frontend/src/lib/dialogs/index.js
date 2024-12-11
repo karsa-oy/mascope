@@ -1,6 +1,6 @@
 export { default as DialogBatchOp } from './DialogBatchOp'
 export * from './dialogBatchDelete.js'
-export { default as DialogBatchImport } from './DialogBatchImport.vue'
+export { DialogBatchImport } from './DialogBatchImport'
 export { default as DialogInstrumentFunction } from './DialogInstrumentFunction.vue'
 export { default as DialogFileUpload } from './DialogFileUpload.vue'
 export { default as DialogMatchRating } from './DialogMatchRating.vue'
