@@ -1,4 +1,6 @@
 <script setup>
+import { ref, reactive, computed, watch } from 'vue'
+
 import FloatLabel from 'primevue/floatlabel'
 import Select from 'primevue/select'
 import ScrollPanel from 'primevue/scrollpanel'
@@ -15,21 +17,17 @@ import Message from 'primevue/message'
 import Dialog from 'primevue/dialog'
 import { useConfirm } from 'primevue/useconfirm'
 
-import { ref, reactive, computed, watch } from 'vue'
-
+import { useApp } from '@/stores'
 import { BaseClipboardContext } from '@/lib/base'
 import { fromSpreadsheet } from '@/lib/table'
 import { genId } from '@/lib/utils'
-
-import { useApp } from '@/stores'
 
 import { useValidation } from './validation.js'
 import { generic } from './generic.js'
 import { autosampler } from './autosampler.js'
 
-const confirm = useConfirm()
-
 const app = useApp()
+const confirm = useConfirm()
 
 const visible = defineModel('visible')
 
