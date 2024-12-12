@@ -28,7 +28,7 @@ const disabled = computed(() => Object.values(invalid.value).some((v) => v))
 
 const signup = async () => {
   if (!disabled.value) {
-    await auth.ownerSignUp({
+    await auth.signupFirstOwner({
       email: input.email,
       username: input.username,
       password: input.password,

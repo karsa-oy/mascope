@@ -82,7 +82,7 @@ export default {
     const app = useApp()
 
     // Handle owner registration check
-    if (type === 'owner_sign_up_status') {
+    if (type === 'first_owner_status') {
       return status === 200 ? { status } : null
     }
 

@@ -1,11 +1,17 @@
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { defineStore } from 'pinia'
 
 import { api } from '@/api'
 
 export const useAuth = defineStore('app.auth', () => {
   const user = ref(null)
-  const ownerRegistrationStatus = ref(false)
+  const requiresOwner = ref(false)
+
+  // Initial auth checks
+  onMounted(async () => {
+    await checkFirstOwner()
+    await identify()
+  })
 
   const identify = async () => {
     user.value =
@@ -38,30 +44,31 @@ export const useAuth = defineStore('app.auth', () => {
     )
     identify()
   }
-  // Owner sign-up
-  const getOwnerRegistrationStatus = async () => {
+
+  // First owner management
+  const checkFirstOwner = async () => {
     try {
-      const response = await api.http.get('/users/owner-registration/status', {
-        type: 'owner_sign_up_status',
+      const response = await api.http.get('/users/first-owner/status', {
+        type: 'first_owner_status',
         use: 'auth',
         validateStatus: (status) => status < 500
       })
-      ownerRegistrationStatus.value = response.status === 200
+      requiresOwner.value = response.status === 200
     } catch (error) {
-      ownerRegistrationStatus.value = false
+      requiresOwner.value = false
     }
   }
 
-  const ownerSignUp = async ({ email, username, password, serverSecret }) => {
+  const signupFirstOwner = async ({ email, username, password, serverSecret }) => {
     await api.http.post(
-      '/users/owner-registration',
+      '/users/first-owner',
       { email, username, password, server_secret: serverSecret },
       {
-        type: 'owner_sign_up',
+        type: 'first_owner_sign_up',
         use: 'create'
       }
     )
-    getOwnerRegistrationStatus()
+    checkFirstOwner()
   }
   // hooks
 
@@ -89,12 +96,12 @@ export const useAuth = defineStore('app.auth', () => {
 
   return {
     user,
-    ownerRegistrationStatus,
+    requiresOwner,
     identify,
     login,
     logout,
-    getOwnerRegistrationStatus,
-    ownerSignUp,
+    checkFirstOwner,
+    signupFirstOwner,
     onLogin
   }
 })

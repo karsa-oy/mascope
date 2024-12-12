@@ -1,6 +1,4 @@
 <script setup>
-import { onMounted } from 'vue'
-
 import ConfirmDialog from 'primevue/confirmdialog'
 import Toast from 'primevue/toast'
 import { useToast } from 'primevue/usetoast'
@@ -14,11 +12,6 @@ import { PaneLogin, PaneOwnerSignup } from '@/lib/panes'
 
 const app = useApp()
 const toast = useToast()
-
-// Check owner registration status on component mount
-onMounted(async () => {
-  await app.auth.getOwnerRegistrationStatus()
-})
 
 // toaster
 app.ui.notification
@@ -40,8 +33,6 @@ app.ui.notification
     }
   })
   .unmount()
-
-app.auth.identify()
 </script>
 
 <template>
@@ -52,7 +43,7 @@ app.auth.identify()
     <Panel style="width: 500px">
       <BaseKarsaLogo />
       <div style="margin-top: 2rem" />
-      <PaneOwnerSignup v-if="app.auth.ownerRegistrationStatus" />
+      <PaneOwnerSignup v-if="app.auth.requiresOwner" />
       <PaneLogin v-else />
     </Panel>
   </div>
