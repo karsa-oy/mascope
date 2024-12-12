@@ -2,25 +2,25 @@ from sqlalchemy import func, select
 from mascope_server.db import async_session
 from mascope_server.db.models import User
 from mascope_server.api.new.auth.config import auth_settings
-from mascope_server.api.new.users.owner_registration.exceptions import (
+from mascope_server.api.new.users.first_owner.exceptions import (
     LastOwnerDeletionException,
     LastOwnerDowngradeException,
-    OwnerRegistrationNotAvailableException,
+    FirstOwnerRegistrationNotAvailableException,
 )
 
 
-async def check_owner_registration():
+async def check_first_owner_registration():
     """
     Check if owner registration is available, i.e. if no users exist.
 
-    :raises OwnerRegistrationNotAvailableException: If any users exist in the system
+    :raises FirstOwnerRegistrationNotAvailableException: If any users exist in the system
     """
     async with async_session() as session:
         query = select(func.count()).select_from(User)  # pylint: disable=not-callable
         result = await session.execute(query)
         count = result.scalar()
     if count > 0:
-        raise OwnerRegistrationNotAvailableException()
+        raise FirstOwnerRegistrationNotAvailableException()
 
 
 async def check_last_owner_deletion(user_id: int):

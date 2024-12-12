@@ -13,16 +13,16 @@ class InvalidServerOwnerSecretException(HTTPException):
         )
 
 
-class OwnerRegistrationNotAvailableException(HTTPException):
+class FirstOwnerRegistrationNotAvailableException(HTTPException):
     """
-    Exception raised when owner registration is not available
+    Exception raised when first owner registration is not available
     (users already exist in the system).
     """
 
     def __init__(self):
         super().__init__(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Owner registration is not available.",
+            detail="First owner registration is not available.",
         )
 
 

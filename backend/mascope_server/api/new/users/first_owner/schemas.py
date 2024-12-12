@@ -1,15 +1,15 @@
 from pydantic import Field, field_validator, model_validator
 from mascope_server.api.new.auth.config import auth_settings
 from mascope_server.api.new.users.schemas import UserCreate
-from mascope_server.api.new.users.owner_registration.secrets import (
+from mascope_server.api.new.users.first_owner.secrets import (
     server_owner_secret_key,
 )
-from mascope_server.api.new.users.owner_registration.exceptions import (
+from mascope_server.api.new.users.first_owner.exceptions import (
     InvalidServerOwnerSecretException,
 )
 
 
-class OwnerCreate(UserCreate):
+class FirstOwnerCreate(UserCreate):
     """Schema for creating the first owner user with server secret validation."""
 
     server_secret: str = Field(

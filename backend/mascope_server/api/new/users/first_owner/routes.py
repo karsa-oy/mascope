@@ -1,22 +1,20 @@
 from fastapi import APIRouter, Body, Depends, Request
 from mascope_server.api.lib.api_features import api_route
-from mascope_server.api.new.users.owner_registration.schemas import OwnerCreate
-from mascope_server.api.new.users.owner_registration.util import (
-    check_owner_registration,
+from mascope_server.api.new.users.first_owner.schemas import FirstOwnerCreate
+from mascope_server.api.new.users.first_owner.util import (
+    check_first_owner_registration,
 )
 from mascope_server.api.new.users.util import get_user_manager
 from mascope_server.api.new.users.exceptions import InvalidUsernameException
 from mascope_server.api.new.users.service import register_user
 from mascope_server.api.new.users.user_manager.service import UserManager
 
-owner_registration_router = APIRouter(
-    prefix="/api/users/owner-registration", tags=["Owner Registration"]
-)
+first_owner_router = APIRouter(prefix="/api/users/first-owner", tags=["First Owner"])
 
 
-@owner_registration_router.get("/status")
+@first_owner_router.get("/status")
 @api_route()
-async def check_owner_sign_up_status_route():
+async def check_first_owner_sign_up_status_route():
     """
     Check if owner signup is available by verifying no users exist in the system.
 
@@ -26,22 +24,22 @@ async def check_owner_sign_up_status_route():
 
     :return: Status message indicating if owner signup is possible
     :rtype: dict
-    :raises OwnerRegistrationNotAvailableException: If any users exist in system (403)
+    :raises FirstOwnerRegistrationNotAvailableException: If any users exist in system (403)
     """
     # Step 1: Check if owner signup is available by verifying no users exist
-    await check_owner_registration()
+    await check_first_owner_registration()
 
     # Step 2: If check passes (no exception raised), return success response
     return {
-        "message": "Please sign-up Mascope owner account",
+        "message": "Please sign-up Mascope first owner account",
     }
 
 
-@owner_registration_router.post("")
+@first_owner_router.post("")
 @api_route(status_code=201)
-async def register_owner_route(
+async def register_first_owner_route(
     request: Request,
-    owner_create: OwnerCreate = Body(...),
+    first_owner_create: FirstOwnerCreate = Body(...),
     user_manager: UserManager = Depends(get_user_manager),
 ):
     """
@@ -49,12 +47,12 @@ async def register_owner_route(
     This endpoint is unprotected but requires a valid server secret.
 
     :param request: The current HTTP request
-    :param owner_create: The owner registration details with server secret
+    :param first_owner_create: The first owner registration details with server secret
     :param user_manager: User manager instance
     :return: The registered owner details
     """
     # Step 1: Check if this is the first user
-    await check_owner_registration()
+    await check_first_owner_registration()
 
     # Step 2: Check for explicit null values in the raw request body
     body = await request.json()
@@ -63,5 +61,5 @@ async def register_owner_route(
 
     # Step 3: Create owner user (privileges are set in schema validation)
     return await register_user(
-        user_create=owner_create, user_manager=user_manager, safe=False
+        user_create=first_owner_create, user_manager=user_manager, safe=False
     )

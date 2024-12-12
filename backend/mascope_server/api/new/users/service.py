@@ -16,7 +16,7 @@ from mascope_server.api.new.auth.config import auth_settings
 from mascope_server.api.new.users.user_manager.service import UserManager
 from mascope_server.api.new.users.schemas import UserCreate, UserRead, UserUpdate
 from mascope_server.api.new.users.util import check_username_exists
-from mascope_server.api.new.users.owner_registration.util import (
+from mascope_server.api.new.users.first_owner.util import (
     check_last_owner_deletion,
     check_owner_role_change,
 )
