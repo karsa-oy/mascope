@@ -80,24 +80,24 @@ const filesPreview = computed(() =>
 )
 
 // Sample Items Tab
-const columns = computed(() => {
+const coreColumns = [
+  { field: 'datetime', label: 'Datetime' },
+  { field: 'filename', label: 'Filename' },
+  { field: 'sample_item_name', label: 'Sample Name' },
+  { field: 'sample_item_type', label: 'Sample Type' },
+  { field: 'filter_id', label: 'Filter ID' }
+]
+const attributeColumns = computed(() => {
   if (imported.items.length === 0) return []
-  const core = [
-    { field: 'datetime', label: 'Datetime' },
-    { field: 'filename', label: 'Filename' },
-    { field: 'sample_item_name', label: 'Sample Name' },
-    { field: 'sample_item_type', label: 'Sample Type' },
-    { field: 'filter_id', label: 'Filter ID' }
-  ]
-  const attributes = [
+  return [
     // find unique attributes
     ...new Set(imported.items.map((item) => Object.keys(item.sample_item_attributes)).flat())
   ].map((key) => ({
     field: `sample_item_attributes.${key}`,
     label: key.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())
   }))
-  return [...core, ...attributes]
 })
+const allColumns = computed(() => [...coreColumns, ...attributeColumns.value])
 
 watch(visible, init)
 function init(active) {
@@ -195,13 +195,7 @@ watch(
                       tableStyle="max-width: 70vw"
                     >
                       <Column
-                        v-for="col of [
-                          { field: 'datetime', label: 'Datetime' },
-                          { field: 'filename', label: 'Filename' },
-                          { field: 'sample_item_name', label: 'Sample Name' },
-                          { field: 'sample_item_type', label: 'Sample Type' },
-                          { field: 'filter_id', label: 'Filter ID' }
-                        ]"
+                        v-for="col of coreColumns"
                         :key="col.field"
                         :field="col.field"
                         :header="col.label"
@@ -229,7 +223,7 @@ watch(
                   tableStyle="max-width: 70vw"
                 >
                   <Column
-                    v-for="col of columns"
+                    v-for="col of allColumns"
                     :key="col.field"
                     :field="col.field"
                     :header="col.label"
