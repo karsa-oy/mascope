@@ -18,12 +18,14 @@ import { useConfirm } from 'primevue/useconfirm'
 import { ref, reactive, computed, watch } from 'vue'
 
 import { BaseClipboardContext } from '@/lib/base'
-import { fromSpreadsheet, parseAutosamplerCsv, parseGenericCsv } from '@/lib/table'
+import { fromSpreadsheet } from '@/lib/table'
 import { genId } from '@/lib/utils'
 
 import { useApp } from '@/stores'
 
 import { useValidation } from './validation.js'
+import { generic } from './generic.js'
+import { autosampler } from './autosampler.js'
 
 const confirm = useConfirm()
 
@@ -119,14 +121,14 @@ async function parse(text) {
   const autosamplerKeys = ['ht3000a_autorun_report', 'software', 'sample_list', 'autosampler']
   imported.type = cols.some((col) => autosamplerKeys.includes(col.field))
     ? 'autosampler'
-    : 'general'
+    : 'generic'
   validation.cols.execute({ cols })
   if (!validation.cols.passed) return
   // rows
   if (imported.type === 'autosampler') {
-    imported.parsed = parseAutosamplerCsv(rows)
-  } else if (imported.type === 'general') {
-    imported.parsed = parseGenericCsv(cols, rows)
+    imported.parsed = autosampler.parse(rows)
+  } else if (imported.type === 'generic') {
+    imported.parsed = generic.parse(cols, rows)
   }
   if (imported.parsed) {
     preprocess()
@@ -141,34 +143,10 @@ function preprocess() {
     if (!imported.filterId) {
       imported.filterId = generated.filterId = genId(6, false)
     }
-    imported.items = imported.parsed.map((parsed, i) => {
-      const item = {
-        filename: acquisitions[i]?.filename ?? null,
-        sample_batch_id: app.data.batch.focused.sample_batch_id,
-        filter_id: imported.filterId,
-        sample_item_attributes: {}
-      }
-      Object.entries(parsed).forEach(([key, value]) => {
-        const attr = key.toLowerCase().replaceAll(/[\s-]/g, '_')
-        if (attr.startsWith('sample_')) {
-          // some fields go into the base record
-          const prop = `sample_item_${attr.slice(7)}`
-          item[prop] = value
-        } else {
-          // others remain in `attributes`
-          item.sample_item_attributes[attr] = value
-        }
-      })
-      return item
-    })
+    imported.items = autosampler.preprocess(acquisitions, imported.parsed)
   }
-  if (imported.type === 'general') {
-    imported.items = imported.parsed.map((parsed, index) => ({
-      datetime: acquisitions[index]?.datetime ?? null,
-      filename: acquisitions[index]?.filename ?? null,
-      ...parsed,
-      sample_batch_id: app.data.batch.focused.sample_batch_id
-    }))
+  if (imported.type === 'generic') {
+    imported.items = generic.preprocess(acquisitions, imported.parsed)
   }
   validation.rows.execute({ files: props.files })
 }
