@@ -10,7 +10,7 @@ from requests.packages.urllib3.exceptions import InsecureRequestWarning
 warnings.simplefilter("ignore", InsecureRequestWarning)
 
 
-def api_get(url: str, path: str, params: dict = None):
+def api_get(url: str, path: str, access_token: str, params: dict = None):
     """
     Send a GET request to the specified API endpoint with optional query parameters.
 
@@ -18,6 +18,8 @@ def api_get(url: str, path: str, params: dict = None):
     :type url: str
     :param path: The specific API path to be appended to the base URL.
     :type path: str
+    :param access_token: Authorization token for API access
+    :type access_token: str
     :param params: A dictionary of query parameters to include in the request.
     :type params: dict, optional
     :return: The response object if the request was successful, otherwise None.
@@ -25,26 +27,36 @@ def api_get(url: str, path: str, params: dict = None):
     """
     full_url = url + "/api/" + path
     try:
+        headers = {"Authorization": f"Bearer {access_token}"}
+
         # Send GET request with query parameters (if provided)
-        resp = requests.get(full_url, params=params, verify=False, timeout=30)
+        resp = requests.get(
+            full_url, params=params, headers=headers, verify=False, timeout=30
+        )
         resp.raise_for_status()  # Raise HTTPError for bad responses
         message = json.loads(resp.content).get("message", None)
         if message is not None:
             print(message)
     except HTTPError as http_err:
-        try:
-            error_message = (
-                json.loads(resp.content)
-                .get("detail", {})
-                .get(
-                    "error_message", "No additional error information from the server."
+        if resp.status_code == 401 or resp.status_code == 403:
+            response = json.loads(resp.content)
+            error_message = response.get("detail", {}).get("error_message", None)
+            print(f"{error_message} Please check your API token.")
+        else:
+            try:
+                error_message = (
+                    json.loads(resp.content)
+                    .get("detail", {})
+                    .get(
+                        "error_message",
+                        "No additional error information from the server.",
+                    )
                 )
+            except json.JSONDecodeError:
+                error_message = "Failed to decode error message from server response."
+            print(
+                f"HTTP error: Unable to retrieve data from {full_url}. \nDetails: {http_err} \nServer message: {error_message}"
             )
-        except json.JSONDecodeError:
-            error_message = "Failed to decode error message from server response."
-        print(
-            f"HTTP error: Unable to retrieve data from {full_url}. \nDetails: {http_err} \nServer message: {error_message}"
-        )
         return None
     except Timeout:
         print(f"Timeout error: The request to {full_url} timed out.")
@@ -62,13 +74,15 @@ def api_get(url: str, path: str, params: dict = None):
     return resp
 
 
-def api_post(url: str, path: str, data: dict):
+def api_post(url: str, path: str, access_token: str, data: dict):
     """Send a POST request to the specified API endpoint with provided data.
 
     :param url: The base URL of the server.
     :type url: str
     :param path: The specific API path to be appended to the base URL.
     :type path: str
+    :param access_token: Authorization token for API access
+    :type access_token: str
     :param data: The data payload to send in the POST request.
     :type data: dict
     :return: The response object if the request was successful, otherwise None.
@@ -76,25 +90,34 @@ def api_post(url: str, path: str, data: dict):
     """
     full_url = url + "/api/" + path
     try:
-        resp = requests.post(full_url, data=json.dumps(data), verify=False, timeout=30)
+        headers = {"Authorization": f"Bearer {access_token}"}
+        resp = requests.post(
+            full_url, data=json.dumps(data), headers=headers, verify=False, timeout=30
+        )
         resp.raise_for_status()  # Raise HTTPError for bad responses
         message = json.loads(resp.content).get("message", None)
         if message is not None:
             print(message)
     except HTTPError as http_err:
-        try:
-            error_message = (
-                json.loads(resp.content)
-                .get("detail", {})
-                .get(
-                    "error_message", "No additional error information from the server."
+        if resp.status_code == 401 or resp.status_code == 403:
+            response = json.loads(resp.content)
+            error_message = response.get("detail", {}).get("error_message", None)
+            print(f"{error_message} Please check your API token.")
+        else:
+            try:
+                error_message = (
+                    json.loads(resp.content)
+                    .get("detail", {})
+                    .get(
+                        "error_message",
+                        "No additional error information from the server.",
+                    )
                 )
+            except json.JSONDecodeError:
+                error_message = "Failed to decode error message from server response."
+            print(
+                f"HTTP error: Unable to retrieve data from {full_url}. \nDetails: {http_err} \nServer message: {error_message}"
             )
-        except json.JSONDecodeError:
-            error_message = "Failed to decode error message from server response."
-        print(
-            f"HTTP error: Unable to retrieve data from {full_url}. \nDetails: {http_err} \nServer message: {error_message}"
-        )
         return None
     except Timeout:
         print(f"Timeout error: The request to {full_url} timed out.")
@@ -116,15 +139,17 @@ def api_post(url: str, path: str, data: dict):
 # Workspaces API
 
 
-def get_workspaces(mascope_url: str) -> list:
+def get_workspaces(mascope_url: str, access_token: str) -> list:
     """Get Mascope workspaces from a URL
 
     :param mascope_url: Mascope URL
     :type mascope_url: str
+    :param access_token: Authorization token for API access
+    :type access_token: str
     :return: List of workspace dictionaries.
     :rtype: list
     """
-    resp = api_get(mascope_url, "workspaces")
+    resp = api_get(url=mascope_url, path="workspaces", access_token=access_token)
     # Check if the request was successful
     if not resp:
         print(
@@ -144,12 +169,14 @@ def get_workspaces(mascope_url: str) -> list:
 # Sample batches API
 
 
-def get_sample_batches(mascope_url: str, workspace_id: str) -> list:
+def get_sample_batches(mascope_url: str, access_token: str, workspace_id: str) -> list:
     """
     Get Mascope sample batches of a workspace.
 
     :param mascope_url: The base URL of the Mascope instance.
     :type mascope_url: str
+    :param access_token: Authorization token for API access
+    :type access_token: str
     :param workspace_id: The ID of the workspace from which to retrieve sample batches.
     :type workspace_id: str
     :return: A list of sample batch dictionaries.
@@ -160,7 +187,12 @@ def get_sample_batches(mascope_url: str, workspace_id: str) -> list:
     query_params = {"workspace_id": workspace_id}
 
     # Perform the GET request with query parameters
-    resp = api_get(mascope_url, "sample/batches", params=query_params)
+    resp = api_get(
+        url=mascope_url,
+        path="sample/batches",
+        access_token=access_token,
+        params=query_params,
+    )
 
     # Check if the request was successful
     if not resp:
@@ -180,6 +212,7 @@ def get_sample_batches(mascope_url: str, workspace_id: str) -> list:
 
 def get_sample_batch_data(
     mascope_url: str,
+    access_token: str,
     sample_batch_id: str,
 ) -> dict:
     """
@@ -191,6 +224,8 @@ def get_sample_batch_data(
 
     :param mascope_url: The base URL of the Mascope instance.
     :type mascope_url: str
+    :param access_token: Authorization token for API access
+    :type access_token: str
     :param sample_batch_id: The ID of the sample batch to retrieve data for.
     :type sample_batch_id: str
     :return: A dictionary containing:
@@ -204,8 +239,11 @@ def get_sample_batch_data(
     :rtype: dict
     """
     # Step 1: Call the API to get the batch data (stored in database)
-    resp = api_get(mascope_url, f"match/targets/batch/{sample_batch_id}")
-
+    resp = api_get(
+        url=mascope_url,
+        path=f"match/targets/batch/{sample_batch_id}",
+        access_token=access_token,
+    )
     if not resp:
         print(
             f"Failed to retrieve match data for sample batch with ID {sample_batch_id}."
@@ -243,12 +281,14 @@ def get_sample_batch_data(
 # Samples API
 
 
-def get_samples(mascope_url: str, sample_batch_id: str) -> list:
+def get_samples(mascope_url: str, access_token: str, sample_batch_id: str) -> list:
     """
     Get Mascope samples of the specified sample batch.
 
     :param mascope_url: The base URL of the Mascope instance.
     :type mascope_url: str
+    :param access_token: Authorization token for API access
+    :type access_token: str
     :param sample_batch_id: The ID of the sample batch from which to retrieve samples.
     :type sample_batch_id: str
     :return: A list of sample dictionaries.
@@ -259,7 +299,9 @@ def get_samples(mascope_url: str, sample_batch_id: str) -> list:
     query_params = {"sample_batch_id": sample_batch_id}
 
     # Perform the GET request with query parameters
-    resp = api_get(mascope_url, "samples", params=query_params)
+    resp = api_get(
+        url=mascope_url, path="samples", access_token=access_token, params=query_params
+    )
 
     # Check if the API request was successful
     if not resp:
@@ -276,19 +318,24 @@ def get_samples(mascope_url: str, sample_batch_id: str) -> list:
     return samples
 
 
-def get_sample(mascope_url: str, sample_item_id: str) -> dict:
+def get_sample(mascope_url: str, access_token: str, sample_item_id: str) -> dict:
     """
     Get details of a specific sample by its ID.
 
     :param mascope_url: The base URL of the Mascope instance.
     :type mascope_url: str
+    :param access_token: Authorization token for API access
+    :type access_token: str
     :param sample_item_id: The ID of the sample item to retrieve.
     :type sample_item_id: str
     :return: The response dictionary containing the sample details, or None if an error occurs.
     :rtype: dict
     """
-    resp = api_get(mascope_url, f"samples/{sample_item_id}")
-
+    resp = api_get(
+        url=mascope_url,
+        path=f"samples/{sample_item_id}",
+        access_token=access_token,
+    )
     if not resp:
         print(f"Failed to retrieve sample details from {mascope_url}.")
         return None
@@ -301,6 +348,7 @@ def get_sample(mascope_url: str, sample_item_id: str) -> dict:
 
 def get_sample_compound_matches(
     mascope_url: str,
+    access_token: str,
     sample_item_id: str,
     target_compound_formula: str,
     target_compound_name: str = "Unknown Compound",
@@ -312,6 +360,8 @@ def get_sample_compound_matches(
 
     :param mascope_url: Base URL of the Mascope API.
     :type mascope_url: str
+    :param access_token: Authorization token for API access
+    :type access_token: str
     :param sample_item_id: Unique identifier of the sample item to analyze.
     :type sample_item_id: str
     :param target_compound_formula: Chemical formula of the target compound.
@@ -350,7 +400,10 @@ def get_sample_compound_matches(
 
     # Make the POST request for the specified sample
     resp = api_post(
-        mascope_url, f"match/aggregate/sample/{sample_item_id}/compound", body
+        url=mascope_url,
+        path=f"match/aggregate/sample/{sample_item_id}/compound",
+        access_token=access_token,
+        data=body,
     )
 
     # Check if the API request was successful
@@ -378,13 +431,19 @@ def get_sample_compound_matches(
 
 
 def get_sample_file_peaks(
-    mascope_url: str, sample_file_id: str, areas: bool = True, heights: bool = True
+    mascope_url: str,
+    access_token: str,
+    sample_file_id: str,
+    areas: bool = True,
+    heights: bool = True,
 ) -> dict:
     """
     Get peaks of a given sample file, with options to include areas and/or heights.
 
     :param mascope_url: The base URL of the Mascope instance.
     :type mascope_url: str
+    :param access_token: Authorization token for API access
+    :type access_token: str
     :param sample_file_id: The ID of the sample file from which to retrieve peaks.
     :type sample_file_id: str
     :param areas: If True, include peak areas in the response, defaults to True.
@@ -405,9 +464,11 @@ def get_sample_file_peaks(
     }
     # Make API request with query parameters
     resp = api_get(
-        mascope_url, f"sample/files/{sample_file_id}/peaks", params=query_params
+        url=mascope_url,
+        path=f"sample/files/{sample_file_id}/peaks",
+        access_token=access_token,
+        params=query_params,
     )
-
     # Check if the API request was successful
     if not resp:
         print(
@@ -429,6 +490,7 @@ def get_sample_file_peaks(
 
 def get_sample_file_peak_timeseries(
     mascope_url: str,
+    access_token: str,
     sample_file_id: str,
     peak_mz: float,
     peak_mz_tolerance_ppm: float = None,
@@ -437,6 +499,8 @@ def get_sample_file_peak_timeseries(
 
     :param mascope_url: The base URL of the Mascope instance.
     :type mascope_url: str
+    :param access_token: Authorization token for API access
+    :type access_token: str
     :param sample_file_id: The ID of the sample file from which to retrieve peak timeseries data.
     :type sample_file_id: str
     :param peak_mz: The m/z of the peak to request timeseries for.
@@ -457,7 +521,10 @@ def get_sample_file_peak_timeseries(
         else {"peak_mz": peak_mz}
     )
     resp = api_post(
-        mascope_url, f"sample/files/{sample_file_id}/peaks/timeseries", body
+        url=mascope_url,
+        path=f"sample/files/{sample_file_id}/peaks/timeseries",
+        access_token=access_token,
+        data=body,
     )
     # Check if the API request was successful
     if not resp:
@@ -482,6 +549,7 @@ def get_sample_file_peak_timeseries(
 
 def get_sample_file_spectrum(
     mascope_url: str,
+    access_token: str,
     sample_file_id: str,
     t_min: float = None,
     t_max: float = None,
@@ -493,6 +561,8 @@ def get_sample_file_spectrum(
 
     :param mascope_url: The base URL of the Mascope instance.
     :type mascope_url: str
+    :param access_token: Authorization token for API access
+    :type access_token: str
     :param sample_file_id: The ID of the sample file from which to retrieve the spectrum.
     :type sample_file_id: str
     :param t_min: Start of the time range, defaults to None.
@@ -523,7 +593,10 @@ def get_sample_file_spectrum(
 
     # Make the GET request to the API endpoint with query parameters
     resp = api_get(
-        mascope_url, f"sample/files/{sample_file_id}/spectrum", params=query_params
+        url=mascope_url,
+        path=f"sample/files/{sample_file_id}/spectrum",
+        access_token=access_token,
+        params=query_params,
     )
 
     # Check if the API request was successful
@@ -552,6 +625,7 @@ def get_sample_file_spectrum(
 
 def create_instrument_function(
     mascope_url: str,
+    access_token: str,
     instrument: str,
     datetime_utc: str,
     peakshape: dict,
@@ -562,6 +636,8 @@ def create_instrument_function(
 
     :param mascope_url: Base URL of the Mascope API.
     :type mascope_url: str
+    :param access_token: Authorization token for API access
+    :type access_token: str
     :param instrument: Name of the instrument.
     :type instrument: str
     :param datetime_utc: UTC timestamp of the instrument function.
@@ -594,8 +670,12 @@ def create_instrument_function(
     }
 
     # Make the POST request to the instrument_functions endpoint
-    resp = api_post(mascope_url, "instrument_functions", data)
-
+    resp = api_post(
+        url=mascope_url,
+        path="instrument_functions",
+        access_token=access_token,
+        data=data,
+    )
     # Check if the API request was successful
     if not resp:
         print(f"Failed to create instrument function from {mascope_url}")
