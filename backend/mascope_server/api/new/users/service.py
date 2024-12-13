@@ -6,7 +6,7 @@ It extends the FastAPI Users library by combining its user management functional
 with custom operations and integrations, including role filtering, validation, etc.
 """
 
-from typing import Optional
+from typing import Optional, Union
 from sqlalchemy import asc, desc, select, func
 from mascope_server.db import async_session
 from mascope_server.db.models import User, Role
@@ -15,6 +15,10 @@ from mascope_server.api.lib.exceptions.api_exceptions import NotFoundException
 from mascope_server.api.new.auth.config import auth_settings
 from mascope_server.api.new.users.user_manager.service import UserManager
 from mascope_server.api.new.users.schemas import UserCreate, UserRead, UserUpdate
+from mascope_server.api.new.users.me.schemas import (
+    UserUpdateMe,
+    UserUpdateMeCredentials,
+)
 from mascope_server.api.new.users.util import check_username_exists
 from mascope_server.api.new.users.first_owner.util import (
     check_last_owner_deletion,
@@ -185,7 +189,7 @@ async def register_user(
 @api_controller()
 async def update_user(
     user_id: int,
-    user_update: UserUpdate,
+    user_update: Union[UserUpdate, UserUpdateMe, UserUpdateMeCredentials],
     user_manager: UserManager,
 ) -> dict:
     """
@@ -206,12 +210,20 @@ async def update_user(
     # Step 1: Retrieve the user
     user = await user_manager.get(user_id)
 
-    # Step 2: If role is being changed, validate owner downgrade
-    if user_update.role_id is not None:
+    # Step 2: Check owner role downgrade only for full UserUpdate schema
+    if (
+        isinstance(user_update, UserUpdate)
+        and hasattr(user_update, "role_id")
+        and user_update.role_id is not None
+    ):
         await check_owner_role_change(user_id, user_update.role_id)
 
-    # Step 3: Check if the new username already exists
-    if user_update.username and user_update.username != user.username:
+    # Step 3: Check username new username already exists if it's being updated
+    if (
+        hasattr(user_update, "username")
+        and user_update.username
+        and user_update.username != user.username
+    ):
         await check_username_exists(user_update.username)
 
     # Step 4: Update the user
