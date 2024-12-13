@@ -9,15 +9,12 @@ from mascope_server.api.new.auth.service import (
     generate_access_token,
     remove_access_tokens,
 )
-from mascope_server.api.new.users.schemas import UserRead, UserCreate
-
 
 # main Auth router
 auth_router = APIRouter(prefix="/api/auth", tags=["Auth"])
 
 # Include JWT-based authentication and registration routes
 auth_router.include_router(fastapi_users.get_auth_router(auth_backend_cookie))
-auth_router.include_router(fastapi_users.get_register_router(UserRead, UserCreate))
 
 
 # Access token-based routes for Jupyter server or external API access
