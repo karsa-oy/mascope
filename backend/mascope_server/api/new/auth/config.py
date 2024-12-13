@@ -17,8 +17,8 @@ class AuthConfig(BaseModel):
         jwt_secret_key  # PRIVATE_KEY used for signing and verifying JWT tokens
     )
     JWT_EXPIRATION_SECONDS: int = (
-        30 * 24 * 60 * 60
-    )  # Token lifetime - 30 days in seconds (JWT expiration)
+        360 * 24 * 60 * 60
+    )  # Token lifetime - 360 days in seconds (JWT expiration)
     JWT_AUDIENCE: list = ["mascope-users:auth"]  # Audience claim for token validation
     JWT_ALGORITHM: str = (
         "HS256"  # Algorithm used for signing the JWT (HMAC with SHA-256)
@@ -27,8 +27,8 @@ class AuthConfig(BaseModel):
     # Cookie settings for web-based JWT storage
     COOKIE_NAME: str = "mascope_auth"  # Name of the authentication cookie
     COOKIE_MAX_AGE_SECONDS: int = (
-        30 * 24 * 60 * 60
-    )  # Lifetime of the cookie - 30 days in seconds (matches JWT expiration)
+        360 * 24 * 60 * 60
+    )  # Lifetime of the cookie - 360 days in seconds (matches JWT expiration)
     COOKIE_SECURE: bool = (
         runtime.mode == "prod"
     )  # to send cookies only over HTTPS, True if in production, False if in dev
@@ -59,7 +59,9 @@ class AuthConfig(BaseModel):
     )
 
     # Access token-based authentication settings for Jupyter library API access
-    ACCESS_TOKEN_EXPIRATION_SECONDS: int = 3600  # Access token lifetime in seconds
+    ACCESS_TOKEN_EXPIRATION_SECONDS: int = (
+        360 * 24 * 60 * 60
+    )  # Access token lifetime  - 360 days in seconds
 
     # Role access levels for RBAC
     # Role names correspond to the role_id values in the database (access_level)
