@@ -329,7 +329,7 @@ async def detect_peaks(
     )
     lib_runtime.logger.info("Complete")
     sample_file_data = load_file(
-        filename, vars=["peak_areas"], prev_dataset=sample_file_data
+        filename, vars=["peak_areas", "peak_heights"], prev_dataset=sample_file_data
     )
     if return_peak_mzs:
         return (sample_file_data, all_peak_mzs)
