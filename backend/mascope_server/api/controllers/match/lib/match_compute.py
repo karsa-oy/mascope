@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from mascope_lib.file_func import get_instrument_type, get_sum_signal
+from mascope_lib.file_func import get_instrument_type, get_sum_signal, load_file
 from mascope_lib.peak import calculate_signal_area, detect_peaks, get_peaks
 from mascope_lib.chemistry import match_mz
 from mascope_server.db.id import gen_id
@@ -277,6 +277,13 @@ async def compute_match_interferences(
             sample_peak_interference=np.nan,
         )
 
+        # Read sample interval if dealing with TOF, default 0.25 for backwards compatibility
+        sample_interval = (
+            (load_file(filename, vars=[]).attrs["props"].get("sample_interval", 0.25))
+            if instrument_type == "tof"
+            else None
+        )
+
         def calc_raw_intensity(row):
             target_mz = row.mz
             dmz = (target_mz / R(target_mz)) / 2  # hwhm
@@ -287,6 +294,7 @@ async def compute_match_interferences(
                     mz_min=target_mz - dmz,
                     mz_max=target_mz + dmz,
                     sum_spectrum=sum_spectrum,
+                    sample_interval=sample_interval,
                 )
             else:
                 # For the Orbitrap, calculate signal maximum intensity in the mz range

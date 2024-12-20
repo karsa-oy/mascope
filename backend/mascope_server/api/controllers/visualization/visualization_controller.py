@@ -4,7 +4,7 @@ import pandas as pd
 import xarray as xr
 from sqlalchemy import select
 from colorcet import glasbey_hv as colormap
-from mascope_lib.file_func import get_instrument_type, load_file
+from mascope_lib.file_func import get_instrument_type, load_file, load_signal
 from mascope_lib.peak import filter_peaks, get_peaks
 from mascope_lib.util import get_closest_non_nan
 from mascope_server.db import async_session
@@ -87,7 +87,7 @@ async def visualize_ion_focus(
 
     # Step 2: Load the sample file and prepare data slice
     runtime.logger.info(f"Loading file: {filename}")
-    sample_file = load_file(filename, vars=["sum_signal", "signal", "peak_heights"])
+    sample_file = load_file(filename, vars=["sum_signal", "peak_heights"])
     instrument_type = get_instrument_type(filename)
     spectrum_unit = "ions" if instrument_type == "tof" else "rel."
     timeseries_unit = "ions" if instrument_type == "tof" else "rel."
@@ -115,6 +115,7 @@ async def visualize_ion_focus(
 
         # Extract the specific isotope slice and compute the sum spectrum
         isotope_slice = sample_file.sel(mz=slice(*mz_range)).compute()
+        isotope_signal = load_signal(filename).sel(mz=slice(*mz_range)).compute()
         isotope_sum_spectrum = isotope_slice.sum_signal
         # Check if the spectrum slice is empty
         if isotope_sum_spectrum.size == 0:
@@ -184,7 +185,7 @@ async def visualize_ion_focus(
                     )
                     fwhm = peak_mz / resolution_function(peak_mz)
                     # Slice spectrum segment presumably containing target peak
-                    isotope_peak_slice = isotope_slice.signal.sel(
+                    isotope_peak_slice = isotope_signal.signal.sel(
                         mz=slice(peak_mz - fwhm / 2, peak_mz + fwhm / 2)
                     ).compute()
 
@@ -200,7 +201,7 @@ async def visualize_ion_focus(
                     )
                 except KeyError as e:
                     runtime.logger.warning(
-                        f"Failed to find mz {peak_mz} in the dataset: {isotope_slice.signal.mz}. Error: {e}"
+                        f"Failed to find mz {peak_mz} in the dataset: {isotope_signal.signal.mz}. Error: {e}"
                     )
                     continue
 

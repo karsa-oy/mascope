@@ -8,7 +8,7 @@ from sqlalchemy import (
     desc,
     func,
 )
-from mascope_lib.file_func import load_file
+from mascope_lib.file_func import load_file, sum_signal_for_time_range
 from mascope_lib.peak import detect_peaks, get_peaks
 from mascope_lib.file_func import get_instrument_type
 from mascope_server.app import sio
@@ -261,7 +261,9 @@ async def update_sample_file(
             raise NotFoundException(f"Sample file with ID '{sample_file_id}' not found")
 
         # Step 2: Update properties
-        for key, value in sample_file_update_data.dict(exclude_unset=True).items():
+        for key, value in sample_file_update_data.model_dump(
+            exclude_unset=True
+        ).items():
             setattr(sample_file, key, value)
 
         # Step 3: Commit changes
@@ -378,8 +380,8 @@ async def get_sample_file_peaks(
                 f"No peak areas found in sample file '{filename}', file may not have been processed"
             )
         peak_areas = get_peaks(sample_file_data, "area").sum(dim="time")
-        response_data["mz"] = list(peak_areas.mz.values.astype(float))
-        response_data["area"] = list(peak_areas.values.astype(float))
+        response_data["mz"] = peak_areas.mz.values.tolist()
+        response_data["area"] = peak_areas.values.tolist()
 
     if heights:
         if "peak_heights" not in sample_file_data:
@@ -389,8 +391,8 @@ async def get_sample_file_peaks(
         peak_heights = get_peaks(sample_file_data, "height").sum(dim="time")
         # If 'mz' was not populated from areas, populate it from heights
         if "mz" not in response_data:
-            response_data["mz"] = list(peak_heights.mz.values.astype(float))
-        response_data["height"] = list(peak_heights.values.astype(float))
+            response_data["mz"] = peak_heights.mz.values.tolist()
+        response_data["height"] = peak_heights.values.tolist()
 
     # Step 5: Format the response for the case where no peaks were detected
     if not response_data["mz"]:
@@ -471,7 +473,7 @@ async def compute_all_sample_file_peaks(
         threshold = 0.9
 
     # Step 4: Detect peaks.
-    sample_file, all_peak_mzs = await detect_peaks(
+    sample_file, list_of_peaks = await detect_peaks(
         filename,
         instrument_functions,
         threshold,
@@ -480,10 +482,9 @@ async def compute_all_sample_file_peaks(
         return_peak_mzs=True,
         instrument_type=instrument_type,
     )
-    list_of_peaks = all_peak_mzs.astype(np.float32)
 
     # Return completion message and peak details.
-    message = f"Detected {len(list_of_peaks)} peaks for file '{filename}'"
+    message = f"Detected {list_of_peaks.size} peaks for file '{filename}'"
     runtime.logger.info(message)
 
     await sio.emit("peak_reload", room=sample_file_id, namespace="/")
@@ -560,8 +561,8 @@ async def get_sample_file_peak_timeseries(
         "results": len(peak_timeseries.time.values),
         "data": {
             "mz": peak_mz_data,
-            "height": list(peak_timeseries.values.astype(float)),
-            "time": list(peak_timeseries.time.values.astype(float)),
+            "height": peak_timeseries.values.tolist(),
+            "time": peak_timeseries.time.values.tolist(),
         },
     }
 
@@ -585,11 +586,10 @@ async def get_sample_file_spectrum(
     The function performs the following steps:
     1. Fetch the sample file from the database.
     2. Determines whether to load the full 'sum_signal' dataset or a specific time range from the 'signal' dataset based on provided time range parameters (t_min and t_max).
-    3. If a time range is specified, finds the closest matching time coordinates in the dataset and slices the dataset to this time range.
-    4. Sums the data over the time dimension to obtain the spectrum.
-    5. If an m/z range is specified, slices the spectrum to this m/z range.
-    6. Extracts m/z values and their corresponding intensities from the spectrum.
-    7. Returns the spectrum data and the total number of m/z values.
+    3. Sums the data over the time dimension to obtain the spectrum.
+    4. If an m/z range is specified, slices the spectrum to this m/z range.
+    5. Extracts m/z values and their corresponding intensities from the spectrum.
+    6. Returns the spectrum data and the total number of m/z values.
 
     :param sample_file_id: Unique identifier for the sample file from which to retrieve the spectrum.
     :type sample_file_id: str
@@ -616,44 +616,25 @@ async def get_sample_file_spectrum(
     runtime.logger.info(f"Loading file: {filename}")
     time_data_points = None
 
-    # Step 3: If a time range is specified, finds the closest matching time coordinates in the dataset and slices the dataset to this time range.
-    if t_min is not None and t_max is not None:
-        # Load the 'signal' data for specific time range
-        sample_file = load_file(filename, vars=["signal"])
+    # Step 3: Sum over the time dimension
+    spectrum = sum_signal_for_time_range(filename, t_min, t_max)
 
-        # Find the closest time points in the data to the provided time range
-        closest_t_min = sample_file.time.sel(time=t_min, method="nearest").item()
-        closest_t_max = sample_file.time.sel(time=t_max, method="nearest").item()
-
-        # Slice the dataset for the time range
-        sample_file_slice = sample_file.sel(time=slice(closest_t_min, closest_t_max))
-
-        # Check the number of data points in the time coordinate
-        time_data_points = sample_file_slice.sizes["time"]
-
-        # Step 4: Sum over the time dimension
-        spectrum = sample_file_slice.sum(dim="time")["signal"]
-    else:
-        # Load the 'sum_signal' for the entire time range
-        sample_file = load_file(filename, vars=["sum_signal"])
-        spectrum = sample_file["sum_signal"]
-
-    # Step 5: Apply m/z range if provided
+    # Step 4: Apply m/z range if provided
     if mz_min is not None and mz_max is not None:
         spectrum = spectrum.sel(mz=slice(mz_min, mz_max))
 
     # Compute the final, sliced spectrum results
     spectrum = spectrum.compute()
 
-    # Step 6: Extract m/z values and intensities
+    # Step 5: Extract m/z values and intensities
     mz_values = spectrum.mz.values.tolist()
     intensity_values = spectrum.values.tolist()
 
+    # Step 6: Return the total count, optional spectrum count, and data
     message = f"Retrieved spectrum data with {len(mz_values)} m/z points from sample file '{filename}'."
     if time_data_points is not None:
         message += f" Time range specified with {time_data_points} data points."
 
-    # Step 7: Return the total count, optional spectrum count, and data
     return {
         "message": message,
         "results": len(mz_values),

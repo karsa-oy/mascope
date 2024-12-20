@@ -43,7 +43,7 @@ Finally, you may place a folder named `tofdaq` in the project root, to have the 
 
 The Mascope runtime includes setup scripts and a comprehensive `mascope` command line tool. This section explains how to setup this environment.
 
-Our setup scripts will install low-level prerequisites (_Python 3.12_, _Node 22_, _Pipx_ and _Poetry_), package dependencies (via `poetry` and `npm`), the `mascope` cli.
+Our setup scripts will install low-level prerequisites (_Python 3.12_, _Node 22_, _Pipx_, _Poetry_ and _.NET Runtime_), package dependencies (via `poetry` and `npm`), the `mascope` cli.
 
 ### Windows setup
 

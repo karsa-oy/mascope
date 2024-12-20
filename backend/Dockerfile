@@ -51,6 +51,12 @@ RUN gpg --homedir /tmp \
 RUN echo "deb [signed-by=/usr/share/keyrings/mono-official-archive-keyring.gpg] https://download.mono-project.com/repo/ubuntu stable-focal main" | tee /etc/apt/sources.list.d/mono-official-stable.list
 RUN apt update
 RUN apt install -y mono-devel
+# dotnet runtime
+RUN wget https://packages.microsoft.com/config/debian/12/packages-microsoft-prod.deb -O packages-microsoft-prod.deb
+RUN dpkg -i packages-microsoft-prod.deb
+RUN rm packages-microsoft-prod.deb
+RUN apt update
+RUN apt install -y dotnet-runtime-9.0
 
 WORKDIR /app
 

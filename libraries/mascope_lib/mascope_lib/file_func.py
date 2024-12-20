@@ -1,16 +1,29 @@
 import fnmatch
 import json
 import os
+import sys
 from ctypes import ArgumentError
 from datetime import datetime, timezone
 from shutil import rmtree
-
+from typing import Optional
 import dask.array as da
 import numpy as np
 import xarray
 import zarr
+from pythonnet import load
+
+load("coreclr")
+import clr
+import mascope_hardware
+
+sys.path.append(os.path.join(mascope_hardware.__path__[0], "./orbitrap/lib/dlls"))
+
+clr.AddReference("ThermoFisher.CommonCore.RawFileReader")
+clr.AddReference("ThermoFisher.CommonCore.Data")
 
 from mascope_lib.runtime import lib_runtime
+from mascope_hardware.orbitrap import thermo
+
 
 from .structs import ExtendableDataArray
 from .util import parse_path_from_item_filename
@@ -191,13 +204,25 @@ class zarr_sdk:
 
     @staticmethod
     def write_sum_signal_dataset(item):
-        filename_base = item.props["filename"]
-        filename_sum_signal = filename_to_zarr_path(filename_base, "sum_signal")
-        # Interpolate missing values in mz dimension using linear method.
-        signal = item.signal.interpolate_na(dim="mz", method="linear")
-        # Data points may not be interpolated if previous value is nan
-        # Fill the remaining nan values with zeros and get sum signal
-        sum_signal = signal.fillna(0).sum(dim="time").compute()
+        base_filename = item.props["filename"]
+        filename_sum_signal = filename_to_zarr_path(base_filename, "sum_signal")
+        sample_type = get_sample_file_type(base_filename)
+
+        match sample_type:
+            case "tof_zarr" | "orbi_zarr":
+                # Interpolate missing values in mz dimension using linear method.
+                signal = item.signal.interpolate_na(dim="mz", method="linear")
+                # Data points may not be interpolated if previous value is nan
+                # Fill the remaining nan values with zeros and get sum signal
+                sum_signal = signal.fillna(0).sum(dim="time").compute()
+            case "orbi_raw":
+                base_path = get_filestore_path()
+                sample_path = parse_path_from_item_filename(base_filename, base_path)
+                datafile_path = os.path.join(sample_path, "data.raw")
+                sum_signal = thermo.compute_sum_signal_in_time_range(datafile_path)
+            case "tof_h5":
+                raise NotImplementedError
+
         sum_signal_array = ExtendableDataArray(
             path=filename_sum_signal, array_module=np
         )
@@ -245,8 +270,8 @@ def get_sum_signal(
         sample_file = load_file(filename, vars=["sum_signal"])
         sum_signal = sample_file.sum_signal
     except AttributeError:
-        # Load file data from a given filename and extract the signal data.
-        sample_file_data = load_file(filename, vars=["signal"])
+        # Load file data from a given filename.
+        sample_file_data = load_file(filename, vars=[])
         # Write missing sum spectrum to file
         zarr_sdk.write_sum_signal_dataset(sample_file_data)
         sample_file = load_file(filename, vars=["sum_signal"])
@@ -255,6 +280,80 @@ def get_sum_signal(
         return sum_signal / sample_file.props["length"]
     else:
         return sum_signal
+
+
+def sum_signal_for_time_range(
+    base_filename: str, t_min: float = None, t_max: float = None, average: bool = False
+) -> xarray.core.dataarray.DataArray:
+    """Calculates the sum spectrum of a given filename in given time range [t_min, t_max]
+
+    :param base_filename: Name of the target file
+    :type base_filename: str
+    :param t_min: Min time value [s], defaults to None (takes the first time coord available)
+    :type t_min: float, optional
+    :param t_max: Max time value [s], defaults to None (takes the last time coord available)
+    :type t_max: float, optional
+    :param average: Return avereage spectrum instead of sum. By default false (return sum).
+    :type average: bool, optional
+    :raises NotImplementedError: The case for h5 TOF files is not implemented
+    :return: Sum/average spectrum in a time range
+    :rtype: xarray.core.dataarray.DataArray
+    """
+    sample_type = get_sample_file_type(base_filename)
+
+    match sample_type:
+        case "tof_zarr" | "orbi_zarr":
+            # Load the 'signal' data for specific time range
+            signal = load_signal(base_filename)
+
+            # Find the closest time points in the data to the provided time range
+            closest_t_min = (
+                signal.time.sel(time=t_min, method="nearest").item()
+                if t_min is not None
+                else signal.time.min()
+            )
+            closest_t_max = (
+                signal.time.sel(time=t_max, method="nearest").item()
+                if t_max is not None
+                else signal.time.max()
+            )
+
+            # Slice the dataset for the time range
+            signal_slice = signal.sel(time=slice(closest_t_min, closest_t_max))
+
+            # Get the number of data points in the time coordinate
+            time_data_points = signal_slice.sizes["time"]
+
+            # Interpolate missing values
+            signal_slice = signal_slice.interpolate_na(dim="mz", method="linear")
+            # Fill the remaining nan values with zeros if any
+            signal_slice = signal_slice.fillna(0)
+
+            # Convert sum signal to dask array
+            sum_signal_dask = da.from_array(
+                signal_slice.sum(dim="time").signal.values, chunks="auto"
+            )
+
+            # Convert to xarray.DataArray
+            sum_signal = xarray.DataArray(
+                data=sum_signal_dask,
+                dims=["mz"],
+                coords={"mz": signal_slice.mz},
+                name="sum_signal",
+            )
+            if average:
+                sum_signal /= time_data_points
+        case "orbi_raw":
+            base_path = get_filestore_path()
+            sample_path = parse_path_from_item_filename(base_filename, base_path)
+            datafile_path = os.path.join(sample_path, "data.raw")
+            sum_signal = thermo.compute_sum_signal_in_time_range(
+                datafile_path, t_min, t_max, average
+            )
+        case "tof_h5":
+            raise NotImplementedError
+
+    return sum_signal
 
 
 def remove_duplicate_mz_values(mz):
@@ -331,6 +430,32 @@ def get_instrument_type(filename: str) -> str:
     return resolve_instrument_type(instrument_name)
 
 
+def get_sample_file_type(filename: str) -> Optional[str]:
+    """Get sample file type based on the presence of a datafile
+    in sample_data_path.
+        *_h5 - h5 file is available
+        *_raw - raw file is available
+        *_zarr - no source data file.
+
+    :param filename: Sample file name
+    :type filename: str
+    :return: Sample file type, one of [tof_h5, tof_zarr, orbi_raw, orbi_zarr]
+    :rtype: str
+    """
+    base_path = get_filestore_path()
+    sample_data_path = parse_path_from_item_filename(filename, base_path)
+    instrument_type = get_instrument_type(filename)
+
+    is_raw = os.path.isfile(os.path.join(sample_data_path, "data.raw"))
+    is_h5 = os.path.isfile(os.path.join(sample_data_path, "data.h5"))
+
+    match instrument_type:
+        case "tof":
+            return "tof_h5" if is_h5 else "tof_zarr"
+        case "orbi":
+            return "orbi_raw" if is_raw else "orbi_zarr"
+
+
 def get_zarr_var_shape(base_filename, var, concat_dim=1):
     """Get the shape of a sample file variable
 
@@ -381,10 +506,12 @@ def load_array(base_filename, var, prev_array=None):
     :return: Loaded sample file object
     :rtype: xarray.Dataset
     """
-
     lib_runtime.logger.debug(f"Loading array {base_filename} : {var}")
     var_path = filename_to_zarr_path(base_filename, var)
+
     if not os.path.exists(var_path):
+        if var == "signal":
+            lib_runtime.logger.error("Use load_signal to access signal array")
         raise FileNotFoundError(var_path)
 
     # Load data from file
@@ -416,11 +543,47 @@ def load_coord(base_filename, var, coord_name):
     :return: Requested coordinate array
     :rtype: np.array
     """
-    path = filename_to_zarr_path(base_filename, var)
-    sync = ExtendableDataArray.get_zarr_synchronizer(path)
-    z = zarr.open(path, mode="r", synchronizer=sync)
+    var_path = filename_to_zarr_path(base_filename, var)
+
+    if not os.path.exists(var_path):
+        if var == "signal":
+            lib_runtime.logger.error("Use load_signal to access signal array")
+        raise FileNotFoundError(var_path)
+
+    sync = ExtendableDataArray.get_zarr_synchronizer(var_path)
+    z = zarr.open(var_path, mode="r", synchronizer=sync)
     coord = z[coord_name]
     return coord[:]
+
+
+def load_signal(base_filename: str) -> xarray.Dataset:
+    """Load signal from the sample file
+
+    :param base_filename: Sample file filename
+    :type base_filename: str
+    :raises NotImplementedError: tof h5 files can not be read directly yet
+    :return: The signal with m/z and time coordinates
+    :rtype: xarray.Dataset
+    """
+    lib_runtime.logger.debug(f"Loading signal from {base_filename}")
+
+    sample_type = get_sample_file_type(base_filename)
+    base_path = get_filestore_path()
+    sample_path = parse_path_from_item_filename(base_filename, base_path)
+
+    if not os.path.exists(sample_path):
+        raise FileNotFoundError(sample_path)
+
+    match sample_type:
+        case "tof_zarr" | "orbi_zarr":
+            return load_array(base_filename, "signal")
+        case "orbi_raw":
+            datafile_path = os.path.join(sample_path, "data.raw")
+            return thermo.get_signal(datafile_path)
+        case "tof_h5":
+            # TODO
+            datafile_path = os.path.join(sample_path, "data.h5")
+            raise NotImplementedError
 
 
 def load_file(base_filename, vars=None, prev_dataset=None):
@@ -449,8 +612,13 @@ def load_file(base_filename, vars=None, prev_dataset=None):
         # Get all saved variable names
         zarrs = get_file_data_vars(filepath)
         vars = [zarr.strip(".zarr") for zarr in zarrs]
+    if "signal" in vars:
+        lib_runtime.logger.error(
+            "Loading signal with load_file is depricated. Use load_signal instead."
+        )
+        vars.pop(vars.index("signal"))
     # Load arrays from mfzarrs
-    lib_runtime.logger.info(f"Loading {vars} from {base_filename}")
+    lib_runtime.logger.info(f"Loading {', '.join(vars)} from {base_filename}")
     datasets = []
     zarr_groups = {}
     # Load requested data arrays

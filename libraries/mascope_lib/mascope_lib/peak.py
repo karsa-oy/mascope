@@ -15,10 +15,14 @@ from scipy.signal._peak_finding_utils import _select_by_peak_distance
 from scipy.stats import norm
 from scipy.integrate import simpson
 import xarray
-
 from mascope_lib.runtime import lib_runtime
-
-from .file_func import load_file, zarr_sdk, get_instrument_type, get_sum_signal
+from .file_func import (
+    load_file,
+    load_signal,
+    zarr_sdk,
+    get_instrument_type,
+    get_sum_signal,
+)
 
 
 # Precompute sigma multiplier for peak generation
@@ -51,7 +55,11 @@ def calculate_peak_area(
 
 
 def calculate_signal_area(
-    filename: str, mz_min: float, mz_max: float, sum_spectrum: xarray.DataArray = None
+    filename: str,
+    mz_min: float,
+    mz_max: float,
+    sum_spectrum: xarray.DataArray = None,
+    sample_interval: float = None,
 ) -> float:
     """Calculate signal area in an mz range
 
@@ -65,6 +73,8 @@ def calculate_signal_area(
     :type mz_max: float
     :param sum_spectrum: Sum spectrum array, defaults to None. If None, load from file.
     :type sum_spectrum: xarray.DataArray
+    :param sample_interval: TOF sampling interval, optional, defaults to None
+    :type sample_interval: float
     :return: Return signal area
     :rtype: float
     """
@@ -76,11 +86,10 @@ def calculate_signal_area(
         # No signal in the specified mz range
         return 0
     if instrument_type == "tof":
-        # default 0.25 for backwards compatibility
-        sample_interval = (
-            load_file(filename, vars=[]).attrs["props"].get("sample_interval", 0.25)
-        )
-        # return sum signal full integral in tof space
+        if sample_interval is None:
+            raise ValueError(
+                "Input argument 'sample_interval' must not be None when calculating signal area for TOF data"
+            )
         return sum_spectrum_slice.sum(dim="mz").compute().item() * sample_interval
     else:
         # return sum signal full integral in mz space
@@ -165,7 +174,7 @@ async def detect_peaks(
     old_peak_areas = []
     old_peak_heights = []
     sample_file_data = load_file(
-        filename, vars=["signal", "peak_areas", "peak_heights"]
+        filename, vars=["peak_areas", "peak_heights", "sum_signal"]
     )
     mz_top = sample_file_data.props["range"][1]
 
@@ -199,13 +208,12 @@ async def detect_peaks(
 
     lib_runtime.logger.info(f"Fitting unit masses: {u_list}")
 
-    sum_spec = get_sum_signal(filename)
-    mz = sum_spec.mz
+    sum_signal = get_sum_signal(filename)
     # Sample interval for peak area calculation in counts vs TOF
     if instrument_type == "tof":
         # default 0.25 for backwards compatibility
         sample_interval = (
-            load_file(filename).attrs["props"].get("sample_interval", 0.25)
+            load_file(filename, vars=[]).attrs["props"].get("sample_interval", 0.25)
         )
     else:
         sample_interval = None
@@ -221,11 +229,13 @@ async def detect_peaks(
         # Broadcast the u_range array to have the same shape as mz
         u_range = u_range[:, :, np.newaxis]
         # Create boolean masks indicating which elements of spec fall within each range
-        mask_u_list = (mz.values >= u_range[0]) & (mz.values <= u_range[1])
+        mask_u_list = (sum_signal.mz.values >= u_range[0]) & (
+            sum_signal.mz.values <= u_range[1]
+        )
         mask_u_list = mask_u_list.any(axis=0)
         # Update mz and spec
-        mz = mz.values[mask_u_list]
-        sum_spec = sum_spec.values[mask_u_list]
+        mz = sum_signal.mz.values[mask_u_list]
+        sum_spec = sum_signal.values[mask_u_list]
 
         if sum_spec.size == 0:
             # Nothing to fit
@@ -237,8 +247,8 @@ async def detect_peaks(
     if instrument_type == "tof":
         specs_to_fit = [
             (
-                mz.sel(mz=slice(u - dmz, u + dmz)).compute().values,
-                sum_spec.sel(mz=slice(u - dmz, u + dmz)).compute().values,
+                sum_signal.mz.sel(mz=slice(u - dmz, u + dmz)).compute().values,
+                sum_signal.sel(mz=slice(u - dmz, u + dmz)).compute().values,
             )
             for u in u_list
         ]
@@ -266,9 +276,7 @@ async def detect_peaks(
             new_peaks.extend(peaks)
         lib_runtime.logger.info(f"Peak detection progress: {(i+1)/len(futures):.2f}")
     executor.shutdown()
-    sample_file_data = sample_file_data.assign_coords(
-        tof=("mz", np.arange(len(sample_file_data.mz)).astype(np.float32))
-    )
+
     if len(new_peaks) > 0:
         new_peak_mzs = list(zip(*new_peaks))[0]
         new_peak_heights = list(zip(*new_peaks))[1]
@@ -312,9 +320,15 @@ async def detect_peaks(
 
     peak_areas = all_peak_areas[unique_peak_index]
     peak_heights = all_peak_heights[unique_peak_index]
-    peak_profiles = sample_file_data.signal.interpolate_na(
+
+    sample_file_signal = load_signal(filename)
+    sample_file_signal = sample_file_signal.assign_coords(
+        tof=("mz", np.arange(len(sample_file_signal.mz)).astype(np.float32))
+    )
+    peak_profiles = sample_file_signal.signal.interpolate_na(
         dim="mz", method="linear"
     ).sel(mz=peak_mzs, method="nearest")
+
     peak_profiles["mz"] = peak_mzs
     peak_profiles_norm = peak_profiles / peak_profiles.sum(dim="time")
     peak_profiles_area = peak_profiles_norm * peak_areas.reshape(-1, 1)
@@ -329,7 +343,9 @@ async def detect_peaks(
     )
     lib_runtime.logger.info("Complete")
     sample_file_data = load_file(
-        filename, vars=["peak_areas", "peak_heights"], prev_dataset=sample_file_data
+        filename,
+        vars=["peak_areas", "peak_heights", "sum_signal"],
+        prev_dataset=sample_file_data,
     )
     if return_peak_mzs:
         return (sample_file_data, all_peak_mzs)

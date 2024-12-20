@@ -15,9 +15,10 @@ from threading import Thread
 from time import sleep
 from datetime import datetime
 from numba import jit
-
 import numpy as np
-from ThermoFisher.CommonCore.Data import Business as ThermoBusiness
+
+from ThermoFisher.CommonCore.RawFileReader import RawFileReaderAdapter
+from ThermoFisher.CommonCore.Data.Business import Device
 
 from mascope_hardware.runtime import hardware_runtime
 from .util import net2np_array
@@ -389,11 +390,8 @@ class RawStreamer(Thread):
                 # Initialize Raw file reader
                 try:
                     with self.lock:
-                        self.raw = ThermoBusiness.RawFileReaderFactory.ReadFile(
-                            file_to_stream
-                        )
-                        i_type = self.raw.GetInstrumentType(0)
-                        self.raw.SelectInstrument(i_type, 1)
+                        self.raw = RawFileReaderAdapter.FileFactory(file_to_stream)
+                        self.raw.SelectInstrument(Device.MS, 1)
                         self.raw.IncludeReferenceAndExceptionData = True
                 except Exception as e:
                     self.log.error(

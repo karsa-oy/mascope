@@ -123,10 +123,11 @@ function install_tooling() {
 "
         # apt repos and update
         sudo add-apt-repository ppa:deadsnakes/ppa -y
+        sudo add-apt-repository ppa:dotnet/backports -y
         sudo apt update
 
-        # install python
-        sudo apt install -y python3.12 python3.12-venv
+        # install python and dotnet runtime (for /libraries/mascope_hardware/orbitrap)
+        sudo apt install -y python3.12 python3.12-venv dotnet-runtime-9.0
     else
         echo "
 

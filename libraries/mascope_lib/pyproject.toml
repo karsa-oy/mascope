@@ -11,6 +11,7 @@ build-backend = "poetry.core.masonry.api"
 [tool.poetry.dependencies]
 python = "~3.12"
 mascope_runtime = { path = '../../runtime/lib/', develop = true }
+mascope_hardware = { path = '../mascope_hardware/', develop = true }
 
 colorcet = "^3.1"
 dask = "==2024.7.0"

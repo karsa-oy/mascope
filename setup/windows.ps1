@@ -176,7 +176,7 @@ function Install-Tooling {
     | 🐍 INSTALLING PYTHON 🐍 |
     +-------------------------+
 
-    Installing Python 3.12, Pipx & Poetry
+    Installing Python 3.12, Pipx, Poetry and .NET Runtime
 
 "@
     # install python 3.12
@@ -193,6 +193,8 @@ function Install-Tooling {
     }
     # install poetry with pipx
     pipx install poetry
+    # install dotnet runtime (for /libraries/mascope_hardware/orbitrap)
+    winget install --silent Microsoft.DotNet.Runtime.9
 
     Write-Output @"
 
