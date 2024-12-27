@@ -289,14 +289,17 @@ class RawProcessor(Thread):
         :param raw_file_path: Path to the target raw file
         :type raw_file_path: str
         """
-        # Write properties to the sample_file
-        write_props(sample_file_props["filename"], sample_file_props)
-
-        # Copy raw file to the sample_file folder
         base_path = get_filestore_path()
         data_path = parse_path_from_item_filename(
             sample_file_props["filename"], base_path
         )
+        # Ensure the sample file directory exists
+        os.makedirs(data_path, exist_ok=True)
+
+        # Write properties to the sample_file
+        write_props(sample_file_props["filename"], sample_file_props)
+
+        # Copy raw file to the sample_file folder
         data_raw_path = os.path.join(data_path, "data.raw")
         shutil.copy(raw_file_path, data_raw_path)
 
