@@ -16,6 +16,7 @@
             python312Packages.pipx
             poetry
             nodejs_22
+            dotnetCorePackages.dotnet_9.runtime
             concurrently
             docker_27
           ];
