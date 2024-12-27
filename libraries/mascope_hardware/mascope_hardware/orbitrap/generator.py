@@ -94,7 +94,7 @@ class RawProcessor(Thread):
     """
 
     def __init__(self, file_queue=Queue(), shutdown_event=Event(), lock=Lock()):
-        super().__init__(self)
+        Thread.__init__(self)
         # Init logger
         self.log = hardware_runtime.logger.bind(key=self.name)
         self.log.info(f"Initializing raw file processor ({self.name})")
