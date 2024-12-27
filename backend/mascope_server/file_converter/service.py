@@ -1,22 +1,18 @@
 import os
 
-from datetime import timedelta, datetime
 from multiprocessing import Event, Lock, Queue
 from queue import Empty
 from threading import Thread
 from time import sleep
-
-import requests
 import socketio
 
 import mascope_lib.runtime as lib_runtime
 
 lib_runtime.init()
 
-from mascope_lib.file_func import zarr_sdk, get_instrument_type
+from mascope_lib.file_func import zarr_sdk
 
 from mascope_lib.structs import AttrDict
-from mascope_lib.util import timestamp_from_filename
 
 import mascope_hardware.runtime as hardware_runtime
 
@@ -27,6 +23,7 @@ hardware_runtime.init()
 #        ValueError: Index 'mz' must be monotonically increasing
 from mascope_hardware.tofwerk.h5_streamer import H5Streamer  # this comes first
 from mascope_hardware.orbitrap.generator import RawStreamer  # and this comes second
+from mascope_hardware.util import create_sample_file_db_record
 
 
 from mascope_runtime import MascopeRuntimeModule
@@ -39,56 +36,6 @@ runtime = MascopeRuntimeModule("file-converter")
 
 host = runtime.config.server if runtime.mode == "prod" else "localhost"
 url = f"http://{host}:{runtime.meta.api_port}"
-
-
-def create_sample_file_db_record(data):
-    """Create a sample file database record by a HTTP request
-
-    :param data: Sample file object to create
-    :type data: dict
-    :raises Exception: HTTP request failed
-    """
-    filename = data["filename"]
-    instrument_type = get_instrument_type(filename)
-    runtime.logger.info(f"Creating sample file record for file: {filename}")
-    instrument_name = filename.split("_")[0]
-    committed_length = data["committed_length"]
-    utc_offset = timedelta(seconds=int(data["utc_offset"]))
-    mz_calibration = data.get("mz_calibration")
-    polarity = data.get("polarity")
-    method_file = data.get("method_file")
-    tic = data.get("tic")
-
-    if instrument_type == "tof":
-        date = timestamp_from_filename(filename).isoformat()
-    else:
-        date = data.get("timestamp")
-
-    date_utc = (datetime.fromisoformat(date) - utc_offset).isoformat()
-
-    sample_file_db_record = {
-        "filename": filename,
-        "instrument": instrument_name,
-        "datetime": date,
-        "datetime_utc": date_utc,
-        "length": committed_length,
-        "range": data["range"],
-        "mz_calibration": mz_calibration,
-        "tic": tic,
-        "polarity": polarity,
-    }
-    if method_file:
-        sample_file_db_record["method_file"] = method_file
-
-    headers = {"Content-Type": "application/json"}
-
-    response = requests.post(
-        f"{url}/api/sample/files", headers=headers, json=sample_file_db_record
-    )
-    if response.status_code != 201:
-        raise Exception(
-            f"Failed to create database record! Status code: {response.status_code}"
-        )
 
 
 def process_stream(streamer):
