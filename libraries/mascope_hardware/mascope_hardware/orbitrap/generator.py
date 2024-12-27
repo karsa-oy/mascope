@@ -13,7 +13,7 @@ from multiprocessing import Event, Lock, Queue
 from queue import Empty
 from threading import Thread
 from time import sleep
-from datetime import datetime
+from datetime import datetime, timezone
 from numba import jit
 import numpy as np
 
@@ -206,6 +206,17 @@ class RawProcessor(Thread):
         """
         return self.raw.RunHeaderEx.EndTime * 60.0 if self.raw else None  # [s]
 
+    @property
+    def mz_range(self) -> list | None:
+        """M/z range of the sample file
+
+        :return: M/z range
+        :rtype: list | None
+        """
+        if self.raw:
+            return [self.raw.RunHeaderEx.LowMass, self.raw.RunHeaderEx.HighMass]
+        return None
+
     def _finalize(self):
         """Finalize acquisition"""
         # Reset self
@@ -258,37 +269,6 @@ class RawProcessor(Thread):
         # Shutdown or cancel
         return False
 
-    def _get_and_feed_data(self, scan_no: int):
-        """Read data from the RAW file and put to queues"""
-        # == Get and feed mass spectrum data ==
-        # Get the scan statistics from the RAW file for this scan number
-        with self.lock:
-            scan_stats = self.raw.GetScanStatsForScanNumber(scan_no)
-        # Get timestamp from scan stats
-        ti = scan_stats.StartTime * 60.0  # [s]
-        # Get polarity from scan stats
-        polarity = scan_stats.ScanType.split(" ")[1]
-        with self.lock:
-            scan = self.raw.GetSegmentedScanFromScanNumber(scan_no, scan_stats)
-        # Map .NET arrays into numpy arrays
-        mz = net2np_array(scan.Positions).astype(np.float32)
-        spec = net2np_array(scan.Intensities).astype(np.float32)
-
-        # Round mz values based on the mz precision
-        mz, spec = self._set_mz_precision(mz, spec)
-        # Combine data for output
-        spec_data = {
-            "filename": self.filename,  # Current file basename
-            "i": self.speci,  # Current spectrum integer index
-            "t": float(ti),  # Timestamp [s]
-            "period": self.interval,  # Collection period [s]
-            "mz": mz.tobytes(),  # Serialized mass axis [float32]
-            "spec": spec.tobytes(),  # Serialized spectrum [float32]
-            "polarity": polarity,  # Polarity, '-' or '+'
-        }
-        # Feed
-        self.spec_queue.put(spec_data)
-
     def run(self):
         self.log.info(f"Running raw processor ({self.name})")
         # Main loop
@@ -315,48 +295,43 @@ class RawProcessor(Thread):
             # Set active flag
             self.active.set()
 
-            # TODO import zarr_sdk?
-            # TODO create spec_data dict
-            spec_data = {
-                "filename": self.filename,  # Current file basename
-                "i": self.speci,  # Current spectrum integer index
-                "t": float(ti),  # Timestamp [s]
-                "period": self.interval,  # Collection period [s]
-                "mz": mz.tobytes(),  # Serialized mass axis [float32]
-                "spec": spec.tobytes(),  # Serialized spectrum [float32]
-                "polarity": polarity,  # Polarity, '-' or '+'
+            # Get UTC offset
+            now = datetime.now()
+            utc_offset = (
+                now - now.astimezone(timezone.utc).replace(tzinfo=None)
+            ).seconds
+
+            # Gather sample file data
+            sample_file_props = {
+                "filename": self.filename,
+                "length": self.length,
+                "range": self.mz_range,
+                "utc_offset": utc_offset,
+                "method_file": self.method_file,
+                "timestamp": self.timestamp,  # for DB record
+                # streaming leftovers:
+                "commited_length": self.length,
+                # non-applicable for Orbi:
+                "single_ion_signal": None,
+                "sample_interval": None,
+                "mz_calibration": None,
             }
+            # TODO handle and add polarity in sample_file_props
+            # TODO handle and add tic in sample_file_props (depends on polarity)
+
+            # ? TODO import zarr_sdk
 
             # TODO figure out where to put spec_data.update({"filename": format_filename(spec_data)})
 
             # TODO create an empty sample_file with props, something like this, check artificial dataset notebook for options
             sample_file = zarr_sdk.init_signal_dataset(spec_data)
 
-            # TODO props must contain
-            # {
-            #     "filename": "KORBI2_2024.06.26-16h56m30s_load_file_tests_-",
-            #     "length": 63.98231801795958,
-            #     "single_ion_signal": null,
-            #     "sample_interval": null,
-
-            #     "committed_length": 63.98231801795958,
-            #     "range": [
-            #         40.0,
-            #         610.0001220703125
-            #     ],
-            #     "mz_calibration": null,
-            #     "utc_offset": 7200,
-            #     "polarity": "-",
-            #     "method_file": "",
-            #     "tic": 18374368.25
-            # }
-
             # TODO copy raw file to sample_file folder
 
             # TODO Write sum_signal?
 
             # TODO create DB record, import create_sample_file_db_record from service.py
-            create_sample_file_db_record(data)
+            # create_sample_file_db_record(data)
 
             # TODO need to keep spec_queue empty to process everything within RawProcessor
 
