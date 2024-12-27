@@ -9,6 +9,7 @@ Created on Tue Apr 09 13:08:29 2019
 
 import os
 from pathlib import Path
+import shutil
 from multiprocessing import Event, Lock, Queue
 from queue import Empty
 from threading import Thread
@@ -21,6 +22,13 @@ from ThermoFisher.CommonCore.RawFileReader import RawFileReaderAdapter
 from ThermoFisher.CommonCore.Data.Business import Device
 
 from mascope_hardware.runtime import hardware_runtime
+from mascope_hardware.util import create_sample_file_db_record
+from mascope_lib.file_func import (
+    write_props,
+    get_sum_signal,
+    get_filestore_path,
+    parse_path_from_item_filename,
+)
 from .util import net2np_array
 
 
@@ -230,7 +238,7 @@ class RawProcessor(Thread):
     def _has_negative_scans(self) -> bool:
         """Does the current raw file contain scans in negative polarity
 
-        :return: Has negative sans
+        :return: Has negative scans
         :rtype: bool
         """
         polarity_filter = self.raw.GetFilterFromString("-")
@@ -242,7 +250,7 @@ class RawProcessor(Thread):
     def _has_positive_scans(self) -> bool:
         """Does the current raw file contain scans in negative polarity
 
-        :return: Has positive sans
+        :return: Has positive scans
         :rtype: bool
         """
         polarity_filter = self.raw.GetFilterFromString("+")
@@ -269,21 +277,51 @@ class RawProcessor(Thread):
         # Shutdown or cancel
         return False
 
+    def _process_raw_file(self, sample_file_props: dict, raw_file_path: str):
+        """Main function processing the raw files:
+        1. Writes properties into the sample file
+        2. Copies raw file into the sample file folder
+        3. Creates sum_signal.zarr
+        4. Creates a record in the database
+
+        :param sample_file_props: Sample file properties
+        :type sample_file_props: dict
+        :param raw_file_path: Path to the target raw file
+        :type raw_file_path: str
+        """
+        # Write properties to the sample_file
+        write_props(sample_file_props["filename"], sample_file_props)
+
+        # Copy raw file to the sample_file folder
+        base_path = get_filestore_path()
+        data_path = parse_path_from_item_filename(
+            sample_file_props["filename"], base_path
+        )
+        data_raw_path = os.path.join(data_path, "data.raw")
+        shutil.copy(raw_file_path, data_raw_path)
+
+        # Write sum_signal to the sample_file
+        get_sum_signal(sample_file_props["filename"])
+
+        create_sample_file_db_record(sample_file_props)
+
+        ## TODO add error handling for file processing
+
     def run(self):
         self.log.info(f"Running raw processor ({self.name})")
         # Main loop
         while not self.shutdown_event.is_set():
             try:
-                file_to_stream = self.file_queue.get(timeout=0.1)
+                file_to_process = self.file_queue.get(timeout=0.1)
                 # Initialize Raw file reader
                 try:
                     with self.lock:
-                        self.raw = RawFileReaderAdapter.FileFactory(file_to_stream)
+                        self.raw = RawFileReaderAdapter.FileFactory(file_to_process)
                         self.raw.SelectInstrument(Device.MS, 1)
                         self.raw.IncludeReferenceAndExceptionData = True
                 except Exception as e:
                     self.log.error(
-                        f"Failed to read file {Path(file_to_stream).name}: {e}"
+                        f"Failed to read file {Path(file_to_process).name}: {e}"
                     )
                     continue
             except Empty:
@@ -291,7 +329,7 @@ class RawProcessor(Thread):
                 continue
 
             # Start processing
-            self.log.info(f"Processing started: {Path(file_to_stream).name}")
+            self.log.info(f"Processing started: {Path(file_to_process).name}")
             # Set active flag
             self.active.set()
 
@@ -303,7 +341,6 @@ class RawProcessor(Thread):
 
             # Gather sample file data
             sample_file_props = {
-                "filename": self.filename,
                 "length": self.length,
                 "range": self.mz_range,
                 "utc_offset": utc_offset,
@@ -316,28 +353,26 @@ class RawProcessor(Thread):
                 "sample_interval": None,
                 "mz_calibration": None,
             }
-            # TODO handle and add polarity in sample_file_props
-            # TODO handle and add tic in sample_file_props (depends on polarity)
 
-            # ? TODO import zarr_sdk
+            # Check if raw file contains negative polarity scans
+            if self._has_negative_scans():
+                # Add missing properties, negative polarity case
+                sample_file_props["polarity"] = "-"
+                sample_file_props["tic"] = self.tic_neg
+                sample_file_props["filename"] = self.filename.replace(" ", "_") + "_-"
 
-            # TODO figure out where to put spec_data.update({"filename": format_filename(spec_data)})
+                # Create sample file with positive negative scans
+                self._process_raw_file(sample_file_props, file_to_process)
 
-            # TODO create an empty sample_file with props, something like this, check artificial dataset notebook for options
-            sample_file = zarr_sdk.init_signal_dataset(spec_data)
+            # Check if raw file contains positive polarity scans
+            if self._has_positive_scans():
+                # Add missing properties, positive polarity case
+                sample_file_props["polarity"] = "+"
+                sample_file_props["tic"] = self.tic_pos
+                sample_file_props["filename"] = self.filename.replace(" ", "_") + "_+"
 
-            # TODO copy raw file to sample_file folder
-
-            # TODO Write sum_signal?
-
-            # TODO create DB record, import create_sample_file_db_record from service.py
-            # create_sample_file_db_record(data)
-
-            # TODO need to keep spec_queue empty to process everything within RawProcessor
-
-            # TODO add info notifications
-
-            # TODO how do I handle the case with different polarities in a file?
+                # Create sample file with positive polarity scans
+                self._process_raw_file(sample_file_props, file_to_process)
 
             # Out of stream loop
             self._finalize()

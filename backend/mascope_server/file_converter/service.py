@@ -22,7 +22,7 @@ hardware_runtime.init()
 # reversed, we get a mysterious error:
 #        ValueError: Index 'mz' must be monotonically increasing
 from mascope_hardware.tofwerk.h5_streamer import H5Streamer  # this comes first
-from mascope_hardware.orbitrap.generator import RawStreamer  # and this comes second
+from mascope_hardware.orbitrap.generator import RawProcessor  # and this comes second
 from mascope_hardware.util import create_sample_file_db_record
 
 
@@ -42,7 +42,7 @@ def process_stream(streamer):
     """Process data stream from the streamer thread
 
     :param streamer: Data streamer instance
-    :type streamer: H5Streamer or RawStreamer
+    :type streamer: H5Streamer or RawProcessor
     """
     global cache
     global sio
@@ -243,9 +243,9 @@ def run():
     )
     h5_fs_watcher.start()
 
-    # orbi streamers
-    raw_streamers = [
-        RawStreamer(
+    # orbi file processors
+    raw_processors = [
+        RawProcessor(
             file_queue=raw_file_queue,
             shutdown_event=shutdown_event,
             lock=streamer_lock,
@@ -261,7 +261,7 @@ def run():
     )
     raw_fs_watcher.start()
 
-    streamers = [*raw_streamers, *h5_streamers]
+    streamers = [*raw_processors, *h5_streamers]
 
     # Start streamer thread(s)
     for streamer in streamers:
