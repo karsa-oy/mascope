@@ -6,6 +6,9 @@ Created on Tue Apr 09 13:08:29 2019
 
 @author: Oskari Kausiala
 """
+# TODO Remove processed file from filestreams
+# TODO more testing
+# TODO get_sum_signal technically gives an error alphough works as it should. Better way to create sum_signal?
 
 import os
 from pathlib import Path
@@ -348,9 +351,9 @@ class RawProcessor(Thread):
                 "range": self.mz_range,
                 "utc_offset": utc_offset,
                 "method_file": self.method_file,
-                "timestamp": self.timestamp,  # for DB record
+                "timestamp": self.timestamp.isoformat(),  # for DB record
                 # streaming leftovers:
-                "commited_length": self.length,
+                "committed_length": self.length,
                 # non-applicable for Orbi:
                 "single_ion_signal": None,
                 "sample_interval": None,
