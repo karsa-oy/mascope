@@ -8,6 +8,7 @@
     let
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
+      dotnet = pkgs.dotnetCorePackages.dotnet_9.runtime;
       fhs = pkgs.buildFHSEnv {
         name = "fhs-shell";
         targetPkgs =
@@ -16,14 +17,14 @@
             python312Packages.pipx
             poetry
             nodejs_22
-            dotnetCorePackages.dotnet_9.runtime
+            dotnet
             concurrently
             docker_27
           ];
         profile = ''
           pipx ensurepath
-          PIPX_DEFAULT_PYTHON=/usr/bin/python
-          export PIPX_DEFAULT_PYTHON
+          export PIPX_DEFAULT_PYTHON=/usr/bin/python
+          export DOTNET_BIN="${dotnet}/bin/dotnet"
         '';
       };
     in
