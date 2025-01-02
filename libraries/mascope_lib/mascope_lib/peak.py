@@ -325,9 +325,11 @@ async def detect_peaks(
     sample_file_signal = sample_file_signal.assign_coords(
         tof=("mz", np.arange(len(sample_file_signal.mz)).astype(np.float32))
     )
-    peak_profiles = sample_file_signal.signal.interpolate_na(
-        dim="mz", method="linear"
-    ).sel(mz=peak_mzs, method="nearest")
+    peak_profiles = (
+        sample_file_signal.signal.chunk(dict(mz=-1))
+        .interpolate_na(dim="mz", method="linear")
+        .sel(mz=peak_mzs, method="nearest")
+    )
 
     peak_profiles["mz"] = peak_mzs
     peak_profiles_norm = peak_profiles / peak_profiles.sum(dim="time")
