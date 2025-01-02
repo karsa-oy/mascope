@@ -62,7 +62,7 @@ function parseTimestamp(timestamp) {
 
 <template>
   <Button
-    v-tooltip="'Notifications'"
+    v-tooltip.left="'Notifications'"
     icon="pi pi-bell"
     severity="secondary"
     text

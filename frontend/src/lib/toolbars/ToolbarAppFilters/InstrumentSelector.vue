@@ -49,6 +49,15 @@ watch(
     dataKey="instrument"
     optionLabel="instrument"
     appendTo="self"
+    v-tooltip.left="'Instrument'"
+    :pt="
+      app.ui.help.bottom_end(`
+          <h1>Instrument Selector</h1>
+
+          <p>Select which instrument to use. Influences the
+          acquisitions tab.</p>
+    `)
+    "
   >
     <template #value="{ value }">
       <span v-if="value?.instrument">

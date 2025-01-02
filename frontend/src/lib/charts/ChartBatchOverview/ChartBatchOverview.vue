@@ -181,10 +181,16 @@ const anyFilters = computed(
 </script>
 
 <template>
-  <figure style="position: relative">
+  <figure>
     <div
       class="row"
-      style="justify-content: flex-start; width: 100%; position: absolute; top: 0; z-index: 100"
+      :style="`
+        justify-content: flex-start;
+        width: 100%;
+        position: fixed;
+        top: 10rem;
+        z-index: 100
+      `"
     >
       <span v-if="anyFilters" class="pi pi-filter" style="opacity: 0.5" />
       <Chip
@@ -226,8 +232,8 @@ const anyFilters = computed(
     class="row"
     :style="`
       justify-content: space-between;
-      width: calc(${app.ui.split.right}vw - 4rem);
-      position: absolute;
+      width: calc(${app.ui.split.right}vw - 6rem);
+      position: fixed;
       bottom: 35px;
       right: 2rem;
     `"

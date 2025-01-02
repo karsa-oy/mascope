@@ -1,12 +1,13 @@
 <script setup>
 import { useConfirm } from 'primevue/useconfirm'
 
-import { ref, reactive, computed, watch } from 'vue'
+import { ref, reactive, computed, watch, useTemplateRef, watchEffect } from 'vue'
 
 import Panel from 'primevue/panel'
 import Button from 'primevue/button'
 import TabMenu from 'primevue/tabmenu'
 import DataTable from 'primevue/datatable'
+import Row from 'primevue/row'
 import Column from 'primevue/column'
 import ProgressSpinner from 'primevue/progressspinner'
 import ContextMenu from 'primevue/contextmenu'
@@ -533,6 +534,18 @@ api.socket.on('sample_batch_reload', (e) => {
         }
       }
     "
+    :pt="
+      app.ui.help.right(`
+        <h1>Sample Browser</h1>
+
+        <p>Shows the samples in your workspace,
+        providing features to organize them into
+        batches.</p>
+
+        <p>Right click batches and samples to
+        perform actions.</p>
+      `)
+    "
   >
     <template #header>
       <TabMenu :model="[{ label: 'Samples', icon: 'pi pi-tags' }]" />
@@ -574,7 +587,15 @@ api.socket.on('sample_batch_reload', (e) => {
       >
         <Column header="Batch" field="sample_batch_name" sortable>
           <template #body="{ data }">
-            <div class="row" style="justify-content: flex-start">
+            <div
+              class="row"
+              style="justify-content: flex-start"
+              v-help.right="
+                `<h1>Batch</h1>
+
+                <p>A group of samples. Right click to perform actions.</p>`
+              "
+            >
               <span
                 :class="`pi pi-chevron-${data.sample_batch_id in batch.expanded ? 'down' : 'right'}`"
                 style="font-size: smaller; margin-right: 0.5rem"
@@ -603,7 +624,15 @@ api.socket.on('sample_batch_reload', (e) => {
         </Column>
         <template #expansion="{ data }">
           <!-- samples -->
-          <div v-if="!app.data.sample.loading" style="min-height: 2rem">
+          <div
+            v-if="!app.data.sample.loading"
+            style="min-height: 2rem"
+            v-help.right_start="
+              `<h1>Samples</h1>
+
+               <p>Sample items. Right click to perform actions.</p>`
+            "
+          >
             <DataTable
               v-if="data.children.length > 0 && app.data.batch.focused"
               :value="data.children"

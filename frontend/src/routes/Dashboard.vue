@@ -1,5 +1,5 @@
 <script setup>
-import { computed, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 
 import Splitter from 'primevue/splitter'
 import SplitterPanel from 'primevue/splitterpanel'
@@ -9,6 +9,7 @@ import TabList from 'primevue/tablist'
 import Tab from 'primevue/tab'
 import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
+import Button from 'primevue/button'
 
 import { ToolbarAppFilters } from '@/lib/toolbars'
 import {
@@ -19,6 +20,7 @@ import {
   PaneTabAcquisitions
 } from '@/lib/panes'
 import { ChartBatchOverview, ChartSampleSpectrum } from '@/lib/charts'
+import { HelpPopover } from '@/lib/help'
 
 import { useApp } from '@/stores'
 
@@ -27,21 +29,47 @@ const app = useApp()
 const tabs = computed(() => [
   {
     label: 'Batch',
-    icon: 'pi pi-hashtag'
+    icon: 'pi pi-hashtag',
+    help: `
+      <h1>Batch Overview Chart</h1>
+
+      <p>Visualize intensity of all samples in
+      a batch against various data points.</p>
+    `
   },
   {
     label: 'Spectrum',
     icon: 'pi pi-chart-bar',
-    disabled: !app.data.sample.focused
+    disabled: !app.data.sample.focused,
+    help: `
+      <h1>Sample Spectrum Chart</h1>
+
+      <p>Visualize the selected sample's signal
+      in detail.</p>
+    `
   },
   {
     label: 'Match',
     icon: 'pi pi-wave-pulse',
-    disabled: !app.data.match.visualized.ion
+    disabled: !app.data.match.visualized.ion,
+    help: `
+      <h1>Match Overview</h1>
+
+      <p>Visualize match isotope peaks for a
+      selected ion as well as their timeseries.
+      Adjust match parameters to fine-tune matches.</p>
+    `
   },
   {
     label: 'Acquisitions',
-    icon: 'pi pi-hourglass'
+    icon: 'pi pi-hourglass',
+    help: `
+      <h1>Acquisition Table</h1>
+
+      <p>View incoming measurements and import them
+      into batches. Import files from your computer
+      into Mascope.</p>
+    `
   }
 ])
 
@@ -106,10 +134,11 @@ watch(
           <Tabs v-model:value="app.ui.tab.active">
             <TabList>
               <Tab
-                v-for="{ icon, label, disabled } in tabs"
+                v-for="{ icon, label, disabled, help } in tabs"
                 :value="label.toLowerCase()"
                 :key="label"
                 :disabled="disabled"
+                :pt="app.ui.help.bottom(help)"
               >
                 <div class="row">
                   <span :class="icon" /><span>{{ label }}</span>
@@ -135,6 +164,7 @@ watch(
       </SplitterPanel>
     </Splitter>
     <PaneProgress />
+    <HelpPopover />
   </article>
 </template>
 
@@ -154,6 +184,7 @@ article {
   gap: 0.5rem;
   padding: 0.5rem;
 }
+
 #filters {
   grid-area: filters;
 }
