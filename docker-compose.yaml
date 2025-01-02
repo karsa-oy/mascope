@@ -37,6 +37,9 @@ services:
         - MASCOPE_RUNTIME
     environment:
       - MASCOPE_TIMEZONE
+    secrets:
+      - ssl_certificate
+      - ssl_secret_key
     tty: true
     ports:
       - 443:443
@@ -46,3 +49,7 @@ secrets:
     file: secrets/jwt_secret_key.txt
   server_owner_secret_key:
     file: secrets/server_owner_secret_key.txt
+  ssl_certificate:
+    file: secrets/mascope.app.pem
+  ssl_secret_key:
+    file: secrets/mascope.app.key
