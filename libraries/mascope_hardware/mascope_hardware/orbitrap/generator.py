@@ -6,7 +6,6 @@ Created on Tue Apr 09 13:08:29 2019
 
 @author: Oskari Kausiala
 """
-# TODO Remove processed file from filestreams
 # TODO more testing
 # TODO get_sum_signal technically gives an error alphough works as it should. Better way to create sum_signal?
 
@@ -383,6 +382,16 @@ class RawProcessor(Thread):
             # Out of stream loop
             self._finalize()
             self.log.info("Processing finished")
+
+            # Delete processed file
+            self.log.info("Deleting file from the streams folder")
+            try:
+                os.remove(file_to_process)
+            except FileNotFoundError as e:
+                self.log.error(
+                    f"Failed to delete file {file_to_process} from streams folder"
+                )
+                self.log.exception(e)
         # Out of main loop
         self.log.info(f"Exiting raw processor ({self.name})")
         self.shutdown()
