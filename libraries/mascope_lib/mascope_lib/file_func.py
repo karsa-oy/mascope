@@ -579,7 +579,8 @@ def load_signal(base_filename: str) -> xarray.Dataset:
             return load_array(base_filename, "signal")
         case "orbi_raw":
             datafile_path = os.path.join(sample_path, "data.raw")
-            return thermo.get_signal(datafile_path)
+            polarity = sample_path.split("_")[-1]
+            return thermo.get_signal(datafile_path, polarity)
         case "tof_h5":
             # TODO
             datafile_path = os.path.join(sample_path, "data.h5")

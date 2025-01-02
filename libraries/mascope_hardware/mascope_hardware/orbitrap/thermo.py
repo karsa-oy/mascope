@@ -1,7 +1,7 @@
 from pathlib import Path
+from itertools import compress
 from contextlib import contextmanager
 import numpy as np
-import pandas as pd
 import xarray as xr
 import dask.array as da
 from mascope_hardware.runtime import hardware_runtime
@@ -39,25 +39,43 @@ def open_raw_file(datafile_path: str):
         )
 
 
-def get_signal(datafile_path: str) -> xr.Dataset:
+def get_signal(datafile_path: str, polarity: str = None) -> xr.Dataset:
     """This function uses the Thermo Fisher libraries to read the raw file and extract the scan data.
     It then merges the scans to have a common m/z scale and converts the data to an xarray Dataset.
 
     :param datafile_path: Path to the Thermo Fisher raw file (.raw) containing the data.
     :type datafile_path: str
+    :param polarity: + or -, Polarity of the scans to be retrieved, optional, defaults to None (get all scans)
+    :type polarity: str
     :return: An xarray Dataset containing the signal data
     :rtype: xr.Dataset
     """
     with open_raw_file(datafile_path) as raw_file:
         num_of_scans = raw_file.RunHeaderEx.SpectraCount
+        scan_indices = list(range(num_of_scans))
+
+        # Filter by polarity
+        if polarity:
+            if polarity not in ["-", "+"]:
+                raise (
+                    ValueError(
+                        "Polarity must be passed as a string containing either '+' or '-'"
+                    )
+                )
+            polarity = "Negative" if polarity == "-" else "Positive"
+            polarity_mask = [
+                raw_file.GetFilterForScanNumber(i + 1).Polarity.ToString() == polarity
+                for i in scan_indices
+            ]
+            scan_indices = list(compress(scan_indices, polarity_mask))
 
         # Extract scan statistics and segmented scan data
         scan_statistics = [
-            raw_file.GetScanStatsForScanNumber(i + 1) for i in range(num_of_scans)
+            raw_file.GetScanStatsForScanNumber(i + 1) for i in scan_indices
         ]
         segmented_scan = [
             raw_file.GetSegmentedScanFromScanNumber(i + 1, scan_statistics[i])
-            for i in range(num_of_scans)
+            for i in scan_indices
         ]
 
         # Extract scan spectra and m/z values
@@ -67,9 +85,7 @@ def get_signal(datafile_path: str) -> xr.Dataset:
         scan_mzs = [
             np.fromiter(scan.Positions, np.float32) for scan in segmented_scan
         ]  # [Th]
-        scan_time = [
-            scan_statistics[i].StartTime * 60 for i in range(num_of_scans)
-        ]  # [s]
+        scan_time = [scan_stat.StartTime * 60 for scan_stat in scan_statistics]  # [s]
 
         # Create a sorted union of all unique m/z values
         all_mzs = np.unique(np.concatenate(scan_mzs))
