@@ -7,7 +7,6 @@ Created on Tue Apr 09 13:08:29 2019
 @author: Oskari Kausiala
 """
 # TODO more testing
-# TODO get_sum_signal technically gives an error alphough works as it should. Better way to create sum_signal?
 
 import os
 from pathlib import Path
@@ -27,7 +26,8 @@ from mascope_hardware.runtime import hardware_runtime
 from mascope_hardware.util import create_sample_file_db_record
 from mascope_lib.file_func import (
     write_props,
-    get_sum_signal,
+    load_file,
+    zarr_sdk,
     get_filestore_path,
     parse_path_from_item_filename,
 )
@@ -306,7 +306,8 @@ class RawProcessor(Thread):
         shutil.copy(raw_file_path, data_raw_path)
 
         # Write sum_signal to the sample_file
-        get_sum_signal(sample_file_props["filename"])
+        sample_file_data = load_file(sample_file_props["filename"], vars=[])
+        zarr_sdk.write_sum_signal_dataset(sample_file_data)
 
         create_sample_file_db_record(sample_file_props)
 
