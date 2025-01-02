@@ -6,8 +6,6 @@ Created on Tue Apr 09 13:08:29 2019
 
 @author: Oskari Kausiala
 """
-# TODO more testing
-
 import os
 from pathlib import Path
 import shutil
