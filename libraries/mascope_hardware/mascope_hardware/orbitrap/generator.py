@@ -215,24 +215,6 @@ class RawProcessor(Thread):
         ).GetEnumerator()
         return scan_enumerator.MoveNext()
 
-    def _wait_for_queues(self):
-        """Wait for tick event to be set before continuing streaming
-
-        Returns
-        -------
-        bool
-            True if ticked, False if shutdown
-        """
-        while not (self.shutdown_event.is_set() or self.cancel_event.is_set()):
-            if not self.spec_queue.qsize():
-                # Queues empty
-                return True
-            else:
-                # Wait for data to be consumed from queues
-                sleep(0.01)
-        # Shutdown or cancel
-        return False
-
     def _process_raw_file(self, sample_file_props: dict, raw_file_path: str):
         """Main function processing the raw files:
         1. Writes properties into the sample file
