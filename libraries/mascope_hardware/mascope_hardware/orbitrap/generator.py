@@ -228,21 +228,36 @@ class RawProcessor(Thread):
         data_path = parse_path_from_item_filename(
             sample_file_props["filename"], base_path
         )
-        # Ensure the sample file directory exists
-        os.makedirs(data_path, exist_ok=True)
 
-        # Write properties to the sample_file
-        write_props(sample_file_props["filename"], sample_file_props)
+        try:
+            # Create sample file directory
+            os.makedirs(data_path)
 
-        # Copy raw file to the sample_file folder
-        data_raw_path = os.path.join(data_path, "data.raw")
-        shutil.copy(raw_file_path, data_raw_path)
+            # Write properties to the sample_file
+            write_props(sample_file_props["filename"], sample_file_props)
 
-        # Write sum_signal to the sample_file
-        sample_file_data = load_file(sample_file_props["filename"], vars=[])
-        zarr_sdk.write_sum_signal_dataset(sample_file_data)
+            # Copy raw file to the sample_file folder
+            data_raw_path = os.path.join(data_path, "data.raw")
+            shutil.copy(raw_file_path, data_raw_path)
 
-        create_sample_file_db_record(sample_file_props)
+            # Create sum_signal array
+            sample_file_data = load_file(sample_file_props["filename"], vars=[])
+            zarr_sdk.write_sum_signal_dataset(sample_file_data)
+
+            self._create_db_record(sample_file_props)
+        except FileExistsError:
+            self.log.error(
+                f"Processing error: sample file {sample_file_props['filename']} already exists!"
+            )
+        except Exception as e:
+            self.log.error(f"Processing error: {e}")
+
+    def _create_db_record(self, sample_file_props: dict):
+        """Creates a record in the database."""
+        try:
+            create_sample_file_db_record(sample_file_props)
+        except Exception as e:
+            self.log.error(f"Failed to create database record: {e}")
 
     def run(self):
         self.log.info(f"Running raw processor ({self.name})")
