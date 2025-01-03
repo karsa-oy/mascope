@@ -212,7 +212,7 @@ class RawProcessor(Thread):
         ).GetEnumerator()
         return scan_enumerator.MoveNext()
 
-    def _process_raw_file(self, sample_file_props: dict, raw_file_path: str):
+    def _process_raw_file(self, sample_file_props: dict, raw_file_path: str) -> bool:
         """Main function processing the raw files:
         1. Writes properties into the sample file
         2. Copies raw file into the sample file folder
@@ -223,6 +223,8 @@ class RawProcessor(Thread):
         :type sample_file_props: dict
         :param raw_file_path: Path to the target raw file
         :type raw_file_path: str
+        :return: True if raw file processed successfully, False otherwise
+        :rtype: bool
         """
         base_path = get_filestore_path()
         data_path = parse_path_from_item_filename(
@@ -245,12 +247,16 @@ class RawProcessor(Thread):
             zarr_sdk.write_sum_signal_dataset(sample_file_data)
 
             self._create_db_record(sample_file_props)
+
+            return True
         except FileExistsError:
             self.log.error(
                 f"Processing error: sample file {sample_file_props['filename']} already exists!"
             )
+            return False
         except Exception as e:
             self.log.error(f"Processing error: {e}")
+            return False
 
     def _create_db_record(self, sample_file_props: dict):
         """Creates a record in the database."""
@@ -306,6 +312,8 @@ class RawProcessor(Thread):
                 "mz_calibration": None,
             }
 
+            if_processed_flag = [True, True]
+
             # Check if raw file contains negative polarity scans
             if self._has_negative_scans():
                 # Add missing properties, negative polarity case
@@ -313,8 +321,10 @@ class RawProcessor(Thread):
                 sample_file_props["tic"] = self.tic_neg
                 sample_file_props["filename"] = self.filename.replace(" ", "_") + "_-"
 
-                # Create sample file with positive negative scans
-                self._process_raw_file(sample_file_props, file_to_process)
+                # Create sample file with negative polarity scans
+                if_processed_flag[0] = self._process_raw_file(
+                    sample_file_props, file_to_process
+                )
 
             # Check if raw file contains positive polarity scans
             if self._has_positive_scans():
@@ -324,21 +334,24 @@ class RawProcessor(Thread):
                 sample_file_props["filename"] = self.filename.replace(" ", "_") + "_+"
 
                 # Create sample file with positive polarity scans
-                self._process_raw_file(sample_file_props, file_to_process)
+                if_processed_flag[1] = self._process_raw_file(
+                    sample_file_props, file_to_process
+                )
 
-            # Out of stream loop
+            # Out of loop
             self._finalize()
             self.log.info("Processing finished")
 
-            # Delete processed file
-            self.log.info("Deleting file from the streams folder")
-            try:
-                os.remove(file_to_process)
-            except FileNotFoundError as e:
-                self.log.error(
-                    f"Failed to delete file {file_to_process} from streams folder"
-                )
-                self.log.exception(e)
+            # If processing completed without error, delete processed file
+            if all(if_processed_flag):
+                self.log.info("Deleting file from the streams folder")
+                try:
+                    os.remove(file_to_process)
+                except FileNotFoundError as e:
+                    self.log.error(
+                        f"Failed to delete file {file_to_process} from streams folder"
+                    )
+                    self.log.exception(e)
         # Out of main loop
         self.log.info(f"Exiting raw processor ({self.name})")
         self.shutdown()
@@ -346,9 +359,6 @@ class RawProcessor(Thread):
     def shutdown(self):
         """Shutdown procedure"""
         self.shutdown_event.set()
-        # Close queues
-        self.spec_queue.close()
-        self.spec_queue.join_thread()
 
     def start_stream(self, filename: str):
         """Method to call externally, to start processing a file
