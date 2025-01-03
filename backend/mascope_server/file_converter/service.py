@@ -165,13 +165,7 @@ def process_stream(streamer):
             spec_data.update({"filename": format_filename(spec_data)})
             spec_i = spec_data["i"]
             # Handle spectrum data
-            success = handle_spec_data(spec_data)
-            if success and hasattr(streamer, "tps_queue"):
-                # If "tps_queue" exists (H5Streamer), handle tps data
-                tps_data = streamer.tps_queue.get()
-                # Format filename
-                tps_data.update({"filename": format_filename(tps_data)})
-                handle_tps_data(tps_data)
+            handle_spec_data(spec_data)
             if spec_i is None:
                 # Received poison pill, clear file from cache
                 cache.pop(spec_data["filename"])
