@@ -62,9 +62,6 @@ class RawProcessor(Thread):
         self.lock = lock
         self.cancel_event = Event()  # Set to cancel current stream
         self.active = Event()  # Acquisition active event
-        # spec_queue is not used by RawProcessor but is required for
-        # backward compatibility with service.py
-        self.spec_queue = Queue()  # Signal output queue
 
     @property
     def timestamp(self) -> datetime:

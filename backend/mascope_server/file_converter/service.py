@@ -158,6 +158,8 @@ def process_stream(streamer):
     while not streamer.shutdown_event.is_set():
         try:
             # Check the queue for new data
+            if not hasattr(streamer, "spec_queue"):
+                raise Empty
             spec_data = streamer.spec_queue.get_nowait()
             # Format filename
             spec_data.update({"filename": format_filename(spec_data)})
