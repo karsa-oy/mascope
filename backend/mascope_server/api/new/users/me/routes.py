@@ -4,7 +4,7 @@ from mascope_server.db.models import User
 from mascope_server.api.lib.api_features import api_route
 from mascope_server.api.new.auth.dependencies import guest_user, current_active_user
 from mascope_server.api.new.users.exceptions import InvalidUsernameException
-from mascope_server.api.new.users.util import get_user_manager
+from mascope_server.api.new.users.user_manager.dependencies import get_user_manager
 from mascope_server.api.new.users.service import update_user, get_user
 from mascope_server.api.new.users.user_manager.service import UserManager
 from mascope_server.api.new.users.schemas import UserUpdate

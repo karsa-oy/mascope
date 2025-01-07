@@ -4,7 +4,7 @@ from mascope_server.api.new.users.first_owner.schemas import FirstOwnerCreate
 from mascope_server.api.new.users.first_owner.util import (
     check_first_owner_registration,
 )
-from mascope_server.api.new.users.util import get_user_manager
+from mascope_server.api.new.users.user_manager.dependencies import get_user_manager
 from mascope_server.api.new.users.exceptions import InvalidUsernameException
 from mascope_server.api.new.users.service import register_user
 from mascope_server.api.new.users.user_manager.service import UserManager

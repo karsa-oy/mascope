@@ -8,31 +8,22 @@ such as access token cleanup for external services like Jupyter.
 """
 
 from typing import Any, Dict, Optional
-from fastapi import Request
+from fastapi import Request, Response
 from fastapi_users import BaseUserManager, IntegerIDMixin
 from fastapi_users import models
-from mascope_server.app.socket import sio
 from mascope_server.db.models import User
 from mascope_server.api.lib.exceptions.api_exceptions import NotFoundException
 from mascope_server.api.new.auth.config import auth_settings
 from mascope_server.api.new.users import exceptions
 from mascope_server.api.new.users.schemas import UserCreate
 from mascope_server.api.new.users.access_token.service import delete_user_access_tokens
+from mascope_server.socket import (
+    event_emitter,
+    authenticate_socket_connection,
+    SocketUnauthenticatedError,
+)
 
 from mascope_server.runtime import runtime
-
-
-async def emit_user_events(user: Optional[User] = None):
-    """
-    Emit socket events for user changes, optionally also to
-    targeted to a specific user.
-
-    :param user: The FastAPI users' user model
-    """
-    await sio.emit("user_reload_all", namespace="/")
-    if user:
-        await sio.emit("user_reload_me", room=f"user-{user.id}", namespace="/")
-    return
 
 
 class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
@@ -117,7 +108,7 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
 
     async def on_after_register(self, user: User, request: Optional[Request] = None):
         runtime.logger.info(f"User {user.username} was registered.")
-        await emit_user_events(user)
+        await event_emitter.emit("user.reload", user)
 
     async def on_after_forgot_password(
         self, user: User, token: str, request: Optional[Request] = None
@@ -132,6 +123,41 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
         runtime.logger.info(
             f"Verification requested for user {user.username}. Verification token: {token}"
         )
+
+    async def on_after_login(
+        self,
+        user: User,
+        request: Optional[Request] = None,
+        response: Optional[Response] = None,
+    ) -> None:
+        """
+        After user login authenticate the socket connection
+
+        :param user: The user that is logging in
+        :param request: Optional FastAPI request
+        :param response: Optional response built by the transport.
+        Defaults to None
+        """
+        print("⚠️⚠️⚠️ User is logged in")
+        try:
+            if request and response and "set-cookie" in response.headers:
+                sid = request.headers.get("x-sid")
+                if not sid:
+                    return
+
+                cookie = response.headers["set-cookie"]
+                jwt_token = cookie.split("mascope_auth=")[1].split(";")[0]
+
+                # Authenticate the socket connection
+                auth_environ = {"HTTP_COOKIE": f"mascope_auth={jwt_token}"}
+                await authenticate_socket_connection(sid=sid, environ=auth_environ)
+        except SocketUnauthenticatedError as e:
+            runtime.logger.error(f"Socket authentication failed after login: {str(e)}")
+        except Exception as e:
+            runtime.logger.error(
+                f"Unexpected error during socket authentication after login: {str(e)}"
+            )
+        return  # pragma: no cover
 
     async def on_after_update(
         self,
@@ -152,7 +178,7 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
         if "password" in update_dict:
             runtime.logger.info(f"User `{user.username}` password was changed.")
             await delete_user_access_tokens(user_id=user.id)
-        await emit_user_events(user)
+        await event_emitter.emit("user.reload", user)
         return  # pragma: no cover
 
     async def on_after_delete(
@@ -165,4 +191,4 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
 
         :param user: The deleted user
         """
-        await emit_user_events(user)
+        await event_emitter.emit("user.reload", user)

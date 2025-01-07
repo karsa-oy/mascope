@@ -2,7 +2,7 @@ from fastapi import APIRouter, Body, Depends, Path, Request
 from mascope_server.api.lib.api_features import api_route
 from mascope_server.api.new.auth.dependencies import owner_user
 from mascope_server.api.new.auth.exceptions import ForbiddenAccessException
-from mascope_server.api.new.users.util import get_user_manager
+from mascope_server.api.new.users.user_manager.dependencies import get_user_manager
 from mascope_server.api.new.users.exceptions import InvalidUsernameException
 from mascope_server.api.new.users.schemas import (
     UserCreate,
