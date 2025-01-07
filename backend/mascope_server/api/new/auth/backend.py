@@ -7,70 +7,19 @@ and bearer transport with database access tokens for the mascope_api jupyter lib
 """
 
 from rich.pretty import pretty_repr
-from fastapi import Depends, Request
-from fastapi_users import FastAPIUsers
+from fastapi import Request
 from fastapi_users.authentication import (
-    CookieTransport,
-    BearerTransport,
-    JWTStrategy,
     AuthenticationBackend,
 )
-from fastapi_users.authentication.strategy.db import (
-    AccessTokenDatabase,
-    DatabaseStrategy,
+from mascope_server.api.new.auth.transports import (
+    access_token_transport,
+    cookie_transport,
 )
-from mascope_server.db.models import AccessToken, User
-from mascope_server.api.new.auth.config import auth_settings
-from mascope_server.api.new.auth.util import get_access_token_db
-from mascope_server.api.new.users.util import get_user_manager
-
-
+from mascope_server.api.new.auth.strategies import (
+    get_database_strategy,
+    get_jwt_strategy,
+)
 from mascope_server.runtime import runtime
-
-# Cookie-based authentication for web app (Mascope web-based interface)
-cookie_transport = CookieTransport(
-    cookie_name=auth_settings.COOKIE_NAME,
-    cookie_max_age=auth_settings.COOKIE_MAX_AGE_SECONDS,
-    cookie_secure=auth_settings.COOKIE_SECURE,
-    cookie_httponly=auth_settings.COOKIE_HTTP_ONLY,
-)
-
-# Bearer-based transport for access token authentication in the Jupyter server
-access_token_transport = BearerTransport(tokenUrl="/api/auth/access_token/generate")
-
-
-# JWT strategy for cookie authentication
-def get_jwt_strategy() -> JWTStrategy:
-    """
-    Returns a JWT strategy for handling user authentication via cookies.
-
-    This function configures a JWT (JSON Web Token) strategy, which FastAPI Users uses to handle
-    user authentication. The JWT is signed using a secret key and has a defined expiration time.
-
-    :return: A configured JWT strategy for handling authentication.
-    :rtype: JWTStrategy
-    """
-    return JWTStrategy(
-        secret=auth_settings.JWT_SECRET_KEY,
-        lifetime_seconds=auth_settings.JWT_EXPIRATION_SECONDS,
-        token_audience=auth_settings.JWT_AUDIENCE,
-        algorithm=auth_settings.JWT_ALGORITHM,
-    )
-
-
-# Database strategy for access token authentication (access token stored in DB)
-def get_database_strategy(
-    access_token_db: AccessTokenDatabase[AccessToken] = Depends(get_access_token_db),
-) -> DatabaseStrategy:
-    """
-    Returns a DatabaseStrategy for access token authentication.
-
-    This strategy validates access token stored in the database, associating each key with a user ID.
-    Tokens expire after the defined lifetime.
-    """
-    return DatabaseStrategy(
-        access_token_db, lifetime_seconds=auth_settings.ACCESS_TOKEN_EXPIRATION_SECONDS
-    )
 
 
 # Cookie-based authentication for the web app
@@ -85,13 +34,6 @@ auth_backend_access_token = AuthenticationBackend(
     name="access-token",
     transport=access_token_transport,
     get_strategy=get_database_strategy,
-)
-
-
-# FastAPI Users setup with authentication with both backends
-fastapi_users = FastAPIUsers[User, int](
-    get_user_manager,
-    [auth_backend_cookie, auth_backend_access_token],
 )
 
 

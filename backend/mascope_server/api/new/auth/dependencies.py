@@ -5,7 +5,7 @@ Route dependencies
 from fastapi import Depends
 from mascope_server.db.models import User
 from mascope_server.api.new.auth.config import auth_settings
-from mascope_server.api.new.auth.auth_backend import fastapi_users, get_enabled_backends
+from mascope_server.api.new.auth import fastapi_users, get_enabled_backends
 from mascope_server.api.new.auth.exceptions import ForbiddenAccessException
 from mascope_server.api.new.roles.exceptions import InvalidRoleException
 

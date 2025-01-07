@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from mascope_server.api.new.auth.auth_backend import (
+from mascope_server.api.new.auth import (
     fastapi_users,
     auth_backend_cookie,
     auth_backend_access_token,
