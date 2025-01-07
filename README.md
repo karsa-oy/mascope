@@ -29,6 +29,7 @@ mascope/           Monorepo root directory
   libraries/         Shared libraries
   notebooks/         Jupyter environment
   runtime/           Config, logging, state and data
+  secrets/           Secrets (.gitignored)
   setup/             Installation scripts
   testfiles/         Test data files (mostly .gitignored)
 ```
@@ -99,6 +100,17 @@ If you run into issues, try to run a clean `reinstall` instead of an `update`. T
 
 Managing frontend dependencies is done in the standard way using `npm`.
 
+### Secrets
+
+Running Mascope in `prod` mode requires the following "secrets" to be present in the `/secrets` directory:
+
+- `jwt_secret_key.txt`: JSON Web Token API private key (arbitrary string)
+- `mascope.app.key`: SSL certificate private key
+- `mascope.app.pem`: SSL certificate
+- `server_owner_secret_key.txt`: First owner registration private key (arbitrary string)
+
+For testing the `prod` mode in local development environment, a self-signed SSL certificate can be generated using the script: `/setup/generate_cert.ps1`.
+
 ---
 
 ## Cheatsheet
@@ -107,6 +119,7 @@ Managing frontend dependencies is done in the standard way using `npm`.
 
 Running in dev mode:
 https://axios-http.com/docs/api_intro
+
 ```sh
 mascope dev run                               # run the backend & frontend
 mascope dev run --reload                      # HMR for the backend on Windows
@@ -233,7 +246,7 @@ mascope prod logs   # attach to the logs
 mascope prod down   # stope the server
 ```
 
-You can also run `mascope up --build` to build and run the containers.
+You can also run `mascope prod up --build` to build and run the containers.
 
 ### Runtime Modules
 
