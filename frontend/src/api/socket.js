@@ -7,7 +7,10 @@ const host = location.hostname
 export function initSocket() {
   // init socket in `/` namespace
   const url = runtime.mode === 'prod' ? `https://${host}` : `ws://${host}:${runtime.meta.api_port}`
-  const socket = io(url)
+  const socket = io(url, {
+    withCredentials: true, // Enables cookie sending
+    transports: ['websocket']
+  })
   console.log('[api:sio] initialized socket for', runtime.mode, ':', url, socket)
   // logging handlers
   socket.onAny((eventName, ...event) => {
