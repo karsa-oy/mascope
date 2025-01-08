@@ -138,7 +138,6 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
         :param response: Optional response built by the transport.
         Defaults to None
         """
-        print("⚠️⚠️⚠️ User is logged in")
         try:
             if request and response and "set-cookie" in response.headers:
                 sid = request.headers.get("x-sid")
