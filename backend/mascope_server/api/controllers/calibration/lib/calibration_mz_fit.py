@@ -29,11 +29,9 @@ from mascope_server.api.controllers.target.isotopes.target_isotopes_controller i
 from mascope_server.api.controllers.target.associations.target_compound_in_target_collection_controller import (
     get_target_compound_in_target_collection,
 )
-from mascope_server.api.lib.notifications.api_notification import (
-    send_progress_user_notification,
-)
-from mascope_server.api.lib.notifications.api_notification_pydantic_model import (
+from mascope_server.socket.notifications import (
     UserNotification,
+    send_progress_user_notification,
 )
 from mascope_server.runtime import runtime
 

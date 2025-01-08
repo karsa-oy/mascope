@@ -12,13 +12,11 @@ from mascope_server.api.lib.exceptions.api_exceptions import (
     handle_exception,
     api_e_response_json,
 )
-from mascope_server.api.lib.notifications.api_notification import (
+from mascope_server.socket.notifications import (
+    UserNotification,
     emit_sio_event,
     handle_reloads,
     handle_notifications,
-)
-from mascope_server.api.lib.notifications.api_notification_pydantic_model import (
-    UserNotification,
 )
 
 from mascope_server.runtime import runtime

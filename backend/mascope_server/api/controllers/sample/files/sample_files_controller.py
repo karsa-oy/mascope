@@ -1,7 +1,6 @@
 import os
 from datetime import datetime
 from fastapi import UploadFile
-import numpy as np
 from sqlalchemy import (
     select,
     asc,
@@ -11,7 +10,7 @@ from sqlalchemy import (
 from mascope_lib.file_func import load_file, sum_signal_for_time_range
 from mascope_lib.peak import detect_peaks, get_peaks
 from mascope_lib.file_func import get_instrument_type
-from mascope_server.app import sio
+from mascope_server.socket import sio
 from mascope_server.db import async_session
 from mascope_server.db.id import gen_id
 from mascope_server.db.models import SampleFile
@@ -27,11 +26,9 @@ from mascope_server.api.models.sample.files.sample_file_pydantic_model import (
     SampleFileCreate,
     SampleFileUpdate,
 )
-from mascope_server.api.lib.notifications.api_notification import (
-    emit_user_notification,
-)
-from mascope_server.api.lib.notifications.api_notification_pydantic_model import (
+from mascope_server.socket.notifications import (
     UserNotification,
+    emit_user_notification,
 )
 
 

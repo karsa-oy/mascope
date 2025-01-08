@@ -51,11 +51,9 @@ from mascope_server.api.models.match.match_pydantic_model import (
     RematchBatchesBody,
     MatchComputeSample,
 )
-from mascope_server.api.lib.notifications.api_notification import (
-    send_progress_user_notification,
-)
-from mascope_server.api.lib.notifications.api_notification_pydantic_model import (
+from mascope_server.socket.notifications import (
     UserNotification,
+    send_progress_user_notification,
 )
 
 

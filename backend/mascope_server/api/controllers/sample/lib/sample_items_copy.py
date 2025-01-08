@@ -10,10 +10,8 @@ from mascope_server.db.models import (
     MatchSample,
 )
 from mascope_server.db.id import gen_id
-from mascope_server.api.lib.notifications.api_notification_pydantic_model import (
+from mascope_server.socket.notifications import (
     UserNotification,
-)
-from mascope_server.api.lib.notifications.api_notification import (
     send_progress_user_notification,
 )
 

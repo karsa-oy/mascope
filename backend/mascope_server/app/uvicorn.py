@@ -1,6 +1,5 @@
-import uvicorn
 import os
-
+import uvicorn
 from mascope_server.runtime import runtime
 
 

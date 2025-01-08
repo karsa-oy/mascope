@@ -9,7 +9,7 @@ from mascope_lib.peak import filter_peaks, get_peaks
 from mascope_lib.util import get_closest_non_nan
 from mascope_server.db import async_session
 from mascope_server.db.models import Sample, TargetIsotope
-from mascope_server.app import sio
+from mascope_server.socket import sio
 from mascope_server.api.lib.exceptions.api_exceptions import NotFoundException
 from mascope_server.api.lib.api_features import api_controller_background_task
 from mascope_server.api.controllers.instrument_functions.lib.instrument_functions_fetch import (

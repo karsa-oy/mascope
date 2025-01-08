@@ -1,9 +1,9 @@
+import uuid
+
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-
-import uuid
 
 from mascope_server.api.lib.exceptions.api_exceptions import handle_exception
 from mascope_server.api.routes import routers

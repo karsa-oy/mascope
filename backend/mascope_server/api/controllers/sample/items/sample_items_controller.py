@@ -8,7 +8,7 @@ from sqlalchemy import (
     func,
 )
 from mascope_lib.file_func import get_instrument_type
-from mascope_server.app import sio
+from mascope_server.socket import sio
 from mascope_server.db import async_session
 from mascope_server.db.id import gen_id
 from mascope_server.db.models import (
@@ -38,11 +38,9 @@ from mascope_server.api.models.sample.items.sample_item_pydantic_model import (
 from mascope_server.api.models.calibration.calibration_pydantic_model import (
     MzCalibrationParams,
 )
-from mascope_server.api.lib.notifications.api_notification import (
-    send_progress_user_notification,
-)
-from mascope_server.api.lib.notifications.api_notification_pydantic_model import (
+from mascope_server.socket.notifications import (
     UserNotification,
+    send_progress_user_notification,
 )
 from mascope_server.api.controllers.instrument_functions.process_instrument_function_controller import (
     process_instrument_function,

@@ -18,7 +18,9 @@ import os
 
 from datetime import datetime
 
-from mascope_server.app import sio  # This is here to circumvent circular import error
+from mascope_server.socket import (
+    sio,
+)  # This is here to circumvent circular import error
 from mascope_server.db import init_db
 from mascope_server.api.controllers.instrument_functions.lib.instrument_functions_fetch import (
     read_instrument_function,

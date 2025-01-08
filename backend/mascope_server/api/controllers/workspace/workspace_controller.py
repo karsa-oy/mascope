@@ -5,7 +5,7 @@ from sqlalchemy import (
     desc,
     func,
 )
-from mascope_server.app import sio
+from mascope_server.socket import sio
 from mascope_server.db import async_session
 from mascope_server.db.id import gen_id
 from mascope_server.db.models import Workspace
