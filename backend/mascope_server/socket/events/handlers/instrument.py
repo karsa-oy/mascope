@@ -1,19 +1,12 @@
-from mascope_server.app.socket import sio
+from mascope_server.socket.server import sio
 from mascope_server.db.id import gen_id
-from mascope_server.api.lib.notifications.api_notification_pydantic_model import (
+from mascope_server.socket.notifications import (
     UserNotification,
-)
-from mascope_server.api.lib.notifications.api_notification import (
     emit_user_notification,
 )
 
-from mascope_server.runtime import runtime
-
-
 instrument_acquisition_notification_process_id = gen_id(8)
 instrument_conversion_notification_process_id = gen_id(8)
-
-runtime.logger.info("Registering socketio instrument event handlers")
 
 
 @sio.event(namespace="/")
