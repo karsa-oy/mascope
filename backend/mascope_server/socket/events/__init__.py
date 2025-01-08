@@ -1,0 +1,8 @@
+"""Socket.IO event system initialization.
+
+This module initializes both the Socket.IO event handlers for client-server
+communication and the internal event emitters for server-side events.
+"""
+
+from . import handlers
+from . import emitters
