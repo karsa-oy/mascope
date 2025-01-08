@@ -10,7 +10,12 @@ if (Test-Path "${env:MASCOPE_PATH}/secrets/mascope.app.*") {
 # Install OpenSSL
 if ( !( Get-Command openssl -ErrorAction SilentlyContinue) ) {
     Write-Host "Installing OpenSSL..."
-    winget install --id ShiningLight.OpenSSL
+    winget install --silent FireDaemon.OpenSSL
+    # Trick to make openssl command available after install
+    Start-Sleep -Seconds 3
+    $userpath = [System.Environment]::GetEnvironmentVariable("Path","User")
+    $machinePath = [System.Environment]::GetEnvironmentVariable("Path","Machine")
+    $env:Path = $userpath + ";" + $machinePath
 }
 
 # Generate the key
