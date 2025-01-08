@@ -1,37 +1,31 @@
+"""Socket.IO notification service."""
+
 from copy import deepcopy
-from mascope_server.app import sio
-from mascope_server.api.lib.notifications.api_notification_pydantic_model import (
-    UserNotification,
-)
-
-from mascope_server.runtime import runtime
+from mascope_server.socket.server import sio
+from mascope_server.socket.notifications.schemas import UserNotification
 
 
-# TODO_notification delete after refactoring
-async def emit_sio_event(
-    event_name: str,
-    notification: dict = None,
-    room: str = None,
+async def emit_user_notification(
+    notification: UserNotification = None,
+    room_id: str = None,
     sid: str = None,
 ):
     """
-    Utility function to emit a Socket.IO event to a specified room.
+    Utility function to emit a Socket.IO event to a specified room_id.
 
-    :param event_name: The name of the Socket.IO event to emit.
     :param notification: The notification to send with the event.
-    :param room: The room to which the event should be emitted.
+    :param room_id: The room to which the event should be emitted.
     :param sid: Optional. The session ID of the client. Used to send direct messages if needed.
     """
-    # Emit without notification if event_name ends with '_reload'
-    if event_name.endswith("_reload"):
-        await sio.emit(event_name, room=room, namespace="/")
-    else:
-        # Emit the event to the specified room
-        await sio.emit(event_name, notification, room=room, namespace="/")
+    notification_dict = notification.model_dump(exclude_none=True)
+    if room_id:
+        await sio.emit(
+            "user_notification", notification_dict, room=room_id, namespace="/"
+        )
 
-        # Check if the user has moved from the room; if so, send them a direct message
-        if sid and room != sid and room not in sio.rooms(sid, namespace="/"):
-            await sio.emit(event_name, notification, room=sid, namespace="/")
+    # Check if the user has moved from the room; if so, send them a direct message
+    if sid and room_id != sid and room_id not in sio.rooms(sid, namespace="/"):
+        await sio.emit("user_notification", notification_dict, room=sid, namespace="/")
 
 
 async def send_progress_user_notification(
@@ -111,27 +105,31 @@ async def send_progress_user_notification(
         await emit_user_notification(notification_copy, instrument_room)
 
 
-async def emit_user_notification(
-    notification: UserNotification = None,
-    room_id: str = None,
+# TODO_notification delete after refactoring
+async def emit_sio_event(
+    event_name: str,
+    notification: dict = None,
+    room: str = None,
     sid: str = None,
 ):
     """
-    Utility function to emit a Socket.IO event to a specified room_id.
+    Utility function to emit a Socket.IO event to a specified room.
 
+    :param event_name: The name of the Socket.IO event to emit.
     :param notification: The notification to send with the event.
-    :param room_id: The room to which the event should be emitted.
+    :param room: The room to which the event should be emitted.
     :param sid: Optional. The session ID of the client. Used to send direct messages if needed.
     """
-    notification_dict = notification.model_dump(exclude_none=True)
-    if room_id:
-        await sio.emit(
-            "user_notification", notification_dict, room=room_id, namespace="/"
-        )
+    # Emit without notification if event_name ends with '_reload'
+    if event_name.endswith("_reload"):
+        await sio.emit(event_name, room=room, namespace="/")
+    else:
+        # Emit the event to the specified room
+        await sio.emit(event_name, notification, room=room, namespace="/")
 
-    # Check if the user has moved from the room; if so, send them a direct message
-    if sid and room_id != sid and room_id not in sio.rooms(sid, namespace="/"):
-        await sio.emit("user_notification", notification_dict, room=sid, namespace="/")
+        # Check if the user has moved from the room; if so, send them a direct message
+        if sid and room != sid and room not in sio.rooms(sid, namespace="/"):
+            await sio.emit(event_name, notification, room=sid, namespace="/")
 
 
 async def handle_reloads(reload_events, kwargs, result):
