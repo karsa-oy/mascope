@@ -109,7 +109,7 @@ Running Mascope in `prod` mode requires the following "secrets" to be present in
 - `mascope.app.pem`: SSL certificate
 - `server_owner_secret_key.txt`: First owner registration private key (arbitrary string)
 
-For testing the `prod` mode in local development environment, a self-signed SSL certificate can be generated using the script: `/setup/generate_cert.ps1`.
+For testing the `prod` mode in local development environment, a self-signed SSL certificate can be generated using the script: `/setup/generate_cert.ps1`. The certificate as well as other secrets must be in place prior to building the containers.
 
 ---
 
@@ -699,7 +699,7 @@ The frontend uses HTTP and WebSocket clients.These are combined into a single cl
 
 ```js
 // import the client
-import { api } from '@/api'
+import { api } from "@/api";
 ```
 
 #### Frontend HTTP Client
@@ -708,35 +708,36 @@ The frontend HTTP API uses [Axios](https://axios-http.com/docs/intro), exposing 
 
 ```js
 // create a new workspace:
-api.http.post(           // method
-  `/workspaces`,              // path
-  { workspace_name: "Foo" },  // body
-  {                           // config
+api.http.post(
+  // method
+  `/workspaces`, // path
+  { workspace_name: "Foo" }, // body
+  {
+    // config
     use: "create",
-    type: "create_workspace"
+    type: "create_workspace",
   }
-)
+);
 ```
 
-Here, `post` is a standard Axios method, receiving the route _url_ path as the first argument, the request _body_ in the second argument and  _config_ options as the third argument. These options include two Mascope-specific custom fields: `use` and `type`; see the _Custom API_ section below for details. For all other options, see the Axios [request config docs](https://axios-http.com/docs/req_config).
+Here, `post` is a standard Axios method, receiving the route _url_ path as the first argument, the request _body_ in the second argument and _config_ options as the third argument. These options include two Mascope-specific custom fields: `use` and `type`; see the _Custom API_ section below for details. For all other options, see the Axios [request config docs](https://axios-http.com/docs/req_config).
 
 To pass _path parameters_, use a template string for the url path. To pass _query parameters_, use the _params_ field of the config argument:
+
 ```js
 // load peaks with areas and heights
-const peaks = await api.http.get(
-  `/sample/files/${sample_file_id}/peaks`,
-  {
-    params: {
-      areas: true,
-      heights: true
-    },
-    use: "read",
-    type: "load_sample_peaks"
-  }
-)
+const peaks = await api.http.get(`/sample/files/${sample_file_id}/peaks`, {
+  params: {
+    areas: true,
+    heights: true,
+  },
+  use: "read",
+  type: "load_sample_peaks",
+});
 ```
 
 The key methods used in our codebase at the moment are:
+
 ```js
 api.http.get(url[, config])
 api.http.delete(url[, config])
@@ -744,6 +745,7 @@ api.http.post(url[, data[, config]])
 api.http.patch(url[, data[, config]])
 api.http.postForm(url[, data[, config]])
 ```
+
 But nothing stops you from using other Axios method; refer to the [Axios docs](https://axios-http.com/docs/api_intro) for details. Note here that their signatures differ, and that all arguments but the _url_ field are optional.
 
 The most common endpoints are wrapped a second time in the [store actions](#frontend-stores), providing a friendlier API for most usecases in the frontend. Typically, you would use these wrappers when they are available. If a new endpoint is added, it may make sense to add such a wrapper to the appropriate store.
@@ -752,16 +754,17 @@ The most common endpoints are wrapped a second time in the [store actions](#fron
 
 The only Mascope-specific API elements added are the `use` and `type` fields added to the _config_ object. The `type` argument should be a snake case title-like identifier for the call, and is rendered as the header of the notification toasts shown to users.
 
-The `use` argument allows specifying a so-called _handler_; this is a Mascope custom abstraction describing what to do with the response of the requestion: which status codes are considered successful, what to unpack from the response and return and what notifications - if any - to show the user. The handlers available currently are: *create*, *read*, *update*, *delete* and *process*. The latter is for long-running background processes emitting progress notifications, like rematching or recalibration.
+The `use` argument allows specifying a so-called _handler_; this is a Mascope custom abstraction describing what to do with the response of the requestion: which status codes are considered successful, what to unpack from the response and return and what notifications - if any - to show the user. The handlers available currently are: _create_, _read_, _update_, _delete_ and _process_. The latter is for long-running background processes emitting progress notifications, like rematching or recalibration.
 
 Handlers should be modified infrequently, as we hope to limit their number to handful of useful patterns. They are defined in `frontend/src/api/handlers.js`; as an example, this is how the `create` handler is implemented:
+
 ```js
-import { useApp } from '@/stores'
+import { useApp } from "@/stores";
 
 export default {
   // ...
   create: (response) => {
-    const { type, status, message, data } = unpack(response)
+    const { type, status, message, data } = unpack(response);
     const app = useApp();
     if (status == 201) {
       // notify users
@@ -769,18 +772,19 @@ export default {
         type,
         message,
         status: "success",
-      })
-      return data
+      });
+      return data;
     } else {
       // warn developers is the response
       // was not handled
-      unhandled(response)
-      return
+      unhandled(response);
+      return;
     }
   },
   // ...
-}
+};
 ```
+
 In rare cases, it makes sense to forego the handler in favor of creating custom handling logic for a specific usecase. For example, file upload is sufficiently idiosyncratic that is warrants a custom handler (see `frontend/src/stores/data/sample.js`).
 
 #### Frontend Socket Client
@@ -789,16 +793,13 @@ The frontend socket API uses [SocketIO](https://socket.io/docs/v4/client-socket-
 
 ```js
 // log workspaces on reload event:
-api.socket.on('workspace_reload', async () => {
-  const workspaces = api.http.get(
-    `/workspaces`,
-    {
-      use: "read",
-      type: "load_workspaces"
-    }
-  )
-  console.log(workspaces)
-})
+api.socket.on("workspace_reload", async () => {
+  const workspaces = api.http.get(`/workspaces`, {
+    use: "read",
+    type: "load_workspaces",
+  });
+  console.log(workspaces);
+});
 ```
 
 ### Frontend Stores
@@ -902,59 +903,50 @@ export const useBatch = defineModule({
   // has a parent, the arg is its key;
   // otherwise no arg is provided. The
   // function should return the data.         [required]
-  load: ({ workspace_id }) => api.http.get(
-    `/sample/batches`,
-    {
+  load: ({ workspace_id }) =>
+    api.http.get(`/sample/batches`, {
       params: { workspace_id },
       use: "read",
-      type: "load_batches"
+      type: "load_batches",
     }),
   // We can also (optionally) define
   // standard CRUD operations
-  read: (sample_batch_id) => api.http.get(
-    `/sample/batches/${sample_batch_id}`,
-    {
+  read: (sample_batch_id) =>
+    api.http.get(`/sample/batches/${sample_batch_id}`, {
       use: "read",
-      type: "read_batch"
-    }
-  ),
-  create: (batch) => api.http.post(
-    `/sample/batches/`, batch,
-    {
+      type: "read_batch",
+    }),
+  create: (batch) =>
+    api.http.post(`/sample/batches/`, batch, {
       use: "create",
-      type: "create_batch"
-    }
-  ),
-  update: (batch) => api.http.patch(
-    `/sample/batches/${batch.sample_batch_id}`, batch,
-    {
+      type: "create_batch",
+    }),
+  update: (batch) =>
+    api.http.patch(`/sample/batches/${batch.sample_batch_id}`, batch, {
       use: "update",
-      type: "update_batch"
-    }
-  ),
-  delete: ({ sample_batch_id }) => api.http.delete(
-    `/sample/batches/${sample_batch_id}`,
-    {
+      type: "update_batch",
+    }),
+  delete: ({ sample_batch_id }) =>
+    api.http.delete(`/sample/batches/${sample_batch_id}`, {
       use: "process",
-      type: "delete_batch"
-    }
-  ),
+      type: "delete_batch",
+    }),
   // And we can even define arbitrary custom
   // operations, which are passed through to
   // the store unchanged, e.g:
   importSamples: async ({ batch, sample_items }) => {
-    const mzFit = useMzFit()
+    const mzFit = useMzFit();
     return await api.http.post(
       `/sample/batches/${batch.sample_batch_id}/import`,
       {
         sample_items,
-        mz_calibration_params: mzFit.mzCalibrationParams
+        mz_calibration_params: mzFit.mzCalibrationParams,
       },
       {
         use: "process",
-        type: "import_samples"
+        type: "import_samples",
       }
-    )
+    );
   },
   // etc.
 });
@@ -983,10 +975,10 @@ You can add help cards in two ways: a [_Vue custom directive_](https://vuejs.org
 Since overlays such as sidebars and modals can cause confusing interactions, the help card API includes a concept of _layers_. As a developer, you need to toggle layer activation when opening or closing dialogs and sidebars:
 
 ```js
-const layer = 'my_sidebar'
+const layer = "my_sidebar";
 watchEffect(() => {
-  app.ui.help.set(sidebarActive.value ? layer : null)
-})
+  app.ui.help.set(sidebarActive.value ? layer : null);
+});
 ```
 
 The layer needs to be passed to all help cards in the overlay. This will be elaborated below.
@@ -994,8 +986,11 @@ The layer needs to be passed to all help cards in the overlay. This will be elab
 #### User Help Directive
 
 The help directive is added globally in `main.js`; this means that for the _base_ layer (as opposed to _overlays_) you can simply do:
+
 ```vue
-<menu v-help.right="`
+<menu
+  v-help.right="
+    `
   <h1>Foo Bar Menu</h1>
 
   <p>This HTML will be rendered
@@ -1004,7 +999,9 @@ The help directive is added globally in `main.js`; this means that for the _base
   <p>In <i>help mode</i>, the card
   will be rendered when the user's
   mouse is inside this element.</p>
-`">
+`
+  "
+>
   <!-- etc. -->
 </menu>
 ```
@@ -1013,19 +1010,23 @@ To use directives in an overlay layer, you can instantiate a custom directive fo
 
 ```vue
 <script setup>
-  import { useApp } from '@/stores'
+import { useApp } from "@/stores";
 
-  const app = useApp()
+const app = useApp();
 
-  const layer = 'my_dialog'
-  const vHelpLayer = app.ui.help.directive(layer)
+const layer = "my_dialog";
+const vHelpLayer = app.ui.help.directive(layer);
 </script>
 
 <template>
-  <div v-help-layer.bottom_end="`
+  <div
+    v-help-layer.bottom_end="
+      `
     <h1>This help card is in the
     <i>my_dialog</i> layer</h1>
-  `">
+  `
+    "
+  >
     <!-- etc. -->
   </div>
 </template>
@@ -1036,26 +1037,26 @@ To use directives in an overlay layer, you can instantiate a custom directive fo
 PrimeVue components include a special [pass-through feature](https://primevue.org/passthrough/) that allows passing various props into elements _inside_ the components. Our help API leverages this to allow us to inject help cards into PrimeVue components via the `pt` prop:
 
 ```vue
-  <Button
-    label="Push It!"
-    @click="doSomething"
-    :pt="
-      app.ui.help.right_end(`
+<Button
+  label="Push It!"
+  @click="doSomething"
+  :pt="
+    app.ui.help.right_end(`
         <h1>Push it, push it some mooooore...</h1>
       `)
-    "
-  />
+  "
+/>
 ```
 
 The API is similar to the directives, but leverages an action inside the help store. To specify the layer, pass an `options` object with a `layer` field as a second argument:
 
 ```vue
 <script setup>
-  import { useApp } from '@/stores'
+import { useApp } from "@/stores";
 
-  const app = useApp()
+const app = useApp();
 
-  const layer = 'my_dialog'
+const layer = "my_dialog";
 </script>
 
 <template>
@@ -1063,9 +1064,12 @@ The API is similar to the directives, but leverages an action inside the help st
     label="The Cake is a Lie!"
     @click="bakeIt"
     :pt="
-      app.ui.help.top(`
+      app.ui.help.top(
+        `
         <h1>This is in the <i>my_dialog</i> layer</h1>
-      `, { layer })
+      `,
+        { layer }
+      )
     "
   />
 </template>
