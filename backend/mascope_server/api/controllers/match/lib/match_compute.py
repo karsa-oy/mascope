@@ -80,7 +80,7 @@ async def compute_match_isotopes(
     try:
         # Check if instrument functions were passed
         if instrument_functions is None:
-            instrument_functions = await read_instrument_functions(filename)
+            instrument_functions = await read_instrument_function(filename)
         instrument_type = get_instrument_type(filename)
 
         # Filter isotopes below threshold
