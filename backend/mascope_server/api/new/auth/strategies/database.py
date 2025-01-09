@@ -34,5 +34,6 @@ def get_database_strategy(
     Tokens expire after the defined lifetime.
     """
     return DatabaseStrategy(
-        access_token_db, lifetime_seconds=auth_settings.ACCESS_TOKEN_EXPIRATION_SECONDS
+        access_token_db,
+        lifetime_seconds=auth_settings.access_token.ACCESS_TOKEN_EXPIRATION_SECONDS,
     )

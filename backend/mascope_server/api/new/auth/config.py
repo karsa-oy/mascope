@@ -1,8 +1,12 @@
+"""
+Core authentication configuration including JWT, cookies, and access tokens settings.
+"""
+
 from pydantic import BaseModel
+from mascope_server.api.new.auth.access_token.config import AccessTokenConfig
+from mascope_server.api.new.auth.secrets import jwt_secret_key
 
 from mascope_server.runtime import runtime
-
-from mascope_server.api.new.auth.secrets import jwt_secret_key
 
 
 # TODO_configuration for auth
@@ -58,14 +62,12 @@ class AuthConfig(BaseModel):
         "mascope-users:verify"  # Audience for email verification tokens
     )
 
-    # Access token-based authentication settings for Jupyter library API access
-    ACCESS_TOKEN_EXPIRATION_SECONDS: int = (
-        360 * 24 * 60 * 60
-    )  # Access token lifetime  - 360 days in seconds
-
     # Role access levels for RBAC
     # Role names correspond to the role_id values in the database (access_level)
     ROLE_ACCESS_LEVELS: dict = {"guest": 100, "editor": 200, "admin": 300, "owner": 400}
+
+    # Access token settings
+    access_token: AccessTokenConfig = AccessTokenConfig()
 
 
 auth_settings = AuthConfig()
