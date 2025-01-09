@@ -6,4 +6,8 @@ from .emitter import event_emitter
 from .auth import authenticate_socket_connection, SocketUnauthenticatedError
 from . import events
 
-runtime.logger.debug("Registering socketio event handlers")
+
+def init_socket():
+    """Initialize Socket.IO server and register event handlers."""
+    runtime.logger.info("Registering socketio event handlers")
+    return sio

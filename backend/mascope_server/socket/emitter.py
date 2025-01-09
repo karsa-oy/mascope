@@ -29,6 +29,9 @@ class EventEmitter:
         """
         Decorator for registering event handlers.
 
+        NOTE: When running with uvicorn in development mode (reload=True), event registration
+        happens in both parent and child processes.
+
         :param event: The name of the event to register the handler for.
         :type event: str
         :return: A decorator to register the handler function.
@@ -39,7 +42,6 @@ class EventEmitter:
             if event not in self._handlers:
                 self._handlers[event] = []
             self._handlers[event].append(handler)
-            runtime.logger.debug(f"Handler registered for event: {event}")
             return handler
 
         return decorator
