@@ -19,6 +19,7 @@ from mascope_server.api.new.auth.strategies import (
     get_database_strategy,
     get_jwt_strategy,
 )
+from mascope_server.api.new.auth.access_token.util import get_token_service
 from mascope_server.runtime import runtime
 
 
@@ -70,9 +71,11 @@ async def get_enabled_backends(request: Request) -> list[AuthenticationBackend]:
 
     # Access token-based authentication for token access (Jupyter server)
     if auth_header and not cookie_auth:
+        token = auth_header.split(" ")[1]
         # Check if the endpoint allows for token access
         if hasattr(route_func, "token_access") and route_func.token_access:
-            runtime.logger.debug("Using API access token authentication.")
+            service_name = await get_token_service(token)
+            runtime.logger.debug(f"Using {service_name} service authentication.")
             return [auth_backend_access_token]
         else:
             runtime.logger.error("Unauthorized for API access token.")

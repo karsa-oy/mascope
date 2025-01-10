@@ -12,3 +12,15 @@ class ForbiddenAccessException(HTTPException):
         detail: str = "You do not have the necessary permission to access this resource.",
     ):
         super().__init__(status_code=status.HTTP_403_FORBIDDEN, detail=detail)
+
+
+class InvalidTokenException(HTTPException):
+    """Exception for invalid or missing authentication token."""
+
+    def __init__(
+        self, detail: str = "Invalid authentication token or missing service."
+    ):
+        super().__init__(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=detail,
+        )

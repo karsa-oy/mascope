@@ -119,8 +119,14 @@ const vHelpLayer = app.ui.help.directive(layer)
           @click="
             async () => {
               try {
-                await api.http.post(`/auth/access_token/remove`)
-                token = (await api.http.post(`/auth/access_token/generate`))?.data?.access_token
+                await api.http.post(`/auth/access_token/remove`, {
+                  service_name: `mascope_api`
+                })
+                token = (
+                  await api.http.post(`/auth/access_token/generate`, {
+                    service_name: `mascope_api`
+                  })
+                )?.data?.access_token
               } catch (e) {
                 console.error(e)
                 app.ui.notification.push({

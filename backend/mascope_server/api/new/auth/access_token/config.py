@@ -11,8 +11,8 @@ class AccessTokenConfig(BaseModel):
     Configuration settings for access tokens.
     """
 
-    # Allowed token types
-    ACCESS_TOKEN_TYPES: List[str] = [
+    # Allowed services for access tokens
+    ALLOWED_SERVICES: List[str] = [
         "mascope_api",  # Access tokens for Jupyter notebooks API
         "file_converter",  # Service tokens for file converter service
         "tof_agent",  # Service tokens for ToF agent

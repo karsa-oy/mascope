@@ -1,11 +1,12 @@
-from sqlalchemy import select
+import json
+from sqlalchemy import select, update
 from mascope_server.db import async_session
 from mascope_server.db.models import AccessToken
 from mascope_server.api.lib.api_features import api_controller
 from mascope_server.api.new.auth import auth_backend_access_token
 
 
-async def generate_access_token(user, strategy):
+async def generate_access_token(user, strategy, service_name: str):
     """
     Generates an access token for the current authenticated user.
 
@@ -13,21 +14,35 @@ async def generate_access_token(user, strategy):
     and return an access token, which is stored in the database.
     """
     response = await auth_backend_access_token.login(strategy, user)
+    # Decode the response body and extract the token
+    data = json.loads(response.body.decode())
+    token = data["access_token"]
+    # Update token type
+    async with async_session() as session:
+        await session.execute(
+            update(AccessToken)
+            .where(AccessToken.token == token)
+            .values(service_name=service_name)
+        )
+        await session.commit()
+
     return response
 
 
 @api_controller()
-async def remove_access_tokens(user, strategy):
+async def remove_access_tokens(user, strategy, service_name: str):
     """
-    Removes all access tokens associated with the current authenticated user.
+    Removes access tokens for the specified service associated with the current authenticated user.
 
-    This function retrieves all access tokens linked to the user and then logs out
+    This function retrieves access tokens linked to the user and then logs out
     each token using the access token authentication backend.
     """
     async with async_session() as session:
         # Query all access tokens associated with the user
         tokens_query = await session.execute(
-            select(AccessToken).where(AccessToken.user_id == user.id)
+            select(AccessToken)
+            .where(AccessToken.user_id == user.id)
+            .where(AccessToken.service_name == service_name)
         )
         tokens = tokens_query.scalars().all()
 
@@ -38,4 +53,6 @@ async def remove_access_tokens(user, strategy):
         for token in tokens:
             await auth_backend_access_token.logout(strategy, user, token.token)
 
-    return {"message": f"All access tokens for user {user.username} have been removed."}
+    return {
+        "message": f"All {service_name} access tokens for user {user.username} have been removed."
+    }
