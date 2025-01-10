@@ -104,6 +104,7 @@ class Role(Base):
 class AccessToken(SQLAlchemyBaseAccessTokenTable[int], Base):
     """
     AccessToken model for storing access tokens linked to user accounts.
+    Supports different servicess for authentication.
     """
 
     __tablename__ = "access_token"
@@ -111,6 +112,10 @@ class AccessToken(SQLAlchemyBaseAccessTokenTable[int], Base):
     token: Mapped[str] = mapped_column(String(length=43), primary_key=True)
     user_id: Mapped[int] = mapped_column(
         ForeignKey("user.id", ondelete="CASCADE"), nullable=False
+    )
+    service_name: Mapped[str] = mapped_column(
+        String(50),
+        nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True),
