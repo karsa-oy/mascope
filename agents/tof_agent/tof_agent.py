@@ -88,8 +88,6 @@ from mascope_hardware.tofwerk.tof_streamer import TofDaqStreamer
 
 
 async def streamer_processor(streamer):
-    global sio
-
     # Handlers
     async def handle_spec_data(data):
         filename = data["filename"]
@@ -104,7 +102,6 @@ async def streamer_processor(streamer):
             # File finished
             runtime.logger.info("File finished")
             raw_filename = data["source_filepath"]
-            global target_path
             while True:
                 try:
                     shutil.copyfile(
@@ -176,47 +173,48 @@ async def streamer_processor(streamer):
 
 
 async def main():
-    global host
-    global port
-    global sio
-
-    url = None
-    if host and port:
-        url = f"http://{host}:{port}"
-    elif host:
-        url = f"http://{host}"
-    if not url:
-        runtime.logger.warning("Mascope host not defined, running in offline mode")
-    while url and not shutdown_event.is_set():
+    global URL
+    if HOST and PORT:
+        URL = f"http://{HOST}:{PORT}"
+    elif HOST:
+        URL = f"http://{HOST}"
+    if not URL:
+        runtime.logger.error(
+            "Mascope host not defined, please check configuration. Exiting..."
+        )
+        SHUTDOWN_EVENT.set()
+    while URL and not SHUTDOWN_EVENT.is_set():
         try:
-            runtime.logger.info(f"Connecting to {url}")
-            await sio.connect(url)
+            runtime.logger.info(f"Connecting to {URL}")
+            await sio.connect(URL)
+            runtime.logger.info(f"Connected!")
             break
         except:
             await asyncio.sleep(1)
-    while not shutdown_event.is_set():
+
+    while not SHUTDOWN_EVENT.is_set():
         await asyncio.sleep(1)
 
 
-host = None
-port = None
-shutdown_event = Event()
+HOST = None
+PORT = None
+URL = None
+SHUTDOWN_EVENT = Event()
 sio = socketio.AsyncClient(logger=False, ssl_verify=False)
-target_path = None
+TARGET_PATH = None
 
 
 def run():
-    global host
-    global port
-    global shutdown_event
-    global target_path
+    global HOST
+    global PORT
+    global TARGET_PATH
 
-    port = runtime.meta.api_port
-    host = runtime.config.host
-    target_path = runtime.config.target
+    PORT = runtime.meta.api_port
+    HOST = runtime.config.host
+    TARGET_PATH = runtime.config.target
 
     streamer = TofDaqStreamer(
-        shutdown_event=shutdown_event,
+        shutdown_event=SHUTDOWN_EVENT,
     )
     streamer.start()
 
@@ -226,10 +224,10 @@ def run():
     try:
         loop.run_until_complete(main())
     except KeyboardInterrupt:
-        shutdown_event.set()
+        SHUTDOWN_EVENT.set()
     except Exception as e:
         runtime.logger.error(e)
-        shutdown_event.set()
+        SHUTDOWN_EVENT.set()
 
 
 if __name__ == "__main__":
