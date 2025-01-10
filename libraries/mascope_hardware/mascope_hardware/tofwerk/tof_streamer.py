@@ -244,6 +244,7 @@ class TofDaqStreamer(BaseGenerator):
                     self.length = (
                         self.desc.nbrWrites * self.desc.nbrBufs
                     ) * self.interval  # [s]
+                    self.tic = 0
                     # Feed coordinates
                     self._feed_coordinates()
                     hardware_runtime.logger.info(
