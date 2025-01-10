@@ -6,6 +6,7 @@ import textwrap
 
 from multiprocessing import Event
 from queue import Empty
+import requests
 import socketio
 
 
@@ -87,6 +88,16 @@ else:
 from mascope_hardware.tofwerk.tof_streamer import TofDaqStreamer
 
 
+async def upload_sample_file(filepath):
+    upload_url = URL + "/api/sample/files/upload"
+    files = {"file": open(filepath, "rb")}
+    runtime.logger.info(upload_url)
+    resp = requests.post(upload_url, files=files, timeout=20, max_retries=5)
+    runtime.logger.debug(f"Response with status: {resp.status_code}, text: {resp.text}")
+    if resp.status_code != 200:
+        raise Exception(resp.text)
+
+
 async def streamer_processor(streamer):
     # Handlers
     async def handle_spec_data(data):
@@ -104,9 +115,8 @@ async def streamer_processor(streamer):
             raw_filename = data["source_filepath"]
             while True:
                 try:
-                    shutil.copyfile(
+                    await upload_sample_file(
                         raw_filename,
-                        os.path.join(target_path, os.path.basename(raw_filename)),
                     )
                     break
                 except Exception as e:
