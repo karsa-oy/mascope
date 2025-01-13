@@ -10,7 +10,7 @@ All developer docs are in this document:
 
 - **[🚀 Getting started](#getting-started)** - install and running - [windows](#windows) / [ubuntu](#ubuntu) / [cheatsheet](#cheatsheet)
 - **[🚂 Runtime](#runtime)** - devops toolchain - [api](#runtime-library) / [cli](#runtime-cli) / [modes](#runtime-modes) / [modules](#runtime-modules) / [envs](#runtime-environments) / [configs](#runtime-config) / [logging](#runtime-logging)
-- **[🤖 Agents](#agents)** - instrument agents - [file mover](#file-mover) / [tof agenet](#tof-agent)
+- **[🤖 Agents](#agents)** - instrument agents - [file mover](#file-mover) / [tof agent](#tof-agent)
 - **[📡 Backend](#backend)** - central server - [api](#backend-api) / [auth](#backend-auth) / [app](#backend-app) / [db](#backend-db) / [file converter](#backend-file-converter)
 - **[🖥️ Frontend](#frontend)** - user interface - [tech](#frontend-technologies) / [codebase](#frontend-codebase) / [api client](#frontend-api-client) / [stores](#frontend-stores) / [help mode](#frontend-user-help) / [tests](#frontend-tests)
 - **[📚 Libraries](#libraries)** - shared packages - [mascope_api](#mascope-api) / [mascope_hardware](#mascope-hardware) / [mascope_lib](#mascope-lib)
@@ -398,10 +398,10 @@ You will need to run the agent once so that it initializes the directory structu
 
 ### TOF Agent
 
-The tof agent agent is responsible for transforming and transfering files from TofWerk instrument machines
+The tof agent agent is responsible for transforming and transfering files from Tofwerk instrument machines
 to the server.
 
-To run all services needed to emulate the TofWerk acquisition workflow in development, run `mascope dev run tof`.
+To run all services needed to emulate the Tofwerk acquisition workflow in development, run `mascope dev run tof`.
 
 To build for production, run the following commands _on a Windows machine_:
 
@@ -414,7 +414,7 @@ Then run the executable found in `agents/file_mover/dist`.
 
 When you run this executable, the `MASCOPE_PATH` will be `%AppData%\Mascope\TofAgent` and the runtime environment will therefore be `%AppData%\Mascope\TofAgent\runtime\env\prod`.
 
-You will need to run the agent once so that it initializes the directory structure, but it will fail to resolve some paths because the configuration needs to be updated. Then go to the env path listed above and update `prod.mascope.toml` with the real paths.
+You will need to run the agent once so that it initializes the directory structure, but it will fail to resolve some paths because the configuration needs to be updated. Then go to the env path listed above and update `prod.mascope.toml` with the real paths and a valid access token (with write access).
 
 ## Backend
 

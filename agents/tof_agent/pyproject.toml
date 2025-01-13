@@ -14,13 +14,12 @@ mascope-tof-agent = 'tof_agent:run'
 
 [tool.poetry.dependencies]
 python = "~3.12"
+mascope_api = { path = '../../libraries/mascope_api/', develop = true }
 mascope_hardware = { path = '../../libraries/mascope_hardware/', develop = true }
 mascope_runtime = { path = '../../runtime/lib/', develop = true }
 
 python-socketio = "^5.11"
-pyyaml = "^6.0"
-aiohttp = "^3.9"
-requests = "^2.32.3"
+aiohttp = "^3.11.11"
 
 [tool.poetry.group.dev.dependencies]
 deptry = "^0.16"

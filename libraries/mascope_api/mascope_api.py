@@ -135,6 +135,72 @@ def api_post(url: str, path: str, access_token: str, data: dict):
     return resp
 
 
+def api_post_file(url: str, path: str, access_token: str, filepath: str):
+    """Send a POST request to the specified API endpoint with a path file to be uploaded.
+
+    :param url: The base URL of the server.
+    :type url: str
+    :param path: The specific API path to be appended to the base URL.
+    :type path: str
+    :param access_token: Authorization token for API access
+    :type access_token: str
+    :param filepath: Path to the file to be uploaded
+    :type filepath: str
+    :return: The response object if the request was successful, otherwise None.
+    :rtype: requests.Response or None
+    """
+    full_url = url + "/api/" + path
+    try:
+        headers = {"Authorization": f"Bearer {access_token}"}
+        with open(filepath, "rb") as file:
+            resp = requests.post(
+                full_url,
+                files={"file": file},
+                headers=headers,
+                verify=False,
+                timeout=30,
+            )
+        resp.raise_for_status()  # Raise HTTPError for bad responses
+        message = json.loads(resp.content).get("message", None)
+        if message is not None:
+            print(message)
+    except HTTPError as http_err:
+        if resp.status_code == 401 or resp.status_code == 403:
+            response = json.loads(resp.content)
+            error_message = response.get("detail", {}).get("error_message", None)
+            print(f"{error_message} Please check your API token.")
+        else:
+            try:
+                error_message = (
+                    json.loads(resp.content)
+                    .get("detail", {})
+                    .get(
+                        "error_message",
+                        "No additional error information from the server.",
+                    )
+                )
+            except json.JSONDecodeError:
+                error_message = "Failed to decode error message from server response."
+            print(
+                f"HTTP error: Unable to retrieve data from {full_url}. \nDetails: {http_err} \nServer message: {error_message}"
+            )
+        return None
+    except Timeout:
+        print(f"Timeout error: The request to {full_url} timed out.")
+        return None
+    except RequestException as req_err:
+        print(
+            f"Connection error: Could not connect to {full_url}. Please check the URL and your network connection. \nDetails: {req_err}"
+        )
+        return None
+    except Exception as e:
+        print(
+            f"Error: An unexpected error occurred while trying to reach {full_url}. \nDetails: {str(e)}"
+        )
+        return None
+    return resp
+
+
 ################
 # Workspaces API
 

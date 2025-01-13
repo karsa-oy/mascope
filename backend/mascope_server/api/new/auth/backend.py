@@ -72,12 +72,10 @@ async def get_enabled_backends(request: Request) -> list[AuthenticationBackend]:
     if auth_header and not cookie_auth:
         # Check if the endpoint allows for token access
         if hasattr(route_func, "token_access") and route_func.token_access:
-            runtime.logger.debug(
-                "Using Jupyter server or external API access authentication."
-            )
+            runtime.logger.debug("Using API access token authentication.")
             return [auth_backend_access_token]
         else:
-            runtime.logger.error("Unauthorized for Jupyter access.")
+            runtime.logger.error("Unauthorized for API access token.")
             return [auth_backend_cookie]
 
     # No valid authentication credentials found

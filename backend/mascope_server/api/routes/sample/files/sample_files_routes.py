@@ -121,7 +121,7 @@ async def delete_sample_file_route(sample_file_id: str, user=Depends(editor_user
 
 
 @sample_files_router.post("/upload")
-@api_route(status_code=201)
+@api_route(status_code=201, token_access=True)
 async def sample_file_upload_route(
     file: UploadFile = Depends(SampleFileUpload), user=Depends(editor_user)
 ):

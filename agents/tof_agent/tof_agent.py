@@ -5,11 +5,11 @@ import textwrap
 
 from multiprocessing import Event
 from queue import Empty
-import requests
 import socketio
 
 
 from mascope_runtime import MascopeRuntimeModule
+from mascope_api import api_post_file
 from mascope_hardware.runtime import init as init_hardware_runtime
 
 
@@ -56,19 +56,31 @@ sio = socketio.AsyncClient(logger=False, ssl_verify=False)
 
 
 async def upload_sample_file(filepath: str) -> None:
-    """Upload the acquired file to Mascope server using the /sample/files/upload endpoint
+    """Upload the acquired file to Mascope server using Mascope API
 
     :param filepath: Full path to the file to be uploaded
     :type filepath: str
     :raises Exception: Raises an exception if the request fails (status code != 200)
     """
-    upload_url = URL + "/api/sample/files/upload"
-    files = {"file": open(filepath, "rb")}
-    runtime.logger.info(upload_url)
-    resp = requests.post(upload_url, files=files, timeout=20, max_retries=5)
-    runtime.logger.debug(f"Response with status: {resp.status_code}, text: {resp.text}")
-    if resp.status_code != 200:
-        raise Exception(resp.text)
+
+    # Validate file before upload request
+    file_ext = os.path.splitext(filepath)[1]
+    if file_ext != ".h5":
+        raise ValueError(f"{file_ext} is not an allowed file extension!")
+
+    # Make file upload request
+    resp = api_post_file(
+        url=URL,
+        path="sample/files/upload",
+        access_token=runtime.config.access_token,
+        filepath=filepath,
+    )
+    if resp is not None:
+        runtime.logger.info(
+            f"File upload of file {os.path.basename(filepath)} succeeded!"
+        )
+    else:
+        raise Exception(f"File upload failed for file {os.path.basename(filepath)}")
 
 
 async def streamer_processor(streamer) -> None:
