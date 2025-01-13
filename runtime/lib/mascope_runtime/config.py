@@ -79,6 +79,7 @@ class MascopeTofAgentConfig(MascopeModuleConfig):
     host: str  # URL of the backend
     source: str  # folder to monitor in the instrument machine
     target: str  # folder to transfer samples to in the server
+    access_token: str  # API access token
 
 
 class MascopeFileMoverConfig(MascopeModuleConfig):

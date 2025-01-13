@@ -33,6 +33,7 @@ DEFAULT_CONFIG = textwrap.dedent(
     # settings
     host = 'localhost'
     target = './filestreams'
+    access_token = ''
 
     [hardware-lib]
     # meta
@@ -203,6 +204,9 @@ def initialize() -> None:
         # runtime state inherited from the CLI
         runtime = MascopeRuntimeModule("tof-agent")
         init_hardware_runtime()
+    # Check if API access token is left empty
+    if not runtime.config.access_token:
+        raise Exception("Please enter your API access token in the config!")
 
 
 async def main() -> None:
