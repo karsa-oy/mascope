@@ -1,6 +1,5 @@
 import asyncio
 import os
-import shutil
 import sys
 import textwrap
 
@@ -13,21 +12,11 @@ import socketio
 from mascope_runtime import MascopeRuntimeModule
 from mascope_hardware.runtime import init as init_hardware_runtime
 
-# check if we are running in a pyinstaller bundle
-bundled = getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS")
-
-
-def mkdir(*args):
-    path = os.path.join(*args)
-    if not os.path.exists(path):
-        os.makedirs(path)
-    return path
-
 
 # default configuration
 # created in production as an initial
 # template for users to modify
-default_config = textwrap.dedent(
+DEFAULT_CONFIG = textwrap.dedent(
     """\
     [meta]
     # meta
@@ -55,40 +44,23 @@ default_config = textwrap.dedent(
     """
 )
 
+HOST = None
+PORT = None
+URL = None
+SHUTDOWN_EVENT = Event()
+TARGET_PATH = None
 
-if bundled:
-    # prod mode
-    # set MASCOPE_PATH as %AppData%\Mascope\TOF_Agent
-    mascope_path = mkdir(os.environ["APPDATA"], "Mascope", "TofAgent")
-    os.environ.setdefault("MASCOPE_PATH", mascope_path)
-    # setup runtime environment
-    env_path = mkdir(mascope_path, "runtime", "env", "prod")
-    data_path = mkdir(env_path, "data")
-    mkdir(env_path, "logs")
-    # init config files if they don't exists
-    config_paths = [
-        os.path.join(env_path, "base.mascope.toml"),
-        os.path.join(env_path, "prod.mascope.toml"),
-    ]
-    for path in config_paths:
-        if not os.path.exists(path):
-            with open(path, "w") as file:
-                file.write(default_config)
-    # initialize the runtime in production mode
-    opts = dict(env="prod", mode="prod", path=mascope_path)
-    runtime = MascopeRuntimeModule("tof-agent", **opts)
-    init_hardware_runtime(**opts)
-else:
-    # dev mode
-    # runtime state inherited from the CLI
-    runtime = MascopeRuntimeModule("tof-agent")
-    init_hardware_runtime()
+runtime = None
+sio = socketio.AsyncClient(logger=False, ssl_verify=False)
 
 
-from mascope_hardware.tofwerk.tof_streamer import TofDaqStreamer
+async def upload_sample_file(filepath: str) -> None:
+    """Upload the acquired file to Mascope server using the /sample/files/upload endpoint
 
-
-async def upload_sample_file(filepath):
+    :param filepath: Full path to the file to be uploaded
+    :type filepath: str
+    :raises Exception: Raises an exception if the request fails (status code != 200)
+    """
     upload_url = URL + "/api/sample/files/upload"
     files = {"file": open(filepath, "rb")}
     runtime.logger.info(upload_url)
@@ -98,9 +70,28 @@ async def upload_sample_file(filepath):
         raise Exception(resp.text)
 
 
-async def streamer_processor(streamer):
-    # Handlers
-    async def handle_spec_data(data):
+async def streamer_processor(streamer) -> None:
+    """Streamer processor task
+
+    Monitors the TofDaqStreamer instance, and streams notifications to the server
+    about the status. When the acquisition is completed, uploads the file.
+
+    :param streamer: Streamer instance
+    :type streamer: TofDaqStreamer
+    :return: Returns nothing
+    :rtype: None
+    """
+
+    async def handle_spec_data(data: dict) -> None:
+        """Handle spectrum data from the streamer
+
+        Updates the log and emits notifications to the server about stream progress.
+
+        :param data: Input data from the streamer
+        :type data: dict
+        :return: Returns nothing
+        :rtype: None
+        """
         filename = data["filename"]
         instrument_name = filename.split("_")[0]
         spec_i = data["i"]
@@ -113,15 +104,12 @@ async def streamer_processor(streamer):
             # File finished
             runtime.logger.info("File finished")
             raw_filename = data["source_filepath"]
-            while True:
-                try:
-                    await upload_sample_file(
-                        raw_filename,
-                    )
-                    break
-                except Exception as e:
-                    runtime.logger.error(f"Failed to copy acquired file: {e}")
-                    await sio.sleep(1)
+            try:
+                await upload_sample_file(
+                    raw_filename,
+                )
+            except Exception as e:
+                runtime.logger.error(f"Failed to upload acquired file: {e}")
             if sio.connected:
                 await sio.emit(
                     "instrument_acquisition_finished",
@@ -143,12 +131,6 @@ async def streamer_processor(streamer):
                     notification_data,
                 )
         runtime.logger.info(f"{streamer.progress:.2f}")
-        return True
-
-    async def handle_tps_data(data):
-        return
-
-        # Main loop
 
     def format_filename(generator_data: dict) -> str:
         """Format raw filename (from data acquisition software) into Mascope sample file name
@@ -165,6 +147,7 @@ async def streamer_processor(streamer):
         formatted_filename = "_".join([formatted_filename, generator_data["polarity"]])
         return formatted_filename
 
+    # Main processing loop
     while not streamer.shutdown_event.is_set():
         try:
             # Check the queue for new data
@@ -172,17 +155,61 @@ async def streamer_processor(streamer):
             # Format filename
             spec_data.update({"filename": format_filename(spec_data)})
             # Handle spectrum data
-            success = await handle_spec_data(spec_data)
-            if success and hasattr(streamer, "tps_queue"):
-                tps_data = streamer.tps_queue.get()
-                # Format filename
-                tps_data.update({"filename": format_filename(tps_data)})
-                await handle_tps_data(tps_data)
+            await handle_spec_data(spec_data)
         except Empty:
             await asyncio.sleep(0.1)
 
 
-async def main():
+def initialize() -> None:
+    """Initialize the application and runtime depending on dev/prod mode
+
+    If in prod mode, check if runtime directory structure exists, and create if not.
+
+    :return: Return nothing
+    :rtype: None
+    """
+    global runtime
+    # check if we are running in a pyinstaller bundle
+    bundled = getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS")
+    if bundled:
+        # prod mode
+        def mkdir(*args):
+            path = os.path.join(*args)
+            if not os.path.exists(path):
+                os.makedirs(path)
+            return path
+
+        # set MASCOPE_PATH as %AppData%\Mascope\TOF_Agent
+        mascope_path = mkdir(os.environ["APPDATA"], "Mascope", "TofAgent")
+        os.environ.setdefault("MASCOPE_PATH", mascope_path)
+        # setup runtime environment
+        env_path = mkdir(mascope_path, "runtime", "env", "prod")
+        mkdir(env_path, "logs")
+        # init config files if they don't exists
+        config_paths = [
+            os.path.join(env_path, "base.mascope.toml"),
+            os.path.join(env_path, "prod.mascope.toml"),
+        ]
+        for path in config_paths:
+            if not os.path.exists(path):
+                with open(path, "w", encoding="utf8") as file:
+                    file.write(DEFAULT_CONFIG)
+        # initialize the runtime in production mode
+        opts = dict(env="prod", mode="prod", path=mascope_path)
+        runtime = MascopeRuntimeModule("tof-agent", **opts)
+        init_hardware_runtime(**opts)
+    else:
+        # dev mode
+        # runtime state inherited from the CLI
+        runtime = MascopeRuntimeModule("tof-agent")
+        init_hardware_runtime()
+
+
+async def main() -> None:
+    """Main task
+
+    Connect socket with the server and wait for shutdown event
+    """
     global URL
     if HOST and PORT:
         URL = f"http://{HOST}:{PORT}"
@@ -193,28 +220,33 @@ async def main():
             "Mascope host not defined, please check configuration. Exiting..."
         )
         SHUTDOWN_EVENT.set()
-    while URL and not SHUTDOWN_EVENT.is_set():
+    while not SHUTDOWN_EVENT.is_set():
         try:
             runtime.logger.info(f"Connecting to {URL}")
             await sio.connect(URL)
-            runtime.logger.info(f"Connected!")
+            runtime.logger.info("Connected!")
             break
-        except:
+        except Exception as e:
+            runtime.logger.error(f"Failed to connect: {e}")
+            # Try again in a second
             await asyncio.sleep(1)
 
     while not SHUTDOWN_EVENT.is_set():
         await asyncio.sleep(1)
 
 
-HOST = None
-PORT = None
-URL = None
-SHUTDOWN_EVENT = Event()
-sio = socketio.AsyncClient(logger=False, ssl_verify=False)
-TARGET_PATH = None
+def run() -> None:
+    """Run method
 
+    Initializes TofDaqStreamer thread, processor task and the main task.
+    Then waits for keyboard interrupt.
+    """
 
-def run():
+    # Initialize runtime
+    initialize()
+    # TofDaqStreamer has to be imported after runtime initialization
+    from mascope_hardware.tofwerk.tof_streamer import TofDaqStreamer
+
     global HOST
     global PORT
     global TARGET_PATH
@@ -223,20 +255,24 @@ def run():
     HOST = runtime.config.host
     TARGET_PATH = runtime.config.target
 
+    # Initialize streamer thread
     streamer = TofDaqStreamer(
         shutdown_event=SHUTDOWN_EVENT,
     )
     streamer.start()
 
     loop = asyncio.get_event_loop()
+
+    # Create streamer processor task
     loop.create_task(streamer_processor(streamer))
 
     try:
+        # Run main task until shutdown event
         loop.run_until_complete(main())
     except KeyboardInterrupt:
         SHUTDOWN_EVENT.set()
     except Exception as e:
-        runtime.logger.error(e)
+        runtime.logger.error(f"Encountered an error: {e}")
         SHUTDOWN_EVENT.set()
 
 
