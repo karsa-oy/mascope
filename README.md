@@ -398,8 +398,7 @@ You will need to run the agent once so that it initializes the directory structu
 
 ### TOF Agent
 
-The tof agent agent is responsible for transforming and transfering files from Tofwerk instrument machines
-to the server.
+The tof agent agent is responsible for transforming and transfering files from Tofwerk instrument machines to the server.
 
 To run all services needed to emulate the Tofwerk acquisition workflow in development, run `mascope dev run tof`.
 
@@ -414,7 +413,7 @@ Then run the executable found in `agents/file_mover/dist`.
 
 When you run this executable, the `MASCOPE_PATH` will be `%AppData%\Mascope\TofAgent` and the runtime environment will therefore be `%AppData%\Mascope\TofAgent\runtime\env\prod`.
 
-You will need to run the agent once so that it initializes the directory structure, but it will fail to resolve some paths because the configuration needs to be updated. Then go to the env path listed above and update `prod.mascope.toml` with the real paths and a valid access token (with write access).
+You will need to run the agent once so that it initializes the directory structure, but it will fail to resolve some paths because the configuration needs to be updated. Then go to the env path listed above and update `prod.mascope.toml` with server URL and a valid access token (with write access).
 
 ## Backend
 

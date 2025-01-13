@@ -32,7 +32,6 @@ DEFAULT_CONFIG = textwrap.dedent(
     log_path = './logs'
     # settings
     host = 'localhost'
-    target = './filestreams'
     access_token = ''
 
     [hardware-lib]
@@ -49,7 +48,6 @@ HOST = None
 PORT = None
 URL = None
 SHUTDOWN_EVENT = Event()
-TARGET_PATH = None
 
 runtime = None
 sio = socketio.AsyncClient(logger=False, ssl_verify=False)
@@ -265,11 +263,9 @@ def run() -> None:
 
     global HOST
     global PORT
-    global TARGET_PATH
 
     PORT = runtime.meta.api_port
     HOST = runtime.config.host
-    TARGET_PATH = runtime.config.target
 
     # Initialize streamer thread
     streamer = TofDaqStreamer(
