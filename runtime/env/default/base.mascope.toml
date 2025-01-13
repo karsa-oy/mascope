@@ -49,8 +49,7 @@ tags = ['agents', 'tof', 'all']
 log_path = './logs'
 # settings
 host = 'localhost'
-source = './agents/tof_agent'
-target = './filestreams'
+access_token = ''
 # scripts
 install = "poetry install"
 uninstall = "poetry env remove --all"
