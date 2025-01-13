@@ -12,4 +12,5 @@ poetry run pyinstaller @(
     '--icon=assets/icon.ico'                      # use the Mascope icon
     '--collect-all', 'mascope_hardware.tofwerk'   # bundle tofwerk lib
     '--collect-all', 'mascope_runtime'            # bundle runtime lib
+    '--collect-all', 'mascope_api'                # bundle mascope api wrapper
 )
