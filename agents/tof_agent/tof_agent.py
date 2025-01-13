@@ -273,7 +273,8 @@ def run() -> None:
     )
     streamer.start()
 
-    loop = asyncio.get_event_loop()
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
 
     # Create streamer processor task
     loop.create_task(streamer_processor(streamer))
