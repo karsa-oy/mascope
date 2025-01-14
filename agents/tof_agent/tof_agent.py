@@ -1,6 +1,7 @@
 import asyncio
 import os
 import sys
+import threading
 import textwrap
 
 from multiprocessing import Event
@@ -53,7 +54,7 @@ runtime = None
 sio = socketio.AsyncClient(logger=False, ssl_verify=False)
 
 
-async def upload_sample_file(filepath: str) -> None:
+def upload_sample_file(filepath: str) -> None:
     """Upload the acquired file to Mascope server using Mascope API
 
     :param filepath: Full path to the file to be uploaded
@@ -116,9 +117,11 @@ async def streamer_processor(streamer) -> None:
             runtime.logger.info("File finished")
             raw_filename = data["source_filepath"]
             try:
-                await upload_sample_file(
-                    raw_filename,
+                # Spawn a thread for file upload to not block the processing of subsequent acquisitions
+                upload_thread = threading.Thread(
+                    target=upload_sample_file, args=(raw_filename,), daemon=True
                 )
+                upload_thread.start()
             except Exception as e:
                 runtime.logger.error(f"Failed to upload acquired file: {e}")
             if sio.connected:
