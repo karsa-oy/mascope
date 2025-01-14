@@ -415,6 +415,8 @@ When you run this executable, the `MASCOPE_PATH` will be `%AppData%\Mascope\TofA
 
 You will need to run the agent once so that it initializes the directory structure, but it will fail to resolve some paths because the configuration needs to be updated. Then go to the env path listed above and update `prod.mascope.toml` with server URL and a valid access token (with write access).
 
+_NOTE:_ In case the config schema is changed, any existing configuration in the target environment must be deleted prior to running the updated version of TofAgent, in order to initialize correct configs.
+
 ## Backend
 
 ```
