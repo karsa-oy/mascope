@@ -45,6 +45,7 @@ DEFAULT_CONFIG = textwrap.dedent(
     """
 )
 
+FILE_UPLOAD_SIZE_LIMIT = 200 * 1024 * 1024  # 200 MB
 HOST = None
 PORT = None
 URL = None
@@ -63,9 +64,16 @@ def upload_sample_file(filepath: str) -> None:
     """
 
     # Validate file before upload request
+    # file extension
     file_ext = os.path.splitext(filepath)[1]
     if file_ext != ".h5":
         raise ValueError(f"{file_ext} is not an allowed file extension!")
+    # file size
+    file_size = os.stat(filepath).st_size
+    if file_size > FILE_UPLOAD_SIZE_LIMIT:
+        raise ValueError(
+            f"File size ({round(file_size / (1024 * 1024), 1)} MB) exceeds the maximum allowed size ({FILE_UPLOAD_SIZE_LIMIT / (1024 * 1024)} MB)"
+        )
 
     # Make file upload request
     resp = api_post_file(
@@ -74,6 +82,7 @@ def upload_sample_file(filepath: str) -> None:
         access_token=runtime.config.access_token,
         filepath=filepath,
     )
+
     if resp is not None:
         runtime.logger.info(
             f"File upload of file {os.path.basename(filepath)} succeeded!"
