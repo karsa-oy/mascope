@@ -172,6 +172,8 @@ async def streamer_processor(streamer) -> None:
             await handle_spec_data(spec_data)
         except Empty:
             await asyncio.sleep(0.1)
+        except Exception as e:
+            runtime.logger.error(f"Failed to process data from the TOF streamer: {e}")
 
 
 def initialize() -> None:
