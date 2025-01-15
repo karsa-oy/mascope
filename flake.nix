@@ -20,6 +20,7 @@
             dotnet
             concurrently
             docker_27
+            openssl
           ];
         profile = ''
           pipx ensurepath
