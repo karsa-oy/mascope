@@ -3,6 +3,8 @@ Functions for target ions and target isotopes generation.
 """
 
 from typing import List
+from functools import partial
+import numpy as np
 from IsoSpecPy import IsoThreshold
 from mascope_lib.molmass import Formula
 from mascope_lib.molmass.elements import ELECTRON
@@ -181,3 +183,62 @@ def generate_target_ions_from_mass(
         )
 
     return target_ions, target_isotopes
+
+
+def group_target_isotopes(masses: list, probs: list, resolution: float) -> tuple:
+    """
+    Group target isotope m/z and relative abundance (probs) to produce lower resolution isotopes.
+
+    The width of the group/bin is defined as dmz = FWHM / 2 = m/z / resolution / 2.
+
+    :param masses: High resolution target isotope m/z
+    :type masses: list
+    :param probs: High resolution target isotope relative abundance
+    :type probs: list
+    :param resolution: Resolution value
+    :type resolution: float
+    :return: Tuple with lists of grouped "mz", "relative_abundance" values
+    :rtype: tuple
+    """
+    # Convert to numpy arrays to simplify computations
+    mz = np.array(masses)
+    intensity = np.array(probs)
+
+    # Sort by m/z to ensure proper binning
+    sorted_indices = np.argsort(mz)
+    mz = mz[sorted_indices]
+    intensity = intensity[sorted_indices]
+
+    # Init grouped m/z and intensity lists
+    mz_grouped = []
+    intensity_grouped = []
+
+    i = 0
+    while i < mz.size:
+        # Calculate bin width for the current m/z
+        dmz = mz[i] / resolution / 2
+
+        # Determine bin size
+        bin_mask = (mz >= mz[i]) & (mz < mz[i] + dmz)
+
+        # Extract values within the current bin
+        mz_bin = mz[bin_mask]
+        intensity_bin = intensity[bin_mask]
+
+        # Final isotope intensity
+        intensity_total = np.sum(intensity_bin)
+
+        # Calculate center of mass for mz in the bin
+        if intensity_total > 0:
+            mz_bin_center = np.sum(mz_bin * intensity_bin) / intensity_total
+        else:
+            mz_bin_center = np.mean(mz_bin)
+
+        # Store grouped values
+        mz_grouped.append(mz_bin_center)
+        intensity_grouped.append(intensity_total)
+
+        # Move to the next bin, skipping all processed values
+        i += np.sum(bin_mask)
+
+    return mz_grouped, intensity_grouped
