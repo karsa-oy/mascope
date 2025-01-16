@@ -97,8 +97,12 @@ def process_stream(streamer):
                 runtime.logger.exception(e)
 
             # Send request to Mascope backend to create sample file record in the db
+            # with authentication if available
             try:
-                create_sample_file_db_record(data)
+                context = socket_client.context_manager.get_context(filename)
+                create_sample_file_db_record(
+                    data=data, access_token=context.access_token
+                )
             except Exception as e:
                 runtime.logger.error(f"Failed to create database record")
                 runtime.logger.exception(e)

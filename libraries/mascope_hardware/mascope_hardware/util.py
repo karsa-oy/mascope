@@ -10,11 +10,13 @@ host = runtime.config.server if runtime.mode == "prod" else "localhost"
 url = f"http://{host}:{runtime.meta.api_port}"
 
 
-def create_sample_file_db_record(data):
+def create_sample_file_db_record(data, access_token=None):
     """Create a sample file database record by a HTTP request
 
     :param data: Sample file object to create
     :type data: dict
+    :param access_token: Optional access_token for request authentication
+    :type headers: str
     :raises Exception: HTTP request failed
     """
     filename = data["filename"]
@@ -50,6 +52,8 @@ def create_sample_file_db_record(data):
         sample_file_db_record["method_file"] = method_file
 
     headers = {"Content-Type": "application/json"}
+    if access_token:
+        headers["Authorization"] = f"Bearer {access_token}"
 
     response = requests.post(
         f"{url}/api/sample/files", headers=headers, json=sample_file_db_record

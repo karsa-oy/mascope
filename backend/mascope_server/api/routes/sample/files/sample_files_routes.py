@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, BackgroundTasks, Request, Depends, UploadFile
 from mascope_server.db.id import gen_id
+from mascope_server.api.new.auth import auth_backend_access_token
 from mascope_server.api.new.auth.dependencies import guest_user, editor_user
 from mascope_server.api.lib.api_features import api_route
 from mascope_server.api.controllers.sample.files.sample_files_controller import (
@@ -79,10 +80,9 @@ async def get_sample_file_route(sample_file_id: str, user=Depends(guest_user)):
 
 
 @sample_files_router.post("")
-@api_route(status_code=201)
+@api_route(status_code=201, token_access=True)
 async def create_sample_file_route(
-    sample_file: SampleFileCreate,
-    #   user=Depends(editor_user) #TODO protect the route, figure how to authenticate request from the file_converter service.
+    sample_file: SampleFileCreate, user=Depends(editor_user)
 ):
     """Create a new sample file record.
 
