@@ -1,6 +1,6 @@
 import os
 from datetime import datetime
-from fastapi import UploadFile
+from fastapi import Depends, UploadFile
 from sqlalchemy import (
     select,
     asc,
@@ -13,7 +13,8 @@ from mascope_lib.file_func import get_instrument_type
 from mascope_server.socket import sio
 from mascope_server.db import async_session
 from mascope_server.db.id import gen_id
-from mascope_server.db.models import SampleFile
+from mascope_server.db.models import SampleFile, User
+from mascope_server.api.new.auth.access_token.service import get_access_token
 from mascope_server.api.controllers.instrument_functions.lib.instrument_functions_fetch import (
     read_instrument_function,
 )
@@ -26,6 +27,7 @@ from mascope_server.api.models.sample.files.sample_file_pydantic_model import (
     SampleFileCreate,
     SampleFileUpdate,
 )
+from mascope_server.socket import event_emitter
 from mascope_server.socket.notifications import (
     UserNotification,
     emit_user_notification,
@@ -286,7 +288,9 @@ FILE_UPLOAD_CHUNK_SIZE = 2 * 1024 * 1024  # 2 MB
 
 
 @api_controller()
-async def sample_file_upload(file: UploadFile) -> dict:
+async def sample_file_upload(
+    file: UploadFile, user: User, strategy, user_sid: str = None
+) -> dict:
     """
     Handles the upload of a sample file and saves it to the `filestreams` directory.
 
@@ -295,6 +299,12 @@ async def sample_file_upload(file: UploadFile) -> dict:
 
     :param file: The uploaded file to be processed.
     :type file: UploadFile
+    :param user: The authenticated user
+    :type user: User
+    :param strategy: The authentication strategy for issueing the file-converter access token
+    :type strategy: AuthenticationBackend
+    :param user_sid : Scocket client session ID, used for protecting events received from file-converter service.
+    :type user_sid : str, optional
     :return: A dictionary containing the success message.
     :rtype: dict
     """
@@ -305,6 +315,22 @@ async def sample_file_upload(file: UploadFile) -> dict:
             # read the file in chunks to ensure it doesn't fill memory
             while contents := file.file.read(FILE_UPLOAD_CHUNK_SIZE):
                 f.write(contents)
+
+        # Get service token for file converter
+        access_token = await get_access_token(
+            user=user, strategy=strategy, service_name="file-converter"
+        )
+        # Emit internal event for file upload
+        await event_emitter.emit(
+            "file-converter.auth",
+            {
+                "filename": file.filename,
+                "user_id": user.id,
+                "username": user.username,
+                "role_id": user.role_id,
+                "access_token": access_token,
+            },
+        )
     except Exception as e:
         raise RuntimeError(f"Failed to upload file {file.filename}: {e}") from e
     finally:

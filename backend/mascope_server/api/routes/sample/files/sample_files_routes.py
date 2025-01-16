@@ -123,7 +123,10 @@ async def delete_sample_file_route(sample_file_id: str, user=Depends(editor_user
 @sample_files_router.post("/upload")
 @api_route(status_code=201, token_access=True)
 async def sample_file_upload_route(
-    file: UploadFile = Depends(SampleFileUpload), user=Depends(editor_user)
+    request: Request,
+    file: UploadFile = Depends(SampleFileUpload),
+    user=Depends(editor_user),
+    strategy=Depends(auth_backend_access_token.get_strategy),
 ):
     """
     Uploads a sample file to the server.
@@ -133,11 +136,18 @@ async def sample_file_upload_route(
 
     :param file: The file to be uploaded, provided in a form field.
     :type file: UploadFile
+    :param user: The authenticated user from dependency injection
+    :type user: User
+    :param strategy: The authentication strategy for issueing the file-converter access token
+    :type strategy: AuthenticationBackend
     :return: A JSON response indicating the success or failure of the upload.
     :rtype: JSONResponse
     """
     # Access the file using file.file
-    return await sample_file_upload(file.file)
+    user_sid = request.headers.get("X-SID")
+    return await sample_file_upload(
+        file=file.file, user=user, strategy=strategy, user_sid=user_sid
+    )
 
 
 @sample_files_router.get("/{sample_file_id}/peaks")

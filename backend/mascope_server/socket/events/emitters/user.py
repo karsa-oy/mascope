@@ -15,4 +15,3 @@ async def notify_clients_of_user_update(user: Optional[User] = None):
     await sio.emit("user_reload_all", namespace="/")
     if user:
         await sio.emit("user_reload_me", room=f"user-{user.id}", namespace="/")
-    return

@@ -1,3 +1,4 @@
 """Event emitters for server-side events that may trigger socket communications."""
 
 from . import user
+from . import file_converter
