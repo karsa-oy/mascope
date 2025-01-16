@@ -4,7 +4,6 @@ from multiprocessing import Event, Lock, Queue
 from queue import Empty
 from threading import Thread
 from time import sleep
-import socketio
 
 import mascope_lib.runtime as lib_runtime
 
@@ -25,9 +24,8 @@ from mascope_hardware.tofwerk.h5_streamer import H5Streamer  # this comes first
 from mascope_hardware.orbitrap.generator import RawProcessor  # and this comes second
 from mascope_hardware.util import create_sample_file_db_record
 
-
 from mascope_runtime import MascopeRuntimeModule
-
+from .socket.client import FileConverterSocketClient
 from .watcher import FSWatcher
 
 
@@ -45,7 +43,7 @@ def process_stream(streamer):
     :type streamer: H5Streamer or RawProcessor
     """
     global cache
-    global sio
+    global socket_client
 
     # Handlers
     def handle_spec_data(data):
@@ -104,14 +102,16 @@ def process_stream(streamer):
             except Exception as e:
                 runtime.logger.error(f"Failed to create database record")
                 runtime.logger.exception(e)
+
             try:
-                sio.emit(
-                    "instrument_conversion_finished",
-                    notification_data,
-                )
+                # Emit with user context
+                socket_client.emit("file_conversion_finished", notification_data)
+                # Clear context after successful processing
+                socket_client.context_manager.clear_context(filename)
             except Exception as e:
                 runtime.logger.error(f"Failed to emit notification")
                 runtime.logger.exception(e)
+
         elif spec_i < 0:
             # New file
             try:
@@ -124,18 +124,19 @@ def process_stream(streamer):
             sample_file = AttrDict(sample_file)
             cache[filename] = sample_file
             try:
-                sio.emit("instrument_conversion_started", notification_data)
+                socket_client.emit("file_conversion_started", notification_data)
             except Exception as e:
-                runtime.logger.error(f"Failed to emit notification")
+                runtime.logger.error("Failed to emit notification")
                 runtime.logger.exception(e)
         else:
             # New data to existing file
             zarr_sdk.update_signal_dataset(data, sample_file)
             try:
                 runtime.logger.info(notification_data["progress"])
-                sio.emit("instrument_conversion_progress", notification_data)
+                socket_client.emit("file_conversion_progress", notification_data)
+                # sio.emit("instrument_conversion_progress", notification_data)
             except Exception as e:
-                runtime.logger.error(f"Failed to emit notification")
+                runtime.logger.error("Failed to emit notification")
                 runtime.logger.exception(e)
         return True
 
@@ -176,29 +177,28 @@ def process_stream(streamer):
 
 def main():
     """Main loop of the service. Connect socket.io and then do nothing."""
-    global sio
+    global socket_client
     runtime.logger.info(f"Attempting to connect to {url}...")
     while not shutdown_event.is_set():
         # Keep trying to connect to socket.io server
         try:
-            sio.connect(url)
+            socket_client.connect()
             break
         except:
             # Connection timed out, wait before retry
             sleep(1)
-    runtime.logger.info(f"Connection established to {url}")
     # socket.io connection established
     while not shutdown_event.is_set():
         # Wait for shutdown event
         sleep(1)
 
 
+# Global variables
 cache = None
 raw_file_queue = Queue()
 h5_file_queue = Queue()
 shutdown_event = Event()
-
-sio = socketio.Client(logger=False, ssl_verify=False)
+socket_client = FileConverterSocketClient(url)
 
 
 def run():
