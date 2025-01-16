@@ -45,3 +45,52 @@ def socket_auth(minimum_role: str):
         return wrapper
 
     return decorator
+
+
+def file_converter_socket_auth(minimum_role: str):
+    """
+    Decorator for file-converter events that validates access token and permissions.
+
+    :param minimum_role: Minimum role required
+    :type minimum_role: str
+    """
+
+    def decorator(handler: Callable):
+        @wraps(handler)
+        async def wrapper(sid: str, data: dict, *args, **kwargs):
+            try:
+                # Get access token from event data
+                access_token = data.pop("access_token", None)
+                if not access_token:
+                    raise SocketUnauthenticatedError("Missing access token")
+
+                # Validate token and get user
+                user = await validate_service_access_token(access_token=access_token)
+
+                # Check role permissions
+                required_role_id = auth_settings.ROLE_ACCESS_LEVELS.get(minimum_role)
+                if required_role_id is None:
+                    runtime.logger.error(f"Invalid role configuration: {minimum_role}")
+                    raise SocketAuthConfigError()
+
+                if user.role_id < required_role_id:
+                    raise SocketForbiddenError()
+
+                runtime.logger.debug(
+                    f"Authenticated file-converter event from user '{user.username}' "
+                    f"with role_id {user.role_id} for file '{data.get('filename', 'unknown')}'"
+                )
+
+                return await handler(sid, data, *args, **kwargs)
+
+            except SocketAuthError as e:
+                runtime.logger.error(f"File converter auth error: {str(e)}")
+                raise
+            except Exception as e:
+                runtime.logger.error(
+                    f"Unexpected file-converter socket auth error: {str(e)}"
+                )
+
+        return wrapper
+
+    return decorator
