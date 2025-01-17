@@ -230,12 +230,18 @@
     max-width: 190px;
   }
 
-  .disable-tooltips .p-tooltip {
-    display: none !important;
-  }
-
   code {
     font-family: monospace;
+  }
+
+  /* Tooltips */
+
+  .p-tooltip {
+    max-width: 800px !important;
+  }
+
+  .disable-tooltips .p-tooltip {
+    display: none !important;
   }
 }
 

@@ -600,7 +600,10 @@ api.socket.on('sample_batch_reload', (e) => {
                 :class="`pi pi-chevron-${data.sample_batch_id in batch.expanded ? 'down' : 'right'}`"
                 style="font-size: smaller; margin-right: 0.5rem"
               />
-              <BaseCopyableField :field="data.sample_batch_name" />
+              <BaseCopyableField
+                :field="data.sample_batch_name"
+                v-tooltip="{ value: `${data.sample_batch_description}`, showDelay: 1000 }"
+              />
             </div>
           </template>
         </Column>
