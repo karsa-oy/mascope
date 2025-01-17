@@ -1,0 +1,107 @@
+from datetime import datetime
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+from mascope_server.api.models.base_pydantic_model import QueryParamsModel
+from mascope_server.api.new.instrument_configs.params import InstrumentConfigParams
+
+
+instrument_config_params = InstrumentConfigParams()
+
+
+class GetInstrumentConfigsQueryParams(QueryParamsModel):
+    filename: str | None = Field(None, description="Filter by filename")
+    instrument: str | None = Field(None, description="Filter by instrument name.")
+    method_file: str | None = Field(None, description="Filter by method file name.")
+    sort: str | None = Field(None, description="Field to sort by.")
+    order: str | None = Field(
+        None, description="Order of sorting, can be either 'asc' or 'desc'."
+    )
+    page: int = Field(0, description="Page number for pagination.")
+    limit: int = Field(10000, description="Number of items per page.")
+
+
+class PeakShape(BaseModel):
+    x: list[float] = Field(
+        ...,
+        description="X-axis values representing the mass-to-charge ratio (m/z) for the peak shape.",
+    )
+    y: list[float] = Field(
+        ...,
+        description="Y-axis values representing intensity for each corresponding m/z value in the peak shape.",
+    )
+
+
+class InstrumentFunctionData(BaseModel):
+    instrument: str = Field(..., description="Instrument name")
+    datetime_utc: datetime = Field(
+        ...,
+        description="UTC timestamp of the sample file used to fit the instrument functions.",
+    )
+    peakshape: PeakShape = Field(..., description="Peak shape data")
+    resolution_function: list[float] = Field(
+        ...,
+        description="Parameters defining the resolution function, which is used to scale the width of peaks accurately during peak fitting.",
+    )
+
+
+class InstrumentConfigFitParams(BaseModel):
+    threshold: float = Field(
+        default=instrument_config_params.threshold,
+        description="R-squared threshold filtering non-(skewed) Gaussian peaks from instrument function evaluation",
+    )
+
+    @field_validator("threshold")
+    @classmethod
+    def validate_threshold(cls, v):
+        if not 0 <= v < 1:
+            raise ValueError(
+                "R-squared threshold must be between 0 and 1, inclusive of 0."
+            )
+        return v
+
+
+class CreateInstrumentConfigBody(BaseModel):
+    instrument: str | None = Field(None, description="Instrument name")
+    datetime_utc: datetime | None = Field(
+        None,
+        description="UTC timestamp of the sample file used to fit the instrument functions.",
+    )
+    peakshape: PeakShape | None = Field(None, description="Peak shape data")
+    resolution_function: list[float] = Field(
+        None,
+        description="Parameters defining the resolution function, which is used to scale the width of peaks accurately during peak fitting.",
+    )
+    method_file: str = Field(
+        ...,
+        description="Name of the instrument config. Must be unique for each instrument.",
+    )
+
+
+class SetInstrumentConfigBody(BaseModel):
+    new_record: CreateInstrumentConfigBody | None = Field(
+        None, description="A new instrument config to create"
+    )
+    instrument_function_id: str | None = Field(
+        None, description="An existing instrument config id to use"
+    )
+
+    @model_validator(mode="after")
+    @classmethod
+    def either_new_or_existing(cls, values):
+        expected_either = "Instrument config: expecting either an instrument_function_id argument or a new_record"
+        both = values.instrument_function_id and values.new_record
+        if both:
+            raise ValueError(f"{expected_either} but both were provided.")
+        neither = (not values.instrument_function_id) and (not values.new_record)
+        if neither:
+            raise ValueError(f"{expected_either} but neither was provided.")
+
+        return values
+
+
+class FitInstrumentConfigBody(BaseModel):
+    filename: str = Field(..., description="The filename of the file used for the fit")
+    instrument_config_params: InstrumentConfigFitParams = Field(
+        InstrumentConfigFitParams(),
+        description="The instrument function fitting parameters",
+    )

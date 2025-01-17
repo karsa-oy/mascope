@@ -5,8 +5,8 @@ from mascope_server.api.models.calibration.calibration_pydantic_model import (
     MzCalibrationParams,
 )
 from mascope_server.api.models.base_pydantic_model import QueryParamsModel
-from mascope_server.api.models.instrument_functions.instrument_function_pydantic_model import (
-    InstrumentFunctionBase,
+from mascope_server.api.new.instrument_configs.schemas import (
+    SetInstrumentConfigBody,
 )
 
 # TODO_configuration possible sample item types list, split by filter_id presence
@@ -80,8 +80,12 @@ class SampleItemCreate(SampleItemBase):
     pass
 
 
-class SampleItemUpdate(SampleItemBase):
-    pass
+class SampleItemUpdate(BaseModel):
+    sample: SampleItemBase = Field(..., description="The sample item fields to update")
+    instrument_config: SetInstrumentConfigBody | None = Field(
+        None,
+        description="An instrument config to set for the sample item.",
+    )
 
 
 class GetSampleItemsQueryParams(QueryParamsModel):
@@ -115,23 +119,7 @@ class SampleItemProcessBody(BaseModel):
     sample_item: SampleItemCreate = Field(
         ..., description="Sample item to be processed (created, calibrated, matched)"
     )
-    existing_method_file: Optional[str] = Field(
-        None, description="An existing method file to use for this sample"
-    )
-    new_method_file: Optional[str] = Field(
-        None, description="A new method file to create and use for this sample"
-    )
-    new_instrument_function: Optional[InstrumentFunctionBase] = Field(
-        None,
-        description="Instrument functions to create and associate with the sample file",
+    instrument_config: SetInstrumentConfigBody = Field(
+        ..., description="Instrument config to set for the sample item"
     )
     mz_calibration_params: MzCalibrationParams = MzCalibrationParams()
-
-    @model_validator(mode="after")
-    @classmethod
-    def validate_method_file_fields(cls, values):
-        if values.existing_method_file and values.new_method_file:
-            raise ValueError(
-                f"Process instrument function ({values.sample_item.filename}): expecting either an existing_method_file argument or a new_method_file_argument but not both."
-            )
-        return values

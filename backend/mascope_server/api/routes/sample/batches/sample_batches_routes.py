@@ -1,5 +1,6 @@
 from fastapi import APIRouter, BackgroundTasks, Request, Depends
 from mascope_server.db.id import gen_id
+from mascope_server.api.lib.exceptions.api_exceptions import NotFoundException
 from mascope_server.api.lib.api_features import api_route
 from mascope_server.api.new.auth.dependencies import editor_user, guest_user
 from mascope_server.api.controllers.sample.batches.sample_batches_controller import (
@@ -21,6 +22,7 @@ from mascope_server.api.models.sample.batches.sample_batch_pydantic_model import
     SampleBatchImportSamplesBody,
     SampleBatchCopyBody,
 )
+from mascope_server.api.new.instrument_configs.service import get_instrument_config
 
 sample_batches_router = APIRouter(prefix="/api/sample/batches", tags=["Sample Batches"])
 
@@ -209,6 +211,17 @@ async def import_sample_items_route(
     if any(si.sample_batch_id != sample_batch_id for si in body.sample_items):
         raise ValueError("The sample_batch_id in the route and sample_items must match")
 
+    # Verify instrument config exists
+    if body.instrument_config.instrument_function_id:
+        instrument_config_record = await get_instrument_config(
+            instrument_function_id=body.instrument_config.instrument_function_id
+        )
+        if not instrument_config_record:
+            raise NotFoundException(
+                "import sample items: no record found with instrument_function_id "
+                + body.instrument_config.instrument_function_id
+            )
+
     # Verify the existance of sample batch
     sample_batch_result = await get_sample_batch(sample_batch_id)
     sample_batch = sample_batch_result.get("data")
@@ -222,6 +235,7 @@ async def import_sample_items_route(
         sample_batch_id=sample_batch_id,
         sample_items=body.sample_items,
         mz_calibration_params=body.mz_calibration_params,
+        instrument_config=body.instrument_config,
         calibrate_batch=body.calibrate_batch,
         independent_transaction=True,
         sid=sid,

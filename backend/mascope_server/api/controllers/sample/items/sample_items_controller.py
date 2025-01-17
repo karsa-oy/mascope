@@ -1,5 +1,4 @@
 from datetime import datetime, timezone
-from typing import Optional
 from fastapi import BackgroundTasks
 from sqlalchemy import (
     select,
@@ -42,11 +41,9 @@ from mascope_server.socket.notifications import (
     UserNotification,
     send_progress_user_notification,
 )
-from mascope_server.api.controllers.instrument_functions.process_instrument_function_controller import (
-    process_instrument_function,
-)
-from mascope_server.api.models.instrument_functions.instrument_function_pydantic_model import (
-    InstrumentFunctionBase,
+from mascope_server.api.new.instrument_configs.service import get_instrument_config
+from mascope_server.api.new.instrument_configs.schemas import (
+    SetInstrumentConfigBody,
 )
 
 
@@ -209,7 +206,12 @@ async def create_sample_item(
 
 @api_controller()
 async def update_sample_item(
-    sample_item_id: str, sample_item: SampleItemUpdate
+    sample_item_id: str,
+    sample_item: SampleItemUpdate,
+    instrument_config: SetInstrumentConfigBody | None = None,
+    background_tasks: BackgroundTasks | None = None,
+    sid=None,
+    process_id=None,
 ) -> dict:
     """
     Updates an existing sample item with new data provided in the sample item update request body.
@@ -219,7 +221,8 @@ async def update_sample_item(
     2. If the sample item is found, update its properties with the new data provided.
     3. Set the sample item's modification timestamp to the current UTC time.
     4. Commit the updated sample item to the database.
-    5. Emit socket.io events to inform clients about the sample item update.
+    5. Process instrument configs for the sample item if needed.
+    6. Reload the sample batch if needed.
 
     :param sample_item_id: The unique identifier of the sample item to update.
     :type sample_item_id: str
@@ -230,6 +233,16 @@ async def update_sample_item(
     :rtype: dict
 
     """
+    # verify instrument config exists
+    if instrument_config and instrument_config.instrument_function_id:
+        instrument_config_record = await get_instrument_config(
+            instrument_function_id=instrument_config.instrument_function_id
+        )
+        if not instrument_config_record:
+            raise NotFoundException(
+                f"update sample item: no record found with instrument_function_id {instrument_config.instrument_function_id}"
+            )
+
     # Step 1: Fetch the existing sample item
     async with async_session() as session:
         existing_sample_item = await session.get(SampleItem, sample_item_id)
@@ -248,16 +261,33 @@ async def update_sample_item(
         await session.commit()
         await session.refresh(existing_sample_item)
 
-    # Step 5: Emit socket.io events
-    # TODO_invalidation
-    await sio.emit(
-        "sample_batch_reload",
-        room=existing_sample_item.sample_batch_id,
-        namespace="/",
-    )
+    # Step 5: Process instrument config
+    if instrument_config:
+        from mascope_server.api.new.instrument_configs.process.service import (
+            process_instrument_config,
+        )
+
+        background_tasks.add_task(
+            process_instrument_config,
+            filenames=[existing_sample_item.filename],
+            instrument_config=instrument_config,
+            independent_transaction=True,
+            sid=sid,
+            process_id=gen_id(8),
+            parent_id=process_id,
+        )
+    else:
+        # Step 6: Reload batch if needed
+        await sio.emit(
+            "sample_batch_reload",
+            room=existing_sample_item.sample_batch_id,
+            namespace="/",
+        )
+        # TODO_invalidation
     return {
         "message": f"Sample '{existing_sample_item.sample_item_name}' was updated.",
         "data": existing_sample_item.to_dict(),
+        "_notification_data": {"sample_item_id": sample_item_id},
     }
 
 
@@ -446,9 +476,7 @@ async def copy_sample_item(
 )
 async def process_sample_item(
     sample_item: SampleItemCreate,
-    existing_method_file: Optional[str] = None,
-    new_method_file: Optional[str] = None,
-    new_instrument_function: Optional[InstrumentFunctionBase] = None,
+    instrument_config: SetInstrumentConfigBody,
     mz_calibration_params: MzCalibrationParams = MzCalibrationParams(),
     independent_transaction: bool = False,
     sid=None,
@@ -471,12 +499,8 @@ async def process_sample_item(
 
     :param sample_item: Details of the sample item to be created.
     :type sample_item: SampleItemCreate
-    :param existing_method_file: A method file already in the instrument function table to use.
-    :type existing_method_file: str, optional
-    :param new_method_file: A new method file not in the instrument function table to create an instrument function for.
-    :type new_method_file: str, optional
-    :param new_instrument_function: A new instrument function to create a record for.
-    :type new_instrument_function: InstrumentFunctionBase, optional
+    :param instrument_config: Instrument config to use for the processed sample item.
+    :type instrument_config: SetInstrumentConfigBody
     :param mz_calibration_params: Calibration parameters to use, defaults to a preconfigured set.
     :type mz_calibration_params: MzCalibrationParams, optional
     :param independent_transaction: Indicates whether this operation should be treated as a standalone transaction.
@@ -505,19 +529,20 @@ async def process_sample_item(
     )
     await send_progress_user_notification(notification, 0.1)
 
-    # Step 1: process instrument functions
+    # Step 1: process instrument config
 
-    if new_method_file or existing_method_file:
-        await process_instrument_function(
-            filename=sample_item.filename,
-            existing_method_file=existing_method_file,
-            new_method_file=new_method_file,
-            new_instrument_function=new_instrument_function,
-            independent_transaction=False,
-            sid=sid,
-            process_id=gen_id(8),
-            parent_id=process_id,
-        )
+    from mascope_server.api.new.instrument_configs.process.service import (
+        process_instrument_config,
+    )
+
+    await process_instrument_config(
+        filenames=[sample_item.filename],
+        instrument_config=instrument_config,
+        independent_transaction=False,
+        sid=sid,
+        process_id=gen_id(8),
+        parent_id=process_id,
+    )
 
     # Step 2: create the sample item
 

@@ -17,7 +17,7 @@ import Message from 'primevue/message'
 
 import { api } from '@/api'
 import { ToolbarTemplate } from '@/lib/toolbars'
-import { PaneInstrumentFunctions } from '@/lib/panes'
+import { PaneInstrumentConfig, InstrumentConfigSelector } from '@/lib/panes'
 import { clone, strToSnakeCase, beautifySnakeCase, beautifyConstant, genId } from '@/lib/utils'
 import { useApp } from '@/stores'
 import {
@@ -79,7 +79,11 @@ const input = reactive({
   instrument: null,
   type: null
 })
-const instrumentFunctions = ref()
+const instrumentConfig = reactive({
+  status: {},
+  payload: {},
+  input: {}
+})
 
 const title = computed(
   () =>
@@ -105,6 +109,9 @@ async function init(active) {
   input.instrument = original.value?.instrument
   input.filterId = original.value?.filter_id ?? null
   input.type = original.value?.sample_item_type ?? null
+  instrumentConfig.status = {}
+  instrumentConfig.input = {}
+  instrumentConfig.payload = {}
   // fill fields
   input.fields = Object.entries({
     sample_item_name: original.value?.sample_item_name,
@@ -173,17 +180,14 @@ async function save() {
         ) ?? {}
     )
   }
-  const { existing_method_file, new_method_file, new_instrument_function } =
-    instrumentFunctions.value?.payload
+  const { instrument_config } = instrumentConfig.payload
   if (props.action == 'create') {
     await app.data.sample.process({
       sample: {
         filename: input.filename,
         ...sample_item
       },
-      existing_method_file,
-      new_method_file,
-      new_instrument_function
+      instrument_config
     })
   } else if (props.action == 'create_pending') {
     if (!(app.data.acquisition.ready.filename == input.filename)) {
@@ -192,7 +196,7 @@ async function save() {
         ...sample_item,
         filename: app.data.acquisition.pending.filename
       }
-      app.data.acquisition.pending.method_file = input.methodFile
+      app.data.acquisition.pending.method_file = instrumentConfig.input.new.method_file
     } else {
       // submitted after conversion completed
       app.data.sample.process({
@@ -200,18 +204,19 @@ async function save() {
           ...sample_item,
           filename: input.filename
         },
-        existing_method_file,
-        new_method_file,
-        new_instrument_function
+        instrument_config
       })
       app.data.acquisition.ready.filename = null
     }
     app.data.acquisition.pending.filename = null
   } else if (props.action == 'update') {
     await app.data.sample.update({
-      ...props.item, // To include sample_item_id
-      ...sample_item,
-      filename: input.filename
+      sample: {
+        ...props.item, // To include sample_item_id
+        ...sample_item,
+        filename: input.filename
+      },
+      instrument_config
     })
   }
 }
@@ -232,7 +237,7 @@ const invalid = computed(() => {
   const missingRequiredFields =
     input.fields?.filter((f) => f?.required).length !=
     input.fields?.filter((f) => f?.required).filter((f) => f.value).length
-  return !input.type || missingRequiredFields || instrumentFunctions.value?.invalid
+  return !input.type || missingRequiredFields || instrumentConfig.status?.invalid
 })
 </script>
 
@@ -247,8 +252,8 @@ const invalid = computed(() => {
       <Tabs v-model:value="tab">
         <TabList>
           <Tab value="sample-details">Sample Details</Tab>
-          <Tab value="instrument-funcs" :disabled="!input.filename || action == 'create_pending'">
-            Instrument Functions
+          <Tab value="instrument-config" :disabled="!input.filename || action == 'create_pending'">
+            Instrument Config
           </Tab>
         </TabList>
         <TabPanel value="sample-details">
@@ -295,45 +300,11 @@ const invalid = computed(() => {
                 <InputText id="item-filename" v-model="input.filename" required disabled />
                 <label for="item-filename"> Filename </label>
               </FloatLabel>
-
-              <div class="input-group" v-if="instrumentFunctions?.methodFile">
-                <FloatLabel>
-                  <Select
-                    inputId="method-file"
-                    v-model="instrumentFunctions.methodFile.selected"
-                    :options="instrumentFunctions.methodFile.options"
-                    :invalid="instrumentFunctions.invalid"
-                  >
-                    <template #value="{ value }">
-                      {{
-                        instrumentFunctions?.methodFile.new?.length > 0
-                          ? `${instrumentFunctions?.methodFile.new} (new)`
-                          : value
-                      }}
-                    </template>
-                  </Select>
-
-                  <label for="method-file"> Method file </label>
-                </FloatLabel>
-                <Button
-                  @click="tab = 'instrument-funcs'"
-                  icon="pi pi-pen-to-square"
-                  v-tooltip="'Add new method file'"
-                  :disabled="action == 'create_pending'"
-                />
-              </div>
-              <FloatLabel v-if="action == 'create_pending' && instrumentFunctions?.creating">
-                <InputText
-                  id="pending-method-file"
-                  v-model="instrumentFunctions.methodFile.new"
-                  required
-                />
-                <label for="pending-method-file"> New method file </label>
-              </FloatLabel>
+              <InstrumentConfigSelector v-model="instrumentConfig" />
             </div>
           </ScrollPanel>
           <Message
-            v-if="action == 'create_pending' && instrumentFunctions.creating"
+            v-if="action == 'create_pending' && instrumentConfig.input?.creating"
             severity="info"
             icon="pi pi-info-circle"
             style="
@@ -344,30 +315,37 @@ const invalid = computed(() => {
               opacity: 0.7;
             "
           >
-            You have entered a new method file: when the sample is processed, the instrument
-            function will be automatically fitted and created.
+            You have entered a new instrument config: when the sample is processed, the config will
+            be automatically fitted and created.
           </Message>
         </TabPanel>
-        <TabPanel value="instrument-funcs">
+        <TabPanel value="instrument-config">
           <ScrollPanel style="width: 100%; height: 50vh">
-            <PaneInstrumentFunctions
+            <PaneInstrumentConfig
               v-if="visible"
-              :filename="input.filename"
-              :autofit="tab == 'instrument-funcs'"
-              v-model:data="instrumentFunctions"
+              :fitTo="input.filename"
+              :autofit="tab == 'instrument-config'"
+              v-model:status="instrumentConfig.status"
+              v-model:input="instrumentConfig.input"
+              v-model:payload="instrumentConfig.payload"
             />
           </ScrollPanel>
         </TabPanel>
       </Tabs>
     </Panel>
     <menu>
-      <ToolbarTemplate v-model:template="template.selected" :default="defaultTemplate" />
+      <ToolbarTemplate
+        v-model:template="template.selected"
+        :default="defaultTemplate"
+        v-if="tab == 'sample-details'"
+      />
+      <div style="width: 320px" v-else />
       <Message
-        v-if="instrumentFunctions?.message"
-        :severity="instrumentFunctions?.message?.severity"
-        :icon="instrumentFunctions?.message?.icon"
+        v-if="instrumentConfig.status?.message"
+        :severity="instrumentConfig.status?.message?.severity"
+        :icon="instrumentConfig.status?.message?.icon"
       >
-        {{ instrumentFunctions?.message?.contents }}
+        {{ instrumentConfig.status?.message?.contents }}
       </Message>
       <menu>
         <Button label="Cancel" @click="() => (action = null)" severity="secondary" />

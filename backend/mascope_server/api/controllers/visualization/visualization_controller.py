@@ -12,8 +12,8 @@ from mascope_server.db.models import Sample, TargetIsotope
 from mascope_server.socket import sio
 from mascope_server.api.lib.exceptions.api_exceptions import NotFoundException
 from mascope_server.api.lib.api_features import api_controller_background_task
-from mascope_server.api.controllers.instrument_functions.lib.instrument_functions_fetch import (
-    read_instrument_function,
+from mascope_server.api.new.instrument_configs.lib import (
+    read_instrument_functions,
 )
 
 
@@ -184,7 +184,7 @@ async def visualize_ion_focus(
             if match:
                 # Timeseries trace
                 try:
-                    _, resolution_function = await read_instrument_function(
+                    _, resolution_function = await read_instrument_functions(
                         filename=filename
                     )
                     fwhm = peak_mz / resolution_function(peak_mz)

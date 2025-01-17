@@ -16,8 +16,8 @@ from mascope_server.api.controllers.match.isotopes.match_isotopes_controller imp
 from mascope_server.api.controllers.match.interferences.match_interferences_controller import (
     create_match_interferences,
 )
-from mascope_server.api.controllers.instrument_functions.lib.instrument_functions_fetch import (
-    read_instrument_function,
+from mascope_server.api.new.instrument_configs.lib import (
+    read_instrument_functions,
 )
 from mascope_server.api.models.match.match_pydantic_model import (
     MatchComputeSample,
@@ -77,7 +77,7 @@ async def compute_match_isotopes(
     try:
         # Check if instrument functions were passed
         if instrument_functions is None:
-            instrument_functions = await read_instrument_function(filename)
+            instrument_functions = await read_instrument_functions(filename)
         instrument_type = get_instrument_type(filename)
 
         # Filter isotopes below threshold and with incorrect resolution
@@ -270,7 +270,7 @@ async def compute_match_interferences(
         instrument_type = get_instrument_type(filename)
 
         # Read instrument resolution function
-        _, R = await read_instrument_function(filename=filename)
+        _, R = await read_instrument_functions(filename=filename)
 
         # Step 2: Initialize DataFrame for interferences and compute raw intensities for each target mz
         isotope_interference_df = target_isotopes_df.copy().assign(

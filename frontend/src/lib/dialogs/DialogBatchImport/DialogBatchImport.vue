@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, computed, watch } from 'vue'
+import { ref, reactive, computed, watch, watchEffect } from 'vue'
 
 import FloatLabel from 'primevue/floatlabel'
 import Select from 'primevue/select'
@@ -68,6 +68,23 @@ const filters = computed(() => {
 
 const validation = useValidation({ imported })
 
+const instrumentConfig = reactive({
+  status: {},
+  payload: {},
+  input: {}
+})
+const fitTarget = ref()
+watchEffect(() => {
+  if (fitTarget.value) {
+    instrumentConfig.input.filename = fitTarget.value.filename
+  }
+})
+watchEffect(() => {
+  fitTarget.value = instrumentConfig.input.creating
+    ? filesPreview.value.find((row) => row.filename == instrumentConfig.input.filename)
+    : null
+})
+
 const title = computed(() => {
   const name = app.data.batch.focused?.sample_batch_name ?? 'selected'
   return imported.type == 'autosampler'
@@ -114,6 +131,9 @@ function init(active) {
   imported.items = []
   imported.filterId = ''
   imported.type = null
+  instrumentConfig.status = {}
+  instrumentConfig.input = {}
+  instrumentConfig.payload = {}
   validation.reset()
 }
 
@@ -174,6 +194,18 @@ watch(
     }
   }
 )
+
+const submit = () => {
+  if (!validation.rows.passed) {
+    return
+  }
+  app.data.batch.importSamples({
+    batch: app.data.batch.focused,
+    sample_items: imported.items,
+    instrument_config: instrumentConfig.payload?.instrument_config
+  })
+  visible.value = false
+}
 </script>
 
 <template>
@@ -187,6 +219,7 @@ watch(
         >
           Issues
         </Tab>
+        <Tab value="instrument-config">Instrument Config</Tab>
       </TabList>
       <TabPanels>
         <TabPanel value="data">
@@ -196,11 +229,21 @@ watch(
                 <Panel>
                   <ScrollPanel style="height: 25vh; max-width: 80vw">
                     <DataTable
+                      v-model:selection="fitTarget"
+                      :selectionMode="instrumentConfig.input.creating ? 'single' : null"
+                      dataKey="filename"
                       :value="filesPreview"
                       scrollable
                       scrollHeight="300px"
                       tableStyle="max-width: 70vw"
                     >
+                      <Column
+                        selectionMode="single"
+                        header="Fit to"
+                        style="width: 10ch"
+                        v-if="instrumentConfig.input.creating"
+                      />
+                      <Column style="width: 10ch" v-else />
                       <Column
                         v-for="col of coreColumns"
                         :key="col.field"
@@ -224,11 +267,21 @@ watch(
             <Panel v-if="imported.items.length > 0">
               <ScrollPanel style="height: 25vh; max-width: 80vw">
                 <DataTable
+                  v-model:selection="fitTarget"
+                  :selectionMode="instrumentConfig.input.creating ? 'single' : null"
+                  dataKey="filename"
                   :value="imported.items"
                   scrollable
                   scrollHeight="300px"
                   tableStyle="max-width: 70vw"
                 >
+                  <Column
+                    selectionMode="single"
+                    header="Fit to"
+                    style="width: 10ch"
+                    v-if="instrumentConfig.input.creating"
+                  />
+                  <Column style="width: 10ch" v-else />
                   <Column
                     v-for="col of allColumns"
                     :key="col.field"
@@ -275,6 +328,15 @@ watch(
             </ScrollPanel>
           </Panel>
         </TabPanel>
+        <TabPanel value="instrument-config">
+          <PaneInstrumentConfig
+            :fitTo="files.map(({ filename }) => filename)"
+            :autofit="tab == 'instrument-config'"
+            v-model:status="instrumentConfig.status"
+            v-model:input="instrumentConfig.input"
+            v-model:payload="instrumentConfig.payload"
+          />
+        </TabPanel>
       </TabPanels>
     </Tabs>
     <!-- Dialog Menu -->
@@ -290,25 +352,19 @@ watch(
           icon="pi pi-sparkles"
         />
       </menu>
+      <InstrumentConfigSelector v-show="tab == 'data'" v-model="instrumentConfig" />
       <menu>
         <Button label="Cancel" severity="secondary" @click="visible = false" />
         <Button
           :label="`Process (${imported.items.length})`"
-          :disabled="!validation.passed"
+          :disabled="!validation.passed || (instrumentConfig.status?.invalid ?? true)"
           @click="
             () => {
               confirm.require({
                 icon: 'pi pi-info-circle',
                 header: 'Import samples',
                 message: `Are you sure you want to import ${imported.items.length} samples into the batch '${app.data.batch.focused?.sample_batch_name}'?`,
-                accept: () => {
-                  if (!validation.rows.passed) return
-                  app.data.batch.importSamples({
-                    batch: app.data.batch.focused,
-                    sample_items: imported.items
-                  })
-                  visible = false
-                },
+                accept: submit,
                 acceptProps: {
                   icon: 'pi pi-file-import',
                   label: 'Import'

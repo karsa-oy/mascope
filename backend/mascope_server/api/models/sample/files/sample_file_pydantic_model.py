@@ -13,7 +13,7 @@ FILE_UPLOAD_SIZE_LIMIT = 200 * 1024 * 1024  # 200 MB
 class SampleFileBase(BaseModel):
     filename: str = Field(..., description="Name of the sample file")
     instrument: str = Field(..., description="Instrument associated with the file")
-    method_file: Optional[str] = Field(None, description="Instrument method filename")
+    method_file: Optional[str] = Field(None, description="Instrument config name")
     datetime: dt = Field(
         ..., description="Datetime (local) of creation of the sample file"
     )
@@ -44,7 +44,7 @@ class SampleFileUpdate(BaseModel):
     filename: str = Field(..., description="Name of the sample file")
     instrument: str = Field(..., description="Instrument associated with the file")
     method_file: Optional[str] = Field(
-        None, description="The method file associated with the file"
+        None, description="The instrument config name associated with the file"
     )
     instrument_function_id: Optional[str] = Field(
         None, description="The ID of the instrument function associated with the file"
