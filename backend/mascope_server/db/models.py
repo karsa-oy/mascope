@@ -438,6 +438,10 @@ class TargetIsotope(Base):
         CheckConstraint("relative_abundance >= 0 AND relative_abundance <= 1"),
         nullable=False,
     )
+    resolution = Column(
+        String(8),
+        nullable=False,
+    )
 
     # Define relationships
     target_ion = relationship("TargetIon", back_populates="target_isotope")
