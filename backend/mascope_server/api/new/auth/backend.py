@@ -69,16 +69,19 @@ async def get_enabled_backends(request: Request) -> list[AuthenticationBackend]:
         runtime.logger.debug("Using web application authentication.")
         return [auth_backend_cookie]
 
-    # Access token-based authentication for token access (Jupyter server)
+    # Access token-based authentication(mascope_api Jupyter lib, file_converter service, tof-agent)
     if auth_header and not cookie_auth:
         token = auth_header.split(" ")[1]
+        token_service_name = await get_token_service(token)
+
         # Check if the endpoint allows for token access
         if hasattr(route_func, "token_access") and route_func.token_access:
-            service_name = await get_token_service(token)
-            runtime.logger.debug(f"Using {service_name} service authentication.")
+            runtime.logger.debug(f"Using {token_service_name} authentication protocol.")
             return [auth_backend_access_token]
         else:
-            runtime.logger.error("Unauthorized for API access token.")
+            runtime.logger.error(
+                f"Unauthorized for {token_service_name} service access."
+            )
             return [auth_backend_cookie]
 
     # No valid authentication credentials found

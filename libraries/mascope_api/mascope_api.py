@@ -27,7 +27,10 @@ def api_get(url: str, path: str, access_token: str, params: dict = None):
     """
     full_url = url + "/api/" + path
     try:
-        headers = {"Authorization": f"Bearer {access_token}"}
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "X-Service-Name": "mascope_api",
+        }
 
         # Send GET request with query parameters (if provided)
         resp = requests.get(
@@ -90,7 +93,10 @@ def api_post(url: str, path: str, access_token: str, data: dict):
     """
     full_url = url + "/api/" + path
     try:
-        headers = {"Authorization": f"Bearer {access_token}"}
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "X-Service-Name": "mascope_api",
+        }
         resp = requests.post(
             full_url, data=json.dumps(data), headers=headers, verify=False, timeout=30
         )
@@ -151,7 +157,10 @@ def api_post_file(url: str, path: str, access_token: str, filepath: str):
     """
     full_url = url + "/api/" + path
     try:
-        headers = {"Authorization": f"Bearer {access_token}"}
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "X-Service-Name": "tof-agent",
+        }
         with open(filepath, "rb") as file:
             resp = requests.post(
                 full_url,

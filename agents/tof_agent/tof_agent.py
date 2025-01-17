@@ -137,6 +137,7 @@ async def streamer_processor(streamer) -> None:
                 await sio.emit(
                     "instrument_acquisition_finished",
                     notification_data,
+                    namespace="/tof-agent",
                 )
         elif spec_i < 0:
             # New file
@@ -145,6 +146,7 @@ async def streamer_processor(streamer) -> None:
                 await sio.emit(
                     "instrument_acquisition_started",
                     notification_data,
+                    namespace="/tof-agent",
                 )
         else:
             # New data to existing file
@@ -152,6 +154,7 @@ async def streamer_processor(streamer) -> None:
                 await sio.emit(
                     "instrument_acquisition_progress",
                     notification_data,
+                    namespace="/tof-agent",
                 )
         runtime.logger.info(f"{streamer.progress:.2f}")
 
@@ -251,7 +254,12 @@ async def main() -> None:
     while not SHUTDOWN_EVENT.is_set():
         try:
             runtime.logger.info(f"Connecting to {URL}")
-            await sio.connect(URL)
+            await sio.connect(
+                url=URL,
+                headers={"X-Service-Name": "tof-agent"},
+                auth={"access_token": runtime.config.access_token},
+                namespaces=["/tof-agent"],
+            )
             runtime.logger.info("Connected!")
             break
         except Exception as e:
