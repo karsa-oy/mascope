@@ -3,7 +3,6 @@ Functions for target ions and target isotopes generation.
 """
 
 from typing import List
-from functools import partial
 import numpy as np
 from IsoSpecPy import IsoThreshold
 from mascope_lib.molmass import Formula
