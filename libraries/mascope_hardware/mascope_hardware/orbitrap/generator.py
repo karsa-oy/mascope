@@ -49,11 +49,19 @@ def strip_filepath(filepath):
 class RawProcessor(Thread):
     """Reads and processes Orbi raw files"""
 
-    def __init__(self, file_queue=Queue(), shutdown_event=Event(), lock=Lock()):
+    def __init__(
+        self,
+        socket_client,
+        file_queue=Queue(),
+        shutdown_event=Event(),
+        lock=Lock(),
+    ):
         Thread.__init__(self)
         # Init logger
         self.log = hardware_runtime.logger.bind(key=self.name)
         self.log.info(f"Initializing raw file processor ({self.name})")
+        # Init socket client
+        self.socket_client = socket_client
         # Opened raw file
         self.raw = None
         # Synchronization primitives
@@ -259,9 +267,23 @@ class RawProcessor(Thread):
             return False
 
     def _create_db_record(self, sample_file_props: dict):
-        """Creates a record in the database."""
+        """
+        Creates a record in the database.
+
+        Requires file to be registered in the file converter service context.
+        Raises error if file context is not found.
+        """
         try:
-            create_sample_file_db_record(sample_file_props)
+            base_filename = os.path.basename(self.raw.FileName)
+            context = self.socket_client.context_manager.get_context(base_filename)
+            if context is None:
+                raise RuntimeError(
+                    f"File {base_filename} not registered in file converter service"
+                )
+
+            create_sample_file_db_record(
+                sample_file_props, access_token=context.access_token
+            )
         except Exception as e:
             self.log.error(f"Failed to create database record: {e}")
 

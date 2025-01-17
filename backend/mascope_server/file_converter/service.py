@@ -106,16 +106,15 @@ def process_stream(streamer):
             except Exception as e:
                 runtime.logger.error(f"Failed to create database record")
                 runtime.logger.exception(e)
-
             try:
                 # Emit with user context
                 socket_client.emit("file_conversion_finished", notification_data)
-                # Clear context after successful processing
-                socket_client.context_manager.clear_context(filename)
             except Exception as e:
                 runtime.logger.error(f"Failed to emit notification")
                 runtime.logger.exception(e)
-
+            finally:
+                # Clear context after successful processing
+                socket_client.context_manager.clear_context(filename)
         elif spec_i < 0:
             # New file
             try:
@@ -246,6 +245,7 @@ def run():
     # orbi file processors
     raw_processors = [
         RawProcessor(
+            socket_client=socket_client,
             file_queue=raw_file_queue,
             shutdown_event=shutdown_event,
             lock=streamer_lock,

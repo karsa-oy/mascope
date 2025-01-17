@@ -66,7 +66,13 @@ class FileContextManager:
         :return: FileContext if found, None otherwise
         """
         normalized_filename = self._normalize_filename(filename)
-        return self._file_contexts.get(normalized_filename)
+        file_context = self._file_contexts.get(normalized_filename)
+        if file_context is None:
+            runtime.logger.trace(
+                f"No context found for filename: {normalized_filename}"
+            )
+            runtime.logger.trace(f"Registered contexts: {self._file_contexts}")
+        return file_context
 
     def clear_context(self, filename: str):
         """Clear file context after processing
