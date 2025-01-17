@@ -1,8 +1,13 @@
 import os
 import shutil
 import asyncio
-from sqlalchemy import text
+from IsoSpecPy import IsoThreshold
+from mascope_lib.molmass import Formula
+from mascope_lib.molmass.elements import ELECTRON
+from sqlalchemy import text, select
+from mascope_server.db.models import TargetIon, TargetIsotope
 from mascope_server.db import configure_database_engine, async_session
+from mascope_server.db.id import gen_id
 from mascope_server.db.ops.backup import create_db_backup
 from mascope_server.runtime import runtime
 
@@ -22,14 +27,61 @@ async def run():
     # Update the engine to the new database (also updates global async_session)
     await configure_database_engine(new_version)
 
-    # Add new column resolution to target_isotope table
     runtime.logger.info("Adding resolution column to the target_isotope table.")
+
     async with async_session() as session:
         await session.execute(
             text(
                 "ALTER TABLE target_isotope ADD COLUMN resolution VARCHAR(8) NOT NULL DEFAULT 'low';"
             )
         )
+        await session.commit()
+
+    # Read all ion formulae
+    runtime.logger.info("Reading existing target ions.")
+    async with async_session() as session:
+        stmt = select(TargetIon)
+        result = await session.execute(stmt)
+        target_ions = result.scalars().all()
+
+    runtime.logger.info("Calculating high resolution isotopes.")
+
+    # Init high resolution target isotopes list
+    target_isotopes = []
+    for ion in target_ions:
+        # Split base and charge
+        target_ion = Formula(ion.target_ion_formula)
+
+        # Predict peaks, take those with r.a.>1%
+        predicted_peaks = IsoThreshold(formula=target_ion.formula, threshold=0.01)
+
+        # Extract resolution masses and probabilities, correct masses for the electron charge
+        masses = [
+            (float(m) - ELECTRON.mass * target_ion.charge) / abs(target_ion.charge)
+            for m in predicted_peaks.masses
+        ]
+        probs = [float(p) for p in predicted_peaks.probs]
+
+        # Store high resolution isotopes
+        target_isotopes.extend(
+            [
+                TargetIsotope(
+                    target_isotope_id=gen_id(16),
+                    target_ion_id=ion.target_ion_id,
+                    mz=mz,
+                    relative_abundance=rel_abu,
+                    resolution="high",
+                )
+                for mz, rel_abu in zip(masses, probs)
+            ]
+        )
+
+    runtime.logger.info("Writing high resolution isotopes to the database.")
+
+    async with async_session() as session:
+        for target_isotope in target_isotopes:
+            # Add the isotopes to be committed to the db
+            session.add(target_isotope)
         await session.commit()
 
 
