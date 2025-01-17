@@ -137,7 +137,6 @@ def process_stream(streamer):
             try:
                 runtime.logger.info(notification_data["progress"])
                 socket_client.emit("file_conversion_progress", notification_data)
-                # sio.emit("instrument_conversion_progress", notification_data)
             except Exception as e:
                 runtime.logger.error("Failed to emit notification")
                 runtime.logger.exception(e)
