@@ -20,6 +20,10 @@ from mascope_server.api.models.target.compounds.target_compound_pydantic_model i
 from mascope_server.runtime import runtime
 
 
+# Low/TOF resolution constant
+RESOLUTION_LOW = 1e5
+
+
 def charge_string(raw_ion: Formula) -> str:
     """Get charge string (+/-) based on ion formula
 
@@ -91,19 +95,24 @@ def generate_target_ions_from_composition(
                 target_ion_formula=raw_ion.formula + charge_string(raw_ion),
                 filter_params={},
             )
-
             target_ions.append(ion)
 
-            # construct and save isotope rows
-            predicted_lines = IsoThreshold(formula=raw_ion.formula, threshold=0.01)
+            # Predict peaks of high resolution isotopes, takes whose with r.a.>1%
+            predicted_peaks = IsoThreshold(formula=raw_ion.formula, threshold=0.01)
 
-            # Extract masses and probabilities, correct masses for the electron charge
-            masses = [
+            # Extract high resolution masses and probabilities, correct masses for the electron charge
+            masses_high_res = [
                 (float(m) - ELECTRON.mass * raw_ion.charge) / abs(raw_ion.charge)
-                for m in predicted_lines.masses
+                for m in predicted_peaks.masses
             ]
-            probs = [float(p) for p in predicted_lines.probs]
+            probs_high_res = [float(p) for p in predicted_peaks.probs]
 
+            # Calculate low resolution isotope peaks
+            masses_low_res, probs_low_res = group_target_isotopes(
+                masses_high_res, probs_high_res, RESOLUTION_LOW
+            )
+
+            # Store high resolution isotopes
             target_isotopes.extend(
                 [
                     TargetIsotope(
@@ -111,10 +120,25 @@ def generate_target_ions_from_composition(
                         target_ion_id=ion.target_ion_id,
                         mz=mz,
                         relative_abundance=rel_abu,
+                        resolution="high",
                     )
-                    for mz, rel_abu in zip(masses, probs)
+                    for mz, rel_abu in zip(masses_high_res, probs_high_res)
                 ]
             )
+            # Store low resolution isotopes
+            target_isotopes.extend(
+                [
+                    TargetIsotope(
+                        target_isotope_id=gen_id(16),
+                        target_ion_id=ion.target_ion_id,
+                        mz=mz,
+                        relative_abundance=rel_abu,
+                        resolution="low",
+                    )
+                    for mz, rel_abu in zip(masses_low_res, probs_low_res)
+                ]
+            )
+
     return target_ions, target_isotopes
 
 
