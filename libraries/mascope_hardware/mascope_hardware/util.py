@@ -10,12 +10,12 @@ host = runtime.config.server if runtime.mode == "prod" else "localhost"
 url = f"http://{host}:{runtime.meta.api_port}"
 
 
-def create_sample_file_db_record(data, access_token=None):
+def create_sample_file_db_record(data, access_token):
     """Create a sample file database record by a HTTP request
 
     :param data: Sample file object to create
     :type data: dict
-    :param access_token: Optional access_token for request authentication
+    :param access_token: Access token requred for request authentication
     :type headers: str
     :raises Exception: HTTP request failed
     """

@@ -275,14 +275,14 @@ class RawProcessor(Thread):
         """
         try:
             base_filename = os.path.basename(self.raw.FileName)
-            context = self.socket_client.context_manager.get_context(base_filename)
-            if context is None:
+            file_context = self.socket_client.context_manager.get_context(base_filename)
+            if file_context is None:
                 raise RuntimeError(
                     f"File {base_filename} not registered in file converter service"
                 )
 
             create_sample_file_db_record(
-                sample_file_props, access_token=context.access_token
+                sample_file_props, access_token=file_context.access_token
             )
         except Exception as e:
             self.log.error(f"Failed to create database record: {e}")
