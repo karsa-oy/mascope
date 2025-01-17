@@ -11,6 +11,7 @@ import TabList from 'primevue/tablist'
 import Tab from 'primevue/tab'
 import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
+import TextArea from 'primevue/textarea'
 
 import { api } from '@/api'
 
@@ -261,20 +262,23 @@ async function execute() {
       </TabList>
       <TabPanels>
         <TabPanel value="info">
-          <Panel>
+          <Panel style="text-align: center">
             <FloatLabel>
               <InputText
                 id="batch-name"
                 v-model="selected.info.name"
                 :disabled="action == 'update_targets'"
+                style="width: 700px"
               />
               <label for="batch-name">Name</label>
             </FloatLabel>
             <FloatLabel>
-              <InputText
+              <TextArea
                 id="batch-desc"
                 v-model="selected.info.desc"
                 :disabled="action == 'update_targets'"
+                autoResize
+                style="width: 700px"
               />
               <label for="batch-desc">Description</label>
             </FloatLabel>

@@ -33,6 +33,7 @@
     --p-inputtext-border-color: var(--p-panel-border-color);
     --p-checkbox-background: var(--p-panel-background);
     --p-checkbox-border-color: var(--p-panel-border-color);
+    --p-textarea-background: var(--p-panel-background);
   }
 
   label {
