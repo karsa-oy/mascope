@@ -1,3 +1,7 @@
+"""
+Users room management.
+"""
+
 from mascope_server.socket.server import sio
 from mascope_server.socket.auth.decorators import socket_auth
 

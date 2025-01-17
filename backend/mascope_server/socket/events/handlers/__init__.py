@@ -1,5 +1,5 @@
 """Socket.IO event handlers for client-server communication."""
 
-from . import connection
+from .default import connection, subscription
 from .file_converter import connection, conversion
-from . import subscription
+from .tof_agent import connection, acquisition

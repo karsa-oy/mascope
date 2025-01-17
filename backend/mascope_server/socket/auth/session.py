@@ -7,44 +7,65 @@ from mascope_server.socket.auth.exceptions import SocketSessionError
 from mascope_server.runtime import runtime
 
 
-async def save_user_session(sid: str, user: User) -> None:
+async def save_user_session(sid: str, user: User, namespace: str = "/") -> None:
     """
-    Save authenticated user data to socket session.
+    Save authenticated user data to the Socket.IO session.
 
-    :param sid: Socket.IO session ID
+    Updates an existing session or creates a new one if none exists.
+
+    :param sid: Socket.IO session ID.
     :type sid: str
-    :param user: Authenticated user instance
+    :param user: Authenticated user instance.
     :type user: User
+    :param namespace: Namespace of the session.
+    :type namespace: str
+    :raises SocketSessionError: If the session cannot be saved.
     """
-    await sio.save_session(
-        sid, {"user_id": user.id, "username": user.username, "role_id": user.role_id}
-    )
+    try:
+        session = await sio.get_session(sid, namespace=namespace) or {}
+        session.update(
+            {"user_id": user.id, "username": user.username, "role_id": user.role_id}
+        )
+        await sio.save_session(sid, session, namespace=namespace)
+    except Exception as e:
+        runtime.logger.error(f"Failed to save user session for SID '{sid}': {str(e)}")
+        raise SocketSessionError("Failed to save session") from e
 
 
-async def clear_user_session(sid: str) -> None:
+async def clear_user_session(sid: str, namespace: str = "/") -> None:
     """
     Clear user-related data from session.
 
-    :param sid: Socket.IO session ID
+    :param sid: Socket.IO session ID.
+    :type sid: str
+    :param namespace: Namespace of the session.
+    :type namespace: str
     """
     try:
-        await sio.save_session(sid, {})
+        session = await sio.get_session(sid, namespace=namespace)
+        if not session:
+            runtime.logger.trace(f"No session found to clear for {sid}")
+            return
+        await sio.save_session(sid, {}, namespace=namespace)
+        runtime.logger.trace(f"Successfully cleared session for {sid}")
     except Exception as e:
         runtime.logger.error(f"Failed to clear session for {sid}: {str(e)}")
 
 
-async def get_session_user(sid: str) -> Dict[str, Any]:
+async def get_session_user(sid: str, namespace: str = "/") -> Dict[str, Any]:
     """
     Get user data from socket session.
 
     :param sid: Socket session ID
     :type sid: str
+    :param namespace: Namespase of the session
+    :type namespace: str
     :return: User session data
     :rtype: Dict[str, Any]
     :raises SocketSessionError: If session is not found or invalid
     """
     try:
-        session = await sio.get_session(sid)
+        session = await sio.get_session(sid, namespace=namespace)
         if not session:
             raise SocketSessionError("No session found")
 

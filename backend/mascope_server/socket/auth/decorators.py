@@ -1,30 +1,36 @@
 """Socket authentication decorators."""
 
 from functools import wraps
-from typing import Callable
+from typing import Callable, Optional
 from mascope_server.api.new.auth.config import auth_settings
 from mascope_server.socket.auth.session import get_session_user
+from mascope_server.socket.auth.token import validate_service_access_token
 from mascope_server.socket.auth.exceptions import (
     SocketAuthError,
     SocketForbiddenError,
     SocketAuthConfigError,
+    SocketUnauthenticatedError,
 )
 from mascope_server.runtime import runtime
 
 
-def socket_auth(minimum_role: str):
+def socket_auth(minimum_role: str, service_name: Optional[str] = None):
     """
     Decorator for Socket.IO event handlers that enforces role-based access control.
 
     :param minimum_role: Minimum role required to access this event
     :type minimum_role: str
+    :param service_name: Name of the service requesting authentication (if applicable)
+    :type service_name: Optional[str]
     """
 
     def decorator(handler: Callable):
         @wraps(handler)
         async def wrapper(sid: str, *args, **kwargs):
             try:
-                session = await get_session_user(sid)
+                session = await get_session_user(
+                    sid, namespace=f"/{service_name}" if service_name else None
+                )
 
                 required_role_id = auth_settings.ROLE_ACCESS_LEVELS.get(minimum_role)
                 if required_role_id is None:
