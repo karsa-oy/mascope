@@ -83,15 +83,13 @@ async def compute_match_isotopes(
             instrument_functions = await read_instrument_function(filename)
         instrument_type = get_instrument_type(filename)
 
-        # Filter isotopes below threshold
-        target_isotopes_df = target_isotopes_df[
-            target_isotopes_df["relative_abundance"] >= min_isotope_abundance
-        ].reset_index(drop=True)
-
-        # Leave only max isotope peaks among those within FWHM/2 distance from each other
-        target_isotopes_df = group_target_isotopes_df(
-            target_isotopes_df, instrument_functions[1]
-        )
+        # Filter isotopes below threshold and with incorrect resolution
+        resolution_type = "low" if instrument_type == "tof" else "high"
+        query = """
+        relative_abundance >= @min_isotope_abundance
+        and resolution == @resolution_type
+        """
+        target_isotopes_df = target_isotopes_df.query(query).reset_index(drop=True)
 
         # Step 1: - Load or detect peaks
         # Find peaks and write to file
