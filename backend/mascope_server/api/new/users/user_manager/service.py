@@ -148,8 +148,7 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
                 jwt_token = cookie.split("mascope_auth=")[1].split(";")[0]
 
                 # Authenticate the socket connection
-                auth_environ = {"HTTP_COOKIE": f"mascope_auth={jwt_token}"}
-                await authenticate_socket_connection(sid=sid, environ=auth_environ)
+                await authenticate_socket_connection(sid=sid, token=jwt_token)
         except SocketUnauthenticatedError as e:
             runtime.logger.error(f"Socket authentication failed after login: {str(e)}")
         except Exception as e:

@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi_users_db_sqlalchemy.access_token import SQLAlchemyAccessTokenDatabase
@@ -6,7 +7,7 @@ from fastapi_users.authentication.strategy.db import (
     DatabaseStrategy,
 )
 from mascope_server.api.new.auth.config import auth_settings
-from mascope_server.db import get_async_session
+from mascope_server.db import async_session, get_async_session
 from mascope_server.db.models import AccessToken
 
 
@@ -37,3 +38,37 @@ def get_database_strategy(
         access_token_db,
         lifetime_seconds=auth_settings.access_token.ACCESS_TOKEN_EXPIRATION_SECONDS,
     )
+
+
+@asynccontextmanager
+async def get_access_token_db_context():
+    """
+    Context manager for access token database operations outside of HTTP requests.
+
+    Used in scenarios like Socket.IO authentication where FastAPI's
+    dependency injection is not available.
+
+    :yield: Database adapter for access token operations
+    :rtype: SQLAlchemyAccessTokenDatabase
+    """
+    async with async_session() as session:
+        yield SQLAlchemyAccessTokenDatabase(session, AccessToken)
+
+
+@asynccontextmanager
+async def get_database_strategy_context():
+    """
+    Context manager for database strategy outside of HTTP requests.
+
+    Provides access token validation capabilities in non-HTTP contexts
+    like Socket.IO authentication.
+
+    :yield: Database strategy instance
+    :rtype: DatabaseStrategy
+    """
+    async with get_access_token_db_context() as access_token_db:
+        strategy = DatabaseStrategy(
+            access_token_db,
+            lifetime_seconds=auth_settings.access_token.ACCESS_TOKEN_EXPIRATION_SECONDS,
+        )
+        yield strategy

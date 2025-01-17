@@ -2,6 +2,9 @@
 
 import re
 from mascope_server.api.new.auth.backend import auth_backend_cookie
+from mascope_server.api.new.auth.strategies.database import (
+    get_database_strategy_context,
+)
 from mascope_server.socket.auth.exceptions import SocketUnauthenticatedError
 from mascope_server.runtime import runtime
 
@@ -71,4 +74,40 @@ async def validate_jwt_token(jwt_token: str):
         raise
     except Exception as e:
         runtime.logger.error(f"Token validation failed: {str(e)}")
+        raise SocketUnauthenticatedError("Token validation failed") from e
+
+
+async def validate_service_access_token(access_token: str):
+    """
+    Validate service access token and return associated user.
+
+    :param access_token: Access token string for service
+    :type access_token: str
+    :return: User instance if token is valid
+    :raises SocketUnauthenticatedError: If token is invalid or service mismatch
+    """
+    try:
+        # Step 1. Basic token validation
+        if not isinstance(access_token, str):
+            raise SocketUnauthenticatedError("Invalid token format: not a string")
+
+        # Step 2. Token validation using access token strategy
+        from mascope_server.api.new.users.user_manager.util import (
+            get_user_manager_context,
+        )
+
+        async with get_database_strategy_context() as database_strategy:
+            async with get_user_manager_context() as user_manager:
+                user = await database_strategy.read_token(access_token, user_manager)
+                if not user:
+                    raise SocketUnauthenticatedError(
+                        "Token validation failed: user not found"
+                    )
+
+                return user
+
+    except SocketUnauthenticatedError:
+        raise
+    except Exception as e:
+        runtime.logger.error(f"Service token validation failed: {str(e)}")
         raise SocketUnauthenticatedError("Token validation failed") from e
