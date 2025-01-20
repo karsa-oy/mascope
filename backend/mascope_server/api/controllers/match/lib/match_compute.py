@@ -85,10 +85,7 @@ async def compute_match_isotopes(
 
         # Filter isotopes below threshold and with incorrect resolution
         resolution_type = "low" if instrument_type == "tof" else "high"
-        query = """
-        relative_abundance >= @min_isotope_abundance
-        and resolution == @resolution_type
-        """
+        query = "relative_abundance >= @min_isotope_abundance and resolution == @resolution_type"
         target_isotopes_df = target_isotopes_df.query(query).reset_index(drop=True)
 
         # Step 1: - Load or detect peaks
