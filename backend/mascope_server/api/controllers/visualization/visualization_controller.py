@@ -73,10 +73,14 @@ async def visualize_ion_focus(
         if not filename:
             raise NotFoundException(f"Sample with ID {sample_item_id} not found")
 
+        instrument_type = get_instrument_type(filename)
+        isotope_resolution = "low" if instrument_type == "tof" else "high"
+
         # Fetch target ion data
         stmt = select(TargetIsotope).where(
             TargetIsotope.target_ion_id == target_ion_id,
             TargetIsotope.relative_abundance >= min_isotope_abundance,
+            TargetIsotope.resolution == isotope_resolution,
         )
         result = await session.execute(stmt)
         target_ion_data = result.scalars().all()
