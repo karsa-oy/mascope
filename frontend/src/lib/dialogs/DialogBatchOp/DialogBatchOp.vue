@@ -268,7 +268,7 @@ async function execute() {
                 id="batch-name"
                 v-model="selected.info.name"
                 :disabled="action == 'update_targets'"
-                style="width: 700px"
+                style="width: 65ch"
               />
               <label for="batch-name">Name</label>
             </FloatLabel>
@@ -278,7 +278,7 @@ async function execute() {
                 v-model="selected.info.desc"
                 :disabled="action == 'update_targets'"
                 autoResize
-                style="width: 700px"
+                style="width: 65ch"
               />
               <label for="batch-desc">Description</label>
             </FloatLabel>

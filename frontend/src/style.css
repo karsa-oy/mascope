@@ -237,7 +237,7 @@
   /* Tooltips */
 
   .p-tooltip {
-    max-width: 800px !important;
+    max-width: 65ch;
   }
 
   .disable-tooltips .p-tooltip {
