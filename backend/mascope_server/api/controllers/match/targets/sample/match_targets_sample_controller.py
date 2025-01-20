@@ -1,5 +1,6 @@
 from typing import Optional
 import pandas as pd
+from mascope_lib.file_func import get_instrument_type
 from mascope_server.api.lib.api_features import api_controller
 from mascope_server.api.controllers.samples.samples_controller import get_sample
 from mascope_server.api.controllers.sample.items.sample_items_controller import (
@@ -487,6 +488,13 @@ async def get_match_sample_isotopes(
     # Sort and paginate the DataFrame
     match_sample_isotopes_df = sort_and_paginate_match_sample_df(
         match_sample_isotopes_df, order, page, limit
+    )
+
+    # Filter out isotopes of incorrect resolution
+    instrument_type = get_instrument_type(sample["filename"])
+    isotope_resolution = "low" if instrument_type == "tof" else "high"
+    match_sample_isotopes_df = match_sample_isotopes_df.query(
+        "resolution == @isotope_resolution"
     )
 
     return {

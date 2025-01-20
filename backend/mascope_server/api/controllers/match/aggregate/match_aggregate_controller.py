@@ -1,5 +1,6 @@
 from typing import Optional
 import pandas as pd
+from mascope_lib.file_func import get_instrument_type
 from sqlalchemy import (
     select,
     and_,
@@ -83,6 +84,12 @@ async def aggregate_match_isotope_filtered_data(
                 raise NotFoundException(f"Sample with ID '{sample_item_id}' not found")
             sample_batch_id = sample.sample_batch_id
 
+            # Get target isotope resolution for the sample_item
+            instrument_type = get_instrument_type(sample.filename)
+            isotope_resolution = "low" if instrument_type == "tof" else "high"
+        else:
+            isotope_resolution = None
+
         if target_ion_id is not None:
             ion = await session.get(TargetIon, target_ion_id)
             if not ion:
@@ -143,6 +150,7 @@ async def aggregate_match_isotope_filtered_data(
                 TargetIsotope.target_isotope_id,
                 TargetIsotope.mz,
                 TargetIsotope.relative_abundance,
+                TargetIsotope.resolution,
             )
             .select_from(TargetCollectionInSampleBatch)
             .where(TargetCollectionInSampleBatch.sample_batch_id == sample_batch_id)
@@ -180,6 +188,12 @@ async def aggregate_match_isotope_filtered_data(
                 TargetIsotope.target_ion_id == TargetIon.target_ion_id,
             )
         )
+
+        if isotope_resolution is not None:
+            # Filter out the isotopes of incorrect resolution
+            target_query = target_query.where(
+                TargetIsotope.resolution == isotope_resolution
+            )
 
         # Apply target_ion_id filter if provided
         if target_ion_id is not None:
@@ -293,6 +307,7 @@ async def aggregate_match_isotope_filtered_data(
             "target_isotope_id",
             "mz",
             "relative_abundance",
+            "resolution",
             "match_mz_error",
             "match_abundance_error",
             "match_isotope_correlation",
