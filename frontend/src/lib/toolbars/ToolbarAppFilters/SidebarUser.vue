@@ -1,16 +1,15 @@
 <script setup>
-import { ref, reactive, watchEffect } from 'vue'
+import { ref, reactive, computed, watchEffect } from 'vue'
 
 import Button from 'primevue/button'
 import Drawer from 'primevue/drawer'
 import ToggleSwitch from 'primevue/toggleswitch'
 import Message from 'primevue/message'
-import InputText from 'primevue/inputtext'
+import SplitButton from 'primevue/splitbutton'
 
 import { api } from '@/api'
 import { useApp } from '@/stores'
 import { BaseCopyableField, BaseEditableField } from '@/lib/base'
-import { beautifySnakeCase } from '@/lib/utils'
 import { DialogUserManagement, DialogPasswordChange } from '@/lib/dialogs'
 import { prettyRoleName } from '@/lib/roles'
 
@@ -18,12 +17,78 @@ const app = useApp()
 
 const drawer = ref()
 
-const token = ref()
-
 const dialog = reactive({
   users: false,
   password: false
 })
+
+// API Token Management
+
+const SERVICE_CONFIGS = {
+  MASCOPE_API: {
+    id: 'mascope_api', // internal id for object keys
+    apiName: 'mascope_api', // name used in API requests
+    label: 'Jupyter', // button label
+    itemLabel: 'Jupyter Notebooks', // dropdown item label
+    icon: 'pi pi-book',
+    minRole: 100 // guest role_id
+  },
+  TOF_AGENT: {
+    id: 'tof_agent', // internal id for object keys
+    apiName: 'tof-agent', // name used in API requests
+    label: 'TOF Agent', // button label
+    itemLabel: 'TOF Agent', // dropdown item label
+    icon: 'pi pi-desktop',
+    minRole: 200 // editor role_id
+  }
+}
+
+const tokens = reactive({
+  [SERVICE_CONFIGS.MASCOPE_API.id]: null,
+  [SERVICE_CONFIGS.TOF_AGENT.id]: null
+})
+
+const selectedTokenType = ref(SERVICE_CONFIGS.MASCOPE_API.id)
+
+const currentServiceConfig = computed(() =>
+  Object.values(SERVICE_CONFIGS).find((c) => c.id === selectedTokenType.value)
+)
+
+// Available token types based on user role
+const availableTokenTypes = computed(() =>
+  Object.values(SERVICE_CONFIGS).filter((config) => app.auth.user.role_id >= config.minRole)
+)
+
+// Property for split button items
+const tokenItems = computed(() =>
+  availableTokenTypes.value.map((config) => ({
+    label: config.itemLabel,
+    icon: config.icon,
+    command: () => {
+      selectedTokenType.value = config.id
+    }
+  }))
+)
+
+const generateToken = async () => {
+  const config = Object.values(SERVICE_CONFIGS).find((c) => c.id === selectedTokenType.value)
+  try {
+    await api.http.post(`/auth/access_token/remove`, {
+      service_name: config.apiName
+    })
+    tokens[config.id] = (
+      await api.http.post(`/auth/access_token/generate`, {
+        service_name: config.apiName
+      })
+    )?.data?.access_token
+  } catch (e) {
+    app.ui.notification.push({
+      type: `${config.id}_token_refresh`,
+      status: 'error',
+      message: `${e?.response?.data?.error || e?.message}`
+    })
+  }
+}
 
 watchEffect(() => {
   if (app.ui.darkmode.active) {
@@ -111,44 +176,23 @@ const vHelpLayer = app.ui.help.directive(layer)
         'API tokens are used for Jupyter notebooks and other development tools. Tokens can only be viewed once for security reasons.'
       "
     >
-      <h4>API Token</h4>
-      <div class="row">
-        <Button
-          icon="pi pi-id-card"
-          label="Regenerate"
-          @click="
-            async () => {
-              try {
-                await api.http.post(`/auth/access_token/remove`, {
-                  service_name: `mascope_api`
-                })
-                token = (
-                  await api.http.post(`/auth/access_token/generate`, {
-                    service_name: `mascope_api`
-                  })
-                )?.data?.access_token
-              } catch (e) {
-                console.error(e)
-                app.ui.notification.push({
-                  type: 'regenerate_api_token',
-                  status: 'error',
-                  message: 'regeneration failed'
-                })
-              }
-            }
-          "
+      <h4>API Access Tokens</h4>
+      <div class="row token-row">
+        <SplitButton
+          :label="currentServiceConfig.label"
+          icon="pi pi-sync"
+          :model="tokenItems"
+          @click="generateToken"
+          class="token-button"
         />
-        <div class="token row" v-if="token">
+        <div class="token-display" v-if="tokens[selectedTokenType]">
           <span class="pi pi-lock" style="opacity: 0.3" />
-          <BaseCopyableField :field="token" />
+          <BaseCopyableField :field="tokens[selectedTokenType]" />
         </div>
       </div>
-      <div v-if="token">
+      <div v-if="tokens[selectedTokenType]">
         <Message icon="pi pi-info-circle" severity="info" closable>
-          <p>
-            This token is only shown once for security reasons; if you lose it, regenerate a new one
-            here.
-          </p>
+          <p>Token is shown only once for security reasons; if you lose it, regenerate a new one</p>
         </Message>
       </div>
     </section>
@@ -168,15 +212,25 @@ const vHelpLayer = app.ui.help.directive(layer)
 .col {
   gap: 0rem;
 }
+.token-row {
+  min-height: 6.5rem;
+}
 
-.token {
-  margin: 1rem;
+.token-button {
+  flex-shrink: 0;
+}
+
+.token-display {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.5rem;
   border: 1px solid var(--p-drawer-border-color);
-  max-width: 180px;
-  word-break: break-all;
   padding: 0.5rem;
   border-radius: 1rem;
   font-size: smaller;
+  max-width: 180px;
+  word-break: break-all;
 }
 
 section:not(:first-child) {
