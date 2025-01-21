@@ -71,15 +71,6 @@ watchEffect(() => {
             calibrationSelection[data['ionization_mechanism_id']] = false
           }
         "
-        :sortOrder="-1"
-        :sortField="
-          ({ ionization_mechanism_id }) =>
-            matchingMechanisms
-              .map(({ ionization_mechanism_id }) => ionization_mechanism_id)
-              .includes(ionization_mechanism_id)
-              ? +1
-              : -1
-        "
       >
         <Column selectionMode="multiple" />
         <Column header="Mechanism" field="ionization_mechanism" sortable />
