@@ -19,6 +19,8 @@ from mascope_server.api.models.target.compounds.target_compound_pydantic_model i
 from mascope_server.runtime import runtime
 
 
+# Threshold for high resolution isotope peaks prediction, r.a.>1%
+ISOTOPE_ABUNDANCE_THRESHOLD = 0.01
 # Low/TOF resolution constant
 RESOLUTION_LOW = 1e4
 
@@ -96,8 +98,10 @@ def generate_target_ions_from_composition(
             )
             target_ions.append(ion)
 
-            # Predict peaks of high resolution isotopes, takes whose with r.a.>1%
-            predicted_peaks = IsoThreshold(formula=raw_ion.formula, threshold=0.01)
+            # Predict peaks of high resolution isotopes
+            predicted_peaks = IsoThreshold(
+                formula=raw_ion.formula, threshold=ISOTOPE_ABUNDANCE_THRESHOLD
+            )
 
             # Extract high resolution masses and probabilities, correct masses for the electron charge
             masses_high_res = [
