@@ -2,10 +2,17 @@ import os
 import shutil
 import asyncio
 from IsoSpecPy import IsoThreshold
+from mascope_server.api.controllers.match.match_controller import (
+    rematch_batches,
+)
+from mascope_server.api.models.match.match_pydantic_model import (
+    RematchBatchesBody,
+    RematchBatchBody,
+)
 from mascope_lib.molmass import Formula
 from mascope_lib.molmass.elements import ELECTRON
 from sqlalchemy import text, select
-from mascope_server.db.models import TargetIon, TargetIsotope
+from mascope_server.db.models import SampleBatch, TargetIon, TargetIsotope
 from mascope_server.db import configure_database_engine, async_session
 from mascope_server.db.id import gen_id
 from mascope_server.db.ops.backup import create_db_backup
@@ -83,6 +90,27 @@ async def run():
             # Add the isotopes to be committed to the db
             session.add(target_isotope)
         await session.commit()
+
+    # Get all sample batches
+    async with async_session() as session:
+        stmt = select(SampleBatch)
+        result = await session.execute(stmt)
+        sample_batch_list = result.scalars().all()
+
+    runtime.logger.info(f"Rematching {len(sample_batch_list)} sample batches.")
+
+    sample_batch_ids = [
+        sample_batch.sample_batch_id for sample_batch in sample_batch_list
+    ]
+    rematch_batch_bodies = [
+        RematchBatchBody(sample_batch_id=sample_batch_id)
+        for sample_batch_id in sample_batch_ids
+    ]
+    rematch_batches_body = RematchBatchesBody(sample_batches=rematch_batch_bodies)
+
+    await rematch_batches(
+        rematch_batches_body, independent_transaction=True, sid="", process_id=""
+    )
 
 
 if __name__ == "__main__":
