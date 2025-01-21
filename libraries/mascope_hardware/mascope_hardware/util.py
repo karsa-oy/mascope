@@ -51,9 +51,11 @@ def create_sample_file_db_record(data, access_token):
     if method_file:
         sample_file_db_record["method_file"] = method_file
 
-    headers = {"Content-Type": "application/json"}
-    if access_token:
-        headers["Authorization"] = f"Bearer {access_token}"
+    headers = {
+        "Content-Type": "application/json",
+        "X-Service-Name": "file-converter",
+        "Authorization": f"Bearer {access_token}",
+    }
 
     response = requests.post(
         f"{url}/api/sample/files", headers=headers, json=sample_file_db_record

@@ -1,10 +1,11 @@
 """JWT token validation and extraction."""
 
 import re
-from mascope_server.api.new.auth.backend import auth_backend_cookie
+from mascope_server.api.new.auth.backend import auth_backend_jwt
 from mascope_server.api.new.auth.strategies.database import (
     get_database_strategy_context,
 )
+from mascope_server.api.new.auth.access_token.util import get_token_service
 from mascope_server.socket.auth.exceptions import SocketUnauthenticatedError
 from mascope_server.runtime import runtime
 
@@ -61,7 +62,7 @@ async def validate_jwt_token(jwt_token: str):
             get_user_manager_context,
         )
 
-        jwt_strategy = auth_backend_cookie.get_strategy()
+        jwt_strategy = auth_backend_jwt.get_strategy()
 
         async with get_user_manager_context() as user_manager:
             user = await jwt_strategy.read_token(jwt_token, user_manager)
@@ -77,12 +78,14 @@ async def validate_jwt_token(jwt_token: str):
         raise SocketUnauthenticatedError("Token validation failed") from e
 
 
-async def validate_service_access_token(access_token: str):
+async def validate_service_access_token(access_token: str, service_name: str):
     """
     Validate service access token and return associated user.
 
     :param access_token: Access token string for service
     :type access_token: str
+    :param service_name: Expected service name
+    :type service_name: str
     :return: User instance if token is valid
     :raises SocketUnauthenticatedError: If token is invalid or service mismatch
     """
@@ -102,6 +105,13 @@ async def validate_service_access_token(access_token: str):
                 if not user:
                     raise SocketUnauthenticatedError(
                         "Token validation failed: user not found"
+                    )
+
+                # Verify service name
+                token_service = await get_token_service(access_token)
+                if token_service != service_name:
+                    raise SocketUnauthenticatedError(
+                        f"The provided token is not authorized for {service_name}. Please try to refresh the token."
                     )
 
                 return user

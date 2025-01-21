@@ -43,7 +43,9 @@ async def connect(sid: str, environ: dict) -> bool:
         jwt_token = await get_jwt_from_cookies(cookies)
 
         # Step 3: Authenticate socket connection and associate session with user
-        await authenticate_socket_connection(sid=sid, token=jwt_token)
+        await authenticate_socket_connection(
+            sid=sid, token=jwt_token, minimum_role="guest"
+        )
         runtime.logger.debug(f"User's socket client {sid} connected.")
         return True
 

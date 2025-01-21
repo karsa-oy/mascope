@@ -42,7 +42,7 @@ async def connect(sid: str, environ: dict, auth: dict) -> bool:
 
         # Step 3: Authenticate connection
         await authenticate_socket_connection(
-            sid=sid, token=access_token, service_name="tof-agent"
+            sid=sid, token=access_token, minimum_role="editor", service_name="tof-agent"
         )
         runtime.logger.debug(f"Tof agent connected with sid {sid}")
         return True

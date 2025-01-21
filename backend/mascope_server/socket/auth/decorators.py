@@ -71,7 +71,9 @@ def file_converter_socket_auth(minimum_role: str):
                     raise SocketUnauthenticatedError("Missing access token")
 
                 # Validate token and get user
-                user = await validate_service_access_token(access_token=access_token)
+                user = await validate_service_access_token(
+                    access_token=access_token, service_name="file-converter"
+                )
 
                 # Check role permissions
                 required_role_id = auth_settings.ROLE_ACCESS_LEVELS.get(minimum_role)
