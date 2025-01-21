@@ -263,7 +263,9 @@ async def main() -> None:
             runtime.logger.info("Connected!")
             break
         except Exception as e:
-            runtime.logger.error(f"Failed to connect: {e}")
+            runtime.logger.error(
+                f"Failed to connect: {e}. Please try to refresh TOF agent access token in the configuration file."
+            )
             # Try again in a second
             await asyncio.sleep(1)
 

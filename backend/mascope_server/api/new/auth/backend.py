@@ -7,7 +7,7 @@ and bearer transport with database access tokens for the mascope_api jupyter lib
 """
 
 from rich.pretty import pretty_repr
-from fastapi import Request
+from fastapi import HTTPException, Request, status
 from fastapi_users.authentication import (
     AuthenticationBackend,
 )
@@ -24,7 +24,7 @@ from mascope_server.runtime import runtime
 
 
 # Cookie-based authentication for the web app
-auth_backend_cookie = AuthenticationBackend(
+auth_backend_jwt = AuthenticationBackend(
     name="jwt",
     transport=cookie_transport,
     get_strategy=get_jwt_strategy,
@@ -60,6 +60,7 @@ async def get_enabled_backends(request: Request) -> list[AuthenticationBackend]:
 
     cookie_auth = request.cookies.get("mascope_auth")
     auth_header = request.headers.get("authorization")
+    request_service_name = request.headers.get("x-service-name")
 
     # Access the route function (endpoint handler)
     route_func = request.scope.get("endpoint")
@@ -67,12 +68,25 @@ async def get_enabled_backends(request: Request) -> list[AuthenticationBackend]:
     # Cookie-based JWT for Mascope web app access
     if cookie_auth:
         runtime.logger.debug("Using web application authentication.")
-        return [auth_backend_cookie]
+        return [auth_backend_jwt]
 
     # Access token-based authentication(mascope_api Jupyter lib, file_converter service, tof-agent)
     if auth_header and not cookie_auth:
         token = auth_header.split(" ")[1]
         token_service_name = await get_token_service(token)
+
+        if token_service_name != request_service_name:
+            runtime.logger.error(
+                f"Token service name '{token_service_name}' "
+                f"mismatch request service name '{request_service_name}'. "
+            )
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=(
+                    "Unauthorized. The provided token is not authorized for this service. "
+                    "Please try to refresh the token."
+                ),
+            )
 
         # Check if the endpoint allows for token access
         if hasattr(route_func, "token_access") and route_func.token_access:
@@ -80,10 +94,16 @@ async def get_enabled_backends(request: Request) -> list[AuthenticationBackend]:
             return [auth_backend_access_token]
         else:
             runtime.logger.error(
-                f"Unauthorized for {token_service_name} service access."
+                f"This endpoint is not configured for {token_service_name} access."
             )
-            return [auth_backend_cookie]
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Access denied. Resource is not available, please contact your administrator.",
+            )
 
     # No valid authentication credentials found
     runtime.logger.error("Request did not contain a valid authentication credentials.")
-    return [auth_backend_cookie]
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Unauthorized. Please log in through Macope web interface or provide a valid API token.",
+    )

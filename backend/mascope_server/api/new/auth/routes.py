@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from mascope_server.api.new.auth import (
     fastapi_users,
-    auth_backend_cookie,
+    auth_backend_jwt,
 )
 from mascope_server.api.new.auth.access_token.routes import access_token_router
 
@@ -9,7 +9,7 @@ from mascope_server.api.new.auth.access_token.routes import access_token_router
 auth_router = APIRouter(prefix="/api/auth", tags=["Auth"])
 
 # Include JWT-based authentication and registration routes
-auth_router.include_router(fastapi_users.get_auth_router(auth_backend_cookie))
+auth_router.include_router(fastapi_users.get_auth_router(auth_backend_jwt))
 
 # Include the access token router within the main auth router for nested routing
 auth_router.include_router(access_token_router)
