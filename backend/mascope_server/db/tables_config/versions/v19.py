@@ -1,5 +1,5 @@
 """
-Schema configuration for v18 database tables. Each key in the dictionary is a table name,
+Schema configuration for v19 database tables. Each key in the dictionary is a table name,
 and its value is a dictionary specifying details about the table's schema and configuration.
 
 Structure:
@@ -178,6 +178,7 @@ table_configs = {
             "target_ion_id": ("VARCHAR(16)", 1, None, 0),
             "mz": ("FLOAT", 1, None, 0),
             "relative_abundance": ("FLOAT", 1, None, 0),
+            "resolution": ("VARCHAR(8)", 1, None, 0),
         },
         "fks": {
             "target_ion_id": (
