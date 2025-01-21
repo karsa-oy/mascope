@@ -20,7 +20,7 @@ from mascope_server.runtime import runtime
 
 
 # Low/TOF resolution constant
-RESOLUTION_LOW = 1e5
+RESOLUTION_LOW = 1e4
 
 
 def charge_string(raw_ion: Formula) -> str:
