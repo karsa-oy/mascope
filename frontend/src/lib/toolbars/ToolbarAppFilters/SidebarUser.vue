@@ -5,7 +5,7 @@ import Button from 'primevue/button'
 import Drawer from 'primevue/drawer'
 import ToggleSwitch from 'primevue/toggleswitch'
 import Message from 'primevue/message'
-import SplitButton from 'primevue/splitbutton'
+import Select from 'primevue/select'
 
 import { api } from '@/api'
 import { useApp } from '@/stores'
@@ -28,17 +28,13 @@ const SERVICE_CONFIGS = {
   MASCOPE_API: {
     id: 'mascope_api', // internal id for object keys
     apiName: 'mascope_api', // name used in API requests
-    label: 'Jupyter', // button label
-    itemLabel: 'Jupyter Notebooks', // dropdown item label
-    icon: 'pi pi-book',
+    label: 'Jupyter Notebooks',
     minRole: 100 // guest role_id
   },
   TOF_AGENT: {
     id: 'tof_agent', // internal id for object keys
     apiName: 'tof-agent', // name used in API requests
-    label: 'TOF Agent', // button label
-    itemLabel: 'TOF Agent', // dropdown item label
-    icon: 'pi pi-desktop',
+    label: 'TOF Agent',
     minRole: 200 // editor role_id
   }
 }
@@ -59,23 +55,22 @@ const availableTokenTypes = computed(() =>
   Object.values(SERVICE_CONFIGS).filter((config) => app.auth.user.role_id >= config.minRole)
 )
 
-// Property for split button items
 const tokenItems = computed(() =>
   availableTokenTypes.value.map((config) => ({
-    label: config.itemLabel,
-    icon: config.icon,
-    command: () => {
-      selectedTokenType.value = config.id
-    }
+    value: config.id,
+    label: config.label
   }))
 )
 
-const generateToken = async () => {
-  const config = Object.values(SERVICE_CONFIGS).find((c) => c.id === selectedTokenType.value)
+const regenerateToken = async () => {
+  if (!currentServiceConfig.value) return
+  const config = currentServiceConfig.value
   try {
+    // Remove existing token
     await api.http.post(`/auth/access_token/remove`, {
       service_name: config.apiName
     })
+    // Generate new token
     tokens[config.id] = (
       await api.http.post(`/auth/access_token/generate`, {
         service_name: config.apiName
@@ -177,23 +172,33 @@ const vHelpLayer = app.ui.help.directive(layer)
       "
     >
       <h4>API Access Tokens</h4>
-      <div class="row token-row">
-        <SplitButton
-          :label="currentServiceConfig.label"
-          icon="pi pi-sync"
-          :model="tokenItems"
-          @click="generateToken"
-          class="token-button"
-        />
-        <div class="token-display" v-if="tokens[selectedTokenType]">
-          <span class="pi pi-lock" style="opacity: 0.3" />
-          <BaseCopyableField :field="tokens[selectedTokenType]" />
+      <div class="token-container">
+        <div class="token-controls">
+          <Select
+            v-model="selectedTokenType"
+            :options="tokenItems"
+            optionLabel="label"
+            optionValue="value"
+            class="service-select"
+          />
+          <Button
+            icon="pi pi-refresh"
+            label="Regenerate"
+            @click="regenerateToken"
+            class="token-button"
+          />
         </div>
-      </div>
-      <div v-if="tokens[selectedTokenType]">
-        <Message icon="pi pi-info-circle" severity="info" closable>
-          <p>Token is shown only once for security reasons; if you lose it, regenerate a new one</p>
-        </Message>
+        <div v-if="tokens[selectedTokenType]" class="token-info">
+          <div class="token-display">
+            <span class="pi pi-lock" style="opacity: 0.3" />
+            <BaseCopyableField :field="tokens[selectedTokenType]" />
+          </div>
+          <Message icon="pi pi-info-circle" severity="info" closable>
+            <p>
+              Token is shown only once for security reasons; if you lose it, regenerate a new one
+            </p>
+          </Message>
+        </div>
       </div>
     </section>
     <section
@@ -212,24 +217,43 @@ const vHelpLayer = app.ui.help.directive(layer)
 .col {
   gap: 0rem;
 }
-.token-row {
-  min-height: 6.5rem;
+
+.token-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-height: 3rem;
+}
+
+.token-controls {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.5rem;
+  width: 100%;
 }
 
 .token-button {
   flex-shrink: 0;
 }
 
+.service-select {
+  width: 100%;
+}
+
+.token-info {
+  display: flex;
+  flex-direction: column;
+}
+
 .token-display {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  margin: 0.5rem;
+  gap: 0.75rem;
   border: 1px solid var(--p-drawer-border-color);
-  padding: 0.5rem;
+  padding: 0.75rem;
   border-radius: 1rem;
   font-size: smaller;
-  max-width: 180px;
+  width: 100%;
   word-break: break-all;
 }
 
