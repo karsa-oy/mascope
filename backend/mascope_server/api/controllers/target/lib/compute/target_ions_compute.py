@@ -123,7 +123,7 @@ def generate_target_ions_from_composition(
                         target_ion_id=ion.target_ion_id,
                         mz=mz,
                         relative_abundance=rel_abu,
-                        resolution="high",
+                        resolution="HIGH",
                     )
                     for mz, rel_abu in zip(masses_high_res, probs_high_res)
                 ]
@@ -136,7 +136,7 @@ def generate_target_ions_from_composition(
                         target_ion_id=ion.target_ion_id,
                         mz=mz,
                         relative_abundance=rel_abu,
-                        resolution="low",
+                        resolution="LOW",
                     )
                     for mz, rel_abu in zip(masses_low_res, probs_low_res)
                 ]

@@ -39,7 +39,7 @@ async def run():
     async with async_session() as session:
         await session.execute(
             text(
-                "ALTER TABLE target_isotope ADD COLUMN resolution VARCHAR(8) NOT NULL DEFAULT 'low';"
+                "ALTER TABLE target_isotope ADD COLUMN resolution VARCHAR(8) NOT NULL DEFAULT 'LOW';"
             )
         )
         await session.commit()

@@ -492,7 +492,7 @@ async def get_match_sample_isotopes(
 
     # Filter out isotopes of incorrect resolution
     instrument_type = get_instrument_type(sample["filename"])
-    isotope_resolution = "low" if instrument_type == "tof" else "high"
+    isotope_resolution = "LOW" if instrument_type == "tof" else "HIGH"
     match_sample_isotopes_df = match_sample_isotopes_df.query(
         "resolution == @isotope_resolution"
     )

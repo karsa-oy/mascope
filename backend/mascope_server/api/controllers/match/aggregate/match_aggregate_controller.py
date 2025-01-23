@@ -86,7 +86,7 @@ async def aggregate_match_isotope_filtered_data(
 
             # Get target isotope resolution for the sample_item
             instrument_type = get_instrument_type(sample.filename)
-            isotope_resolution = "low" if instrument_type == "tof" else "high"
+            isotope_resolution = "LOW" if instrument_type == "tof" else "HIGH"
         else:
             isotope_resolution = None
 
