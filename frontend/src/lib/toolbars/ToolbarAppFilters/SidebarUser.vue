@@ -66,13 +66,8 @@ const regenerateToken = async () => {
   if (!currentServiceConfig.value) return
   const config = currentServiceConfig.value
   try {
-    // Remove existing token
-    await api.http.post(`/auth/access_token/remove`, {
-      service_name: config.apiName
-    })
-    // Generate new token
     tokens[config.id] = (
-      await api.http.post(`/auth/access_token/generate`, {
+      await api.http.post(`/auth/access_token/regenerate`, {
         service_name: config.apiName
       })
     )?.data?.access_token

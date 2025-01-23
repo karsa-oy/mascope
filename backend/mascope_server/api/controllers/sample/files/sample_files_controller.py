@@ -289,7 +289,7 @@ FILE_UPLOAD_CHUNK_SIZE = 2 * 1024 * 1024  # 2 MB
 
 @api_controller()
 async def sample_file_upload(
-    file: UploadFile, user: User, strategy, user_sid: str = None
+    file: UploadFile, user: User, user_sid: str = None
 ) -> dict:
     """
     Handles the upload of a sample file and saves it to the `filestreams` directory.
@@ -301,8 +301,6 @@ async def sample_file_upload(
     :type file: UploadFile
     :param user: The authenticated user
     :type user: User
-    :param strategy: The authentication strategy for issueing the file-converter access token
-    :type strategy: AuthenticationBackend
     :param user_sid : Scocket client session ID, used for protecting events received from file-converter service.
     :type user_sid : str, optional
     :return: A dictionary containing the success message.
@@ -317,9 +315,7 @@ async def sample_file_upload(
                 f.write(contents)
 
         # Get service token for file converter
-        access_token = await get_access_token(
-            user=user, strategy=strategy, service_name="file-converter"
-        )
+        access_token = await get_access_token(user=user, service_name="file-converter")
         # Emit internal event for file upload
         await event_emitter.emit(
             "file-converter.auth",
