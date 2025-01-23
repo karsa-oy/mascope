@@ -1,5 +1,8 @@
 from typing import Optional
 import pandas as pd
+from mascope_server.api.new.match.params.schema import (
+    DEFAULT_MIN_ISOTOPE_ABUNDANCE,
+)
 from mascope_lib.file_func import get_instrument_type
 from mascope_server.api.lib.api_features import api_controller
 from mascope_server.api.controllers.samples.samples_controller import get_sample
@@ -38,10 +41,6 @@ from mascope_server.api.controllers.match.lib.match_util import (
     deduplicate_match_df,
     sort_and_paginate_match_sample_df,
 )
-
-# TODO_configuration
-# Default Filter Parameters
-DEFAULT_MIN_ISOTOPE_ABUNDANCE = 0.15
 
 
 @api_controller()

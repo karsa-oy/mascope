@@ -1,7 +1,8 @@
 import pandas as pd
 import numpy as np
-from functools import partial
-from typing import Optional
+from mascope_server.api.new.match.params.schema import (
+    DEFAULT_MIN_ISOTOPE_ABUNDANCE,
+)
 from mascope_lib.file_func import get_instrument_type, get_sum_signal, load_file
 from mascope_lib.peak import calculate_signal_area, detect_peaks, get_peaks
 from mascope_lib.chemistry import match_mz
@@ -34,10 +35,6 @@ from mascope_server.socket.notifications import (
 
 
 from mascope_server.runtime import runtime
-
-# TODO_configuration
-# Default Filter Parameters
-DEFAULT_MIN_ISOTOPE_ABUNDANCE = 0.05
 
 # -------------------------------------------------------------------
 # Isotope level

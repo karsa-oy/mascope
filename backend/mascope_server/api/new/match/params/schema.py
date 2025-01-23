@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field, model_validator
 # TODO_configuration Default Match Parameters
 
 # global defaults
-DEFAULT_MIN_ISOTOPE_ABUNDANCE = 0.05
+DEFAULT_MIN_ISOTOPE_ABUNDANCE = 0.1
 DEFAULT_PROBABLE_MATCH_THRESHOLD = 0.8
 DEFAULT_POSSIBLE_MATCH_THRESHOLD = 0.7
 
