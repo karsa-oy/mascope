@@ -1,6 +1,9 @@
 from typing import List, Optional
-from pydantic import Field
+from pydantic import Field, field_validator
 from mascope_server.api.models.base_pydantic_model import QueryParamsModel
+
+
+ISOTOPE_RESOLUTION_TYPES = ["HIGH", "LOW"]
 
 
 class GetTargetIsotopesQueryParams(QueryParamsModel):
@@ -16,6 +19,9 @@ class GetTargetIsotopesQueryParams(QueryParamsModel):
     )
     max_relative_abundance: Optional[float] = Field(
         None, description="Maximum relative abundance for filtering."
+    )
+    resolution: Optional[str] = Field(
+        None, description="Type of the target isotope resolution, LOW or HIGH"
     )
     target_compound_ids: List[str] = Field(
         default=[], description="List of target compound IDs to filter isotopes."
@@ -44,3 +50,14 @@ class GetTargetIsotopesQueryParams(QueryParamsModel):
     )
     page: int = Field(0, description="Pagination page.")
     limit: int = Field(1000000, description="Number of items per page.")
+
+    @field_validator("resolution")
+    @classmethod
+    def validate_resolution(cls, resolution):
+        """Ensure isotope `resolution` is one of the allowed types."""
+        if resolution not in ISOTOPE_RESOLUTION_TYPES:
+            allowed_types = ", ".join(ISOTOPE_RESOLUTION_TYPES)
+            raise ValueError(
+                f"Invalid isotope resolution type '{resolution}'. Allowed types are: {allowed_types}."
+            )
+        return resolution
