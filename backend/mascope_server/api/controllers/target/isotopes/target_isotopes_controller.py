@@ -20,6 +20,7 @@ async def get_target_isotopes(
     max_mz: Optional[float] = None,
     min_relative_abundance: Optional[float] = None,
     max_relative_abundance: Optional[float] = None,
+    resolution: Optional[str] = None,
     target_compound_ids: Optional[List[str]] = None,
     ionization_mechanism_ids: Optional[List[str]] = None,
     sample_batch_id: Optional[str] = None,
@@ -54,6 +55,8 @@ async def get_target_isotopes(
     :type min_relative_abundance: Optional[float], optional
     :param max_relative_abundance: Maximum relative abundance percentage to filter isotopes.
     :type max_relative_abundance: Optional[float], optional
+    :param resolution: Required isotope resolution, 'LOW' or 'HIGH'
+    :type resolution: Optional[str], optional
     :param target_compound_ids: List of target compound IDs to filter isotopes.
     :type target_compound_ids: Optional[List[str]], optional
     :param ionization_mechanism_ids: List of ionization mechanism IDs to filter isotopes.
@@ -90,6 +93,8 @@ async def get_target_isotopes(
             stmt = stmt.filter(TargetIsotope.mz >= min_mz)
         if max_mz is not None:
             stmt = stmt.filter(TargetIsotope.mz <= max_mz)
+        if resolution is not None:
+            stmt = stmt.filter(TargetIsotope.resolution == resolution)
         if min_relative_abundance is not None:
             stmt = stmt.filter(
                 TargetIsotope.relative_abundance >= min_relative_abundance

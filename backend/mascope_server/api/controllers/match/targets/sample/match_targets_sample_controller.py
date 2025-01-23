@@ -413,11 +413,14 @@ async def get_match_sample_isotopes(
     sample_batch_id = sample["sample_batch_id"]
     sample_item_name = sample["sample_item_name"]
     instrument = sample["instrument"]
+    instrument_type = get_instrument_type(sample["filename"])
+    isotope_resolution = "LOW" if instrument_type == "tof" else "HIGH"
 
     # Fetch target isotopes for the sample batch with filter parameters
     target_isotopes = await get_target_isotopes(
         target_ion_id=target_ion_id,
         min_relative_abundance=min_relative_abundance,
+        resolution=isotope_resolution,
         sample_batch_id=sample_batch_id,
         target_collection_id=target_collection_id,
         show_target_collection=True,
@@ -487,13 +490,6 @@ async def get_match_sample_isotopes(
     # Sort and paginate the DataFrame
     match_sample_isotopes_df = sort_and_paginate_match_sample_df(
         match_sample_isotopes_df, order, page, limit
-    )
-
-    # Filter out isotopes of incorrect resolution
-    instrument_type = get_instrument_type(sample["filename"])
-    isotope_resolution = "LOW" if instrument_type == "tof" else "HIGH"
-    match_sample_isotopes_df = match_sample_isotopes_df.query(
-        "resolution == @isotope_resolution"
     )
 
     return {
