@@ -3,7 +3,7 @@ from pydantic import Field, field_validator
 from mascope_server.api.models.base_pydantic_model import QueryParamsModel
 
 
-ISOTOPE_RESOLUTION_TYPES = ["HIGH", "LOW", None]
+ISOTOPE_RESOLUTION_TYPES = ["HIGH", "LOW"]
 
 
 class GetTargetIsotopesQueryParams(QueryParamsModel):
@@ -55,7 +55,7 @@ class GetTargetIsotopesQueryParams(QueryParamsModel):
     @classmethod
     def validate_resolution(cls, resolution):
         """Ensure isotope `resolution` is one of the allowed types."""
-        if resolution not in ISOTOPE_RESOLUTION_TYPES:
+        if resolution is not None and resolution not in ISOTOPE_RESOLUTION_TYPES:
             allowed_types = ", ".join(ISOTOPE_RESOLUTION_TYPES)
             raise ValueError(
                 f"Invalid isotope resolution type '{resolution}'. Allowed types are: {allowed_types}."
