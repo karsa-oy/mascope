@@ -16,6 +16,7 @@ from mascope_server.api.lib.exceptions.api_exceptions import NotFoundException
 from mascope_server.api.new.auth.config import auth_settings
 from mascope_server.api.new.users import exceptions
 from mascope_server.api.new.users.schemas import UserCreate
+from mascope_server.api.new.auth.access_token.service import regenerate_access_token
 from mascope_server.api.new.users.access_token.service import delete_user_access_tokens
 from mascope_server.socket import (
     event_emitter,
@@ -131,7 +132,9 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
         response: Optional[Response] = None,
     ) -> None:
         """
-        After user login authenticate the socket connection
+        After user login:
+        1. Authenticate the socket connection
+        2. Generate file-converter access token for editor+ roles
 
         :param user: The user that is logging in
         :param request: Optional FastAPI request
@@ -139,6 +142,7 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
         Defaults to None
         """
         try:
+            # Step 1: Socket authentication
             if request and response and "set-cookie" in response.headers:
                 sid = request.headers.get("x-sid")
                 if not sid:
@@ -151,6 +155,9 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
                 await authenticate_socket_connection(
                     sid=sid, token=jwt_token, minimum_role="guest"
                 )
+            # Step 2: Generate file converter access token for editor+ roles
+            if user.role_id >= auth_settings.ROLE_ACCESS_LEVELS.get("editor"):
+                await regenerate_access_token(user=user, service_name="file-converter")
         except SocketUnauthenticatedError as e:
             runtime.logger.error(f"Socket authentication failed after login: {str(e)}")
         except Exception as e:

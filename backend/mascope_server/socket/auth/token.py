@@ -1,11 +1,7 @@
-"""JWT token validation and extraction."""
+"""Socket-specific JWT token validation and extraction."""
 
 import re
 from mascope_server.api.new.auth.backend import auth_backend_jwt
-from mascope_server.api.new.auth.strategies.database import (
-    get_database_strategy_context,
-)
-from mascope_server.api.new.auth.access_token.util import get_token_service
 from mascope_server.socket.auth.exceptions import SocketUnauthenticatedError
 from mascope_server.runtime import runtime
 
@@ -75,49 +71,4 @@ async def validate_jwt_token(jwt_token: str):
         raise
     except Exception as e:
         runtime.logger.error(f"Token validation failed: {str(e)}")
-        raise SocketUnauthenticatedError("Token validation failed") from e
-
-
-async def validate_service_access_token(access_token: str, service_name: str):
-    """
-    Validate service access token and return associated user.
-
-    :param access_token: Access token string for service
-    :type access_token: str
-    :param service_name: Expected service name
-    :type service_name: str
-    :return: User instance if token is valid
-    :raises SocketUnauthenticatedError: If token is invalid or service mismatch
-    """
-    try:
-        # Step 1. Basic token validation
-        if not isinstance(access_token, str):
-            raise SocketUnauthenticatedError("Invalid token format: not a string")
-
-        # Step 2. Token validation using access token strategy
-        from mascope_server.api.new.users.user_manager.util import (
-            get_user_manager_context,
-        )
-
-        async with get_database_strategy_context() as database_strategy:
-            async with get_user_manager_context() as user_manager:
-                user = await database_strategy.read_token(access_token, user_manager)
-                if not user:
-                    raise SocketUnauthenticatedError(
-                        "Token validation failed: user not found"
-                    )
-
-                # Verify service name
-                token_service = await get_token_service(access_token)
-                if token_service != service_name:
-                    raise SocketUnauthenticatedError(
-                        f"The provided token is not authorized for {service_name}. Please try to refresh the token."
-                    )
-
-                return user
-
-    except SocketUnauthenticatedError:
-        raise
-    except Exception as e:
-        runtime.logger.error(f"Service token validation failed: {str(e)}")
         raise SocketUnauthenticatedError("Token validation failed") from e

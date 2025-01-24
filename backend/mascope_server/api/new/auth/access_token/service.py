@@ -3,10 +3,16 @@ from sqlalchemy import select, update
 from mascope_server.db import async_session
 from mascope_server.db.models import AccessToken, User
 from mascope_server.api.lib.api_features import api_controller
-from mascope_server.api.new.auth import auth_backend_access_token
+from mascope_server.api.new.auth.backend import auth_backend_access_token
 from mascope_server.api.new.auth.strategies.database import (
     get_database_strategy_context,
 )
+from mascope_server.api.new.auth.exceptions import InvalidTokenException
+from mascope_server.api.new.auth.access_token.validation import (
+    validate_service_access_token,
+)
+
+from mascope_server.runtime import runtime
 
 
 @api_controller()
@@ -32,10 +38,16 @@ async def get_access_token(user: User, service_name: str) -> str:
         token = token_query.scalar_one_or_none()
 
         if token:
-            return token.token
+            try:
+                await validate_service_access_token(token.token, service_name)
+                return token.token
+            except InvalidTokenException:
+                runtime.logger.debug(
+                    f"Invalid {service_name} token found, regenerating new one"
+                )
 
     # Generate new token if none exists
-    response = await generate_access_token(user, service_name)
+    response = await regenerate_access_token(user, service_name)
 
     # Extract token from response
     data = json.loads(response.body.decode())
@@ -64,6 +76,9 @@ async def generate_access_token(user, service_name: str):
         )
         await session.commit()
 
+    runtime.logger.debug(
+        f"{user.username} access token for {service_name} is generated"
+    )
     return response
 
 

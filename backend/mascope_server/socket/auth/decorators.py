@@ -3,8 +3,11 @@
 from functools import wraps
 from typing import Callable, Optional
 from mascope_server.api.new.auth.config import auth_settings
+from mascope_server.api.new.auth.exceptions import InvalidTokenException
+from mascope_server.api.new.auth.access_token.validation import (
+    validate_service_access_token,
+)
 from mascope_server.socket.auth.session import get_session_user
-from mascope_server.socket.auth.token import validate_service_access_token
 from mascope_server.socket.auth.exceptions import (
     SocketAuthError,
     SocketForbiddenError,
@@ -90,7 +93,9 @@ def file_converter_socket_auth(minimum_role: str):
                 )
 
                 return await handler(sid, data, *args, **kwargs)
-
+            except InvalidTokenException as e:
+                runtime.logger.error(f"File converter auth error: {str(e)}")
+                raise SocketUnauthenticatedError(str(e)) from e
             except SocketAuthError as e:
                 runtime.logger.error(f"File converter auth error: {str(e)}")
                 raise

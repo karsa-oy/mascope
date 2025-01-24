@@ -2,10 +2,11 @@
 
 from typing import Optional
 from mascope_server.api.new.auth.config import auth_settings
-from mascope_server.socket.auth.token import (
-    validate_jwt_token,
+from mascope_server.api.new.auth.exceptions import InvalidTokenException
+from mascope_server.api.new.auth.access_token.validation import (
     validate_service_access_token,
 )
+from mascope_server.socket.auth.token import validate_jwt_token
 from mascope_server.socket.auth.session import clear_user_session, save_user_session
 from mascope_server.socket.auth.exceptions import (
     SocketAuthConfigError,
@@ -82,6 +83,8 @@ async def authenticate_socket_connection(
             f"{service_name.title() if service_name else 'User'} socket session {sid} "
             f"authenticated by user '{user.username}'"
         )
+    except InvalidTokenException as e:
+        raise SocketUnauthenticatedError(str(e)) from e
     except Exception as e:
         # Handle authentication error and clean up session."""
         await clear_user_session(sid=sid, namespace=namespace)
