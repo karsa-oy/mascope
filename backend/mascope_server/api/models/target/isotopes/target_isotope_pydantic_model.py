@@ -3,7 +3,7 @@ from pydantic import Field, field_validator
 from mascope_server.api.models.base_pydantic_model import QueryParamsModel
 
 
-ISOTOPE_RESOLUTION_TYPES = ["HIGH", "LOW"]
+ISOTOPE_RESOLUTION_TYPES = ["HIGH", "LOW", None]
 
 
 class GetTargetIsotopesQueryParams(QueryParamsModel):
