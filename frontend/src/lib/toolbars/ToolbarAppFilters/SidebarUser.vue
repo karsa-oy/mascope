@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, computed, watchEffect } from 'vue'
+import { ref, reactive, computed, watchEffect, watch } from 'vue'
 
 import Button from 'primevue/button'
 import Drawer from 'primevue/drawer'
@@ -23,36 +23,31 @@ const dialog = reactive({
 })
 
 // API Token Management
-
-const SERVICE_CONFIGS = {
-  MASCOPE_API: {
-    id: 'mascope_api', // internal id for object keys
+const SERVICE_CONFIGS = [
+  {
+    id: 'mascope_api',
     apiName: 'mascope_api', // name used in API requests
     label: 'Jupyter Notebooks',
     minRole: 100 // guest role_id
   },
-  TOF_AGENT: {
-    id: 'tof_agent', // internal id for object keys
-    apiName: 'tof-agent', // name used in API requests
+  {
+    id: 'tof_agent',
+    apiName: 'tof-agent',
     label: 'TOF Agent',
     minRole: 200 // editor role_id
   }
-}
+]
 
-const tokens = reactive({
-  [SERVICE_CONFIGS.MASCOPE_API.id]: null,
-  [SERVICE_CONFIGS.TOF_AGENT.id]: null
-})
-
-const selectedTokenType = ref(SERVICE_CONFIGS.MASCOPE_API.id)
+const token = ref(null)
+const selectedTokenType = ref(SERVICE_CONFIGS[0].id)
 
 const currentServiceConfig = computed(() =>
-  Object.values(SERVICE_CONFIGS).find((c) => c.id === selectedTokenType.value)
+  SERVICE_CONFIGS.find((c) => c.id === selectedTokenType.value)
 )
 
 // Available token types based on user role
 const availableTokenTypes = computed(() =>
-  Object.values(SERVICE_CONFIGS).filter((config) => app.auth.user.role_id >= config.minRole)
+  SERVICE_CONFIGS.filter((config) => app.auth.user.role_id >= config.minRole)
 )
 
 const tokenItems = computed(() =>
@@ -63,10 +58,10 @@ const tokenItems = computed(() =>
 )
 
 const regenerateToken = async () => {
-  if (!currentServiceConfig.value) return
   const config = currentServiceConfig.value
+  if (!config) return
   try {
-    tokens[config.id] = (
+    token.value = (
       await api.http.post(`/auth/access_token/regenerate`, {
         service_name: config.apiName
       })
@@ -79,6 +74,17 @@ const regenerateToken = async () => {
     })
   }
 }
+
+// Clear state when closing drawer
+const clear = () => {
+  token.value = null
+  selectedTokenType.value = SERVICE_CONFIGS[0].id
+}
+
+// Watch drawer visibility to clear state
+watch(drawer, (visible) => {
+  if (!visible) clear()
+})
 
 watchEffect(() => {
   if (app.ui.darkmode.active) {
@@ -175,6 +181,7 @@ const vHelpLayer = app.ui.help.directive(layer)
             optionLabel="label"
             optionValue="value"
             class="service-select"
+            @change="token = null"
           />
           <Button
             icon="pi pi-refresh"
@@ -183,10 +190,10 @@ const vHelpLayer = app.ui.help.directive(layer)
             class="token-button"
           />
         </div>
-        <div v-if="tokens[selectedTokenType]" class="token-info">
+        <div v-if="token" class="token-info">
           <div class="token-display">
             <span class="pi pi-lock" style="opacity: 0.3" />
-            <BaseCopyableField :field="tokens[selectedTokenType]" />
+            <BaseCopyableField :field="token" />
           </div>
           <Message icon="pi pi-info-circle" severity="info" closable>
             <p>
