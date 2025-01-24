@@ -77,7 +77,7 @@ async def run():
                     target_ion_id=ion.target_ion_id,
                     mz=mz,
                     relative_abundance=rel_abu,
-                    resolution="high",
+                    resolution="HIGH",
                 )
                 for mz, rel_abu in zip(masses, probs)
             ]
