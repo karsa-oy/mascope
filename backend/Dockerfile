@@ -17,10 +17,6 @@ RUN poetry build
 
 WORKDIR /app/libraries/mascope_hardware
 COPY ./libraries/mascope_hardware .
-# patch the tofwerk dll
-ARG TW_DLL_PATH="/app/libraries/mascope_hardware/mascope_hardware/tofwerk/lib/dlls/linux_x86_64"
-RUN apt install patchelf 
-RUN patchelf --force-rpath --set-rpath ${TW_DLL_PATH} "${TW_DLL_PATH}/libtwh5.so"
 RUN poetry build
 
 WORKDIR /app/libraries/mascope_lib
