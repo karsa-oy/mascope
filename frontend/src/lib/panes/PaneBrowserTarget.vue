@@ -171,9 +171,7 @@ const menu = computed(() => ({
 
 watch(
   () =>
-    app.data.match.isotope.focused ??
-    app.data.match.isotope.focused ??
-    app.data.match.compound.focused,
+    app.data.match.isotope.focused ?? app.data.match.ion.focused ?? app.data.match.compound.focused,
   async (match) => {
     const ionId =
       match?.target_ion_id ??
