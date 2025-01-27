@@ -21,6 +21,7 @@
             concurrently
             docker_27
             openssl
+            gcc
           ];
         profile = ''
           pipx ensurepath
