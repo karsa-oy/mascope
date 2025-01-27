@@ -105,5 +105,5 @@ async def get_enabled_backends(request: Request) -> list[AuthenticationBackend]:
     runtime.logger.error("Request did not contain a valid authentication credentials.")
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Unauthorized. Please log in through Macope web interface or provide a valid API token.",
+        detail="Unauthorized. Please log in through Mascope web interface or provide a valid API token.",
     )

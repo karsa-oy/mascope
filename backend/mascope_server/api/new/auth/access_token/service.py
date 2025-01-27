@@ -18,15 +18,16 @@ from mascope_server.runtime import runtime
 @api_controller()
 async def get_access_token(user: User, service_name: str) -> str:
     """
-    Gets an access token for the specified user and service. If no token exists,
-    generates a new one.
+    Gets an access token for the specified user and service.
+    Raises InvalidTokenException if token is missing or invalid.
 
     :param user: The authenticated user
     :type user: User
     :param service_name: Name of the service (e.g., "file-converter")
     :type service_name: str
-    :return: The access token string
+    :return: The access token string if valid
     :rtype: str
+    :raises: InvalidTokenException if token invalid/missing
     """
     async with async_session() as session:
         # Query existing token for the user and service
@@ -37,21 +38,18 @@ async def get_access_token(user: User, service_name: str) -> str:
         )
         token = token_query.scalar_one_or_none()
 
-        if token:
-            try:
-                await validate_service_access_token(token.token, service_name)
-                return token.token
-            except InvalidTokenException:
-                runtime.logger.debug(
-                    f"Invalid {service_name} token found, regenerating new one"
-                )
+        if not token:
+            raise InvalidTokenException(
+                "You don't have access to this service. Please log in to Mascope again to refresh your access."
+            )
 
-    # Generate new token if none exists
-    response = await regenerate_access_token(user, service_name)
-
-    # Extract token from response
-    data = json.loads(response.body.decode())
-    return data["access_token"]
+        try:
+            await validate_service_access_token(token.token, service_name)
+            return token.token
+        except InvalidTokenException as e:
+            raise InvalidTokenException(
+                "Your access to this service has expired. Please log in to Mascope again to refresh your access."
+            ) from e
 
 
 @api_controller()

@@ -1,6 +1,6 @@
 import os
 from datetime import datetime
-from fastapi import Depends, UploadFile
+from fastapi import UploadFile
 from sqlalchemy import (
     select,
     asc,
@@ -15,6 +15,7 @@ from mascope_server.db import async_session
 from mascope_server.db.id import gen_id
 from mascope_server.db.models import SampleFile, User
 from mascope_server.api.new.auth.access_token.service import get_access_token
+from mascope_server.api.new.auth.exceptions import InvalidTokenException
 from mascope_server.api.controllers.instrument_functions.lib.instrument_functions_fetch import (
     read_instrument_function,
 )
@@ -22,7 +23,10 @@ from mascope_server.api.lib.api_features import (
     api_controller,
     api_controller_background_task,
 )
-from mascope_server.api.lib.exceptions.api_exceptions import NotFoundException
+from mascope_server.api.lib.exceptions.api_exceptions import (
+    ApiException,
+    NotFoundException,
+)
 from mascope_server.api.models.sample.files.sample_file_pydantic_model import (
     SampleFileCreate,
     SampleFileUpdate,
@@ -314,7 +318,7 @@ async def sample_file_upload(
             while contents := file.file.read(FILE_UPLOAD_CHUNK_SIZE):
                 f.write(contents)
 
-        # Get service token for file converter
+        # Get service token for file converter, check it's valid
         access_token = await get_access_token(user=user, service_name="file-converter")
         # Emit internal event for file upload
         await event_emitter.emit(
@@ -327,6 +331,8 @@ async def sample_file_upload(
                 "access_token": access_token,
             },
         )
+    except ApiException:
+        raise
     except Exception as e:
         raise RuntimeError(f"Failed to upload file {file.filename}: {e}") from e
     finally:
