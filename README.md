@@ -12,7 +12,7 @@ All developer docs are in this document:
 - **[🚂 Runtime](#runtime)** - devops toolchain - [api](#runtime-library) / [cli](#runtime-cli) / [modes](#runtime-modes) / [modules](#runtime-modules) / [envs](#runtime-environments) / [configs](#runtime-config) / [logging](#runtime-logging)
 - **[🤖 Agents](#agents)** - instrument agents - [file mover](#file-mover) / [tof agent](#tof-agent)
 - **[📡 Backend](#backend)** - central server - [api](#backend-api) / [auth](#backend-auth) / [app](#backend-app) / [db](#backend-db) / [file converter](#backend-file-converter)
-- **[🖥️ Frontend](#frontend)** - user interface - [tech](#frontend-technologies) / [codebase](#frontend-codebase) / [api client](#frontend-api-client) / [stores](#frontend-stores) / [help mode](#frontend-user-help) / [tests](#frontend-tests)
+- **[🖥️ Frontend](#frontend)** - user interface - [tech](#frontend-technologies) / [development](#frontend-development) / [codebase](#frontend-codebase) / [api client](#frontend-api-client) / [stores](#frontend-stores) / [help mode](#frontend-user-help) / [tests](#frontend-tests)
 - **[📚 Libraries](#libraries)** - shared packages - [mascope_api](#mascope-api) / [mascope_hardware](#mascope-hardware) / [mascope_lib](#mascope-lib)
 - **[📒 Notebooks](#notebooks)** - jupyter environment
 - **[📄 Documentation](#documentation)** - about the docs
@@ -662,6 +662,26 @@ The Mascope frontend is build with the following technologies:
 - [PrimeVue](https://primevue.org/introduction/) as the component library
 - [Vite](https://vitejs.dev/guide/) as the build tool + dev server
 - [Playwright](https://playwright.dev/docs/intro) for end-to-end tests
+
+### Frontend Development
+
+The frontend is deployed via a Vite dev server when running `mascope dev run`. This serves the frontend on `localhost:5173` and triggers hot module reloading (HMR) to reload the frontend whenver changes are made to frontend code. This is not always 100% reliable, especially when application state is involved which could be corrupted; to be safe, manually reload the page.
+
+#### Acquisition Range Config
+
+One important feature in the frontend is the _acquisition tab_. This allows users to select acquired files and load them into a batch.
+
+In order to facilitate ergonomic development with the our standard test dataset, it can be helpful to configure the default time range selection in the [runtime config](#runtime-config) of the frontend:
+
+```toml
+# dev.mascope.toml
+
+[frontend]
+acquisition_filter = { min = '2022' }
+```
+You can also set a `max` if necessary, and you can provide any date string parsable by the [Javascript `Date` constructor](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date/Date), e.g. `2023-05-23` or `2025-01-27T19:14`.
+
+
 
 ### Frontend Codebase
 

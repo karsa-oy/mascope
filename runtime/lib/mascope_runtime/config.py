@@ -91,12 +91,17 @@ class MascopeFileMoverConfig(MascopeModuleConfig):
     target: str  # folder to transfer samples to in the server
 
 
+class DatetimeRange(BaseModel):
+    min: Optional[str] = None
+    max: Optional[str] = None
+
+
 class MascopeFrontendConfig(MascopeModuleConfig):
     """
     Frontend module specific configuration options
     """
 
-    pass
+    acquisition_filter: Optional[DatetimeRange] | str = None
 
 
 class MascopeNotebooksConfig(MascopeModuleConfig):

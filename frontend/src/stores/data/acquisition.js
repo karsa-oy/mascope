@@ -2,6 +2,7 @@ import { ref, reactive, computed, watch, watchEffect } from 'vue'
 import { defineStore } from 'pinia'
 
 import { api } from '@/api'
+import { runtime } from '@/lib/runtime'
 
 import { useSample } from './sample'
 import { useInstrument } from './instrument'
@@ -26,20 +27,14 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
     filename: null
   })
 
-  const time = reactive({
-    mode: 'Last 24 hours',
-    range: {
-      min: null,
-      max: null
-    }
-  })
+  const time = reactive(initTime())
   const days = computed(() =>
     time.mode == 'range' ? null : time.mode == 'Last 24 hours' ? 1 : Number(time.mode.split(' ')[1])
   )
   watchEffect(() => {
     if (time.range.min || time.range.max) {
       time.mode = 'range'
-    } else {
+    } else if (time.mode == 'range') {
       time.mode = 'Last 24 hours'
     }
   })
@@ -185,3 +180,36 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
     load
   }
 })
+
+const toDate = (iso) => (iso ? new Date(iso) : null)
+
+function initTime() {
+  const configured = runtime.config.acquisition_filter
+  if (configured) {
+    if (typeof configured == 'string') {
+      return {
+        mode: configured,
+        range: {
+          min: null,
+          max: null
+        }
+      }
+    } else if (typeof configured == 'object') {
+      return {
+        mode: 'range',
+        range: {
+          min: toDate(configured.min),
+          max: toDate(configured.max)
+        }
+      }
+    }
+  } else {
+    return {
+      mode: 'Last 24 hours',
+      range: {
+        min: null,
+        max: null
+      }
+    }
+  }
+}

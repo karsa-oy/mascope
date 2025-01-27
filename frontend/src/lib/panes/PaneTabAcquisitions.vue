@@ -82,7 +82,7 @@ watch(
     <template #header="{ chooseCallback }">
       <menu style="gap: 1rem; align-items: baseline; height: fit-content">
         <Select
-          props.inputId="time"
+          inputId="time"
           v-model="app.data.acquisition.time.mode"
           :options="['Last 24 hours', 'Last 7 days', 'Last 30 days', 'Last 90 days']"
           style="flex-direction: row-reverse"
