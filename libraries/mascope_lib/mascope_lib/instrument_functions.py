@@ -173,7 +173,11 @@ async def process_peak_shapes(
 
     # Clean shifted outliers
     p_centers = np.array(p_centers)
-    non_outlier_mask = np.where(p_centers - np.median(p_centers) < 1e-3)[0]
+    center_mad = np.median(np.abs(p_centers - np.median(p_centers)))
+    non_outlier_mask = np.where(
+        np.abs(p_centers - np.median(p_centers)) < 3 * center_mad
+    )[0]
+
     p_fwhms = [p_fwhms[i] for i in non_outlier_mask]
     p_ys = [p_ys[i] for i in non_outlier_mask]
     p_mzs = [p_mzs[i] for i in non_outlier_mask]
