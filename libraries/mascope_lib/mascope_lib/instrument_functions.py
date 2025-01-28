@@ -207,10 +207,17 @@ def fit_gaussian(instrument_type, dmz, x: np.array, y: np.array) -> ModelResult:
         model = model + bkg
 
     max_ind = np.argmax(y)
-    params.add("p_amplitude", value=y[max_ind], min=0, max=y[max_ind])
+    params.add("p_amplitude", value=0.8 * y[max_ind], min=0, max=y[max_ind])
     params.add("p_center", value=x[max_ind], min=min(x), max=max(x))
-    params.add("p_sigma", value=0.01)
-    params.add("p_gamma", value=-0.1, max=0)
+
+    if instrument_type == "orbi":
+        # Keep symmetric Gaussian
+        params.add("p_gamma", value=0, vary=False)
+        params.add("p_sigma", value=dmz / 5 / SIGMA_MULTIPLIER)
+    if instrument_type == "tof":
+        # Allow for slight skewed Gaussian
+        params.add("p_gamma", value=0.1, min=0)
+        params.add("p_sigma", value=0.01)
 
     fit = model.fit(y, params, x=x)
     return fit
