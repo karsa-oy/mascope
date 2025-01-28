@@ -27,7 +27,7 @@ admin_router = APIRouter(prefix="/api/users/admin", tags=["User Management Admin
 async def admin_register_user_route(
     request: Request,
     user_create: UserCreate = Body(...),
-    current_user=Depends(admin_user),
+    user=Depends(admin_user),
     user_manager: UserManager = Depends(get_user_manager),
 ):
     """
@@ -37,8 +37,8 @@ async def admin_register_user_route(
     :type request: Request
     :param user_create: The details of the user to be registered.
     :type user_create: UserCreate
-    :param current_user: The currently authenticated admin user.
-    :type current_user: User
+    :param user: The currently authenticated admin user.
+    :type user: User
     :param user_manager: The UserManager instance for user operations.
     :type user_manager: UserManager
     :raises ForbiddenAccessException: If the admin tries to register a user with a higher role.
@@ -67,7 +67,7 @@ async def admin_update_user_route(
     request: Request,
     user_id: int = Path(..., description="ID of the user to update"),
     user_update: UserUpdate = Body(...),
-    current_user=Depends(admin_user),
+    user=Depends(admin_user),
     user_manager: UserManager = Depends(get_user_manager),
 ):
     """
@@ -80,8 +80,8 @@ async def admin_update_user_route(
     :type user_id: int
     :param user_update: The update payload containing the fields to be updated.
     :type user_update: UserUpdate
-    :param current_user: The currently authenticated admin user, validated via dependency injection.
-    :type current_user: User
+    :param user: The currently authenticated admin user, validated via dependency injection.
+    :type user: User
     :param user_manager: The user manager instance used to interact with the user database.
     :type user_manager: UserManager
     :raises ForbiddenAccessException: If the admin attempts to update a user with a role
@@ -96,7 +96,7 @@ async def admin_update_user_route(
 
     # Step 2: Compare roles, admin cannot update users with admin/owner roles
     target_user_role_id = (await get_user(user_id=user_id)).get("data").role_id
-    if target_user_role_id >= current_user.role_id:
+    if target_user_role_id >= user.role_id:
         raise ForbiddenAccessException()
 
     # Step 3: Restrict role changes, admin can assign up to editor
@@ -119,14 +119,14 @@ async def admin_update_user_route(
 @api_route()
 async def admin_reset_user_password(
     user_id: int = Path(..., description="ID of the user to reset password"),
-    current_user=Depends(admin_user),
+    user=Depends(admin_user),
     user_manager: UserManager = Depends(get_user_manager),
 ):
     """
     Reset the password for a user. Admins can reset passwords for users with `guest` or `editor` roles only.
 
     :param user_id: The ID of the user to reset the password.
-    :param current_user: The currently authenticated admin user.
+    :param user: The currently authenticated admin user.
     :param user_manager: The user manager instance.
     :return: The new password for the user.
     """
@@ -145,13 +145,13 @@ async def admin_delete_user_access_tokens(
     user_id: int = Path(
         ..., description="ID of the user whose access tokens to delete"
     ),
-    current_user=Depends(admin_user),
+    user=Depends(admin_user),
 ):
     """
     Deletes all access tokens for a user. Admins can delete access tokens for users with `guest` or `editor` roles only.
 
     :param user_id: The ID of the user whose access tokens should be deleted.
-    :param current_user: The currently authenticated admin user.
+    :param user: The currently authenticated admin user.
     :return: A success message.
     """
     # Step 1: Ensure target user role is within allowed limits
@@ -167,7 +167,7 @@ async def admin_delete_user_access_tokens(
 @api_route()
 async def admin_delete_user_route(
     user_id: int = Path(..., description="ID of the user to delete"),
-    current_user=Depends(admin_user),
+    user=Depends(admin_user),
     user_manager: UserManager = Depends(get_user_manager),
 ):
     """
@@ -175,8 +175,8 @@ async def admin_delete_user_route(
 
     :param user_id: The unique ID of the user to delete.
     :type user_id: int
-    :param current_user: The current authenticated admin user.
-    :type current_user: User
+    :param user: The current authenticated admin user.
+    :type user: User
     :param user_manager: The UserManager instance.
     :type user_manager: UserManager
     :raises ForbiddenAccessException: If the admin attempts to delete a user with a higher role.

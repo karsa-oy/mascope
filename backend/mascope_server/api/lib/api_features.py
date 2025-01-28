@@ -1,3 +1,4 @@
+import inspect
 from functools import wraps
 from typing import Callable, List, Tuple
 from fastapi.responses import JSONResponse
@@ -83,50 +84,87 @@ def api_controller(emit_reload_events: List[Tuple[str, str]] = [], error_message
 def api_route(
     status_code: int = 200,
     token_access: bool = False,
+    public: bool = False,
 ):
     """
-    A decorator for route handler functions to standardize the response structure and handle exceptions.
+    A decorator for FastAPI route handlers that provides:
+    1. Authentication enforcement by default (unless marked as public)
+    2. Standardized response formatting
+    3. Consistent error handling
+    4. Optional token-based access for external service/agents/packages
 
-    This decorator wraps route handler functions to automatically format their successful responses into
-    a consistent JSON structure, including optional success messages. It also catches ApiException instances
-    to return standardized error responses.
-
-    The decorator allows for customization of the HTTP status code for successful responses, inclusion of
-    a data payload, and addition of custom success messages.
+    By default, all routes require authentication via auth user dependency injection.
+    Routes must either:
+    - Include auth user dependency (e.g., user=Depends(guest_user))
+    - Or be explicitly marked as public with @api_route(public=True)
 
     Usage:
-    @api_route(status_code=201, include_message=True, success_message="Entity created successfully")
-    async def your_route_handler(...):
-        # Your handler implementation
+    Protected route (requires authentication):
+
+        @router.get("/some-protected-path")
+        @api_route()
+        async def name_of_protected_route(user=Depends(guest_user)):
+            ...
+
+    Public route (no authentication):
+
+        @router.get("/some-public-path")
+        @api_route(public=True)
+        async def name_of_public_route():
+            ...
+
+    Custom auth level with specific status code"
+        @router.post("/some-admin-path")
+        @api_route(status_code=201)
+        async def name_of_admin_route(user=Depends(admin_user)):
+            ...
 
     :param status_code: HTTP status code to be used for successful responses, defaults to 200.
     :type status_code: int, optional
     :param token_access: Flag to indicate if the route allows access via an access token (for Jupyter or external access).
                            If set to True, the endpoint is accessible via a Bearer token in addition to standard JWT authentication.
     :type token_access: bool, optional
+    :param public: Flag to explicitly mark route as public (no auth)
+    :type public: bool, optional
     :return: The wrapped route handler function with standardized response formatting and exception handling.
     :rtype: Callable
     """
 
     def decorator(func: Callable):
-        # Attach access attributes to function
+        # Step 1: Configure route access token settings
         func.token_access = token_access
+
+        # Step 2: Verify route security - either must be public or have auth dependency
+        if not public:
+            signature = inspect.signature(func)
+            if "user" not in signature.parameters:
+                runtime.logger.error("Please check the route definition")
+                error_message = (
+                    f"Configuration error in route '{func.__name__}'\n"
+                    f"All routes must either:\n"
+                    f"1. Include auth user dependency (e.g., user=Depends(guest_user))\n"
+                    f"2. Be explicitly marked as public with @api_route(public=True)\n"
+                    f"Please update the route definition accordingly."
+                )
+                raise ValueError(error_message)
 
         @wraps(func)
         async def wrapper(*args, **kwargs):
             try:
-                # Log user information if available
+                # Step 3: Log authenticated user information if available
                 user = kwargs.get("user")
                 if user:
                     runtime.logger.trace(f"User:\n{pretty_repr(user.to_dict())}")
 
-                # Execute the function
+                # Step 4: Execute the route handler
                 result = await func(*args, **kwargs)
+
+                # Step 5: Prepare response headers
                 headers = {}
-                # Move process_id to headers
                 if result is not None and "process_id" in result:
                     headers["Process-ID"] = result.pop("process_id")
 
+                # Step 6: Return formatted JSON response
                 return JSONResponse(
                     status_code=status_code,
                     content=jsonable_encoder(result),

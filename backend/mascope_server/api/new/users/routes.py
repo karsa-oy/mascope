@@ -16,15 +16,15 @@ users_router = APIRouter(prefix="/api/users", tags=["Users"])
 @api_route()
 async def get_users_route(
     query_params: GetUsersQueryParams = Depends(),
-    current_user=Depends(admin_user),
+    user=Depends(admin_user),
 ):
     """
     Retrieve a paginated list of all users.
 
     :param query_params: Query parameters for pagination and sorting.
     :type query_params: GetUsersQueryParams
-    :param current_user: The current authenticated user with admin permissions or higher.
-    :type current_user: User
+    :param user: The current authenticated user with admin permissions or higher.
+    :type user: User
     :return: A dictionary containing the user list and metadata.
     :rtype: dict
     """
@@ -35,15 +35,15 @@ async def get_users_route(
 @api_route()
 async def get_user_route(
     user_id: int = Path(..., description="ID of the user to retrieve"),
-    current_user=Depends(admin_user),
+    user=Depends(admin_user),
 ):
     """
     Retrieve the user's details.
 
     :param user_id: The unique ID of the user to retrieve.
     :type user_id: int
-    :param current_user: The current authenticated user with admin permissions or higher.
-    :type current_user: User
+    :param user: The current authenticated user with admin permissions or higher.
+    :type user: User
     :return: A dictionary containing the user's details.
     :rtype: dict
     """

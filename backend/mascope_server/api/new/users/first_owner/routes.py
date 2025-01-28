@@ -13,7 +13,7 @@ first_owner_router = APIRouter(prefix="/api/users/first-owner", tags=["First Own
 
 
 @first_owner_router.get("/status")
-@api_route()
+@api_route(public=True)
 async def check_first_owner_sign_up_status_route():
     """
     Check if owner signup is available by verifying no users exist in the system.
@@ -36,7 +36,7 @@ async def check_first_owner_sign_up_status_route():
 
 
 @first_owner_router.post("")
-@api_route(status_code=201)
+@api_route(status_code=201, public=True)
 async def register_first_owner_route(
     request: Request,
     first_owner_create: FirstOwnerCreate = Body(...),

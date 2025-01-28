@@ -25,7 +25,7 @@ owner_router = APIRouter(prefix="/api/users/owner", tags=["User Management Owner
 async def owner_register_user_route(
     request: Request,
     user_create: UserCreate = Body(...),
-    current_user=Depends(owner_user),
+    user=Depends(owner_user),
     user_manager: UserManager = Depends(get_user_manager),
 ):
     """
@@ -35,8 +35,8 @@ async def owner_register_user_route(
     :type request: Request
     :param user_create: The details of the user to be registered.
     :type user_create: UserCreate
-    :param current_user: The currently authenticated owner user.
-    :type current_user: User
+    :param user: The currently authenticated owner user.
+    :type user: User
     :param user_manager: The UserManager instance for user operations.
     :type user_manager: UserManager
     :return: A success message and the registered user's details.
@@ -57,7 +57,7 @@ async def owner_update_user_route(
     request: Request,
     user_id: int = Path(..., description="ID of the user to update"),
     user_update: UserUpdate = Body(...),
-    current_user=Depends(owner_user),
+    user=Depends(owner_user),
     user_manager: UserManager = Depends(get_user_manager),
 ):
     """
@@ -68,8 +68,8 @@ async def owner_update_user_route(
     :type user_id: int
     :param user_update: The update payload containing the fields to be updated.
     :type user_update: UserUpdate
-    :param current_user: The currently authenticated owner user, validated via dependency injection.
-    :type current_user: User
+    :param user: The currently authenticated owner user, validated via dependency injection.
+    :type user: User
     :param user_manager: The UserManager instance used to interact with the user database.
     :type user_manager: UserManager
     :param request: The current HTTP request.
@@ -79,7 +79,7 @@ async def owner_update_user_route(
     :rtype: dict
     """
     # Step 1: Check owner is not updating themselves
-    if current_user.id == user_id:
+    if user.id == user_id:
         raise ForbiddenAccessException(
             detail="You can not update your own account by this endpoint."
         )
@@ -101,19 +101,19 @@ async def owner_update_user_route(
 @api_route()
 async def owner_reset_user_password(
     user_id: int = Path(..., description="ID of the user to reset password"),
-    current_user=Depends(owner_user),
+    user=Depends(owner_user),
     user_manager: UserManager = Depends(get_user_manager),
 ):
     """
     Reset the password for a user. Owners can reset passwords for all users except themselves.
 
     :param user_id: The ID of the user to reset the password.
-    :param current_user: The currently authenticated owner user.
+    :param user: The currently authenticated owner user.
     :param user_manager: The user manager instance.
     :return: The new password for the user.
     """
     # Step 1: Prevent owners from resetting their own password
-    if user_id == current_user.id:
+    if user_id == user.id:
         raise ForbiddenAccessException(detail="You cannot reset your own password.")
 
     # Step 2: Reset the user's password
@@ -126,17 +126,17 @@ async def owner_delete_user_access_tokens(
     user_id: int = Path(
         ..., description="ID of the user whose access tokens to delete"
     ),
-    current_user=Depends(owner_user),
+    user=Depends(owner_user),
 ):
     """
     Deletes all access tokens for a user. Owners can delete access tokens for any user except themselves.
 
     :param user_id: The ID of the user whose access tokens should be deleted.
-    :param current_user: The currently authenticated owner user.
+    :param user: The currently authenticated owner user.
     :return: A success message.
     """
     # Step 1: Ensure owner is not deleting their own access tokens
-    if user_id == current_user.id:
+    if user_id == user.id:
         raise ForbiddenAccessException(
             detail="You cannot delete your own access tokens."
         )
@@ -149,7 +149,7 @@ async def owner_delete_user_access_tokens(
 @api_route()
 async def owner_delete_user_route(
     user_id: int = Path(..., description="ID of the user to delete"),
-    current_user=Depends(owner_user),
+    user=Depends(owner_user),
     user_manager: UserManager = Depends(get_user_manager),
 ):
     """
@@ -157,15 +157,15 @@ async def owner_delete_user_route(
 
     :param user_id: The unique ID of the user to delete.
     :type user_id: int
-    :param current_user: The currently authenticated owner user.
-    :type current_user: User
+    :param user: The currently authenticated owner user.
+    :type user: User
     :param user_manager: The UserManager instance.
     :type user_manager: UserManager
     :return: A success message.
     :rtype: dict
     """
     # Step 1: Check owner is not deleting themselves
-    if current_user.id == user_id:
+    if user.id == user_id:
         raise ForbiddenAccessException(detail="You can not delete your own account.")
 
     # Step 2: Delete the user
