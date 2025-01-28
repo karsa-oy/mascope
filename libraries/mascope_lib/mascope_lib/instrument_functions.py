@@ -70,12 +70,12 @@ async def process_peak_shapes(
     instrument_type: str,
     dmz: float,
     r_sq_thres: float,
-    n_peaks=100,
+    n_peaks=50,
 ) -> tuple:
     """Calculate normalized peak shapes and their parameters from a given spectrum
 
     1. Find indices of the potential peaks in the spectrum.
-    2. Pick several peaks (100 by default) with the highest intensity.
+    2. Pick several peaks (50 by default) with the highest intensity.
     3. Predefine the common domain/x-scale for the peaks.
     4. Process each peak:
         a) Select and normalize narrow regions around the peak.
