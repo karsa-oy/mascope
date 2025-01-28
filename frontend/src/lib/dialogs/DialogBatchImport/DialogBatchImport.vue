@@ -17,9 +17,16 @@ import Message from 'primevue/message'
 import Dialog from 'primevue/dialog'
 import { useConfirm } from 'primevue/useconfirm'
 
+import { fromSpreadsheet } from '@/lib/table'
+import {
+  sampleTypes,
+  sampleTypesFilterIdRequired,
+  sampleTypesFilterIdOptional,
+  sampleTypesFilterIdNotAllowed
+} from '@/lib/constants'
+import { PaneInstrumentConfig, InstrumentConfigSelector } from '@/lib/panes'
 import { useApp } from '@/stores'
 import { BaseClipboardContext } from '@/lib/base'
-import { fromSpreadsheet } from '@/lib/table'
 import { genId } from '@/lib/utils'
 
 import { useValidation } from './validation.js'
