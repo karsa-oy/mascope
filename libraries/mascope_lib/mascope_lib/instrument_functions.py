@@ -102,7 +102,8 @@ async def process_peak_shapes(
     :return: Tuple containing p_x, p_ys, p_mzs, and p_fwhms
     :rtype: tuple
     """
-    peak_indices = choose_peaks(spec, n_peaks=n_peaks)
+    distance = int(dmz / np.median(np.diff(mz)))
+    peak_indices = choose_peaks(spec, distance=distance, n_peaks=n_peaks)
 
     p_x = np.linspace(-10, 10, 101)
     p_ys, p_mzs, p_fwhms, p_centers = [], [], [], []
@@ -211,19 +212,22 @@ def fit_gaussian(instrument_type, dmz, x: np.array, y: np.array) -> ModelResult:
     return fit
 
 
-def choose_peaks(spec: np.ndarray, n_peaks=100) -> np.ndarray:
+def choose_peaks(spec: np.ndarray, distance: int, n_peaks=100) -> np.ndarray:
     """Select peaks from a spectrum based on a specified quartile threshold
 
     This function finds peaks in a given spectrum and returns n_peaks highest.
 
     :param spec: The spectrum data from which peaks are to be selected
     :type spec: np.ndarray
+    :param distance: Required minimal horizontal distance (>= 1) in samples between
+        neighbouring peaks.
+    :type distance: int
     :param n_peaks: Number of peaks to return, defaults to 100
     :type n_peaks: int, optional
     :return: Array of indices where peaks are located in the spectrum
     :rtype: np.ndarray
     """
-    peak_indices, _ = find_peaks(spec)
+    peak_indices, _ = find_peaks(spec, distance=distance)
 
     # Extract the values at the peak indices
     peak_values = spec[peak_indices]
