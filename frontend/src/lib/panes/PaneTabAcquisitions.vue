@@ -80,9 +80,9 @@ watch(
     auto
   >
     <template #header="{ chooseCallback }">
-      <menu style="gap: 1rem; align-items: baseline; height: fit-content">
+      <menu class="acquisition-menu">
         <Select
-          props.inputId="time"
+          inputId="time"
           v-model="app.data.acquisition.time.mode"
           :options="['Last 24 hours', 'Last 7 days', 'Last 30 days', 'Last 90 days']"
           style="flex-direction: row-reverse"
@@ -111,7 +111,8 @@ watch(
             :class="'full ' + (app.data.acquisition.time.mode == 'range' ? '' : 'inactive')"
           />
         </FloatLabel>
-        <FloatLabel>
+        <div style="flex-grow: 1; flex-shrink: 1" />
+        <FloatLabel style="flex-grow: 1; max-width: 250px">
           <label>Search</label>
           <IconField class="full">
             <InputIcon>
@@ -180,6 +181,13 @@ watch(
 </template>
 
 <style scoped>
+.acquisition-menu {
+  gap: 1rem;
+  align-items: baseline;
+  height: fit-content;
+  width: 100%;
+}
+
 menu {
   display: flex;
   flex-flow: row nowrap;

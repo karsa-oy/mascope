@@ -77,6 +77,8 @@ run = "poetry run mascope-file-mover"
 pkg_path = './frontend'
 tags = ['lab', 'orbi', 'tof', 'file', 'all']
 log_path = './logs'
+# settings
+# acquisition_filter = { min = '2020-01-01T00:00' }
 # scripts
 install = "npm install"
 run = "npm run dev"

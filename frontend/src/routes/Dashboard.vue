@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 
 import Splitter from 'primevue/splitter'
 import SplitterPanel from 'primevue/splitterpanel'
@@ -28,8 +28,20 @@ const app = useApp()
 
 const tabs = computed(() => [
   {
+    label: 'Acquisitions',
+    icon: 'pi pi-hourglass',
+    help: `
+      <h1>Acquisition Table</h1>
+
+      <p>View incoming measurements and import them
+      into batches. Import files from your computer
+      into Mascope.</p>
+    `
+  },
+  {
     label: 'Batch',
     icon: 'pi pi-hashtag',
+    disabled: !app.data.batch.focused,
     help: `
       <h1>Batch Overview Chart</h1>
 
@@ -59,48 +71,8 @@ const tabs = computed(() => [
       selected ion as well as their timeseries.
       Adjust match parameters to fine-tune matches.</p>
     `
-  },
-  {
-    label: 'Acquisitions',
-    icon: 'pi pi-hourglass',
-    help: `
-      <h1>Acquisition Table</h1>
-
-      <p>View incoming measurements and import them
-      into batches. Import files from your computer
-      into Mascope.</p>
-    `
   }
 ])
-
-watch(
-  computed(() => app.data.acquisition.mode),
-  (scenthound) => {
-    if (scenthound) {
-      app.ui.tab.active = 'acquisitions'
-    }
-  }
-)
-watch(
-  computed(() => app.data.match.visualized.ion),
-  (focused) => {
-    if (focused && app.ui.tab.active !== 'spectrum') {
-      app.ui.tab.active = 'match'
-    } else {
-      if (app.ui.tab.active == 'match') {
-        app.ui.tab.active = 'batch'
-      }
-    }
-  }
-)
-watch(
-  computed(() => app.data.sample.focused),
-  (sample) => {
-    if (!sample && app.ui.tab.active == 'spectrum') {
-      app.ui.tab.active = 'batch'
-    }
-  }
-)
 </script>
 
 <template>
@@ -125,7 +97,7 @@ watch(
             <PaneBrowserSample />
           </SplitterPanel>
           <SplitterPanel :size="50">
-            <PaneBrowserTarget @focused="tab = 1" />
+            <PaneBrowserTarget />
           </SplitterPanel>
         </Splitter>
       </SplitterPanel>
