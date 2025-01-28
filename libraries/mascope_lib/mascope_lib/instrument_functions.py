@@ -17,6 +17,8 @@ from mascope_lib.file_func import get_instrument_type, get_sum_signal, load_arra
 
 # Precompute sigma multiplier for peak generation
 SIGMA_MULTIPLIER = 2 * np.sqrt(2 * np.log(2))
+# Minimum number of peaks required to evaluate instrument functions
+MIN_NUM_PEAKS = 3
 
 
 async def fit_instrument_functions(filename: str, dmz=0.5, r_sq_thres=0.95) -> tuple:
@@ -39,6 +41,7 @@ async def fit_instrument_functions(filename: str, dmz=0.5, r_sq_thres=0.95) -> t
     :type dmz: float, optional
     :param r_sq_thres: R-squared threshold for peak fitting, defaults to 0.95
     :type r_sq_thres: float, optional
+    :raises ValueError: Not enough peaks for instrument function estimation
     :return: Tuple containing the peak shape as dict, resolution function as partial, statistics as dict
     :rtype: tuple
     """
@@ -52,6 +55,11 @@ async def fit_instrument_functions(filename: str, dmz=0.5, r_sq_thres=0.95) -> t
     p_x, p_ys, p_mzs, p_fwhms = await process_peak_shapes(
         mz, spec, instrument_type, dmz, r_sq_thres
     )
+    # Check if there are enough peaks for peak shape estimation
+    if len(p_mzs) < MIN_NUM_PEAKS:
+        error_message = "Not enough quality peaks to evaluate instrument functions"
+        lib_runtime.logger.error(error_message)
+        raise ValueError(error_message)
 
     peak_shape, ps_stats = calculate_peakshape(p_x, p_ys)
     resolution_function, resfun_stats = await fit_resolution_function(
