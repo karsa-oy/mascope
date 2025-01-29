@@ -17,6 +17,8 @@ from mascope_lib.file_func import get_instrument_type, get_sum_signal, load_arra
 
 # Precompute sigma multiplier for peak generation
 SIGMA_MULTIPLIER = 2 * np.sqrt(2 * np.log(2))
+# Minimum number of peaks required to evaluate instrument functions
+MIN_NUM_PEAKS = 3
 
 
 async def fit_instrument_functions(filename: str, dmz=0.5, r_sq_thres=0.95) -> tuple:
@@ -39,6 +41,7 @@ async def fit_instrument_functions(filename: str, dmz=0.5, r_sq_thres=0.95) -> t
     :type dmz: float, optional
     :param r_sq_thres: R-squared threshold for peak fitting, defaults to 0.95
     :type r_sq_thres: float, optional
+    :raises ValueError: Not enough peaks for instrument function estimation
     :return: Tuple containing the peak shape as dict, resolution function as partial, statistics as dict
     :rtype: tuple
     """
@@ -52,6 +55,11 @@ async def fit_instrument_functions(filename: str, dmz=0.5, r_sq_thres=0.95) -> t
     p_x, p_ys, p_mzs, p_fwhms = await process_peak_shapes(
         mz, spec, instrument_type, dmz, r_sq_thres
     )
+    # Check if there are enough peaks for peak shape estimation
+    if len(p_mzs) < MIN_NUM_PEAKS:
+        error_message = "Not enough quality peaks to evaluate instrument functions"
+        lib_runtime.logger.error(error_message)
+        raise ValueError(error_message)
 
     peak_shape, ps_stats = calculate_peakshape(p_x, p_ys)
     resolution_function, resfun_stats = await fit_resolution_function(
@@ -70,12 +78,12 @@ async def process_peak_shapes(
     instrument_type: str,
     dmz: float,
     r_sq_thres: float,
-    n_peaks=100,
+    n_peaks=50,
 ) -> tuple:
     """Calculate normalized peak shapes and their parameters from a given spectrum
 
     1. Find indices of the potential peaks in the spectrum.
-    2. Pick several peaks (100 by default) with the highest intensity.
+    2. Pick several peaks (50 by default) with the highest intensity.
     3. Predefine the common domain/x-scale for the peaks.
     4. Process each peak:
         a) Select and normalize narrow regions around the peak.
@@ -102,7 +110,8 @@ async def process_peak_shapes(
     :return: Tuple containing p_x, p_ys, p_mzs, and p_fwhms
     :rtype: tuple
     """
-    peak_indices = choose_peaks(spec, n_peaks=n_peaks)
+    distance = int(dmz / np.median(np.diff(mz)))
+    peak_indices = choose_peaks(spec, distance=distance, n_peaks=n_peaks)
 
     p_x = np.linspace(-10, 10, 101)
     p_ys, p_mzs, p_fwhms, p_centers = [], [], [], []
@@ -172,7 +181,11 @@ async def process_peak_shapes(
 
     # Clean shifted outliers
     p_centers = np.array(p_centers)
-    non_outlier_mask = np.where(p_centers - np.median(p_centers) < 1e-3)[0]
+    center_mad = np.median(np.abs(p_centers - np.median(p_centers)))
+    non_outlier_mask = np.where(
+        np.abs(p_centers - np.median(p_centers)) < 3 * center_mad
+    )[0]
+
     p_fwhms = [p_fwhms[i] for i in non_outlier_mask]
     p_ys = [p_ys[i] for i in non_outlier_mask]
     p_mzs = [p_mzs[i] for i in non_outlier_mask]
@@ -202,28 +215,38 @@ def fit_gaussian(instrument_type, dmz, x: np.array, y: np.array) -> ModelResult:
         model = model + bkg
 
     max_ind = np.argmax(y)
-    params.add("p_amplitude", value=y[max_ind], min=0, max=y[max_ind])
+    params.add("p_amplitude", value=0.8 * y[max_ind], min=0, max=y[max_ind])
     params.add("p_center", value=x[max_ind], min=min(x), max=max(x))
-    params.add("p_sigma", value=0.01)
-    params.add("p_gamma", value=-0.1, max=0)
+
+    if instrument_type == "orbi":
+        # Keep symmetric Gaussian
+        params.add("p_gamma", value=0, vary=False)
+        params.add("p_sigma", value=dmz / 5 / SIGMA_MULTIPLIER)
+    if instrument_type == "tof":
+        # Allow for slight skewed Gaussian
+        params.add("p_gamma", value=0.1, min=0)
+        params.add("p_sigma", value=0.01)
 
     fit = model.fit(y, params, x=x)
     return fit
 
 
-def choose_peaks(spec: np.ndarray, n_peaks=100) -> np.ndarray:
+def choose_peaks(spec: np.ndarray, distance: int, n_peaks=100) -> np.ndarray:
     """Select peaks from a spectrum based on a specified quartile threshold
 
     This function finds peaks in a given spectrum and returns n_peaks highest.
 
     :param spec: The spectrum data from which peaks are to be selected
     :type spec: np.ndarray
+    :param distance: Required minimal horizontal distance (>= 1) in samples between
+        neighbouring peaks.
+    :type distance: int
     :param n_peaks: Number of peaks to return, defaults to 100
     :type n_peaks: int, optional
     :return: Array of indices where peaks are located in the spectrum
     :rtype: np.ndarray
     """
-    peak_indices, _ = find_peaks(spec)
+    peak_indices, _ = find_peaks(spec, distance=distance)
 
     # Extract the values at the peak indices
     peak_values = spec[peak_indices]

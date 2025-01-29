@@ -321,13 +321,14 @@ async def instrument_functions_fit(
     :rtype: dict
     """
     instrument_type = get_instrument_type(sample_file.filename)
+    dmz = 0.01 if instrument_type == "orbi" else 0.5
 
     (
         peakshape_numpy,
         resolution_function_partial,
         stats,
     ) = await fit_instrument_functions(
-        sample_file.filename, r_sq_thres=instrument_function_params.threshold
+        sample_file.filename, r_sq_thres=instrument_function_params.threshold, dmz=dmz
     )
 
     # Convert peakshape to lists to be serialized
