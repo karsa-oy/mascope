@@ -17,8 +17,10 @@ async def connect(sid: str, environ: dict) -> bool:
     """
     Handle new frontend user connections on default namespace.
 
-    Attempts authentication from the JWT token in cookies. Returns True to accept
-    the connection or False to refuse it.
+    Always accepts the connection but attempts authentication if JWT token in cookie is present.
+    If authentication succeeds, the socket session is associated with the user.
+    If authentication fails or no credentials are present, the connection remains
+    unauthenticated but still active.
 
     NOTE: Authentication on connection looks like current Socket.IO best practice.
     The unathienticated connections may be rejected for security reasons.
@@ -51,10 +53,10 @@ async def connect(sid: str, environ: dict) -> bool:
 
     except SocketUnauthenticatedError as e:
         runtime.logger.error(f"User socket session authentication failed: {str(e)}")
-        return False
+        return True
     except Exception as e:
         runtime.logger.error(f"Unexpected errorduring user socket connection: {str(e)}")
-        return False
+        return True
 
 
 @sio.event

@@ -39,7 +39,7 @@ export const useAuth = defineStore('app.auth', () => {
       {},
       {
         type: 'user_sign_out',
-        user: 'auth'
+        use: 'auth'
       }
     )
     identify()

@@ -70,9 +70,22 @@ function handleClientError(error) {
   return Promise.reject(error)
 }
 
+/**
+ * Handles server-side errors from API responses.
+ * Part of axios interceptor chain, runs after handleResponseData and specific handlers.
+ * One of purposes is catching unhandled 401s to trigger auth check.
+ */
 function handleServerError(error) {
   const { method, url, headers } = error?.config
   const type = headers['X-Type']
+
+  // Any unhandled 401 triggers auth check, which will "redirect: to login if needed
+  if (error?.response?.status === 401) {
+    const app = useApp()
+    app.auth.identify()
+    return Promise.reject(error)
+  }
+
   // log to console for developers
   const { detail, error: message } = error?.response?.data
   console.error(

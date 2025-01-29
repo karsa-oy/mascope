@@ -146,6 +146,9 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
             if request and response and "set-cookie" in response.headers:
                 sid = request.headers.get("x-sid")
                 if not sid:
+                    runtime.logger.error(
+                        f"There is no sid in the request headers. User: {user.username}"
+                    )
                     return
 
                 cookie = response.headers["set-cookie"]
