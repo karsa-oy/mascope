@@ -96,10 +96,10 @@ const layout = computed(() => ({
     title: 'm/z [Th]',
     gridcolor: '#33333399'
   },
+  margin: { l: 50, r: 10, t: 30, b: 100 },
   dragmode: 'zoom',
   showlegend: false,
-  height: '300',
-  width: '450'
+  height: 350
 }))
 
 const area = new Intl.NumberFormat('en-US', {
@@ -131,16 +131,32 @@ watch(
 
 <template>
   <div>
-    <ScrollPanel>
-      <div class="row" style="gap: 1rem; justify-content: flex-start; padding: 0 2rem">
-        <figure
-          v-for="(isotopeChart, index) of isotopeCharts"
-          :key="isotopeChart.target_isotope_id"
-        >
-          <h3 :style="`color: ${isotopeChart.traces[0]?.line.color}; margin: 0`">
-            Isotope {{ error.format(isotopeChart.mz) }}
-          </h3>
-          <!--
+    <div
+      class="row"
+      :style="`
+          gap: 2rem;
+          align-items: flex-start;
+          justify-content: flex-start;
+          max-width: calc(${app.ui.split.right}vw - 4rem);
+          overflow-x: auto;
+          height: 430px;
+          margin-bottom: 2rem;
+        `"
+    >
+      <figure
+        v-for="(isotopeChart, index) of isotopeCharts"
+        :key="isotopeChart.target_isotope_id"
+        :style="`
+            min-width: 550px;
+            width: calc(${app.ui.split.right}vw / 2);
+            max-width: calc(${app.ui.split.right}vw / 2);
+            height: auto;
+          `"
+      >
+        <h3 :style="`color: ${isotopeChart.traces[0]?.line.color}; margin: 0`">
+          Isotope {{ error.format(isotopeChart.mz) }}
+        </h3>
+        <!--
             This chart uses a *function ref* to enable dynamically
             assigning refs to a reactive object. We use the `index`
             rather than the `target_isotope_id` to ensure that we
@@ -149,50 +165,53 @@ watch(
 
             See https://vuejs.org/guide/essentials/template-refs.html#function-refs
           -->
-          <BaseChartPlotly
-            :id="`ChartMatchSpectrum-${isotopeChart.target_isotope_id}`"
-            :title="`Isotope ${error.format(isotopeChart.mz)}`"
-            :ref="(el) => (plots[index] = el)"
-            :data="isotopeChart.traces"
-            :layout="layout"
-            hideTitle
+        <BaseChartPlotly
+          :id="`ChartMatchSpectrum-${isotopeChart.target_isotope_id}`"
+          :title="`Isotope ${error.format(isotopeChart.mz)}`"
+          :ref="(el) => (plots[index] = el)"
+          :data="isotopeChart.traces"
+          :layout="layout"
+          hideTitle
+        />
+        <div
+          id="chart-spectrum-controls"
+          class="row"
+          style="`
+              flex-wrap: wrap;
+              max-width: 100%;
+              justify-content: center;
+            `"
+        >
+          <BaseMatchTag :row="isotopeChart" text />
+          <Tag
+            :value="`Peak ${settings.yMode} intensity: ${area.format(settings.yMode == 'sum' ? isotopeChart.sample_peak_area : isotopeChart.sample_peak_area / sampleLength)}`"
+            :severity="
+              isotopeChart.sample_peak_area < app.data.match.params.current.peak_min_intensity
+                ? 'warn'
+                : 'info'
+            "
           />
-          <div
-            id="chart-spectrum-controls"
-            class="row"
-            style="flex-wrap: wrap; max-width: 35ch; justify-content: center"
-          >
-            <BaseMatchTag :row="isotopeChart" text />
-            <Tag
-              :value="`Peak ${settings.yMode} intensity: ${area.format(settings.yMode == 'sum' ? isotopeChart.sample_peak_area : isotopeChart.sample_peak_area / sampleLength)}`"
-              :severity="
-                isotopeChart.sample_peak_area < app.data.match.params.current.peak_min_intensity
-                  ? 'warn'
-                  : 'info'
-              "
-            />
-            <Tag
-              :value="`mz error: ${error.format(isotopeChart.match_mz_error)}`"
-              :severity="
-                Math.abs(isotopeChart.match_mz_error) > app.data.match.params.current.mz_tolerance
-                  ? 'warn'
-                  : 'info'
-              "
-            />
+          <Tag
+            :value="`mz error: ${error.format(isotopeChart.match_mz_error)}`"
+            :severity="
+              Math.abs(isotopeChart.match_mz_error) > app.data.match.params.current.mz_tolerance
+                ? 'warn'
+                : 'info'
+            "
+          />
 
-            <Tag
-              :value="`Abundance error: ${error.format(isotopeChart.match_abundance_error)}`"
-              :severity="
-                Math.abs(isotopeChart.match_abundance_error) >
-                app.data.match.params.current.isotope_ratio_tolerance
-                  ? 'warn'
-                  : 'info'
-              "
-            />
-          </div>
-        </figure>
-      </div>
-    </ScrollPanel>
+          <Tag
+            :value="`Abundance error: ${error.format(isotopeChart.match_abundance_error)}`"
+            :severity="
+              Math.abs(isotopeChart.match_abundance_error) >
+              app.data.match.params.current.isotope_ratio_tolerance
+                ? 'warn'
+                : 'info'
+            "
+          />
+        </div>
+      </figure>
+    </div>
   </div>
 </template>
 

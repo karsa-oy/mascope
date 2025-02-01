@@ -29,10 +29,10 @@ const modifiedMatchIon = ref()
   <div
     :style="`
       height: calc(100vh - 150px); 
-      width: calc(${app.ui.split.right}vw - 4rem);
+      width: calc(${app.ui.split.right}vw - 5rem);
     `"
   >
-    <ScrollPanel style="height: calc(100vh - 150px); width: calc(100%-4rem)">
+    <ScrollPanel style="height: calc(100vh - 150px); width: calc(100%-6rem)">
       <h1 style="text-align: center" v-if="modifiedMatchIon">
         <BaseMatchTag :row="modifiedMatchIon" :style="'font-size: large'" />
         match: ion <i>{{ app.data.match.visualized.ion?.target_ion_formula }}</i>
