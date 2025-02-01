@@ -4,7 +4,10 @@ import { api } from '@/api'
 
 import { useMzFit } from '@/lib/mzFit'
 
+import { useUi } from '../ui'
+
 import { useWorkspace } from './workspace'
+import { useSample } from './sample'
 
 export const useBatch = defineModule({
   name: 'batch',
@@ -12,6 +15,22 @@ export const useBatch = defineModule({
   useParent: useWorkspace,
   subscribe: true,
   reloadOn: 'sample_batch_reload',
+  onRefocus: () => {
+    const sample = useSample()
+    const ui = useUi()
+    if (sample.list.length > 0) {
+      ui.tab.active = 'batch'
+    } else if (ui.tab.active == 'batch') {
+      ui.tab.default()
+    }
+  },
+  onEvent: () => {
+    const sample = useSample()
+    const ui = useUi()
+    if (sample.list.length == 0 && ui.tab.active == 'batch') {
+      ui.tab.default()
+    }
+  },
   load: ({ workspace_id }) =>
     api.http.get(`/sample/batches`, {
       params: { workspace_id },

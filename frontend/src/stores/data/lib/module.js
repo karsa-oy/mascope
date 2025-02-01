@@ -11,7 +11,9 @@ export const defineModule = ({
   subscribe = false, // make socket io subscription for key
   reloadOn = null, // events to reload the module on
   unfocusBefore = [], // unofucus before running these ops
-  multiselect = false, // ⚠️ currently not in use
+  multiselect = false, // currently not in use
+  onRefocus = () => {}, // lifecycle hook executed after refocus
+  onEvent = () => {}, // lifecycle hook executed after event reload
   // api
   load, // async func, may accept parent record
   read, // get one record by id
@@ -195,13 +197,16 @@ export const defineModule = ({
     }
 
     // reload children on refocus
-    watch(focused, (focused) => {
-      children.value.forEach(({ reload }) =>
-        reload({
-          name,
-          focused
-        })
+    watch(focused, async (focused) => {
+      await Promise.all(
+        children.value.map(({ reload }) =>
+          reload({
+            name,
+            focused
+          })
+        )
       )
+      onRefocus()
     })
 
     // unfocus before calling certain methods
@@ -226,19 +231,21 @@ export const defineModule = ({
     }
 
     // Hook the module to reload its data under specific conditions
+    const reloadHandler =
+      // Check if the parent is a virtual parent (used for special cases like match data)
+      parent && parent.name.includes('virtual')
+        ? reload // For virtual parents, reload without passing trigger arguments
+        : () =>
+            reload({
+              name: parent?.name,
+              focused: parent?.focused, // Pass the parent's focused record
+              event: reloadOn // Include the event that triggered the reload
+            })
     if (reloadOn) {
-      api.socket.on(
-        reloadOn,
-        // Check if the parent is a virtual parent (used for special cases like match data)
-        parent && parent.name.includes('virtual')
-          ? reload // For virtual parents, reload without passing trigger arguments
-          : () =>
-              reload({
-                name: parent?.name,
-                focused: parent?.focused, // Pass the parent's focused record
-                event: reloadOn // Include the event that triggered the reload
-              })
-      )
+      api.socket.on(reloadOn, async () => {
+        await reloadHandler()
+        onEvent()
+      })
     }
 
     // EVENTS

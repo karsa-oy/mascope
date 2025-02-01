@@ -41,7 +41,7 @@ const tabs = computed(() => [
   {
     label: 'Batch',
     icon: 'pi pi-hashtag',
-    disabled: !app.data.batch.focused,
+    disabled: app.data.sample.list.length == 0,
     help: `
       <h1>Batch Overview Chart</h1>
 
