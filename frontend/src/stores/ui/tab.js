@@ -3,8 +3,10 @@ import { defineStore } from 'pinia'
 
 import { useData } from '../data'
 
+const DEFAULT_TAB = 'acquisitions'
+
 export const useTab = defineStore('app.ui.tab', () => {
-  const active = ref('acquisitions')
+  const active = ref(DEFAULT_TAB)
 
   const data = useData()
 
@@ -23,7 +25,7 @@ export const useTab = defineStore('app.ui.tab', () => {
         active.value = 'match'
       } else {
         if (active.value == 'match') {
-          active.value = data.batch.focused ? 'batch' : 'acquisitions'
+          active.value = data.batch.focused ? 'batch' : DEFAULT_TAB
         }
       }
     }
@@ -40,10 +42,15 @@ export const useTab = defineStore('app.ui.tab', () => {
     () => data.batch.focused,
     (focused) => {
       if (!focused && active.value == 'batch') {
-        active.value = 'acquisitions'
+        active.value = DEFAULT_TAB
       }
     }
   )
 
-  return { active }
+  return {
+    active,
+    default: () => {
+      active.value = DEFAULT_TAB
+    }
+  }
 })
