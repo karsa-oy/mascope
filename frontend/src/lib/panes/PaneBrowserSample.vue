@@ -398,9 +398,8 @@ watch(
   async (focusedSample) => {
     if (!focusedSample) {
       // If no sample is focused, unset the match visualization
-      return app.data.match.visualized.unset({
-        cacheTarget: true
-      })
+      app.data.match.visualized.clear()
+      return
     }
 
     const { instrument, sample_item_id: sampleId } = focusedSample

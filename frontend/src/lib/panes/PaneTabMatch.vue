@@ -21,8 +21,6 @@ const settings = reactive({
   intensityScale: null,
   yMode: 'sum'
 })
-
-const modifiedMatchIon = ref()
 </script>
 
 <template>
@@ -31,10 +29,11 @@ const modifiedMatchIon = ref()
       height: calc(100vh - 150px); 
       width: calc(${app.ui.split.right}vw - 5rem);
     `"
+    v-if="app.data.match.params.ui"
   >
     <ScrollPanel style="height: calc(100vh - 150px); width: calc(100%-6rem)">
-      <h1 style="text-align: center" v-if="modifiedMatchIon">
-        <BaseMatchTag :row="modifiedMatchIon" :style="'font-size: large'" />
+      <h1 style="text-align: center">
+        <BaseMatchTag :row="app.data.match.visualized.ionScored" :style="'font-size: large'" />
         match: ion <i>{{ app.data.match.visualized.ion?.target_ion_formula }}</i>
         for
         <i>{{ app.data.match.visualized.ion?.sample_item_name }}</i> with target
@@ -43,7 +42,7 @@ const modifiedMatchIon = ref()
       <ChartMatchSpectra :settings="settings" />
       <ChartMatchTimeseries :settings="settings" />
       <div class="row match-tools">
-        <ToolbarIonMatchParams v-model:modifiedMatchIon="modifiedMatchIon" />
+        <ToolbarIonMatchParams />
         <ToolbarMatchCharts
           v-model:scale="settings.intensityScale"
           v-model:yMode="settings.yMode"

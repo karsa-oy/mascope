@@ -60,10 +60,10 @@ const isotopeCharts = computed(() => {
     const isotopeTraces = traces.value?.slice(start, end)
     // compute match category for this isotope
     let match_category = 0
-    if (isotope.match_score > app.data.match.params.current.possible_match_threshold) {
+    if (isotope.match_score > app.data.match.params.ui.possible_match_threshold) {
       match_category = 1
     }
-    if (isotope.match_score > app.data.match.params.current.probable_match_threshold) {
+    if (isotope.match_score > app.data.match.params.ui.probable_match_threshold) {
       match_category = 2
     }
     // return chart data
@@ -186,7 +186,7 @@ watch(
           <Tag
             :value="`Peak ${settings.yMode} intensity: ${area.format(settings.yMode == 'sum' ? isotopeChart.sample_peak_area : isotopeChart.sample_peak_area / sampleLength)}`"
             :severity="
-              isotopeChart.sample_peak_area < app.data.match.params.current.peak_min_intensity
+              isotopeChart.sample_peak_area < app.data.match.params.ui.peak_min_intensity
                 ? 'warn'
                 : 'info'
             "
@@ -194,7 +194,7 @@ watch(
           <Tag
             :value="`mz error: ${error.format(isotopeChart.match_mz_error)}`"
             :severity="
-              Math.abs(isotopeChart.match_mz_error) > app.data.match.params.current.mz_tolerance
+              Math.abs(isotopeChart.match_mz_error) > app.data.match.params.ui.mz_tolerance
                 ? 'warn'
                 : 'info'
             "
@@ -204,7 +204,7 @@ watch(
             :value="`Abundance error: ${error.format(isotopeChart.match_abundance_error)}`"
             :severity="
               Math.abs(isotopeChart.match_abundance_error) >
-              app.data.match.params.current.isotope_ratio_tolerance
+              app.data.match.params.ui.isotope_ratio_tolerance
                 ? 'warn'
                 : 'info'
             "

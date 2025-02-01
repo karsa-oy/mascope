@@ -235,7 +235,7 @@ watch(
       collection?.target_collection_id !== oldCollection?.target_collection_id
     // conditionally unset match visualized
     if (!collection || changedCollection) {
-      app.data.match.visualized.unset()
+      app.data.match.visualized.clear()
     }
     if (collection) {
       scrollTo(collection)
@@ -257,7 +257,7 @@ watch(
       // unfocus child if unfocused
       app.data.match.ion.unfocus()
       // and unset visualized match
-      app.data.match.visualized.unset()
+      app.data.match.visualized.clear()
     }
   }
 )
