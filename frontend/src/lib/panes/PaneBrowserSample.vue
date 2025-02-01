@@ -125,7 +125,9 @@ const batchContextMenu = ref()
 // prevent default event handling
 const handleBatchRightClick = (event) => {
   sampleContextMenu.value.hide()
-  batchContextMenu.value.show(event.originalEvent)
+  if (app.data.batch.focusedId == batch.context.sample_batch_id) {
+    batchContextMenu.value.show(event.originalEvent)
+  }
 }
 
 const batchMenuEntries = computed(() => [
