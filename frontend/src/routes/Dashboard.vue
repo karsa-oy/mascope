@@ -118,6 +118,9 @@ const tabs = computed(() => [
               </Tab>
             </TabList>
             <TabPanels>
+              <TabPanel value="acquisitions">
+                <PaneTabAcquisitions :active="app.ui.tab.active == 'acquisitions'" />
+              </TabPanel>
               <TabPanel value="batch">
                 <ChartBatchOverview />
               </TabPanel>
@@ -126,9 +129,6 @@ const tabs = computed(() => [
               </TabPanel>
               <TabPanel value="match">
                 <PaneTabMatch v-if="app.data.match.visualized.ion" />
-              </TabPanel>
-              <TabPanel value="acquisitions">
-                <PaneTabAcquisitions :active="app.ui.tab.active == 'acquisitions'" />
               </TabPanel>
             </TabPanels>
           </Tabs>
