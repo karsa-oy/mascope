@@ -103,7 +103,7 @@ const tabs = computed(() => [
       </SplitterPanel>
       <SplitterPanel :size="80">
         <Panel id="charts">
-          <Tabs v-model:value="app.ui.tab.active">
+          <Tabs v-model:value="app.ui.tab.active" lazy>
             <TabList>
               <Tab
                 v-for="{ icon, label, disabled, help } in tabs"
@@ -119,7 +119,7 @@ const tabs = computed(() => [
             </TabList>
             <TabPanels>
               <TabPanel value="batch">
-                <ChartBatchOverview v-if="app.data.batch.focused" />
+                <ChartBatchOverview />
               </TabPanel>
               <TabPanel value="spectrum">
                 <ChartSampleSpectrum />
