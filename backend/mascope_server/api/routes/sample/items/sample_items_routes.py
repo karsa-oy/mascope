@@ -1,9 +1,8 @@
 from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from mascope_server.db.id import gen_id
-from mascope_server.api.new.auth.dependencies import editor_user, guest_user
 from mascope_server.api.lib.api_features import api_route
-from mascope_server.api.lib.exceptions.api_exceptions import NotFoundException
-
+from mascope_server.api.new.auth.dependencies import editor_user, guest_user
+from mascope_server.api.new.instrument_configs.service import get_instrument_config
 from mascope_server.api.controllers.sample.items.sample_items_controller import (
     get_sample_items,
     get_sample_item,
@@ -11,6 +10,8 @@ from mascope_server.api.controllers.sample.items.sample_items_controller import 
     delete_sample_item,
     update_sample_item,
     copy_sample_item,
+)
+from mascope_server.api.controllers.sample.items.sample_items_process_controller import (
     process_sample_item,
 )
 from mascope_server.api.controllers.sample.lib.sample_file_fetch import (
@@ -18,8 +19,8 @@ from mascope_server.api.controllers.sample.lib.sample_file_fetch import (
 )
 from mascope_server.api.models.sample.items.sample_item_pydantic_model import (
     SampleItemCreate,
-    SampleItemUpdate,
     GetSampleItemsQueryParams,
+    SampleItemUpdateBody,
     SampleItemCopyBody,
     SampleItemProcessBody,
 )
@@ -72,16 +73,30 @@ async def create_sample_item_route(
 @sample_items_router.patch("/{sample_item_id}")
 @api_route()
 async def update_sample_item_route(
-    sample_item_id: str, sample_item: SampleItemUpdate, user=Depends(editor_user)
+    request: Request,
+    sample_item_id: str,
+    body: SampleItemUpdateBody,
+    background_tasks: BackgroundTasks,
+    user=Depends(editor_user),
 ):
     """Update an existing sample item's details.
 
     :param sample_item_id: The unique identifier of the sample item.
-    :param sample_item: The sample item update data.
+    :param body: The sample item update body
     :param user: The current authenticated user with editor permissions.
     :return: A dictionary containing the updated sample item details.
     """
-    return await update_sample_item(sample_item_id, sample_item)
+    sid = request.headers.get("X-SID")
+    process_id = gen_id(8)  # generate id for potential process_instrument_config
+
+    return await update_sample_item(
+        sample_item_id=sample_item_id,
+        sample_item=body.sample_item,
+        instrument_config=body.instrument_config,
+        background_tasks=background_tasks,
+        sid=sid,
+        process_id=process_id,
+    )
 
 
 @sample_items_router.delete("/{sample_item_id}")
@@ -148,6 +163,14 @@ async def process_sample_item_route(
     """
     # Verify the existance of sample file
     await fetch_sample_file(filename=body.sample_item.filename)
+    # Verify instrument config exists
+    if (
+        body.instrument_config
+        and body.instrument_config.instrument_function_id is not None
+    ):
+        await get_instrument_config(
+            instrument_function_id=body.instrument_config.instrument_function_id
+        )
 
     # Get data for notifications
     sid = request.headers.get("X-SID")
@@ -156,9 +179,7 @@ async def process_sample_item_route(
     background_tasks.add_task(
         process_sample_item,
         sample_item=body.sample_item,
-        existing_method_file=body.existing_method_file,
-        new_method_file=body.new_method_file,
-        new_instrument_function=body.new_instrument_function,
+        instrument_config=body.instrument_config,
         mz_calibration_params=body.mz_calibration_params,
         independent_transaction=True,
         sid=sid,

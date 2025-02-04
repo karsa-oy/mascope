@@ -101,11 +101,13 @@ export const useHelp = defineStore('app.ui.help', () => {
 })
 
 function containment(a, b) {
-  if (a.element.contains(b.element)) {
-    return 1
-  }
-  if (b.element.contains(a.element)) {
-    return -1
+  if (a?.element && b?.element) {
+    if (a.element.contains(b.element)) {
+      return 1
+    }
+    if (b.element.contains(a.element)) {
+      return -1
+    }
   }
   return 0
 }

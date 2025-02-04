@@ -1,6 +1,5 @@
 import os
 from datetime import datetime, timezone
-from typing import List
 from fastapi import BackgroundTasks
 import pandas as pd
 
@@ -53,8 +52,14 @@ from mascope_server.api.controllers.sample.items.sample_items_controller import 
 from mascope_server.api.controllers.calibration.calibration_controller import (
     calibration_mz_calibrate_batch,
 )
-from mascope_server.api.controllers.instrument_functions.lib.instrument_functions_fetch import (
-    read_instrument_function,
+from mascope_server.api.new.instrument_configs.process.service import (
+    process_instrument_config,
+)
+from mascope_server.api.new.instrument_configs.lib import (
+    read_instrument_functions,
+)
+from mascope_server.api.new.instrument_configs.schemas import (
+    SetInstrumentConfigBody,
 )
 from mascope_server.api.models.sample.batches.sample_batch_pydantic_model import (
     SampleBatchCreateBody,
@@ -587,8 +592,9 @@ async def delete_sample_batch(
 )
 async def import_sample_items(
     sample_batch_id: str,
-    sample_items: List[SampleItemCreate],
+    sample_items: list[SampleItemCreate],
     mz_calibration_params: MzCalibrationParams,
+    instrument_config: SetInstrumentConfigBody,
     calibrate_batch: bool = True,
     independent_transaction: bool = False,
     sid: str = None,
@@ -599,12 +605,14 @@ async def import_sample_items(
     optionally calibrating the batch, and computing matches.
 
     Steps:
-    1. Verify that all sample items are from the same instrument.
-    2. Create provided sample items and save them to the database.
-    3. Optionally calibrate the batch using the provided calibration parameters,
+    1. Verify that all sample items are for the same instrument.
+    2. Process instrument configs for the sample files.
+    3. Create provided sample items and save them to the database.
+    4. Optionally calibrate the batch using the provided calibration parameters,
         based on the calibrate_batch flag and if the instrument is TOF.
-    4. Compute matches for the batch.
-    5. In case of calibration failure, send a notification with information about failed samples.
+    5. Compute matches for the batch.
+    6. In case of calibration failure, send a notification with information about failed samples.
+    7. Return the status message
 
     :param sample_batch_id: ID of the sample batch where sample items will be imported.
     :type sample_batch_id: str
@@ -612,6 +620,8 @@ async def import_sample_items(
     :type sample_items: List[SampleItemCreate]
     :param mz_calibration_params: Calibration parameters for the batch. If not provided, default values are used.
     :type mz_calibration_params: MzCalibrationParams
+    :param instrument_config: Instrument config to use for the imported files.
+    :type instrument_config: InstrumentConfigBody
     :param calibrate_batch: A boolean flag to control whether the batch should undergo calibration, defaults to True
     :type calibrate_batch: bool, optional
     :param independent_transaction: Flag to indicate if the operation should be treated as an independent transaction, defaults to False
@@ -623,7 +633,7 @@ async def import_sample_items(
     sample_batch = sample_batch_result.get("data")
     sample_batch_name = sample_batch["sample_batch_name"]
 
-    # Step 1: Verify all sample items are for the same instrument
+    # Step 1: Verify that all sample items are for the same instrument
     instrument_types = {get_instrument_type(item.filename) for item in sample_items}
     if len(instrument_types) > 1:
         raise ValueError(
@@ -647,14 +657,25 @@ async def import_sample_items(
     )
     await send_progress_user_notification(notification, 0.1)
 
-    # Step 2: Create provided sample items and save to database
+    # Step 2: Process instrument configs for the files
+    await process_instrument_config(
+        filenames=[item.filename for item in sample_items],
+        instrument_config=instrument_config,
+        independent_transaction=False,
+        sid=sid,
+        process_id=gen_id(8),
+        parent_id=process_id,
+    )
+    await send_progress_user_notification(notification, 0.15)
+
+    # Step 3: Create provided sample items and save to database
     for sample_item in sample_items:
         await create_sample_item(sample_item=sample_item)
 
     notification.message = f"Created {len(sample_items)} sample{'s records' if len(sample_items) > 1 else 'record'}."
     await send_progress_user_notification(notification, 0.2)
 
-    # Step 3: Optionally calibrate batch if calibrate_batch flag is True and instrument is TOF
+    # Step 4: Optionally calibrate batch if calibrate_batch flag is True and instrument is TOF
     warning = None
     if calibrate_batch and instrument_type == "tof":
         samples_calibrate_failed = []
@@ -686,7 +707,7 @@ async def import_sample_items(
                 # This is a critical error, re-raise it
                 raise
 
-    # Step 4: Compute matches for the batch, this would reload the current batch, the other affected_sample_batch_ids reloaded in the calibration_mz_calibrate_batch
+    # Step 5: Compute matches for the batch, this would reload the current batch, the other affected_sample_batch_ids reloaded in the calibration_mz_calibrate_batch
     await rematch_batch(
         sample_batch_id=sample_batch_id,
         independent_transaction=False,
@@ -698,7 +719,7 @@ async def import_sample_items(
     notification.message = f"Sample batch'{sample_batch_name}' rematched."
     await send_progress_user_notification(notification, 0.95)
 
-    # Step 5: Raise a warning if encountered during batch calibration
+    # Step 6: Raise a warning if encountered during batch calibration
     if warning is not None:
         raise_api_warning(
             warning,
@@ -708,7 +729,7 @@ async def import_sample_items(
             },
         )
 
-    # Step 4: Return the status message
+    # Step 7: Return the status message
     return {
         "message": f"{len(sample_items)} sample{'s' if len(sample_items) > 1 else ''} was imported to the sample batch '{sample_batch_name}'.",
         "_notification_data": {"sample_batch_id": sample_batch_id},
@@ -901,7 +922,7 @@ async def sample_batch_export_peaks(
 
         try:
             filename = row["filename"]
-            instrument_functions = await read_instrument_function(filename=filename)
+            instrument_functions = await read_instrument_functions(filename=filename)
             instrument_type = get_instrument_type(filename)
 
             await send_progress_user_notification(notification, 0.1)

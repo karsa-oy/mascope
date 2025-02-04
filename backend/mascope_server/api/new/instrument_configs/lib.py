@@ -1,12 +1,11 @@
 import numpy as np
 
-from mascope_server.api.controllers.instrument_functions.instrument_functions_controller import (
-    get_instrument_function,
-)
 from mascope_lib.instrument_functions import r_orbi
 
+from mascope_server.api.new.instrument_configs.service import get_instrument_config
 
-async def read_instrument_function(filename):
+
+async def read_instrument_functions(filename):
     """
     Retrieves and processes instrument function parameters for a given sample file.
 
@@ -20,18 +19,21 @@ async def read_instrument_function(filename):
              The resolution function R takes a mass (m) and returns the resolution at that mass.
     :rtype: tuple(dict, function)
     """
-    instrument_function_data = await get_instrument_function(filename=filename)
-    instrument_function = instrument_function_data.get("data")
-    peakshape = instrument_function["peakshape"]
-    R_p = instrument_function["resolution_function"]
+    instrument_config = (await get_instrument_config(filename=filename)).get("data")
+    peakshape = instrument_config["peakshape"]
+    R_p = instrument_config["resolution_function"]
     if len(R_p) == 1:
         # Use native Orbitrap resolution function
         p1 = R_p[0]
-        R = lambda m: r_orbi(m, p1)
+
+        def R(m):
+            return r_orbi(m, p1)
     elif len(R_p) == 2:
         # Use resolution function from Junninen's thesis for TOF
         p1, p2 = R_p
-        R = lambda m: m / (p1 * m + p2)
+
+        def R(m):
+            return m / (p1 * m + p2)
     elif len(R_p) == 3:
         # Use 2nd order polynomial (backwards compatibility for Orbitrap) TODO: legacy
         R = np.poly1d(R_p)

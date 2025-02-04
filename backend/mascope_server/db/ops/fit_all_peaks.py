@@ -22,8 +22,8 @@ from mascope_server.socket import (
     sio,
 )  # This is here to circumvent circular import error
 from mascope_server.db import init_db
-from mascope_server.api.controllers.instrument_functions.lib.instrument_functions_fetch import (
-    read_instrument_function,
+from mascope_server.api.new.instrument_config.lib import (
+    read_instrument_functions,
 )
 import mascope_lib.runtime as lib_runtime
 
@@ -50,7 +50,7 @@ def sample_file_op(sample_filepath: str, sample_filename: str) -> None:
         add_peak_threshold = 0.9
 
         instrument_functions = loop.run_until_complete(
-            read_instrument_function(filename=sample_filename)
+            read_instrument_functions(filename=sample_filename)
         )
         loop.run_until_complete(
             detect_peaks(
@@ -111,7 +111,7 @@ if __name__ == "__main__":
         # Check if we are in a date directory
         try:
             datetime.strptime(dirpath.split(os.sep)[-1], "%Y.%m.%d")
-        except ValueError as e:
+        except ValueError:
             # Not a date directory
             continue
         # We are in a date directory, dirnames are sample files

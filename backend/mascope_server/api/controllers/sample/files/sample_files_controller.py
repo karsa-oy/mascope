@@ -15,9 +15,8 @@ from mascope_server.db import async_session
 from mascope_server.db.id import gen_id
 from mascope_server.db.models import SampleFile, User
 from mascope_server.api.new.auth.access_token.service import get_access_token
-from mascope_server.api.new.auth.exceptions import InvalidTokenException
-from mascope_server.api.controllers.instrument_functions.lib.instrument_functions_fetch import (
-    read_instrument_function,
+from mascope_server.api.new.instrument_configs.lib import (
+    read_instrument_functions,
 )
 from mascope_server.api.lib.api_features import (
     api_controller,
@@ -488,7 +487,7 @@ async def compute_all_sample_file_peaks(
     filename = sample_file_data.get("data").get("filename")
 
     # Step 2: Load instrument functions and determine instrument type.
-    instrument_functions = await read_instrument_function(filename=filename)
+    instrument_functions = await read_instrument_functions(filename=filename)
     instrument_type = get_instrument_type(filename)
 
     # Step 3: Set threshold based on instrument type.

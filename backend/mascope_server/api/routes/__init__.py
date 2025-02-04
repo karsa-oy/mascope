@@ -7,13 +7,18 @@ from mascope_server.api.new.users.me.routes import me_router
 from mascope_server.api.new.users.admin.routes import admin_router
 from mascope_server.api.new.users.owner.routes import owner_router
 from mascope_server.api.new.roles.routes import roles_router
+from mascope_server.api.new.params import params_router
+from mascope_server.api.new.instruments import instruments_router
+from mascope_server.api.new.instrument_configs.routes import (
+    instrument_configs_router,
+)
+from mascope_server.api.new.instrument_configs.process.routes import (
+    instrument_configs_process_router,
+)
 from mascope_server.api.routes.attribute_templates.attribute_templates_routes import (
     attribute_templates_router,
 )
 from mascope_server.api.routes.calibration.calibration_routes import calibration_router
-from mascope_server.api.routes.instrument_functions.instrument_functions_routes import (
-    instrument_functions_router,
-)
 from mascope_server.api.routes.ionization_mechanisms.ionization_mechanisms_routes import (
     ionization_mechanisms_router,
 )
@@ -80,9 +85,6 @@ from mascope_server.api.routes.visualization.visualization_routes import (
 )
 from mascope_server.api.routes.workspace.workspace_routes import workspace_router
 
-from mascope_server.api.new.params import params_router
-from mascope_server.api.new.instruments import instruments_router
-
 routers = [
     auth_router,
     me_router,
@@ -106,7 +108,8 @@ routers = [
     target_isotopes_router,
     ionization_mechanisms_router,
     instruments_router,
-    instrument_functions_router,
+    instrument_configs_router,
+    instrument_configs_process_router,
     calibration_router,
     match_targets_sample_router,
     match_targets_batch_router,

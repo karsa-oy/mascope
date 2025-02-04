@@ -51,13 +51,14 @@ export const useBatch = defineModule({
         type: 'copy_batch'
       }
     ),
-  importSamples: async ({ batch, sample_items }) => {
+  importSamples: async ({ batch, sample_items, instrument_config }) => {
     const mzFit = useMzFit()
     return await api.http.post(
       `/sample/batches/${batch.sample_batch_id}/import`,
       {
         sample_items,
-        mz_calibration_params: mzFit.mzCalibrationParams
+        mz_calibration_params: mzFit.mzCalibrationParams,
+        instrument_config
       },
       {
         use: 'process',

@@ -63,6 +63,7 @@ watch(param, (value) => {
         :step="range.step"
         :disabled="disabled"
         :maxFractionDigits="3"
+        :allowEmpty="false"
       />
       <label :for="id"> {{ label }}</label>
     </FloatLabel>

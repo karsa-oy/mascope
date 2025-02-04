@@ -2,6 +2,7 @@ from fastapi import APIRouter, BackgroundTasks, Request, Depends
 from mascope_server.db.id import gen_id
 from mascope_server.api.lib.api_features import api_route
 from mascope_server.api.new.auth.dependencies import editor_user, guest_user
+from mascope_server.api.new.instrument_configs.service import get_instrument_config
 from mascope_server.api.controllers.sample.batches.sample_batches_controller import (
     get_sample_batches,
     get_sample_batch,
@@ -209,6 +210,12 @@ async def import_sample_items_route(
     if any(si.sample_batch_id != sample_batch_id for si in body.sample_items):
         raise ValueError("The sample_batch_id in the route and sample_items must match")
 
+    # Verify instrument config exists
+    if body.instrument_config.instrument_function_id is not None:
+        await get_instrument_config(
+            instrument_function_id=body.instrument_config.instrument_function_id
+        )
+
     # Verify the existance of sample batch
     sample_batch_result = await get_sample_batch(sample_batch_id)
     sample_batch = sample_batch_result.get("data")
@@ -222,6 +229,7 @@ async def import_sample_items_route(
         sample_batch_id=sample_batch_id,
         sample_items=body.sample_items,
         mz_calibration_params=body.mz_calibration_params,
+        instrument_config=body.instrument_config,
         calibrate_batch=body.calibrate_batch,
         independent_transaction=True,
         sid=sid,

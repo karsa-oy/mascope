@@ -32,11 +32,15 @@ export const useSample = defineModule({
       use: 'create',
       type: 'create_sample'
     }),
-  update: (sample) =>
-    api.http.patch(`/sample/items/${sample.sample_item_id}`, sample, {
-      use: 'update',
-      type: 'update_sample'
-    }),
+  update: ({ sample, instrument_config }) =>
+    api.http.patch(
+      `/sample/items/${sample.sample_item_id}`,
+      { sample_item: sample, instrument_config: instrument_config },
+      {
+        use: 'update',
+        type: 'update_sample'
+      }
+    ),
   delete: ({ sample_item_id }) =>
     api.http.delete(`/sample/items/${sample_item_id}`, {
       use: 'delete',
@@ -54,14 +58,14 @@ export const useSample = defineModule({
         type: 'copy_sample'
       }
     ),
-  process: async ({ sample, ...instrument_function_process }) => {
+  process: async ({ sample, instrument_config }) => {
     const mzFit = useMzFit()
     return await api.http.post(
       `/sample/items/process`,
       {
         sample_item: sample,
         mz_calibration_params: mzFit.mzCalibrationParams,
-        ...instrument_function_process
+        instrument_config
       },
       {
         use: 'process',

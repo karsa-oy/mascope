@@ -6,8 +6,9 @@ sample batch-related data.
 """
 
 from mascope_server.db import async_session
-from mascope_server.db.models import SampleBatch
+from mascope_server.db.models import SampleBatch, SampleItem
 from mascope_server.api.lib.exceptions.api_exceptions import NotFoundException
+from sqlalchemy import distinct, select
 
 
 class SampleBatchData:
@@ -44,3 +45,20 @@ async def fetch_sample_batch_data(sample_batch_id: str) -> SampleBatchData:
 
         # Return the SampleBatchData object with unpacked data
         return SampleBatchData(sample_batch, ion_mechanisms)
+
+
+async def fetch_sample_batches_for_filenames(filenames: list[str]) -> set[str]:
+    """
+    Fetches unique sample batch IDs for the given filenames.
+
+    :param filenames: List of filenames to fetch sample batches for
+    :type filenames: list[str]
+    :return: Set of unique sample batch IDs
+    :rtype: set[str]
+    """
+    async with async_session() as session:
+        query = select(SampleItem.sample_batch_id).filter(
+            SampleItem.filename.in_(filenames)
+        )
+        batch_ids = await session.scalars(query)
+        return set(batch_ids)
