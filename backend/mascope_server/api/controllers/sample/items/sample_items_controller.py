@@ -45,6 +45,9 @@ from mascope_server.api.new.instrument_configs.service import get_instrument_con
 from mascope_server.api.new.instrument_configs.schemas import (
     SetInstrumentConfigBody,
 )
+from mascope_server.api.new.instrument_configs.process.service import (
+    process_instrument_config,
+)
 
 
 @api_controller()
@@ -263,18 +266,13 @@ async def update_sample_item(
 
     # Step 5: Process instrument config
     if instrument_config:
-        from mascope_server.api.new.instrument_configs.process.service import (
-            process_instrument_config,
-        )
-
         background_tasks.add_task(
             process_instrument_config,
             filenames=[existing_sample_item.filename],
             instrument_config=instrument_config,
             independent_transaction=True,
             sid=sid,
-            process_id=gen_id(8),
-            parent_id=process_id,
+            process_id=process_id,
         )
     else:
         # Step 6: Reload batch if needed
@@ -530,11 +528,6 @@ async def process_sample_item(
     await send_progress_user_notification(notification, 0.1)
 
     # Step 1: process instrument config
-
-    from mascope_server.api.new.instrument_configs.process.service import (
-        process_instrument_config,
-    )
-
     await process_instrument_config(
         filenames=[sample_item.filename],
         instrument_config=instrument_config,

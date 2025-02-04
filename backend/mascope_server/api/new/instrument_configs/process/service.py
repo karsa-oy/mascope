@@ -4,7 +4,6 @@ from mascope_server.socket import sio
 from mascope_server.api.models.sample.files.sample_file_pydantic_model import (
     SampleFileUpdate,
 )
-from mascope_server.api.lib.exceptions.api_exceptions import NotFoundException
 from mascope_server.api.lib.api_features import (
     api_controller_background_task,
 )
@@ -18,8 +17,8 @@ from mascope_server.api.controllers.sample.files.sample_files_controller import 
 from mascope_server.api.controllers.sample.lib.sample_file_fetch import (
     fetch_sample_file,
 )
-from mascope_server.api.controllers.sample.items.sample_items_controller import (
-    get_sample_items,
+from mascope_server.api.controllers.sample.lib.sample_batches_fetch import (
+    fetch_sample_batches_for_filenames,
 )
 from mascope_server.api.new.instrument_configs.schemas import (
     CreateInstrumentConfigBody,
@@ -78,10 +77,6 @@ async def process_instrument_config(
         instrument_config_record = await get_instrument_config(
             instrument_function_id=instrument_config.instrument_function_id
         )
-        if not instrument_config_record:
-            raise NotFoundException(
-                f"process instrument config: no record found with instrument_function_id {instrument_config.instrument_function_id}"
-            )
         method_file = instrument_config_record["data"]["method_file"]
 
     runtime.logger.info(f"Processing instrument config '{method_file}' for '{label}'")
@@ -161,17 +156,7 @@ async def process_instrument_config(
     await asyncio.gather(*update_tasks)
 
     # Step 7. Reload affected batches
-    get_tasks = [get_sample_items(filename=filename) for filename in filenames]
-    results = await asyncio.gather(*get_tasks)
-    affected_batch_ids = list(
-        set(
-            [
-                item["sample_batch_id"]
-                for data in [result["data"] for result in results]
-                for item in data
-            ]
-        )
-    )
+    affected_batch_ids = await fetch_sample_batches_for_filenames(filenames)
     reload_tasks = [
         sio.emit(
             "sample_batch_reload",
