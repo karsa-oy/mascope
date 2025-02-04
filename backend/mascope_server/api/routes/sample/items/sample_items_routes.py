@@ -67,6 +67,7 @@ async def create_sample_item_route(
         sample_item=sample_item, independent_transaction=True
     )
 
+    process_id = gen_id(8)  # generate id for potential process_instrument_config
 
 @sample_items_router.delete("/{sample_item_id}")
 @api_route()
@@ -161,6 +162,14 @@ async def process_sample_item_route(
     """
     # Verify the existance of sample file
     await fetch_sample_file(filename=body.sample_item.filename)
+    # Verify instrument config exists
+    if (
+        body.instrument_config
+        and body.instrument_config.instrument_function_id is not None
+    ):
+        await get_instrument_config(
+            instrument_function_id=body.instrument_config.instrument_function_id
+        )
 
     # Get data for notifications
     sid = request.headers.get("X-SID")

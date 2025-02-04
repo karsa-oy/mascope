@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, BackgroundTasks, Request
-
-from mascope_server.api.lib.exceptions.api_exceptions import NotFoundException
 from mascope_server.db.id import gen_id
-from mascope_server.api.new.auth.dependencies import editor_user
 from mascope_server.api.lib.api_features import api_route
-
+from mascope_server.api.controllers.sample.lib.sample_file_fetch import (
+    fetch_sample_file,
+)
+from mascope_server.api.new.auth.dependencies import editor_user
 from mascope_server.api.new.instrument_configs.service import get_instrument_config
 from mascope_server.api.new.instrument_configs.process.service import (
     process_instrument_config,
@@ -54,15 +54,12 @@ async def process_instrument_config_route(
     :return: A response containing a message and a unique process ID for tracking the background task.
     :rtype: dict
     """
-    if body.instrument_config.instrument_function_id:
-        instrument_config_record = await get_instrument_config(
+    # verify filename and instrument config exists
+    await fetch_sample_file(filename=body.filename)
+    if body.instrument_config.instrument_function_id is not None:
+        await get_instrument_config(
             instrument_function_id=body.instrument_config.instrument_function_id
         )
-        if not instrument_config_record:
-            raise NotFoundException(
-                "process instrument config: no record found with instrument_function_id "
-                + body.instrument_config.instrument_function_id
-            )
     process_id = gen_id(8)
     background_tasks.add_task(
         process_instrument_config,

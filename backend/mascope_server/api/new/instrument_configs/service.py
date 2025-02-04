@@ -5,7 +5,8 @@ from sqlalchemy import (
     desc,
     func,
 )
-
+from mascope_lib.instrument_functions import fit_instrument_functions
+from mascope_lib.file_func import get_instrument_type
 from mascope_server.db.id import gen_id
 from mascope_server.db import async_session
 from mascope_server.db.models import SampleFile, InstrumentFunction as InstrumentConfig
@@ -14,12 +15,9 @@ from mascope_server.api.lib.api_features import (
     api_controller_background_task,
 )
 from mascope_server.api.lib.exceptions.api_exceptions import NotFoundException
-from mascope_lib.instrument_functions import fit_instrument_functions
-from mascope_lib.file_func import get_instrument_type
 from mascope_server.api.controllers.sample.lib.sample_file_fetch import (
     fetch_sample_file,
 )
-
 from mascope_server.api.new.instrument_configs.schemas import (
     CreateInstrumentConfigBody,
     InstrumentFunctionData,
@@ -273,10 +271,7 @@ async def delete_instrument_config(instrument_function_id: str):
     instrument_config = (
         await get_instrument_config(instrument_function_id=instrument_function_id)
     ).get("data")
-    if not instrument_config:
-        raise NotFoundException(
-            f"delete instrument config: no record found with instrument_function_id {instrument_function_id}"
-        )
+
     # Step 2. Retrieve all instrument configs with the same instrument and method file
     async with async_session() as session:
         result = await session.execute(

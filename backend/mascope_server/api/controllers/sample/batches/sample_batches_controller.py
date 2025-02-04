@@ -661,6 +661,10 @@ async def import_sample_items(
     await process_instrument_config(
         filenames=[item.filename for item in sample_items],
         instrument_config=instrument_config,
+        independent_transaction=False,
+        sid=sid,
+        process_id=gen_id(8),
+        parent_id=process_id,
     )
     await send_progress_user_notification(notification, 0.15)
 

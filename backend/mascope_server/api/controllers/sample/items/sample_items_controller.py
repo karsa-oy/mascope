@@ -228,14 +228,10 @@ async def update_sample_item(
 
     """
     # verify instrument config exists
-    if instrument_config and instrument_config.instrument_function_id:
-        instrument_config_record = await get_instrument_config(
+    if instrument_config and instrument_config.instrument_function_id is not None:
+        await get_instrument_config(
             instrument_function_id=instrument_config.instrument_function_id
         )
-        if not instrument_config_record:
-            raise NotFoundException(
-                f"update sample item: no record found with instrument_function_id {instrument_config.instrument_function_id}"
-            )
 
     # Step 1: Fetch the existing sample item
     async with async_session() as session:
@@ -276,7 +272,6 @@ async def update_sample_item(
     return {
         "message": f"Sample '{existing_sample_item.sample_item_name}' was updated.",
         "data": existing_sample_item.to_dict(),
-        "_notification_data": {"sample_item_id": sample_item_id},
     }
 
 

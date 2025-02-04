@@ -1,6 +1,5 @@
 from mascope_lib.file_func import get_instrument_type
 from mascope_server.db.id import gen_id
-from mascope_server.api.lib.exceptions.api_exceptions import NotFoundException
 from mascope_server.api.lib.api_features import (
     api_controller_background_task,
 )
@@ -22,7 +21,6 @@ from mascope_server.socket.notifications import (
 from mascope_server.api.new.instrument_configs.process.service import (
     process_instrument_config,
 )
-from mascope_server.api.new.instrument_configs.service import get_instrument_config
 from mascope_server.api.new.instrument_configs.schemas import (
     SetInstrumentConfigBody,
 )
@@ -77,16 +75,6 @@ async def process_sample_item(
     :rtype: dict
     """
 
-    # verify instrument config exists
-    if instrument_config and instrument_config.instrument_function_id:
-        instrument_config_record = await get_instrument_config(
-            instrument_function_id=instrument_config.instrument_function_id
-        )
-        if not instrument_config_record:
-            raise NotFoundException(
-                f"process sample item: no record found with instrument_function_id {instrument_config.instrument_function_id}"
-            )
-
     notification = UserNotification(
         process_id=process_id,
         type="process_sample_item",
@@ -106,7 +94,6 @@ async def process_sample_item(
     await send_progress_user_notification(notification, 0.1)
 
     # Step 1: process instrument config
-
     await process_instrument_config(
         filenames=[sample_item.filename],
         instrument_config=instrument_config,
