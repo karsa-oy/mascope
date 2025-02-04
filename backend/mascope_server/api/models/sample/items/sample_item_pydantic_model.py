@@ -81,11 +81,7 @@ class SampleItemCreate(SampleItemBase):
 
 
 class SampleItemUpdate(BaseModel):
-    sample: SampleItemBase = Field(..., description="The sample item fields to update")
-    instrument_config: SetInstrumentConfigBody | None = Field(
-        None,
-        description="An instrument config to set for the sample item.",
-    )
+    pass
 
 
 class GetSampleItemsQueryParams(QueryParamsModel):
@@ -106,6 +102,16 @@ class GetSampleItemsQueryParams(QueryParamsModel):
     )
     page: int = Field(0, description="The page number for pagination, default 0")
     limit: int = Field(10000, description="The number of results per page.")
+
+
+class SampleItemUpdateBody(BaseModel):
+    sample_item: SampleItemBase = Field(
+        ..., description="The sample item fields to update"
+    )
+    instrument_config: SetInstrumentConfigBody | None = Field(
+        None,
+        description="An instrument config to set for the sample item.",
+    )
 
 
 class SampleItemCopyBody(BaseModel):

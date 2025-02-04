@@ -35,7 +35,7 @@ export const useSample = defineModule({
   update: ({ sample, instrument_config }) =>
     api.http.patch(
       `/sample/items/${sample.sample_item_id}`,
-      { sample, instrument_config },
+      { sample_item: sample, instrument_config: instrument_config },
       {
         use: 'update',
         type: 'update_sample'
