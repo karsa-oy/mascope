@@ -95,7 +95,7 @@ class zarr_sdk:
         try:
             data_path = parse_path_from_item_filename(filename, base_path)
         except Exception as e:
-            raise Exception("Error parsing filename")
+            raise NameError(f"Error parsing filename: {e}") from e
         if os.path.exists(data_path):
             if overwrite:
                 rmtree(data_path)
