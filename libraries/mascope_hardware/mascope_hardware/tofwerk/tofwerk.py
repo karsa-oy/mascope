@@ -100,3 +100,30 @@ def get_signal(datafile_path: str, t1=None, t2=None):
             {"signal": (("time", "mz"), signal_dask)},
             coords={"mz": all_mzs, "time": scan_time[start:end]},
         )
+
+
+def compute_sum_signal_in_time_range(
+    datafile_path: str,
+    t1: float = None,
+    t2: float = None,
+    average: bool = False,
+) -> xr.core.dataarray.DataArray:
+    """Computes sum signal in (t1, t2) time range
+
+    t1=None is equal to t1=t_min, t2=None is equal to t2=t_max.
+
+    :param datafile_path: Path to the HDF5 file containing spectrum data.
+    :type datafile_path: str
+    :param t1: Optional start time in seconds (default is None).
+    :type t1: float, optional
+    :param t2: Optional end time in seconds (default is None).
+    :type t2: float, optional
+    :param average: If spectrum should be averaged, defaults to False
+    :type average: bool, optional
+    :return: Sum signal
+    :rtype: xr.core.dataarray.DataArray
+    """
+    signal = get_signal(datafile_path, t1, t2)
+    if average:
+        return signal.mean(dim="time")
+    return signal.sum(dim="time")
