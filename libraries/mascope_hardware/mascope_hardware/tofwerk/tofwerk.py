@@ -24,9 +24,9 @@ def open_h5_file(datafile_path: str):
             if h5_file is not None:
                 h5_file.close()
     except Exception as e:
-        hardware_runtime.logger.error(
-            f"Failed to open the file {Path(datafile_path).name}: {e}"
-        )
+        err_message = f"Failed to open the file {Path(datafile_path).name}: {e}"
+        hardware_runtime.logger.error(err_message)
+        raise Exception(err_message) from e
 
 
 def get_signal(datafile_path: str, t1=None, t2=None):
@@ -54,17 +54,6 @@ def get_signal(datafile_path: str, t1=None, t2=None):
         # Get time scale
         scan_time = h5_file["TimingData"]["BufTimes"][:].reshape(-1)
 
-        if (
-            t1 > t2
-            or t1 is not None
-            and (t1 < scan_time.min())
-            or t2 is not None
-            and (t2 > scan_time.max())
-        ):
-            err_message = f"Invalid time range: {t1} > {t2}"
-            hardware_runtime.logger.error(err_message)
-            raise ValueError(err_message)
-
         if t1 is None and t2 is None:
             # Return full signal
             # Get signal array first
@@ -76,6 +65,11 @@ def get_signal(datafile_path: str, t1=None, t2=None):
                 {"signal": (("time", "mz"), signal_dask)},
                 coords={"mz": all_mzs, "time": scan_time},
             )
+
+        if t1 > t2:
+            err_message = f"Invalid time range: {t1} > {t2}"
+            hardware_runtime.logger.error(err_message)
+            raise ValueError(err_message)
 
         # Extract signal shape, naming of dimensions according to TOF docs
         n_writes, n_bufs, n_segments, n_samples = signal_ref.shape
