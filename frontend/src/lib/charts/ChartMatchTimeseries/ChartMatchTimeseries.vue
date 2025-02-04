@@ -72,6 +72,7 @@ const layout = computed(() => ({
     gridcolor: '#33333399',
     gridwidth: 1
   },
+  margin: { l: 50, r: 10, t: 30, b: 100 },
   dragmode: 'zoom',
   showlegend: true
 }))

@@ -215,7 +215,7 @@ async function init(value) {
   initial.targets = clone(selected.targets)
   initial.calibrants = clone(selected.calibrants)
   // set initial tab
-  tab.value == 'update_targets' ? 'targets' : 'info'
+  tab.value = value == 'update_targets' ? 'targets' : 'info'
 }
 
 // confirmation

@@ -795,7 +795,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onEnter))
                 scrollHeight="300px"
                 tableStyle="min-width: 450px; "
                 style="min-width: 400px"
-                sortField="sample_batch_name"
+                sortField="sample_batch_utc_created"
                 :sortOrder="-1"
               >
                 <Column selectionMode="multiple" header="" headerStyle="width: 3rem">

@@ -129,6 +129,7 @@ const layout = computed(() => ({
     showgrid: true,
     gridcolor: '#33333399',
     tickmode: 'array',
+    tickangle: 45,
     gridwidth: 1,
     ...xAxis.value
   },
@@ -141,8 +142,10 @@ const layout = computed(() => ({
     rangemode: 'tozero',
     gridwidth: 1
   },
-  minreducedheight: 250,
-  showlegend: true
+  margin: { l: 50, r: 50, t: 50, b: 50 },
+  minreducedheight: 300,
+  showlegend: true,
+  height: 650
 }))
 
 function onClick({ points }) {

@@ -41,7 +41,7 @@ const tabs = computed(() => [
   {
     label: 'Batch',
     icon: 'pi pi-hashtag',
-    disabled: !app.data.batch.focused,
+    disabled: app.data.sample.list.length == 0,
     help: `
       <h1>Batch Overview Chart</h1>
 
@@ -103,7 +103,7 @@ const tabs = computed(() => [
       </SplitterPanel>
       <SplitterPanel :size="80">
         <Panel id="charts">
-          <Tabs v-model:value="app.ui.tab.active">
+          <Tabs v-model:value="app.ui.tab.active" lazy>
             <TabList>
               <Tab
                 v-for="{ icon, label, disabled, help } in tabs"
@@ -118,17 +118,17 @@ const tabs = computed(() => [
               </Tab>
             </TabList>
             <TabPanels>
+              <TabPanel value="acquisitions">
+                <PaneTabAcquisitions :active="app.ui.tab.active == 'acquisitions'" />
+              </TabPanel>
               <TabPanel value="batch">
-                <ChartBatchOverview v-if="app.data.batch.focused" />
+                <ChartBatchOverview />
               </TabPanel>
               <TabPanel value="spectrum">
                 <ChartSampleSpectrum />
               </TabPanel>
               <TabPanel value="match">
                 <PaneTabMatch v-if="app.data.match.visualized.ion" />
-              </TabPanel>
-              <TabPanel value="acquisitions">
-                <PaneTabAcquisitions :active="app.ui.tab.active == 'acquisitions'" />
               </TabPanel>
             </TabPanels>
           </Tabs>
