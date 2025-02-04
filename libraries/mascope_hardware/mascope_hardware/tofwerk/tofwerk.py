@@ -131,5 +131,5 @@ def compute_sum_signal_in_time_range(
     """
     signal = get_signal(datafile_path, t1, t2)
     if average:
-        return signal.mean(dim="time")
-    return signal.sum(dim="time")
+        return signal.mean(dim="time").signal.rename("sum_signal")
+    return signal.sum(dim="time").signal.rename("sum_signal")
