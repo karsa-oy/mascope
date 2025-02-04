@@ -23,6 +23,7 @@ clr.AddReference("ThermoFisher.CommonCore.Data")
 
 from mascope_lib.runtime import lib_runtime
 from mascope_hardware.orbitrap import thermo
+from mascope_hardware.tofwerk import tofwerk
 
 
 from .structs import ExtendableDataArray
@@ -207,6 +208,8 @@ class zarr_sdk:
         base_filename = item.props["filename"]
         filename_sum_signal = filename_to_zarr_path(base_filename, "sum_signal")
         sample_type = get_sample_file_type(base_filename)
+        base_path = get_filestore_path()
+        sample_path = parse_path_from_item_filename(base_filename, base_path)
 
         match sample_type:
             case "tof_zarr" | "orbi_zarr":
@@ -216,12 +219,11 @@ class zarr_sdk:
                 # Fill the remaining nan values with zeros and get sum signal
                 sum_signal = signal.fillna(0).sum(dim="time").compute()
             case "orbi_raw":
-                base_path = get_filestore_path()
-                sample_path = parse_path_from_item_filename(base_filename, base_path)
                 datafile_path = os.path.join(sample_path, "data.raw")
                 sum_signal = thermo.compute_sum_signal_in_time_range(datafile_path)
             case "tof_h5":
-                raise NotImplementedError
+                datafile_path = os.path.join(sample_path, "data.h5")
+                sum_signal = tofwerk.compute_sum_signal_in_time_range(datafile_path)
 
         sum_signal_array = ExtendableDataArray(
             path=filename_sum_signal, array_module=np
@@ -300,6 +302,8 @@ def sum_signal_for_time_range(
     :rtype: xarray.core.dataarray.DataArray
     """
     sample_type = get_sample_file_type(base_filename)
+    base_path = get_filestore_path()
+    sample_path = parse_path_from_item_filename(base_filename, base_path)
 
     match sample_type:
         case "tof_zarr" | "orbi_zarr":
@@ -344,14 +348,15 @@ def sum_signal_for_time_range(
             if average:
                 sum_signal /= time_data_points
         case "orbi_raw":
-            base_path = get_filestore_path()
-            sample_path = parse_path_from_item_filename(base_filename, base_path)
             datafile_path = os.path.join(sample_path, "data.raw")
             sum_signal = thermo.compute_sum_signal_in_time_range(
                 datafile_path, t_min, t_max, average
             )
         case "tof_h5":
-            raise NotImplementedError
+            datafile_path = os.path.join(sample_path, "data.h5")
+            sum_signal = tofwerk.compute_sum_signal_in_time_range(
+                datafile_path, t_min, t_max, average
+            )
 
     return sum_signal
 
@@ -582,9 +587,8 @@ def load_signal(base_filename: str) -> xarray.Dataset:
             polarity = sample_path.split("_")[-1]
             return thermo.get_signal(datafile_path, polarity)
         case "tof_h5":
-            # TODO
             datafile_path = os.path.join(sample_path, "data.h5")
-            raise NotImplementedError
+            return tofwerk.get_signal(datafile_path)
 
 
 def load_file(base_filename, vars=None, prev_dataset=None):
