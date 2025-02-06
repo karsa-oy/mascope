@@ -7,52 +7,64 @@ Created on Tue Apr 09 13:08:29 2019
 @author: Oskari Kausiala
 """
 
+from datetime import datetime, timezone
 import os
-from multiprocessing import Event, Queue
+from pathlib import Path
+from random import sample
+import shutil
+from multiprocessing import Event, Queue, Lock
 from queue import Empty
 from threading import Thread
 from time import sleep
 
+import h5py
+
 from mascope_hardware.runtime import hardware_runtime
+from mascope_hardware.util import create_sample_file_db_record
+from mascope_lib.file_func import (
+    write_props,
+    load_file,
+    zarr_sdk,
+    get_filestore_path,
+    parse_path_from_item_filename,
+)
 
 
 def strip_filepath(filepath):
     """Strip path and file extension
 
-    Parameters
-    ----------
-    filepath : str
-        Full file path
-
-    Returns
-    -------
-    str
-        Base filename
+    :param filepath: Full file path
+    :type filepath: str
+    :return: Base filename
+    :rtype: str
     """
     return os.path.splitext(os.path.basename(filepath))[0]
 
 
-class BaseGenerator(Thread):
-    """Base class for TofDaqStreamer and H5Streamer to inherit common methods from."""
+class H5Processor(Thread):
+    """Read and process TOF h5 files"""
 
-    def __init__(self):
-        # Synchronization primitives
-        self.shutdown_event = Event()  # Set to break out from main loop
-        self.active = Event()  # TofDaqStreamer active event
-        self.cancel_event = Event()  # Cancel event
-        self.spec_queue = Queue()  # Signal output queue
-        # self.tps_queue = Queue()                # TPS output queue
-        # Per acquisition attributes
+    def __init__(
+        self, socket_client, file_queue=Queue(), shutdown_event=Event(), lock=Lock()
+    ):
+        Thread.__init__(self)
+        # Init logger
+        self.log = hardware_runtime.logger.bind(key=self.name)
+        self.log.info("H5Processor initialized")
+        self.socket_client = socket_client
+        self.file_queue = file_queue
+        self.shutdown_event = shutdown_event
+        self.lock = lock
+        self.cancel_event = Event()
+        self.active = Event()
+
+        self.h5 = None  # The h5 file reference
         self.filename = None  # Filename base from TW h5 file
         self.interval = None  # TofDaqStreamer interval [s]
-        self.length = None  # TofDaqStreamer length [s]
         self.sample_interval = None  # Tof sample interval [ns]
         self.single_ion_signal = None  # Single ion signal [mV*ns/ion]
         self.tof_frequency = None  # Tof frequency [Hz]
         self.tic = None  # Cumulative TIC
-        self.speci = -1  # Index of last received spectrum,
-        # -1 when there is no active acquisition
-        Thread.__init__(self)
 
     @property
     def conversion_coefficient(self):
@@ -64,36 +76,243 @@ class BaseGenerator(Thread):
         )
 
     @property
-    def progress(self):
-        # TofDaqStreamer progress
-        if not self.active.is_set():
-            return 100
-        n = self.desc.nbrWrites * self.desc.nbrBufs  # Total number of spectra
-        return ((self.speci + 1) / n) * 100.0  # [%]
+    def interval(self) -> float:
+        """Mean measurement interval in seconds, i.e. length of one spectrum in the sample
+
+        :return: Measurement interval [s]
+        :rtype: float
+        """
+        # TODO
+        return  # [s]
 
     @property
-    def tps_info(self):
-        """List of TPS  names"""
-        return self._get_tps_info()
+    def length(self) -> float:
+        """Length of the sample file in seconds
 
-    def _check(self):
-        """Check for state change
-
-        Returns
-        -------
-        int
-            State change: 2 new file, 1 new data, 0 nothing new
+        :return: Sample length [s]
+        :rtype: float
         """
-        curr_filename = strip_filepath(self.desc.currentDataFileName.decode())
-        if self.filename != curr_filename:
-            # New file
-            return 2
-        curr_speci = (self.desc.iWrite * self.desc.nbrBufs) + self.desc.iBuf
-        if self.speci < curr_speci:
-            # New data
-            return 1
-        # Nothing new
-        return 0
+        # TODO
+        return  # [s]
+
+    @property
+    def mz_range(self) -> list | None:
+        """M/z range of the sample file
+
+        :return: M/z range
+        :rtype: list | None
+        """
+        if self.h5:
+            # TODO
+            return
+        return None
+
+    def _finalize(self):
+        """Finalize acquisition"""
+        # Reset self
+        self.active.clear()
+        with self.lock:
+            self.h5.close()
+            self.h5 = None
+        self.cancel_event.clear()
+
+    def _process_h5_file(self, sample_file_props: dict, h5_filepath: str) -> bool:
+        """Main function processing the h5 files:
+        1. Writes properties into the sample file
+        2. Copies h5 file into the sample file folder
+        3. Creates sum_signal.zarr
+        4. Creates a record in the database
+
+        :param sample_file_props: Sample file properties
+        :type sample_file_props: dict
+        :param h5_filepath: H5 file full path
+        :type h5_filepath: str
+        """
+        base_path = get_filestore_path()
+        data_path = parse_path_from_item_filename(
+            sample_file_props["filename"], base_path
+        )
+
+        try:
+            # Create sample file directory
+            os.makedirs(data_path)
+
+            # Write properties to the sample_file
+            write_props(sample_file_props["filename"], sample_file_props)
+
+            # Copy h5 file to the sample_file folder
+            data_h5_path = os.path.join(data_path, "data.h5")
+            shutil.copy(h5_filepath, data_h5_path)
+
+            # Create sum_signal array
+            sample_file_data = load_file(sample_file_props["filename"], vars=[])
+            zarr_sdk.write_sum_signal_dataset(sample_file_data)
+
+            self._create_db_record(sample_file_props)
+
+            return True
+        except FileExistsError:
+            self.log.error(
+                f"Processing error: sample file {sample_file_props['filename']} already exists!"
+            )
+            return False
+        except Exception as e:
+            self.log.error(f"Processing error: {e}")
+            return False
+
+    def _create_db_record(self, sample_file_props: dict):
+        """
+        Creates a record in the database.
+
+        Requires file to be registered in the file converter service context.
+        Raises error if file context is not found.
+        """
+        try:
+            base_filename = os.path.basename(self.raw.FileName)
+            file_context = self.socket_client.context_manager.get_context(base_filename)
+            if file_context is None:
+                raise RuntimeError(
+                    f"File {base_filename} not registered in file converter service"
+                )
+
+            create_sample_file_db_record(
+                sample_file_props, access_token=file_context.access_token
+            )
+        except Exception as e:
+            self.log.error(f"Failed to create database record: {e}")
+
+    def run(self):
+        self.log.info(f"Running h5 processor ({self.name})")
+        # Main loop
+        while not self.shutdown_event.is_set():
+            try:
+                file_to_process = self.file_queue.get(timeout=0.1)
+                # Initialize h5 file reader
+                try:
+                    with self.lock:
+                        self.h5 = h5py.File(file_to_process, "r")
+                except Exception as e:
+                    self.log.error(f"Failed to open file {Path(file_to_process)}: {e}")
+                    continue
+            except Empty:
+                # No file to process, continue
+                continue
+
+            self.log.info(f"Processing file: {Path(file_to_process).name}")
+            # set active flag
+            self.active.set()
+
+            # Get UTC offset
+            now = datetime.now()
+            utc_offset = (
+                now - now.astimezone(timezone.utc).replace(tzinfo=None)
+            ).seconds
+
+            # TODO
+            # TODO How do we get polarity? How to calculate TICs?
+            # Get sample file properties
+            sample_file_props = {}
+
+            if_processed = self._process_h5_file(sample_file_props, file_to_process)
+
+            self._finalize()
+            self.log.info(f"Finished processing file: {Path(file_to_process).name}")
+
+            if if_processed:
+                self.log.info("Deleting file from the streams folder")
+                try:
+                    os.remove(file_to_process)
+                except FileNotFoundError:
+                    self.log.error(
+                        f"Failed to delete file {file_to_process} from streams folder"
+                    )
+                    self.log.exception(e)
+
+        # Out of main loop
+        self.log.info(f"Exiting h5 processor ({self.name})")
+        self.shutdown()
+
+    def shutdown(self):
+        """Shutdown procedure"""
+        self.shutdown_event.set()
+
+    def start_stream(self, filename: str):
+        """Method to call externally, to start processing a file
+
+        Alternative to directly putting a file into `self.file_queue`
+
+        :param filename: Full path to the file to be streamed
+        :type filename: str
+        :raises ValueError: If file is not found
+        """
+        if os.path.isfile(filename):
+            self.file_queue.put(filename)
+        else:
+            raise ValueError(f"File does not exist: {filename}")
+
+
+class BaseGenerator(Thread):
+    """Base class for TofDaqStreamer and H5Streamer to inherit common methods from."""
+
+    # def __init__(self):
+    #     # Synchronization primitives
+    #     self.shutdown_event = Event()  # Set to break out from main loop
+    #     self.active = Event()  # TofDaqStreamer active event
+    #     self.cancel_event = Event()  # Cancel event
+    #     self.spec_queue = Queue()  # Signal output queue
+    #     # self.tps_queue = Queue()                # TPS output queue
+    #     # Per acquisition attributes
+    #     self.filename = None  # Filename base from TW h5 file
+    #     self.interval = None  # TofDaqStreamer interval [s]
+    #     self.length = None  # TofDaqStreamer length [s]
+    #     self.sample_interval = None  # Tof sample interval [ns]
+    #     self.single_ion_signal = None  # Single ion signal [mV*ns/ion]
+    #     self.tof_frequency = None  # Tof frequency [Hz]
+    #     self.tic = None  # Cumulative TIC
+    #     self.speci = -1  # Index of last received spectrum,
+    #     # -1 when there is no active acquisition
+    #     Thread.__init__(self)
+
+    # @property
+    # def conversion_coefficient(self):
+    #     """Coefficient to convert signal intensity from [mV/ext] -> [ions/sec]"""
+    #     return (
+    #         self.interval
+    #         * (self.sample_interval * self.tof_frequency)
+    #         / self.single_ion_signal
+    #     )
+
+    # @property
+    # def progress(self):
+    #     # TofDaqStreamer progress
+    #     if not self.active.is_set():
+    #         return 100
+    #     n = self.desc.nbrWrites * self.desc.nbrBufs  # Total number of spectra
+    #     return ((self.speci + 1) / n) * 100.0  # [%]
+
+    # @property
+    # def tps_info(self):
+    #     """List of TPS  names"""
+    #     return self._get_tps_info()
+
+    # def _check(self):
+    #     """Check for state change
+
+    #     Returns
+    #     -------
+    #     int
+    #         State change: 2 new file, 1 new data, 0 nothing new
+    #     """
+    #     curr_filename = strip_filepath(self.desc.currentDataFileName.decode())
+    #     if self.filename != curr_filename:
+    #         # New file
+    #         return 2
+    #     curr_speci = (self.desc.iWrite * self.desc.nbrBufs) + self.desc.iBuf
+    #     if self.speci < curr_speci:
+    #         # New data
+    #         return 1
+    #     # Nothing new
+    #     return 0
 
     def _feed_coordinates(self):
         coordinates = {
