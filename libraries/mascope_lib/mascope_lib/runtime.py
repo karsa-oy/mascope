@@ -1,3 +1,7 @@
+import mascope_hardware.runtime as hardware_runtime
+
+hardware_runtime.init()
+
 from mascope_runtime import MascopeRuntimeModule
 
 
