@@ -30,22 +30,6 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
 
   const instrument = computed(() => sample.focused.instrument)
   const instrumentType = computed(() => getInstrumentType(sample.focused.instrument))
-  const ionScored = computed(() => {
-    if (!matchParams.ui) {
-      return null
-    }
-    let match_category = 0
-    if (ion.value.match_score > matchParams.ui.possible_match_threshold) {
-      match_category = 1
-    }
-    if (ion.value.match_score > matchParams.ui.probable_match_threshold) {
-      match_category = 2
-    }
-    return {
-      ...ion.value,
-      match_category
-    }
-  })
 
   // actions
   /**
@@ -173,7 +157,6 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
   return {
     // state
     ion,
-    ionScored,
     isotopes,
     instrument,
     instrumentType,

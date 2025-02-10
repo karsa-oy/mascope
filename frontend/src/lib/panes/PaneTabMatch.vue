@@ -21,6 +21,15 @@ const settings = reactive({
   intensityScale: null,
   yMode: 'sum'
 })
+
+// recompute match category with the UI's param state
+const uiScoredIon = computed(() => {
+  const ion = app.data.match.visualized.ion
+  return {
+    ...ion,
+    match_category: app.data.match.params.uiCategory(ion)
+  }
+})
 </script>
 
 <template>
@@ -33,7 +42,7 @@ const settings = reactive({
   >
     <ScrollPanel style="height: calc(100vh - 150px); width: calc(100%-6rem)">
       <h1 style="text-align: center">
-        <BaseMatchTag :row="app.data.match.visualized.ionScored" :style="'font-size: large'" />
+        <BaseMatchTag :row="uiScoredIon" :style="'font-size: large'" />
         match: ion <i>{{ app.data.match.visualized.ion?.target_ion_formula }}</i>
         for
         <i>{{ app.data.match.visualized.ion?.sample_item_name }}</i> with target

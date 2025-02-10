@@ -58,14 +58,8 @@ const isotopeCharts = computed(() => {
         ? nextStart // use it as the end of isotope trace data
         : traces?.length // otherwise use all remaining data
     const isotopeTraces = traces.value?.slice(start, end)
-    // compute match category for this isotope
-    let match_category = 0
-    if (isotope.match_score > app.data.match.params.ui.possible_match_threshold) {
-      match_category = 1
-    }
-    if (isotope.match_score > app.data.match.params.ui.probable_match_threshold) {
-      match_category = 2
-    }
+    // compute match category with UI match params
+    const match_category = app.data.match.params.uiCategory(isotope)
     // return chart data
     return {
       // all match isotope fields

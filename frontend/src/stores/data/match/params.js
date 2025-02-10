@@ -102,6 +102,21 @@ export const useMatchParams = defineStore('app.data.match.params', () => {
     await matchVisualized.reload({ init: true })
   }
 
+  // compute match category using UI param values
+  function uiCategory(record) {
+    if (!ui.value) {
+      return record.match_category
+    }
+    let match_category = 0
+    if (record.match_score > ui.value.possible_match_threshold) {
+      match_category = 1
+    }
+    if (record.match_score > ui.value.probable_match_threshold) {
+      match_category = 2
+    }
+    return match_category
+  }
+
   return {
     ui,
     db,
@@ -111,6 +126,7 @@ export const useMatchParams = defineStore('app.data.match.params', () => {
     reset,
     revert,
     save,
-    remove
+    remove,
+    uiCategory
   }
 })

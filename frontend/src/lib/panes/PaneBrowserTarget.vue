@@ -80,11 +80,7 @@ const tree = computed(() =>
           .map((ion) => ({
             ...ion,
             // isotopes
-            children: app.data.match.isotope.list.filter(
-              // the isotope level is atypical so we need to manually
-              // construct the parent key
-              (iso) => iso.parent_key == `${ion.target_collection_id}__${ion.target_ion_id}`
-            )
+            children: app.data.match.isotope.list.filter((iso) => iso.parent_key == ion.match_key)
           }))
       }))
   }))
