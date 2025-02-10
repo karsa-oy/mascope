@@ -60,30 +60,20 @@ class H5Processor(Thread):
 
         self.h5 = None  # The h5 file reference
         self.filename = None  # Filename base from TW h5 file
-        self.interval = None  # TofDaqStreamer interval [s]
-        self.sample_interval = None  # Tof sample interval [ns]
-        self.single_ion_signal = None  # Single ion signal [mV*ns/ion]
-        self.tof_frequency = None  # Tof frequency [Hz]
-        self.tic = None  # Cumulative TIC
 
     @property
-    def conversion_coefficient(self):
-        """Coefficient to convert signal intensity from [mV/ext] -> [ions/sec]"""
-        return (
-            self.interval
-            * (self.sample_interval * self.tof_frequency)
-            / self.single_ion_signal
-        )
-
-    @property
-    def interval(self) -> float:
+    def interval(self) -> float | None:
         """Mean measurement interval in seconds, i.e. length of one spectrum in the sample
 
         :return: Measurement interval [s]
         :rtype: float
         """
-        # TODO
-        return  # [s]
+        if self.h5:
+            # Get total number of timestamps/scans
+            n_scans = self.h5.attrs["NbrBufs"] * self.h5.attrs["NbrWrites"]
+            # Return mean difference between timestamps
+            return self.length / n_scans  # [s]
+        return None
 
     @property
     def length(self) -> float:
@@ -92,8 +82,14 @@ class H5Processor(Thread):
         :return: Sample length [s]
         :rtype: float
         """
-        # TODO
-        return  # [s]
+        if self.h5:
+            # Get timestamp reference and retrieve first and last values
+            timestamps = self.h5["TimingData"]["BufTimes"]
+            t_first = timestamps[0, 0]
+            t_last = timestamps[-1, -1]
+            # Return difference between first and last timestamp as total length
+            return t_last - t_first  # [s]
+        return None
 
     @property
     def mz_range(self) -> list | None:
@@ -103,8 +99,84 @@ class H5Processor(Thread):
         :rtype: list | None
         """
         if self.h5:
-            # TODO
-            return
+            # Return a list of 1st and last m/z values
+            return self.h5["FullSpectra"]["MassAxis"][[0, -1]].tolist()
+        return None
+
+    @property
+    def polarity(self) -> str | None:
+        """Polarity of the sample file
+
+        :return: polarity as a string
+        :rtype: str | None
+        """
+        if self.h5:
+            return "-" if self.h5.attrs["IonMode"] == "negative" else "+"
+        return None
+
+    @property
+    def single_ion_signal(self) -> float | None:
+        """Single ion signal [mV*ns/ion]
+
+        :return: Single ion signal [mV*ns/ion]
+        :rtype: float
+        """
+        if self.h5:
+            return self.h5["FullSpectra"].attrs["Single Ion Signal"][0]
+        return None
+
+    @property
+    def sample_interval(self) -> float | None:
+        """Sample interval in nanoseconds
+
+        :return: Sample interval [ns]
+        :rtype: float
+        """
+        if self.h5:
+            return self.h5["FullSpectra"].attrs["SampleInterval"][0] * 1e9  # [s]->[ns]
+        return None
+
+    @property
+    def tic(self) -> float | None:
+        """Total Ion Current (TIC) of the sample file
+
+        :return: TIC
+        :rtype: float
+        """
+        if self.h5:
+            # TOF frequency [Hz] (1/TOF period)
+            tof_frequency = 1 / self.h5["TimingData"].attrs["TofPeriod"][0]
+            # Coefficient to convert signal intensity from [mV/ext] -> [ions/sec]
+            conversion_coef = (
+                self.interval
+                * (self.sample_interval * tof_frequency)
+                / self.single_ion_signal
+            )
+            return (
+                self.h5["FullSpectra"]["SumSpectrum"][:].sum() * conversion_coef
+            )  # [mV/ext] -> [ions/sec]
+        return None
+
+    @property
+    def mass_calibration(self) -> dict | None:
+        """Mass calibration properties
+
+        :return: Mass calibration properties
+        :rtype: dict
+        """
+        if self.h5:
+            # Get FullSpectra attributes reference
+            attrs = self.h5["FullSpectra"].attrs
+            # Number of mass calibration parameters
+            num_params = attrs["MassCalibration nbrParameters"][0]
+            # Get mass calibration parameters
+            mass_calib_params = [
+                attrs[f"MassCalibration p{i+1}"][0] for i in range(num_params)
+            ]
+            return {
+                "mode": attrs["MassCalibMode"][0],
+                "par": mass_calib_params,
+            }
         return None
 
     def _finalize(self):
@@ -114,6 +186,7 @@ class H5Processor(Thread):
         with self.lock:
             self.h5.close()
             self.h5 = None
+            self.filename = None
         self.cancel_event.clear()
 
     def _process_h5_file(self, sample_file_props: dict, h5_filepath: str) -> bool:
@@ -198,7 +271,9 @@ class H5Processor(Thread):
                 # No file to process, continue
                 continue
 
-            self.log.info(f"Processing file: {Path(file_to_process).name}")
+            # Get filename
+            self.filename = Path(file_to_process).name
+            self.log.info(f"Processing file: {self.filename}")
             # set active flag
             self.active.set()
 
@@ -208,10 +283,21 @@ class H5Processor(Thread):
                 now - now.astimezone(timezone.utc).replace(tzinfo=None)
             ).seconds
 
-            # TODO
-            # TODO How do we get polarity? How to calculate TICs?
             # Get sample file properties
-            sample_file_props = {}
+            sample_file_props = {
+                "filename": self.filename,
+                "length": self.length,
+                "committed_length": self.length,
+                "range": self.mz_range,
+                "polarity": self.polarity,
+                "single_ion_signal": self.single_ion_signal,
+                "sample_interval": self.sample_interval,
+                "tic": self.tic,
+                "mass_calibration": self.mass_calibration,
+                "utc_offset": utc_offset,
+                # Not applicable for TOF
+                "method_file": None,
+            }
 
             if_processed = self._process_h5_file(sample_file_props, file_to_process)
 
