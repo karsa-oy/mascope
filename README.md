@@ -13,7 +13,7 @@ All developer docs are in this document:
 - **[🤖 Agents](#agents)** - instrument agents - [file mover](#file-mover) / [tof agent](#tof-agent)
 - **[📡 Backend](#backend)** - central server - [api](#backend-api) / [auth](#backend-auth) / [app](#backend-app) / [db](#backend-db) / [file converter](#backend-file-converter)
 - **[🖥️ Frontend](#frontend)** - user interface - [tech](#frontend-technologies) / [development](#frontend-development) / [codebase](#frontend-codebase) / [api client](#frontend-api-client) / [stores](#frontend-stores) / [help mode](#frontend-user-help) / [tests](#frontend-tests)
-- **[📚 Libraries](#libraries)** - shared packages - [mascope_api](#mascope-api) / [mascope_hardware](#mascope-hardware) / [mascope_lib](#mascope-lib)
+- **[📚 Libraries](#libraries)** - shared packages - [mascope_sdk](#mascope-sdk) / [mascope_hardware](#mascope-hardware) / [mascope_lib](#mascope-lib)
 - **[📒 Notebooks](#notebooks)** - jupyter environment
 - **[📄 Documentation](#documentation)** - about the docs
 
@@ -482,7 +482,7 @@ The JWT secret key in production is stored at `${MASCOPE_PATH}/secrets/jwt_secre
 
 #### Access Token authentication
 
-To enable authenticated access for external applications, such as Jupyter servers and the public `mascope_api` library, **Access Token-based authentication** is implemented.
+To enable authenticated access for external applications, such as Jupyter servers and the public `mascope_sdk` library, **Access Token-based authentication** is implemented.
 
 - **Access Tokens**:
   - Stored in the database and linked to a user via the `AccessToken` model.
@@ -493,7 +493,7 @@ To enable authenticated access for external applications, such as Jupyter server
   - The authentication system dynamically selects the appropriate backend (`auth_backend_access_token`) for such requests.
 - **Use cases**:
   - Jupyter server integration, where tokens are passed via the `Authorization` header (`Bearer <access_token>`).
-  - Public libraries like `mascope_api` that rely on external access.
+  - Public libraries like `mascope_sdk` that rely on external access.
 
 #### Authorization
 
@@ -679,9 +679,8 @@ In order to facilitate ergonomic development with the our standard test dataset,
 [frontend]
 acquisition_filter = { min = '2022' }
 ```
+
 You can also set a `max` if necessary, and you can provide any date string parsable by the [Javascript `Date` constructor](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date/Date), e.g. `2023-05-23` or `2025-01-27T19:14`.
-
-
 
 ### Frontend Codebase
 
@@ -1144,18 +1143,18 @@ Javascript). In addition to the three libraries listed here, the [Runtime Librar
 
 ```
   libraries/       Shared libraries
-    mascope_api/        Public REST API wrapper
+    mascope_sdk/        Public REST API wrapper
     mascope_hardware/   Instrument interfaces
     mascope_lib/        Chemistry and signal processing
 ```
 
-### Mascope API
+### Mascope SDK
 
 This library exposes a public Python SDK for end-users to leverage especially in Jupyter notebooks.
 
 ### Mascope Hardware
 
-This library exposes interfaces to proprietary mass spectroscapy instruments.
+This library exposes interfaces to proprietary mass spectroscopy instruments.
 
 Before importing anything else, you must initialize the library:
 

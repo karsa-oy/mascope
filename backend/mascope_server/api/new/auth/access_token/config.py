@@ -13,7 +13,7 @@ class AccessTokenConfig(BaseModel):
 
     # Allowed services for access tokens
     ALLOWED_SERVICES: List[str] = [
-        "mascope_api",  # for Jupyter notebooks API library
+        "mascope_sdk",  # for Jupyter notebooks API library
         "file-converter",  # for file converter service
         "tof-agent",  # for TOF-instrument agent
     ]

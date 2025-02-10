@@ -40,13 +40,13 @@ async def alter_access_token_table():
         )
         existing_tokens = tokens_query.all()
 
-        # Store the token data, set existing service_name to 'mascope_api'
+        # Store the token data, set existing service_name to 'mascope_sdk'
         token_data = [
             {
                 "token": token.token,
                 "user_id": token.user_id,
                 "created_at": token.created_at,
-                "service_name": "mascope_api",
+                "service_name": "mascope_sdk",
             }
             for token in existing_tokens
         ]

@@ -29,7 +29,7 @@ def api_get(url: str, path: str, access_token: str, params: dict = None):
     try:
         headers = {
             "Authorization": f"Bearer {access_token}",
-            "X-Service-Name": "mascope_api",
+            "X-Service-Name": "mascope_sdk",
         }
 
         # Send GET request with query parameters (if provided)
@@ -95,7 +95,7 @@ def api_post(url: str, path: str, access_token: str, data: dict):
     try:
         headers = {
             "Authorization": f"Bearer {access_token}",
-            "X-Service-Name": "mascope_api",
+            "X-Service-Name": "mascope_sdk",
         }
         resp = requests.post(
             full_url, data=json.dumps(data), headers=headers, verify=False, timeout=30

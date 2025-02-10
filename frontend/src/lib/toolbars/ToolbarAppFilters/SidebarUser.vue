@@ -25,7 +25,7 @@ const dialog = reactive({
 // API Token Management
 const SERVICE_CONFIGS = [
   {
-    id: 'mascope_api', // used for both internal reference in selectedTokenType and API requests for packages
+    id: 'mascope_sdk', // used for both internal reference in selectedTokenType and API requests for packages
     label: 'Jupyter Notebooks',
     minRole: 100 // guest role_id
   },
@@ -37,7 +37,7 @@ const SERVICE_CONFIGS = [
 ]
 
 const token = ref(null)
-const selectedTokenType = ref('mascope_api')
+const selectedTokenType = ref('mascope_sdk')
 
 const currentServiceConfig = computed(() =>
   SERVICE_CONFIGS.find((c) => c.id === selectedTokenType.value)
@@ -76,7 +76,7 @@ const regenerateToken = async () => {
 // Clear state when closing drawer
 const clear = () => {
   token.value = null
-  selectedTokenType.value = 'mascope_api'
+  selectedTokenType.value = 'mascope_sdk'
 }
 
 // Watch drawer visibility to clear state

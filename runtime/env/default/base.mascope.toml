@@ -118,6 +118,6 @@ tofwerk_dll = 'Auto'
 
 [api-lib]
 # meta
-pkg_path = './libraries/mascope_api'
+pkg_path = './libraries/mascope_sdk'
 tags = ['lib']
 log_path = './logs'

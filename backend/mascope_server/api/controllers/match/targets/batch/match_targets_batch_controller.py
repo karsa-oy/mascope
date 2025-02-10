@@ -46,7 +46,7 @@ async def get_batch_data(
     compounds, ions, isotopes, match interferences, and samples, optionally applying deduplication
     based on collection priority.
 
-    This function is used in the `mascope_api` library, serving as a wrapper for Jupyter
+    This function is used in the `mascope_sdk` library, serving as a wrapper for Jupyter
     notebooks, enabling easy retrieval of batch match data in batch selector widgets.
 
     Steps:

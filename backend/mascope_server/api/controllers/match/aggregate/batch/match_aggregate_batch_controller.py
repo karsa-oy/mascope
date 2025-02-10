@@ -17,7 +17,7 @@ async def get_batch_and_aggregated_matches(
 ) -> dict:
     """
     Retrieves detailed information for a specific sample batch, including aggregated match data for isotopes, ions,
-    compounds. This function is used in the `mascope_api` wrapper for Jupyter notebooks to load
+    compounds. This function is used in the `mascope_sdk` wrapper for Jupyter notebooks to load
     the batch match data get_sample_batch_data_new, that is used in the batch selector widget.
 
     Steps:

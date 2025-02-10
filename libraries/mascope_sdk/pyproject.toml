@@ -1,0 +1,40 @@
+[project]
+name = "mascope_sdk"
+description = "Mascope's public SDK library, wrapping the app's REST API."
+classifiers = [
+    "Topic :: Scientific/Engineering :: Atmospheric Science",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+authors = [
+    { name = "Oskari Kausiala", email = "oskari.kausiala@karsa.fi>" },
+    { name = "Philip Chernonog", email = "philip.chernonog@karsa.fi>" },
+    ]
+maintainers = [
+    { name = "Oskari Kausiala", email = "oskari.kausiala@karsa.fi>" },
+    { name = "Philip Chernonog", email = "philip.chernonog@karsa.fi>" },
+    ]
+license = { text = "GPL-3.0-or-later" }
+readme = "README.md"
+requires-python = ">=3.8"
+version = "0.1.0"
+
+[project.urls]
+homepage = "https://karsa.fi/"
+repository = "https://github.com/Karsa-Oy/Mascope"
+documentation = "https://github.com/Karsa-Oy/Mascope"
+"Bug Tracker" = "https://github.com/Karsa-Oy/Mascope/issues"
+
+[tool.poetry]
+packages = [{ include = "mascope_sdk.py" }]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.dependencies]
+python = ">=3.8"
+
+requests = "^2.32"
+
+[tool.poetry.group.dev.dependencies]
+deptry = "^0.16"

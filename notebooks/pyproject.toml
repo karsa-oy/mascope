@@ -4,6 +4,7 @@ version = "1.2"
 description = "Karsa Mascope"
 authors = ["Karsa Oy <support@karsa.fi>"]
 license = "Proprietary"
+package-mode = false
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
@@ -16,7 +17,7 @@ jupyterlab = '~4.2'
 mascope_server = { path = '../backend/', develop = true }
 mascope_lib = { path = '../libraries/mascope_lib/', develop = true }
 mascope_hardware = { path = '../libraries/mascope_hardware/', develop = true }
-mascope_api = { path = '../libraries/mascope_api/', develop = true }
+mascope_sdk = { path = '../libraries/mascope_sdk/', develop = true }
 
 ipywidgets = "^8.1"
 lmfit = "^1.3"

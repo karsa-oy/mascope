@@ -208,7 +208,7 @@ async def get_batch_and_aggregated_matches_route(
     user=Depends(guest_user),
 ):
     """Retrieve all batch and aggregated match data for a sample batch.
-    May be used in the mascope_api lib for Jypter server.
+    May be used in the mascope_sdk lib for Jypter server.
 
     :param sample_batch_id: The unique identifier of the sample batch.
     :type sample_batch_id: str

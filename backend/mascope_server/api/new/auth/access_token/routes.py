@@ -23,13 +23,13 @@ async def access_token_regenerate_route(
     Removes existing tokens for the service and generates a new one.
 
     Different services require different minimum roles:
-    - mascope_api: guest or higher - for Jupyter access
+    - mascope_sdk: guest or higher - for Jupyter access
     - tof-agent: editor or higher - for TOF agent access
     - file-converter: internal service, managed automatically
     """
     service_name = access_token_request.service_name
 
-    if service_name == "mascope_api":
+    if service_name == "mascope_sdk":
         await role_based_access(user, "guest")
     elif service_name == "tof-agent":
         await role_based_access(user, "editor")

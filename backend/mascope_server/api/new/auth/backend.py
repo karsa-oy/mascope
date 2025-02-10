@@ -3,7 +3,7 @@ Authentication backend configuration for Mascope Server.
 
 This file configures the authentication backends used in the FastAPI Users implementation.
 It defines the cookie transport and JWT strategy for mascope web-based interface, 
-and bearer transport with database access tokens for the mascope_api jupyter library authentication.
+and bearer transport with database access tokens for the mascope_sdk jupyter library authentication.
 """
 
 from rich.pretty import pretty_repr
@@ -70,7 +70,7 @@ async def get_enabled_backends(request: Request) -> list[AuthenticationBackend]:
         runtime.logger.debug("Using web application authentication.")
         return [auth_backend_jwt]
 
-    # Access token-based authentication(mascope_api Jupyter lib, file_converter service, tof-agent)
+    # Access token-based authentication(mascope_sdk Jupyter lib, file_converter service, tof-agent)
     if auth_header and not cookie_auth:
         token = auth_header.split(" ")[1]
         token_service_name = await get_token_service(token)

@@ -10,7 +10,7 @@ import socketio
 
 
 from mascope_runtime import MascopeRuntimeModule
-from mascope_api import api_post_file
+from mascope_sdk import api_post_file
 from mascope_hardware.runtime import init as init_hardware_runtime
 
 
