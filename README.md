@@ -1152,6 +1152,41 @@ Javascript). In addition to the three libraries listed here, the [Runtime Librar
 
 This library exposes a public Python SDK for end-users to leverage especially in Jupyter notebooks.
 
+#### Test publish
+
+To make a test publish in [Test Python Package Index (TestPyPI)](https://test.pypi.org/), you need to register an account, generate an API token and then configure the `test-pypi` repository in `poetry`:
+
+```sh
+poetry config repositories.test-pypi https://test.pypi.org/legacy/
+poetry config pypi-token.test-pypi <YOUR-API-TOKEN>
+```
+
+Once configured, to make a test publish, run the following commands:
+
+```sh
+poetry version patch            # Bump version number (<major>.<minor>.<patch>)
+poetry build                    # Build distributable
+poetry publish -r test-pypi     # Publish in PyPI
+```
+
+To verify that the publish worked as expected, run the Powershell script `/libraries/mascope_sdk/tests/test_install.ps1`. It will create a virtual environment, install the `mascope_sdk` package from TestPyPI and run `/libraries/mascope_sdk/tests/test_import.py`. You should see the package version number printed in the terminal.
+
+#### Publish
+
+To publish the package in the _real_ [Python Package Index (PyPI)](https://pypi.org/), you need to register an account, generate an API token and add it in `poetry` config:
+
+```sh
+poetry config pypi-token.pypi <YOUR-API-TOKEN>
+```
+
+To publish the package, run the following commands:
+
+```sh
+(poetry version patch)  # Bump version number (<major>.<minor>.<patch>)
+poetry build            # Build distributable
+poetry publish          # Publish in PyPI
+```
+
 ### Mascope Hardware
 
 This library exposes interfaces to proprietary mass spectroscopy instruments.
