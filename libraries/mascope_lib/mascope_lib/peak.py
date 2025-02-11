@@ -5,8 +5,10 @@ Created on Wed Apr 17 13:45:17 2019
 
 @author: Oskari Kausiala
 """
+
 import asyncio
 import os
+import math
 from concurrent.futures import ProcessPoolExecutor
 
 import lmfit
@@ -206,7 +208,7 @@ async def detect_peaks(
         lib_runtime.logger.info("Nothing to fit")
         return sample_file_data
 
-    lib_runtime.logger.info(f"Fitting unit masses: {u_list}")
+    lib_runtime.logger.info(f"Fitting {len(u_list)} unit masses")
 
     sum_signal = get_sum_signal(filename)
     # Sample interval for peak area calculation in counts vs TOF
@@ -270,11 +272,16 @@ async def detect_peaks(
     ]
 
     new_peaks = []
+    last_progress = None
     for i, future in enumerate(asyncio.as_completed(futures)):
         fit, peaks = await future
         if fit:
             new_peaks.extend(peaks)
-        lib_runtime.logger.info(f"Peak detection progress: {(i+1)/len(futures):.2f}")
+        progress = 100 * (i + 1) / len(futures)
+        rounded_progress = math.floor(progress / 10) * 10
+        if rounded_progress != last_progress:
+            lib_runtime.logger.info(f"Peak detection progress: {rounded_progress}%")
+        last_progress = rounded_progress
     executor.shutdown()
 
     if len(new_peaks) > 0:
