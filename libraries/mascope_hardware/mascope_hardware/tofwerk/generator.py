@@ -237,20 +237,18 @@ class H5Processor(Thread):
             return False
 
     def _create_db_record(self, sample_file_props: dict):
-        """
-        Creates a record in the database.
+        """Create a record in the database
 
-        Requires file to be registered in the file converter service context.
-        Raises error if file context is not found.
+        :param sample_file_props: Sample file properties
+        :type sample_file_props: dict
         """
         try:
-            base_filename = os.path.basename(self.raw.FileName)
+            base_filename = Path(self.file_to_process).name
             file_context = self.socket_client.context_manager.get_context(base_filename)
             if file_context is None:
                 raise RuntimeError(
                     f"File {base_filename} not registered in file converter service"
                 )
-
             create_sample_file_db_record(
                 sample_file_props, access_token=file_context.access_token
             )
