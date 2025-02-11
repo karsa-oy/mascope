@@ -47,8 +47,7 @@ const title = computed(() => {
 })
 const checklistEnabled = computed(() => {
   const possibleMatch =
-    app.data.match.visualized.ion.match_score >=
-    app.data.match.params.current.possible_match_threshold
+    app.data.match.visualized.ion.match_score >= app.data.match.params.ui.possible_match_threshold
   return (
     (props.rating === '0' && possibleMatch) ||
     props.rating === '1' ||
@@ -67,38 +66,37 @@ const invalid = computed(
 const isotopes = computed(() =>
   app.data.match.visualized.isotopes.map((isotope) => {
     let failures = []
-    if (Math.abs(isotope.match_mz_error) > app.data.match.params.current.mz_tolerance) {
+    if (Math.abs(isotope.match_mz_error) > app.data.match.params.ui.mz_tolerance) {
       failures.push({
         filter: 'm/z tolerance',
         message: `Isotope m/z error is ${isotope.match_mz_error.toFixed(3)}`,
-        threshold: app.data.match.params.current.mz_tolerance
+        threshold: app.data.match.params.ui.mz_tolerance
       })
     }
     if (
-      Math.abs(isotope.match_abundance_error) >
-      app.data.match.params.current.isotope_ratio_tolerance
+      Math.abs(isotope.match_abundance_error) > app.data.match.params.ui.isotope_ratio_tolerance
     ) {
       failures.push({
         filter: 'Isotope ratio tolerance',
         message: `Match abundance error is ${isotope.match_abundance_error.toFixed(3)}`,
-        threshold: app.data.match.params.current.isotope_ratio_tolerance
+        threshold: app.data.match.params.ui.isotope_ratio_tolerance
       })
     }
-    if (isotope.sample_peak_area < app.data.match.params.current.peak_min_intensity) {
+    if (isotope.sample_peak_area < app.data.match.params.ui.peak_min_intensity) {
       failures.push({
         filter: 'Minimum peak intensity',
         message: `Sample peak area is ${isotope.sample_peak_area.toFixed(3)}`,
-        threshold: app.data.match.params.current.peak_min_intensity
+        threshold: app.data.match.params.ui.peak_min_intensity
       })
     }
     if (
       Math.max(isotope.match_isotope_correlation, 0) <
-      app.data.match.params.current.min_isotope_correlation
+      app.data.match.params.ui.min_isotope_correlation
     ) {
       failures.push({
         filter: 'Minimum isotope correlation',
         isotopeValue: `Match isotope correlation is ${isotope.match_isotope_correlation.toFixed(3)}`,
-        threshold: app.data.match.params.current.min_isotope_correlation
+        threshold: app.data.match.params.ui.min_isotope_correlation
       })
     }
     return { ...isotope, failures, failure_count: failures.length }

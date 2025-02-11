@@ -41,7 +41,7 @@ async function submitRating(rating) {
  */
 async function processRatingSubmission(rating) {
   const matchScore = app.data.match.visualized.ion.match_score
-  const possibleMatch = matchScore >= app.data.match.params.current.possible_match_threshold
+  const possibleMatch = matchScore >= app.data.match.params.ui.possible_match_threshold
 
   if (rating === 1 || (rating === 0 && possibleMatch) || (rating === 2 && !possibleMatch)) {
     dialog.rating = rating
@@ -75,18 +75,12 @@ function handleUnsavedMatchParams() {
     header: 'Unsaved match settings',
     message:
       'You have unsaved changes in your match isotope/peak parameters. Please save or discard them before submitting a rating.',
-    accept: async () => {
-      await app.data.match.params.save()
-      await app.data.match.visualized.reset()
-    },
+    accept: app.data.match.params.save,
     acceptProps: {
       icon: 'pi pi-save',
       label: 'Save changes'
     },
-    reject: async () => {
-      await app.data.match.params.reset()
-      await app.data.match.visualized.reset()
-    },
+    reject: app.data.match.params.revert,
     rejectProps: {
       icon: 'pi pi-times',
       label: 'Discard changes',

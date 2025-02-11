@@ -92,7 +92,7 @@ const corr = new Intl.NumberFormat('en-US', {
         :value="corr.format(app.data.match.visualized.isotopes[0].match_isotope_correlation)"
         :severity="
           Math.abs(app.data.match.visualized.isotopes[0].match_isotope_correlation) >
-          app.data.match.params.current.min_isotope_correlation
+          app.data.match.params.ui.min_isotope_correlation
             ? 'info'
             : 'warn'
         "

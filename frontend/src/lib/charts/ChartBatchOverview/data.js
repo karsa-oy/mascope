@@ -182,7 +182,7 @@ export const useChartData = defineStore('chart.batch.overview', () => {
               ? target_compound_name
               : target_compound_formula
             name = `${compound_prefix}: ${target_ion_formula}`
-            match_key = `${target_collection_id}_${target_compound_id}_${target_ion_id}`
+            match_key = `${target_collection_id}_${target_ion_id}`
             all_matches = [...app.data.match.ion.list]
             break
           }

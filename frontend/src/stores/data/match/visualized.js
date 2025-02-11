@@ -2,7 +2,7 @@ import { ref, computed, reactive, watch } from 'vue'
 import { defineStore } from 'pinia'
 
 import { api } from '@/api'
-import { debounce } from '@/lib/utils'
+import { debounce, instrumentType as getInstrumentType } from '@/lib/utils'
 
 import { useUi } from '@/stores/ui'
 
@@ -29,6 +29,7 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
   })
 
   const instrument = computed(() => sample.focused.instrument)
+  const instrumentType = computed(() => getInstrumentType(sample.focused.instrument))
 
   // actions
   /**
@@ -65,22 +66,11 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
 
     // Reset filter parameters if the sample has changed and no new filter_parames to set are provided
     if (sampleChanged && !ionMatchParams) {
-      await matchParams.reset({
-        instrument: instrument.value
-      })
-    }
-
-    // Apply new filter parameters if provided
-    if (ionMatchParams) {
-      await matchParams.init({
-        params: ionMatchParams,
-        instrument: instrument.value
-      })
+      matchParams.set()
     }
 
     // Load matches and activate visualization
-    await loadMatches({ sampleId, ionId, collectionId })
-    await activate({ sampleId, ionId })
+    await load({ sampleId, ionId, collectionId, init: true })
 
     // Update cache to reflect the new state
     cache.sampleId = sampleId
@@ -88,29 +78,26 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
     cache.collectionId = collectionId
   }
 
-  async function reset() {
-    await loadMatches()
-    await activate()
+  async function reload({ init } = { init: false }) {
+    await load({ init })
   }
 
-  async function unset({ cacheSample = false, cacheTarget = false } = {}) {
+  async function clear() {
     if (!ion.value) {
       return
     }
     ui.chart.clear()
-    if (!ion.value) return
+    // reset values
     ion.value = null
     isotopes.value = null
-    if (!cacheSample) {
-      cache.sampleId = null
-    }
-    if (!cacheTarget) {
-      cache.ionId = null
-      cache.collectionId = null
-    }
+    // clear cache
+    cache.sampleId = null
+    cache.ionId = null
+    cache.collectionId = null
   }
 
-  async function loadMatches({ sampleId, ionId, collectionId } = {}) {
+  async function load({ sampleId, ionId, collectionId, init } = { init: true }) {
+    // load matches
     const target_ion_id = ionId ?? ion.value?.target_ion_id
     if (!target_ion_id) return
     const sampleIon = await api.http.post(
@@ -118,44 +105,30 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
       {
         target_ion_id,
         target_collection_id: collectionId ?? ion.value?.target_collection_id,
-        match_params: matchParams.current
+        match_params: matchParams.ui
       },
       {
         use: 'read',
         type: 'load_matches'
       }
     )
-    if (!sampleIon) return
-    const existingIsotopes = isotopes.value
+    if (!sampleIon) {
+      return
+    }
 
     ion.value = sampleIon.match_ions[0]
-    isotopes.value = sampleIon.match_isotopes.map((isotope) => {
-      let existingIsotope = null
-      if (existingIsotopes) {
-        existingIsotope = existingIsotopes.find(
-          (existing) => existing.target_isotope_id === isotope.target_isotope_id
-        )
-      }
+    isotopes.value = sampleIon.match_isotopes.map((isotope) => ({
+      ...isotope,
+      color:
+        isotopes.value?.find((existing) => existing.target_isotope_id === isotope.target_isotope_id)
+          ?.color ?? null, // Preserve color if exists
+      mz: isotope.mz.toFixed(4)
+    }))
 
-      return {
-        target_isotope_id: isotope.target_isotope_id,
-        color: existingIsotope?.color || null, // Preserve color if exists
-        mz: isotope.mz.toFixed(4),
-        match_score: isotope.match_score,
-        match_category: isotope.match_category,
-        alarm_mode: isotope.alarm_mode,
-        target_collection_type: isotope.target_collection_type,
-        relative_abundance: isotope.relative_abundance,
-        sample_peak_area: isotope.sample_peak_area,
-        match_mz_error: isotope.match_mz_error,
-        match_abundance_error: isotope.match_abundance_error,
-        match_isotope_correlation: isotope.match_isotope_correlation
-      }
-    })
-  }
-
-  async function activate({ sampleId, ionId } = {}) {
-    if (!ion.value) return
+    if (init) {
+      // use backend to init frontend params
+      matchParams.set({ params: matchParams.db })
+    }
 
     ui.chart.clear()
 
@@ -163,9 +136,9 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
       params: {
         sample_item_id: sampleId ?? ion.value.sample_item_id,
         target_ion_id: ionId ?? ion.value.target_ion_id,
-        min_isotope_abundance: matchParams.current.min_isotope_abundance,
-        peak_min_intensity: matchParams.current.peak_min_intensity,
-        mz_tolerance: matchParams.current.mz_tolerance
+        min_isotope_abundance: matchParams.ui.min_isotope_abundance,
+        peak_min_intensity: matchParams.ui.peak_min_intensity,
+        mz_tolerance: matchParams.ui.mz_tolerance
       },
       use: 'read',
       type: 'read_visualized_ion'
@@ -175,9 +148,9 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
   // clear when switching workspaces
   const workspace = useWorkspace()
   watch(
-    computed(() => workspace.focused),
+    () => workspace.focused,
     () => {
-      unset()
+      clear()
     }
   )
 
@@ -185,9 +158,11 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
     // state
     ion,
     isotopes,
+    instrument,
+    instrumentType,
     // actions
     set: debounce(set),
-    reset,
-    unset
+    reload,
+    clear
   }
 })

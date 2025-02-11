@@ -98,7 +98,7 @@ function generateKey(level) {
         return {
           ...record,
           parent_key: `${target_collection_id}_${target_compound_id}`,
-          match_key: `${target_collection_id}_${target_compound_id}_${target_ion_id}`
+          match_key: `${target_collection_id}_${target_ion_id}`
         }
       }
     case 'Isotope':
@@ -106,8 +106,8 @@ function generateKey(level) {
         const { target_collection_id, target_ion_id, target_isotope_id } = record
         return {
           ...record,
-          parent_key: `${target_collection_id}__${target_ion_id}`,
-          match_key: `${target_collection_id}__${target_ion_id}_${target_isotope_id}`
+          parent_key: `${target_collection_id}_${target_ion_id}`,
+          match_key: `${target_collection_id}_${target_isotope_id}`
         }
       }
   }

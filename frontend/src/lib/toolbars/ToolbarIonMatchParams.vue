@@ -22,16 +22,6 @@ const isSaving = ref(false)
 const isotopeSettings = ref()
 const peakSettings = ref()
 
-onMounted(() => app.data.match.params.init())
-
-function undoChanges() {
-  // Revert filter parameters to their initial values
-  Object.keys(app.data.match.params.initial).forEach((key) => {
-    app.data.match.params.current[key] = app.data.match.params.initial[key]
-  })
-  app.data.match.visualized.reset()
-}
-
 async function saveParams() {
   confirm.require({
     icon: 'pi pi-info-circle',
@@ -41,8 +31,6 @@ async function saveParams() {
       isSaving.value = true
       await app.data.match.params.save()
       isSaving.value = false
-      app.data.match.params.init()
-      await app.data.match.visualized.reset()
     },
     acceptProps: {
       icon: 'pi pi-save',
@@ -61,12 +49,7 @@ function deleteParams() {
     icon: 'pi pi-exclamation-triangle',
     header: 'Deleting match parameters',
     message: `Are you sure you want to delete ${app.data.match.visualized.ion?.target_ion_formula} match parameters for ${app.data.match.visualized.ion?.instrument} instrument?`,
-    accept: async () => {
-      app.data.match.params.reset()
-      await app.data.match.params.remove()
-      await app.data.match.visualized.reset()
-      app.data.match.params.init()
-    },
+    accept: app.data.match.params.remove,
     acceptProps: {
       icon: 'pi pi-trash',
       label: 'Delete',
@@ -80,11 +63,6 @@ function deleteParams() {
   })
 }
 
-async function resetParams() {
-  await app.data.match.params.reset()
-  await app.data.match.visualized.reset()
-}
-
 const items = computed(() => [
   {
     label: 'Save parameters',
@@ -95,13 +73,13 @@ const items = computed(() => [
   {
     label: 'Revert changes',
     icon: 'pi pi-undo',
-    command: undoChanges,
+    command: app.data.match.params.revert,
     disabled: !app.data.match.params.changed
   },
   {
     label: 'Set defaults',
     icon: 'pi pi-file-import',
-    command: resetParams,
+    command: app.data.match.params.reset,
     disabled: app.data.match.params.default
   },
   {
@@ -118,10 +96,9 @@ const items = computed(() => [
 
 const possibleMatchRange = computed({
   get() {
-    console.log('g')
     return [
-      app.data.match.params.current.possible_match_threshold,
-      app.data.match.params.current.probable_match_threshold
+      app.data.match.params.ui.possible_match_threshold,
+      app.data.match.params.ui.probable_match_threshold
     ]
   },
   set([a, b]) {
@@ -133,40 +110,17 @@ const possibleMatchRange = computed({
       possible = b
       probable = a
     }
-    app.data.match.params.current.possible_match_threshold = possible
-    app.data.match.params.current.probable_match_threshold = probable
+    app.data.match.params.ui.possible_match_threshold = possible
+    app.data.match.params.ui.probable_match_threshold = probable
   }
 })
 
 const matchRangeMiddle = computed(
   () =>
     (100 *
-      (app.data.match.params.current.possible_match_threshold +
-        app.data.match.params.current.probable_match_threshold)) /
+      (app.data.match.params.ui.possible_match_threshold +
+        app.data.match.params.ui.probable_match_threshold)) /
     2
-)
-
-const modifiedMatchIon = defineModel('modifiedMatchIon')
-
-watch(
-  () => [
-    app.data.match.visualized.ion,
-    app.data.match.params.current.possible_match_threshold,
-    app.data.match.params.current.probable_match_threshold
-  ],
-  ([visualizedIon, possible, probable]) => {
-    let match_category = 0
-    if (visualizedIon.match_score > possible) {
-      match_category = 1
-    }
-    if (visualizedIon.match_score > probable) {
-      match_category = 2
-    }
-    modifiedMatchIon.value = {
-      ...visualizedIon,
-      match_category
-    }
-  }
 )
 </script>
 
@@ -211,28 +165,28 @@ watch(
       <div class="row" style="padding: 1rem; gap: 0.5rem">
         <BaseParamField
           label="m/z tolerance [ppm]"
-          v-model:param="app.data.match.params.current.mz_tolerance"
-          @change="app.data.match.visualized.reset"
+          v-model:param="app.data.match.params.ui.mz_tolerance"
+          @change="app.data.match.visualized.reload"
           :range="{ min: 0, max: 100, step: 1 }"
         />
         <BaseParamField
           label="Min. isotope abundance"
-          v-model:param="app.data.match.params.current.min_isotope_abundance"
-          @change="app.data.match.visualized.reset"
+          v-model:param="app.data.match.params.ui.min_isotope_abundance"
+          @change="app.data.match.visualized.reload"
           :range="{ min: 0, max: 1, step: 0.01 }"
           disabled
           col
         />
         <BaseParamField
           label="Isotope ratio tolerance"
-          v-model:param="app.data.match.params.current.isotope_ratio_tolerance"
-          @change="app.data.match.visualized.reset"
+          v-model:param="app.data.match.params.ui.isotope_ratio_tolerance"
+          @change="app.data.match.visualized.reload"
           :range="{ min: 0, max: 1, step: 0.05 }"
         />
         <BaseParamField
           label="Min. isotope correlation"
-          v-model:param="app.data.match.params.current.min_isotope_correlation"
-          @change="app.data.match.visualized.reset"
+          v-model:param="app.data.match.params.ui.min_isotope_correlation"
+          @change="app.data.match.visualized.reload"
           :range="{ min: 0, max: 1, step: 0.1 }"
         />
       </div>
@@ -265,29 +219,29 @@ watch(
       <div class="row" style="padding: 1rem; gap: 1rem; align-items: flex-start">
         <BaseParamField
           label="Min. peak intensity"
-          v-model:param="app.data.match.params.current.peak_min_intensity"
-          @change="app.data.match.visualized.reset"
+          v-model:param="app.data.match.params.ui.peak_min_intensity"
+          @change="app.data.match.visualized.reload"
           :range="{ min: 0, max: 10000, step: 500 }"
         />
         <div class="col" style="gap: 0">
           <div class="row" :key="matchRangeMiddle">
             <BaseParamField
               label="Possible match [%]"
-              v-model:param="app.data.match.params.current.possible_match_threshold"
-              @change="app.data.match.visualized.reset"
+              v-model:param="app.data.match.params.ui.possible_match_threshold"
+              @change="app.data.match.visualized.reload"
               :range="{
                 min: 0,
-                max: app.data.match.params.current.probable_match_threshold,
+                max: app.data.match.params.ui.probable_match_threshold,
                 step: 0.05
               }"
               hideSlider
             />
             <BaseParamField
               label="Probable match [%]"
-              v-model:param="app.data.match.params.current.probable_match_threshold"
-              @change="app.data.match.visualized.reset"
+              v-model:param="app.data.match.params.ui.probable_match_threshold"
+              @change="app.data.match.visualized.reload"
               :range="{
-                min: app.data.match.params.current.possible_match_threshold,
+                min: app.data.match.params.ui.possible_match_threshold,
                 max: 1,
                 step: 0.05
               }"

@@ -80,11 +80,7 @@ const tree = computed(() =>
           .map((ion) => ({
             ...ion,
             // isotopes
-            children: app.data.match.isotope.list.filter(
-              // the isotope level is atypical so we need to manually
-              // construct the parent key
-              (iso) => iso.parent_key == `${ion.target_collection_id}__${ion.target_ion_id}`
-            )
+            children: app.data.match.isotope.list.filter((iso) => iso.parent_key == ion.match_key)
           }))
       }))
   }))
@@ -235,7 +231,7 @@ watch(
       collection?.target_collection_id !== oldCollection?.target_collection_id
     // conditionally unset match visualized
     if (!collection || changedCollection) {
-      app.data.match.visualized.unset()
+      app.data.match.visualized.clear()
     }
     if (collection) {
       scrollTo(collection)
@@ -257,7 +253,7 @@ watch(
       // unfocus child if unfocused
       app.data.match.ion.unfocus()
       // and unset visualized match
-      app.data.match.visualized.unset()
+      app.data.match.visualized.clear()
     }
   }
 )
