@@ -7,6 +7,7 @@ from sqlalchemy import (
     desc,
     func,
 )
+from typing import Literal
 from mascope_lib.file_func import load_file, sum_signal_for_time_range
 from mascope_lib.peak import detect_peaks, get_peaks
 from mascope_lib.file_func import get_instrument_type
@@ -495,6 +496,7 @@ async def get_sample_file_peaks(
 )
 async def compute_all_sample_file_peaks(
     sample_file_id: str,
+    if_exists: Literal["append", "replace"] = "append",
     independent_transaction: bool = False,
     sid: str = None,
     process_id=None,
@@ -542,7 +544,7 @@ async def compute_all_sample_file_peaks(
         instrument_functions,
         threshold,
         u_list=None,
-        if_exists="append",
+        if_exists=if_exists,
         return_peak_mzs=True,
         instrument_type=instrument_type,
     )
