@@ -23,6 +23,7 @@ from mascope_server.api.models.sample.files.sample_file_pydantic_model import (
     GetSampleFilesQueryParams,
     GetRecentSampleFilesQueryParams,
     GetSampleFilePeaksQueryParams,
+    ComputeAllSampleFilePeaksQueryParams,
     GetSampleFilePeakTimeseriesBody,
     GetSpectrumQueryParams,
 )
@@ -172,6 +173,7 @@ async def compute_all_sample_file_peaks_route(
     request: Request,
     sample_file_id: str,
     background_tasks: BackgroundTasks,
+    query_params: ComputeAllSampleFilePeaksQueryParams = Depends(),
     user=Depends(editor_user),
 ):
     """Compute all peaks for a sample file asynchronously.
@@ -192,6 +194,7 @@ async def compute_all_sample_file_peaks_route(
     background_tasks.add_task(
         compute_all_sample_file_peaks,
         sample_file_id=sample_file_id,
+        if_exists=query_params.if_exists,
         independent_transaction=True,
         sid=sid,
         process_id=process_id,

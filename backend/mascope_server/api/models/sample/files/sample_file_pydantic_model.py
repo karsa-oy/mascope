@@ -1,4 +1,4 @@
-from typing import Optional, Dict, List, Annotated
+from typing import Optional, Dict, List, Annotated, Literal
 from datetime import datetime as dt
 from pydantic import BaseModel, Field, field_validator, model_validator
 from fastapi import UploadFile
@@ -142,6 +142,13 @@ class GetSampleFilePeaksQueryParams(QueryParamsModel):
                 "You need to request either peak areas, peak heights, or both. At least one of 'areas' or 'heights' must be set to True. "
             )
         return values
+
+
+class ComputeAllSampleFilePeaksQueryParams(QueryParamsModel):
+    if_exists: Literal["append", "replace"] = Field(
+        "append",
+        description="Whether to append to or replace any existing peaks in the sample file.",
+    )
 
 
 class GetSampleFilePeakTimeseriesBody(BaseModel):
