@@ -59,6 +59,7 @@ class H5Processor(Thread):
         self.active = Event()
 
         self.h5 = None  # The h5 file reference
+        self.file_to_process = None  # Path to the h5 file to process
         self.filename = None  # Filename base from TW h5 file
 
     @property
@@ -185,8 +186,10 @@ class H5Processor(Thread):
         self.active.clear()
         with self.lock:
             self.h5.close()
+            # Reset attributes
             self.h5 = None
             self.filename = None
+            self.file_to_process = None
         self.cancel_event.clear()
 
     def _process_h5_file(self, sample_file_props: dict, h5_filepath: str) -> bool:
@@ -259,20 +262,22 @@ class H5Processor(Thread):
         # Main loop
         while not self.shutdown_event.is_set():
             try:
-                file_to_process = self.file_queue.get(timeout=0.1)
+                self.file_to_process = self.file_queue.get(timeout=0.1)
                 # Initialize h5 file reader
                 try:
                     with self.lock:
-                        self.h5 = h5py.File(file_to_process, "r")
+                        self.h5 = h5py.File(self.file_to_process, "r")
                 except Exception as e:
-                    self.log.error(f"Failed to open file {Path(file_to_process)}: {e}")
+                    self.log.error(
+                        f"Failed to open file {Path(self.file_to_process)}: {e}"
+                    )
                     continue
             except Empty:
                 # No file to process, continue
                 continue
 
             # Get filename
-            self.filename = Path(file_to_process).name
+            self.filename = Path(self.file_to_process).stem
             self.log.info(f"Processing file: {self.filename}")
             # set active flag
             self.active.set()
