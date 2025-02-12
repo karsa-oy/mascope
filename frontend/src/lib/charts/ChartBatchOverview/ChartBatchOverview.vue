@@ -189,7 +189,7 @@ const anyFilters = computed(
       class="row"
       :style="`
         justify-content: flex-start;
-        width: 100%;
+        width: calc(${app.ui.split.right}vw - 3rem);
         position: fixed;
         top: 10rem;
         z-index: 100
