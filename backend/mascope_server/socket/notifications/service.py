@@ -1,8 +1,11 @@
 """Socket.IO notification service."""
 
 from copy import deepcopy
+from typing import Any
 from mascope_server.socket.server import sio
 from mascope_server.socket.notifications.schemas import UserNotification
+
+from mascope_server.runtime import runtime
 
 
 async def emit_user_notification(
@@ -132,27 +135,119 @@ async def emit_sio_event(
             await sio.emit(event_name, notification, room=sid, namespace="/")
 
 
-async def handle_reloads(reload_events, kwargs, result):
-    """Emit reload events based on the given configurations."""
-    for event_name, room in reload_events:
-        room_id = kwargs.get(room)
-        if not room_id and result:
-            room_id = result.get(room) or result.get("data").get(room)
-        if room_id is not None:
-            await sio.emit(event_name, room=room_id, namespace="/")
+async def handle_reloads(
+    reload_events: list[tuple[str, str]] | None,
+    kwargs: dict[str, Any],
+    result: dict[str, Any] | None,
+) -> None:
+    """
+    Emit Socket.IO reload events to specified rooms based on provided configuration.
+
+    For each reload event configuration:
+     1. Attempts to find room IDs by checking kwargs, result['data'] and result['_notification_data']
+     2. Validates and normalizes room IDs to a list format
+     3. Emits events to each room ID
+
+     :param reload_events: List of tuples containing (event_name, room_key) pairs
+         - event_name: Name of the Socket.IO event to emit
+         - room_key: Key to look up room IDs in kwargs or result
+     :type reload_events: list[tuple[str, str]]
+     :param kwargs: Controller function keyword arguments that may contain room IDs
+     :type kwargs: dict[str, Any]
+     :param result: Controller function result dictionary that may contain room IDs in 'data' or '_notification_data' keys.
+            May be none when handling the error_reload events.
+     :type result: dict[str, Any] | None
+    """
+    # Guard against empty reload_events list
+    if not reload_events:
+        return
+    # Process each reload event configuration
+    for event_name, room_key in reload_events:
+        room_ids = []
+        # Step 1a: Check kwargs first
+        if room_key in kwargs:
+            room_ids = kwargs[room_key]
+
+        elif result:
+            # Step 1b: Check in result['data']
+            if "data" in result and isinstance(result["data"], dict):
+                room_ids = result.get("data", {}).get(room_key)
+            # Step 1c: If not found, check in result["_notification_data"]
+            if not room_ids and "_notification_data" in result:
+                room_ids = result.get("_notification_data", {}).get(room_key)
+
+        # Step 1d: Log warning if no room_ids found
+        if not room_ids:
+            runtime.logger.warning(
+                f"No room IDs found for event '{event_name}' with key '{room_key}'"
+            )
+            continue
+
+        # Step 2: Normalize single room_id to list format for consistency
+        if not isinstance(room_ids, list):
+            room_ids = [room_ids]
+
+        # Step 3: Emit event to each room
+        for room_id in room_ids:
+            if room_id is not None:
+                try:
+                    await sio.emit(event_name, room=room_id, namespace="/")
+                except (ValueError, TypeError) as e:
+                    runtime.logger.error(
+                        f"Failed to emit '{event_name}' to room {room_id}: {str(e)}"
+                    )
+                    continue
 
 
-async def handle_notifications(rooms, notification, kwargs, result, sid):
-    """Emit notifications to specified rooms."""
+async def handle_notifications(
+    rooms: list[str] | None,
+    notification: UserNotification,
+    kwargs: dict[str, Any],
+    result: dict[str, Any] | None,
+    sid: str | None,
+) -> None:
+    """
+    Emit Socket.IO user notifications to specified rooms.
+
+    Process flow:
+    1. Guard against empty rooms list
+    2. For each room:
+       - Find room_id in kwargs, result['data'], or result['_notification_data']
+       - Handle special case for 'instrument' room
+         TODO_notifications refactor this, looks like a hack
+       - Emit notification to the room
+
+    :param rooms: List of room keys to find room IDs
+    :type rooms: list[str] | None
+    :param notification: UserNotification instance to be emitted
+    :type notification: UserNotification
+    :param kwargs:  Controller function kwargs that may contain room IDs
+    :type kwargs: dict[str, Any]
+    :param result: Controller function result that may contain room IDs in 'data'
+            or '_notification_data' keys. May be None when handling error notifications.
+    :type result: dict[str, Any] | None
+    :param sid: Socket.IO session ID for direct messaging
+    :type sid: str | None
+    """
+    # Guard against empty rooms  list
+    if not rooms:
+        return
+
     for room in rooms:
         room_id = kwargs.get(room)
         if not room_id and result:
-            # TODO_data wrapper
+            # Try to find room_id in result
             room_id = (
                 result.get(room)
                 or result.get("data", {}).get(room)
                 or result.get("_notification_data", {}).get(room)
             )
+
+        if not room_id:
+            runtime.logger.warning(
+                f"No room ID found for user notification in room '{room}'"
+            )
+            continue
         # for istrument room don't check if the user has moved from the room -> no sid is provided
         if room_id and room == "instrument":
             await emit_user_notification(notification, room_id)

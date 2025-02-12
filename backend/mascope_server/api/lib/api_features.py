@@ -182,44 +182,57 @@ def api_route(
 
 
 def api_controller_background_task(
-    success_notification_rooms: List[str] = [],
-    success_reload: List[Tuple[str, str]] = [],
-    error_notification_rooms: List[str] = [],
-    error_reload: List[Tuple[str, str]] = [],
-):
+    success_notification_rooms: List[str] | None = None,
+    success_reload: List[Tuple[str, str]] | None = None,
+    error_notification_rooms: List[str] | None = None,
+    error_reload: List[Tuple[str, str]] | None = None,
+) -> Callable:
     """
-    A decorator for background task controller functions to standardize response structure, handle exceptions, and emit Socket.IO events.
+    Decorator for background task controllers that standardizes response and error handling, Socket.IO events.
 
-    This decorator wraps a controller function, executes it, and depending on the outcome (success or failure), updates the payload, and emits Socket.IO events.
+    Transaction behavior:
+    The decorator uses 'independent_transaction' controller's flag to manage Socket.IO communications:
+    - When True: Emits notifications and reloads directly from this function
+    - When False: Suppresses notifications/reloads and re-raises exceptions for parent handler
+    - Special case: 'rematch_batch' function always emits reloads when parent_id exists
+        TODO_notifications refactor this, looks like a hack
 
-    The decorator handles two main scenarios:
-    1. When the wrapped function completes successfully, it updates the payload with success details and emits the specified success events.
-    2. When the wrapped function raises an ApiException or any other exception, it updates the payload with error details and emits the specified error events.
+    The decorator supports two types of Socket.IO communications: (controlled by independent_transaction):
+    1. Notifications: User-facing messages about task progress/status
+       - Success: Always sent
+       - Warnings: Always sent (ApiException with status_code 200)
+       - Errors: Only sent for independent transactions
+    2. Reloads: Data refresh signals for UI components
+       - Success: Sent for independent transactions or rematch_batch
+       - Warnings: Same as success
+       - Errors: Only sent for independent transactions
 
-    Returns:
-        - A decorator that wraps asynchronous controller functions for background tasks with standardized success and error handling.
     Usage:
         @api_controller_background_task(
-            success_emit_events=[("event_name_success", "room_key_success")],
-            error_emit_events=[("event_name_failure", "room_key_failure")],
-            default_payload={"initial": "data"},  TODO the pydantic model can be used
-            success_message="Task completed successfully",
-            error_message="Task failed"
+            success_reload=[("sample_batch_reload", "affected_sample_batch_ids")]
         )
-        async def my_background_task_function(*args, **kwargs):
-            # Function body
+        async def import_sample_items(
+            sample_batch_id: str,
+            **kwargs
+            independent_transaction: bool = False,  # Controls notification behavior
+        ) -> Dict[str, Any]:
+            return {
+                "_notification_data": {
+                    "affected_sample_batch_ids": ["sample_batch_id1", ...]  # Will trigger reloads if independent
+                }
+            }
 
-
-    :param success_emit_events: A list of tuples, where each tuple contains an event name and a room key for successful operations. The room key is used to target the event emission. Defaults to an empty list.
-    :type success_emit_events: List[Tuple[str, str]], optional
-    :param error_emit_events: List of tuples for error event names and room keys. Similar to success_emit_events but used for error scenarios. Defaults to an empty list.
-    :type error_emit_events: List[Tuple[str, str]], optional
-    :param default_payload: Default payload for event emissions. A dictionary containing default data to include in the event emission payload. Defaults to None.
-    :type default_payload: dict, optional
-    :param success_message: A custom message to include in the payload when the operation succeeds. Defaults to None, which will use a generic success message based on the function name.
-    :type success_message: str, optional
-    :param error_message: A custom message to include in the payload when the operation fails. Defaults to None, which will use a generic error message based on the function name.
-    :type error_message: str, optional
+    :param success_notification_rooms: List of room keys for success user notifications, defaults to []
+    :type success_notification_rooms: List[str], optional
+    :param success_reload: List of tuples (event_name, room_key) for success UI reload notifications, defaults to []
+    :type success_reload: List[Tuple[str, str]], optional
+    :param error_notification_rooms: List of room keys for error user notifications, defaults to []
+    :type error_notification_rooms: List[str], optional
+    :param error_reload: List of tuples (event_name, room_key) for error reloads, defaults to []
+    :type error_reload: List[Tuple[str, str]], optional
+    :return: The decorated async function that add to async controller the notification
+            and error handling logic
+    :rtype: Callable
     """
 
     def decorator(func):
