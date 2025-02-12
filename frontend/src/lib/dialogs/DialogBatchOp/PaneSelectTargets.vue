@@ -4,6 +4,10 @@ import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Panel from 'primevue/panel'
 import SelectButton from 'primevue/selectbutton'
+import FloatLabel from 'primevue/floatlabel'
+import IconField from 'primevue/iconfield'
+import InputIcon from 'primevue/inputicon'
+import InputText from 'primevue/inputtext'
 
 import { ref, computed } from 'vue'
 
@@ -23,32 +27,38 @@ const props = defineProps({
   }
 })
 
+const search = ref()
+
 const categories = ['Targets', 'Calibrants', 'Diagnostics', 'All']
 const category = ref(categories.find((c) => c.toLowerCase() == props.mode.toLowerCase()))
 
 const targetCollections = computed(() =>
-  app.data.target.collection.list.filter((coll) => {
-    const type = category.value.toUpperCase()
-    return type == 'ALL' ? true : coll.target_collection_type == type
-  })
+  app.data.target.collection.list
+    .filter((coll) => {
+      const type = category.value.toUpperCase()
+      return type == 'ALL' ? true : coll.target_collection_type == type
+    })
+    .filter(
+      (coll) =>
+        coll.target_collection_name.toLowerCase().includes(search.value?.toLowerCase() ?? '') ||
+        coll.target_collection_description.toLowerCase().includes(search.value?.toLowerCase() ?? '')
+    )
 )
-
-// init
-if (props.mode == 'calibrants' && !selected.value) {
-  // if autosetting fails inform user
-  // notificationStore.showWarningNotification({
-  //   notification: 'noCalibrationCollection',
-  //   data: {
-  //     batch: props.batch,
-  //     collection: selected.value?.target_collection_name ?? 'none'
-  //   }
-  // })
-}
 </script>
 
 <template>
   <Panel>
-    <SelectButton v-model="category" :options="categories" :allowEmpty="false" />
+    <div class="row">
+      <SelectButton v-model="category" :options="categories" :allowEmpty="false" />
+      <FloatLabel style="flex-grow: 1; max-width: 250px">
+        <IconField class="full">
+          <InputIcon>
+            <i class="pi pi-search" />
+          </InputIcon>
+          <InputText v-model="search" placeholder="Search" />
+        </IconField>
+      </FloatLabel>
+    </div>
     <ScrollPanel style="width: 100%; height: 300px">
       <DataTable v-model:selection="selected" :value="targetCollections">
         <Column v-if="mode == 'targets'" selectionMode="multiple" headerStyle="width: 3rem" />
@@ -61,7 +71,12 @@ if (props.mode == 'calibrants' && !selected.value) {
 </template>
 
 <style scoped>
-.p-selectbutton {
+.row {
   margin-bottom: 1rem;
+  height: fit-content;
+}
+
+:deep(.p-floatlabel) {
+  margin: 0;
 }
 </style>
