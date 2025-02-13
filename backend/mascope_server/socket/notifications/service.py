@@ -136,7 +136,7 @@ async def emit_sio_event(
 
 
 async def handle_reloads(
-    reload_events: list[tuple[str, str]] | None,
+    reload_events: list[tuple[str, str]],
     kwargs: dict[str, Any],
     result: dict[str, Any] | None,
 ) -> None:
@@ -158,9 +158,6 @@ async def handle_reloads(
             May be none when handling the error_reload events.
      :type result: dict[str, Any] | None
     """
-    # Guard against empty reload_events list
-    if not reload_events:
-        return
     # Process each reload event configuration
     for event_name, room_key in reload_events:
         room_ids = []
@@ -192,7 +189,7 @@ async def handle_reloads(
             if room_id is not None:
                 try:
                     await sio.emit(event_name, room=room_id, namespace="/")
-                except (ValueError, TypeError) as e:
+                except Exception as e:
                     runtime.logger.error(
                         f"Failed to emit '{event_name}' to room {room_id}: {str(e)}"
                     )
@@ -200,7 +197,7 @@ async def handle_reloads(
 
 
 async def handle_notifications(
-    rooms: list[str] | None,
+    rooms: list[str],
     notification: UserNotification,
     kwargs: dict[str, Any],
     result: dict[str, Any] | None,
@@ -229,10 +226,6 @@ async def handle_notifications(
     :param sid: Socket.IO session ID for direct messaging
     :type sid: str | None
     """
-    # Guard against empty rooms  list
-    if not rooms:
-        return
-
     for room in rooms:
         room_id = kwargs.get(room)
         if not room_id and result:

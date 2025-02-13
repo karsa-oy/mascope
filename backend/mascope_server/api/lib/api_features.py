@@ -182,10 +182,10 @@ def api_route(
 
 
 def api_controller_background_task(
-    success_notification_rooms: List[str] | None = None,
-    success_reload: List[Tuple[str, str]] | None = None,
-    error_notification_rooms: List[str] | None = None,
-    error_reload: List[Tuple[str, str]] | None = None,
+    success_notification_rooms: list[str] | None = None,
+    success_reload: list[tuple[str, str]] | None = None,
+    error_notification_rooms: list[str] | None = None,
+    error_reload: list[tuple[str, str]] | None = None,
 ) -> Callable:
     """
     Decorator for background task controllers that standardizes response and error handling, Socket.IO events.
@@ -223,17 +223,26 @@ def api_controller_background_task(
             }
 
     :param success_notification_rooms: List of room keys for success user notifications, defaults to []
-    :type success_notification_rooms: List[str], optional
-    :param success_reload: List of tuples (event_name, room_key) for success UI reload notifications, defaults to []
-    :type success_reload: List[Tuple[str, str]], optional
-    :param error_notification_rooms: List of room keys for error user notifications, defaults to []
-    :type error_notification_rooms: List[str], optional
-    :param error_reload: List of tuples (event_name, room_key) for error reloads, defaults to []
-    :type error_reload: List[Tuple[str, str]], optional
+    :type success_notification_rooms: list[str], optional
+    :param success_reload: list of tuples (event_name, room_key) for success UI reload notifications, defaults to []
+    :type success_reload: list[tuple[str, str]], optional
+    :param error_notification_rooms: list of room keys for error user notifications, defaults to []
+    :type error_notification_rooms: list[str], optional
+    :param error_reload: list of tuples (event_name, room_key) for error reloads, defaults to []
+    :type error_reload: list[tuple[str, str]], optional
     :return: The decorated async function that add to async controller the notification
             and error handling logic
     :rtype: Callable
     """
+    # Convert None to empty lists
+    success_notification_rooms = (
+        success_notification_rooms if success_notification_rooms is not None else []
+    )
+    success_reload = success_reload if success_reload is not None else []
+    error_notification_rooms = (
+        error_notification_rooms if error_notification_rooms is not None else []
+    )
+    error_reload = error_reload if error_reload is not None else []
 
     def decorator(func):
         @wraps(func)
