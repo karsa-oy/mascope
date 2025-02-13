@@ -494,7 +494,7 @@ async def get_sample_file_peaks(
     success_notification_rooms=["sid"],
     error_notification_rooms=["sid"],
 )
-async def compute_all_sample_file_peaks(
+async def compute_sample_file_peaks(
     sample_file_id: str,
     if_exists: Literal["append", "replace"] = "append",
     independent_transaction: bool = False,

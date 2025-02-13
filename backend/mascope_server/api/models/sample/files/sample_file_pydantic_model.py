@@ -144,7 +144,7 @@ class GetSampleFilePeaksQueryParams(QueryParamsModel):
         return values
 
 
-class ComputeAllSampleFilePeaksQueryParams(QueryParamsModel):
+class ComputeSampleFilePeaksQueryParams(QueryParamsModel):
     if_exists: Literal["append", "replace"] = Field(
         "append",
         description="Whether to append to or replace any existing peaks in the sample file.",
