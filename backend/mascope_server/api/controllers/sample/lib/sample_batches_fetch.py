@@ -47,18 +47,24 @@ async def fetch_sample_batch_data(sample_batch_id: str) -> SampleBatchData:
         return SampleBatchData(sample_batch, ion_mechanisms)
 
 
-async def fetch_sample_batches_for_filenames(filenames: list[str]) -> set[str]:
+async def fetch_sample_batch_ids(
+    filenames: list[str] = [], sample_item_ids: list[str] = []
+) -> set[str]:
     """
-    Fetches unique sample batch IDs for the given filenames.
+    Fetches unique sample batch IDs for the given filenames and/or
+    sample item IDs.
 
-    :param filenames: List of filenames to fetch sample batches for
-    :type filenames: list[str]
+    :param filenames: List of filenames to fetch sample batche ids for
+    :type filenames: list[str], optional
+    :param sample_item_ids: List of sample_item_ids to fetch sample batch ids for
+    :type sample_item_ids: list[str], optional
     :return: Set of unique sample batch IDs
     :rtype: set[str]
     """
     async with async_session() as session:
-        query = select(SampleItem.sample_batch_id).filter(
+        query = select(SampleItem.sample_batch_id).where(
             SampleItem.filename.in_(filenames)
+            | SampleItem.sample_item_id.in_(sample_item_ids)
         )
         batch_ids = await session.scalars(query)
-        return set(batch_ids)
+        return [*set(batch_ids)]

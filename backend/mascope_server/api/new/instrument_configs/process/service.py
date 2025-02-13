@@ -18,7 +18,7 @@ from mascope_server.api.controllers.sample.lib.sample_file_fetch import (
     fetch_sample_file,
 )
 from mascope_server.api.controllers.sample.lib.sample_batches_fetch import (
-    fetch_sample_batches_for_filenames,
+    fetch_sample_batch_ids,
 )
 from mascope_server.api.new.instrument_configs.schemas import (
     CreateInstrumentConfigBody,
@@ -156,7 +156,7 @@ async def process_instrument_config(
     await asyncio.gather(*update_tasks)
 
     # Step 7. Reload affected batches
-    affected_batch_ids = await fetch_sample_batches_for_filenames(filenames)
+    affected_batch_ids = await fetch_sample_batch_ids(filenames=filenames)
     reload_tasks = [
         sio.emit(
             "sample_batch_reload",
