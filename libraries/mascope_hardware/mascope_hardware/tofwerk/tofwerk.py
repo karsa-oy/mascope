@@ -60,9 +60,9 @@ def get_signal(datafile_path: str, t1=None, t2=None):
             signal_array = signal_ref[:].reshape(-1, signal_ref.shape[-1])
             # Convert to dask array
             signal_dask = da.from_array(signal_array, chunks="auto")
-            # Init and return xarray Dataset
+            # Init and return xarray Dataset with swapped dimensions
             return xr.Dataset(
-                {"signal": (("time", "mz"), signal_dask)},
+                {"signal": (("mz", "time"), signal_dask.T)},
                 coords={"mz": all_mzs, "time": scan_time},
             )
 
@@ -95,9 +95,9 @@ def get_signal(datafile_path: str, t1=None, t2=None):
         # Convert to dask array
         signal_dask = da.from_array(signal_slice, chunks="auto")
 
-        # Init and return xarray Dataset
+        # Init and return xarray Dataset with swapped dimensions
         return xr.Dataset(
-            {"signal": (("time", "mz"), signal_dask)},
+            {"signal": (("mz", "time"), signal_dask.T)},
             coords={"mz": all_mzs, "time": scan_time[start:end]},
         )
 
