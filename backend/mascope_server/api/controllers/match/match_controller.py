@@ -2,8 +2,8 @@
 """
 Match Controller
 
-This module contains all the functionalities and endpoints related to 
-the matching/rematching processes and related operations. 
+This module contains all the functionalities and endpoints related to
+the matching/rematching processes and related operations.
 """
 
 import asyncio
@@ -42,6 +42,9 @@ from mascope_server.api.controllers.target.lib.fetch.target_isotopes_fetch impor
 from mascope_server.api.controllers.match.aggregate.match_aggregate_controller import (
     aggregate_and_create_matches,
 )
+from mascope_server.api.controllers.sample.lib.sample_batches_fetch import (
+    fetch_sample_batch_ids,
+)
 from mascope_server.api.controllers.samples.samples_controller import (
     get_samples,
     get_sample,
@@ -62,6 +65,8 @@ from mascope_server.runtime import runtime
 # -------------------------------------------------------------------
 # Sample level
 # -------------------------------------------------------------------
+
+
 @api_controller_background_task(
     success_notification_rooms=["sample_batch_id"],
     success_reload=[("sample_batch_reload", "sample_batch_id")],
@@ -76,6 +81,7 @@ async def rematch_sample(
     independent_transaction: bool = False,
     sid: str = None,
     process_id=None,
+    parent_id=None,
 ) -> dict:
     """
     Performs a rematch of sample by removing and/or computing matches based on the specified parameters.
@@ -165,6 +171,43 @@ async def rematch_sample(
         "_notification_data": {
             "sample_item_id": sample_item_id,
         },
+    }
+
+
+@api_controller_background_task(
+    success_notification_rooms=["sample_batch_id"],
+    success_reload=[("sample_batch_reload", "sample_batch_ids")],
+    error_notification_rooms=["sid"],
+)
+async def rematch_samples(
+    sample_item_ids: list[str],
+    added_target_compound_ids: list[str] | None = None,
+    added_ionization_mechanism_ids: list[str] | None = None,
+    removed_target_compound_ids: list[str] | None = None,
+    removed_ionization_mechanism_ids: list[str] | None = None,
+    independent_transaction: bool = False,
+    sid: str = None,
+    process_id=None,
+    parent_id=None,
+) -> dict:
+    for sample_item_id in sample_item_ids:
+        await rematch_sample(
+            sample_item_id=sample_item_id,
+            added_target_compound_ids=added_target_compound_ids,
+            added_ionization_mechanism_ids=added_ionization_mechanism_ids,
+            removed_target_compound_ids=removed_target_compound_ids,
+            removed_ionization_mechanism_ids=removed_ionization_mechanism_ids,
+            independent_transaction=False,
+            sid=sid,
+            process_id=gen_id(8),
+            parent_id=process_id,
+        )
+    affected_sample_batch_ids = await fetch_sample_batch_ids(
+        sample_item_ids=sample_item_ids
+    )
+    return {
+        "message": f"Rematched {len(sample_item_ids)} samples",
+        "_notification_data": {"sample_batch_ids": affected_sample_batch_ids},
     }
 
 
