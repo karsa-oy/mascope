@@ -1,5 +1,5 @@
 """
-Functionalities related to the m/z fitting calibration processes. 
+Functionalities related to the m/z fitting calibration processes.
 """
 
 import h5py
@@ -74,7 +74,7 @@ async def mz_fit(
     tic = sample_file.props.get("tic", np.inf)
 
     if tic < tic_threshold:
-        error = "TIC is too low! Check ionization device."
+        warning = "TIC is too low! Check ionization device."
         return fit, stats, error, warning
 
     await send_progress_user_notification(notification, 0.35)
@@ -149,7 +149,7 @@ async def mz_fit(
         # Not enough calibration peaks
         fit = None
         stats = good_matches_df.to_dict("records")
-        error = "Not enough calibration peaks"
+        warning = "Not enough calibration peaks"
 
     return fit, stats, error, warning
 

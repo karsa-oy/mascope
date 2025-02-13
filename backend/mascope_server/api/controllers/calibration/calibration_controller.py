@@ -542,7 +542,7 @@ async def calibration_mz_calibrate_samples(
         except ApiException as e:
             sample = (await get_sample_item(sample_item_id=sample_item_id))["data"]
             # If an exception occurs during sample calibration, log the error and add the sample to the failed list
-            runtime.logger.error(
+            runtime.logger.warning(
                 f"Calibrating sample '{sample['sample_item_name']}' failed: {e}"
             )
             samples_calibrate_failed.append(
