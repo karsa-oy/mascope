@@ -666,9 +666,10 @@ def load_file(base_filename, vars=None, prev_dataset=None):
             ).get(var, [])
         try:
             var_dataset = load_array(base_filename, var, prev_item)
-        except FileNotFoundError as e:
-            lib_runtime.logger.error(f"[load_file] Error {base_filename}/{var}:")
-            lib_runtime.logger.error(f"    {e.__class__.__name__}({str(e)})")
+        except FileNotFoundError:
+            lib_runtime.logger.warning(
+                f"[load_file] {var} not found for {base_filename}:"
+            )
             continue
         datasets.append(var_dataset)
         zarr_groups[var] = var_dataset.attrs.get("zarr_groups", [])
