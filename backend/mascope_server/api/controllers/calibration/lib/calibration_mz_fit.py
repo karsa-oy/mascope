@@ -2,20 +2,20 @@
 Functionalities related to the m/z fitting calibration processes. 
 """
 
+import h5py
 import numpy as np
 import pandas as pd
 from scipy.optimize import fsolve
 
 from mascope_hardware.tofwerk.calibration import mz_calibrate
-from mascope_hardware.tofwerk.lib.TwTool import TwTof2Mass
 
 from mascope_lib.file_func import (
-    get_zarr_var_shape,
+    get_sample_file_type,
+    get_sum_signal,
     load_coord,
     load_file,
     update_props,
     update_zarr_array_coord,
-    remove_duplicate_mz_values,
 )
 from zarr.errors import PathNotFoundError
 from mascope_server.api.lib.api_features import (
@@ -158,19 +158,18 @@ def signal_mz_calibration_update(fit, filename):
     mode = fit["mode"]
     par = fit["par"]
     # Calculate new mz axis
-    nbr_samples = get_zarr_var_shape(filename, "signal")[0]
-    par = np.array(par, dtype=np.double)
-    new_mz = np.array([TwTof2Mass(tof, mode, par) for tof in range(nbr_samples)])
-    new_mz = remove_duplicate_mz_values(new_mz)
-    new_range = [new_mz[0], new_mz[-1]]
+    nbr_samples = get_sum_signal(filename).size
+    tof = np.arange(nbr_samples)
+    new_mz = tof_to_mass(tof, mode, par)
+    new_range = new_mz[0], new_mz[-1]
 
     # Update zarr file coordinates and props
     runtime.logger.info(f"Calibrating file: {filename}")
-    if nbr_samples != get_zarr_var_shape(filename, "signal")[0]:
-        raise Exception("Number of TOF samples does not match")
+    sample_file_type = get_sample_file_type(filename)
     update_props(filename, {"range": new_range, "mz_calibration": fit})
-    # Write new mz coordinates to zarr file
-    update_zarr_array_coord(filename, "signal", "mz", new_mz)
+    if sample_file_type != "tof_h5":
+        # Write new mz coordinates to zarr file
+        update_zarr_array_coord(filename, "signal", "mz", new_mz)
     try:
         update_zarr_array_coord(filename, "sum_signal", "mz", new_mz)
     except PathNotFoundError:
