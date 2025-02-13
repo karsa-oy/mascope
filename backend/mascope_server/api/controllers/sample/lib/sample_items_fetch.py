@@ -52,3 +52,20 @@ async def fetch_sample_item_ids(
             )
 
     return sample_item_ids, sample_ref
+
+
+async def fetch_sample_item_ids_for_filenames(filenames: list[str]) -> set[str]:
+    """
+    Fetches unique sample item IDs for the given filenames.
+
+    :param filenames: List of filenames to fetch sample batches for
+    :type filenames: list[str]
+    :return: Set of unique sample item IDs
+    :rtype: set[str]
+    """
+    async with async_session() as session:
+        query = select(SampleItem.sample_item_id).where(
+            SampleItem.filename.in_(filenames)
+        )
+        item_ids = await session.scalars(query)
+        return set(item_ids)
