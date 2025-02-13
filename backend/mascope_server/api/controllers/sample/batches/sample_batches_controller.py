@@ -31,7 +31,10 @@ from mascope_server.api.lib.exceptions.api_exceptions import (
     ApiException,
     raise_api_warning,
 )
-from mascope_server.api.controllers.match.match_controller import rematch_batch
+from mascope_server.api.controllers.match.match_controller import (
+    rematch_batch,
+    rematch_samples,
+)
 from mascope_server.api.controllers.target.collections.target_collections_controller import (
     get_target_collections,
 )
@@ -53,7 +56,7 @@ from mascope_server.api.controllers.sample.items.sample_items_controller import 
 )
 from mascope_server.api.controllers.samples.samples_controller import get_sample
 from mascope_server.api.controllers.calibration.calibration_controller import (
-    calibration_mz_calibrate_batch,
+    calibration_mz_calibrate_samples,
 )
 from mascope_server.api.new.instrument_configs.process.service import (
     process_instrument_config,
@@ -590,8 +593,9 @@ async def delete_sample_batch(
 
 @api_controller_background_task(
     success_notification_rooms=["sid"],
+    success_reload=[("sample_batch_reload", "sample_batch_ids")],
     error_notification_rooms=["sid"],
-    error_reload=[("sample_batch_reload", "sample_batch_id")],
+    error_reload=[("sample_batch_reload", "sample_batch_ids")],
 )
 async def import_sample_items(
     sample_batch_id: str,
@@ -613,9 +617,10 @@ async def import_sample_items(
     3. Create provided sample items and save them to the database.
     4. Optionally calibrate the batch using the provided calibration parameters,
         based on the calibrate_batch flag and if the instrument is TOF.
-    5. Compute matches for the batch.
-    6. In case of calibration failure, send a notification with information about failed samples.
-    7. Return the status message
+    5. Rematch affected sample items.
+    6. Gather affected sample batches.
+    7. In case of calibration failure, send a notification with information about failed samples.
+    8. Return the status message
 
     :param sample_batch_id: ID of the sample batch where sample items will be imported.
     :type sample_batch_id: str
@@ -674,31 +679,43 @@ async def import_sample_items(
     await send_progress_user_notification(notification, 0.15)
 
     # Step 3: Create provided sample items and save to database
+    created_sample_item_ids = []
     for sample_item in sample_items:
-        await create_sample_item(sample_item=sample_item)
+        sample_item_id = (await create_sample_item(sample_item=sample_item))["data"][
+            "sample_item_id"
+        ]
+        created_sample_item_ids.append(sample_item_id)
 
     notification.message = f"Created {len(sample_items)} sample{'s records' if len(sample_items) > 1 else 'record'}."
     await send_progress_user_notification(notification, 0.2)
 
     # Step 4: Optionally calibrate batch if calibrate_batch flag is True and instrument is TOF
     warning = None
+    # set default values, in case calibration is not run or fails
+    affected_sample_item_ids = created_sample_item_ids
+    affected_sample_batch_ids = [sample_batch_id]
+    # conditionally calibrate
     if calibrate_batch and instrument_type == "tof":
         samples_calibrate_failed = []
         try:
-            calibration_mz_calibrate_batch_data = await calibration_mz_calibrate_batch(
-                sample_batch_id=sample_batch_id,
+            calibration = await calibration_mz_calibrate_samples(
+                sample_item_ids=created_sample_item_ids,
                 mz_calibration_params=mz_calibration_params,
                 independent_transaction=False,
                 sid=sid,
                 process_id=gen_id(8),
                 parent_id=process_id,
             )
-            affected_sample_batch_ids = calibration_mz_calibrate_batch_data["data"].get(
-                "affected_sample_batch_ids", None
+            affected_sample_item_ids = calibration["data"].get(
+                "affected_sample_item_ids", []
             )
+            affected_sample_batch_ids = calibration["data"].get(
+                "affected_sample_batch_ids", []
+            ) + [sample_batch_id]
             notification.message = f"Sample batch'{sample_batch_name}' m/z calibrated."
-            if len(affected_sample_batch_ids):
-                notification.message += f" Calibration affected {len(affected_sample_batch_ids)} other sample batch{'es' if (len(affected_sample_batch_ids)) > 1 else ''}."
+            spillover = len(affected_sample_batch_ids) - 1
+            if spillover:
+                notification.message += f" Calibration affected {spillover} other sample batch{'es' if spillover > 1 else ''}."
             await send_progress_user_notification(notification, 0.6)
         except ApiException as e:
             if e.status_code == 200:
@@ -712,36 +729,37 @@ async def import_sample_items(
                 # This is a critical error, re-raise it
                 raise
 
-    # Step 5: Compute matches for the batch, this would reload the current batch, the other affected_sample_batch_ids reloaded in the calibration_mz_calibrate_batch
-    await rematch_batch(
-        sample_batch_id=sample_batch_id,
+    # Step 5: Rematch affected samples
+    await rematch_samples(
+        sample_item_ids=affected_sample_item_ids,
         independent_transaction=False,
         sid=sid,
         process_id=gen_id(8),
         parent_id=process_id,
     )
 
-    notification.message = f"Sample batch'{sample_batch_name}' rematched."
+    notification.message = f"Rematched {len(affected_sample_item_ids)} sample items affected by the import."
     await send_progress_user_notification(notification, 0.95)
 
-    # Step 6: Raise a warning if encountered during batch calibration
+    # Step 6: Gather affected batches
+    sample_batch_ids_to_reload = list(
+        set([*affected_sample_batch_ids, *processed["sample_batch_ids"]])
+    )
+
+    # Step 7: Raise a warning if encountered during calibration
     if warning is not None:
         raise_api_warning(
             warning,
             {
-                "sample_batch_id": sample_batch_id,
+                "sample_batch_ids": sample_batch_ids_to_reload,
                 "samples_calibrate_failed": samples_calibrate_failed,
             },
         )
 
-    # Step 7: Return the status message
+    # Step 8: Return the status message
     return {
         "message": f"{len(sample_items)} sample{'s' if len(sample_items) > 1 else ''} was imported to the sample batch '{sample_batch_name}'.",
-        "_notification_data": {
-            "sample_batch_ids": [
-                *set([sample_batch_id, *processed["sample_batch_ids"]])
-            ]
-        },
+        "_notification_data": {"sample_batch_ids": sample_batch_ids_to_reload},
     }
 
 

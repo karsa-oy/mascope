@@ -467,7 +467,7 @@ async def calibration_mz_calibrate_sample(
 
 @api_controller_background_task(
     success_notification_rooms=["sid"],
-    success_reload=[("sample_batch_reload", "sample_batch_ids")],
+    success_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
     error_notification_rooms=["sid"],
 )
 async def calibration_mz_calibrate_samples(
@@ -556,7 +556,7 @@ async def calibration_mz_calibrate_samples(
                 }
             )
 
-    sample_batch_ids_to_reload = fetch_sample_batch_ids(
+    sample_batch_ids_to_reload = await fetch_sample_batch_ids(
         sample_item_ids=sample_item_ids_to_reload
     )
 
@@ -568,6 +568,7 @@ async def calibration_mz_calibrate_samples(
             warning_message,
             {
                 "samples_calibrate_failed": samples_calibrate_failed,
+                "affected_sample_batch_ids": sample_batch_ids_to_reload,
             },
         )
 
@@ -579,7 +580,7 @@ async def calibration_mz_calibrate_samples(
         "message": f"m/z calibrated {len(sample_item_ids)} samples. {len(sample_batch_ids_to_reload)} sample batch{'es were' if len(sample_batch_ids_to_reload) > 1 else 'was'} affected.",
         "_notification_data": {
             "sample_item_ids": sample_item_ids,
-            "affected_sample_batch_ids": list(sample_batch_ids_to_reload),
+            "affected_sample_batch_ids": sample_batch_ids_to_reload,
         },
     }
 
