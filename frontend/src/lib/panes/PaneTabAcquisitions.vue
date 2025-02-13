@@ -170,8 +170,16 @@ watch(
       <div v-else class="center" style="min-height: 150px">
         <i class="info-line"> <span class="pi pi-inbox" /><span>No acquisitions found</span> </i>
       </div>
-      <DialogSampleOp v-model:action="dialog.sample" :item="selected.files[0]" />
-      <DialogBatchImport v-model:visible="dialog.batchImport" :files="selected.files" />
+      <DialogSampleOp
+        v-model:action="dialog.sample"
+        :item="selected.files[0]"
+        @submit="selected.files = []"
+      />
+      <DialogBatchImport
+        v-model:visible="dialog.batchImport"
+        :files="selected.files"
+        @submit="selected.files = []"
+      />
       <DialogFileUpload :files="uploadedFiles" />
       <i class="info-line">
         <span class="pi pi-file-arrow-up" /><span>Drag sample files here to upload them</span>

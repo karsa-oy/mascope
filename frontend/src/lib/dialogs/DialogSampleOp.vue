@@ -34,6 +34,8 @@ const props = defineProps({
   }
 })
 
+const emit = defineEmits(['submit'])
+
 const original = computed(() => props.item)
 
 // dialog visibility reactivity
@@ -163,6 +165,7 @@ const sampleTypeOptions = computed(() => {
 
 async function save() {
   visible.value = null
+  emit('submit')
   const sample_item = {
     sample_item_name: input.fields.find((field) => field.label == 'sample_item_name').value,
     sample_item_type: input.type,

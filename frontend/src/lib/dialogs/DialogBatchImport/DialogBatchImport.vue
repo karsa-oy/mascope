@@ -45,6 +45,8 @@ const props = defineProps({
   }
 })
 
+const emit = defineEmits(['submit'])
+
 const tab = ref('data')
 
 const imported = reactive({
@@ -199,6 +201,7 @@ const submit = () => {
   if (!validation.rows.passed) {
     return
   }
+  emit('submit')
   app.data.batch.importSamples({
     batch: app.data.batch.focused,
     sample_items: imported.items,
