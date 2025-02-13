@@ -73,7 +73,7 @@ class H5Processor(Thread):
             # Get total number of timestamps/scans
             n_scans = self.h5.attrs["NbrBufs"] * self.h5.attrs["NbrWrites"]
             # Return mean difference between timestamps
-            return self.length / n_scans  # [s]
+            return float(self.length / n_scans)  # [s]
         return None
 
     @property
@@ -89,7 +89,7 @@ class H5Processor(Thread):
             t_first = timestamps[0, 0]
             t_last = timestamps[-1, -1]
             # Return difference between first and last timestamp as total length
-            return t_last - t_first  # [s]
+            return float(t_last - t_first)  # [s]
         return None
 
     @property
@@ -123,7 +123,7 @@ class H5Processor(Thread):
         :rtype: float
         """
         if self.h5:
-            return self.h5["FullSpectra"].attrs["Single Ion Signal"][0]
+            return float(self.h5["FullSpectra"].attrs["Single Ion Signal"][0])
         return None
 
     @property
@@ -134,7 +134,28 @@ class H5Processor(Thread):
         :rtype: float
         """
         if self.h5:
-            return self.h5["FullSpectra"].attrs["SampleInterval"][0] * 1e9  # [s]->[ns]
+            return float(
+                self.h5["FullSpectra"].attrs["SampleInterval"][0] * 1e9
+            )  # [s]->[ns]
+        return None
+
+    @property
+    def conversion_coefficient(self) -> float | None:
+        """Coefficient to convert signal intensity from [mV/ext] -> [ions/sec]
+
+        Was used TofDaqStreamer, not applied here, but formula is good to keep
+
+        :return: Conversion coefficient
+        :rtype: float | None
+        """
+        if self.h5:
+            # TOF frequency [Hz] (1/TOF period)
+            tof_frequency = 1 / self.h5["TimingData"].attrs["TofPeriod"][0]
+            return float(
+                self.interval
+                * (self.sample_interval * tof_frequency)
+                / self.single_ion_signal
+            )
         return None
 
     @property
@@ -145,17 +166,7 @@ class H5Processor(Thread):
         :rtype: float
         """
         if self.h5:
-            # TOF frequency [Hz] (1/TOF period)
-            tof_frequency = 1 / self.h5["TimingData"].attrs["TofPeriod"][0]
-            # Coefficient to convert signal intensity from [mV/ext] -> [ions/sec]
-            conversion_coef = (
-                self.interval
-                * (self.sample_interval * tof_frequency)
-                / self.single_ion_signal
-            )
-            return (
-                self.h5["FullSpectra"]["SumSpectrum"][:].sum() * conversion_coef
-            )  # [mV/ext] -> [ions/sec]
+            return float(self.h5["FullSpectra"]["SumSpectrum"][:].sum())
         return None
 
     @property
@@ -172,10 +183,10 @@ class H5Processor(Thread):
             num_params = attrs["MassCalibration nbrParameters"][0]
             # Get mass calibration parameters
             mass_calib_params = [
-                attrs[f"MassCalibration p{i+1}"][0] for i in range(num_params)
+                float(attrs[f"MassCalibration p{i+1}"][0]) for i in range(num_params)
             ]
             return {
-                "mode": attrs["MassCalibMode"][0],
+                "mode": int(attrs["MassCalibMode"][0]),
                 "par": mass_calib_params,
             }
         return None
