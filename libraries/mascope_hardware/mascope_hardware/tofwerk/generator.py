@@ -200,7 +200,6 @@ class H5Processor(Thread):
             # Reset attributes
             self.h5 = None
             self.filename = None
-            self.file_to_process = None
         self.cancel_event.clear()
 
     def _process_h5_file(self, sample_file_props: dict, h5_filepath: str) -> bool:
@@ -299,7 +298,7 @@ class H5Processor(Thread):
 
             # Get sample file properties
             sample_file_props = {
-                "filename": self.filename,
+                "filename": self.filename.replace(" ", "_") + "_" + self.polarity,
                 "length": self.length,
                 "committed_length": self.length,
                 "range": self.mz_range,
@@ -313,18 +312,22 @@ class H5Processor(Thread):
                 "method_file": None,
             }
 
-            if_processed = self._process_h5_file(sample_file_props, file_to_process)
+            if_processed = self._process_h5_file(
+                sample_file_props, self.file_to_process
+            )
 
             self._finalize()
-            self.log.info(f"Finished processing file: {Path(file_to_process).name}")
+            self.log.info(
+                f"Finished processing file: {Path(self.file_to_process).name}"
+            )
 
             if if_processed:
                 self.log.info("Deleting file from the streams folder")
                 try:
-                    os.remove(file_to_process)
+                    os.remove(self.file_to_process)
                 except FileNotFoundError:
                     self.log.error(
-                        f"Failed to delete file {file_to_process} from streams folder"
+                        f"Failed to delete file {self.file_to_process} from streams folder"
                     )
                     self.log.exception(e)
 
