@@ -7,7 +7,6 @@ the matching/rematching processes and related operations.
 """
 
 import asyncio
-from typing import List, Optional
 from sqlalchemy import select, delete
 from mascope_server.db import async_session
 from mascope_server.db.id import gen_id
@@ -70,10 +69,10 @@ from mascope_server.runtime import runtime
 )
 async def rematch_sample(
     sample_item_id: str,
-    added_target_compound_ids: Optional[List[str]] = None,
-    added_ionization_mechanism_ids: Optional[List[str]] = None,
-    removed_target_compound_ids: Optional[List[str]] = None,
-    removed_ionization_mechanism_ids: Optional[List[str]] = None,
+    added_target_compound_ids: list[str] | None = None,
+    added_ionization_mechanism_ids: list[str] | None = None,
+    removed_target_compound_ids: list[str] | None = None,
+    removed_ionization_mechanism_ids: list[str] | None = None,
     independent_transaction: bool = False,
     sid: str = None,
     process_id=None,
@@ -96,13 +95,13 @@ async def rematch_sample(
     :param sample_item_id: ID of the sample item for which the rematch is to be performed.
     :type sample_item_id: str
     :param added_target_compound_ids: List of target compound IDs for which matches need to be computed, defaults to None
-    :type added_target_compound_ids: Optional[List[str]], optional
+    :type added_target_compound_ids: list[str] | None, optional
     :param added_ionization_mechanism_ids: List of ionization mechanism IDs for which matches need to be computed, defaults to None
-    :type added_ionization_mechanism_ids: Optional[List[str]], optional
+    :type added_ionization_mechanism_ids: list[str] | None, optional
     :param removed_target_compound_ids: List of target compound IDs for which matches are to be removed, defaults to None
-    :type removed_target_compound_ids: Optional[List[str]], optional
+    :type removed_target_compound_ids: list[str] | None, optional
     :param removed_ionization_mechanism_ids: List of ionization mechanism IDs for which matches are to be removed, defaults to None
-    :type removed_ionization_mechanism_ids: Optional[List[str]], optional
+    :type removed_ionization_mechanism_ids: list[str] | None, optional
     :param independent_transaction: Flag indicating whether the ramtching is an independent transaction, which affects event emission, defaults to False
     :type independent_transaction: bool, optional
     :param sid: Session ID, used for targeting specific clients when emitting events, defaults to None
@@ -176,8 +175,8 @@ async def rematch_sample(
 )
 async def match_remove_sample(
     sample_item_id: str,
-    removed_target_compound_ids: Optional[List[str]] = None,
-    removed_ionization_mechanism_ids: Optional[List[str]] = None,
+    removed_target_compound_ids: list[str] | None = None,
+    removed_ionization_mechanism_ids: list[str] | None = None,
     independent_transaction: bool = False,
     sid: str = None,
     process_id=None,
@@ -198,9 +197,9 @@ async def match_remove_sample(
     :param sample_item_id: Unique identifier for the sample item whose matches are to be removed.
     :type sample_item_id: str
     :param removed_target_compound_ids: List of target compound IDs to filter the matches that need to be removed, optional.
-    :type removed_target_compound_ids: Optional[List[str]]
+    :type removed_target_compound_ids: list[str] | None
     :param removed_ionization_mechanism_ids: List of ionization mechanism IDs to filter the matches that need to be removed, optional.
-    :type removed_ionization_mechanism_ids: Optional[List[str]]
+    :type removed_ionization_mechanism_ids: list[str] | None
     :param independent_transaction: Flag indicating whether the operation should be treated as an independent transaction, defaults to False.
     :type independent_transaction: bool
     :raises HTTPException: Raises an HTTPException if the operation fails during an independent transaction.
@@ -243,8 +242,8 @@ async def match_remove_sample(
 )
 async def match_compute_sample(
     sample_item_id: str,
-    added_target_compound_ids: Optional[List[str]] = None,
-    added_ionization_mechanism_ids: Optional[List[str]] = None,
+    added_target_compound_ids: list[str] | None = None,
+    added_ionization_mechanism_ids: list[str] | None = None,
     independent_transaction: bool = False,
     sid: str = None,
     process_id=None,
@@ -274,9 +273,9 @@ async def match_compute_sample(
     :param sample_item_id: ID of the sample item for which matches are to be computed.
     :type sample_item_id: str
     :param added_target_compound_ids: List of added target compound IDs to be considered for match computation, defaults to None
-    :type added_target_compound_ids: Optional[List[str]], optional
+    :type added_target_compound_ids: list[str] | None, optional
     :param added_ionization_mechanism_ids: List of added ionization mechanism IDs to be considered for match computation, defaults to None
-    :type added_ionization_mechanism_ids: Optional[List[str]], optional
+    :type added_ionization_mechanism_ids: list[str] | None, optional
     :param independent_transaction: Flag indicating whether the sample match computing is an independent transaction, which affects event emission, defaults to False
     :type independent_transaction: bool, optional
     :param sid: Session ID, used for targeting specific clients when emitting events, defaults to None
@@ -542,10 +541,10 @@ async def rematch_batches(
 )
 async def rematch_batch(
     sample_batch_id: str,
-    added_target_compound_ids: Optional[List[str]] = None,
-    added_ionization_mechanism_ids: Optional[List[str]] = None,
-    removed_target_compound_ids: Optional[List[str]] = None,
-    removed_ionization_mechanism_ids: Optional[List[str]] = None,
+    added_target_compound_ids: list[str] | None = None,
+    added_ionization_mechanism_ids: list[str] | None = None,
+    removed_target_compound_ids: list[str] | None = None,
+    removed_ionization_mechanism_ids: list[str] | None = None,
     independent_transaction: bool = False,
     notification: UserNotification = None,
     sid: str = None,
@@ -572,13 +571,13 @@ async def rematch_batch(
     :param sample_batch_id: ID of the sample batch for which the rematch is to be performed.
     :type sample_batch_id: str
     :param added_target_compound_ids: List of target compound IDs for which matches need to be computed, defaults to None
-    :type added_target_compound_ids: Optional[List[str]], optional
+    :type added_target_compound_ids: list[str] | None, optional
     :param added_ionization_mechanism_ids: List of ionization mechanism IDs for which matches need to be computed, defaults to None
-    :type added_ionization_mechanism_ids: Optional[List[str]], optional
+    :type added_ionization_mechanism_ids: list[str] | None, optional
     :param removed_target_compound_ids: List of target compound IDs for which matches are to be removed, defaults to None
-    :type removed_target_compound_ids: Optional[List[str]], optional
+    :type removed_target_compound_ids: list[str] | None, optional
     :param removed_ionization_mechanism_ids: List of ionization mechanism IDs for which matches are to be removed, defaults to None
-    :type removed_ionization_mechanism_ids: Optional[List[str]], optional
+    :type removed_ionization_mechanism_ids: list[str] | None, optional
 
     Notes:
         - If `removed_*` parameters are provided, the function removes matches related to these parameters.
@@ -588,13 +587,13 @@ async def rematch_batch(
     :param sample_batch_id: _description_
     :type sample_batch_id: str
     :param added_target_compound_ids: _description_, defaults to None
-    :type added_target_compound_ids: Optional[List[str]], optional
+    :type added_target_compound_ids: list[str] | None, optional
     :param added_ionization_mechanism_ids: _description_, defaults to None
-    :type added_ionization_mechanism_ids: Optional[List[str]], optional
+    :type added_ionization_mechanism_ids: list[str] | None, optional
     :param removed_target_compound_ids: _description_, defaults to None
-    :type removed_target_compound_ids: Optional[List[str]], optional
+    :type removed_target_compound_ids: list[str] | None, optional
     :param removed_ionization_mechanism_ids: _description_, defaults to None
-    :type removed_ionization_mechanism_ids: Optional[List[str]], optional
+    :type removed_ionization_mechanism_ids: list[str] | None, optional
     :param independent_transaction: _description_, defaults to False
     :type independent_transaction: bool, optional
     :param notification: _description_, defaults to None
@@ -735,8 +734,8 @@ async def rematch_batch(
 )
 async def match_remove_batch(
     sample_batch_id: str,
-    removed_target_compound_ids: Optional[List[str]] = None,
-    removed_ionization_mechanism_ids: Optional[List[str]] = None,
+    removed_target_compound_ids: list[str] | None = None,
+    removed_ionization_mechanism_ids: list[str] | None = None,
     independent_transaction: bool = False,
     sid: str = None,
     process_id=None,
@@ -757,9 +756,9 @@ async def match_remove_batch(
     :param sample_batch_id: ID of the sample batch for which matches are to be removed.
     :type sample_batch_id: str
     :param removed_target_compound_ids: List of target compound IDs for which matches are to be removed, optional.
-    :type removed_target_compound_ids: Optional[List[str]]
+    :type removed_target_compound_ids: list[str] | None
     :param removed_ionization_mechanism_ids: List of ionization mechanism IDs for which matches are to be removed, optional.
-    :type removed_ionization_mechanism_ids: Optional[List[str]]
+    :type removed_ionization_mechanism_ids: list[str] | None
     :param independent_transaction: Flag indicating if the operation should be an independent transaction, default to False.
     :type independent_transaction: bool
     """
@@ -807,8 +806,8 @@ async def match_remove_batch(
 )
 async def match_compute_batch(
     sample_batch_id: str,
-    added_target_compound_ids: Optional[List[str]] = None,
-    added_ionization_mechanism_ids: Optional[List[str]] = None,
+    added_target_compound_ids: list[str] | None = None,
+    added_ionization_mechanism_ids: list[str] | None = None,
     independent_transaction: bool = False,
     notification: UserNotification = None,
     sid: str = None,
@@ -841,9 +840,9 @@ async def match_compute_batch(
     :param sample_batch_id: The identifier of the sample batch for which match computation is to be performed.
     :type sample_batch_id: str
     :param added_target_compound_ids: A list of identifiers for target compounds that have been added to the batch, limiting the scope of match computation.
-    :type added_target_compound_ids: Optional[List[str]], optional
+    :type added_target_compound_ids: list[str] | None, optional
     :param added_ionization_mechanism_ids: A list of identifiers for ionization mechanisms that have been added to the batch, limiting the scope of match computation.
-    :type added_ionization_mechanism_ids: Optional[List[str]], optional
+    :type added_ionization_mechanism_ids: list[str] | None, optional
     :param independent_transaction: Indicates whether the match computation operation should be treated as a standalone process, which affects event emission and UI updates.
     :type independent_transaction: bool, optional
     :raises ApiException: Raised in cases where match computation cannot proceed due to issues such as unverified m/z calibration or the absence of new target isotopes to compute matches for.

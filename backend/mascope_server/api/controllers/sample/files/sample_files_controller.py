@@ -499,8 +499,8 @@ async def compute_all_sample_file_peaks(
     if_exists: Literal["append", "replace"] = "append",
     independent_transaction: bool = False,
     sid: str = None,
-    process_id=None,
-    parent_id=None,
+    process_id: str | None = None,
+    parent_id: str | None = None,
 ) -> dict:
     """
     Computes all peak data for a specific sample file, performing the operation as a background task.
