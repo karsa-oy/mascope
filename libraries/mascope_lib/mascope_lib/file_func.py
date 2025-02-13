@@ -392,6 +392,28 @@ def filename_to_zarr_path(base_filename, variable):
     return os.path.join(sample_data_path, zarr_filename)
 
 
+def filename_to_datafile_path(base_filename):
+    """Derive full path to a h5 or raw data file from sample filename
+
+    :param base_filename: Sample file filename
+    :type base_filename: str
+    :return: Full path
+    :rtype: str
+    """
+    # Get path to the sample file folder
+    base_path = get_filestore_path()
+    sample_data_path = parse_path_from_item_filename(base_filename, base_path)
+
+    sample_file_type = get_sample_file_type(base_filename)
+
+    # Get path to the datafile and verify if it exists
+    datafile_path = os.path.join(sample_data_path, f"data.{sample_file_type}")
+    if os.path.exists(datafile_path):
+        return datafile_path
+    else:
+        raise FileNotFoundError(f"The file {datafile_path} was not found")
+
+
 def get_file_data_vars(filepath):
     """Get list of available variables in a sample file
 
