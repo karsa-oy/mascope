@@ -34,3 +34,24 @@ async def fetch_sample_file(filename: str) -> dict:
 
         # Step 3: Return sample file details
         return sample_file
+
+
+async def fetch_sample_files(filenames: list[str]) -> dict:
+    """
+    Retrieves a multiple sample files from a list of filenames.
+
+    Steps:
+    1. Execute a query to fetch the sample files with the specified filenames.
+    2. Return the sample file's details as a dictionary.
+
+    :param filenames: List of filenames of the sample files to retrieve.
+    :type filenames: list[str]
+    :return: The requested sample file's details.
+    :rtype: dict
+    """
+    async with async_session() as session:
+        result = await session.execute(
+            select(SampleFile).where(SampleFile.filename.in_(filenames))
+        )
+        sample_files = result.scalars().all()
+    return sample_files
