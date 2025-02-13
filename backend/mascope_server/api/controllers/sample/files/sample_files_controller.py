@@ -564,6 +564,29 @@ async def compute_sample_file_peaks(
     }
 
 
+@api_controller_background_task(
+    success_notification_rooms=["sid"],
+    error_notification_rooms=["sid"],
+)
+async def compute_sample_files_peaks(
+    sample_file_ids: list[str],
+    if_exists: Literal["append", "replace"] = "append",
+    independent_transaction: bool = False,
+    sid: str = None,
+    process_id: str | None = None,
+    parent_id: str | None = None,
+) -> dict:
+    for sample_file_id in sample_file_ids:
+        await compute_sample_file_peaks(
+            sample_file_id=sample_file_id,
+            if_exists=if_exists,
+            independent_transaction=True,
+            sid=sid,
+            process_id=gen_id(8),
+            parent_id=process_id,
+        )
+
+
 @api_controller()
 async def get_sample_file_peak_timeseries(
     sample_file_id: str, peak_mz: float, peak_mz_tolerance_ppm: float
