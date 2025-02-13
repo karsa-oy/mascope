@@ -1,6 +1,7 @@
 import fnmatch
 import json
 import os
+import glob
 import sys
 from ctypes import ArgumentError
 from datetime import datetime, timezone
@@ -826,3 +827,16 @@ def write_zarr_attributes(filepath, attributes):
     sync = ExtendableDataArray.get_zarr_synchronizer(filepath)
     z = zarr.open(filepath, mode="a", synchronizer=sync)
     z.attrs.update(attributes)
+
+
+def delete_peaks(base_filename: str):
+    """Delete sample file peaks.
+
+    :param base_filename: Sample file filename
+    :type base_filename: str
+    """
+    base_path = get_filestore_path()
+    sample_data_path = parse_path_from_item_filename(base_filename, base_path)
+    peak_dirs = glob.glob(os.path.join(sample_data_path, "peak_*"))
+    for dir in peak_dirs:
+        rmtree(dir)
