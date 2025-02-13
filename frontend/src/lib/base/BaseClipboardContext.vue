@@ -28,6 +28,11 @@ const props = defineProps({
     required: false,
     default: 'Paste here'
   },
+  hideInitMessage: {
+    type: Boolean,
+    required: false,
+    default: false
+  },
   persistMessage: {
     type: Boolean,
     default: false
@@ -72,7 +77,7 @@ async function process() {
   }
 }
 
-let alive = ref(true)
+let alive = ref(!props.hideInitMessage)
 setTimeout(
   () => {
     alive.value = false

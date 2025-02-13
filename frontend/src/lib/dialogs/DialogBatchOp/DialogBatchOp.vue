@@ -192,21 +192,13 @@ async function init(value) {
     selected.info.name = ''
     selected.info.desc = ''
     // init ionization mechanisms
-    selected.mechanisms.matching = app.data.mechanism.list.filter(
-      (mech) => mech.ionization_mechanism === '+Br-'
-    )
+    selected.mechanisms.matching = []
     // init target collections with defaults
-    selected.targets = app.data.target.collection.list.filter(
-      (coll) =>
-        coll.target_collection_name === 'Explosives targets' ||
-        coll.target_collection_id === 'kNBOCx32dpehRWUw'
-    )
+    selected.targets = []
     // init calibrants with defaults
     selected.calibrants = app.data.target.collection.list.find(
-      (coll) =>
-        coll.target_collection_name === 'Br calibrants' ||
-        coll.target_collection_id === 'xkSPp3eZrWXYSVDa'
-    )
+      ({ target_collection_type }) => target_collection_type == 'CALIBRANTS'
+    ) // use first calibrant collection otherwise
   }
   // save initial state
   initial.info = clone(selected.info)

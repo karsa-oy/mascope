@@ -19,6 +19,9 @@ import Column from 'primevue/column'
 import InlineMessage from 'primevue/inlinemessage'
 import Listbox from 'primevue/listbox'
 import Avatar from 'primevue/avatar'
+import Select from 'primevue/select'
+import IconField from 'primevue/iconfield'
+import InputIcon from 'primevue/inputicon'
 import { useConfirm } from 'primevue/useconfirm'
 
 import { api } from '@/api'
@@ -72,7 +75,9 @@ const batches = reactive({
 })
 const selected = reactive({
   workspace: null,
-  source: null, // for adding compounds
+  source: 'collection',
+  collection: 'all-compounds', // for adding compounds
+  search: '',
   tab: 'compounds',
   all: {
     targets: false,
@@ -184,22 +189,17 @@ function restore(compound) {
   compounds.selected.push(compound)
 }
 
+watchEffect(() => {
+  if (selected.source == 'input') {
+    selected.search = ''
+  }
+})
 watchEffect(async () => {
-  let pending = []
-  if (!selected.source || selected.source == 'Selection') {
-    return
-  } else if (selected.source === 'All') {
-    pending = app.data.target.compound.list
-  } else if (selected.source) {
-    const id = app.data.target.collection.list.find(
-      ({ target_collection_name }) => target_collection_name == selected.source
-    ).target_collection_id
-    const collection = await app.data.target.collection.read(id)
-    pending = collection?.target_compounds ?? []
-  }
-  if (pending.length) {
-    loadCompounds(pending)
-  }
+  // reload compounds
+  compounds.loaded =
+    selected.collection === 'all-compounds'
+      ? app.data.target.compound.list
+      : ((await app.data.target.collection.read(selected.collection))?.target_compounds ?? [])
   // select all checkbox state
   selected.all.targets =
     compounds.loaded.length > 0
@@ -210,28 +210,6 @@ watchEffect(async () => {
         )
       : false
 })
-function loadCompounds(data) {
-  const index = new Map(
-    [...compounds.selected, ...data].map((compound) => [
-      compound.target_compound_id ?? compound.target_compound_formula,
-      compound
-    ])
-  )
-  // reconcile with exisiting compounds
-  const reconciled = data.map(
-    (compound) =>
-      index.get(compound.target_compound_id ?? compound.target_compound_formula) ?? compound
-  )
-  if (selected.source !== 'Selection') {
-    compounds.loaded = reconciled
-  } else {
-    const unselected = (added) =>
-      !compounds.selected.find(
-        (selected) => selected.target_compound_formula == added.target_compound_formula
-      )
-    compounds.selected.push(...reconciled.filter(unselected))
-  }
-}
 function loadSpreadsheet({ rows }) {
   let prexisting = []
   rows.forEach((compound) => {
@@ -249,7 +227,22 @@ function loadSpreadsheet({ rows }) {
       }
     }
   })
-  loadCompounds(prexisting)
+  const index = new Map(
+    [...compounds.selected, ...prexisting].map((compound) => [
+      compound.target_compound_id ?? compound.target_compound_formula,
+      compound
+    ])
+  )
+  // reconcile with exisiting compounds
+  const reconciled = prexisting.map(
+    (compound) =>
+      index.get(compound.target_compound_id ?? compound.target_compound_formula) ?? compound
+  )
+  const unselected = (added) =>
+    !compounds.selected.find(
+      (selected) => selected.target_compound_formula == added.target_compound_formula
+    )
+  compounds.selected.push(...reconciled.filter(unselected))
 }
 
 watchEffect(() => loadBatches(selected.workspace))
@@ -377,12 +370,13 @@ async function init(mode) {
     return
   }
   selected.tab = 'compounds'
-  selected.source = 'Selection'
+  selected.collection = 'all-compounds'
+  selected.source = 'collection'
+  selected.search = ''
   compounds.loaded = []
   compounds.selected = []
   compounds.initial = []
   compounds.created = []
-  add.expanded = false
   add.name = ''
   add.formula = ''
   add.cas = ''
@@ -425,26 +419,6 @@ async function init(mode) {
   compounds.initial = clone(compounds.selected)
   batches.initial = clone(batches.selected)
   loadBatches(selected.workspace)
-}
-
-/**
- * Checks if any of the 'add compound' input fields are focused.
- * If none of the relevant fields are focused, it collapses the add compound panel.
- *
- * @param {Event} event - The blur event that triggers this function.
- */
-function addCheckFocus(event) {
-  // Get the active element (the currently focused element)
-  const activeElement = document.activeElement
-
-  // Check if the active element is not any of the inputs in the panel
-  if (
-    activeElement.id !== 'add-compound-formula' &&
-    activeElement.id !== 'add-compound-name' &&
-    activeElement.id !== 'add-compound-cas'
-  ) {
-    add.expanded = false
-  }
 }
 
 /**
@@ -517,203 +491,227 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onEnter))
         <TabPanels>
           <!-- compounds -->
           <TabPanel value="compounds">
-            <div class="row selector">
-              <Listbox
-                v-model="selected.source"
-                :options="[
-                  'Selection',
-                  'All',
-                  ...app.data.target.collection.list
-                    .filter((coll) =>
-                      action !== 'create'
-                        ? coll.target_collection_id !== original.target_collection_id
-                        : true
-                    )
-                    .map((coll) => coll.target_collection_name)
-                ]"
-                id="target-collection-source"
-                style="min-width: 200px; height: 300px"
-              >
-                <template #option="slotProps">
-                  <div style="display: flex; flex-flow: row; gap: 0.5rem; align-items: center">
-                    <Avatar
-                      :icon="`pi ${slotProps.option == 'Selection' ? 'pi-list-check' : 'pi-book'}`"
-                      shape="circle"
-                    />
-                    <span>{{ slotProps.option }}</span>
+            <div class="selector">
+              <div class="row" style="align-items: stretch; height: 450px">
+                <Panel>
+                  <div class="row" style="margin-bottom: 1rem; align-items: flex-start">
+                    <h4 style="margin: 0" v-if="action == 'update'">Collection changes</h4>
+                    <h4 style="margin: 0" v-else-if="action == 'create'">Collection</h4>
+                    <span
+                      :style="`
+                        opacity: 0.5;
+                        font-style: italic;
+                        max-width: 250px;
+                        font-size: smaller;
+                        text-align: right;
+                      `"
+                    >
+                      Add compounds by pasting spreadsheet cells here or by using the panel to the
+                      right.
+                    </span>
                   </div>
-                </template>
-              </Listbox>
-              <Panel>
-                <div class="row">
-                  <Button
-                    :icon="add.expanded ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"
-                    @click="add.expanded = !add.expanded"
-                    text
-                  />
-                  <FloatLabel style="flex-grow: 1">
-                    <InputText
-                      v-model="add.formula"
-                      id="add-compound-formula"
-                      style="width: 100%"
-                      @focus="add.expanded = true"
-                      @blur="addCheckFocus"
-                      :invalid="!add.formula.trim() && add.expanded"
-                    />
-                    <label for="add-compound-formula">Formula*</label>
-                  </FloatLabel>
-                  <Button
-                    label="Add"
-                    icon="pi pi-plus"
-                    @click="addCompound"
-                    :disabled="!add.formula.trim()"
-                  />
-                </div>
-                <div
-                  :class="`row expandable ${add.expanded ? 'expanded' : 'collapsed'}`"
-                  style="padding-left: 5ch"
-                >
-                  <FloatLabel>
-                    <InputText
-                      v-model="add.name"
-                      id="add-compound-name"
-                      @focus="add.expanded = true"
-                      @blur="addCheckFocus"
-                    />
-                    <label for="add-compound-name">Name</label>
-                  </FloatLabel>
-                  <FloatLabel>
-                    <InputText
-                      v-model="add.cas"
-                      id="add-compound-cas"
-                      @focus="add.expanded = true"
-                      @blur="addCheckFocus"
-                    />
-                    <label for="add-compound-cas">CAS Number</label>
-                  </FloatLabel>
-                </div>
-                <BaseClipboardContext
-                  v-if="selected.source == 'Selection'"
-                  info="You can also add compounds by pasting spreadsheet cells"
-                  @validated="({ data }) => loadSpreadsheet({ rows: data })"
-                  :parse="
-                    (text) => {
-                      const { rows } = fromSpreadsheet(text, [
-                        'target_compound_name',
-                        'target_compound_formula',
-                        'cas_number' // optional
-                      ])
-                      return rows
-                    }
-                  "
-                  :validate="
-                    (data) => {
-                      const cols = Object.keys(data[0]).length
-                      const rows = data.length
-                      if (cols == 1 && rows == 1) {
+                  <BaseClipboardContext
+                    hideInitMessage
+                    @validated="({ data }) => loadSpreadsheet({ rows: data })"
+                    :parse="
+                      (text) => {
+                        const { rows } = fromSpreadsheet(text, [
+                          'target_compound_name',
+                          'target_compound_formula',
+                          'cas_number' // optional
+                        ])
+                        return rows
+                      }
+                    "
+                    :validate="
+                      (data) => {
+                        const cols = Object.keys(data[0]).length
+                        const rows = data.length
+                        if (cols == 1 && rows == 1) {
+                          return {
+                            valid: false,
+                            severity: 'warn',
+                            message: 'Please paste spreadsheet cells'
+                          }
+                        }
+                        const validCols = 2 <= cols && cols <= 3
+                        const validRows = data.map(
+                          (row) => row?.target_compound_formula?.length > 0
+                        )
+                        const valid = validRows && validCols
+                        const messageCols = !validCols
+                          ? `You pasted ${cols} columns but 2 or 3 are expected`
+                          : null
+                        const messageRows = !validRows
+                          ? `Some rows are missing a formula, which is required`
+                          : null
+                        const message =
+                          messageCols ?? messageRows ?? `Pasted ${cols} columns and ${rows} rows`
                         return {
-                          valid: false,
-                          severity: 'warn',
-                          message: 'Please paste spreadsheet cells'
+                          valid,
+                          severity: valid ? 'success' : 'warn',
+                          message
                         }
                       }
-                      const validCols = 2 <= cols && cols <= 3
-                      const validRows = data.map((row) => row?.target_compound_formula?.length > 0)
-                      const valid = validRows && validCols
-                      const messageCols = !validCols
-                        ? `You pasted ${cols} columns but 2 or 3 are expected`
-                        : null
-                      const messageRows = !validRows
-                        ? `Some rows are missing a formula, which is required`
-                        : null
-                      const message =
-                        messageCols ?? messageRows ?? `Pasted ${cols} columns and ${rows} rows`
-                      return {
-                        valid,
-                        severity: valid ? 'success' : 'warn',
-                        message
-                      }
-                    }
-                  "
-                  :persistMessage="changes.length == 0"
-                >
-                  <DataTable
-                    dataKey="target_compound_formula"
-                    v-if="changes.length"
-                    :value="changes"
-                    sortMode="multiple"
-                    :multiSortMeta="[
-                      { field: 'status', order: 1 },
-                      { field: 'target_compound_formula', order: 1 }
-                    ]"
-                    scrollable
-                    :scrollHeight="add.expanded ? '130px' : '200px'"
-                    style="flex-grow: 1"
+                    "
+                    :persistMessage="changes.length == 0"
                   >
-                    <Column header="Status" field="status" key="status" columnKey="status" sortable>
-                      <template #body="slotProps">
-                        <InlineMessage
-                          v-if="slotProps.data.status == '1 create'"
-                          severity="success"
-                        >
-                          Create
-                        </InlineMessage>
-                        <InlineMessage v-else-if="slotProps.data.status == '2 add'" severity="info">
-                          Add
-                        </InlineMessage>
-                        <InlineMessage
-                          v-else-if="slotProps.data.status == '3 keep'"
-                          severity="secondary"
-                          icon="pi pi-thumbtack"
-                        >
-                          Keep
-                        </InlineMessage>
-                        <InlineMessage
-                          v-else-if="slotProps.data.status == '4 remove'"
-                          severity="warn"
-                        >
-                          Remove
-                        </InlineMessage>
-                      </template>
-                    </Column>
-                    <Column
-                      v-for="col of columns.filter(({ field }) => field !== 'status')"
-                      :key="col.field"
-                      :field="col.field"
-                      :header="col.label"
-                      sortable
+                    <DataTable
+                      dataKey="target_compound_formula"
+                      v-if="changes.length"
+                      :value="changes"
+                      sortMode="multiple"
+                      :multiSortMeta="[
+                        { field: 'status', order: 1 },
+                        { field: 'target_compound_formula', order: 1 }
+                      ]"
+                      scrollable
+                      scrollHeight="350px"
+                      style="flex-grow: 1; height: 350px"
+                    >
+                      <Column
+                        header="Status"
+                        field="status"
+                        key="status"
+                        columnKey="status"
+                        sortable
+                      >
+                        <template #body="slotProps">
+                          <InlineMessage
+                            v-if="slotProps.data.status == '1 create'"
+                            severity="success"
+                          >
+                            Create
+                          </InlineMessage>
+                          <InlineMessage
+                            v-else-if="slotProps.data.status == '2 add'"
+                            severity="info"
+                          >
+                            Add
+                          </InlineMessage>
+                          <InlineMessage
+                            v-else-if="slotProps.data.status == '3 keep'"
+                            severity="secondary"
+                            icon="pi pi-thumbtack"
+                          >
+                            Keep
+                          </InlineMessage>
+                          <InlineMessage
+                            v-else-if="slotProps.data.status == '4 remove'"
+                            severity="warn"
+                          >
+                            Remove
+                          </InlineMessage>
+                        </template>
+                      </Column>
+                      <Column
+                        v-for="col of columns.filter(({ field }) => field !== 'status')"
+                        :key="col.field"
+                        :field="col.field"
+                        :header="col.label"
+                        sortable
+                      />
+                      <Column headerStyle="width: 3rem">
+                        <template #body="slotProps">
+                          <Button
+                            v-if="slotProps.data.status == '4 remove'"
+                            @click="restore(slotProps.data)"
+                            icon="pi pi-plus"
+                            severity="secondary"
+                            text
+                          />
+                          <Button
+                            v-else
+                            @click="remove(slotProps.data)"
+                            icon="pi pi-times"
+                            severity="secondary"
+                            text
+                          />
+                        </template>
+                      </Column>
+                    </DataTable>
+                    <i v-else style="margin-bottom: 5rem"> No compounds added yet </i>
+                  </BaseClipboardContext>
+                </Panel>
+                <Panel>
+                  <div class="row" style="align-items: flex-start">
+                    <h4 style="margin-bottom: 0.5rem">Add compounds</h4>
+                    <SelectButton
+                      v-model="selected.source"
+                      :allowEmpty="false"
+                      :options="[
+                        {
+                          label: 'Import existing',
+                          value: 'collection'
+                        },
+                        { label: 'Create new', value: 'input' }
+                      ]"
+                      optionLabel="label"
+                      optionValue="value"
                     />
-                    <Column headerStyle="width: 3rem">
-                      <template #body="slotProps">
-                        <Button
-                          v-if="slotProps.data.status == '4 remove'"
-                          @click="restore(slotProps.data)"
-                          icon="pi pi-plus"
-                          severity="secondary"
-                          text
+                  </div>
+                  <div
+                    class="row"
+                    style="align-items: flex-end"
+                    v-if="selected.source == 'collection'"
+                  >
+                    <FloatLabel>
+                      <label>Collection</label>
+                      <Select
+                        v-model:modelValue="selected.collection"
+                        :options="[
+                          {
+                            target_collection_id: 'all-compounds',
+                            target_collection_name: 'All compounds'
+                          },
+                          ...app.data.target.collection.list.filter((coll) =>
+                            action !== 'create'
+                              ? coll.target_collection_id !== original.target_collection_id
+                              : true
+                          )
+                        ]"
+                        optionLabel="target_collection_name"
+                        optionValue="target_collection_id"
+                        dataKey="target_collection_id"
+                        id="target-collection-source"
+                        style="min-width: 200px"
+                        filter
+                        resetFilterOnHide
+                      />
+                    </FloatLabel>
+                    <FloatLabel style="flex-grow: 1">
+                      <IconField class="full">
+                        <InputIcon>
+                          <i class="pi pi-search" />
+                        </InputIcon>
+                        <InputText
+                          v-model="selected.search"
+                          placeholder="Search compounds"
+                          style="width: 100%"
                         />
-                        <Button
-                          v-else
-                          @click="remove(slotProps.data)"
-                          icon="pi pi-times"
-                          severity="secondary"
-                          text
-                        />
-                      </template>
-                    </Column>
-                  </DataTable>
-                  <i v-else style="margin-bottom: 5rem"> No compounds added yet </i>
-                </BaseClipboardContext>
-                <div v-else class="grid">
+                      </IconField>
+                    </FloatLabel>
+                  </div>
                   <DataTable
+                    v-if="selected.source == 'collection'"
                     :key="key.targets"
                     dataKey="target_compound_id"
                     v-model:selection="compounds.selected"
-                    :value="compounds.loaded"
+                    :value="
+                      compounds.loaded.filter((comp) => {
+                        const query = selected.search.toLowerCase()
+                        const nameMatch = comp.target_compound_name.toLowerCase()?.includes(query)
+                        const formulaMatch = comp.target_compound_formula
+                          ?.toLowerCase()
+                          .includes(query)
+                        const casMatch = comp.cas_number?.toLowerCase().includes(query)
+                        return nameMatch || formulaMatch || casMatch
+                      })
+                    "
                     sortField="mz"
                     scrollable
-                    scrollHeight="250px"
-                    style="min-width: 400px"
+                    scrollHeight="300px"
+                    style="min-width: 500px"
                   >
                     <Column selectionMode="multiple" header="" headerStyle="width: 3rem">
                       <template #header>
@@ -755,13 +753,39 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onEnter))
                       sortable
                     />
                   </DataTable>
-                </div>
-              </Panel>
+                  <div
+                    v-if="selected.source == 'input'"
+                    style="min-width: 500px; height: 100%; display: grid; place-items: center"
+                  >
+                    <div class="col" style="gap: 0.5rem; margin-top: 2rem">
+                      <FloatLabel>
+                        <InputText v-model="add.formula" id="add-compound-formula" />
+                        <label for="add-compound-formula">Formula</label>
+                      </FloatLabel>
+                      <FloatLabel>
+                        <InputText v-model="add.name" id="add-compound-name" />
+                        <label for="add-compound-name">Name</label>
+                      </FloatLabel>
+                      <FloatLabel>
+                        <InputText v-model="add.cas" id="add-compound-cas" />
+                        <label for="add-compound-cas">CAS Number</label>
+                      </FloatLabel>
+                      <Button
+                        label="Add compound"
+                        icon="pi pi-plus"
+                        @click="addCompound"
+                        :disabled="!add.formula.trim()"
+                        style="width: 210px; margin-top: 2rem"
+                      />
+                    </div>
+                  </div>
+                </Panel>
+              </div>
             </div>
           </TabPanel>
           <!-- batches -->
           <TabPanel value="batches">
-            <div class="row selector">
+            <div class="row" style="height: 400px; align-items: stretch; gap: 0.5rem">
               <Listbox
                 v-model="selected.workspace"
                 dataKey="workspace_id"
@@ -783,55 +807,57 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onEnter))
                           : `${workspace.workspace_name} (current)`
                     }))
                 "
-                style="min-width: 200px"
+                style="min-width: 200px; min-height: 350px"
               />
               <!-- batches -->
-              <DataTable
-                :key="key.batches"
-                dataKey="sample_batch_id"
-                v-model:selection="batches.selected"
-                :value="batches.loaded"
-                scrollable
-                scrollHeight="300px"
-                tableStyle="min-width: 450px; "
-                style="min-width: 400px"
-                sortField="sample_batch_utc_created"
-                :sortOrder="-1"
-              >
-                <Column selectionMode="multiple" header="" headerStyle="width: 3rem">
-                  <template #header>
-                    <Checkbox
-                      :binary="true"
-                      v-model="selected.all.batches"
-                      :disabled="batches.loaded.length == 0"
-                      @update:modelValue="
-                        (select) => {
-                          if (select) {
-                            const selected = batches.selected.map(
-                              ({ sample_batch_id }) => sample_batch_id
-                            )
-                            batches.selected.push(
-                              ...batches.loaded.filter(
-                                (loaded) => !selected.includes(loaded.sample_batch_id)
+              <Panel>
+                <DataTable
+                  :key="key.batches"
+                  dataKey="sample_batch_id"
+                  v-model:selection="batches.selected"
+                  :value="batches.loaded"
+                  scrollable
+                  scrollHeight="400px"
+                  tableStyle="min-width: 500px;"
+                  style="min-width: 400px"
+                  sortField="sample_batch_utc_created"
+                  :sortOrder="-1"
+                >
+                  <Column selectionMode="multiple" header="" headerStyle="width: 3rem">
+                    <template #header>
+                      <Checkbox
+                        :binary="true"
+                        v-model="selected.all.batches"
+                        :disabled="batches.loaded.length == 0"
+                        @update:modelValue="
+                          (select) => {
+                            if (select) {
+                              const selected = batches.selected.map(
+                                ({ sample_batch_id }) => sample_batch_id
                               )
-                            )
-                          } else {
-                            const loaded = batches.loaded.map(
-                              ({ sample_batch_id }) => sample_batch_id
-                            )
-                            batches.selected = batches.selected.filter(
-                              (selected) => !loaded.includes(selected.sample_batch_id)
-                            )
+                              batches.selected.push(
+                                ...batches.loaded.filter(
+                                  (loaded) => !selected.includes(loaded.sample_batch_id)
+                                )
+                              )
+                            } else {
+                              const loaded = batches.loaded.map(
+                                ({ sample_batch_id }) => sample_batch_id
+                              )
+                              batches.selected = batches.selected.filter(
+                                (selected) => !loaded.includes(selected.sample_batch_id)
+                              )
+                            }
+                            key.batches += 1
                           }
-                          key.batches += 1
-                        }
-                      "
-                      inputClass="custom"
-                    />
-                  </template>
-                </Column>
-                <Column header="Batch" field="sample_batch_name" />
-              </DataTable>
+                        "
+                        inputClass="custom"
+                      />
+                    </template>
+                  </Column>
+                  <Column header="Batch" field="sample_batch_name" />
+                </DataTable>
+              </Panel>
             </div>
           </TabPanel>
         </TabPanels>
@@ -873,15 +899,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onEnter))
 </template>
 
 <style scoped>
-.grid {
-  min-width: 300px;
-  min-height: 150px;
-  height: 100%;
-  display: grid;
-  place-items: center;
-  gap: 0.5rem;
-}
-
 .row {
   align-items: flex-end;
 }
@@ -892,10 +909,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onEnter))
 .col {
   display: flex;
   gap: 0.5rem;
-}
-
-.selector > * {
-  min-height: 300px;
 }
 
 :deep(.p-panel-header) {
