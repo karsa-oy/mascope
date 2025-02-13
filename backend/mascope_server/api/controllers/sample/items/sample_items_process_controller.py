@@ -18,6 +18,7 @@ from mascope_server.socket.notifications import (
     UserNotification,
     send_progress_user_notification,
 )
+from mascope_server.api.controllers.match.match_controller import rematch_samples
 from mascope_server.api.new.instrument_configs.process.service import (
     process_instrument_config,
 )
@@ -32,7 +33,7 @@ from mascope_server.api.controllers.sample.items.sample_items_controller import 
 @api_controller_background_task(
     # success_notification_rooms=["sample_batch_id"],  # TEMP for postman testing
     success_notification_rooms=["sid"],
-    success_reload=[("sample_batch_reload", "sample_batch_id")],
+    success_reload=[("sample_batch_reload", "sample_batch_ids")],
     error_notification_rooms=["sid"],
     error_reload=[("sample_batch_reload", "sample_batch_id")],
     # error_notification_rooms=["sample_batch_id"],  # TEMP for postman testing
@@ -57,7 +58,8 @@ async def process_sample_item(
     2. Create a new sample item using the provided details.
     3. Perform m/z calibration on the newly created sample item if instrument is TOF
         using provided calibration parameters.
-    4. Compute matches for the sample item, integrating any newly identified matches.
+    4A. Compute matches for the sample item, integrating any newly identified matches.
+    4B. Recompute matches for samples affected by instrument config processing
     5. Fetch the final sample details including match data for verification and further processing.
 
     :param sample_item: Details of the sample item to be created.
@@ -94,14 +96,16 @@ async def process_sample_item(
     await send_progress_user_notification(notification, 0.1)
 
     # Step 1: process instrument config
-    await process_instrument_config(
-        filenames=[sample_item.filename],
-        instrument_config=instrument_config,
-        independent_transaction=False,
-        sid=sid,
-        process_id=gen_id(8),
-        parent_id=process_id,
-    )
+    processed = (
+        await process_instrument_config(
+            filenames=[sample_item.filename],
+            instrument_config=instrument_config,
+            independent_transaction=False,
+            sid=sid,
+            process_id=gen_id(8),
+            parent_id=process_id,
+        )
+    )["data"]
 
     # Step 2: create the sample item
 
@@ -138,7 +142,7 @@ async def process_sample_item(
         )
         await send_progress_user_notification(notification, 0.6)
 
-    # Step 4: Compute matches if calibration is successful
+    # Step 4A: Compute processed sample matches
     await match_compute_sample(
         sample_item_id=sample_item_id,
         independent_transaction=False,
@@ -146,6 +150,11 @@ async def process_sample_item(
         process_id=gen_id(8),
         parent_id=process_id,
     )
+    # Step 4B: Recompute matches affected by instrument config processing
+    if independent_transaction:
+        await rematch_samples(
+            sample_item_ids=processed["sample_item_ids"], independent_transaction=False
+        )
 
     notification.message = (
         f"Matches computed for sample '{sample_item.sample_item_name}'."
@@ -165,6 +174,10 @@ async def process_sample_item(
         "_notification_data": {
             "sample_item_id": sample_item_id,
             "filename": sample["filename"],
-            "sample_batch_id": sample["sample_batch_id"],
+            "sample_batch_ids": [
+                sample["sample_batch_id"],
+                *processed["sample_batch_ids"],
+            ],
+            "sample_item_ids": processed["sample_item_ids"],
         },
     }

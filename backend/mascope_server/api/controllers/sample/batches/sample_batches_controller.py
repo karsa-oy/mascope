@@ -661,14 +661,16 @@ async def import_sample_items(
     await send_progress_user_notification(notification, 0.1)
 
     # Step 2: Process instrument configs for the files
-    await process_instrument_config(
-        filenames=[item.filename for item in sample_items],
-        instrument_config=instrument_config,
-        independent_transaction=False,
-        sid=sid,
-        process_id=gen_id(8),
-        parent_id=process_id,
-    )
+    processed = (
+        await process_instrument_config(
+            filenames=[item.filename for item in sample_items],
+            instrument_config=instrument_config,
+            independent_transaction=False,
+            sid=sid,
+            process_id=gen_id(8),
+            parent_id=process_id,
+        )
+    )["data"]
     await send_progress_user_notification(notification, 0.15)
 
     # Step 3: Create provided sample items and save to database
@@ -735,7 +737,11 @@ async def import_sample_items(
     # Step 7: Return the status message
     return {
         "message": f"{len(sample_items)} sample{'s' if len(sample_items) > 1 else ''} was imported to the sample batch '{sample_batch_name}'.",
-        "_notification_data": {"sample_batch_id": sample_batch_id},
+        "_notification_data": {
+            "sample_batch_ids": [
+                *set([sample_batch_id, *processed["sample_batch_ids"]])
+            ]
+        },
     }
 
 
