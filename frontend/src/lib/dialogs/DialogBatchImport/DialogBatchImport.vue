@@ -225,7 +225,7 @@ const submit = () => {
         <TabPanel value="data">
           <BaseClipboardContext :parse="parse" :persistMessage="imported.items.length == 0">
             <template v-slot:info>
-              <div id="preview">
+              <div id="preview" v-if="imported.items.length == 0">
                 <Panel>
                   <ScrollPanel style="height: 25vh; max-width: 80vw">
                     <DataTable
