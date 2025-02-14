@@ -15,6 +15,7 @@ from mascope_server.db import async_session
 from mascope_server.db.id import gen_id
 from mascope_server.db.models import SampleFile, User
 from mascope_server.api.new.auth.access_token.service import get_access_token
+from mascope_server.api.new.instruments import get_instruments
 from mascope_server.api.new.instrument_configs.lib import (
     read_instrument_functions,
 )
@@ -165,7 +166,8 @@ async def create_sample_file(sample_file: SampleFileCreate) -> dict:
     2. Commit the transaction to persist the new sample file in the database.
     3. Refresh the instance to get the created data from the database.
     4. Emit a 'sample_file_created' event with the filename and instrument.
-    5. Return the created sample file data.
+    5. Ensure instruments are reloaded
+    6. Return the created sample file data.
 
     :param sample_file: Data for creating the sample file.
     :type sample_file: SampleFileCreate
@@ -174,6 +176,10 @@ async def create_sample_file(sample_file: SampleFileCreate) -> dict:
     :rtype: dict
     """
     async with async_session() as session:
+        initial_instruments = [
+            i["instrument"] for i in (await get_instruments())["data"]
+        ]
+
         # Step 1: Construct new sample file
         new_sample_file = SampleFile(
             sample_file_id=gen_id(16), **sample_file.model_dump()
@@ -199,7 +205,15 @@ async def create_sample_file(sample_file: SampleFileCreate) -> dict:
         )
         await emit_user_notification(notification, sample_file.instrument)
 
-        # Step 5: Return created sample file
+        # Step 5. Trigger instruments reload
+        if sample_file.instrument not in initial_instruments:
+            # instrument added by creation and needs reload
+            await sio.emit(
+                "instruments_reload",
+                namespace="/",
+            )
+
+        # Step 6: Return created sample file
         return {
             "message": f"Sample file '{new_sample_file.filename}' created successfully.",
             "data": new_sample_file.to_dict(),
@@ -214,6 +228,7 @@ async def delete_sample_file(sample_file_id: str):
     Steps:
     1. Fetch the sample file from the database using the provided ID.
     2. Delete the fetched sample file from the session and commit the changes to the database.
+    3. Conditionally reload instruments
 
     :param sample_file_id: The ID of the sample file to delete.
     :type sample_file_id: str
@@ -228,6 +243,15 @@ async def delete_sample_file(sample_file_id: str):
         # Step 2: Delete and commit
         await session.delete(sample_file)
         await session.commit()
+
+        # Step 3: Trigger instruments reload
+        final_instruments = [i["instrument"] for i in (await get_instruments())["data"]]
+        if sample_file.instrument not in final_instruments:
+            # instrument removed by deletion and needs reload
+            await sio.emit(
+                "instruments_reload",
+                namespace="/",
+            )
 
     return {
         "message": f"Sample file '{sample_file.filename}' deleted successfully.",
@@ -246,7 +270,8 @@ async def update_sample_file(
     2. Update the sample file's properties with the new data.
     3. Commit the changes to the database.
     4. Refresh the instance to get updated data from the database.
-    5. Return the updated sample file data.
+    5. Reload instrument data.
+    6. Return the updated sample file data.
 
     :param sample_file_id: The ID of the sample file to update.
     :type sample_file_id: str
@@ -257,6 +282,10 @@ async def update_sample_file(
     :rtype: dict
     """
     async with async_session() as session:
+        initial_instruments = set(
+            [i["instrument"] for i in (await get_instruments())["data"]]
+        )
+
         # Step 1: Fetch the sample file
         sample_file = await session.get(SampleFile, sample_file_id)
         if not sample_file:
@@ -274,7 +303,18 @@ async def update_sample_file(
         # Step 4: Refresh instance
         await session.refresh(sample_file)
 
-        # Step 5: Return updated sample file
+        # Step 5. Trigger instruments reload
+        final_instruments = set(
+            [i["instrument"] for i in (await get_instruments())["data"]]
+        )
+        if initial_instruments != final_instruments:
+            # instruments changed by update and need reloading
+            await sio.emit(
+                "instruments_reload",
+                namespace="/",
+            )
+
+        # Step 6: Return updated sample file
         return {
             "message": f"Sample file '{sample_file.filename}' updated successfully.",
             "data": sample_file.to_dict(),

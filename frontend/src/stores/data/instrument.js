@@ -6,6 +6,7 @@ export const useInstrument = defineModule({
   name: 'instrument',
   key: 'instrument',
   subscribe: true,
+  reloadOn: 'instruments_reload',
   load: async () =>
     await api.http.get(`/instruments`, {
       use: 'read',
