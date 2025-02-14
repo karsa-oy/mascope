@@ -31,12 +31,10 @@ from mascope_server.api.controllers.sample.items.sample_items_controller import 
 
 
 @api_controller_background_task(
-    # success_notification_rooms=["sample_batch_id"],  # TEMP for postman testing
     success_notification_rooms=["sid"],
-    success_reload=[("sample_batch_reload", "sample_batch_ids")],
+    success_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
     error_notification_rooms=["sid"],
-    error_reload=[("sample_batch_reload", "sample_batch_id")],
-    # error_notification_rooms=["sample_batch_id"],  # TEMP for postman testing
+    error_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
 )
 async def process_sample_item(
     sample_item: SampleItemCreate,
@@ -153,7 +151,8 @@ async def process_sample_item(
     # Step 4B: Recompute matches affected by instrument config processing
     if independent_transaction:
         await rematch_samples(
-            sample_item_ids=processed["sample_item_ids"], independent_transaction=False
+            sample_item_ids=processed["affected_sample_item_ids"],
+            independent_transaction=False,
         )
 
     notification.message = (
@@ -174,10 +173,12 @@ async def process_sample_item(
         "_notification_data": {
             "sample_item_id": sample_item_id,
             "filename": sample["filename"],
-            "sample_batch_ids": [
-                sample["sample_batch_id"],
-                *processed["sample_batch_ids"],
-            ],
-            "sample_item_ids": processed["sample_item_ids"],
+            "affected_sample_batch_ids": list(
+                set(
+                    sample["sample_batch_id"],
+                    *processed["affected_sample_batch_ids"],
+                )
+            ),
+            "affected_sample_item_ids": processed["affected_sample_item_ids"],
         },
     }

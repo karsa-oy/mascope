@@ -55,6 +55,9 @@ from mascope_server.api.controllers.sample.items.sample_items_controller import 
     copy_sample_item,
 )
 from mascope_server.api.controllers.samples.samples_controller import get_sample
+from mascope_server.api.controllers.sample.lib.sample_batches_fetch import (
+    fetch_sample_batch_ids,
+)
 from mascope_server.api.controllers.calibration.calibration_controller import (
     calibration_mz_calibrate_samples,
 )
@@ -593,9 +596,9 @@ async def delete_sample_batch(
 
 @api_controller_background_task(
     success_notification_rooms=["sid"],
-    success_reload=[("sample_batch_reload", "sample_batch_ids")],
+    success_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
     error_notification_rooms=["sid"],
-    error_reload=[("sample_batch_reload", "sample_batch_ids")],
+    error_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
 )
 async def import_sample_items(
     sample_batch_id: str,
@@ -686,15 +689,13 @@ async def import_sample_items(
         ]
         created_sample_item_ids.append(sample_item_id)
 
+    # Add created sample items to the rematch set
+    sample_item_ids_to_rematch = set(created_sample_item_ids)
     notification.message = f"Created {len(sample_items)} sample{'s records' if len(sample_items) > 1 else 'record'}."
     await send_progress_user_notification(notification, 0.2)
 
     # Step 4: Optionally calibrate batch if calibrate_batch flag is True and instrument is TOF
     warning = None
-    # set default values, in case calibration is not run or fails
-    affected_sample_item_ids = created_sample_item_ids
-    affected_sample_batch_ids = [sample_batch_id]
-    # conditionally calibrate
     if calibrate_batch and instrument_type == "tof":
         samples_calibrate_failed = []
         try:
@@ -706,52 +707,69 @@ async def import_sample_items(
                 process_id=gen_id(8),
                 parent_id=process_id,
             )
-            affected_sample_item_ids = calibration["data"].get(
+            # Add calibration-affected items to the rematch set
+            calibration_affected_items = calibration["data"].get(
                 "affected_sample_item_ids", []
             )
-            affected_sample_batch_ids = calibration["data"].get(
-                "affected_sample_batch_ids", []
-            ) + [sample_batch_id]
+            sample_item_ids_to_rematch.update(calibration_affected_items)
+
             notification.message = f"Sample batch'{sample_batch_name}' m/z calibrated."
-            spillover = len(affected_sample_batch_ids) - 1
-            if spillover:
-                notification.message += f" Calibration affected {spillover} other sample batch{'es' if spillover > 1 else ''}."
             await send_progress_user_notification(notification, 0.6)
         except ApiException as e:
             if e.status_code == 200:
-                # This is a warning, proceed to ramtch, the not-calibrated samples will be not matched
-                # since the calibration is not verified
+                # Handle warning case: proceed to ramtch, the not-calibrated samples
+                # will be not matched since the calibration is not verified
                 samples_calibrate_failed = e.tech_message.get(
                     "samples_calibrate_failed", []
                 )
                 warning = e.user_message
+                # update affected items from the warning response
+                calibration_affected_items = e.tech_message.get(
+                    "affected_sample_item_ids", []
+                )
+                sample_item_ids_to_rematch.update(calibration_affected_items)
             else:
                 # This is a critical error, re-raise it
                 raise
 
-    # Step 5: Rematch affected samples
+    # Step 5: Rematch all affected samples
     await rematch_samples(
-        sample_item_ids=affected_sample_item_ids,
+        sample_item_ids=list(sample_item_ids_to_rematch),
         independent_transaction=False,
         sid=sid,
         process_id=gen_id(8),
         parent_id=process_id,
     )
 
-    notification.message = f"Rematched {len(affected_sample_item_ids)} sample items affected by the import."
-    await send_progress_user_notification(notification, 0.95)
+    notification.message = f"Rematched {len(sample_item_ids_to_rematch)} sample items affected by the import."
+    await send_progress_user_notification(notification, 0.9)
 
-    # Step 6: Gather affected batches
-    sample_batch_ids_to_reload = list(
-        set([*affected_sample_batch_ids, *processed["sample_batch_ids"]])
+    # Step 6: Get all affected batch IDs
+    all_affected_items = set(sample_item_ids_to_rematch)
+    all_affected_items.update(processed.get("sample_item_ids", []))
+
+    sample_batch_ids_to_reload = await fetch_sample_batch_ids(
+        sample_item_ids=all_affected_items
     )
+
+    # Check for spillover effects (affects on other batches)
+    other_affected_batches = [
+        bid for bid in sample_batch_ids_to_reload if bid != sample_batch_id
+    ]
+
+    if other_affected_batches:
+        other_affected_batches_message = (
+            f"Import affected {len(other_affected_batches)} other sample batches"
+        )
+        runtime.logger.info(other_affected_batches_message)
+        notification.message += other_affected_batches_message
 
     # Step 7: Raise a warning if encountered during calibration
     if warning is not None:
         raise_api_warning(
             warning,
             {
-                "sample_batch_ids": sample_batch_ids_to_reload,
+                "affected_sample_batch_ids": sample_batch_ids_to_reload,
                 "samples_calibrate_failed": samples_calibrate_failed,
             },
         )
@@ -759,7 +777,7 @@ async def import_sample_items(
     # Step 8: Return the status message
     return {
         "message": f"{len(sample_items)} sample{'s' if len(sample_items) > 1 else ''} was imported to the sample batch '{sample_batch_name}'.",
-        "_notification_data": {"sample_batch_ids": sample_batch_ids_to_reload},
+        "_notification_data": {"affected_sample_batch_ids": sample_batch_ids_to_reload},
     }
 
 

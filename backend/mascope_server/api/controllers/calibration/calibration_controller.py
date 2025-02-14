@@ -35,6 +35,9 @@ from mascope_server.api.controllers.sample.items.sample_items_controller import 
 from mascope_server.api.controllers.sample.lib.sample_batches_fetch import (
     fetch_sample_batch_ids,
 )
+from mascope_server.api.controllers.sample.lib.sample_items_fetch import (
+    fetch_affected_sample_data_for_filename,
+)
 from mascope_server.api.models.sample.files.sample_file_pydantic_model import (
     SampleFileUpdate,
 )
@@ -105,13 +108,26 @@ async def calibration_mz_fit(
     sid: str = None,
     process_id=None,
     parent_id=None,
-):
+) -> dict:
     """
     Start m/z fit calibration for a given sample item based on the calibration parameters.
 
-    :param sample_item_id: ID of the sample item.
-    :param mz_calibration_params: Calibration parameters.
-    :param background_tasks: Optional background task parameter.
+    :param sample_item_id: ID of the sample item
+    :type sample_item_id: str
+    :param mz_calibration_params: Calibration parameters
+    :type mz_calibration_params: MzCalibrationParams
+    :param independent_transaction: Whether to run as independent transaction
+    :type independent_transaction: bool
+    :param sid: Session ID for notifications
+    :type sid: str
+    :param process_id: Process ID for tracking
+    :type process_id: str
+    :param parent_id: Parent process ID for tracking
+    :type parent_id: str
+    :return: Dictionary containing fit results and notification data
+    :rtype: dict
+    :raises NotFoundException: If sample item, batch or calibration collection not found
+    :raises ApiException: If m/z fitting fails
     """
     # Step 1: Retrieve sample and batch data
     async with async_session() as session:
@@ -128,7 +144,18 @@ async def calibration_mz_fit(
 
     build_params = sample_batch.build_params
 
-    # Step 2: Prepare progress user notification.
+    # Check if calibration collection is present
+    if not build_params.get("calibration_collection"):
+        raise NotFoundException(
+            f"Calibration collection not found in build parameters for sample batch '{sample_batch.sample_batch_id}'"
+        )
+
+    # Step 2: Fetch affected samples data
+    sample_item_ids, sample_batch_ids, *_ = (
+        await fetch_affected_sample_data_for_filename(sample.filename)
+    )
+
+    # Step 3: Prepare progress user notification.
     notification = UserNotification(
         process_id=process_id,
         parent_id=parent_id,
@@ -146,17 +173,13 @@ async def calibration_mz_fit(
         },
     )
 
-    # Step 3: m/z fit the sample file
+    # Step 4: m/z fit the sample file
     calibration_mechs = build_params.get("calibration_ion_mechanisms")
     matching_mechs = build_params["ion_mechanisms"]
-    if calibration_mechs:
-        runtime.logger.debug(
-            "Calibrating mz fit using calibration ionization mechanisms"
-        )
-        mechanisms = calibration_mechs
-    else:
-        runtime.logger.debug("Calibrating mz fit using matching ionization mechanisms")
-        mechanisms = matching_mechs
+    mechanisms = calibration_mechs if calibration_mechs else matching_mechs
+    runtime.logger.debug(
+        f"Calibrating mz fit using {'calibration' if calibration_mechs else 'matching'} ionization mechanisms"
+    )
     fit, stats, error, warning = await mz_fit(
         filename=sample.filename,
         calibration_collection_id=build_params["calibration_collection"],
@@ -168,7 +191,14 @@ async def calibration_mz_fit(
         notification=notification,
     )
 
-    # Step 4: Handle errors and warnings
+    # Step 5: Handle errors and warnings
+    calibration_data = {"fit": fit, "stats": stats}
+
+    affected_samples_data = {
+        "affected_sample_item_ids": sample_item_ids,
+        "affected_sample_batch_ids": sample_batch_ids,
+    }
+
     if error is not None:
         # Raise an error if the m/z fit failed, error user notification will be send in wrapper
         error_message = (
@@ -177,13 +207,7 @@ async def calibration_mz_fit(
         runtime.logger.error(error)
         raise ApiException(
             error_message,
-            {
-                "data": {
-                    "fit": fit,
-                    "stats": stats,
-                    "error": error,
-                }
-            },
+            {"data": {**calibration_data, "error": error}, **affected_samples_data},
             422,
         )
     elif warning is not None:
@@ -192,29 +216,15 @@ async def calibration_mz_fit(
         )
         raise_api_warning(
             warning_message,
-            {
-                "data": {
-                    "fit": fit,
-                    "stats": stats,
-                    "warning": warning,
-                }
-            },
+            {"data": {**calibration_data, "warning": warning}, **affected_samples_data},
         )
-
-    # Step 5: Return m/z fit result data and message
-    data = {
-        "fit": fit,
-        "stats": stats,
-        "error": error,
-        "warning": warning,
-    }
+    # Step 6: Return m/z fit result data and message
     return {
-        "data": data,
+        "data": {**calibration_data},
         "message": f"Finished to m/z fit sample '{sample.sample_item_name}'.",
         "_notification_data": {
-            "fit": fit,
-            "stats": stats,
-            "error": error,
+            **calibration_data,
+            "error": None,
             "sample_item_id": sample_item_id,
             "filename": sample.filename,
         },
@@ -223,7 +233,9 @@ async def calibration_mz_fit(
 
 @api_controller_background_task(
     success_notification_rooms=["sid"],
+    success_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
     error_notification_rooms=["sid"],
+    error_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
 )
 async def calibration_mz_apply(
     fit: dict,
@@ -241,21 +253,10 @@ async def calibration_mz_apply(
     :return: List of calibrated sample item IDs.
     """
     # Step 1: Get affected sample items and their batches
-    async with async_session() as session:
-        result = await session.execute(
-            select(SampleItem)
-            .options(joinedload(SampleItem.sample_batch))
-            .filter(SampleItem.filename == filename)
-        )
-        sample_items = result.scalars().all()
-
-    if not sample_items:
-        raise NotFoundException(f"No sample items found for sample file '{filename}'")
-
-    affected_batches = {item.sample_batch for item in sample_items}
-    total_samples = len(sample_items)
-    sample_item_ids = [item.to_dict()["sample_item_id"] for item in sample_items]
-    sample_batch_ids = set([item.to_dict()["sample_batch_id"] for item in sample_items])
+    sample_item_ids, sample_batch_ids, sample_items, sample_batches = (
+        await fetch_affected_sample_data_for_filename(filename)
+    )
+    total_samples = len(sample_item_ids)
 
     # Step 2: Prepare progress user notification.
     notification = UserNotification(
@@ -304,8 +305,8 @@ async def calibration_mz_apply(
 
     await send_progress_user_notification(notification, 0.8)
 
-    # Step 3: Notify completion and emit a reload event for each affected batch
-    for sample_batch in affected_batches:
+    # Step 3: Notify completion for each affected batch
+    for sample_batch in sample_batches:
         sample_batch_id = sample_batch.sample_batch_id
         sample_batch_name = sample_batch.sample_batch_name
         batch_samples = [
@@ -338,19 +339,16 @@ async def calibration_mz_apply(
                 parent_id=process_id,
             )
 
-        # Emit reload event if independent transaction
-        if independent_transaction:
-            await sio.emit("sample_batch_reload", room=sample_batch_id, namespace="/")
-
     # Step 4: Return m/z fit result data and message
     return {
         "data": {
-            "sample_item_ids": sample_item_ids,
-            "sample_batch_ids": list(sample_batch_ids),
+            "affected_sample_item_ids": sample_item_ids,
+            "affected_sample_batch_ids": sample_batch_ids,
         },
         "message": f"Applied m/z fit for sample file '{filename}', {total_samples} sample item{'s' if total_samples != 1 else ''} affected.",
         "_notification_data": {
-            "sample_item_ids": sample_item_ids,
+            "affected_sample_item_ids": sample_item_ids,
+            "affected_sample_batch_ids": sample_batch_ids,
             "filename": filename,
         },
     }
@@ -358,7 +356,9 @@ async def calibration_mz_apply(
 
 @api_controller_background_task(
     success_notification_rooms=["sid"],
+    success_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
     error_notification_rooms=["sid"],
+    error_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
 )
 async def calibration_mz_calibrate_sample(
     sample_item_id: str,
@@ -379,19 +379,32 @@ async def calibration_mz_calibrate_sample(
     3. Perform the calibration using the specified parameters.
     4. In case of any exceptions during the process, emit an error message indicating the failure.
 
-    :param sample_item_id: The ID of the sample to be calibrated.
+
+    :param sample_item_id: The ID of the sample to be calibrated
     :type sample_item_id: str
-    :param mz_calibration_params: The calibration parameters to be used for the calibration process.
+    :param mz_calibration_params: The calibration parameters to be used
     :type mz_calibration_params: MzCalibrationParams
+    :param independent_transaction: Whether to run as independent transaction
+    :type independent_transaction: bool
+    :param sid: Session ID for notifications
+    :type sid: str
+    :param process_id: Process ID for tracking
+    :type process_id: str
+    :param parent_id: Parent process ID for tracking
+    :type parent_id: str
     :raises NotFoundException: If the sample with the given ID is not found in the database.
     :raises ValueError: If the sample does not have a valid filename associated with it.
     :raises ApiException: For any exceptions that occur during the calibration process.
     """
-    # Step 1: Retrieve sample data
+    # Step 1: Retrieve sample data and affected samples
     async with async_session() as session:
         sample = await session.get(SampleItem, sample_item_id)
     if not sample:
         raise NotFoundException(f"Sample item with ID '{sample_item_id}' not found")
+
+    sample_item_ids, sample_batch_ids, *_ = (
+        await fetch_affected_sample_data_for_filename(sample.filename)
+    )
 
     runtime.logger.info(f"...m/z calibrating sample '{sample.sample_item_name}' ...")
 
@@ -430,28 +443,22 @@ async def calibration_mz_calibrate_sample(
     await send_progress_user_notification(notification, 0.3)
 
     # Step 4: Apply m/z calibration
-    calibration_mz_apply_data = await calibration_mz_apply(
+    await calibration_mz_apply(
         fit=fit,
         filename=sample.filename,
+        independent_transaction=False,
         sid=sid,
         process_id=gen_id(8),
         parent_id=process_id,
     )
-    sample_item_ids = calibration_mz_apply_data["data"].get("sample_item_ids", None)
-    sample_batch_ids = calibration_mz_apply_data["data"].get("sample_batch_ids", None)
 
     await send_progress_user_notification(notification, 0.95)
-
-    # TODO_reload Reload affected sample batches
-    if independent_transaction:
-        for sample_batch_id in sample_batch_ids:
-            await sio.emit("sample_batch_reload", room=sample_batch_id, namespace="/")
 
     # Step 5: Return rematched sample and message
     response_data = {
         "data": {
-            "affected_sample_item_ids": list(sample_item_ids),
-            "affected_sample_batch_ids": list(sample_batch_ids),
+            "affected_sample_item_ids": sample_item_ids,
+            "affected_sample_batch_ids": sample_batch_ids,
         },
         "message": f"Sample '{sample.sample_item_name}' m/z calibrated.",
         "_notification_data": {
@@ -469,6 +476,7 @@ async def calibration_mz_calibrate_sample(
     success_notification_rooms=["sid"],
     success_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
     error_notification_rooms=["sid"],
+    error_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
 )
 async def calibration_mz_calibrate_samples(
     sample_item_ids: str,
@@ -520,7 +528,7 @@ async def calibration_mz_calibrate_samples(
     await send_progress_user_notification(notification)
 
     # Step 3: Calibrate each sample and collect results
-    sample_item_ids_to_reload = set()
+    affected_sample_item_ids = set()
     samples_calibrate_failed = []
     for sample_item_id in sample_item_ids:
         # Wrap in try/except to not break the loop if one item fails
@@ -535,10 +543,10 @@ async def calibration_mz_calibrate_samples(
                 parent_id=process_id,
             )
 
-            affected_sample_item_ids = calibration["data"].get(
-                "affected_sample_item_ids", None
+            calibration_affected_items = calibration.get("data", {}).get(
+                "affected_sample_item_ids", []
             )
-            sample_item_ids_to_reload.update(affected_sample_item_ids)
+            affected_sample_item_ids.update(calibration_affected_items)
         except ApiException as e:
             sample = (await get_sample_item(sample_item_id=sample_item_id))["data"]
             # If an exception occurs during sample calibration, log the error and add the sample to the failed list
@@ -555,9 +563,14 @@ async def calibration_mz_calibrate_samples(
                     "warning_message": e.user_message,
                 }
             )
+            # collect affected items from failed calibration
+            affected_sample_item_ids.update(
+                e.tech_message.get("affected_sample_item_ids", [])
+            )
 
+    # Get all affected batch IDs
     sample_batch_ids_to_reload = await fetch_sample_batch_ids(
-        sample_item_ids=sample_item_ids_to_reload
+        sample_item_ids=list(affected_sample_item_ids)
     )
 
     # Step 4: If there are any failed to calibrate samples, raise a warning(200) exception
@@ -575,11 +588,12 @@ async def calibration_mz_calibrate_samples(
     # Step 5: Return rematched batch and message
     return {
         "data": {
-            "sample_batch_ids": list(sample_batch_ids_to_reload),
+            "affected_sample_item_ids": list(affected_sample_item_ids),
         },
         "message": f"m/z calibrated {len(sample_item_ids)} samples. {len(sample_batch_ids_to_reload)} sample batch{'es were' if len(sample_batch_ids_to_reload) > 1 else 'was'} affected.",
         "_notification_data": {
             "sample_item_ids": sample_item_ids,
+            "affected_sample_item_ids": list(affected_sample_item_ids),
             "affected_sample_batch_ids": sample_batch_ids_to_reload,
         },
     }
@@ -587,7 +601,9 @@ async def calibration_mz_calibrate_samples(
 
 @api_controller_background_task(
     success_notification_rooms=["sid"],
+    success_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
     error_notification_rooms=["sid"],
+    error_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
 )
 async def calibration_mz_calibrate_batch(
     sample_batch_id: str,
@@ -644,16 +660,18 @@ async def calibration_mz_calibrate_batch(
         process_id=gen_id(8),
         parent_id=process_id,
     )
-    sample_batch_ids_to_reload = calibration_result["data"]["sample_batch_ids"]
+    affected_sample_batch_ids = calibration_result.get("data", {}).get(
+        "affected_sample_batch_ids", []
+    )
 
     # Step 5: Return rematched batch and message
     return {
         "data": {
-            "affected_sample_batch_ids": list(sample_batch_ids_to_reload),
+            "affected_sample_batch_ids": affected_sample_batch_ids,
         },
-        "message": f"Sample batch '{sample_batch.sample_batch_name}' m/z calibrated. {len(sample_batch_ids_to_reload)} sample batch{'es were' if len(sample_batch_ids_to_reload) > 1 else 'was'} affected.",
+        "message": f"Sample batch '{sample_batch.sample_batch_name}' m/z calibrated. {len(affected_sample_batch_ids)} sample batch{'es were' if len(affected_sample_batch_ids) > 1 else 'was'} affected.",
         "_notification_data": {
             "sample_batch_id": sample_batch_id,
-            "affected_sample_batch_ids": list(sample_batch_ids_to_reload),
+            "affected_sample_batch_ids": affected_sample_batch_ids,
         },
     }

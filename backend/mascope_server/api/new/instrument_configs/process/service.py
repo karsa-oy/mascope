@@ -42,6 +42,7 @@ from mascope_server.runtime import runtime
     success_notification_rooms=["sid"],
     success_reload=[("sample_batch_reload", "sample_batch_ids")],
     error_notification_rooms=["sid"],
+    error_reload=[("sample_batch_reload", "sample_batch_ids")],
 )
 async def process_instrument_config(
     filenames: list[str],
@@ -190,8 +191,8 @@ async def process_instrument_config(
 
     return {
         "data": {
-            "sample_batch_ids": affected_sample_batch_ids,
-            "sample_item_ids": affected_sample_item_ids,
+            "affected_sample_batch_ids": affected_sample_batch_ids,
+            "affected_sample_item_ids": affected_sample_item_ids,
         },
         "message": f"Processing instrument config successful: {user_message}",
         "_notification_data": {
@@ -200,5 +201,7 @@ async def process_instrument_config(
             "method_file": method_file,
             "created": create,
             "autofitted": autofit,
+            "affected_sample_batch_ids": affected_sample_batch_ids,
+            "affected_sample_item_ids": affected_sample_item_ids,
         },
     }

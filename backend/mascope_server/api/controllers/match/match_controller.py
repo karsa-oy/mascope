@@ -176,8 +176,9 @@ async def rematch_sample(
 
 @api_controller_background_task(
     success_notification_rooms=["sample_batch_id"],
-    success_reload=[("sample_batch_reload", "sample_batch_ids")],
+    success_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
     error_notification_rooms=["sid"],
+    error_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
 )
 async def rematch_samples(
     sample_item_ids: list[str],
@@ -207,7 +208,7 @@ async def rematch_samples(
     )
     return {
         "message": f"Rematched {len(sample_item_ids)} samples",
-        "_notification_data": {"sample_batch_ids": affected_sample_batch_ids},
+        "_notification_data": {"affected_sample_batch_ids": affected_sample_batch_ids},
     }
 
 
