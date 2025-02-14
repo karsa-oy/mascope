@@ -67,8 +67,8 @@ const uiScoredIon = computed(() => {
 <style scoped>
 .match-tools {
   position: fixed;
-  top: 72px;
-  right: 7px;
+  top: 10rem;
+  right: 4rem;
   z-index: 50;
   justify-content: flex-end;
   padding: 0.5rem;

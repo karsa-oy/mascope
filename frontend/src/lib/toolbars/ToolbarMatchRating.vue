@@ -93,7 +93,8 @@ function handleUnsavedMatchParams() {
 <template>
   <Button
     v-tooltip.bottom="'Rate Match'"
-    severity="help"
+    severity="secondary"
+    text
     icon="pi pi-star"
     iconClass="small-icon"
     @click="

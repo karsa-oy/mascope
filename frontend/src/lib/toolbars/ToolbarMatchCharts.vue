@@ -16,6 +16,7 @@ const yMode = defineModel('yMode')
   <Button
     v-tooltip.bottom="'Chart settings'"
     severity="secondary"
+    text
     @click="
       (event) => {
         chartSettings.toggle(event)
