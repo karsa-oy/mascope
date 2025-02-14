@@ -1,6 +1,8 @@
 <script setup>
 import { ref, computed, watch, toRaw } from 'vue'
 
+import { useWindowSize } from '@vueuse/core'
+
 import ScrollPanel from 'primevue/scrollpanel'
 import Tag from 'primevue/tag'
 
@@ -14,11 +16,17 @@ import { useChartData } from './data.js'
 const app = useApp()
 const data = useChartData()
 
+const { height, width } = useWindowSize()
+
 const plots = ref({})
 
 const { settings } = defineProps({
   settings: {
     type: Object,
+    required: true
+  },
+  sidebarOpen: {
+    type: Boolean,
     required: true
   }
 })
@@ -90,10 +98,11 @@ const layout = computed(() => ({
     title: 'm/z [Th]',
     gridcolor: '#33333399'
   },
-  margin: { l: 50, r: 10, t: 30, b: 100 },
+  margin: { l: 50, r: 5, t: 30, b: 40 },
   dragmode: 'zoom',
   showlegend: false,
-  height: 350
+  height: 250,
+  width: (width * (app.ui.split.right / 100)) / isotopeCharts.value.length
 }))
 
 const area = new Intl.NumberFormat('en-US', {
@@ -128,26 +137,25 @@ watch(
     <div
       class="row"
       :style="`
-          gap: 2rem;
+          gap: 0rem;
           align-items: flex-start;
           justify-content: flex-start;
           max-width: calc(${app.ui.split.right}vw - 4rem);
-          overflow-x: auto;
-          height: 430px;
-          margin-bottom: 2rem;
+          height: 300px;
         `"
     >
       <figure
         v-for="(isotopeChart, index) of isotopeCharts"
         :key="isotopeChart.target_isotope_id"
         :style="`
-            min-width: 550px;
-            width: calc(${app.ui.split.right}vw / 2);
-            max-width: calc(${app.ui.split.right}vw / 2);
-            height: auto;
+            width: calc(${app.ui.split.right}vw / ${isotopeCharts.length} - 2rem);
+            height: calc((100vh - 40rem) / 2);
+            position: relative;
           `"
+        :class="sidebarOpen ? 'sidebarOpen' : ''"
       >
         <h3 :style="`color: ${isotopeChart.traces[0]?.line.color}; margin: 0`">
+          <BaseMatchTag :row="isotopeChart" />
           Isotope {{ error.format(isotopeChart.mz) }}
         </h3>
         <!--
@@ -168,15 +176,10 @@ watch(
           hideTitle
         />
         <div
-          id="chart-spectrum-controls"
-          class="row"
+          class="float"
           style="`
-              flex-wrap: wrap;
-              max-width: 100%;
-              justify-content: center;
             `"
         >
-          <BaseMatchTag :row="isotopeChart" text />
           <Tag
             :value="`Peak ${settings.yMode} intensity: ${area.format(settings.yMode == 'sum' ? isotopeChart.sample_peak_area : isotopeChart.sample_peak_area / sampleLength)}`"
             :severity="
@@ -212,5 +215,26 @@ watch(
 <style scoped>
 #chart-spectrum-controls :global(fieldset) {
   margin: 0 !important;
+}
+
+@layer override {
+  .float {
+    flex-flow: column nowrap;
+    gap: 0.5rem;
+    align-items: flex-end;
+    position: absolute;
+    top: 5rem;
+    right: 1rem;
+    display: none;
+    :deep(*) {
+      font-size: smaller;
+    }
+  }
+
+  figure:hover .float,
+  .sidebarOpen .float {
+    display: flex;
+    z-index: 9999;
+  }
 }
 </style>

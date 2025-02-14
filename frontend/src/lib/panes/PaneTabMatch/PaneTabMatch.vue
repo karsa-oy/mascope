@@ -32,6 +32,8 @@ const uiScoredIon = computed(() => {
     match_category: app.data.match.params.uiCategory(ion)
   }
 })
+
+const sidebarOpen = ref(false)
 </script>
 
 <template>
@@ -43,15 +45,15 @@ const uiScoredIon = computed(() => {
     v-if="app.data.match.params.ui"
   >
     <ScrollPanel style="height: calc(100vh - 150px); width: calc(100%-6rem)">
-      <h1 style="text-align: center">
-        <SidebarMatchParams />
+      <h1 style="text-align: center; margin: 1rem">
+        <SidebarMatchParams v-model:open="sidebarOpen" />
         <BaseMatchTag :row="uiScoredIon" :style="'font-size: large'" />
         match: ion <i>{{ app.data.match.visualized.ion?.target_ion_formula }}</i>
         for
         <i>{{ app.data.match.visualized.ion?.sample_item_name }}</i> with target
         <i>{{ compound?.target_compound_formula }}</i>
       </h1>
-      <ChartMatchSpectra :settings="settings" />
+      <ChartMatchSpectra :settings="settings" :sidebarOpen="sidebarOpen" />
       <ChartMatchTimeseries :settings="settings" />
       <div class="row match-tools">
         <ToolbarMatchCharts

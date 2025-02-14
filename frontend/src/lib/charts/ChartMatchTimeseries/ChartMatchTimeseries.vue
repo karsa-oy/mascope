@@ -72,9 +72,15 @@ const layout = computed(() => ({
     gridcolor: '#33333399',
     gridwidth: 1
   },
-  margin: { l: 50, r: 10, t: 30, b: 100 },
+  margin: { l: 50, r: 20, t: 30, b: 40 },
   dragmode: 'zoom',
-  showlegend: true
+  showlegend: true,
+  legend: {
+    xanchor: 'right',
+    x: 1,
+    y: 1
+  },
+  height: 350
 }))
 
 const corr = new Intl.NumberFormat('en-US', {
@@ -85,8 +91,8 @@ const corr = new Intl.NumberFormat('en-US', {
 </script>
 
 <template>
-  <figure>
-    <span>
+  <figure style="padding: 0">
+    <span style="margin-bottom: 1rem">
       isotope correlation coefficient:
       <Tag
         :value="corr.format(app.data.match.visualized.isotopes[0].match_isotope_correlation)"

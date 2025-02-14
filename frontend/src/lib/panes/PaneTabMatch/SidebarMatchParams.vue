@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, watchEffect, onMounted } from 'vue'
 
 import Button from 'primevue/button'
 import Drawer from 'primevue/drawer'
@@ -16,6 +16,11 @@ const app = useApp()
 
 const drawer = ref()
 const isSaving = ref(false)
+
+const open = defineModel('open')
+watchEffect(() => {
+  open.value = drawer.value
+})
 
 async function saveParams() {
   confirm.require({

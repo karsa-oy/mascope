@@ -1,8 +1,13 @@
 <script setup>
-import { ref, computed, onMounted, watchEffect } from 'vue'
+import { ref, computed, onMounted, watchEffect, watch } from 'vue'
+
 import * as Plotly from 'plotly.js-basic-dist'
 
+import { useWindowSize } from '@vueuse/core'
+
 import { useApp } from '@/stores'
+
+const { width, height } = useWindowSize()
 
 const app = useApp()
 
@@ -107,7 +112,14 @@ watchEffect(() => {
 </script>
 
 <template>
-  <div ref="plot" :id="id" class="plot" @click.prevent style="width: 100%; height: 100%" />
+  <div
+    ref="plot"
+    :id="id"
+    class="plot"
+    @click.prevent
+    style="width: 100%; height: 100%"
+    :key="`${width}-${height}`"
+  />
 </template>
 
 <style scoped>
