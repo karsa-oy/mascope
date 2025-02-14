@@ -5,8 +5,10 @@ import { computed, ref, reactive } from 'vue'
 
 import { BaseMatchTag } from '@/lib/base'
 import { ChartMatchSpectra, ChartMatchTimeseries } from '@/lib/charts'
-import { ToolbarIonMatchParams, ToolbarMatchCharts, ToolbarMatchRating } from '@/lib/toolbars'
+import { ToolbarMatchCharts, ToolbarMatchRating } from '@/lib/toolbars'
 import { useApp } from '@/stores'
+
+import SidebarMatchParams from './SidebarMatchParams.vue'
 
 const app = useApp()
 
@@ -42,6 +44,7 @@ const uiScoredIon = computed(() => {
   >
     <ScrollPanel style="height: calc(100vh - 150px); width: calc(100%-6rem)">
       <h1 style="text-align: center">
+        <SidebarMatchParams />
         <BaseMatchTag :row="uiScoredIon" :style="'font-size: large'" />
         match: ion <i>{{ app.data.match.visualized.ion?.target_ion_formula }}</i>
         for
@@ -51,7 +54,6 @@ const uiScoredIon = computed(() => {
       <ChartMatchSpectra :settings="settings" />
       <ChartMatchTimeseries :settings="settings" />
       <div class="row match-tools">
-        <ToolbarIonMatchParams />
         <ToolbarMatchCharts
           v-model:scale="settings.intensityScale"
           v-model:yMode="settings.yMode"
