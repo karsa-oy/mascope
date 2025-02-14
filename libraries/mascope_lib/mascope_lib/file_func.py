@@ -610,7 +610,15 @@ def load_signal(base_filename: str) -> xarray.Dataset:
             return thermo.get_signal(datafile_path, polarity)
         case "tof_h5":
             datafile_path = os.path.join(sample_path, "data.h5")
-            return tofwerk.get_signal(datafile_path)
+            signal = tofwerk.get_signal(datafile_path)
+            sum_signal_mz = get_sum_signal(base_filename).mz.values
+            # Check if m/z axis calibration was applied to sample file
+            # by comparing m/z in sum signal and in h5 file
+            if np.array_equal(signal.mz.values, sum_signal_mz):
+                # m/z axis match, no calibration was previously applied
+                return signal
+            # M/z in sum signal and in h5 file do not match, replace m/z in signal
+            return signal.assign_coords(mz=sum_signal_mz)
 
 
 def load_file(base_filename, vars=None, prev_dataset=None):
