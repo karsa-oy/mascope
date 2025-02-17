@@ -10,7 +10,7 @@ export const defineModule = ({
   useParent = null, // optionally define a parent module
   subscribe = false, // make socket io subscription for key
   reloadOn = null, // events to reload the module on
-  unfocusBefore = [], // unofucus before running these ops
+  unfocusBefore = [], // unfucus before running these ops
   multiselect = false, // currently not in use
   onRefocus = () => {}, // lifecycle hook executed after refocus
   onEvent = () => {}, // lifecycle hook executed after event reload
