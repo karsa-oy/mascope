@@ -696,8 +696,8 @@ api.socket.on('sample_batch_reload', (e) => {
           <div class="spinner" v-else><ProgressSpinner strokeWidth="5px" />loading...</div>
         </template>
       </DataTable>
-      <ContextMenu ref="batchContextMenu" :model="batchMenuEntries" />
-      <ContextMenu ref="sampleContextMenu" :model="sampleMenuEntries" />
+      <ContextMenu ref="batchContextMenu" :model="batchMenuEntries" @hide="batch.context = null" />
+      <ContextMenu ref="sampleContextMenu" :model="sampleMenuEntries" @hide="item.context = null" />
     </div>
   </Panel>
   <Popover ref="batchOptionsPopover" contentStyle="height: fit-content;">
