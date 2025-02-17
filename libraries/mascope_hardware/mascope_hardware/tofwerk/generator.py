@@ -7,6 +7,7 @@ from multiprocessing import Event, Queue, Lock
 from queue import Empty
 from threading import Thread
 import h5py
+import numpy as np
 
 from mascope_hardware.runtime import hardware_runtime
 from mascope_hardware.util import create_sample_file_db_record
@@ -59,8 +60,14 @@ class H5Processor(Thread):
         :rtype: float
         """
         if self.h5:
-            # Get total number of timestamps/scans
-            n_scans = self.h5.attrs["NbrBufs"] * self.h5.attrs["NbrWrites"]
+            # Check for zero bufs in the last write
+            last_write = self.h5["TimingData"]["BufTimes"][-1]
+            num_zero_writes = np.sum(last_write == 0)
+            # Get total number of valid timestamps/scans
+            n_scans = (
+                self.h5.attrs["NbrBufs"][0] * self.h5.attrs["NbrWrites"][0]
+                - num_zero_writes
+            )
             # Return mean difference between timestamps
             return float(self.length / n_scans)  # [s]
         return None
@@ -76,7 +83,9 @@ class H5Processor(Thread):
             # Get timestamp reference and retrieve first and last values
             timestamps = self.h5["TimingData"]["BufTimes"]
             t_first = timestamps[0, 0]
-            t_last = timestamps[-1, -1]
+            # Last write may contain zero bufs, exclude them
+            t_last_bufs = timestamps[-1]
+            t_last = t_last_bufs[t_last_bufs != 0][-1]
             # Return difference between first and last timestamp as total length
             return float(t_last - t_first)  # [s]
         return None
