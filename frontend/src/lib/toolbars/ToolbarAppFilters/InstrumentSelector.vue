@@ -6,38 +6,6 @@ import Select from 'primevue/select'
 import { useApp } from '@/stores'
 
 const app = useApp()
-
-/**
- * Watch for when instrument data is loaded, then focus on the saved instrument.
- * If the saved instrument is not available, fallback to the first instrument in the list.
- * The watcher only has an effect if no instrument is focused.
- */
-watch(
-  () => app.data.instrument.list.length,
-  (count) => {
-    if (count > 0 && !app.data.instrument.focused) {
-      const saved = app.data.instrument.list.find(
-        ({ instrument }) => instrument === localStorage.getItem('mascope-instrument')
-      )
-      if (saved) {
-        app.data.instrument.focused = saved
-      }
-    }
-  },
-  { immediate: true }
-)
-
-/**
- * Sync focused instrument with the saved one in localStorage.
- */
-watch(
-  () => app.data.instrument.focused,
-  (instrument) => {
-    if (instrument) {
-      localStorage.setItem('mascope-instrument', instrument.instrument)
-    }
-  }
-)
 </script>
 
 <template>

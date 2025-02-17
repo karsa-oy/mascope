@@ -91,13 +91,6 @@ async function handlePending() {
     pending.peakExport = false
   }
 }
-watch(
-  () => app.data.workspace.focused,
-  () => {
-    app.data.batch.focused = null
-    app.data.sample.focused = null
-  }
-)
 
 const formatter = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 2,

@@ -7,6 +7,8 @@ export const useWorkspace = defineModule({
   key: 'workspace_id',
   subscribe: true,
   reloadOn: 'workspace_reload',
+  allowUnfocus: false,
+  persist: true,
   load: () =>
     api.http.get(`/workspaces`, {
       use: 'read',
