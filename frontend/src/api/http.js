@@ -77,7 +77,7 @@ function handleClientError(error) {
  */
 function handleServerError(error) {
   const { method, url, headers } = error?.config
-  const type = headers['X-Type']
+  const type = headers['X-Type'] ?? 'unknown'
 
   // Any unhandled 401 triggers auth check, which will "redirect: to login if needed
   if (error?.response?.status === 401) {
