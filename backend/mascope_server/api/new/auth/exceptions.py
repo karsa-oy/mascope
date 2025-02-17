@@ -9,7 +9,7 @@ class ForbiddenAccessException(HTTPException):
 
     def __init__(
         self,
-        detail: str = "You do not have the necessary permission to access this resource.",
+        detail: str = "You do not have permission to perform this action.",
     ):
         super().__init__(status_code=status.HTTP_403_FORBIDDEN, detail=detail)
 
