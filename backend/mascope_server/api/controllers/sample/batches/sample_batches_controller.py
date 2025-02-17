@@ -725,8 +725,8 @@ async def import_sample_items(
                 warning = e.user_message
                 # update affected items from the warning response
                 calibration_affected_items = e.tech_message.get(
-                    "affected_sample_item_ids", []
-                )
+                    "_notification_data", {}
+                ).get("affected_sample_item_ids", [])
                 sample_item_ids_to_rematch.update(calibration_affected_items)
             else:
                 # This is a critical error, re-raise it
@@ -749,7 +749,7 @@ async def import_sample_items(
     all_affected_items.update(processed.get("sample_item_ids", []))
 
     sample_batch_ids_to_reload = await fetch_sample_batch_ids(
-        sample_item_ids=all_affected_items
+        sample_item_ids=list(all_affected_items)
     )
 
     # Check for spillover effects (affects on other batches)
@@ -769,7 +769,9 @@ async def import_sample_items(
         raise_api_warning(
             warning,
             {
-                "affected_sample_batch_ids": sample_batch_ids_to_reload,
+                "_notification_data": {
+                    "affected_sample_batch_ids": sample_batch_ids_to_reload,
+                },
                 "samples_calibrate_failed": samples_calibrate_failed,
             },
         )

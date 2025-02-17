@@ -564,9 +564,10 @@ async def calibration_mz_calibrate_samples(
                 }
             )
             # collect affected items from failed calibration
-            affected_sample_item_ids.update(
-                e.tech_message.get("affected_sample_item_ids", [])
+            calibration_affected_items = e.tech_message.get(
+                "affected_sample_item_ids", []
             )
+            affected_sample_item_ids.update(calibration_affected_items)
 
     # Get all affected batch IDs
     sample_batch_ids_to_reload = await fetch_sample_batch_ids(
@@ -581,7 +582,10 @@ async def calibration_mz_calibrate_samples(
             warning_message,
             {
                 "samples_calibrate_failed": samples_calibrate_failed,
-                "affected_sample_batch_ids": sample_batch_ids_to_reload,
+                "_notification_data": {
+                    "affected_sample_batch_ids": sample_batch_ids_to_reload,
+                    "affected_sample_item_ids": list(affected_sample_item_ids),
+                },
             },
         )
 
@@ -589,6 +593,7 @@ async def calibration_mz_calibrate_samples(
     return {
         "data": {
             "affected_sample_item_ids": list(affected_sample_item_ids),
+            "affected_sample_batch_ids": sample_batch_ids_to_reload,
         },
         "message": f"m/z calibrated {len(sample_item_ids)} samples. {len(sample_batch_ids_to_reload)} sample batch{'es were' if len(sample_batch_ids_to_reload) > 1 else 'was'} affected.",
         "_notification_data": {

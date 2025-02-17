@@ -48,7 +48,7 @@ async def fetch_sample_batch_data(sample_batch_id: str) -> SampleBatchData:
 
 
 async def fetch_sample_batch_ids(
-    filenames: list[str] = [], sample_item_ids: list[str] = []
+    filenames: list[str] = None, sample_item_ids: list[str] = None
 ) -> list[str]:
     """
     Fetches unique sample batch IDs for the given filenames and/or
@@ -62,9 +62,13 @@ async def fetch_sample_batch_ids(
     :rtype: list[str]
     """
     async with async_session() as session:
-        query = select(SampleItem.sample_batch_id).where(
-            SampleItem.filename.in_(filenames)
-            | SampleItem.sample_item_id.in_(sample_item_ids)
-        )
+        if filenames:
+            query = select(SampleItem.sample_batch_id).where(
+                SampleItem.filename.in_(filenames)
+            )
+        elif sample_item_ids:
+            query = select(SampleItem.sample_batch_id).where(
+                SampleItem.sample_item_id.in_(sample_item_ids)
+            )
         batch_ids = await session.scalars(query)
         return list(set(batch_ids))
