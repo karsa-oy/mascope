@@ -19,7 +19,6 @@ from mascope_server.db.id import gen_id
 from mascope_server.db.models import (
     Workspace,
     SampleBatch,
-    SampleItem,
     TargetCollectionInSampleBatch,
 )
 from mascope_server.socket import sio
@@ -45,10 +44,14 @@ from mascope_server.api.controllers.target.ions.target_ions_controller import (
 from mascope_server.api.controllers.target.isotopes.target_isotopes_controller import (
     get_target_isotopes,
 )
+from mascope_server.api.controllers.sample.lib.sample_items_fetch import (
+    fetch_sample_item_ids,
+)
 from mascope_server.api.controllers.sample.items.sample_items_controller import (
     create_sample_item,
     copy_sample_item,
 )
+from mascope_server.api.controllers.samples.samples_controller import get_sample
 from mascope_server.api.controllers.calibration.calibration_controller import (
     calibration_mz_calibrate_batch,
 )
@@ -889,16 +892,19 @@ async def sample_batch_export_peaks(
     :param sid: Session ID for targeting specific clients when emitting events, defaults to None.
     :type sid: str, optional
     """
-    sample_batch_result = await get_sample_batch(sample_batch_id)
-    sample_batch = sample_batch_result.get("data")
-    sample_batch_name = sample_batch["sample_batch_name"]
-
+    # Get sample batch name
     async with async_session() as session:
-        # Fetch sample items for the batch
-        stmt = select(SampleItem).filter(SampleItem.sample_batch_id == sample_batch_id)
-        result = await session.execute(stmt)
-        sample_items_dict_list = [row.to_dict() for row in result.scalars()]
-        sample_items_df = pd.DataFrame(sample_items_dict_list)
+        sample_batch = await session.get(SampleBatch, sample_batch_id)
+        sample_batch_name = sample_batch.sample_batch_name
+
+    sample_item_ids, _ = await fetch_sample_item_ids(sample_batch_id=sample_batch_id)
+
+    sample_items_dict_list = []
+    for sample_item_id in sample_item_ids:
+        result = await get_sample(sample_item_id)
+        sample_items_dict_list.append(result["data"])
+
+    sample_items_df = pd.DataFrame(sample_items_dict_list)
 
     peak_data = []
     total_samples = len(sample_items_df)
@@ -951,50 +957,41 @@ async def sample_batch_export_peaks(
             runtime.logger.error(repr(e))
             continue
 
-        peak_data.extend(
-            [
-                (
-                    sample_batch["sample_batch_name"],
-                    row["sample_item_name"],
-                    row["sample_item_type"],
-                    row["filter_id"],
-                    row["filename"],
-                    peak.mz.item(),
-                    peak.item(),
-                )
-                for peak in peak_data_item
-            ]
-        )
-
-    batch_peak_df = pd.DataFrame.from_records(
-        peak_data,
-        columns=(
-            "batch name",
-            "sample name",
-            "sample type",
-            "filter id",
-            "filename",
-            "mz",
-            "area",
-        ),
-    )
+        for peak in peak_data_item:
+            peak_data.append(
+                {
+                    "mz": peak.mz.item(),
+                    "intensity": peak.item(),
+                    "unit": "area",
+                    "sample_batch_name": sample_batch_name,
+                    "sample_item_name": row["sample_item_name"],
+                    "filename": row["filename"],
+                    "filter_id": row["filter_id"],
+                    "sample_item_type": row["sample_item_type"],
+                    "datetime": row["datetime"],
+                    "datetime_utc": row["datetime_utc"],
+                    "sample_file_id": row["sample_file_id"],
+                    "sample_item_id": row["sample_item_id"],
+                    "tic": row["tic"],
+                    "instrument": instrument_type,
+                }
+            )
 
     dt_str = datetime.now().isoformat().replace("-", "").replace(":", "").split(".")[0]
 
     peakfile_path = get_filestore_path()
-    peakfile_filename = (
-        dt_str
-        + "_peaks_"
-        + sample_batch["sample_batch_name"].replace(" ", "_")
-        + ".parquet"
+    peakfile_filename = "_".join(
+        [dt_str, "peaks", sample_batch_name.replace(" ", "_") + ".csv"]
     )
     runtime.logger.info(f"Writing peak data to file {peakfile_filename}")
-    batch_peak_df.to_parquet(
-        os.path.join(peakfile_path, peakfile_filename), index=False
+    # Save peak data to dataframe and then to csv file
+    batch_peak_df = pd.DataFrame(peak_data)
+    batch_peak_df.to_csv(
+        os.path.join(peakfile_path, peakfile_filename), index=False, sep=";"
     )
     runtime.logger.info("Write complete")
 
-    # Step 6: Return the status message
+    # Return the status message
     return {
         "message": f"Peak data for sample batch '{sample_batch_name}' was exported to file '{peakfile_filename}' and saved to '{peakfile_path}'.",
         "_notification_data": {
