@@ -19,7 +19,7 @@ const props = defineProps({
 })
 
 const original = computed(() =>
-  action.value == 'create' ? null : app.data.workspace.focused ?? props.workspace
+  action.value == 'create' ? null : (app.data.workspace.focused ?? props.workspace)
 )
 
 const info = reactive({
@@ -71,8 +71,8 @@ async function execute() {
       })
 
       // Logic to focus new workspace
-      if (response?.workspace_id) {
-        const newWorkspaceId = response.workspace_id
+      if (response?.data?.workspace_id) {
+        const newWorkspaceId = response.data.workspace_id
 
         const unwatch = watch(
           () => app.data.workspace.list,
