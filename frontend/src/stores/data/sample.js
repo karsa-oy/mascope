@@ -111,6 +111,7 @@ export const useSample = defineModule({
               file // The file being uploaded
             },
             {
+              type: 'sample_file_upload',
               timeout: FILE_UPLOAD_TIMEOUT,
               onUploadProgress: (progressEvent) => {
                 const percentCompleted = progressEvent.progress * 100 // Calculate progress percentage
