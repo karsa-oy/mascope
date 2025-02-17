@@ -176,7 +176,7 @@ const upload = () => {
     <!-- ORBI FILES -->
     <template v-if="processed.invalid.orbi.length > 0">
       <h3>Invalid OrbiTrap Files</h3>
-      <p>The following h5 files do not have a valid OrbiTrap instrument name as a prefix:</p>
+      <p>The following raw files do not have a valid OrbiTrap instrument name as a prefix:</p>
       <ul>
         <li v-for="file in processed.invalid.orbi" :key="file.name">
           {{ file.name }}
