@@ -64,15 +64,12 @@ const batchOptionsPopover = ref()
 
 watch(
   () => app.data.batch.focused,
-  async (selected) => {
-    if (selected) {
-      const batchId = app.data.batch.focused.sample_batch_id
-      batch.expanded = { [batchId]: true }
-      app.data.batch.focus(selected)
+  async (focused) => {
+    if (focused) {
+      batch.expanded = { [focused.sample_batch_id]: true }
       await handlePending()
     } else {
       batch.expanded = {}
-      app.data.batch.unfocus()
     }
   }
 )
