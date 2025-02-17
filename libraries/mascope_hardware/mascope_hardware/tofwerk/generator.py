@@ -20,17 +20,6 @@ from mascope_lib.file_func import (
 )
 
 
-def strip_filepath(filepath):
-    """Strip path and file extension
-
-    :param filepath: Full file path
-    :type filepath: str
-    :return: Base filename
-    :rtype: str
-    """
-    return os.path.splitext(os.path.basename(filepath))[0]
-
-
 class H5Processor(Thread):
     """Read and process TOF h5 files"""
 
@@ -323,7 +312,7 @@ class H5Processor(Thread):
                 self.log.info("Deleting file from the streams folder")
                 try:
                     os.remove(self.file_to_process)
-                except FileNotFoundError:
+                except FileNotFoundError as e:
                     self.log.error(
                         f"Failed to delete file {self.file_to_process} from streams folder"
                     )
@@ -331,22 +320,4 @@ class H5Processor(Thread):
 
         # Out of main loop
         self.log.info(f"Exiting h5 processor ({self.name})")
-        self.shutdown()
-
-    def shutdown(self):
-        """Shutdown procedure"""
         self.shutdown_event.set()
-
-    def start_stream(self, filename: str):
-        """Method to call externally, to start processing a file
-
-        Alternative to directly putting a file into `self.file_queue`
-
-        :param filename: Full path to the file to be streamed
-        :type filename: str
-        :raises ValueError: If file is not found
-        """
-        if os.path.isfile(filename):
-            self.file_queue.put(filename)
-        else:
-            raise ValueError(f"File does not exist: {filename}")
