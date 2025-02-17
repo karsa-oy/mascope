@@ -347,7 +347,7 @@ async function pasteBatch() {
   if (batch.pasted) {
     await app.data.batch.copy({
       sample_batch_id: batch.pasted.sample_batch_id,
-      workspace_id: app.data.workspace.focused.workspace_id,
+      workspace_id: app.data.workspace.focusedId,
       sample_batch_name: generateCopyName(batch.pasted.sample_batch_name),
       sample_batch_description: batch.pasted.sample_batch_description
     })

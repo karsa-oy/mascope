@@ -794,8 +794,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onEnter))
                   app.data.workspace.list
                     .sort((a, b) => {
                       // ensure the current workspace comes first
-                      if (a.workspace_id == app.data.workspace.focused.workspace_id) return -1
-                      if (b.workspace_id == app.data.workspace.focused.workspace_id) return 1
+                      if (a.workspace_id == app.data.workspace.focusedId) return -1
+                      if (b.workspace_id == app.data.workspace.focusedId) return 1
                       return 0
                     })
                     .map((workspace, index) => ({
