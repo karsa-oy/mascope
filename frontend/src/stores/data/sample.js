@@ -152,7 +152,7 @@ export const useSample = defineModule({
             status: 'error',
             message: errorMessage
           })
-          console.error(`${op.operationId} upload failed for ${file.name}:`, error)
+          console.error(`Sample file upload failed for ${file.name}:`, error)
         }
       })
     )
