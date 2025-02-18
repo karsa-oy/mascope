@@ -933,12 +933,15 @@ async def sample_batch_export_peaks(
 
             await send_progress_user_notification(notification, 0.1)
 
-            # Assign peak fitting threshold depending on the instrument type
+            # Assign peak fitting threshold and peak abundance units
+            # depending on the instrument type
             # Correct intrument type unsured by get_instrument_type
             if instrument_type == "orbi":
                 threshold = 0.8
+                unit = "height"
             if instrument_type == "tof":
                 threshold = 0.9
+                unit = "area"
             sample_file = await detect_peaks(
                 filename,
                 instrument_functions,
@@ -950,7 +953,7 @@ async def sample_batch_export_peaks(
 
             await send_progress_user_notification(notification, 0.9)
 
-            peak_data_item = get_peaks(sample_file, "area").sum(dim="time")
+            peak_data_item = get_peaks(sample_file, unit).sum(dim="time")
 
             await send_progress_user_notification(notification, 1)
         except Exception as e:
@@ -962,7 +965,7 @@ async def sample_batch_export_peaks(
                 {
                     "mz": peak.mz.item(),
                     "intensity": peak.item(),
-                    "unit": "area",
+                    "unit": unit,
                     "sample_batch_name": sample_batch_name,
                     "sample_item_name": row["sample_item_name"],
                     "filename": row["filename"],
