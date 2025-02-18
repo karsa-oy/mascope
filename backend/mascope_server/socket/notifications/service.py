@@ -136,6 +136,7 @@ async def emit_sio_event(
 
 
 async def handle_reloads(
+    context: str,
     reload_events: list[tuple[str, str]],
     kwargs: dict[str, Any],
     result: dict[str, Any] | None,
@@ -176,7 +177,7 @@ async def handle_reloads(
         # Step 1d: Log warning if no room_ids found
         if not room_ids:
             runtime.logger.warning(
-                f"No room IDs found for event '{event_name}' with key '{room_key}'"
+                f"{context}: No room IDs found for event '{event_name}' with key '{room_key}'"
             )
             continue
 
@@ -191,7 +192,7 @@ async def handle_reloads(
                     await sio.emit(event_name, room=room_id, namespace="/")
                 except Exception as e:
                     runtime.logger.error(
-                        f"Failed to emit '{event_name}' to room {room_id}: {str(e)}"
+                        f"{context}: Failed to emit '{event_name}' to room {room_id}: {str(e)}"
                     )
                     continue
 

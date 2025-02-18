@@ -278,7 +278,12 @@ def api_controller_background_task(
                 if independent_transaction or (
                     func.__name__ == "rematch_batch" and parent_id
                 ):
-                    await handle_reloads(success_reload, kwargs, result)
+                    await handle_reloads(
+                        f"Success reload {func.__name__}",
+                        success_reload,
+                        kwargs,
+                        result,
+                    )
 
                 return result
             except ApiException as e:
@@ -295,7 +300,12 @@ def api_controller_background_task(
                     if independent_transaction or (
                         func.__name__ == "rematch_batch" and parent_id
                     ):
-                        await handle_reloads(error_reload, kwargs, e.tech_message)
+                        await handle_reloads(
+                            f"ApiException reload (status == 200) {func.__name__}",
+                            error_reload,
+                            kwargs,
+                            e.tech_message,
+                        )
 
                     if not independent_transaction and parent_id:
                         # Re-raise warning exceptions to be caught in parent handler
@@ -314,7 +324,12 @@ def api_controller_background_task(
                         await handle_notifications(
                             error_notification_rooms, notification, kwargs, None, sid
                         )
-                        await handle_reloads(error_reload, kwargs, None)
+                        await handle_reloads(
+                            f"ApiException reload (status != 200) {func.__name__}",
+                            error_reload,
+                            kwargs,
+                            None,
+                        )
                     # If not an independent transaction, re-raise the ApiException
                     else:
                         # Handle already processed exceptions
@@ -339,7 +354,12 @@ def api_controller_background_task(
                     await handle_notifications(
                         error_notification_rooms, notification, kwargs, None, sid
                     )
-                    await handle_reloads(error_reload, kwargs, None)
+                    await handle_reloads(
+                        f"Unhandled Exception reload {func.__name}",
+                        error_reload,
+                        kwargs,
+                        None,
+                    )
                 # If not an independent transaction, re-raise the ApiException
                 else:
                     raise api_exc from e
