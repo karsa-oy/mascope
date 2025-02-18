@@ -602,8 +602,16 @@ watch(
           <div class="spinner" v-else><ProgressSpinner strokeWidth="5px" />loading...</div>
         </template>
       </DataTable>
-      <ContextMenu ref="collectionContextMenu" :model="menu.collection" />
-      <ContextMenu ref="compoundContextMenu" :model="menu.compound" />
+      <ContextMenu
+        ref="collectionContextMenu"
+        :model="menu.collection"
+        @hide="context.collection = null"
+      />
+      <ContextMenu
+        ref="compoundContextMenu"
+        :model="menu.compound"
+        @hide="context.compound = null"
+      />
     </div>
   </Panel>
   <DialogTargetCollectionOp v-model:action="dialog.collection" :collection="context.collection" />
