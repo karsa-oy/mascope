@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, BackgroundTasks, Request, Depends, UploadFile
+from mascope_server.api.new.auth.access_token.service import get_access_token
 from mascope_server.db.id import gen_id
-from mascope_server.api.new.auth import auth_backend_access_token
 from mascope_server.api.new.auth.dependencies import guest_user, editor_user
 from mascope_server.api.lib.api_features import api_route
 from mascope_server.api.controllers.sample.files.sample_files_controller import (
@@ -142,6 +142,10 @@ async def sample_file_upload_route(
     """
     # Access the file using file.file
     user_sid = request.headers.get("X-SID")
+
+    # Validate the user's file-converter access_token, to prevent unauthorized access
+    await get_access_token(user=user, service_name="file-converter")
+
     return await sample_file_upload(file=file.file, user=user, user_sid=user_sid)
 
 
