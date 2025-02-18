@@ -997,6 +997,7 @@ async def sample_batch_export_peaks(
     # Return the status message
     return {
         "message": f"Peak data for sample batch '{sample_batch_name}' was exported to file '{peakfile_filename}' and saved to '{peakfile_path}'.",
+        "data": {"filename": peakfile_filename},
         "_notification_data": {
             "sample_batch_id": sample_batch_id,
         },
