@@ -9,6 +9,7 @@ import os
 import sys
 import io
 import re
+from types import TracebackType
 
 from rich.console import Console
 from rich.traceback import Traceback
@@ -34,6 +35,38 @@ def style(msg: str, *tags: List[str]) -> str:
     for tag in reversed(tags):
         end += f"</{tag}>"
     return f"{start}{msg}{end}"
+
+
+class Stacktrace:
+    """
+    Dummy class for printing pretty stacktraces
+    """
+
+    pass
+
+
+def stacktrace(show_locals: bool = False, skip_frames: int = 0) -> Traceback:
+    """
+    Constructs a pretty stacktrace for situations where
+    there is no exception.
+
+    :param show_locals: whether to show local variables in the frame
+    :param skip_frames: how many frames to skip in the begining
+    :return traceback: a rich Traceback object
+    """
+    trace = None
+    depth = 1
+    while True:
+        try:
+            frame = sys._getframe(depth)
+            depth += 1
+        except Exception:
+            break
+        if depth > skip_frames:
+            trace = TracebackType(trace, frame, frame.f_lasti, frame.f_lineno)
+    exception = Exception("trace for debugging purposes (not a real exception)")
+    stack = Traceback.extract(Stacktrace, exception, trace, show_locals=show_locals)
+    return Traceback(stack, show_locals=show_locals)
 
 
 def formatter(root_path: str) -> Callable[[loguru.Record], str]:
@@ -99,7 +132,7 @@ def formatter(root_path: str) -> Callable[[loguru.Record], str]:
         status = "{extra[status_code]: >3}"
         method = "{extra[method]: <7}"
         head = f"{timestamp} {level} " + status_style(f"{status} {method}")
-        head_text = f"{record["level"]} {record["extra"]["status_code"]} {record["extra"]["method"]}"
+        head_text = f"{record['level']} {record['extra']['status_code']} {record['extra']['method']}"
 
         # message
         envpath = os.path.join(
@@ -109,13 +142,13 @@ def formatter(root_path: str) -> Callable[[loguru.Record], str]:
             record["message"].replace(envpath, "$env").replace(root_path, "$mascope")
         )
         message = "{extra[parsed_message]: <60}"
-        message_text = f"{record["message"]}"
+        message_text = f"{record['message']}"
 
         # footer
         module = "{name}:{line}"
         key = "{extra[key]}"
         tail = f"{module} {key}"
-        tail_text = f"{record["name"]} {record["extra"]["key"]}"
+        tail_text = f"{record['name']} {record['extra']['key']}"
 
         # highlight search
         full_text = f"{head_text} {message_text} {tail_text}"
@@ -126,13 +159,25 @@ def formatter(root_path: str) -> Callable[[loguru.Record], str]:
         # FORMAT
         fmt = style(f" {head} {message} {tail}\n", *tags)
 
-        # tracebacks
-        if record["exception"] is not None:
-            output = io.StringIO()
-            console = Console(file=output, force_terminal=True)
-            traceback = Traceback.from_exception(*record["exception"])
+        # TRACEBACKS
+        output = io.StringIO()
+        console = Console(file=output, force_terminal=True)
+        trace_opt = record["extra"].get("trace", False)
+        is_exception = record["exception"] is not None
+        trace = None
+        if is_exception:
+            # pretty print exception traceback
+            trace = Traceback.from_exception(*record["exception"])
+        elif trace_opt:
+            # construct stacktrace without exception
+            trace = stacktrace(skip_frames=5)  # *
+            # * we skip five frames in order to get directly to the
+            # logger callsite, i.e. we avoid printing stack frames
+            # from this module or loguru.
+        if trace:
+            # if trace exists, we add it to the message
             console.print("")
-            console.print(traceback)
+            console.print(trace)
             record["extra"]["rich_exception"] = output.getvalue()
             fmt += "{extra[rich_exception]}\n"
 
