@@ -68,7 +68,7 @@ from mascope_server.runtime import runtime
 
 
 @api_controller_background_task(
-    success_notification_rooms=["sample_batch_id"],
+    success_notification_rooms=["sid"],
     success_reload=[("sample_batch_reload", "sample_batch_id")],
     error_notification_rooms=["sid"],
 )
@@ -175,7 +175,7 @@ async def rematch_sample(
 
 
 @api_controller_background_task(
-    success_notification_rooms=["sample_batch_id"],
+    success_notification_rooms=["sid"],
     success_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
     error_notification_rooms=["sid"],
     error_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
