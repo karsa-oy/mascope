@@ -893,9 +893,9 @@ async def sample_batch_export_peaks(
     :type sid: str, optional
     """
     # Get sample batch name
-    async with async_session() as session:
-        sample_batch = await session.get(SampleBatch, sample_batch_id)
-        sample_batch_name = sample_batch.sample_batch_name
+    sample_batch_result = await get_sample_batch(sample_batch_id)
+    sample_batch = sample_batch_result.get("data")
+    sample_batch_name = sample_batch["sample_batch_name"]
 
     sample_item_ids, _ = await fetch_sample_item_ids(sample_batch_id=sample_batch_id)
 
