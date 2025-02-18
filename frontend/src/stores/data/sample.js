@@ -146,7 +146,7 @@ export const useSample = defineModule({
         } catch (error) {
           errors += 1
           // Handle upload errors for this specific file
-          const errorMessage = `Failed to upload file ${file.name}: ${error.message}`
+          const errorMessage = `Failed to upload file ${file.name}: ${error.response?.data?.error ?? error.message}`
           ui.notification.push({
             type: 'sample_file_upload',
             process_id,
