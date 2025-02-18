@@ -13,10 +13,10 @@ maintainers = [
     { name = "Oskari Kausiala", email = "oskari.kausiala@karsa.fi>" },
     { name = "Philip Chernonog", email = "philip.chernonog@karsa.fi>" },
     ]
-license = { text = "GPL-3.0-or-later" }
+license = { text = "MIT" }
 readme = "README.md"
 requires-python = ">=3.8"
-version = "0.1.0"
+version = "0.1.1"
 
 [project.urls]
 homepage = "https://karsa.fi/"
