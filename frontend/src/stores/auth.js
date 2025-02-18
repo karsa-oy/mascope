@@ -44,6 +44,17 @@ export const useAuth = defineStore('app.auth', () => {
     )
     identify()
   }
+  const expire = async () => {
+    await api.http.post(
+      `/auth/logout`,
+      {},
+      {
+        type: 'user_session_expired',
+        use: 'auth'
+      }
+    )
+    identify()
+  }
 
   // First owner management
   const checkFirstOwner = async () => {
@@ -100,6 +111,7 @@ export const useAuth = defineStore('app.auth', () => {
     identify,
     login,
     logout,
+    expire,
     checkFirstOwner,
     signupFirstOwner,
     onLogin

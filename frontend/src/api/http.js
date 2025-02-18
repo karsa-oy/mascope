@@ -82,7 +82,7 @@ function handleServerError(error) {
   // Any unhandled 401 triggers auth check, which will "redirect: to login if needed
   if (error?.response?.status === 401) {
     const app = useApp()
-    app.auth.identify()
+    app.auth.expire()
     return Promise.reject(error)
   }
 

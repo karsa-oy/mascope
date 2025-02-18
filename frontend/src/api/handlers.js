@@ -99,11 +99,21 @@ export default {
     // Handle successful responses
     if (status === 200 || status === 204) {
       if (type !== 'identify_user') {
+        const message = {
+          user_sign_in: 'Signed in successfully',
+          user_sign_out: 'Signed out succesfully',
+          user_session_expired:
+            'Your login session expired, so you have been signed out. Please sign in again.'
+        }
+        const knownEvent = type in message
         app.ui.notification.push({
           type,
-          message: message ?? 'Signed in successfully',
-          status: 'success'
+          message: knownEvent ? message[type] : 'Authentication successful',
+          status: 'info'
         })
+        if (!knownEvent) {
+          console.warn(`unknown succesful auth event type ${type}`, response)
+        }
       }
       return data.data
     }

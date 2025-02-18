@@ -100,7 +100,6 @@ export const useSample = defineModule({
     const mainProcessId = genId(8) // Generate a unique ID for the overall upload process
     let successes = 0 // Counter to track the number of successful uploads
     let errors = 0 // Counter to track the number of failed uploads
-    let fileConverterError = false // Track if file converter auth issue occured
 
     // Use Promise.all to handle multiple file uploads in parallel
     await Promise.all(
@@ -146,21 +145,16 @@ export const useSample = defineModule({
           }
         } catch (error) {
           errors += 1
-          if (auth.user && error.status == 401) {
-            // File converter authentication error
-            fileConverterError = true
-          } else {
-            // Handle upload errors for this specific file
-            const errorMessage = `Failed to upload file ${file.name}: ${error.message}`
-            ui.notification.push({
-              type: 'sample_file_upload',
-              process_id,
-              parent_id: mainProcessId,
-              status: 'error',
-              message: errorMessage
-            })
-            console.error(`Sample file upload failed for ${file.name}:`, error)
-          }
+          // Handle upload errors for this specific file
+          const errorMessage = `Failed to upload file ${file.name}: ${error.message}`
+          ui.notification.push({
+            type: 'sample_file_upload',
+            process_id,
+            parent_id: mainProcessId,
+            status: 'error',
+            message: errorMessage
+          })
+          console.error(`Sample file upload failed for ${file.name}:`, error)
         }
       })
     )
@@ -193,14 +187,6 @@ export const useSample = defineModule({
         process_id: mainProcessId,
         progress: 100,
         message: `Failed to upload all ${errors} file${errors > 1 ? 's' : ''}`
-      })
-    }
-    if (fileConverterError) {
-      ui.notification.push({
-        type: 'file_converter_auth',
-        status: 'error',
-        message:
-          "File uploads failed because your server's file converter is not authenticated. Please contact an admin."
       })
     }
     return {
