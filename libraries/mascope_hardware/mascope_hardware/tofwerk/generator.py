@@ -49,16 +49,15 @@ class H5Processor(Thread):
         :rtype: float
         """
         if self.h5:
-            # Check for zero bufs in the last write
-            last_write = self.h5["TimingData"]["BufTimes"][-1]
-            num_zero_writes = np.sum(last_write == 0)
-            # Get total number of valid timestamps/scans
-            n_scans = (
-                self.h5.attrs["NbrBufs"][0] * self.h5.attrs["NbrWrites"][0]
-                - num_zero_writes
-            )
-            # Return mean difference between timestamps
-            return float(self.length / n_scans)  # [s]
+            timestamps = self.h5["TimingData"]["BufTimes"][:].flatten()
+            non_zero_indices = np.where(timestamps != 0)[0]
+
+            # Trim trailing zeros
+            timestamps = timestamps[: non_zero_indices[-1] + 1]
+
+            # Calculate the mean difference between consecutive datapoints
+            differences = np.diff(timestamps)
+            return float(np.mean(differences))  # [s]
         return None
 
     @property
@@ -75,8 +74,9 @@ class H5Processor(Thread):
             # Last write may contain zero bufs, exclude them
             t_last_bufs = timestamps[-1]
             t_last = t_last_bufs[t_last_bufs != 0][-1]
-            # Return difference between first and last timestamp as total length
-            return float(t_last - t_first)  # [s]
+            # Total length of the sample file is the difference between
+            # starts of the first and the last scan + mean interval between scans
+            return float(t_last - t_first) + self.interval  # [s]
         return None
 
     @property
