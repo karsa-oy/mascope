@@ -992,11 +992,12 @@ async def sample_batch_export_peaks(
     batch_peak_df.to_csv(
         os.path.join(peakfile_path, peakfile_filename), index=False, sep=";"
     )
-    runtime.logger.info("Write complete")
+    message = f"Peak data for sample batch '{sample_batch_name}' was exported to file '{peakfile_filename}' and saved to '{peakfile_path}'."
+    runtime.logger.info(message)
 
     # Return the status message
     return {
-        "message": f"Peak data for sample batch '{sample_batch_name}' was exported to file '{peakfile_filename}' and saved to '{peakfile_path}'.",
+        "message": message,
         "data": {"filename": peakfile_filename},
         "_notification_data": {
             "sample_batch_id": sample_batch_id,
