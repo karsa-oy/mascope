@@ -37,7 +37,7 @@ const props = defineProps({
 const emit = defineEmits('click')
 
 const plot = ref(null)
-const ready = ref(false)
+const created = ref(false)
 
 // reset chart zoom to autorange
 const resetZoom = () => {
@@ -101,13 +101,18 @@ onMounted(() => {
   Plotly.newPlot(plot.value, props.data, derived.value.layout, derived.value.config)
   // event listener
   plot.value.on('plotly_click', (e) => emit('click', e))
-  ready.value = true
+  created.value = true
   Plotly.react(plot.value, props.data, derived.value.layout, derived.value.config)
 })
 
+const ready = computed(
+  () => created.value && props.data && derived.value.layout && app.ui.split.right
+)
+
 watchEffect(() => {
-  if (!ready.value || !props.data || !props.layout || !props.layout || !app.ui.split.right) return
-  Plotly.react(plot.value, props.data, derived.value.layout, derived.value.config)
+  if (ready.value) {
+    Plotly.react(plot.value, props.data, derived.value.layout, derived.value.config)
+  }
 })
 </script>
 
