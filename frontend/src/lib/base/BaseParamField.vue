@@ -27,6 +27,10 @@ const props = defineProps({
   hideSlider: {
     type: Boolean,
     default: false
+  },
+  small: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -64,6 +68,7 @@ watch(param, (value) => {
         :disabled="disabled"
         :maxFractionDigits="3"
         :allowEmpty="false"
+        :size="small ? 'small' : 'large'"
       />
       <label :for="id"> {{ label }}</label>
     </FloatLabel>

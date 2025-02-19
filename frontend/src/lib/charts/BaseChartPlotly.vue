@@ -1,8 +1,13 @@
 <script setup>
-import { ref, computed, onMounted, watchEffect } from 'vue'
+import { ref, computed, onMounted, watchEffect, watch } from 'vue'
+
 import * as Plotly from 'plotly.js-basic-dist'
 
+import { useWindowSize } from '@vueuse/core'
+
 import { useApp } from '@/stores'
+
+const { width, height } = useWindowSize()
 
 const app = useApp()
 
@@ -32,7 +37,7 @@ const props = defineProps({
 const emit = defineEmits('click')
 
 const plot = ref(null)
-const ready = ref(false)
+const created = ref(false)
 
 // reset chart zoom to autorange
 const resetZoom = () => {
@@ -96,18 +101,30 @@ onMounted(() => {
   Plotly.newPlot(plot.value, props.data, derived.value.layout, derived.value.config)
   // event listener
   plot.value.on('plotly_click', (e) => emit('click', e))
-  ready.value = true
+  created.value = true
   Plotly.react(plot.value, props.data, derived.value.layout, derived.value.config)
 })
 
+const ready = computed(
+  () => created.value && props.data && derived.value.layout && app.ui.split.right
+)
+
 watchEffect(() => {
-  if (!ready.value || !props.data || !props.layout || !props.layout || !app.ui.split.right) return
-  Plotly.react(plot.value, props.data, derived.value.layout, derived.value.config)
+  if (ready.value) {
+    Plotly.react(plot.value, props.data, derived.value.layout, derived.value.config)
+  }
 })
 </script>
 
 <template>
-  <div ref="plot" :id="id" class="plot" @click.prevent style="width: 100%; height: 100%" />
+  <div
+    ref="plot"
+    :id="id"
+    class="plot"
+    @click.prevent
+    style="width: 100%; height: 100%"
+    :key="`${width}-${height}`"
+  />
 </template>
 
 <style scoped>
