@@ -12,61 +12,15 @@ const app = useApp()
 
 const menu = ref()
 const dialog = ref()
-const filter = ref()
-
-/**
- * Watch for when workspace data is initially loaded, then focus on the saved workspace.
- * If the saved workspace is not available, fallback to the first workspace in the list.
- * The watcher only triggers on the first load and is then disabled to avoid conflicts.
- */
-watch(
-  () => app.data.workspace.list.length,
-  (count) => {
-    if (count > 0) {
-      const saved = app.data.workspace.list.find(
-        ({ workspace_id }) => workspace_id === localStorage.getItem('mascope-workspace')
-      )
-      filter.value = saved ?? app.data.workspace.list[0]
-      if (filter.value) {
-        app.data.workspace.focus(filter.value)
-      }
-    }
-  },
-  { once: true, immediate: true }
-)
-
-/**
- * Focus the workspace when changed in the toolbar, updating localStorage.
- */
-watch(filter, (workspace) => {
-  if (workspace) {
-    app.data.workspace.focus(workspace)
-    localStorage.setItem('mascope-workspace', workspace.workspace_id)
-  } else {
-    app.data.workspace.unfocus()
-  }
-})
-
-/**
- * Sync selected workspace in the toolbar with the focused workspace in app state.
- */
-watch(
-  () => app.data.workspace.focused,
-  (workspace) => {
-    if (workspace && filter.value.workspace_id !== workspace.workspace_id) {
-      filter.value = workspace
-    }
-  }
-)
 </script>
 
 <template>
-  <div v-tooltip.bottom="filter?.workspace_description">
+  <div v-tooltip.bottom="app.data.workspace?.workspace_description">
     <label for="workspace-selector" class="hidden">Workspace selector</label>
     <Select
       inputId="workspace-selector"
       dataKey="workspace_id"
-      v-model="filter"
+      v-model="app.data.workspace.focused"
       :options="app.data.workspace.list"
       optionLabel="workspace_name"
       style="flex-direction: row-reverse"

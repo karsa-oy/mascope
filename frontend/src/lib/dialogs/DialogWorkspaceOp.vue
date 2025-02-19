@@ -19,7 +19,7 @@ const props = defineProps({
 })
 
 const original = computed(() =>
-  action.value == 'create' ? null : app.data.workspace.focused ?? props.workspace
+  action.value == 'create' ? null : (app.data.workspace.focused ?? props.workspace)
 )
 
 const info = reactive({
@@ -71,8 +71,8 @@ async function execute() {
       })
 
       // Logic to focus new workspace
-      if (response?.workspace_id) {
-        const newWorkspaceId = response.workspace_id
+      if (response?.data?.workspace_id) {
+        const newWorkspaceId = response.data.workspace_id
 
         const unwatch = watch(
           () => app.data.workspace.list,
@@ -104,32 +104,8 @@ async function execute() {
      * - Sets up a one-time watcher to focus on the new workspace after the current one is deleted.
      */
     case 'delete': {
-      const currentIndex = app.data.workspace.list.findIndex(
-        ({ workspace_id }) => workspace_id === original.value.workspace_id
-      )
-
-      const nextWorkspace =
-        currentIndex > 0
-          ? app.data.workspace.list[currentIndex - 1] // Prefer the previous workspace in the list
-          : app.data.workspace.list[1] // Or the next one if the first was deleted
-
-      if (nextWorkspace) {
-        const originalWorkspace = original.value
-
-        const unwatch = watch(
-          () => app.data.workspace.list,
-          (newList, oldList) => {
-            const isOriginalWorkspaceDeleted = !newList.find(
-              (workspace) => workspace.workspace_id === originalWorkspace.workspace_id
-            )
-            if (isOriginalWorkspaceDeleted && newList.length < oldList.length) {
-              app.data.workspace.focus(nextWorkspace)
-              unwatch() // Stop watching after focusing
-            }
-          }
-        )
-
-        app.data.workspace.delete(originalWorkspace)
+      if (app.data.workspace.list.length > 1) {
+        app.data.workspace.delete(original.value)
       } else {
         info.message =
           'You cannot delete the last remaining workspace in the database. Create a new workspace before deleting this one.'

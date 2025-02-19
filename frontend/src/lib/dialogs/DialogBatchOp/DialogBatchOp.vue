@@ -88,7 +88,7 @@ const updated = computed(() => {
   const common = {
     sample_batch_name: selected.info.name,
     sample_batch_description: selected.info.desc,
-    workspace_id: app.data.workspace.focused.workspace_id,
+    workspace_id: app.data.workspace.focusedId,
     build_params: {
       calibration_collection: selected.calibrants.target_collection_id,
       ion_mechanisms: selected.mechanisms.matching.map((mech) => mech.ionization_mechanism_id),

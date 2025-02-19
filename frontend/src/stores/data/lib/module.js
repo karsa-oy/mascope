@@ -10,8 +10,10 @@ export const defineModule = ({
   useParent = null, // optionally define a parent module
   subscribe = false, // make socket io subscription for key
   reloadOn = null, // events to reload the module on
-  unfocusBefore = [], // unofucus before running these ops
+  unfocusBefore = [], // unfucus before running these ops
   multiselect = false, // currently not in use
+  allowUnfocus = true, // whether to allow unfocusing
+  persist = false, // whether to save focus to local storage
   onRefocus = () => {}, // lifecycle hook executed after refocus
   onEvent = () => {}, // lifecycle hook executed after event reload
   // api
@@ -24,6 +26,7 @@ export const defineModule = ({
 
     const prefix = `[app.data.${name.replaceAll('_', ' ')}]`
     const log = (message, ...rest) => console.log(`${prefix} ${message}`, ...rest)
+    const warn = (message, ...rest) => console.warn(`${prefix} ${message}`, ...rest)
     const debug = (message, ...rest) => console.debug(`${prefix} ${message}`, ...rest)
 
     const singleselect = !multiselect
@@ -132,19 +135,64 @@ export const defineModule = ({
             focused.value = null
           }
         }
-    // internal
-    const refocus = (focusedId) => {
-      if (focusedId) {
-        debug('refocusing', focusedId)
-        // refocus
-        const focusValid = records.value.map((record) => record[key]).includes(focusedId)
-        const id = focusValid ? focusedId : null
-        if (id) {
-          focus({ [key]: id })
-        } else {
-          unfocus()
+
+    // persistence
+
+    const stateLoaded = ref(false)
+    const storageKey = `module[${name}]`
+    const restoreState = () => {
+      if (!stateLoaded.value && persist) {
+        const state = localStorage.getItem(storageKey)
+        if (!state) {
+          debug('state not found storage')
+          return false
         }
+        debug('loading focus from storage', state)
+        focus({ [key]: state })
+        stateLoaded.value = true
+        return true
+      } else {
+        return false
       }
+    }
+    const persistState = (record) => {
+      if (record) {
+        debug('saving focus to storage', record[key])
+        localStorage.setItem(storageKey, record[key])
+      }
+    }
+    if (persist) {
+      watch(focused, persistState)
+    }
+
+    // focus automation
+
+    // automatically reassign next focus after reload
+    const refocus = (previousId) => {
+      // using the previously focused value
+      const previousValid = records.value.map((record) => record[key]).includes(previousId)
+      if (previousId && previousValid) {
+        debug(`refocusing on ${previousId}`)
+        focus({ [key]: previousId })
+        return focused.value
+      }
+      // then try to restore state
+      const restored = restoreState()
+      if (restored) {
+        return focused.value
+      }
+      // then try to unfocus if allowed
+      if (allowUnfocus) {
+        unfocus()
+        return focused.value
+      }
+      // finally try to autofocus on the first record
+      const resolved = records.value.length > 0 ? records.value[0] : null
+      if (!resolved) {
+        warn('refocus failed to resolve the default record.')
+      }
+      debug(`autofocusing ${resolved[key]}`)
+      focus(resolved)
       return focused.value
     }
 

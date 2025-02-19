@@ -9,12 +9,12 @@ export const useTargetCollection = defineModule({
   load: () =>
     api.http.get(`/target/collections`, {
       use: 'read',
-      type: 'load_target_collectoons'
+      type: 'load_target_collections'
     }),
   read: (target_collection_id) =>
     api.http.get(`/target/collections/${target_collection_id}`, {
       use: 'read',
-      type: 'load_target_collectoons'
+      type: 'load_target_collections'
     }),
   create: (collection) =>
     api.http.post(`/target/collections`, collection, {

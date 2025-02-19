@@ -64,15 +64,12 @@ const batchOptionsPopover = ref()
 
 watch(
   () => app.data.batch.focused,
-  async (selected) => {
-    if (selected) {
-      const batchId = app.data.batch.focused.sample_batch_id
-      batch.expanded = { [batchId]: true }
-      app.data.batch.focus(selected)
+  async (focused) => {
+    if (focused) {
+      batch.expanded = { [focused.sample_batch_id]: true }
       await handlePending()
     } else {
       batch.expanded = {}
-      app.data.batch.unfocus()
     }
   }
 )
@@ -94,13 +91,6 @@ async function handlePending() {
     pending.peakExport = false
   }
 }
-watch(
-  () => app.data.workspace.focused,
-  () => {
-    app.data.batch.focused = null
-    app.data.sample.focused = null
-  }
-)
 
 const formatter = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 2,
@@ -357,7 +347,7 @@ async function pasteBatch() {
   if (batch.pasted) {
     await app.data.batch.copy({
       sample_batch_id: batch.pasted.sample_batch_id,
-      workspace_id: app.data.workspace.focused.workspace_id,
+      workspace_id: app.data.workspace.focusedId,
       sample_batch_name: generateCopyName(batch.pasted.sample_batch_name),
       sample_batch_description: batch.pasted.sample_batch_description
     })
