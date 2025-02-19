@@ -8,6 +8,7 @@ from mascope_server.api.controllers.sample.items.sample_items_controller import 
     get_sample_item,
     create_sample_item,
     delete_sample_item,
+    sample_item_export_peaks,
     update_sample_item,
     copy_sample_item,
 )
@@ -189,5 +190,43 @@ async def process_sample_item_route(
 
     return {
         "message": f"Processing sample '{body.sample_item.sample_item_name}', please wait.",
+        "process_id": process_id,
+    }
+
+
+@sample_items_router.get("/{sample_item_id}/export_peak_data")
+@api_route(status_code=202)
+async def sample_item_export_peaks_route(
+    request: Request,
+    sample_item_id: str,
+    background_tasks: BackgroundTasks,
+    user=Depends(editor_user),
+):
+    """Export peak data for a specific sample item.
+
+    :param sample_item_id: The unique identifier of the sample item.
+    :type sample_item_id: str
+    :param background_tasks: Background task handler.
+    :type background_tasks: BackgroundTasks
+    :param user: The current authenticated user with editor permissions.
+    :type user: User
+    :return: A dictionary containing a message and process ID.
+    :rtype: dict
+    """
+    # Verify the existance of sample item
+    await get_sample_item(sample_item_id)
+
+    sid = request.headers.get("X-SID")
+    process_id = gen_id(8)
+
+    background_tasks.add_task(
+        sample_item_export_peaks,
+        sample_item_id=sample_item_id,
+        independent_transaction=True,
+        sid=sid,
+        process_id=process_id,
+    )
+    return {
+        "message": f"Exporting peak data for a sample item '{sample_item_id}', please wait.",
         "process_id": process_id,
     }
