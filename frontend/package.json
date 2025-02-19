@@ -22,7 +22,10 @@
     "test:gen": "npx playwright codegen http://localhost:5173/",
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore",
     "format": "prettier --write src/",
-    "palette": "node scripts/palette.js"
+    "palette": "node scripts/palette.js",
+    "clean": "npm run clean:windows && npm run clean:linux",
+    "clean:windows": "node -e \"if (process.platform === 'win32') process.exit(1)\" || , if exist node_modules rmdir /Q /S node_modules",
+    "clean:linux": "node -e \"if (process.platform !== 'win32') process.exit(1)\" || rm -rf node_modules"
   },
   "dependencies": {
     "@floating-ui/vue": "^1.1.5",

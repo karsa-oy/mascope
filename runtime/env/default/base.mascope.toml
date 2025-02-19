@@ -81,6 +81,7 @@ log_path = './logs'
 # acquisition_filter = { min = '2020-01-01T00:00' }
 # scripts
 install = "npm install"
+uninstall = "npm run clean"
 run = "npm run dev"
 
 [notebooks]
