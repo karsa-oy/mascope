@@ -14,7 +14,7 @@ import { useApp } from '@/stores'
 const confirm = useConfirm()
 const app = useApp()
 
-const drawer = ref()
+const drawer = ref(false)
 const isSaving = ref(false)
 
 const open = defineModel('open')
@@ -135,7 +135,6 @@ const matchRangeMiddle = computed(
         drawer = true
       }
     "
-    :style="`position: fixed; top: 10rem; left: calc(${app.ui.split.left}vw + 2rem)`"
   />
   <Drawer
     v-model:visible="drawer"
