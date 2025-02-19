@@ -27,6 +27,12 @@ const refresh = () => {
   key.value = Math.random()
 }
 
+const summary = computed(
+  () =>
+    `${app.data.match.visualized.ion.target_ion_formula} match parameters
+  for ${app.data.match.visualized.ion.instrument} instrument`
+)
+
 const items = computed(() => [
   {
     label: 'Save parameters',
@@ -35,7 +41,7 @@ const items = computed(() => [
       confirm.require({
         icon: 'pi pi-info-circle',
         header: 'Saving match parameters',
-        message: `Are you sure you want to save current ${app.data.match.visualized.ion.target_ion_formula} match parameters for ${app.data.match.visualized.ion.instrument} instrument?`,
+        message: `Are you sure you want to save ${summary.value}?`,
         accept: async () => {
           isSaving.value = true
           await app.data.match.params.save()
@@ -79,7 +85,7 @@ const items = computed(() => [
       confirm.require({
         icon: 'pi pi-exclamation-triangle',
         header: 'Deleting match parameters',
-        message: `Are you sure you want to delete ${app.data.match.visualized.ion?.target_ion_formula} match parameters for ${app.data.match.visualized.ion?.instrument} instrument?`,
+        message: `Are you sure you want to delete ${summary.value}`,
         accept: () => {
           app.data.match.params.remove()
           refresh()
