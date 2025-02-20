@@ -99,7 +99,7 @@ class H5Processor(Thread):
         :rtype: str | None
         """
         if self.h5:
-            return "-" if self.h5.attrs["IonMode"] == "negative" else "+"
+            return "-" if self.h5.attrs["IonMode"] == b"negative" else "+"
         return None
 
     @property
