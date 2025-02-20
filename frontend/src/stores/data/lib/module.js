@@ -61,6 +61,7 @@ export const defineModule = ({
       ? ref(null)
       : computed(() => (selected.value?.length == 1 ? selected.value[0] : null))
     const focusedId = computed(() => (focused.value ? focused.value[key] : null))
+    const selectedIds = computed(() => selected.value.map((record) => record[key]))
     const active = (arg) =>
       arg ? selected.value.map((record) => record[key]).includes(arg[key]) : false
 
@@ -359,6 +360,7 @@ export const defineModule = ({
       singleselect,
       // selection
       selected,
+      selectedIds,
       focused,
       focusedId,
       active,
