@@ -1,5 +1,13 @@
 from datetime import datetime, timezone
+import os
 from fastapi import BackgroundTasks
+from mascope_server.api.controllers.sample.lib.sample_batches_fetch import (
+    fetch_sample_batch_data,
+)
+from mascope_server.api.controllers.samples.samples_controller import get_sample
+from mascope_server.api.new.instrument_configs.lib import read_instrument_functions
+import numpy as np
+import pandas as pd
 from sqlalchemy import (
     select,
     asc,
@@ -32,6 +40,7 @@ from mascope_server.api.models.sample.items.sample_item_pydantic_model import (
 )
 from mascope_server.socket.notifications import (
     UserNotification,
+    send_progress_user_notification,
 )
 from mascope_server.api.new.instrument_configs.service import get_instrument_config
 from mascope_server.api.new.instrument_configs.schemas import (
@@ -40,6 +49,10 @@ from mascope_server.api.new.instrument_configs.schemas import (
 from mascope_server.api.new.instrument_configs.process.service import (
     process_instrument_config,
 )
+from mascope_server.runtime import runtime
+
+from mascope_lib.file_func import get_filestore_path, get_instrument_type, load_signal
+from mascope_lib.peak import detect_peaks
 
 
 @api_controller()
@@ -472,5 +485,176 @@ async def copy_sample_item(
         "_notification_data": {
             "sample_item_id": new_sample_item_id,
             "sample_batch_id": sample_batch_id,
+        },
+    }
+
+
+@api_controller_background_task(
+    success_notification_rooms=["sid"],
+    error_notification_rooms=["sid"],
+)
+async def sample_item_export_peaks(
+    sample_item_id: str,
+    independent_transaction: bool = False,
+    sid=None,
+    process_id=None,
+    parent_id=None,
+):
+    """Exports peak data for a specific sample item to a CSV file. This process involves loading sample file
+    as a sample view, detecting peaks, and compiling peak data into a DataFrame before saving it to a file.
+
+    Peak data is exported as a CSV file with the following columns:
+    - datetime: The date and time of the scan in the local timezone.
+    - datetime_utc: The date and time of the scan in UTC.
+    - tic: The total ion current for the scan.
+    - mz: The mass-to-charge ratio of the peak.
+    - intensity: The intensity of the peak in each scan.
+    - unit: The unit of the intensity value (ions for TOF or relative for Orbitrap).
+    - sample_batch_name: The name of the sample batch.
+    - sample_item_name: The name of the sample item.
+    - filename: The filename of the sample file.
+    - filter_id: The ID of the filter used.
+    - sample_item_type: The type of the sample item.
+    - sample_file_id: The ID of the sample file.
+    - sample_item_id: The ID of the sample item.
+    - instrument: The type of the instrument used for the sample file.
+
+    :param sample_item_id: ID of the sample item.
+    :type sample_item_id: str
+    :param independent_transaction: Flag to indicate if the operation should be treated as an independent transaction, defaults to False.
+    :type independent_transaction: bool, optional
+    :param sid: Session ID for targeting specific clients when emitting events, defaults to None.
+    :type sid: str, optional
+    """
+    # Get sample item data as a sample view
+    sample_item_result = await get_sample(sample_item_id)
+    sample_item = sample_item_result.get("data")
+    sample_item_name = sample_item["sample_item_name"]
+
+    # Get sample batch name
+    sample_batch_id = sample_item["sample_batch_id"]
+    sample_batch_data = await fetch_sample_batch_data(sample_batch_id)
+    sample_batch_name = sample_batch_data.sample_batch_name
+
+    # Prepare notification
+    notification = UserNotification(
+        process_id=process_id,
+        parent_id=parent_id,
+        type="sample_item_export_peaks",
+        status="pending",
+        message=f"Exporting peak data for sample item '{sample_item_name}'",
+        # NOTE set the internal room_ids for the pending user_notifications and sid of the user, will be removed from the data.
+        data={
+            "sample_item_id": sample_item_id,
+            "sample_batch_id": sample_batch_id,
+            "_room_ids": [sid],
+            "_sid": sid,
+        },
+    )
+
+    await send_progress_user_notification(notification, 0.1)
+
+    try:
+        filename = sample_item["filename"]
+        instrument_functions = await read_instrument_functions(filename=filename)
+        instrument_type = get_instrument_type(filename)
+
+        await send_progress_user_notification(notification, 0.1)
+
+        # Assign peak fitting threshold and peak abundance units
+        # depending on the instrument type
+        # Correct intrument type unsured by get_instrument_type
+        if instrument_type == "orbi":
+            threshold = 0.8
+            peak_data_type = "peak_heights"
+        if instrument_type == "tof":
+            threshold = 0.9
+            peak_data_type = "peak_areas"
+        sample_file = await detect_peaks(
+            filename,
+            instrument_functions,
+            threshold,
+            u_list=None,
+            if_exists="append",
+            instrument_type=instrument_type,
+        )
+
+        sample_peak_data = sample_file[peak_data_type].dropna(dim="mz", how="all")
+
+        await send_progress_user_notification(notification, 0.8)
+    except Exception as e:
+        runtime.logger.error(repr(e))
+
+    # Get scan timestamps
+    base_datetime = sample_item["datetime"]
+    scan_timestamps = pd.to_timedelta(
+        sample_peak_data.time.values, unit="s"
+    ) + pd.Timestamp(base_datetime)
+    # Get scan timestamps UTC
+    base_datetime_utc = sample_item["datetime_utc"]
+    scan_timestamps_utc = pd.to_timedelta(
+        sample_peak_data.time.values, unit="s"
+    ) + pd.Timestamp(base_datetime_utc)
+
+    # Get ticks for each time scan
+    scan_tics = load_signal(filename).sum(dim="mz").signal.values
+
+    mz_values = sample_peak_data.mz.values
+    intensities = sample_peak_data.values.T  # Transpose to get (n_scans, n_mz)
+
+    # Create arrays for the repeated values
+    repeated_datetimes = np.repeat(
+        scan_timestamps.values[:, np.newaxis], len(mz_values), axis=1
+    )
+    repeated_datetimes_utc = np.repeat(
+        scan_timestamps_utc.values[:, np.newaxis], len(mz_values), axis=1
+    )
+    repeated_tics = np.repeat(scan_tics[:, np.newaxis], len(mz_values), axis=1)
+    repeated_mz = np.repeat(mz_values, len(scan_timestamps))
+
+    # Create the final DataFrame
+    batch_peak_df = pd.DataFrame(
+        {
+            "datetime": repeated_datetimes.T.flatten(),
+            "datetime_utc": repeated_datetimes_utc.T.flatten(),
+            "tic": repeated_tics.T.flatten(),
+            "mz": repeated_mz.flatten(),
+            "intensity": intensities.flatten(),
+        }
+    ).assign(
+        unit="ions" if instrument_type == "tof" else "rel.",
+        sample_batch_name=sample_batch_name,
+        sample_item_name=sample_item_name,
+        filename=filename,
+        filter_id=sample_item["filter_id"],
+        sample_item_type=sample_item["sample_item_type"],
+        sample_file_id=sample_item["sample_file_id"],
+        sample_item_id=sample_item["sample_item_id"],
+        instrument=instrument_type,
+    )
+
+    await send_progress_user_notification(notification, 1)
+
+    # Get the current date and time as a string for a filename
+    dt_str = datetime.now().isoformat().replace("-", "").replace(":", "").split(".")[0]
+
+    # Save the peak data to a CSV file
+    peakfile_path = get_filestore_path()
+    peakfile_filename = "_".join(
+        [dt_str, "peak_data", sample_item_name.replace(" ", "_") + ".csv"]
+    )
+    runtime.logger.info(f"Writing peak data to file {peakfile_filename}")
+    batch_peak_df.to_csv(
+        os.path.join(peakfile_path, peakfile_filename), index=False, sep=";"
+    )
+    message = f"Peak data for sample item '{sample_item_name}' was exported to file '{peakfile_filename}' and saved to '{peakfile_path}'."
+    runtime.logger.info(message)
+
+    # Return the status message
+    return {
+        "message": message,
+        "data": {"filename": peakfile_filename},
+        "_notification_data": {
+            "sample_item_id": sample_item_id,
         },
     }
