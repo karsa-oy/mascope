@@ -630,7 +630,7 @@ async def sample_item_export_peaks(
         sample_item_type=sample_view["sample_item_type"],
         sample_file_id=sample_view["sample_file_id"],
         sample_item_id=sample_view["sample_item_id"],
-        instrument=instrument_type,
+        instrument=sample_view["instrument"],
     )
 
     await send_progress_user_notification(notification, 1)
