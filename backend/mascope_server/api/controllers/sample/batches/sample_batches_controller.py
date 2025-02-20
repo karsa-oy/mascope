@@ -1,3 +1,4 @@
+import asyncio
 import os
 from datetime import datetime, timezone
 from fastapi import BackgroundTasks
@@ -766,12 +767,31 @@ async def import_sample_items(
         runtime.logger.info(other_affected_batches_message)
         notification.message += other_affected_batches_message
 
-    # Step 7: Raise a warning if encountered during calibration
-    if warning is not None:
+    # Step 6: Rematch all imported samples
+    await rematch_samples(
+        sample_item_ids=created_sample_item_ids,
+        independent_transaction=False,
+        sid=sid,
+        process_id=gen_id(8),
+        parent_id=process_id,
+    )
 
     notification.message = f"Rematched {len(all_affected_sample_item_ids)} sample items affected by the import."
     await send_progress_user_notification(notification, 0.9)
 
+    # Step 7: Create separate independent task to recompute matches for other affected samples
+    asyncio.create_task(
+        rematch_samples(
+            sample_item_ids=[
+                si_id
+                for si_id in all_affected_sample_item_ids
+                if si_id not in created_sample_item_ids  # exclude the imported samples
+            ],
+            independent_transaction=True,  # Set to true to handle reloads independantly
+            # sid=sid,
+            process_id=gen_id(8),
+        )
+    )
 
     # Step 8: Raise a warning if encountered during calibration
     if calibration_warning is not None:

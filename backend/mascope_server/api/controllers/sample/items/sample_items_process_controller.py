@@ -1,3 +1,4 @@
+import asyncio
 from mascope_lib.file_func import get_instrument_type
 from mascope_server.db.id import gen_id
 from mascope_server.api.lib.api_features import (
@@ -182,19 +183,30 @@ async def process_sample_item(
         process_id=gen_id(8),
         parent_id=process_id,
     )
-    # Step 4B: Recompute matches affected by instrument config processing
-    if independent_transaction:
-        await rematch_samples(
-            sample_item_ids=processed["affected_sample_item_ids"],
-            independent_transaction=False,
-        )
 
     notification.message = (
         f"Matches computed for sample '{sample_item.sample_item_name}'."
     )
     await send_progress_user_notification(notification, 0.9)
 
-    # Step 5: Fetch updated sample details including match data
+    # Step 5: Create separate independent task to recompute matches for other affected samples
+    asyncio.create_task(
+        rematch_samples(
+            sample_item_ids=[
+                si_id
+                for si_id in all_affected_sample_item_ids
+                if si_id != created_sample_item_id  # exclude the processed sample
+            ],
+            independent_transaction=True,  # Set to true to handle reloads independantly
+            sid=sid,
+            process_id=gen_id(8),
+        )
+    )
+
+    runtime.logger.info(
+        f"Started independant rematch task for {len(all_affected_sample_item_ids)} affected samples"
+    )
+
     # Step 6. Gather all affected batch IDs for ui reload events
     _, affected_sample_batch_ids, *_ = await fetch_affected_sample_data(
         sample_item_ids=list(all_affected_sample_item_ids)
