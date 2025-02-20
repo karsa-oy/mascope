@@ -527,12 +527,12 @@ async def sample_item_export_peaks(
     :type sid: str, optional
     """
     # Get sample item data as a sample view
-    sample_item_result = await get_sample(sample_item_id)
-    sample_item = sample_item_result.get("data")
-    sample_item_name = sample_item["sample_item_name"]
+    sample_view_result = await get_sample(sample_item_id)
+    sample_view = sample_view_result.get("data")
+    sample_item_name = sample_view["sample_item_name"]
 
     # Get sample batch name
-    sample_batch_id = sample_item["sample_batch_id"]
+    sample_batch_id = sample_view["sample_batch_id"]
     sample_batch_data = await fetch_sample_batch_data(sample_batch_id)
     sample_batch_name = sample_batch_data.sample_batch_name
 
@@ -555,7 +555,7 @@ async def sample_item_export_peaks(
     await send_progress_user_notification(notification, 0.1)
 
     try:
-        filename = sample_item["filename"]
+        filename = sample_view["filename"]
         instrument_functions = await read_instrument_functions(filename=filename)
         instrument_type = get_instrument_type(filename)
 
@@ -586,12 +586,12 @@ async def sample_item_export_peaks(
         runtime.logger.error(repr(e))
 
     # Get scan timestamps
-    base_datetime = sample_item["datetime"]
+    base_datetime = sample_view["datetime"]
     scan_timestamps = pd.to_timedelta(
         sample_peak_data.time.values, unit="s"
     ) + pd.Timestamp(base_datetime)
     # Get scan timestamps UTC
-    base_datetime_utc = sample_item["datetime_utc"]
+    base_datetime_utc = sample_view["datetime_utc"]
     scan_timestamps_utc = pd.to_timedelta(
         sample_peak_data.time.values, unit="s"
     ) + pd.Timestamp(base_datetime_utc)
@@ -613,7 +613,7 @@ async def sample_item_export_peaks(
     repeated_mz = np.repeat(mz_values, len(scan_timestamps))
 
     # Create the final DataFrame
-    batch_peak_df = pd.DataFrame(
+    sample_peak_df = pd.DataFrame(
         {
             "datetime": repeated_datetimes.T.flatten(),
             "datetime_utc": repeated_datetimes_utc.T.flatten(),
@@ -626,10 +626,10 @@ async def sample_item_export_peaks(
         sample_batch_name=sample_batch_name,
         sample_item_name=sample_item_name,
         filename=filename,
-        filter_id=sample_item["filter_id"],
-        sample_item_type=sample_item["sample_item_type"],
-        sample_file_id=sample_item["sample_file_id"],
-        sample_item_id=sample_item["sample_item_id"],
+        filter_id=sample_view["filter_id"],
+        sample_item_type=sample_view["sample_item_type"],
+        sample_file_id=sample_view["sample_file_id"],
+        sample_item_id=sample_view["sample_item_id"],
         instrument=instrument_type,
     )
 
@@ -644,7 +644,7 @@ async def sample_item_export_peaks(
         [dt_str, "peak_data", sample_item_name.replace(" ", "_") + ".csv"]
     )
     runtime.logger.info(f"Writing peak data to file {peakfile_filename}")
-    batch_peak_df.to_csv(
+    sample_peak_df.to_csv(
         os.path.join(peakfile_path, peakfile_filename), index=False, sep=";"
     )
     message = f"Peak data for sample item '{sample_item_name}' was exported to file '{peakfile_filename}' and saved to '{peakfile_path}'."
