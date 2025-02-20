@@ -899,17 +899,17 @@ async def sample_batch_export_peaks(
 
     sample_item_ids, _ = await fetch_sample_item_ids(sample_batch_id=sample_batch_id)
 
-    sample_items_dict_list = []
+    sample_views_dict_list = []
     for sample_item_id in sample_item_ids:
         result = await get_sample(sample_item_id)
-        sample_items_dict_list.append(result["data"])
+        sample_views_dict_list.append(result["data"])
 
-    sample_items_df = pd.DataFrame(sample_items_dict_list)
+    sample_views_df = pd.DataFrame(sample_views_dict_list)
 
     peak_data = []
-    total_samples = len(sample_items_df)
+    total_samples = len(sample_views_df)
 
-    for index, row in sample_items_df.iterrows():
+    for index, row in sample_views_df.iterrows():
         # Prepare progress user notification.
         notification = UserNotification(
             process_id=process_id,
