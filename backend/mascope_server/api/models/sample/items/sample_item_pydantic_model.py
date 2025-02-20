@@ -114,11 +114,11 @@ class SampleItemUpdateBody(BaseModel):
     )
 
 
-class SampleItemCopyBody(BaseModel):
+class SampleItemsCopyBody(BaseModel):
     sample_batch_id: str = Field(
-        ..., description="ID of the sample batch where to copy sample item"
+        ..., description="ID of the sample batch where to copy sample items"
     )
-    sample_item_name: str = Field(..., description="Name of the new sample item")
+    sample_item_ids: list[str] = Field(..., description="Sample item IDs to copy")
 
 
 class SampleItemProcessBody(BaseModel):

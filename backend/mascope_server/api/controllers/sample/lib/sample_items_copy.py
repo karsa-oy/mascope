@@ -1,6 +1,8 @@
+from typing import NamedTuple
 from sqlalchemy import (
     select,
 )
+import math
 from mascope_server.db.models import (
     MatchIsotope,
     MatchInterference,
@@ -16,9 +18,13 @@ from mascope_server.socket.notifications import (
 )
 
 
-async def copy_sample_item_match_data(
-    original_sample_item_id: str,
-    new_sample_item_id: str,
+class CopyMatches(NamedTuple):
+    original_sample_item_id: str
+    new_sample_item_id: str
+
+
+async def copy_sample_items_match_data(
+    copy_commands: list[CopyMatches],
     session,
     notification: UserNotification = None,
 ):
@@ -39,8 +45,10 @@ async def copy_sample_item_match_data(
     :type notification: UserNotification, optional
     """
 
-    async def copy_match_records(model, progress_increment):
-        query = select(model).filter(model.sample_item_id == original_sample_item_id)
+    async def copy_match_records(command, model, progress_increment):
+        query = select(model).where(
+            model.sample_item_id == command.original_sample_item_id
+        )
         result = await session.execute(query)
         match_records = result.scalars().all()
 
@@ -53,7 +61,7 @@ async def copy_sample_item_match_data(
             new_record_data.update(
                 {
                     f"{model.__tablename__}_id": gen_id(32),
-                    "sample_item_id": new_sample_item_id,
+                    "sample_item_id": command.new_sample_item_id,
                 }
             )
             new_record = model(**new_record_data)
@@ -62,10 +70,18 @@ async def copy_sample_item_match_data(
         if notification:
             await send_progress_user_notification(notification, progress_increment)
 
-    # Copy each type of match record with progress tracking
-    await copy_match_records(MatchIsotope, 0.25)
-    await copy_match_records(MatchInterference, 0.5)
-    await copy_match_records(MatchIon, 0.75)
-    await copy_match_records(MatchCompound, 0.85)
-    await copy_match_records(MatchCollection, 0.9)
-    await copy_match_records(MatchSample, 0.95)
+    # calculate progress from step index and within-step progress
+    total = len(copy_commands)
+
+    def progress(step_index, step_prog):
+        return (step_index - 1) / total + step_prog / total
+
+    # execute through copy commands, reporting progress
+    for i, command in enumerate(copy_commands):
+        await send_progress_user_notification(notification, progress(i, 0))
+        await copy_match_records(command, MatchIsotope, progress(i, 0.25))
+        await copy_match_records(command, MatchInterference, progress(i, 0.5))
+        await copy_match_records(command, MatchIon, progress(i, 0.75))
+        await copy_match_records(command, MatchCompound, progress(i, 0.85))
+        await copy_match_records(command, MatchCollection, progress(i, 0.9))
+        await copy_match_records(command, MatchSample, progress(i, 0.95))

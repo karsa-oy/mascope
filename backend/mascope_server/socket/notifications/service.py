@@ -70,7 +70,7 @@ async def send_progress_user_notification(
             "calibration_mz_calibrate_sample",
             "import_sample_items",
             "process_sample_item",
-            "copy_sample_item",
+            "copy_sample_items",
         ]
         and increment
     ):

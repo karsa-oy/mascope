@@ -53,7 +53,7 @@ from mascope_server.api.controllers.sample.lib.sample_items_fetch import (
 )
 from mascope_server.api.controllers.sample.items.sample_items_controller import (
     create_sample_item,
-    copy_sample_item,
+    copy_sample_items,
 )
 from mascope_server.api.controllers.samples.samples_controller import get_sample
 from mascope_server.api.controllers.sample.lib.fetch_affected_sample_data import (
@@ -903,31 +903,15 @@ async def copy_sample_batch(
     new_sample_batch = create_sample_batch_result["data"]
 
     # Step 5: Copy sample items associated with the original sample batch
-    total_samples = len(original_sample_batch.sample_item)
-    for item_index, sample_item in enumerate(original_sample_batch.sample_item):
-        notification = UserNotification(
-            process_id=process_id,
-            type="copy_sample_batch",
-            status="pending",
-            message=f"Copying sample {item_index + 1}/{total_samples} to new batch.",
-            data={
-                "sample_batch_id": new_sample_batch["sample_batch_id"],
-                "_room_ids": [sid],
-                "_sid": sid,
-                "_total_samples": total_samples,
-                "_item_index": item_index,
-            },
-        )
-        await send_progress_user_notification(notification, 0.2)
-        await copy_sample_item(
-            sample_item_id=sample_item.sample_item_id,
-            sample_item_name=sample_item.sample_item_name,
-            sample_batch_id=new_sample_batch["sample_batch_id"],
-            sid=sid,
-            process_id=gen_id(8),
-            parent_id=process_id,
-        )
-        await send_progress_user_notification(notification, 0.9)
+    await copy_sample_items(
+        sample_item_ids=[s.sample_item_id for s in original_sample_batch.sample_item],
+        sample_batch_id=new_sample_batch["sample_batch_id"],
+        always_copy_matches=True,
+        independent_transaction=False,
+        sid=sid,
+        process_id=gen_id(8),
+        parent_id=process_id,
+    )
 
     # Step 6: Return the copied batch and message
     sample_batch_name = new_sample_batch["sample_batch_name"]

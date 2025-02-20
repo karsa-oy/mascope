@@ -51,10 +51,12 @@ const formatter = new Intl.NumberFormat('en-US', {
 // component ref
 const contextMenuRef = ref()
 
+const isSample = (item) => item.sample_item_id && item.sample_batch_id && item.sample_item_name
+
 // prevent default event handling
 const onContextMenuClick = async (event) => {
   // disable context menu for multiselection
-  if (app.data.sample.focusedId == sample.context?.sample_item_id) {
+  if (app.data.sample.selectedIds.includes(sample.context?.sample_item_id)) {
     contextMenuRef.value.show(event.originalEvent)
     emit('contextMenu', contextMenuRef.value)
   } else {
@@ -68,100 +70,115 @@ const onContextMenuClick = async (event) => {
   } catch (err) {
     return
   }
-  if (pasted?.sample_batch_id && pasted?.sample_item_id) {
+  const valid = pasted?.every(isSample) ?? false
+  if (valid) {
     sample.pasted = pasted
   }
 }
 
-const contextMenuEntries = computed(() => [
-  {
-    label: 'Paste sample',
-    icon: 'pi pi-clipboard',
-    visible: sample.pasted !== null,
-    command: async () => {
-      if (sample.pasted) {
-        await app.data.sample.copy({
-          sample_item_id: sample.pasted.sample_item_id,
-          sample_batch_id: sample.context.sample_batch_id,
-          sample_item_name: generateCopyName(sample.pasted.sample_item_name)
-        })
-      }
-    }
-  },
-  {
-    separator: true,
-    visible: sample.pasted !== null
-  },
-  {
-    label: `Edit sample`,
-    icon: 'pi pi-file-edit',
-    command: () => {
-      dialog.op = 'update'
-    }
-  },
-  {
-    label: 'Copy sample',
-    icon: 'pi pi-copy',
-    command: async () => {
-      const clipboard = JSON.stringify(sample.context)
-      try {
-        await navigator.clipboard.writeText(clipboard)
-      } catch (err) {
-        console.warn(err)
-      }
-    }
-  },
-  {
-    label: `Delete sample`,
-    icon: 'pi pi-trash',
-    command: () => {
-      confirm.require({
-        icon: 'pi pi-exclamation-triangle',
-        header: `Deleting sample '${sample.context.sample_item_name}'`,
-        message: `Delete sample '${sample.context.sample_item_name}'
-          from batch "${app.data.batch.focused.sample_batch_name}"?`,
-        accept: async () => {
-          // unload if necessary
-          if (sample.context.sample_item_id == app.data.sample.focused?.sample_item_id) {
-            app.data.sample.unfocus()
-          }
-          await app.data.sample.delete(sample.context)
-        },
-        acceptProps: {
-          icon: 'pi pi-trash',
-          label: 'Delete',
-          severity: 'danger'
-        },
-        rejectProps: {
-          label: 'Cancel',
-          severity: 'secondary'
+const contextMenuEntries = computed(() => {
+  const multiselecting = app.data.sample.selected.length > 1
+  const s = multiselecting ? 's' : ''
+  return [
+    {
+      label: `Paste sample${sample.pasted?.length > 1 ? 's' : ''}`,
+      icon: 'pi pi-clipboard',
+      visible: sample.pasted !== null,
+      command: async () => {
+        if (sample.pasted.length > 0) {
+          await app.data.sample.copy({
+            sample_item_ids: sample.pasted.map((s) => s.sample_item_id),
+            sample_batch_id: props.batch.sample_batch_id
+          })
         }
-      })
+      }
+    },
+    {
+      separator: true,
+      visible: sample.pasted !== null
+    },
+    {
+      label: `Edit sample`,
+      icon: 'pi pi-file-edit',
+      visible: app.data.sample.focused !== null,
+      command: () => {
+        dialog.op = 'update'
+      }
+    },
+    {
+      label: `Copy sample${s}`,
+      icon: 'pi pi-copy',
+      command: async () => {
+        const clipboard = JSON.stringify(
+          app.data.sample.selected.map(({ sample_item_id, sample_batch_id, sample_item_name }) => ({
+            sample_item_id,
+            sample_batch_id,
+            sample_item_name
+          }))
+        )
+        try {
+          await navigator.clipboard.writeText(clipboard)
+        } catch (err) {
+          console.warn(err)
+        }
+      }
+    },
+    {
+      label: `Delete sample`,
+      icon: 'pi pi-trash',
+      command: () => {
+        confirm.require({
+          icon: 'pi pi-exclamation-triangle',
+          header: `Deleting sample '${sample.context.sample_item_name}'`,
+          message: `Delete sample '${sample.context.sample_item_name}'
+          from batch "${app.data.batch.focused.sample_batch_name}"?`,
+          accept: async () => {
+            // unload if necessary
+            if (sample.context.sample_item_id == app.data.sample.focused?.sample_item_id) {
+              app.data.sample.unfocus()
+            }
+            await app.data.sample.delete(sample.context)
+          },
+          acceptProps: {
+            icon: 'pi pi-trash',
+            label: 'Delete',
+            severity: 'danger'
+          },
+          rejectProps: {
+            label: 'Cancel',
+            severity: 'secondary'
+          }
+        })
+      },
+      visible: !multiselecting
+    },
+    { separator: true, visible: !multiselecting },
+    {
+      label: `Recalibrate sample`,
+      icon: 'pi pi-replay',
+      command: () => {
+        dialog.calibration = true
+      },
+      visible: !multiselecting
+    },
+    {
+      label: `Rematch sample`,
+      icon: 'pi pi-replay',
+      command: async () => {
+        await app.data.sample.rematch(sample.context)
+      },
+      visible: !multiselecting
+    },
+    {
+      label: `Compute all peaks`,
+      icon: 'pi pi-wave-pulse',
+      command: async () => {
+        await app.data.peak.computeAll(sample.context)
+      },
+      visible: !multiselecting
     }
-  },
-  { separator: true },
-  {
-    label: `Recalibrate sample`,
-    icon: 'pi pi-replay',
-    command: () => {
-      dialog.calibration = true
-    }
-  },
-  {
-    label: `Rematch sample`,
-    icon: 'pi pi-replay',
-    command: async () => {
-      await app.data.sample.rematch(sample.context)
-    }
-  },
-  {
-    label: `Compute all peaks`,
-    icon: 'pi pi-wave-pulse',
-    command: async () => {
-      await app.data.peak.computeAll(sample.context)
-    }
-  }
-])
+  ]
+})
 </script>
 
 <template>

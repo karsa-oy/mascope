@@ -10,7 +10,7 @@ from mascope_server.api.controllers.sample.items.sample_items_controller import 
     delete_sample_item,
     sample_item_export_peaks,
     update_sample_item,
-    copy_sample_item,
+    copy_sample_items,
 )
 from mascope_server.api.controllers.sample.items.sample_items_process_controller import (
     process_sample_item,
@@ -22,7 +22,7 @@ from mascope_server.api.models.sample.items.sample_item_pydantic_model import (
     SampleItemCreate,
     GetSampleItemsQueryParams,
     SampleItemUpdateBody,
-    SampleItemCopyBody,
+    SampleItemsCopyBody,
     SampleItemProcessBody,
 )
 
@@ -113,12 +113,11 @@ async def delete_sample_item_route(sample_item_id: str, user=Depends(editor_user
     return await delete_sample_item(sample_item_id)
 
 
-@sample_items_router.post("/{sample_item_id}/copy")
+@sample_items_router.post("/copy")
 @api_route(status_code=202)
-async def copy_sample_item_route(
+async def copy_sample_items_route(
     request: Request,
-    sample_item_id: str,
-    body: SampleItemCopyBody,
+    body: SampleItemsCopyBody,
     background_tasks: BackgroundTasks,
     user=Depends(editor_user),
 ):
@@ -133,17 +132,16 @@ async def copy_sample_item_route(
     sid = request.headers.get("X-SID")
     process_id = gen_id(8)
     background_tasks.add_task(
-        copy_sample_item,
-        sample_item_id=sample_item_id,
+        copy_sample_items,
+        sample_item_ids=body.sample_item_ids,
         sample_batch_id=body.sample_batch_id,
-        sample_item_name=body.sample_item_name,
         independent_transaction=True,
         background_tasks=background_tasks,
         sid=sid,
         process_id=process_id,
     )
     return {
-        "message": f"Copying sample '{body.sample_item_name}', please wait.",
+        "message": f"Copying {len(body.sample_item_ids)} samples, please wait.",
         "process_id": process_id,
     }
 

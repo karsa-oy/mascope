@@ -47,12 +47,12 @@ export const useSample = defineModule({
       use: 'delete',
       type: 'delete_sample'
     }),
-  copy: ({ sample_item_id, sample_batch_id, sample_item_name }) =>
+  copy: ({ sample_item_ids, sample_batch_id }) =>
     api.http.post(
-      `/sample/items/${sample_item_id}/copy`,
+      `/sample/items/copy`,
       {
         sample_batch_id,
-        sample_item_name
+        sample_item_ids
       },
       {
         use: 'process',
