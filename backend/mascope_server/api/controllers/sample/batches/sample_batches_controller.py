@@ -875,14 +875,14 @@ async def sample_batch_export_peaks(
     parent_id=None,
 ):
     """
-    Exports peak data for a specific sample batch to a parquet file. This process involves loading sample files,
+    Exports peak data for a specific sample batch to a CSV file. This process involves loading sample files,
     detecting peaks, and compiling peak data into a DataFrame before saving it to a file.
 
     Steps:
     1. Fetch sample items belonging to the specified sample batch.
     2. Iterate over each sample item, load its file, and perform peak detection.
     3. Compile detected peaks into a DataFrame.
-    4. Save the DataFrame to a parquet file named with the sample batch name and current datetime.
+    4. Save the DataFrame to a CSV file named with the sample batch name and current datetime.
     5. If independent_transaction is True, emit a 'batch_export_peak_data_finished' event with the session ID.
 
     :param sample_batch_id: ID of the original sample batch to be copied.
@@ -965,7 +965,7 @@ async def sample_batch_export_peaks(
                 {
                     "mz": peak.mz.item(),
                     "intensity": peak.item(),
-                    "unit": unit,
+                    "unit": "ions" if instrument_type == "tof" else "rel.",
                     "sample_batch_name": sample_batch_name,
                     "sample_item_name": row["sample_item_name"],
                     "filename": row["filename"],
