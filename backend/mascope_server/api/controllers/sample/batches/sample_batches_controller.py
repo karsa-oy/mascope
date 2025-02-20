@@ -976,7 +976,7 @@ async def sample_batch_export_peaks(
                     "sample_file_id": row["sample_file_id"],
                     "sample_item_id": row["sample_item_id"],
                     "tic": row["tic"],
-                    "instrument": instrument_type,
+                    "instrument": row["instrument"],
                 }
             )
 
