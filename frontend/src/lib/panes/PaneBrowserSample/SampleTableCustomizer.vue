@@ -14,15 +14,19 @@ const app = useApp()
 const popoverRef = ref()
 const popoverTab = ref('All')
 
-const selectedColumns = defineModel('columns')
+const config = defineModel('config')
 
 const emit = defineEmits(['popover'])
 
-const defaultColumns = [
-  { field: 'sample_item_name', kind: 'standard', label: 'Item', type: 'string' },
-  { field: 'index', kind: 'standard', label: '#', type: 'string' },
-  { field: 'filter_id', kind: 'standard', label: 'Filter', type: 'string' }
-]
+const defaultConfig = {
+  columns: [
+    { field: 'sample_item_name', kind: 'standard', label: 'Item', type: 'string' },
+    { field: 'index', kind: 'standard', label: '#', type: 'string' },
+    { field: 'filter_id', kind: 'standard', label: 'Filter', type: 'string' }
+  ],
+  sortField: 'index',
+  sortOrder: 1
+}
 
 const availableColumns = computed(() => {
   const standard = [
@@ -50,20 +54,22 @@ const availableColumns = computed(() => {
 
 // local storage persistence
 
-const storageKey = computed(
-  () => `mascope-sample-columns-${app.data.batch.focused.sample_batch_id}`
-)
+const storageKey = computed(() => `sample-browser-batch[${app.data.batch.focused.sample_batch_id}]`)
 // write
-watch(selectedColumns, (cols) => {
-  localStorage.setItem(storageKey.value, JSON.stringify(cols))
-})
+watch(
+  config,
+  (state) => {
+    localStorage.setItem(storageKey.value, JSON.stringify(state))
+  },
+  { deep: true }
+)
 // read
 watch(
   () => app.data.batch.focused,
   (batch) => {
     if (batch) {
-      const storedColumns = localStorage.getItem(storageKey.value)
-      selectedColumns.value = storedColumns ? JSON.parse(storedColumns) : defaultColumns
+      const storedConfig = localStorage.getItem(storageKey.value)
+      config.value = storedConfig ? JSON.parse(storedConfig) : defaultConfig
     }
   },
   { immediate: true }
@@ -117,12 +123,12 @@ function createLabel(field) {
         severity="secondary"
         iconPos="right"
         text
-        @click="selectedColumns = defaultColumns"
+        @click="selectedColumns = defaultConfig.columns"
         v-tooltip.right="'Reset columns'"
       />
     </div>
     <Listbox
-      v-model="selectedColumns"
+      v-model="config.columns"
       :options="
         availableColumns.filter(({ field }) =>
           popoverTab == 'Selected'

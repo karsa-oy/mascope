@@ -218,7 +218,7 @@ async function parseClipboard() {
   }
 }
 
-const selectedColumns = ref([])
+const config = ref({})
 </script>
 
 <template v-if="app.data.batch.list">
@@ -312,7 +312,7 @@ const selectedColumns = ref([])
           <template #body="{ data }">
             <SampleTableCustomizer
               v-if="data.sample_batch_id in batch.expanded"
-              v-model:columns="selectedColumns"
+              v-model:config="config"
               @popover="
                 (ref) => {
                   contextMenuRef.hide() // hide batch context menu
@@ -327,7 +327,7 @@ const selectedColumns = ref([])
         <template #expansion="{ data }">
           <SampleTable
             :batch="data"
-            :columns="selectedColumns"
+            v-model:config="config"
             @contextMenu="
               (ref) => {
                 contextMenuRef.hide() // hide batch context menu

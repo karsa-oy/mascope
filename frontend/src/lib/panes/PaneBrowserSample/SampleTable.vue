@@ -11,7 +11,7 @@ import { api, generateCopyName } from '@/api'
 
 import { BaseMatchTag, BaseCopyableField } from '@/lib/base'
 import { DialogSampleOp, DialogCalibration } from '@/lib/dialogs'
-
+import { clone } from '@/lib/utils'
 import { useApp } from '@/stores'
 
 const confirm = useConfirm()
@@ -21,12 +21,10 @@ const props = defineProps({
   batch: {
     type: Object,
     required: true
-  },
-  columns: {
-    type: Array,
-    required: true
   }
 })
+
+const config = defineModel('config')
 
 const emit = defineEmits(['contextMenu'])
 
@@ -164,16 +162,6 @@ const contextMenuEntries = computed(() => [
     }
   }
 ])
-
-// monitor reloading events
-
-const reloading = ref(false)
-api.socket.on('sample_batch_reload', (e) => {
-  reloading.value = true
-  setTimeout(() => {
-    reloading.value = false
-  }, 2500)
-}) // see stateRestore hook in the sample DataTable below
 </script>
 
 <template>
@@ -196,16 +184,21 @@ api.socket.on('sample_batch_reload', (e) => {
       v-model:contextMenuSelection="sample.context"
       contextMenu
       @rowContextmenu="onContextMenuClick"
-      sortField="index"
       reorderableColumns
-      stateStorage="local"
-      :stateKey="`mascope-sample-table-${batch.sample_batch_id}`"
-      @stateRestore="
-        () => {
-          // don't restore selection unless reloading
-          if (!reloading) {
-            app.data.sample.unfocus()
-          }
+      :sortField="config.sortField"
+      :sortOrder="config.sortOrder"
+      @sort="
+        ({ sortField, sortOrder }) => {
+          config.sortField = sortField
+          config.sortOrder = sortOrder
+        }
+      "
+      @column-reorder="
+        ({ dragIndex, dropIndex }) => {
+          let columns = clone(config.columns)
+          const column = columns.splice(dragIndex - 1, 1)[0]
+          columns.splice(dropIndex - 1, 0, column)
+          config.columns = columns
         }
       "
       size="small"
@@ -222,7 +215,7 @@ api.socket.on('sample_batch_reload', (e) => {
         </template>
       </Column>
 
-      <template v-for="{ field, label, kind } in columns" :key="field">
+      <template v-for="{ field, label, kind } in config.columns" :key="field">
         <Column v-if="kind == 'standard'" :field="field" :header="label" sortable>
           <template #body="{ data }">
             <span class="field">
