@@ -596,8 +596,9 @@ async def sample_item_export_peaks(
         sample_peak_data.time.values, unit="s"
     ) + pd.Timestamp(base_datetime_utc)
 
-    # Get ticks for each time scan
+    # Get ticks for each time scan, normalize, correct by general TIC
     scan_tics = load_signal(filename).sum(dim="mz").signal.values
+    scan_tics = scan_tics / scan_tics.sum() * sample_view["tic"]
 
     mz_values = sample_peak_data.mz.values
     intensities = sample_peak_data.values.T  # Transpose to get (n_scans, n_mz)
