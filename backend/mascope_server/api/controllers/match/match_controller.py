@@ -208,7 +208,10 @@ async def rematch_samples(
     )
     return {
         "message": f"Rematched {len(sample_item_ids)} samples",
-        "_notification_data": {"affected_sample_batch_ids": affected_sample_batch_ids},
+        "_notification_data": {
+            "affected_sample_item_ids": affected_sample_item_ids,
+            "affected_sample_batch_ids": affected_sample_batch_ids,
+        },
     }
 
 

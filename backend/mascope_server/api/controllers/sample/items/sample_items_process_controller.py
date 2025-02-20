@@ -3,6 +3,7 @@ from mascope_server.db.id import gen_id
 from mascope_server.api.lib.api_features import (
     api_controller_background_task,
 )
+from mascope_server.api.lib.exceptions.api_exceptions import ApiException
 from mascope_server.api.controllers.match.match_controller import match_compute_sample
 from mascope_server.api.controllers.calibration.calibration_controller import (
     calibration_mz_calibrate_sample,
@@ -11,9 +12,13 @@ from mascope_server.api.controllers.samples.samples_controller import get_sample
 from mascope_server.api.models.sample.items.sample_item_pydantic_model import (
     SampleItemCreate,
 )
+from mascope_server.api.controllers.sample.items.sample_items_controller import (
+    create_sample_item,
+)
 from mascope_server.api.controllers.sample.lib.fetch_affected_sample_data import (
     fetch_affected_sample_data,
 )
+from mascope_server.api.controllers.match.match_controller import rematch_samples
 from mascope_server.api.models.calibration.calibration_pydantic_model import (
     MzCalibrationParams,
 )
@@ -21,16 +26,14 @@ from mascope_server.socket.notifications import (
     UserNotification,
     send_progress_user_notification,
 )
-from mascope_server.api.controllers.match.match_controller import rematch_samples
 from mascope_server.api.new.instrument_configs.process.service import (
     process_instrument_config,
 )
 from mascope_server.api.new.instrument_configs.schemas import (
     SetInstrumentConfigBody,
 )
-from mascope_server.api.controllers.sample.items.sample_items_controller import (
-    create_sample_item,
-)
+
+from mascope_server.runtime import runtime
 
 
 @api_controller_background_task(
@@ -59,9 +62,10 @@ async def process_sample_item(
     2. Create a new sample item using the provided details.
     3. Perform m/z calibration on the newly created sample item if instrument is TOF
         using provided calibration parameters.
-    4A. Compute matches for the sample item, integrating any newly identified matches.
-    4B. Recompute matches for samples affected by instrument config processing
-    5. Fetch the final sample details including match data for verification and further processing.
+    4. Compute matches for the processed sample
+    5. Create separate independent task to recompute matches for other affected samples
+    6. Gather all affected batch IDs for ui reload events
+    7. Fetch processed sample details including match data
 
     :param sample_item: Details of the sample item to be created.
     :type sample_item: SampleItemCreate
@@ -77,6 +81,8 @@ async def process_sample_item(
     :return: Details of the processed sample including matches.
     :rtype: dict
     """
+    # Initialize collector for affected sample items
+    all_affected_sample_item_ids = set()
 
     notification = UserNotification(
         process_id=process_id,
@@ -90,23 +96,26 @@ async def process_sample_item(
             "filename": sample_item.filename,
             "sample_batch_id": sample_item.sample_batch_id,
             "_room_ids": [sid],
-            # "_room_ids": [sample_item.sample_batch_id],  # TEMP for postman testing
             "_sid": sid,
         },
     )
     await send_progress_user_notification(notification, 0.1)
 
     # Step 1: process instrument config
-    processed = (
-        await process_instrument_config(
-            filenames=[sample_item.filename],
-            instrument_config=instrument_config,
-            independent_transaction=False,
-            sid=sid,
-            process_id=gen_id(8),
-            parent_id=process_id,
+    instrument_config_result = await process_instrument_config(
+        filenames=[sample_item.filename],
+        instrument_config=instrument_config,
+        independent_transaction=False,
+        sid=sid,
+        process_id=gen_id(8),
+        parent_id=process_id,
+    )
+    # Collect affected items from instrument config processing
+    all_affected_sample_item_ids.update(
+        instrument_config_result["_notification_data"].get(
+            "affected_sample_item_ids", []
         )
-    )["data"]
+    )
 
     # Step 2: create the sample item
 
@@ -116,36 +125,58 @@ async def process_sample_item(
         sample_item=sample_item, independent_transaction=True
     )
     created_sample_item = create_sample_result.get("data")
-    sample_item_id = created_sample_item["sample_item_id"]
+    created_sample_item_id = created_sample_item["sample_item_id"]
 
-    notification.message = f"Sample '{sample_item.sample_item_name}' record created with ID: {sample_item_id}."
+    # Add newly created item to affected items
+    all_affected_sample_item_ids.add(created_sample_item_id)
+
+    notification.message = f"Sample '{sample_item.sample_item_name}' record created with ID: {created_sample_item_id}."
     notification.data = {
-        "sample_item_id": sample_item_id,
+        "sample_item_id": created_sample_item_id,
         "filename": sample_item.filename,
         "sample_batch_id": sample_item.sample_batch_id,
         "_room_ids": [sid],
-        # "_room_ids": [sample_item.sample_batch_id],  # TEMP for postman testing
         "_sid": sid,
     }
     await send_progress_user_notification(notification, 0.2)
 
     # Step 3: Calibrate the sample item if instrument is TOF
     if get_instrument_type(created_sample_item["filename"]) == "tof":
-        await calibration_mz_calibrate_sample(
-            sample_item_id=sample_item_id,
-            mz_calibration_params=mz_calibration_params,
-            sid=sid,
-            process_id=gen_id(8),
-            parent_id=process_id,
-        )
-        notification.message = (
-            f"Sample '{sample_item.sample_item_name}' m/z calibrated."
-        )
-        await send_progress_user_notification(notification, 0.6)
+        try:
+            calibration_result = await calibration_mz_calibrate_sample(
+                sample_item_id=created_sample_item_id,
+                mz_calibration_params=mz_calibration_params,
+                independent_transaction=False,
+                sid=sid,
+                process_id=gen_id(8),
+                parent_id=process_id,
+            )
+            # Collect calibration-affected sample items
+            all_affected_sample_item_ids.update(
+                calibration_result["_notification_data"].get(
+                    "affected_sample_item_ids", []
+                )
+            )
 
-    # Step 4A: Compute processed sample matches
+            notification.message = (
+                f"Sample '{sample_item.sample_item_name}' m/z calibrated."
+            )
+            await send_progress_user_notification(notification, 0.6)
+        except ApiException as e:
+            if e.status_code == 200:
+                # Handle warnings, collect affected items from warning response
+                all_affected_sample_item_ids.update(
+                    e.tech_message.get("_notification_data", {}).get(
+                        "affected_sample_item_ids", []
+                    )
+                )
+            else:
+                # This is a critical error, re-raise it
+                raise
+
+    # Step 4: Compute matches for processed sample
     await match_compute_sample(
-        sample_item_id=sample_item_id,
+        sample_item_id=created_sample_item_id,
         independent_transaction=False,
         sid=sid,
         process_id=gen_id(8),
@@ -164,9 +195,15 @@ async def process_sample_item(
     await send_progress_user_notification(notification, 0.9)
 
     # Step 5: Fetch updated sample details including match data
+    # Step 6. Gather all affected batch IDs for ui reload events
+    _, affected_sample_batch_ids, *_ = await fetch_affected_sample_data(
+        sample_item_ids=list(all_affected_sample_item_ids)
+    )
+
+    # Step 7: Fetch processed sample details including match data
     sample = (
         await get_sample(
-            sample_item_id=sample_item_id,
+            sample_item_id=created_sample_item_id,
         )
     )["data"]
 
@@ -174,14 +211,9 @@ async def process_sample_item(
         "message": f"Sample '{sample['sample_item_name']}' was successfully processed.",
         "data": sample,
         "_notification_data": {
-            "sample_item_id": sample_item_id,
+            "sample_item_id": created_sample_item_id,
             "filename": sample["filename"],
-            "affected_sample_batch_ids": list(
-                set(
-                    sample["sample_batch_id"],
-                    *processed["affected_sample_batch_ids"],
-                )
-            ),
-            "affected_sample_item_ids": processed["affected_sample_item_ids"],
+            "affected_sample_batch_ids": affected_sample_batch_ids,
+            "affected_sample_item_ids": list(all_affected_sample_item_ids),
         },
     }

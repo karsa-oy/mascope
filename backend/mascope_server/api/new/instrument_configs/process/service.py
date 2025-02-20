@@ -1,7 +1,7 @@
 import asyncio
 
 from mascope_lib.file_func import delete_peaks
-from mascope_server.socket import sio
+from mascope_server.db.id import gen_id
 from mascope_server.api.models.sample.files.sample_file_pydantic_model import (
     SampleFileUpdate,
 )
@@ -15,15 +15,12 @@ from mascope_server.socket.notifications import (
 from mascope_server.api.controllers.sample.files.sample_files_controller import (
     update_sample_file,
 )
+from mascope_server.api.controllers.sample.lib.fetch_affected_sample_data import (
+    fetch_affected_sample_data,
+)
 from mascope_server.api.controllers.sample.lib.sample_file_fetch import (
     fetch_sample_file,
     fetch_sample_files,
-)
-from mascope_server.api.controllers.sample.lib.sample_batches_fetch import (
-    fetch_sample_batch_ids,
-)
-from mascope_server.api.controllers.sample.lib.sample_items_fetch import (
-    fetch_sample_item_ids_for_filenames,
 )
 from mascope_server.api.controllers.match.match_controller import rematch_samples
 from mascope_server.api.new.instrument_configs.schemas import (
@@ -40,9 +37,9 @@ from mascope_server.runtime import runtime
 
 @api_controller_background_task(
     success_notification_rooms=["sid"],
-    success_reload=[("sample_batch_reload", "sample_batch_ids")],
+    success_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
     error_notification_rooms=["sid"],
-    error_reload=[("sample_batch_reload", "sample_batch_ids")],
+    error_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
 )
 async def process_instrument_config(
     filenames: list[str],
@@ -65,9 +62,9 @@ async def process_instrument_config(
       5B. Otherwise resolve existing instrument function id
       6. Fetch sample file records
       7. Update the sample file records
-      8. Redetect sample file peaks
-      9. Recompute sample item matches
-      10. Reload affected batches
+      8. Delete existing peaks for sample files
+      9. Gather affected sample data
+      10. Recompute sample item matches
 
     :param filename: The filename of the file to associate the insturment function with.
     :type filename: str
@@ -168,32 +165,27 @@ async def process_instrument_config(
     await asyncio.gather(*update_tasks)
 
     # Step 8. Delete existing peaks for sample files
-
     label = f"file {filenames[0]}" if len(filenames) == 1 else f"{len(filenames)} files"
     runtime.logger.info(f"Deleting peaks for {label}")
     for filename in filenames:
         delete_peaks(filename)
 
-    # Step 9. Gather affected sample item ids
-
-    affected_sample_item_ids = await fetch_sample_item_ids_for_filenames(filenames)
-
-    if independent_transaction:
-        await rematch_samples(
-            sample_item_ids=affected_sample_item_ids, independent_transaction=False
-        )
-
-    # Step 10. Reload affected batches
-
-    affected_sample_batch_ids = await fetch_sample_batch_ids(
-        filenames=filenames, sample_item_ids=affected_sample_item_ids
+    # Step 9. Gather affected sample data
+    affected_sample_item_ids, affected_sample_batch_ids, *_ = (
+        await fetch_affected_sample_data(filenames=filenames)
     )
 
+    # Step 10. Recompute sample item matches
+    if independent_transaction:
+        await rematch_samples(
+            sample_item_ids=affected_sample_item_ids,
+            independent_transaction=False,
+            sid=sid,
+            process_id=gen_id(8),
+            parent_id=process_id,
+        )
+
     return {
-        "data": {
-            "affected_sample_batch_ids": affected_sample_batch_ids,
-            "affected_sample_item_ids": affected_sample_item_ids,
-        },
         "message": f"Processing instrument config successful: {user_message}",
         "_notification_data": {
             "filenames": filenames,
