@@ -10,7 +10,7 @@ import { useWorkspace } from '../workspace'
 import { useSample } from '../sample'
 
 import { useMatchParams } from './params'
-import { useMatchIon } from './records'
+import { useMatchIon, useMatchCompound, useMatchCollection } from './records'
 
 // MATCH VISUALIZATION
 
@@ -151,6 +151,72 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
     () => workspace.focused,
     () => {
       clear()
+    }
+  )
+
+  /**
+   * Watches for changes in the focused sample and updates the match visualization accordingly.
+   *
+   * This watcher reacts whenever `app.data.sample.focused` changes:
+   * - Scenario 1: Match Tab is active (app.data.match.visualized.ion is set)
+   *   - If a new sample is focused and there's an ion currently visualized in the Match tab,
+   *     the function retrieves the corresponding data from `app.data.match.visualized.ion`.
+   *   - The match visualization is then updated with the new sample ID,  visualised ion ID, collection ID, and its filter parameters.
+   *
+   * - Scenario 2: Target selection in Target Browser (app.data.match.visualized.ion is inactive):
+   *   - If no ion is currently visualized but there is a selected ion in the Target browser,
+   *     it retrieves the focused ion and the appropriate filter parameters from `app.data.match.ion.selected`.
+   *   - If a compound is selected instead, it finds the corresponding ion from the loaded ions and retrieves its filter parameters.
+   *   - The match visualization is then triggered with the selected sample, ion, and selected collection details.
+   *
+   * - Unsetting the Match Visualization:
+   *   - If no sample is focused, the match visualization tab is cleared by calling `unset`.
+   *
+   * @param {Object|null} newFocusedSample - The new sample that has been focused, or null if no sample is focused.
+   */
+  watch(
+    () => sample.focused,
+    async (sample) => {
+      // clear visualization if no sample focused
+      if (!sample) {
+        clear()
+        return
+      }
+      const matchCollection = useMatchCollection()
+
+      // do nothing if no collection is focused
+      let collectionId = matchCollection.focusedId
+      if (!collectionId) {
+        return
+      }
+
+      const matchIon = useMatchIon()
+      const matchCompound = useMatchCompound()
+      let sampleId = sample.sample_item_id
+      let ionId = null
+
+      if (ion.value) {
+        // use match visualized
+        ionId = ion.value.target_ion_id
+        collectionId = ion.value.target_collection_id
+      } else if (matchIon.focused) {
+        // no match visualized but match ion focused
+        ionId = matchIon.focused.target_ion_id
+      } else if (matchCompound.focused) {
+        // no match visualized but match compound focused
+        ionId = matchIon.list?.find(
+          (ion) => ion.target_compound_id === matchCompound.focusedId
+        )?.target_ion_id
+      }
+
+      if (ionId && collectionId) {
+        // Set the match visualization with the new sample ID, ion ID, collection ID, and filter params
+        await set({
+          sampleId,
+          ionId,
+          collectionId
+        })
+      }
     }
   )
 
