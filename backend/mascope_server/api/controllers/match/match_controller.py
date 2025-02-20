@@ -42,8 +42,8 @@ from mascope_server.api.controllers.target.lib.fetch.target_isotopes_fetch impor
 from mascope_server.api.controllers.match.aggregate.match_aggregate_controller import (
     aggregate_and_create_matches,
 )
-from mascope_server.api.controllers.sample.lib.sample_batches_fetch import (
-    fetch_sample_batch_ids,
+from mascope_server.api.controllers.sample.lib.fetch_affected_sample_data import (
+    fetch_affected_sample_data,
 )
 from mascope_server.api.controllers.samples.samples_controller import (
     get_samples,
@@ -203,8 +203,8 @@ async def rematch_samples(
             process_id=gen_id(8),
             parent_id=process_id,
         )
-    affected_sample_batch_ids = await fetch_sample_batch_ids(
-        sample_item_ids=sample_item_ids
+    affected_sample_item_ids, affected_sample_batch_ids, *_ = (
+        await fetch_affected_sample_data(sample_item_ids=sample_item_ids)
     )
     return {
         "message": f"Rematched {len(sample_item_ids)} samples",

@@ -11,6 +11,9 @@ from mascope_server.api.controllers.samples.samples_controller import get_sample
 from mascope_server.api.models.sample.items.sample_item_pydantic_model import (
     SampleItemCreate,
 )
+from mascope_server.api.controllers.sample.lib.fetch_affected_sample_data import (
+    fetch_affected_sample_data,
+)
 from mascope_server.api.models.calibration.calibration_pydantic_model import (
     MzCalibrationParams,
 )

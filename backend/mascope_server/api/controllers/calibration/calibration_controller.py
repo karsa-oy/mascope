@@ -6,9 +6,7 @@ background tasks to process calibration and related operations.
 """
 
 from sqlalchemy import select, func, and_
-from sqlalchemy.orm import joinedload
 from mascope_server.db import async_session
-from mascope_server.socket import sio
 from mascope_server.db.id import gen_id
 from mascope_server.db.models import Sample, SampleBatch, SampleItem
 from mascope_server.api.lib.api_features import (
@@ -32,11 +30,8 @@ from mascope_server.api.controllers.sample.files.sample_files_controller import 
 from mascope_server.api.controllers.sample.items.sample_items_controller import (
     get_sample_item,
 )
-from mascope_server.api.controllers.sample.lib.sample_batches_fetch import (
-    fetch_sample_batch_ids,
-)
-from mascope_server.api.controllers.sample.lib.sample_items_fetch import (
-    fetch_affected_sample_data_for_filename,
+from mascope_server.api.controllers.sample.lib.fetch_affected_sample_data import (
+    fetch_affected_sample_data,
 )
 from mascope_server.api.models.sample.files.sample_file_pydantic_model import (
     SampleFileUpdate,
@@ -151,8 +146,8 @@ async def calibration_mz_fit(
         )
 
     # Step 2: Fetch affected samples data
-    sample_item_ids, sample_batch_ids, *_ = (
-        await fetch_affected_sample_data_for_filename(sample.filename)
+    affected_sample_item_ids, affected_sample_batch_ids, *_ = (
+        await fetch_affected_sample_data(filenames=[sample.filename])
     )
 
     # Step 3: Prepare progress user notification.
@@ -253,10 +248,13 @@ async def calibration_mz_apply(
     :return: List of calibrated sample item IDs.
     """
     # Step 1: Get affected sample items and their batches
-    sample_item_ids, sample_batch_ids, sample_items, sample_batches = (
-        await fetch_affected_sample_data_for_filename(filename)
-    )
-    total_samples = len(sample_item_ids)
+    (
+        affected_sample_item_ids,
+        affected_sample_batch_ids,
+        affected_sample_items,
+        affected_sample_batches,
+    ) = await fetch_affected_sample_data(filenames=[filename], include_objects=True)
+    total_samples = len(affected_sample_item_ids)
 
     # Step 2: Prepare progress user notification.
     notification = UserNotification(
@@ -402,10 +400,10 @@ async def calibration_mz_calibrate_sample(
     if not sample:
         raise NotFoundException(f"Sample item with ID '{sample_item_id}' not found")
 
-    sample_item_ids, sample_batch_ids, *_ = (
-        await fetch_affected_sample_data_for_filename(sample.filename)
+    # Get affected samples data for this file
+    affected_sample_item_ids, affected_sample_batch_ids, *_ = (
+        await fetch_affected_sample_data(filenames=[sample.filename])
     )
-
     runtime.logger.info(f"...m/z calibrating sample '{sample.sample_item_name}' ...")
 
     # Step 2: Prepare progress user notification.

@@ -1,12 +1,10 @@
-from typing import Optional, List, Tuple, NamedTuple
+from typing import Optional, List, Tuple
 from sqlalchemy import select
-from sqlalchemy.orm import joinedload
 from mascope_server.db import async_session
 from mascope_server.db.models import (
     SampleItem,
     SampleBatch,
 )
-from mascope_server.api.lib.exceptions.api_exceptions import NotFoundException
 
 from mascope_server.runtime import runtime
 
@@ -54,62 +52,3 @@ async def fetch_sample_item_ids(
             )
 
     return sample_item_ids, sample_ref
-
-
-async def fetch_sample_item_ids_for_filenames(filenames: list[str]) -> list[str]:
-    """
-    Fetches unique sample item IDs for the given filenames.
-
-    :param filenames: List of filenames to fetch sample batches for
-    :type filenames: list[str]
-    :return: List of unique sample item IDs
-    :rtype: list[str]
-    """
-    async with async_session() as session:
-        query = select(SampleItem.sample_item_id).where(
-            SampleItem.filename.in_(filenames)
-        )
-        item_ids = await session.scalars(query)
-        return list(set(item_ids))
-
-
-class AffectedSampleData(NamedTuple):
-    sample_item_ids: List[str]
-    sample_batch_ids: List[str]
-    sample_items: List[SampleItem]
-    sample_batches: List[SampleBatch]
-
-
-async def fetch_affected_sample_data_for_filename(
-    filename: str,
-) -> AffectedSampleData:
-    """
-    Fetches affected sample item IDs and their corresponding batch IDs for a given filename.
-
-    :param filename: Filename to fetch affected samples for
-    :type filename: str
-    :return: AffectedSampleData containing sample IDs and objects
-    :rtype: AffectedSampleData
-    :raises NotFoundException: If no sample items found for the given filename
-    """
-    async with async_session() as session:
-        result = await session.execute(
-            select(SampleItem)
-            .options(joinedload(SampleItem.sample_batch))
-            .filter(SampleItem.filename == filename)
-        )
-        sample_items = result.scalars().all()
-
-        if not sample_items:
-            raise NotFoundException(
-                f"No sample items found for sample file '{filename}'"
-            )
-
-        return AffectedSampleData(
-            sample_item_ids=[item.to_dict()["sample_item_id"] for item in sample_items],
-            sample_batch_ids=list(
-                {item.to_dict()["sample_batch_id"] for item in sample_items}
-            ),
-            sample_items=sample_items,
-            sample_batches=list({item.sample_batch for item in sample_items}),
-        )

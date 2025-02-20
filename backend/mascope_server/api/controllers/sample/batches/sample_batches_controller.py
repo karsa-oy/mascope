@@ -58,6 +58,9 @@ from mascope_server.api.controllers.samples.samples_controller import get_sample
 from mascope_server.api.controllers.sample.lib.sample_batches_fetch import (
     fetch_sample_batch_ids,
 )
+from mascope_server.api.controllers.sample.lib.fetch_affected_sample_data import (
+    fetch_affected_sample_data,
+)
 from mascope_server.api.controllers.calibration.calibration_controller import (
     calibration_mz_calibrate_samples,
 )
@@ -732,9 +735,9 @@ async def import_sample_items(
                 # This is a critical error, re-raise it
                 raise
 
-    # Step 5: Rematch all affected samples
-    await rematch_samples(
-        sample_item_ids=list(sample_item_ids_to_rematch),
+    # Step 5. Get all affected batch IDs
+    _, affected_sample_batch_ids, *_ = await fetch_affected_sample_data(
+        sample_item_ids=list(all_affected_sample_item_ids)
         independent_transaction=False,
         sid=sid,
         process_id=gen_id(8),
@@ -748,8 +751,6 @@ async def import_sample_items(
     all_affected_items = set(sample_item_ids_to_rematch)
     all_affected_items.update(processed.get("sample_item_ids", []))
 
-    sample_batch_ids_to_reload = await fetch_sample_batch_ids(
-        sample_item_ids=list(all_affected_items)
     )
 
     # Check for spillover effects (affects on other batches)
