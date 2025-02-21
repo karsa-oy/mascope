@@ -602,7 +602,7 @@ async def sample_item_export_peaks(
     scan_tics = scan_tics / scan_tics.sum() * sample["tic"]
 
     mz_values = sample_peak_data.mz.values
-    intensities = sample_peak_data.values.T  # Transpose to get (n_scans, n_mz)
+    intensities = sample_peak_data.values
 
     # Create arrays for the repeated values
     repeated_datetimes = np.repeat(
