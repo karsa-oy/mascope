@@ -94,6 +94,7 @@ async def update_sample_item_route(
         sample_item=body.sample_item,
         instrument_config=body.instrument_config,
         background_tasks=background_tasks,
+        independent_transaction=True,
         sid=sid,
         process_id=process_id,
     )

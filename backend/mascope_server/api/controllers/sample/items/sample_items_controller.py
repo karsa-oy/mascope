@@ -24,6 +24,7 @@ from mascope_server.api.lib.exceptions.api_exceptions import (
 from mascope_server.api.controllers.sample.lib.sample_items_copy import (
     copy_sample_item_match_data,
 )
+from mascope_server.api.controllers.samples.lib.samples_fetch import fetch_sample
 from mascope_server.api.controllers.match.match_controller import match_compute_sample
 from mascope_server.api.models.sample.items.sample_item_pydantic_model import (
     SampleItemCreate,
@@ -204,8 +205,9 @@ async def update_sample_item(
     sample_item: SampleItemUpdate,
     instrument_config: SetInstrumentConfigBody | None = None,
     background_tasks: BackgroundTasks | None = None,
-    sid=None,
-    process_id=None,
+    independent_transaction: bool = False,
+    sid: str | None = None,
+    process_id: str | None = None,
 ) -> dict:
     """
     Updates an existing sample item with new data provided in the sample item update request body.
@@ -216,16 +218,26 @@ async def update_sample_item(
     3. Set the sample item's modification timestamp to the current UTC time.
     4. Commit the updated sample item to the database.
     5. Process instrument configs for the sample item if needed.
-    6. Reload the sample batch if needed.
+    6. Reload of sample batch happens in the end of update operation if only basic fields were updated,
+        or in the end of potential process_instrument_config.
 
     :param sample_item_id: The unique identifier of the sample item to update.
     :type sample_item_id: str
     :param sample_item: The new data for the sample item update.
-    :type sample_item: sample itemUpdate
+    :type sample_item: SampleItemUpdate
+    :param instrument_config: Optional instrument configuration to process.
+    :type instrument_config: SetInstrumentConfigBody | None
+    :param background_tasks: FastAPI background tasks for processing instrument config post-update.
+    :type background_tasks: BackgroundTasks | None
+    :param independent_transaction: Flag to indicate if the operation should be treated as an independent transaction.
+    :type independent_transaction: bool
+    :param sid: Socket.IO session ID, used for emitting notifications to specific clients.
+    :type sid: str | None
+    :param process_id: Process identifier for tracking background operations.
+    :type process_id: str | None
     :raises NotFoundException: If no sample item is found with the provided ID.
     :return: The updated sample item data as a dictionary.
-    :rtype: dict
-
+    :rtype: dict[str, Any]
     """
     # verify instrument config exists
     if instrument_config and instrument_config.instrument_function_id is not None:
@@ -239,36 +251,51 @@ async def update_sample_item(
         if not existing_sample_item:
             raise NotFoundException(f"Sample item with ID '{sample_item_id}' not found")
 
-        # Step 2: Update the sample item properties
-        update_data = sample_item.dict(exclude_unset=True)
-        for key, value in update_data.items():
-            setattr(existing_sample_item, key, value)
+        # Step 2: Update the sample item properties if anything changed
+        update_data = sample_item.model_dump(exclude_unset=True)
+        changed_fields = {
+            key: value
+            for key, value in update_data.items()
+            if getattr(existing_sample_item, key) != value
+        }
+        if changed_fields:
+            # Update only the changed fields
+            for key, value in changed_fields.items():
+                setattr(existing_sample_item, key, value)
 
-        # Step 3: Update modification timestamp
-        existing_sample_item.sample_item_utc_modified = datetime.now(timezone.utc)
+            # Step 3: Update modification timestamp
+            existing_sample_item.sample_item_utc_modified = datetime.now(timezone.utc)
 
-        # Step 4: Commit the updates
-        await session.commit()
-        await session.refresh(existing_sample_item)
+            # Step 4: Commit the updates
+            await session.commit()
+            await session.refresh(existing_sample_item)
 
     # Step 5: Process instrument config
     if instrument_config:
-        background_tasks.add_task(
-            process_instrument_config,
-            filenames=[existing_sample_item.filename],
-            instrument_config=instrument_config,
-            independent_transaction=True,
-            sid=sid,
-            process_id=process_id,
-        )
-    else:
-        # Step 6: Reload batch if needed
+        sample = await fetch_sample(sample_item_id)
+        current_instrument_id = getattr(sample, "instrument_function_id", None)
+
+        # Process only if there's a new record or the instrument_function_id changed
+        if (
+            instrument_config.new_record
+            or instrument_config.instrument_function_id != current_instrument_id
+        ):
+            background_tasks.add_task(
+                process_instrument_config,
+                filenames=[existing_sample_item.filename],
+                instrument_config=instrument_config,
+                independent_transaction=True,
+                sid=sid,
+                process_id=process_id,
+            )
+    elif changed_fields:
+        # Step 6: Directly reload batch if needed # TODO_invalidation
         await sio.emit(
             "sample_batch_reload",
             room=existing_sample_item.sample_batch_id,
             namespace="/",
         )
-        # TODO_invalidation
+
     return {
         "message": f"Sample '{existing_sample_item.sample_item_name}' was updated.",
         "data": existing_sample_item.to_dict(),

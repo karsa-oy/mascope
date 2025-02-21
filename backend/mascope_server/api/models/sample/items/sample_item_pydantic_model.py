@@ -80,7 +80,7 @@ class SampleItemCreate(SampleItemBase):
     pass
 
 
-class SampleItemUpdate(BaseModel):
+class SampleItemUpdate(SampleItemBase):
     pass
 
 
@@ -105,7 +105,7 @@ class GetSampleItemsQueryParams(QueryParamsModel):
 
 
 class SampleItemUpdateBody(BaseModel):
-    sample_item: SampleItemBase = Field(
+    sample_item: SampleItemUpdate = Field(
         ..., description="The sample item fields to update"
     )
     instrument_config: SetInstrumentConfigBody | None = Field(
