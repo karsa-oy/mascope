@@ -1,4 +1,4 @@
-import { ref, watch } from 'vue'
+import { ref, watchEffect, onMounted } from 'vue'
 import { defineStore } from 'pinia'
 
 import { useApp } from '@/stores'
@@ -20,30 +20,39 @@ export const useChartData = defineStore('chart.sample.spectrum', () => {
     }
   })
 
-  watch([() => app.ui.tab.active, () => app.data.peak.list], async ([tab, peaks]) => {
-    const activeFileId = app.data.sample.focused?.sample_file_id
-    if (activeFileId) {
-      if (activeFileId !== loadedFileId.value && tab == 'spectrum') {
-        await load(activeFileId, peaks)
-        loadedFileId.value = activeFileId
-      }
-    } else {
-      traces.value = []
-      loadedFileId.value = null
-      if (app.ui.tab.active == 'spectrum') {
-        app.ui.tab.active = 'batch'
-      }
+  // load triggering
+  watchEffect(async () => {
+    const sampleFileId = app.data.sample.focused?.sample_file_id
+    const sampleFocused = sampleFileId !== null
+    const sampleFileChanged = loadedFileId.value !== sampleFileId
+    const peaksLoaded = app.data.peak.list.length > 0
+    const tabOpen = app.ui.tab.active === 'spectrum'
+    if (sampleFocused && sampleFileChanged && peaksLoaded && tabOpen) {
+      await load()
     }
   })
 
-  async function load(sampleFileId, peaks) {
+  // unload triggering
+  watchEffect(() => {
+    const sampleUnfocused = !app.data.sample.focused?.sample_file_id
+    if (sampleUnfocused) {
+      unload()
+    }
+  })
+
+  // load spectrum data
+  async function load() {
+    const sampleFileId = app.data.sample.focused?.sample_file_id
+    // start loading
     loading.value = true
+    // get spectrum data from the backend
     const data = await api.http.get(`/sample/files/${sampleFileId}/spectrum`, {
       use: 'read',
       type: 'get_spectrum'
     })
+    // if successful, construct chart traces
     if (data) {
-      traces.value = peaks
+      traces.value = app.data.peak.list
         .map(({ mz, height, area }) => ({
           name: 'Peak',
           type: 'scatter',
@@ -87,7 +96,20 @@ export const useChartData = defineStore('chart.sample.spectrum', () => {
       unit.value = data.intensity_unit
       length.value = data.intensity.length
     }
+    // wrap up loading
     loading.value = false
+    loadedFileId.value = sampleFileId
+    return true
+  }
+
+  // unload data and switch tab if necessary
+  function unload() {
+    traces.value = []
+    loadedFileId.value = null
+    const tabOpen = app.ui.tab.active === 'spectrum'
+    if (tabOpen) {
+      app.ui.tab.default()
+    }
   }
 
   return { traces, length, unit, loading }

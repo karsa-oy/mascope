@@ -122,7 +122,7 @@ const tabs = computed(() => [
                 <PaneTabAcquisitions :active="app.ui.tab.active == 'acquisitions'" />
               </TabPanel>
               <TabPanel value="batch">
-                <ChartBatchOverview />
+                <ChartBatchOverview v-if="app.data.batch.focused" />
               </TabPanel>
               <TabPanel value="spectrum">
                 <ChartSampleSpectrum />
