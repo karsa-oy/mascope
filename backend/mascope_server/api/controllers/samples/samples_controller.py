@@ -12,7 +12,6 @@ from sqlalchemy import (
 )
 from mascope_server.db import async_session
 from mascope_server.db.models import (
-    SampleItem,
     Sample,
     MatchSample,
     MatchCollection,
@@ -181,9 +180,9 @@ async def get_sample(
     """
     # Check sample item by ID
     async with async_session() as session:
-        sample_item = await session.get(SampleItem, sample_item_id)
-    if not sample_item:
-        raise NotFoundException(f"Sample item with ID '{sample_item_id}' not found")
+        sample = await session.get(Sample, sample_item_id)
+    if not sample:
+        raise NotFoundException(f"Sample with ID '{sample_item_id}' not found")
 
     async with async_session() as session:
         # Construct query with joins to include MatchSample, MatchCollection, and TargetCollection data

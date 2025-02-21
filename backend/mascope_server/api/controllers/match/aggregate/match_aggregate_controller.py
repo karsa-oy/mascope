@@ -38,6 +38,7 @@ from mascope_server.api.controllers.match.lib.match_remove import remove_matches
 from mascope_server.api.controllers.sample.lib.sample_items_fetch import (
     fetch_sample_item_ids,
 )
+from mascope_server.api.controllers.samples.lib.samples_fetch import fetch_sample
 from mascope_server.api.controllers.match.ions.match_ions_controller import (
     create_match_ions,
 )
@@ -79,9 +80,7 @@ async def aggregate_match_isotope_filtered_data(
     async with async_session() as session:
         # Step 1: Verify existence of the entities and fetch required data
         if sample_item_id is not None:
-            sample = await session.get(Sample, sample_item_id)
-            if not sample:
-                raise NotFoundException(f"Sample with ID '{sample_item_id}' not found")
+            sample = await fetch_sample(sample_item_id)
             sample_batch_id = sample.sample_batch_id
 
             # Get target isotope resolution for the sample_item

@@ -1,13 +1,12 @@
+from typing import Optional
 import pandas as pd
 from sqlalchemy import (
     select,
 )
-from typing import Optional
 from mascope_lib.util import norm
 from mascope_server.db.id import gen_id
 from mascope_server.db import async_session
 from mascope_server.db.models import (
-    Sample,
     SampleBatch,
     TargetCompound,
     TargetIon,
@@ -18,6 +17,7 @@ from mascope_server.api.lib.exceptions.api_exceptions import NotFoundException
 from mascope_server.api.controllers.target.ions.target_ions_controller import (
     create_target_ions,
 )
+from mascope_server.api.controllers.samples.lib.samples_fetch import fetch_sample
 from mascope_server.api.new.match.params import apply_match_params
 from mascope_server.api.controllers.match.lib.match_compute import (
     compute_match_isotopes,
@@ -71,9 +71,7 @@ async def aggregate_sample_match_ion(
     """
     async with async_session() as session:
         # Step 1: Fetch sample and target ion to verify its existence
-        sample = await session.get(Sample, sample_item_id)
-        if not sample:
-            raise NotFoundException(f"Sample with ID '{sample_item_id}' not found")
+        sample = await fetch_sample(sample_item_id)
         ion = await session.get(TargetIon, target_ion_id)
         if not ion:
             raise NotFoundException(f"Target ion with ID '{target_ion_id}' not found")
@@ -194,9 +192,7 @@ async def aggregate_sample_match_compound(
     # data retrieval
     async with async_session() as session:
         # Step 1: Fetch sample related data and verify its existence
-        sample = await session.get(Sample, sample_item_id)
-        if not sample:
-            raise NotFoundException(f"Sample with ID '{sample_item_id}' not found")
+        sample = await fetch_sample(sample_item_id)
 
         # Fetch sample batch data and verify its existence
         sample_batch = await session.get(SampleBatch, sample.sample_batch_id)
@@ -327,11 +323,8 @@ async def get_sample_and_aggregated_matches(
     :return: A dictionary containing the sample information and aggregated match data.
     :rtype: dict
     """
-    async with async_session() as session:
-        # Step 1: Fetch sample to verify its existence
-        sample = await session.get(Sample, sample_item_id)
-    if not sample:
-        raise NotFoundException(f"Sample with ID '{sample_item_id}' not found")
+    # Step 1: Fetch sample to verify its existence
+    sample = await fetch_sample(sample_item_id)
 
     sample_dict = sample.to_dict()
 

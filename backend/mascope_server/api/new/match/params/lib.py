@@ -1,7 +1,6 @@
 import pandas as pd
 
-from mascope_server.db import async_session
-from mascope_server.db.models import Sample
+from mascope_server.api.controllers.samples.lib.samples_fetch import fetch_sample
 
 from mascope_lib.instrument import resolve_instrument_type
 
@@ -17,8 +16,7 @@ def instrument_default_match_params(instrument_name: str):
 
 
 async def default_match_params(sample_item_id: str):
-    async with async_session() as session:
-        sample = await session.get(Sample, sample_item_id)
+    sample = await fetch_sample(sample_item_id)
     return instrument_default_match_params(sample.instrument)
 
 

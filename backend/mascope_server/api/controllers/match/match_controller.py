@@ -49,6 +49,7 @@ from mascope_server.api.controllers.samples.samples_controller import (
     get_samples,
     get_sample,
 )
+from mascope_server.api.controllers.samples.lib.samples_fetch import fetch_sample
 from mascope_server.api.models.match.match_pydantic_model import (
     RematchBatchesBody,
     MatchComputeSample,
@@ -253,10 +254,7 @@ async def match_remove_sample(
     :raises RuntimeError: Raises a RuntimeError for internal call failures when not in an independent transaction.
     """
     # Step 1: Retrieve batch data and associated sample item.
-    async with async_session() as session:
-        sample = await session.get(Sample, sample_item_id)
-        if not sample:
-            raise NotFoundException(f"Sample with ID '{sample_item_id}' not found")
+    sample = await fetch_sample(sample_item_id)
     sample_item_name = sample.sample_item_name
     runtime.logger.info(
         f"...Removing matches for sample '{sample_item_name}' with ID '{sample_item_id}' ..."
