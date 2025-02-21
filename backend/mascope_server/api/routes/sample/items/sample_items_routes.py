@@ -214,7 +214,8 @@ async def sample_item_export_peaks_route(
     :rtype: dict
     """
     # Verify the existance of sample item
-    await get_sample_item(sample_item_id)
+    sample_item_result = await get_sample_item(sample_item_id)
+    sample_item_name = sample_item_result.get("data").get("sample_item_name")
 
     sid = request.headers.get("X-SID")
     process_id = gen_id(8)
@@ -227,6 +228,6 @@ async def sample_item_export_peaks_route(
         process_id=process_id,
     )
     return {
-        "message": f"Exporting peak data for a sample item '{sample_item_id}', please wait.",
+        "message": f"Exporting peak data for a sample item '{sample_item_name}', please wait.",
         "process_id": process_id,
     }
