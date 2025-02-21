@@ -53,11 +53,18 @@ def get_signal(datafile_path: str, t1=None, t2=None):
         all_mzs = h5_file["FullSpectra"]["MassAxis"][:]
         # Get time scale
         scan_time = h5_file["TimingData"]["BufTimes"][:].reshape(-1)
+        last_non_zero_scan = np.where(scan_time != 0)[0][-1]
+        # Cut out zero scans
+        scan_time = scan_time[: last_non_zero_scan + 1]
+        # Total number of scans
+        n_scans = scan_time.size
 
         if t1 is None and t2 is None:
             # Return full signal
-            # Get signal array first
-            signal_array = signal_ref[:].reshape(-1, signal_ref.shape[-1])
+            # Get signal array first, cut out zero scans
+            signal_array = signal_ref[:].reshape(-1, signal_ref.shape[-1])[
+                : last_non_zero_scan + 1, :
+            ]
             # Convert to dask array
             signal_dask = da.from_array(signal_array, chunks="auto")
             # Init and return xarray Dataset with swapped dimensions
@@ -71,10 +78,8 @@ def get_signal(datafile_path: str, t1=None, t2=None):
             hardware_runtime.logger.error(err_message)
             raise ValueError(err_message)
 
-        # Extract signal shape, naming of dimensions according to TOF docs
-        n_writes, n_bufs, n_segments, n_samples = signal_ref.shape
-        # Total number of scans
-        n_scans = n_writes * n_bufs * n_segments
+        # Extract number of samples (of m/z points)
+        n_samples = signal_ref.shape[-1]
 
         # Update start and end if are not provided
         start = 0 if t1 is None else np.abs(scan_time - t1).argmin()
