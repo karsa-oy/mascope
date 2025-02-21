@@ -780,18 +780,24 @@ async def import_sample_items(
     await send_progress_user_notification(notification, 0.9)
 
     # Step 7: Create separate independent task to recompute matches for other affected samples
-    asyncio.create_task(
-        rematch_samples(
-            sample_item_ids=[
-                si_id
-                for si_id in all_affected_sample_item_ids
-                if si_id not in created_sample_item_ids  # exclude the imported samples
-            ],
-            independent_transaction=True,  # Set to true to handle reloads independantly
-            # sid=sid,
-            process_id=gen_id(8),
+    other_affected_sample_item_ids = [
+        si_id
+        for si_id in all_affected_sample_item_ids
+        if si_id not in created_sample_item_ids  # exclude the imported samples
+    ]
+    if other_affected_sample_item_ids:
+        asyncio.create_task(
+            rematch_samples(
+                sample_item_ids=other_affected_sample_item_ids,
+                independent_transaction=True,  # Set to true to handle reloads independantly
+                sid=sid,
+                process_id=gen_id(8),
+            )
         )
-    )
+
+        runtime.logger.info(
+            f"Started independant rematch task for {len(other_affected_sample_item_ids)} affected samples"
+        )
 
     # Step 8: Raise a warning if encountered during calibration
     if calibration_warning is not None:

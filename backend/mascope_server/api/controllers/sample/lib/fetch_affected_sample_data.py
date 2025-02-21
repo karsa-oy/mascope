@@ -8,7 +8,6 @@ from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 from mascope_server.db.models import SampleItem, SampleBatch
 from mascope_server.db import async_session
-from mascope_server.api.lib.exceptions.api_exceptions import NotFoundException
 
 
 class AffectedSampleData(NamedTuple):
@@ -46,7 +45,6 @@ async def fetch_affected_sample_data(
     :rtype: AffectedSampleData
     :raises ValueError: If neither filenames nor sample_item_ids is provided,
                        or if both are provided
-    :raises NotFoundException: If no items are found matching the criteria
     """
     # Validate input parameters
     if (filenames is None and sample_item_ids is None) or (
@@ -63,23 +61,16 @@ async def fetch_affected_sample_data(
             query = select(SampleItem.sample_item_id, SampleItem.sample_batch_id)
 
         # Apply the appropriate filter
-        filter_description = ""
         if filenames:
             query = query.filter(SampleItem.filename.in_(filenames))
-            filter_description = f"filenames: {filenames}"
         else:
             query = query.filter(SampleItem.sample_item_id.in_(sample_item_ids))
-            filter_description = f"sample_item_ids: {sample_item_ids}"
 
         result = await session.execute(query)
 
         if include_objects:
             # Extract data from objects
             sample_items = result.scalars().all()
-            if not sample_items:
-                raise NotFoundException(
-                    f"No affected sample items found for {filter_description}"
-                )
 
             # Collect data from objects
             affected_sample_item_ids = {item.sample_item_id for item in sample_items}
@@ -95,10 +86,6 @@ async def fetch_affected_sample_data(
         else:
             # Extract IDs only
             rows = result.all()
-            if not rows:
-                raise NotFoundException(
-                    f"No affected sample items found for {filter_description}"
-                )
 
             affected_sample_item_ids = {row[0] for row in rows}
             affected_sample_batch_ids = {row[1] for row in rows}
