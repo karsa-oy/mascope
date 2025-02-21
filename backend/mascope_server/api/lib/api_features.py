@@ -1,6 +1,6 @@
 import inspect
 from functools import wraps
-from typing import Callable, List, Tuple
+from typing import Callable
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from rich.pretty import pretty_repr
@@ -15,7 +15,6 @@ from mascope_server.api.lib.exceptions.api_exceptions import (
 )
 from mascope_server.socket.notifications import (
     UserNotification,
-    emit_sio_event,
     handle_reloads,
     handle_notifications,
 )
@@ -23,25 +22,39 @@ from mascope_server.socket.notifications import (
 from mascope_server.runtime import runtime
 
 
-def api_controller(emit_reload_events: List[Tuple[str, str]] = [], error_message=None):
+def api_controller(
+    success_reload_events: list[tuple[str, str]] | None = None,
+    error_reload_events: list[tuple[str, str]] | None = None,
+):
     """
     A decorator for controller functions to handle exceptions and standardize error responses.
 
-    This decorator wraps a controller function, catches any exceptions thrown during its executions. If an ApiException is caught
-    (meaning that some other controller was called and it has already raised the processed ApiException), it is re-raised to be
-    handled by FastAPI's exception handlers. For non-processed exceptions, an ApiException is raised with a custom or default error
+    This decorator wraps a controller function, catches any exceptions thrown during its execution.
+    If an ApiException is caught (meaning that some other controller was called and it has already
+    raised the processed ApiException), it is re-raised to be handled by FastAPI's exception handlers.
+    For non-processed exceptions, an ApiException is raised with a custom or default error
     message, providing additional context about where the error occurred.
 
+    Also handles emit reload events based on execution outcome if independent_transaction flag is set.
+
     Usage:
-        @api_controller(error_message="Custom error message")
+        @api_controller(
+            success_reload_events=[("sample_batch_reload", "sample_batch_id")],
+            error_reload_events=[("sample_batch_error", "sample_batch_id")]
+        )
         async def some_controller_function(...):
             ...
 
-    :param error_message: Custom error message to use if an exception occurs, defaults to None. If None, a default message based on the function name is used.
-    :type error_message: str, optional
-    :return: The decorated controller function wrapped in a try-except block for exception handling.
+    :param success_reload_events: List of tuples (event_name, room_key) for success UI reload notifications
+    :type success_reload_events: list[tuple[str, str]] | None
+    :param error_reload_events: List of tuples (event_name, room_key) for error UI reload notifications
+    :type error_reload_events: list[tuple[str, str]] | None
+    :return: The decorated controller function wrapped in a try-except block for exception handling
     :rtype: Callable
     """
+    # Convert None to empty lists
+    success_reload_events = success_reload_events or []
+    error_reload_events = error_reload_events or []
 
     def decorator(func: Callable):
         @wraps(func)
@@ -49,32 +62,45 @@ def api_controller(emit_reload_events: List[Tuple[str, str]] = [], error_message
             independent_transaction = kwargs.get("independent_transaction", False)
             try:
                 result = await func(*args, **kwargs)
+
+                # Emit reload events only if this is an independent transaction
                 if independent_transaction:
-                    # Emit reload events
-                    for event_name, room_key in emit_reload_events:
-                        room_id = (
-                            kwargs.get(room_key)
-                            or result.get(room_key)
-                            or result.get("data").get(room_key)
-                            if room_key
-                            else None
-                        )
-                        if room_id:
-                            await emit_sio_event(event_name=event_name, room=room_id)
+                    await handle_reloads(
+                        f"Success reload {func.__name__}",
+                        success_reload_events,
+                        kwargs,
+                        result,
+                    )
                 return result
             except ApiException as e:
                 # Handle already processed exceptions
-                context_message = (
-                    error_message or f"Failed to {beautify_func_name(func.__name__)}"
-                )
+                context_message = f"Failed to {beautify_func_name(func.__name__)}"
                 user_message = f"{context_message}. {e.user_message}"
+
+                # Emit error reload events if this is an independent transaction
+                if independent_transaction:
+                    await handle_reloads(
+                        f"ApiException reload (status {e.status_code}) {func.__name__}",
+                        error_reload_events,
+                        kwargs,
+                        e.tech_message,
+                    )
+
                 raise ApiException(user_message, e.tech_message, e.status_code)
             except Exception as e:
-                # Use a custom error message if provided, otherwise default to the function name
-                context_message = (
-                    error_message or f"Failed to {beautify_func_name(func.__name__)}"
-                )
-                raise process_exception(e, context_message)
+                context_message = f"Failed to {beautify_func_name(func.__name__)}"
+                api_exc = process_exception(e, context_message)
+
+                # Emit error reload events if this is an independent transaction
+                if independent_transaction:
+                    await handle_reloads(
+                        f"Unhandled Exception reload {func.__name__}",
+                        error_reload_events,
+                        kwargs,
+                        None,
+                    )
+
+                raise api_exc
 
         return wrapper
 
@@ -301,7 +327,7 @@ def api_controller_background_task(
                         func.__name__ == "rematch_batch" and parent_id
                     ):
                         await handle_reloads(
-                            f"ApiException reload (status == 200) {func.__name__}",
+                            f"ApiException reload (status {e.status_code}) {func.__name__}",
                             error_reload,
                             kwargs,
                             e.tech_message,
@@ -325,7 +351,7 @@ def api_controller_background_task(
                             error_notification_rooms, notification, kwargs, None, sid
                         )
                         await handle_reloads(
-                            f"ApiException reload (status != 200) {func.__name__}",
+                            f"ApiException reload (status {e.status_code}) {func.__name__}",
                             error_reload,
                             kwargs,
                             None,
@@ -355,7 +381,7 @@ def api_controller_background_task(
                         error_notification_rooms, notification, kwargs, None, sid
                     )
                     await handle_reloads(
-                        f"Unhandled Exception reload {func.__name}",
+                        f"Unhandled Exception reload {func.__name__}",
                         error_reload,
                         kwargs,
                         None,

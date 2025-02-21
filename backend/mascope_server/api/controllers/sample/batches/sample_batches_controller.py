@@ -263,9 +263,9 @@ async def get_batch_targets(sample_batch_id: str, deduplicate: bool = False) -> 
 
 
 @api_controller(
-    emit_reload_events=[
+    success_reload_events=[
         ("workspace_reload", "workspace_id"),
-    ],
+    ],  # TODO_invalidation
 )
 async def create_sample_batch(
     sample_batch: SampleBatchCreateBody,
@@ -280,7 +280,7 @@ async def create_sample_batch(
     3. Associate the new sample batch with target collections if any are provided in the request.
     4. Commit the transaction to persist the new sample batch in the database.
     5. If independent_transaction is True, emit a 'workspace_reload' event with the workspace ID.
-        May be done in the api_controller by providing emit_reload_events.
+        Done in the api_controller by providing success_reload_events.
     6. Return the details of the created sample batch as a dictionary.
 
     :param sample_batch: Data for creating the sample batch.

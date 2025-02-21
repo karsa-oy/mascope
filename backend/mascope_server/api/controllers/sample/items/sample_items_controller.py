@@ -143,9 +143,9 @@ async def get_sample_item(sample_item_id: str) -> dict:
 
 
 @api_controller(
-    emit_reload_events=[
+    success_reload_events=[
         ("sample_batch_reload", "sample_batch_id"),
-    ],
+    ],  # TODO_invalidation
 )
 async def create_sample_item(
     sample_item: SampleItemCreate, independent_transaction: bool = False

@@ -108,33 +108,6 @@ async def send_progress_user_notification(
         await emit_user_notification(notification_copy, instrument_room)
 
 
-# TODO_notification delete after refactoring
-async def emit_sio_event(
-    event_name: str,
-    notification: dict = None,
-    room: str = None,
-    sid: str = None,
-):
-    """
-    Utility function to emit a Socket.IO event to a specified room.
-
-    :param event_name: The name of the Socket.IO event to emit.
-    :param notification: The notification to send with the event.
-    :param room: The room to which the event should be emitted.
-    :param sid: Optional. The session ID of the client. Used to send direct messages if needed.
-    """
-    # Emit without notification if event_name ends with '_reload'
-    if event_name.endswith("_reload"):
-        await sio.emit(event_name, room=room, namespace="/")
-    else:
-        # Emit the event to the specified room
-        await sio.emit(event_name, notification, room=room, namespace="/")
-
-        # Check if the user has moved from the room; if so, send them a direct message
-        if sid and room != sid and room not in sio.rooms(sid, namespace="/"):
-            await sio.emit(event_name, notification, room=sid, namespace="/")
-
-
 async def handle_reloads(
     context: str,
     reload_events: list[tuple[str, str]],
@@ -145,19 +118,22 @@ async def handle_reloads(
     Emit Socket.IO reload events to specified rooms based on provided configuration.
 
     For each reload event configuration:
-     1. Attempts to find room IDs by checking kwargs, result['data'] and result['_notification_data']
-     2. Validates and normalizes room IDs to a list format
-     3. Emits events to each room ID
+    1. Attempts to find room IDs by checking kwargs, result['data'] and result['_notification_data']
+    2. Validates and normalizes room IDs to a list format
+    3. Emits events to each room ID
 
-     :param reload_events: List of tuples containing (event_name, room_key) pairs
-         - event_name: Name of the Socket.IO event to emit
-         - room_key: Key to look up room IDs in kwargs or result
-     :type reload_events: list[tuple[str, str]]
-     :param kwargs: Controller function keyword arguments that may contain room IDs
-     :type kwargs: dict[str, Any]
-     :param result: Controller function result dictionary that may contain room IDs in 'data' or '_notification_data' keys.
-            May be none when handling the error_reload events.
-     :type result: dict[str, Any] | None
+    :param context: Descriptive string for logging purposes, typically identifies the source and type of reload
+                    (e.g. "Success reload update sample item")
+    :type context: str
+    :param reload_events: List of tuples containing (event_name, room_key) pairs
+        - event_name: Name of the Socket.IO event to emit
+        - room_key: Key to look up room IDs in kwargs or result
+    :type reload_events: list[tuple[str, str]]
+    :param kwargs: Controller function keyword arguments that may contain room IDs
+    :type kwargs: dict[str, Any]
+    :param result: Controller function result dictionary that may contain room IDs in 'data' or '_notification_data' keys.
+        May be none when handling the error_reload events.
+    :type result: dict[str, Any] | None
     """
     # Process each reload event configuration
     for event_name, room_key in reload_events:
