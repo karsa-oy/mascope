@@ -527,12 +527,12 @@ async def sample_item_export_peaks(
     :type sid: str, optional
     """
     # Get sample item data as a sample view
-    sample_view_result = await get_sample(sample_item_id)
-    sample_view = sample_view_result.get("data")
-    sample_item_name = sample_view["sample_item_name"]
+    sample_result = await get_sample(sample_item_id)
+    sample = sample_result.get("data")
+    sample_item_name = sample["sample_item_name"]
 
     # Get sample batch name
-    sample_batch_id = sample_view["sample_batch_id"]
+    sample_batch_id = sample["sample_batch_id"]
     sample_batch_data = await fetch_sample_batch_data(sample_batch_id)
     sample_batch_name = sample_batch_data.sample_batch_name
 
@@ -555,7 +555,7 @@ async def sample_item_export_peaks(
     await send_progress_user_notification(notification, 0.1)
 
     try:
-        filename = sample_view["filename"]
+        filename = sample["filename"]
         instrument_functions = await read_instrument_functions(filename=filename)
         instrument_type = get_instrument_type(filename)
 
@@ -586,19 +586,19 @@ async def sample_item_export_peaks(
         runtime.logger.error(repr(e))
 
     # Get scan timestamps
-    base_datetime = sample_view["datetime"]
+    base_datetime = sample["datetime"]
     scan_timestamps = pd.to_timedelta(
         sample_peak_data.time.values, unit="s"
     ) + pd.Timestamp(base_datetime)
     # Get scan timestamps UTC
-    base_datetime_utc = sample_view["datetime_utc"]
+    base_datetime_utc = sample["datetime_utc"]
     scan_timestamps_utc = pd.to_timedelta(
         sample_peak_data.time.values, unit="s"
     ) + pd.Timestamp(base_datetime_utc)
 
     # Get ticks for each time scan, normalize, correct by general TIC
     scan_tics = load_signal(filename).sum(dim="mz").signal.values
-    scan_tics = scan_tics / scan_tics.sum() * sample_view["tic"]
+    scan_tics = scan_tics / scan_tics.sum() * sample["tic"]
 
     mz_values = sample_peak_data.mz.values
     intensities = sample_peak_data.values.T  # Transpose to get (n_scans, n_mz)
@@ -627,11 +627,11 @@ async def sample_item_export_peaks(
         sample_batch_name=sample_batch_name,
         sample_item_name=sample_item_name,
         filename=filename,
-        filter_id=sample_view["filter_id"],
-        sample_item_type=sample_view["sample_item_type"],
-        sample_file_id=sample_view["sample_file_id"],
-        sample_item_id=sample_view["sample_item_id"],
-        instrument=sample_view["instrument"],
+        filter_id=sample["filter_id"],
+        sample_item_type=sample["sample_item_type"],
+        sample_file_id=sample["sample_file_id"],
+        sample_item_id=sample["sample_item_id"],
+        instrument=sample["instrument"],
     )
 
     await send_progress_user_notification(notification, 1)
