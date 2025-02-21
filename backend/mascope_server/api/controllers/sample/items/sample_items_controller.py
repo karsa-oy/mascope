@@ -584,6 +584,7 @@ async def sample_item_export_peaks(
         await send_progress_user_notification(notification, 0.8)
     except Exception as e:
         runtime.logger.error(repr(e))
+        raise e
 
     # Get scan timestamps
     base_datetime = sample["datetime"]
