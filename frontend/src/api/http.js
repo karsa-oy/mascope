@@ -23,7 +23,7 @@ export const initHttp = () => {
 
 function handleRequestData(config) {
   const { method, url } = config
-  console.debug(`[api:http] request ${method} ${url}`, config)
+  console.debug(`▶️ [api:http] request ${method} ${url}`, config)
   // session id
   const sid = api?.socket?.id
   if (sid) {
@@ -43,7 +43,7 @@ function handleRequestData(config) {
 
 function handleResponseData(response) {
   const { method, url } = response?.config
-  console.debug(`[api:http] response ${method} ${url}`, response)
+  console.debug(`✅ [api:http] response ${method} ${url}`, response)
   // pick the handler
   const handlerName = response?.config?.headers['X-Handler']
   const handler = handlerName ? handlers[handlerName] : (resp) => resp
@@ -58,7 +58,7 @@ function handleClientError(error) {
   const type = headers['X-Type']
   // log to console for developers
   const { detail, error: message } = error?.response?.data
-  console.error(`[api:http] ${method} ${url} client failure: ${detail?.error_message}`, error)
+  console.error(`❌[api:http] ${method} ${url} client failure: ${detail?.error_message}`, error)
   // emit notification to users
   const app = useApp()
   app.ui.notification.push({
@@ -89,7 +89,7 @@ function handleServerError(error) {
   // log to console for developers
   const { detail, error: message } = error?.response?.data
   console.error(
-    `[api:http] ${type} ${method} ${url} server failure: ${detail?.error_message}`,
+    `🚫 [api:http] ${type} ${method} ${url} server failure: ${detail?.error_message}`,
     error
   )
   // emit notification to users

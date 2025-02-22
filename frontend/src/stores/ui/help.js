@@ -49,7 +49,7 @@ export const useHelp = defineStore('app.ui.help', () => {
       hooks: {
         onMounted: () => {
           const element = document.getElementById(rootId)
-          console.debug('[help] registering element', rootId, { args, element })
+          console.debug('🛟 [help] registering element', rootId, { args, element })
           register(element, args)
         }
       }

@@ -137,7 +137,7 @@ export async function batchExportCsv() {
   const app = useApp()
 
   if (!app.data.batch.focused) {
-    console.error('No batch is currently focused.')
+    console.error('📄 [export] no batch is currently focused.')
     return
   }
 

@@ -68,7 +68,7 @@ export default {
   process: (response) => {
     const { status, data } = unpack(response)
     if (status === 202) {
-      console.debug('[api:http] progress notification', data)
+      console.debug('✅ [api:http] progress notification', data)
       // data is returned in sio user_notifications
     } else {
       unhandled(response)
@@ -112,7 +112,7 @@ export default {
           status: 'info'
         })
         if (!knownEvent) {
-          console.warn(`unknown succesful auth event type ${type}`, response)
+          console.warn(`⚠️ [api:http] unknown succesful auth event type ${type}`, response)
         }
       }
       return data.data
@@ -134,5 +134,5 @@ function unpack(response) {
 
 function unhandled(response) {
   const { status, method, url } = unpack(response)
-  console.warn(`[api:http] ${method} ${url} response status ${status} unhandled:`, response)
+  console.warn(`⚠️ [api:http] ${method} ${url} response status ${status} unhandled:`, response)
 }

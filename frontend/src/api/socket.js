@@ -11,10 +11,10 @@ export function initSocket() {
     withCredentials: true, // Enables cookie sending
     transports: ['websocket']
   })
-  console.debug('[api:sio] initialized socket for', runtime.mode, ':', url, socket)
+  console.debug('📫 [api:sio] initialized socket for', runtime.mode, ':', url, socket)
   // logging handlers
   socket.onAny((eventName, ...event) => {
-    console.debug(`[api:sio] ${eventName} emitted:`, event)
+    console.debug(`📫 [api:sio] ${eventName} emitted:`, event)
   })
   return socket
 }

@@ -124,7 +124,7 @@ watch(
       // correspondence between position & zoom
       const plot = plots.value[index]
       if (visualized && plot) {
-        console.log('[chart] resetting match spectra zoom')
+        console.log('📊 [chart] resetting match spectra zoom')
         plot.resetZoom()
       }
     })

@@ -25,9 +25,9 @@ export const defineModule = ({
     // CONFIG
 
     const prefix = `[app.data.${name.replaceAll('_', ' ')}]`
-    const log = (message, ...rest) => console.log(`${prefix} ${message}`, ...rest)
-    const warn = (message, ...rest) => console.warn(`${prefix} ${message}`, ...rest)
-    const debug = (message, ...rest) => console.debug(`${prefix} ${message}`, ...rest)
+    const log = (message, ...rest) => console.log(`🔄 ${prefix} ${message}`, ...rest)
+    const warn = (message, ...rest) => console.warn(`🔄 ${prefix} ${message}`, ...rest)
+    const debug = (message, ...rest) => console.debug(`🔄 ${prefix} ${message}`, ...rest)
 
     const singleselect = !multiselect
     const parent = useParent ? useParent() : null
@@ -138,10 +138,10 @@ export const defineModule = ({
     watch(focused, (nextFocus, prevFocus) => {
       if (nextFocus !== prevFocus) {
         if (prevFocus) {
-          debug('unfocusing', prevFocus)
+          console.debug(`☁️ ${prefix} unfocusing`, prevFocus)
         }
         if (nextFocus) {
-          debug('focusing', nextFocus)
+          console.debug(`⭐ ${prefix} focusing`, nextFocus)
         }
       }
     })
@@ -151,13 +151,13 @@ export const defineModule = ({
       prevSelected.forEach((selected) => {
         const newlyUnselected = !nextSelected.map((p) => p[key]).includes(selected[key])
         if (newlyUnselected) {
-          debug('unselecting', selected)
+          console.debug(`☁️ ${prefix} unselecting`, selected)
         }
       })
       nextSelected.forEach((selected) => {
         const newlySelected = !prevSelected.map((p) => p[key]).includes(selected[key])
         if (newlySelected) {
-          debug('selecting', selected)
+          console.debug(`✨ ${prefix} selecting`, selected)
         }
       })
     })
