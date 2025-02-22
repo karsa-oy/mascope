@@ -204,9 +204,11 @@ async def rematch_samples(
             process_id=gen_id(8),
             parent_id=process_id,
         )
-    affected_sample_item_ids, affected_sample_batch_ids, *_ = (
-        await fetch_affected_sample_data(sample_item_ids=sample_item_ids)
-    )
+    (
+        affected_sample_item_ids,
+        affected_sample_batch_ids,
+        *_,
+    ) = await fetch_affected_sample_data(sample_item_ids=sample_item_ids)
     return {
         "message": f"Rematched {len(sample_item_ids)} samples",
         "_notification_data": {
@@ -425,6 +427,45 @@ async def match_compute_sample(
         "data": sample,
         "message": f"Match isotopes and interferences computed for sample '{sample_item_name}'.",
         "_notification_data": {"sample_item_id": sample_item_id},
+    }
+
+
+@api_controller_background_task(
+    success_notification_rooms=["sid"],
+    success_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
+    error_notification_rooms=["sid"],
+    error_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
+)
+async def match_compute_samples(
+    sample_item_ids: list[str],
+    added_target_compound_ids: list[str] | None = None,
+    added_ionization_mechanism_ids: list[str] | None = None,
+    independent_transaction: bool = False,
+    sid: str = None,
+    process_id=None,
+    parent_id=None,
+) -> dict:
+    for sample_item_id in sample_item_ids:
+        await match_compute_sample(
+            sample_item_id=sample_item_id,
+            added_target_compound_ids=added_target_compound_ids,
+            added_ionization_mechanism_ids=added_ionization_mechanism_ids,
+            independent_transaction=False,
+            sid=sid,
+            process_id=gen_id(8),
+            parent_id=process_id,
+        )
+    (
+        affected_sample_item_ids,
+        affected_sample_batch_ids,
+        *_,
+    ) = await fetch_affected_sample_data(sample_item_ids=sample_item_ids)
+    return {
+        "message": f"Match isotopes and interferences computed for {len(sample_item_ids)} samples.",
+        "_notification_data": {
+            "affected_sample_item_ids": affected_sample_item_ids,
+            "affected_sample_batch_ids": affected_sample_batch_ids,
+        },
     }
 
 
