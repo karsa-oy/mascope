@@ -68,7 +68,7 @@ export default {
   process: (response) => {
     const { status, data } = unpack(response)
     if (status === 202) {
-      console.log('[api:http] progress notification', data)
+      console.debug('[api:http] progress notification', data)
       // data is returned in sio user_notifications
     } else {
       unhandled(response)
