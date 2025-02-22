@@ -888,7 +888,7 @@ You can also impertively apply, remove and check focus by calling the `focus`, `
 
 ```js
 app.data.batch.focus(someBatch); // often you would focus using a batch record
-app.data.batch.active(someBatch); // true
+app.data.batch.isFocused(someBatch); // true
 app.data.batch.focus({ sample_batch_id }); // but only the id is actually needed
 app.data.batch.unfocus(); // unfocusing requires no arguments
 ```

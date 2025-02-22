@@ -59,46 +59,47 @@ export const defineModule = ({
     const selected = multiselect ? ref([]) : computed(() => (focused.value ? [focused.value] : []))
     const focused = singleselect
       ? ref(null)
-      : computed(() => (selected.value?.length == 1 ? selected.value[0] : null))
+      : computed(() => (selected.value?.length === 1 ? selected.value[0] : null))
     const focusedId = computed(() => (focused.value ? focused.value[key] : null))
     const selectedIds = computed(() => selected.value.map((record) => record[key]))
-    const active = (arg) =>
+    const isSelected = (arg) =>
       arg ? selected.value.map((record) => record[key]).includes(arg[key]) : false
+    const isFocused = (arg) => (arg && focused.value ? focused.value[key] === arg[key] : false)
 
     // methods
     const select = multiselect
       ? (...args) => {
           args.forEach((arg) => {
-            if (!active(arg)) {
-              selected.value.push(records.value.find((record) => record[key] == arg[key]))
+            if (!isSelected(arg)) {
+              selected.value.push(records.value.find((record) => record[key] === arg[key]))
             }
           })
         }
       : // singleselect
         (arg) => {
-          if (!active(arg)) {
-            focused.value = records.value.find((record) => record[key] == arg[key])
+          if (!isFocused(arg)) {
+            focused.value = records.value.find((record) => record[key] === arg[key])
           }
         }
     const unselect = multiselect
       ? (...args) => {
           args.forEach((arg) => {
-            if (active(arg)) {
+            if (isSelected(arg)) {
               selected.value = selected.value.filter((record) => record[key] !== arg[key])
             }
           })
         }
       : // singleselect
         (arg) => {
-          if (active(arg)) {
+          if (isFocused(arg)) {
             focused.value = null
           }
         }
     const focus = multiselect
       ? (arg) => {
           debug('focusing', arg)
-          if (!active(arg)) {
-            selected.value = [records.value.find((record) => record[key] == arg[key])]
+          if (!isSelected(arg)) {
+            selected.value = [records.value.find((record) => record[key] === arg[key])]
           }
         }
       : // singleselect
@@ -109,8 +110,8 @@ export const defineModule = ({
             focused.value = records.value.find(arg)
           } else {
             // but normally, focus using a record or key field
-            if (!active(arg)) {
-              focused.value = records.value.find((record) => record[key] == arg[key])
+            if (!isFocused(arg)) {
+              focused.value = records.value.find((record) => record[key] === arg[key])
             }
           }
         }
@@ -118,7 +119,7 @@ export const defineModule = ({
       ? (arg) => {
           debug('unfocusing')
           if (arg) {
-            if (active(arg)) {
+            if (isSelected(arg)) {
               selected.value = []
             }
           } else {
@@ -129,7 +130,7 @@ export const defineModule = ({
         (arg) => {
           debug('unfocusing')
           if (arg) {
-            if (active(arg)) {
+            if (isFocused(arg)) {
               focused.value = null
             }
           } else {
@@ -329,9 +330,9 @@ export const defineModule = ({
       records.value = records.value
         .map(async (record) => {
           if (ids.include[record[key]]) {
-            if (type == 'delete') {
+            if (type === 'delete') {
               return null
-            } else if (type == 'update') {
+            } else if (type === 'update') {
               return await read(record[key])
             }
           } else {
@@ -340,7 +341,7 @@ export const defineModule = ({
         })
         .filter((record) => !ids.include(record[key]))
       // add fresh data
-      if (type == 'create') {
+      if (type === 'create') {
         ids.forEach(async (id) => {
           const record = await read(id)
           records.value.push(record)
@@ -361,11 +362,13 @@ export const defineModule = ({
       // selection
       selected,
       selectedIds,
-      focused,
-      focusedId,
-      active,
+      isSelected,
       select,
       unselect,
+      // focus
+      focused,
+      focusedId,
+      isFocused,
       focus,
       unfocus,
       // children
