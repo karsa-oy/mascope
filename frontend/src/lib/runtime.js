@@ -13,4 +13,4 @@ function initRuntime() {
 
 export const runtime = initRuntime()
 
-console.log('RUNTIME', runtime ?? import.meta.env.MASCOPE_RUNTIME)
+console.log('[runtime] initialized', runtime ?? import.meta.env.MASCOPE_RUNTIME)
