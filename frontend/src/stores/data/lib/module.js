@@ -236,7 +236,7 @@ export const defineModule = ({
     // hook
     const reload = async (trigger) => {
       const oldFocusedId = focused.value ? focused.value[key] : null
-      log(`load triggered by ${trigger?.event ?? trigger?.name ?? 'unknown'}`)
+      debug(`load triggered by ${trigger?.event ?? trigger?.name ?? 'unknown'}`)
       loading.value = true
       if (trigger?.name) {
         records.value = trigger?.focused ? await load(trigger.focused) : []
@@ -249,7 +249,7 @@ export const defineModule = ({
       // propegate to children
       if (children.value.length > 0) {
         await Promise.all(children.value.map(({ reload }) => reload({ name, focused: newFocused })))
-        log('child data loaded')
+        debug('child data loaded')
       }
       loading.value = false
     }
@@ -332,11 +332,11 @@ export const defineModule = ({
       }
       watch(focused, (next, prev) => {
         if (prev) {
-          log('unsubscribing')
+          debug('unsubscribing')
           api.socket.emit('unsubscribe', room(prev))
         }
         if (next) {
-          log('subscribing')
+          debug('subscribing')
           api.socket.emit('subscribe', room(next))
         }
       })
