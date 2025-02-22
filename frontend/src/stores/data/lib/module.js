@@ -97,14 +97,12 @@ export const defineModule = ({
         }
     const focus = multiselect
       ? (arg) => {
-          debug('focusing', arg)
           if (!isSelected(arg)) {
             selected.value = [records.value.find((record) => record[key] === arg[key])]
           }
         }
       : // singleselect
         (arg) => {
-          debug('focusing', arg)
           if (typeof arg === 'function') {
             // allow predicates to focus with arbitrary conditions
             focused.value = records.value.find(arg)
@@ -117,7 +115,6 @@ export const defineModule = ({
         }
     const unfocus = multiselect
       ? (arg) => {
-          debug('unfocusing')
           if (arg) {
             if (isSelected(arg)) {
               selected.value = []
@@ -128,7 +125,6 @@ export const defineModule = ({
         }
       : // singleselect
         (arg) => {
-          debug('unfocusing')
           if (arg) {
             if (isFocused(arg)) {
               focused.value = null
@@ -137,6 +133,34 @@ export const defineModule = ({
             focused.value = null
           }
         }
+
+    // focus logging
+    watch(focused, (nextFocus, prevFocus) => {
+      if (nextFocus !== prevFocus) {
+        if (prevFocus) {
+          debug('unfocusing', prevFocus)
+        }
+        if (nextFocus) {
+          debug('focusing', nextFocus)
+        }
+      }
+    })
+
+    // selection logging
+    watch(selected, (nextSelected, prevSelected) => {
+      prevSelected.forEach((selected) => {
+        const newlyUnselected = !nextSelected.map((p) => p[key]).includes(selected[key])
+        if (newlyUnselected) {
+          debug('unselecting', selected)
+        }
+      })
+      nextSelected.forEach((selected) => {
+        const newlySelected = !prevSelected.map((p) => p[key]).includes(selected[key])
+        if (newlySelected) {
+          debug('selecting', selected)
+        }
+      })
+    })
 
     // persistence
 
