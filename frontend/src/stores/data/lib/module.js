@@ -135,32 +135,45 @@ export const defineModule = ({
         }
 
     // focus logging
-    watch(focused, (nextFocus, prevFocus) => {
-      if (nextFocus !== prevFocus) {
-        if (prevFocus) {
-          console.debug(`☁️ ${prefix} unfocusing`, prevFocus)
+    if (singleselect) {
+      watch(focused, (nextFocus, prevFocus) => {
+        if (nextFocus !== prevFocus) {
+          if (prevFocus) {
+            console.debug(`☁️ ${prefix} unfocusing`, prevFocus)
+          }
+          if (nextFocus) {
+            console.debug(`⭐ ${prefix} focusing`, nextFocus)
+          }
         }
-        if (nextFocus) {
-          console.debug(`⭐ ${prefix} focusing`, nextFocus)
-        }
-      }
-    })
+      })
+    }
 
     // selection logging
-    watch(selected, (nextSelected, prevSelected) => {
-      prevSelected.forEach((selected) => {
-        const newlyUnselected = !nextSelected.map((p) => p[key]).includes(selected[key])
-        if (newlyUnselected) {
-          console.debug(`☁️ ${prefix} unselecting`, selected)
+    if (multiselect) {
+      watch(selected, (nextSelected, prevSelected) => {
+        prevSelected.forEach((selected) => {
+          const newlyUnselected = !nextSelected.map((p) => p[key]).includes(selected[key])
+          if (newlyUnselected) {
+            if (nextSelected.length >= 1) {
+              console.debug(`☁️ ${prefix} unselecting`, selected)
+            } else {
+              console.log(`☁️ ${prefix} unfocusing`, selected)
+            }
+          }
+        })
+        nextSelected.forEach((selected) => {
+          const newlySelected = !prevSelected.map((p) => p[key]).includes(selected[key])
+          if (newlySelected) {
+            if (!focused.value) {
+              console.debug(`✨ ${prefix} selecting`, selected)
+            }
+          }
+        })
+        if (focused.value) {
+          console.log(`⭐ ${prefix} focusing`, focused.value)
         }
       })
-      nextSelected.forEach((selected) => {
-        const newlySelected = !prevSelected.map((p) => p[key]).includes(selected[key])
-        if (newlySelected) {
-          console.debug(`✨ ${prefix} selecting`, selected)
-        }
-      })
-    })
+    }
 
     // persistence
 
