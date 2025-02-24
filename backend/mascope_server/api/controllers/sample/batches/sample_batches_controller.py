@@ -56,9 +56,6 @@ from mascope_server.api.controllers.sample.items.sample_items_controller import 
     copy_sample_item,
 )
 from mascope_server.api.controllers.samples.samples_controller import get_sample
-from mascope_server.api.controllers.sample.lib.sample_batches_fetch import (
-    fetch_sample_batch_ids,
-)
 from mascope_server.api.controllers.sample.lib.fetch_affected_sample_data import (
     fetch_affected_sample_data,
 )
