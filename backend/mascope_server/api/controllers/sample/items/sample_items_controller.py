@@ -271,25 +271,24 @@ async def update_sample_item(
             await session.refresh(existing_sample_item)
 
     # Step 5: Process instrument config
-    if instrument_config:
-        sample = await fetch_sample(sample_item_id)
-        current_instrument_id = getattr(sample, "instrument_function_id", None)
+    sample = await fetch_sample(sample_item_id)
+    current_instrument_id = getattr(sample, "instrument_function_id", None)
 
-        # Process only if there's a new record or the instrument_function_id changed
-        if (
-            instrument_config.new_record
-            or instrument_config.instrument_function_id != current_instrument_id
-        ):
-            background_tasks.add_task(
-                process_instrument_config,
-                filenames=[existing_sample_item.filename],
-                instrument_config=instrument_config,
-                independent_transaction=True,
-                sid=sid,
-                process_id=process_id,
-            )
+    # Process only if there's a new record or the instrument_function_id changed
+    if (
+        instrument_config.new_record
+        or instrument_config.instrument_function_id != current_instrument_id
+    ):
+        background_tasks.add_task(
+            process_instrument_config,
+            filenames=[existing_sample_item.filename],
+            instrument_config=instrument_config,
+            independent_transaction=True,
+            sid=sid,
+            process_id=process_id,
+        )
+    # Step 6: Directly reload batch if needed # TODO_invalidation
     elif changed_fields:
-        # Step 6: Directly reload batch if needed # TODO_invalidation
         await sio.emit(
             "sample_batch_reload",
             room=existing_sample_item.sample_batch_id,
