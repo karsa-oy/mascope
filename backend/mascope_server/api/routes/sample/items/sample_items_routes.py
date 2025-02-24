@@ -7,8 +7,8 @@ from mascope_server.api.controllers.sample.items.sample_items_controller import 
     get_sample_items,
     get_sample_item,
     create_sample_item,
-    delete_sample_item,
     sample_item_export_peaks,
+    delete_sample_items,
     update_sample_item,
     copy_sample_items,
 )
@@ -22,6 +22,7 @@ from mascope_server.api.models.sample.items.sample_item_pydantic_model import (
     SampleItemCreate,
     GetSampleItemsQueryParams,
     SampleItemUpdateBody,
+    SampleItemsDeleteBody,
     SampleItemsCopyBody,
     SampleItemProcessBody,
 )
@@ -101,6 +102,23 @@ async def update_sample_item_route(
     )
 
 
+@sample_items_router.post("/delete")
+@api_route()
+async def delete_sample_items_route(
+    body: SampleItemsDeleteBody,
+    user=Depends(editor_user),
+):
+    """Delete a specific sample items by IDs.
+
+    :param body: The sample items delete body.
+    :param user: The current authenticated user with editor permissions.
+    :return: A dictionary confirming deletion.
+    """
+    return await delete_sample_items(
+        sample_item_ids=body.sample_item_ids, independent_transaction=True
+    )
+
+
 @sample_items_router.delete("/{sample_item_id}")
 @api_route()
 async def delete_sample_item_route(sample_item_id: str, user=Depends(editor_user)):
@@ -110,7 +128,9 @@ async def delete_sample_item_route(sample_item_id: str, user=Depends(editor_user
     :param user: The current authenticated user with editor permissions.
     :return: A dictionary confirming deletion.
     """
-    return await delete_sample_item(sample_item_id)
+    return await delete_sample_items(
+        sample_item_ids=[sample_item_id], independented_transaction=True
+    )
 
 
 @sample_items_router.post("/copy")

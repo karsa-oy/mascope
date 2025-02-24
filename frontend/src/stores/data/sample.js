@@ -17,7 +17,6 @@ export const useSample = defineModule({
   key: 'sample_item_id',
   multiselect: true,
   useParent: useBatch,
-  unfocusBefore: ['delete'],
   subscribe: ({ sample_file_id }) => sample_file_id,
   load: ({ sample_batch_id }) =>
     api.http.get(`/samples`, {
@@ -42,11 +41,15 @@ export const useSample = defineModule({
         type: 'update_sample'
       }
     ),
-  delete: ({ sample_item_id }) =>
-    api.http.delete(`/sample/items/${sample_item_id}`, {
-      use: 'delete',
-      type: 'delete_sample'
-    }),
+  delete: ({ sample_item_ids }) =>
+    api.http.post(
+      `/sample/items/delete`,
+      { sample_item_ids },
+      {
+        use: 'delete',
+        type: 'delete_sample'
+      }
+    ),
   copy: ({ sample_item_ids, sample_batch_id }) =>
     api.http.post(
       `/sample/items/copy`,

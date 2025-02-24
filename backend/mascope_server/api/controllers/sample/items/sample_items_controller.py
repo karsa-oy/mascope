@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 from sqlalchemy import (
     select,
+    delete,
     asc,
     desc,
     func,
@@ -34,6 +35,9 @@ from mascope_server.api.controllers.sample.lib.sample_items_copy import (
     CopyMatches,
 )
 from mascope_server.api.controllers.samples.lib.samples_fetch import fetch_sample
+from mascope_server.api.controllers.sample.lib.fetch_affected_sample_data import (
+    fetch_affected_sample_data,
+)
 from mascope_server.api.controllers.match.match_controller import match_compute_samples
 from mascope_server.api.models.sample.items.sample_item_pydantic_model import (
     SampleItemCreate,
@@ -317,37 +321,58 @@ async def update_sample_item(
     }
 
 
-@api_controller()
-async def delete_sample_item(sample_item_id: str):
+@api_controller(
+    success_reload_events=[
+        ("sample_batch_reload", "affected_sample_batch_ids"),
+    ],  # TODO_invalidation
+)
+async def delete_sample_items(
+    sample_item_ids: list[str], independent_transaction: bool = False
+):
     """
     Deletes a sample item by its unique identifier.
 
     Steps:
-    1. Fetch the sample item by its ID from the database.
-    2. If the sample item is found, delete it from the session and commit the changes to the database.
-    3. Emit socket.io events to inform clients about the sample item deletion.
+    1. Check no duplicate sample item ids were provided
+    2. Check sample items to be deleted exist
+    3. Retrieve affected batch ids
+    4. Delete samples
 
     :param sample_item_id: The unique identifier of the sample item to delete.
     :type sample_item_id: str
     :raises NotFoundException: If no sample item is found with the provided ID.
     """
-    # Step 1: Fetch the sample item
+    # Step 1: Check no duplicate sample item ids were provided
+    if len(set(sample_item_ids)) < len(sample_item_ids):
+        raise ValueError("delete sample items: sample item IDs must be unique")
     async with async_session() as session:
-        sample_item = await session.get(SampleItem, sample_item_id)
-        if not sample_item:
-            raise NotFoundException(f"Sample item with ID '{sample_item_id}' not found")
-        # Step 2: Delete the sample item and commit changes
-        await session.delete(sample_item)
+        # Step 2: Check sample items to delete exist
+        select_query = select(SampleItem).where(
+            SampleItem.sample_item_id.in_(sample_item_ids)
+        )
+        result = await session.execute(select_query)
+        sample_items = result.scalars().all()
+        found_ids = [s.sample_item_id for s in sample_items]
+        missing_ids = [id for id in sample_item_ids if id not in found_ids]
+        if missing_ids:
+            raise NotFoundException(
+                f"Failed to find {len(missing_ids)} sample item{'s' if len(missing_ids) > 1 else ''}: {missing_ids}"
+            )
+        # Step 3: Retreive affected batch ids
+        _, affected_sample_batch_ids, *_ = await fetch_affected_sample_data(
+            sample_item_ids=sample_item_ids
+        )
+        # Step 4: Delete the sample items
+        delete_query = delete(SampleItem).where(
+            SampleItem.sample_item_id.in_(sample_item_ids)
+        )
+        await session.execute(delete_query)
         await session.commit()
-    # Step 3: Emit socket.io events
-    await sio.emit(
-        "sample_batch_reload",
-        room=sample_item.sample_batch_id,
-        namespace="/",
-    )
 
+    s = "s" if len(sample_item_ids) > 1 else ""
     return {
-        "message": f"Sample item '{sample_item.sample_item_name}' was deleted.",
+        "message": f"Deleted {len(sample_item_ids)} sample item{s}.",
+        "_notification_data": {"affected_sample_batch_ids": affected_sample_batch_ids},
     }
 
 

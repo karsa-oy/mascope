@@ -124,20 +124,25 @@ const contextMenuEntries = computed(() => {
       }
     },
     {
-      label: `Delete sample`,
+      label: `Delete sample${s}`,
       icon: 'pi pi-trash',
       command: () => {
         confirm.require({
           icon: 'pi pi-exclamation-triangle',
-          header: `Deleting sample '${sample.context.sample_item_name}'`,
-          message: `Delete sample '${sample.context.sample_item_name}'
-          from batch "${app.data.batch.focused.sample_batch_name}"?`,
+          header: `Delete sample${s}`,
+          message: `
+            Are you sure you want to delete
+            ${app.data.sample.selected.length} sample${s} from
+            batch "${app.data.batch.focused.sample_batch_name}"?
+          `,
           accept: async () => {
             // unload if necessary
             if (sample.context.sample_item_id == app.data.sample.focused?.sample_item_id) {
               app.data.sample.unfocus()
             }
-            await app.data.sample.delete(sample.context)
+            await app.data.sample.delete({
+              sample_item_ids: app.data.sample.selectedIds
+            })
           },
           acceptProps: {
             icon: 'pi pi-trash',
@@ -149,8 +154,7 @@ const contextMenuEntries = computed(() => {
             severity: 'secondary'
           }
         })
-      },
-      visible: !multiselecting
+      }
     },
     { separator: true, visible: !multiselecting },
     {

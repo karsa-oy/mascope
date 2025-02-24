@@ -114,6 +114,12 @@ class SampleItemUpdateBody(BaseModel):
     )
 
 
+class SampleItemsDeleteBody(BaseModel):
+    sample_item_ids: list[str] = Field(
+        ..., description="The sample item IDs of samples to be deleted"
+    )
+
+
 class SampleItemsCopyBody(BaseModel):
     sample_batch_id: str = Field(
         ..., description="ID of the sample batch where to copy sample items"
