@@ -249,9 +249,10 @@ export const defineModule = ({
     }
 
     // hook
-    const reload = async (trigger) => {
+    const sync = async (trigger) => {
+      const oldCount = records.value.length
       const oldFocusedId = focused.value ? focused.value[key] : null
-      debug(`load triggered by ${trigger?.event ?? trigger?.name ?? 'unknown'}`)
+      debug(`sync triggered by ${trigger?.event ?? trigger?.name ?? 'unknown'}`)
       loading.value = true
       if (trigger?.name) {
         records.value = trigger?.focused ? await load(trigger.focused) : []
@@ -259,12 +260,19 @@ export const defineModule = ({
         records.value = await load()
       }
       records.value.forEach((record, index) => (record.index = (index + 1).toString()))
-      log('data loaded')
+      const newCount = records.value.length
+      if (newCount == 0) {
+        log('data unloaded')
+      } else if (newCount > 0 && oldCount == 0) {
+        log('data loaded')
+      } else if (newCount > 0 && oldCount > 0) {
+        log('data reloaded')
+      }
       const newFocused = refocus(oldFocusedId)
       // propegate to children
       if (children.value.length > 0) {
-        await Promise.all(children.value.map(({ reload }) => reload({ name, focused: newFocused })))
-        debug('child data loaded')
+        await Promise.all(children.value.map(({ sync }) => sync({ name, focused: newFocused })))
+        debug('children synced')
       }
       loading.value = false
     }
@@ -275,21 +283,21 @@ export const defineModule = ({
       auth.onLogin(() => {
         if (!parent) {
           // root modules self init on mount
-          reload({ event: 'initialization' })
+          sync({ event: 'initialization' })
         }
       })
     })
 
     if (parent) {
       // child modules init with parent
-      parent.register({ reload })
+      parent.register({ sync })
     }
 
     // reload children on refocus
     watch(focused, async (focused) => {
       await Promise.all(
-        children.value.map(({ reload }) =>
-          reload({
+        children.value.map(({ sync }) =>
+          sync({
             name,
             focused
           })
@@ -316,16 +324,16 @@ export const defineModule = ({
     // event triggered reloading
 
     if (!parent) {
-      api.socket.on(`org_reload`, () => reload({ event: 'org_reload' }))
+      api.socket.on(`org_reload`, () => sync({ event: 'org_reload' }))
     }
 
     // Hook the module to reload its data under specific conditions
     const reloadHandler =
       // Check if the parent is a virtual parent (used for special cases like match data)
       parent && parent.name.includes('virtual')
-        ? reload // For virtual parents, reload without passing trigger arguments
+        ? sync // For virtual parents, reload without passing trigger arguments
         : () =>
-            reload({
+            sync({
               name: parent?.name,
               focused: parent?.focused, // Pass the parent's focused record
               event: reloadOn // Include the event that triggered the reload

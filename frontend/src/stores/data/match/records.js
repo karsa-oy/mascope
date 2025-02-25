@@ -19,7 +19,7 @@ const defineMatch = (level) => {
       // to batch and sample selections
       name: 'virtual match parent',
       multiselect: false,
-      register: ({ reload }) => {
+      register: ({ sync }) => {
         const batch = useBatch()
         const sample = useSample()
         watch(
@@ -30,7 +30,7 @@ const defineMatch = (level) => {
               return { focused: batch.focused, name: 'virtual parent (batch)' }
             }
           }),
-          reload
+          sync
         )
       }
     }),
