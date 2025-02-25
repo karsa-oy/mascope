@@ -150,7 +150,7 @@ const contextMenuEntries = computed(() => [
     icon: 'pi pi-file-export',
     command: async () => {
       if (app.data.batch.focused?.sample_batch_id == batch.context.sample_batch_id) {
-        await batchExportCsv()
+        await app.data.batch.exportCsv(app.data.batch.focused)
       } else {
         app.data.batch.focused = batch.context
         pending.batchExport = true
