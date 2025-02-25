@@ -29,7 +29,8 @@ export const useHelp = defineStore('app.ui.help', () => {
   }
 
   const register = (element, args) => {
-    cards.value.push({ element, mouse: useMouseInElement(element), ...args })
+    const { isOutside } = useMouseInElement(element)
+    cards.value.push({ element, isOutside, ...args })
   }
 
   // hook into HTML elmenents:
@@ -73,7 +74,7 @@ export const useHelp = defineStore('app.ui.help', () => {
     // filter the current layer
     const active = cards.value.filter((card) => card.layer == (layer.value ?? 'default'))
     // filter to select cards containing the mouse
-    const hovered = active.filter(({ mouse }) => !mouse.isOutside)
+    const hovered = active.filter(({ isOutside }) => !isOutside)
     // select the lowest element in the containment hierarchy
     return hovered.sort(containment)[0]
   })
