@@ -97,8 +97,10 @@ export const defineModule = ({
         }
     const focus = multiselect
       ? (arg) => {
-          if (!isSelected(arg)) {
-            selected.value = [records.value.find((record) => record[key] === arg[key])]
+          if (!isFocused(arg)) {
+            selected.value = [records.value.find((record) => record[key] === arg[key])].filter(
+              (record) => !!record
+            )
           }
         }
       : // singleselect
