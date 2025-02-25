@@ -36,17 +36,18 @@ const batch = computed(() => (original.value?.sample_item_id ? null : original.v
 const samples = ref(null)
 const previewSample = ref()
 watchEffect(async () => {
-  samples.value = batch.value
-    ? await api.http.get(`/samples`, {
-        params: {
-          sample_batch_id: batch.value.sample_batch_id,
-          batch_matches_info: false,
-          sort: 'datetime_utc'
-        },
-        use: 'read',
-        type: 'load_samples'
-      })
-    : null
+  samples.value =
+    batch.value && visible.value
+      ? await api.http.get(`/samples`, {
+          params: {
+            sample_batch_id: batch.value.sample_batch_id,
+            batch_matches_info: false,
+            sort: 'datetime_utc'
+          },
+          use: 'read',
+          type: 'load_samples'
+        })
+      : null
   previewSample.value = samples.value?.length > 0 ? { ...samples.value[0] } : null
 })
 

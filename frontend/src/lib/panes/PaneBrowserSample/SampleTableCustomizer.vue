@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 
 import Button from 'primevue/button'
 import Popover from 'primevue/popover'
@@ -9,14 +9,18 @@ import SelectButton from 'primevue/selectbutton'
 import { beautifySnakeCase } from '@/lib/utils'
 import { useApp } from '@/stores'
 
+import { useCustomizerPopover } from './stores'
+
 const app = useApp()
 
+const customizer = useCustomizerPopover()
+
 const popoverRef = ref()
-const popoverTab = ref('All')
+onMounted(() => {
+  customizer.popover = popoverRef.value
+})
 
-const config = defineModel('config')
-
-const emit = defineEmits(['popover'])
+const tab = ref('All')
 
 const defaultConfig = {
   columns: [
@@ -57,7 +61,7 @@ const availableColumns = computed(() => {
 const storageKey = computed(() => `sample-browser-batch[${app.data.batch.focused.sample_batch_id}]`)
 // write
 watch(
-  config,
+  () => customizer.config,
   (state) => {
     localStorage.setItem(storageKey.value, JSON.stringify(state))
   },
@@ -69,7 +73,7 @@ watch(
   (batch) => {
     if (batch) {
       const storedConfig = localStorage.getItem(storageKey.value)
-      config.value = storedConfig ? JSON.parse(storedConfig) : defaultConfig
+      customizer.config = storedConfig ? JSON.parse(storedConfig) : defaultConfig
     }
   },
   { immediate: true }
@@ -109,14 +113,13 @@ function createLabel(field) {
     @click="
       (event) => {
         event.stopPropagation()
-        emit('popover', popoverRef)
-        popoverRef.show(event)
+        customizer.show(event)
       }
     "
   />
   <Popover ref="popoverRef" contentStyle="height: fit-content;">
     <div class="row" style="margin-bottom: 0.5rem">
-      <SelectButton v-model="popoverTab" :options="['All', 'Selected']" :allowEmpty="false" />
+      <SelectButton v-model="tab" :options="['All', 'Selected']" :allowEmpty="false" />
       <Button
         label="Reset"
         icon="pi pi-replay"
@@ -128,12 +131,10 @@ function createLabel(field) {
       />
     </div>
     <Listbox
-      v-model="config.columns"
+      v-model="customizer.config.columns"
       :options="
         availableColumns.filter(({ field }) =>
-          popoverTab == 'Selected'
-            ? selectedColumns.map(({ field }) => field).includes(field)
-            : true
+          tab == 'Selected' ? selectedColumns.map(({ field }) => field).includes(field) : true
         )
       "
       multiple
