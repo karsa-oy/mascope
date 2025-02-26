@@ -9,6 +9,7 @@ import ToastService from 'primevue/toastservice'
 import Ripple from 'primevue/ripple'
 
 import 'primeicons/primeicons.css'
+import '@phosphor-icons/web/regular'
 
 import App from './App.vue'
 import router from './routes'
