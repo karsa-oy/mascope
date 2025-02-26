@@ -11,6 +11,7 @@ from sqlalchemy import (
     Text,
     JSON,
     func,
+    or_,
     select,
     text,
 )
@@ -23,7 +24,6 @@ from fastapi_users.db import (
 from fastapi_users_db_sqlalchemy.access_token import (
     SQLAlchemyBaseAccessTokenTable,
 )
-from mascope_server.api.new.auth.config import auth_settings
 
 
 class BaseMixin(object):
@@ -76,6 +76,8 @@ class User(SQLAlchemyBaseUserTable[int], Base):
         :param current_user_id: User ID to exclude from count
         :return: Count of other owner users
         """
+        from mascope_server.api.new.auth.config import auth_settings
+
         query = (
             select(func.count())  # pylint: disable=not-callable
             .select_from(User)
@@ -126,6 +128,36 @@ class AccessToken(SQLAlchemyBaseAccessTokenTable[int], Base):
 
     # Define relationships
     user = relationship("User", back_populates="access_token")
+
+    @classmethod
+    async def clean_invalid_tokens(cls, session) -> int:
+        """
+        Clean up tokens with NULL/invalid service names that are not allowed in AccessTokenConfig.
+
+        :param session: SQLAlchemy async session
+        :type session: AsyncSession
+        :return: Number of deleted tokens
+        :rtype: int
+        """
+        from mascope_server.api.new.auth.config import auth_settings
+
+        allowed_services = auth_settings.access_token.ALLOWED_SERVICES
+
+        # Find tokens with NULL service names or invalid service names
+        stmt = select(cls).where(
+            or_(cls.service_name.is_(None), cls.service_name.notin_(allowed_services))
+        )
+
+        result = await session.execute(stmt)
+        invalid_tokens = result.scalars().all()
+
+        if invalid_tokens:
+            for token in invalid_tokens:
+                await session.delete(token)
+            await session.commit()
+
+        # Return number of deleted tokens
+        return len(invalid_tokens)
 
 
 class Workspace(Base):
