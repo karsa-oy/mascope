@@ -544,6 +544,108 @@ async def copy_sample_items(
         "_notification_data": {
             "sample_item_ids": [copy.sample_item_id for copy in copied_samples],
             "sample_batch_id": sample_batch_id,
+            "sample_batch_name": batch.sample_batch_name,
+        },
+    }
+
+
+@api_controller_background_task(
+    success_notification_rooms=["sid"],
+    success_reload=[("sample_batch_reload", "sample_batch_ids")],
+    error_notification_rooms=["sid"],
+)
+async def move_sample_items(
+    sample_item_ids: list[str],
+    sample_batch_id: str,
+    independent_transaction: bool = False,
+    background_tasks: BackgroundTasks = None,
+    sid=None,
+    process_id=None,
+    parent_id=None,
+) -> dict:
+    """
+    Move a set of samples to a specific batch. Leverages the copy_sample_items
+    and delete_sample_items controllers:
+
+    Steps:
+    1. Validate batch existence
+    2. Validate samples existence
+    3. Validate move is between different batches
+    4. Copy sample items over to the batch
+    5. Delete the original sample items if succesful
+
+    :param sample_item_ids: ID of the original sample items to be moved.
+    :type sample_item_ids: list[str[]
+    :param sample_batch_id: ID of the sample batch where the items will be placed.
+    :type sample_batch_id: str
+    :param independent_transaction: Flag indicating whether the sample item copy is an independent transaction and if the operation should emit a reload event for the sample batch and if the sample should be rematched for new batch targets, defaults to False
+    :type independent_transaction: bool, optional
+    :param background_tasks: FastAPI background tasks for computing matches post-copy, defaults to None
+    :type background_tasks: BackgroundTasks, optional
+    :param sid: Session ID, used for emitting notifications to specific clients, defaults to None
+    :type sid: str, optional
+    :raises NotFoundException: If the original sample item is not found.
+    :return: The newly created sample item dict.
+    :rtype: dict
+    """
+
+    # Step 1. Validate batch existence
+    async with async_session() as session:
+        batch = await session.get(SampleBatch, sample_batch_id)
+
+        if not batch:
+            raise NotFoundException(
+                f"Sample batch with ID '{sample_batch_id}' not found"
+            )
+
+        # Step 2. Validate samples existence
+        stmt = select(SampleItem).where(SampleItem.sample_item_id.in_(sample_item_ids))
+        result = await session.execute(stmt)
+        original_samples = result.scalars().all()
+        original_sample_item_ids = [
+            original.sample_item_id for original in original_samples
+        ]
+
+        missing_sample_item_ids = [
+            id for id in sample_item_ids if id not in original_sample_item_ids
+        ]
+        for missing_sample_item_id in missing_sample_item_ids:
+            raise NotFoundException(
+                f"Sample item with ID '{missing_sample_item_id}' not found"
+            )
+
+    # Step 3. Validate move is between different batches
+    _, affected_sample_batch_ids, *_ = await fetch_affected_sample_data(
+        sample_item_ids=sample_item_ids
+    )
+    if sample_batch_id in affected_sample_batch_ids:
+        raise ValueError(
+            "Move sample items: some of the samples you are trying to move are already in the requested batch"
+        )
+
+    # Step 4: copy sample items over
+    copy_result = await copy_sample_items(
+        sample_item_ids=sample_item_ids,
+        sample_batch_id=sample_batch_id,
+        independent_transaction=False,
+        background_tasks=background_tasks,
+        sid=sid,
+        process_id=gen_id(8),
+        parent_id=process_id,
+    )
+    moved_samples = copy_result["data"]
+
+    # Step 5. Delete original samples if copy successful
+    if moved_samples:
+        await delete_sample_items(
+            sample_item_ids=sample_item_ids,
+        )
+    return {
+        "message": f"Moved {len(sample_item_ids)} samples successfully to batch '{batch.sample_batch_name}'.",
+        "data": moved_samples,
+        "_notification_data": {
+            "sample_item_ids": sample_item_ids,
+            "sample_batch_ids": [sample_batch_id, *affected_sample_batch_ids],
         },
     }
 

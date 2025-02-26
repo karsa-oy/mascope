@@ -12,16 +12,18 @@ export const useClipboard = defineStore('browser.sample.clipboard', () => {
       }
     }
   })
+  const data = computed(() => parsed.value?.data)
+  const op = computed(() => parsed.value?.op)
   const batch = computed(() => {
-    if (isBatch(parsed.value)) {
-      return parsed.value
+    if (isBatch(data.value)) {
+      return data.value
     } else {
       return null
     }
   })
   const samples = computed(() => {
-    if (parsed.value?.every(isSample)) {
-      return parsed.value
+    if (Array.isArray(data.value) && data.value?.every(isSample)) {
+      return data.value
     } else {
       return null
     }
@@ -35,13 +37,22 @@ export const useClipboard = defineStore('browser.sample.clipboard', () => {
     }
   }
 
-  async function write(data) {
+  async function write({ op, data }) {
+    if (!op || !['copy', 'cut'].includes(op)) {
+      throw Error("clipboard writing must include an 'op' field with value 'copy' or 'cut'")
+    }
     try {
-      const text = JSON.stringify(data)
+      const text = JSON.stringify({ op, data })
       await navigator.clipboard.writeText(text)
     } catch (err) {
       console.warn(err)
     }
+  }
+  async function copy(data) {
+    await write({ op: 'copy', data })
+  }
+  async function cut(data) {
+    await write({ op: 'cut', data })
   }
 
   async function clear() {
@@ -49,10 +60,11 @@ export const useClipboard = defineStore('browser.sample.clipboard', () => {
   }
 
   return {
-    parsed,
+    op,
     batch,
     samples,
-    write,
+    copy,
+    cut,
     read,
     clear
   }

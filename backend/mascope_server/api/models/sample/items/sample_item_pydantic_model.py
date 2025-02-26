@@ -127,6 +127,13 @@ class SampleItemsCopyBody(BaseModel):
     sample_item_ids: list[str] = Field(..., description="Sample item IDs to copy")
 
 
+class SampleItemsMoveBody(BaseModel):
+    sample_batch_id: str = Field(
+        ..., description="ID of the sample batch where to move sample items"
+    )
+    sample_item_ids: list[str] = Field(..., description="Sample item IDs to move")
+
+
 class SampleItemProcessBody(BaseModel):
     sample_item: SampleItemCreate = Field(
         ..., description="Sample item to be processed (created, calibrated, matched)"

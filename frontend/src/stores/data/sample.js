@@ -62,6 +62,18 @@ export const useSample = defineModule({
         type: 'copy_sample'
       }
     ),
+  move: ({ sample_item_ids, sample_batch_id }) =>
+    api.http.post(
+      `/sample/items/move`,
+      {
+        sample_batch_id,
+        sample_item_ids
+      },
+      {
+        use: 'process',
+        type: 'move_sample'
+      }
+    ),
   process: async ({ sample, instrument_config }) => {
     const mzFit = useMzFit()
     return await api.http.post(

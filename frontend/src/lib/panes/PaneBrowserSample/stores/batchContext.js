@@ -19,7 +19,6 @@ export const useBatchContext = defineStore('browser.batch.context', () => {
   const sampleContext = useSampleContext()
   const customizerPopover = useCustomizerPopover()
   const clipboard = useClipboard()
-  const pasted = computed(() => clipboard.batch)
 
   // state
   const menu = ref()
@@ -61,12 +60,14 @@ export const useBatchContext = defineStore('browser.batch.context', () => {
       icon: 'pi pi-clipboard',
       command: async () => {
         if (clipboard.batch) {
-          await app.data.batch.copy({
-            sample_batch_id: clipboard.batch.sample_batch_id,
-            workspace_id: app.data.workspace.focusedId,
-            sample_batch_name: generateCopyName(clipboard.batch.sample_batch_name),
-            sample_batch_description: clipboard.batch.sample_batch_description
-          })
+          if (clipboard.op === 'copy') {
+            await app.data.batch.copy({
+              sample_batch_id: clipboard.batch.sample_batch_id,
+              workspace_id: app.data.workspace.focusedId,
+              sample_batch_name: generateCopyName(clipboard.batch.sample_batch_name),
+              sample_batch_description: clipboard.batch.sample_batch_description
+            })
+          }
         }
       },
       visible: clipboard.batch !== null
@@ -77,10 +78,17 @@ export const useBatchContext = defineStore('browser.batch.context', () => {
       visible: clipboard.samples !== null,
       command: async () => {
         if (clipboard.samples.length > 0) {
-          await app.data.sample.copy({
-            sample_item_ids: clipboard.samples.map((s) => s.sample_item_id),
-            sample_batch_id: row.value.sample_batch_id
-          })
+          if (clipboard.op === 'copy') {
+            await app.data.sample.copy({
+              sample_item_ids: clipboard.samples.map((s) => s.sample_item_id),
+              sample_batch_id: row.value.sample_batch_id
+            })
+          } else if (clipboard.op === 'cut') {
+            await app.data.sample.move({
+              sample_item_ids: clipboard.samples.map((s) => s.sample_item_id),
+              sample_batch_id: row.value.sample_batch_id
+            })
+          }
         }
       }
     },
@@ -108,7 +116,7 @@ export const useBatchContext = defineStore('browser.batch.context', () => {
       label: 'Copy batch',
       icon: 'pi pi-copy',
       command: () => {
-        clipboard.write(row.value)
+        clipboard.copy(row.value)
       },
       visible: row.value !== null
     },
@@ -183,7 +191,6 @@ export const useBatchContext = defineStore('browser.batch.context', () => {
     clear,
     menu,
     entries,
-    dialog,
-    pasted
+    dialog
   }
 })

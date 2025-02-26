@@ -11,6 +11,7 @@ from mascope_server.api.controllers.sample.items.sample_items_controller import 
     delete_sample_items,
     update_sample_item,
     copy_sample_items,
+    move_sample_items,
 )
 from mascope_server.api.controllers.sample.items.sample_items_process_controller import (
     process_sample_item,
@@ -24,6 +25,7 @@ from mascope_server.api.models.sample.items.sample_item_pydantic_model import (
     SampleItemUpdateBody,
     SampleItemsDeleteBody,
     SampleItemsCopyBody,
+    SampleItemsMoveBody,
     SampleItemProcessBody,
 )
 
@@ -153,6 +155,39 @@ async def copy_sample_items_route(
     process_id = gen_id(8)
     background_tasks.add_task(
         copy_sample_items,
+        sample_item_ids=body.sample_item_ids,
+        sample_batch_id=body.sample_batch_id,
+        independent_transaction=True,
+        background_tasks=background_tasks,
+        sid=sid,
+        process_id=process_id,
+    )
+    return {
+        "message": f"Copying {len(body.sample_item_ids)} samples, please wait.",
+        "process_id": process_id,
+    }
+
+
+@sample_items_router.post("/move")
+@api_route(status_code=202)
+async def move_sample_items_route(
+    request: Request,
+    body: SampleItemsMoveBody,
+    background_tasks: BackgroundTasks,
+    user=Depends(editor_user),
+):
+    """Copy an existing sample item to a new sample batch.
+
+    :param sample_item_id: The unique identifier of the sample item.
+    :param body: The data for copying the sample item.
+    :param background_tasks: Background tasks for processing the copy.
+    :param user: The current authenticated user with editor permissions.
+    :return: A dictionary confirming the copy process has started.
+    """
+    sid = request.headers.get("X-SID")
+    process_id = gen_id(8)
+    background_tasks.add_task(
+        move_sample_items,
         sample_item_ids=body.sample_item_ids,
         sample_batch_id=body.sample_batch_id,
         independent_transaction=True,

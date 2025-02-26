@@ -17,7 +17,6 @@ export const useSampleContext = defineStore('browser.sample.context', () => {
   const batchContext = useBatchContext()
   const customizerPopover = useCustomizerPopover()
   const clipboard = useClipboard()
-  const pasted = computed(() => clipboard.samples)
 
   // state
   const menu = ref()
@@ -62,10 +61,17 @@ export const useSampleContext = defineStore('browser.sample.context', () => {
         visible: clipboard.samples !== null,
         command: async () => {
           if (clipboard.samples.length > 0) {
-            await app.data.sample.copy({
-              sample_item_ids: clipboard.samples.map((s) => s.sample_item_id),
-              sample_batch_id: row.value.sample_batch_id
-            })
+            if (clipboard.op === 'copy') {
+              await app.data.sample.copy({
+                sample_item_ids: clipboard.samples.map((s) => s.sample_item_id),
+                sample_batch_id: row.value.sample_batch_id
+              })
+            } else if (clipboard.op === 'cut') {
+              await app.data.sample.move({
+                sample_item_ids: clipboard.samples.map((s) => s.sample_item_id),
+                sample_batch_id: row.value.sample_batch_id
+              })
+            }
           }
         }
       },
@@ -85,7 +91,22 @@ export const useSampleContext = defineStore('browser.sample.context', () => {
         label: `Copy sample${s}`,
         icon: 'pi pi-copy',
         command: async () => {
-          clipboard.write(
+          clipboard.copy(
+            app.data.sample.selected.map(
+              ({ sample_item_id, sample_batch_id, sample_item_name }) => ({
+                sample_item_id,
+                sample_batch_id,
+                sample_item_name
+              })
+            )
+          )
+        }
+      },
+      {
+        label: `Cut sample${s}`,
+        icon: 'pi ph ph-scissors',
+        command: async () => {
+          clipboard.cut(
             app.data.sample.selected.map(
               ({ sample_item_id, sample_batch_id, sample_item_name }) => ({
                 sample_item_id,
@@ -165,7 +186,6 @@ export const useSampleContext = defineStore('browser.sample.context', () => {
     clear,
     menu,
     entries,
-    dialog,
-    pasted
+    dialog
   }
 })
