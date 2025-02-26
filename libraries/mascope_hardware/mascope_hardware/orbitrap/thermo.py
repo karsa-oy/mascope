@@ -1,6 +1,7 @@
 from pathlib import Path
 from itertools import compress
 from contextlib import contextmanager
+from typing import Iterable
 import numpy as np
 import xarray as xr
 import dask.array as da
@@ -165,3 +166,41 @@ def compute_sum_signal_in_time_range(
         return xr.DataArray(
             data=sum_signal_dask, dims=["mz"], coords={"mz": mz}, name="sum_signal"
         )
+
+
+def get_tic_per_scan(
+    datafile_path: str, timestamps: Iterable[float] | None = None
+) -> tuple:
+    """Extracts the Total Ion Current (TIC) per scan from the raw file.
+
+    :param datafile_path: Path to the Thermo Fisher raw file (.raw) containing the data.
+    :type datafile_path: str
+    :param timestamps: Optional iterable of timestamps [s] to extract TIC values for, defaults to None
+    :type timestamps: Iterable[float], optional
+    :return: Tuple containing the scan timestamps [s] and TIC values as numpy arrays
+    :rtype: tuple
+    """
+    with open_raw_file(datafile_path) as raw_file:
+        num_of_scans = raw_file.RunHeaderEx.SpectraCount
+        scan_indices = list(range(num_of_scans))
+
+        scan_statistics = [
+            raw_file.GetScanStatsForScanNumber(i + 1) for i in scan_indices
+        ]
+        scan_tic = np.asarray([scan_stat.TIC for scan_stat in scan_statistics])
+        scan_timestamp = np.asarray(
+            [scan_stat.StartTime for scan_stat in scan_statistics]
+        )
+
+        if timestamps:
+            # Filter TIC values by timestamps
+            timestamps = np.asarray(timestamps)
+            # Find closest scan index for each timestamp
+            scan_indices = np.searchsorted(scan_timestamp, timestamps)
+            # Ensure indices are within valid range
+            scan_indices = np.clip(scan_indices, 0, len(scan_timestamp) - 1)
+            # Extract scan TIC and scan timestamps values for the closest scan index
+            scan_tic = scan_tic[scan_indices]
+            scan_timestamp = scan_timestamp[scan_indices]
+
+        return scan_timestamp, scan_tic
