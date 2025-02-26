@@ -228,6 +228,20 @@ def delete_orphaned_records(conn, table_name):
                 f"🗑️ Deleted {deleted_count} orphaned target_collection_in_sample_batch records due to invalid sample_batch_id."
             )
 
+    elif table_name == "sample_item":
+        # Check for sample_item records that have no corresponding sample_file
+        cursor.execute(
+            """
+            DELETE FROM sample_item
+            WHERE filename NOT IN (SELECT filename FROM sample_file);
+            """
+        )
+        deleted_count = cursor.rowcount
+        if deleted_count > 0:
+            runtime.logger.info(
+                f"🗑️ Deleted {deleted_count} orphaned sample_item records with missing corresponding sample_file references."
+            )
+
     elif table_name in ["match", "match_isotope", "match_interference"]:
         cursor.execute(
             f"""
