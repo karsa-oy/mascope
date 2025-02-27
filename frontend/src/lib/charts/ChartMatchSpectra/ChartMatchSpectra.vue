@@ -234,7 +234,6 @@ watch(
   figure:hover .float,
   .sidebarOpen .float {
     display: flex;
-    z-index: 9999;
   }
 }
 </style>

@@ -33,7 +33,7 @@ const yMode = defineModel('yMode')
       />
     </div>
     <div class="row">
-      <SelectButton v-model="yMode" :options="['sum', 'average']" />
+      <SelectButton v-model="yMode" :options="['sum', 'average']" :allowEmpty="false" />
     </div>
   </Popover>
 </template>
