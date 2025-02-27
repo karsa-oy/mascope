@@ -1,7 +1,7 @@
 import os
 import tomllib
 from pydantic import BaseModel
-from typing import Literal, List, Optional
+from typing import Literal
 
 
 # PYDANTIC MODELS
@@ -10,15 +10,17 @@ from typing import Literal, List, Optional
 # to the runtime environment active, which defaults to
 #    $MASCOPE_PATH/runtime/env/default
 
+type LogLevel = Literal[
+    "trace", "debug", "info", "success", "warning", "error", "critical"
+]
+
 
 class MascopeMetaConfig(BaseModel):
     """
     Global configuration options shared across all Mascope modules.
     """
 
-    log_level: Optional[
-        Literal["trace", "debug", "info", "success", "warning", "error", "critical"]
-    ] = None  # global log level to print to terminal at
+    log_level: LogLevel | None = None  # global log level to print to terminal at
     description: str = "Mascope configuration"  # Description for `mascope env list`
     api_port: int = 8090  # API port
     filestore: str = r"./filestore"  # filestore path
@@ -31,15 +33,13 @@ class MascopeModuleConfig(BaseModel):
     """
 
     name: str  # name of the module, e.g. 'backend'
-    tags: Optional[List[str]] = []  # module groups to which the module should belong *
-    pkg_path: Optional[str] = None  # the path to the Poetry or NPM package, if any
-    log_path: Optional[str] = "./logs"  # path where to print log files
-    log_level: Optional[
-        Literal["trace", "debug", "info", "success", "warning", "error", "critical"]
-    ] = None  # module log level to print to terminal at
-    install: Optional[str] = None  # command to install the module, if any
-    uninstall: Optional[str] = None  # commmand to uninstall the module, if any
-    run: Optional[str] = None  # command to run the module, if any
+    tags: list[str] | None = []  # module groups to which the module should belong *
+    pkg_path: str | None = None  # the path to the Poetry or NPM package, if any
+    log_path: str | None = "./logs"  # path where to print log files
+    log_level: LogLevel | None = None  # module log level to print to terminal at
+    install: str | None = None  # command to install the module, if any
+    uninstall: str | None = None  # commmand to uninstall the module, if any
+    run: str | None = None  # command to run the module, if any
 
     # * module groups allow you to easily run multiple modules.
     # For example, a common scenario is testing TOF acquisition
@@ -92,8 +92,8 @@ class MascopeFileMoverConfig(MascopeModuleConfig):
 
 
 class DatetimeRange(BaseModel):
-    min: Optional[str] = None
-    max: Optional[str] = None
+    min: str | None = None
+    max: str | None = None
 
 
 class MascopeFrontendConfig(MascopeModuleConfig):
@@ -101,7 +101,7 @@ class MascopeFrontendConfig(MascopeModuleConfig):
     Frontend module specific configuration options
     """
 
-    acquisition_filter: Optional[DatetimeRange] | str = None
+    acquisition_filter: DatetimeRange | str | None = None
 
 
 class MascopeNotebooksConfig(MascopeModuleConfig):
@@ -157,18 +157,18 @@ class MascopeRuntimeConfig(BaseModel):
     # global
     meta: MascopeMetaConfig
     # services
-    backend: Optional[MascopeBackendConfig] = None
-    file_converter: Optional[MascopeFileConverterConfig] = None
-    tof_agent: Optional[MascopeTofAgentConfig] = None
-    file_mover: Optional[MascopeFileMoverConfig] = None
+    backend: MascopeBackendConfig | None = None
+    file_converter: MascopeFileConverterConfig | None = None
+    tof_agent: MascopeTofAgentConfig | None = None
+    file_mover: MascopeFileMoverConfig | None = None
     # clients
-    notebooks: Optional[MascopeNotebooksConfig] = None
-    frontend: Optional[MascopeFrontendConfig] = None
-    cli: Optional[MascopeCliConfig] = None
+    notebooks: MascopeNotebooksConfig | None = None
+    frontend: MascopeFrontendConfig | None = None
+    cli: MascopeCliConfig | None = None
     # libraries
-    standard_lib: Optional[MascopeStandardLibConfig] = None
-    hardware_lib: Optional[MascopeHardwareLibConfig] = None
-    api_lib: Optional[MascopeApiLibConfig] = None
+    standard_lib: MascopeStandardLibConfig | None = None
+    hardware_lib: MascopeHardwareLibConfig | None = None
+    api_lib: MascopeApiLibConfig | None = None
 
 
 # UTILITY FUNCTIONS
@@ -270,7 +270,7 @@ def resolve_log_levels(config: dict, fallback: str = "info") -> dict:
 
 
 def build_config(
-    root_path: str, env_path: str, layers: List[str]
+    root_path: str, env_path: str, layers: list[str]
 ) -> MascopeRuntimeConfig:
     """
     Load a set of configuration `layers` (base, dev or prod),
@@ -294,7 +294,7 @@ def build_config(
                 overlay = tomllib.load(f)
                 for module, module_overlay in overlay.items():
                     module_key = module.replace("-", "_")
-                    if not module_key in config:
+                    if module_key not in config:
                         config[module_key] = {}
                     config[module_key] = {
                         "name": module,  # pass the module name
