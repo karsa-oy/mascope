@@ -56,7 +56,11 @@ from mascope_server.api.new.instrument_configs.process.service import (
 )
 from mascope_server.runtime import runtime
 
-from mascope_lib.file_func import get_filestore_path, get_instrument_type, load_signal
+from mascope_lib.file_func import (
+    get_filestore_path,
+    get_instrument_type,
+    get_tic_per_scan,
+)
 from mascope_lib.peak import detect_peaks
 
 from mascope_server.api.lib.utils import generate_copy_name
@@ -750,20 +754,19 @@ async def sample_item_export_peaks(
         runtime.logger.error(repr(e))
         raise e
 
-    # Get scan timestamps
+    # File creation timestamp
     base_datetime = sample["datetime"]
-    scan_timestamps = pd.to_timedelta(
-        sample_peak_data.time.values, unit="s"
-    ) + pd.Timestamp(base_datetime)
+    # Get sample peak timestamps local
+    sample_peak_time = sample_peak_data.time.values
+    # Convert peak time to timedelta
+    sample_peak_timedelta = pd.to_timedelta(sample_peak_time, unit="s")
+    # Get scan timestamps relative to the base datetime
+    scan_timestamps = sample_peak_timedelta + pd.Timestamp(base_datetime)
     # Get scan timestamps UTC
     base_datetime_utc = sample["datetime_utc"]
-    scan_timestamps_utc = pd.to_timedelta(
-        sample_peak_data.time.values, unit="s"
-    ) + pd.Timestamp(base_datetime_utc)
-
-    # Get ticks for each time scan, normalize, correct by general TIC
-    scan_tics = load_signal(filename).sum(dim="mz").signal.values
-    scan_tics = scan_tics / scan_tics.sum() * sample["tic"]
+    scan_timestamps_utc = sample_peak_timedelta + pd.Timestamp(base_datetime_utc)
+    # Get ticks for each time scan
+    _, scan_tics = get_tic_per_scan(filename)
 
     mz_values = sample_peak_data.mz.values
     intensities = sample_peak_data.values
