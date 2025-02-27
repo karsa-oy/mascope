@@ -1,5 +1,6 @@
 from pathlib import Path
 from contextlib import contextmanager
+from typing import Iterable
 import h5py
 import numpy as np
 import xarray as xr
@@ -88,13 +89,13 @@ def get_signal(datafile_path: str, t1=None, t2=None):
         # 1. flatten n_writes, n_bufs, n_segments dimensions
         # 2. group dimension coordinates
         # 3. get coordinate groups of the required scans in start:end range
-        indices = np.indices(signal_ref.shape[:-1]).reshape(3, -1).T[start:end]
+        coordinates = np.indices(signal_ref.shape[:-1]).reshape(3, -1).T[start:end]
 
         # Preallocate output array
         signal_slice = np.empty((end - start, n_samples), dtype=signal_ref.dtype)
 
         # Populate result by iterating over the first three dimensions
-        for ind, coord in enumerate(indices):
+        for ind, coord in enumerate(coordinates):
             signal_slice[ind, :] = signal_ref[coord[0], coord[1], coord[2], :]
 
         # Convert to dask array
@@ -132,3 +133,53 @@ def compute_sum_signal_in_time_range(
     if average:
         return signal.mean(dim="time").signal.rename("sum_signal")
     return signal.sum(dim="time").signal.rename("sum_signal")
+
+
+def get_tic_per_scan(
+    datafile_path: str, timestamps: Iterable[float] | None = None
+) -> tuple:
+    """Calculate TIC per scan from HDF5 file.
+
+    :param datafile_path: Path to the HDF5 file containing spectrum data.
+    :type datafile_path: str
+    :param timestamps: Optional list of timestamps to filter TIC values.
+    :type timestamps: Iterable[float], optional
+    :return: Tuple of time and TIC values as numpy arrays
+    :rtype: tuple
+    """
+    with open_h5_file(datafile_path) as h5_file:
+        # Get signal HDF5 dataset reference
+        signal_ref = h5_file["FullSpectra"]["TofData"]
+        # Get time scale
+        scan_timestamp = h5_file["TimingData"]["BufTimes"][:].reshape(-1)
+        # Total number of non-zero scans
+        n_scans = np.where(scan_timestamp != 0)[0][-1] + 1
+        # Cut out zero scans
+        scan_timestamp = scan_timestamp[:n_scans]
+        # Prealocate scan_tic array
+        scan_tic = np.empty(n_scans)
+        # 1. flatten n_writes, n_bufs, n_segments dimensions
+        # 2. group dimension coordinates
+        # 3. get coordinate groups
+        coordinates = np.indices(signal_ref.shape[:-1]).reshape(3, -1).T
+        coordinates = coordinates[:n_scans]
+        # Populate TIC array by iterating over the first three dimensions
+        for ind, coord in enumerate(coordinates):
+            scan_tic[ind] = signal_ref[coord[0], coord[1], coord[2], :].sum()
+        # Get total TIC
+        total_tic = h5_file["FullSpectra"]["SumSpectrum"][:].sum()
+        # Correct TIC per scan by total TIC
+        scan_tic = scan_tic / scan_tic.sum() * total_tic
+
+        if timestamps:
+            # Filter TIC values by timestamps
+            timestamps = np.asarray(timestamps)
+            # Find closest scan index for each timestamp
+            scan_indices = np.searchsorted(scan_timestamp, timestamps)
+            # Ensure indices are within valid range
+            scan_indices = np.clip(scan_indices, 0, len(scan_timestamp) - 1)
+            # Extract scan TIC and scan timestamps values for the closest scan index
+            scan_tic = scan_tic[scan_indices]
+            scan_timestamp = scan_timestamp[scan_indices]
+
+        return scan_timestamp, scan_tic
