@@ -585,7 +585,18 @@ def load_coord(base_filename, var, coord_name):
     sync = ExtendableDataArray.get_zarr_synchronizer(var_path)
     z = zarr.open(var_path, mode="r", synchronizer=sync)
     coord = z[coord_name]
-    return coord[:]
+    coord_array = coord[:]
+    # Check if array is empty
+    if not coord_array.size:
+        # Perhaps the coordinate is hiding in groups
+        # Get list of groups
+        groups = list(z.group_keys())
+
+        # Load time coordinate from each group and concatenate
+        coord_arrays = [z[group][coord_name][:] for group in groups]
+        coord_array = np.concatenate(coord_arrays)
+
+    return coord_array
 
 
 def load_signal(base_filename: str) -> xarray.Dataset:
