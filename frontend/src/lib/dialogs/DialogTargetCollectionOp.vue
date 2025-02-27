@@ -445,7 +445,7 @@ const addCompound = () => {
   add.cas = ''
 }
 const onEnter = (event) => {
-  if (event.code == 'Enter') {
+  if (visible.value && event.code == 'Enter') {
     addCompound()
   }
 }
