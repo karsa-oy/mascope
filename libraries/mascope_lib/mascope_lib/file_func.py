@@ -6,7 +6,7 @@ import sys
 from ctypes import ArgumentError
 from datetime import datetime, timezone
 from shutil import rmtree
-from typing import Optional
+from typing import Iterable, Optional
 import dask.array as da
 import numpy as np
 import xarray
@@ -703,6 +703,72 @@ def load_file(base_filename, vars=None, prev_dataset=None):
     dataset.attrs["props"] = props
     dataset.attrs["zarr_groups"] = zarr_groups
     return dataset
+
+
+def get_tic_per_scan(base_filename: str, timestamps: Iterable | None = None) -> tuple:
+    """Get TIC per scan from the sample file depending on the file type
+
+    :param base_filename: Sample file filename
+    :type base_filename: str
+    :param timestamps: Optional timestamps of the scans, defaults to None
+    :type timestamps: Iterable | None
+    :return: TIC time and TIC per scan as numpy arrays
+    :rtype: tuple
+    """
+    sample_type = get_sample_file_type(base_filename)
+    datafile_path = filename_to_datafile_path(base_filename)
+    match sample_type:
+        case "tof_h5":
+            tic_time, tic_per_scan = tofwerk.get_tic_per_scan(datafile_path, timestamps)
+        case "orbi_raw":
+            tic_time, tic_per_scan = thermo.get_tic_per_scan(datafile_path, timestamps)
+        case "tof_zarr" | "orbi_zarr":
+            zarr_path = filename_to_zarr_path(base_filename, "signal")
+            sync = ExtendableDataArray.get_zarr_synchronizer(zarr_path)
+            z = zarr.open(zarr_path, mode="r", synchronizer=sync)
+
+            # Get sum of counts along mz coordinate for each time coordinate
+            signal_array = da.from_zarr(z["signal"])
+            tic_per_scan = signal_array.sum(axis=0).compute()
+            # Check if TIC values are available
+            if not tic_per_scan.size:
+                # Get list of groups in zarr file
+                groups = list(z.group_keys())
+
+                # Load signal to dask arrays for each group
+                signal_arrays = [da.from_zarr(z[group]["signal"]) for group in groups]
+                # Sum signal arrays along mz coordinate
+                group_tic_per_scan = [
+                    da.nan_to_num(array, 0.0).sum(axis=0).compute()
+                    for array in signal_arrays
+                ]
+                # Concatenate TIC values from each group
+                tic_per_scan = np.concatenate(group_tic_per_scan, axis=0)
+
+            # Correct TIC values by total TIC value if available
+            try:
+                total_tic = load_file(base_filename, vars=[]).props["tic"]
+                tic_per_scan = tic_per_scan / tic_per_scan.sum() * total_tic
+            except KeyError:
+                lib_runtime.logger.warning(
+                    "Total TIC value is not available in the sample file"
+                )
+
+            # Get time coordinate as numpy array
+            tic_time = load_coord(base_filename, "signal", "time")
+
+            if timestamps:
+                # Filter TIC values by timestamps
+                timestamps = np.asarray(timestamps)
+                # Find closest scan index for each timestamp
+                scan_indices = np.searchsorted(tic_time, timestamps)
+                # Ensure indices are within valid range
+                scan_indices = np.clip(scan_indices, 0, len(tic_time) - 1)
+                # Extract scan TIC and scan timestamps values for the closest scan index
+                tic_per_scan = tic_per_scan[scan_indices]
+                tic_time = tic_time[scan_indices]
+
+    return tic_time, tic_per_scan
 
 
 def open_mfzarr(path, sync=None, mode="r", concat_dim="time", prev_array=None):
