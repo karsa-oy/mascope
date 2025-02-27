@@ -408,11 +408,15 @@ def filename_to_datafile_path(base_filename):
     sample_file_type = get_sample_file_type(base_filename)
 
     # Get path to the datafile and verify if it exists
-    datafile_path = os.path.join(sample_data_path, f"data.{sample_file_type}")
-    if os.path.exists(datafile_path):
-        return datafile_path
-    else:
-        raise FileNotFoundError(f"The file {datafile_path} was not found")
+    match sample_file_type:
+        case "tof_h5":
+            return os.path.join(sample_data_path, "data.h5")
+        case "orbi_raw":
+            return os.path.join(sample_data_path, "data.raw")
+        case "tof_zarr" | "orbi_zarr":
+            FileNotFoundError(
+                f"Sample file {sample_data_path} does not contain h5 or raw datafile"
+            )
 
 
 def get_file_data_vars(filepath):
