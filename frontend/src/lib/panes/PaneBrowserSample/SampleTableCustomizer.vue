@@ -8,6 +8,7 @@ import SelectButton from 'primevue/selectbutton'
 
 import { beautifySnakeCase } from '@/lib/utils'
 import { useApp } from '@/stores'
+import { runtime } from '@/lib/runtime'
 
 import { useCustomizerPopover } from './stores'
 
@@ -21,16 +22,6 @@ onMounted(() => {
 })
 
 const tab = ref('All')
-
-const defaultConfig = {
-  columns: [
-    { field: 'sample_item_name', kind: 'standard', label: 'Item', type: 'string' },
-    { field: 'index', kind: 'standard', label: '#', type: 'string' },
-    { field: 'filter_id', kind: 'standard', label: 'Filter', type: 'string' }
-  ],
-  sortField: 'index',
-  sortOrder: 1
-}
 
 const availableColumns = computed(() => {
   const standard = [
@@ -56,27 +47,55 @@ const availableColumns = computed(() => {
     .filter(({ type }) => type !== 'object')
 })
 
+const runtimeConfig = runtime.config.sample_table_defaults
+
+const defaultConfig = computed(() => ({
+  columns: runtimeConfig.columns
+    .map((col) => availableColumns.value.find(({ field }) => field === col))
+    .filter((col) => !!col),
+  sortField: runtimeConfig.sort_field,
+  sortOrder: runtimeConfig.sort_order
+}))
+const isDefault = computed(
+  () => JSON.stringify(customizer.config) === JSON.stringify(defaultConfig.value)
+)
+const isInitialized = computed(() => JSON.stringify(customizer.config) !== '{}')
+
 // local storage persistence
 
 const storageKey = computed(() => `sample-browser-batch[${app.data.batch.focused.sample_batch_id}]`)
-// write
+
+// write to local storage
+function writeConfig() {
+  if (isInitialized.value && !isDefault.value) {
+    const newState = JSON.stringify(customizer.config)
+    localStorage.setItem(storageKey.value, newState)
+  }
+}
+// read from local storage, falling back on default
+function readConfig() {
+  const storedState = localStorage.getItem(storageKey.value)
+  const defaultState = JSON.stringify(defaultConfig.value)
+  customizer.config = JSON.parse(storedState ?? defaultState)
+}
+// reset to default config and clear local storage
+function resetConfig() {
+  customizer.config = defaultConfig.value
+  localStorage.removeItem(storageKey.value)
+}
+
+// write to local storage when any options update
+watch(() => customizer.config, writeConfig, { deep: true })
+
+// read from local storage when a batch is loaded
 watch(
-  () => customizer.config,
-  (state) => {
-    localStorage.setItem(storageKey.value, JSON.stringify(state))
-  },
-  { deep: true }
-)
-// read
-watch(
-  () => app.data.batch.focused,
-  (batch) => {
-    if (batch) {
-      const storedConfig = localStorage.getItem(storageKey.value)
-      customizer.config = storedConfig ? JSON.parse(storedConfig) : defaultConfig
+  () => app.data.sample.list,
+  (samples) => {
+    // use sample count to figure out when loaded
+    if (samples.length > 0) {
+      readConfig()
     }
-  },
-  { immediate: true }
+  }
 )
 
 // utils
@@ -126,15 +145,17 @@ function createLabel(field) {
         severity="secondary"
         iconPos="right"
         text
-        @click="selectedColumns = defaultConfig.columns"
-        v-tooltip.right="'Reset columns'"
+        @click="resetConfig"
+        v-tooltip.right="'Reset table configuration'"
       />
     </div>
     <Listbox
       v-model="customizer.config.columns"
       :options="
         availableColumns.filter(({ field }) =>
-          tab == 'Selected' ? selectedColumns.map(({ field }) => field).includes(field) : true
+          tab === 'Selected'
+            ? customizer.config.columns.map(({ field }) => field).includes(field)
+            : true
         )
       "
       multiple

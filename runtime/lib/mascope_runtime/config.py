@@ -96,12 +96,19 @@ class DatetimeRange(BaseModel):
     max: str | None = None
 
 
+class SampleTableDefaults(BaseModel):
+    columns: list[str] = ["sample_item_name", "index", "filter_id"]
+    sort_field: str = "index"
+    sort_order: Literal[1, -1] = 1
+
+
 class MascopeFrontendConfig(MascopeModuleConfig):
     """
     Frontend module specific configuration options
     """
 
     acquisition_filter: DatetimeRange | str | None = None
+    sample_table_defaults: SampleTableDefaults = SampleTableDefaults()
 
 
 class MascopeNotebooksConfig(MascopeModuleConfig):
