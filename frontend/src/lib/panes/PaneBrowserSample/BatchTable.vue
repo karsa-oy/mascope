@@ -15,15 +15,15 @@ import { useApp } from '@/stores'
 import SampleTable from './SampleTable.vue'
 import SampleTableCustomizer from './SampleTableCustomizer.vue'
 
-import { useBatchContext } from './stores'
+import { useBatchContextMenu } from './stores'
 
 const app = useApp()
 
-const context = useBatchContext()
+const contextMenu = useBatchContextMenu()
 
 const contextMenuRef = ref()
 onMounted(() => {
-  context.menu = contextMenuRef.value
+  contextMenu.ref = contextMenuRef.value
 })
 
 const batch = reactive({
@@ -55,7 +55,7 @@ watchEffect(() => {
     style="border: none"
     @contextmenu.prevent.stop="
       (event) => {
-        context.onClick(event)
+        contextMenu.onClick(event)
       }
     "
     :pt="
@@ -84,7 +84,7 @@ watchEffect(() => {
         size="small"
         @click="
           () => {
-            context.dialog.op = 'create'
+            contextMenu.dialog.op = 'create'
           }
         "
       />
@@ -97,13 +97,13 @@ watchEffect(() => {
         :metaKeySelection="false"
         v-model:selection="app.data.batch.focused"
         v-model:expandedRows="batch.expanded"
-        v-model:contextMenuSelection="context.selection"
+        v-model:contextMenuSelection="contextMenu.selection"
         contextMenu
         @rowContextmenu="
           async (event) => {
             event.originalEvent.stopPropagation() // don't trigger handler in <Panel> (see above)
             event.originalEvent.preventDefault() // don't open default context menu
-            await context.onClick(event)
+            await contextMenu.onClick(event)
           }
         "
         sortField="sample_batch_utc_created"
@@ -146,7 +146,7 @@ watchEffect(() => {
     </div>
   </Panel>
   <!-- modals etc -->
-  <ContextMenu ref="contextMenuRef" :model="context.entries" @hide="context.clear" />
-  <DialogBatchOp v-model:action="context.dialog.op" :batch="context.row" />
-  <DialogCalibration v-model:visible="context.dialog.calibration" :context="context.row" />
+  <ContextMenu ref="contextMenuRef" :model="contextMenu.entries" @hide="contextMenu.clear" />
+  <DialogBatchOp v-model:action="contextMenu.dialog.op" :batch="contextMenu.row" />
+  <DialogCalibration v-model:visible="contextMenu.dialog.calibration" :context="contextMenu.row" />
 </template>

@@ -1,19 +1,19 @@
-import { ref, useTemplateRef } from 'vue'
+import { ref } from 'vue'
 import { defineStore } from 'pinia'
 
-import { useBatchContext } from './batchContext.js'
-import { useSampleContext } from './sampleContext.js'
+import { useBatchContextMenu } from './batchContextMenu.js'
+import { useSampleContextMenu } from './sampleContextMenu.js'
 
 export const useCustomizerPopover = defineStore('browser.sample.customizer', () => {
-  const batchContext = useBatchContext()
-  const sampleContext = useSampleContext()
+  const batchContextMenu = useBatchContextMenu()
+  const sampleContextMenu = useSampleContextMenu()
 
   const popover = ref()
   const config = ref({})
 
   function show(event) {
-    batchContext.hide()
-    sampleContext.hide()
+    batchContextMenu.hide()
+    sampleContextMenu.hide()
     popover.value?.show(event)
   }
 

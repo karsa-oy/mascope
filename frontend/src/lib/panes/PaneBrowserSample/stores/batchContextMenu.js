@@ -7,16 +7,16 @@ import { useApp } from '@/stores'
 import { useBatchDeleteDialog } from '@/lib/dialogs'
 import { generateCopyName } from '@/api/utils'
 
-import { useSampleContext } from './sampleContext.js'
+import { useSampleContextMenu } from './sampleContextMenu.js'
 import { useCustomizerPopover } from './customizerPopover.js'
 import { useClipboard } from './clipboard.js'
 
-export const useBatchContext = defineStore('browser.batch.context', () => {
+export const useBatchContextMenu = defineStore('browser.sample.batchCtxMenu', () => {
   const app = useApp()
   const confirm = useConfirm()
 
   // local deps
-  const sampleContext = useSampleContext()
+  const sampleContextMenu = useSampleContextMenu()
   const customizerPopover = useCustomizerPopover()
   const clipboard = useClipboard()
 
@@ -41,7 +41,7 @@ export const useBatchContext = defineStore('browser.batch.context', () => {
     }
   }
   function show(event) {
-    sampleContext.hide()
+    sampleContextMenu.hide()
     customizerPopover.hide()
     menu.value?.show(event?.originalEvent ?? event)
   }
@@ -195,13 +195,13 @@ export const useBatchContext = defineStore('browser.batch.context', () => {
   ])
 
   return {
+    ref: menu,
     onClick,
     row,
     show,
     hide,
     selection,
     clear,
-    menu,
     entries,
     dialog
   }

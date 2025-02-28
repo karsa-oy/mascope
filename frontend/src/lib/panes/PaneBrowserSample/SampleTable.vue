@@ -12,17 +12,17 @@ import { DialogSampleOp, DialogCalibration } from '@/lib/dialogs'
 import { clone } from '@/lib/utils'
 import { useApp } from '@/stores'
 
-import { useSampleContext, useCustomizerPopover } from './stores'
+import { useSampleContextMenu, useCustomizerPopover } from './stores'
 
 const confirm = useConfirm()
 const app = useApp()
 
 const customizer = useCustomizerPopover()
-const context = useSampleContext()
+const contextMenu = useSampleContextMenu()
 
 const contextMenuRef = ref()
 onMounted(() => {
-  context.menu = contextMenuRef.value
+  contextMenu.ref = contextMenuRef.value
 })
 
 const props = defineProps({
@@ -57,13 +57,13 @@ const formatter = new Intl.NumberFormat('en-US', {
       selectionMode="multiple"
       :metaKeySelection="true"
       v-model:selection="app.data.sample.selected"
-      v-model:contextMenuSelection="context.selection"
+      v-model:contextMenuSelection="contextMenu.selection"
       contextMenu
       @rowContextmenu="
         async (event) => {
           event.originalEvent.stopPropagation() // don't trigger batch context menu
           event.originalEvent.preventDefault() // don't open default context menu
-          await context.onClick(event)
+          await contextMenu.onClick(event)
         }
       "
       reorderableColumns
@@ -118,7 +118,7 @@ const formatter = new Intl.NumberFormat('en-US', {
   </div>
   <div class="spinner" v-else><ProgressSpinner strokeWidth="5px" />loading...</div>
   <!-- modals etc. -->
-  <ContextMenu ref="contextMenuRef" :model="context.entries" @hide="context.clear" />
-  <DialogSampleOp v-model:action="context.dialog.op" :item="context.row" />
-  <DialogCalibration v-model:visible="context.dialog.calibration" :context="context.row" />
+  <ContextMenu ref="contextMenuRef" :model="contextMenu.entries" @hide="contextMenu.clear" />
+  <DialogSampleOp v-model:action="contextMenu.dialog.op" :item="contextMenu.row" />
+  <DialogCalibration v-model:visible="contextMenu.dialog.calibration" :context="contextMenu.row" />
 </template>

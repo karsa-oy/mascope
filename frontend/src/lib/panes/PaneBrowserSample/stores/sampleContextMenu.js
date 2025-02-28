@@ -5,16 +5,16 @@ import { useConfirm } from 'primevue/useconfirm'
 
 import { useApp } from '@/stores'
 
-import { useBatchContext } from './batchContext.js'
+import { useBatchContextMenu } from './batchContextMenu.js'
 import { useCustomizerPopover } from './customizerPopover.js'
 import { useClipboard } from './clipboard.js'
 
-export const useSampleContext = defineStore('browser.sample.context', () => {
+export const useSampleContextMenu = defineStore('browser.sample.sampleCtxMenu', () => {
   const app = useApp()
   const confirm = useConfirm()
 
   // local deps
-  const batchContext = useBatchContext()
+  const batchContextMenu = useBatchContextMenu()
   const customizerPopover = useCustomizerPopover()
   const clipboard = useClipboard()
 
@@ -38,7 +38,7 @@ export const useSampleContext = defineStore('browser.sample.context', () => {
     show(event)
   }
   function show(event) {
-    batchContext.hide()
+    batchContextMenu.hide()
     customizerPopover.hide()
     menu.value?.show(event?.originalEvent ?? event)
   }
@@ -188,13 +188,13 @@ export const useSampleContext = defineStore('browser.sample.context', () => {
   })
 
   return {
+    ref: menu,
     onClick,
     row,
     show,
     hide,
     selection,
     clear,
-    menu,
     entries,
     dialog
   }
