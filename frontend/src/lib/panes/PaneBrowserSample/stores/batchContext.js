@@ -53,6 +53,17 @@ export const useBatchContext = defineStore('browser.batch.context', () => {
     selection.value = null
   }
 
+  const pasteSamplesValid = computed(
+    () =>
+      row.value !== null &&
+      clipboard.samples !== null &&
+      (clipboard.op === 'copy' ||
+        (clipboard.op === 'cut' &&
+          clipboard.samples.every(
+            ({ sample_batch_id }) => sample_batch_id !== row.value?.sample_batch_id
+          )))
+  )
+
   // context menu entries
   const entries = computed(() => [
     {
@@ -75,7 +86,7 @@ export const useBatchContext = defineStore('browser.batch.context', () => {
     {
       label: `Paste sample${clipboard.samples?.length > 1 ? 's' : ''}`,
       icon: 'pi pi-clipboard',
-      visible: clipboard.samples !== null,
+      visible: pasteSamplesValid.value,
       command: async () => {
         if (clipboard.samples.length > 0) {
           if (clipboard.op === 'copy') {
@@ -88,13 +99,14 @@ export const useBatchContext = defineStore('browser.batch.context', () => {
               sample_item_ids: clipboard.samples.map((s) => s.sample_item_id),
               sample_batch_id: row.value.sample_batch_id
             })
+            clipboard.clear()
           }
         }
       }
     },
     {
       separator: true,
-      visible: (clipboard.batch !== null || clipboard.samples !== null) && row.value !== null
+      visible: (clipboard.batch !== null || pasteSamplesValid.value) && row.value !== null
     },
     {
       label: 'Edit batch',
