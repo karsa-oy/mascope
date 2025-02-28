@@ -192,6 +192,42 @@ async def rematch_samples(
     process_id=None,
     parent_id=None,
 ) -> dict:
+    """
+    Performs a rematch of multiple samples by removing and/or computing matches based on the specified parameters.
+    Thin wrapper arpund the `rematch_sample` controller.
+
+    This function handles the rematch process of the samples by first removing matches associated with removed
+    target compounds or ionization mechanisms and then adding matches for added compounds or mechanisms.
+    If no parameters are provided, it performs a complete rematch by removing all existing sample matches and
+    recomputing them.
+
+    Steps:
+    1. Rematch each sample in seqeuence
+    2. Retrieve affected sample/batch IDs for reloads
+
+    :param sample_item_ids: IDs of the sample items for which the rematch is to be performed.
+    :type sample_item_ids: list[str]
+    :param added_target_compound_ids: List of target compound IDs for which matches need to be computed, defaults to None
+    :type added_target_compound_ids: list[str] | None, optional
+    :param added_ionization_mechanism_ids: List of ionization mechanism IDs for which matches need to be computed, defaults to None
+    :type added_ionization_mechanism_ids: list[str] | None, optional
+    :param removed_target_compound_ids: List of target compound IDs for which matches are to be removed, defaults to None
+    :type removed_target_compound_ids: list[str] | None, optional
+    :param removed_ionization_mechanism_ids: List of ionization mechanism IDs for which matches are to be removed, defaults to None
+    :type removed_ionization_mechanism_ids: list[str] | None, optional
+    :param independent_transaction: Flag indicating whether the ramtching is an independent transaction, which affects event emission, defaults to False
+    :type independent_transaction: bool, optional
+    :param sid: Session ID, used for targeting specific clients when emitting events, defaults to None
+    :type sid: str, optional
+    :return: The dict with rematched Sample object.
+    rtype: dict
+
+    Notes:
+        - If `removed_*` parameters are provided, the function removes matches related to these parameters.
+        - If `added_*` parameters are provided, the function computes new matches related to these parameters.
+        - If no `added_*` or `removed_*` parameters are provided, the function removes all existing matches and computes new matches for all targets.
+    """
+    # Step 1. rematch each sample in sequence
     for sample_item_id in sample_item_ids:
         await rematch_sample(
             sample_item_id=sample_item_id,
@@ -204,6 +240,7 @@ async def rematch_samples(
             process_id=gen_id(8),
             parent_id=process_id,
         )
+    # Step 2. Retrieve affected sample item and batch IDs for reloads
     (
         affected_sample_item_ids,
         affected_sample_batch_ids,
