@@ -532,9 +532,10 @@ async def copy_sample_items(
             sample_item_ids=[s.sample_item_id for s in samples_to_rematch],
             added_target_compound_ids=None,
             added_ionization_mechanism_ids=None,
-            independent_transaction=independent_transaction,
+            independent_transaction=True,
             sid=sid,
-            process_id=process_id,
+            process_id=gen_id(8),
+            parent_id=process_id,
         )
 
     # Step 7: Return the copied samle and message
