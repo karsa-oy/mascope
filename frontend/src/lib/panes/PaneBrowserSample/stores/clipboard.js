@@ -56,6 +56,7 @@ export const useClipboard = defineStore('browser.sample.clipboard', () => {
   }
 
   async function clear() {
+    navigator.clipboard.writeText('')
     raw.value = null
   }
 

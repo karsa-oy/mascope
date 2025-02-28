@@ -81,6 +81,7 @@ export const useSampleContextMenu = defineStore('browser.sample.sampleCtxMenu', 
                 sample_item_ids: clipboard.samples.map((s) => s.sample_item_id),
                 sample_batch_id: row.value.sample_batch_id
               })
+              clipboard.clear()
             }
           }
         }
