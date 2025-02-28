@@ -1,6 +1,6 @@
 from pathlib import Path
 from contextlib import contextmanager
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Tuple
 import h5py
 import numpy as np
 import xarray as xr
@@ -21,7 +21,6 @@ def open_h5_file(datafile_path: str):
         try:
             yield h5_file
         finally:
-            # Ensure file is always closed
             if h5_file is not None:
                 h5_file.close()
     except Exception as e:
@@ -30,7 +29,13 @@ def open_h5_file(datafile_path: str):
         raise Exception(err_message) from e
 
 
-def get_signal(datafile_path: str, t_min=None, t_max=None, mz_min=None, mz_max=None):
+def get_signal(
+    datafile_path: str,
+    t_min: Optional[float] = None,
+    t_max: Optional[float] = None,
+    mz_min: Optional[float] = None,
+    mz_max: Optional[float] = None,
+) -> xr.Dataset:
     """
     Retrieve a full time-windowed signal from an HDF5 file. Allows slicing by time and m/z range.
 
@@ -100,7 +105,7 @@ def get_signal(datafile_path: str, t_min=None, t_max=None, mz_min=None, mz_max=N
                 },
             )
 
-        if t_min > t_max:
+        if t_min is not None and t_max is not None and t_min > t_max:
             err_message = f"Invalid time range: {t_min} > {t_max}"
             hardware_runtime.logger.error(err_message)
             raise ValueError(err_message)
@@ -117,21 +122,17 @@ def get_signal(datafile_path: str, t_min=None, t_max=None, mz_min=None, mz_max=N
             .reshape(3, -1)
             .T[t_start_ind : t_end_ind + 1]
         )
-
         # Preallocate output array
         signal_slice = np.empty(
             (t_end_ind - t_start_ind + 1, n_samples), dtype=signal_ref.dtype
         )
-
         # Populate result by iterating over the first three dimensions
         for ind, coord in enumerate(coordinates):
             signal_slice[ind, :] = signal_ref[
                 coord[0], coord[1], coord[2], mz_start_ind : mz_end_ind + 1
             ]
 
-        # Convert to dask array
         signal_dask = da.from_array(signal_slice, chunks="auto")
-
         # Init and return xarray Dataset with swapped dimensions
         return xr.Dataset(
             {"signal": (("mz", "time"), signal_dask.T)},
@@ -206,9 +207,7 @@ def compute_sum_signal_in_time_range(
         if average:
             sum_signal /= t_end_ind - t_start_ind + 1
 
-        # Convert to xarray DataArray
         sum_signal_da = xr.DataArray(sum_signal, dims=["mz"], coords={"mz": all_mzs})
-
         return sum_signal_da.rename("sum_signal")
 
 
@@ -234,22 +233,25 @@ def get_tic_per_scan(
         n_scans = np.where(scan_timestamp != 0)[0][-1] + 1
         # Cut out zero scans
         scan_timestamp = scan_timestamp[:n_scans]
-        # Prealocate scan_tic array
-        scan_tic = np.empty(n_scans)
+
         # 1. flatten n_writes, n_bufs, n_segments dimensions
         # 2. group dimension coordinates
         # 3. get coordinate groups
         coordinates = np.indices(signal_ref.shape[:-1]).reshape(3, -1).T
         coordinates = coordinates[:n_scans]
+
+        # Prealocate scan_tic array
+        scan_tic = np.empty(n_scans)
         # Populate TIC array by iterating over the first three dimensions
         for ind, coord in enumerate(coordinates):
             scan_tic[ind] = signal_ref[coord[0], coord[1], coord[2], :].sum()
+
         # Get total TIC
         total_tic = h5_file["FullSpectra"]["SumSpectrum"][:].sum()
         # Correct TIC per scan by total TIC
         scan_tic = scan_tic / scan_tic.sum() * total_tic
 
-        if timestamps:
+        if timestamps is not None:
             # Filter TIC values by timestamps
             timestamps = np.asarray(timestamps)
             # Find closest scan index for each timestamp
