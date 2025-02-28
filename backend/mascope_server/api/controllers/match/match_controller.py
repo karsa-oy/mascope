@@ -482,6 +482,39 @@ async def match_compute_samples(
     process_id=None,
     parent_id=None,
 ) -> dict:
+    """
+    Computes new matches for a specific sample items, taking into account any added target compounds or ionization mechanisms.
+    A thin wrapper around the `match_compute_sample` controller.
+
+    This function handles the entire match computation process for a given sample items. It includes:
+    - Fetching target isotopes relevant for match computation, either specific to added compounds/ionization mechanisms or for all targets associated with the sample's batch.
+    - Filtering out existing matches to avoid redundant computations.
+    - Performing the actual match computation at the isotope level.
+    - Aggregating and creating higher-level matches, such as ions, compounds, collections, and sample matches, based on the computed match isotopes.
+
+    Typically, this function is called for completely new samples or after matches have been removed using `match_remove_sample`, ensuring that no aggregated match data exists.
+    This allows the use of `aggregate_and_create_matches` without the need for `aggregate_and_recreate_matches`.
+
+
+    Steps:
+    1. Compute match samples
+    2. Retrieve affected sample/batch IDs for reloads
+
+    :param sample_item_ids: ID of the sample item for which matches are to be computed.
+    :type sample_item_ids: str
+    :param added_target_compound_ids: List of added target compound IDs to be considered for match computation, defaults to None
+    :type added_target_compound_ids: list[str] | None, optional
+    :param added_ionization_mechanism_ids: List of added ionization mechanism IDs to be considered for match computation, defaults to None
+    :type added_ionization_mechanism_ids: list[str] | None, optional
+    :param independent_transaction: Flag indicating whether the sample match computing is an independent transaction, which affects event emission, defaults to False
+    :type independent_transaction: bool, optional
+    :param sid: Session ID, used for targeting specific clients when emitting events, defaults to None
+    :type sid: str, optional
+    :raises ApiException: Raised when no new target isotopes are available for match computation or if other critical preconditions are not met.
+    :return: A dictionary containing the rematched sample object and a status message.
+    :rtype: dict
+    """
+    # Step 1. Compute match samples
     for sample_item_id in sample_item_ids:
         await match_compute_sample(
             sample_item_id=sample_item_id,
@@ -492,6 +525,7 @@ async def match_compute_samples(
             process_id=gen_id(8),
             parent_id=process_id,
         )
+    # Step 2. Retrieve affected sample/batch IDs for reloads
     (
         affected_sample_item_ids,
         affected_sample_batch_ids,
