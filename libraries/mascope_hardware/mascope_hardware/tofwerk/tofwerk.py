@@ -30,20 +30,25 @@ def open_h5_file(datafile_path: str):
         raise Exception(err_message) from e
 
 
-def get_signal(datafile_path: str, t1=None, t2=None):
+def get_signal(datafile_path: str, t_min=None, t_max=None, mz_min=None, mz_max=None):
     """
-    Retrieve a full time-windowed signal from an HDF5 file.
+    Retrieve a full time-windowed signal from an HDF5 file. Allows slicing by time and m/z range.
 
-    If start or end time (or both) are provided, returns signal time slice.
-    t1=None is equal to t1=t_min, t2=None is equal to t2=t_max.
+    t_min=None is equal to min scan time, t_max=None is equal to max scan time.
+    mz_min=None is equal to min m/z, mz_max=None is equal to max m/z.
 
     :param datafile_path: Path to the HDF5 file containing spectrum data.
     :type datafile_path: str
-    :param t1: Optional start time in seconds (default is None).
-    :type t1: float, optional
-    :param t2: Optional end time in seconds (default is None).
-    :type t2: float, optional
-    :raises IndexError: If start time is greater than end time.
+    :param t_min: Optional start time in seconds (default is None).
+    :type t_min: float, optional
+    :param t_max: Optional end time in seconds (default is None).
+    :type t_max: float, optional
+    :param mz_min: Optional start m/z value (default is None).
+    :type mz_min: float, optional
+    :param mz_max: Optional end m/z value (default is None).
+    :type mz_max: float, optional
+    :raises ValueError: If start time is greater than end time, or start m/z is greater than end m/z.
+    :raises Exception: If an error occurs while opening the HDF5 file.
     :return: An xarray Dataset containing the signal data.
     :rtype: xr.Dataset
     """
@@ -60,10 +65,28 @@ def get_signal(datafile_path: str, t1=None, t2=None):
         # Total number of scans
         n_scans = scan_time.size
 
-        if t1 is None and t2 is None:
-            # Return full signal
-            # Get signal array first, cut out zero scans
-            signal_array = signal_ref[:].reshape(-1, signal_ref.shape[-1])[
+        # Determine m/z range
+        mz_min = min(all_mzs) if mz_min is None else mz_min
+        mz_max = max(all_mzs) if mz_max is None else mz_max
+
+        # Check m/z range
+        if mz_min > mz_max:
+            err_message = f"Invalid m/z range: {mz_min} > {mz_max}"
+            hardware_runtime.logger.error(err_message)
+            raise ValueError(err_message)
+
+        # Find indices of m/z range
+        mz_start_ind = np.abs(all_mzs - mz_min).argmin()
+        mz_end_ind = np.abs(all_mzs - mz_max).argmin()
+
+        # Calculate number of samples (of m/z points)
+        n_samples = mz_end_ind - mz_start_ind + 1
+
+        if t_min is None and t_max is None:
+            # Slice the signal between mz_start_ind and mz_end_ind
+            signal_array = signal_ref[:, :, :, mz_start_ind : mz_end_ind + 1]
+            # Reshape the signal array to 2D
+            signal_array = signal_array.reshape(-1, signal_array.shape[-1])[
                 : last_non_zero_scan + 1, :
             ]
             # Convert to dask array
@@ -71,32 +94,40 @@ def get_signal(datafile_path: str, t1=None, t2=None):
             # Init and return xarray Dataset with swapped dimensions
             return xr.Dataset(
                 {"signal": (("mz", "time"), signal_dask.T)},
-                coords={"mz": all_mzs, "time": scan_time},
+                coords={
+                    "mz": all_mzs[mz_start_ind : mz_end_ind + 1],
+                    "time": scan_time,
+                },
             )
 
-        if t1 > t2:
-            err_message = f"Invalid time range: {t1} > {t2}"
+        if t_min > t_max:
+            err_message = f"Invalid time range: {t_min} > {t_max}"
             hardware_runtime.logger.error(err_message)
             raise ValueError(err_message)
 
-        # Extract number of samples (of m/z points)
-        n_samples = signal_ref.shape[-1]
-
-        # Update start and end if are not provided
-        start = 0 if t1 is None else np.abs(scan_time - t1).argmin()
-        end = n_scans if t2 is None else np.abs(scan_time - t2).argmin() + 1
+        # Find indices of time range
+        t_start_ind = 0 if t_min is None else np.abs(scan_time - t_min).argmin()
+        t_end_ind = n_scans - 1 if t_max is None else np.abs(scan_time - t_max).argmin()
 
         # 1. flatten n_writes, n_bufs, n_segments dimensions
         # 2. group dimension coordinates
         # 3. get coordinate groups of the required scans in start:end range
-        coordinates = np.indices(signal_ref.shape[:-1]).reshape(3, -1).T[start:end]
+        coordinates = (
+            np.indices(signal_ref.shape[:-1])
+            .reshape(3, -1)
+            .T[t_start_ind : t_end_ind + 1]
+        )
 
         # Preallocate output array
-        signal_slice = np.empty((end - start, n_samples), dtype=signal_ref.dtype)
+        signal_slice = np.empty(
+            (t_end_ind - t_start_ind + 1, n_samples), dtype=signal_ref.dtype
+        )
 
         # Populate result by iterating over the first three dimensions
         for ind, coord in enumerate(coordinates):
-            signal_slice[ind, :] = signal_ref[coord[0], coord[1], coord[2], :]
+            signal_slice[ind, :] = signal_ref[
+                coord[0], coord[1], coord[2], mz_start_ind : mz_end_ind + 1
+            ]
 
         # Convert to dask array
         signal_dask = da.from_array(signal_slice, chunks="auto")
@@ -104,32 +135,35 @@ def get_signal(datafile_path: str, t1=None, t2=None):
         # Init and return xarray Dataset with swapped dimensions
         return xr.Dataset(
             {"signal": (("mz", "time"), signal_dask.T)},
-            coords={"mz": all_mzs, "time": scan_time[start:end]},
+            coords={
+                "mz": all_mzs[mz_start_ind : mz_end_ind + 1],
+                "time": scan_time[t_start_ind : t_end_ind + 1],
+            },
         )
 
 
 def compute_sum_signal_in_time_range(
     datafile_path: str,
-    t1: float = None,
-    t2: float = None,
+    t_min: float = None,
+    t_max: float = None,
     average: bool = False,
 ) -> xr.core.dataarray.DataArray:
-    """Computes sum signal in (t1, t2) time range
+    """Computes sum signal in (t_min, t_max) time range
 
-    t1=None is equal to t1=t_min, t2=None is equal to t2=t_max.
+    t_min=None is equal to min scan time, t_max=None is equal to max scan time.
 
     :param datafile_path: Path to the HDF5 file containing spectrum data.
     :type datafile_path: str
-    :param t1: Optional start time in seconds (default is None).
-    :type t1: float, optional
-    :param t2: Optional end time in seconds (default is None).
-    :type t2: float, optional
+    :param t_min: Optional start time in seconds (default is None).
+    :type t_min: float, optional
+    :param t_max: Optional end time in seconds (default is None).
+    :type t_max: float, optional
     :param average: If spectrum should be averaged, defaults to False
     :type average: bool, optional
     :return: Sum signal
     :rtype: xr.core.dataarray.DataArray
     """
-    signal = get_signal(datafile_path, t1, t2)
+    signal = get_signal(datafile_path, t_min=t_min, t_max=t_max)
     if average:
         return signal.mean(dim="time").signal.rename("sum_signal")
     return signal.sum(dim="time").signal.rename("sum_signal")
