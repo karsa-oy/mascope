@@ -109,11 +109,14 @@ const ready = computed(
   () => created.value && props.data && derived.value.layout && app.ui.split.right
 )
 
-watchEffect(() => {
-  if (ready.value) {
-    Plotly.react(plot.value, props.data, derived.value.layout, derived.value.config)
-  }
-})
+watchEffect(
+  () => {
+    if (ready.value) {
+      Plotly.react(plot.value, props.data, derived.value.layout, derived.value.config)
+    }
+  },
+  { flush: 'post' }
+)
 </script>
 
 <template>
