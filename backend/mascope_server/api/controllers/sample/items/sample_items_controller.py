@@ -410,7 +410,7 @@ async def copy_sample_items(
     6. Compute matches if necessary.
 
     :param sample_item_ids: ID of the original sample items to be copied.
-    :type sample_item_ids: list[str[]
+    :type sample_item_ids: list[str]
     :param sample_batch_id: ID of the sample batch where the new items will be placed.
     :type sample_batch_id: str
     :param always_copy_matches: Whether to copy matches even when copying between different batches (used in batch copy controller)
@@ -542,16 +542,16 @@ async def copy_sample_items(
         "message": f"Copied {len(copied_samples)} samples successfully to batch '{batch.sample_batch_name}'.",
         "data": [s.to_dict() for s in copied_samples],
         "_notification_data": {
-            "sample_item_ids": [copy.sample_item_id for copy in copied_samples],
-            "sample_batch_id": sample_batch_id,
-            "sample_batch_name": batch.sample_batch_name,
+            "affected_sample_item_ids": [
+                copy.sample_item_id for copy in copied_samples
+            ],
         },
     }
 
 
 @api_controller_background_task(
     success_notification_rooms=["sid"],
-    success_reload=[("sample_batch_reload", "sample_batch_ids")],
+    success_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
     error_notification_rooms=["sid"],
 )
 async def move_sample_items(
@@ -644,8 +644,8 @@ async def move_sample_items(
         "message": f"Moved {len(sample_item_ids)} samples successfully to batch '{batch.sample_batch_name}'.",
         "data": moved_samples,
         "_notification_data": {
-            "sample_item_ids": sample_item_ids,
-            "sample_batch_ids": [sample_batch_id, *affected_sample_batch_ids],
+            "affected_sample_item_ids": sample_item_ids,
+            "affected_sample_batch_ids": [sample_batch_id, *affected_sample_batch_ids],
         },
     }
 
