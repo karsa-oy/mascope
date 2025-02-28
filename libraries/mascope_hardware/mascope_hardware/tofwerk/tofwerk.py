@@ -1,6 +1,6 @@
 from pathlib import Path
 from contextlib import contextmanager
-from typing import Iterable
+from typing import Iterable, Optional
 import h5py
 import numpy as np
 import xarray as xr
@@ -144,11 +144,12 @@ def get_signal(datafile_path: str, t_min=None, t_max=None, mz_min=None, mz_max=N
 
 def compute_sum_signal_in_time_range(
     datafile_path: str,
-    t_min: float = None,
-    t_max: float = None,
+    t_min: Optional[float] = None,
+    t_max: Optional[float] = None,
     average: bool = False,
 ) -> xr.core.dataarray.DataArray:
-    """Computes sum signal in (t_min, t_max) time range
+    """
+    Computes sum signal in (t_min, t_max) time range.
 
     t_min=None is equal to min scan time, t_max=None is equal to max scan time.
 
@@ -158,27 +159,70 @@ def compute_sum_signal_in_time_range(
     :type t_min: float, optional
     :param t_max: Optional end time in seconds (default is None).
     :type t_max: float, optional
-    :param average: If spectrum should be averaged, defaults to False
+    :param average: If spectrum should be averaged, defaults to False.
     :type average: bool, optional
-    :return: Sum signal
+    :return: Sum signal.
     :rtype: xr.core.dataarray.DataArray
     """
-    signal = get_signal(datafile_path, t_min=t_min, t_max=t_max)
-    if average:
-        return signal.mean(dim="time").signal.rename("sum_signal")
-    return signal.sum(dim="time").signal.rename("sum_signal")
+    with open_h5_file(datafile_path) as h5_file:
+        # Get signal HDF5 dataset reference
+        signal_ref = h5_file["FullSpectra"]["TofData"]
+        # Get m/z scale
+        all_mzs = h5_file["FullSpectra"]["MassAxis"][:]
+        # Get time scale
+        scan_time = h5_file["TimingData"]["BufTimes"][:].reshape(-1)
+        last_non_zero_scan = np.where(scan_time != 0)[0][-1]
+        # Cut out zero scans
+        scan_time = scan_time[: last_non_zero_scan + 1]
+        # Total number of scans
+        n_scans = scan_time.size
+
+        # Determine time range
+        t_start_ind = 0 if t_min is None else np.abs(scan_time - t_min).argmin()
+        t_end_ind = n_scans - 1 if t_max is None else np.abs(scan_time - t_max).argmin()
+
+        # 1. flatten n_writes, n_bufs, n_segments dimensions
+        # 2. group dimension coordinates
+        # 3. get coordinate groups of the scans
+        coordinates = np.indices(signal_ref.shape[:-1]).reshape(3, -1).T
+        start_coord = coordinates[t_start_ind]
+        end_coord = coordinates[t_end_ind]
+
+        # Initialize sum signal array
+        sum_signal = np.zeros_like(all_mzs)
+
+        # Process the signal in chunks to save memory
+        for i in range(start_coord[0], end_coord[0]):
+            chunk = signal_ref[i, :, :, :]
+            # Sum the signal within the chunk
+            chunk_sum = chunk.sum(axis=(0, 1))
+            sum_signal += chunk_sum
+
+        # Sum the signal within the last chunk
+        last_chunk = signal_ref[end_coord[0], : end_coord[1] + 1, : end_coord[2] + 1, :]
+        last_chunk_sum = last_chunk.sum(axis=(0, 1))
+        sum_signal += last_chunk_sum
+
+        if average:
+            sum_signal /= t_end_ind - t_start_ind + 1
+
+        # Convert to xarray DataArray
+        sum_signal_da = xr.DataArray(sum_signal, dims=["mz"], coords={"mz": all_mzs})
+
+        return sum_signal_da.rename("sum_signal")
 
 
 def get_tic_per_scan(
-    datafile_path: str, timestamps: Iterable[float] | None = None
-) -> tuple:
-    """Calculate TIC per scan from HDF5 file.
+    datafile_path: str, timestamps: Optional[Iterable[float]] = None
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Calculate TIC per scan from HDF5 file.
 
     :param datafile_path: Path to the HDF5 file containing spectrum data.
     :type datafile_path: str
     :param timestamps: Optional list of timestamps to filter TIC values.
     :type timestamps: Iterable[float], optional
-    :return: Tuple of time and TIC values as numpy arrays
+    :return: Tuple of time and TIC values as numpy arrays.
     :rtype: tuple
     """
     with open_h5_file(datafile_path) as h5_file:
