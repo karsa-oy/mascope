@@ -599,12 +599,25 @@ def load_coord(base_filename, var, coord_name):
     return coord_array
 
 
-def load_signal(base_filename: str) -> xarray.Dataset:
+def load_signal(
+    base_filename: str,
+    t_min: Optional[float] = None,
+    t_max: Optional[float] = None,
+    mz_min: Optional[float] = None,
+    mz_max: Optional[float] = None,
+) -> xarray.Dataset:
     """Load signal from the sample file
+
+    Suports m/z and time slicing.
 
     :param base_filename: Sample file filename
     :type base_filename: str
-    :raises NotImplementedError: tof h5 files can not be read directly yet
+    :param t_min: Min time value [s], defaults to None
+    :type t_min: float, optional
+    :param t_max: Max time value [s], defaults to None
+    :type t_max: float, optional
+    :param mz_min: Min m/z value, defaults to None
+    :type mz_min: float, optional
     :return: The signal with m/z and time coordinates
     :rtype: xarray.Dataset
     """
@@ -617,24 +630,62 @@ def load_signal(base_filename: str) -> xarray.Dataset:
     if not os.path.exists(sample_path):
         raise FileNotFoundError(sample_path)
 
-    match sample_type:
-        case "tof_zarr" | "orbi_zarr":
-            return load_array(base_filename, "signal")
-        case "orbi_raw":
-            datafile_path = os.path.join(sample_path, "data.raw")
-            polarity = sample_path.split("_")[-1]
-            return thermo.get_signal(datafile_path, polarity)
-        case "tof_h5":
-            datafile_path = os.path.join(sample_path, "data.h5")
-            signal = tofwerk.get_signal(datafile_path)
-            sum_signal_mz = get_sum_signal(base_filename).mz.values
-            # Check if m/z axis calibration was applied to sample file
-            # by comparing m/z in sum signal and in h5 file
-            if np.array_equal(signal.mz.values, sum_signal_mz):
-                # m/z axis match, no calibration was previously applied
-                return signal
-            # M/z in sum signal and in h5 file do not match, replace m/z in signal
-            return signal.assign_coords(mz=sum_signal_mz)
+    try:
+        match sample_type:
+            case "tof_zarr" | "orbi_zarr":
+                signal_ds = load_array(base_filename, "signal")
+
+                # Check time range
+                t_min = signal_ds.time.min() if t_min is None else t_min
+                t_max = signal_ds.time.max() if t_max is None else t_max
+                if t_min > t_max:
+                    raise ValueError(f"Invalid time range: {t_min} > {t_max}")
+
+                # Check m/z range
+                mz_min = signal_ds.mz.min() if mz_min is None else mz_min
+                mz_max = signal_ds.mz.max() if mz_max is None else mz_max
+                if mz_min > mz_max:
+                    raise ValueError(f"Invalid m/z range: {mz_min} > {mz_max}")
+
+                signal_ds_sliced = signal_ds.sel(
+                    time=slice(t_min, t_max), mz=slice(mz_min, mz_max)
+                )
+                # Check if sliced signal contains data
+                if not signal_ds_sliced.signal.size:
+                    raise ValueError(
+                        f"""No data found in the specified time or m/z range.
+                M/z range of the sample file: {signal_ds.mz.min():.1f} - {signal_ds.mz.max():.1f}
+                Time range: {signal_ds.time.min():.1f} - {signal_ds.mz.max():.1f} s.
+                """
+                    )
+                return signal_ds_sliced
+            case "orbi_raw":
+                datafile_path = os.path.join(sample_path, "data.raw")
+                polarity = sample_path.split("_")[-1]
+                return thermo.get_signal(
+                    datafile_path, t_min, t_max, mz_min, mz_max, polarity
+                )
+            case "tof_h5":
+                datafile_path = os.path.join(sample_path, "data.h5")
+                signal = tofwerk.get_signal(datafile_path, t_min, t_max, mz_min, mz_max)
+                # Check if m/z axis calibration was applied to sample file
+                # by comparing m/z in sum signal and in h5 file
+                sum_signal_mz = get_sum_signal(base_filename).mz.values
+                if np.array_equal(signal.mz.values, sum_signal_mz):
+                    # m/z axis match, no calibration was previously applied
+                    return signal
+                # M/z in sum signal and in h5 file do not match, replace m/z in signal
+                return signal.assign_coords(mz=sum_signal_mz)
+    except Exception as e:
+        lib_runtime.logger.error(f"Error loading signal from {base_filename}: {e})")
+        # Return empty signal dataset with "mz" and "time" coordinates in case of error
+        return xarray.Dataset(
+            {
+                "signal": (["mz", "time"], np.zeros((0, 0))),
+                "mz": (["mz"], np.zeros(0)),
+                "time": (["time"], np.zeros(0)),
+            }
+        )
 
 
 def load_file(base_filename, vars=None, prev_dataset=None):
