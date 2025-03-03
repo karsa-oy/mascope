@@ -10,7 +10,7 @@ All developer docs are in this document:
 
 - **[🚀 Getting started](#getting-started)** - install and running - [windows](#windows) / [ubuntu](#ubuntu) / [cheatsheet](#cheatsheet)
 - **[🚂 Runtime](#runtime)** - devops toolchain - [api](#runtime-library) / [cli](#runtime-cli) / [modes](#runtime-modes) / [modules](#runtime-modules) / [envs](#runtime-environments) / [configs](#runtime-config) / [logging](#runtime-logging)
-- **[🤖 Agents](#agents)** - instrument agents - [file mover](#file-mover) / [tof agent](#tof-agent)
+- **[🤖 Agents](#agents)** - instrument agents - [file mover](#file-uploader) / [tof agent](#tof-agent)
 - **[📡 Backend](#backend)** - central server - [api](#backend-api) / [auth](#backend-auth) / [app](#backend-app) / [db](#backend-db) / [file converter](#backend-file-converter)
 - **[🖥️ Frontend](#frontend)** - user interface - [tech](#frontend-technologies) / [development](#frontend-development) / [codebase](#frontend-codebase) / [api client](#frontend-api-client) / [stores](#frontend-stores) / [help mode](#frontend-user-help) / [tests](#frontend-tests)
 - **[📚 Libraries](#libraries)** - shared packages - [mascope_sdk](#mascope-sdk) / [mascope_hardware](#mascope-hardware) / [mascope_lib](#mascope-lib)
@@ -372,26 +372,26 @@ minimal transformations and move files to the server.
 
 ```
 agents/          Instrument machine agents
-  file_mover/         File mover (for Orbitrap)
+  file_uploader/         File mover (for Orbitrap)
   tof_agent/          Tofwerk TOF
 ```
 
 ### File Mover
 
-The file-mover agent is responsible for moving files from instrument machines unchanged to the server. This is designed for use in Orbitrap machines.
+The file-uploader agent is responsible for moving files from instrument machines unchanged to the server. This is designed for use in Orbitrap machines.
 
 To run all services needed to emulate the Orbitrap acquisition workflow in development, run `mascope dev run orbi`.
 
 To build for production, run the following commands _on a Windows machine_:
 
 ```
-cd agents/file_mover
+cd agents/file_uploader
 ./build.ps1
 ```
 
-Then run the executable found in `agents/file_mover/dist`.
+Then run the executable found in `agents/file_uploader/dist`.
 
-When you run this executable, the `MASCOPE_PATH` will be `%AppData%\Mascope\FileMover` and the runtime environment will therefore be `%AppData%\Mascope\FileMover\runtime\env\prod`
+When you run this executable, the `MASCOPE_PATH` will be `%AppData%\Mascope\FileUploader` and the runtime environment will therefore be `%AppData%\Mascope\FileUploader\runtime\env\prod`
 
 You will need to run the agent once so that it initializes the directory structure, but it will fail to resolve some paths because the configuration needs to be updated. Then go to the env path listed above and update `prod.mascope.toml` with the real paths.
 
@@ -408,7 +408,7 @@ cd agents/tof_agent
 ./build.ps1
 ```
 
-Then run the executable found in `agents/file_mover/dist`.
+Then run the executable found in `agents/file_uploader/dist`.
 
 When you run this executable, the `MASCOPE_PATH` will be `%AppData%\Mascope\TofAgent` and the runtime environment will therefore be `%AppData%\Mascope\TofAgent\runtime\env\prod`.
 

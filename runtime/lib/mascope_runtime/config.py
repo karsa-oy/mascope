@@ -69,7 +69,9 @@ class FileConverterConfig(ModuleConfig):
     File converter module specific configuration options
     """
 
-    server: str = r"backend"  # production host URL; the default works in our docker compose network
+    server: str = (
+        r"backend"  # production host URL; the default works in our docker compose network
+    )
     source: str = r"./filestreams"  # folder to monitor for files to convert
     raw_threads: int = 2  # number of threads for converting Orbitrap files
     h5_threads: int = 2  # number of threads for converting Tof files
@@ -85,7 +87,7 @@ class TofAgentConfig(ModuleConfig):
     access_token: str  # API access token
 
 
-class FileMoverConfig(ModuleConfig):
+class FileUploaderConfig(ModuleConfig):
     """
     File Mover module specific configuration options
     """
@@ -93,7 +95,7 @@ class FileMoverConfig(ModuleConfig):
     mask: str = "*.raw"  # file pattern to look for
     timeout: int = 10  # timeout (s) for a file transfer operation
     source: str  # folder to monitor in the instrument machine
-    target: str  # folder to transfer samples to in the server
+    access_token: str  # API access token
 
 
 class DatetimeRange(BaseModel):
@@ -172,7 +174,7 @@ class RuntimeConfig(BaseModel):
     backend: BackendConfig | None = None
     file_converter: FileConverterConfig | None = None
     tof_agent: TofAgentConfig | None = None
-    file_mover: FileMoverConfig | None = None
+    file_uploader: FileUploaderConfig | None = None
     # clients
     notebooks: NotebooksConfig | None = None
     frontend: FrontendConfig | None = None

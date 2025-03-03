@@ -55,16 +55,16 @@ install = "poetry install"
 uninstall = "poetry env remove --all"
 run = "poetry run mascope-tof-agent"
 
-[file-mover]
+[file-uploader]
 # meta
-pkg_path = './agents/file_mover'
+pkg_path = './agents/file_uploader'
 tags = ['agents', 'orbi', 'all']
 log_path = './logs'
 # settings
 mask = '*.raw'
 timeout = 10
-source = './agents/file_mover'
-target = './filestreams'
+source = './agents/file_uploader'
+access_token = ''
 # scripts
 install = "poetry install"
 uninstall = "poetry env remove --all"
