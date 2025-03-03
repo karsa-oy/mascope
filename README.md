@@ -374,7 +374,6 @@ minimal transformations and move files to the server.
 agents/          Instrument machine agents
   file_mover/         File mover (for Orbitrap)
   tof_agent/          Tofwerk TOF
-  ht300a/             Autosampler (not in use)
 ```
 
 ### File Mover
