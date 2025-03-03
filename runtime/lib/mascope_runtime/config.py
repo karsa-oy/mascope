@@ -95,6 +95,7 @@ class FileUploaderConfig(ModuleConfig):
     mask: str = "*.raw"  # file pattern to look for
     timeout: int = 10  # timeout (s) for a file transfer operation
     source: str  # folder to monitor in the instrument machine
+    host: str  # URL of the backend
     access_token: str  # API access token
 
 

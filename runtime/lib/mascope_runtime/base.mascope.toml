@@ -64,6 +64,7 @@ log_path = './logs'
 mask = '*.raw'
 timeout = 10
 source = './agents/file_uploader'
+host = 'localhost'
 access_token = ''
 # scripts
 install = "poetry install"
