@@ -77,25 +77,21 @@ def get_signal(
 
         # Check m/z range
         if mz_min > mz_max:
-            err_message = f"Invalid m/z range: {mz_min} > {mz_max}"
-            hardware_runtime.logger.error(err_message)
-            raise ValueError(err_message)
+            raise ValueError(f"Invalid m/z range: {mz_min} > {mz_max}")
 
-        # Determine tine range
-        t_min = raw_file.RunHeaderEx.StartTime if t_min is None else t_min
-        t_max = raw_file.RunHeaderEx.EndTime if t_max is None else t_max
+        # Determine time range
+        t_min = raw_file.RunHeaderEx.StartTime * 60 if t_min is None else t_min  # [s]
+        t_max = raw_file.RunHeaderEx.EndTime * 60 if t_max is None else t_max  # [s]
 
         # Check time range
         if t_min > t_max:
-            err_message = f"Invalid time range: {t_min} > {t_max}"
-            hardware_runtime.logger.error(err_message)
-            raise ValueError(err_message)
+            raise ValueError(f"Invalid time range: {t_min} > {t_max}")
 
         num_of_scans = raw_file.RunHeaderEx.SpectraCount
         scan_indices = list(range(1, num_of_scans + 1))
 
         # Filter by polarity
-        if polarity:
+        if polarity is not None:
             if polarity not in ["-", "+"]:
                 raise (
                     ValueError(
@@ -131,6 +127,14 @@ def get_signal(
             mz_mask = np.logical_and(mz_min <= positions, positions <= mz_max)
             scan_specs.append(intensities[mz_mask])
             scan_mzs.append(positions[mz_mask])
+
+        if scan_mzs == []:
+            raise ValueError(
+                f"""No data found in the specified time or m/z range.
+                M/z range of the sample file: {raw_file.RunHeaderEx.LowMass} - {raw_file.RunHeaderEx.HighMass}
+                Time range: {raw_file.RunHeaderEx.StartTime*60:.1f} - {raw_file.RunHeaderEx.EndTime*60:.1f} s.
+                """
+            )
 
         # Create a sorted union of all unique m/z values
         all_mzs = np.unique(np.concatenate(scan_mzs))
@@ -182,14 +186,14 @@ def compute_sum_signal_in_time_range(
         t_start = raw_file.RunHeader.StartTime
         t_end = raw_file.RunHeader.EndTime
 
-        # Check if t1 and t2 are passed
+        # Check if t_min and t_max are passed
         t_min = t_start if t_min is None else t_min / 60
         t_max = t_end if t_max is None else t_max / 60
 
         # Setup mz tolerance - counts within ppm are binned
         mass_option = MassOptions(ppm, ToleranceUnits.ppm)
 
-        # Get averaged spectrum in time range (t1, t2)
+        # Get averaged spectrum in time range (t_max, t_max)
         average_scan = Extensions.AverageScansInTimeRange(
             raw_file, t_min, t_max, System.String(""), mass_option
         )

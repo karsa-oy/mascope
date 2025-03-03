@@ -76,9 +76,12 @@ def get_signal(
 
         # Check m/z range
         if mz_min > mz_max:
-            err_message = f"Invalid m/z range: {mz_min} > {mz_max}"
-            hardware_runtime.logger.error(err_message)
-            raise ValueError(err_message)
+            raise ValueError(f"Invalid m/z range: {mz_min} > {mz_max}")
+        # Check if provided mzs have intersection with the mzs in the file
+        if mz_min > all_mzs[-1] or mz_max < all_mzs[0]:
+            raise ValueError(
+                f"Provided m/z range ({mz_min}, {mz_max}) is out of the sample file m/z range ({all_mzs[0]:.1f}, {all_mzs[-1]:.1f})"
+            )
 
         # Find indices of m/z range
         mz_start_ind = np.abs(all_mzs - mz_min).argmin()
@@ -106,9 +109,7 @@ def get_signal(
             )
 
         if t_min is not None and t_max is not None and t_min > t_max:
-            err_message = f"Invalid time range: {t_min} > {t_max}"
-            hardware_runtime.logger.error(err_message)
-            raise ValueError(err_message)
+            raise ValueError(f"Invalid time range: {t_min} > {t_max}")
 
         # Find indices of time range
         t_start_ind = 0 if t_min is None else np.abs(scan_time - t_min).argmin()
