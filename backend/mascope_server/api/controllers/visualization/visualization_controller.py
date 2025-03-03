@@ -119,7 +119,9 @@ async def visualize_ion_focus(
 
         # Extract the specific isotope slice and compute the sum spectrum
         isotope_slice = sample_file.sel(mz=slice(*mz_range)).compute()
-        isotope_signal = load_signal(filename).sel(mz=slice(*mz_range)).compute()
+        isotope_signal = load_signal(
+            filename, mz_min=mz_range[0], mz_max=mz_range[1]
+        ).compute()
         isotope_sum_spectrum = isotope_slice.sum_signal
         # Check if the spectrum slice is empty
         if isotope_sum_spectrum.size == 0:
