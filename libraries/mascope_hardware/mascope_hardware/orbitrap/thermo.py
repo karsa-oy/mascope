@@ -1,7 +1,7 @@
 from pathlib import Path
 from itertools import compress
 from contextlib import contextmanager
-from typing import Iterable
+from typing import Iterable, Optional
 import numpy as np
 import xarray as xr
 import dask.array as da
@@ -40,20 +40,59 @@ def open_raw_file(datafile_path: str):
         )
 
 
-def get_signal(datafile_path: str, polarity: str = None) -> xr.Dataset:
+def get_signal(
+    datafile_path: str,
+    t_min: Optional[float] = None,
+    t_max: Optional[float] = None,
+    mz_min: Optional[float] = None,
+    mz_max: Optional[float] = None,
+    polarity: str = None,
+) -> xr.Dataset:
     """This function uses the Thermo Fisher libraries to read the raw file and extract the scan data.
     It then merges the scans to have a common m/z scale and converts the data to an xarray Dataset.
+    Allows slicing by time and m/z range.
+
+    t_min=None is equal to min scan time, t_max=None is equal to max scan time.
+    mz_min=None is equal to min m/z, mz_max=None is equal to max m/z.
 
     :param datafile_path: Path to the Thermo Fisher raw file (.raw) containing the data.
     :type datafile_path: str
-    :param polarity: + or -, Polarity of the scans to be retrieved, optional, defaults to None (get all scans)
+    :param t_min: Minimum time [s], optional, defaults to None
+    :type t_min: float
+    :param t_max: Maximum time [s], optional, defaults to None
+    :type t_max: float
+    :param mz_min: Minimum m/z, optional, defaults to None
+    :type mz_min: float
+    :param mz_max: Maximum m/z, optional, defaults to None
+    :type mz_max: float
+    :param polarity: + or -, Polarity of the scans to be retrieved, optional, defaults to None
     :type polarity: str
     :return: An xarray Dataset containing the signal data
     :rtype: xr.Dataset
     """
     with open_raw_file(datafile_path) as raw_file:
+        # Determine m/z range
+        mz_min = raw_file.RunHeaderEx.LowMass if mz_min is None else mz_min
+        mz_max = raw_file.RunHeaderEx.HighMass if mz_max is None else mz_max
+
+        # Check m/z range
+        if mz_min > mz_max:
+            err_message = f"Invalid m/z range: {mz_min} > {mz_max}"
+            hardware_runtime.logger.error(err_message)
+            raise ValueError(err_message)
+
+        # Determine tine range
+        t_min = raw_file.RunHeaderEx.StartTime if t_min is None else t_min
+        t_max = raw_file.RunHeaderEx.EndTime if t_max is None else t_max
+
+        # Check time range
+        if t_min > t_max:
+            err_message = f"Invalid time range: {t_min} > {t_max}"
+            hardware_runtime.logger.error(err_message)
+            raise ValueError(err_message)
+
         num_of_scans = raw_file.RunHeaderEx.SpectraCount
-        scan_indices = list(range(num_of_scans))
+        scan_indices = list(range(1, num_of_scans + 1))
 
         # Filter by polarity
         if polarity:
@@ -65,28 +104,33 @@ def get_signal(datafile_path: str, polarity: str = None) -> xr.Dataset:
                 )
             polarity = "Negative" if polarity == "-" else "Positive"
             polarity_mask = [
-                raw_file.GetFilterForScanNumber(i + 1).Polarity.ToString() == polarity
+                raw_file.GetFilterForScanNumber(i).Polarity.ToString() == polarity
                 for i in scan_indices
             ]
             scan_indices = list(compress(scan_indices, polarity_mask))
 
-        # Extract scan statistics and segmented scan data
-        scan_statistics = [
-            raw_file.GetScanStatsForScanNumber(i + 1) for i in scan_indices
-        ]
-        segmented_scan = [
-            raw_file.GetSegmentedScanFromScanNumber(i + 1, scan_statistics[i])
-            for i in scan_indices
-        ]
+        scan_statistics = [raw_file.GetScanStatsForScanNumber(i) for i in scan_indices]
+        scan_time = [scan_stat.StartTime * 60 for scan_stat in scan_statistics]  # [s]
+
+        # Filter by time range
+        time_mask = [t_min <= t <= t_max for t in scan_time]
+        scan_indices = list(compress(scan_indices, time_mask))
+
+        # Update time scale
+        scan_time = list(compress(scan_time, time_mask))
 
         # Extract scan spectra and m/z values
-        scan_specs = [
-            np.fromiter(scan.Intensities, np.float64) for scan in segmented_scan
-        ]  # [Relative abundance]
-        scan_mzs = [
-            np.fromiter(scan.Positions, np.float32) for scan in segmented_scan
-        ]  # [Th]
-        scan_time = [scan_stat.StartTime * 60 for scan_stat in scan_statistics]  # [s]
+        scan_specs = []
+        scan_mzs = []
+        for i in scan_indices:
+            scan = raw_file.GetSegmentedScanFromScanNumber(i)
+            intensities = np.frombuffer(scan.Intensities)
+            positions = np.frombuffer(scan.Positions)
+
+            # Filter by m/z range
+            mz_mask = np.logical_and(mz_min <= positions, positions <= mz_max)
+            scan_specs.append(intensities[mz_mask])
+            scan_mzs.append(positions[mz_mask])
 
         # Create a sorted union of all unique m/z values
         all_mzs = np.unique(np.concatenate(scan_mzs))
