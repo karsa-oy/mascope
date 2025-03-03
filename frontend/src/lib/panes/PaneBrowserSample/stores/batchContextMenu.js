@@ -81,7 +81,7 @@ export const useBatchContextMenu = defineStore('browser.sample.batchCtxMenu', ()
           }
         }
       },
-      visible: clipboard.batch !== null
+      visible: clipboard.batch !== null && row.value === null
     },
     {
       label: `Paste sample${clipboard.samples?.length > 1 ? 's' : ''}`,
@@ -106,7 +106,7 @@ export const useBatchContextMenu = defineStore('browser.sample.batchCtxMenu', ()
     },
     {
       separator: true,
-      visible: (clipboard.batch !== null || pasteSamplesValid.value) && row.value !== null
+      visible: pasteSamplesValid.value
     },
     {
       label: 'Edit batch',
