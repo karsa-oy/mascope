@@ -157,19 +157,19 @@ def get_signal(
 
 def compute_sum_signal_in_time_range(
     datafile_path: str,
-    t1: float = None,
-    t2: float = None,
-    average: bool = False,
+    t_min: Optional[float] = None,
+    t_max: Optional[float] = None,
+    average: Optional[bool] = False,
     ppm: int = 1,
 ) -> xr.core.dataarray.DataArray:
-    """Computes sum signal in (t1, t2) time range, binning counts within "ppm" value
+    """Computes sum signal in (t_min, t_max) time range, binning counts within "ppm" value
 
     :param datafile_path: Path to the Thermo Fisher raw file (.raw) containing the data.
     :type datafile_path: str
-    :param t1: Start time [s]
-    :type t1: float, optional
-    :param t2: End time [s]
-    :type t2: float, optional
+    :param t_min: Start time [s]
+    :type t_min: float, optional
+    :param t_max: End time [s]
+    :type t_max: float, optional
     :param average: If spectrum should be averaged, defaults to False
     :type average: bool, optional
     :param ppm: ppm precision for binning, defaults to 1
@@ -179,25 +179,25 @@ def compute_sum_signal_in_time_range(
     """
     with open_raw_file(datafile_path) as raw_file:
         # Get full time range
-        t_min = raw_file.RunHeader.StartTime
-        t_max = raw_file.RunHeader.EndTime
+        t_start = raw_file.RunHeader.StartTime
+        t_end = raw_file.RunHeader.EndTime
 
         # Check if t1 and t2 are passed
-        t1 = t_min if t1 is None else t1 / 60
-        t2 = t_max if t2 is None else t2 / 60
+        t_min = t_start if t_min is None else t_min / 60
+        t_max = t_end if t_max is None else t_max / 60
 
         # Setup mz tolerance - counts within ppm are binned
         mass_option = MassOptions(ppm, ToleranceUnits.ppm)
 
         # Get averaged spectrum in time range (t1, t2)
         average_scan = Extensions.AverageScansInTimeRange(
-            raw_file, t1, t2, System.String(""), mass_option
+            raw_file, t_min, t_max, System.String(""), mass_option
         )
         averaged_spec = average_scan.SegmentedScan
 
         # Extract averaged signal, multiply by num_of_scans to restore sum signal
-        mz = np.fromiter(averaged_spec.Positions, np.float32)
-        sum_signal = np.fromiter(averaged_spec.Intensities, np.float32)
+        mz = np.frombuffer(averaged_spec.Positions)
+        sum_signal = np.frombuffer(averaged_spec.Intensities)
 
         if not average:
             # Multiply by number of averaged scans
