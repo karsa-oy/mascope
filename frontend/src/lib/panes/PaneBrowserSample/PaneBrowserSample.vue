@@ -2,6 +2,7 @@
 import BatchTable from './BatchTable.vue'
 import SampleTable from './SampleTable.vue'
 import SampleTableCustomizer from './SampleTableCustomizer.vue'
+import SampleContextMenu from './SampleContextMenu.vue'
 </script>
 
 <template>
@@ -13,4 +14,5 @@ import SampleTableCustomizer from './SampleTableCustomizer.vue'
       <SampleTable :batch="batch" />
     </template>
   </BatchTable>
+  <SampleContextMenu />
 </template>

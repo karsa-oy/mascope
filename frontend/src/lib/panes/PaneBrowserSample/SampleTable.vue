@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { computed } from 'vue'
 
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
@@ -19,11 +19,6 @@ const app = useApp()
 
 const customizer = useCustomizerPopover()
 const contextMenu = useSampleContextMenu()
-
-const contextMenuRef = ref()
-onMounted(() => {
-  contextMenu.ref = contextMenuRef.value
-})
 
 const props = defineProps({
   batch: {
@@ -118,7 +113,6 @@ const formatter = new Intl.NumberFormat('en-US', {
   </div>
   <div class="spinner" v-else><ProgressSpinner strokeWidth="5px" />loading...</div>
   <!-- modals etc. -->
-  <ContextMenu ref="contextMenuRef" :model="contextMenu.entries" @hide="contextMenu.clear" />
   <DialogSampleOp v-model:action="contextMenu.dialog.op" :item="contextMenu.row" />
   <DialogCalibration v-model:visible="contextMenu.dialog.calibration" :context="contextMenu.row" />
 </template>
