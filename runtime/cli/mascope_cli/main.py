@@ -109,7 +109,7 @@ def modules(
     table.add_column("Path", style="green", no_wrap=True)
     table.add_column("Install", style="magenta", no_wrap=True)
     table.add_column("Run", style="magenta", no_wrap=True)
-    for mod in runtime.pkgs:
+    for mod in runtime.modules:
         if show(mod):
             table.add_row(mod["name"], mod["pkg_path"], mod["install"], mod["run"])
     console = Console()

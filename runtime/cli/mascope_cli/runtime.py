@@ -1,3 +1,3 @@
-from mascope_runtime import MascopeRuntimeModule
+from mascope_runtime import Runtime
 
-runtime = MascopeRuntimeModule("cli")
+runtime = Runtime("cli")

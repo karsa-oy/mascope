@@ -2,9 +2,9 @@ from datetime import timedelta, datetime
 import requests
 from mascope_lib.file_func import get_instrument_type
 from mascope_lib.util import timestamp_from_filename
-from mascope_runtime import MascopeRuntimeModule
+from mascope_runtime import Runtime
 
-runtime = MascopeRuntimeModule("file-converter")
+runtime = Runtime("file-converter")
 
 host = runtime.config.server if runtime.mode == "prod" else "localhost"
 url = f"http://{host}:{runtime.meta.api_port}"

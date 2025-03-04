@@ -1,0 +1,127 @@
+import os
+from loguru import logger
+
+from .mode import RuntimeMode
+from .state import RuntimeJsonState, RuntimeTempState
+from .exceptions import MissingMascopePathException
+from .options import RuntimeOptions
+from .env import RuntimeEnv
+from .module import RuntimeModule
+from .config import MetaConfig, load_config
+from .logger import configure_logger
+
+
+class Runtime:
+    """
+    The main runtime instance, providing a localized interface
+    to the Mascope runtime.
+
+    Each service, library and tool - known collectively as
+    'modules' - have their own runtime instance; they are
+    distinguished by the 'module' string identifier passed
+    to this class.
+
+    The class provides access to global runtime interfaces like
+    state, environment and meta configuration, as well as local
+    runtime interfaces such as the module's own config.
+    """
+
+    options: RuntimeOptions
+    state: RuntimeJsonState | RuntimeTempState
+    env: RuntimeEnv
+    module: RuntimeModule
+
+    _path: str
+    _version: str
+
+    def __init__(self, module: str, **opts):
+        # load options
+        self.options = RuntimeOptions(**opts)
+
+        # initialize attributes
+        self.read_envvars()
+        self.init_state()
+
+        # initalize runtime
+        self.env = RuntimeEnv(self)
+        self.module = RuntimeModule(module, self)
+
+        # load config
+        self._full_config = load_config(self)
+
+        # configure loguru global logger
+        configure_logger(self)
+
+    @property
+    def path(self) -> str:
+        return self._path
+
+    @property
+    def mode(self) -> RuntimeMode:
+        return self.state.mode
+
+    @property
+    def version(self) -> str:
+        return self._version
+
+    @property
+    def meta(self) -> MetaConfig:
+        return self._full_config.meta
+
+    @property
+    def config(self):
+        return self.module.config
+
+    @property
+    def logger(self):
+        return logger
+
+    @property
+    def modules(self):
+        return [
+            {
+                key: mod.get(key)
+                for key in (
+                    "name",
+                    "tags",
+                    "pkg_path",
+                    "install",
+                    "uninstall",
+                    "run",
+                )
+            }
+            for mod in self._full_config.model_dump().values()
+            if (mod is not None and "name" in mod and mod["name"])
+        ]
+
+    # METHODS
+
+    def read_envvars(self):
+        resolved_path = self.options.path or os.environ.get("MASCOPE_PATH")
+        if not resolved_path:
+            raise MissingMascopePathException()
+        else:
+            self._path = resolved_path
+        self._version = os.environ.get("MASCOPE_VERSION")
+
+    def init_state(self):
+        if self.options.env or self.options.mode:
+            self.state = RuntimeTempState(self.options.env, self.options.mode)
+        else:
+            self.state = RuntimeJsonState(self._path)
+
+    def resolve(self, path: str) -> str:
+        if not isinstance(path, str):
+            raise ValueError("Path must be a string")
+        # only resolve relative paths
+        if path.startswith("./"):
+            # join relative to the base path:
+            #   "./foo/bar" => "/base_path/foo/bar"
+            joined_path = os.path.join(
+                self._path,
+                *path.replace("./", "").split("/"),
+            )
+            # resolve symlinks:
+            return os.path.realpath(joined_path)
+        else:
+            return path

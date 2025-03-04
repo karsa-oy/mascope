@@ -3,12 +3,10 @@ import subprocess
 import shlex
 
 from mascope_cli.runtime import runtime
-from mascope_runtime.module import MascopeRuntimeModule
+from mascope_runtime import Runtime
 
 
-def run(
-    command: str, runtime: MascopeRuntimeModule = runtime, vars: dict = dict()
-) -> None:
+def run(command: str, runtime: Runtime = runtime, vars: dict = dict()) -> None:
     """
     Execute a command in a subprocess
 
@@ -21,7 +19,7 @@ def run(
         env[key] = val
     subprocess.run(
         shlex.split(command),  # split to ensure correct parsing
-        cwd=runtime.root_path,
+        cwd=runtime.path,
         stderr=subprocess.STDOUT,
         env=env,
     )

@@ -12,6 +12,6 @@ if hardware_runtime.hardware_runtime.mode == "prod":
 
 
 # this should be last to ensure log level is correct
-from mascope_runtime import MascopeRuntimeModule
+from mascope_runtime import Runtime
 
-runtime = MascopeRuntimeModule("backend")
+runtime = Runtime("backend")

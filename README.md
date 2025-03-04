@@ -184,7 +184,7 @@ When you instantiate a Mascope runtime instance for some module, you can access 
 
 ```py
 # backend/mascope_server/runtime.py
-runtime = MascopeRuntimeModule('backend')
+runtime = Runtime('backend')
 
 # elsewhere
 from mascope_server.runtime import runtime
@@ -278,19 +278,18 @@ Some folders may be symbolically linked to a runtime to facilitate network drive
 
 ### Runtime Config
 
-The `mascope.toml` files inside a runtime configures the app. The configuration includes app wide settings (under `meta`) and [module](#runtime-modules) specific configuration settings. There are three files, that have the same schema:
+The `mascope.toml` files inside a runtime configures the app. The configuration includes app wide settings (under `meta`) and [module](#runtime-modules) specific configuration settings. There are two files, that have the same schema:
 
 ```py
 runtime/
   env/
     foo/
       ...                  # Rest of the env's state
-      base.mascope.toml    # Baseline app config - applies always
       dev.mascope.toml     # Development app config - overrides base in dev mode
       prod.mascope.toml    # Production app config - overrides base in prod mode
 ```
 
-For a complete and up-to-date list of options, refer to the default baseline configuration, found at `runtime/env/default/base.mascope.toml`. Here is an example of a small `dev.mascope.toml` you may use during development to override specific values:
+For a complete and up-to-date list of options, refer to the configuration defaults, found at `runtime/lib/mascope_runtime/base.mascope.toml`. Here is an example of a small `dev.mascope.toml` you may use during development to override specific values:
 
 ```toml
 [meta]

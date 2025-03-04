@@ -25,7 +25,7 @@ def run_poetry_command(command_name: str):
     """
     Helper function to run a poetry command within the backend directory.
     """
-    backend_dir = os.path.join(runtime.root_path, "backend")
+    backend_dir = os.path.join(runtime.path, "backend")
     try:
         result = subprocess.run(
             ["poetry", "run", command_name],

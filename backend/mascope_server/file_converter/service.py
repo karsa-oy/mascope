@@ -14,12 +14,12 @@ hardware_runtime.init()
 from mascope_hardware.orbitrap.generator import RawProcessor
 from mascope_hardware.tofwerk.generator import H5Processor
 
-from mascope_runtime import MascopeRuntimeModule
+from mascope_runtime import Runtime
 from .socket.client import FileConverterSocketClient
 from .watcher import FSWatcher
 
 
-runtime = MascopeRuntimeModule("file-converter")
+runtime = Runtime("file-converter")
 
 
 host = runtime.config.server if runtime.mode == "prod" else "localhost"

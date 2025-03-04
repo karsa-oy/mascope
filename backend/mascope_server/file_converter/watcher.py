@@ -3,9 +3,9 @@ import os
 from threading import Event, Thread
 from time import sleep
 
-from mascope_runtime import MascopeRuntimeModule
+from mascope_runtime import Runtime
 
-runtime = MascopeRuntimeModule("file-converter")
+runtime = Runtime("file-converter")
 
 
 class FSWatcher(Thread):

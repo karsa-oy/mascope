@@ -1,8 +1,13 @@
+from __future__ import annotations
+import typing
+
+if typing.TYPE_CHECKING:
+    from .instance import Runtime
+
 import os
 import tomllib
 from pydantic import BaseModel
 from typing import Literal
-
 
 # PYDANTIC MODELS
 
@@ -15,9 +20,9 @@ type LogLevel = Literal[
 ]
 
 
-class MascopeMetaConfig(BaseModel):
+class MetaConfig(BaseModel):
     """
-    Global configuration options shared across all Mascope modules.
+    Global configuration options shared across all  modules.
     """
 
     log_level: LogLevel | None = None  # global log level to print to terminal at
@@ -26,9 +31,9 @@ class MascopeMetaConfig(BaseModel):
     filestore: str = r"./filestore"  # filestore path
 
 
-class MascopeModuleConfig(BaseModel):
+class ModuleConfig(BaseModel):
     """
-    Base class for module-specific configuration; every Mascope module
+    Base class for module-specific configuration; every  module
     shares these configuration options.
     """
 
@@ -50,7 +55,7 @@ class MascopeModuleConfig(BaseModel):
     # up all of the services.
 
 
-class MascopeBackendConfig(MascopeModuleConfig):
+class BackendConfig(ModuleConfig):
     """
     Backend module specific configuration options
     """
@@ -59,7 +64,7 @@ class MascopeBackendConfig(MascopeModuleConfig):
     filestreams: str = r"./filestreams"  # path to the file streams folder
 
 
-class MascopeFileConverterConfig(MascopeModuleConfig):
+class FileConverterConfig(ModuleConfig):
     """
     File converter module specific configuration options
     """
@@ -73,7 +78,7 @@ class MascopeFileConverterConfig(MascopeModuleConfig):
     interval: int = 3  # polling interval (s) when checking the file system
 
 
-class MascopeTofAgentConfig(MascopeModuleConfig):
+class TofAgentConfig(ModuleConfig):
     """
     Tof Agent module specific configuration options
     """
@@ -82,7 +87,7 @@ class MascopeTofAgentConfig(MascopeModuleConfig):
     access_token: str  # API access token
 
 
-class MascopeFileMoverConfig(MascopeModuleConfig):
+class FileMoverConfig(ModuleConfig):
     """
     File Mover module specific configuration options
     """
@@ -104,7 +109,7 @@ class SampleTableDefaults(BaseModel):
     sort_order: Literal[1, -1] = 1
 
 
-class MascopeFrontendConfig(MascopeModuleConfig):
+class FrontendConfig(ModuleConfig):
     """
     Frontend module specific configuration options
     """
@@ -113,7 +118,7 @@ class MascopeFrontendConfig(MascopeModuleConfig):
     sample_table_defaults: SampleTableDefaults = SampleTableDefaults()
 
 
-class MascopeNotebooksConfig(MascopeModuleConfig):
+class NotebooksConfig(ModuleConfig):
     """
     Notebook module specific configuration options
     """
@@ -121,7 +126,7 @@ class MascopeNotebooksConfig(MascopeModuleConfig):
     pass
 
 
-class MascopeCliConfig(MascopeModuleConfig):
+class CliConfig(ModuleConfig):
     """
     Cli module specific configuration options
     """
@@ -129,7 +134,7 @@ class MascopeCliConfig(MascopeModuleConfig):
     pass
 
 
-class MascopeStandardLibConfig(MascopeModuleConfig):
+class StandardLibConfig(ModuleConfig):
     """
     Standard Library module specific configuration options
     """
@@ -137,7 +142,7 @@ class MascopeStandardLibConfig(MascopeModuleConfig):
     pass
 
 
-class MascopeHardwareLibConfig(MascopeModuleConfig):
+class HardwareLibConfig(ModuleConfig):
     """
     Hardware Library module specific configuration options
     """
@@ -147,7 +152,7 @@ class MascopeHardwareLibConfig(MascopeModuleConfig):
     # Defaults to automatically resolving the platform.
 
 
-class MascopeApiLibConfig(MascopeModuleConfig):
+class ApiLibConfig(ModuleConfig):
     """
     API Library module specific configuration options
     """
@@ -155,164 +160,137 @@ class MascopeApiLibConfig(MascopeModuleConfig):
     pass
 
 
-class MascopeRuntimeConfig(BaseModel):
+class RuntimeConfig(BaseModel):
     """
-    The Mascope runtime configuration
+    The  runtime configuration
 
     Includes the meta configuration, as well as all module
     configuration objects.
     """
 
     # global
-    meta: MascopeMetaConfig
+    meta: MetaConfig
     # services
-    backend: MascopeBackendConfig | None = None
-    file_converter: MascopeFileConverterConfig | None = None
-    tof_agent: MascopeTofAgentConfig | None = None
-    file_mover: MascopeFileMoverConfig | None = None
+    backend: BackendConfig | None = None
+    file_converter: FileConverterConfig | None = None
+    tof_agent: TofAgentConfig | None = None
+    file_mover: FileMoverConfig | None = None
     # clients
-    notebooks: MascopeNotebooksConfig | None = None
-    frontend: MascopeFrontendConfig | None = None
-    cli: MascopeCliConfig | None = None
+    notebooks: NotebooksConfig | None = None
+    frontend: FrontendConfig | None = None
+    cli: CliConfig | None = None
     # libraries
-    standard_lib: MascopeStandardLibConfig | None = None
-    hardware_lib: MascopeHardwareLibConfig | None = None
-    api_lib: MascopeApiLibConfig | None = None
+    standard_lib: StandardLibConfig | None = None
+    hardware_lib: HardwareLibConfig | None = None
+    api_lib: ApiLibConfig | None = None
 
 
-# UTILITY FUNCTIONS
-
-
-def resolve_path(base_path: str, value: any) -> any:
+class RuntimeConfigLoader:
     """
-    Resolve relative paths using some base path.
+    Helper class to facilitate loading the configuration of
+    the runtime.
 
-    Only applies to strings starting with ./
-    Other values are returned unmodified.
+    Loading works as follows:
+     1. Depending on the runtime mode, load `dev.mascope.toml`
+        or `prod.mascope.toml` from the runtime environment;
+        missing values use defaults set in `base.mascope.toml`
+        in the runtime library.
+     2. Resolve relative paths into absolute paths, using the
+        runtime environment path (except for package paths,
+        which resolve relative to the Mascope root path).
+     3. Resolve log level for each module, using CLI arguments,
+        toml settings and defaults.
+     4. Validate the resulting dictionary using the Pydantic
+        model for the configuration.
 
-    :param base_path: the path relative to which to resolve
-    :param value: the value to resolve, which may be a path string
-    :return: resolved path or unchanged value
+    This class is to be used with the `load_config` below.
     """
-    # only process strings
-    if isinstance(value, str):
-        # that are relative paths
-        if value.startswith("./"):
-            path = value
-            # join relative to the base path:
-            #   "./foo/bar" => "/base_path/foo/bar"
-            joined_path = os.path.join(
-                base_path,
-                *path.replace("./", "").split("/"),
-            )
-            # resolve symlinks:
-            real_path = os.path.realpath(joined_path)
-            return real_path
-    # return other values as is
-    return value
 
+    _root: Runtime
+    _raw: dict
+    _resolved: RuntimeConfig
 
-def resolve_paths(root_path: str, env_path: str, config: dict) -> dict:
-    """
-    Iterate through a `config` dictionary, resolving paths.
-    A resolved config dictionary is returned.
+    def __init__(self, root: Runtime):
+        self._root = root
 
-    The key "pkg_path" is resolved against MASCOPE_PATH - passed
-    as the `root_path` argument. Meanwhile other relative path
-    declarations are resolved against the currently active
-    environment path, passed as `env_path`.
+        self.base = self.root.resolve("./runtime/lib/mascope_runtime/base.mascope.toml")
+        self.path = self.env.resolve(f"./{self.root.mode}.mascope.toml")
 
-    :param root_path: the root MASCOPE_PATH
-    :param env_path: the active runtime environment path
-    :param config: the configuration for which to resolve paths
-    :return: resolved configuration dictionary
-    """
-    new_config = {}
-    for key, value in config.items():
-        if isinstance(value, dict):
-            # recurse for subconfigs
-            new_config[key] = resolve_paths(root_path, env_path, value)
-        else:
-            # resolve paths for other values
-            if key == "pkg_path":
-                # package path is resolve against MASCOPE_PATH
-                new_config[key] = resolve_path(root_path, value)
+        config = self._load_tomls()
+        config = self._resolve_paths(config)
+        config = self._resolve_loglevels(config)
+        config = self._validate_options(config)
+        self._resolved = config
+
+    @property
+    def root(self):
+        return self._root
+
+    @property
+    def env(self):
+        return self.root.env
+
+    @property
+    def config(self):
+        return self._resolved
+
+    def _load_tomls(self):
+        raw_config = {}
+        for path in [self.base, self.path]:
+            if os.path.exists(path):
+                with open(path, "rb") as f:
+                    # apply overlay
+                    overlay = tomllib.load(f)
+                    for module, module_overlay in overlay.items():
+                        module_key = module.replace("-", "_")
+                        if module_key not in raw_config:
+                            raw_config[module_key] = {}
+                        raw_config[module_key] = {
+                            "name": module,  # pass the module name
+                            **raw_config[module_key],  # inherit previous layer
+                            **module_overlay,  # override with overlay
+                        }
+        return raw_config
+
+    def _resolve_paths(self, unresolved: any | None = None) -> None:
+        resolved = {}
+        for key, value in unresolved.items():
+            if isinstance(value, dict):
+                # recurse for subconfigs
+                resolved[key] = self._resolve_paths(value)
+            elif isinstance(value, str):
+                # resolve paths for other values
+                if key == "pkg_path":
+                    resolved[key] = self.root.resolve(value)
+                else:
+                    resolved[key] = self.env.resolve(value)
             else:
-                # other paths are resolved against the runtime env
-                new_config[key] = resolve_path(env_path, value)
-    return new_config
+                resolved[key] = value
+        return resolved
+
+    def _resolve_loglevels(self, unresolved: dict, fallback: LogLevel = "info") -> None:
+        resolved = {}
+        meta = unresolved.get("meta")
+        meta_log_level = meta.get("log_level") if meta else None
+        cli_env_var = os.environ.get("MASCOPE_LOGLEVEL")
+        cli_log_level = cli_env_var.lower() if cli_env_var else None
+        for sub_key, sub_config in unresolved.items():
+            # init subconfig
+            resolved[sub_key] = unresolved[sub_key]
+            # resolve log levels
+            config_log_level = sub_config.get("log_level")
+            resolved[sub_key]["log_level"] = (
+                cli_log_level  # cli overrides all
+                or config_log_level  # otherwise use module level
+                or meta_log_level  # otherwise use the meta level
+                or fallback  # and worst case fall back to info
+            )
+        return resolved
+
+    def _validate_options(self, unvalidated: dict) -> None:
+        return RuntimeConfig(**unvalidated)
 
 
-def resolve_log_levels(config: dict, fallback: str = "info") -> dict:
-    """
-    Resolve log levels in a `config` dictionary using explicitly
-    set configuration values, the CLI option passed through an env
-    var, and a default, passed though the `fallback` argument.
-
-    The order of precedence is:
-      1. CLI option (--log-level debug / -l info)
-      2. Module-specific config (log_level = "warning" in [backend])
-      3. Global configuration (og_level = "critical" in [meta])
-      4. The fallback (argument to this function)
-
-    :param config: the configuration dictionary
-    :param fallback: the fallback level if resolution fails
-    :return: configuration dictionary with resolved log levels
-    """
-    new_config = {}
-    meta = config.get("meta")
-    meta_log_level = meta.get("log_level") if meta else None
-    cli_env_var = os.environ.get("MASCOPE_LOGLEVEL")
-    cli_log_level = cli_env_var.lower() if cli_env_var else None
-    for sub_key, sub_config in config.items():
-        # init subconfig
-        new_config[sub_key] = config[sub_key]
-        # resolve log levels
-        config_log_level = sub_config.get("log_level")
-        new_config[sub_key]["log_level"] = (
-            cli_log_level  # cli overrides all
-            or config_log_level  # otherwise use module level
-            or meta_log_level  # otherwise use the meta level
-            or fallback  # and worst case fall back to info
-        )
-    return new_config
-
-
-def build_config(
-    root_path: str, env_path: str, layers: list[str]
-) -> MascopeRuntimeConfig:
-    """
-    Load a set of configuration `layers` (base, dev or prod),
-    and overlay them such that each layer overrides properties
-    set by the previous one. Then resolve relative paths and
-    log levels using the `root_path` (MASCOPE_PATH) and the
-    `env_path` (path to the environment).
-
-    :param root_path: the root MASCOPE_PATH
-    :param env_path: the active runtime environment path
-    :param layers: list of config file paths to overlay
-    :return: resolved and validated config Pydantic model
-    """
-    config = {}
-    for layer in layers:
-        layer_path = os.path.join(env_path, f"{layer}.mascope.toml")
-        # apply config layers
-        if os.path.exists(layer_path):
-            with open(layer_path, "rb") as f:
-                # apply overlay
-                overlay = tomllib.load(f)
-                for module, module_overlay in overlay.items():
-                    module_key = module.replace("-", "_")
-                    if module_key not in config:
-                        config[module_key] = {}
-                    config[module_key] = {
-                        "name": module,  # pass the module name
-                        **config[module_key],  # inherit previous layer
-                        **module_overlay,  # override with overlay
-                    }
-    # resolve relative paths to absolute
-    config = resolve_paths(root_path, env_path, config)
-    # resolve log level based on config and cli args
-    config = resolve_log_levels(config)
-    # return validate model
-    return MascopeRuntimeConfig(**config)
+def load_config(root: Runtime):
+    loader = RuntimeConfigLoader(root)
+    return loader.config

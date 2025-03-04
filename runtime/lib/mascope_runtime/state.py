@@ -1,13 +1,11 @@
 import os
 import json
 
-from typing import List
-
 """
 This file provides an API representing runtime state,
 
-- `MascopeRuntimeJsonState` persisted to a `state.json` on disk
-- `MascopeRuntimeTempState` persisted to an object in memory
+- `RuntimeJsonState` persisted to a `state.json` on disk
+- `RuntimeTempState` persisted to an object in memory
 
 The API uses setters and getters to provide a simple
 API to the state:
@@ -52,9 +50,9 @@ default_state = {
 state_path = None  # *
 
 
-class MascopeRuntimeJsonState(object):
+class RuntimeJsonState(object):
     """
-    Persistent Mascope runtime state
+    Persistent  runtime state
 
     This class represents the persistent runtime state,
     which is saved to `MASCOPE_PATH/runtime/state.json`.
@@ -107,15 +105,14 @@ class MascopeRuntimeJsonState(object):
 temp_state = None  # *
 
 
-class MascopeRuntimeTempState(object):
+class RuntimeTempState(object):
     def __init__(
         self,
         env: str,
         mode: str,
-        modules: List[str],
     ):
         """
-        Emphemeral Mascope runtime state
+        Emphemeral  runtime state
 
         This class representates a temporary runtime state.
         State is persisted only in memory, in a regular
@@ -125,10 +122,6 @@ class MascopeRuntimeTempState(object):
         temp_state = {
             "env": {"active": env or "default", "override": None},
             "mode": {"active": mode or "dev", "override": None},
-            "modules": {
-                "active": modules or ["backend", "frontend"],
-                "override": None,
-            },
         }
 
     def __setattr__(self, attr: str, value: any):
