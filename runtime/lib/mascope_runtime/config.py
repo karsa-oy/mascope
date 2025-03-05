@@ -64,7 +64,9 @@ class MascopeFileConverterConfig(MascopeModuleConfig):
     File converter module specific configuration options
     """
 
-    server: str = r"backend"  # production host URL; the default works in our docker compose network
+    server: str = (
+        r"backend"  # production host URL; the default works in our docker compose network
+    )
     source: str = r"./filestreams"  # folder to monitor for files to convert
     raw_threads: int = 2  # number of threads for converting Orbitrap files
     h5_threads: int = 2  # number of threads for converting Tof files
@@ -97,7 +99,7 @@ class DatetimeRange(BaseModel):
 
 
 class SampleTableDefaults(BaseModel):
-    columns: list[str] = ["sample_item_name", "index", "filter_id"]
+    columns: list[str] = ["sample_item_name", "index"]
     sort_field: str = "index"
     sort_order: Literal[1, -1] = 1
 
