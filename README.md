@@ -271,6 +271,7 @@ runtime/
       database/            # The primary SQLite db and its backups
       filestore/           # Stored raw and processed files
       filestreams/         # Network drive to receive incoming files
+      temp/                # Temporary folder for ephemeral download files
       ...                  # .mascope.toml config files
 ```
 

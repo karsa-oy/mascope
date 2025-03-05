@@ -52,6 +52,12 @@ class RuntimeEnv:
         """
         return os.path.join(self.envdir, self.name)
 
+    def dir(self, name: str) -> str:
+        """
+        Returns a path of a runtime directory
+        """
+        return os.path.join(self.path, name)
+
     def resolve(self, path: str) -> any:
         """
         Resolve a path relative to the runtime environment;

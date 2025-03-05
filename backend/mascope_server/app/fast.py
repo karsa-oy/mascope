@@ -1,4 +1,6 @@
 import uuid
+import os
+import shutil
 
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -68,9 +70,21 @@ for router in routers:
 
 # database
 @fast.on_event("startup")
-async def startup_event():
-    """Run at application startup"""
+async def init_database():
+    """Init database at application startup"""
+    # database init
     await init_db()
+
+
+# temp directory
+@fast.on_event("startup")
+async def init_temp_dir():
+    """Recreate temp directory on startup, erasing all files"""
+    # reset temp folder
+    temp_dir = runtime.env.dir("temp")
+    if os.path.exists(temp_dir):
+        shutil.rmtree(temp_dir)
+    os.mkdir(temp_dir)
 
 
 # exception handlers
