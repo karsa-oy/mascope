@@ -5,7 +5,6 @@ import textwrap
 
 from multiprocessing import Event, Queue
 from queue import Empty
-from shutil import SameFileError
 from threading import Thread
 
 import watchdog
@@ -52,6 +51,25 @@ SHUTDOWN_EVENT = Event()
 runtime = None
 
 
+def process_file_upload(filepath: str) -> None:
+    """Process file upload
+
+    :param filepath: Full path to the file to be uploaded
+    :type filepath: str
+    """
+    try:
+        upload_sample_file(filepath)
+        # Delete file after successful upload
+        os.remove(filepath)
+    except Exception as e:
+        runtime.logger.error(f"Exception {e.__class__.__name__}({str(e)})")
+        # Move failed file into a separate directory
+        failed_dir = mkdir(runtime.config.source, "failed")
+        failed_filepath = os.path.join(failed_dir, os.path.basename(filepath))
+        os.rename(filepath, failed_filepath)
+        runtime.logger.debug(f"Moved failed file to {failed_filepath}")
+
+
 def upload_sample_file(filepath: str) -> None:
     """Upload the acquired file to Mascope server using Mascope API
 
@@ -74,9 +92,7 @@ def upload_sample_file(filepath: str) -> None:
         )
 
     # Make file upload request
-    runtime.logger.debug(
-        f"Making an upload request to {URL} with token {runtime.config.access_token} and filepath {filepath}"
-    )
+    runtime.logger.debug(f"Making an upload request to {URL} for file {filepath}")
     resp = api_post_file(
         url=URL,
         path="sample/files/upload",
@@ -90,7 +106,7 @@ def upload_sample_file(filepath: str) -> None:
             f"File upload of file {os.path.basename(filepath)} succeeded!"
         )
     else:
-        raise Exception(f"File upload failed for file {os.path.basename(filepath)}")
+        raise RuntimeError(f"File upload failed for file {os.path.basename(filepath)}")
 
 
 def mkdir(*args: tuple) -> str:
@@ -240,7 +256,7 @@ class FileUploader:
         self.shutdown_event = Event()
         self.jobs = Queue()
         self.watcher = FileSystemWatcher(
-            client=self, path=source_path, mask=mask, recursive=True
+            client=self, path=source_path, mask=mask, recursive=False
         )
 
     def on_filesystem_object_created(self, fname: str) -> None:
@@ -277,18 +293,6 @@ class FileUploader:
         """
         return time.time() - os.stat(fname).st_atime
 
-    def upload(self, fname: str) -> None:
-        """Copy file into target directory
-
-        :param fname: Path of the file to copy
-        :type fname: str
-        """
-        runtime.logger.info(f"Uploading file {fname}")
-        try:
-            upload_sample_file(fname)
-        except Exception as e:
-            runtime.logger.error(f"Exception {e.__class__.__name__}({str(e)})")
-
     def run_until_complete(self):
         """
         Main loop that continuously checks for jobs to process and uploads files if necessary.
@@ -318,13 +322,14 @@ class FileUploader:
                         self.jobs.put(fname)
                         runtime.logger.debug(f"Put {fname} back to queue")
                         continue
-                    self.upload(fname)
+                    # Spawn a thread for file upload to not block the processing of subsequent acquisitions
+                    upload_thread = Thread(
+                        target=process_file_upload, args=(fname,), daemon=True
+                    )
+                    upload_thread.start()
                 except Empty:
                     continue
-                except FileNotFoundError:
-                    continue
-                except SameFileError:
-                    continue
+
         except KeyboardInterrupt as e:
             runtime.logger.error(f"{e.__class__.__name__}({str(e)})")
         except Exception as e:
