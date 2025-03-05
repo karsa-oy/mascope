@@ -1028,7 +1028,7 @@ async def sample_batch_export_peaks(
                 {
                     "mz": peak.mz.item(),
                     "intensity": peak.item(),
-                    "unit": "ions" if instrument_type == "tof" else "rel.",
+                    "unit": "ions" if instrument_type == "tof" else "counts",
                     "sample_batch_name": sample_batch_name,
                     "sample_item_name": row["sample_item_name"],
                     "filename": row["filename"],

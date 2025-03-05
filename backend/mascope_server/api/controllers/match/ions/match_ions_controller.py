@@ -241,7 +241,7 @@ async def get_match_ions(
             if instrument_type == "tof":
                 unit = "ions"
             else:
-                unit = "rel."
+                unit = "counts"
             ion_data["unit"] = unit
         except AttributeError:
             pass

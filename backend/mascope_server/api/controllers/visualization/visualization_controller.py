@@ -93,8 +93,8 @@ async def visualize_ion_focus(
     runtime.logger.info(f"Loading file: {filename}")
     sample_file = load_file(filename, vars=["sum_signal", "peak_heights"])
     instrument_type = get_instrument_type(filename)
-    spectrum_unit = "ions" if instrument_type == "tof" else "rel."
-    timeseries_unit = "ions" if instrument_type == "tof" else "rel."
+    spectrum_unit = "ions" if instrument_type == "tof" else "counts"
+    timeseries_unit = "ions" if instrument_type == "tof" else "counts"
 
     # Step 3: Convert target ion data to DataFrame and prepare data
     target_ion_list = [ion.to_dict() for ion in target_ion_data]

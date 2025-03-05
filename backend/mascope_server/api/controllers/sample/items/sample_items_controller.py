@@ -475,11 +475,13 @@ async def copy_sample_items(
                     "sample_item_utc_modified": datetime.now(  # same for last modification
                         timezone.utc
                     ),
-                    "sample_item_name": generate_copy_name(  # generate copy name from the original
-                        original.sample_item_name
-                    )
-                    if original.sample_batch_id == sample_batch_id
-                    else original.sample_item_name,
+                    "sample_item_name": (
+                        generate_copy_name(  # generate copy name from the original
+                            original.sample_item_name
+                        )
+                        if original.sample_batch_id == sample_batch_id
+                        else original.sample_item_name
+                    ),
                 }
             )
             copy = SampleItem(**fields)
@@ -786,7 +788,7 @@ async def sample_item_export_peaks(
             "intensity": intensities.flatten(),
         }
     ).assign(
-        unit="ions" if instrument_type == "tof" else "rel.",
+        unit="ions" if instrument_type == "tof" else "counts",
         sample_batch_name=sample_batch_name,
         sample_item_name=sample_item_name,
         filename=filename,
