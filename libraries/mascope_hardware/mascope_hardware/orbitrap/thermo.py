@@ -89,6 +89,8 @@ def get_signal(
 
         num_of_scans = raw_file.RunHeaderEx.SpectraCount
         scan_indices = list(range(1, num_of_scans + 1))
+        # Get all scans
+        scans = tuple(Extensions.GetScans(raw_file, 1, num_of_scans))
 
         # Filter by polarity
         if polarity is not None:
@@ -105,8 +107,7 @@ def get_signal(
             ]
             scan_indices = list(compress(scan_indices, polarity_mask))
 
-        scan_statistics = [raw_file.GetScanStatsForScanNumber(i) for i in scan_indices]
-        scan_time = [scan_stat.StartTime * 60 for scan_stat in scan_statistics]  # [s]
+        scan_time = [scan.ScanStatistics.StartTime * 60 for scan in scans]  # [s]
 
         # Filter by time range
         time_mask = [t_min <= t <= t_max for t in scan_time]
@@ -119,9 +120,8 @@ def get_signal(
         scan_specs = []
         scan_mzs = []
         for i in scan_indices:
-            scan = raw_file.GetSegmentedScanFromScanNumber(i)
-            intensities = np.frombuffer(scan.Intensities)
-            positions = np.frombuffer(scan.Positions)
+            intensities = np.frombuffer(scans[i - 1].SegmentedScan.Intensities)
+            positions = np.frombuffer(scans[i - 1].SegmentedScan.Positions)
 
             # Filter by m/z range
             mz_mask = np.logical_and(mz_min <= positions, positions <= mz_max)
