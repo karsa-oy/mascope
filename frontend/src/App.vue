@@ -7,6 +7,7 @@ import { useToast } from 'primevue/usetoast'
 import Panel from 'primevue/panel'
 import ProgressSpinner from 'primevue/progressspinner'
 
+import { runtime } from '@/lib/runtime.js'
 import { beautifySnakeCase } from '@/lib/utils'
 import { BaseKarsaLogo } from '@/lib/base'
 import { useApp } from '@/stores'
@@ -17,7 +18,7 @@ const toast = useToast()
 
 // toaster
 app.ui.notification
-  .on('*', ({ status, type, message }) => {
+  .on('*', ({ status, type, message, data }) => {
     if (status !== 'pending') {
       const severity =
         {
@@ -32,6 +33,13 @@ app.ui.notification
         detail: message,
         life: duration
       })
+
+      if (status === 'success' && data && 'download' in data) {
+        const link = document.createElement('a')
+        link.download = data['download']
+        link.href = `${runtime.api_path}/api/temp/${link.download}`
+        link.click()
+      }
     }
   })
   .unmount()
