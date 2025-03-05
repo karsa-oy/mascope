@@ -256,9 +256,26 @@ const submit = () => {
                     </DataTable>
                   </ScrollPanel>
                   <Message severity="secondary" icon="pi pi-clipboard">
-                    Paste sample spreadsheet cells with 'name', 'type', 'filter id' columns, and
-                    (optionally) extra fields. Include headers and verify the row count matches your
-                    selection.
+                    <b>Paste sample metadata from a spreadsheet.</b>
+                    <ul>
+                      <li>Required fields are 'name' and 'type'.</li>
+                      <li>
+                        You may include 'filter id' if applicable, or any other extra attributes
+                        each in their own column.
+                      </li>
+                      <li>
+                        Include the header row, and verify the row count matches the number of
+                        selected acquisitions.
+                      </li>
+                      <li>
+                        Allowed sample types are:<br />
+                        {{
+                          sampleTypesFilterIdOptional
+                            .concat(sampleTypesFilterIdNotAllowed)
+                            .join(', ')
+                        }}.
+                      </li>
+                    </ul>
                   </Message>
                 </Panel>
               </div>
