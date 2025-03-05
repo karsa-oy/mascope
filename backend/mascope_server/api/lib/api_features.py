@@ -1,7 +1,7 @@
 import inspect
 from functools import wraps
 from typing import Callable
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.encoders import jsonable_encoder
 from rich.pretty import pretty_repr
 
@@ -185,12 +185,16 @@ def api_route(
                 # Step 4: Execute the route handler
                 result = await func(*args, **kwargs)
 
-                # Step 5: Prepare response headers
+                # Step 5: if result is file, return as-is:
+                if isinstance(result, FileResponse):
+                    return result
+
+                # Step 6: Prepare response headers
                 headers = {}
                 if result is not None and "process_id" in result:
                     headers["Process-ID"] = result.pop("process_id")
 
-                # Step 6: Return formatted JSON response
+                # Step 7: Return formatted JSON response
                 return JSONResponse(
                     status_code=status_code,
                     content=jsonable_encoder(result),
