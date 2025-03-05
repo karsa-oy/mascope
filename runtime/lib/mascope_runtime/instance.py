@@ -125,3 +125,23 @@ class Runtime:
             return os.path.realpath(joined_path)
         else:
             return path
+
+    def secret(self, envvar: str, path: str, all_lines: bool = False) -> str:
+        # construct paths to look in
+        envvar_path = os.environ.get(envvar)
+        root_path = os.path.join(self.path, "secrets", path)
+        # try to open each path
+        for file_path in [envvar_path, root_path]:
+            # ensure the path and file exist
+            if file_path and os.path.exists(file_path):
+                with open(file_path, "r", encoding="utf-8") as f:
+                    # if succesful, return the result
+                    return (
+                        "\n".join(f.readlines())  # all lines
+                        if all_lines
+                        else f.readlines()[0].replace("\n", "")  # first line
+                    )
+        # if no file was found, raise an error
+        raise FileNotFoundError(
+            f"Secret could not be found using env var {envvar} and path {path}"
+        )

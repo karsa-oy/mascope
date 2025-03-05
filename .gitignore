@@ -10,5 +10,6 @@ __pycache__
 
 /.env
 /secrets
+/runtime/secrets
 
 tofdaq
