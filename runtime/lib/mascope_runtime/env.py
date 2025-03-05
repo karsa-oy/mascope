@@ -29,11 +29,28 @@ class RuntimeEnv:
         return self._root
 
     @property
+    def envdir(self) -> str:
+        return os.path.join(self.root.path, "runtime", "env")
+
+    @property
+    def list(self) -> list[dict]:
+        envdir = [
+            {"name": name, "path": os.path.join(self.envdir, name)}
+            for name in os.listdir(self.envdir)
+        ]
+        envs = [
+            entry
+            for entry in envdir
+            if (os.path.isdir(entry["path"]) and not entry["name"].startswith("."))
+        ]
+        return envs
+
+    @property
     def path(self) -> str:
         """
         The runtime environment path
         """
-        return os.path.join(self._root.path, "runtime", "env", self.name)
+        return os.path.join(self.envdir, self.name)
 
     def resolve(self, path: str) -> any:
         """

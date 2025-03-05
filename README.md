@@ -151,9 +151,9 @@ mascope prod build         # build the production containers
 Manage runtime envs:
 
 ```sh
-mascope env list           # list runtime env
-mascope env activate foo   # set foo as the active env
-mascope env default        # revert to the default env
+mascope env list            # list runtime env
+mascope env use foo         # set foo as the active env
+mascope env use default     # revert to the default env
 ```
 
 ---
@@ -258,7 +258,7 @@ Modules' _configuration_ is specified in the `base`, `dev` and `prod` files with
 
 The Mascope app requires multiple persistence mechanisms: SQLite, various files, configuration files and even a small state.json file. To facilitate ease of operations, these are organized in a single folder called a _runtime env_.
 
-To list available envs, run `mascope env list`. To activate an env _foo_, run `mascope env activate foo`. To revert to the _default_ env, run `mascope env default`.
+To list available envs, run `mascope env list`. To activate an env _foo_, run `mascope env use foo`. To revert to the _default_ env, run `mascope env use default`.
 
 The `runtime/env` folder can contain multiple runtime environments. Only `default` - the team's standard development environment - is not `.gitignore`d. The folder structure looks like this:
 
