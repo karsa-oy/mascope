@@ -16,6 +16,7 @@ class AccessTokenConfig(BaseModel):
         "mascope_sdk",  # for Jupyter notebooks API library
         "file-converter",  # for file converter service
         "tof-agent",  # for TOF-instrument agent
+        "file-uploader",  # for File Uploader agent
     ]
     # Access token-based authentication settings for Jupyter library API access
     ACCESS_TOKEN_EXPIRATION_SECONDS: int = (

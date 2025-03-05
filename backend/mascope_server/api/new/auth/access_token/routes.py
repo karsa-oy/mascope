@@ -25,6 +25,7 @@ async def access_token_regenerate_route(
     Different services require different minimum roles:
     - mascope_sdk: guest or higher - for Jupyter access
     - tof-agent: editor or higher - for TOF agent access
+    - file-uploader: editor or higher - for FileUploader agent access
     - file-converter: internal service, managed automatically
     """
     service_name = access_token_request.service_name
@@ -32,6 +33,8 @@ async def access_token_regenerate_route(
     if service_name == "mascope_sdk":
         await role_based_access(user, "guest")
     elif service_name == "tof-agent":
+        await role_based_access(user, "editor")
+    elif service_name == "file-uploader":
         await role_based_access(user, "editor")
     elif service_name == "file-converter":
         raise InternalServiceAccessException()

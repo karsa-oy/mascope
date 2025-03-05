@@ -33,6 +33,11 @@ const SERVICE_CONFIGS = [
     id: 'tof-agent', // Different delimiter styles (_ vs -) are used in id (packages/libraries use _, services/agents use -).
     label: 'TOF Agent',
     minRole: 200 // editor role_id
+  },
+  {
+    id: 'file-uploader',
+    label: 'File Uploader',
+    minRole: 200 // editor role_id
   }
 ]
 
