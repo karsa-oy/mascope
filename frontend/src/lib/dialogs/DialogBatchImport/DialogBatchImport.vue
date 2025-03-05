@@ -87,6 +87,10 @@ watchEffect(() => {
     : null
 })
 
+const allowedSampleTypes = computed(() => {
+  return sampleTypesFilterIdOptional.concat(sampleTypesFilterIdNotAllowed).join(', ')
+})
+
 const title = computed(() => {
   const name = app.data.batch.focused?.sample_batch_name ?? 'selected'
   return imported.type == 'autosampler'
@@ -225,7 +229,25 @@ const submit = () => {
         <Tab value="instrument-config">Instrument Config</Tab>
       </TabList>
       <TabPanels>
-        <TabPanel value="data">
+        <TabPanel
+          value="data"
+          :pt="
+            app.ui.help.top(`
+              <b>Paste sample metadata from a spreadsheet.</b>
+              <ul>
+              <li>Required fields are 'name' and 'type'.</li>
+              <li>
+                You may include 'filter id' if applicable, or any other extra attributes
+                each in their own column.
+              </li>
+              <li>
+                Allowed sample types are:<br />
+                ${allowedSampleTypes}
+              </li>
+              </ul>
+            `)
+          "
+        >
           <BaseClipboardContext :parse="parse" :persistMessage="imported.items.length == 0">
             <template v-slot:info>
               <div id="preview" v-if="imported.items.length == 0">
@@ -257,25 +279,8 @@ const submit = () => {
                   </ScrollPanel>
                   <Message severity="secondary" icon="pi pi-clipboard">
                     <b>Paste sample metadata from a spreadsheet.</b>
-                    <ul>
-                      <li>Required fields are 'name' and 'type'.</li>
-                      <li>
-                        You may include 'filter id' if applicable, or any other extra attributes
-                        each in their own column.
-                      </li>
-                      <li>
-                        Include the header row, and verify the row count matches the number of
-                        selected acquisitions.
-                      </li>
-                      <li>
-                        Allowed sample types are:<br />
-                        {{
-                          sampleTypesFilterIdOptional
-                            .concat(sampleTypesFilterIdNotAllowed)
-                            .join(', ')
-                        }}.
-                      </li>
-                    </ul>
+                    <br /><br />
+                    Activate help mode for detailed information.
                   </Message>
                 </Panel>
               </div>
