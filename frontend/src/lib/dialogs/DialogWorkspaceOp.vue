@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, computed, watch } from 'vue'
+import { ref, reactive, computed, watch, nextTick } from 'vue'
 
 import FloatLabel from 'primevue/floatlabel'
 import Dialog from 'primevue/dialog'
@@ -83,6 +83,7 @@ async function execute() {
 
             if (createdWorkspace) {
               app.data.workspace.focus(createdWorkspace)
+              nextTick()
               unwatch() // Stop watching after focusing
             }
           }
