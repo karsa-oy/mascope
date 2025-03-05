@@ -813,7 +813,7 @@ async def sample_item_export_peaks(
     sample_peak_df.to_csv(
         os.path.join(temp_dir, peakfile_filename), index=False, sep=";"
     )
-    message = f"Peak data for sample item '{sample_item_name}' was exported to file '{peakfile_filename}' and saved to '{peakfile_path}'."
+    message = f"Peak data for sample item '{sample_item_name}' was exported to file '{peakfile_filename}'."
     runtime.logger.info(message)
 
     # Return the status message
@@ -822,5 +822,6 @@ async def sample_item_export_peaks(
         "data": {"filename": peakfile_filename},
         "_notification_data": {
             "sample_item_id": sample_item_id,
+            "download": peakfile_filename,
         },
     }

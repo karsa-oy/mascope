@@ -109,8 +109,12 @@ export const useSample = defineModule({
         type: 'rematch_sample'
       }
     ),
+  exportPeaks: async ({ sample_item_id }) =>
+    api.http.get(`/sample/items/${sample_item_id}/export_peak_data`, {
+      use: 'process',
+      type: 'export_sample_peaks'
+    }),
   upload: async (files) => {
-    const auth = useAuth()
     const ui = useUi()
     const mainProcessId = genId(8) // Generate a unique ID for the overall upload process
     let successes = 0 // Counter to track the number of successful uploads
