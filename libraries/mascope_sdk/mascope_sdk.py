@@ -141,7 +141,13 @@ def api_post(url: str, path: str, access_token: str, data: dict):
     return resp
 
 
-def api_post_file(url: str, path: str, access_token: str, filepath: str):
+def api_post_file(
+    url: str,
+    path: str,
+    access_token: str,
+    filepath: str,
+    service_name: str = "mascope_sdk",
+):
     """Send a POST request to the specified API endpoint with a path file to be uploaded.
 
     :param url: The base URL of the server.
@@ -152,6 +158,8 @@ def api_post_file(url: str, path: str, access_token: str, filepath: str):
     :type access_token: str
     :param filepath: Path to the file to be uploaded
     :type filepath: str
+    :param service_name: The name of the service making the request, defaults to "mascope_sdk".
+    :type service_name: str, optional
     :return: The response object if the request was successful, otherwise None.
     :rtype: requests.Response or None
     """
@@ -159,7 +167,7 @@ def api_post_file(url: str, path: str, access_token: str, filepath: str):
     try:
         headers = {
             "Authorization": f"Bearer {access_token}",
-            "X-Service-Name": "tof-agent",
+            "X-Service-Name": service_name,
         }
         with open(filepath, "rb") as file:
             resp = requests.post(

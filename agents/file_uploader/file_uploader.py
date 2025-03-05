@@ -82,6 +82,7 @@ def upload_sample_file(filepath: str) -> None:
         path="sample/files/upload",
         access_token=runtime.config.access_token,
         filepath=filepath,
+        service_name="file-uploader",
     )
 
     if resp is not None:
