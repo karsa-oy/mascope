@@ -1057,7 +1057,7 @@ async def sample_batch_export_peaks(
         index=False,
         sep=";",
     )
-    message = f"Peak data for sample batch '{sample_batch_name}' was exported to file '{peakfile_filename}' and saved to '{temp_dir}'."
+    message = f"Peak data for sample batch '{sample_batch_name}' was exported to file '{peakfile_name}'."
     runtime.logger.info(message)
 
     # Return the status message
@@ -1066,5 +1066,6 @@ async def sample_batch_export_peaks(
         "data": {"filename": peakfile_filename},
         "_notification_data": {
             "sample_batch_id": sample_batch_id,
+            "download": peakfile_filename,
         },
     }
