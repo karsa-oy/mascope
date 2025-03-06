@@ -7,7 +7,7 @@ from mascope_server.api.models.base_pydantic_model import QueryParamsModel
 
 # TODO_configuration Default sample file upload params
 FILE_UPLOAD_EXTENSIONS = {".h5", ".raw"}
-FILE_UPLOAD_SIZE_LIMIT = 200 * 1024 * 1024  # 200 MB
+FILE_UPLOAD_SIZE_LIMIT = 1000 * 1024 * 1024  # 1 GB
 
 
 class SampleFileBase(BaseModel):
