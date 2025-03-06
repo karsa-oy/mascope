@@ -252,3 +252,99 @@ def get_tic_per_scan(
             scan_timestamp = scan_timestamp[scan_indices]
 
         return scan_timestamp, scan_tic
+
+
+def get_peak_profiles(
+    datafile_path: str,
+    mzs: Iterable[float],
+    t_min: Optional[float] = None,
+    t_max: Optional[float] = None,
+    polarity: Optional[str] = None,
+) -> xr.Dataset:
+    """Extracts the peak profiles for the specified m/z values in the time range (t_min, t_max).
+
+    :param datafile_path: Path to the Thermo Fisher raw file (.raw) containing the data.
+    :type datafile_path: str
+    :param mzs: array of m/z values for which peak profiles are required.
+    :type mzs: float
+    :param t_min: Start time [s], optional, defaults to None
+    :type t_min: float
+    :param t_max: End time [s], optional, defaults to None
+    :type t_max: float
+    :param polarity: + or -, Polarity of the scans to be retrieved, optional, defaults to None
+    :type polarity: str
+    :return: An xarray Dataset containing the peak profiles
+    :rtype: xr.Dataset
+    """
+    with open_raw_file(datafile_path) as raw_file:
+        # Make sure mzs are numpy array
+        mzs = np.asarray(mzs)
+        # Get full time range
+        t_start = raw_file.RunHeader.StartTime * 60  # [s]
+        t_end = raw_file.RunHeader.EndTime * 60  # [s]
+
+        # Check if t_min and t_max are passed
+        t_min = t_start if t_min is None else t_min
+        t_max = t_end if t_max is None else t_max
+
+        num_of_scans = raw_file.RunHeaderEx.SpectraCount
+        scan_indices = list(range(0, num_of_scans))
+        # Get all scans
+        scans = tuple(Extensions.GetScans(raw_file, 1, num_of_scans))
+
+        # Filter by polarity
+        if polarity is not None:
+            if polarity not in ["-", "+"]:
+                raise (
+                    ValueError(
+                        "Polarity must be passed as a string containing either '+' or '-'"
+                    )
+                )
+            polarity = "Negative" if polarity == "-" else "Positive"
+            polarity_mask = [
+                raw_file.GetFilterForScanNumber(i + 1).Polarity.ToString() == polarity
+                for i in scan_indices
+            ]
+            scan_indices = list(compress(scan_indices, polarity_mask))
+
+        scan_time = [scan.ScanStatistics.StartTime * 60 for scan in scans]  # [s]
+
+        # Filter by time range
+        time_mask = [t_min <= t <= t_max for t in scan_time]
+        scan_indices = list(compress(scan_indices, time_mask))
+
+        # If scan_indices is empty, raise an error
+        if not scan_indices:
+            raise ValueError(
+                f"""No data found in the specified time range.
+                Time range of the sample file: {t_start:.1f} - {t_end:.1f} s.
+                """
+            )
+
+        # Update time scale
+        scan_time = list(compress(scan_time, time_mask))
+
+        intensities = [
+            np.frombuffer(scans[i].SegmentedScan.Intensities) for i in scan_indices
+        ]
+        positions = [
+            np.frombuffer(scans[i].SegmentedScan.Positions) for i in scan_indices
+        ]
+
+        # Calculate the intensities for the given mz_values
+        intensities_for_mz_values = []
+        for pos, intens in zip(positions, intensities):
+            intensities_for_mz_values.append(np.interp(mzs, pos, intens))
+
+        # Convert to dask array, transpose to have mz values as columns
+        peak_profiles_dask = da.from_array(
+            np.array(intensities_for_mz_values).T, chunks="auto"
+        )
+
+        # Export xarray array with time and mz coordinates
+        return xr.DataArray(
+            peak_profiles_dask,
+            dims=("mz", "time"),
+            coords={"mz": mzs, "time": np.array(scan_time)},
+            name="signal",
+        )
