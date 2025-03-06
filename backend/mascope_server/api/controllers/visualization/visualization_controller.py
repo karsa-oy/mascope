@@ -1,21 +1,19 @@
 import asyncio
 import numpy as np
 import pandas as pd
-import xarray as xr
 from sqlalchemy import select
 from colorcet import glasbey_hv as colormap
-from mascope_lib.file_func import get_instrument_type, load_file, load_signal
+from mascope_lib.file_func import (
+    get_instrument_type,
+    get_peak_profiles,
+    load_file,
+)
 from mascope_lib.peak import filter_peaks, get_peaks
-from mascope_lib.util import get_closest_non_nan
 from mascope_server.db import async_session
 from mascope_server.db.models import Sample, TargetIsotope
 from mascope_server.socket import sio
 from mascope_server.api.lib.exceptions.api_exceptions import NotFoundException
 from mascope_server.api.lib.api_features import api_controller_background_task
-from mascope_server.api.new.instrument_configs.lib import (
-    read_instrument_functions,
-)
-
 
 from mascope_server.runtime import runtime
 
@@ -34,7 +32,7 @@ async def visualize_ion_focus(
     mz_tolerance: int,
     independent_transaction: bool = False,
     sid: str = None,
-    process_id=None,
+    process_id: str = None,
 ):
     """
     Visualizes the focus on a specific ion for a given sample item by computing and emitting sum spectrum and time series data.
@@ -46,8 +44,6 @@ async def visualize_ion_focus(
     4. Iterates over each target isotope, computing and emitting visualization traces for the sum spectrum and time series.
     5. Constructs and emits the sum timeseries trace if applicable.
 
-    :param sid: Session ID for emitting data to the specific client.
-    :type sid: str
     :param sample_item_id: ID of the sample item to visualize.
     :type sample_item_id: str
     :param target_ion_id: ID of the target ion to focus on.
@@ -119,9 +115,6 @@ async def visualize_ion_focus(
 
         # Extract the specific isotope slice and compute the sum spectrum
         isotope_slice = sample_file.sel(mz=slice(*mz_range)).compute()
-        isotope_signal = load_signal(
-            filename, mz_min=mz_range[0], mz_max=mz_range[1]
-        ).compute()
         isotope_sum_spectrum = isotope_slice.sum_signal
         # Check if the spectrum slice is empty
         if isotope_sum_spectrum.size == 0:
@@ -163,9 +156,13 @@ async def visualize_ion_focus(
         )
         # Peak traces (vertical lines)
         peaks = get_peaks(isotope_slice, "height").sum(dim="time").compute()
-        runtime.logger.debug(f"Peaks in the range {mz_range}: {peaks.mz}")
+        runtime.logger.debug(f"Peaks in the range {mz_range}: {peaks.mz.values}")
         peaks = filter_peaks(peaks, intensity=peak_min_intensity)
-        runtime.logger.debug(f"Peaks above threshold {peak_min_intensity}: {peaks.mz}")
+        runtime.logger.debug(
+            f"Peaks above threshold {peak_min_intensity}: {peaks.mz.values}"
+        )
+        # Get peak profiles/timeseries
+        peak_profiles = get_peak_profiles(filename, peaks.mz.values)
         for peak in peaks:
             peak_mz = peak.mz.item()
             match = True if abs((peak_mz - mz) / mz * 1e6) <= mz_tolerance else False
@@ -185,32 +182,7 @@ async def visualize_ion_focus(
             )
             if match:
                 # Timeseries trace
-                try:
-                    _, resolution_function = await read_instrument_functions(
-                        filename=filename
-                    )
-                    fwhm = peak_mz / resolution_function(peak_mz)
-                    # Slice spectrum segment presumably containing target peak
-                    isotope_peak_slice = isotope_signal.signal.sel(
-                        mz=slice(peak_mz - fwhm / 2, peak_mz + fwhm / 2)
-                    ).compute()
-
-                    match_timeseries = xr.apply_ufunc(
-                        get_closest_non_nan,
-                        isotope_peak_slice,
-                        kwargs={
-                            "x": isotope_peak_slice.mz.values,
-                            "target": peak_mz,
-                        },
-                        input_core_dims=[["mz"]],
-                        vectorize=True,
-                    )
-                except KeyError as e:
-                    runtime.logger.warning(
-                        f"Failed to find mz {peak_mz} in the dataset: {isotope_signal.signal.mz}. Error: {e}"
-                    )
-                    continue
-
+                match_timeseries = peak_profiles.sel(mz=peak_mz)
                 timeseries_time = match_timeseries.time.values.astype(np.float32)
                 timeseries_y = match_timeseries.values.astype(np.float32)
                 timeseries_rgb = colormap[i + COLOR_OFFSET]
@@ -251,7 +223,7 @@ async def visualize_ion_focus(
 
         await sio.emit("visualization_signal_timeseries", timeseries_traces, room=sid)
         # Sleep 0 to let other tasks be scheduled before next iteration
-        await asyncio.sleep(0)
+        await asyncio.sleep(0.001)
 
     # Step 5: Constructs and emits the sum timeseries trace if applicable.
     # If no data to visualize, return early
