@@ -3,51 +3,34 @@ set -euo pipefail
 IFS=$'\n\t'
 
 # parse args
-action=$1
-modules="${@:2}"
+action="${1:-reinstall}"
 
 # resolve mascope path
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-ROOT_PATH=$( dirname $SCRIPT_DIR )
-
-# determine wheter or not the CLI
-# should be un/re/installed:
-if [[ $modules == *cli* ]]; then
-    cli=1
-elif [[ -z $modules ]]; then
-    cli=1
-else
-    cli=0
-fi
+ROOT_PATH=$( dirname "$SCRIPT_DIR" )
 
 # main procedure
 function main() {
     write_intro
 
-    if [ $(action_in "uninstall" "reinstall") ]; then
-        uninstall_mascope_modules "${modules}"
-        if [ $cli ]; then
-            uninstall_mascope_cli
-        fi
+    if [ "$(action_in 'uninstall' 'reinstall')" ]; then
+        uninstall_mascope_modules
         clear_mascope_envvars
     fi
 
-    if [ $(action_in "install" "reinstall") ]; then
+    if [ "$(action_in 'install' 'reinstall')" ]; then
         set_mascope_envvars
         install_tooling
     fi
 
-    if [ $(action_in "install" "reinstall" "update") ]; then
+    if [ "$(action_in 'install' 'reinstall' 'update')" ]; then
         clear_mascope_state
-        if [ $cli ]; then
-            install_mascope_cli
-        fi
-        install_mascope_modules "${modules}"
+        install_mascope_modules
     fi
 
     write_outro
 
-    if [ $(action_in "install" "reinstall") ]; then
+    if [ "$(action_in 'install' 'reinstall')" ]; then
         su "${USER}"
     fi
 }
@@ -150,7 +133,7 @@ function install_tooling() {
 
     # ensure pipx uses python 3.12
     python_path=$(which python3.12)
-    if [[ PIPX_DEFAULT_PYTHON != $python_path ]]; then
+    if [[ PIPX_DEFAULT_PYTHON != "$python_path" ]]; then
         set_envvar 'PIPX_DEFAULT_PYTHON' "${python_path}"
     fi
 
@@ -205,7 +188,7 @@ function install_tooling() {
         sudo add-apt-repository -y "deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable"
         apt-cache policy docker-ce
         sudo apt install -y docker-ce
-        sudo usermod -aG docker ${USER}
+        sudo usermod -aG docker "${USER}"
     else
         echo "
 
@@ -213,45 +196,6 @@ function install_tooling() {
 
 "
     fi
-}
-
-function install_mascope_cli() {
-    echo "
-
-    +------------------------------+
-    | ⚡ INSTALLING MASCOPE CLI ⚡ |
-    +------------------------------+
-
-    "
-    cd "${MASCOPE_PATH}/runtime/cli"
-
-    # try to uninstall, ignore failure
-    pipx uninstall mascope_cli || true
-    # build with poetry
-    poetry env use $PIPX_DEFAULT_PYTHON
-    poetry build
-    # install for user
-    pipx install .
-
-    cd ${MASCOPE_PATH}
-}
-
-function uninstall_mascope_cli() {
-    echo "
-
-    +--------------------------------+
-    | ⚡ UNINSTALLING MASCOPE CLI ⚡ |
-    +--------------------------------+
-
-    "
-    cd "${MASCOPE_PATH}/runtime/cli"
-
-    # try to uninstall, ignore failure
-    pipx uninstall mascope_cli || true
-    # remove all virtual envs
-    poetry env remove --all
-
-    cd "${MASCOPE_PATH}"
 }
 
 function install_mascope_modules() {
@@ -262,7 +206,7 @@ function install_mascope_modules() {
     +----------------------------------+
 
     "
-    mascope dev install $1
+    python3.12 ./setup/mascope.py install
 }
 
 function uninstall_mascope_modules() {
@@ -273,7 +217,7 @@ function uninstall_mascope_modules() {
     +------------------------------------+
 
     "
-    mascope dev uninstall $1
+    python3.12 ./setup/mascope.py uninstall
 }
 
 function write_intro() {

@@ -1,4 +1,4 @@
-from typing import List, Dict, Annotated, Optional
+from typing import List, Annotated, Optional
 import os
 import json
 import typer
@@ -137,68 +137,3 @@ def run(
     command = f"{concurrently} --raw {names} {cmds}"
     print(f"Running command: {command}")
     lib.run(command)
-
-
-def install_module(mod, lock=False):
-    if mod["install"]:
-        options = f'--names "{mod["name"]}"'
-        python_path = os.environ["PIPX_DEFAULT_PYTHON"]
-        # lock command
-        poetry_lock = "poetry lock &&" if "poetry" in mod["install"] else None
-        npm_lock = (
-            "npm install --package-lock-only &&" if "npm" in mod["install"] else None
-        )
-        lock_cmd = (poetry_lock or npm_lock or "") if lock else ""
-        # environment setup
-        env_setup = (
-            f"poetry env use {python_path} &&" if "poetry" in mod["install"] else ""
-        )
-        # execution
-        lib.run(
-            f'{concurrently} {options} "cd {mod["pkg_path"]} && {env_setup} {lock_cmd} {mod["install"]}"'
-        )
-
-
-def uninstall_module(mod):
-    if mod["install"]:
-        options = f'--names "{mod["name"]}"'
-        # execution
-        lib.run(
-            f'{concurrently} {options} "cd {mod["pkg_path"]} && {mod["uninstall"]}"'
-        )
-
-
-@dev_app.command()
-def install(
-    mods: Annotated[
-        Optional[List[str]],
-        typer.Argument(
-            help="List of modules to install; run `mascope modules --installable` for a list of installable modules"
-        ),
-    ] = None,
-):
-    """
-    Install or update modules in your dev env
-    """
-    install_all = mods is None
-    for pkg in runtime.modules:
-        if install_all or (pkg["name"] in (mods or [])):
-            install_module(pkg)
-
-
-@dev_app.command()
-def uninstall(
-    mods: Annotated[
-        Optional[List[str]],
-        typer.Argument(
-            help="List of modules to uninstall; run `mascope modules --installable` for a list of uninstallable modules"
-        ),
-    ] = None,
-):
-    """
-    Uninstall modules in your dev env
-    """
-    uninstall_all = mods is None
-    for pkg in reversed(runtime.modules):
-        if uninstall_all or (pkg["name"] in (mods or [])):
-            uninstall_module(pkg)
