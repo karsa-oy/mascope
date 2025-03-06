@@ -2,8 +2,7 @@ from __future__ import annotations
 import typing
 
 if typing.TYPE_CHECKING:
-    from .instance import Runtime
-    from .env import RuntimeEnv
+    from .runtime import Runtime
 
 import os
 import tomllib
@@ -205,15 +204,15 @@ class RuntimeConfigLoader:
     This class is to be used with the `load_config` below.
     """
 
-    _root: Runtime
+    _runtime: Runtime
     _raw: dict
     _resolved: RuntimeConfig
 
-    def __init__(self, root: Runtime):
-        self._root = root
+    def __init__(self, runtime: Runtime):
+        self._runtime = runtime
 
-        self.base = self.root.path("./runtime/lib/mascope_runtime/base.mascope.toml")
-        self.path = self.env.path(f"./{self.root.mode}.mascope.toml")
+        self.base = self.runtime.path("./runtime/lib/mascope_runtime/base.mascope.toml")
+        self.path = self.runtime.env.path(f"./{self.runtime.mode}.mascope.toml")
 
         config = self._load_tomls()
         config = self._resolve_paths(config)
@@ -222,12 +221,8 @@ class RuntimeConfigLoader:
         self._resolved = config
 
     @property
-    def root(self):
-        return self._root
-
-    @property
-    def env(self) -> RuntimeEnv:
-        return self.root.env
+    def runtime(self):
+        return self._runtime
 
     @property
     def config(self):
@@ -262,10 +257,10 @@ class RuntimeConfigLoader:
                 if value.startswith("./"):
                     if key != "pkg_path":
                         # default to resolving against env
-                        resolved[key] = self.env.realpath(value)
+                        resolved[key] = self.runtime.env.realpath(value)
                     else:
                         # except package path
-                        resolved[key] = self.root.realpath(value)
+                        resolved[key] = self.runtime.realpath(value)
                 # keep non-relative paths as-is
                 else:
                     resolved[key] = value
@@ -296,6 +291,6 @@ class RuntimeConfigLoader:
         return RuntimeConfig(**unvalidated)
 
 
-def load_config(root: Runtime):
-    loader = RuntimeConfigLoader(root)
+def load_config(runtime: Runtime):
+    loader = RuntimeConfigLoader(runtime)
     return loader.config

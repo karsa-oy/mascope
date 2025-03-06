@@ -3,7 +3,7 @@ from __future__ import annotations
 import typing
 
 if typing.TYPE_CHECKING:
-    from .instance import Runtime
+    from .runtime import Runtime
 
 import loguru
 from loguru import logger
@@ -49,31 +49,24 @@ class RuntimeLoggerLoader:
     below.
     """
 
-    _root: Runtime
+    _runtime: Runtime
     _logger: loguru.Logger
 
-    def __init__(self, root: Runtime) -> None:
-        self._root = root
+    def __init__(self, runtime: Runtime) -> None:
+        self._runtime = runtime
         self._logger = self.configure()
 
     @property
-    def root(self):
-        return self._root
-
-    @property
-    def module(self):
-        return self.root.module
-
-    @property
-    def env(self):
-        return self.root.env
+    def runtime(self):
+        return self._runtime
 
     @property
     def logger(self):
         return self._logger
 
     def path(self, *args: list[str]):
-        return os.path.join(self.module.config.log_path, self.root.mode, *args)
+        log_path = self.runtime.module.config.log_path
+        return os.path.join(log_path, self.runtime.mode, *args)
 
     # module is not typed to prevent circular import
     def configure(self) -> None:
@@ -89,7 +82,7 @@ class RuntimeLoggerLoader:
         os.makedirs(self.path(), exist_ok=True)
         # define logging handlers
         file_handler = dict(
-            sink=self.path(f"{{time:YYYY-MM-DD}}.{self.module.name}.log"),
+            sink=self.path(f"{{time:YYYY-MM-DD}}.{self.runtime.module.name}.log"),
             format=self.formatter(),
             level="INFO",  # avoid large file size
             enqueue=True,  # multiprocess safe
@@ -103,7 +96,7 @@ class RuntimeLoggerLoader:
             sink=sys.stdout,
             format=self.formatter(),
             colorize=True,
-            level=self.module.config.log_level.upper(),
+            level=self.runtime.module.config.log_level.upper(),
             enqueue=True,  # multiprocess safe
             catch=True,
         )
@@ -111,7 +104,7 @@ class RuntimeLoggerLoader:
         logger.remove()  # remove old settings
         logger.configure(  # apply new settings
             handlers=[file_handler, terminal_handler]
-            if self.module.name != "cli"
+            if self.runtime.module.name != "cli"
             else [terminal_handler],
             levels=[
                 dict(name="TRACE", color="<magenta>"),
@@ -122,7 +115,7 @@ class RuntimeLoggerLoader:
                 dict(name="ERROR", color="<red><bold>"),
                 dict(name="CRITICAL", color="<RED><bold>"),
             ],
-            extra=dict(mod=self.module.name, key="", status_code="", method=""),
+            extra=dict(mod=self.runtime.module.name, key="", status_code="", method=""),
         )
         return logger
 
@@ -193,8 +186,8 @@ class RuntimeLoggerLoader:
             # message
             record["extra"]["parsed_message"] = (
                 record["message"]
-                .replace(self.env.path(), "$env")
-                .replace(self.root.path(), "$mascope")
+                .replace(self.runtime.env.path(), "$env")
+                .replace(self.runtime.path(), "$mascope")
             )
             message = "{extra[parsed_message]: <60}"
             message_text = f"{record['message']}"
@@ -283,5 +276,5 @@ class RuntimeLoggerLoader:
         return Traceback(stack, show_locals=show_locals)
 
 
-def configure_logger(root: Runtime):
-    RuntimeLoggerLoader(root)
+def configure_logger(runtime: Runtime):
+    RuntimeLoggerLoader(runtime)

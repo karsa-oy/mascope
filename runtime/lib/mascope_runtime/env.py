@@ -3,7 +3,7 @@ from __future__ import annotations
 import typing
 
 if typing.TYPE_CHECKING:
-    from .instance import Runtime
+    from .runtime import Runtime
 
 import os
 
@@ -17,20 +17,20 @@ class RuntimeEnv:
 
     name: str
 
-    _root: Runtime
+    _runtime: Runtime
 
-    def __init__(self, root: Runtime):
+    def __init__(self, runtime: Runtime):
         # init attributes
-        self._root = root
-        self.name = self.root.state.env
+        self._runtime = runtime
+        self.name = self.runtime.state.env
 
     @property
-    def root(self) -> Runtime:
-        return self._root
+    def runtime(self) -> Runtime:
+        return self._runtime
 
     @property
     def dir(self) -> str:
-        return self.root.path("runtime", "env")
+        return self.runtime.path("runtime", "env")
 
     @property
     def list(self) -> list[dict]:

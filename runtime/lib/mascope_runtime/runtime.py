@@ -4,10 +4,9 @@ from loguru import logger
 from .mode import RuntimeMode
 from .state import RuntimeJsonState, RuntimeTempState
 from .exceptions import MissingMascopePathException
-from .options import RuntimeOptions
 from .env import RuntimeEnv
 from .module import RuntimeModule
-from .config import MetaConfig, load_config
+from .config import RuntimeConfig, MetaConfig, load_config
 from .logger import configure_logger
 
 
@@ -26,21 +25,25 @@ class Runtime:
     runtime interfaces such as the module's own config.
     """
 
-    options: RuntimeOptions
     state: RuntimeJsonState | RuntimeTempState
     env: RuntimeEnv
     module: RuntimeModule
 
     _path: str
     _version: str
+    _full_config: RuntimeConfig
 
-    def __init__(self, module: str, **opts):
-        # load options
-        self.options = RuntimeOptions(**opts)
-
+    def __init__(
+        self,
+        module: str,
+        env: str | None = None,
+        mode: RuntimeMode | None = None,
+        path: str | None = None,
+    ):
         # initialize attributes
-        self.read_envvars()
-        self.init_state()
+        self._init_path(path=path)
+        self._init_version()
+        self._init_state(env=env, mode=mode)
 
         # initalize runtime
         self.env = RuntimeEnv(self)
@@ -92,6 +95,22 @@ class Runtime:
 
     # METHODS
 
+    def _init_path(self, path: str):
+        resolved_path = path or os.environ.get("MASCOPE_PATH")
+        if not resolved_path:
+            raise MissingMascopePathException()
+        else:
+            self._path = resolved_path
+
+    def _init_version(self):
+        self._version = os.environ.get("MASCOPE_VERSION")
+
+    def _init_state(self, env: str | None = None, mode: RuntimeMode | None = None):
+        if env or mode:
+            self.state = RuntimeTempState(env, mode)
+        else:
+            self.state = RuntimeJsonState(self._path)
+
     def path(self, *args: list[str]) -> str:
         if len(args) == 1 and "/" in args[0]:
             # resolve string paths like "./foo/bar"
@@ -103,20 +122,6 @@ class Runtime:
 
     def realpath(self, *args: list[str]) -> str:
         return os.path.realpath(self.path(*args))
-
-    def read_envvars(self):
-        resolved_path = self.options.path or os.environ.get("MASCOPE_PATH")
-        if not resolved_path:
-            raise MissingMascopePathException()
-        else:
-            self._path = resolved_path
-        self._version = os.environ.get("MASCOPE_VERSION")
-
-    def init_state(self):
-        if self.options.env or self.options.mode:
-            self.state = RuntimeTempState(self.options.env, self.options.mode)
-        else:
-            self.state = RuntimeJsonState(self._path)
 
     def secret(self, envvar: str, path: str, all_lines: bool = False) -> str:
         # construct paths to look in

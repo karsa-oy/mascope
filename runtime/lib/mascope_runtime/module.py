@@ -3,7 +3,7 @@ from __future__ import annotations
 import typing
 
 if typing.TYPE_CHECKING:
-    from .instance import Runtime
+    from .runtime import Runtime
 
 import json
 
@@ -18,27 +18,27 @@ class RuntimeModule:
 
     name: str
 
-    _root: Runtime
+    _runtime: Runtime
 
-    def __init__(self, name: str, root: Runtime) -> None:
+    def __init__(self, name: str, runtime: Runtime) -> None:
         self.name = name
-        self._root = root
+        self._runtime = runtime
 
     @property
-    def root(self) -> Runtime:
-        return self._root
+    def runtime(self) -> Runtime:
+        return self._runtime
 
     @property
     def config(self) -> ModuleConfig:
-        return getattr(self.root._full_config, self.name.replace("-", "_"))
+        return getattr(self.runtime._full_config, self.name.replace("-", "_"))
 
     def to_dict(self):
         return {
             "config": self.config.model_dump(),
-            "mode": self.root.mode,
-            "env": self.root.env.name,
-            "meta": self.root.meta.model_dump(),
-            "version": self.root.version,
+            "mode": self.runtime.mode,
+            "env": self.runtime.env.name,
+            "meta": self.runtime.meta.model_dump(),
+            "version": self.runtime.version,
         }
 
     def to_json(self):
