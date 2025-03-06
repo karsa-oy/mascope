@@ -188,18 +188,12 @@ class RuntimeConfigLoader:
     Helper class to facilitate loading the configuration of
     the runtime.
 
-    Loading works as follows:
-     1. Depending on the runtime mode, load `dev.mascope.toml`
-        or `prod.mascope.toml` from the runtime environment;
-        missing values use defaults set in `base.mascope.toml`
-        in the runtime library.
-     2. Resolve relative paths into absolute paths, using the
-        runtime environment path (except for package paths,
-        which resolve relative to the Mascope root path).
-     3. Resolve log level for each module, using CLI arguments,
-        toml settings and defaults.
-     4. Validate the resulting dictionary using the Pydantic
-        model for the configuration.
+    During initialization, the class loads mascope.toml files,
+    combines them, resolves paths and log levels and validates
+    all fields using a Pydantic model.
+
+    The resulting validated configuration is exposed with
+    the `config` property.
 
     This class is to be used with the `load_config` below.
     """
@@ -209,10 +203,25 @@ class RuntimeConfigLoader:
     _resolved: RuntimeConfig
 
     def __init__(self, runtime: Runtime):
-        self._runtime = runtime
+        """
+        Initializes the runtime configuration:
 
-        self.base = self.runtime.path("./runtime/lib/mascope_runtime/base.mascope.toml")
-        self.path = self.runtime.env.path(f"./{self.runtime.mode}.mascope.toml")
+         1. Depending on the runtime mode, load `dev.mascope.toml`
+            or `prod.mascope.toml` from the runtime environment;
+            missing values use defaults set in `base.mascope.toml`
+            in the runtime library.
+         2. Resolve relative paths into absolute paths, using the
+            runtime environment path (except for package paths,
+            which resolve relative to the Mascope root path).
+         3. Resolve log level for each module, using CLI arguments,
+            toml settings and defaults.
+         4. Validate the resulting dictionary using the Pydantic
+            model for the configuration.
+
+        :param runtime: The parent runtime
+        :type runtime: Runtime
+        """
+        self._runtime = runtime
 
         config = self._load_tomls()
         config = self._resolve_paths(config)
@@ -222,13 +231,30 @@ class RuntimeConfigLoader:
 
     @property
     def runtime(self):
+        """
+        The main runtime context
+        """
         return self._runtime
 
     @property
     def config(self):
+        """
+        The loaded and resolved config
+        """
         return self._resolved
 
     def _load_tomls(self):
+        """
+        Over defaults from `base.mascope.toml` in the runtime
+        library, with settings in either `dev.mascope.toml` or
+        `prod.mascope.toml`, returning the result as a dict.
+
+        :return: Raw config dictionary
+        :rtype: dict
+        """
+        self.base = self.runtime.path("./runtime/lib/mascope_runtime/base.mascope.toml")
+        self.path = self.runtime.env.path(f"./{self.runtime.mode}.mascope.toml")
+
         raw_config = {}
         for path in [self.base, self.path]:
             if os.path.exists(path):
@@ -247,6 +273,16 @@ class RuntimeConfigLoader:
         return raw_config
 
     def _resolve_paths(self, unresolved: any | None = None) -> None:
+        """
+        Iterates through an unresolved config or - when recursing -
+        a subdict thereof. When encountering a path-like string value,
+        it replaces relative paths with absolute paths. Resolution
+        uses the runtime env path by default, except for package
+        paths which are resolved relative to the runtime root path.
+
+        :return: Resolved config dictionary
+        :rtype: dict
+        """
         resolved = {}
         for key, value in unresolved.items():
             if isinstance(value, dict):
@@ -269,6 +305,14 @@ class RuntimeConfigLoader:
         return resolved
 
     def _resolve_loglevels(self, unresolved: dict, fallback: LogLevel = "info") -> None:
+        """
+        Iterates through the root level of the unresolved config,
+        resolving log levels based on various inputs.
+
+        :return: Resolved config dictionary
+        :rtype: dict
+        """
+
         resolved = {}
         meta = unresolved.get("meta")
         meta_log_level = meta.get("log_level") if meta else None
@@ -288,9 +332,25 @@ class RuntimeConfigLoader:
         return resolved
 
     def _validate_options(self, unvalidated: dict) -> None:
+        """
+        Validates the resolved but unvalidated config dict using
+        the Pydantic model.
+
+        :return: Validated configuration model
+        :rtype: RuntimeConfig
+        """
         return RuntimeConfig(**unvalidated)
 
 
 def load_config(runtime: Runtime):
+    """
+    Init a runtime config loader using the runtime,
+    and return the resolved and validated config.
+
+    :param runtime: The runtime context
+    :type runtime: Runtime
+    :return: The runtime configuration
+    :rtype: RuntimeConfig
+    """
     loader = RuntimeConfigLoader(runtime)
     return loader.config

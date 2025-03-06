@@ -20,20 +20,37 @@ class RuntimeEnv:
     _runtime: Runtime
 
     def __init__(self, runtime: Runtime):
+        """
+        Initializes the runtime enviornment interface, retrieving
+        the active environment from the parent runtime state.
+
+        :param runtime: The main runtime class
+        :type runtime: Runtime
+        """
         # init attributes
         self._runtime = runtime
         self.name = self.runtime.state.env
 
     @property
     def runtime(self) -> Runtime:
+        """
+        The parent runtime instance.
+        """
         return self._runtime
 
     @property
     def dir(self) -> str:
+        """
+        Path of the runtime env parent directory.
+        """
         return self.runtime.path("runtime", "env")
 
     @property
     def list(self) -> list[dict]:
+        """
+        List environments available in the runtime, as
+        dicts with "name" and "path" fields
+        """
         envdir = [
             {"name": name, "path": os.path.join(self.dir, name)}
             for name in os.listdir(self.dir)
@@ -45,9 +62,17 @@ class RuntimeEnv:
         ]
         return envs
 
-    # METHODS
+    # PUBLIC METHODS
 
     def path(self, *args: list[str]) -> str:
+        """
+        Resolves the path relative to the active env path.
+
+        :param *args: A list of path segments or one string path in Unix notation
+        :type arg: list[str], optional
+        :return: Resolved path
+        :rtype: str
+        """
         if len(args) == 1 and "/" in args[0]:
             # resolve string paths like "./foo/bar"
             segments = args[0].replace("./", "").split("/")
@@ -57,4 +82,12 @@ class RuntimeEnv:
         return os.path.join(self.dir, self.name, *segments)
 
     def realpath(self, *args: list[str]) -> str:
+        """
+        Resolves the path relative to the active env path, resolving symlinks as well.
+
+        :param *args: A list of path segments or one string path in Unix notation
+        :type arg: list[str], optional
+        :return: Resolved path
+        :rtype: str
+        """
         return os.path.realpath(self.path(*args))

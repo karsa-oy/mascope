@@ -53,18 +53,42 @@ class RuntimeLoggerLoader:
     _logger: loguru.Logger
 
     def __init__(self, runtime: Runtime) -> None:
+        """
+        Configures the runtime logger, saving the
+        result to self._logger.
+
+        :param runtime: The parent runtime context
+        :type runtime: Runtime
+        """
         self._runtime = runtime
         self._logger = self.configure()
 
     @property
     def runtime(self):
+        """
+        The parent runtime context.
+        """
         return self._runtime
 
     @property
     def logger(self):
+        """
+        Get the configured logger.
+
+        :return: the logger of the runtime module
+        :rtype: loguru.Logger
+        """
         return self._logger
 
     def path(self, *args: list[str]):
+        """
+        Resolves the path relative to the logging directory
+
+        :param *args: A list of path segments
+        :type arg: list[str], optional
+        :return: Resolved path
+        :rtype: str
+        """
         log_path = self.runtime.module.config.log_path
         return os.path.join(log_path, self.runtime.mode, *args)
 
@@ -277,4 +301,10 @@ class RuntimeLoggerLoader:
 
 
 def configure_logger(runtime: Runtime):
+    """
+    Load the runtime logging setup, configuring
+    loguru globally as a sideeffect. Because of how
+    loguru works, we don't need to return anything
+    here.
+    """
     RuntimeLoggerLoader(runtime)
