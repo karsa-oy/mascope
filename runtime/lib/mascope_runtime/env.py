@@ -29,14 +29,14 @@ class RuntimeEnv:
         return self._root
 
     @property
-    def envdir(self) -> str:
-        return os.path.join(self.root.path, "runtime", "env")
+    def dir(self) -> str:
+        return self.root.path("runtime", "env")
 
     @property
     def list(self) -> list[dict]:
         envdir = [
-            {"name": name, "path": os.path.join(self.envdir, name)}
-            for name in os.listdir(self.envdir)
+            {"name": name, "path": os.path.join(self.dir, name)}
+            for name in os.listdir(self.dir)
         ]
         envs = [
             entry
@@ -45,40 +45,16 @@ class RuntimeEnv:
         ]
         return envs
 
-    @property
-    def path(self) -> str:
-        """
-        The runtime environment path
-        """
-        return os.path.join(self.envdir, self.name)
+    # METHODS
 
-    def dir(self, name: str) -> str:
-        """
-        Returns a path of a runtime directory
-        """
-        return os.path.join(self.path, name)
-
-    def resolve(self, path: str) -> any:
-        """
-        Resolve a path relative to the runtime environment;
-        a path like ./foo/bar is transformed to a path like
-        /my/mascope/runtime/env/myenv/foo/bar, if the
-        $MASCOPE_PATH is set to /my/mascope.
-        """
-        # only process strings
-        if not isinstance(path, str):
-            raise ValueError("Path must be a string")
-        # only resolve relative paths
-        if path.startswith("./"):
-            path = path
-            # join relative to the base path:
-            #   "./foo/bar" => "/base_path/foo/bar"
-            joined_path = os.path.join(
-                self.path,
-                *path.replace("./", "").split("/"),
-            )
-            # resolve symlinks:
-            real_path = os.path.realpath(joined_path)
-            return real_path
+    def path(self, *args: list[str]) -> str:
+        if len(args) == 1 and "/" in args[0]:
+            # resolve string paths like "./foo/bar"
+            segments = args[0].replace("./", "").split("/")
         else:
-            return path
+            # treat arg list as-is
+            segments = args
+        return os.path.join(self.dir, self.name, *segments)
+
+    def realpath(self, *args: list[str]) -> str:
+        return os.path.realpath(self.path(*args))

@@ -19,7 +19,7 @@ def run(command: str, runtime: Runtime = runtime, vars: dict = dict()) -> None:
         env[key] = val
     subprocess.run(
         shlex.split(command),  # split to ensure correct parsing
-        cwd=runtime.path,
+        cwd=runtime.path(),
         stderr=subprocess.STDOUT,
         env=env,
     )

@@ -805,13 +805,12 @@ async def sample_item_export_peaks(
     dt_str = datetime.now().isoformat().replace("-", "").replace(":", "").split(".")[0]
 
     # Save the peak data to a CSV file
-    temp_dir = runtime.env.dir("temp")
     peakfile_filename = "_".join(
         [dt_str, "peak_data", sample_item_name.replace(" ", "_") + ".csv"]
     )
     runtime.logger.info(f"Writing peak data to file {peakfile_filename}")
     sample_peak_df.to_csv(
-        os.path.join(temp_dir, peakfile_filename), index=False, sep=";"
+        runtime.env.path("temp", peakfile_filename), index=False, sep=";"
     )
     message = f"Peak data for sample item '{sample_item_name}' was exported to file '{peakfile_filename}'."
     runtime.logger.info(message)

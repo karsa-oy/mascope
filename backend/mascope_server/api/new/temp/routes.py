@@ -25,5 +25,5 @@ async def get_temp_file_route(temp_file: str, user=Depends(guest_user)):
     :return: A dictionary containing the total count and a list of instruments with their types.
     :rtype: dict
     """
-    file_path = os.path.join(runtime.env.dir("temp"), temp_file)
+    file_path = runtime.env.path("temp", temp_file)
     return FileResponse(file_path)

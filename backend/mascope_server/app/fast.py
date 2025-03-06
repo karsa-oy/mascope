@@ -81,7 +81,7 @@ async def init_database():
 async def init_temp_dir():
     """Recreate temp directory on startup, erasing all files"""
     # reset temp folder
-    temp_dir = runtime.env.dir("temp")
+    temp_dir = runtime.env.path("temp")
     if os.path.exists(temp_dir):
         shutil.rmtree(temp_dir)
     os.mkdir(temp_dir)

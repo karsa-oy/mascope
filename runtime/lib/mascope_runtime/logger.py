@@ -65,12 +65,15 @@ class RuntimeLoggerLoader:
         return self.root.module
 
     @property
+    def env(self):
+        return self.root.env
+
+    @property
     def logger(self):
         return self._logger
 
-    @property
-    def log_path(self):
-        return os.path.join(self.module.config.log_path, self.root.mode)
+    def path(self, *args: list[str]):
+        return os.path.join(self.module.config.log_path, self.root.mode, *args)
 
     # module is not typed to prevent circular import
     def configure(self) -> None:
@@ -83,12 +86,10 @@ class RuntimeLoggerLoader:
         :return: the loguru logger
         """
         # setup log path
-        os.makedirs(self.log_path, exist_ok=True)
+        os.makedirs(self.path(), exist_ok=True)
         # define logging handlers
         file_handler = dict(
-            sink=os.path.join(
-                self.log_path, f"{{time:YYYY-MM-DD}}.{self.module.name}.log"
-            ),
+            sink=self.path(f"{{time:YYYY-MM-DD}}.{self.module.name}.log"),
             format=self.formatter(),
             level="INFO",  # avoid large file size
             enqueue=True,  # multiprocess safe
@@ -127,10 +128,9 @@ class RuntimeLoggerLoader:
 
     def formatter(self) -> Callable[[loguru.Record], str]:
         """
-        Factory that produces a format function given a
-        root_path (MASCOPE_PATH) value.
+        Factory that produces a format function used in
+        the loguru logger.
 
-        :param root_path: the MASCOPE_PATH
         :return: the record formatting function
         """
 
@@ -191,16 +191,10 @@ class RuntimeLoggerLoader:
             head_text = f"{record['level']} {record['extra']['status_code']} {record['extra']['method']}"
 
             # message
-            envpath = os.path.join(
-                self.module.root.path,
-                "runtime",
-                "env",
-                os.environ.get("MASCOPE_ENV", "prod"),
-            )
             record["extra"]["parsed_message"] = (
                 record["message"]
-                .replace(envpath, "$env")
-                .replace(self.module.root.path, "$mascope")
+                .replace(self.env.path(), "$env")
+                .replace(self.root.path(), "$mascope")
             )
             message = "{extra[parsed_message]: <60}"
             message_text = f"{record['message']}"

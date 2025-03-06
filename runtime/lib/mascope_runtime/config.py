@@ -3,6 +3,7 @@ import typing
 
 if typing.TYPE_CHECKING:
     from .instance import Runtime
+    from .env import RuntimeEnv
 
 import os
 import tomllib
@@ -69,9 +70,7 @@ class FileConverterConfig(ModuleConfig):
     File converter module specific configuration options
     """
 
-    server: str = (
-        r"backend"  # production host URL; the default works in our docker compose network
-    )
+    server: str = r"backend"  # production host URL; the default works in our docker compose network
     source: str = r"./filestreams"  # folder to monitor for files to convert
     raw_threads: int = 2  # number of threads for converting Orbitrap files
     h5_threads: int = 2  # number of threads for converting Tof files
@@ -213,8 +212,8 @@ class RuntimeConfigLoader:
     def __init__(self, root: Runtime):
         self._root = root
 
-        self.base = self.root.resolve("./runtime/lib/mascope_runtime/base.mascope.toml")
-        self.path = self.env.resolve(f"./{self.root.mode}.mascope.toml")
+        self.base = self.root.path("./runtime/lib/mascope_runtime/base.mascope.toml")
+        self.path = self.env.path(f"./{self.root.mode}.mascope.toml")
 
         config = self._load_tomls()
         config = self._resolve_paths(config)
@@ -227,7 +226,7 @@ class RuntimeConfigLoader:
         return self._root
 
     @property
-    def env(self):
+    def env(self) -> RuntimeEnv:
         return self.root.env
 
     @property
@@ -259,11 +258,17 @@ class RuntimeConfigLoader:
                 # recurse for subconfigs
                 resolved[key] = self._resolve_paths(value)
             elif isinstance(value, str):
-                # resolve paths for other values
-                if key == "pkg_path":
-                    resolved[key] = self.root.resolve(value)
+                # resolve relative paths
+                if value.startswith("./"):
+                    if key != "pkg_path":
+                        # default to resolving against env
+                        resolved[key] = self.env.realpath(value)
+                    else:
+                        # except package path
+                        resolved[key] = self.root.realpath(value)
+                # keep non-relative paths as-is
                 else:
-                    resolved[key] = self.env.resolve(value)
+                    resolved[key] = value
             else:
                 resolved[key] = value
         return resolved

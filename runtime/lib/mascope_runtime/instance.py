@@ -53,10 +53,6 @@ class Runtime:
         configure_logger(self)
 
     @property
-    def path(self) -> str:
-        return self._path
-
-    @property
     def mode(self) -> RuntimeMode:
         return self.state.mode
 
@@ -96,6 +92,18 @@ class Runtime:
 
     # METHODS
 
+    def path(self, *args: list[str]) -> str:
+        if len(args) == 1 and "/" in args[0]:
+            # resolve string paths like "./foo/bar"
+            segments = args[0].replace("./", "").split("/")
+        else:
+            # treat arg list as-is
+            segments = args
+        return os.path.join(self._path, *segments)
+
+    def realpath(self, *args: list[str]) -> str:
+        return os.path.realpath(self.path(*args))
+
     def read_envvars(self):
         resolved_path = self.options.path or os.environ.get("MASCOPE_PATH")
         if not resolved_path:
@@ -110,26 +118,10 @@ class Runtime:
         else:
             self.state = RuntimeJsonState(self._path)
 
-    def resolve(self, path: str) -> str:
-        if not isinstance(path, str):
-            raise ValueError("Path must be a string")
-        # only resolve relative paths
-        if path.startswith("./"):
-            # join relative to the base path:
-            #   "./foo/bar" => "/base_path/foo/bar"
-            joined_path = os.path.join(
-                self._path,
-                *path.replace("./", "").split("/"),
-            )
-            # resolve symlinks:
-            return os.path.realpath(joined_path)
-        else:
-            return path
-
     def secret(self, envvar: str, path: str, all_lines: bool = False) -> str:
         # construct paths to look in
         envvar_path = os.environ.get(envvar)
-        root_path = os.path.join(self.path, "secrets", path)
+        root_path = self.path("secrets", path)
         # try to open each path
         for file_path in [envvar_path, root_path]:
             # ensure the path and file exist
