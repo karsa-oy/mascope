@@ -264,3 +264,78 @@ def get_tic_per_scan(
             scan_timestamp = scan_timestamp[scan_indices]
 
         return scan_timestamp, scan_tic
+
+
+def get_peak_profiles(
+    datafile_path: str,
+    mzs: Iterable[float],
+    t_min: Optional[float] = None,
+    t_max: Optional[float] = None,
+) -> xr.Dataset:
+    """Extracts the peak profiles for the specified m/z values in the time range (t_min, t_max).
+
+    :param datafile_path: Path to the Tofwerk HDF5 file (.h5) containing the data.
+    :type datafile_path: str
+    :param mzs: array of m/z values for which peak profiles are required.
+    :type mzs: Iterable[float]
+    :param t_min: Start time [s], optional, defaults to None
+    :type t_min: Optional[float]
+    :param t_max: End time [s], optional, defaults to None
+    :type t_max: Optional[float]
+    :return: An xarray Dataset containing the peak profiles
+    :rtype: xr.Dataset
+    """
+    with open_h5_file(datafile_path) as h5_file:
+        # Make sure mzs are numpy array
+        mzs = np.asarray(mzs)
+        # Get full time range
+        scan_time = h5_file["TimingData"]["BufTimes"][:].reshape(-1)
+        last_non_zero_scan = np.where(scan_time != 0)[0][-1]
+        scan_time = scan_time[: last_non_zero_scan + 1]
+
+        # Check if t_min and t_max are passed
+        t_min = scan_time[0] if t_min is None else t_min
+        t_max = scan_time[-1] if t_max is None else t_max
+
+        # Filter by time range
+        time_mask = (scan_time >= t_min) & (scan_time <= t_max)
+        scan_time = scan_time[time_mask]
+
+        # Get signal HDF5 dataset reference
+        signal_ref = h5_file["FullSpectra"]["TofData"]
+        all_mzs = h5_file["FullSpectra"]["MassAxis"][:]
+
+        # Find indices of m/z range
+        mz_start_ind = np.abs(all_mzs - mzs.min()).argmin()
+        mz_end_ind = np.abs(all_mzs - mzs.max()).argmin()
+
+        # Initialize output array
+        peak_profiles = np.zeros((len(mzs), len(scan_time)))
+
+        # Get the coordinates of the scans
+        coordinates = np.indices(signal_ref.shape[:-1]).reshape(3, -1).T
+
+        # Populate result by iterating over the scans
+        for i, t in enumerate(scan_time):
+            scan_idx = np.abs(scan_time - t).argmin()
+            coordinate = coordinates[scan_idx]
+            signal = signal_ref[
+                coordinate[0],
+                coordinate[1],
+                coordinate[2],
+                mz_start_ind : mz_end_ind + 1,
+            ]
+            peak_profiles[:, i] = np.interp(
+                mzs, all_mzs[mz_start_ind : mz_end_ind + 1], signal
+            )
+
+        # Convert to dask array
+        peak_profiles_dask = da.from_array(peak_profiles, chunks="auto")
+
+        # Export xarray array with time and mz coordinates
+        return xr.DataArray(
+            peak_profiles_dask,
+            dims=("mz", "time"),
+            coords={"mz": mzs, "time": scan_time},
+            name="signal",
+        )
