@@ -134,8 +134,8 @@ const upload = () => {
       </ul>
       <p>
         <i>
-          Valid TOF instrument names must include the word TOF or API (in lower or upper case) and
-          consist only of letters and (optionally) numerical suffixes.
+          Valid TOF instrument names must include the word TOF or API (in lower or upper case),
+          separated from the rest of the filename by an underscore.
         </i>
       </p>
       <p>Please select or enter an instrument to assign these files to:</p>
@@ -176,7 +176,7 @@ const upload = () => {
     <!-- ORBI FILES -->
     <template v-if="processed.invalid.orbi.length > 0">
       <h3>Invalid OrbiTrap Files</h3>
-      <p>The following raw files do not have a valid OrbiTrap instrument name as a prefix:</p>
+      <p>The following raw files do not have a valid Orbitrap instrument name as a prefix:</p>
       <ul>
         <li v-for="file in processed.invalid.orbi" :key="file.name">
           {{ file.name }}
@@ -184,8 +184,8 @@ const upload = () => {
       </ul>
       <p>
         <i>
-          Valid OrbiTrap instrument names must include the word ORBI (in lower or upper case) and
-          consist only of letters and (optionally) numerical suffixes.
+          Valid Orbitrap instrument names must include the word ORBI (in lower or upper case),
+          separated from the rest of the filename by an underscore.
         </i>
       </p>
       <p>Please select or enter an instrument to assign these files to:</p>
