@@ -822,6 +822,40 @@ def get_tic_per_scan(base_filename: str, timestamps: Iterable | None = None) -> 
     return tic_time, tic_per_scan
 
 
+def get_peak_profiles(
+    base_filename: str,
+    mzs: Iterable[float],
+    t_min: Optional[float] = None,
+    t_max: Optional[float] = None,
+    polarity: Optional[str] = None,
+) -> xarray.Dataset:
+    """Get peak profiles for given m/z values in the time range [t_min, t_max]
+
+    :param datafile_path: _description_
+    :type datafile_path: str
+    :param mzs: _description_
+    :type mzs: Iterable[float]
+    :param t_min: _description_, defaults to None
+    :type t_min: Optional[float], optional
+    :param t_max: _description_, defaults to None
+    :type t_max: Optional[float], optional
+    :param polarity: _description_, defaults to None
+    :type polarity: Optional[str], optional
+    :return: _description_
+    :rtype: xr.Dataset
+    """
+    sample_type = get_sample_file_type(base_filename)
+    datafile_path = filename_to_datafile_path(base_filename)
+    match sample_type:
+        case "orbi_raw":
+            return thermo.get_peak_profiles(datafile_path, mzs, t_min, t_max, polarity)
+        case "tof_h5":
+            return tofwerk.get_peak_profiles(datafile_path, mzs, t_min, t_max)
+        case "tof_zarr" | "orbi_zarr":
+            # TODO Implement peak profiles for TOF and Orbi zarr files
+            pass
+
+
 def open_mfzarr(path, sync=None, mode="r", concat_dim="time", prev_array=None):
     """Load data from a multi-file zarr into a xarray.Dataset
 
