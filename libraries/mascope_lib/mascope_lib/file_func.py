@@ -850,7 +850,11 @@ def get_peak_profiles(
         case "orbi_raw":
             return thermo.get_peak_profiles(datafile_path, mzs, t_min, t_max, polarity)
         case "tof_h5":
-            return tofwerk.get_peak_profiles(datafile_path, mzs, t_min, t_max)
+            # Get calibrated m/z values
+            sum_signal_mz = get_sum_signal(base_filename).mz.values
+            return tofwerk.get_peak_profiles(
+                datafile_path, mzs, sum_signal_mz, t_min, t_max
+            )
         case "tof_zarr" | "orbi_zarr":
             # TODO Implement peak profiles for TOF and Orbi zarr files
             pass

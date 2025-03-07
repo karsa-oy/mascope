@@ -269,6 +269,7 @@ def get_tic_per_scan(
 def get_peak_profiles(
     datafile_path: str,
     mzs: Iterable[float],
+    true_mz_axis: Iterable[float],
     t_min: Optional[float] = None,
     t_max: Optional[float] = None,
 ) -> xr.Dataset:
@@ -278,6 +279,8 @@ def get_peak_profiles(
     :type datafile_path: str
     :param mzs: array of m/z values for which peak profiles are required.
     :type mzs: Iterable[float]
+    :param true_mz_axis: Calibrated m/z axis values.
+    :type true_mz_axis: Iterable[float]
     :param t_min: Start time [s], optional, defaults to None
     :type t_min: Optional[float]
     :param t_max: End time [s], optional, defaults to None
@@ -303,11 +306,10 @@ def get_peak_profiles(
 
         # Get signal HDF5 dataset reference
         signal_ref = h5_file["FullSpectra"]["TofData"]
-        all_mzs = h5_file["FullSpectra"]["MassAxis"][:]
 
         # Find indices of m/z range
-        mz_start_ind = np.abs(all_mzs - mzs.min()).argmin()
-        mz_end_ind = np.abs(all_mzs - mzs.max()).argmin()
+        mz_start_ind = np.abs(true_mz_axis - mzs.min()).argmin()
+        mz_end_ind = np.abs(true_mz_axis - mzs.max()).argmin()
 
         # Initialize output array
         peak_profiles = np.zeros((len(mzs), len(scan_time)))
@@ -326,7 +328,7 @@ def get_peak_profiles(
                 mz_start_ind : mz_end_ind + 1,
             ]
             peak_profiles[:, i] = np.interp(
-                mzs, all_mzs[mz_start_ind : mz_end_ind + 1], signal
+                mzs, true_mz_axis[mz_start_ind : mz_end_ind + 1], signal
             )
 
         # Convert to dask array
