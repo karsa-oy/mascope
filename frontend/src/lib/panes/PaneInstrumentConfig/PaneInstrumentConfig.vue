@@ -339,7 +339,8 @@ watchEffect(() => {
     fitting: fitting.value,
     invalid: invalidConfigCreate.value || invalidConfigUpdate.value || (error.value ?? false),
     selectable: selectable.value,
-    message: message.value
+    message: message.value,
+    changed: !configUnchanged.value || input.value.creating
   }
 })
 
