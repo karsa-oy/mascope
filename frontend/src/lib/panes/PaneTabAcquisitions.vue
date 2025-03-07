@@ -78,6 +78,7 @@ watch(
     customUpload
     multiple
     auto
+    :pt="{ root: { style: 'border: none; padding: 0' } }"
   >
     <template #header="{ chooseCallback }">
       <menu class="acquisition-menu">
@@ -149,10 +150,10 @@ watch(
         :value="acquisitions"
         :totalRecords="acquisitions.length"
         scrollable
-        scrollHeight="calc(100vh - 200px)"
+        scrollHeight="calc(100vh - 350px)"
         sortField="datetime"
         :sortOrder="-1"
-        :rows="12"
+        :rows="25"
         paginator
         size="small"
       >
