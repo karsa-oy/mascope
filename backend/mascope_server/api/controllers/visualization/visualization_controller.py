@@ -5,7 +5,6 @@ from sqlalchemy import select
 from colorcet import glasbey_hv as colormap
 from mascope_lib.file_func import (
     get_instrument_type,
-    get_peak_profiles,
     load_file,
 )
 from mascope_lib.peak import filter_peaks, get_peaks
@@ -68,7 +67,6 @@ async def visualize_ion_focus(
         filename = result.scalar_one_or_none()
         if not filename:
             raise NotFoundException(f"Sample with ID {sample_item_id} not found")
-
         instrument_type = get_instrument_type(filename)
         isotope_resolution = "LOW" if instrument_type == "tof" else "HIGH"
 
@@ -84,13 +82,16 @@ async def visualize_ion_focus(
             raise NotFoundException(
                 f"Target ion with ID {target_ion_id} not found or does not meet abundance threshold"
             )
+    # Set units and peak data type based on instrument type
+    spectrum_unit, timeseries_unit, peak_data_type, peak_profile_type = (
+        ("ions", "ions", "peak_areas", "area")
+        if instrument_type == "tof"
+        else ("rel.", "rel.", "peak_heights", "height")
+    )
 
     # Step 2: Load the sample file and prepare data slice
     runtime.logger.info(f"Loading file: {filename}")
-    sample_file = load_file(filename, vars=["sum_signal", "peak_heights"])
-    instrument_type = get_instrument_type(filename)
-    spectrum_unit = "ions" if instrument_type == "tof" else "counts"
-    timeseries_unit = "ions" if instrument_type == "tof" else "counts"
+    sample_file = load_file(filename, vars=["sum_signal", peak_data_type])
 
     # Step 3: Convert target ion data to DataFrame and prepare data
     target_ion_list = [ion.to_dict() for ion in target_ion_data]
@@ -154,15 +155,15 @@ async def visualize_ion_focus(
                 "unit": spectrum_unit,
             }
         )
+        peak_profiles = get_peaks(isotope_slice, peak_profile_type)
         # Peak traces (vertical lines)
-        peaks = get_peaks(isotope_slice, "height").sum(dim="time").compute()
+        peaks = peak_profiles.sum(dim="time").compute()
         runtime.logger.debug(f"Peaks in the range {mz_range}: {peaks.mz.values}")
         peaks = filter_peaks(peaks, intensity=peak_min_intensity)
         runtime.logger.debug(
             f"Peaks above threshold {peak_min_intensity}: {peaks.mz.values}"
         )
         # Get peak profiles/timeseries
-        peak_profiles = get_peak_profiles(filename, peaks.mz.values)
         for peak in peaks:
             peak_mz = peak.mz.item()
             match = True if abs((peak_mz - mz) / mz * 1e6) <= mz_tolerance else False
@@ -223,7 +224,7 @@ async def visualize_ion_focus(
 
         await sio.emit("visualization_signal_timeseries", timeseries_traces, room=sid)
         # Sleep 0 to let other tasks be scheduled before next iteration
-        await asyncio.sleep(0.001)
+        await asyncio.sleep(0)
 
     # Step 5: Constructs and emits the sum timeseries trace if applicable.
     # If no data to visualize, return early
