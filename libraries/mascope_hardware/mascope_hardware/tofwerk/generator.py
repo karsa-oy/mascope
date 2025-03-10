@@ -12,9 +12,8 @@ import numpy as np
 from mascope_hardware.runtime import hardware_runtime
 from mascope_hardware.util import create_sample_file_db_record
 from mascope_lib.file_func import (
+    get_sum_signal,
     write_props,
-    load_file,
-    zarr_sdk,
     get_filestore_path,
     parse_path_from_item_filename,
 )
@@ -218,8 +217,7 @@ class H5Processor(Thread):
             shutil.copy(h5_filepath, data_h5_path)
 
             # Create sum_signal array
-            sample_file_data = load_file(sample_file_props["filename"], vars=[])
-            zarr_sdk.write_sum_signal_dataset(sample_file_data)
+            get_sum_signal(sample_file_props["filename"])
 
             self._create_db_record(sample_file_props)
 
