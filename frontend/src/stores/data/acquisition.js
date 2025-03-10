@@ -16,6 +16,18 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
 
   const mode = ref(false)
   const list = ref([])
+  const selected = ref([])
+  const focused = computed(() => {
+    if (selected.value.length === 1) {
+      return selected.value[0]
+    } else {
+      return null
+    }
+  })
+  const multiselected = computed(() => selected.value.length > 1)
+  const unfocus = () => {
+    selected.value = []
+  }
   const pending = reactive({
     filename: null,
     sample: null,
@@ -49,9 +61,11 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
       ui.notification.clearLatest()
     }
   })
+  watch(time, () => unfocus())
 
   const mzCalibration = ref(null)
   const orbi = computed(() => instrument.focused.instrument.toLowerCase().includes('orbi'))
+
   // instrument
 
   watch(
@@ -62,6 +76,11 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
       await loadMzCalibration()
       await load()
     }
+  )
+
+  watch(
+    () => instrument.focused,
+    () => unfocus()
   )
 
   // acquisitions
@@ -172,6 +191,10 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
     // state
     mode,
     list,
+    selected,
+    focused,
+    multiselected,
+    unfocus,
     pending,
     ready,
     time,

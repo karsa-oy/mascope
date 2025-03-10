@@ -33,17 +33,6 @@ const dialog = reactive({
   batchImport: false
 })
 
-const selected = reactive({
-  files: []
-})
-
-watch(
-  () => app.data.instrument.focused,
-  () => {
-    selected.files = []
-  }
-)
-
 const search = ref('')
 
 const acquisitions = computed(
@@ -60,13 +49,6 @@ watchEffect(() => {
     dialog.sample = 'create_pending'
   }
 })
-watch(
-  computed(() => app.data.acquisition.time),
-  () => {
-    selected.files = []
-  },
-  { deep: true }
-)
 </script>
 
 <template>
@@ -127,15 +109,15 @@ watch(
           label="Process"
           icon="pi pi-file-plus"
           :disabled="
-            selected.files?.length == 0 ||
+            app.data.acquisition.selected?.length == 0 ||
             !app.data.batch.focused ||
             !app.data.acquisition.list.length
           "
           @click="
             () => {
-              if (selected.files?.length == 1) {
+              if (app.data.acquisition.focused) {
                 dialog.sample = 'create'
-              } else if (selected.files?.length > 1) {
+              } else if (app.data.acquisition.multiselected) {
                 dialog.batchImport = true
               }
             }
@@ -146,7 +128,7 @@ watch(
     <template #empty>
       <DataTable
         v-if="acquisitions?.length"
-        v-model:selection="selected.files"
+        v-model:selection="app.data.acquisition.selected"
         :value="acquisitions"
         :totalRecords="acquisitions.length"
         scrollable
@@ -161,8 +143,8 @@ watch(
         <Column header="Filename" field="filename" sortable />
         <Column header="Datetime" field="datetime" sortable />
         <template #paginatorstart>
-          <strong v-if="selected.files.length" style="font-style: italic">
-            {{ selected.files.length }} files selected
+          <strong v-if="app.data.acquisition.multiselected" style="font-style: italic">
+            {{ app.data.acquisition.selected.length }} files selected
           </strong>
           <div v-else style="min-width: 11ch" />
         </template>
@@ -173,13 +155,13 @@ watch(
       </div>
       <DialogSampleOp
         v-model:action="dialog.sample"
-        :item="selected.files[0]"
-        @submit="selected.files = []"
+        :item="app.data.acquisition.focused"
+        @submit="app.data.acquisition.unfocus()"
       />
       <DialogBatchImport
         v-model:visible="dialog.batchImport"
-        :files="selected.files"
-        @submit="selected.files = []"
+        :files="app.data.acquisition.selected"
+        @submit="app.data.acquisition.unfocus()"
       />
       <DialogFileUpload :files="uploadedFiles" />
       <i class="info-line">
