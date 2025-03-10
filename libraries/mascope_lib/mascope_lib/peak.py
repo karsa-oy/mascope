@@ -18,13 +18,12 @@ from scipy.stats import norm
 from scipy.integrate import simpson
 import xarray
 import dask
-import dask.array as da
 from mascope_lib.runtime import lib_runtime
 from .file_func import (
     get_peak_profiles,
     get_sample_file_type,
     load_file,
-    zarr_sdk,
+    write_peaks,
     get_instrument_type,
     get_sum_signal,
 )
@@ -292,7 +291,7 @@ async def detect_peaks(
 
     new_peaks = []
     last_progress = None
-    lib_runtime.logger.debug(f"Run peak detection")
+    lib_runtime.logger.debug("Run peak detection")
     for i, future in enumerate(asyncio.as_completed(futures)):
         fit, peaks = await future
         if fit:
@@ -362,12 +361,13 @@ async def detect_peaks(
     # Calculate peak areas and heights
     peak_profiles_area = peak_profiles_norm * peak_areas.reshape(-1, 1)
     peak_profiles_height = peak_profiles_norm * peak_heights.reshape(-1, 1)
+
     lib_runtime.logger.info(f"Writing peaks to file {filename}")
     overwrite_peak_dataset = if_exists in {"append", "replace"}
-    zarr_sdk.write_peaks(
+    write_peaks(
         peak_profiles_area,
         peak_profiles_height,
-        sample_file_data,
+        filename,
         overwrite_peak_dataset,
     )
     lib_runtime.logger.info("Complete")
