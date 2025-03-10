@@ -814,21 +814,21 @@ def get_peak_profiles(
     t_min: Optional[float] = None,
     t_max: Optional[float] = None,
     polarity: Optional[str] = None,
-) -> xarray.Dataset:
+) -> xarray.DataArray:
     """Get peak profiles for given m/z values in the time range [t_min, t_max]
 
-    :param datafile_path: _description_
+    :param datafile_path: Path to the data file
     :type datafile_path: str
-    :param mzs: _description_
+    :param mzs: List of target m/z values
     :type mzs: Iterable[float]
-    :param t_min: _description_, defaults to None
+    :param t_min: Left border of the time range [s], defaults to None
     :type t_min: Optional[float], optional
-    :param t_max: _description_, defaults to None
+    :param t_max: Right border of the time range [s], defaults to None
     :type t_max: Optional[float], optional
-    :param polarity: _description_, defaults to None
+    :param polarity: Polarity of the scan to extract, defaults to None (get all scans)
     :type polarity: Optional[str], optional
-    :return: _description_
-    :rtype: xr.Dataset
+    :return: Peak profiles for the given m/z values
+    :rtype: xr.DataArray
     """
     sample_type = get_sample_file_type(base_filename)
     datafile_path = filename_to_datafile_path(base_filename)
@@ -842,8 +842,13 @@ def get_peak_profiles(
                 datafile_path, mzs, sum_signal_mz, t_min, t_max
             )
         case "tof_zarr" | "orbi_zarr":
-            # TODO Implement peak profiles for TOF and Orbi zarr files
-            pass
+            signal = load_signal(base_filename, t_min, t_max)
+            # Interpolate missing values in mz dimension using linear method.
+            signal = signal.interpolate_na(dim="mz", method="linear")
+            # Fill the remaining nan values with zeros
+            signal = signal.fillna(0)
+            # Extract the peak profiles for the closest m/z values
+            return signal.sel(mz=mzs, method="nearest").signal
 
 
 def open_mfzarr(path, sync=None, mode="r", concat_dim="time", prev_array=None):
