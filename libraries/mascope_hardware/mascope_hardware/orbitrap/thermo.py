@@ -40,6 +40,30 @@ def open_raw_file(datafile_path: str):
         )
 
 
+def filter_by_polarity(raw_file, scan_indices: list, polarity: str) -> list:
+    """Filter scan indices by polarity.
+
+    :param raw_file: The raw file object containing scan data.
+    :type raw_file: ThermoFisher.CommonCore.Data.Interfaces.IRawDataExtended
+    :param scan_indices: List of scan indices to filter.
+    :type scan_indices: list
+    :param polarity: Polarity of the scans to be retrieved, either '+' or '-'.
+    :type polarity: str
+    :return: List of scan indices that match the specified polarity.
+    :rtype: list
+    """
+    if polarity not in ["-", "+"]:
+        raise ValueError(
+            "Polarity must be passed as a string containing either '+' or '-'"
+        )
+    polarity = "Negative" if polarity == "-" else "Positive"
+    polarity_mask = [
+        raw_file.GetFilterForScanNumber(i).Polarity.ToString() == polarity
+        for i in scan_indices
+    ]
+    return list(compress(scan_indices, polarity_mask))
+
+
 def get_signal(
     datafile_path: str,
     t_min: Optional[float] = None,
@@ -71,41 +95,22 @@ def get_signal(
     :rtype: xr.Dataset
     """
     with open_raw_file(datafile_path) as raw_file:
-        # Determine m/z range
         mz_min = raw_file.RunHeaderEx.LowMass if mz_min is None else mz_min
         mz_max = raw_file.RunHeaderEx.HighMass if mz_max is None else mz_max
-
-        # Check m/z range
         if mz_min > mz_max:
             raise ValueError(f"Invalid m/z range: {mz_min} > {mz_max}")
 
-        # Determine time range
         t_min = raw_file.RunHeaderEx.StartTime * 60 if t_min is None else t_min  # [s]
         t_max = raw_file.RunHeaderEx.EndTime * 60 if t_max is None else t_max  # [s]
-
-        # Check time range
         if t_min > t_max:
             raise ValueError(f"Invalid time range: {t_min} > {t_max}")
 
         num_of_scans = raw_file.RunHeaderEx.SpectraCount
         scan_indices = list(range(1, num_of_scans + 1))
-        # Get all scans
         scans = tuple(Extensions.GetScans(raw_file, 1, num_of_scans))
 
-        # Filter by polarity
-        if polarity is not None:
-            if polarity not in ["-", "+"]:
-                raise (
-                    ValueError(
-                        "Polarity must be passed as a string containing either '+' or '-'"
-                    )
-                )
-            polarity = "Negative" if polarity == "-" else "Positive"
-            polarity_mask = [
-                raw_file.GetFilterForScanNumber(i).Polarity.ToString() == polarity
-                for i in scan_indices
-            ]
-            scan_indices = list(compress(scan_indices, polarity_mask))
+        if polarity:
+            scan_indices = filter_by_polarity(raw_file, scan_indices, polarity)
 
         scan_time = [scan.ScanStatistics.StartTime * 60 for scan in scans]  # [s]
 
@@ -149,10 +154,8 @@ def get_signal(
             # Only fill values that exist in this scan
             signal_array[indices, scan_idx] = intensity
 
-        # Convert to dask array
         signal_dask = da.from_array(signal_array, chunks="auto")
 
-        # Create and return xarray Dataset
         return xr.Dataset(
             {"signal": (("mz", "time"), signal_dask)},
             coords={"mz": all_mzs, "time": scan_time},
@@ -183,12 +186,11 @@ def compute_sum_signal_in_time_range(
     """
     with open_raw_file(datafile_path) as raw_file:
         # Get full time range
-        t_start = raw_file.RunHeader.StartTime
-        t_end = raw_file.RunHeader.EndTime
+        t_start = raw_file.RunHeader.StartTime  # [min]
+        t_end = raw_file.RunHeader.EndTime  # [min]
 
-        # Check if t_min and t_max are passed
-        t_min = t_start if t_min is None else t_min / 60
-        t_max = t_end if t_max is None else t_max / 60
+        t_min = t_start if t_min is None else t_min / 60  # [min]
+        t_max = t_end if t_max is None else t_max / 60  # [min]
 
         # Setup mz tolerance - counts within ppm are binned
         mass_option = MassOptions(ppm, ToleranceUnits.ppm)
@@ -217,7 +219,7 @@ def compute_sum_signal_in_time_range(
 
 
 def get_tic_per_scan(
-    datafile_path: str, timestamps: Iterable[float] | None = None
+    datafile_path: str, timestamps: Optional[Iterable[float]] = None
 ) -> tuple:
     """Extracts the Total Ion Current (TIC) per scan from the raw file.
 
@@ -277,35 +279,20 @@ def get_peak_profiles(
     :rtype: xr.Dataset
     """
     with open_raw_file(datafile_path) as raw_file:
-        # Make sure mzs are numpy array
         mzs = np.asarray(mzs)
         # Get full time range
         t_start = raw_file.RunHeader.StartTime * 60  # [s]
         t_end = raw_file.RunHeader.EndTime * 60  # [s]
 
-        # Check if t_min and t_max are passed
         t_min = t_start if t_min is None else t_min
         t_max = t_end if t_max is None else t_max
 
         num_of_scans = raw_file.RunHeaderEx.SpectraCount
         scan_indices = list(range(0, num_of_scans))
-        # Get all scans
         scans = tuple(Extensions.GetScans(raw_file, 1, num_of_scans))
 
-        # Filter by polarity
-        if polarity is not None:
-            if polarity not in ["-", "+"]:
-                raise (
-                    ValueError(
-                        "Polarity must be passed as a string containing either '+' or '-'"
-                    )
-                )
-            polarity = "Negative" if polarity == "-" else "Positive"
-            polarity_mask = [
-                raw_file.GetFilterForScanNumber(i + 1).Polarity.ToString() == polarity
-                for i in scan_indices
-            ]
-            scan_indices = list(compress(scan_indices, polarity_mask))
+        if polarity:
+            scan_indices = filter_by_polarity(raw_file, scan_indices, polarity)
 
         scan_time = [scan.ScanStatistics.StartTime * 60 for scan in scans]  # [s]
 

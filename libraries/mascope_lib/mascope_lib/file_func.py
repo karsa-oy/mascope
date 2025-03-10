@@ -3,13 +3,11 @@ import json
 import os
 import glob
 import sys
-from ctypes import ArgumentError
-from datetime import datetime, timezone
 from shutil import rmtree
 from typing import Iterable, Optional
 import dask.array as da
 import numpy as np
-import xarray
+import xarray as xr
 import zarr
 from pythonnet import load
 
@@ -32,137 +30,6 @@ from .util import parse_path_from_item_filename
 from .instrument import resolve_instrument_type
 
 
-class zarr_sdk:
-    @staticmethod
-    def finalize_signal_dataset(data, sample_file):
-        filename = data["filename"]
-        try:
-            final_length = float(
-                sample_file["signal"].time[-1] + sample_file["signal_period"][-1]
-            )
-        except Exception as e:
-            lib_runtime.logger.error(
-                f"""
-                [finalize_signal_dataset] Warning: {e.__class__.__name__}({str(e)})
-            """
-            )
-            final_length = sample_file["props"]["length"]
-
-        # Update properties
-        final_length = min(final_length, sample_file["props"]["length"])
-        sample_file["props"].update(
-            {
-                "committed_length": final_length,
-                "length": final_length,
-                "tic": data["tic"],
-            }
-        )
-        # Write properties
-        update_props(filename, sample_file["props"])
-        # flush arrays
-        arrays = [sample_file["signal"], sample_file["signal_period"]]
-        for a in arrays:
-            if isinstance(a, ExtendableDataArray):
-                a.flush()
-        # write sum signal array
-        zarr_sdk.write_sum_signal_dataset(sample_file)
-
-    @staticmethod
-    def init_centroid_dataset(data, item):
-        filename = filename_to_zarr_path(data["filename"], "centroids")
-        centroid_array = ExtendableDataArray(path=filename, array_module=da)
-        centroid_array.init_array(
-            dims=("mz", "time"), coords=[[], []], name="centroids"
-        )
-        item.update({"centroids": centroid_array})
-
-    @staticmethod
-    def init_signal_dataset(data, overwrite=False):
-        # First filesystem operation in acquisition api sequence:
-        #   init_signal_dataset - init_tps_dataset - init_viz_dataset -
-        #   update_signal_dataset - update_tps_dataset
-        #   - finalize_signal_dataset
-        # Returns acquisition item shared through the acquisiiton api
-        base_path = get_filestore_path()
-        filename = data.get("filename")
-        mz = np.frombuffer(data["mz"], dtype=np.float32)
-        single_ion_signal = data.get("single_ion_signal")
-        t_range = data["t_range"]
-        mz_calibration = data.get("mz_calibration")
-        polarity = data.get("polarity")
-        sample_interval = data.get("sample_interval")
-        method_file = data.get("method_file")
-
-        try:
-            data_path = parse_path_from_item_filename(filename, base_path)
-        except Exception as e:
-            raise NameError(f"Error parsing filename: {e}") from e
-        if os.path.exists(data_path):
-            if overwrite:
-                rmtree(data_path)
-            else:
-                raise FileExistsError(data_path)
-        filename_signal = filename_to_zarr_path(filename, "signal")
-        signal_array = ExtendableDataArray(path=filename_signal, array_module=da)
-        signal_array.init_array(dims=("mz", "time"), coords=[mz, []], name="signal")
-        filename_period = filename_to_zarr_path(filename, "signal_period")
-        period_array = ExtendableDataArray(path=filename_period, array_module=np)
-        period_array.init_array(dims=("time"), coords=[[]], name="signal_period")
-        t = datetime.now()
-        utc_offset = (t - t.astimezone(timezone.utc).replace(tzinfo=None)).seconds
-        properties = {
-            "filename": filename,
-            "length": float(t_range[1]),
-            "committed_length": 0.0,
-            "range": [float(mz[0]), float(mz[-1])],
-            "mz_calibration": mz_calibration,
-            "single_ion_signal": single_ion_signal,
-            "polarity": polarity,
-            "sample_interval": sample_interval,
-            "utc_offset": utc_offset,
-            "method_file": method_file,
-        }
-        write_props(filename, properties)
-
-        return {
-            "signal": signal_array,
-            "signal_period": period_array,
-            "props": properties,
-        }
-
-    @staticmethod
-    def update_signal_dataset(data, item):
-        base_path = get_filestore_path()
-        ti = np.array([data["t"]], dtype=np.float32)
-        period = np.array([data["period"]], dtype=np.float32)
-        lib_runtime.logger.debug(ti.item())
-        spec = np.frombuffer(data["spec"], dtype=np.float32)
-        spec = spec.reshape(-1, 1)
-        if "mz" in data:
-            # mz coordinates provided with data (Orbitrap)
-            mz = np.frombuffer(data["mz"], dtype=np.float32)
-            mz = mz.reshape(
-                -1,
-            )
-        else:
-            # Use mz coordinates from signal_array (TOF)
-            mz = item["signal"]["mz"]
-        # Extend data arrays (write to file)
-        item["signal"].extend_array(spec, [mz, ti], "time")
-        item["signal_period"].extend_array(period, [ti], "time")
-        # Update committed_length in .props, when new chunk is committed
-        if item["signal"].delayed_write is None:
-            committed_length = float(
-                item["signal"].time[-1] + item["signal_period"][-1]
-            )
-            item["props"].update({"committed_length": committed_length})
-            prop_path = os.path.join(
-                parse_path_from_item_filename(data["filename"], base_path), ".props"
-            )
-            with open(prop_path, "w") as f:
-                json.dump(item["props"], f, indent=4)
-
-
 def get_filestore_path() -> str:
     """Return path to the filestore
 
@@ -181,17 +48,17 @@ def get_filestore_path() -> str:
 
 
 def write_peaks(
-    peak_areas: xarray.DataArray,
-    peak_heights: xarray.DataArray,
+    peak_areas: xr.DataArray,
+    peak_heights: xr.DataArray,
     filename: str,
     overwrite: bool = False,
 ) -> None:
     """Write fitted peak areas and peak heights to zarr files
 
     :param peak_areas: Data array with peak areas
-    :type peak_areas: xarray.DataArray
+    :type peak_areas: xr.DataArray
     :param peak_heights: Data array with peak heights
-    :type peak_heights: xarray.DataArray
+    :type peak_heights: xr.DataArray
     :param filename: Sample file name
     :type filename: str
     :param overwrite: Flag to overwrite peaks if they already exist, defaults to False
@@ -222,7 +89,7 @@ def write_peaks(
     peak_heights.to_zarr(filename_peak_heights)
 
 
-def get_sum_signal(filename: str, average: bool = False) -> xarray.DataArray:
+def get_sum_signal(filename: str, average: bool = False) -> xr.DataArray:
     """Calculates the sum spectrum of a given filename
 
     :param filename: Name of the target file
@@ -230,7 +97,7 @@ def get_sum_signal(filename: str, average: bool = False) -> xarray.DataArray:
     :param average: Return avereage spectrum instead of sum. By default false (return sum).
     :type average: bool
     :return: Sum/average spectrum
-    :rtype: xarray.core.dataarray.DataArray
+    :rtype: xr.core.dataarray.DataArray
     """
     try:
         # Load precomputed sum spectrum from zarr file
@@ -251,7 +118,7 @@ def get_sum_signal(filename: str, average: bool = False) -> xarray.DataArray:
 
 def sum_signal_for_time_range(
     base_filename: str, t_min: float = None, t_max: float = None, average: bool = False
-) -> xarray.DataArray:
+) -> xr.DataArray:
     """Calculates the sum spectrum of a given filename in given time range [t_min, t_max]
 
     :param base_filename: Name of the target file
@@ -264,7 +131,7 @@ def sum_signal_for_time_range(
     :type average: bool, optional
     :raises NotImplementedError: The case for h5 TOF files is not implemented
     :return: Sum/average spectrum in a time range
-    :rtype: xarray.core.dataarray.DataArray
+    :rtype: xr.core.dataarray.DataArray
     """
     sample_type = get_sample_file_type(base_filename)
     base_path = get_filestore_path()
@@ -298,13 +165,11 @@ def sum_signal_for_time_range(
             # Fill the remaining nan values with zeros if any
             signal_slice = signal_slice.fillna(0)
 
-            # Convert sum signal to dask array
             sum_signal_dask = da.from_array(
                 signal_slice.sum(dim="time").signal.values, chunks="auto"
             )
 
-            # Convert to xarray.DataArray
-            sum_signal = xarray.DataArray(
+            sum_signal = xr.DataArray(
                 data=sum_signal_dask,
                 dims=["mz"],
                 coords={"mz": signal_slice.mz},
@@ -322,23 +187,7 @@ def sum_signal_for_time_range(
             sum_signal = tofwerk.compute_sum_signal_in_time_range(
                 datafile_path, t_min, t_max, average
             )
-
     return sum_signal
-
-
-def remove_duplicate_mz_values(mz):
-    # Sometimes TOF signal mz coordinate contains multiple zeros at the beginning
-    # This may cause duplicate coordinate value error in some functions
-    # This function fixes the coordinate vector by setting arbitrary small values for
-    # the zero coordinates
-    mz_unique = mz
-    mz_below_10_mask = mz < 10
-    if (np.diff(mz[mz_below_10_mask]) == 0).any():
-        mz_below_10_maxi = mz_below_10_mask.sum()
-        mz_unique[mz_below_10_mask] = np.linspace(
-            0, mz[mz_below_10_maxi], mz_below_10_maxi, endpoint=False
-        )
-    return mz_unique
 
 
 def filename_to_zarr_path(base_filename, variable):
@@ -426,7 +275,7 @@ def get_instrument_type(filename: str) -> str:
     return resolve_instrument_type(instrument_name)
 
 
-def get_sample_file_type(filename: str) -> Optional[str]:
+def get_sample_file_type(filename: str) -> str:
     """Get sample file type based on the presence of a datafile
     in sample_data_path.
         *_h5 - h5 file is available
@@ -452,42 +301,8 @@ def get_sample_file_type(filename: str) -> Optional[str]:
             return "orbi_raw" if is_raw else "orbi_zarr"
 
 
-def get_zarr_var_shape(base_filename, var, concat_dim=1):
-    """Get the shape of a sample file variable
-
-    :param base_filename: Sample file filename
-    :type base_filename: str
-    :param var: Variable name
-    :type var: str
-    :param concat_dim: Concatenation dimension of groups of the variable, defaults to 1
-    :type concat_dim: int, optional
-    :raises FileNotFoundError: No such sample file or variable
-    :raises ArgumentError: Illegal concat_dim
-    :return: Shape of the variable
-    :rtype: tuple
-    """
-    path = filename_to_zarr_path(base_filename, var)
-    if not os.path.exists(path):
-        raise FileNotFoundError(f"Zarr file {path} does not exist")
-    sync = ExtendableDataArray.get_zarr_synchronizer(path)
-    z = zarr.open(path, mode="r", synchronizer=sync)
-    group_shapes = [g[1][var].shape for g in z.groups()]
-    dim0, dim1 = zip(*group_shapes)
-    if concat_dim == 0:
-        shape = (sum(dim0), max(dim1))
-    elif concat_dim == 1:
-        shape = (max(dim0), sum(dim1))
-    else:
-        raise ArgumentError(
-            """
-            Error in 'get_zarr_var_shape()', 'concat_dim' must be 0 or 1
-        """
-        )
-    return shape
-
-
 def load_array(base_filename, var, prev_array=None):
-    """Load a stored mfzarr variable from file into a xarray.Dataset object.
+    """Load a stored mfzarr variable from file into a xr.Dataset object.
        If the variable receives another chunk of mfzarr data, then subsequent
        load_array calls with non-empty prev_array will update
        previously created dataset from the updated variable.
@@ -497,10 +312,10 @@ def load_array(base_filename, var, prev_array=None):
     :param var: Sample file variable name
     :type var: str
     :param prev_array: Previously loaded array to update with the updated var, defaults to None
-    :type prev_array: xarray.DataArray, optional
+    :type prev_array: xr.DataArray, optional
     :raises FileNotFoundError: No such sample file or variable in it.
     :return: Loaded sample file object
-    :rtype: xarray.Dataset
+    :rtype: xr.Dataset
     """
     lib_runtime.logger.debug(f"Loading array {base_filename} : {var}")
     var_path = filename_to_zarr_path(base_filename, var)
@@ -522,7 +337,7 @@ def load_array(base_filename, var, prev_array=None):
         dataset = open_mfzarr(var_path, prev_array=prev_array, sync=sync)
     else:
         # Single file
-        dataset = open_zarr(var_path, sync=sync)
+        dataset = xr.open_zarr(var_path, synchronizer=sync)
 
     return dataset
 
@@ -569,7 +384,7 @@ def load_signal(
     t_max: Optional[float] = None,
     mz_min: Optional[float] = None,
     mz_max: Optional[float] = None,
-) -> xarray.Dataset:
+) -> xr.Dataset:
     """Load signal from the sample file
 
     Suports m/z and time slicing.
@@ -583,7 +398,7 @@ def load_signal(
     :param mz_min: Min m/z value, defaults to None
     :type mz_min: float, optional
     :return: The signal with m/z and time coordinates
-    :rtype: xarray.Dataset
+    :rtype: xr.Dataset
     """
     lib_runtime.logger.debug(f"Loading signal from {base_filename}")
 
@@ -643,7 +458,7 @@ def load_signal(
     except Exception as e:
         lib_runtime.logger.error(f"Error loading signal from {base_filename}: {e})")
         # Return empty signal dataset with "mz" and "time" coordinates in case of error
-        return xarray.Dataset(
+        return xr.Dataset(
             {
                 "signal": (["mz", "time"], np.zeros((0, 0))),
                 "mz": (["mz"], np.zeros(0)),
@@ -653,7 +468,7 @@ def load_signal(
 
 
 def load_file(base_filename, vars=None, prev_dataset=None):
-    """Load stored mfzarr variables into an xarray.Dataset object.
+    """Load stored mfzarr variables into an xr.Dataset object.
        If the variables receive another chunk of data, then subsequent
        load_file calls with non-empty prev_dataset will update
        previously created dataset from updated variables.
@@ -663,10 +478,10 @@ def load_file(base_filename, vars=None, prev_dataset=None):
     :param vars: List of variable (zarr array) names to load, defaults to None. If None, all variables are loaded.
     :type vars: list, optional
     :param prev_dataset: Previously loaded dataset to update with updated vars, defaults to None.
-    :type prev_dataset: xarray.Dataset, optional
+    :type prev_dataset: xr.Dataset, optional
     :raises FileNotFoundError: No such sample file
     :return: Loaded sample file object
-    :rtype: xarray.Dataset
+    :rtype: xr.Dataset
     """
 
     base_path = get_filestore_path()
@@ -709,7 +524,7 @@ def load_file(base_filename, vars=None, prev_dataset=None):
             if prev_var not in vars:
                 datasets.append(prev_var_dataset)
     # Merge datasets per variable into one dataset
-    dataset = xarray.merge(datasets)
+    dataset = xr.merge(datasets)
     # Load properties
     prop_path = os.path.join(filepath, ".props")
     with open(prop_path, "r") as f:
@@ -792,7 +607,7 @@ def get_peak_profiles(
     t_min: Optional[float] = None,
     t_max: Optional[float] = None,
     polarity: Optional[str] = None,
-) -> xarray.DataArray:
+) -> xr.DataArray:
     """Get peak profiles for given m/z values in the time range [t_min, t_max]
 
     :param datafile_path: Path to the data file
@@ -830,7 +645,7 @@ def get_peak_profiles(
 
 
 def open_mfzarr(path, sync=None, mode="r", concat_dim="time", prev_array=None):
-    """Load data from a multi-file zarr into a xarray.Dataset
+    """Load data from a multi-file zarr into a xr.Dataset
 
     :param path: Full path to the multi-file zarr array
     :type path: str
@@ -841,9 +656,9 @@ def open_mfzarr(path, sync=None, mode="r", concat_dim="time", prev_array=None):
     :param concat_dim: Dimension name along which to concatenate the files, defaults to "time"
     :type concat_dim: str, optional
     :param prev_array: Previously loaded array to update with new mfzarr data chunk, defaults to None
-    :type prev_array: xarray.DataArray, optional
+    :type prev_array: xr.DataArray, optional
     :return: Concatenated data
-    :rtype: xarray.Dataset
+    :rtype: xr.Dataset
     """
 
     z = zarr.open(path, mode=mode, synchronizer=sync)
@@ -858,52 +673,15 @@ def open_mfzarr(path, sync=None, mode="r", concat_dim="time", prev_array=None):
         lib_runtime.logger.debug("no new groups")
         return prev_array
     lib_runtime.logger.debug(f"loading groups: {groups}")
-    x = xarray.concat(
-        [
-            xarray.open_zarr(path, g, consolidated=False, synchronizer=sync)
-            for g in groups
-        ],
+    x = xr.concat(
+        [xr.open_zarr(path, g, consolidated=False, synchronizer=sync) for g in groups],
         concat_dim,
     )
     if prev_array is not None:
-        x = xarray.concat([prev_array.to_dataset(), x], concat_dim)
+        x = xr.concat([prev_array.to_dataset(), x], concat_dim)
     x.attrs = z.attrs.asdict()
     x.attrs["zarr_groups"] = groups
     return x
-
-
-def open_zarr(path, sync=None):
-    """Open zarr array
-
-    :param path: str
-    :type path: Path to the zarr
-    :param sync: Zarr file synchronizer, defaults to None
-    :type sync: zarr.ProcessSynchronizer, optional
-    :raises FileNotFoundError: Such file does not exist
-    :return: The opened zarr file
-    :rtype: xarray.DataArray
-    """
-    if not os.path.exists(path):
-        raise FileNotFoundError(path)
-    ds = xarray.open_zarr(path, consolidated=False, synchronizer=sync)
-    return ds
-
-
-def read_zarr_attributes(filepath):
-    """Read zarr file attributes
-
-    :param filepath: Path to the zarr file
-    :type filepath: str
-    :raises FileNotFoundError: No such zarr file
-    :return: Attributes dictionary
-    :rtype: dict
-    """
-    if not os.path.exists(filepath):
-        raise FileNotFoundError(f"Zarr file {filepath} does not exist")
-    sync = ExtendableDataArray.get_zarr_synchronizer(filepath)
-    z = zarr.open(filepath, mode="r", synchronizer=sync)
-    attributes = z.attrs.asdict()
-    return attributes
 
 
 def update_props(base_filename, props_to_update):
@@ -959,14 +737,6 @@ def update_zarr_array_coord(base_filename, var, dim, coord):
     zarr_array[dim][:] = coord
     for group_name, group in zarr_array.groups():
         group[dim][:] = coord
-
-
-def write_zarr_attributes(filepath, attributes):
-    if not os.path.exists(filepath):
-        raise ValueError(f"Zarr file {filepath} does not exist")
-    sync = ExtendableDataArray.get_zarr_synchronizer(filepath)
-    z = zarr.open(filepath, mode="a", synchronizer=sync)
-    z.attrs.update(attributes)
 
 
 def delete_peaks(base_filename: str):
