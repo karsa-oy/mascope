@@ -222,9 +222,7 @@ def write_peaks(
     peak_heights.to_zarr(filename_peak_heights)
 
 
-def get_sum_signal(
-    filename: str, average: bool = False
-) -> xarray.core.dataarray.DataArray:
+def get_sum_signal(filename: str, average: bool = False) -> xarray.DataArray:
     """Calculates the sum spectrum of a given filename
 
     :param filename: Name of the target file
@@ -240,28 +238,8 @@ def get_sum_signal(
         sum_signal = sample_file.sum_signal
     except (AttributeError, FileNotFoundError):
         base_filename = sample_file.props["filename"]
+        sum_signal = sum_signal_for_time_range(base_filename)
         filename_sum_signal = filename_to_zarr_path(base_filename, "sum_signal")
-        sample_type = get_sample_file_type(base_filename)
-        base_path = get_filestore_path()
-        sample_path = parse_path_from_item_filename(base_filename, base_path)
-
-        match sample_type:
-            case "tof_zarr" | "orbi_zarr":
-                # Interpolate missing values in mz dimension using linear method.
-                signal = load_signal(base_filename).signal.interpolate_na(
-                    dim="mz", method="linear"
-                )
-                # Data points may not be interpolated if previous value is nan
-                # Fill the remaining nan values with zeros and get sum signal
-                sum_signal = signal.fillna(0).sum(dim="time")
-                # Rename signal to sum_signal
-                sum_signal.name = "sum_signal"
-            case "orbi_raw":
-                datafile_path = os.path.join(sample_path, "data.raw")
-                sum_signal = thermo.compute_sum_signal_in_time_range(datafile_path)
-            case "tof_h5":
-                datafile_path = os.path.join(sample_path, "data.h5")
-                sum_signal = tofwerk.compute_sum_signal_in_time_range(datafile_path)
         # Write sum signal to zarr file
         sum_signal.to_zarr(filename_sum_signal)
 
@@ -273,7 +251,7 @@ def get_sum_signal(
 
 def sum_signal_for_time_range(
     base_filename: str, t_min: float = None, t_max: float = None, average: bool = False
-) -> xarray.core.dataarray.DataArray:
+) -> xarray.DataArray:
     """Calculates the sum spectrum of a given filename in given time range [t_min, t_max]
 
     :param base_filename: Name of the target file
