@@ -12,6 +12,7 @@ import { useSample } from './sample'
 import { useTargetCollection } from './target'
 import { useMatchCollection } from './match'
 import { useMechanism } from './mechanism'
+import { useAcquisition } from './acquisition'
 
 export const useBatch = defineModule({
   name: 'batch',
@@ -22,8 +23,11 @@ export const useBatch = defineModule({
   onRefocus: () => {
     const sample = useSample()
     const ui = useUi()
+    const acquistion = useAcquisition()
     if (sample.list.length > 0) {
-      ui.tab.active = 'batch'
+      if (acquistion.selected.length === 0) {
+        ui.tab.active = 'batch'
+      }
     } else if (ui.tab.active == 'batch') {
       ui.tab.default()
     }
