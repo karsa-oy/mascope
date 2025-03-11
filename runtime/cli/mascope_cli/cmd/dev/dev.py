@@ -74,7 +74,7 @@ def run(
     # set mode to dev
     runtime.state.mode = "dev"
     # set config env var
-    frontend_runtime = Runtime("frontend")
+    frontend_runtime = Runtime("frontend", log=False)
     os.environ["MASCOPE_ENV"] = runtime.env.name
     os.environ["MASCOPE_RUNTIME"] = json.dumps(
         {

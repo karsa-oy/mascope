@@ -26,8 +26,9 @@ colors = {
     "backend": palette["green"],
     "frontend": palette["orange"],
     "notebooks": palette["red"],
-    "tof-agent": palette["magenta"],
+    "tof-agent": palette["pink"],
     "file-mover": palette["purple"],
+    "file-converter": palette["magenta"],
 }
 
 

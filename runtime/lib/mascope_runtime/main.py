@@ -2,6 +2,8 @@ import os
 import subprocess
 import shlex
 
+from loguru import logger
+
 from .mode import RuntimeMode
 from .state import RuntimeJsonState, RuntimeTempState
 from .exceptions import MissingMascopePathException
@@ -26,6 +28,7 @@ class Runtime:
     runtime interfaces such as the module's own config.
     """
 
+    context: str | None
     state: RuntimeJsonState | RuntimeTempState
     env: RuntimeEnv
     module: RuntimeModule
@@ -41,6 +44,8 @@ class Runtime:
         env: str | None = None,
         mode: RuntimeMode | None = None,
         path: str | None = None,
+        context: str | None = None,
+        log: bool = True,
     ):
         """
         Initializes the primary runtime interface. Resolves the
@@ -64,13 +69,15 @@ class Runtime:
         # initalize runtime
         self.env = RuntimeEnv(self)
         self.module = RuntimeModule(module, self)
+        self.context = context
 
         # load config
         self._full_config = load_config(self)
 
         # configure loguru global logger
-        self.logging = RuntimeLogging(self)
-        self.logging.configure()
+        if log and not self.context:
+            self.logging = RuntimeLogging(self)
+            self.logging.configure()
 
     @property
     def mode(self) -> RuntimeMode:
@@ -105,7 +112,9 @@ class Runtime:
         """
         The runtime's local (module specific) configuration
         """
-        return self.logging.logger
+        if self.context:
+            return logger.bind(context=self.context)
+        return logger
 
     @property
     def modules(self):

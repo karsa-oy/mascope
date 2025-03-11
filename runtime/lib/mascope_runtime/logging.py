@@ -3,6 +3,7 @@ from __future__ import annotations
 import typing
 
 if typing.TYPE_CHECKING:
+    import loguru
     from .runtime import Runtime
 
 from loguru import logger
@@ -20,6 +21,26 @@ from rich.traceback import Traceback
 from typing import List, Callable
 
 highlight = re.compile("SUCCESS|WARNING|ERROR|CRITICAL")
+
+palette = {
+    "magenta": "#d8137f",
+    "red": "#d65407",
+    "orange": "#dc8a0e",
+    "green": "#17ad98",
+    "blue": "#149bda",
+    "purple": "#796af5",
+    "pink": "#c720ca",
+}
+
+colors = {
+    "cli": palette["blue"],
+    "backend": palette["green"],
+    "frontend": palette["orange"],
+    "notebooks": palette["red"],
+    "tof-agent": palette["pink"],
+    "file-mover": palette["purple"],
+    "file-converter": palette["magenta"],
+}
 
 
 class Stacktrace:
@@ -214,9 +235,10 @@ class RuntimeLogging:
             message_text = f"{record['message']}"
 
             # footer
-            module = "{name}:{line}"
+            module = self.style("{extra[mod]}", f"fg {colors[record['extra']['mod']]}")
+            path = "{name}:{line}"
             key = "{extra[key]}"
-            tail = f"{module} {key}"
+            tail = f"{module} {path} {key}"
             tail_text = f"{record['name']} {record['extra']['key']}"
 
             # highlight search

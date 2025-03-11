@@ -225,12 +225,12 @@ def initialize() -> None:
         # initialize the runtime in production mode
         opts = dict(env="prod", mode="prod", path=mascope_path)
         runtime = Runtime("tof-agent", **opts)
-        init_hardware_runtime(**opts)
+        init_hardware_runtime(**opts, context="tof-agent")
     else:
         # dev mode
         # runtime state inherited from the CLI
         runtime = Runtime("tof-agent")
-        init_hardware_runtime()
+        init_hardware_runtime(context="tof-agent")
     # Check if API access token is left empty
     if not runtime.config.access_token:
         raise Exception("Please enter your API access token in the config!")

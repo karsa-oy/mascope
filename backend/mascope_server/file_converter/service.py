@@ -5,11 +5,11 @@ from time import sleep
 
 import mascope_lib.runtime as lib_runtime
 
-lib_runtime.init()
+lib_runtime.init(context="file-converter")
 
 import mascope_hardware.runtime as hardware_runtime
 
-hardware_runtime.init()
+hardware_runtime.init(context="file-converter")
 
 from mascope_hardware.orbitrap.generator import RawProcessor
 from mascope_hardware.tofwerk.generator import H5Processor
