@@ -62,12 +62,13 @@ def run(command: str, vars: dict = dict()) -> None:
     env = os.environ.copy()
     for key, val in vars.items():
         env[key] = val
-    subprocess.run(
+    result = subprocess.run(
         shlex.split(command),  # split to ensure correct parsing
         cwd=path,
-        stderr=subprocess.STDOUT,
         env=env,
     )
+    if result.stderr:
+        raise Exception(result.stderr)
 
 
 def install_module(mod, lock=False):
