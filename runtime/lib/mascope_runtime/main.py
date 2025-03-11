@@ -1,7 +1,6 @@
 import os
 import subprocess
 import shlex
-from loguru import logger
 
 from .mode import RuntimeMode
 from .state import RuntimeJsonState, RuntimeTempState
@@ -9,7 +8,7 @@ from .exceptions import MissingMascopePathException
 from .env import RuntimeEnv
 from .module import RuntimeModule
 from .config import RuntimeConfig, MetaConfig, ModuleConfig, load_config
-from .logger import configure_logger
+from .logging import RuntimeLogging
 
 
 class Runtime:
@@ -30,6 +29,7 @@ class Runtime:
     state: RuntimeJsonState | RuntimeTempState
     env: RuntimeEnv
     module: RuntimeModule
+    logging: RuntimeLogging
 
     _path: str
     _version: str
@@ -69,7 +69,8 @@ class Runtime:
         self._full_config = load_config(self)
 
         # configure loguru global logger
-        configure_logger(self)
+        self.logging = RuntimeLogging(self)
+        self.logging.configure()
 
     @property
     def mode(self) -> RuntimeMode:
@@ -104,7 +105,7 @@ class Runtime:
         """
         The runtime's local (module specific) configuration
         """
-        return logger
+        return self.logging.logger
 
     @property
     def modules(self):

@@ -5,7 +5,6 @@ import typing
 if typing.TYPE_CHECKING:
     from .runtime import Runtime
 
-import loguru
 from loguru import logger
 
 import datetime
@@ -31,7 +30,7 @@ class Stacktrace:
     pass
 
 
-class RuntimeLoggerLoader:
+class RuntimeLogging:
     """
     Helper class to configure the runtime logger of a
     module.
@@ -50,7 +49,6 @@ class RuntimeLoggerLoader:
     """
 
     _runtime: Runtime
-    _logger: loguru.Logger
 
     def __init__(self, runtime: Runtime) -> None:
         """
@@ -61,7 +59,6 @@ class RuntimeLoggerLoader:
         :type runtime: Runtime
         """
         self._runtime = runtime
-        self._logger = self.configure()
 
     @property
     def runtime(self):
@@ -78,7 +75,7 @@ class RuntimeLoggerLoader:
         :return: the logger of the runtime module
         :rtype: loguru.Logger
         """
-        return self._logger
+        return logger
 
     def path(self, *args: list[str]):
         """
@@ -298,13 +295,3 @@ class RuntimeLoggerLoader:
         exception = Exception("trace for debugging purposes (not a real exception)")
         stack = Traceback.extract(Stacktrace, exception, trace, show_locals=show_locals)
         return Traceback(stack, show_locals=show_locals)
-
-
-def configure_logger(runtime: Runtime):
-    """
-    Load the runtime logging setup, configuring
-    loguru globally as a sideeffect. Because of how
-    loguru works, we don't need to return anything
-    here.
-    """
-    RuntimeLoggerLoader(runtime)
