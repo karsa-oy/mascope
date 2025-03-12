@@ -23,6 +23,7 @@ from mascope_lib.runtime import lib_runtime
 from .file_func import (
     get_peak_profiles,
     get_sample_file_type,
+    load_array,
     load_file,
     write_peaks,
     get_instrument_type,
@@ -200,10 +201,17 @@ async def detect_peaks(
             """
         )
     peakshape, R = instrument_functions
-    sample_file_data = load_file(
-        filename, vars=["peak_areas", "peak_heights", "sum_signal"]
-    )
-    mz_top = sample_file_data.props["range"][1]
+    sample_file_props = load_file(filename, vars=[]).props
+    sum_signal = get_sum_signal(filename)
+
+    # Check if there are any peaks already fitted
+    try:
+        peak_heights = load_array(filename, "peak_heights").peak_heights
+        peak_areas = load_array(filename, "peak_areas").peak_areas
+    except FileNotFoundError:
+        peak_heights, peak_areas = None, None
+
+    mz_top = sample_file_props["range"][1]
 
     if u_list is None:
         # Fit all peaks
@@ -213,12 +221,10 @@ async def detect_peaks(
         # Filter out too large values
         u_list = u_list[u_list <= mz_top]
 
-    old_peak_mzs = []
-    old_peak_areas = []
-    old_peak_heights = []
+    old_peak_mzs, old_peak_areas, old_peak_heights = [], [], []
 
     # Fit peaks to given unit masses
-    if "peak_areas" in sample_file_data:
+    if peak_areas is not None and if_exists != "replace":
         if if_exists == "fail":
             raise FileExistsError("Peak data exists!")
 
@@ -226,11 +232,8 @@ async def detect_peaks(
         sample_file_type = get_sample_file_type(filename)
         if sample_file_type in ["tof_zarr", "orbi_zarr"]:
             # Drop nans for old files containing signal as zarr
-            peak_areas = sample_file_data.peak_areas.dropna(dim="mz")
-            peak_heights = sample_file_data.peak_heights.dropna(dim="mz")
-        else:
-            peak_areas = sample_file_data.peak_areas
-            peak_heights = sample_file_data.peak_heights
+            peak_areas = peak_areas.dropna(dim="mz")
+            peak_heights = peak_heights.dropna(dim="mz")
 
         # Get previously fitted unit masses
         old_peak_mzs = peak_areas.mz.values.tolist()
@@ -243,7 +246,9 @@ async def detect_peaks(
         if u_list.size == 0:
             # Nothing to fit
             lib_runtime.logger.info("Nothing to fit")
-            return sample_file_data
+            return load_file(
+                filename, vars=["peak_areas", "peak_heights", "sum_signal"]
+            )
 
         lib_runtime.logger.debug(
             "Getting sums of previously fitted peak areas and heights"
@@ -253,11 +258,10 @@ async def detect_peaks(
 
     lib_runtime.logger.info(f"Fitting {u_list.size} unit masses")
 
-    sum_signal = sample_file_data.sum_signal
     # Sample interval for peak area calculation in counts vs TOF
     # default 0.25 for backwards compatibility
     sample_interval = (
-        sample_file_data.attrs["props"].get("sample_interval", 0.25)
+        sample_file_props.get("sample_interval", 0.25)
         if instrument_type == "tof"
         else None
     )
@@ -290,10 +294,12 @@ async def detect_peaks(
             seg_spec_indices = segment_spec(sum_spec)
             specs_to_fit = [(mz[chunk], sum_spec[chunk]) for chunk in seg_spec_indices]
     if instrument_type == "tof":
+        sum_mz = sum_signal.mz.compute().values
+        sum_values = sum_signal.compute().values
         specs_to_fit = [
             (
-                sum_signal.mz.sel(mz=slice(u - dmz, u + dmz)).compute().values,
-                sum_signal.sel(mz=slice(u - dmz, u + dmz)).compute().values,
+                sum_mz[(sum_mz >= u - dmz) & (sum_mz <= u + dmz)],
+                sum_values[(sum_mz >= u - dmz) & (sum_mz <= u + dmz)],
             )
             for u in u_list
         ]
@@ -349,7 +355,7 @@ async def detect_peaks(
     all_peak_areas = all_peak_areas[all_peak_ind]
     all_peak_heights = all_peak_heights[all_peak_ind]
 
-    peak_mz_coord = sample_file_data.mz.sel(
+    peak_mz_coord = sum_signal.mz.sel(
         mz=all_peak_mzs,
         method="nearest",
     )
@@ -371,8 +377,8 @@ async def detect_peaks(
     peak_heights = all_peak_heights[unique_peak_index]
 
     # Get the tof values corresponding to the peak mzs using np.searchsorted
-    tofs = np.arange(len(sample_file_data.sum_signal.mz)).astype(np.float32)
-    indices = np.searchsorted(sample_file_data.sum_signal.mz.values, all_peak_mzs)
+    tofs = np.arange(len(sum_signal.mz)).astype(np.float32)
+    indices = np.searchsorted(sum_signal.mz.values, all_peak_mzs)
     indices = np.clip(indices, 0, len(tofs) - 1)  # Ensure indices are within bounds
     unique_tofs = tofs[indices]
     # Get the peak profiles and assign the tof coordinate
@@ -397,7 +403,6 @@ async def detect_peaks(
     sample_file_data = load_file(
         filename,
         vars=["peak_areas", "peak_heights", "sum_signal"],
-        prev_dataset=sample_file_data,
     )
     if return_peak_mzs:
         return (sample_file_data, all_peak_mzs)

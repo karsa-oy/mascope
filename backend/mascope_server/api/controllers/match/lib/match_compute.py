@@ -3,7 +3,12 @@ import numpy as np
 from mascope_server.api.new.match.params.schema import (
     DEFAULT_MIN_ISOTOPE_ABUNDANCE,
 )
-from mascope_lib.file_func import get_instrument_type, get_sum_signal, load_file
+from mascope_lib.file_func import (
+    get_instrument_type,
+    get_sum_signal,
+    load_array,
+    load_file,
+)
 from mascope_lib.peak import calculate_signal_area, detect_peaks, get_peaks
 from mascope_lib.chemistry import match_mz
 from mascope_server.db.id import gen_id
@@ -95,7 +100,7 @@ async def compute_match_isotopes(
             threshold = 0.8
         if instrument_type == "tof":
             threshold = 0.9
-        sample_file = await detect_peaks(
+        await detect_peaks(
             filename,
             instrument_functions,
             threshold,
@@ -103,11 +108,13 @@ async def compute_match_isotopes(
             if_exists="append",
             instrument_type=instrument_type,
         )
-        # Use peak height as an intensity value for Orbitrap, peak area for TOF
+
+        runtime.logger.debug("Start matching")
+
         if instrument_type == "orbi":
-            peaks = get_peaks(sample_file, "height")
+            peaks = load_array(filename, "peak_heights").peak_heights
         if instrument_type == "tof":
-            peaks = get_peaks(sample_file, "area")
+            peaks = load_array(filename, "peak_areas").peak_areas
 
         # Step 2: - Prepare data
         # init match df from target isotopes
@@ -123,9 +130,9 @@ async def compute_match_isotopes(
             match_score=np.nan,
         )
 
-        # parse peak data
+        runtime.logger.debug("Parse peak data")
         peak_mzs = peaks.mz.values
-        peak_areas = peaks.sum(dim="time").values
+        peak_areas = peaks.sum(dim="time").compute().values
         peak_tofs = peaks.tof.values
         peak_sorting = np.argsort(peak_mzs)
 
