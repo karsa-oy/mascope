@@ -38,7 +38,7 @@ colors = {
     "frontend": palette["orange"],
     "notebooks": palette["red"],
     "tof-agent": palette["pink"],
-    "file-mover": palette["purple"],
+    "file-uploader": palette["purple"],
     "file-converter": palette["magenta"],
 }
 
@@ -145,9 +145,11 @@ class RuntimeLogging:
         # create fresh config
         logger.remove()  # remove old settings
         logger.configure(  # apply new settings
-            handlers=[file_handler, terminal_handler]
-            if self.runtime.module.name != "cli"
-            else [terminal_handler],
+            handlers=(
+                [file_handler, terminal_handler]
+                if self.runtime.module.name != "cli"
+                else [terminal_handler]
+            ),
             levels=[
                 dict(name="TRACE", color="<magenta>"),
                 dict(name="DEBUG", color="<magenta>"),
@@ -194,22 +196,27 @@ class RuntimeLogging:
                 # informational response
                 def status_style(msg):
                     return self.style(msg, "blue")
+
             elif response(200):
                 # successful response
                 def status_style(msg):
                     return self.style(msg, "green")
+
             elif response(300):
                 # redirection response
                 def status_style(msg):
                     return self.style(msg, "cyan")
+
             elif response(400):
                 # client error response
                 def status_style(msg):
                     return self.style(msg, "bold", "yellow")
+
             elif response(500):
                 # server error response
                 def status_style(msg):
                     return self.style(msg, "bold", "red")
+
             else:
                 # other
                 def status_style(msg):

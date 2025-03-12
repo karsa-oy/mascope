@@ -12,7 +12,7 @@ import watchdog
 from watchdog.events import PatternMatchingEventHandler
 from watchdog.observers import Observer
 
-from mascope_runtime import MascopeRuntimeModule
+from mascope_runtime import Runtime
 from mascope_sdk import api_post_file
 
 
@@ -155,13 +155,11 @@ def initialize() -> None:
                 with open(path, "w", encoding="utf-8") as file:
                     file.write(DEFAULT_CONFIG)
         # initialize the runtime in production mode
-        runtime = MascopeRuntimeModule(
-            "file-uploader", env="prod", mode="prod", path=mascope_path
-        )
+        runtime = Runtime("file-uploader", env="prod", mode="prod", path=mascope_path)
     else:
         # dev mode
         # runtime state inherited from the CLI
-        runtime = MascopeRuntimeModule("file-uploader")
+        runtime = Runtime("file-uploader")
 
 
 class FileSystemWatcher:
