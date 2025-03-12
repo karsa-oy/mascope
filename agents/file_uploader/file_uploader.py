@@ -48,7 +48,7 @@ PORT = None
 URL = None
 SHUTDOWN_EVENT = Event()
 
-runtime = None
+runtime = None  # pylint: disable=invalid-name
 
 
 def process_file_upload(filepath: str) -> None:
@@ -61,7 +61,7 @@ def process_file_upload(filepath: str) -> None:
         upload_sample_file(filepath)
         # Delete file after successful upload
         os.remove(filepath)
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-except
         runtime.logger.error(f"Exception {e.__class__.__name__}({str(e)})")
         # Move failed file into a separate directory
         failed_dir = mkdir(runtime.config.source, "failed")
@@ -88,7 +88,10 @@ def upload_sample_file(filepath: str) -> None:
     file_size = os.stat(filepath).st_size
     if file_size > FILE_UPLOAD_SIZE_LIMIT:
         raise ValueError(
-            f"File size ({round(file_size / (1024 * 1024), 1)} MB) exceeds the maximum allowed size ({FILE_UPLOAD_SIZE_LIMIT / (1024 * 1024)} MB)"
+            (
+                f"File size ({round(file_size / (1024 * 1024), 1)} MB) exceeds the maximum",
+                "allowed size ({FILE_UPLOAD_SIZE_LIMIT / (1024 * 1024)} MB)",
+            )
         )
 
     # Make file upload request
@@ -133,7 +136,7 @@ def initialize() -> None:
     :return: Return nothing
     :rtype: None
     """
-    global runtime
+    global runtime  # pylint: disable=global-statement
     # check if we are running in a pyinstaller bundle
     bundled = getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS")
     if bundled:
@@ -143,7 +146,6 @@ def initialize() -> None:
         os.environ.setdefault("MASCOPE_PATH", mascope_path)
         # setup runtime environment
         env_path = mkdir(mascope_path, "runtime", "env", "prod")
-        data_path = mkdir(env_path, "data")
         mkdir(env_path, "logs")
         # init config files if they don't exists
         config_paths = [
@@ -186,7 +188,7 @@ class FileSystemWatcher:
             """
             try:
                 self.client.on_filesystem_object_created(event.src_path)
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-except
                 runtime.logger.error(f"Exception {e.__class__.__name__}({str(e)})")
 
         def on_moved(self, event: watchdog.events.FileSystemEvent) -> None:
@@ -197,7 +199,7 @@ class FileSystemWatcher:
             """
             try:
                 self.client.on_filesystem_object_created(event.dest_path)
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-except
                 runtime.logger.error(f"Exception {e.__class__.__name__}({str(e)})")
 
     def __init__(self, client, path: str, mask: str, recursive=False):
@@ -237,11 +239,12 @@ class FileSystemWatcher:
                 time.sleep(1)
             except KeyboardInterrupt:
                 self.client.shutdown_event.set()
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-except
                 runtime.logger.error(f"Exception {e.__class__.__name__}({str(e)})")
         self.stop()
 
     def run_as_daemon(self):
+        """Run as daemon"""
         Thread(target=self.run).start()
 
 
@@ -295,10 +298,10 @@ class FileUploader:
         """
         Main loop that continuously checks for jobs to process and uploads files if necessary.
 
-        This method runs in a loop until the `shutdown_event` is set. It periodically checks for new jobs
-        from the `jobs` queue and processes them. If a job is found, it checks the time since the last access
-        and decides whether to requeue the job or upload the file. The loop handles several exceptions to ensure
-        smooth operation and logs critical errors.
+        This method runs in a loop until the `shutdown_event` is set. It periodically checks
+        for new jobs from the `jobs` queue and processes them. If a job is found, it checks the
+        time since the last access and decides whether to requeue the job or upload the file.
+        The loop handles several exceptions to ensure smooth operation and logs critical errors.
 
         Exceptions Handled:
             - Empty: Raised when the `jobs` queue is empty.
@@ -307,7 +310,8 @@ class FileUploader:
             - KeyboardInterrupt: Raised when the process is interrupted by the user.
             - Exception: Catches all other exceptions and logs them as critical errors.
 
-        The method ensures that the `shutdown_event` is set when exiting, either normally or due to an exception.
+        The method ensures that the `shutdown_event` is set when exiting, either normally or due
+        to an exception.
         """
         try:
             while not self.shutdown_event.is_set():
@@ -320,7 +324,7 @@ class FileUploader:
                         self.jobs.put(fname)
                         runtime.logger.debug(f"Put {fname} back to queue")
                         continue
-                    # Spawn a thread for file upload to not block the processing of subsequent acquisitions
+                    # Spawn a thread for file upload
                     upload_thread = Thread(
                         target=process_file_upload, args=(fname,), daemon=True
                     )
@@ -330,7 +334,7 @@ class FileUploader:
 
         except KeyboardInterrupt as e:
             runtime.logger.error(f"{e.__class__.__name__}({str(e)})")
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             runtime.logger.error(f"{e.__class__.__name__}({str(e)})")
         finally:
             self.shutdown_event.set()
@@ -339,14 +343,14 @@ class FileUploader:
 def run() -> None:
     """Main function of the application
 
-    Start `SampleMover` thread and wait until it finishes
+    Start `FileUploader` thread and wait until it finishes
     """
     # Initialize runtime
     initialize()
 
-    global URL
-    global HOST
-    global PORT
+    global URL  # pylint: disable=global-statement
+    global HOST  # pylint: disable=global-statement
+    global PORT  # pylint: disable=global-statement
 
     PORT = runtime.meta.api_port
     HOST = runtime.config.host
@@ -362,9 +366,9 @@ def run() -> None:
 
     if not os.path.isdir(runtime.config.source):
         raise RuntimeError(f"Invalid source directory {runtime.config.source}")
-    mover = FileUploader(runtime.config.source, runtime.config.mask)
-    mover.watcher.run_as_daemon()
-    mover.run_until_complete()
+    uploader = FileUploader(runtime.config.source, runtime.config.mask)
+    uploader.watcher.run_as_daemon()
+    uploader.run_until_complete()
 
 
 if __name__ == "__main__":
