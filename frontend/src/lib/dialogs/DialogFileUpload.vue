@@ -20,7 +20,7 @@ import { instrumentType } from '@/lib/utils'
 import { useApp } from '@/stores'
 
 // TODO_configuration Default sample file upload params
-const FILE_UPLOAD_SIZE_LIMIT = 200 * 1024 * 1024 // 200 MB
+const FILE_UPLOAD_SIZE_LIMIT = 2.5 * 1024 * 1024 * 1024 // 2.5 GB
 
 const app = useApp()
 
@@ -228,7 +228,7 @@ const upload = () => {
       <h3>Files exceeding the size limit</h3>
       <p>
         The following files exceeded the
-        {{ FILE_UPLOAD_SIZE_LIMIT / (1024 * 1024) }} MB size limit:
+        {{ FILE_UPLOAD_SIZE_LIMIT / (1024 * 1024 * 1024) }} GB size limit:
       </p>
       <ul>
         <li v-for="file in processed.invalid.oversized" :key="file.name">

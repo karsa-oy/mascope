@@ -45,7 +45,7 @@ DEFAULT_CONFIG = textwrap.dedent(
     """
 )
 
-FILE_UPLOAD_SIZE_LIMIT = 200 * 1024 * 1024  # 200 MB
+FILE_UPLOAD_SIZE_LIMIT = 2.5 * 1024**3  # 2.5 GB
 HOST = None
 PORT = None
 URL = None
@@ -72,7 +72,7 @@ def upload_sample_file(filepath: str) -> None:
     file_size = os.stat(filepath).st_size
     if file_size > FILE_UPLOAD_SIZE_LIMIT:
         raise ValueError(
-            f"File size ({round(file_size / (1024 * 1024), 1)} MB) exceeds the maximum allowed size ({FILE_UPLOAD_SIZE_LIMIT / (1024 * 1024)} MB)"
+            f"File size ({round(file_size / (1024**3), 1)} GB) exceeds the maximum allowed size ({FILE_UPLOAD_SIZE_LIMIT / (1024**3)} GB)"
         )
 
     # Make file upload request

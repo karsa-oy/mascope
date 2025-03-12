@@ -7,7 +7,7 @@ from mascope_server.api.models.base_pydantic_model import QueryParamsModel
 
 # TODO_configuration Default sample file upload params
 FILE_UPLOAD_EXTENSIONS = {".h5", ".raw"}
-FILE_UPLOAD_SIZE_LIMIT = 1000 * 1024 * 1024  # 1 GB
+FILE_UPLOAD_SIZE_LIMIT = 2.5 * 1024**3  # 2.5 GB
 
 
 class SampleFileBase(BaseModel):
@@ -87,13 +87,13 @@ class SampleFileUpload(BaseModel):
     @classmethod
     def validate_size(cls, file: UploadFile):
         if hasattr(file, "size") and file.size > FILE_UPLOAD_SIZE_LIMIT:
-            size_limit_mb = FILE_UPLOAD_SIZE_LIMIT / 1024 / 1024
+            size_limit_mb = FILE_UPLOAD_SIZE_LIMIT / 1024**3
             # Raise a RequestValidationError directly
             raise RequestValidationError(
                 [
                     {
                         "loc": ("file",),
-                        "msg": f"File exceeds the size limit of {size_limit_mb} MB.",
+                        "msg": f"File exceeds the size limit of {size_limit_mb} GB.",
                         "type": "value_error.file_size",
                     }
                 ]
