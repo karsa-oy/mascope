@@ -86,7 +86,7 @@ async def visualize_ion_focus(
     spectrum_unit, timeseries_unit, peak_data_type, peak_profile_type = (
         ("ions", "ions", "peak_areas", "area")
         if instrument_type == "tof"
-        else ("rel.", "rel.", "peak_heights", "height")
+        else ("counts", "counts", "peak_heights", "height")
     )
 
     # Step 2: Load the sample file and prepare data slice
