@@ -1,15 +1,12 @@
 import typer
-from shutil import copytree
-import os
-import zipfile
-from typing import Optional, Annotated
+from typing import Annotated
 
 from rich.console import Console
 from rich.table import Table
 
 from mascope_cli.runtime import runtime
 
-from mascope_runtime import MascopeRuntimeModule
+from mascope_runtime import Runtime
 
 
 env_app = typer.Typer()
@@ -36,18 +33,8 @@ def list():
     table.add_column("Description", style="green")
     table.add_column("Path", style="magenta", no_wrap=True)
     table.add_column("Status", style="cyan", no_wrap=True)
-    env_dir = os.path.join(runtime.root_path, "runtime", "env")
-    all_entries = [
-        {"name": name, "path": os.path.join(env_dir, name)}
-        for name in os.listdir(env_dir)
-    ]
-    envs = [
-        entry
-        for entry in all_entries
-        if (os.path.isdir(entry["path"]) and not entry["name"].startswith("."))
-    ]
-    for env in envs:
-        env_runtime = MascopeRuntimeModule("cli", env=env["name"])
+    for env in runtime.env.list:
+        env_runtime = Runtime("cli", env=env["name"])
         is_selected = env["name"] == runtime.state.env
         default = "default" if env["name"] == "default" else None
         active = "active" if is_selected else None
@@ -63,18 +50,25 @@ def list():
     console.print(table)
 
 
+def complete_env():
+    return [e["name"] for e in runtime.env.list]
+
+
 @env_app.command()
-def activate(env: Annotated[str, typer.Argument(help="The environment to activate")]):
+def use(
+    env: Annotated[
+        str,
+        typer.Argument(
+            help="The environment to activate",
+            autocompletion=complete_env,
+        ),
+    ],
+):
     """
     Activate an env, so that it is used in all subsequent commands
     """
-    runtime.state.env = env
-    runtime.logger.info(f"Mascope env set to '{env}'")
-
-
-@env_app.command()
-def default():
-    """
-    Activates the default env
-    """
-    runtime.state.env = "default"
+    if env in [e["name"] for e in runtime.env.list]:
+        runtime.state.env = env
+        runtime.logger.info(f"Mascope env set to '{env}'")
+    else:
+        runtime.logger.error(f"No env named '{env}' was found")

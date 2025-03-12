@@ -162,6 +162,14 @@ export const useSampleContextMenu = defineStore('browser.sample.sampleCtxMenu', 
       },
       { separator: true, visible: !multiselecting },
       {
+        label: 'Export peaks',
+        icon: 'pi pi-file-export',
+        command: async () => {
+          await app.data.sample.exportPeaks(row.value)
+        },
+        visible: !multiselecting
+      },
+      {
         label: `Recalibrate sample`,
         icon: 'pi pi-replay',
         command: () => {

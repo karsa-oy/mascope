@@ -8,3 +8,4 @@ agents/*
 database/*
 filestore/*
 filestreams/*
+temp/*

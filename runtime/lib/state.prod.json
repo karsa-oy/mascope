@@ -6,12 +6,5 @@
   "mode": {
     "active": "prod",
     "override": null
-  },
-  "modules": {
-    "active": [
-      "backend",
-      "frontend"
-    ],
-    "override": null
   }
 }

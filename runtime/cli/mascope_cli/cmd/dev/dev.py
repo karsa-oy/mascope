@@ -1,11 +1,11 @@
-from typing import List, Dict, Annotated, Optional
+from typing import List, Annotated, Optional
 import os
 import json
 import typer
 import platform
 import base64
 
-from mascope_runtime import MascopeRuntimeModule
+from mascope_runtime import Runtime
 
 from mascope_cli.runtime import runtime
 
@@ -64,22 +64,22 @@ def run(
     # select modules by name
     selected = [
         mod
-        for mod in runtime.pkgs
+        for mod in runtime.modules
         if mod["name"] in (modules or ["backend", "frontend"])
     ]
     # use tags if no modules were selected
     if not len(selected):
         [tag] = modules
-        selected = [mod for mod in runtime.pkgs if tag in mod["tags"]]
+        selected = [mod for mod in runtime.modules if tag in mod["tags"]]
     # set mode to dev
     runtime.state.mode = "dev"
     # set config env var
-    frontend_runtime = MascopeRuntimeModule("frontend")
-    os.environ["MASCOPE_ENV"] = runtime.env
+    frontend_runtime = Runtime("frontend", log=False)
+    os.environ["MASCOPE_ENV"] = runtime.env.name
     os.environ["MASCOPE_RUNTIME"] = json.dumps(
         {
             "mode": frontend_runtime.mode,
-            "env": frontend_runtime.env,
+            "env": frontend_runtime.env.name,
             "meta": frontend_runtime.meta.model_dump(),
             "config": frontend_runtime.config.model_dump(),
             "version": os.environ["MASCOPE_VERSION"],
@@ -128,80 +128,12 @@ def run(
             return f'"wt --window 0 pwsh -noExit -EncodedCommand {base64_cmd}"'
         else:
             # default behavior
-            return f'"cd {mod['pkg_path']} && {mod['run']}"'
+            return f'"cd {mod["pkg_path"]} && {mod["run"]}"'
 
     # construct arguments
-    names = f'--names {','.join(map(lambda proc: f'{proc['name']}', selected))}'
-    cmds = f'{" ".join(map(
-        run_module,
-        selected
-    ))}'
+    names = f"--names {','.join(map(lambda proc: f'{proc["name"]}', selected))}"
+    cmds = f"{' '.join(map(run_module, selected))}"
     # run command
     command = f"{concurrently} --raw {names} {cmds}"
     print(f"Running command: {command}")
     lib.run(command)
-
-
-def install_module(mod, lock=False):
-    if mod["install"]:
-        options = f'--names "{mod['name']}"'
-        python_path = os.environ["PIPX_DEFAULT_PYTHON"]
-        # lock command
-        poetry_lock = "poetry lock &&" if "poetry" in mod["install"] else None
-        npm_lock = (
-            "npm install --package-lock-only &&" if "npm" in mod["install"] else None
-        )
-        lock_cmd = (poetry_lock or npm_lock or "") if lock else ""
-        # environment setup
-        env_setup = (
-            f"poetry env use {python_path} &&" if "poetry" in mod["install"] else ""
-        )
-        # execution
-        lib.run(
-            f'{concurrently} {options} "cd {mod['pkg_path']} && {env_setup} {lock_cmd} {mod['install']}"'
-        )
-
-
-def uninstall_module(mod):
-    if mod["install"]:
-        options = f'--names "{mod['name']}"'
-        # execution
-        lib.run(
-            f'{concurrently} {options} "cd {mod['pkg_path']} && {mod['uninstall']}"'
-        )
-
-
-@dev_app.command()
-def install(
-    mods: Annotated[
-        Optional[List[str]],
-        typer.Argument(
-            help="List of modules to install; run `mascope modules --installable` for a list of installable modules"
-        ),
-    ] = None,
-):
-    """
-    Install or update modules in your dev env
-    """
-    install_all = mods == None
-    for pkg in runtime.pkgs:
-        if install_all or (pkg["name"] in (mods or [])):
-            install_module(pkg)
-
-
-@dev_app.command()
-def uninstall(
-    mods: Annotated[
-        Optional[List[str]],
-        typer.Argument(
-            help="List of modules to uninstall; run `mascope modules --installable` for a list of uninstallable modules"
-        ),
-    ] = None,
-):
-    """
-    Uninstall modules in your dev env
-    """
-    uninstall_all = mods == None
-    for pkg in reversed(runtime.pkgs):
-        if uninstall_all or (pkg["name"] in (mods or [])):
-            uninstall_module(pkg)

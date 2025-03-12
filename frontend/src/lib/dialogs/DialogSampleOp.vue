@@ -81,10 +81,17 @@ const input = reactive({
   instrument: null,
   type: null
 })
+const initial = ref()
+const changedInput = computed(
+  () => JSON.stringify(input) !== initial.value || instrumentConfig.status?.changed === true // * see note below
+)
 const instrumentConfig = reactive({
   status: {},
   payload: {},
   input: {}
+})
+const generated = reactive({
+  filterId: null
 })
 
 const title = computed(
@@ -114,6 +121,8 @@ async function init(active) {
   instrumentConfig.status = {}
   instrumentConfig.input = {}
   instrumentConfig.payload = {}
+  // reset generated
+  generated.filterId = null
   // fill fields
   input.fields = Object.entries({
     sample_item_name: original.value?.sample_item_name,
@@ -122,6 +131,8 @@ async function init(active) {
     label,
     value
   }))
+
+  initial.value = JSON.stringify(input)
 }
 // autofill fields when template is selected
 watch(template, autofill)
@@ -135,9 +146,6 @@ function autofill() {
   }
 }
 
-const generated = reactive({
-  filterId: null
-})
 const filters = computed(() => {
   return app.data.batch.focused
     ? [
@@ -240,8 +248,16 @@ const invalid = computed(() => {
   const missingRequiredFields =
     input.fields?.filter((f) => f?.required).length !=
     input.fields?.filter((f) => f?.required).filter((f) => f.value).length
-  return !input.type || missingRequiredFields || instrumentConfig.status?.invalid
+  const invalidUpdate = action.value === 'update' && !changedInput.value // * see note below
+  return !input.type || missingRequiredFields || instrumentConfig.status?.invalid || invalidUpdate
 })
+
+// * Note that for older samples, the dialog may open immediately valid!
+
+// This is because legacy samples have no instrument config, and the instrument config pane
+// will force _some_ config to be chosen. This means that opening the dialog for a legacy
+// sample will immediately be a valid change, since the dialog has automatically updated
+// the previous 'null' method_file to the first instrument config in the list.
 </script>
 
 <template>

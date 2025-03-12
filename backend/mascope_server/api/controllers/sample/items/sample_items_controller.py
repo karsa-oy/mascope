@@ -805,15 +805,14 @@ async def sample_item_export_peaks(
     dt_str = datetime.now().isoformat().replace("-", "").replace(":", "").split(".")[0]
 
     # Save the peak data to a CSV file
-    peakfile_path = get_filestore_path()
     peakfile_filename = "_".join(
         [dt_str, "peak_data", sample_item_name.replace(" ", "_") + ".csv"]
     )
     runtime.logger.info(f"Writing peak data to file {peakfile_filename}")
     sample_peak_df.to_csv(
-        os.path.join(peakfile_path, peakfile_filename), index=False, sep=";"
+        runtime.env.path("temp", peakfile_filename), index=False, sep=";"
     )
-    message = f"Peak data for sample item '{sample_item_name}' was exported to file '{peakfile_filename}' and saved to '{peakfile_path}'."
+    message = f"Peak data for sample item '{sample_item_name}' was exported to file '{peakfile_filename}'."
     runtime.logger.info(message)
 
     # Return the status message
@@ -822,5 +821,6 @@ async def sample_item_export_peaks(
         "data": {"filename": peakfile_filename},
         "_notification_data": {
             "sample_item_id": sample_item_id,
+            "download": peakfile_filename,
         },
     }

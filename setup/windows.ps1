@@ -3,46 +3,33 @@
 Param
 (
     # Actions: install, update, uninstall, reinstall
-    [parameter(mandatory = $true, position = 0)][string]$Action,
-    [parameter(mandatory = $false, position = 1, ValueFromRemainingArguments = $true)]$Modules
+    [parameter(mandatory = $true, position = 0)][string]$Action = 'reinstall'
 )
 
 # SCRIPT
 
 $Main = {
-    $Full = $Modules.count -eq 0
-    $Cli = 'cli' -in $Modules
     $Install = $Action -eq 'install'
     $Reinstall = $Action -eq 'reinstall'
-    $FullReinstall = $Reinstall -and $Full
     $Uninstall = $Action -eq 'uninstall'
     $Update = $Action -eq 'update'
 
     Write-Intro
     
     if ( $Uninstall -or $Reinstall) {
-        Uninstall-MascopeModules $Modules
-        if ($Full -or $Cli) {
-            Uninstall-MascopeCli
-            Clear-MascopeEnvVars
-        }
+        Uninstall-MascopeModules
+        Clear-MascopeEnvVars
     }
 
-    if ( $Install -or $FullReinstall ) {    
+    if ( $Install -or $Reinstall ) {    
         Test-ExistingPipx
         Set-MascopeEnvVars
         Install-Tooling
     }
-    elseif ( $Reinstall ) {
-        Set-MascopeEnvVars
-    }
     
     if ( $Install -or $Reinstall -or $Update) {
         Clear-MascopeState
-        if ( $Cli -or $Full) {
-            Install-MascopeCli
-        }
-        Install-MascopeModules $Modules
+        Install-MascopeModules
     }
     
     Write-Outro
@@ -241,56 +228,7 @@ function Set-RuntimePermissions {
     Get-ChildItem -Path $RuntimeEnv -Recurse |  Set-Acl -AclObject $acl
 }
 
-function Install-MascopeCli {
-    Write-Output @"
-
-    +------------------------------+
-    | ⚡ INSTALLING MASCOPE CLI ⚡ |
-    +------------------------------+
-
-"@
-    Set-Location "${env:MASCOPE_PATH}\runtime\cli"
-    # poetry build
-    if (Test-CommandExists mascope) {
-        Write-Output "mascope cli detected - reinstalling"
-        poetry env use $env:PIPX_DEFAULT_PYTHON
-        poetry build
-        pipx reinstall mascope_cli
-    }
-    else {
-        Write-Output "mascope cli not detected - installing"
-        poetry env use $env:PIPX_DEFAULT_PYTHON
-        poetry build
-        pipx install .
-    }
-    Set-Location $env:MASCOPE_PATH
-}
-
-function Uninstall-MascopeCli {
-    Write-Output @"
-
-    +--------------------------------+
-    | ⚡ UNINSTALLING MASCOPE CLI ⚡ |
-    +--------------------------------+
-
-"@
-    Set-Location "${env:MASCOPE_PATH}\runtime\cli"
-    # poetry build
-    if (Test-CommandExists mascope) {
-        Write-Output "mascope cli detected - uninstalling"
-        pipx uninstall mascope_cli
-        poetry env remove --all
-    }
-    else {
-        Write-Output "mascope cli not detected - skipping uninstall"
-    }
-    Set-Location $env:MASCOPE_PATH
-}
-
 function Install-MascopeModules {
-    param (
-        $Mods
-    )
     Write-Output @"
 
     +----------------------------------+
@@ -302,13 +240,10 @@ function Install-MascopeModules {
     # https://github.com/open-cli-tools/concurrently/issues/492
     [System.Environment]::SetEnvironmentVariable('NODE_NO_WARNINGS', 1)
     # Install dev dependencies
-    mascope dev install $Mods
+    py -3.12 "${env:MASCOPE_PATH}/setup/mascope.py" install
 }
 
 function Uninstall-MascopeModules {
-    param (
-        $Mods
-    )
     Write-Output @"
 
     +------------------------------------+
@@ -320,7 +255,7 @@ function Uninstall-MascopeModules {
     # https://github.com/open-cli-tools/concurrently/issues/492
     [System.Environment]::SetEnvironmentVariable('NODE_NO_WARNINGS', 1)
     # Install dev dependencies
-    mascope dev uninstall $Mods
+    py -3.12 "${env:MASCOPE_PATH}/setup/mascope.py" uninstall
 }
 
 # BANNERS

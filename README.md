@@ -151,9 +151,9 @@ mascope prod build         # build the production containers
 Manage runtime envs:
 
 ```sh
-mascope env list           # list runtime env
-mascope env activate foo   # set foo as the active env
-mascope env default        # revert to the default env
+mascope env list            # list runtime env
+mascope env use foo         # set foo as the active env
+mascope env use default     # revert to the default env
 ```
 
 ---
@@ -184,7 +184,7 @@ When you instantiate a Mascope runtime instance for some module, you can access 
 
 ```py
 # backend/mascope_server/runtime.py
-runtime = MascopeRuntimeModule('backend')
+runtime = Runtime('backend')
 
 # elsewhere
 from mascope_server.runtime import runtime
@@ -258,7 +258,7 @@ Modules' _configuration_ is specified in the `base`, `dev` and `prod` files with
 
 The Mascope app requires multiple persistence mechanisms: SQLite, various files, configuration files and even a small state.json file. To facilitate ease of operations, these are organized in a single folder called a _runtime env_.
 
-To list available envs, run `mascope env list`. To activate an env _foo_, run `mascope env activate foo`. To revert to the _default_ env, run `mascope env default`.
+To list available envs, run `mascope env list`. To activate an env _foo_, run `mascope env use foo`. To revert to the _default_ env, run `mascope env use default`.
 
 The `runtime/env` folder can contain multiple runtime environments. Only `default` - the team's standard development environment - is not `.gitignore`d. The folder structure looks like this:
 
@@ -271,6 +271,7 @@ runtime/
       database/            # The primary SQLite db and its backups
       filestore/           # Stored raw and processed files
       filestreams/         # Network drive to receive incoming files
+      temp/                # Temporary folder for ephemeral download files
       ...                  # .mascope.toml config files
 ```
 
@@ -278,19 +279,18 @@ Some folders may be symbolically linked to a runtime to facilitate network drive
 
 ### Runtime Config
 
-The `mascope.toml` files inside a runtime configures the app. The configuration includes app wide settings (under `meta`) and [module](#runtime-modules) specific configuration settings. There are three files, that have the same schema:
+The `mascope.toml` files inside a runtime configures the app. The configuration includes app wide settings (under `meta`) and [module](#runtime-modules) specific configuration settings. There are two files, that have the same schema:
 
 ```py
 runtime/
   env/
     foo/
       ...                  # Rest of the env's state
-      base.mascope.toml    # Baseline app config - applies always
       dev.mascope.toml     # Development app config - overrides base in dev mode
       prod.mascope.toml    # Production app config - overrides base in prod mode
 ```
 
-For a complete and up-to-date list of options, refer to the default baseline configuration, found at `runtime/env/default/base.mascope.toml`. Here is an example of a small `dev.mascope.toml` you may use during development to override specific values:
+For a complete and up-to-date list of options, refer to the configuration defaults, found at `runtime/lib/mascope_runtime/base.mascope.toml`. Here is an example of a small `dev.mascope.toml` you may use during development to override specific values:
 
 ```toml
 [meta]

@@ -15,7 +15,7 @@ import watchdog
 from watchdog.events import PatternMatchingEventHandler
 from watchdog.observers import Observer
 
-from mascope_runtime import MascopeRuntimeModule
+from mascope_runtime import Runtime
 
 
 # check if we are running in a pyinstaller bundle
@@ -74,13 +74,11 @@ if bundled:
             with open(path, "w") as file:
                 file.write(default_config)
     # initialize the runtime in production mode
-    runtime = MascopeRuntimeModule(
-        "file-mover", env="prod", mode="prod", path=mascope_path
-    )
+    runtime = Runtime("file-mover", env="prod", mode="prod", path=mascope_path)
 else:
     # dev mode
     # runtime state inherited from the CLI
-    runtime = MascopeRuntimeModule("file-mover")
+    runtime = Runtime("file-mover")
 
 
 def parent_func_name() -> str:

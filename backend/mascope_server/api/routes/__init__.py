@@ -9,6 +9,7 @@ from mascope_server.api.new.users.owner.routes import owner_router
 from mascope_server.api.new.roles.routes import roles_router
 from mascope_server.api.new.params import params_router
 from mascope_server.api.new.instruments import instruments_router
+from mascope_server.api.new.temp.routes import temp_router
 from mascope_server.api.new.instrument_configs.routes import (
     instrument_configs_router,
 )
@@ -124,4 +125,5 @@ routers = [
     match_interferences_router,
     match_isotopes_router,
     visualization_router,
+    temp_router,
 ]

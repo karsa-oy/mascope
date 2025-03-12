@@ -1045,24 +1045,26 @@ async def sample_batch_export_peaks(
 
     dt_str = datetime.now().isoformat().replace("-", "").replace(":", "").split(".")[0]
 
-    peakfile_path = get_filestore_path()
-    peakfile_filename = "_".join(
+    peakfile_name = "_".join(
         [dt_str, "peaks", sample_batch_name.replace(" ", "_") + ".csv"]
     )
-    runtime.logger.info(f"Writing peak data to file {peakfile_filename}")
+    runtime.logger.info(f"Writing peak data to file {peakfile_name}")
     # Save peak data to dataframe and then to csv file
     batch_peak_df = pd.DataFrame(peak_data)
     batch_peak_df.to_csv(
-        os.path.join(peakfile_path, peakfile_filename), index=False, sep=";"
+        runtime.env.path("temp", peakfile_name),
+        index=False,
+        sep=";",
     )
-    message = f"Peak data for sample batch '{sample_batch_name}' was exported to file '{peakfile_filename}' and saved to '{peakfile_path}'."
+    message = f"Peak data for sample batch '{sample_batch_name}' was exported to file '{peakfile_name}'."
     runtime.logger.info(message)
 
     # Return the status message
     return {
         "message": message,
-        "data": {"filename": peakfile_filename},
+        "data": {"filename": peakfile_name},
         "_notification_data": {
             "sample_batch_id": sample_batch_id,
+            "download": peakfile_name,
         },
     }

@@ -9,7 +9,7 @@ from queue import Empty
 import socketio
 
 
-from mascope_runtime import MascopeRuntimeModule
+from mascope_runtime import Runtime
 from mascope_sdk import api_post_file
 from mascope_hardware.runtime import init as init_hardware_runtime
 
@@ -224,13 +224,13 @@ def initialize() -> None:
                     file.write(DEFAULT_CONFIG)
         # initialize the runtime in production mode
         opts = dict(env="prod", mode="prod", path=mascope_path)
-        runtime = MascopeRuntimeModule("tof-agent", **opts)
-        init_hardware_runtime(**opts)
+        runtime = Runtime("tof-agent", **opts)
+        init_hardware_runtime(**opts, context="tof-agent")
     else:
         # dev mode
         # runtime state inherited from the CLI
-        runtime = MascopeRuntimeModule("tof-agent")
-        init_hardware_runtime()
+        runtime = Runtime("tof-agent")
+        init_hardware_runtime(context="tof-agent")
     # Check if API access token is left empty
     if not runtime.config.access_token:
         raise Exception("Please enter your API access token in the config!")

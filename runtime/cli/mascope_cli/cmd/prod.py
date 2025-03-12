@@ -1,13 +1,12 @@
 import typer
 import os
-import json
 import platform
 import time
 
 from typing import Optional, List
 from typing_extensions import Annotated
 
-from mascope_runtime import MascopeRuntimeModule
+from mascope_runtime import Runtime
 
 from . import lib
 
@@ -55,7 +54,7 @@ def main(args: Annotated[Optional[List[str]], typer.Argument()] = None) -> None:
     """
     if len(args) == 1 and args[0] == "--help":
         print(long_help)
-    runtime = MascopeRuntimeModule("frontend")
+    runtime = Runtime("frontend")
     runtime.state.mode = "prod"
     command = f"{compose_cmd} {' '.join(args)}"
     # timezone
@@ -70,16 +69,8 @@ def main(args: Annotated[Optional[List[str]], typer.Argument()] = None) -> None:
     lib.run(
         command=command,
         vars=dict(
-            MASCOPE_ENV=runtime.env,
-            MASCOPE_RUNTIME=json.dumps(
-                {
-                    "mode": runtime.mode,
-                    "env": runtime.env,
-                    "meta": runtime.meta.model_dump(),
-                    "config": runtime.config.model_dump(),
-                    "version": os.environ["MASCOPE_VERSION"],
-                }
-            ),
+            MASCOPE_ENV=runtime.env.name,
+            MASCOPE_RUNTIME=runtime.module.to_json(),
             MASCOPE_FILESTORE=runtime.meta.filestore,
             MASCOPE_TIMEZONE=timezone,
         ),

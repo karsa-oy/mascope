@@ -1,1 +1,1 @@
-from .module import MascopeRuntimeModule
+from .main import Runtime
