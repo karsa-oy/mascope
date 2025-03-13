@@ -24,8 +24,6 @@ from mascope_lib.runtime import lib_runtime
 from mascope_hardware.orbitrap import thermo
 from mascope_hardware.tofwerk import tofwerk
 
-
-from .structs import ExtendableDataArray
 from .util import parse_path_from_item_filename
 from .instrument import resolve_instrument_type
 
@@ -45,6 +43,20 @@ def get_filestore_path() -> str:
         else lib_runtime.meta.filestore
     )
     return base_path
+
+
+def get_zarr_synchronizer(zarr_path: str) -> zarr.ProcessSynchronizer:
+    """Get zarr synchronizer for a given zarr file
+
+    :param zarr_path: Path to the zarr file
+    :type zarr_path: str
+    :return: Zarr synchronizer
+    :rtype: zarr.ProcessSynchronizer
+    """
+    parent_dir = os.path.dirname(zarr_path)
+    sync_name = zarr_path.split(os.path.sep)[-1].replace(".zarr", ".sync")
+    sync_path = os.path.sep.join([parent_dir, sync_name])
+    return zarr.ProcessSynchronizer(sync_path)
 
 
 def write_peaks(
@@ -331,7 +343,7 @@ def load_array(base_filename, var, prev_array=None):
         groups = list(z.group_keys())
         return bool(len(groups))
 
-    sync = ExtendableDataArray.get_zarr_synchronizer(var_path)
+    sync = get_zarr_synchronizer(var_path)
     if is_multifile():
         # Multi-file (grouped)
         dataset = open_mfzarr(var_path, prev_array=prev_array, sync=sync)
@@ -361,7 +373,7 @@ def load_coord(base_filename, var, coord_name):
             lib_runtime.logger.error("Use load_signal to access signal array")
         raise FileNotFoundError(var_path)
 
-    sync = ExtendableDataArray.get_zarr_synchronizer(var_path)
+    sync = get_zarr_synchronizer(var_path)
     z = zarr.open(var_path, mode="r", synchronizer=sync)
     coord = z[coord_name]
     coord_array = coord[:]
@@ -554,7 +566,7 @@ def get_tic_per_scan(base_filename: str, timestamps: Iterable | None = None) -> 
             tic_time, tic_per_scan = thermo.get_tic_per_scan(datafile_path, timestamps)
         case "tof_zarr" | "orbi_zarr":
             zarr_path = filename_to_zarr_path(base_filename, "signal")
-            sync = ExtendableDataArray.get_zarr_synchronizer(zarr_path)
+            sync = get_zarr_synchronizer(zarr_path)
             z = zarr.open(zarr_path, mode="r", synchronizer=sync)
 
             # Get sum of counts along mz coordinate for each time coordinate
@@ -732,7 +744,7 @@ def update_zarr_array_coord(base_filename, var, dim, coord):
     :type coord: np.array
     """
     array_path = filename_to_zarr_path(base_filename, var)
-    sync = ExtendableDataArray.get_zarr_synchronizer(array_path)
+    sync = get_zarr_synchronizer(array_path)
     zarr_array = zarr.open(array_path, mode="a", synchronizer=sync)
     zarr_array[dim][:] = coord
     for group_name, group in zarr_array.groups():
