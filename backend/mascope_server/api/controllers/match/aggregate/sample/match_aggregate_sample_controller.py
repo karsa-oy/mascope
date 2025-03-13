@@ -1,4 +1,3 @@
-from typing import Optional
 import pandas as pd
 from sqlalchemy import (
     select,
@@ -156,7 +155,7 @@ async def aggregate_sample_match_ion(
 async def aggregate_sample_match_compound(
     sample_item_id: str,
     target_compound_formula: str,
-    match_params: Optional[BaseMatchParams] = None,
+    match_params: BaseMatchParams | None = None,
     target_compound_name: str = "Unknown Compound",
 ) -> dict:
     """

@@ -87,13 +87,13 @@ class SampleFileUpload(BaseModel):
     @classmethod
     def validate_size(cls, file: UploadFile):
         if hasattr(file, "size") and file.size > FILE_UPLOAD_SIZE_LIMIT:
-            size_limit_mb = FILE_UPLOAD_SIZE_LIMIT / 1024**3
+            size_limit_gb = FILE_UPLOAD_SIZE_LIMIT / 1024**3
             # Raise a RequestValidationError directly
             raise RequestValidationError(
                 [
                     {
                         "loc": ("file",),
-                        "msg": f"File exceeds the size limit of {size_limit_mb} GB.",
+                        "msg": f"File exceeds the size limit of {size_limit_gb} GB.",
                         "type": "value_error.file_size",
                     }
                 ]

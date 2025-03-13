@@ -1,7 +1,7 @@
 from pathlib import Path
 from itertools import compress
 from contextlib import contextmanager
-from typing import Iterable, Optional
+from typing import Iterable, Literal
 import numpy as np
 import xarray as xr
 import dask.array as da
@@ -66,11 +66,11 @@ def filter_by_polarity(raw_file, scan_indices: list, polarity: str) -> list:
 
 def get_signal(
     datafile_path: str,
-    t_min: Optional[float] = None,
-    t_max: Optional[float] = None,
-    mz_min: Optional[float] = None,
-    mz_max: Optional[float] = None,
-    polarity: str = None,
+    t_min: float | None = None,
+    t_max: float | None = None,
+    mz_min: float | None = None,
+    mz_max: float | None = None,
+    polarity: Literal["+", "-"] | None = None,
 ) -> xr.Dataset:
     """This function uses the Thermo Fisher libraries to read the raw file and extract the scan data.
     It then merges the scans to have a common m/z scale and converts the data to an xarray Dataset.
@@ -164,9 +164,9 @@ def get_signal(
 
 def compute_sum_signal_in_time_range(
     datafile_path: str,
-    t_min: Optional[float] = None,
-    t_max: Optional[float] = None,
-    average: Optional[bool] = False,
+    t_min: float | None = None,
+    t_max: float | None = None,
+    average: bool = False,
     ppm: int = 1,
 ) -> xr.core.dataarray.DataArray:
     """Computes sum signal in (t_min, t_max) time range, binning counts within "ppm" value
@@ -219,7 +219,7 @@ def compute_sum_signal_in_time_range(
 
 
 def get_tic_per_scan(
-    datafile_path: str, timestamps: Optional[Iterable[float]] = None
+    datafile_path: str, timestamps: Iterable[float] | None = None
 ) -> tuple:
     """Extracts the Total Ion Current (TIC) per scan from the raw file.
 
@@ -259,9 +259,9 @@ def get_tic_per_scan(
 def get_peak_profiles(
     datafile_path: str,
     mzs: Iterable[float],
-    t_min: Optional[float] = None,
-    t_max: Optional[float] = None,
-    polarity: Optional[str] = None,
+    t_min: float | None = None,
+    t_max: float | None = None,
+    polarity: Literal["+", "-"] | None = None,
 ) -> xr.Dataset:
     """Extracts the peak profiles for the specified m/z values in the time range (t_min, t_max).
 

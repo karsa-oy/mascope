@@ -1,6 +1,6 @@
 from pathlib import Path
 from contextlib import contextmanager
-from typing import Iterable, Optional, Tuple
+from typing import Iterable, Tuple
 import h5py
 import numpy as np
 import xarray as xr
@@ -31,10 +31,10 @@ def open_h5_file(datafile_path: str):
 
 def get_signal(
     datafile_path: str,
-    t_min: Optional[float] = None,
-    t_max: Optional[float] = None,
-    mz_min: Optional[float] = None,
-    mz_max: Optional[float] = None,
+    t_min: float | None = None,
+    t_max: float | None = None,
+    mz_min: float | None = None,
+    mz_max: float | None = None,
 ) -> xr.Dataset:
     """
     Retrieve a full time-windowed signal from an HDF5 file. Allows slicing by time and m/z range.
@@ -146,8 +146,8 @@ def get_signal(
 
 def compute_sum_signal_in_time_range(
     datafile_path: str,
-    t_min: Optional[float] = None,
-    t_max: Optional[float] = None,
+    t_min: float | None = None,
+    t_max: float | None = None,
     average: bool = False,
 ) -> xr.core.dataarray.DataArray:
     """
@@ -213,7 +213,7 @@ def compute_sum_signal_in_time_range(
 
 
 def get_tic_per_scan(
-    datafile_path: str, timestamps: Optional[Iterable[float]] = None
+    datafile_path: str, timestamps: Iterable[float] | None = None
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Calculate TIC per scan from HDF5 file.
@@ -270,8 +270,8 @@ def get_peak_profiles(
     datafile_path: str,
     mzs: Iterable[float],
     true_mz_axis: Iterable[float],
-    t_min: Optional[float] = None,
-    t_max: Optional[float] = None,
+    t_min: float | None = None,
+    t_max: float | None = None,
 ) -> xr.Dataset:
     """Extracts the peak profiles for the specified m/z values in the time range (t_min, t_max).
 
@@ -281,10 +281,10 @@ def get_peak_profiles(
     :type mzs: Iterable[float]
     :param true_mz_axis: Calibrated m/z axis values.
     :type true_mz_axis: Iterable[float]
-    :param t_min: Start time [s], optional, defaults to None
-    :type t_min: Optional[float]
-    :param t_max: End time [s], optional, defaults to None
-    :type t_max: Optional[float]
+    :param t_min: Start time [s], defaults to None
+    :type t_min: float, optional
+    :param t_max: End time [s], defaults to None
+    :type t_max: float, optional
     :return: An xarray Dataset containing the peak profiles
     :rtype: xr.Dataset
     """

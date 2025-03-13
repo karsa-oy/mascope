@@ -1,4 +1,3 @@
-from typing import Optional
 import pandas as pd
 from mascope_lib.file_func import get_instrument_type
 from sqlalchemy import (
@@ -416,14 +415,14 @@ async def aggregate_matches(
 
 @api_controller()
 async def aggregate_and_create_matches(
-    sample_batch_id: str = None,
-    sample_item_id: str = None,
-    target_ion_id: str = None,
-    match_params: BaseMatchParams = None,
-    match_ions: Optional[bool] = True,
-    match_compounds: Optional[bool] = True,
-    match_collections: Optional[bool] = True,
-    match_samples: Optional[bool] = True,
+    sample_batch_id: str | None = None,
+    sample_item_id: str | None = None,
+    target_ion_id: str | None = None,
+    match_params: BaseMatchParams | None = None,
+    match_ions: bool = True,
+    match_compounds: bool = True,
+    match_collections: bool = True,
+    match_samples: bool = True,
 ) -> dict:
     """
     Processes aggregated match data by first aggregating data based on given filters and then creating
@@ -537,14 +536,14 @@ async def aggregate_and_create_matches(
 
 @api_controller()
 async def aggregate_and_recreate_matches(
-    sample_batch_id: str = None,
-    sample_item_id: str = None,
-    target_ion_id: str = None,
-    match_params: BaseMatchParams = None,
-    match_ions: Optional[bool] = True,
-    match_compounds: Optional[bool] = True,
-    match_collections: Optional[bool] = True,
-    match_samples: Optional[bool] = True,
+    sample_batch_id: str | None = None,
+    sample_item_id: str | None = None,
+    target_ion_id: str | None = None,
+    match_params: BaseMatchParams | None = None,
+    match_ions: bool = True,
+    match_compounds: bool = True,
+    match_collections: bool = True,
+    match_samples: bool = True,
 ) -> dict:
     """
     Aggregates and re-creates match data by first removing existing aggregates based on flags,

@@ -4,7 +4,7 @@ import os
 import glob
 import sys
 from shutil import rmtree
-from typing import Iterable, Optional
+from typing import Iterable, Literal
 import dask.array as da
 import numpy as np
 import xarray as xr
@@ -380,10 +380,10 @@ def load_coord(base_filename, var, coord_name):
 
 def load_signal(
     base_filename: str,
-    t_min: Optional[float] = None,
-    t_max: Optional[float] = None,
-    mz_min: Optional[float] = None,
-    mz_max: Optional[float] = None,
+    t_min: float | None = None,
+    t_max: float | None = None,
+    mz_min: float | None = None,
+    mz_max: float | None = None,
 ) -> xr.Dataset:
     """Load signal from the sample file
 
@@ -604,9 +604,9 @@ def get_tic_per_scan(base_filename: str, timestamps: Iterable | None = None) -> 
 def get_peak_profiles(
     base_filename: str,
     mzs: Iterable[float],
-    t_min: Optional[float] = None,
-    t_max: Optional[float] = None,
-    polarity: Optional[str] = None,
+    t_min: float | None = None,
+    t_max: float | None = None,
+    polarity: Literal["+", "-"] | None = None,
 ) -> xr.DataArray:
     """Get peak profiles for given m/z values in the time range [t_min, t_max]
 
@@ -615,11 +615,11 @@ def get_peak_profiles(
     :param mzs: List of target m/z values
     :type mzs: Iterable[float]
     :param t_min: Left border of the time range [s], defaults to None
-    :type t_min: Optional[float], optional
+    :type t_min: float, optional
     :param t_max: Right border of the time range [s], defaults to None
-    :type t_max: Optional[float], optional
+    :type t_max: float, optional
     :param polarity: Polarity of the scan to extract, defaults to None (get all scans)
-    :type polarity: Optional[str], optional
+    :type polarity: str, optional
     :return: Peak profiles for the given m/z values
     :rtype: xr.DataArray
     """
