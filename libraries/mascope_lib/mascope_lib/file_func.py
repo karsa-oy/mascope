@@ -99,8 +99,9 @@ def write_peaks(
         peak_heights.to_zarr(filename_peak_heights)
     except FileNotFoundError as e:
         if ".partial" in str(e):
+            # peak_heights in Exception because it's longer than peak_areas and sum_signal
             raise Exception(
-                f"The path is probably too long: {filename_peak_areas}"
+                f"The path is probably too long: {filename_peak_heights}"
             ) from e
         else:
             raise
@@ -124,8 +125,16 @@ def get_sum_signal(filename: str, average: bool = False) -> xr.DataArray:
         base_filename = sample_file.props["filename"]
         sum_signal = sum_signal_for_time_range(base_filename)
         filename_sum_signal = filename_to_zarr_path(base_filename, "sum_signal")
-        # Write sum signal to zarr file
-        sum_signal.to_zarr(filename_sum_signal)
+
+        try:
+            sum_signal.to_zarr(filename_sum_signal)
+        except FileNotFoundError as e:
+            if ".partial" in str(e):
+                raise Exception(
+                    f"The path is probably too long: {filename_sum_signal}"
+                ) from e
+            else:
+                raise
 
     if average:
         return sum_signal / sample_file.props["length"]
