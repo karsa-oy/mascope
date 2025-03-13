@@ -82,7 +82,6 @@ def write_peaks(
     filename_peak_areas = filename_to_zarr_path(filename, "peak_areas")
     filename_peak_heights = filename_to_zarr_path(filename, "peak_heights")
 
-    # Check if paths exist
     if os.path.exists(filename_peak_areas) or os.path.exists(filename_peak_heights):
         if overwrite:
             rmtree(filename_peak_areas)
@@ -92,13 +91,19 @@ def write_peaks(
                 f"Peak areas or peak heights already exist for {filename}"
             )
 
-    # Set names for peak areas and peak heights
     peak_areas.name = "peak_areas"
     peak_heights.name = "peak_heights"
 
-    # Write peak areas and peak heights to zarr files
-    peak_areas.to_zarr(filename_peak_areas)
-    peak_heights.to_zarr(filename_peak_heights)
+    try:
+        peak_areas.to_zarr(filename_peak_areas)
+        peak_heights.to_zarr(filename_peak_heights)
+    except FileNotFoundError as e:
+        if ".partial" in str(e):
+            raise Exception(
+                f"The path is probably too long: {filename_peak_areas}"
+            ) from e
+        else:
+            raise
 
 
 def get_sum_signal(filename: str, average: bool = False) -> xr.DataArray:
