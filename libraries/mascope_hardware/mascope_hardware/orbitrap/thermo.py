@@ -40,7 +40,9 @@ def open_raw_file(datafile_path: str):
         )
 
 
-def filter_by_polarity(raw_file, scan_indices: list, polarity: str) -> list:
+def filter_by_polarity(
+    raw_file, scan_indices: list, polarity: Literal["+", "-"]
+) -> list:
     """Filter scan indices by polarity.
 
     :param raw_file: The raw file object containing scan data.
