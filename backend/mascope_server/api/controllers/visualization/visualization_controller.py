@@ -5,6 +5,7 @@ from sqlalchemy import select
 from colorcet import glasbey_hv as colormap
 from mascope_lib.file_func import (
     get_instrument_type,
+    get_sum_signal,
     load_file,
 )
 from mascope_lib.peak import filter_peaks, get_peaks
@@ -83,15 +84,16 @@ async def visualize_ion_focus(
                 f"Target ion with ID {target_ion_id} not found or does not meet abundance threshold"
             )
     # Set units and peak data type based on instrument type
-    spectrum_unit, timeseries_unit, peak_data_type, peak_profile_type = (
-        ("ions", "ions", "peak_areas", "area")
+    spectrum_unit, timeseries_unit, peak_profile_type = (
+        ("ions", "ions", "area")
         if instrument_type == "tof"
-        else ("counts", "counts", "peak_heights", "height")
+        else ("counts/s", "counts/s", "height")
     )
 
     # Step 2: Load the sample file and prepare data slice
     runtime.logger.info(f"Loading file: {filename}")
-    sample_file = load_file(filename, vars=["sum_signal", peak_data_type])
+    sample_file = load_file(filename, vars=["peak_areas", "peak_heights"])
+    sum_signal = get_sum_signal(filename)
 
     # Step 3: Convert target ion data to DataFrame and prepare data
     target_ion_list = [ion.to_dict() for ion in target_ion_data]
@@ -116,7 +118,7 @@ async def visualize_ion_focus(
 
         # Extract the specific isotope slice and compute the sum spectrum
         isotope_slice = sample_file.sel(mz=slice(*mz_range)).compute()
-        isotope_sum_spectrum = isotope_slice.sum_signal
+        isotope_sum_spectrum = sum_signal.sel(mz=slice(*mz_range)).compute()
         # Check if the spectrum slice is empty
         if isotope_sum_spectrum.size == 0:
             # No signal in the requested range, plot 0-line still
@@ -157,7 +159,7 @@ async def visualize_ion_focus(
         )
         peak_profiles = get_peaks(isotope_slice, peak_profile_type)
         # Peak traces (vertical lines)
-        peaks = peak_profiles.sum(dim="time").compute()
+        peaks = isotope_slice.peak_heights.sum(dim="time").compute()
         runtime.logger.debug(f"Peaks in the range {mz_range}: {peaks.mz.values}")
         peaks = filter_peaks(peaks, intensity=peak_min_intensity)
         runtime.logger.debug(
