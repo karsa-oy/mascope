@@ -42,7 +42,7 @@ DEFAULT_CONFIG = textwrap.dedent(
     """
 )
 
-FILE_UPLOAD_SIZE_LIMIT = 200 * 1024 * 1024  # 200 MB
+FILE_UPLOAD_SIZE_LIMIT = 2.5 * 1024**3  # 2.5 GB
 HOST = None
 PORT = None
 URL = None
