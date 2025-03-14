@@ -4,7 +4,6 @@ prod.mascope.toml
 
 # Ignore the contents of the following directories
 logs/*
-agents/*
 database/*
 filestore/*
 filestreams/*
