@@ -147,6 +147,7 @@ def initialize() -> None:
         # setup runtime environment
         env_path = mkdir(mascope_path, "runtime", "env", "prod")
         mkdir(env_path, "logs")
+        mkdir(env_path, "data")
         # init config files if they don't exists
         config_paths = [
             os.path.join(env_path, "base.mascope.toml"),
@@ -217,7 +218,9 @@ class FileSystemWatcher:
         """
         self.observer.schedule(self.handler, self.path, recursive=self.recursive)
         self.observer.start()
-        runtime.logger.info(f"started watching {self.path}")
+        runtime.logger.info(
+            f"Started watching {self.path} for new files matching pattern '{self.mask}'"
+        )
 
     def stop(self) -> None:
         """Stop watching.

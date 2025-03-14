@@ -89,7 +89,7 @@ class TofAgentConfig(ModuleConfig):
 
 class FileUploaderConfig(ModuleConfig):
     """
-    File Mover module specific configuration options
+    File Uploader module specific configuration options
     """
 
     mask: str = "*.raw"  # file pattern to look for

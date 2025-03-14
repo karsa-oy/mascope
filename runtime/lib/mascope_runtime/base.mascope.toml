@@ -69,7 +69,7 @@ access_token = ''
 # scripts
 install = "poetry install"
 uninstall = "poetry env remove --all"
-run = "poetry run mascope-file-mover"
+run = "poetry run mascope-file-uploader"
 
 # CLIENTS
 

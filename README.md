@@ -372,13 +372,13 @@ minimal transformations and move files to the server.
 
 ```
 agents/          Instrument machine agents
-  file_uploader/         File mover (for Orbitrap)
+  file_uploader/      File mover (for Orbitrap)
   tof_agent/          Tofwerk TOF
 ```
 
-### File Mover
+### File Uploader
 
-The file-uploader agent is responsible for moving files from instrument machines unchanged to the server. This is designed for use in Orbitrap machines.
+The File Uploader agent is responsible for uploading files from instrument machines unchanged to the server. This is designed for use in Orbitrap machines.
 
 To run all services needed to emulate the Orbitrap acquisition workflow in development, run `mascope dev run orbi`.
 
@@ -393,11 +393,20 @@ Then run the executable found in `agents/file_uploader/dist`.
 
 When you run this executable, the `MASCOPE_PATH` will be `%AppData%\Mascope\FileUploader` and the runtime environment will therefore be `%AppData%\Mascope\FileUploader\runtime\env\prod`
 
-You will need to run the agent once so that it initializes the directory structure, but it will fail to resolve some paths because the configuration needs to be updated. Then go to the env path listed above and update `prod.mascope.toml` with the real paths.
+You will need to run the agent once so that it initializes the directory structure, but it will fail to resolve some paths because the configuration needs to be updated. Then go to the env path listed above and update `prod.mascope.toml` with:
+
+1. Server URL
+2. Access token with write access:
+   - Log into Mascope web application (editor role or higher required)
+   - Click the user profile icon to open the sidebar
+   - In the "API Access Tokens" section, select "File Uploader" from the dropdown
+   - Generate and copy the access token (note: token is shown only once)
+
+_NOTE:_ In case the config schema is changed, any existing configuration in the target environment must be deleted prior to running the updated version of TofAgent, in order to initialize correct configs.
 
 ### TOF Agent
 
-The tof agent agent is responsible for transforming and transfering files from Tofwerk instrument machines to the server.
+The TOF Agent is responsible for transforming and transfering files from Tofwerk instrument machines to the server.
 
 To run all services needed to emulate the Tofwerk acquisition workflow in development, run `mascope dev run tof`.
 
