@@ -29,6 +29,30 @@ def open_h5_file(datafile_path: str):
         raise Exception(err_message) from e
 
 
+def get_conversion_coefficient(h5_file) -> float:
+    """
+    Calculate the conversion coefficient to convert signal intensity from [mV/ext] to [ions/sec].
+
+    :param h5_file: Opened HDF5 file object.
+    :type h5_file: h5py.File
+    :return: Conversion coefficient.
+    :rtype: float
+    """
+    single_ion_signal = (
+        h5_file["FullSpectra"].attrs["Single Ion Signal"][0] * 1e-9
+    )  # [mV·s/ion]
+    sample_interval = h5_file["FullSpectra"].attrs["SampleInterval"][0]  # [s]
+    tof_period = h5_file["TimingData"].attrs["TofPeriod"][0] * 1e-9  # [s]
+    tof_frequency = 1 / tof_period  # [1/s]
+
+    # Coefficient to convert signal intensity from [mV/ext] -> [ions/sec]
+    conversion_coefficient = (
+        sample_interval * tof_frequency / single_ion_signal
+    )  # [ions/(mV·s)]
+
+    return conversion_coefficient
+
+
 def get_signal(
     datafile_path: str,
     t_min: float | None = None,
@@ -163,7 +187,7 @@ def compute_sum_signal_in_time_range(
     :type t_max: float, optional
     :param average: If spectrum should be averaged, defaults to False.
     :type average: bool, optional
-    :return: Sum signal.
+    :return: Sum signal [ions/sec] in the specified time range.
     :rtype: xr.core.dataarray.DataArray
     """
     with open_h5_file(datafile_path) as h5_file:
@@ -205,8 +229,18 @@ def compute_sum_signal_in_time_range(
         last_chunk_sum = last_chunk.sum(axis=(0, 1))
         sum_signal += last_chunk_sum
 
+        # Normalize by number of extractions [mV] -> [mV/ext]
+        n_extractions = h5_file.attrs["NbrWaveforms"][0]
+        sum_signal /= n_extractions
+
         if average:
-            sum_signal /= t_end_ind - t_start_ind + 1
+            sum_signal = sum_signal / (t_end_ind - t_start_ind + 1)
+
+        # Coefficient to convert signal intensity from [mV/ext] -> [ions/sec]
+        conversion_coefficient = get_conversion_coefficient(h5_file)
+
+        # Convert [mV/ext] -> [ions/sec]
+        sum_signal *= conversion_coefficient
 
         sum_signal_da = xr.DataArray(sum_signal, dims=["mz"], coords={"mz": all_mzs})
         return sum_signal_da.rename("sum_signal")
