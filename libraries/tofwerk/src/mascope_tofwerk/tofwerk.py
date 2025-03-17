@@ -157,6 +157,16 @@ def get_signal(
                 coord[0], coord[1], coord[2], mz_start_ind : mz_end_ind + 1
             ]
 
+        # Normalize by number of extractions [mV] -> [mV/ext]
+        n_extractions = h5_file.attrs["NbrWaveforms"][0]
+        signal_slice /= n_extractions
+
+        # Coefficient to convert signal intensity from [mV/ext] -> [ions/sec]
+        conversion_coefficient = get_conversion_coefficient(h5_file)
+
+        # Convert [mV/ext] -> [ions/sec]
+        signal_slice *= conversion_coefficient
+
         signal_dask = da.from_array(signal_slice, chunks="auto")
         # Init and return xarray Dataset with swapped dimensions
         return xr.Dataset(
