@@ -281,8 +281,14 @@ def get_tic_per_scan(
         for ind, coord in enumerate(coordinates):
             scan_tic[ind] = signal_ref[coord[0], coord[1], coord[2], :].sum()
 
+        sum_spec = h5_file.h5["FullSpectra"]["SumSpectrum"][:]
+        # Normalize by number of extractions [mV] -> [mV/ext]
+        n_extractions = h5_file.attrs["NbrWaveforms"][0]
+        sum_spec /= n_extractions
+        # Convert to ions/sec
+        sum_spec *= get_conversion_coefficient(h5_file)
         # Get total TIC
-        total_tic = h5_file["FullSpectra"]["SumSpectrum"][:].sum()
+        total_tic = sum_spec.sum()
         # Correct TIC per scan by total TIC
         scan_tic = scan_tic / scan_tic.sum() * total_tic
 
