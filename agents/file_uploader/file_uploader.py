@@ -90,7 +90,7 @@ def upload_sample_file(filepath: str) -> None:
         raise ValueError(
             (
                 f"File size ({round(file_size / (1024 * 1024), 1)} MB) exceeds the maximum",
-                "allowed size ({FILE_UPLOAD_SIZE_LIMIT / (1024 * 1024)} MB)",
+                f"allowed size ({FILE_UPLOAD_SIZE_LIMIT / (1024 * 1024)} MB)",
             )
         )
 
@@ -113,7 +113,7 @@ def upload_sample_file(filepath: str) -> None:
 
 
 def mkdir(*args: tuple) -> str:
-    """ "
+    """
     Creates a directory at the specified path if it does not already exist.
 
     :param args: Components of the path to be joined.
@@ -174,7 +174,7 @@ class FileSystemWatcher:
         Implement callbacks for file system events.
 
         :param PatternMatchingEventHandler: Event handler from the watchdog package
-        :type PatternMatchingEventHandler: watchdig.events.PatternMatchingEventHandler
+        :type PatternMatchingEventHandler: watchdog.events.PatternMatchingEventHandler
         """
 
         def __init__(self, client, patterns):
@@ -248,7 +248,9 @@ class FileSystemWatcher:
 
     def run_as_daemon(self):
         """Run as daemon"""
-        Thread(target=self.run).start()
+        t = Thread(target=self.run)
+        t.daemon = True
+        t.start()
 
 
 class FileUploader:
@@ -336,7 +338,7 @@ class FileUploader:
                     continue
 
         except KeyboardInterrupt as e:
-            runtime.logger.error(f"{e.__class__.__name__}({str(e)})")
+            runtime.logger.info("Shutdown requested by user.")
         except Exception as e:  # pylint: disable=broad-except
             runtime.logger.error(f"{e.__class__.__name__}({str(e)})")
         finally:

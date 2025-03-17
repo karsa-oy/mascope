@@ -10,7 +10,7 @@ All developer docs are in this document:
 
 - **[🚀 Getting started](#getting-started)** - install and running - [windows](#windows) / [ubuntu](#ubuntu) / [cheatsheet](#cheatsheet)
 - **[🚂 Runtime](#runtime)** - devops toolchain - [api](#runtime-library) / [cli](#runtime-cli) / [modes](#runtime-modes) / [modules](#runtime-modules) / [envs](#runtime-environments) / [configs](#runtime-config) / [logging](#runtime-logging)
-- **[🤖 Agents](#agents)** - instrument agents - [file mover](#file-uploader) / [tof agent](#tof-agent)
+- **[🤖 Agents](#agents)** - instrument agents - [file uploader](#file-uploader) / [tof agent](#tof-agent)
 - **[📡 Backend](#backend)** - central server - [api](#backend-api) / [auth](#backend-auth) / [app](#backend-app) / [db](#backend-db) / [file converter](#backend-file-converter)
 - **[🖥️ Frontend](#frontend)** - user interface - [tech](#frontend-technologies) / [development](#frontend-development) / [codebase](#frontend-codebase) / [api client](#frontend-api-client) / [stores](#frontend-stores) / [help mode](#frontend-user-help) / [tests](#frontend-tests)
 - **[📚 Libraries](#libraries)** - shared packages - [mascope_sdk](#mascope-sdk) / [mascope_hardware](#mascope-hardware) / [mascope_lib](#mascope-lib)
@@ -372,7 +372,7 @@ minimal transformations and move files to the server.
 
 ```
 agents/          Instrument machine agents
-  file_uploader/      File mover (for Orbitrap)
+  file_uploader/      File uploader (for Orbitrap)
   tof_agent/          Tofwerk TOF
 ```
 
