@@ -13,6 +13,7 @@ from mascope_tofwerk.runtime import runtime
 from mascope_file.io import write_props
 from mascope_file.name import parse_path_from_item_filename
 from mascope_file.record import create_sample_file_db_record
+from mascope_hardware.tofwerk import get_conversion_coefficient
 
 
 class H5Processor(Thread):
@@ -122,25 +123,6 @@ class H5Processor(Thread):
         return None
 
     @property
-    def conversion_coefficient(self) -> float | None:
-        """Coefficient to convert signal intensity from [mV/ext] -> [ions/sec]
-
-        Was used TofDaqStreamer, not applied here, but formula is good to keep
-
-        :return: Conversion coefficient
-        :rtype: float | None
-        """
-        if self.h5:
-            # TOF frequency [Hz] (1/TOF period)
-            tof_frequency = 1 / self.h5["TimingData"].attrs["TofPeriod"][0]
-            return float(
-                self.interval
-                * (self.sample_interval * tof_frequency)
-                / self.single_ion_signal
-            )
-        return None
-
-    @property
     def tic(self) -> float | None:
         """Total Ion Current (TIC) of the sample file
 
@@ -148,7 +130,14 @@ class H5Processor(Thread):
         :rtype: float
         """
         if self.h5:
-            return float(self.h5["FullSpectra"]["SumSpectrum"][:].sum())
+            sum_spec = self.h5["FullSpectra"]["SumSpectrum"][:]
+            # Normalize by number of extractions [mV] -> [mV/ext]
+            n_extractions = self.h5.attrs["NbrWaveforms"][0]
+            sum_spec /= n_extractions
+            # Convert to ions/sec
+            sum_spec *= get_conversion_coefficient(self.h5)
+            # Calculate total ion current
+            return float(sum_spec.sum())
         return None
 
     @property
