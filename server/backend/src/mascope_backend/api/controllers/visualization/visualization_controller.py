@@ -85,16 +85,13 @@ async def visualize_ion_focus(
                 f"Target ion with ID {target_ion_id} not found or does not meet abundance threshold"
             )
     # Set units and peak data type based on instrument type
-    spectrum_unit, timeseries_unit, peak_profile_type = (
-        ("ions", "ions", "area")
-        if instrument_type == "tof"
-        else ("counts/s", "counts/s", "height")
-    )
+    units = "counts/s"
+    peak_profile_type = "area" if instrument_type == "tof" else "height"
 
     # Step 2: Load the sample file and prepare data slice
     runtime.logger.info(f"Loading file: {filename}")
     sample_file = load_file(filename, vars=["peak_areas", "peak_heights"])
-    sum_signal = get_sum_signal(filename)
+    averaged_signal = get_sum_signal(filename) / sample_file.time.size
 
     # Step 3: Convert target ion data to DataFrame and prepare data
     target_ion_list = [ion.to_dict() for ion in target_ion_data]
@@ -119,24 +116,24 @@ async def visualize_ion_focus(
 
         # Extract the specific isotope slice and compute the sum spectrum
         isotope_slice = sample_file.sel(mz=slice(*mz_range)).compute()
-        isotope_sum_spectrum = sum_signal.sel(mz=slice(*mz_range)).compute()
+        isotope_averaged_spec = averaged_signal.sel(mz=slice(*mz_range)).compute()
         # Check if the spectrum slice is empty
-        if isotope_sum_spectrum.size == 0:
+        if isotope_averaged_spec.size == 0:
             # No signal in the requested range, plot 0-line still
             runtime.logger.warning(
                 f"No data found in the mz range {mz_range} for requested mz {mz}"
             )
-            sum_spectrum_mz = np.array(list(mz_range), dtype=np.float32)
-            sum_spectrum_y = np.array([0, 0], dtype=np.float32)
+            averaged_spec_mz = np.array(list(mz_range), dtype=np.float32)
+            averaged_spec_y = np.array([0, 0], dtype=np.float32)
             isotope_expected_height = 0
         else:
             # Prepare signal to be plotted
-            isotope_height = isotope_sum_spectrum.dropna(dim="mz").sel(
+            isotope_height = isotope_averaged_spec.dropna(dim="mz").sel(
                 mz=mz, method="nearest"
             )
             # Sum spectrum traces
-            sum_spectrum_mz = isotope_sum_spectrum.mz.values.astype(np.float32)
-            sum_spectrum_y = isotope_sum_spectrum.values.astype(np.float32)
+            averaged_spec_mz = isotope_averaged_spec.mz.values.astype(np.float32)
+            averaged_spec_y = isotope_averaged_spec.values.astype(np.float32)
             if i == 0:
                 # Set signal normalization constant
                 main_isotope_height = float(isotope_height)
@@ -153,14 +150,14 @@ async def visualize_ion_focus(
                 "line": {"color": "rgb({},{},{})".format(*colormap[i + COLOR_OFFSET])},
                 "fill": "tozeroy",
                 "fillcolor": "rgba({},{},{}, .3)".format(*colormap[i + COLOR_OFFSET]),
-                "x": sum_spectrum_mz.tobytes(),
-                "y": sum_spectrum_y.tobytes(),
-                "unit": spectrum_unit,
+                "x": averaged_spec_mz.tobytes(),
+                "y": averaged_spec_y.tobytes(),
+                "unit": units,
             }
         )
         peak_profiles = get_peaks(isotope_slice, peak_profile_type)
         # Peak traces (vertical lines)
-        peaks = isotope_slice.peak_heights.sum(dim="time").compute()
+        peaks = isotope_slice.peak_heights.mean(dim="time").compute()
         runtime.logger.debug(f"Peaks in the range {mz_range}: {peaks.mz.values}")
         peaks = filter_peaks(peaks, intensity=peak_min_intensity)
         runtime.logger.debug(
@@ -181,7 +178,7 @@ async def visualize_ion_focus(
                     },
                     "x": [peak_mz, peak_mz],
                     "y": [0, peak_height],
-                    "unit": spectrum_unit,
+                    "unit": units,
                 }
             )
             if match:
@@ -200,7 +197,7 @@ async def visualize_ion_focus(
                         "fillcolor": "rgba({},{},{},.3)".format(*timeseries_rgb),
                         "x": timeseries_time.tobytes(),
                         "y": timeseries_y.tobytes(),
-                        "unit": timeseries_unit,
+                        "unit": units,
                     }
                 )
                 if i == 0 and sum_timeseries is None:
@@ -219,7 +216,7 @@ async def visualize_ion_focus(
                 },
                 "x": [float(mz), float(mz)],
                 "y": [0, isotope_expected_height],
-                "unit": spectrum_unit,
+                "unit": units,
             }
         )
 
@@ -245,7 +242,7 @@ async def visualize_ion_focus(
             "line": {"color": "rgb(136, 136, 136)"},
             "x": timeseries_time.tobytes(),
             "y": timeseries_y.tobytes(),
-            "unit": timeseries_unit,
+            "unit": units,
         },
     ]
     await sio.emit("visualization_signal_timeseries", timeseries_traces, room=sid)
