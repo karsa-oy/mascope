@@ -648,15 +648,14 @@ async def get_sample_file_spectrum(
     mz_max: float = None,
 ) -> dict:
     """
-    Retrieves the mass spectrum from a specified sample file within optional time and m/z ranges.
+    Retrieves the averaged spectrum from a specified sample file within optional time and m/z ranges.
 
-    The function performs the following steps:
-    1. Fetch the sample file from the database.
-    2. Determines whether to load the full 'sum_signal' dataset or a specific time range from the 'signal' dataset based on provided time range parameters (t_min and t_max).
-    3. Sums the data over the time dimension to obtain the spectrum.
-    4. If an m/z range is specified, slices the spectrum to this m/z range.
-    5. Extracts m/z values and their corresponding intensities from the spectrum.
-    6. Returns the spectrum data and the total number of m/z values.
+    Steps:
+    1. Fetch the sample file details using the provided ID.
+    2. Compute averaged spectrum in the time range.
+    3. Filter by m/z range if provided.
+    4. Extract m/z values and their corresponding intensities from the spectrum.
+    5. Return the spectrum data, including the total number of m/z points and optional metadata.
 
     :param sample_file_id: Unique identifier for the sample file from which to retrieve the spectrum.
     :type sample_file_id: str
@@ -668,36 +667,30 @@ async def get_sample_file_spectrum(
     :type mz_min: float, optional
     :param mz_max: End of the optional m/z range, defaults to None.
     :type mz_max: float, optional
-    :raises process_exception: Handles exceptions and raises an informative error message.
-    :return: A dictionary containing the total number of data points, and arrays of m/z values and their corresponding intensities.
+    :return: A dictionary containing the total number of m/z points, optional spectrum metadata,
+    and arrays of m/z values and their corresponding intensities.
     :rtype: dict
     """
     # Step 1: Fetch sample file info from the database
     sample_file_data = await get_sample_file(sample_file_id)
     filename = sample_file_data.get("data").get("filename")
-    # Derive intensity units from instrument type
-    instrument_type = get_instrument_type(filename)
-    intensity_unit = ("ions" if instrument_type == "tof" else "counts",)
+    intensity_unit = "counts/s"
 
-    # Step 2: Load the sample file and determine whether to use the full signal or a time slice and calculate the corresponding spectrum DataArray
     runtime.logger.info(f"Loading file: {filename}")
     time_data_points = None
 
-    # Step 3: Sum over the time dimension
-    spectrum = sum_signal_for_time_range(filename, t_min, t_max)
+    # Step 2: Compute averaged spectrum in the time range
+    spectrum = sum_signal_for_time_range(filename, t_min, t_max, average=True)
 
-    # Step 4: Apply m/z range if provided
+    # Step 3: Filter by m/z range if provided
     if mz_min is not None and mz_max is not None:
-        spectrum = spectrum.sel(mz=slice(mz_min, mz_max))
+        spectrum = spectrum.sel(mz=slice(mz_min, mz_max)).compute()
 
-    # Compute the final, sliced spectrum results
-    spectrum = spectrum.compute()
-
-    # Step 5: Extract m/z values and intensities
+    # Step 4: Extract m/z values and intensities
     mz_values = spectrum.mz.values.tolist()
     intensity_values = spectrum.values.tolist()
 
-    # Step 6: Return the total count, optional spectrum count, and data
+    # Step 5: Return the total count, optional spectrum count, and data
     message = f"Retrieved spectrum data with {len(mz_values)} m/z points from sample file '{filename}'."
     if time_data_points is not None:
         message += f" Time range specified with {time_data_points} data points."
