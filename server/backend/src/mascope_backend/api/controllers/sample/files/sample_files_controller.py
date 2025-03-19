@@ -392,10 +392,11 @@ async def sample_file_upload(
 
 @api_controller()
 async def get_sample_file_peaks(
-    sample_file_id: str, areas: bool, heights: bool
+    sample_file_id: str, areas: bool, heights: bool, average: bool = True
 ) -> dict:
     """
     Retrieves peaks from a specified sample file, with options to include areas and/or heights.
+    The data is averaged across the time dimension by default.
 
     Steps:
     1. Fetch the sample file details using the provided ID.
@@ -410,6 +411,8 @@ async def get_sample_file_peaks(
     :type areas: bool
     :param heights: If True, include peak heights in the response.
     :type heights: bool
+    :param average: If True, return averaged peak data, defaults to True.
+    :type average: bool, optional
     :raises NotFoundException: If the sample file is not found or hasn't been processed (no peak data available).
     :return: A dictionary with the peak data dict in columnar format:
         - "mz": list of mass/charge (m/z) values for each peak.
@@ -445,7 +448,10 @@ async def get_sample_file_peaks(
             raise NotFoundException(
                 f"No peak areas found in sample file '{filename}', file may not have been processed"
             )
-        peak_areas = get_peaks(sample_file_data, "area").sum(dim="time")
+        peak_areas = get_peaks(sample_file_data, "area")
+        peak_areas = (
+            peak_areas.mean(dim="time") if average else peak_areas.sum(dim="time")
+        )
         response_data["mz"] = peak_areas.mz.values.tolist()
         response_data["area"] = peak_areas.values.tolist()
 
@@ -454,7 +460,10 @@ async def get_sample_file_peaks(
             raise NotFoundException(
                 f"No peak heights found in sample file '{filename}', file may not have been processed"
             )
-        peak_heights = get_peaks(sample_file_data, "height").sum(dim="time")
+        peak_heights = get_peaks(sample_file_data, "height")
+        peak_heights = (
+            peak_heights.mean(dim="time") if average else peak_heights.sum(dim="time")
+        )
         # If 'mz' was not populated from areas, populate it from heights
         if "mz" not in response_data:
             response_data["mz"] = peak_heights.mz.values.tolist()
