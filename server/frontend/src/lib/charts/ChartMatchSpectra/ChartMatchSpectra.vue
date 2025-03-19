@@ -36,16 +36,16 @@ const sampleLength = computed(() =>
 )
 
 const traces = computed(() => {
-  // Scale trace y-values based on "sum / average" toggle
+  // Scale trace y-values based on "average / sum" toggle
   if (sampleLength === null) {
     return []
   }
-  return settings.yMode == 'sum'
+  return settings.yMode == 'average'
     ? data.traces
     : data.traces.map((trace) => {
-        // Scale chart traces by dividing all y-values by sampleLength
+        // Scale chart traces by multiplying all y-values by sampleLength
         let newTrace = structuredClone(toRaw(trace))
-        newTrace.y = trace.y.map((value) => value / sampleLength.value)
+        newTrace.y = trace.y.map((value) => value * sampleLength.value)
         return newTrace
       })
 })
@@ -179,7 +179,7 @@ watch(
           class="float"
         >
           <Tag
-            :value="`Peak ${settings.yMode} intensity: ${area.format(settings.yMode == 'sum' ? isotopeChart.sample_peak_area : isotopeChart.sample_peak_area / sampleLength)}`"
+            :value="`Peak ${settings.yMode} intensity: ${area.format(settings.yMode == 'average' ? isotopeChart.sample_peak_area : isotopeChart.sample_peak_area * sampleLength)}`"
             :severity="
               isotopeChart.sample_peak_area < app.data.match.params.ui.peak_min_intensity
                 ? 'warn'

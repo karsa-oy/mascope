@@ -23,35 +23,20 @@ const sampleLength = computed(() =>
   app.data.sample.selected.length != 1 ? null : app.data.sample.selected[0].length
 )
 
-const timeIntervals = computed(() => {
-  // Interval between consecutive scans in the sample ("time resolution") in seconds
-  if (!data.traces.length) {
-    return []
-  }
-  const t = data.traces[0].x
-  // Calculate intervals starting from the second time coordinate
-  const tDiff = t.slice(1).map((n, i) => {
-    return n - t[i]
-  })
-  return t[0] > 0
-    ? // If first time coordinate is not 0, we use that as the first interval
-      [t[0], ...tDiff]
-    : // Otherwise use mean interval as the first interval
-      [tDiff.reduce((p, c) => p + c, 0) / tDiff.length, ...tDiff]
-})
-
 const traces = computed(() => {
   // Scale trace y-values based on "sum / average" toggle
   if (sampleLength.value === null) {
     return []
   }
-  return settings.yMode == 'sum'
-    ? data.traces.toReversed()
-    : data.traces.map((trace) => {
-        // Scale chart traces by dividing all y-values by time interval
+  return settings.yMode == 'average'
+    ? data.traces.map((trace) => {
         let newTrace = structuredClone(toRaw(trace))
-        newTrace.y = trace.y.map((value, i) => value / timeIntervals.value[i])
         newTrace.fill = 'none'
+        return newTrace
+      })
+    : data.traces.toReversed().map((trace) => {
+        // Scale chart traces by multiplying all y-values by time interval
+        let newTrace = structuredClone(toRaw(trace))
         return newTrace
       })
 })
@@ -65,7 +50,7 @@ const layout = computed(() => ({
     gridwidth: 1
   },
   yaxis: {
-    title: `Peak intensity [${settings.yMode == 'average' ? 'counts/s' : 'counts'}]`,
+    title: `Peak intensity [counts/s]`,
     showgrid: true,
     autorange: true,
     rangemode: 'tozero',
