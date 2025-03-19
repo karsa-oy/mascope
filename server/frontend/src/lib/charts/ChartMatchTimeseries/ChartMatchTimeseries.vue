@@ -65,7 +65,7 @@ const layout = computed(() => ({
     gridwidth: 1
   },
   yaxis: {
-    title: `Peak intensity [${data?.unit}${settings.yMode == 'sum' ? '' : '/s'}]`,
+    title: `Peak intensity [${settings.yMode == 'average' ? 'counts/s' : 'counts'}]`,
     showgrid: true,
     autorange: true,
     rangemode: 'tozero',

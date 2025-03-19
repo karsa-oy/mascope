@@ -21,7 +21,7 @@ const compound = computed(() =>
 
 const settings = reactive({
   intensityScale: null,
-  yMode: 'sum'
+  yMode: 'average'
 })
 
 // recompute match category with the UI's param state

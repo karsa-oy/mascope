@@ -89,7 +89,7 @@ const scale = computed(
 // standard plotly layout
 const layout = computed(() => ({
   yaxis: {
-    title: `Signal intensity [${data?.unit}${settings.yMode == 'sum' ? '' : '/s'}]`,
+    title: `Signal intensity [${settings.yMode == 'average' ? 'counts/s' : 'counts'}]`,
     gridcolor: '#33333399',
     rangemode: 'nonnegative',
     ...scale.value
@@ -177,8 +177,6 @@ watch(
         />
         <div
           class="float"
-          style="`
-            `"
         >
           <Tag
             :value="`Peak ${settings.yMode} intensity: ${area.format(settings.yMode == 'sum' ? isotopeChart.sample_peak_area : isotopeChart.sample_peak_area / sampleLength)}`"
