@@ -3,11 +3,14 @@ import { ref } from 'vue'
 
 import Button from 'primevue/button'
 import Popover from 'primevue/popover'
+import SelectButton from 'primevue/selectbutton'
 
 import { BaseParamField } from '@/lib/base'
 
 const chartSettings = ref()
 const scale = defineModel('scale')
+const yMode = defineModel('yMode')
+
 </script>
 
 <template>
@@ -29,6 +32,9 @@ const scale = defineModel('scale')
         v-model:param="scale"
         :range="{ min: 0, max: 100000, step: 2000 }"
       />
+    </div>
+    <div class="row">
+      <SelectButton v-model="yMode" :options="['average', 'sum']" :allowEmpty="false" />
     </div>
   </Popover>
 </template>
