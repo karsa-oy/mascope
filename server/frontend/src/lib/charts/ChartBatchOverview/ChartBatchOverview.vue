@@ -19,7 +19,7 @@ const yMode = ref('average')
 const log = ref(true)
 const unit = computed(() =>
   // Adjust the y-axis unit based on "average / sum" toggle
-  yMode.value == 'average' ? 'Counts per second' : 'Counts'
+  yMode.value == 'average' ? '[cps]' : '[counts]'
 )
 
 const traces = computed(() => {
