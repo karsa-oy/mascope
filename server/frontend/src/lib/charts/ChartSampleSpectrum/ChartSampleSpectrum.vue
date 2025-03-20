@@ -14,12 +14,12 @@ import { useChartData } from './data.js'
 const app = useApp()
 const data = useChartData()
 
-const yMode = ref('sum')
+const yMode = ref('average')
 const scale = ref()
 const log = ref()
 const unit = computed(() =>
-  // Adjust the y-axis unit based on "sum / average" toggle
-  yMode.value == 'sum' ? data.unit : `${data.unit}/s`
+  // Adjust the y-axis unit based on "average / sum" toggle
+  yMode.value == 'average' ? 'counts/s' : 'counts'
 )
 
 const traces = computed(() => {
@@ -28,16 +28,16 @@ const traces = computed(() => {
     return []
   }
   const sampleLength = app.data.sample.selected[0].length
-  return yMode.value == 'sum'
+  return yMode.value == 'average'
     ? data.traces
     : data.traces.map((trace) => {
         // Scale chart traces by dividing all y-values by sampleLength
         let newTrace = structuredClone(toRaw(trace))
-        newTrace.y = trace.y.map((value) => value / sampleLength)
+        newTrace.y = trace.y.map((value) => value * sampleLength)
         // For peak traces, scale "customdata" containing [height, area]
         if (newTrace.name == 'Peak') {
           newTrace.customdata = trace.customdata.map((subarr) => {
-            return subarr.map((value) => value / sampleLength)
+            return subarr.map((value) => value * sampleLength)
           })
         }
         return newTrace
@@ -111,7 +111,7 @@ const config = {
     `"
   >
     <div class="row">
-      <SelectButton v-model="yMode" :options="['sum', 'average']" />
+      <SelectButton v-model="yMode" :options="['average', 'sum']" />
       <ToggleSwitch v-model="log" />
       <span> log scale </span>
     </div>
