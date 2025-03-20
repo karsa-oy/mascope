@@ -226,7 +226,7 @@ export const useChartData = defineStore('chart.batch.overview', () => {
           <br>
           <b>%{text}</b>
           <br>
-          Intensity: %{y:,.0f} %{customdata[1]}
+          Intensity: %{y:,.2e} %{customdata[1]}
           <br>
           %{customdata[0]}
           <extra></extra>
