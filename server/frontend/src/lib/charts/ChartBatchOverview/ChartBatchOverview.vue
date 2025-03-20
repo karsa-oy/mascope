@@ -15,11 +15,11 @@ import { useChartData } from './data'
 const app = useApp()
 const data = useChartData()
 
-const yMode = ref('sum')
+const yMode = ref('average')
 const log = ref(true)
 const unit = computed(() =>
-  // Adjust the y-axis unit based on "sum / average" toggle
-  yMode.value == 'sum' ? '' : `per second`
+  // Adjust the y-axis unit based on "average / sum" toggle
+  yMode.value == 'average' ? 'Counts per second' : 'Counts'
 )
 
 const traces = computed(() => {
@@ -29,17 +29,21 @@ const traces = computed(() => {
     (o, sample) => ({ ...o, [sample.sample_item_id]: sample.length }),
     {}
   )
-  return yMode.value == 'sum'
-    ? data.traces
+  return yMode.value == 'average'
+    ? data.traces.map((trace) => {
+        let newTrace = structuredClone(toRaw(trace))
+        newTrace.customdata = trace.customdata.map((cd) => [cd[0], 'counts/s'])
+        return newTrace
+      })
     : data.traces.map((trace) => {
         // Scale chart traces by dividing all y-values by sampleLength
         let newTrace = structuredClone(toRaw(trace))
         // Use x-coordinate (sample_item_id) to retrieve sample length
         newTrace.y = trace.y.map((value, i) =>
-          value !== null ? value / sampleLengths[trace.x[i]] : null
+          value !== null ? value * sampleLengths[trace.x[i]] : null
         )
-        // Unit is in the second element of customdata. Append with "/s"
-        newTrace.customdata = trace.customdata.map((cd) => [cd[0], cd[1] + '/s'])
+        // Unit is in the second element of customdata. Append with "counts"
+        newTrace.customdata = trace.customdata.map((cd) => [cd[0], 'counts'])
         return newTrace
       })
 })
@@ -242,7 +246,7 @@ const anyFilters = computed(
     `"
   >
     <div class="row">
-      <SelectButton v-model="yMode" :options="['sum', 'average']" />
+      <SelectButton v-model="yMode" :options="['average', 'sum']" />
       <ToggleSwitch v-model="log" style="margin-left: 1rem" />
       <span> log scale </span>
     </div>
