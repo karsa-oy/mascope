@@ -2,7 +2,7 @@
 
 # create the binary in the virutal env
 uv run pyinstaller @(
-    'tof_agent.py'
+    './src/mascope_tof_agent/main.py'
     '--onefile', '--name', 'Mascope-TofAgent'     # make one executable file
     '--noconfirm'                                 # replace dist w/o confirming
     '--console'                                   # open the console for logs
