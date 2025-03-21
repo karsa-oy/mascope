@@ -10,10 +10,10 @@ import h5py
 import numpy as np
 
 from mascope_tofwerk.runtime import runtime
+from mascope_tofwerk.tofwerk import get_conversion_coefficient
 from mascope_file.io import write_props
 from mascope_file.name import parse_path_from_item_filename
 from mascope_file.record import create_sample_file_db_record
-from mascope_hardware.tofwerk import get_conversion_coefficient
 
 
 class H5Processor(Thread):
