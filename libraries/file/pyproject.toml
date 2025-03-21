@@ -1,0 +1,17 @@
+[project]
+name = "mascope_file"
+version = "0.0.0"
+description = "Mascope's internal file library"
+authors = [{ name = "Oskari Kausiala", email = "oskari.kausiala@karsa.fi" }]
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "mascope_runtime",
+    "datetime-glob~=1.0",
+    "numpy~=1.26",
+    "xarray==2024.6.0",
+    "zarr==2.18.2",
+]
+
+[build-system]
+requires = ["uv_build>=0.6,<0.7"]
+build-backend = "uv_build"

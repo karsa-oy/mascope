@@ -1,0 +1,74 @@
+[project]
+name = "mascope"
+version = "0.0.0"
+description = "Karsa Mascope"
+authors = [{ name = "Karsa Oy", email = "support@karsa.fi" }]
+requires-python = ">=3.12,<3.13"
+license.text = "LicenseRef-Proprietary"
+dependencies = [
+    "mascope_cli",
+    "mascope_backend",
+    # libraries
+    "mascope_runtime",
+    "mascope_chem",
+    "mascope_sdk",
+    "mascope_signal",
+    "mascope_tofwerk",
+    "mascope_thermo",
+    # agents
+    "mascope_tof_agent",
+    "mascope_file_agent",
+]
+
+[project.scripts]
+mascope = "mascope_cli.main:app"
+mascope-backend = "mascope_backend.main:exec"
+mascope-db = "mascope_backend.db.main:exec"
+mascope-tof-agent = "mascope_tof_agent.main:run"
+mascope-file-agent = "mascope_file_agent.main:run"
+
+[dependency-groups]
+dev = [
+    "deptry>=0.16,<0.17",
+    "austin-dist~=3.6",
+    # builds
+    "pyinstaller~=6.8",
+    # jupyter
+    "jupyterlab>=4.2,<4.3",
+    "dash>=2.17.1,<3",
+    "ipywidgets~=8.1",
+    "matplotlib>=3.10.1",
+    "plotly>=5.23.0,<6",
+    "scikit-learn>=1.5.1,<2",
+    "voila>=0.5.8,<0.6",
+    # testing
+    "pytest~=8.2",
+    "pytest-asyncio>=0.23,<0.24",
+]
+
+[tool.uv.workspace]
+members = [
+    "tooling/cli",
+    "server/backend",
+    "libraries/*",
+    "agents/*",
+]
+
+[tool.uv.sources]
+mascope_backend = { workspace = true }
+mascope_cli = { workspace = true }
+# libraries
+mascope_chem = { workspace = true }
+mascope_file = { workspace = true }
+mascope_sdk = { workspace =  true }
+mascope_signal = { workspace = true }
+mascope_tofwerk = { workspace = true }
+mascope_thermo = { workspace = true }
+mascope_runtime = { workspace = true }
+# agents
+mascope_tof_agent = { workspace = true }
+mascope_file_agent = { workspace = true }
+
+[build-system]
+requires = ["uv_build>=0.6,<0.7"]
+build-backend = "uv_build"

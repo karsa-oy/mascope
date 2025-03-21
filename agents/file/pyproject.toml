@@ -1,0 +1,16 @@
+[project]
+name = "mascope_file_agent"
+version = "0.0.0"
+description = "Mascope's instrument machine agent. Sends sample files to the Mascope server."
+authors = [{ name = "Karsa Oy", email = "support@karsa.fi" }]
+requires-python = ">=3.12,<3.13"
+license = "LicenseRef-Proprietary"
+dependencies = [
+    "mascope_sdk",
+    "mascope_runtime",
+    "watchdog~=4.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.6,<0.7"]
+build-backend = "uv_build"

@@ -1,0 +1,20 @@
+[project]
+name = "mascope_chem"
+version = "0.0.0"
+description = "Mascope's internal chemistry library"
+authors = [{ name = "Oskari Kausiala", email = "oskari.kausiala@karsa.fi" }]
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "mascope_runtime",
+    "colorcet~=3.1",
+    "datashader>=0.16,<0.17",
+    "h5py~=3.11",
+    "numpy~=1.26",
+    "pandas~=2.2",
+    "pillow~=10.3",
+    "xarray==2024.6.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.6,<0.7"]
+build-backend = "uv_build"

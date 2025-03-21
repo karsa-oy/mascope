@@ -2,14 +2,14 @@ services:
   backend:
     command: "api-server"
     build:
-      dockerfile: backend/Dockerfile
+      dockerfile: server/backend/Dockerfile
       context: .
     tty: true
     ports:
       - 8090:8090
     volumes:
-      - ./runtime/env/${MASCOPE_ENV:-default}:/app/runtime/env/prod
-      - ${MASCOPE_FILESTORE}:/app/runtime/env/prod/filestore
+      - ./.runtime/env/${MASCOPE_ENV:-default}:/app/.runtime/env/prod
+      - ${MASCOPE_FILESTORE}:/app/.runtime/env/prod/filestore
     environment:
       MASCOPE_LOGLEVEL: ${MASCOPE_LOGLEVEL}
       MASCOPE_TIMEZONE: ${MASCOPE_TIMEZONE}
@@ -21,12 +21,12 @@ services:
   file_converter:
     command: "file-converter"
     build:
-      dockerfile: backend/Dockerfile
+      dockerfile: server/backend/Dockerfile
       context: .
     tty: true
     volumes:
-      - ./runtime/env/${MASCOPE_ENV:-default}:/app/runtime/env/prod
-      - ${MASCOPE_FILESTORE}:/app/runtime/env/prod/filestore
+      - ./.runtime/env/${MASCOPE_ENV:-default}:/app/.runtime/env/prod
+      - ${MASCOPE_FILESTORE}:/app/.runtime/env/prod/filestore
     environment:
       MASCOPE_LOGLEVEL: ${MASCOPE_LOGLEVEL}
       MASCOPE_TIMEZONE: ${MASCOPE_TIMEZONE}
@@ -37,7 +37,7 @@ services:
       - server_owner_secret_key
   frontend:
     build:
-      context: frontend
+      context: server/frontend
       args:
         - MASCOPE_RUNTIME
     environment:
@@ -51,10 +51,10 @@ services:
 
 secrets:
   jwt_secret_key:
-    file: secrets/jwt_secret_key.txt
+    file: .runtime/secrets/jwt_secret_key.txt
   server_owner_secret_key:
-    file: secrets/server_owner_secret_key.txt
+    file: .runtime/secrets/server_owner_secret_key.txt
   ssl_certificate:
-    file: secrets/mascope.app.pem
+    file: .runtime/secrets/mascope.app.pem
   ssl_secret_key:
-    file: secrets/mascope.app.key
+    file: .runtime/secrets/mascope.app.key

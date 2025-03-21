@@ -1,7 +1,11 @@
-dist
 log
 
 __pycache__
+build
+dist
+*.egg-info
+.ipynb_checkpoints
+
 *.tar.gz
 .debug_env
 
@@ -9,7 +13,7 @@ __pycache__
 .vscode/tasks.json
 
 /.env
-/secrets
-/runtime/secrets
+/.venv
 
 tofdaq
+/runtime/env/*

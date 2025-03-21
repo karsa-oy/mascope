@@ -1,5 +1,0 @@
-# Ignore everything within the 'env' directory
-/*
-
-# Un-ignore the 'default' environment, so only files and directories under 'default' are tracked
-!/default/
