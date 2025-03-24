@@ -34,11 +34,7 @@ const traces = computed(() => {
         newTrace.fill = 'none'
         return newTrace
       })
-    : data.traces.toReversed().map((trace) => {
-        // Scale chart traces by multiplying all y-values by time interval
-        let newTrace = structuredClone(toRaw(trace))
-        return newTrace
-      })
+    : data.traces.toReversed()
 })
 
 const layout = computed(() => ({
