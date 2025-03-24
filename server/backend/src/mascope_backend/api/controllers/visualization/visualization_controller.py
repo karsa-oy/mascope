@@ -105,6 +105,7 @@ async def visualize_ion_focus(
     main_isotope_i = 0
     main_isotope_height = 0
     sum_timeseries = None
+    match_isotope_counter = 0
     for i, mz in enumerate(mzs):
         runtime.logger.info("{:d}/{:d}: {:3f}".format(i + 1, len(mzs), mz))
         spectrum_traces = []
@@ -204,6 +205,7 @@ async def visualize_ion_focus(
                     sum_timeseries = match_timeseries
                 elif i > 0 and sum_timeseries is not None:
                     sum_timeseries += match_timeseries
+                match_isotope_counter += 1
 
         # Target mz trace (red vertical line)
         spectrum_traces.append(
@@ -228,7 +230,7 @@ async def visualize_ion_focus(
 
     # Step 5: Constructs and emits the sum timeseries trace if applicable.
     # If no data to visualize, return early
-    if sum_timeseries is None:
+    if match_isotope_counter <= 1 or sum_timeseries is None:
         return
     # Sum timeseries trace
     timeseries_time = sum_timeseries.time.values.astype(np.float32)
