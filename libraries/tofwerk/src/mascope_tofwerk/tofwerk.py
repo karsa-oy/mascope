@@ -31,7 +31,7 @@ def open_h5_file(datafile_path: str):
 
 def get_conversion_coefficient(h5_file) -> float:
     """
-    Calculate the conversion coefficient to convert signal intensity from [mV/ext] to [ions/sec].
+    Calculate the conversion coefficient to convert signal intensity from [mV] to [ions/sec].
 
     :param h5_file: Opened HDF5 file object.
     :type h5_file: h5py.File
@@ -43,11 +43,12 @@ def get_conversion_coefficient(h5_file) -> float:
     )  # [mV·s/ion]
     sample_interval = h5_file["FullSpectra"].attrs["SampleInterval"][0]  # [s]
     tof_period = h5_file["TimingData"].attrs["TofPeriod"][0] * 1e-9  # [s]
-    tof_frequency = 1 / tof_period  # [1/s]
+    tof_frequency = 1 / tof_period  # [ext/s]
+    n_extractions = h5_file.attrs["NbrWaveforms"][0]  # [ext]
 
-    # Coefficient to convert signal intensity from [mV/ext] -> [ions/sec]
+    # Coefficient to convert signal intensity from [mV] -> [ions/sec]
     conversion_coefficient = (
-        sample_interval * tof_frequency / single_ion_signal
+        sample_interval * tof_frequency / single_ion_signal / n_extractions
     )  # [ions/(mV·s)]
 
     return conversion_coefficient
@@ -157,14 +158,10 @@ def get_signal(
                 coord[0], coord[1], coord[2], mz_start_ind : mz_end_ind + 1
             ]
 
-        # Normalize by number of extractions [mV] -> [mV/ext]
-        n_extractions = h5_file.attrs["NbrWaveforms"][0]
-        signal_slice /= n_extractions
-
-        # Coefficient to convert signal intensity from [mV/ext] -> [ions/sec]
+        # Coefficient to convert signal intensity from [mV] -> [ions/sec]
         conversion_coefficient = get_conversion_coefficient(h5_file)
 
-        # Convert [mV/ext] -> [ions/sec]
+        # Convert [mV] -> [ions/sec]
         signal_slice *= conversion_coefficient
 
         signal_dask = da.from_array(signal_slice, chunks="auto")
@@ -239,17 +236,13 @@ def compute_sum_signal_in_time_range(
         last_chunk_sum = last_chunk.sum(axis=(0, 1))
         sum_signal += last_chunk_sum
 
-        # Normalize by number of extractions [mV] -> [mV/ext]
-        n_extractions = h5_file.attrs["NbrWaveforms"][0]
-        sum_signal /= n_extractions
-
         if average:
             sum_signal = sum_signal / (t_end_ind - t_start_ind + 1)
 
-        # Coefficient to convert signal intensity from [mV/ext] -> [ions/sec]
+        # Coefficient to convert signal intensity from [mV] -> [ions/sec]
         conversion_coefficient = get_conversion_coefficient(h5_file)
 
-        # Convert [mV/ext] -> [ions/sec]
+        # Convert [mV] -> [ions/sec]
         sum_signal *= conversion_coefficient
 
         sum_signal_da = xr.DataArray(sum_signal, dims=["mz"], coords={"mz": all_mzs})
@@ -292,9 +285,6 @@ def get_tic_per_scan(
             scan_tic[ind] = signal_ref[coord[0], coord[1], coord[2], :].sum()
 
         sum_spec = h5_file.h5["FullSpectra"]["SumSpectrum"][:]
-        # Normalize by number of extractions [mV] -> [mV/ext]
-        n_extractions = h5_file.attrs["NbrWaveforms"][0]
-        sum_spec /= n_extractions
         # Convert to ions/sec
         sum_spec *= get_conversion_coefficient(h5_file)
         # Get total TIC
