@@ -10,7 +10,7 @@ from sqlalchemy import (
 )
 from mascope_file.io import load_file
 from mascope_file.name import get_instrument_type
-from mascope_signal.compute import sum_signal_for_time_range
+from mascope_signal.compute import sum_signal_for_time_range, get_sum_signal
 from mascope_signal.peak import detect_peaks, get_peaks
 
 from mascope_backend.socket import sio
@@ -689,7 +689,11 @@ async def get_sample_file_spectrum(
     time_data_points = None
 
     # Step 2: Compute averaged spectrum in the time range
-    spectrum = sum_signal_for_time_range(filename, t_min, t_max, average=True)
+    if t_min is None and t_max is None:
+        # Try to get previously computed sum signal
+        spectrum = get_sum_signal(filename, average=True)
+    else:
+        spectrum = sum_signal_for_time_range(filename, t_min, t_max, average=True)
 
     # Step 3: Filter by m/z range if provided
     if mz_min is not None and mz_max is not None:

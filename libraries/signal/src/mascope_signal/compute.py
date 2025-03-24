@@ -84,11 +84,11 @@ def get_sum_signal(filename: str, average: bool = False) -> xr.DataArray:
                 raise
 
     if average:
+        base_filename = sample_file.props["filename"]
         sample_type = get_sample_file_type(base_filename)
         if sample_type in ["tof_zarr", "orbi_zarr"]:
             # Keep averaging by time length for older converted files
             return sum_signal / sample_file.props["length"]
-        # Average by number of scans for sample files with original data file present
         time_coord = get_scan_timestamps(base_filename)
         return sum_signal / time_coord.size
     else:
