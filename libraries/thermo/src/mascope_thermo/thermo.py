@@ -259,6 +259,28 @@ def get_tic_per_scan(
         return scan_timestamp, scan_tic
 
 
+def get_scan_timestamps(datafile_path: str) -> np.ndarray:
+    """Extracts the scan timestamps [s] from the raw file.
+
+    :param datafile_path: Path to the Thermo Fisher raw file (.raw) containing the data.
+    :type datafile_path: str
+    :return: Array of scan timestamps [s]
+    :rtype: np.ndarray
+    """
+    with open_raw_file(datafile_path) as raw_file:
+        num_of_scans = raw_file.RunHeaderEx.SpectraCount
+        scan_indices = list(range(num_of_scans))
+
+        scan_statistics = [
+            raw_file.GetScanStatsForScanNumber(i + 1) for i in scan_indices
+        ]
+        scan_timestamp = np.asarray(
+            [scan_stat.StartTime for scan_stat in scan_statistics]
+        )
+
+        return scan_timestamp
+
+
 def get_peak_profiles(
     datafile_path: str,
     mzs: Iterable[float],

@@ -91,7 +91,7 @@ async def visualize_ion_focus(
     # Step 2: Load the sample file and prepare data slice
     runtime.logger.info(f"Loading file: {filename}")
     sample_file = load_file(filename, vars=["peak_areas", "peak_heights"])
-    averaged_signal = get_sum_signal(filename) / sample_file.time.size
+    averaged_signal = get_sum_signal(filename, average=True)
 
     # Step 3: Convert target ion data to DataFrame and prepare data
     target_ion_list = [ion.to_dict() for ion in target_ion_data]

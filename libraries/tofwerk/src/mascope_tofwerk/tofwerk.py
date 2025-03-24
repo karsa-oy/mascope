@@ -316,6 +316,26 @@ def get_tic_per_scan(
         return scan_timestamp, scan_tic
 
 
+def get_scan_timestamps(datafile_path: str) -> np.ndarray:
+    """
+    Retrieve scan timestamps from the HDF5 file.
+
+    :param datafile_path: Path to the HDF5 file containing spectrum data.
+    :type datafile_path: str
+    :return: Array of scan timestamps.
+    :rtype: np.ndarray
+    """
+    with open_h5_file(datafile_path) as h5_file:
+        # Get time scale
+        scan_timestamp = h5_file["TimingData"]["BufTimes"][:].reshape(-1)
+        # Total number of non-zero scans
+        n_scans = np.where(scan_timestamp != 0)[0][-1] + 1
+        # Cut out zero scans
+        scan_timestamp = scan_timestamp[:n_scans]
+
+        return scan_timestamp
+
+
 def get_peak_profiles(
     datafile_path: str,
     mzs: Iterable[float],

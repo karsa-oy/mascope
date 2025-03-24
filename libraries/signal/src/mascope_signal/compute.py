@@ -19,6 +19,41 @@ from mascope_tofwerk import tofwerk
 from mascope_signal.runtime import runtime
 
 
+def get_scan_timestamps(base_filename: str) -> np.ndarray:
+    """
+    Retrieve scan timestamps from a given file based on its type.
+
+    :param base_filename: Sample file name.
+    :type base_filename: str
+    :return: An array of scan timestamps extracted from the sample file.
+    """
+    sample_type = get_sample_file_type(base_filename)
+    match sample_type:
+        case "tof_zarr" | "orbi_zarr":
+            signal_path = filename_to_zarr_path(base_filename, "signal")
+
+            sync = get_zarr_synchronizer(signal_path)
+            z = zarr.open(signal_path, mode="r", synchronizer=sync)
+            time_array = z["time"][:]
+            if not time_array.size:
+                # Perhaps the coordinate is hiding in groups
+                groups = list(z.group_keys())
+                # Load time coordinate from each group and concatenate
+                time_arrays = [z[group]["time"][:] for group in groups]
+                time_array = np.concatenate(time_arrays)
+            return time_array
+        case "orbi_raw":
+            datafile_path = os.path.join(
+                parse_path_from_item_filename(base_filename), "data.raw"
+            )
+            return thermo.get_scan_timestamps(datafile_path)
+        case "tof_h5":
+            datafile_path = os.path.join(
+                parse_path_from_item_filename(base_filename), "data.h5"
+            )
+            return tofwerk.get_scan_timestamps(datafile_path)
+
+
 def get_sum_signal(filename: str, average: bool = False) -> xr.DataArray:
     """Calculates the sum spectrum of a given filename
 
@@ -49,7 +84,13 @@ def get_sum_signal(filename: str, average: bool = False) -> xr.DataArray:
                 raise
 
     if average:
-        return sum_signal / sample_file.props["length"]
+        sample_type = get_sample_file_type(base_filename)
+        if sample_type in ["tof_zarr", "orbi_zarr"]:
+            # Keep averaging by time length for older converted files
+            return sum_signal / sample_file.props["length"]
+        # Average by number of scans for sample files with original data file present
+        time_coord = get_scan_timestamps(base_filename)
+        return sum_signal / time_coord.size
     else:
         return sum_signal
 
