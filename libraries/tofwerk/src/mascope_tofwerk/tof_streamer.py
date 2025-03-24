@@ -110,9 +110,6 @@ class TofDaqStreamer(Thread):
 
                 if is_acquisition_active:
                     # Acquisition is active
-                    if not self._prev_daq_active:
-                        # Daq active first time
-                        self.on_first_daq_active()
                     self.on_daq_active()
                 else:
                     # Acquisition is not active
@@ -162,6 +159,9 @@ class TofDaqStreamer(Thread):
         ret = TwWaitForNewData(1000, self.desc, self.ptr, True)
         if ret == 4:
             runtime.logger.debug("Received new data")
+            if self._my_bufs_processed is None:
+                # Daq active first time
+                self.on_first_daq_active()
             if self.desc.totalBufsProcessed > 0:
                 # Process new data
                 self._my_bufs_processed = self.desc.totalBufsProcessed
