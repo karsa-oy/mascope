@@ -14,6 +14,9 @@ from mascope_runtime import Runtime
 
 from mascope_sdk import api_post_file
 
+# TofDaqStreamer is imported in the run method after runtime initialization
+# from mascope_tofwerk.tof_streamer import TofDaqStreamer
+
 
 # default configuration
 # created in production as an initial
@@ -192,44 +195,45 @@ async def streamer_processor(streamer) -> None:
         """
         filename = data["filename"]
         instrument_name = filename.split("_")[0]
-        spec_i = data["i"]
+        spec_i = data["i"]  # scan index
         notification_data = {
             "filename": filename,
             "instrument": instrument_name,
             "progress": streamer.progress,
         }
-        if spec_i is None:
-            # File finished
-            runtime.logger.info(f"Acquisition of file {filename} finished")
-            raw_filename = data["source_filepath"]
-            # Spawn a thread for file upload to not block the processing of subsequent acquisitions
-            upload_thread = threading.Thread(
-                target=process_file_upload, args=(raw_filename,), daemon=True
-            )
-            upload_thread.start()
-            if sio.connected:
-                await sio.emit(
-                    "instrument_acquisition_finished",
-                    notification_data,
-                    namespace="/tof-agent",
+        match spec_i:
+            case None:
+                # File finished
+                runtime.logger.info(f"Acquisition of file {filename} finished")
+                raw_filename = data["source_filepath"]
+                # Spawn a thread for upload to not block processing of subsequent acquisitions
+                upload_thread = threading.Thread(
+                    target=process_file_upload, args=(raw_filename,), daemon=True
                 )
-        elif spec_i < 0:
-            # New file
-            runtime.logger.info(f"Acquisition of file: {filename} started")
-            if sio.connected:
-                await sio.emit(
-                    "instrument_acquisition_started",
-                    notification_data,
-                    namespace="/tof-agent",
-                )
-        else:
-            # New data to existing file
-            if sio.connected:
-                await sio.emit(
-                    "instrument_acquisition_progress",
-                    notification_data,
-                    namespace="/tof-agent",
-                )
+                upload_thread.start()
+                if sio.connected:
+                    await sio.emit(
+                        "instrument_acquisition_finished",
+                        notification_data,
+                        namespace="/tof-agent",
+                    )
+            case -1:
+                # New file
+                runtime.logger.info(f"Acquisition of file: {filename} started")
+                if sio.connected:
+                    await sio.emit(
+                        "instrument_acquisition_started",
+                        notification_data,
+                        namespace="/tof-agent",
+                    )
+            case _:
+                # New data to existing file
+                if sio.connected:
+                    await sio.emit(
+                        "instrument_acquisition_progress",
+                        notification_data,
+                        namespace="/tof-agent",
+                    )
         runtime.logger.info(f"Acquisition progress: {streamer.progress:.2f}%")
 
     # Main processing loop
