@@ -34,6 +34,7 @@ DEFAULT_CONFIG = textwrap.dedent(
     # meta
     log_level = 'info'
     log_path = './logs'
+    color = "purple"
     # settings
     mask = '*.raw'
     timeout = 3
@@ -146,7 +147,7 @@ def initialize() -> None:
         mascope_path = mkdir(os.environ["APPDATA"], "Mascope", "FileAgent")
         os.environ.setdefault("MASCOPE_PATH", mascope_path)
         # setup runtime environment
-        env_path = mkdir(mascope_path, "runtime", "env", "prod")
+        env_path = mkdir(mascope_path, ".runtime", "env", "prod")
         mkdir(env_path, "logs")
         mkdir(env_path, "data")
         # init config files if they don't exists

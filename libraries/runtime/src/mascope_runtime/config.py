@@ -38,7 +38,7 @@ class ModuleConfig(BaseModel):
     """
 
     name: str  # name of the module, e.g. 'backend'
-    color: str  # color for logging tag
+    color: str | None = "white"  # color for logging tag
     tags: list[str] | None = []  # module groups to which the module should belong *
     log_path: str | None = "./logs"  # path where to print log files
     log_level: LogLevel | None = None  # module log level to print to terminal at
@@ -65,7 +65,9 @@ class FileConverterConfig(ModuleConfig):
     File converter module specific configuration options
     """
 
-    server: str = r"backend"  # production host URL; the default works in our docker compose network
+    server: str = (
+        r"backend"  # production host URL; the default works in our docker compose network
+    )
     source: str = r"./filestreams"  # folder to monitor for files to convert
     raw_threads: int = 2  # number of threads for converting Orbitrap files
     h5_threads: int = 2  # number of threads for converting Tof files

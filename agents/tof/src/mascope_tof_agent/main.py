@@ -9,10 +9,10 @@ from multiprocessing import Event
 from queue import Empty
 import socketio
 
-
 from mascope_runtime import Runtime
 
 from mascope_sdk import api_post_file
+import socketio.exceptions
 
 # TofDaqStreamer is imported in the run method after runtime initialization
 # from mascope_tofwerk.tof_streamer import TofDaqStreamer
@@ -35,14 +35,15 @@ DEFAULT_CONFIG = textwrap.dedent(
     # meta
     log_level = 'info'
     log_path = './logs'
+    color = "pink"
     # settings
     host = 'localhost'
     access_token = ''
 
-    [hardware-lib]
-    # meta
-    log_level = 'info'
+    [tofwerk-lib]
+    tags = ['lib']
     log_path = './logs'
+    color = "white"
     # settings
     tofwerk_dll = 'Auto'
     #  TofWerk DLL selection - 'Auto', 'Windows', 'Linux' or 'Darwin' (= MacOs)
@@ -152,7 +153,7 @@ def initialize() -> None:
         mascope_path = mkdir(os.environ["APPDATA"], "Mascope", "TofAgent")
         os.environ.setdefault("MASCOPE_PATH", mascope_path)
         # setup runtime environment
-        env_path = mkdir(mascope_path, "runtime", "env", "prod")
+        env_path = mkdir(mascope_path, ".runtime", "env", "prod")
         mkdir(env_path, "logs")
         # init config files if they don't exists
         config_paths = [
@@ -267,10 +268,13 @@ async def main() -> None:
             )
             runtime.logger.info("Connected!")
             break
-        except Exception as e:  # pylint: disable=broad-except
-            runtime.logger.error(f"Failed to connect: {e}. Retrying...")
-            # Try again in a second
-            await asyncio.sleep(10)
+        except socketio.exceptions.ConnectionError as e:
+            runtime.logger.error(
+                f"Failed to connect: {e}. Please check the agent configuration."
+            )
+        # Try again in a moment
+        runtime.logger.info("Retry connecting in 10 seconds...")
+        await asyncio.sleep(10)
 
     # Wait until shutdown event
     while not SHUTDOWN_EVENT.is_set():
