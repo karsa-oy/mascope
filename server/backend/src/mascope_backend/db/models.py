@@ -217,6 +217,10 @@ class SampleItem(Base):
     sample_item_utc_created = Column(TIMESTAMP)
     sample_item_utc_modified = Column(TIMESTAMP)
     filter_id = Column(String(6))
+    tic = Column(Float)
+    polarity = Column(String(1))
+    t0 = Column(Float)
+    t1 = Column(Float)
 
     # Define relationships
     sample_batch = relationship("SampleBatch", back_populates="sample_item")
@@ -285,8 +289,7 @@ class SampleFile(Base):
     length = Column(Float)
     range = Column(JSON)
     mz_calibration = Column(JSON)
-    tic = Column(Float)
-    polarity = Column(String(1))
+    polarity = Column(String(4))
 
     # Define relationships
     instrument_function = relationship(
@@ -729,6 +732,8 @@ class Sample(Base):
     )
     sample_batch_id = Column(String(16), ForeignKey("sample_batch.sample_batch_id"))
     sample_item_name = Column(String(256))
+    t0 = Column(Float)
+    t1 = Column(Float)
     filename = Column(String(256))
     instrument = Column(String(64))
     method_file = Column(String(256))

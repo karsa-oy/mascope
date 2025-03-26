@@ -312,8 +312,6 @@ async def calibration_mz_apply(
     # Update database record
     sample_file["mz_calibration"] = fit
     sample_file["range"] = new_range
-    # Ensure polarity is a valid string
-    sample_file["polarity"] = sample_file.get("polarity") or ""
     runtime.logger.info(sample_file)
     await update_sample_file(
         sample_file["sample_file_id"], SampleFileUpdate(**sample_file)

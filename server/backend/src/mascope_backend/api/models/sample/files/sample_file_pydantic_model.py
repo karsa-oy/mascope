@@ -26,14 +26,13 @@ class SampleFileBase(BaseModel):
     mz_calibration: Optional[Dict] = Field(
         None, description="m/z calibration function parameters of the sample file"
     )
-    tic: float = Field(..., description="TIC of the sample file")
-    polarity: str = Field(..., description="Polarity of the sample file")
+    polarity: str = Field(..., description="Polarities present in the sample file")
 
     @field_validator("polarity")
     @classmethod
     def validate_polarity(cls, v):
-        if v not in ["+", "-"]:
-            raise ValueError("Polarity must be '+' or '-'")
+        if v not in ["+", "-", "+-", "-+"]:
+            raise ValueError("Polarity must be '+', '-', '+-' or '-+'")
         return v
 
 
@@ -61,8 +60,7 @@ class SampleFileUpdate(BaseModel):
     mz_calibration: Optional[Dict] = Field(
         None, description="m/z calibration function parameters of the sample file"
     )
-    tic: float = Field(..., description="TIC of the sample file")
-    polarity: str = Field("", description="Polarity of the sample file")
+    polarity: str = Field("", description="Polarities present in the sample file")
 
 
 class SampleFileUpload(BaseModel):

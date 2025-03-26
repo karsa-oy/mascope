@@ -29,6 +29,32 @@ class SampleItemBase(BaseModel):
     filter_id: Optional[str] = Field(
         None, description="Optional filter_id of the sample item"
     )
+    tic: float = Field(..., description="TIC of the sample item")
+    polarity: str = Field(..., description="Polarity of the sample item")
+    t0: float = Field(..., description="Start time of the sample item")
+    t1: float = Field(..., description="End time of the sample item")
+
+    @field_validator("t0", "t1")
+    @classmethod
+    def validate_time(cls, v):
+        if v < 0:
+            raise ValueError("Time values must be non-negative")
+        return v
+
+    @model_validator(mode="after")
+    @classmethod
+    def validate_time_range(cls, values):
+        t0, t1 = values.t0, values.t1
+        if t0 is not None and t1 is not None and t0 >= t1:
+            raise ValueError("t0 must be less than t1")
+        return values
+
+    @field_validator("polarity")
+    @classmethod
+    def validate_polarity(cls, v):
+        if v not in ["+", "-"]:
+            raise ValueError("Polarity must be '+' or '-'")
+        return v
 
     @field_validator("filter_id")
     @classmethod
@@ -77,7 +103,17 @@ class SampleItemBase(BaseModel):
 
 
 class SampleItemCreate(SampleItemBase):
-    pass
+    tic: Optional[float] = Field(None, description="TIC of the sample item")
+    t0: Optional[float] = Field(None, description="Start time of the sample item")
+    t1: Optional[float] = Field(None, description="End time of the sample item")
+
+    @model_validator(mode="after")
+    @classmethod
+    def validate_time_range(cls, values):
+        t0, t1 = values.t0, values.t1
+        if t0 is not None and t1 is not None and t0 >= t1:
+            raise ValueError("t0 must be less than t1")
+        return values
 
 
 class SampleItemUpdate(SampleItemBase):
