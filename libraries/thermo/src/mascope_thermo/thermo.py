@@ -1,9 +1,19 @@
+"""
+This module provides functions to read and process Thermo Fisher raw files.
+
+Where it's applicable, the scans are first filtered by polarity then by time range.
+
+There may be a confusion with indices since the Thermo library uses 1-based indexing,
+while Python uses 0-based indexing. scan_indices are 1-based, while scan_indices_python are 0-based.
+"""
+
 from pathlib import Path
 from itertools import compress
 from contextlib import contextmanager
 from typing import Iterable, Literal
 
 import numpy as np
+from scipy.interpolate import interp1d
 import xarray as xr
 import dask.array as da
 
@@ -11,7 +21,7 @@ from ThermoFisher.CommonCore.RawFileReader import RawFileReaderAdapter
 from ThermoFisher.CommonCore.Data.Business import Device, MassOptions
 from ThermoFisher.CommonCore.Data import ToleranceUnits, Extensions
 
-import System
+from System.Collections.Generic import List
 
 from mascope_thermo.runtime import runtime
 
@@ -44,7 +54,7 @@ def open_raw_file(datafile_path: str):
 def filter_by_polarity(
     raw_file, scan_indices: list, polarity: Literal["+", "-"]
 ) -> list:
-    """Filter scan indices by polarity.
+    """Filter scan indices by polarity. Can be used to verify if the specified polarity is available in the raw file.
 
     :param raw_file: The raw file object containing scan data.
     :type raw_file: ThermoFisher.CommonCore.Data.Interfaces.IRawDataExtended
@@ -57,14 +67,61 @@ def filter_by_polarity(
     """
     if polarity not in ["-", "+"]:
         raise ValueError(
-            "Polarity must be passed as a string containing either '+' or '-'"
+            f"Invalid polarity '{polarity}' provided. Polarity must be '+' or '-'."
         )
+    # Convert polarity to the format used in the raw file
     polarity = "Negative" if polarity == "-" else "Positive"
+
     polarity_mask = [
         raw_file.GetFilterForScanNumber(i).Polarity.ToString() == polarity
         for i in scan_indices
     ]
-    return list(compress(scan_indices, polarity_mask))
+    scan_indices = list(compress(scan_indices, polarity_mask))
+
+    if not scan_indices:
+        raise ValueError(f"{polarity} polarity not found in the raw file.")
+
+    return scan_indices
+
+
+def filter_by_time(raw_file, scan_indices: list, t_min: float, t_max: float) -> tuple:
+    """Filter scan indices by time range.
+
+    :param raw_file: The raw file object containing scan data.
+    :type raw_file: ThermoFisher.CommonCore.Data.Interfaces.IRawDataExtended
+    :param scan_indices: List of scan indices to filter.
+    :type scan_indices: list
+    :param t_min: Minimum time [s].
+    :type t_min: float
+    :param t_max: Maximum time [s].
+    :type t_max: float
+    :return: Tuple of filtered scan indices and corresponding scan times.
+    :rtype: tuple
+    """
+    # Set default time range if not provided
+    t_min = raw_file.RunHeaderEx.StartTime * 60 if t_min is None else t_min
+    t_max = raw_file.RunHeaderEx.EndTime * 60 if t_max is None else t_max
+
+    if t_min > t_max:
+        raise ValueError(f"Invalid time range: {t_min:.1f} s > {t_max:.1f} s")
+
+    scan_time = [
+        raw_file.GetScanStatsForScanNumber(i).StartTime * 60 for i in scan_indices
+    ]  # [s]
+    time_mask = [t_min <= t <= t_max for t in scan_time]
+    # Filter scan indices
+    scan_indices = list(compress(scan_indices, time_mask))
+
+    if not scan_indices:
+        raise ValueError(
+            f"""No data found in the specified time range for the chosen polarity.
+                Accepted time range: {min(scan_time):.1f} - {max(scan_time):.1f} s.
+                """
+        )
+
+    # Update time scale
+    scan_time = list(compress(scan_time, time_mask))
+    return scan_indices, scan_time
 
 
 def get_signal(
@@ -101,12 +158,9 @@ def get_signal(
         mz_min = raw_file.RunHeaderEx.LowMass if mz_min is None else mz_min
         mz_max = raw_file.RunHeaderEx.HighMass if mz_max is None else mz_max
         if mz_min > mz_max:
-            raise ValueError(f"Invalid m/z range: {mz_min} > {mz_max}")
-
-        t_min = raw_file.RunHeaderEx.StartTime * 60 if t_min is None else t_min  # [s]
-        t_max = raw_file.RunHeaderEx.EndTime * 60 if t_max is None else t_max  # [s]
-        if t_min > t_max:
-            raise ValueError(f"Invalid time range: {t_min} > {t_max}")
+            raise ValueError(
+                f"Invalid m/z range: mz_min={mz_min}, mz_max={mz_max}, where mz_min > mz_max"
+            )
 
         num_of_scans = raw_file.RunHeaderEx.SpectraCount
         scan_indices = list(range(1, num_of_scans + 1))
@@ -115,18 +169,10 @@ def get_signal(
         if polarity:
             scan_indices = filter_by_polarity(raw_file, scan_indices, polarity)
 
-        scan_time = [scan.ScanStatistics.StartTime * 60 for scan in scans]  # [s]
-
-        # Filter by time range
-        time_mask = [t_min <= t <= t_max for t in scan_time]
-        scan_indices = list(compress(scan_indices, time_mask))
-
-        # Update time scale
-        scan_time = list(compress(scan_time, time_mask))
+        scan_indices, scan_time = filter_by_time(raw_file, scan_indices, t_min, t_max)
 
         # Extract scan spectra and m/z values
-        scan_specs = []
-        scan_mzs = []
+        scan_mzs, scan_specs = [], []
         for i in scan_indices:
             intensities = np.frombuffer(scans[i - 1].SegmentedScan.Intensities)
             positions = np.frombuffer(scans[i - 1].SegmentedScan.Positions)
@@ -136,11 +182,10 @@ def get_signal(
             scan_specs.append(intensities[mz_mask])
             scan_mzs.append(positions[mz_mask])
 
-        if scan_mzs == []:
+        if not scan_mzs:
             raise ValueError(
-                f"""No data found in the specified time or m/z range.
-                M/z range of the sample file: {raw_file.RunHeaderEx.LowMass} - {raw_file.RunHeaderEx.HighMass}
-                Time range: {raw_file.RunHeaderEx.StartTime * 60:.1f} - {raw_file.RunHeaderEx.EndTime * 60:.1f} s.
+                f"""No data found in the specified m/z range.
+                M/z range of the raw file: {raw_file.RunHeaderEx.LowMass} - {raw_file.RunHeaderEx.HighMass}
                 """
             )
 
@@ -171,8 +216,10 @@ def compute_sum_signal_in_time_range(
     t_max: float | None = None,
     average: bool = False,
     ppm: int = 1,
+    polarity: Literal["+", "-"] | None = None,
 ) -> xr.core.dataarray.DataArray:
-    """Computes sum signal in (t_min, t_max) time range, binning counts within "ppm" value
+    """Computes sum signal in (t_min, t_max) time range, binning counts within "ppm" value.
+    Polarity filter may be optionally provided.
 
     :param datafile_path: Path to the Thermo Fisher raw file (.raw) containing the data.
     :type datafile_path: str
@@ -182,26 +229,33 @@ def compute_sum_signal_in_time_range(
     :type t_max: float, optional
     :param average: If spectrum should be averaged, defaults to False
     :type average: bool, optional
-    :param ppm: ppm precision for binning, defaults to 1
+    :param ppm: ppm precision for binning, defaults to 1. This value determines the mass tolerance for grouping m/z values,
+                where a smaller ppm value results in finer binning and higher precision.
     :type ppm: int, optional
-    :return: Sum signal
+    :param polarity: + or -, Polarity of the scans to be retrieved, optional, defaults to None
+    :type polarity: str, optional
+    :raises ValueError: If the specified time range is invalid, or if no data is found in the specified filters,
+                        or the specified polarity is not found in the raw file.
+    :return: Sum signal in the specified time range for specified polarity as an xarray DataArray.
     :rtype: xr.core.dataarray.DataArray
     """
     with open_raw_file(datafile_path) as raw_file:
-        # Get full time range
-        t_start = raw_file.RunHeader.StartTime  # [min]
-        t_end = raw_file.RunHeader.EndTime  # [min]
+        num_of_scans = raw_file.RunHeaderEx.SpectraCount
+        scan_indices = list(range(1, num_of_scans + 1))
 
-        t_min = t_start if t_min is None else t_min / 60  # [min]
-        t_max = t_end if t_max is None else t_max / 60  # [min]
+        if polarity:
+            scan_indices = filter_by_polarity(raw_file, scan_indices, polarity)
+
+        scan_indices, _ = filter_by_time(raw_file, scan_indices, t_min, t_max)
 
         # Setup mz tolerance - counts within ppm are binned
         mass_option = MassOptions(ppm, ToleranceUnits.ppm)
 
         # Get averaged spectrum in time range (t_max, t_max)
-        average_scan = Extensions.AverageScansInTimeRange(
-            raw_file, t_min, t_max, System.String(""), mass_option
-        )
+        net_scan_indices = List[int]()
+        for index in scan_indices:
+            net_scan_indices.Add(index)
+        average_scan = Extensions.AverageScans(raw_file, net_scan_indices, mass_option)
         averaged_spec = average_scan.SegmentedScan
 
         # Extract averaged signal, multiply by num_of_scans to restore sum signal
@@ -222,39 +276,51 @@ def compute_sum_signal_in_time_range(
 
 
 def get_tic_per_scan(
-    datafile_path: str, timestamps: Iterable[float] | None = None
+    datafile_path: str,
+    timestamps: Iterable[float] | None = None,
+    polarity: Literal["+", "-"] | None = None,
 ) -> tuple:
-    """Extracts the Total Ion Current (TIC) per scan from the raw file.
+    """
+    Allows filtering by timestamps and polarity.
+    If timestamps are provided, the function will return the TIC values for the closest scan to each timestamp.
 
     :param datafile_path: Path to the Thermo Fisher raw file (.raw) containing the data.
     :type datafile_path: str
     :param timestamps: Optional iterable of timestamps [s] to extract TIC values for, defaults to None
     :type timestamps: Iterable[float], optional
+    :param polarity: + or -, Polarity of the scans to be retrieved, optional, defaults to None
+    :type polarity: str, optional
     :return: Tuple containing the scan timestamps [s] and TIC values as numpy arrays
     :rtype: tuple
     """
     with open_raw_file(datafile_path) as raw_file:
         num_of_scans = raw_file.RunHeaderEx.SpectraCount
-        scan_indices = list(range(num_of_scans))
+        scan_indices = list(range(1, num_of_scans + 1))
 
-        scan_statistics = [
-            raw_file.GetScanStatsForScanNumber(i + 1) for i in scan_indices
-        ]
+        scan_statistics = [raw_file.GetScanStatsForScanNumber(i) for i in scan_indices]
         scan_tic = np.asarray([scan_stat.TIC for scan_stat in scan_statistics])
         scan_timestamp = np.asarray(
             [scan_stat.StartTime for scan_stat in scan_statistics]
         )
 
+        if polarity:
+            scan_indices = filter_by_polarity(raw_file, scan_indices, polarity)
+            scan_indices_python = [i - 1 for i in scan_indices]
+            scan_tic = scan_tic[scan_indices_python]
+            scan_timestamp = scan_timestamp[scan_indices_python]
+
         if timestamps:
             # Filter TIC values by timestamps
             timestamps = np.asarray(timestamps)
             # Find closest scan index for each timestamp
-            scan_indices = np.searchsorted(scan_timestamp, timestamps)
+            scan_indices_python = np.searchsorted(scan_timestamp, timestamps)
             # Ensure indices are within valid range
-            scan_indices = np.clip(scan_indices, 0, len(scan_timestamp) - 1)
+            scan_indices_python = np.clip(
+                scan_indices_python, 0, len(scan_timestamp) - 1
+            )
             # Extract scan TIC and scan timestamps values for the closest scan index
-            scan_tic = scan_tic[scan_indices]
-            scan_timestamp = scan_timestamp[scan_indices]
+            scan_tic = scan_tic[scan_indices_python]
+            scan_timestamp = scan_timestamp[scan_indices_python]
 
         return scan_timestamp, scan_tic
 
@@ -269,11 +335,9 @@ def get_scan_timestamps(datafile_path: str) -> np.ndarray:
     """
     with open_raw_file(datafile_path) as raw_file:
         num_of_scans = raw_file.RunHeaderEx.SpectraCount
-        scan_indices = list(range(num_of_scans))
+        scan_indices = list(range(1, num_of_scans + 1))
 
-        scan_statistics = [
-            raw_file.GetScanStatsForScanNumber(i + 1) for i in scan_indices
-        ]
+        scan_statistics = [raw_file.GetScanStatsForScanNumber(i) for i in scan_indices]
         scan_timestamp = np.asarray(
             [scan_stat.StartTime for scan_stat in scan_statistics]
         )
@@ -305,48 +369,35 @@ def get_peak_profiles(
     """
     with open_raw_file(datafile_path) as raw_file:
         mzs = np.asarray(mzs)
-        # Get full time range
-        t_start = raw_file.RunHeader.StartTime * 60  # [s]
-        t_end = raw_file.RunHeader.EndTime * 60  # [s]
-
-        t_min = t_start if t_min is None else t_min
-        t_max = t_end if t_max is None else t_max
 
         num_of_scans = raw_file.RunHeaderEx.SpectraCount
-        scan_indices = list(range(0, num_of_scans))
+        scan_indices = list(range(1, num_of_scans + 1))
         scans = tuple(Extensions.GetScans(raw_file, 1, num_of_scans))
 
         if polarity:
             scan_indices = filter_by_polarity(raw_file, scan_indices, polarity)
 
-        scan_time = [scan.ScanStatistics.StartTime * 60 for scan in scans]  # [s]
-
-        # Filter by time range
-        time_mask = [t_min <= t <= t_max for t in scan_time]
-        scan_indices = list(compress(scan_indices, time_mask))
-
-        # If scan_indices is empty, raise an error
-        if not scan_indices:
-            raise ValueError(
-                f"""No data found in the specified time range.
-                Time range of the sample file: {t_start:.1f} - {t_end:.1f} s.
-                """
-            )
-
-        # Update time scale
-        scan_time = list(compress(scan_time, time_mask))
+        scan_indices, scan_time = filter_by_time(
+            raw_file, scan_indices, t_min, t_max
+        )  # [s]
 
         intensities = [
-            np.frombuffer(scans[i].SegmentedScan.Intensities) for i in scan_indices
+            np.frombuffer(scans[i - 1].SegmentedScan.Intensities) for i in scan_indices
         ]
         positions = [
-            np.frombuffer(scans[i].SegmentedScan.Positions) for i in scan_indices
+            np.frombuffer(scans[i - 1].SegmentedScan.Positions) for i in scan_indices
         ]
 
-        # Calculate the intensities for the given mz_values
-        intensities_for_mz_values = []
-        for pos, intens in zip(positions, intensities):
-            intensities_for_mz_values.append(np.interp(mzs, pos, intens))
+        # Prepare interpolation functions for all scans
+        interpolation_funcs = [
+            interp1d(pos, intens, bounds_error=False, fill_value=0)
+            for pos, intens in zip(positions, intensities)
+        ]
+
+        # Interpolate intensities for all scans at once
+        intensities_for_mz_values = np.array(
+            [interp_func(mzs) for interp_func in interpolation_funcs]
+        )
 
         # Convert to dask array, transpose to have mz values as columns
         peak_profiles_dask = da.from_array(
