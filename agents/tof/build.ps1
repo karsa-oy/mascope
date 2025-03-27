@@ -1,7 +1,9 @@
 #Requires -Version 7.0 -PSEdition Core
 
+poetry install --with dev
+
 # create the binary in the virutal env
-uv run pyinstaller @(
+poetry run pyinstaller @(
     './src/mascope_tof_agent/main.py'
     '--onefile', '--name', 'Mascope-TofAgent'     # make one executable file
     '--noconfirm'                                 # replace dist w/o confirming
