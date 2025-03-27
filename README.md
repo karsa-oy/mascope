@@ -394,13 +394,13 @@ The best resource for learning about the Typer API is the [Typer docs Learn sect
 
 ## Agents
 
-Agents are small Python programs installed with Pyinstaller on Windows instrument machines. They perform
-minimal transformations and move files to the server.
+Agents are small Python programs installed with Pyinstaller on Windows instrument machines. They perform minimal transformations and move files to the server. As opposed to other packages, the agent dependencies are managed by separate Poetry environments, to avoid the need to compile whole uv workspace into the distributable.
 
 ```sh
-agents/         # Instrument machine agents
-  file/           # File Agent (for ThermoFisher Orbitrap instruments)
-  tof_agent/      # TOF Agent (for Tofwerk TOF instruments)
+agents/           # Instrument machine agents
+  file/               # File Agent (for ThermoFisher Orbitrap instruments)
+  tof_agent/          # TOF Agent (for Tofwerk TOF instruments)
+  install_tooling.ps1 # Powershell script to install agent build tools (pipx, poetry)
 ```
 
 ### File Agent
@@ -419,6 +419,8 @@ To run all services needed to emulate the Tofwerk acquisition workflow in develo
 
 To build for production, you execute a build script _on a Windows machine_. In this section we use the TOF Agent as an example, but the the File Agent functions analogously.
 
+Before building, install the required tooling by running `install_tooling.ps1` located at the root of the `agents/` directory. The script will install Python, Pipx and Poetry if not already installed. Then, run the agent build script:
+
 ```
 cd agents/tof
 ./build.ps1
@@ -436,6 +438,8 @@ You will need to run the agent once so that it initializes the directory structu
    - Click the user profile icon to open the sidebar
    - In the "API Access Tokens" section, select "TOF Agent" from the dropdown
    - Generate and copy the access token (note: token is shown only once)
+
+Then restart the agent, and the correct config is loaded and the agent is ready to go.
 
 > [!IMPORTANT]
 > In case the config schema is changed, any existing configuration in the target environment must be deleted prior to running the updated version of TofAgent, in order to initialize correct configs.
