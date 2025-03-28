@@ -125,8 +125,7 @@ def mkdir(*args: tuple) -> str:
     """
 
     path = os.path.join(*args)
-    if not os.path.exists(path):
-        os.makedirs(path)
+    os.makedirs(path, exist_ok=True)
     return path
 
 
