@@ -10,7 +10,6 @@ import h5py
 import numpy as np
 
 from mascope_tofwerk.runtime import runtime
-from mascope_tofwerk.tofwerk import get_conversion_coefficient
 from mascope_file.io import write_props
 from mascope_file.name import parse_path_from_item_filename
 from mascope_file.record import create_sample_file_db_record
@@ -54,7 +53,6 @@ class H5Processor(Thread):
             # Calculate the mean difference between consecutive datapoints
             differences = np.diff(timestamps)
             return float(np.mean(differences))  # [s]
-        return None
 
     @property
     def length(self) -> float:
@@ -73,7 +71,6 @@ class H5Processor(Thread):
             # Total length of the sample file is the difference between
             # starts of the first and the last scan + mean interval between scans
             return float(t_last - t_first) + self.interval  # [s]
-        return None
 
     @property
     def mz_range(self) -> list | None:
@@ -85,18 +82,6 @@ class H5Processor(Thread):
         if self.h5:
             # Return a list of 1st and last m/z values
             return self.h5["FullSpectra"]["MassAxis"][[0, -1]].tolist()
-        return None
-
-    @property
-    def polarity(self) -> str | None:
-        """Polarity of the sample file
-
-        :return: polarity as a string
-        :rtype: str | None
-        """
-        if self.h5:
-            return "-" if self.h5.attrs["IonMode"] == b"negative" else "+"
-        return None
 
     @property
     def single_ion_signal(self) -> float | None:
@@ -107,7 +92,6 @@ class H5Processor(Thread):
         """
         if self.h5:
             return float(self.h5["FullSpectra"].attrs["Single Ion Signal"][0])
-        return None
 
     @property
     def sample_interval(self) -> float | None:
@@ -120,25 +104,6 @@ class H5Processor(Thread):
             return float(
                 self.h5["FullSpectra"].attrs["SampleInterval"][0] * 1e9
             )  # [s]->[ns]
-        return None
-
-    @property
-    def tic(self) -> float | None:
-        """Total Ion Current (TIC) of the sample file
-
-        :return: TIC
-        :rtype: float
-        """
-        if self.h5:
-            sum_spec = self.h5["FullSpectra"]["SumSpectrum"][:]
-            # Normalize by number of extractions [mV] -> [mV/ext]
-            n_extractions = self.h5.attrs["NbrWaveforms"][0]
-            sum_spec /= n_extractions
-            # Convert to ions/sec
-            sum_spec *= get_conversion_coefficient(self.h5)
-            # Calculate total ion current
-            return float(sum_spec.sum())
-        return None
 
     @property
     def mass_calibration(self) -> dict | None:
@@ -160,7 +125,20 @@ class H5Processor(Thread):
                 "mode": int(attrs["MassCalibMode"][0]),
                 "par": mass_calib_params,
             }
-        return None
+
+    @property
+    def polarity(self) -> str | None:
+        """Polarity options in the sample file
+
+        :return: Polarity options
+        :rtype: str | None
+        """
+        if self.h5:
+            ion_mode = self.h5.attrs.get("IonMode", "").lower()
+            if ion_mode == b"negative":
+                return "-"
+            elif ion_mode == b"positive":
+                return "+"
 
     def _finalize(self):
         """Finalize acquisition"""
@@ -197,10 +175,6 @@ class H5Processor(Thread):
             # Copy h5 file to the sample_file folder
             data_h5_path = os.path.join(data_path, "data.h5")
             shutil.copy(h5_filepath, data_h5_path)
-
-            # TODO - remove this commented code
-            # Create sum_signal array
-            # get_sum_signal(sample_file_props["filename"])
 
             self._create_db_record(sample_file_props)
 
@@ -266,14 +240,12 @@ class H5Processor(Thread):
 
             # Get sample file properties
             sample_file_props = {
-                "filename": self.filename.replace(" ", "_") + "_" + self.polarity,
+                "filename": self.filename.replace(" ", "_"),
                 "length": self.length,
                 "committed_length": self.length,
                 "range": self.mz_range,
-                "polarity": self.polarity,
                 "single_ion_signal": self.single_ion_signal,
                 "sample_interval": self.sample_interval,
-                "tic": self.tic,
                 "mass_calibration": self.mass_calibration,
                 "utc_offset": utc_offset,
                 # Not applicable for TOF

@@ -180,49 +180,73 @@ async def create_sample_item(
     sample_item: SampleItemCreate, independent_transaction: bool = False
 ) -> dict:
     """
-    Creates a new sample item with the specified details after verifying that an associated
-    sample file exists in the database.
+    Creates a new sample item after verifying the associated sample file exists.
 
     Steps:
-    1. Verify that the sample file with the given filename exists in the database.
-    2. Create a new sample item object with the provided details and a generated ID.
-    3. Add the new sample item to the session and commit the changes to the database.
-    4. Return the details of the created sample item.
+    1. Verify the existence of the sample file with the given filename.
+    2. Add missing fields to the sample item.
+    3. Create a new sample item with the provided details and a generated ID.
+    4. Add the new sample item to the session, commit, and refresh.
+    5. Return the created sample item's details.
 
-    :param sample_item: Sample item creation details from the request body.
+    :param sample_item: Details for creating the sample item.
     :type sample_item: SampleItemCreate
-    :param independent_transaction: Flag indicating whether the sample item create is an independent transaction, defaults to False
+    :param independent_transaction: Flag for independent transaction, defaults to False.
     :type independent_transaction: bool, optional
-    :return: The created sample item's details.
+    :return: Details of the created sample item.
     :rtype: dict
-    :raises NotFoundException: Raised if the associated sample file does not exist.
+    :raises NotFoundException: If the associated sample file does not exist.
     """
     async with async_session() as session:
         # Step 1: Verify the existence of the sample file
-        result = await session.execute(
+        sample_file = await session.scalar(
             select(SampleFile).where(SampleFile.filename == sample_item.filename)
         )
-        sample_file = result.scalars().one_or_none()
-
         if not sample_file:
             raise NotFoundException(
                 f"Sample file with filename '{sample_item.filename}' not found"
             )
-        # Step 2: Generate unique ID and create new sample item
+
+        # Step 2: Add missing fields to the sample item
+        # Convert the sample item to a dictionary for creating a new instance
+        sample_item_dict = sample_item.model_dump()
+        # Add TIC, t0, t1 to the sample item dictionary
+        # TODO add a possibility to specify t0 and t1 in the request body?
+        try:
+            tic_time, tic_values = get_tic_per_scan(
+                sample_file.filename, polarity=sample_item.polarity
+            )
+        except TypeError:
+            verbose_polarity = "positive" if sample_item.polarity == "+" else "negative"
+            raise NotFoundException(
+                f"No scans with '{verbose_polarity}' polarity were found in the file '{sample_item.filename}'."
+            )
+        sample_item_dict["tic"] = (
+            float(np.sum(tic_values)) if sample_item.tic is None else sample_item.tic
+        )
+        sample_item_dict["t0"] = (
+            float(tic_time[0]) if sample_item.t0 is None else sample_item.t0
+        )
+        sample_item_dict["t1"] = (
+            float(tic_time[-1]) if sample_item.t1 is None else sample_item.t1
+        )
+
+        # Step 3: Create a new sample item
         new_sample_item = SampleItem(
             sample_item_id=gen_id(),
-            **sample_item.model_dump(),  # Pydantic model's data
+            **sample_item.model_dump(),
             sample_item_utc_created=datetime.now(timezone.utc),
             sample_item_utc_modified=datetime.now(timezone.utc),
         )
-        # Step 3: Add to session and commit
+
+        # Step 4: Add to session, commit, and refresh
         session.add(new_sample_item)
         await session.commit()
         await session.refresh(new_sample_item)
 
-    # Step 4: Return the new sample item details
+    # Step 5: Return the new sample item details
     return {
-        "message": f"Sample item '{new_sample_item.sample_item_name}' was created.",
+        "message": f"Sample item '{new_sample_item.sample_item_name}' was created successfully.",
         "data": new_sample_item.to_dict(),
     }
 

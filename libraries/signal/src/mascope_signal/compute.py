@@ -184,6 +184,7 @@ def load_signal(
     t_max: float | None = None,
     mz_min: float | None = None,
     mz_max: float | None = None,
+    polarity: Literal["+", "-"] | None = None,
 ) -> xr.Dataset:
     """Load signal from the sample file
 
@@ -197,6 +198,10 @@ def load_signal(
     :type t_max: float, optional
     :param mz_min: Min m/z value, defaults to None
     :type mz_min: float, optional
+    :param mz_max: Max m/z value, defaults to None
+    :type mz_max: float, optional
+    :param polarity: Polarity of the scan to extract, defaults to None (get all scans)
+    :type polarity: str, optional
     :return: The signal with m/z and time coordinates
     :rtype: xr.Dataset
     """
@@ -243,7 +248,6 @@ def load_signal(
                 return signal_ds_sliced
             case "orbi_raw":
                 datafile_path = os.path.join(sample_path, "data.raw")
-                polarity = sample_path.split("_")[-1]
                 return thermo.get_signal(
                     datafile_path, t_min, t_max, mz_min, mz_max, polarity
                 )

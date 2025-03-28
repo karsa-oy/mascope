@@ -13,23 +13,13 @@ from ThermoFisher.CommonCore.Data.Business import Device
 from mascope_file.io import write_props
 from mascope_file.name import parse_path_from_item_filename
 from mascope_file.record import create_sample_file_db_record
+from mascope_thermo.thermo import get_polarity_options
 
 from mascope_thermo.runtime import runtime
 
 
-def strip_filepath(filepath):
-    """Strip path and file extension
-
-    Parameters
-    ----------
-    filepath : str
-        Full file path
-
-    Returns
-    -------
-    str
-        Base filename
-    """
+def strip_filepath(filepath: str) -> str:
+    """Strip path and file extension"""
     return os.path.splitext(os.path.basename(filepath))[0]
 
 
@@ -101,47 +91,6 @@ class RawProcessor(Thread):
         if self.raw:
             method_file = self.raw.SampleInformation.InstrumentMethodFile
             return method_file if method_file else None
-        return None
-
-    @property
-    def tic_neg(self) -> float | None:
-        """Total ion current in negative polarity (TIC)
-
-        :return: TIC
-        :rtype: float | None
-        """
-        if self.raw:
-            num_of_scans = self.raw.RunHeaderEx.SpectraCount
-            tics = np.zeros(num_of_scans)
-            for i in range(num_of_scans):
-                if (
-                    self.raw.GetFilterForScanNumber(i + 1).Polarity.ToString()
-                    == "Negative"
-                ):
-                    tics[i] = self.raw.GetScanStatsForScanNumber(i + 1).TIC
-            total_tic_neg = np.sum(tics)
-            return total_tic_neg
-        return None
-
-    @property
-    def tic_pos(self) -> float | None:
-        """Total ion current in positive polarity (TIC)
-
-        :return: TIC
-        :rtype: float | None
-        """
-        if self.raw:
-            num_of_scans = self.raw.RunHeaderEx.SpectraCount
-            tics = np.zeros(num_of_scans)
-            for i in range(num_of_scans):
-                if (
-                    self.raw.GetFilterForScanNumber(i + 1).Polarity.ToString()
-                    == "Positive"
-                ):
-                    tics[i] = self.raw.GetScanStatsForScanNumber(i + 1).TIC
-            total_tic_pos = np.sum(tics)
-            return total_tic_pos
-        return None
 
     @property
     def interval(self) -> float:
@@ -150,9 +99,8 @@ class RawProcessor(Thread):
         :return: Measurement interval [s]
         :rtype: float
         """
-        return (
-            self.length / self.raw.RunHeaderEx.LastSpectrum if self.raw else None
-        )  # [s]
+        if self.raw:
+            return self.length / self.raw.RunHeaderEx.LastSpectrum  # [s]
 
     @property
     def length(self) -> float:
@@ -161,7 +109,8 @@ class RawProcessor(Thread):
         :return: Sample length [s]
         :rtype: float
         """
-        return self.raw.RunHeaderEx.EndTime * 60.0 if self.raw else None  # [s]
+        if self.raw:
+            return self.raw.RunHeaderEx.EndTime * 60.0  # [s]
 
     @property
     def mz_range(self) -> list | None:
@@ -172,7 +121,16 @@ class RawProcessor(Thread):
         """
         if self.raw:
             return [self.raw.RunHeaderEx.LowMass, self.raw.RunHeaderEx.HighMass]
-        return None
+
+    @property
+    def polarity(self) -> str | None:
+        """Polarity options in the sample file
+
+        :return: Polarity options
+        :rtype: str | None
+        """
+        if self.raw:
+            return get_polarity_options(self.raw.FileName)
 
     def _finalize(self):
         """Finalize acquisition"""
@@ -182,30 +140,6 @@ class RawProcessor(Thread):
             self.raw.Dispose()
             self.raw = None
         self.cancel_event.clear()
-
-    def _has_negative_scans(self) -> bool:
-        """Does the current raw file contain scans in negative polarity
-
-        :return: Has negative scans
-        :rtype: bool
-        """
-        polarity_filter = self.raw.GetFilterFromString("-")
-        scan_enumerator = self.raw.GetFilteredScanEnumerator(
-            polarity_filter
-        ).GetEnumerator()
-        return scan_enumerator.MoveNext()
-
-    def _has_positive_scans(self) -> bool:
-        """Does the current raw file contain scans in negative polarity
-
-        :return: Has positive scans
-        :rtype: bool
-        """
-        polarity_filter = self.raw.GetFilterFromString("+")
-        scan_enumerator = self.raw.GetFilteredScanEnumerator(
-            polarity_filter
-        ).GetEnumerator()
-        return scan_enumerator.MoveNext()
 
     def _process_raw_file(self, sample_file_props: dict, raw_file_path: str) -> bool:
         """Main function processing the raw files:
@@ -234,12 +168,7 @@ class RawProcessor(Thread):
             data_raw_path = os.path.join(data_path, "data.raw")
             shutil.copy(raw_file_path, data_raw_path)
 
-            # TODO - delete this commented code
-            # Create sum_signal array
-            # get_sum_signal(sample_file_props["filename"])
-
             self._create_db_record(sample_file_props)
-
             return True
         except FileExistsError:
             self.log.error(
@@ -305,6 +234,7 @@ class RawProcessor(Thread):
 
             # Gather sample file data
             sample_file_props = {
+                "filename": self.filename.replace(" ", "_"),
                 "length": self.length,
                 "range": self.mz_range,
                 "utc_offset": utc_offset,
@@ -318,38 +248,13 @@ class RawProcessor(Thread):
                 "mz_calibration": None,
             }
 
-            if_processed_flag = [True, True]
-
-            # Check if raw file contains negative polarity scans
-            if self._has_negative_scans():
-                # Add missing properties, negative polarity case
-                sample_file_props["polarity"] = "-"
-                sample_file_props["tic"] = self.tic_neg
-                sample_file_props["filename"] = self.filename.replace(" ", "_") + "_-"
-
-                # Create sample file with negative polarity scans
-                if_processed_flag[0] = self._process_raw_file(
-                    sample_file_props, file_to_process
-                )
-
-            # Check if raw file contains positive polarity scans
-            if self._has_positive_scans():
-                # Add missing properties, positive polarity case
-                sample_file_props["polarity"] = "+"
-                sample_file_props["tic"] = self.tic_pos
-                sample_file_props["filename"] = self.filename.replace(" ", "_") + "_+"
-
-                # Create sample file with positive polarity scans
-                if_processed_flag[1] = self._process_raw_file(
-                    sample_file_props, file_to_process
-                )
+            if_processed = self._process_raw_file(sample_file_props, file_to_process)
 
             # Out of loop
             self._finalize()
             self.log.info("Processing finished")
 
-            # If processing completed without error, delete processed file
-            if all(if_processed_flag):
+            if if_processed:
                 self.log.info("Deleting file from the streams folder")
                 try:
                     os.remove(file_to_process)

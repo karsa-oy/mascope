@@ -26,9 +26,7 @@ def create_sample_file_db_record(data, access_token):
     committed_length = data["committed_length"]
     utc_offset = timedelta(seconds=int(data["utc_offset"]))
     mz_calibration = data.get("mz_calibration")
-    polarity = data.get("polarity")
     method_file = data.get("method_file")
-    tic = data.get("tic")
 
     if instrument_type == "tof":
         date = timestamp_from_filename(filename).isoformat()
@@ -45,8 +43,6 @@ def create_sample_file_db_record(data, access_token):
         "length": committed_length,
         "range": data["range"],
         "mz_calibration": mz_calibration,
-        "tic": tic,
-        "polarity": polarity,
     }
     if method_file:
         sample_file_db_record["method_file"] = method_file
