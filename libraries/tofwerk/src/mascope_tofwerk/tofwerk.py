@@ -306,13 +306,19 @@ def get_tic_per_scan(
         return scan_timestamp, scan_tic
 
 
-def get_scan_timestamps(datafile_path: str) -> np.ndarray:
+def get_scan_timestamps(
+    datafile_path: str, t_min: float | None = None, t_max: float | None = None
+) -> np.ndarray:
     """
-    Retrieve scan timestamps from the HDF5 file.
+    Retrieve scan timestamps from the HDF5 file, optionally filtering by a time range.
 
     :param datafile_path: Path to the HDF5 file containing spectrum data.
     :type datafile_path: str
-    :return: Array of scan timestamps.
+    :param t_min: Optional start time in seconds (default is None).
+    :type t_min: float, optional
+    :param t_max: Optional end time in seconds (default is None).
+    :type t_max: float, optional
+    :return: Array of scan timestamps within the specified time range.
     :rtype: np.ndarray
     """
     with open_h5_file(datafile_path) as h5_file:
@@ -322,6 +328,12 @@ def get_scan_timestamps(datafile_path: str) -> np.ndarray:
         n_scans = np.where(scan_timestamp != 0)[0][-1] + 1
         # Cut out zero scans
         scan_timestamp = scan_timestamp[:n_scans]
+
+        # Apply time filtering if t_min or t_max is provided
+        if t_min is not None:
+            scan_timestamp = scan_timestamp[scan_timestamp >= t_min]
+        if t_max is not None:
+            scan_timestamp = scan_timestamp[scan_timestamp <= t_max]
 
         return scan_timestamp
 

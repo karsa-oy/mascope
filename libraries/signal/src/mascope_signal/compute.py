@@ -19,16 +19,35 @@ from mascope_tofwerk import tofwerk
 from mascope_signal.runtime import runtime
 
 
-def get_scan_timestamps(base_filename: str) -> np.ndarray:
+def get_scan_timestamps(
+    base_filename: str,
+    t_min: float | None = None,
+    t_max: float | None = None,
+    polarity: Literal["+", "-"] | None = None,
+) -> np.ndarray:
     """
     Retrieve scan timestamps from a given file based on its type.
 
     :param base_filename: Sample file name.
     :type base_filename: str
+    :param t_min: Minimum time [s], optional, defaults to None
+    :type t_min: float
+    :param t_max: Maximum time [s], optional, defaults to None
+    :type t_max: float
     :return: An array of scan timestamps extracted from the sample file.
     """
     sample_type = get_sample_file_type(base_filename)
     match sample_type:
+        case "orbi_raw":
+            datafile_path = os.path.join(
+                parse_path_from_item_filename(base_filename), "data.raw"
+            )
+            return thermo.get_scan_timestamps(datafile_path, t_min, t_max, polarity)
+        case "tof_h5":
+            datafile_path = os.path.join(
+                parse_path_from_item_filename(base_filename), "data.h5"
+            )
+            return tofwerk.get_scan_timestamps(datafile_path, t_min, t_max)
         case "tof_zarr" | "orbi_zarr":
             signal_path = filename_to_zarr_path(base_filename, "signal")
 
@@ -41,24 +60,24 @@ def get_scan_timestamps(base_filename: str) -> np.ndarray:
                 # Load time coordinate from each group and concatenate
                 time_arrays = [z[group]["time"][:] for group in groups]
                 time_array = np.concatenate(time_arrays)
+                # Filter by time if t_min and/or t_max are provided
+                if t_min is not None:
+                    time_array = time_array[time_array >= t_min]
+                if t_max is not None:
+                    time_array = time_array[time_array <= t_max]
+
             return time_array
-        case "orbi_raw":
-            datafile_path = os.path.join(
-                parse_path_from_item_filename(base_filename), "data.raw"
-            )
-            return thermo.get_scan_timestamps(datafile_path)
-        case "tof_h5":
-            datafile_path = os.path.join(
-                parse_path_from_item_filename(base_filename), "data.h5"
-            )
-            return tofwerk.get_scan_timestamps(datafile_path)
 
 
-def get_sum_signal(filename: str, average: bool = False) -> xr.DataArray:
+def get_sum_signal(
+    filename: str, polarity: Literal["+", "-"] | None = None, average: bool = False
+) -> xr.DataArray:
     """Calculates the sum spectrum of a given filename
 
     :param filename: Name of the target file
     :type filename: str
+    :param polarity: Polarity of the scan to extract, defaults to None (get all scans)
+    :type polarity: str, optional
     :param average: Return avereage spectrum instead of sum. By default false (return sum).
     :type average: bool
     :return: Sum/average spectrum
@@ -79,7 +98,7 @@ def get_sum_signal(filename: str, average: bool = False) -> xr.DataArray:
                 f"Unexpected state: sample_file is None but AttributeError was raised"
             )
         base_filename = sample_file.props["filename"]
-        sum_signal = sum_signal_for_time_range(base_filename)
+        sum_signal = sum_signal_for_time_range(base_filename, polarity=polarity)
         filename_sum_signal = filename_to_zarr_path(base_filename, "sum_signal")
 
         try:
@@ -106,7 +125,11 @@ def get_sum_signal(filename: str, average: bool = False) -> xr.DataArray:
 
 
 def sum_signal_for_time_range(
-    base_filename: str, t_min: float = None, t_max: float = None, average: bool = False
+    base_filename: str,
+    t_min: float = None,
+    t_max: float = None,
+    polarity: Literal["+", "-"] | None = None,
+    average: bool = False,
 ) -> xr.DataArray:
     """Calculates the sum spectrum of a given filename in given time range [t_min, t_max]
 
@@ -116,6 +139,8 @@ def sum_signal_for_time_range(
     :type t_min: float, optional
     :param t_max: Max time value [s], defaults to None (takes the last time coord available)
     :type t_max: float, optional
+    :param polarity: Polarity of the scan to extract, defaults to None (get all scans)
+    :type polarity: str, optional
     :param average: Return avereage spectrum instead of sum. By default false (return sum).
     :type average: bool, optional
     :raises NotImplementedError: The case for h5 TOF files is not implemented
@@ -126,6 +151,23 @@ def sum_signal_for_time_range(
     sample_path = parse_path_from_item_filename(base_filename)
 
     match sample_type:
+        case "orbi_raw":
+            datafile_path = os.path.join(sample_path, "data.raw")
+            sum_signal = thermo.compute_sum_signal_in_time_range(
+                datafile_path,
+                t_min=t_min,
+                t_max=t_max,
+                average=average,
+                polarity=polarity,
+            )
+        case "tof_h5":
+            datafile_path = os.path.join(sample_path, "data.h5")
+            sum_signal = tofwerk.compute_sum_signal_in_time_range(
+                datafile_path,
+                t_min=t_min,
+                t_max=t_max,
+                average=average,
+            )
         case "tof_zarr" | "orbi_zarr":
             # Load the 'signal' data for specific time range
             signal = load_signal(base_filename)
@@ -165,16 +207,6 @@ def sum_signal_for_time_range(
             )
             if average:
                 sum_signal /= time_data_points
-        case "orbi_raw":
-            datafile_path = os.path.join(sample_path, "data.raw")
-            sum_signal = thermo.compute_sum_signal_in_time_range(
-                datafile_path, t_min, t_max, average
-            )
-        case "tof_h5":
-            datafile_path = os.path.join(sample_path, "data.h5")
-            sum_signal = tofwerk.compute_sum_signal_in_time_range(
-                datafile_path, t_min, t_max, average
-            )
     return sum_signal
 
 
@@ -215,6 +247,22 @@ def load_signal(
 
     try:
         match sample_type:
+            case "orbi_raw":
+                datafile_path = os.path.join(sample_path, "data.raw")
+                return thermo.get_signal(
+                    datafile_path, t_min, t_max, mz_min, mz_max, polarity
+                )
+            case "tof_h5":
+                datafile_path = os.path.join(sample_path, "data.h5")
+                signal = tofwerk.get_signal(datafile_path, t_min, t_max, mz_min, mz_max)
+                # Check if m/z axis calibration was applied to sample file
+                # by comparing m/z in sum signal and in h5 file
+                sum_signal_mz = get_sum_signal(base_filename).mz.values
+                if np.array_equal(signal.mz.values, sum_signal_mz):
+                    # m/z axis match, no calibration was previously applied
+                    return signal
+                # M/z in sum signal and in h5 file do not match, replace m/z in signal
+                return signal.assign_coords(mz=sum_signal_mz)
             case "tof_zarr" | "orbi_zarr":
                 signal_ds = load_array(base_filename, "signal")
                 if sample_type == "tof_zarr":
@@ -246,22 +294,6 @@ def load_signal(
                 """
                     )
                 return signal_ds_sliced
-            case "orbi_raw":
-                datafile_path = os.path.join(sample_path, "data.raw")
-                return thermo.get_signal(
-                    datafile_path, t_min, t_max, mz_min, mz_max, polarity
-                )
-            case "tof_h5":
-                datafile_path = os.path.join(sample_path, "data.h5")
-                signal = tofwerk.get_signal(datafile_path, t_min, t_max, mz_min, mz_max)
-                # Check if m/z axis calibration was applied to sample file
-                # by comparing m/z in sum signal and in h5 file
-                sum_signal_mz = get_sum_signal(base_filename).mz.values
-                if np.array_equal(signal.mz.values, sum_signal_mz):
-                    # m/z axis match, no calibration was previously applied
-                    return signal
-                # M/z in sum signal and in h5 file do not match, replace m/z in signal
-                return signal.assign_coords(mz=sum_signal_mz)
     except Exception as e:
         runtime.logger.error(f"Error loading signal from {base_filename}: {e})")
         # Return empty signal dataset with "mz" and "time" coordinates in case of error
@@ -274,23 +306,33 @@ def load_signal(
         )
 
 
-def get_tic_per_scan(base_filename: str, timestamps: Iterable | None = None) -> tuple:
+def get_tic_per_scan(
+    base_filename: str,
+    timestamps: Iterable | None = None,
+    polarity: Literal["+", "-"] | None = None,
+) -> tuple:
     """Get TIC per scan from the sample file depending on the file type
 
     :param base_filename: Sample file filename
     :type base_filename: str
     :param timestamps: Optional timestamps of the scans, defaults to None
     :type timestamps: Iterable | None
+    :param polarity: Polarity of the scan to extract, defaults to None (get all scans)
+    :type polarity: str | None
     :return: TIC time and TIC per scan as numpy arrays
     :rtype: tuple
     """
     sample_type = get_sample_file_type(base_filename)
     datafile_path = filename_to_datafile_path(base_filename)
     match sample_type:
-        case "tof_h5":
-            tic_time, tic_per_scan = tofwerk.get_tic_per_scan(datafile_path, timestamps)
         case "orbi_raw":
-            tic_time, tic_per_scan = thermo.get_tic_per_scan(datafile_path, timestamps)
+            tic_time, tic_per_scan = thermo.get_tic_per_scan(
+                datafile_path, timestamps, polarity
+            )
+        case "tof_h5":
+            tic_time, tic_per_scan = tofwerk.get_tic_per_scan(
+                datafile_path, timestamps, polarity
+            )
         case "tof_zarr" | "orbi_zarr":
             zarr_path = filename_to_zarr_path(base_filename, "signal")
             sync = get_zarr_synchronizer(zarr_path)

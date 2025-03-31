@@ -325,24 +325,35 @@ def get_tic_per_scan(
         return scan_timestamp, scan_tic
 
 
-def get_scan_timestamps(datafile_path: str) -> np.ndarray:
-    """Extracts the scan timestamps [s] from the raw file.
+def get_scan_timestamps(
+    datafile_path: str,
+    t_min: float | None = None,
+    t_max: float | None = None,
+    polarity: Literal["+", "-"] | None = None,
+) -> np.ndarray:
+    """Extracts the scan timestamps [s] from the raw file, with optional polarity and time filtering.
 
     :param datafile_path: Path to the Thermo Fisher raw file (.raw) containing the data.
     :type datafile_path: str
-    :return: Array of scan timestamps [s]
+    :param t_min: Minimum time [s], optional, defaults to None
+    :type t_min: float
+    :param t_max: Maximum time [s], optional, defaults to None
+    :type t_max: float
+    :param polarity: Polarity of the scans to be retrieved, either '+' or '-', optional, defaults to None
+    :type polarity: str
+    :return: Array of filtered scan timestamps [s]
     :rtype: np.ndarray
     """
     with open_raw_file(datafile_path) as raw_file:
         num_of_scans = raw_file.RunHeaderEx.SpectraCount
         scan_indices = list(range(1, num_of_scans + 1))
 
-        scan_statistics = [raw_file.GetScanStatsForScanNumber(i) for i in scan_indices]
-        scan_timestamp = np.asarray(
-            [scan_stat.StartTime for scan_stat in scan_statistics]
-        )
+        if polarity:
+            scan_indices = filter_by_polarity(raw_file, scan_indices, polarity)
 
-        return scan_timestamp
+        _, scan_time = filter_by_time(raw_file, scan_indices, t_min, t_max)
+
+        return np.asarray(scan_time)
 
 
 def get_peak_profiles(
