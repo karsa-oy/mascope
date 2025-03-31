@@ -400,7 +400,6 @@ Agents are small Python programs installed with Pyinstaller on Windows instrumen
 agents/           # Instrument machine agents
   file/               # File Agent (for ThermoFisher Orbitrap instruments)
   tof_agent/          # TOF Agent (for Tofwerk TOF instruments)
-  install_tooling.ps1 # Powershell script to install agent build tools (pipx, poetry)
 ```
 
 ### File Agent
@@ -419,7 +418,7 @@ To run all services needed to emulate the Tofwerk acquisition workflow in develo
 
 To build for production, you execute a build script _on a Windows machine_. In this section we use the TOF Agent as an example, but the the File Agent functions analogously.
 
-Before building, install the required tooling by running `install_tooling.ps1` located at the root of the `agents/` directory. The script will install Python, Pipx and Poetry if not already installed. Then, run the agent build script:
+To run the agent build script, execute:
 
 ```
 cd agents/tof

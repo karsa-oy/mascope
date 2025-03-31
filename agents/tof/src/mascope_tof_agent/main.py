@@ -73,7 +73,8 @@ def process_file_upload(filepath: str) -> None:
     except Exception as e:  # pylint: disable=broad-except
         runtime.logger.error(f"Exception {e.__class__.__name__}({str(e)})")
         # Move failed file into a separate directory
-        failed_dir = mkdir(runtime.config.source, "failed_uploads")
+        source_dir = os.path.dirname(filepath)
+        failed_dir = os.path.join(source_dir, "failed_uploads")
         failed_filepath = os.path.join(failed_dir, os.path.basename(filepath))
         shutil.copyfile(filepath, failed_filepath)
         runtime.logger.debug(f"Moved failed file to {failed_filepath}")

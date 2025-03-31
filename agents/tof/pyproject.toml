@@ -5,18 +5,27 @@ description = "Agent to connect Tofwerk TOF with Karsa Mascope"
 authors = [{ name = "Karsa Oy", email = "support@karsa.fi" }]
 requires-python = ">=3.12,<3.13"
 license.text = "LicenseRef-Proprietary"
+dependencies = [
+    "mascope_runtime",
+    "mascope_sdk",
+    "mascope_tofwerk",
+    "python-socketio~=5.11",
+    "aiohttp>=3.11.11,<4",
+]
 
-[tool.poetry.dependencies]
-mascope_file = { path = "../../libraries/file", develop = true }
-mascope_runtime = { path = "../../libraries/runtime", develop = true }
-mascope_sdk = { path = "../../libraries/sdk", develop = true }
-mascope_tofwerk = { path = "../../libraries/tofwerk", develop = true}
-python-socketio = "^5.12.1"
-aiohttp = "^3.11.14"
+[project.scripts]
+mascope-tof-agent = "mascope_tof_agent.main:run"
 
-[tool.poetry.group.dev.dependencies]
-pyinstaller = "^6.12.0"
+[dependency-groups]
+dev = [
+  "pyinstaller~=6.12"
+]
+
+[tool.uv.sources]
+mascope_runtime = { path = "../../libraries/runtime", editable = true }
+mascope_sdk = { path = "../../libraries/sdk", editable = true }
+mascope_tofwerk = { path = "../../libraries/tofwerk", editable = true }
 
 [build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["uv_build>=0.6,<0.7"]
+build-backend = "uv_build"

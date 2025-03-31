@@ -1,9 +1,7 @@
 #Requires -Version 7.0 -PSEdition Core
 
-poetry install --with dev
-
 # create the binary in the virutal env
-poetry run pyinstaller @(
+uv run pyinstaller @(
     './src/mascope_file_agent/main.py'
     '--onefile', '--name', 'Mascope-File-Agent'   # make one executable file
     '--noconfirm'                                 # replace dist w/o confirming
