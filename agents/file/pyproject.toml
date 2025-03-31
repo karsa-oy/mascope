@@ -5,15 +5,24 @@ description = "Mascope's instrument machine agent. Sends sample files to the Mas
 authors = [{ name = "Karsa Oy", email = "support@karsa.fi" }]
 requires-python = ">=3.12,<3.13"
 license = "LicenseRef-Proprietary"
+dependencies = [
+    "mascope_runtime",
+    "mascope_sdk",
+    "watchdog~=4.0",
+]
 
-[tool.poetry.dependencies]
-mascope_runtime = { path = "../../libraries/runtime", develop = true }
-mascope_sdk = { path = "../../libraries/sdk", develop = true }
-watchdog = "^6.0.0"
+[project.scripts]
+mascope-file-agent = "mascope_file_agent.main:run"
 
-[tool.poetry.group.dev.dependencies]
-pyinstaller = "^6.12.0"
+[dependency-groups]
+dev = [
+  "pyinstaller~=6.12"
+]
+
+[tool.uv.sources]
+mascope_runtime = { path = "../../libraries/runtime", editable = true }
+mascope_sdk = { path = "../../libraries/sdk", editable = true }
 
 [build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["uv_build>=0.6,<0.7"]
+build-backend = "uv_build"

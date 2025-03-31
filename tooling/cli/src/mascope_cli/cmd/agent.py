@@ -4,7 +4,7 @@ from typing import Optional, List
 from typing_extensions import Annotated
 
 
-from mascope_cli import runtime
+from mascope_cli.runtime import runtime
 from mascope_cli.cmd import lib
 
 agent_app = typer.Typer(add_help_option=False)
@@ -20,4 +20,6 @@ def main(args: Annotated[Optional[List[str]], typer.Argument()] = None) -> None:
     if len(args) != 1:
         runtime.logger.error("mascope agent requires exactly 1 argument: file or tof")
         return
-    lib.run(command=f"uv run mascope-{args[0]}-agent")
+    lib.run(
+        command=f"uv run mascope-{args[0]}-agent", cwd=runtime.path("agents", args[0])
+    )

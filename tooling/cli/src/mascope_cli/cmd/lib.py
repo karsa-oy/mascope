@@ -6,7 +6,9 @@ from mascope_cli.runtime import runtime
 from mascope_runtime import Runtime
 
 
-def run(command: str, runtime: Runtime = runtime, vars: dict = dict()) -> None:
+def run(
+    command: str, runtime: Runtime = runtime, vars: dict = dict(), cwd=runtime.path()
+) -> None:
     """
     Execute a command in a subprocess
 
@@ -19,7 +21,7 @@ def run(command: str, runtime: Runtime = runtime, vars: dict = dict()) -> None:
         env[key] = val
     subprocess.run(
         shlex.split(command),  # split to ensure correct parsing
-        cwd=runtime.path(),
+        cwd=cwd,
         stderr=subprocess.STDOUT,
         env=env,
     )
