@@ -15,23 +15,93 @@ import argparse
 import asyncio
 import fnmatch
 import os
+import numpy as np
 
 from datetime import datetime
+from sqlalchemy import (
+    select,
+    desc,
+)
+
+
+from mascope_backend.db import init_db, async_session
+
+from mascope_backend.api.controllers.sample.lib.sample_file_fetch import (
+    fetch_sample_file,
+)
+from mascope_backend.db.models import InstrumentFunction as InstrumentConfig
+
+from mascope_file.name import get_instrument_type
 
 from mascope_signal.peak import detect_peaks
+from mascope_signal.instrument_func.fit import r_orbi
 
-from mascope_backend.socket import (
-    sio,
-)  # This is here to circumvent circular import error
-from mascope_backend.db import init_db
-from mascope_backend.api.new.instrument_config.lib import (
-    read_instrument_functions,
-)
 
 from mascope_backend.runtime import runtime
 
 
 loop = None
+
+
+async def get_instrument_functions(
+    filename: str,
+) -> dict:
+    """
+    Retrieves a single instrument config either by filename
+    """
+    async with async_session() as session:
+        # 2A: Fetch instrument function by filename
+        sample_file = await fetch_sample_file(filename=filename)
+        stmt = (
+            (
+                select(InstrumentConfig)
+                .where(
+                    InstrumentConfig.method_file == sample_file.method_file,
+                    InstrumentConfig.instrument == sample_file.instrument,
+                )
+                .order_by(desc(InstrumentConfig.datetime_utc))
+                .limit(1)
+            )
+            if sample_file.method_file
+            else (
+                select(InstrumentConfig)
+                .where(
+                    InstrumentConfig.instrument == sample_file.instrument,
+                )
+                .order_by(desc(InstrumentConfig.datetime_utc))
+                .limit(1)
+            )
+        )
+        # Step 3: Execute query
+        results = await session.execute(stmt)
+        instrument_config = results.scalar_one_or_none()
+
+        # Step 4: Check existence
+        if not instrument_config:
+            raise ValueError(f"Instrument config not found for {filename}")
+
+        instrument_config = instrument_config.to_dict()
+
+    peakshape = instrument_config["peakshape"]
+    R_p = instrument_config["resolution_function"]
+    if len(R_p) == 1:
+        # Use native Orbitrap resolution function
+        p1 = R_p[0]
+
+        def R(m):
+            return r_orbi(m, p1)
+
+    elif len(R_p) == 2:
+        # Use resolution function from Junninen's thesis for TOF
+        p1, p2 = R_p
+
+        def R(m):
+            return m / (p1 * m + p2)
+
+    elif len(R_p) == 3:
+        # Use 2nd order polynomial (backwards compatibility for Orbitrap) TODO: legacy
+        R = np.poly1d(R_p)
+    return peakshape, R
 
 
 def sample_file_op(sample_filepath: str, sample_filename: str) -> None:
@@ -44,16 +114,20 @@ def sample_file_op(sample_filepath: str, sample_filename: str) -> None:
     """
     global loop
     try:
-        add_peak_threshold = 0.9
+        instrument_type = get_instrument_type(sample_filename)
+        if instrument_type == "orbi":
+            threshold = 0.8
+        if instrument_type == "tof":
+            threshold = 0.9
 
         instrument_functions = loop.run_until_complete(
-            read_instrument_functions(filename=sample_filename)
+            get_instrument_functions(filename=sample_filename)
         )
         loop.run_until_complete(
             detect_peaks(
                 sample_filename,
                 instrument_functions,
-                add_peak_threshold,
+                threshold,
                 if_exists="append",
             )
         )
