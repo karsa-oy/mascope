@@ -17,9 +17,10 @@ import {
   PaneBrowserSample,
   PaneBrowserTarget,
   PaneTabMatch,
-  PaneTabAcquisitions
+  PaneTabAcquisitions,
+  PaneTabSpectrum
 } from '@/lib/panes'
-import { ChartBatchOverview, ChartSampleSpectrum } from '@/lib/charts'
+import { ChartBatchOverview } from '@/lib/charts'
 import { HelpPopover } from '@/lib/help'
 
 import { useApp } from '@/stores'
@@ -103,7 +104,7 @@ const tabs = computed(() => [
       </SplitterPanel>
       <SplitterPanel :size="80">
         <Panel id="charts">
-          <Tabs v-model:value="app.ui.tab.active" lazy>
+          <Tabs v-model:value="app.ui.tab.active">
             <TabList>
               <Tab
                 v-for="{ icon, label, disabled, help } in tabs"
@@ -122,13 +123,15 @@ const tabs = computed(() => [
                 <PaneTabAcquisitions :active="app.ui.tab.active == 'acquisitions'" />
               </TabPanel>
               <TabPanel value="batch">
-                <ChartBatchOverview v-if="app.data.batch.focused" />
+                <ChartBatchOverview v-if="app.data.batch.focused && app.ui.tab.active == 'batch'" />
               </TabPanel>
               <TabPanel value="spectrum">
-                <ChartSampleSpectrum />
+                <PaneTabSpectrum v-if="app.ui.tab.active == 'spectrum'" />
               </TabPanel>
               <TabPanel value="match">
-                <PaneTabMatch v-if="app.data.match.visualized.ion" />
+                <PaneTabMatch
+                  v-if="app.data.match.visualized.ion && app.ui.tab.active == 'match'"
+                />
               </TabPanel>
             </TabPanels>
           </Tabs>

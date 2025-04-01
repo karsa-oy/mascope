@@ -15,47 +15,56 @@ const app = useApp()
 
 const props = defineProps({
   collection: {
-    required: true,
+    required: false,
     type: Object
+  },
+  formula: {
+    required: false,
+    type: String
   }
 })
 
 const popover = ref()
 
 const input = reactive({
-  target_compound_formula: '',
+  target_compound_formula: props.formula ?? '',
   target_compound_name: null,
   cas_number: null
 })
+
+const targetCollection = computed(() => props.collection ?? app.data.match.collection.focused)
+const targetCompounds = computed(
+  () => targetCollection.value?.children ?? app.data.match.compound.list
+)
 
 const addCompound = () => {
   const prexisting = app.data.target.compound.list.find(
     (comp) => comp.target_compound_formula === input.target_compound_formula
   )
   const common = {
-    target_collection_id: props.collection.target_collection_id,
-    target_collection_name: props.collection.target_collection_name,
-    target_collection_type: props.collection.target_collection_type
+    target_collection_id: targetCollection.value.target_collection_id,
+    target_collection_name: targetCollection.value.target_collection_name,
+    target_collection_type: targetCollection.value.target_collection_type
   }
   if (prexisting) {
     app.data.target.collection.update({
       ...common,
       target_compound_ids: [
-        ...props.collection.children.map(({ target_compound_id }) => target_compound_id),
+        ...targetCompounds.value.map(({ target_compound_id }) => target_compound_id),
         prexisting.target_compound_id
       ]
     })
   } else {
     app.data.target.collection.update({
       ...common,
-      target_compound_ids: props.collection.children.map(
+      target_compound_ids: targetCompounds.value.map(
         ({ target_compound_id }) => target_compound_id
       ),
       target_compounds_create: [
         {
           target_compound_formula: input.target_compound_formula.trim(),
-          target_compound_name: input.target_compound_name.trim(),
-          cas_number: input.cas_number.trim()
+          target_compound_name: input.target_compound_name?.trim(),
+          cas_number: input.cas_number?.trim()
         }
       ]
     })
@@ -65,7 +74,7 @@ const addCompound = () => {
 
 const confirmation = async () => {
   let count = (
-    await api.http.get(`/target/collections/${props.collection.target_collection_id}`, {
+    await api.http.get(`/target/collections/${targetCollection.value.target_collection_id}`, {
       use: 'read',
       type: 'read_target_collections'
     })
@@ -99,6 +108,7 @@ const invalidFormula = computed(() => {
   //   Debugger: https://regex101.com/r/Mbjq8C/1
   //   Inspiration: https://stackoverflow.com/questions/23602175/regex-for-parsing-chemical-formulas#23602425
 })
+const disabled = computed(() => !props.collection && !app.data.match.collection.focused)
 </script>
 
 <template>
@@ -106,17 +116,20 @@ const invalidFormula = computed(() => {
     icon="pi pi-plus"
     text
     size="small"
-    v-tooltip="'Add compound'"
     @click="
       (event) => {
         event.stopPropagation()
         popover.toggle(event)
       }
     "
+    v-tooltip="disabled ? 'Open a target collection to add a compound' : 'Add compound'"
+    :disabled="disabled"
   />
   <Popover ref="popover">
     <div class="col" style="gap: 0rem">
-      <h4 style="margin: 1rem 0">Add compound to '{{ collection.target_collection_name }}'</h4>
+      <h4 style="margin: 1rem 0">
+        Add compound to '{{ targetCollection.target_collection_name }}'
+      </h4>
       <FloatLabel style="margin: 1rem 0">
         <InputText
           id="add-compound-formula"

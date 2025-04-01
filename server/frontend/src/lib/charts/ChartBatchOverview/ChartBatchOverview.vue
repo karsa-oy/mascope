@@ -152,11 +152,10 @@ const layout = computed(() => ({
   height: 650
 }))
 
-function onClick({ points }) {
-  if (!points) return
+function onClick({ pointIndex, curveNumber }) {
+  if (!pointIndex || !curveNumber) return
   // Select sample corresponding to the clicked data point
-  const sampleIndex = points[0].pointIndex
-  const sample = app.data.sample.list[sampleIndex]
+  const sample = app.data.sample.list[pointIndex]
 
   if (sample) {
     app.data.sample.focus(sample)
@@ -165,8 +164,7 @@ function onClick({ points }) {
   }
 
   // Focus on the corresponding compound/ion using the trace index
-  const traceIndex = points[0].curveNumber
-  const trace = data.traces[traceIndex]
+  const trace = data.traces[curveNumber]
 
   // Guard for matchData availability
   if (!trace.matchData) return

@@ -120,6 +120,7 @@ export const useMatchParams = defineStore('app.data.match.params', () => {
   return {
     ui,
     db,
+    typeDefaults,
     default: areDefault,
     changed,
     set,

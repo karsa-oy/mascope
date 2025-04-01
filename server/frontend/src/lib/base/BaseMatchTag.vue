@@ -20,6 +20,10 @@ const props = defineProps({
   style: {
     type: String,
     default: 'font-size: 11px'
+  },
+  nofade: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -68,7 +72,7 @@ const zeroScored = computed(() => props.score == '00.00%')
     v-tooltip.right="tooltip"
     :value="text ? `Match score: ${score}` : score"
     :severity="severity"
-    :class="alarmMode || zeroScored ? '' : 'pale'"
+    :class="nofade || alarmMode || zeroScored ? '' : 'pale'"
     :style="style"
   />
 </template>

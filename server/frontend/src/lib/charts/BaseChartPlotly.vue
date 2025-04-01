@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, watchEffect, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watchEffect, watch } from 'vue'
 
 import Plotly from 'plotly.js-dist-min'
 
@@ -34,7 +34,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits('click')
+const emit = defineEmits(['click', 'zoom'])
 
 const plot = ref(null)
 const created = ref(false)
@@ -97,12 +97,37 @@ const derived = computed(() => ({
   )
 }))
 
+function handleClick(event) {
+  const { data, x, y } = event.points[0]
+  emit('click', { data, x, y, event: event.event, ...event.points[0] })
+}
+
+function handleZoom(data) {
+  const xmin = data['xaxis.range[0]']
+  const xmax = data['xaxis.range[1]']
+  const ymin = data['yaxis.range[0]']
+  const ymax = data['yaxis.range[1]']
+  emit('zoom', {
+    rangeX: xmin != null && xmax != null ? { range: [xmin, xmax] } : null,
+    rangeY: ymin != null && ymax != null ? { range: [ymin, ymax] } : null
+  })
+}
+
 onMounted(() => {
+  // create the plot
   Plotly.newPlot(plot.value, props.data, derived.value.layout, derived.value.config)
-  // event listener
-  plot.value.on('plotly_click', (e) => emit('click', e))
+  // add the event listener
+  plot.value.on('plotly_click', handleClick)
+  plot.value.on('plotly_relayout', handleZoom)
+  // mark as created
   created.value = true
+  // adapt to changes
   Plotly.react(plot.value, props.data, derived.value.layout, derived.value.config)
+})
+onBeforeUnmount(() => {
+  plot.value.removeEventListener('plotly_click', handleClick)
+  plot.value.removeEventListener('plotly_relayout', handleZoom)
+  Plotly.purge(plot.value)
 })
 
 const ready = computed(
@@ -112,6 +137,7 @@ const ready = computed(
 watchEffect(
   () => {
     if (ready.value) {
+      // adapt to changes
       Plotly.react(plot.value, props.data, derived.value.layout, derived.value.config)
     }
   },
@@ -124,9 +150,13 @@ watchEffect(
     ref="plot"
     :id="id"
     class="plot"
-    @click.prevent
     style="width: 100%; height: 100%"
     :key="`${width}-${height}`"
+    @contextmenu="
+      (e) => {
+        e.preventDefault()
+      }
+    "
   />
 </template>
 
