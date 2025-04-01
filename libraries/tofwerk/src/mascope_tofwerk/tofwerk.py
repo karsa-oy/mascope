@@ -29,6 +29,25 @@ def open_h5_file(datafile_path: str):
         raise Exception(err_message) from e
 
 
+def get_polarity_options(datafile_path: str) -> str:
+    """
+    Retrieve the polarity based on the IonMode attribute in the HDF5 file.
+
+    :param datafile_path: Path to the HDF5 file containing spectrum data.
+    :type datafile_path: str
+    :return: polarity value, either "+" or "-".
+    :rtype: str
+    """
+    with open_h5_file(datafile_path) as h5_file:
+        ion_mode = h5_file.attrs.get("IonMode", "").lower()
+        if ion_mode == b"negative":
+            return "-"
+        elif ion_mode == b"positive":
+            return "+"
+        else:
+            raise ValueError(f"Unexpected IonMode value: {ion_mode}")
+
+
 def get_conversion_coefficient(h5_file) -> float:
     """
     Calculate the conversion coefficient to convert signal intensity from [mV] to [ions/sec].

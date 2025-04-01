@@ -140,6 +140,21 @@ class H5Processor(Thread):
             elif ion_mode == b"positive":
                 return "+"
 
+    @property
+    def polarity(self) -> str | None:
+        """Polarity options in the sample file
+
+        :return: Polarity options
+        :rtype: str | None
+        """
+        if self.h5:
+            ion_mode = self.h5.attrs.get("IonMode", "").lower()
+            if ion_mode == b"negative":
+                return "-"
+            elif ion_mode == b"positive":
+                return "+"
+        return None
+
     def _finalize(self):
         """Finalize acquisition"""
         # Reset self
@@ -248,6 +263,7 @@ class H5Processor(Thread):
                 "sample_interval": self.sample_interval,
                 "mass_calibration": self.mass_calibration,
                 "utc_offset": utc_offset,
+                "polarity": self.polarity,
                 # Not applicable for TOF
                 "method_file": None,
             }

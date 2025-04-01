@@ -43,6 +43,7 @@ def create_sample_file_db_record(data, access_token):
         "length": committed_length,
         "range": data["range"],
         "mz_calibration": mz_calibration,
+        "polarity": data["polarity"],
     }
     if method_file:
         sample_file_db_record["method_file"] = method_file

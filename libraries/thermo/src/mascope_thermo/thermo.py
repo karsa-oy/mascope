@@ -51,6 +51,35 @@ def open_raw_file(datafile_path: str):
         runtime.logger.error(f"Failed to open the file {Path(datafile_path).name}: {e}")
 
 
+def get_polarity_options(datafile_path: str) -> str:
+    """Reads the polarities present in a raw file.
+
+    :param datafile_path: Path to the Thermo Fisher raw file (.raw) containing the data.
+    :type datafile_path: str
+    :return: "-" if only negative polarities are present, "+" if only positive, "+-" if both are present.
+    :rtype: str
+    """
+    with open_raw_file(datafile_path) as raw_file:
+        num_of_scans = raw_file.RunHeaderEx.SpectraCount
+        scan_indices = list(range(1, num_of_scans + 1))
+
+        polarities = set(
+            raw_file.GetFilterForScanNumber(i).Polarity.ToString() for i in scan_indices
+        )
+
+        has_positive = "Positive" in polarities
+        has_negative = "Negative" in polarities
+
+        if has_positive and has_negative:
+            return "+-"
+        elif has_positive:
+            return "+"
+        elif has_negative:
+            return "-"
+        else:
+            raise ValueError("No valid polarities found in the raw file.")
+
+
 def filter_by_polarity(
     raw_file, scan_indices: list, polarity: Literal["+", "-"]
 ) -> list:

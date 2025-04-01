@@ -132,6 +132,17 @@ class RawProcessor(Thread):
         if self.raw:
             return get_polarity_options(self.raw.FileName)
 
+    @property
+    def polarity(self) -> str | None:
+        """Polarity options in the sample file
+
+        :return: Polarity options
+        :rtype: str | None
+        """
+        if self.raw:
+            return get_polarity_options(self.raw.FileName)
+        return None
+
     def _finalize(self):
         """Finalize acquisition"""
         # Reset self
@@ -240,6 +251,7 @@ class RawProcessor(Thread):
                 "utc_offset": utc_offset,
                 "method_file": self.method_file,
                 "timestamp": self.timestamp.isoformat(),  # for DB record
+                "polarity": self.polarity,
                 # streaming leftovers:
                 "committed_length": self.length,
                 # non-applicable for Orbi:

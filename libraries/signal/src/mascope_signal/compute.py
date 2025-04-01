@@ -423,3 +423,29 @@ def get_peak_profiles(
             signal = signal.fillna(0)
             # Extract the peak profiles for the closest m/z values
             return signal.sel(mz=mzs, method="nearest").signal
+
+
+def get_polarity_options(base_filename: str) -> str:
+    """Reads the polarities present in a sample file.
+
+    :param base_filename: Sample file filename
+    :type base_filename: str
+    :return: Polarity options as "-", "+", or "+-" depending on the data.
+    :rtype: str
+    """
+    sample_type = get_sample_file_type(base_filename)
+    datafile_path = parse_path_from_item_filename(base_filename)
+    match sample_type:
+        case "orbi_raw":
+            datafile_path = os.path.join(datafile_path, "data.raw")
+            return thermo.get_polarity_options(datafile_path)
+        case "tof_h5":
+            datafile_path = os.path.join(datafile_path, "data.h5")
+            return tofwerk.get_polarity_options(datafile_path)
+        case "tof_zarr" | "orbi_zarr":
+            polarity = base_filename.split("_")[-1]
+            if polarity in ["+", "-"]:
+                return polarity
+            else:
+                # If polarity is not specified, return None (get all scans)
+                return None
