@@ -35,7 +35,7 @@
     "axios": "^1.7.7",
     "chart.js": "^4.4.6",
     "pinia": "^2.2.2",
-    "plotly.js-basic-dist": "^2.35.2",
+    "plotly.js-dist-min": "^3.0.1",
     "primeicons": "^7.0.0",
     "primevue": "^4.2.5",
     "socket.io-client": "^4.7.5",

@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, watchEffect, watch } from 'vue'
 
-import * as Plotly from 'plotly.js-basic-dist'
+import Plotly from 'plotly.js-dist-min'
 
 import { useWindowSize } from '@vueuse/core'
 
