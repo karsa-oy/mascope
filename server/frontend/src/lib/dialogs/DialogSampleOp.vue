@@ -179,6 +179,7 @@ async function save() {
     sample_item_type: input.type,
     sample_batch_id: app.data.batch.focused.sample_batch_id,
     filter_id: input.filterId,
+    polarity: input.polarity,
     sample_item_attributes: clone(
       input.fields
         .filter((field) => field.label != 'sample_item_name')
@@ -249,7 +250,33 @@ const invalid = computed(() => {
     input.fields?.filter((f) => f?.required).length !=
     input.fields?.filter((f) => f?.required).filter((f) => f.value).length
   const invalidUpdate = action.value === 'update' && !changedInput.value // * see note below
-  return !input.type || missingRequiredFields || instrumentConfig.status?.invalid || invalidUpdate
+  return !input.type || !input.polarity || missingRequiredFields || instrumentConfig.status?.invalid || invalidUpdate
+})
+
+const polarityOptions = computed(() => {
+  switch (original.value?.polarity) {
+    case '+':
+      return [{ label: 'Positive', value: '+' }];
+    case '-':
+      return [{ label: 'Negative', value: '-' }];
+    case '+-':
+      return [
+        { label: 'Positive', value: '+' },
+        { label: 'Negative', value: '-' }
+      ];
+    default:
+      return [{label: 'Unknown', value: null }];
+  }
+})
+
+const isPolarityFrozen = ref(false);
+watchEffect(() => {
+  if (polarityOptions.value.length === 1) {
+    input.polarity = polarityOptions.value[0].value;
+    isPolarityFrozen.value = true;
+  } else {
+    isPolarityFrozen.value = false;
+  }
 })
 
 // * Note that for older samples, the dialog may open immediately valid!
@@ -313,6 +340,19 @@ const invalid = computed(() => {
                   optionLabel="label"
                 />
                 <label for="item-type"> Sample type </label>
+              </FloatLabel>
+
+              <FloatLabel>
+                <Select
+                  inputId="polarity-type"
+                  v-model="input.polarity"
+                  :options="polarityOptions"
+                  dataKey="value"
+                  optionValue="value"
+                  optionLabel="label"
+                  :disabled="isPolarityFrozen"
+                />
+                <label for="item-type"> Polarity </label>
               </FloatLabel>
 
               <FloatLabel>
