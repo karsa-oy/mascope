@@ -25,11 +25,16 @@ from mascope_backend.api.controllers.match.lib.match_aggregate import (
     aggregate_match_ions,
     aggregate_match_ions_light,
     aggregate_match_compounds_light,
+    set_ions_match_category,
     compile_samples_df,
 )
 from mascope_backend.api.controllers.match.aggregate.match_aggregate_controller import (
     aggregate_match_isotope_filtered_data,
     aggregate_matches,
+)
+from mascope_backend.api.controllers.target.lib.compute.target_ions_compute import (
+    generate_target_ions_from_composition,
+    generate_target_ions_from_mass,
 )
 from mascope_backend.api.new.match.params import BaseMatchParams, default_match_params
 
@@ -297,6 +302,229 @@ async def aggregate_sample_match_compound(
                 "match_isotopes": filtered_match_isotope_df.to_dict("records"),
             },
         }
+
+
+@api_controller()
+async def aggregate_sample_match_compounds(
+    sample_item_id: str,
+    target_compound_formulas: list[str],
+    match_params: BaseMatchParams | None = None,
+    ion_mechanism_ids: list[str] | None = None,
+) -> dict:
+    """
+    Retrieves matches for compounds within a sample based on a target compound formula,
+    applying specified match parameters to filter the matches.
+
+    Steps:
+    1. Verify the existence of the sample and its batch, extract ion mechanisms.
+    2. Prepare the target compound by normalizing its formula and creating a target compound instance.
+    3. Generate and create target ions and isotopes for the compound.
+    4. Compute matches for the created isotopes within the sample file.
+    5. Apply filters to the computed isotope matches based on the provided parameters.
+    6. Aggregate ion-level data from the filtered isotopes.
+    7. Aggregate compound-level data from the ions and merge with target compound information.
+
+    :param sample_item_id: Unique identifier of the sample item to analyze.
+    :type sample_item_id: str
+    :param target_compound_formulas: Chemical formulas of the target compounds.
+    :type target_compound_formulas: list[str]
+    :param match_params: Parameters to filter the match results, affecting which matches are considered significant
+    :type match_params: BaseMatchParams
+    :param ion_mechanism_ids: Ionization mechanisms IDs to use in matching
+    :type ion_mechanism_ids: list[str]
+    :raises NotFoundException: Raised if the sample item or sample batch cannot be found.
+    :raises ValueError: Raised if no ion mechanisms are defined for the sample batch.
+    :return: A dictionary containing aggregated match compounds, ions, and isotopes, each as a list of dictionaries.
+    :rtype: dict
+    """
+    # match param defaults depend on instrument
+    # so we use a helper to infer them:
+    if not match_params:
+        match_params = await default_match_params(sample_item_id)
+    # data retrieval
+    async with async_session() as session:
+        # Step 1: Fetch sample related data and verify its existence
+        sample = await fetch_sample(sample_item_id)
+
+        # Fetch sample batch data and verify its existence
+        sample_batch = await session.get(SampleBatch, sample.sample_batch_id)
+        if not sample_batch:
+            raise NotFoundException(
+                f"Sample batch with ID '{sample.sample_batch_id}' not found"
+            )
+
+        # Extract ion_mechanisms IDs from build_params
+        ion_mechanisms_ids = ion_mechanism_ids or sample_batch.build_params.get(
+            "ion_mechanisms", []
+        )
+        if not ion_mechanisms_ids:
+            raise ValueError(
+                f"No ion mechanisms were provided, and there are no ion mechanisms for sample batch '{sample_batch.sample_batch_name}'."
+            )
+
+        # Fetch the ionization mechanisms from the database using the extracted IDs
+        result = await session.execute(
+            select(IonizationMechanism).filter(
+                IonizationMechanism.ionization_mechanism_id.in_(ion_mechanisms_ids)
+            )
+        )
+        ionization_mechanisms = result.scalars().all()
+        if not ionization_mechanisms:
+            raise NotFoundException(
+                f"Ionization mechanisms with IDs {ion_mechanisms_ids} not found"
+            )
+
+        target_compounds = []
+        created_ions = []
+        created_isotopes = []
+
+        # Step 2: Prepare target compounds
+        for target_compound_formula in target_compound_formulas:
+            # Normalize the compound formula for consistency
+            normalized_formula = norm(target_compound_formula)
+
+            # Attempt to parse the target compound formula as a mass if applicable
+            try:
+                target_compound_mass = float(normalized_formula)
+            except ValueError:
+                target_compound_mass = None  # If parsing fails, proceed without a mass
+
+            # Initialize the target compound with the normalized formula
+            target_compound = TargetCompound(
+                target_compound_id=gen_id(),
+                target_compound_formula=normalized_formula,
+            )
+            target_compounds.append(target_compound.to_dict())
+
+            # Step 3: Generate and create target ions and isotopes.
+            if target_compound_mass is None:
+                # Parsing into float failed, target compound is given by composition
+                (
+                    target_ions,
+                    target_isotopes,
+                ) = generate_target_ions_from_composition(
+                    target_compound, ionization_mechanisms
+                )
+            else:
+                # Try if target compound is given by mass (try to parse composition into float)
+                target_compound_mass = float(target_compound.target_compound_formula)
+                (
+                    target_ions,
+                    target_isotopes,
+                ) = generate_target_ions_from_mass(
+                    target_compound_mass, target_compound, ionization_mechanisms
+                )
+            for target_isotope in target_isotopes:
+                # Add the isotopes to be committed to the db
+                session.add(target_isotope)
+            for target_ion in target_ions:
+                # Add the ions to be committed to the db
+                session.add(target_ion)
+
+            created_ions += [ion.to_dict() for ion in target_ions]
+            created_isotopes += [isotope.to_dict() for isotope in target_isotopes]
+
+    # Convert the dictionaries into DataFrames
+    target_compound_df = pd.DataFrame(target_compounds)
+    created_ions_df = pd.DataFrame(created_ions)
+    target_isotopes_df = pd.DataFrame(created_isotopes)
+
+    results = []
+    if len(target_isotopes_df) > 0:
+        # Step 4: Compute matches for the isotopes in the sample file.
+        match_isotope_df = await compute_match_isotopes(
+            filename=sample.filename,
+            target_isotopes_df=target_isotopes_df,
+            min_isotope_abundance=match_params.min_isotope_abundance,
+        )
+
+        # Drop the 'index' column from the match_isotope_df DataFrame
+        match_isotope_df = match_isotope_df.drop(columns=["index"])
+        # Step 5: Apply filters to the computed isotope matches based on the provided parameters.
+        filtered_match_isotope_df = apply_match_params(match_isotope_df, match_params)
+
+        # Step 6: Aggregate ion-level data from the filtered isotopes.
+        match_ions_df = (
+            filtered_match_isotope_df.groupby("target_ion_id")
+            .agg(
+                match_score=(
+                    "match_score",
+                    lambda x: (
+                        x * filtered_match_isotope_df.loc[x.index, "relative_abundance"]
+                    ).sum(),
+                ),
+                sample_peak_area_sum=("sample_peak_area", "sum"),
+            )
+            .reset_index()
+        )
+        # set instrument and match category
+        match_ions_df["instrument"] = sample.instrument
+        match_ions_df = await set_ions_match_category(match_ions_df, match_params)
+        # merge with created ions
+        match_ions_df = pd.merge(
+            match_ions_df, created_ions_df, on="target_ion_id", how="left"
+        )
+
+        # Step 7: Aggregate compound-level data from the ions and merge with target compound information.
+        match_compounds_data_df = (
+            match_ions_df.sort_values(
+                by=["match_category", "match_score"], ascending=[False, False]
+            )
+            .groupby("target_compound_id")
+            .apply(
+                lambda df: pd.Series(
+                    {
+                        "match_score": df.iloc[0]["match_score"],
+                        "match_category": df.iloc[0]["match_category"],
+                        "sample_peak_area_sum": df["sample_peak_area_sum"].sum(),
+                    }
+                )
+            )
+            .reset_index()
+        )
+
+        # Explicitly cast match_category to int
+        match_compounds_data_df["match_category"] = match_compounds_data_df[
+            "match_category"
+        ].astype(int)
+
+        # Merge match_compounds_data_df with target_compound_df
+        merged_match_compounds_df = pd.merge(
+            match_compounds_data_df,
+            target_compound_df,
+            on="target_compound_id",
+            how="left",
+        )
+        match_compounds = merged_match_compounds_df.to_dict("records")
+        match_ions = match_ions_df.to_dict("records")
+        match_isotopes = filtered_match_isotope_df.to_dict("records")
+
+        results = [
+            {
+                **compound,
+                "children": [
+                    {
+                        **ion,
+                        "children": [
+                            {**isotope}
+                            for isotope in match_isotopes
+                            if isotope["target_ion_id"] == ion["target_ion_id"]
+                        ],
+                    }
+                    for ion in match_ions
+                    if ion["target_compound_id"] == compound["target_compound_id"]
+                ],
+            }
+            for compound in match_compounds
+        ]
+
+    # Prepare the final output
+    if len(results) > 0:
+        message = f"{len(results)} matches found for {len(target_compound_formulas)} target compounds"
+    else:
+        message = "No matches found for the specified compounds"
+
+    return {"message": message, "data": results}
 
 
 @api_controller()

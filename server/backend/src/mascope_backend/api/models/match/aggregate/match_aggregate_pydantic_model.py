@@ -43,6 +43,20 @@ class AggregateSampleMatchCompoundBody(BaseModel):
     )
 
 
+class AggregateSampleMatchCompoundsBody(BaseModel):
+    target_compound_formulas: list[str] = Field(
+        ..., description="Target compound formulas to match and aggregate"
+    )
+    match_params: TofMatchParams | OrbiMatchParams = Field(
+        None,
+        description="Sample-specific filter parameters, used for match_score and sample_peak_area filtering",
+    )
+    ion_mechanism_ids: list[str] | None = Field(
+        None,
+        description="List of ion mechanism ids to use; if none are provided, sample batch defaults are used.",
+    )
+
+
 class AggregateAndCreateMatchesBody(AggregateMatchIsotopeFilteredDataBody):
     match_ions: Optional[bool] = Field(
         True, description="Flag to determine if ion matches should be processed"

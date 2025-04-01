@@ -9,6 +9,7 @@ from mascope_backend.api.controllers.match.aggregate.match_aggregate_controller 
 from mascope_backend.api.controllers.match.aggregate.sample.match_aggregate_sample_controller import (
     aggregate_sample_match_ion,
     aggregate_sample_match_compound,
+    aggregate_sample_match_compounds,
     get_sample_and_aggregated_matches,
 )
 from mascope_backend.api.controllers.sample.items.sample_items_controller import (
@@ -18,6 +19,7 @@ from mascope_backend.api.models.match.aggregate.match_aggregate_pydantic_model i
     AggregateMatchIsotopeFilteredDataBody,
     AggregateSampleMatchIonBody,
     AggregateSampleMatchCompoundBody,
+    AggregateSampleMatchCompoundsBody,
     AggregateAndCreateMatchesBody,
 )
 from mascope_backend.api.new.auth.dependencies import editor_user, guest_user
@@ -107,7 +109,7 @@ async def aggregate_sample_match_compound_route(
     body: AggregateSampleMatchCompoundBody,
     user=Depends(guest_user),
 ):
-    """Aggregate match datafor compounds within a sample based on a target compound formula,
+    """Aggregate match data for compounds within a sample based on a target compound formula,
     applying specified match parameters to filter the matches.
 
     :param sample_item_id: The unique identifier of the sample.
@@ -124,6 +126,33 @@ async def aggregate_sample_match_compound_route(
         target_compound_formula=body.target_compound.target_compound_formula,
         target_compound_name=body.target_compound.target_compound_name,
         match_params=body.match_params,
+    )
+
+
+@match_aggregate_sample_router.post("/{sample_item_id}/compounds")
+@api_route(token_access=True)
+async def aggregate_sample_match_compounds_route(
+    sample_item_id: str,
+    body: AggregateSampleMatchCompoundsBody,
+    user=Depends(guest_user),
+):
+    """Aggregate match data for compounds within a sample based on a target compound formula,
+    applying specified match parameters to filter the matches.
+
+    :param sample_item_id: The unique identifier of the sample.
+    :type sample_item_id: str
+    :param body: Aggregation parameters for match compound data.
+    :type body: AggregateSampleMatchCompoundBody
+    :param user: The current authenticated user with guest permissions.
+    :type user: User
+    :return: Aggregated match compound data.
+    :rtype: dict
+    """
+    return await aggregate_sample_match_compounds(
+        sample_item_id=sample_item_id,
+        target_compound_formulas=body.target_compound_formulas,
+        match_params=body.match_params,
+        ion_mechanism_ids=body.ion_mechanism_ids,
     )
 
 

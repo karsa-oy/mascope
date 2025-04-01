@@ -110,7 +110,7 @@ async def visualize_ion_focus(
         runtime.logger.info("{:d}/{:d}: {:3f}".format(i + 1, len(mzs), mz))
         spectrum_traces = []
         timeseries_traces = []
-        dmz = 0.5
+        dmz = 0.3
         mz_range = (mz - dmz, mz + dmz)
         rel_abu = rel_abus[i]
         current_target_isotope_id = target_isotope_ids[i]
