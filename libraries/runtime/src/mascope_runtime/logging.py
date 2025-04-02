@@ -331,7 +331,7 @@ class RuntimeLogging:
 
         return status_style
 
-    def stacktrace(show_locals: bool = False, skip_frames: int = 0) -> Traceback:
+    def stacktrace(self, show_locals: bool = False, skip_frames: int = 0) -> Traceback:
         """
         Constructs a pretty stacktrace for situations where
         there is no exception.
