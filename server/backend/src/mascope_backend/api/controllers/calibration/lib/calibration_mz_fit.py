@@ -12,7 +12,7 @@ from mascope_tofwerk.calibration import mz_calibrate
 from mascope_file.io import load_coord, load_file, update_props, update_zarr_array_coord
 from mascope_file.name import get_sample_file_type
 
-from mascope_signal.compute import get_sum_signal
+from mascope_signal.compute import get_sum_signal, get_tic_per_scan
 
 from mascope_backend.api.lib.api_features import (
     api_controller,
@@ -30,13 +30,9 @@ from mascope_backend.socket.notifications import (
     UserNotification,
     send_progress_user_notification,
 )
+from mascope_backend.api.new.match.params import MZ_ERROR_TOLERANCE, TIC_THRESHOLD
 
 from mascope_backend.runtime import runtime
-
-# TODO_configuration
-# Default calibration parameters
-MZ_ERROR_TOLERANCE = 10
-TIC_THRESHOLD = 1e6
 
 
 @api_controller()
@@ -63,12 +59,11 @@ async def mz_fit(
     error = None
     warning = None
 
-    # calculate tic
     await send_progress_user_notification(notification, 0.25)
 
-    # Get TIC from sample file props
-    sample_file = load_file(filename, vars=[])
-    tic = sample_file.props.get("tic", np.inf)
+    # Get TIC
+    _, tic_per_scan = get_tic_per_scan(filename)
+    tic = np.sum(tic_per_scan)
 
     if tic < tic_threshold:
         warning = "TIC is too low! Check ionization device."

@@ -303,7 +303,7 @@ def get_tic_per_scan(
         for ind, coord in enumerate(coordinates):
             scan_tic[ind] = signal_ref[coord[0], coord[1], coord[2], :].sum()
 
-        sum_spec = h5_file.h5["FullSpectra"]["SumSpectrum"][:]
+        sum_spec = h5_file["FullSpectra"]["SumSpectrum"][:]
         # Convert to ions/sec
         sum_spec *= get_conversion_coefficient(h5_file)
         # Get total TIC

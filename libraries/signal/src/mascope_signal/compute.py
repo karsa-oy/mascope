@@ -330,9 +330,7 @@ def get_tic_per_scan(
                 datafile_path, timestamps, polarity
             )
         case "tof_h5":
-            tic_time, tic_per_scan = tofwerk.get_tic_per_scan(
-                datafile_path, timestamps, polarity
-            )
+            tic_time, tic_per_scan = tofwerk.get_tic_per_scan(datafile_path, timestamps)
         case "tof_zarr" | "orbi_zarr":
             zarr_path = filename_to_zarr_path(base_filename, "signal")
             sync = get_zarr_synchronizer(zarr_path)
