@@ -18,8 +18,8 @@ async def fetch_instrument_config_by_filename(filename: str) -> InstrumentConfig
 
     :param filename: Name of the sample file for which instrument functions are required.
     :type filename: str
-    :return:
-    :rtype: tuple(dict, function)
+    :return: InstrumentConfig object containing instrument functions, or None if not found.
+    :rtype: InstrumentConfig | None
     """
     async with async_session() as session:
         sample_file = await fetch_sample_file(filename=filename)
@@ -59,9 +59,32 @@ def parse_instrument_functions(
              The peak shape details include parameters defining the shape of peaks in the mass spectrum.
              The resolution function R takes a mass (m) and returns the resolution at that mass.
     :rtype: tuple[dict, callable]
+    :raises ValueError: If the instrument configuration does not contain the expected attributes or if they are not
+                        in the expected format.
     """
     peakshape = instrument_config.peakshape
     R_p = instrument_config.resolution_function
+
+    # Validate instrument configuration
+    if not (
+        hasattr(instrument_config, "peakshape")
+        and hasattr(instrument_config, "resolution_function")
+    ):
+        raise ValueError(
+            (
+                "Instrument config does not contain peak shape or resolution function: ",
+                f"{instrument_config}.",
+            )
+        )
+    if not (isinstance(peakshape, dict) and isinstance(R_p, list)):
+        raise ValueError(
+            (
+                "Instrument configurations are not in the expected format: ",
+                f"peakshape: {peakshape}, resolution_function: {R_p}.",
+            )
+        )
+
+    # Derive callable from resolution function parameters
     if len(R_p) == 1:
         # Use native Orbitrap resolution function
         p1 = R_p[0]
@@ -93,6 +116,7 @@ async def read_instrument_functions(filename: str) -> tuple[dict, callable]:
              The peak shape details include parameters defining the shape of peaks in the mass spectrum.
              The resolution function R takes a mass (m) and returns the resolution at that mass.
     :rtype: tuple[dict, callable]
+    :raises ValueError: If no instrument configuration is found for the given filename.
     """
     instrument_config = await fetch_instrument_config_by_filename(filename)
     if instrument_config is None:
