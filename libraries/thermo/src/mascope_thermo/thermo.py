@@ -137,7 +137,11 @@ def filter_by_time(raw_file, scan_indices: list, t_min: float, t_max: float) -> 
     scan_time = [
         raw_file.GetScanStatsForScanNumber(i).StartTime * 60 for i in scan_indices
     ]  # [s]
-    time_mask = [t_min <= t <= t_max for t in scan_time]
+
+    # Create a mask for scan times within the specified range
+    # Using epsilon to avoid floating point precision issues
+    epsilon = np.finfo(np.float64).eps * max(scan_time)
+    time_mask = [(t_min - epsilon) <= t <= (t_max + epsilon) for t in scan_time]
     # Filter scan indices
     scan_indices = list(compress(scan_indices, time_mask))
 
