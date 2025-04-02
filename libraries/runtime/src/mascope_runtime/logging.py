@@ -4,7 +4,7 @@ import typing
 
 if typing.TYPE_CHECKING:
     import loguru
-    from .runtime import Runtime
+    from mascope_runtime import Runtime
     from .mode import RuntimeMode
 
 from loguru import logger

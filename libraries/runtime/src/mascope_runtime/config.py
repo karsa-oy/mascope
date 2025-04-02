@@ -2,7 +2,7 @@ from __future__ import annotations
 import typing
 
 if typing.TYPE_CHECKING:
-    from .runtime import Runtime
+    from mascope_runtime import Runtime
 
 import os
 import tomllib
