@@ -95,5 +95,7 @@ async def read_instrument_functions(filename: str) -> tuple[dict, callable]:
     :rtype: tuple[dict, callable]
     """
     instrument_config = await fetch_instrument_config_by_filename(filename)
+    if instrument_config is None:
+        raise ValueError(f"Instrument configuration not found for {filename}.")
     peakshape, R = parse_instrument_functions(instrument_config)
     return peakshape, R

@@ -57,7 +57,12 @@ async def refit_peaks():
             )
         except FileNotFoundError:
             runtime.logger.error(
-                f"Error computing peaks for sample file {sample_file.filename}."
+                f"Error computing peaks for sample file {sample_file.filename}. File not found."
+            )
+            continue
+        except ValueError as e:
+            runtime.logger.error(
+                f"Error computing peaks for sample file {sample_file.filename}: {e}."
             )
             continue
 
