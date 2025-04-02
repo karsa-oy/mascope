@@ -69,11 +69,11 @@ async def migrate(current_version, target_version):
             await run_migration_script(migration)
         except Exception as error:
             runtime.logger.error(f"Migration {migration_label} failed!")
+            runtime.logger.error(error)
             failed_db_path = os.path.join(db_dir, f"mascope.v{next_version}.db")
             debug_db_path = os.path.join(db_dir, "mascope.debug.db")
             if os.path.exists(failed_db_path):
                 os.rename(failed_db_path, debug_db_path)
-            runtime.logger.error(error)
             runtime.logger.error(
                 f"A copy failed target database is found at {debug_db_path}"
             )
