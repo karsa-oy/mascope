@@ -50,10 +50,16 @@ async def refit_peaks():
                 f"{i+1}/{len(sample_files)}",
             )
         )
-        await compute_peaks(
-            sample_file.filename,
-            if_exists="replace",
-        )
+        try:
+            await compute_peaks(
+                sample_file.filename,
+                if_exists="replace",
+            )
+        except FileNotFoundError:
+            runtime.logger.error(
+                f"Error computing peaks for sample file {sample_file.filename}."
+            )
+            continue
 
 
 async def test():
