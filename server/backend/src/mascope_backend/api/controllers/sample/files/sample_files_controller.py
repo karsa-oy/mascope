@@ -9,19 +9,19 @@ from sqlalchemy import (
     func,
 )
 from mascope_file.io import load_file
-from mascope_file.name import get_instrument_type
 from mascope_signal.compute import sum_signal_for_time_range, get_sum_signal
-from mascope_signal.peak import detect_peaks, get_peaks
+from mascope_signal.peak import get_peaks
 
 from mascope_backend.socket import sio
 from mascope_backend.db import async_session
 from mascope_backend.db.id import gen_id
 from mascope_backend.db.models import SampleFile, User
+from mascope_backend.api.controllers.sample.lib.sample_file_compute import (
+    compute_peaks,
+)
 from mascope_backend.api.new.auth.access_token.service import get_access_token
 from mascope_backend.api.new.instruments import get_instruments
-from mascope_backend.api.new.instrument_configs.lib import (
-    read_instrument_functions,
-)
+
 from mascope_backend.api.lib.api_features import (
     api_controller,
     api_controller_background_task,
@@ -539,25 +539,7 @@ async def compute_sample_file_peaks(
     filename = sample_file_data.get("data").get("filename")
 
     # Step 2: Load instrument functions and determine instrument type.
-    instrument_functions = await read_instrument_functions(filename=filename)
-    instrument_type = get_instrument_type(filename)
-
-    # Step 3: Set threshold based on instrument type.
-    if instrument_type == "orbi":
-        threshold = 0.8
-    if instrument_type == "tof":
-        threshold = 0.9
-
-    # Step 4: Detect peaks.
-    sample_file, list_of_peaks = await detect_peaks(
-        filename,
-        instrument_functions,
-        threshold,
-        u_list=None,
-        if_exists=if_exists,
-        return_peak_mzs=True,
-        instrument_type=instrument_type,
-    )
+    sample_file, list_of_peaks = await compute_peaks(filename, if_exists)
 
     # Return completion message and peak details.
     message = f"Detected {list_of_peaks.size} peaks for file '{filename}'"

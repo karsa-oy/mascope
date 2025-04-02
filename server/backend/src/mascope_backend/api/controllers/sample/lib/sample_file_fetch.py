@@ -36,9 +36,10 @@ async def fetch_sample_file(filename: str) -> dict:
         return sample_file
 
 
-async def fetch_sample_files(filenames: list[str]) -> dict:
+async def fetch_sample_files(filenames: list[str] | None = None) -> dict:
     """
-    Retrieves a multiple sample files from a list of filenames.
+    Retrieves a multiple sample files from a list of filenames. If no filenames are provided,
+    all sample files are retrieved.
 
     Steps:
     1. Execute a query to fetch the sample files with the specified filenames.
@@ -50,8 +51,12 @@ async def fetch_sample_files(filenames: list[str]) -> dict:
     :rtype: dict
     """
     async with async_session() as session:
-        result = await session.execute(
-            select(SampleFile).where(SampleFile.filename.in_(filenames))
-        )
+        if filenames is None:
+            # Return all sample file records
+            result = await session.execute(select(SampleFile))
+        else:
+            result = await session.execute(
+                select(SampleFile).where(SampleFile.filename.in_(filenames))
+            )
         sample_files = result.scalars().all()
     return sample_files

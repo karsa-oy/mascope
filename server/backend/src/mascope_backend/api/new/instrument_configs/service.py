@@ -24,6 +24,9 @@ from mascope_backend.api.new.instrument_configs.schemas import (
     PeakShape,
     InstrumentConfigFitParams,
 )
+from mascope_backend.api.new.instrument_configs.lib import (
+    fetch_instrument_config_by_filename,
+)
 
 # This service reinforces the a uniqueness constraint:
 #    "Each instrument config must have a unique
@@ -133,9 +136,9 @@ async def get_instrument_config(
 
     Steps:
     1. Validate input parameters to ensure that either a filename or an instrument_function_id is provided, but not both.
-    2A. If a filename is provided, construct a query to fetch the latest valid instrument function, filtering by method file is the sample file has one set.
+    2A. If a filename is provided, fetch the latest valid instrument function, filtering by method file is the sample file has one set.
     2B. If an instrument_function_id is provided, construct a query to fetch the instrument function directly by its ID.
-    3. Execute the query and fetch the result.
+    3B. Execute the query and fetch the result.
     4. Check if the instrument function exists. If not, raise a NotFoundException with an appropriate message based on the provided parameters.
     5. Return the instrument function's details as a dictionary, including relevant fields such as resolution, peak shape parameters, etc.
 
@@ -159,36 +162,16 @@ async def get_instrument_config(
         # Step 2: Construct query based on parameters
         if filename:
             # 2A: Fetch instrument function by filename
-            sample_file = await fetch_sample_file(filename=filename)
-            stmt = (
-                (
-                    select(InstrumentConfig)
-                    .where(
-                        InstrumentConfig.method_file == sample_file.method_file,
-                        InstrumentConfig.instrument == sample_file.instrument,
-                    )
-                    .order_by(desc(InstrumentConfig.datetime_utc))
-                    .limit(1)
-                )
-                if sample_file.method_file
-                else (
-                    select(InstrumentConfig)
-                    .where(
-                        InstrumentConfig.instrument == sample_file.instrument,
-                    )
-                    .order_by(desc(InstrumentConfig.datetime_utc))
-                    .limit(1)
-                )
-            )
+            instrument_config = await fetch_instrument_config_by_filename(filename)
         elif instrument_function_id:
             # 2B: Fetch instrument function by ID
             stmt = select(InstrumentConfig).where(
                 InstrumentConfig.instrument_function_id == instrument_function_id
             )
 
-        # Step 3: Execute query
-        results = await session.execute(stmt)
-        instrument_config = results.scalar_one_or_none()
+            # Step 3B: Execute query
+            results = await session.execute(stmt)
+            instrument_config = results.scalar_one_or_none()
 
         # Step 4: Check existence
         if not instrument_config:
