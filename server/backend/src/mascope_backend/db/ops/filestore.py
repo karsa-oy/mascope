@@ -67,18 +67,12 @@ async def refit_peaks():
             continue
 
 
-async def test():
-    """Test function to check if the CLI is working."""
-    runtime.logger.info("Test function executed successfully.")
-
-
 # CLI entry point
 
 
 ACTIONS = {
-    "delete_sum_signal": delete_sum_signal,
-    "refit_peaks": refit_peaks,
-    "test": test,
+    "delete-sum-signal": delete_sum_signal,
+    "refit-peaks": refit_peaks,
 }
 ActionTypes = Literal[tuple(ACTIONS.keys())]
 
