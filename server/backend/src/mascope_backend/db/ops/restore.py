@@ -80,16 +80,16 @@ async def db_restore(tables_to_restore=None):
 # -----------------------------
 
 
-def run_db_restore():
+def run_db_restore(tables: list[str] | None = None):
     """
     Orchestrates the schema restoration process for specified database tables in synchronous mode.
-    This function wraps the async restore function using asyncio.run.
-    """
-    # Extract table names from CLI arguments or restore all tables
-    tables_to_restore = sys.argv[1:] if len(sys.argv) > 1 else None
 
-    # Run the async function in a sync environment
-    asyncio.run(db_restore(tables_to_restore))
+    :param tables: List of tables to restore. If None, all tables will be restored, defaults to None
+    :type tables: list[str] | None, optional
+    """
+
+    # Run the async function with the specified tables
+    asyncio.run(db_restore(tables))
 
 
 # -----------------------------

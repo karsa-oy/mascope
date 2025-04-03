@@ -1,5 +1,5 @@
-import typer
 from typing import Annotated
+import typer
 
 from mascope_backend.db.ops.backup import run_db_backup
 from mascope_backend.db.ops.clean_access_tokens import run_db_clean_access_tokens
@@ -35,11 +35,18 @@ def backup():
 
 
 @db_app.command()
-def restore():
+def restore(
+    tables: list[str] | None = typer.Argument(
+        None,
+        help="Tables to restore. If not provided, all configured tables will be restored.",
+    )
+):
     """
     Restore a Mascope database.
+
+    Optionally specify tables to restore (e.g., mascope-db restore sample_file sample_item).
     """
-    run_db_restore()
+    run_db_restore(tables)
 
 
 @db_app.command()
