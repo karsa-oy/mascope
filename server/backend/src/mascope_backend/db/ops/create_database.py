@@ -7,7 +7,6 @@ It provides two entry points:
 """
 
 import os
-import gc
 import asyncio
 from sqlalchemy import text
 from mascope_backend.db import (
@@ -112,9 +111,6 @@ async def init_db_and_create():
 
         # Create the backup
         await create_db_backup()
-
-        # Force garbage collection to close any lingering database connections
-        gc.collect()  # Reclaims memory and helps release file handles
 
         # Remove the old database
         try:

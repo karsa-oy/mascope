@@ -1,3 +1,4 @@
+import gc
 import os
 import asyncio
 import sqlite3
@@ -34,6 +35,9 @@ async def create_db_backup():
         runtime.logger.info(f"Database backup created at {backup_db_path}")
     except Exception as e:
         runtime.logger.error(f"Failed to create database backup: {e}")
+    finally:
+        # Force garbage collection to close any lingering database connections
+        gc.collect()  # Reclaims memory and helps release file handles
 
 
 def backup_db(db_path, backup_db_path):
