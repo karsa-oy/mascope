@@ -1,0 +1,2 @@
+from .service import authenticate_socket_connection
+from .exceptions import SocketUnauthenticatedError

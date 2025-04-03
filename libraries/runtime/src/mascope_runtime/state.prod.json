@@ -1,0 +1,10 @@
+{
+  "env": {
+    "active": "prod",
+    "override": null
+  },
+  "mode": {
+    "active": "prod",
+    "override": null
+  }
+}

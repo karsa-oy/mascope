@@ -1,0 +1,22 @@
+[project]
+name = "mascope_signal"
+version = "0.0.0"
+description = "Mascope's signal processing library"
+authors = [{ name = "Oskari Kausiala", email = "oskari.kausiala@karsa.fi" }]
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "mascope_runtime",
+    "mascope_thermo",
+    "mascope_tofwerk",
+    "dask==2024.7.0",
+    "lmfit~=1.3",
+    "numpy~=1.26",
+    "pandas~=2.2",
+    "scipy~=1.13",
+    "xarray==2024.6.0",
+    "zarr==2.18.2",
+]
+
+[build-system]
+requires = ["uv_build>=0.6,<0.7"]
+build-backend = "uv_build"

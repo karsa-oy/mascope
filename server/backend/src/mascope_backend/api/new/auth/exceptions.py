@@ -1,0 +1,26 @@
+from fastapi import HTTPException, status
+
+
+class ForbiddenAccessException(HTTPException):
+    """
+    Exception for Forbidden (403) access.
+    Used when a user does not have sufficient permissions to access a resource.
+    """
+
+    def __init__(
+        self,
+        detail: str = "You do not have permission to perform this action.",
+    ):
+        super().__init__(status_code=status.HTTP_403_FORBIDDEN, detail=detail)
+
+
+class InvalidTokenException(HTTPException):
+    """Exception for invalid or missing authentication token."""
+
+    def __init__(
+        self, detail: str = "Invalid authentication token or missing service."
+    ):
+        super().__init__(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=detail,
+        )

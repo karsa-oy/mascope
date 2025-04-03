@@ -1,4 +1,8 @@
 **/node_modules
 **/__pycache__
 **/playwright-report
-runtime/env
+**/build
+**/*.egg-info
+.venv
+.runtime/**
+runtime/env/*
