@@ -141,6 +141,7 @@ watchEffect(() => {
       >
         <Column selectionMode="multiple" headerStyle="width: 3rem" />
         <Column header="Filename" field="filename" sortable />
+        <Column header="Polarity" field="polarity" sortable/>
         <Column header="Datetime" field="datetime" sortable />
         <template #paginatorstart>
           <strong v-if="app.data.acquisition.multiselected" style="font-style: italic">
