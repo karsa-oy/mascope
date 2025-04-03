@@ -1,0 +1,18 @@
+[project]
+name = "mascope_runtime"
+version = "0.0.0"
+description = "Karsa Mascope's shared runtime util library for config, state and logging"
+authors = [{ name = "Karsa Oy", email = "support@karsa.fi" }]
+requires-python = ">=3.12,<3.13"
+license.text = "LicenseRef-Proprietary"
+dependencies = [
+    "rich>=13.7.1,<14",
+    "pydantic>=2.8.2,<3",
+    "loguru>=0.7.2,<0.8",
+    "duckdb>=1.2.1,<2",
+    "pytz~=2025.1",
+]
+
+[build-system]
+requires = ["uv_build>=0.6,<0.7"]
+build-backend = "uv_build"

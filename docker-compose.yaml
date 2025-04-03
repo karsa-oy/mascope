@@ -2,36 +2,59 @@ services:
   backend:
     command: "api-server"
     build:
-      dockerfile: backend/Dockerfile
+      dockerfile: server/backend/Dockerfile
       context: .
     tty: true
     ports:
       - 8090:8090
     volumes:
-      - ./runtime/env/${MASCOPE_ENV:-default}:/app/runtime/env/prod
-      - ${MASCOPE_FILESTORE}:/app/runtime/env/prod/filestore
+      - ./.runtime/env/${MASCOPE_ENV:-default}:/app/.runtime/env/prod
+      - ${MASCOPE_FILESTORE}:/app/.runtime/env/prod/filestore
     environment:
-      - MASCOPE_LOGLEVEL
-      - MASCOPE_TIMEZONE
+      MASCOPE_LOGLEVEL: ${MASCOPE_LOGLEVEL}
+      MASCOPE_TIMEZONE: ${MASCOPE_TIMEZONE}
+      JWT_SECRET_KEY_FILE: /run/secrets/jwt_secret_key
+      SERVER_OWNER_SECRET_KEY_FILE: /run/secrets/server_owner_secret_key
+    secrets:
+      - jwt_secret_key
+      - server_owner_secret_key
   file_converter:
     command: "file-converter"
     build:
-      dockerfile: backend/Dockerfile
+      dockerfile: server/backend/Dockerfile
       context: .
     tty: true
     volumes:
-      - ./runtime/env/${MASCOPE_ENV:-default}:/app/runtime/env/prod
-      - ${MASCOPE_FILESTORE}:/app/runtime/env/prod/filestore
+      - ./.runtime/env/${MASCOPE_ENV:-default}:/app/.runtime/env/prod
+      - ${MASCOPE_FILESTORE}:/app/.runtime/env/prod/filestore
     environment:
-      - MASCOPE_LOGLEVEL
-      - MASCOPE_TIMEZONE
+      MASCOPE_LOGLEVEL: ${MASCOPE_LOGLEVEL}
+      MASCOPE_TIMEZONE: ${MASCOPE_TIMEZONE}
+      JWT_SECRET_KEY_FILE: /run/secrets/jwt_secret_key
+      SERVER_OWNER_SECRET_KEY_FILE: /run/secrets/server_owner_secret_key
+    secrets:
+      - jwt_secret_key
+      - server_owner_secret_key
   frontend:
     build:
-      context: frontend
+      context: server/frontend
       args:
         - MASCOPE_RUNTIME
     environment:
       - MASCOPE_TIMEZONE
+    secrets:
+      - ssl_certificate
+      - ssl_secret_key
     tty: true
     ports:
       - 443:443
+
+secrets:
+  jwt_secret_key:
+    file: .runtime/secrets/jwt_secret_key.txt
+  server_owner_secret_key:
+    file: .runtime/secrets/server_owner_secret_key.txt
+  ssl_certificate:
+    file: .runtime/secrets/mascope.app.pem
+  ssl_secret_key:
+    file: .runtime/secrets/mascope.app.key

@@ -1,0 +1,201 @@
+import asyncio
+
+from mascope_file.io import delete_peaks
+from mascope_backend.db.id import gen_id
+from mascope_backend.api.models.sample.files.sample_file_pydantic_model import (
+    SampleFileUpdate,
+)
+from mascope_backend.api.lib.api_features import (
+    api_controller_background_task,
+)
+from mascope_backend.socket.notifications import (
+    UserNotification,
+    emit_user_notification,
+)
+from mascope_backend.api.controllers.sample.files.sample_files_controller import (
+    update_sample_file,
+)
+from mascope_backend.api.controllers.sample.lib.fetch_affected_sample_data import (
+    fetch_affected_sample_data,
+)
+from mascope_backend.api.controllers.sample.lib.sample_file_fetch import (
+    fetch_sample_file,
+    fetch_sample_files,
+)
+from mascope_backend.api.controllers.match.match_controller import rematch_samples
+from mascope_backend.api.new.instrument_configs.schemas import (
+    CreateInstrumentConfigBody,
+    SetInstrumentConfigBody,
+)
+from mascope_backend.api.new.instrument_configs.service import (
+    fit_instrument_config,
+    create_instrument_config,
+    get_instrument_config,
+)
+from mascope_backend.runtime import runtime
+
+
+@api_controller_background_task(
+    success_notification_rooms=["sid"],
+    success_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
+    error_notification_rooms=["sid"],
+    error_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
+)
+async def process_instrument_config(
+    filenames: list[str],
+    instrument_config: SetInstrumentConfigBody,
+    fit_filename: str | None = None,
+    independent_transaction: bool = None,
+    sid=None,
+    process_id=None,
+    parent_id: str = None,
+):
+    """
+    Conditionally fit and create instrument functions for a sample file.
+
+    Steps:
+      1. Get the sample file
+      2. Validate method file arguments and resolve which to use
+      3. Check if record creation and/or autofitting is required
+      4. Autofit instrument function (if necessary)
+      5A. Create instrument function record (if necessary)
+      5B. Otherwise resolve existing instrument function id
+      6. Fetch sample file records
+      7. Update the sample file records
+      8. Delete existing peaks for sample files
+      9. Gather affected sample data
+      10. Recompute sample item matches
+
+    :param filename: The filename of the file to associate the insturment function with.
+    :type filename: str
+    :param instrument_config: An instrument config to set to the sample files.
+    :type instrument_config: SetInstrumentConfigBody
+    """
+    if len(filenames) == 0:
+        raise ValueError("Process instrument config: filenames must be provided")
+    elif len(filenames) == 1:
+        label = f"sample file {filenames[0]}"
+    else:
+        label = f"{len(filenames)} sample files"
+
+    # Step 2: Resolve method file
+    if instrument_config.new_record:
+        method_file = instrument_config.new_record.method_file
+    else:
+        instrument_config_record = await get_instrument_config(
+            instrument_function_id=instrument_config.instrument_function_id
+        )
+        method_file = instrument_config_record["data"]["method_file"]
+
+    runtime.logger.info(f"Processing instrument config '{method_file}' for '{label}'")
+
+    # Step 3: Check if record creation and/or autofitting is needed
+    if instrument_config.instrument_function_id:
+        details = f"existing instrument config '{method_file}' for '{label}'"
+        user_message = f"used {details}"
+        runtime.logger.info(f"Using {details}")
+        create = False
+        autofit = False
+    elif instrument_config.new_record:
+        if instrument_config.new_record.resolution_function:
+            autofit = False
+            process_message = "user-provided"
+        else:
+            autofit = True
+            process_message = "autofitted"
+        details = f"new instrument config for new {process_message} instrument config '{method_file}' for '{label}'"
+        user_message = f"created {details}"
+        runtime.logger.info(f"Creating {details}")
+        create = True
+
+    # Step 4: Autofit instrument function
+    if autofit:
+        # use first file if not fit file provided
+        if not fit_filename:
+            fit_filename = filenames[0]
+        # Get file
+        fit_sample_file = await fetch_sample_file(filename=fit_filename)
+        # notify the user
+        notification = UserNotification(
+            process_id=process_id,
+            parent_id=parent_id,
+            type="process_instrument_config",
+            status="info",
+            message=f"Autofitting instrument config for {method_file} with {fit_filename}.",
+            data={
+                "filename": fit_filename,
+                "method_file": method_file,
+            },
+        )
+        await emit_user_notification(notification=notification, room_id=sid, sid=sid)
+        # fit to the file
+        new_fields = (await fit_instrument_config(sample_file=fit_sample_file))["data"][
+            "instrument_functions"
+        ].model_dump()
+        # create instrument config record
+        new_fields["method_file"] = method_file
+        instrument_config.new_record = CreateInstrumentConfigBody(**new_fields)
+
+    if create:
+        # Step 5A: Create instrument config record
+        body = CreateInstrumentConfigBody(**instrument_config.new_record.model_dump())
+        instrument_function_id = (await create_instrument_config(body))["data"][
+            "instrument_function_id"
+        ]
+    else:
+        # Step 5B: Get existing instrument config id
+        instrument_function_id = instrument_config.instrument_function_id
+
+    # Step 6. Fetch sample file records
+    sample_files = await fetch_sample_files(filenames=filenames)
+
+    # Step 7: Update sample file records
+    async def process_file(sample_file):
+        sample_file_fields = {
+            **sample_file.to_dict(),
+            "method_file": method_file,
+            "instrument_function_id": instrument_function_id,
+        }
+        await update_sample_file(
+            sample_file.sample_file_id,
+            SampleFileUpdate(**sample_file_fields),
+        )
+
+    update_tasks = [process_file(sample_file) for sample_file in sample_files]
+    await asyncio.gather(*update_tasks)
+
+    # Step 8. Delete existing peaks for sample files
+    label = f"file {filenames[0]}" if len(filenames) == 1 else f"{len(filenames)} files"
+    runtime.logger.info(f"Deleting peaks for {label}")
+    for filename in filenames:
+        delete_peaks(filename)
+
+    # Step 9. Gather affected sample data
+    (
+        affected_sample_item_ids,
+        affected_sample_batch_ids,
+        *_,
+    ) = await fetch_affected_sample_data(filenames=filenames)
+
+    # Step 10. Recompute sample item matches
+    if independent_transaction:
+        await rematch_samples(
+            sample_item_ids=affected_sample_item_ids,
+            independent_transaction=False,
+            sid=sid,
+            process_id=gen_id(8),
+            parent_id=process_id,
+        )
+
+    return {
+        "message": f"Processing instrument config successful: {user_message}",
+        "_notification_data": {
+            "filenames": filenames,
+            "instrument_function_id": instrument_function_id,
+            "method_file": method_file,
+            "created": create,
+            "autofitted": autofit,
+            "affected_sample_batch_ids": affected_sample_batch_ids,
+            "affected_sample_item_ids": affected_sample_item_ids,
+        },
+    }

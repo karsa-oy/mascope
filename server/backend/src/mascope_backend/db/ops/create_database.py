@@ -1,0 +1,147 @@
+"""
+Utility module for creating a new database from scratch with the latest schema.
+
+It provides two entry points:
+- An async function `create_database()` for use by other async code
+- A sync function `run()` as the Poetry command entry point
+"""
+
+import os
+import gc
+import asyncio
+from sqlalchemy import text
+from mascope_backend.db import (
+    get_available_db_version,
+    get_current_db_version,
+    configure_database_engine,
+    async_session,
+)
+from mascope_backend.db.ops.backup import create_db_backup
+
+from mascope_backend.runtime import runtime
+from mascope_backend.db.models import Base, Sample
+
+
+async def create_database():
+    """
+    Create a new database with all tables defined in the SQLAlchemy models.
+
+    This function:
+    1. Creates all database tables based on the SQLAlchemy models
+    2. Creates the sample_view for joining sample_item and sample_file
+
+    Assumes a database connection is already established.
+
+    :return: None
+    """
+    # Create all tables in the database according to models defined in the Base
+    async with async_session() as session:
+        # Acquire a connection
+        connection = await session.connection()
+
+        # Explicitly create tables, excluding the Sample view
+        for table_name, table_obj in Base.metadata.tables.items():
+            if table_name != Sample.__tablename__:
+                await connection.run_sync(table_obj.create)
+
+        # Create the sample_view
+        await connection.execute(
+            text(
+                """
+            CREATE VIEW IF NOT EXISTS sample_view AS
+            SELECT
+                sample_item.sample_item_id,
+                sample_file.sample_file_id,
+                sample_file.instrument_function_id,
+                sample_item.sample_batch_id,
+                sample_item.sample_item_name,
+                sample_file.filename,
+                sample_file.instrument,
+                sample_file.method_file,
+                sample_item.sample_item_type,
+                sample_item.sample_item_attributes,
+                sample_item.filter_id,
+                sample_file.length,
+                sample_file.tic,
+                sample_file.polarity,
+                sample_file.range,
+                sample_file.mz_calibration,
+                sample_file.datetime,
+                sample_file.datetime_utc,
+                sample_item.sample_item_utc_created,
+                sample_item.sample_item_utc_modified
+            FROM
+                sample_item
+            JOIN
+                sample_file ON sample_item.filename = sample_file.filename
+            """
+            )
+        )
+        await session.commit()
+
+    runtime.logger.info("New database created successfully.")
+
+
+async def init_db_and_create():
+    """
+    Initialize the database configuration and create a new database.
+
+    This function:
+    1. Checks if a database with the latest available version already exists.
+        When it is not a new runtime environment.
+    2. Backs up any existing database before removing it
+    3. Configures the database engine with the latest version
+    4. Creates a new database with all required tables and views
+
+    :return: None
+    """
+    last_version = get_available_db_version()
+    existing_version = get_current_db_version()
+
+    # If database with latest version already exists, back it up and remove it
+    if last_version == existing_version:
+        runtime.logger.warning(
+            f"Existing database with the last available version {existing_version} detected, creating a backup."
+        )
+        db_path = os.path.join(
+            runtime.config.database, f"mascope.v{existing_version}.db"
+        )
+        if not os.path.exists(db_path):
+            runtime.logger.error("Existing database file not found.")
+            return
+
+        # Create the backup
+        await create_db_backup()
+
+        # Force garbage collection to close any lingering database connections
+        gc.collect()  # Reclaims memory and helps release file handles
+
+        # Remove the old database
+        try:
+            os.remove(db_path)
+            runtime.logger.info(f"Removed previous database file: {db_path}")
+        except PermissionError as e:
+            runtime.logger.error(f"Failed to remove the database file: {e}")
+            return
+
+    # Configure the database engine with the latest version
+    # This creates a new database file and establishes the async connection
+    await configure_database_engine(last_version)
+
+    # Create all tables defined in the SQLAlchemy models
+    await create_database()
+
+    runtime.logger.info(f"Database mascope.v{last_version} setup completed.")
+
+
+def run_db_create():
+    """
+    Synchronous entry point for the Poetry command 'mascope-db-create'.
+
+    Initializes the database configuration and creates a new database.
+    """
+    asyncio.run(init_db_and_create())
+
+
+if __name__ == "__main__":
+    run_db_create()

@@ -1,0 +1,115 @@
+
+# MASCOPE DEFAULT BASE CONFIG
+
+# Each section may also have
+# log_level =  "trace", "debug", "info", "warning", "success", "error" or "critical"
+
+[meta]
+description = "The default runtime env"
+api_port = 8090
+filestore = './filestore'
+
+[cli]
+color = "blue"
+log_path = './logs'
+
+# SERVERS
+
+[backend]
+tags = ['server', 'tof', 'orbi', 'file', 'lab', 'all']
+log_path = './logs'
+color = "green"
+# settings
+database = './database'
+filestreams = './filestreams'
+# scripts
+run = "uv run mascope backend run api-server"
+
+
+[file-converter]
+tags = ['server', 'tof', 'orbi', 'file', 'all']
+log_path = './logs'
+color = "orange"
+# settings
+server = 'backend'
+source = './filestreams'
+raw_threads = 1
+h5_threads = 1
+# scripts
+run = "uv run mascope backend run file-converter"
+
+
+[frontend]
+tags = ['lab', 'orbi', 'tof', 'file', 'all']
+log_path = './logs'
+color = "magenta"
+# settings
+# acquisition_filter = { min = '2020-01-01T00:00' }
+# scripts
+run = "cd ./server/frontend && npm install && npm run dev"
+
+# AGENTS
+
+[tof-agent]
+tags = ['agents', 'tof', 'all']
+log_path = './logs'
+color = "pink"
+# settings
+host = 'localhost'
+access_token = ''
+# scripts
+run = "uv run mascope agent tof"
+
+[file-agent]
+tags = ['agents', 'orbi', 'all']
+log_path = './logs'
+color = "purple"
+# settings
+mask = '*.raw'
+timeout = 10
+source = './agents/file'
+host = 'localhost'
+access_token = ''
+# scripts
+run = "uv run mascope agent file"
+
+# LIBRARIES
+
+# general
+
+[file-lib]
+tags = ['lib']
+log_path = './logs'
+color = "white"
+
+[chemistry-lib]
+tags = ['lib']
+log_path = './logs'
+color = "white"
+
+[signal-lib]
+tags = ['lib']
+log_path = './logs'
+color = "white"
+
+# hardware
+
+[thermo-lib]
+tags = ['lib']
+log_path = './logs'
+color = "white"
+
+[tofwerk-lib]
+tags = ['lib']
+log_path = './logs'
+color = "white"
+# settings
+tofwerk_dll = 'Auto'
+# 'Auto', 'Windows', 'Linux' or 'Darwin' (= MacOs)
+
+# public
+
+[sdk-lib]
+tags = ['lib']
+log_path = './logs'
+color = "white"

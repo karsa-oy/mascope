@@ -1,0 +1,58 @@
+{
+  "name": "mascope",
+  "author": {
+    "name": "www.karsa.fi",
+    "email": "support@karsa.fi"
+  },
+  "description": "Karsa Mascope",
+  "homepage": "https://www.karsa.fi",
+  "version": "2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "serve": "vite --open",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "npx playwright test --project=chromium",
+    "test:full": "npx playwright test",
+    "test:only": "npx playwright test --project=chromium --retries=0 -g",
+    "test:headed": "npx playwright test --project=chromium --headed --trace off --timeout 0 --reporter list --project=chromium --retries=0 -g",
+    "test:trace": "npx playwright test --project=chromium --trace on --project=chromium --retries=0 -g",
+    "test:gen": "npx playwright codegen http://localhost:5173/",
+    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore",
+    "format": "prettier --write src/",
+    "palette": "node scripts/palette.js",
+    "clean": "npm run clean:windows && npm run clean:linux",
+    "clean:windows": "node -e \"if (process.platform === 'win32') process.exit(1)\" || , if exist node_modules rmdir /Q /S node_modules",
+    "clean:linux": "node -e \"if (process.platform !== 'win32') process.exit(1)\" || rm -rf node_modules"
+  },
+  "dependencies": {
+    "@floating-ui/vue": "^1.1.5",
+    "@phosphor-icons/web": "^2.1.1",
+    "@primevue/themes": "^4.0.7",
+    "@vueuse/core": "^12.2.0",
+    "axios": "^1.7.7",
+    "chart.js": "^4.4.6",
+    "pinia": "^2.2.2",
+    "plotly.js-basic-dist": "^2.35.2",
+    "primeicons": "^7.0.0",
+    "primevue": "^4.2.5",
+    "socket.io-client": "^4.7.5",
+    "vue": "^3.5.6",
+    "vue-router": "^4.4.5",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.2/xlsx-0.20.2.tgz"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.47.1",
+    "@rushstack/eslint-patch": "^1.10.4",
+    "@types/node": "^20.16.5",
+    "@vitejs/plugin-vue": "^5.1.4",
+    "@vue/eslint-config-prettier": "^9.0.0",
+    "chroma-js": "^2.6.0",
+    "eslint": "^8.57.1",
+    "eslint-plugin-vue": "^9.28.0",
+    "prettier": "^3.3.3",
+    "vite": "^5.4.6"
+  }
+}

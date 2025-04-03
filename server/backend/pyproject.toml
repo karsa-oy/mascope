@@ -1,0 +1,42 @@
+[project]
+name = "mascope_backend"
+version = "0.0.0"
+description = "Karsa Mascope"
+authors = [{ name = "Karsa Oy", email = "support@karsa.fi" }]
+requires-python = ">=3.12,<3.13"
+license.text = "LicenseRef-Proprietary"
+dependencies = [
+    # internal
+    "mascope_runtime",
+    "mascope_chem",
+    "mascope_thermo",
+    "mascope_tofwerk",
+    "mascope_file",
+    "mascope_signal",
+    # external
+    "aiosqlite>=0.20,<0.21",
+    "colorcet~=3.1",
+    "isospecpy>=2.2.2,<3",
+    "fastapi>=0.111,<0.112",
+    "fastapi-users[oauth, sqlalchemy]>=13.0.0,<14",
+    "nanoid~=2.0",
+    "nest-asyncio~=1.6",
+    "numpy~=1.26",
+    "pandas~=2.2",
+    "pyarrow>=18.0.0",
+    "python-socketio~=5.11",
+    "python-multipart>=0.0.9,<0.0.10",
+    "pyyaml~=6.0",
+    "requests~=2.32",
+    "rich>=13.7.1,<14",
+    "scipy~=1.13",
+    "sqlalchemy~=2.0",
+    "typer>=0.12.3,<0.13",
+    "uvicorn>=0.30,<0.31",
+    "websocket-client~=1.8",
+    "zarr==2.18.2",
+]
+
+[build-system]
+requires = ["uv_build>=0.6,<0.7"]
+build-backend = "uv_build"
