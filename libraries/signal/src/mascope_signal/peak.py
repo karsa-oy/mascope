@@ -3,6 +3,7 @@ import os
 import math
 from concurrent.futures import ProcessPoolExecutor
 from typing import Iterable
+import warnings
 
 import lmfit
 import numpy as np
@@ -315,16 +316,24 @@ async def detect_peaks(
 
     new_peaks = []
     last_progress = None
+    fit_warnings = set()
     runtime.logger.debug("Run peak detection")
     for i, future in enumerate(asyncio.as_completed(futures)):
-        fit, peaks = await future
+        fit, peaks, captured_warnings = await future
         if fit:
             new_peaks.extend(peaks)
+        for warning in captured_warnings:
+            fit_warnings.add(warning)
         progress = 100 * (i + 1) / len(futures)
         rounded_progress = math.floor(progress / 10) * 10
         if rounded_progress != last_progress:
             runtime.logger.info(f"Peak detection progress: {rounded_progress}%")
         last_progress = rounded_progress
+
+    # Log unique warnings
+    for warning in fit_warnings:
+        runtime.logger.debug(f"Peak detection warning: {warning}")
+
     executor.shutdown()
 
     if new_peaks:
@@ -539,47 +548,44 @@ def fit_peaks(
 
 
 def fit_n_peaks(
-    x,
-    y,
-    peak_shape,
-    resolution_function,
-    threshold,
-    sample_interval=None,
-    max_n_peaks=5,
-    fit_pos=True,
-    fit_hei=True,
-    fit_res=False,
-):
-    """Fit a priori unknown number of peaks of known shape and width into signal y.
+    x: Iterable,
+    y: Iterable,
+    peak_shape: dict,
+    resolution_function: callable,
+    threshold: float,
+    sample_interval: float = None,
+    max_n_peaks: int = 5,
+    fit_pos: bool = True,
+    fit_hei: bool = True,
+    fit_res: bool = False,
+) -> tuple:
+    """Fit a number of peaks to a signal.
+    The function tries to fit a number of peaks to the signal 'y' using the
+    specified peak shape and resolution function. It iteratively adds peaks
+    until the residual norm does not decrease significantly.
 
-    Parameters
-    ----------
-    x : array
-        y coordinates
-    y : array
-        signal to deconvolve
-    peak_shape : dict
-        peak shape {x: array, y: array}
-    resolution_function : callable or float
-        function to calculate the width of the peak
-    sample_interval : float
-        signal sampling interval, by default None
-    max_n_peaks : int, optional
-        maximum number of peaks to fit, by default 5
-    threshold : float, optional
-        to add a new peak, the fit must improve at least by this factor,
-        by default 0.9
-    fit_pos : bool, optional
-        fit peak positions, by default True
-    fit_hei : bool, optional
-        fit peak heights, by default True
-    fit_res : bool, optional
-        fit peak widths, by default False
-
-    Returns
-    -------
-    tuple
-        returns (lmfit result, peaks)
+    :param x: x-values of the signal (m/z values)
+    :type x: Iterable
+    :param y: y-values of the signal (intensity values)
+    :type y: Iterable
+    :param peak_shape: The shape of the peak to be fitted.
+    :type peak_shape: dict
+    :param resolution_function: A function that returns the resolution of the peak
+    :type resolution_function: callable
+    :param threshold: Threshold for adding a new peak.
+    :type threshold: float
+    :param sample_interval: signal sampling interval, defaults to None
+    :type sample_interval: float, optional
+    :param max_n_peaks: max number of peaks to fit, defaults to 5
+    :type max_n_peaks: int, optional
+    :param fit_pos: if vary peak positions, defaults to True
+    :type fit_pos: bool, optional
+    :param fit_hei: if vary peak heights, defaults to True
+    :type fit_hei: bool, optional
+    :param fit_res: if vary peak resolution, defaults to False
+    :type fit_res: bool, optional
+    :return: tuple containing the fit result, the fitted peaks, and caught warnings
+    :rtype: tuple
     """
     if not len(y):
         return None, None
@@ -608,22 +614,29 @@ def fit_n_peaks(
 
         dpos = x[-1] - x[0]
 
-        fit, peaks = fit_peaks(
-            x,
-            y,
-            peak_shape,
-            i + 1,
-            init_pos,
-            init_hei,
-            init_res,
-            fit_pos,
-            fit_hei,
-            fit_res,
-            dpos=dpos,
-            max_iter=100,
-        )
+        # Capture warnings during the fitting process
+        captured_warnings = []
+        with warnings.catch_warnings(record=True) as ws:
+            warnings.simplefilter("always")
+            fit, peaks = fit_peaks(
+                x,
+                y,
+                peak_shape,
+                i + 1,
+                init_pos,
+                init_hei,
+                init_res,
+                fit_pos,
+                fit_hei,
+                fit_res,
+                dpos=dpos,
+                max_iter=100,
+            )
+            captured_warnings.extend(str(w.message) for w in ws)
+
         if not fit:
             return None, []
+
         new_residual_norm = np.linalg.norm(fit.residual)
         # Check for add new peak condition
         if new_residual_norm > threshold * residual_norm:
@@ -665,7 +678,7 @@ def fit_n_peaks(
         (*peak, calculate_peak_area(x, peak_shape, peak, sample_interval))
         for peak in peaks
     ]
-    return fit, peaks
+    return fit, peaks, captured_warnings
 
 
 def fwhm_to_sigma(fwhm):
