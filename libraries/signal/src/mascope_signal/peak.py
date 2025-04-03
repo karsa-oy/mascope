@@ -356,6 +356,8 @@ async def detect_peaks(
     valid_indices = sum_signal.sel(mz=peak_mz_coord, method="nearest").values > 0
     peak_mz_coord = peak_mz_coord[valid_indices]
     all_peak_mzs = all_peak_mzs[valid_indices]
+    all_peak_areas = all_peak_areas[valid_indices]
+    all_peak_heights = all_peak_heights[valid_indices]
 
     peak_mzs, unique_peak_index = np.unique(peak_mz_coord, return_index=True)
     all_peak_mzs = all_peak_mzs[unique_peak_index]
