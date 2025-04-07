@@ -1,7 +1,7 @@
 import os
 from typing import Literal
 from datetime import datetime
-from fastapi import UploadFile
+from fastapi import HTTPException, UploadFile
 from sqlalchemy import (
     select,
     asc,
@@ -164,12 +164,13 @@ async def create_sample_file(sample_file: SampleFileCreate) -> dict:
     Creates a new sample file with the given data.
 
     Steps:
-    1. Construct a new SampleFile object with provided data and add it to the session.
-    2. Commit the transaction to persist the new sample file in the database.
-    3. Refresh the instance to get the created data from the database.
-    4. Emit a 'sample_file_created' event with the filename and instrument.
-    5. Ensure instruments are reloaded
-    6. Return the created sample file data.
+    1. Check if a sample file with the given filename already exists.
+    2. Construct a new SampleFile object with provided data and add it to the session.
+    3. Commit the transaction to persist the new sample file in the database.
+    4. Refresh the instance to get the created data from the database.
+    5. Emit a 'sample_file_created' event with the filename and instrument.
+    6. Ensure instruments are reloaded
+    7. Return the created sample file data.
 
     :param sample_file: Data for creating the sample file.
     :type sample_file: SampleFileCreate
@@ -177,24 +178,33 @@ async def create_sample_file(sample_file: SampleFileCreate) -> dict:
     :return: The created sample file data.
     :rtype: dict
     """
+    # Step 1: Check if a sample file with the given filename already exists
+    existing_files = await get_sample_files(filename=sample_file.filename)
+
+    if existing_files["results"] > 0:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Sample file with filename '{sample_file.filename}' already exists",
+        )
+
     async with async_session() as session:
         initial_instruments = [
             i["instrument"] for i in (await get_instruments())["data"]
         ]
 
-        # Step 1: Construct new sample file
+        # Step 2: Construct new sample file
         new_sample_file = SampleFile(
             sample_file_id=gen_id(16), **sample_file.model_dump()
         )
         session.add(new_sample_file)
 
-        # Step 2: Commit transaction
+        # Step 3: Commit transaction
         await session.commit()
 
-        # Step 3: Refresh instance
+        # Step 4: Refresh instance
         await session.refresh(new_sample_file)
 
-        # Step 4: Emit create_sample_file event
+        # Step 5: Emit create_sample_file event
         notification = UserNotification(
             process_id=gen_id(8),
             type="create_sample_file",
@@ -207,7 +217,7 @@ async def create_sample_file(sample_file: SampleFileCreate) -> dict:
         )
         await emit_user_notification(notification, sample_file.instrument)
 
-        # Step 5. Trigger instruments reload
+        # Step 6. Trigger instruments reload
         if sample_file.instrument not in initial_instruments:
             # instrument added by creation and needs reload
             await sio.emit(
@@ -215,7 +225,7 @@ async def create_sample_file(sample_file: SampleFileCreate) -> dict:
                 namespace="/",
             )
 
-        # Step 6: Return created sample file
+        # Step 7: Return created sample file
         return {
             "message": f"Sample file '{new_sample_file.filename}' created successfully.",
             "data": new_sample_file.to_dict(),
