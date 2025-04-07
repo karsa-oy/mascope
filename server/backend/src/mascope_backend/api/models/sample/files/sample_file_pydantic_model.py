@@ -1,3 +1,4 @@
+import os
 from typing import Optional, Dict, List, Annotated, Literal
 from datetime import datetime as dt
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -70,7 +71,7 @@ class SampleFileUpload(BaseModel):
     @field_validator("file")
     @classmethod
     def validate_extension(cls, file: UploadFile):
-        if not any(file.filename.endswith(ext) for ext in FILE_UPLOAD_EXTENSIONS):
+        if os.path.splitext(file.filename)[1].lower() not in FILE_UPLOAD_EXTENSIONS:
             # Raise a RequestValidationError directly
             raise RequestValidationError(
                 [
