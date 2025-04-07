@@ -16,7 +16,12 @@ from mascope_chem.molmass import Formula
 from mascope_chem.molmass.elements import ELECTRON
 
 
-from mascope_backend.db.models import SampleBatch, TargetIon, TargetIsotope
+from mascope_backend.db.models import (
+    IonizationMechanism,
+    SampleBatch,
+    TargetIon,
+    TargetIsotope,
+)
 from mascope_backend.db import configure_database_engine, async_session
 from mascope_backend.db.id import gen_id
 from mascope_backend.db.ops.backup import create_db_backup
@@ -61,18 +66,81 @@ async def run():
     # Init high resolution target isotopes list
     target_isotopes = []
     for ion in target_ions:
-        # Split base and charge
-        target_ion = Formula(ion.target_ion_formula)
+        try:
+            # Branch if ion created based on mass, not formula (adapted from "generate_target_ions_from_mass")
+            if "." in ion.target_ion_formula:
+                # Strip ionization to parse mass
+                target_mass = float(ion.target_ion_formula.split("-")[0].split("+")[0])
+                # Fetch ionization mechanism from db
+                async with async_session() as session:
+                    stmt = select(IonizationMechanism).where(
+                        IonizationMechanism.ionization_mechanism_id
+                        == ion.ionization_mechanism_id
+                    )
+                    result = await session.execute(stmt)
+                    ionization_mechanism = result.scalars().first()
+                mechanism = ionization_mechanism.ionization_mechanism
+                # Parse ionization mechanism
+                if len(mechanism) > 1:
+                    # Addition or abstraction mechanism
+                    # Calculate isotopic pattern of the ionization mechanism
+                    mechanism_formula = Formula(
+                        "(" + mechanism[1:-1] + ")" + mechanism[-1]
+                    )
+                    is_adduct = mechanism[0] == "+"
+                    if is_adduct:
+                        # Addition mechanism
+                        predicted_peaks = IsoThreshold(
+                            formula=mechanism_formula.formula, threshold=0.01
+                        )
+                        masses = [
+                            (
+                                target_mass
+                                + float(m)
+                                - ELECTRON.mass * mechanism_formula.charge
+                            )
+                            / abs(mechanism_formula.charge)
+                            for m in predicted_peaks.masses
+                        ]
+                        probs = [float(p) for p in predicted_peaks.probs]
+                    else:
+                        # Abstraction mechanism, no knowledge of the isotopic pattern
+                        masses = [target_mass - mechanism_formula.mass]
+                        probs = [1.0]
+                else:
+                    # Special case: electron transfer
+                    is_addition = mechanism[0] == "-"
+                    masses = [
+                        (
+                            target_mass + ELECTRON.mass
+                            if is_addition
+                            else target_mass - ELECTRON.mass
+                        )
+                    ]
+                    probs = [1.0]
+            # Branch if ion created based on formula
+            else:
+                # Split base and charge
+                target_ion = Formula(ion.target_ion_formula)
 
-        # Predict peaks, take those with r.a.>1%
-        predicted_peaks = IsoThreshold(formula=target_ion.formula, threshold=0.01)
+                # Predict peaks, take those with r.a.>1%
+                predicted_peaks = IsoThreshold(
+                    formula=target_ion.formula, threshold=0.01
+                )
 
-        # Extract resolution masses and probabilities, correct masses for the electron charge
-        masses = [
-            (float(m) - ELECTRON.mass * target_ion.charge) / abs(target_ion.charge)
-            for m in predicted_peaks.masses
-        ]
-        probs = [float(p) for p in predicted_peaks.probs]
+                # Extract resolution masses and probabilities, correct masses for the electron charge
+                masses = [
+                    (float(m) - ELECTRON.mass * target_ion.charge)
+                    / abs(target_ion.charge)
+                    for m in predicted_peaks.masses
+                ]
+                probs = [float(p) for p in predicted_peaks.probs]
+
+        except Exception as e:
+            runtime.logger.error(
+                f"Error calculating isotopes for target ion {ion}: {e}"
+            )
+            continue
 
         # Store high resolution isotopes
         target_isotopes.extend(
