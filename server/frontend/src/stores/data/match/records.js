@@ -1,4 +1,4 @@
-import { watch, computed } from 'vue'
+import { watch } from 'vue'
 
 import { api } from '@/api'
 
@@ -23,14 +23,10 @@ const defineMatch = (level) => {
         const batch = useBatch()
         const sample = useSample()
         watch(
-          computed(() => {
-            if (sample.focused) {
-              return { focused: sample.focused, name: 'virtual parent (sample)' }
-            } else {
-              return { focused: batch.focused, name: 'virtual parent (batch)' }
-            }
-          }),
-          sync
+          () => batch.hash + sample.hash + sample.focusedId,
+          () => {
+            sync({ focused: sample.focused ?? batch.focused, name: 'virtual parent (sample)' })
+          }
         )
       }
     }),

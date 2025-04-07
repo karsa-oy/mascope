@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 
 import { api } from '@/api'
 import { useAuth } from '@/stores/auth'
+import { genId } from '@/lib/utils'
 
 export const defineModule = ({
   name, // module name (snake_case)
@@ -241,6 +242,7 @@ export const defineModule = ({
 
     // state
     const loading = ref(false)
+    const hash = ref(genId(8))
 
     // children
     const children = ref([])
@@ -274,6 +276,7 @@ export const defineModule = ({
         await Promise.all(children.value.map(({ sync }) => sync({ name, focused: newFocused })))
         debug('children synced')
       }
+      hash.value = genId(8) // differentiate loads with a hash
       loading.value = false
     }
 
@@ -403,6 +406,7 @@ export const defineModule = ({
       // data
       list,
       loading,
+      hash,
       // options
       multiselect,
       singleselect,
