@@ -4,7 +4,7 @@ from mascope_backend.api.new.match.params.schema import (
     DEFAULT_MIN_ISOTOPE_ABUNDANCE,
 )
 from mascope_file.io import load_array, load_file
-from mascope_file.name import get_instrument_type
+from mascope_file.name import get_instrument_type, get_sample_file_type
 
 from mascope_signal.compute import get_sum_signal
 from mascope_signal.peak import calculate_signal_area, detect_peaks
@@ -123,6 +123,10 @@ async def compute_match_isotopes(
             peaks = load_array(filename, "peak_heights").peak_heights
         if instrument_type == "tof":
             peaks = load_array(filename, "peak_areas").peak_areas
+
+        sample_file_type = get_sample_file_type(filename)
+        if sample_file_type in ["orbi_zarr", "tof_zarr"]:
+            peaks = peaks.dropna(dim="mz", how="all")
 
         # Step 2: - Prepare data
         # init match df from target isotopes
