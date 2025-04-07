@@ -44,6 +44,11 @@ from mascope_backend.api.new.match.params.schema import (
 
 from mascope_backend.runtime import runtime
 
+# TODO rename sample_peak_area into sample_peak_intensity
+# TODO rename sample_peak_area_sum into sample_peak_intensity_mean
+# TODO rename sample_peak_area_relative into sample_peak_intensity_relative
+# TODO for now ...peak_area... means peak area for TOF and peak height for orbi
+
 # -------------------------------------------------------------------
 # Isotope level
 # -------------------------------------------------------------------
@@ -135,7 +140,7 @@ async def compute_match_isotopes(
 
         runtime.logger.debug("Parse peak data")
         peak_mzs = peaks.mz.values
-        peak_areas = peaks.sum(dim="time").compute().values
+        peak_intensities = peaks.mean(dim="time").compute().values
         peak_tofs = peaks.tof.values
         peak_sorting = np.argsort(peak_mzs)
 
@@ -153,7 +158,7 @@ async def compute_match_isotopes(
                 # get match peak
                 peak_index = peak_sorting[match_index]
                 peak_mz = peak_mzs[peak_index]
-                peak_area = peak_areas[peak_index]
+                peak_intensity = peak_intensities[peak_index]
                 # check current best match
                 best_match = row.sample_peak_id
                 if not np.isnan(best_match):
@@ -166,7 +171,7 @@ async def compute_match_isotopes(
                 row["sample_peak_id"] = peak_index
                 row["sample_peak_mz"] = peak_mz
                 row["sample_peak_tof"] = peak_tofs[int(peak_index)]
-                row["sample_peak_area"] = peak_area
+                row["sample_peak_area"] = peak_intensity
             return row
 
         match_isotope_df = (
@@ -178,14 +183,14 @@ async def compute_match_isotopes(
         # Step 4: - Calculate match stats
 
         # calculate isotope ratios
-        # sum matched sample peak heights for each ion
-        ion_level_peak_sums = match_isotope_df.groupby(
+        # calculate mean matched sample peak heights for each ion
+        ion_level_peak_means = match_isotope_df.groupby(
             ["target_ion_id"], as_index=False
-        )["sample_peak_area"].sum()
-        # join sums back to the isotope level
-        isotope_level_peak_sums = pd.merge(
+        )["sample_peak_area"].mean()
+        # join means back to the isotope level
+        isotope_level_peak_means = pd.merge(
             match_isotope_df,
-            ion_level_peak_sums.rename(
+            ion_level_peak_means.rename(
                 columns={"sample_peak_area": "sample_peak_area_sum"}
             ),
             on=["target_ion_id"],
@@ -195,7 +200,7 @@ async def compute_match_isotopes(
         # compute relative peak heights
         match_isotope_df.loc[:, "sample_peak_area_relative"] = (
             match_isotope_df["sample_peak_area"]
-            / isotope_level_peak_sums["sample_peak_area_sum"]
+            / isotope_level_peak_means["sample_peak_area_sum"]
         )
         # calculate isotope ratio errors
         match_isotope_df.loc[:, "match_abundance_error"] = match_isotope_df[
