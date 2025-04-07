@@ -37,6 +37,10 @@ from mascope_backend.api.models.match.isotopes.match_isotopes_pydantic_model imp
 from mascope_backend.api.new.instrument_configs.lib import (
     read_instrument_functions,
 )
+from mascope_backend.api.new.match.params.schema import (
+    ORBI_FITTING_THRESHOLD,
+    TOF_FITTING_THRESHOLD,
+)
 
 from mascope_backend.runtime import runtime
 
@@ -96,9 +100,9 @@ async def compute_match_isotopes(
         # Assign peak fitting threshold depending on the instrument type
         # Correct intrument type unsured by get_instrument_type
         if instrument_type == "orbi":
-            threshold = 0.8
+            threshold = ORBI_FITTING_THRESHOLD
         if instrument_type == "tof":
-            threshold = 0.9
+            threshold = TOF_FITTING_THRESHOLD
         await detect_peaks(
             filename,
             instrument_functions,

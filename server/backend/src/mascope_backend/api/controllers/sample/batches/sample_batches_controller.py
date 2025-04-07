@@ -85,6 +85,10 @@ from mascope_backend.socket.notifications import (
     UserNotification,
     send_progress_user_notification,
 )
+from mascope_backend.api.new.match.params.schema import (
+    ORBI_FITTING_THRESHOLD,
+    TOF_FITTING_THRESHOLD,
+)
 
 
 from mascope_backend.runtime import runtime
@@ -1000,10 +1004,10 @@ async def sample_batch_export_peaks(
             # depending on the instrument type
             # Correct intrument type unsured by get_instrument_type
             if instrument_type == "orbi":
-                threshold = 0.8
+                threshold = ORBI_FITTING_THRESHOLD
                 unit = "height"
             if instrument_type == "tof":
-                threshold = 0.9
+                threshold = TOF_FITTING_THRESHOLD
                 unit = "area"
             sample_file = await detect_peaks(
                 filename,

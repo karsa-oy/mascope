@@ -2,6 +2,10 @@ from typing import Literal
 from mascope_backend.api.new.instrument_configs.lib import (
     read_instrument_functions,
 )
+from mascope_backend.api.new.match.params.schema import (
+    ORBI_FITTING_THRESHOLD,
+    TOF_FITTING_THRESHOLD,
+)
 from mascope_file.name import get_instrument_type
 from mascope_signal.peak import detect_peaks
 
@@ -28,9 +32,9 @@ async def compute_peaks(
 
     # Step 2: Set threshold based on instrument type.
     if instrument_type == "orbi":
-        threshold = 0.8
+        threshold = ORBI_FITTING_THRESHOLD
     if instrument_type == "tof":
-        threshold = 0.9
+        threshold = TOF_FITTING_THRESHOLD
 
     # Step 3: Detect peaks.
     sample_file, list_of_peaks = await detect_peaks(

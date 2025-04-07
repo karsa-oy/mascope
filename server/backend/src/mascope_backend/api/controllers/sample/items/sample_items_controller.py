@@ -62,6 +62,10 @@ from mascope_backend.api.new.instrument_configs.schemas import (
 from mascope_backend.api.new.instrument_configs.process.service import (
     process_instrument_config,
 )
+from mascope_backend.api.new.match.params.schema import (
+    ORBI_FITTING_THRESHOLD,
+    TOF_FITTING_THRESHOLD,
+)
 
 from mascope_backend.runtime import runtime
 
@@ -733,10 +737,10 @@ async def sample_item_export_peaks(
         # depending on the instrument type
         # Correct intrument type unsured by get_instrument_type
         if instrument_type == "orbi":
-            threshold = 0.8
+            threshold = ORBI_FITTING_THRESHOLD
             peak_data_type = "peak_heights"
         if instrument_type == "tof":
-            threshold = 0.9
+            threshold = TOF_FITTING_THRESHOLD
             peak_data_type = "peak_areas"
         sample_file = await detect_peaks(
             filename,
