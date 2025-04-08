@@ -567,10 +567,9 @@ async def rematch_batches(
     Steps:
     1. Gather initial data for each sample batch, including the number of items per batch and workspace IDs.
     2. Notify client who triggered rematch_batches that batches processing has started.
-    3. Sequentially process each sample batch with the specific for each batch added and removed parameters.
-    4. Aggregate failed samples from each batch for reporting.
-    5. Notify client who triggered rematch_batches that batches processing has finished, including information about any failures.
-
+    3. Process each sample batch sequentially, continuing even if individual batches fail.
+    4. Aggregate results including: successful batches, failed samples, and critical errors.
+    5. Return status message along with notification data.
 
     :param rematch_batches_body: A list of sample batch identifiers along with optional removed/added entities
     :type rematch_batches_body: RematchBatchesBody
@@ -581,10 +580,15 @@ async def rematch_batches(
     :return: A status message indicating the outcome of the batch rematch operation, including any failed match computations for samples.
     :rtype: dict
     """
-    # Initialize variables for tracking overall progress and failures for correct user notifications
+    # Initialize variables for tracking overall progress
     total_batches = len(rematch_batches_body.sample_batches)
     total_number_of_items = 0
     items_per_batch = []
+
+    # Results tracking
+    samples_compute_failed_all = []  # to collect failed samples from all batches
+    rematched_sample_batch_ids = []  # Collect batch IDs that were rematched
+    failed_batches = []  # Track batches that failed to rematch
 
     # Step 1: Collect total items and individual batch items count
     for sample_batch in rematch_batches_body.sample_batches:
@@ -600,9 +604,7 @@ async def rematch_batches(
         for items in items_per_batch
     ]
 
-    # Step 3: Process each batch
-    samples_compute_failed_all = []  # to collect failed samples from all batches
-    rematched_sample_batch_ids = []  # Collect batch IDs that were rematched
+    # Step 2: Process each batch
     for batch_index, (sample_batch, batch_weight) in enumerate(
         zip(rematch_batches_body.sample_batches, batch_weights), start=1
     ):
@@ -644,46 +646,90 @@ async def rematch_batches(
         # Perform the rematch operation for the current batch
         try:
             task_result = await task
-            rematched_sample_batch_ids.append(
-                task_result["_notification_data"]["sample_batch_id"]
+            if task_result is None:
+                error_msg = f"There were problems during rematching batch {sample_batch_id}, check the logs above."
+                runtime.logger.warning(error_msg)
+                failed_batches.append({"batch_id": sample_batch_id, "error": error_msg})
+                continue  # Skip to the next batch
+            batch_id = task_result.get("_notification_data", {}).get(
+                "sample_batch_id", None
             )
+            if batch_id:
+                rematched_sample_batch_ids.append(batch_id)
         except ApiException as e:
             # If the task fails, log the error and continue with the next batch
             if e.status_code == 200:  # Warning ApiException with 2-- code
-                # Collect failed samples and continue processing next batches
+                # Collect warning-level failured samples and continue processing next batches
                 samples_compute_failed_all.extend(
                     e.tech_message.get("samples_compute_failed", [])
                 )
-                rematched_sample_batch_ids.append(
-                    e.tech_message.get("sample_batch_id", None)
-                )
+                batch_id = e.tech_message.get("sample_batch_id", None)
+                if batch_id:
+                    rematched_sample_batch_ids.append(batch_id)
             else:
-                # Log critical error and re-raise exception to stop rematching all batches
-                runtime.logger.error(
-                    f"Critical Error in rematch_batch: {e.user_message}"
+                # Log critical error but continue with next batch
+                error_msg = (
+                    f"Critical error in batch {sample_batch_id}: {e.user_message}"
                 )
-                raise e from e
+                runtime.logger.error(error_msg)
 
-        # Step 4: Aggregate failed samples from the batch for reporting
-        # If the task result contains information about failed samples, aggregate this information for all batches
+                failed_batches.append(
+                    {"batch_id": sample_batch_id, "error": e.user_message}
+                )
+        except Exception as e:
+            # Handle unexpected errors
+            error_msg = (
+                f"Unexpected error during rematching batch {sample_batch_id}: {str(e)}"
+            )
+            runtime.logger.error(error_msg)
+            failed_batches.append({"batch_id": sample_batch_id, "error": str(e)})
+
+        # Update proress user notification
         notification.message = (
             f"Finished rematching sample batch {batch_index}/{total_batches}."
         )
         await send_progress_user_notification(notification, 0.8)
 
-    # If there are any aggregated failed samples from all batches, send the waring notificatoin
+    # Step 3: Log summary results
+    if failed_batches:
+        runtime.logger.warning(
+            f"There were problems with rematching {len(failed_batches)} sample batches. "
+            f"Check the logs above and try manually rematching after addressing the issues."
+        )
+
     if samples_compute_failed_all:
-        user_message = f"Warning during rematching {total_batches} sample batch{'es' if total_batches != 1 else ''}: failed to compute matches for {len(samples_compute_failed_all)} sample{'s' if len(samples_compute_failed_all) != 1 else ''}."
+        runtime.logger.warning(
+            f"Failed to compute matches for {len(samples_compute_failed_all)} samples across {len(rematched_sample_batch_ids)} batches"
+        )
+
+    runtime.logger.info(
+        f"Summary: {len(rematched_sample_batch_ids)}/{total_batches} sample batches successfully rematched"
+    )
+
+    # Step 4: Raise appropriate exception based on issues
+    if failed_batches or samples_compute_failed_all:
+        if failed_batches:
+            plural_batch = "es" if total_batches != 1 else ""
+            failed_count = len(failed_batches)
+            user_message = f"Error during rematching {total_batches} sample batch{plural_batch}: {failed_count} batch{plural_batch if failed_count > 1 else ''} failed with critical errors."
+            status_code = 500  # Internal server error for critical issues
+        else:
+            plural_batch = "es" if total_batches != 1 else ""
+            plural_sample = "s" if len(samples_compute_failed_all) != 1 else ""
+            user_message = f"Warning during rematching {total_batches} sample batch{plural_batch}: failed to compute matches for {len(samples_compute_failed_all)} sample{plural_sample}."
+            status_code = 200  # Warning status code
+
         raise ApiException(
             user_message,
             {
                 "sample_batch_ids": rematched_sample_batch_ids,
                 "samples_compute_failed": samples_compute_failed_all,
+                "failed_batches": failed_batches,
             },
-            200,
+            status_code,
         )
 
-    # Step 8: Return sample batch data and message
+    # Step 5: Return sample batch data and message
     return {
         "message": f"{total_batches} sample batch{'es' if total_batches != 1 else ''} rematched.",
         "_notification_data": {"sample_batch_ids": rematched_sample_batch_ids},

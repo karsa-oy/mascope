@@ -68,25 +68,39 @@ def get_sum_signal(filename: str, average: bool = False) -> xr.DataArray:
         # Load precomputed sum spectrum from zarr file
         sample_file = load_file(filename, vars=["sum_signal"])
         sum_signal = sample_file.sum_signal
-    except (AttributeError, FileNotFoundError):
+    except FileNotFoundError:
+        # case where file doesn't exist in filestore
+        runtime.logger.warning(f"Sample file not found: {filename}")
+        raise RuntimeError(f"Sample file not found or inaccessible: {filename}")
+    except AttributeError:
+        # proceed if sample_file exists but is missing sum_signal
+        if sample_file is None:
+            raise RuntimeError(
+                f"Unexpected state: sample_file is None but AttributeError was raised"
+            )
         base_filename = sample_file.props["filename"]
         sum_signal = sum_signal_for_time_range(base_filename)
         filename_sum_signal = filename_to_zarr_path(base_filename, "sum_signal")
 
         try:
             sum_signal.to_zarr(filename_sum_signal)
-        except FileNotFoundError as e:
-            if ".partial" in str(e):
+        except FileNotFoundError as fe:
+            if ".partial" in str(fe):
                 raise Exception(
                     f"The path is probably too long: {filename_sum_signal}"
-                ) from e
+                ) from fe
             else:
                 raise
 
-    if average:
+    # Handle average calculation if requested
+    if (
+        average and sample_file is not None
+    ):  # Only compute average if sample_file exists
         base_filename = sample_file.props["filename"]
         time_coord = get_scan_timestamps(base_filename)
         return sum_signal / time_coord.size
+    elif average:
+        raise RuntimeError(f"Cannot calculate average: sample file not available")
     else:
         return sum_signal
 
