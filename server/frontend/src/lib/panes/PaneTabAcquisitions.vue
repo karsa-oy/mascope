@@ -34,15 +34,25 @@ const dialog = reactive({
 })
 
 const search = ref('')
+const polarityFilter = ref('') // Default polarity filter
 
-const acquisitions = computed(
-  () =>
-    app.data.acquisition.list?.filter(({ filename }) =>
-      filename.toLowerCase().includes(search.value.toLowerCase())
-    ) ?? []
-)
+const acquisitions = computed(() => {
+  return (
+    app.data.acquisition.list?.filter(({ filename, polarity }) => {
+      const matchesSearch = filename.toLowerCase().includes(search.value.toLowerCase())
+      const matchesPolarity =
+        polarityFilter.value === '' || polarity === polarityFilter.value
+      return matchesSearch && matchesPolarity
+    }) ?? []
+  )
+})
 
 const uploadedFiles = ref([])
+
+// Watch for polarity changes and clear selected acquisitions
+watch(polarityFilter, () => {
+  app.data.acquisition.selected = [] // Clear selected acquisitions
+})
 
 watchEffect(() => {
   if (app.data.acquisition.pending.filename && app.data.acquisition.mode && props.active) {
@@ -94,7 +104,14 @@ watchEffect(() => {
             :class="'full ' + (app.data.acquisition.time.mode == 'range' ? '' : 'inactive')"
           />
         </FloatLabel>
-        <div style="flex-grow: 1; flex-shrink: 1" />
+        <!-- Polarity Dropdown -->
+        <Select
+          inputId="polarity"
+          v-model="polarityFilter"
+          :options="['', '+', '-']"
+          style="max-width: 125px"
+          placeholder="Polarity"
+        />
         <FloatLabel style="flex-grow: 1; max-width: 250px">
           <label>Search</label>
           <IconField class="full">
@@ -141,7 +158,7 @@ watchEffect(() => {
       >
         <Column selectionMode="multiple" headerStyle="width: 3rem" />
         <Column header="Filename" field="filename" sortable />
-        <Column header="Polarity" field="polarity" sortable/>
+        <Column header="Polarity" field="polarity" sortable />
         <Column header="Datetime" field="datetime" sortable />
         <template #paginatorstart>
           <strong v-if="app.data.acquisition.multiselected" style="font-style: italic">
