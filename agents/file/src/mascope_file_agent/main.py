@@ -82,8 +82,8 @@ def upload_sample_file(filepath: str) -> None:
 
     # Validate file before upload request
     # file extension
-    file_ext = filepath.split(".")[-1]
-    mask_ext = runtime.config.mask.split(".")[-1]
+    file_ext = os.path.splitext(filepath)[1].lower()
+    mask_ext = os.path.splitext(runtime.config.mask)[1].lower()
     if file_ext != mask_ext:
         raise ValueError(f"{file_ext} is not an allowed file extension!")
     # file size

@@ -90,7 +90,7 @@ def upload_sample_file(filepath: str) -> None:
 
     # Validate file before upload request
     # file extension
-    file_ext = os.path.splitext(filepath)[1]
+    file_ext = os.path.splitext(filepath)[1].lower()
     if file_ext != ".h5":
         raise ValueError(f"{file_ext} is not an allowed file extension!")
     # file size
