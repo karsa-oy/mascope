@@ -32,7 +32,7 @@ export const useChartData = defineStore('chart.sample.spectrum', () => {
     const peaksLoaded = app.data.peak.list.length > 0
     const tabOpen = app.ui.tab.active === 'spectrum'
     if (sampleFocused && sampleFileChanged && peaksLoaded && tabOpen) {
-      await load()
+      load()
     }
   })
 
