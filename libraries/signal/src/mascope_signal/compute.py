@@ -293,7 +293,7 @@ def load_signal(
                 Time range: {signal_ds.time.min():.1f} - {signal_ds.mz.max():.1f} s.
                 """
                     )
-                return signal_ds_sliced
+                return signal_ds_sliced.chunk(dict(mz=-1))
     except Exception as e:
         runtime.logger.error(f"Error loading signal from {base_filename}: {e})")
         # Return empty signal dataset with "mz" and "time" coordinates in case of error
