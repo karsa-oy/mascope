@@ -487,7 +487,7 @@ wheels = [
 
 [[package]]
 name = "dask"
-version = "2024.12.1"
+version = "2024.7.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
@@ -498,9 +498,9 @@ dependencies = [
     { name = "pyyaml" },
     { name = "toolz" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b6/19/1d1e57c0fa24dfd241bbec46d4b70c37ec15e8071a7e06d43d327c8dafbb/dask-2024.12.1.tar.gz", hash = "sha256:bac809af21c2dd7eb06827bccbfc612504f3ee6435580e548af912828f823195", size = 10693689 }
+sdist = { url = "https://files.pythonhosted.org/packages/0b/e7/fbfb8dc3631acc8ab09d85748bd874ac9096d738e975d5991d46ae31a0e7/dask-2024.7.0.tar.gz", hash = "sha256:0060bae9a58b5b3ce7e0d97040e903b4d3db09ba49222101cfc40f9834a8a6bc", size = 9396051 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/6d/5a/cdc78a77bb1c7290fd1ccfe6001437f99a2af63e28343299abd09336236e/dask-2024.12.1-py3-none-any.whl", hash = "sha256:1f32acddf1a6994e3af6734756f0a92467c47050bc29f3555bb9b140420e8e19", size = 1269300 },
+    { url = "https://files.pythonhosted.org/packages/c6/c7/79f6ae51b64c20db98100946544a47a20671e589be19404f6696481d6024/dask-2024.7.0-py3-none-any.whl", hash = "sha256:0f30f218a1fe1c8e9a6ba8add1207088ba9ff049098d4ea4ce045fd5ff7ca914", size = 1230086 },
 ]
 
 [[package]]
@@ -1446,6 +1446,7 @@ dependencies = [
     { name = "mascope-tofwerk" },
     { name = "nanoid" },
     { name = "nest-asyncio" },
+    { name = "numcodecs" },
     { name = "numpy" },
     { name = "pandas" },
     { name = "pyarrow" },
@@ -1477,6 +1478,7 @@ requires-dist = [
     { name = "mascope-tofwerk", editable = "libraries/tofwerk" },
     { name = "nanoid", specifier = "~=2.0" },
     { name = "nest-asyncio", specifier = "~=1.6" },
+    { name = "numcodecs", specifier = "==0.15.1" },
     { name = "numpy", specifier = "~=1.26" },
     { name = "pandas", specifier = "~=2.2" },
     { name = "pyarrow", specifier = ">=18.0.0" },
@@ -1490,7 +1492,7 @@ requires-dist = [
     { name = "typer", specifier = ">=0.15.2,<0.16" },
     { name = "uvicorn", specifier = ">=0.34,<0.35" },
     { name = "websocket-client", specifier = "~=1.8" },
-    { name = "zarr", specifier = "==2.18.7" },
+    { name = "zarr", specifier = "==2.18.2" },
 ]
 
 [[package]]
@@ -1544,6 +1546,7 @@ source = { editable = "libraries/file" }
 dependencies = [
     { name = "datetime-glob" },
     { name = "mascope-runtime" },
+    { name = "numcodecs" },
     { name = "numpy" },
     { name = "xarray" },
     { name = "zarr" },
@@ -1553,9 +1556,10 @@ dependencies = [
 requires-dist = [
     { name = "datetime-glob", specifier = "~=1.0" },
     { name = "mascope-runtime", editable = "libraries/runtime" },
+    { name = "numcodecs", specifier = "==0.15.1" },
     { name = "numpy", specifier = "~=1.26" },
     { name = "xarray", specifier = "==2024.11.0" },
-    { name = "zarr", specifier = "==2.18.7" },
+    { name = "zarr", specifier = "==2.18.2" },
 ]
 
 [[package]]
@@ -1600,6 +1604,7 @@ dependencies = [
     { name = "mascope-runtime" },
     { name = "mascope-thermo" },
     { name = "mascope-tofwerk" },
+    { name = "numcodecs" },
     { name = "numpy" },
     { name = "pandas" },
     { name = "scipy" },
@@ -1609,16 +1614,17 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "dask", specifier = "==2024.12.1" },
+    { name = "dask", specifier = "==2024.7.0" },
     { name = "lmfit", specifier = "~=1.3" },
     { name = "mascope-runtime", editable = "libraries/runtime" },
     { name = "mascope-thermo", editable = "libraries/thermo" },
     { name = "mascope-tofwerk", editable = "libraries/tofwerk" },
+    { name = "numcodecs", specifier = "==0.15.1" },
     { name = "numpy", specifier = "~=1.26" },
     { name = "pandas", specifier = "~=2.2" },
     { name = "scipy", specifier = "~=1.13" },
     { name = "xarray", specifier = "==2024.11.0" },
-    { name = "zarr", specifier = "==2.18.7" },
+    { name = "zarr", specifier = "==2.18.2" },
 ]
 
 [[package]]
@@ -2934,7 +2940,7 @@ wheels = [
 
 [[package]]
 name = "zarr"
-version = "2.18.7"
+version = "2.18.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "asciitree" },
@@ -2942,9 +2948,9 @@ dependencies = [
     { name = "numcodecs" },
     { name = "numpy" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/da/1d/01cf9e3ab2d85190278efc3fca9f68563de35ae30ee59e7640e3af98abe3/zarr-2.18.7.tar.gz", hash = "sha256:b2b8f66f14dac4af66b180d2338819981b981f70e196c9a66e6bfaa9e59572f5", size = 3604558 }
+sdist = { url = "https://files.pythonhosted.org/packages/b3/00/ac5c518ff1c1b1cc87a62f86ad9d19c647c19d969a91faa40d3b6342ccaa/zarr-2.18.2.tar.gz", hash = "sha256:9bb393b8a0a38fb121dbb913b047d75db28de9890f6d644a217a73cf4ae74f47", size = 3603055 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5e/d8/9ffd8c237b3559945bb52103cf0eed64ea098f7b7f573f8d2962ef27b4b2/zarr-2.18.7-py3-none-any.whl", hash = "sha256:ac3dc4033e9ae4e9d7b5e27c97ea3eaf1003cc0a07f010bd83d5134bf8c4b223", size = 211273 },
+    { url = "https://files.pythonhosted.org/packages/5d/bd/8d881d8ca6d80fcb8da2b2f94f8855384daf649499ddfba78ffd1ee2caa3/zarr-2.18.2-py3-none-any.whl", hash = "sha256:a638754902f97efa99b406083fdc807a0e2ccf12a949117389d2a4ba9b05df38", size = 210228 },
 ]
 
 [[package]]

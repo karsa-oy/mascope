@@ -34,7 +34,8 @@ dependencies = [
     "typer>=0.15.2,<0.16",
     "uvicorn>=0.34,<0.35",
     "websocket-client~=1.8",
-    "zarr==2.18.7",
+    "zarr==2.18.2", # TODO: Resolve dependency issue https://github.com/Karsa-Oy/Mascope/issues/479
+    "numcodecs==0.15.1", # TODO: See issue above 
 ]
 
 [build-system]
