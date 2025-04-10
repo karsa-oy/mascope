@@ -65,9 +65,7 @@ class FileConverterConfig(ModuleConfig):
     File converter module specific configuration options
     """
 
-    server: str = (
-        r"backend"  # production host URL; the default works in our docker compose network
-    )
+    server: str = r"backend"  # production host URL; the default works in our docker compose network
     source: str = r"./filestreams"  # folder to monitor for files to convert
     raw_threads: int = 2  # number of threads for converting Orbitrap files
     h5_threads: int = 2  # number of threads for converting Tof files

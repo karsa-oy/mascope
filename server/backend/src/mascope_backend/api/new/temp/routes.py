@@ -1,5 +1,3 @@
-import os
-
 from fastapi import APIRouter, Depends
 from fastapi.responses import FileResponse
 
@@ -26,4 +24,4 @@ async def get_temp_file_route(temp_file: str, user=Depends(guest_user)):
     :rtype: dict
     """
     file_path = runtime.env.path("temp", temp_file)
-    return FileResponse(file_path)
+    return FileResponse(file_path, filename=temp_file)

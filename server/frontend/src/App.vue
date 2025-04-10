@@ -18,7 +18,7 @@ const toast = useToast()
 
 // toaster
 app.ui.notification
-  .on('*', ({ status, type, message, data }) => {
+  .on('*', ({ status, type, message, data, error }) => {
     if (status !== 'pending') {
       const severity =
         {
@@ -34,9 +34,11 @@ app.ui.notification
         life: duration
       })
 
-      if (status === 'success' && data && 'download' in data) {
+      const download = data?.download ?? error?.detail?.data?.download
+
+      if ((status === 'success' || status === 'warning') && download) {
         const link = document.createElement('a')
-        link.download = data['download']
+        link.download = download
         link.href = `${runtime.api_path}/api/temp/${link.download}`
         link.click()
       }

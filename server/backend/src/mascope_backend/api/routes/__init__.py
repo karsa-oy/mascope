@@ -17,6 +17,7 @@ from mascope_backend.api.new.instrument_configs.process.routes import (
     instrument_configs_process_router,
 )
 from mascope_backend.api.new.cheminfo.routes import cheminfo_router
+from mascope_backend.api.new.file.routes import file_router
 from mascope_backend.api.routes.attribute_templates.attribute_templates_routes import (
     attribute_templates_router,
 )
@@ -128,4 +129,5 @@ routers = [
     visualization_router,
     temp_router,
     cheminfo_router,
+    file_router,
 ]
