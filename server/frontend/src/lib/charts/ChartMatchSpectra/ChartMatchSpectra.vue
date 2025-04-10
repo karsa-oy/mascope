@@ -179,9 +179,9 @@ watch(
           class="float"
         >
           <Tag
-            :value="`Peak ${settings.yMode} intensity: ${area.format(settings.yMode == 'average' ? isotopeChart.sample_peak_area : isotopeChart.sample_peak_area * sampleLength)}`"
+            :value="`Peak ${settings.yMode} intensity: ${area.format(settings.yMode == 'average' ? isotopeChart.sample_peak_intensity : isotopeChart.sample_peak_intensity * sampleLength)}`"
             :severity="
-              isotopeChart.sample_peak_area < app.data.match.params.ui.peak_min_intensity
+              isotopeChart.sample_peak_intensity < app.data.match.params.ui.peak_min_intensity
                 ? 'warn'
                 : 'info'
             "

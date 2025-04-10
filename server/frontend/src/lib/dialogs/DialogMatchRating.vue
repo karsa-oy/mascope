@@ -42,7 +42,7 @@ const expandedIsotopes = ref()
 
 // computed
 const title = computed(() => {
-  const ionSumIntensity = peak.format(app.data.match.visualized.ion?.sample_peak_area_sum)
+  const ionSumIntensity = peak.format(app.data.match.visualized.ion?.sample_peak_intensity_mean)
   return `${app.data.sample.focused?.sample_item_name}: ${app.data.match.visualized.ion?.target_ion_formula} | Intensity: ${ionSumIntensity}`
 })
 const checklistEnabled = computed(() => {
@@ -82,10 +82,10 @@ const isotopes = computed(() =>
         threshold: app.data.match.params.ui.isotope_ratio_tolerance
       })
     }
-    if (isotope.sample_peak_area < app.data.match.params.ui.peak_min_intensity) {
+    if (isotope.sample_peak_intensity < app.data.match.params.ui.peak_min_intensity) {
       failures.push({
         filter: 'Minimum peak intensity',
-        message: `Sample peak area is ${isotope.sample_peak_area.toFixed(3)}`,
+        message: `Sample peak area is ${isotope.sample_peak_intensity.toFixed(3)}`,
         threshold: app.data.match.params.ui.peak_min_intensity
       })
     }
@@ -257,7 +257,7 @@ const peak = new Intl.NumberFormat('en-US', {
                 <template #body="{ data }">
                   <BaseMatchTag
                     :row="data"
-                    :tooltip="`Peak intensity sum: ${peak.format(data?.sample_peak_area_sum)}`"
+                    :tooltip="`Peak intensity sum: ${peak.format(data?.sample_peak_intensity_mean)}`"
                   />
                 </template>
               </Column>

@@ -219,8 +219,8 @@ async def aggregate_match_isotope_filtered_data(
                 MatchIsotope.match_mz_error,
                 MatchIsotope.match_abundance_error,
                 MatchIsotope.match_isotope_correlation,
-                MatchIsotope.sample_peak_area,
-                MatchIsotope.sample_peak_area_relative,
+                MatchIsotope.sample_peak_intensity,
+                MatchIsotope.sample_peak_intensity_relative,
                 MatchIsotope.sample_peak_mz,
                 MatchIsotope.sample_peak_tof,
                 MatchIsotope.match_score,
@@ -312,8 +312,8 @@ async def aggregate_match_isotope_filtered_data(
             "match_mz_error",
             "match_abundance_error",
             "match_isotope_correlation",
-            "sample_peak_area",
-            "sample_peak_area_relative",
+            "sample_peak_intensity",
+            "sample_peak_intensity_relative",
             "sample_peak_mz",
             "sample_peak_tof",
             "match_score",
@@ -328,7 +328,7 @@ async def aggregate_match_isotope_filtered_data(
             .reset_index(drop=True)
         )
 
-        # Step 5: Apply match_params (provided may be None) filtering match_score, sample_peak_area, setting match_category
+        # Step 5: Apply match_params (provided may be None) filtering match_score, sample_peak_intensity, setting match_category
         aggregated_match_isotope_filtered_data_df = apply_match_params(
             aggregated_sample_match_isotope_data_df, match_params
         )

@@ -14,9 +14,11 @@ class MatchIsotopeBase(BaseModel):
     sample_peak_mz: float = Field(
         ..., description="Mass-to-charge ratio of the sample peak"
     )
-    sample_peak_area: float = Field(..., description="Area of the sample peak")
-    sample_peak_area_relative: float = Field(
-        ..., description="Relative area of the sample peak"
+    sample_peak_intensity: float = Field(
+        ..., description="Intensity of the sample peak"
+    )
+    sample_peak_intensity_relative: float = Field(
+        ..., description="Relative intensity of the sample peak"
     )
     sample_peak_tof: float = Field(..., description="Time-of-flight of the sample peak")
     match_abundance_error: float = Field(

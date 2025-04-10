@@ -94,14 +94,14 @@ async def mz_fit(
     # Filter matches
     good_matches_df = match_isotope_df[
         (match_isotope_df.relative_abundance >= isotope_abundance_min)
-        & (match_isotope_df.sample_peak_area >= peak_intensity_min)
+        & (match_isotope_df.sample_peak_intensity >= peak_intensity_min)
         & (abs(match_isotope_df.match_mz_error) <= refine_window)
         & (match_isotope_df.match_score >= match_score_min)
     ]
     n_relevant_isotopes = len(
         match_isotope_df[(match_isotope_df.relative_abundance >= isotope_abundance_min)]
     )
-    calibrant_signal_intensity = good_matches_df["sample_peak_area"]
+    calibrant_signal_intensity = good_matches_df["sample_peak_intensity"]
     calibrant_to_tic = calibrant_signal_intensity / tic
     await send_progress_user_notification(notification, 0.75)
 

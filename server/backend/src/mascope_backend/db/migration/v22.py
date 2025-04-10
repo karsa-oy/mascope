@@ -84,6 +84,9 @@ async def modify_schema():
         runtime.logger.info("Drop columns from sample_file...")
         await session.execute(text("ALTER TABLE sample_file DROP COLUMN tic;"))
 
+        runtime.logger.info("Renaming legacy columns...")
+        await rename_columns(session)
+
         await session.commit()
         runtime.logger.info("Schema migration completed successfully!")
 
@@ -144,6 +147,60 @@ async def update_sample_view(session):
             """
         )
     )
+
+
+async def rename_columns(session):
+    """
+    Rename columns `sample_peak_area` to `sample_peak_intensity` and
+    `sample_peak_area_sum` to `sample_peak_intensity_mean` in all tables.
+    """
+    # Define the columns to rename
+    columns_to_rename = {
+        "sample_peak_area": "sample_peak_intensity",
+        "sample_peak_area_sum": "sample_peak_intensity_mean",
+        "sample_peak_area_relative": "sample_peak_intensity_relative",
+    }
+
+    # Query the database schema to find tables with the target columns
+    for old_column, new_column in columns_to_rename.items():
+        result = await session.execute(
+            text(
+                """
+                SELECT name
+                FROM sqlite_master
+                WHERE type='table'
+                """
+            )
+        )
+        tables = [row[0] for row in result.fetchall()]
+
+        # Rename the column in each table
+        for table in tables:
+            # Check if the column exists in the table
+            result = await session.execute(
+                text(
+                    f"""
+                    PRAGMA table_info({table});
+                    """
+                )
+            )
+            columns = [row[1] for row in result.fetchall()]
+            if old_column not in columns:
+                continue
+
+            runtime.logger.info(
+                f"Renaming column {old_column} to {new_column} in table {table}..."
+            )
+            await session.execute(
+                text(
+                    f"""
+                    ALTER TABLE {table}
+                    RENAME COLUMN {old_column} TO {new_column};
+                    """
+                )
+            )
+
+    runtime.logger.info("Column renaming completed.")
 
 
 if __name__ == "__main__":

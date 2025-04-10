@@ -27,11 +27,11 @@ def compare_match_samples(samples_data: list, match_samples: list) -> list:
                     mismatches.append(
                         f"match_category: {sample.get('match_category')} != {match_sample.get('match_category')}"
                     )
-                if sample.get("sample_peak_area_sum") != match_sample.get(
-                    "sample_peak_area_sum"
+                if sample.get("sample_peak_intensity_mean") != match_sample.get(
+                    "sample_peak_intensity_mean"
                 ):
                     mismatches.append(
-                        f"sample_peak_area_sum: {sample.get('sample_peak_area_sum')} != {match_sample.get('sample_peak_area_sum')}"
+                        f"sample_peak_intensity_mean: {sample.get('sample_peak_intensity_mean')} != {match_sample.get('sample_peak_intensity_mean')}"
                     )
                 if sample.get("sample_peak_interference_sum") != match_sample.get(
                     "sample_peak_interference_sum"

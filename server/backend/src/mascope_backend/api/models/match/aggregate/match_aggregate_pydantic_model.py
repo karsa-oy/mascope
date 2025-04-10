@@ -15,7 +15,7 @@ class AggregateMatchIsotopeFilteredDataBody(BaseModel):
     )
     match_params: TofMatchParams | OrbiMatchParams = Field(
         None,
-        description="Ion-specific filter parameters, used for match_score and sample_peak_area filtering, setting match_category",
+        description="Ion-specific filter parameters, used for match_score and sample_peak_intensity filtering, setting match_category",
     )
     include_match_interference: bool = Field(
         True, description="Include match interference data in the response"
@@ -29,7 +29,7 @@ class AggregateSampleMatchIonBody(BaseModel):
     )
     match_params: TofMatchParams | OrbiMatchParams = Field(
         None,
-        description="Ion-specific filter parameters, used for match_score and sample_peak_area filtering",
+        description="Ion-specific filter parameters, used for match_score and sample_peak_intensity filtering",
     )
 
 
@@ -39,7 +39,7 @@ class AggregateSampleMatchCompoundBody(BaseModel):
     )
     match_params: TofMatchParams | OrbiMatchParams = Field(
         None,
-        description="Sample-specific filter parameters, used for match_score and sample_peak_area filtering",
+        description="Sample-specific filter parameters, used for match_score and sample_peak_intensity filtering",
     )
 
 

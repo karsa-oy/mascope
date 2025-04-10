@@ -134,8 +134,8 @@ async def compute_match_isotopes(
             match_isotope_id=np.nan,
             sample_peak_id=np.nan,
             sample_peak_mz=np.nan,
-            sample_peak_area=np.nan,
-            sample_peak_area_relative=np.nan,
+            sample_peak_intensity=np.nan,
+            sample_peak_intensity_relative=np.nan,
             match_abundance_error=np.nan,
             match_isotope_correlation=np.nan,
             match_mz_error=np.nan,
@@ -175,7 +175,7 @@ async def compute_match_isotopes(
                 row["sample_peak_id"] = peak_index
                 row["sample_peak_mz"] = peak_mz
                 row["sample_peak_tof"] = peak_tofs[int(peak_index)]
-                row["sample_peak_area"] = peak_intensity
+                row["sample_peak_intensity"] = peak_intensity
             return row
 
         match_isotope_df = (
@@ -190,27 +190,27 @@ async def compute_match_isotopes(
         # calculate mean matched sample peak heights for each ion
         ion_level_peak_means = match_isotope_df.groupby(
             ["target_ion_id"], as_index=False
-        )["sample_peak_area"].mean()
+        )["sample_peak_intensity"].mean()
         # join means back to the isotope level
         isotope_level_peak_means = pd.merge(
             match_isotope_df,
             ion_level_peak_means.rename(
-                columns={"sample_peak_area": "sample_peak_area_sum"}
+                columns={"sample_peak_intensity": "sample_peak_intensity_mean"}
             ),
             on=["target_ion_id"],
             how="left",
         )
 
         # compute relative peak heights
-        match_isotope_df.loc[:, "sample_peak_area_relative"] = (
-            match_isotope_df["sample_peak_area"]
-            / isotope_level_peak_means["sample_peak_area_sum"]
+        match_isotope_df.loc[:, "sample_peak_intensity_relative"] = (
+            match_isotope_df["sample_peak_intensity"]
+            / isotope_level_peak_means["sample_peak_intensity_mean"]
         )
         # calculate isotope ratio errors
         match_isotope_df.loc[:, "match_abundance_error"] = match_isotope_df[
             "relative_abundance"
         ] * (
-            match_isotope_df["sample_peak_area_relative"]
+            match_isotope_df["sample_peak_intensity_relative"]
             - match_isotope_df["relative_abundance"]
         )
         # calculate isotope correlations

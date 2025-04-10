@@ -266,7 +266,7 @@ table_configs = {
             "sample_item_id": ("VARCHAR(16)", 1, None, 0),
             "match_score": ("FLOAT", 1, None, 0),
             "match_category": ("INTEGER", 1, None, 0),
-            "sample_peak_area_sum": ("FLOAT", 1, None, 0),
+            "sample_peak_intensity_mean": ("FLOAT", 1, None, 0),
             "sample_peak_interference_sum": ("FLOAT", 1, None, 0),
             "match_sample_utc_created": ("TIMESTAMP", 0, None, 0),
             "match_sample_utc_modified": ("TIMESTAMP", 0, None, 0),
@@ -283,7 +283,7 @@ table_configs = {
                     CHECK (match_score BETWEEN 0 AND 1),
                 match_category INTEGER NOT NULL
                     CHECK (match_category BETWEEN 0 AND 2),
-                sample_peak_area_sum FLOAT NOT NULL,
+                sample_peak_intensity_mean FLOAT NOT NULL,
                 sample_peak_interference_sum FLOAT NOT NULL,
                 match_sample_utc_created TIMESTAMP,
                 match_sample_utc_modified TIMESTAMP
@@ -300,7 +300,7 @@ table_configs = {
             "target_collection_id": ("VARCHAR(16)", 1, None, 0),
             "match_score": ("FLOAT", 1, None, 0),
             "match_category": ("INTEGER", 1, None, 0),
-            "sample_peak_area_sum": ("FLOAT", 1, None, 0),
+            "sample_peak_intensity_mean": ("FLOAT", 1, None, 0),
             "sample_peak_interference_sum": ("FLOAT", 1, None, 0),
             "match_collection_utc_created": ("TIMESTAMP", 0, None, 0),
             "match_collection_utc_modified": ("TIMESTAMP", 0, None, 0),
@@ -325,7 +325,7 @@ table_configs = {
                     CHECK (match_score BETWEEN 0 AND 1),
                 match_category INTEGER NOT NULL
                     CHECK (match_category BETWEEN 0 AND 2),
-                sample_peak_area_sum FLOAT NOT NULL,
+                sample_peak_intensity_mean FLOAT NOT NULL,
                 sample_peak_interference_sum FLOAT NOT NULL,
                 match_collection_utc_created TIMESTAMP,
                 match_collection_utc_modified TIMESTAMP
@@ -342,7 +342,7 @@ table_configs = {
             "target_compound_id": ("VARCHAR(16)", 1, None, 0),
             "match_score": ("FLOAT", 1, None, 0),
             "match_category": ("INTEGER", 1, None, 0),
-            "sample_peak_area_sum": ("FLOAT", 1, None, 0),
+            "sample_peak_intensity_mean": ("FLOAT", 1, None, 0),
             "sample_peak_interference_sum": ("FLOAT", 1, None, 0),
             "match_compound_utc_created": ("TIMESTAMP", 0, None, 0),
             "match_compound_utc_modified": ("TIMESTAMP", 0, None, 0),
@@ -367,7 +367,7 @@ table_configs = {
                     CHECK (match_score BETWEEN 0 AND 1),
                 match_category INTEGER NOT NULL
                     CHECK (match_category BETWEEN 0 AND 2),
-                sample_peak_area_sum FLOAT NOT NULL,
+                sample_peak_intensity_mean FLOAT NOT NULL,
                 sample_peak_interference_sum FLOAT NOT NULL,
                 match_compound_utc_created TIMESTAMP,
                 match_compound_utc_modified TIMESTAMP
@@ -384,7 +384,7 @@ table_configs = {
             "target_ion_id": ("VARCHAR(16)", 1, None, 0),
             "match_score": ("FLOAT", 1, None, 0),
             "match_category": ("INTEGER", 1, None, 0),
-            "sample_peak_area_sum": ("FLOAT", 1, None, 0),
+            "sample_peak_intensity_mean": ("FLOAT", 1, None, 0),
             "sample_peak_interference_sum": ("FLOAT", 1, None, 0),
             "match_ion_utc_created": ("TIMESTAMP", 0, None, 0),
             "match_ion_utc_modified": ("TIMESTAMP", 0, None, 0),
@@ -404,7 +404,7 @@ table_configs = {
                     CHECK (match_score BETWEEN 0 AND 1),
                 match_category INTEGER NOT NULL
                     CHECK (match_category BETWEEN 0 AND 2),
-                sample_peak_area_sum FLOAT NOT NULL,
+                sample_peak_intensity_mean FLOAT NOT NULL,
                 sample_peak_interference_sum FLOAT NOT NULL,
                 match_ion_utc_created TIMESTAMP,
                 match_ion_utc_modified TIMESTAMP
@@ -421,8 +421,8 @@ table_configs = {
             "sample_item_id": ("VARCHAR(16)", 1, None, 0),
             "sample_peak_id": ("INTEGER", 1, None, 0),
             "sample_peak_mz": ("FLOAT", 1, None, 0),
-            "sample_peak_area": ("FLOAT", 1, None, 0),
-            "sample_peak_area_relative": ("FLOAT", 1, None, 0),
+            "sample_peak_intensity": ("FLOAT", 1, None, 0),
+            "sample_peak_intensity_relative": ("FLOAT", 1, None, 0),
             "sample_peak_tof": ("FLOAT", 1, None, 0),
             "match_abundance_error": ("FLOAT", 1, None, 0),
             "match_mz_error": ("FLOAT", 1, None, 0),
@@ -454,8 +454,8 @@ table_configs = {
                     REFERENCES sample_item(sample_item_id) ON DELETE CASCADE,
                 sample_peak_id INTEGER NOT NULL,
                 sample_peak_mz FLOAT NOT NULL,
-                sample_peak_area FLOAT NOT NULL,
-                sample_peak_area_relative FLOAT NOT NULL,
+                sample_peak_intensity FLOAT NOT NULL,
+                sample_peak_intensity_relative FLOAT NOT NULL,
                 sample_peak_tof FLOAT NOT NULL,
                 match_abundance_error FLOAT NOT NULL,
                 match_mz_error FLOAT NOT NULL,

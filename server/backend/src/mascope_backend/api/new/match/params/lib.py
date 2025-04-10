@@ -67,7 +67,7 @@ def apply_match_params(
             "match_mz_error",
             "match_abundance_error",
             "match_isotope_correlation",
-            "sample_peak_area",
+            "sample_peak_intensity",
             "relative_abundance",
         ]:
             if pd.isna(row[field]) or row.get(field) is None:
@@ -88,15 +88,15 @@ def apply_match_params(
                     <= params["isotope_ratio_tolerance"],
                     max(row.get("match_isotope_correlation", 0), 0)
                     >= params["min_isotope_correlation"],
-                    row["sample_peak_area"] >= params["peak_min_intensity"],
+                    row["sample_peak_intensity"] >= params["peak_min_intensity"],
                     row["relative_abundance"] >= params["min_isotope_abundance"],
                 ]
             )
             else 0
         )
 
-        row["sample_peak_area"] = (
-            row["sample_peak_area"]
+        row["sample_peak_intensity"] = (
+            row["sample_peak_intensity"]
             if all(
                 [
                     abs(row["match_mz_error"]) <= params["mz_tolerance"],

@@ -208,7 +208,7 @@ export const useBatch = defineModule({
           { field: 'sample_item_type', label: 'Sample type' },
           { field: 'target_compound_name', label: 'Compound name' },
           { field: 'target_compound_formula', label: 'Compound formula' },
-          { field: 'sample_peak_area_sum', label: 'Sample peak intensity' },
+          { field: 'sample_peak_intensity_mean', label: 'Sample peak intensity' },
           { field: 'sample_peak_interference_sum', label: 'Sample peak interference' },
           { field: 'match_score', label: 'Match score' }
         ]
@@ -224,7 +224,7 @@ export const useBatch = defineModule({
           { field: 'target_compound_formula', label: 'Compound formula' },
           { field: 'ionization_mechanism', label: 'Ionization mechanism' },
           { field: 'target_ion_formula', label: 'Ion formula' },
-          { field: 'sample_peak_area_sum', label: 'Sample peak intensity' },
+          { field: 'sample_peak_intensity_mean', label: 'Sample peak intensity' },
           { field: 'sample_peak_interference_sum', label: 'Sample peak interference' },
           { field: 'match_score', label: 'Match score' }
         ]
