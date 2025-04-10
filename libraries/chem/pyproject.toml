@@ -7,12 +7,12 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "mascope_runtime",
     "colorcet~=3.1",
-    "datashader>=0.16,<0.17",
+    "datashader>=0.17,<0.18",
     "h5py~=3.11",
     "numpy~=1.26",
     "pandas~=2.2",
     "pillow~=10.3",
-    "xarray==2024.6.0",
+    "xarray==2024.11.0",
 ]
 
 [build-system]

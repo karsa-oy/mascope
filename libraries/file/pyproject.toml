@@ -8,8 +8,8 @@ dependencies = [
     "mascope_runtime",
     "datetime-glob~=1.0",
     "numpy~=1.26",
-    "xarray==2024.6.0",
-    "zarr==2.18.2",
+    "xarray==2024.11.0",
+    "zarr==2.18.7",
 ]
 
 [build-system]
