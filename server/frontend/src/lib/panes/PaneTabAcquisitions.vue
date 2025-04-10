@@ -42,7 +42,7 @@ const acquisitions = computed(() => {
     app.data.acquisition.list?.filter(({ filename, polarity }) => {
       const matchesSearch = filename.toLowerCase().includes(search.value.toLowerCase())
       const matchesPolarity =
-        polarityFilter.value === '' || polarity === polarityFilter.value
+        polarityFilter.value === '' || polarity === polarityFilter.value || polarity === '+-'
       return matchesSearch && matchesPolarity
     }) ?? []
   )
@@ -56,6 +56,19 @@ const hasMixedPolarities = computed(() => {
     app.data.acquisition.selected?.map((file) => file.polarity)
   )
   return selectedPolarities.has('+') && selectedPolarities.has('-')
+})
+
+const polarityNotSpecified = computed(() => {
+  const selectedPolarities = new Set(
+    app.data.acquisition.selected?.map((file) => file.polarity)
+  )
+  return (
+    !selectedPolarities.has('+') &&
+    !selectedPolarities.has('-') &&
+    polarityFilter.value === '' &&
+    selectedPolarities.has('+-') &&
+    app.data.acquisition.selected?.length > 1
+  )
 })
 
 // Watch for polarity changes and clear selected acquisitions
@@ -138,7 +151,8 @@ watchEffect(() => {
             app.data.acquisition.selected?.length == 0 ||
             !app.data.batch.focused ||
             !app.data.acquisition.list.length ||
-            hasMixedPolarities
+            hasMixedPolarities ||
+            polarityNotSpecified
           "
           @click="
             () => {
@@ -212,6 +226,14 @@ watchEffect(() => {
         >
           <span>Cannot process files with both "+" and "-" polarities selected.</span>
         </Message>
+        <Message
+          v-if="polarityNotSpecified"
+          class="warning-plate"
+          severity="warn"
+          icon="pi pi-exclamation-triangle"
+        >
+            <span>Files with mixed polarities are selected. Please specify a polarity.</span>
+        </Message>
       </div>
     </template>
   </FileUpload>
@@ -233,10 +255,10 @@ watchEffect(() => {
   margin-bottom: 0.5rem;
 }
 
-.warning-plates-container {
+.warning-plate-container {
   display: flex;
   align-items: flex-start;
-  flex-direction: column;
+  flex-flow: column;
 }
 
 menu {
