@@ -16,6 +16,7 @@ import { runtime } from '@/lib/runtime'
 import { DialogSampleOp, DialogBatchImport, DialogFileUpload } from '@/lib/dialogs'
 
 import { useApp } from '@/stores'
+import { Message } from 'primevue'
 
 // TODO_configuration Default sample file upload params
 const FILE_UPLOAD_EXTENSIONS = ['.h5', '.raw']
@@ -48,6 +49,14 @@ const acquisitions = computed(() => {
 })
 
 const uploadedFiles = ref([])
+
+// Check if files with both "+" and "-" polarities are selected
+const hasMixedPolarities = computed(() => {
+  const selectedPolarities = new Set(
+    app.data.acquisition.selected?.map((file) => file.polarity)
+  )
+  return selectedPolarities.has('+') && selectedPolarities.has('-')
+})
 
 // Watch for polarity changes and clear selected acquisitions
 watch(polarityFilter, () => {
@@ -128,7 +137,8 @@ watchEffect(() => {
           :disabled="
             app.data.acquisition.selected?.length == 0 ||
             !app.data.batch.focused ||
-            !app.data.acquisition.list.length
+            !app.data.acquisition.list.length ||
+            hasMixedPolarities
           "
           @click="
             () => {
@@ -185,6 +195,24 @@ watchEffect(() => {
       <i class="info-line">
         <span class="pi pi-file-arrow-up" /><span>Drag sample files here to upload them</span>
       </i>
+      <div class="warning-plate-container">
+        <Message
+          v-if="!app.data.batch.focused"
+          class="warning-plate"
+          severity="warn"
+          icon="pi pi-exclamation-triangle"
+        >
+          <span>Select the batch to process the files.</span>
+        </Message>
+        <Message
+          v-if="hasMixedPolarities"
+          class="warning-plate"
+          severity="warn"
+          icon="pi pi-exclamation-triangle"
+        >
+          <span>Cannot process files with both "+" and "-" polarities selected.</span>
+        </Message>
+      </div>
     </template>
   </FileUpload>
 </template>
@@ -195,6 +223,20 @@ watchEffect(() => {
   align-items: baseline;
   height: fit-content;
   width: 100%;
+}
+
+.warning-plate {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  max-width: fit-content;
+  margin-bottom: 0.5rem;
+}
+
+.warning-plates-container {
+  display: flex;
+  align-items: flex-start;
+  flex-direction: column;
 }
 
 menu {
