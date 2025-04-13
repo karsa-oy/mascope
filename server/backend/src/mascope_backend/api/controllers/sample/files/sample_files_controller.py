@@ -1,4 +1,5 @@
 import os
+import shutil
 from typing import Literal
 from datetime import datetime
 from fastapi import HTTPException, UploadFile
@@ -9,6 +10,8 @@ from sqlalchemy import (
     func,
 )
 from mascope_file.io import load_file
+from mascope_file.name import parse_path_from_item_filename
+
 from mascope_signal.compute import sum_signal_for_time_range, get_sum_signal
 from mascope_signal.peak import get_peaks
 
@@ -29,6 +32,7 @@ from mascope_backend.api.lib.api_features import (
 from mascope_backend.api.lib.exceptions.api_exceptions import (
     ApiException,
     NotFoundException,
+    raise_api_warning,
 )
 from mascope_backend.api.models.sample.files.sample_file_pydantic_model import (
     SampleFileCreate,
@@ -235,28 +239,59 @@ async def create_sample_file(sample_file: SampleFileCreate) -> dict:
 @api_controller()
 async def delete_sample_file(sample_file_id: str):
     """
-    Deletes a sample file by its unique ID.
+    Deletes a sample file by its unique ID and removes the corresponding filestore directory.
 
     Steps:
     1. Fetch the sample file from the database using the provided ID.
-    2. Delete the fetched sample file from the session and commit the changes to the database.
-    3. Conditionally reload instruments
+    2. Check if any sample items are associated with this file. If so, raise an error.
+    3. Delete the fetched sample file from the session and commit the changes to the database.
+    4. Delete the corresponding filestore directory.
+    5. Conditionally reload instruments.
+    6. Trigger acquisitions reload.
 
     :param sample_file_id: The ID of the sample file to delete.
     :type sample_file_id: str
     :raises NotFoundException: If the sample file with the given ID is not found.
+    :raises HTTPException: If sample items are associated with this file.
     """
+    from mascope_backend.api.controllers.sample.items.sample_items_controller import (
+        get_sample_items,
+    )
+
     async with async_session() as session:
         # Step 1: Fetch the sample file
         sample_file = await session.get(SampleFile, sample_file_id)
         if not sample_file:
             raise NotFoundException(f"Sample file with ID '{sample_file_id}' not found")
 
-        # Step 2: Delete and commit
+        # Step 2: Check if any sample items are associated with this file
+        sample_items = (await get_sample_items(filename=sample_file.filename))["data"]
+        if sample_items:
+            # raise a warning and abort if some found
+            message = (
+                f"Cannot delete sample file '{sample_file.filename}' because it is associated with {len(sample_items)} sample item(s). Delete the sample items first.",
+            )
+            data = {"sample_item_ids": [i["sample_item_id"] for i in sample_items]}
+            raise_api_warning(message, data)
+            return {"message": message, "data": data}
+
+        # Step 3: Delete from database and commit
         await session.delete(sample_file)
         await session.commit()
 
-        # Step 3: Trigger instruments reload
+        # Step 4: Delete the corresponding filestore directory
+        try:
+            filestore_path = parse_path_from_item_filename(sample_file.filename)
+            if os.path.exists(filestore_path):
+                shutil.rmtree(filestore_path)
+                runtime.logger.info(f"Deleted filestore directory: {filestore_path}")
+        except Exception as e:
+            runtime.logger.error(
+                f"Failed to delete filestore directory for '{sample_file.filename}': {e}"
+            )
+            # Continue execution even if file deletion fails
+
+        # Step 5: Trigger instruments reload
         final_instruments = [i["instrument"] for i in (await get_instruments())["data"]]
         if sample_file.instrument not in final_instruments:
             # instrument removed by deletion and needs reload
@@ -264,6 +299,11 @@ async def delete_sample_file(sample_file_id: str):
                 "instruments_reload",
                 namespace="/",
             )
+
+        # Step 6: Trigger acquisitions reload
+        await sio.emit(
+            "acquisitions_reload", namespace="/", room=sample_file.instrument
+        )
 
     return {
         "message": f"Sample file '{sample_file.filename}' deleted successfully.",
