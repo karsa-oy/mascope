@@ -9,6 +9,7 @@ from mascope_backend.api.controllers.sample.files.sample_files_controller import
     get_sample_file,
     create_sample_file,
     delete_sample_file,
+    delete_sample_files,
     update_sample_file,
     sample_file_upload,
     get_sample_file_peaks,
@@ -26,6 +27,7 @@ from mascope_backend.api.models.sample.files.sample_file_pydantic_model import (
     ComputeSampleFilePeaksQueryParams,
     GetSampleFilePeakTimeseriesBody,
     GetSpectrumQueryParams,
+    DeleteSampleFilesBody,
 )
 
 sample_files_router = APIRouter(prefix="/api/sample/files", tags=["Sample Files"])
@@ -121,6 +123,23 @@ async def delete_sample_file_route(
     :return: Confirmation message on deletion.
     """
     await delete_sample_file(sample_file_id)
+
+
+@sample_files_router.post("/delete")
+@api_route()
+async def delete_sample_files_route(
+    request: Request, body: DeleteSampleFilesBody, user=Depends(editor_user)
+):
+    """Delete multiple sample files by their IDs.
+
+    Only deletes files that don't have existing sample items associated with them.
+    Returns information about which files were deleted and which were skipped.
+
+    :param body: Request body containing list of sample file IDs to delete.
+    :param user: Authenticated user with editor access.
+    :return: Information about deleted and skipped files.
+    """
+    return await delete_sample_files(sample_file_ids=body.sample_file_ids)
 
 
 @sample_files_router.post("/upload")

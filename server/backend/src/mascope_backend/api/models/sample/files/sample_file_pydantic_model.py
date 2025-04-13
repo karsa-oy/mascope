@@ -197,3 +197,7 @@ class GetSpectrumQueryParams(QueryParamsModel):
         ):
             raise ValueError("Both mz_min and mz_max must be provided")
         return values
+
+
+class DeleteSampleFilesBody(BaseModel):
+    sample_file_ids: list[str] = Field(..., description="List of sample file IDs to delete")
