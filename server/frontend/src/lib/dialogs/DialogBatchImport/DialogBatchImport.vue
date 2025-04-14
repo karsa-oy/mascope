@@ -42,6 +42,10 @@ const props = defineProps({
   files: {
     type: Object,
     required: true
+  },
+  polarity: {
+    type: String,
+    default: ''
   }
 })
 
@@ -177,7 +181,7 @@ function preprocess() {
     imported.items = autosampler.preprocess(acquisitions, imported.parsed)
   }
   if (imported.type === 'generic') {
-    imported.items = generic.preprocess(acquisitions, imported.parsed)
+    imported.items = generic.preprocess(acquisitions, imported.parsed, props.polarity)
   }
   validation.rows.execute({ files: props.files })
 }

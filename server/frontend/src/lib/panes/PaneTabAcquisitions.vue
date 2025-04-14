@@ -35,45 +35,54 @@ const dialog = reactive({
 })
 
 const search = ref('')
-const polarityFilter = ref('') // Default polarity filter
+const polarityDropdown = ref('')
 
-const acquisitions = computed(() => {
-  return (
-    app.data.acquisition.list?.filter(({ filename, polarity }) => {
-      const matchesSearch = filename.toLowerCase().includes(search.value.toLowerCase())
-      const matchesPolarity =
-        polarityFilter.value === '' || polarity === polarityFilter.value || polarity === '+-'
-      return matchesSearch && matchesPolarity
-    }) ?? []
-  )
-})
+const acquisitions = computed(() => 
+  app.data.acquisition.list?.filter(({ filename, polarity }) => 
+    filename.toLowerCase().includes(search.value.toLowerCase()) &&
+    (polarityDropdown.value === '' ||
+      polarityDropdown.value === '+-' ||
+      polarity === polarityDropdown.value ||
+      polarity === '+-')
+  ) ?? []
+);
 
 const uploadedFiles = ref([])
 
 // Check if files with both "+" and "-" polarities are selected
-const hasMixedPolarities = computed(() => {
-  const selectedPolarities = new Set(
-    app.data.acquisition.selected?.map((file) => file.polarity)
-  )
-  return selectedPolarities.has('+') && selectedPolarities.has('-')
+const hasBothPolarities = computed(() => {
+  const hasPositive = app.data.acquisition.selected.some(({ polarity }) => polarity === '+')
+  const hasNegative = app.data.acquisition.selected.some(({ polarity }) => polarity === '-')
+  return hasPositive && hasNegative
 })
 
-const polarityNotSpecified = computed(() => {
-  const selectedPolarities = new Set(
-    app.data.acquisition.selected?.map((file) => file.polarity)
-  )
-  return (
-    !selectedPolarities.has('+') &&
-    !selectedPolarities.has('-') &&
-    polarityFilter.value === '' &&
-    selectedPolarities.has('+-') &&
-    app.data.acquisition.selected?.length > 1
-  )
+// We consider "+-" as a mixed polarity type
+const onlyMixedPolaritySelected = computed(() => {
+  const allMixed = app.data.acquisition.selected.every(({polarity}) => polarity === '+-')
+  const moreThanOneSelected = app.data.acquisition.selected.length > 1
+  const polarityNotSpecified = ['','+-'].includes(polarityDropdown.value)
+  return allMixed && moreThanOneSelected && polarityNotSpecified
 })
 
 // Watch for polarity changes and clear selected acquisitions
-watch(polarityFilter, () => {
+watch(polarityDropdown, () => {
   app.data.acquisition.selected = [] // Clear selected acquisitions
+})
+
+const derivedPolarity = computed(() => {
+  if (['+', '-'].includes(polarityDropdown.value)) {
+    return polarityDropdown.value
+  }
+  const hasPositive = app.data.acquisition.selected.some(({ polarity }) => polarity === '+')
+  const hasNegative = app.data.acquisition.selected.some(({ polarity }) => polarity === '-')
+  const hasMixed = app.data.acquisition.selected.some(({ polarity }) => polarity === '+-')
+  if (hasPositive && hasMixed) {
+    return '+'
+  }
+  if (hasNegative && hasMixed) {
+    return '-'
+  }
+  return null
 })
 
 watchEffect(() => {
@@ -126,14 +135,14 @@ watchEffect(() => {
             :class="'full ' + (app.data.acquisition.time.mode == 'range' ? '' : 'inactive')"
           />
         </FloatLabel>
-        <!-- Polarity Dropdown -->
         <Select
           inputId="polarity"
-          v-model="polarityFilter"
-          :options="['', '+', '-']"
+          v-model="polarityDropdown"
+          :options="['+-', '+', '-']"
           style="max-width: 125px"
           placeholder="Polarity"
         />
+        <div style="flex-grow: 1; flex-shrink: 1" />
         <FloatLabel style="flex-grow: 1; max-width: 250px">
           <label>Search</label>
           <IconField class="full">
@@ -150,10 +159,12 @@ watchEffect(() => {
           :disabled="
             app.data.acquisition.selected?.length == 0 ||
             !app.data.batch.focused ||
-            !app.data.acquisition.list.length ||
-            hasMixedPolarities ||
-            polarityNotSpecified
+            hasBothPolarities ||
+            onlyMixedPolaritySelected
           "
+          :tooltip="!app.data.batch.focused || app.data.acquisition.selected.length === 0 
+            ? 'Select acquisitions and a batch in order to process sample files' 
+            : ''"
           @click="
             () => {
               if (app.data.acquisition.focused) {
@@ -190,7 +201,22 @@ watchEffect(() => {
           </strong>
           <div v-else style="min-width: 11ch" />
         </template>
-        <template #paginatorend> <div style="min-width: 12ch" /> </template>
+        <template #paginatorend>
+          <div class="info-text">
+            <span v-if="!app.data.batch.focused">
+              <span class="pi pi-info-circle"/>
+              Select a batch to process the files.
+            </span>
+            <span v-else-if="hasBothPolarities">
+              <span class="pi pi-info-circle"/>
+              Cannot process files with both "+" and "-" polarities selected.
+            </span>
+            <span v-else-if="onlyMixedPolaritySelected">
+              <span class="pi pi-info-circle"/>
+              Only mixed polarity files selected. Please choose a polarity from the dropdown.
+            </span>
+          </div>
+        </template>
       </DataTable>
       <div v-else class="center" style="min-height: 150px">
         <i class="info-line"> <span class="pi pi-inbox" /><span>No acquisitions found</span> </i>
@@ -203,38 +229,13 @@ watchEffect(() => {
       <DialogBatchImport
         v-model:visible="dialog.batchImport"
         :files="app.data.acquisition.selected"
+        :polarity="derivedPolarity"
         @submit="app.data.acquisition.unfocus()"
       />
       <DialogFileUpload :files="uploadedFiles" />
       <i class="info-line">
         <span class="pi pi-file-arrow-up" /><span>Drag sample files here to upload them</span>
       </i>
-      <div class="warning-plate-container">
-        <Message
-          v-if="!app.data.batch.focused"
-          class="warning-plate"
-          severity="warn"
-          icon="pi pi-exclamation-triangle"
-        >
-          <span>Select the batch to process the files.</span>
-        </Message>
-        <Message
-          v-if="hasMixedPolarities"
-          class="warning-plate"
-          severity="warn"
-          icon="pi pi-exclamation-triangle"
-        >
-          <span>Cannot process files with both "+" and "-" polarities selected.</span>
-        </Message>
-        <Message
-          v-if="polarityNotSpecified"
-          class="warning-plate"
-          severity="warn"
-          icon="pi pi-exclamation-triangle"
-        >
-            <span>Files with mixed polarities are selected. Please specify a polarity.</span>
-        </Message>
-      </div>
     </template>
   </FileUpload>
 </template>
@@ -245,20 +246,6 @@ watchEffect(() => {
   align-items: baseline;
   height: fit-content;
   width: 100%;
-}
-
-.warning-plate {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  max-width: fit-content;
-  margin-bottom: 0.5rem;
-}
-
-.warning-plate-container {
-  display: flex;
-  align-items: flex-start;
-  flex-flow: column;
 }
 
 menu {
@@ -297,4 +284,17 @@ menu :deep(.full) {
   gap: 0.5rem;
   margin: 0.5rem;
 }
+
+.info-text .pi {
+  display: inline-flex;
+  align-items: center;
+  font-size: 1.2em;
+  vertical-align: middle;
+}
+
+.info-text {
+  font-style: italic;
+}
+
+
 </style>

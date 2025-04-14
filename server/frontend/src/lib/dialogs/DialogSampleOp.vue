@@ -118,6 +118,10 @@ async function init(active) {
   input.instrument = original.value?.instrument
   input.filterId = original.value?.filter_id ?? null
   input.type = original.value?.sample_item_type ?? null
+  input.polarity = original.value?.polarity ?? null
+  if (polarityOptions.value.length === 1) {
+    input.polarity = polarityOptions.value[0].value
+  }
   instrumentConfig.status = {}
   instrumentConfig.input = {}
   instrumentConfig.payload = {}
@@ -250,7 +254,9 @@ const invalid = computed(() => {
     input.fields?.filter((f) => f?.required).length !=
     input.fields?.filter((f) => f?.required).filter((f) => f.value).length
   const invalidUpdate = action.value === 'update' && !changedInput.value // * see note below
-  return !input.type || !input.polarity || missingRequiredFields || instrumentConfig.status?.invalid || invalidUpdate
+  const allowedPolarities = ['+', '-'];
+  const polarityInvalid = !allowedPolarities.includes(input.polarity);
+  return !input.type || polarityInvalid || missingRequiredFields || instrumentConfig.status?.invalid || invalidUpdate
 })
 
 const polarityOptions = computed(() => {
@@ -266,16 +272,6 @@ const polarityOptions = computed(() => {
       ];
     default:
       return [{label: 'Unknown', value: null }];
-  }
-})
-
-const isPolarityFrozen = ref(false);
-watchEffect(() => {
-  if (polarityOptions.value.length === 1) {
-    input.polarity = polarityOptions.value[0].value;
-    isPolarityFrozen.value = true;
-  } else {
-    isPolarityFrozen.value = false;
   }
 })
 
@@ -350,7 +346,7 @@ watchEffect(() => {
                   dataKey="value"
                   optionValue="value"
                   optionLabel="label"
-                  :disabled="isPolarityFrozen"
+                  :disabled="polarityOptions.length === 1"
                 />
                 <label for="item-type"> Polarity </label>
               </FloatLabel>

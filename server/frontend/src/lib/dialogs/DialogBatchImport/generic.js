@@ -47,12 +47,14 @@ export const generic = {
       return newSample
     })
   },
-  preprocess: (acquisitions, parsed) => {
+  preprocess: (acquisitions, parsed, polarity) => {
     const app = useApp()
+    const polarities = Array(acquisitions.length).fill(polarity)
+
     return parsed.map((parsed, index) => ({
       datetime: acquisitions[index]?.datetime ?? null,
       filename: acquisitions[index]?.filename ?? null,
-      polarity: acquisitions[index]?.polarity ?? null,
+      polarity: polarities[index],
       ...parsed,
       sample_batch_id: app.data.batch.focused.sample_batch_id
     }))
