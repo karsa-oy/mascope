@@ -80,7 +80,17 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
 
   watch(
     () => instrument.focused,
-    () => unfocus()
+    (next, prev) => {
+      // clear selection
+      unfocus()
+      // update socket subscriptions
+      if (prev) {
+        api.socket.emit('unsubscribe', prev.instrument)
+      }
+      if (next) {
+        api.socket.emit('subscribe', next.instrument)
+      }
+    }
   )
 
   // acquisitions
@@ -127,6 +137,10 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
       list.value = recent
     }
   }
+
+  api.socket.on('acquisitions_reload', () => {
+    load()
+  })
 
   ui.notification.on('instrument_acquisition', ({ process_id, data, status }) => {
     if (mode.value) {
