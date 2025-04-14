@@ -1,4 +1,4 @@
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, shallowRef, computed, watch, onMounted } from 'vue'
 import { defineStore } from 'pinia'
 
 import { api } from '@/api'
@@ -36,7 +36,7 @@ export const defineModule = ({
     // DATA
 
     // raw data
-    const records = ref([])
+    const records = shallowRef([])
     // read-only data
     const list = computed(() => {
       // aggregation / joins
@@ -54,12 +54,14 @@ export const defineModule = ({
     //  focused   |  record / null |  Bindable (read/write)  |  Computed (read-only)
 
     // This allows you to count on both APIs being available for read scenarios
-    // but ensures you don't accidently corrupt state through inconsistent binds.
+    // but ensures you don't accidently corrupt state through inconsisteshallowRe binds.
 
     // state
-    const selected = multiselect ? ref([]) : computed(() => (focused.value ? [focused.value] : []))
+    const selected = multiselect
+      ? shallowRef([])
+      : computed(() => (focused.value ? [focused.value] : []))
     const focused = singleselect
-      ? ref(null)
+      ? shallowRef(null)
       : computed(() => (selected.value?.length === 1 ? selected.value[0] : null))
     const focusedId = computed(() => (focused.value ? focused.value[key] : null))
     const selectedIds = computed(() => selected.value.map((record) => record[key]))
