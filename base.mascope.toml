@@ -23,7 +23,7 @@ color = "green"
 database = './database'
 filestreams = './filestreams'
 # scripts
-run = "uv run mascope backend run api-server"
+run = "uv run mascope-backend run api-server"
 
 
 [file-converter]
@@ -36,7 +36,7 @@ source = './filestreams'
 raw_threads = 1
 h5_threads = 1
 # scripts
-run = "uv run mascope backend run file-converter"
+run = "uv run mascope-backend run file-converter"
 
 
 [frontend]
