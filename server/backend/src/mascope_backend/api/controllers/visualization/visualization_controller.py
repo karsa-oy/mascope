@@ -7,14 +7,15 @@ from colorcet import glasbey_hv as colormap
 from mascope_file.io import load_file
 from mascope_file.name import get_instrument_type
 
-from mascope_signal.compute import get_sum_signal
+from mascope_signal.compute import get_sum_signal, get_scan_timestamps
 from mascope_signal.peak import filter_peaks, get_peaks
 
 from mascope_backend.db import async_session
-from mascope_backend.db.models import Sample, TargetIsotope
+from mascope_backend.db.models import TargetIsotope
 from mascope_backend.socket import sio
 from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
 from mascope_backend.api.lib.api_features import api_controller_background_task
+from mascope_backend.api.controllers.samples.samples_controller import get_sample
 
 from mascope_backend.runtime import runtime
 
@@ -62,16 +63,17 @@ async def visualize_ion_focus(
     :raises NotFoundException: If the sample item or target ion does not exist or does not meet the specified criteria.
     """
     # Step 1: Fetch sample filename and target ion data from the database
-    async with async_session() as session:
-        # Fetch sample filename
-        stmt = select(Sample.filename).where(Sample.sample_item_id == sample_item_id)
-        result = await session.execute(stmt)
-        filename = result.scalar_one_or_none()
-        if not filename:
-            raise NotFoundException(f"Sample with ID {sample_item_id} not found")
-        instrument_type = get_instrument_type(filename)
-        isotope_resolution = "LOW" if instrument_type == "tof" else "HIGH"
+    sample_result = await get_sample(sample_item_id)
+    sample = sample_result.get("data")
+    filename = sample.get("filename")
+    if not filename:
+        raise NotFoundException(f"Sample with ID {sample_item_id} not found")
+    polarity = sample.get("polarity")
 
+    instrument_type = get_instrument_type(filename)
+    isotope_resolution = "LOW" if instrument_type == "tof" else "HIGH"
+
+    async with async_session() as session:
         # Fetch target ion data
         stmt = select(TargetIsotope).where(
             TargetIsotope.target_ion_id == target_ion_id,
@@ -185,6 +187,11 @@ async def visualize_ion_focus(
             if match:
                 # Timeseries trace
                 match_timeseries = peak_profiles.sel(mz=peak_mz)
+                if polarity:
+                    time_scan = get_scan_timestamps(filename, polarity=polarity)
+                    match_timeseries = match_timeseries.sel(
+                        time=time_scan, method="nearest"
+                    )
                 timeseries_time = match_timeseries.time.values.astype(np.float32)
                 timeseries_y = match_timeseries.values.astype(np.float32)
                 timeseries_rgb = colormap[i + COLOR_OFFSET]

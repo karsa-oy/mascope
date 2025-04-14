@@ -8,6 +8,7 @@ class MatchComputeSample(BaseModel):
     sample_batch_id: str = Field(..., description="ID of the sample batch")
     filename: str = Field(..., description="Filename of the sample item")
     instrument: str = Field(..., description="Instrument of the sample item")
+    polarity: str = Field(..., description="Polarity of the sample item")
 
 
 class RematchBody(BaseModel):

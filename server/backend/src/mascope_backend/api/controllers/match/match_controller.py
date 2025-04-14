@@ -375,6 +375,7 @@ async def match_compute_sample(
     sample_batch_id = sample["sample_batch_id"]
     filename = sample["filename"]
     instrument = sample["instrument"]
+    polarity = sample["polarity"]
 
     # Check if 'verified' exists in mz_calibration. If not, provide a default value of False
     verified = (
@@ -426,6 +427,7 @@ async def match_compute_sample(
         sample_batch_id=sample_batch_id,
         filename=filename,
         instrument=instrument,
+        polarity=polarity,
     )
 
     # Prepare progress user notification.
@@ -1097,6 +1099,7 @@ async def match_compute_batch(
             sample_batch_id=sample.sample_batch_id,
             filename=sample.filename,
             instrument=sample.instrument,
+            polarity=sample.polarity,
         )
 
         # Prepare progress user notification.

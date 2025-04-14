@@ -261,6 +261,7 @@ async def aggregate_sample_match_compound(
             filename=sample.filename,
             target_isotopes_df=target_isotopes_df,
             min_isotope_abundance=match_params.min_isotope_abundance,
+            polarity=sample.polarity,
         )
 
         # Drop the 'index' column from the match_isotope_df DataFrame
@@ -436,6 +437,7 @@ async def aggregate_sample_match_compounds(
             filename=sample.filename,
             target_isotopes_df=target_isotopes_df,
             min_isotope_abundance=match_params.min_isotope_abundance,
+            polarity=sample.polarity,
         )
 
         # Drop the 'index' column from the match_isotope_df DataFrame

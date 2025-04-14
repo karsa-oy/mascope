@@ -1,3 +1,4 @@
+from typing import Literal
 import pandas as pd
 import numpy as np
 from mascope_backend.api.new.match.params.schema import (
@@ -6,7 +7,7 @@ from mascope_backend.api.new.match.params.schema import (
 from mascope_file.io import load_array, load_file
 from mascope_file.name import get_instrument_type, get_sample_file_type
 
-from mascope_signal.compute import get_sum_signal
+from mascope_signal.compute import get_sum_signal, get_scan_timestamps
 from mascope_signal.peak import calculate_signal_area, detect_peaks
 
 from mascope_chem.mz import match_mz
@@ -44,18 +45,17 @@ from mascope_backend.api.new.match.params.schema import (
 
 from mascope_backend.runtime import runtime
 
-# TODO rename sample_peak_area into sample_peak_intensity
-# TODO rename sample_peak_area_sum into sample_peak_intensity_mean
-# TODO rename sample_peak_area_relative into sample_peak_intensity_relative
-# TODO for now ...peak_area... means peak area for TOF and peak height for orbi
-
 # -------------------------------------------------------------------
 # Isotope level
 # -------------------------------------------------------------------
 
 
 async def compute_match_isotopes(
-    filename, target_isotopes_df, min_isotope_abundance, instrument_functions=None
+    filename: str,
+    target_isotopes_df: pd.DataFrame,
+    min_isotope_abundance: float,
+    instrument_functions: tuple = None,
+    polarity: Literal["+", "-"] = None,
 ):
     """
     Computes matches for specified target isotopes within a sample file.
@@ -77,6 +77,8 @@ async def compute_match_isotopes(
     :type min_isotope_abundance: float
     :param instrument_functions: Optional tuple containing peak shape details and a resolution function R.
     :type instrument_functions: tuple(dict, function), optional
+    :param polarity: Polarity of the sample, either "+", "-", or "+-".
+    :type polarity: Literal["+", "-"], optional
     :return: DataFrame with details of the matches found for each target isotope.
     :rtype: pd.DataFrame
     :raises RuntimeError: If an error occurs during the matching process.
@@ -128,6 +130,11 @@ async def compute_match_isotopes(
         if sample_file_type in ["orbi_zarr", "tof_zarr"]:
             peaks = peaks.dropna(dim="mz", how="all")
 
+        if polarity:
+            # Filter peaks based on polarity
+            time_scan = get_scan_timestamps(filename, polarity=polarity)
+            peaks = peaks.sel(time=time_scan, method="nearest")
+
         # Step 2: - Prepare data
         # init match df from target isotopes
         match_isotope_df = target_isotopes_df.copy().assign(
@@ -143,9 +150,12 @@ async def compute_match_isotopes(
         )
 
         runtime.logger.debug("Parse peak data")
-        peak_mzs = peaks.mz.values
         peak_intensities = peaks.mean(dim="time").compute().values
-        peak_tofs = peaks.tof.values
+        # Filter for non-zero intensities
+        non_zero_peaks = peak_intensities > 0
+        peak_intensities = peak_intensities[non_zero_peaks]
+        peak_mzs = peaks.mz.values[non_zero_peaks]
+        peak_tofs = peaks.tof.values[non_zero_peaks]
         peak_sorting = np.argsort(peak_mzs)
 
         # Step 3: - Perform matching
@@ -374,6 +384,7 @@ async def compute_and_create_sample_match_isotope_data(
     # Step 1: Unpack the sample parameters for ease of use
     sample_item_id = sample.sample_item_id
     filename = sample.filename
+    polarity = sample.polarity
 
     #  Sent progress user notificaton if notification is provided
     if notification:
@@ -397,6 +408,7 @@ async def compute_and_create_sample_match_isotope_data(
         filename=filename,
         target_isotopes_df=target_isotopes_df,
         min_isotope_abundance=DEFAULT_MIN_ISOTOPE_ABUNDANCE,
+        polarity=polarity,
     )
     if match_isotope_df.empty:
         raise RuntimeError("No match isotopes found")

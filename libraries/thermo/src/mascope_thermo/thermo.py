@@ -355,6 +355,9 @@ def get_tic_per_scan(
             scan_tic = scan_tic[scan_indices_python]
             scan_timestamp = scan_timestamp[scan_indices_python]
 
+        # Convert timestamp from minutes to seconds
+        scan_timestamp = scan_timestamp * 60
+
         return scan_timestamp, scan_tic
 
 
