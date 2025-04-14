@@ -49,7 +49,6 @@ const show = (severity, message) => {
 }
 
 async function process() {
-  navigator.permissions.query({ name: 'clipboard-read' })
   let text = await navigator.clipboard.readText()
   let result
   try {
