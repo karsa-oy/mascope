@@ -136,7 +136,7 @@ async def rematch_sample(
 
     # Step 2: Compute new matches based on provided added parameters
     if added_target_compound_ids or added_ionization_mechanism_ids:
-        await match_compute_sample(
+        compute_result = await match_compute_sample(
             sample_item_id=sample_item_id,
             added_target_compound_ids=added_target_compound_ids,
             added_ionization_mechanism_ids=added_ionization_mechanism_ids,
@@ -154,7 +154,7 @@ async def rematch_sample(
             process_id=gen_id(8),
             parent_id=process_id,
         )  # Remove all existing matches
-        await match_compute_sample(
+        compute_result = await match_compute_sample(
             sample_item_id=sample_item_id,
             independent_transaction=False,
             sid=sid,
@@ -166,9 +166,16 @@ async def rematch_sample(
     sample_data = await get_sample(sample_item_id)
     sample = sample_data.get("data")
     sample_item_name = sample["sample_item_name"]
+
+    # Include match status info in the message if available
+    match_compute_info = compute_result.get("message", "") if compute_result else ""
+    message = f"Sample '{sample_item_name}' was rematched."
+    if match_compute_info:
+        message = f"{message} {match_compute_info}"
+
     return {
         "data": sample,
-        "message": f"Sample '{sample_item_name}' was rematched.",
+        "message": message,
         "_notification_data": {
             "sample_item_id": sample_item_id,
         },
@@ -450,21 +457,26 @@ async def match_compute_sample(
         },
     )
 
-    await compute_and_create_sample_match_isotope_data(
+    # Compute match data
+    match_data = await compute_and_create_sample_match_isotope_data(
         sample_pydantic, target_isotopes_df, notification
     )
 
     # Step 5: Aggregate and save match_ions, match_compounds, match_collections and match_samples
-    # This step is crucial to create higher-level matches after computing and saving the isotope-level matches.
-    await aggregate_and_create_matches(sample_item_id=sample_item_id)
+
+    # Aggregate and save higher-level matches if isotope-level matches were computed and saved
+    if not match_data["match_isotopes"].empty:
+        await aggregate_and_create_matches(sample_item_id=sample_item_id)
+        message = f"Match isotopes and interferences computed for sample '{sample_item_name}'."
+    else:
+        message = f"No matches found for sample '{sample_item_name}'."
 
     # Step 6: Return sample with computed match data and status message
     sample_data = await get_sample(sample_item_id)
     sample = sample_data.get("data")
-    sample_item_name = sample["sample_item_name"]
     return {
         "data": sample,
-        "message": f"Match isotopes and interferences computed for sample '{sample_item_name}'.",
+        "message": message,
         "_notification_data": {"sample_item_id": sample_item_id},
     }
 
@@ -887,7 +899,7 @@ async def rematch_batch(
                 match_isotopes=False,
                 match_ions=False,
             )
-        await match_compute_batch(
+        compute_result = await match_compute_batch(
             sample_batch_id=sample_batch_id,
             added_target_compound_ids=added_target_compound_ids,
             added_ionization_mechanism_ids=added_ionization_mechanism_ids,
@@ -916,7 +928,7 @@ async def rematch_batch(
             process_id=gen_id(8),
             parent_id=process_id,
         )  # Remove all existing matches
-        await match_compute_batch(
+        compute_result = await match_compute_batch(
             sample_batch_id=sample_batch_id,
             independent_transaction=False,
             sid=sid,
@@ -925,9 +937,16 @@ async def rematch_batch(
         )  # Compute matches for all targets
 
     # Step 6: Return sample batch data and message
+
+    # Include match status info in the message if available
+    message = (
+        compute_result.get("message", "")
+        if compute_result
+        else f"Sample batch '{sample_batch_name}' was rematched."
+    )
     return {
         "data": sample_batch.to_dict(),
-        "message": f"Sample batch '{sample_batch_name}' was rematched.",
+        "message": message,
         "_notification_data": {"sample_batch_id": sample_batch_id},
     }
 
@@ -1090,6 +1109,7 @@ async def match_compute_batch(
 
     # Step 4: Process each sample item for match computation and send progress user notification.
     samples_compute_failed = []
+    samples_with_matches = []
     total_samples = len(samples)
     for item_index, sample in enumerate(samples):
         # Prepare data for match computation
@@ -1156,9 +1176,13 @@ async def match_compute_batch(
 
             # Step 5: Compute and save match_isotopes and match_interferences for the sample items that passed all checks,
             # where new target isotopes are identified, m/z calibration is verified.
-            await compute_and_create_sample_match_isotope_data(
+            match_data = await compute_and_create_sample_match_isotope_data(
                 sample_pydantic, filtered_target_isotopes_df, notification
             )
+
+            # Track samples that had matches for reporting
+            if not match_data["match_isotopes"].empty:
+                samples_with_matches.append(sample.sample_item_name)
         except ApiException as e:
             # If an exception occurs during sample match computation, log the error and add the sample to the failed list
             runtime.logger.info(
@@ -1190,9 +1214,18 @@ async def match_compute_batch(
         )
 
     # Step 8: Return sample batch data and message
+    message = f"Match isotopes and interferences computed for sample batch '{sample_batch_name}'."
+    if samples_with_matches:
+        match_count = len(samples_with_matches)
+        match_message = (
+            f" Matches found in {match_count} sample{'s' if match_count != 1 else ''}."
+        )
+        message += match_message
+    else:
+        message += " No matches were found in any samples."
     return {
         "data": sample_batch.to_dict(),
-        "message": f"Match isotopes and interferences computed for sample batch '{sample_batch_name}'.",
+        "message": message,
         "_notification_data": {"sample_batch_id": sample_batch_id},
     }
 

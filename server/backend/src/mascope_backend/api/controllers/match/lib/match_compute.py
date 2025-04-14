@@ -420,13 +420,15 @@ async def compute_and_create_sample_match_isotope_data(
     :param target_isotopes_df: A DataFrame containing target isotope information for match computation.
     :type target_isotopes_df: DataFrame
     :param notification: Optional notification for sending progress user notifications of match computation.
-    :type notification: UserNotification, optional
-    :raises RuntimeError: If no match interferences or match isotopes are found during computation.
+    :type notification: UserNotification | None
+    :return: Dictionary containing match_isotopes and match_interferences DataFrames
+    :rtype: dict[str, pd.DataFrame]
     """
     # Step 1: Unpack the sample parameters for ease of use
     sample_item_id = sample.sample_item_id
     filename = sample.filename
     polarity = sample.polarity
+    sample_item_name = sample.sample_item_name
 
     #  Sent progress user notificaton if notification is provided
     if notification:
@@ -438,7 +440,10 @@ async def compute_and_create_sample_match_isotope_data(
         filename, target_isotopes_df
     )
     if match_interference_df.empty:
-        raise RuntimeError("No match interferences found")
+        runtime.logger.warning(
+            f"No match interferences found for sample '{sample_item_name}'"
+        )
+
     # Send progress user notificaton after computing interferences
     if notification:
         await send_progress_user_notification(notification, 0.5)
@@ -453,27 +458,38 @@ async def compute_and_create_sample_match_isotope_data(
         polarity=polarity,
     )
     if match_isotope_df.empty:
-        raise RuntimeError("No match isotopes found")
+        runtime.logger.warning(
+            f"No match isotopes found for sample '{sample_item_name}'"
+        )
+
     # Send progress user notificaton after computing match isotopes
     if notification:
         await send_progress_user_notification(notification, 0.75)
 
     # Step 4: Save to the database computed match interferences and isotopes if any were found
-    match_interference_df["sample_item_id"] = sample_item_id
-    match_isotope_df["sample_item_id"] = sample_item_id
+    if not match_interference_df.empty:
+        match_interference_df["sample_item_id"] = sample_item_id
+        # Convert the DataFrame to a list of Pydantic models
+        match_interferences = [
+            MatchInterferenceBase(**row)
+            for row in match_interference_df.to_dict(orient="records")
+        ]
+        await create_match_interferences(match_interferences)
 
-    # Convert the DataFrame to a list of Pydantic models
-    match_interferences = [
-        MatchInterferenceBase(**row)
-        for row in match_interference_df.to_dict(orient="records")
-    ]
-    match_isotopes = [
-        MatchIsotopeBase(**row) for row in match_isotope_df.to_dict(orient="records")
-    ]
-
-    await create_match_interferences(match_interferences)
-    await create_match_isotopes(match_isotopes)
+    if not match_isotope_df.empty:
+        match_isotope_df["sample_item_id"] = sample_item_id
+        # Convert the DataFrame to a list of Pydantic models
+        match_isotopes = [
+            MatchIsotopeBase(**row)
+            for row in match_isotope_df.to_dict(orient="records")
+        ]
+        await create_match_isotopes(match_isotopes)
 
     # Send progress user notificaton indicating completion of compute_and_create_sample_match_isotope_data process
     if notification:
         await send_progress_user_notification(notification, 0.95)
+
+    return {
+        "match_isotopes": match_isotope_df,
+        "match_interferences": match_interference_df,
+    }
