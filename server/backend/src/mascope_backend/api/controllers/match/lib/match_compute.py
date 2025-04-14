@@ -41,6 +41,7 @@ from mascope_backend.api.new.instrument_configs.lib import (
 from mascope_backend.api.new.match.params.schema import (
     ORBI_FITTING_THRESHOLD,
     TOF_FITTING_THRESHOLD,
+    UnmatchedIsotopeParams,
 )
 
 from mascope_backend.runtime import runtime
@@ -58,16 +59,27 @@ async def compute_match_isotopes(
     polarity: Literal["+", "-"] = None,
 ):
     """
-    Computes matches for specified target isotopes within a sample file.
+    Compute matches between target isotopes and sample file peaks.
 
-    This function identifies the best matching peaks within the sample spectrum for each target isotope based on
-    their m/z values. It computes match statistics such as match score, m/z error, and isotope correlation.
+    This function identifies the best matching peaks within the sample spectrum for each target isotope
+    based on their m/z values and computes match statistics. For isotopes without matching peaks,
+    default values are assigned with a match score of 0.
 
     Steps:
     1. Load peaks from the sample file and prepare the data for matching.
-    2. MatchIsotope each target isotope to the closest peak within a predefined m/z tolerance window.
+    2. Match each target isotope to the closest peak within a predefined m/z tolerance window.
     3. Compute match statistics such as isotope correlations, m/z errors, and match score.
-    4. Return a DataFrame containing the match details for each target isotope.
+    4. Assign default values for isotopes without matching peaks.
+    5. Return a DataFrame containing the match details for each target isotope.
+
+    Steps:
+    1. Initialize parameters and load data from the sample file.
+    2. Detect peaks in the sample file for potential matches.
+    3. Create initial dataframe with placeholders for all target isotopes.
+    4. Perform matching between target isotopes and sample peaks.
+    5. Calculate match statistics for isotopes with actual matches.
+    6. Assign default values for isotopes without matching peaks.
+    7. Return a DataFrame containing match details for all target isotopes.
 
     :param filename: Path to the sample file to be analyzed for matches.
     :type filename: str
@@ -84,23 +96,28 @@ async def compute_match_isotopes(
     :raises RuntimeError: If an error occurs during the matching process.
 
     Notes:
-        - Matching is done on isotope-level. Ion, compound and collection level matches are aggregated from
-        isotope-level matches on read sample operation; see the samples_controller.py for this aggregation.
+    - Matching is done at the isotope level. Ion, compound and collection level matches are
+      aggregated in a separate process.
+    - Isotopes without matching peaks are assigned a match score of 0 and placeholder values
+      for the required database fields.
 
     TODO min_isotope_abundance will be passed from the match_params
     """
     try:
-        # Check if instrument functions were passed
+        # Step 1: Initialize parameters and load data
         if instrument_functions is None:
             instrument_functions = await read_instrument_functions(filename)
+
         instrument_type = get_instrument_type(filename)
+        resolution_type = "LOW" if instrument_type == "tof" else "HIGH"
+        unmatched_defaults = UnmatchedIsotopeParams()
 
         # Filter isotopes below threshold and with incorrect resolution
-        resolution_type = "LOW" if instrument_type == "tof" else "HIGH"
         query = "relative_abundance >= @min_isotope_abundance and resolution == @resolution_type"
         target_isotopes_df = target_isotopes_df.query(query).reset_index(drop=True)
 
-        # Step 1: - Load or detect peaks
+        # Step 2: - Detect peaks in the sample file
+
         # Find peaks and write to file
         u_list = list(np.unique(np.round(target_isotopes_df.mz)))
 
@@ -110,6 +127,8 @@ async def compute_match_isotopes(
             threshold = ORBI_FITTING_THRESHOLD
         if instrument_type == "tof":
             threshold = TOF_FITTING_THRESHOLD
+
+        # Detect peaks in the sample file
         await detect_peaks(
             filename,
             instrument_functions,
@@ -121,6 +140,7 @@ async def compute_match_isotopes(
 
         runtime.logger.debug("Start matching")
 
+        # Load the appropriate peak data based on instrument type
         if instrument_type == "orbi":
             peaks = load_array(filename, "peak_heights").peak_heights
         if instrument_type == "tof":
@@ -138,7 +158,9 @@ async def compute_match_isotopes(
         # Step 2: - Prepare data
         # init match df from target isotopes
         match_isotope_df = target_isotopes_df.copy().assign(
-            match_isotope_id=np.nan,
+            match_isotope_id=[
+                gen_id(length=32) for _ in range(len(target_isotopes_df))
+            ],
             sample_peak_id=np.nan,
             sample_peak_mz=np.nan,
             sample_peak_intensity=np.nan,
@@ -146,9 +168,11 @@ async def compute_match_isotopes(
             match_abundance_error=np.nan,
             match_isotope_correlation=np.nan,
             match_mz_error=np.nan,
-            match_score=np.nan,
+            match_score=unmatched_defaults.match_score,
+            sample_peak_tof=np.nan,
         )
 
+        # Step 4: Extract peak data for matching
         runtime.logger.debug("Parse peak data")
         peak_intensities = peaks.mean(dim="time").compute().values
         # Filter for non-zero intensities
@@ -158,43 +182,42 @@ async def compute_match_isotopes(
         peak_tofs = peaks.tof.values[non_zero_peaks]
         peak_sorting = np.argsort(peak_mzs)
 
-        # Step 3: - Perform matching
-
+        # Step 5: Perform matching
         def match(row):
             # Get all peaks within unit mass window
             mz_tolerance = 0.5
             target_mz = row.mz
-            match_indeces, _ = match_mz(
+            match_indices, _ = match_mz(
                 target_mz, peak_mzs[peak_sorting], tolerance=mz_tolerance
             )
+
             # Find closest match
-            for match_index in match_indeces:
-                # get match peak
+            for match_index in match_indices:
+                # Get match peak
                 peak_index = peak_sorting[match_index]
                 peak_mz = peak_mzs[peak_index]
                 peak_intensity = peak_intensities[peak_index]
-                # check current best match
+
+                # Check if better than current match
                 best_match = row.sample_peak_id
                 if not np.isnan(best_match):
-                    prev_mz_err = np.abs(row.sample_peak_mz - target_mz)
-                    new_mz_err = np.abs(peak_mz - target_mz)
+                    prev_mz_err = abs(row.sample_peak_mz - target_mz)
+                    new_mz_err = abs(peak_mz - target_mz)
                     if new_mz_err > prev_mz_err:
                         continue
-                # save match
-                row["match_isotope_id"] = gen_id(length=32)
+
+                # Save match
                 row["sample_peak_id"] = peak_index
                 row["sample_peak_mz"] = peak_mz
                 row["sample_peak_tof"] = peak_tofs[int(peak_index)]
                 row["sample_peak_intensity"] = peak_intensity
             return row
 
-        match_isotope_df = (
-            match_isotope_df.apply(match, axis=1)
-            .dropna(subset=["sample_peak_mz"])
-            .reset_index()
-        )
+        # Apply matching to all isotopes
+        match_isotope_df = match_isotope_df.apply(match, axis=1).reset_index()
 
-        # Step 4: - Calculate match stats
+        # Create a mask for matched isotopes (those with actual peak data)
+        matched_mask = ~match_isotope_df["sample_peak_mz"].isna()
 
         # calculate isotope ratios
         # calculate mean matched sample peak heights for each ion
@@ -243,27 +266,46 @@ async def compute_match_isotopes(
                     )
                 )
             )
-        )
-        match_isotope_df["match_isotope_correlation"] = match_isotope_df[
-            "match_isotope_correlation"
-        ].fillna(value=0)
+            match_isotope_df["match_isotope_correlation"] = match_isotope_df[
+                "match_isotope_correlation"
+            ].fillna(0.0)
 
-        # calculate mz errors
-        match_isotope_df.loc[:, "match_mz_error"] = (
-            1e6
-            * (match_isotope_df["sample_peak_mz"] - match_isotope_df["mz"])
-            / match_isotope_df["mz"]
-        )
-
-        def score(row):
-            row["match_score"] = (1 - abs(row.match_abundance_error)) * max(
-                0, (1 - 1e-2 * abs(row.match_mz_error))
+            # Calculate m/z errors (in ppm)
+            match_isotope_df.loc[:, "match_mz_error"] = (
+                1e6
+                * (match_isotope_df["sample_peak_mz"] - match_isotope_df["mz"])
+                / match_isotope_df["mz"]
             )
-            return row
 
-        match_isotope_df = match_isotope_df.apply(
-            score, axis=1, result_type="broadcast"
-        )
+            # Calculate match scores
+            def score(row):
+                row["match_score"] = (1 - abs(row.match_abundance_error)) * max(
+                    0, (1 - 1e-2 * abs(row.match_mz_error))
+                )
+                return row
+
+            match_isotope_df = match_isotope_df.apply(
+                score, axis=1, result_type="broadcast"
+            )
+
+        # Step 7: Set default values for unmatched isotopes
+        unmatched_mask = ~matched_mask
+        if unmatched_mask.any():
+            unmatched_count = unmatched_mask.sum()
+            runtime.logger.info(
+                f"Found {unmatched_count} isotopes without matching peaks"
+            )
+
+            # Set sample_peak_mz for unmatched isotopes using target m/z values
+            match_isotope_df.loc[unmatched_mask, "sample_peak_mz"] = (
+                match_isotope_df.loc[unmatched_mask, "mz"]
+            )
+
+            # Apply all defaults except sample_peak_mz which was handled above
+            for column, value in unmatched_defaults.model_dump().items():
+                if column != "sample_peak_mz":
+                    match_isotope_df.loc[unmatched_mask, column] = value
+
         return match_isotope_df
     except Exception as e:
         error_message = f"Computing matches failed: {e}"
@@ -360,7 +402,7 @@ async def compute_and_create_sample_match_isotope_data(
     sample: MatchComputeSample,
     target_isotopes_df,
     notification: UserNotification = None,
-):
+) -> dict[str, pd.DataFrame]:
     """
     Computes matc isotopes and match interferences for a given sample against a set of target isotopes.
 
