@@ -61,10 +61,12 @@ def get_scan_timestamps(
                 time_arrays = [z[group]["time"][:] for group in groups]
                 time_array = np.concatenate(time_arrays)
                 # Filter by time if t_min and/or t_max are provided
+                # Using epsilon to avoid floating point precision issues
+                epsilon = np.finfo(np.float64).eps * max(time_array)
                 if t_min is not None:
-                    time_array = time_array[time_array >= t_min]
+                    time_array = time_array[time_array >= t_min - epsilon]
                 if t_max is not None:
-                    time_array = time_array[time_array <= t_max]
+                    time_array = time_array[time_array <= t_max + epsilon]
 
             return time_array
 

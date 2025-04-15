@@ -1,5 +1,5 @@
 import os
-import sys
+import gc
 import sqlite3
 import asyncio
 
@@ -31,6 +31,7 @@ async def db_restore(tables_to_restore=None):
 
     :param tables_to_restore: List of tables to restore, defaults to restoring all tables.
     """
+    gc.collect()
     await create_db_backup()
 
     # Determine the current version and paths

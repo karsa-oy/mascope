@@ -555,6 +555,10 @@ table_configs = {
             "sample_item_utc_created": ("TIMESTAMP", 0, None, 0),
             "sample_item_utc_modified": ("TIMESTAMP", 0, None, 0),
             "filter_id": ("VARCHAR(6)", 0, None, 0),
+            "tic": ("FLOAT", 0, None, 0),
+            "polarity": ("VARCHAR(1)", 0, None, 0),
+            "t0": ("FLOAT", 0, None, 0),
+            "t1": ("FLOAT", 0, None, 0),
         },
         "fks": {
             "sample_batch_id": (
@@ -575,7 +579,11 @@ table_configs = {
                 sample_item_attributes JSON,
                 sample_item_utc_created TIMESTAMP,
                 sample_item_utc_modified TIMESTAMP,
-                filter_id VARCHAR(6)
+                filter_id VARCHAR(6),
+                tic FLOAT,
+                polarity VARCHAR(1),
+                t0 FLOAT,
+                t1 FLOAT
             );
         """,
         "indexes": [
@@ -595,8 +603,7 @@ table_configs = {
             "length": ("FLOAT", 0, None, 0),
             "range": ("JSON", 0, None, 0),
             "mz_calibration": ("JSON", 0, None, 0),
-            "tic": ("FLOAT", 0, None, 0),
-            "polarity": ("VARCHAR(1)", 0, None, 0),
+            "polarity": ("VARCHAR(4)", 0, None, 0),
         },
         "fks": {
             "instrument_function_id": (
@@ -617,9 +624,8 @@ table_configs = {
                 datetime_utc TIMESTAMP, 
                 length FLOAT, 
                 range JSON, 
-                mz_calibration JSON, 
-                tic FLOAT, 
-                polarity VARCHAR(1), 
+                mz_calibration JSON,
+                polarity VARCHAR(4),
                 PRIMARY KEY (sample_file_id), 
                 FOREIGN KEY(instrument_function_id) REFERENCES instrument_function (instrument_function_id) ON DELETE SET NULL, 
                 UNIQUE (filename)

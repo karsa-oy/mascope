@@ -13,6 +13,7 @@ from mascope_backend.db import (
 )
 from mascope_backend.db.ops.maintenance import db_maintenance
 from mascope_backend.db.ops.backup import create_db_backup
+from mascope_backend.db.ops.restore import db_restore
 from mascope_backend.db.models import SampleItem
 from mascope_backend.runtime import runtime
 from mascope_signal.compute import get_scan_timestamps
@@ -60,17 +61,17 @@ async def modify_schema():
         await session.execute(text("ALTER TABLE sample_item ADD COLUMN t1 FLOAT;"))
 
         runtime.logger.info(
-            "Update sample_item tic and polarity columns with data from sample_view..."
+            "Update sample_item tic and polarity columns with data from sample_file..."
         )
         await session.execute(
             text(
                 """
             UPDATE sample_item
             SET 
-                polarity = sample_view.polarity,
-                tic = sample_view.tic
-            FROM sample_view
-            WHERE sample_item.sample_item_id = sample_view.sample_item_id;
+                polarity = sample_file.polarity,
+                tic = sample_file.tic
+            FROM sample_file
+            WHERE sample_item.filename = sample_file.filename;
         """
             )
         )
@@ -89,6 +90,10 @@ async def modify_schema():
 
         await session.commit()
         runtime.logger.info("Schema migration completed successfully!")
+
+        runtime.logger.info("Restore tables with schema inconsistencies if any...")
+        await db_restore()  # To curate sample_file polarity column type to VARCHAR(4)
+        await db_maintenance()
 
 
 async def populate_time_range(session):

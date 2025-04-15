@@ -588,7 +588,7 @@ def fit_n_peaks(
     :rtype: tuple
     """
     if not len(y):
-        return None, None
+        return None, None, []
 
     # Convert peak shape
     peak_shape["x"] = np.array(peak_shape["x"], dtype=np.float64)
@@ -635,7 +635,7 @@ def fit_n_peaks(
             captured_warnings.extend(str(w.message) for w in ws)
 
         if not fit:
-            return None, []
+            return None, [], []
 
         new_residual_norm = np.linalg.norm(fit.residual)
         # Check for add new peak condition

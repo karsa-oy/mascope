@@ -132,17 +132,6 @@ class RawProcessor(Thread):
         if self.raw:
             return get_polarity_options(self.raw.FileName)
 
-    @property
-    def polarity(self) -> str | None:
-        """Polarity options in the sample file
-
-        :return: Polarity options
-        :rtype: str | None
-        """
-        if self.raw:
-            return get_polarity_options(self.raw.FileName)
-        return None
-
     def _finalize(self):
         """Finalize acquisition"""
         # Reset self

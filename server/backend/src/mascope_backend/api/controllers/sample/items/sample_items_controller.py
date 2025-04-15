@@ -234,7 +234,7 @@ async def create_sample_item(
         # Step 3: Create a new sample item
         new_sample_item = SampleItem(
             sample_item_id=gen_id(),
-            **sample_item.model_dump(),
+            **sample_item_dict,
             sample_item_utc_created=datetime.now(timezone.utc),
             sample_item_utc_modified=datetime.now(timezone.utc),
         )
