@@ -4,8 +4,9 @@ import ctypes as ct
 import platform
 import sys
 from enum import Enum
-
 import numpy as np
+import os
+
 from numpy.ctypeslib import ndpointer
 
 from mascope_tofwerk.runtime import runtime
@@ -19,19 +20,14 @@ elif platform.architecture() == ("64bit", "WindowsPE"):
 else:
     raise EnvironmentError(str(platform.architecture()))
 
-libpath = runtime.path(
-    "libraries",
-    "tofwerk",
-    "src",
-    "mascope_tofwerk",
-    "lib",
+libpath = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
     "dlls",
     libdir,
     libname[sys.platform],
 )
-runtime.logger.info(
-    f"Loading Tofwerk TofDaq DLL from: mascope_tofwerk/lib/dlls/{libdir}/{libname[sys.platform]}"
-)
+runtime.logger.info(f"Loading Tofwerk TofDaq DLL from: {libpath}")
+
 tofdaqdll = ct.cdll.LoadLibrary(libpath)
 runtime.logger.info("Succesfully Loaded Tofwerk TofDaq DLL")
 
