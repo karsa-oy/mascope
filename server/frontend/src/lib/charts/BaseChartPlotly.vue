@@ -121,8 +121,6 @@ onMounted(() => {
   plot.value.on('plotly_relayout', handleZoom)
   // mark as created
   created.value = true
-  // adapt to changes
-  Plotly.react(plot.value, props.data, derived.value.layout, derived.value.config)
 })
 onBeforeUnmount(() => {
   plot.value.removeEventListener('plotly_click', handleClick)
