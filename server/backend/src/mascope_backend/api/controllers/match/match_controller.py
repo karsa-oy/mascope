@@ -856,6 +856,7 @@ async def rematch_batch(
     await send_progress_user_notification(notification)
 
     # Step 2: Remove existing matches based on provided removed parameters
+    compute_result = ""
     if (removed_target_compound_ids and len(removed_target_compound_ids) > 0) or (
         removed_ionization_mechanism_ids and len(removed_ionization_mechanism_ids) > 0
     ):
