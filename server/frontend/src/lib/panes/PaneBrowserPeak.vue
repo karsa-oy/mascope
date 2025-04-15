@@ -37,18 +37,19 @@ const formatter = new Intl.NumberFormat('en-US', {
       size="small"
       scrollable
       scrollHeight="340px"
+      :virtualScrollerOptions="{ itemSize: 20 }"
     >
-      <Column field="mz" header="m/z" sortable>
+      <Column field="mz" header="m/z" sortable style="height: 20px">
         <template #body="{ data }">
           {{ formatter.format(data.mz) }}
         </template>
       </Column>
-      <Column field="height" header="height" sortable>
+      <Column field="height" header="height" sortable style="height: 20px">
         <template #body="{ data }">
           {{ formatter.format(data.height) }}
         </template>
       </Column>
-      <Column field="area" header="area" sortable>
+      <Column field="area" header="area" sortable style="height: 20px">
         <template #body="{ data }">
           {{ formatter.format(data.area) }}
         </template>
