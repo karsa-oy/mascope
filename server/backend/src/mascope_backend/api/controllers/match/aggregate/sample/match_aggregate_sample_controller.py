@@ -455,7 +455,7 @@ async def aggregate_sample_match_compounds(
                         x * filtered_match_isotope_df.loc[x.index, "relative_abundance"]
                     ).sum(),
                 ),
-                sample_peak_area_sum=("sample_peak_area", "sum"),
+                sample_peak_intensity_sum=("sample_peak_intensity", "sum"),
             )
             .reset_index()
         )
@@ -478,7 +478,9 @@ async def aggregate_sample_match_compounds(
                     {
                         "match_score": df.iloc[0]["match_score"],
                         "match_category": df.iloc[0]["match_category"],
-                        "sample_peak_area_sum": df["sample_peak_area_sum"].sum(),
+                        "sample_peak_intensity_sum": df[
+                            "sample_peak_intensity_sum"
+                        ].sum(),
                     }
                 )
             )
