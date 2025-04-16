@@ -79,7 +79,7 @@ export const useChartData = defineStore('chart.sample.spectrum', () => {
         hovertemplate:
           [
             '<i>Peak</i>',
-            'mz: <b>%{customdata[2]:.3e}</b>',
+            'mz: <b>%{customdata[2]:.4f}</b>',
             'height: <b>%{customdata[0]:.3e}</b>',
             'area: <b>%{customdata[1]:.3e}</b>'
           ].join('<br>') + '<extra></extra>' // use "<extra></extra>" to get rid of extra block from the hoverbox
@@ -125,7 +125,7 @@ export const useChartData = defineStore('chart.sample.spectrum', () => {
         hovertemplate:
           [
             '<i>Peak</i>',
-            'mz: <b>%{customdata[2]:.3e}</b>',
+            'mz: <b>%{customdata[2]:.4f}</b>',
             'height: <b>%{customdata[0]:.3e}</b>',
             'area: <b>%{customdata[1]:.3e}</b>'
           ].join('<br>') + '<extra></extra>'
