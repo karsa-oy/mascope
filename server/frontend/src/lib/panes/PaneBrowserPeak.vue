@@ -7,6 +7,7 @@ import Column from 'primevue/column'
 import ContextMenu from 'primevue/contextmenu'
 
 import { BaseCopyableField } from '@/lib/base'
+import { num } from '@/lib/formatters'
 import { useApp } from '@/stores'
 
 const app = useApp()
@@ -41,17 +42,17 @@ const formatter = new Intl.NumberFormat('en-US', {
     >
       <Column field="mz" header="m/z" sortable style="height: 20px">
         <template #body="{ data }">
-          {{ formatter.format(data.mz) }}
+          {{ num.mz.format(data.mz) }}
         </template>
       </Column>
       <Column field="height" header="height" sortable style="height: 20px">
         <template #body="{ data }">
-          {{ formatter.format(data.height) }}
+          {{ num.peakIntensity.format(data.height) }}
         </template>
       </Column>
       <Column field="area" header="area" sortable style="height: 20px">
         <template #body="{ data }">
-          {{ formatter.format(data.area) }}
+          {{ num.peakIntensity.format(data.area) }}
         </template>
       </Column>
     </DataTable>

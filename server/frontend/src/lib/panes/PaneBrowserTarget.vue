@@ -17,6 +17,7 @@ import {
   DialogTargetCompoundUpdate,
   DialogMechanismsOp
 } from '@/lib/dialogs'
+import { num } from '@/lib/formatters'
 
 import { useApp } from '@/stores'
 
@@ -58,11 +59,6 @@ const dialog = reactive({
   collection: null,
   compound: false,
   mechanisms: false
-})
-
-const formatter = new Intl.NumberFormat('en-US', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2
 })
 
 const tree = computed(() =>
@@ -368,7 +364,7 @@ watch(
           <template #body="{ data }">
             <BaseMatchTag
               :row="data"
-              :tooltip="`Peak intensity mean: ${formatter.format(data?.sample_peak_intensity_mean)}`"
+              :tooltip="`Peak intensity mean: ${num.peakIntensity.format(data?.sample_peak_intensity_mean)}`"
             />
           </template>
         </Column>
@@ -452,7 +448,7 @@ watch(
               <template #body="{ data }">
                 <BaseMatchTag
                   :row="data"
-                  :tooltip="`Peak intensity sum: ${formatter.format(data?.sample_peak_intensity_mean)}`"
+                  :tooltip="`Peak intensity sum: ${num.peakIntensity.format(data?.sample_peak_intensity_mean)}`"
                 />
               </template>
             </Column>
@@ -497,7 +493,7 @@ watch(
                   <template #body="{ data }">
                     <BaseMatchTag
                       :row="data"
-                      :tooltip="`Peak intensity sum: ${formatter.format(data?.sample_peak_intensity_mean)}`"
+                      :tooltip="`Peak intensity sum: ${num.peakIntensity.format(data?.sample_peak_intensity_mean)}`"
                     />
                   </template>
                 </Column>
@@ -577,19 +573,21 @@ watch(
                         <div :id="data.match_key" style="height: 100%" />
                         <BaseMatchTag
                           :row="data"
-                          :tooltip="`Peak intensity sum: ${formatter.format(data?.sample_peak_intensity)}`"
+                          :tooltip="`Peak intensity sum: ${num.peakIntensity.format(data?.sample_peak_intensity)}`"
                         />
                       </template>
                     </Column>
                     <Column style="width: 4ch" />
                     <Column header="mz" field="mz" style="width: 15ch" sortable>
                       <template #body="{ data }">
-                        <BaseCopyableField :field="formatter.format(data.mz)" />
+                        <BaseCopyableField :field="num.mz.format(data.mz)" />
                       </template>
                     </Column>
                     <Column header="r.a." field="relative_abundance" sortable>
                       <template #body="{ data }">
-                        <BaseCopyableField :field="formatter.format(data.relative_abundance)" />
+                        <BaseCopyableField
+                          :field="num.relativeAbundance.format(data.relative_abundance)"
+                        />
                       </template>
                     </Column>
                   </DataTable>

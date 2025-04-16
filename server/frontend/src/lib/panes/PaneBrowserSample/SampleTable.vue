@@ -10,6 +10,7 @@ import { useConfirm } from 'primevue/useconfirm'
 import { BaseMatchTag, BaseCopyableField } from '@/lib/base'
 import { DialogSampleOp, DialogCalibration } from '@/lib/dialogs'
 import { clone } from '@/lib/utils'
+import { num } from '@/lib/formatters'
 import { useApp } from '@/stores'
 
 import { useSampleContextMenu, useCustomizerPopover } from './stores'
@@ -87,7 +88,7 @@ const formatter = new Intl.NumberFormat('en-US', {
         <template #body="{ data }">
           <BaseMatchTag
             :row="data"
-            :tooltip="`Peak intensity sum: ${formatter.format(data?.sample_peak_intensity_mean)}`"
+            :tooltip="`Peak intensity sum: ${num.peakIntensity.format(data?.sample_peak_intensity_mean)}`"
           />
         </template>
       </Column>

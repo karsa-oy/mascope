@@ -8,6 +8,7 @@ import Tag from 'primevue/tag'
 
 import { BaseMatchTag } from '@/lib/base'
 import { clone } from '@/lib/utils'
+import { num } from '@/lib/formatters'
 import { useApp } from '@/stores'
 
 import BaseChartPlotly from '../BaseChartPlotly.vue'
@@ -105,14 +106,6 @@ const layout = computed(() => ({
   width: (width * (app.ui.split.right / 100)) / isotopeCharts.value.length
 }))
 
-const area = new Intl.NumberFormat('en-US', {
-  maximumFractionDigits: 1
-})
-const error = new Intl.NumberFormat('en-US', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2
-})
-
 // reset chart zoom when changing targets
 watch(
   // follow visualization, not focused target
@@ -156,7 +149,7 @@ watch(
       >
         <h3 :style="`color: ${isotopeChart.traces[0]?.line.color}; margin: 0`">
           <BaseMatchTag :row="isotopeChart" />
-          Isotope {{ error.format(isotopeChart.mz) }}
+          Isotope {{ num.mz.format(isotopeChart.mz) }}
         </h3>
         <!--
             This chart uses a *function ref* to enable dynamically
@@ -169,17 +162,15 @@ watch(
           -->
         <BaseChartPlotly
           :id="`ChartMatchSpectrum-${isotopeChart.target_isotope_id}`"
-          :title="`Isotope ${error.format(isotopeChart.mz)}`"
+          :title="`Isotope ${num.mz.format(isotopeChart.mz)}`"
           :ref="(el) => (plots[index] = el)"
           :data="isotopeChart.traces"
           :layout="layout"
           hideTitle
         />
-        <div
-          class="float"
-        >
+        <div class="float">
           <Tag
-            :value="`Peak ${settings.yMode} intensity: ${area.format(settings.yMode == 'average' ? isotopeChart.sample_peak_intensity : isotopeChart.sample_peak_intensity * sampleLength)}`"
+            :value="`Peak ${settings.yMode} intensity: ${num.peakIntensity.format(settings.yMode == 'average' ? isotopeChart.sample_peak_intensity : isotopeChart.sample_peak_intensity * sampleLength)}`"
             :severity="
               isotopeChart.sample_peak_intensity < app.data.match.params.ui.peak_min_intensity
                 ? 'warn'
@@ -187,7 +178,7 @@ watch(
             "
           />
           <Tag
-            :value="`mz error: ${error.format(isotopeChart.match_mz_error)}`"
+            :value="`m/z error (ppm): ${num.mzError.format(isotopeChart.match_mz_error)}`"
             :severity="
               Math.abs(isotopeChart.match_mz_error) > app.data.match.params.ui.mz_tolerance
                 ? 'warn'
@@ -196,7 +187,7 @@ watch(
           />
 
           <Tag
-            :value="`Abundance error: ${error.format(isotopeChart.match_abundance_error)}`"
+            :value="`Abundance error: ${num.relativeAbundanceError.format(isotopeChart.match_abundance_error)}`"
             :severity="
               Math.abs(isotopeChart.match_abundance_error) >
               app.data.match.params.ui.isotope_ratio_tolerance
