@@ -1,4 +1,4 @@
-import { ref, shallowRef, watchEffect } from 'vue'
+import { ref, shallowRef, watchEffect, computed } from 'vue'
 import { defineStore } from 'pinia'
 
 import { useApp } from '@/stores'
@@ -6,7 +6,7 @@ import { api } from '@/api'
 import { usePreview } from '@/lib/panes'
 
 export const useChartData = defineStore('chart.sample.spectrum', () => {
-  const traces = shallowRef([])
+  const mainTraces = shallowRef([])
   const loadedFileId = ref()
   const length = ref()
   const unit = ref('')
@@ -63,7 +63,7 @@ export const useChartData = defineStore('chart.sample.spectrum', () => {
       const intensities = data.intensity.slice(from, to + 1)
       return Math.max(...intensities)
     }
-    const newTraces = [
+    mainTraces.value = [
       {
         name: 'Peak',
         type: 'scatter' + gl,
@@ -96,7 +96,7 @@ export const useChartData = defineStore('chart.sample.spectrum', () => {
       {
         name: 'Signal',
         line: {
-          color: 'rgb(252, 79, 48)'
+          color: 'green'
         },
         mode: 'lines',
         type: 'scatter' + gl,
@@ -107,47 +107,57 @@ export const useChartData = defineStore('chart.sample.spectrum', () => {
           '<extra></extra>' // use "<extra></extra>" to get rid of extra block from the hoverbox
       }
     ]
-    const focused = app.data.peak.focused
-    if (focused) {
-      newTraces.push({
-        name: 'Focused Peak',
-        type: 'scatter' + gl,
-        mode: 'lines+markers',
-        line: {
-          color: 'white'
-        },
-        x: [focused.mz, focused.mz], // *
-        y: [0, focused.height], // *
-        customdata: [
-          [focused.height, focused.area, focused.mz],
-          [focused.height, focused.area, focused.mz]
-        ],
-        hovertemplate:
-          [
-            '<i>Peak</i>',
-            'mz: <b>%{customdata[2]:.4f}</b>',
-            'height: <b>%{customdata[0]:.3e}</b>',
-            'area: <b>%{customdata[1]:.3e}</b>'
-          ].join('<br>') + '<extra></extra>'
-      })
-    }
-    traces.value = preview.peak
-      ? newTraces.concat({
-          name: 'Peak Preview',
-          line: {
-            color: 'red'
-          },
-          mode: 'lines',
-          type: 'scatter' + gl,
-          x: [...Array(3).keys()].map(() => preview.peak.mz), // *
-          y: [...Array(3).keys()].map(
-            (index) => mzRangeMax.value(preview.peak.mz, 0.05) * (index / 2)
-          ) // *
-        })
-      : newTraces
     unit.value = data.intensity_unit
     length.value = data.intensity.length
   }
+  const focusTrace = computed(() => {
+    const focused = app.data.peak.focused
+    return focused
+      ? [
+          {
+            name: 'Focused Peak',
+            type: 'scatter' + gl,
+            mode: 'lines+markers',
+            line: {
+              color: 'white'
+            },
+            x: [focused.mz, focused.mz], // *
+            y: [0, focused.height], // *
+            customdata: [
+              [focused.height, focused.area, focused.mz],
+              [focused.height, focused.area, focused.mz]
+            ],
+            hovertemplate:
+              [
+                '<i>Peak</i>',
+                'mz: <b>%{customdata[2]:.4f}</b>',
+                'height: <b>%{customdata[0]:.3e}</b>',
+                'area: <b>%{customdata[1]:.3e}</b>'
+              ].join('<br>') + '<extra></extra>'
+          }
+        ]
+      : []
+  })
+  const previewTrace = computed(() =>
+    preview.peak
+      ? [
+          {
+            name: 'Peak Preview',
+            line: {
+              color: 'red'
+            },
+            mode: 'lines',
+            type: 'scatter' + gl,
+            x: [...Array(3).keys()].map(() => preview.peak.mz), // *
+            y: [...Array(3).keys()].map(
+              (index) => mzRangeMax.value(preview.peak.mz, 0.05) * (index / 2)
+            ),
+            hovertemplate: ['<i>Peak</i>', 'mz: <b>%{x:.4f}</b>'].join('<br>') + '<extra></extra>'
+          }
+        ]
+      : []
+  )
+  const traces = computed(() => [...mainTraces.value, ...focusTrace.value, ...previewTrace.value])
 
   // unload data and switch tab if necessary
   function unload() {
