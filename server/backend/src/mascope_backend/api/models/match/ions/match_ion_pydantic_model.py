@@ -11,11 +11,11 @@ class MatchIonBase(BaseModel):
     target_ion_id: str = Field(..., description="Foreign key to target_ion")
     match_score: float = Field(..., description="Score of the match ion")
     match_category: int = Field(..., description="Category of the match")
-    sample_peak_intensity_mean: float = Field(
+    sample_peak_intensity_sum: float = Field(
         ..., description="Intensity of the sample peak"
     )
     sample_peak_interference_sum: float = Field(
-        ..., description="Area of the sample peak"
+        ..., description="Interference of the sample peak"
     )
 
 

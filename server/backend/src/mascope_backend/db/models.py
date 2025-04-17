@@ -506,7 +506,7 @@ class MatchSample(Base):
     match_category = Column(
         Integer, CheckConstraint("match_category BETWEEN 0 AND 2"), nullable=False
     )
-    sample_peak_intensity_mean = Column(Float, nullable=False)
+    sample_peak_intensity_sum = Column(Float, nullable=False)
     sample_peak_interference_sum = Column(Float, nullable=False)
     match_sample_utc_created = Column(TIMESTAMP)
     match_sample_utc_modified = Column(TIMESTAMP)
@@ -537,7 +537,7 @@ class MatchCollection(Base):
     match_category = Column(
         Integer, CheckConstraint("match_category BETWEEN 0 AND 2"), nullable=False
     )
-    sample_peak_intensity_mean = Column(Float, nullable=False)
+    sample_peak_intensity_sum = Column(Float, nullable=False)
     sample_peak_interference_sum = Column(Float, nullable=False)
     match_collection_utc_created = Column(TIMESTAMP)
     match_collection_utc_modified = Column(TIMESTAMP)
@@ -571,7 +571,7 @@ class MatchCompound(Base):
     match_category = Column(
         Integer, CheckConstraint("match_category BETWEEN 0 AND 2"), nullable=False
     )
-    sample_peak_intensity_mean = Column(Float, nullable=False)
+    sample_peak_intensity_sum = Column(Float, nullable=False)
     sample_peak_interference_sum = Column(Float, nullable=False)
     match_compound_utc_created = Column(TIMESTAMP)
     match_compound_utc_modified = Column(TIMESTAMP)
@@ -603,7 +603,7 @@ class MatchIon(Base):
     match_category = Column(
         Integer, CheckConstraint("match_category BETWEEN 0 AND 2"), nullable=False
     )
-    sample_peak_intensity_mean = Column(Float, nullable=False)
+    sample_peak_intensity_sum = Column(Float, nullable=False)
     sample_peak_interference_sum = Column(Float, nullable=False)
     match_ion_utc_created = Column(TIMESTAMP)
     match_ion_utc_modified = Column(TIMESTAMP)

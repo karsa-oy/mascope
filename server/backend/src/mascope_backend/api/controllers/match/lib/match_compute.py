@@ -220,25 +220,25 @@ async def compute_match_isotopes(
 
         # Step 6: - Calculate match stats for isotopes with actual matches
         if matched_mask.any():
-            # Calculate ion-level statistics - isotope ratios, mean matched sample peak heights for each ion
-            ion_level_peak_means = match_isotope_df.groupby(
+            # Calculate ion-level statistics - isotope ratios, sum matched sample peak intensities for each ion
+            ion_level_peak_sums = match_isotope_df.groupby(
                 "target_ion_id", as_index=False
-            )["sample_peak_intensity"].mean()
+            )["sample_peak_intensity"].sum()
 
-            # Join means back to the isotope level
-            isotope_level_peak_means = pd.merge(
+            # Join sums back to the isotope level
+            isotope_level_peak_sums = pd.merge(
                 match_isotope_df,
-                ion_level_peak_means.rename(
-                    columns={"sample_peak_intensity": "sample_peak_intensity_mean"}
+                ion_level_peak_sums.rename(
+                    columns={"sample_peak_intensity": "sample_peak_intensity_sum"}
                 ),
                 on="target_ion_id",
                 how="left",
             )
 
-            # Calculate relative peak areas
+            # Calculate relative peak intensities
             match_isotope_df.loc[:, "sample_peak_intensity_relative"] = (
                 match_isotope_df["sample_peak_intensity"]
-                / isotope_level_peak_means["sample_peak_intensity_mean"]
+                / isotope_level_peak_sums["sample_peak_intensity_sum"]
             )
 
             # Calculate abundance matching errors

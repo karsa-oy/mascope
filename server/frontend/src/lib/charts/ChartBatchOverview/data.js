@@ -131,7 +131,7 @@ export const useChartData = defineStore('chart.batch.overview', () => {
         const targetMaxMatchCategory = Math.max(
           ...targetMatches.map(({ match_category }) => match_category)
         )
-        // Y-axis - sample_peak_intensity_mean
+        // Y-axis - sample_peak_intensity_sum
         const intensities = samples.value // iterate through filtered samples
           .map(
             // find the match for each, if it exists
@@ -140,7 +140,7 @@ export const useChartData = defineStore('chart.batch.overview', () => {
           )
           .map(
             // get the intensity from the record, if its valid
-            (match) => (match && match.match_category > 0 ? match.sample_peak_intensity_mean : null)
+            (match) => (match && match.match_category > 0 ? match.sample_peak_intensity_sum : null)
           )
 
         // skip if no valid intensity data

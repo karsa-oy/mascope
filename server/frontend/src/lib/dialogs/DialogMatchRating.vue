@@ -42,7 +42,7 @@ const expandedIsotopes = ref()
 
 // computed
 const title = computed(() => {
-  const ionSumIntensity = peak.format(app.data.match.visualized.ion?.sample_peak_intensity_mean)
+  const ionSumIntensity = peak.format(app.data.match.visualized.ion?.sample_peak_intensity_sum)
   return `${app.data.sample.focused?.sample_item_name}: ${app.data.match.visualized.ion?.target_ion_formula} | Intensity: ${ionSumIntensity}`
 })
 const checklistEnabled = computed(() => {
@@ -257,7 +257,7 @@ const peak = new Intl.NumberFormat('en-US', {
                 <template #body="{ data }">
                   <BaseMatchTag
                     :row="data"
-                    :tooltip="`Peak intensity sum: ${peak.format(data?.sample_peak_intensity_mean)}`"
+                    :tooltip="`Peak intensity sum: ${peak.format(data?.sample_peak_intensity_sum)}`"
                   />
                 </template>
               </Column>
