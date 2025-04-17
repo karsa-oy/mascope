@@ -57,7 +57,7 @@ async def compute_match_isotopes(
     min_isotope_abundance: float,
     instrument_functions: tuple = None,
     polarity: Literal["+", "-"] = None,
-):
+) -> pd.DataFrame:
     """
     Compute matches between target isotopes and sample file peaks.
 
@@ -91,7 +91,7 @@ async def compute_match_isotopes(
     :type instrument_functions: tuple(dict, function), optional
     :param polarity: Polarity of the sample, either "+", "-", or "+-".
     :type polarity: Literal["+", "-"], optional
-    :return: DataFrame with details of the matches found for each target isotope.
+    :return: DataFrame with match details for all target isotopes, including those without matches
     :rtype: pd.DataFrame
     :raises RuntimeError: If an error occurs during the matching process.
 
@@ -155,8 +155,7 @@ async def compute_match_isotopes(
             time_scan = get_scan_timestamps(filename, polarity=polarity)
             peaks = peaks.sel(time=time_scan, method="nearest")
 
-        # Step 2: - Prepare data
-        # init match df from target isotopes
+        # Step 3: Create initial dataframe with default values for all isotopes
         match_isotope_df = target_isotopes_df.copy().assign(
             match_isotope_id=[
                 gen_id(length=32) for _ in range(len(target_isotopes_df))
@@ -219,50 +218,55 @@ async def compute_match_isotopes(
         # Create a mask for matched isotopes (those with actual peak data)
         matched_mask = ~match_isotope_df["sample_peak_mz"].isna()
 
-        # calculate isotope ratios
-        # calculate mean matched sample peak heights for each ion
-        ion_level_peak_means = match_isotope_df.groupby(
-            ["target_ion_id"], as_index=False
-        )["sample_peak_intensity"].mean()
-        # join means back to the isotope level
-        isotope_level_peak_means = pd.merge(
-            match_isotope_df,
-            ion_level_peak_means.rename(
-                columns={"sample_peak_intensity": "sample_peak_intensity_mean"}
-            ),
-            on=["target_ion_id"],
-            how="left",
-        )
+        # Step 6: - Calculate match stats for isotopes with actual matches
+        if matched_mask.any():
+            # Calculate ion-level statistics - isotope ratios, mean matched sample peak heights for each ion
+            ion_level_peak_means = match_isotope_df.groupby(
+                "target_ion_id", as_index=False
+            )["sample_peak_intensity"].mean()
 
-        # compute relative peak heights
-        match_isotope_df.loc[:, "sample_peak_intensity_relative"] = (
-            match_isotope_df["sample_peak_intensity"]
-            / isotope_level_peak_means["sample_peak_intensity_mean"]
-        )
-        # calculate isotope ratio errors
-        match_isotope_df.loc[:, "match_abundance_error"] = match_isotope_df[
-            "relative_abundance"
-        ] * (
-            match_isotope_df["sample_peak_intensity_relative"]
-            - match_isotope_df["relative_abundance"]
-        )
-        # calculate isotope correlations
-        match_isotope_df = match_isotope_df.groupby(
-            ["target_ion_id"], group_keys=False
-        ).apply(
-            lambda ion_group: (
-                ion_group.assign(
-                    match_isotope_correlation=(
-                        np.corrcoef(
-                            np.array(
-                                [
-                                    peaks.sel(mz=peak_mz, method="nearest")
-                                    for peak_mz in ion_group["sample_peak_mz"]
-                                ]
-                            )
-                        )[0, 1]
-                        if len(ion_group) > 1
-                        else 1
+            # Join means back to the isotope level
+            isotope_level_peak_means = pd.merge(
+                match_isotope_df,
+                ion_level_peak_means.rename(
+                    columns={"sample_peak_intensity": "sample_peak_intensity_mean"}
+                ),
+                on="target_ion_id",
+                how="left",
+            )
+
+            # Calculate relative peak areas
+            match_isotope_df.loc[:, "sample_peak_intensity_relative"] = (
+                match_isotope_df["sample_peak_intensity"]
+                / isotope_level_peak_means["sample_peak_intensity_mean"]
+            )
+
+            # Calculate abundance matching errors
+            match_isotope_df.loc[:, "match_abundance_error"] = match_isotope_df[
+                "relative_abundance"
+            ] * (
+                match_isotope_df["sample_peak_intensity_relative"]
+                - match_isotope_df["relative_abundance"]
+            )
+
+            # Calculate isotope correlations by ion group
+            match_isotope_df = match_isotope_df.groupby(
+                ["target_ion_id"], group_keys=False
+            ).apply(
+                lambda ion_group: (
+                    ion_group.assign(
+                        match_isotope_correlation=(
+                            np.corrcoef(
+                                np.array(
+                                    [
+                                        peaks.sel(mz=peak_mz, method="nearest")
+                                        for peak_mz in ion_group["sample_peak_mz"]
+                                    ]
+                                )
+                            )[0, 1]
+                            if len(ion_group) > 1
+                            else 1
+                        )
                     )
                 )
             )

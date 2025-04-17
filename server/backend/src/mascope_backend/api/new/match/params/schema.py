@@ -29,8 +29,8 @@ ORBI_FITTING_THRESHOLD = 0.6
 
 # default values for unmatched isotopes
 DEFAULT_UNMATCHED_SAMPLE_PEAK_ID = -1
-DEFAULT_UNMATCHED_SAMPLE_PEAK_AREA = 0.0
-DEFAULT_UNMATCHED_SAMPLE_PEAK_AREA_RELATIVE = 0.0
+DEFAULT_UNMATCHED_SAMPLE_PEAK_INTENSITY = 0.0
+DEFAULT_UNMATCHED_SAMPLE_PEAK_INTENSITY_RELATIVE = 0.0
 DEFAULT_UNMATCHED_MATCH_ABUNDANCE_ERROR = 1.0
 DEFAULT_UNMATCHED_MATCH_MZ_ERROR = 0.0
 DEFAULT_UNMATCHED_MATCH_ISOTOPE_CORRELATION = 0.0
@@ -128,13 +128,13 @@ class UnmatchedIsotopeParams(BaseModel):
         DEFAULT_UNMATCHED_SAMPLE_PEAK_ID,
         description="ID value for isotopes without matching peaks. -1 indicates no real peak.",
     )
-    sample_peak_area: float = Field(
-        DEFAULT_UNMATCHED_SAMPLE_PEAK_AREA,
-        description="Default peak area for isotopes without matching peaks.",
+    sample_peak_intensity: float = Field(
+        DEFAULT_UNMATCHED_SAMPLE_PEAK_INTENSITY,
+        description="Default peak intensity for isotopes without matching peaks.",
     )
-    sample_peak_area_relative: float = Field(
-        DEFAULT_UNMATCHED_SAMPLE_PEAK_AREA_RELATIVE,
-        description="Default relative peak area for isotopes without matching peaks.",
+    sample_peak_intensity_relative: float = Field(
+        DEFAULT_UNMATCHED_SAMPLE_PEAK_INTENSITY_RELATIVE,
+        description="Default relative peak intensity for isotopes without matching peaks.",
     )
     match_abundance_error: float = Field(
         DEFAULT_UNMATCHED_MATCH_ABUNDANCE_ERROR,
