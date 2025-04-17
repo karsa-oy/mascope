@@ -1,6 +1,7 @@
 import inspect
 from functools import wraps
 from typing import Callable
+from fastapi import Request
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.encoders import jsonable_encoder
 from rich.pretty import pretty_repr
@@ -14,6 +15,7 @@ from mascope_backend.api.lib.exceptions.api_exceptions import (
 )
 from mascope_backend.socket.notifications import (
     UserNotification,
+    emit_user_notification,
     handle_reloads,
     handle_notifications,
 )
@@ -175,16 +177,21 @@ def api_route(
 
         @wraps(func)
         async def wrapper(*args, **kwargs):
-            try:
-                # Step 3: Log authenticated user information if available
-                user = kwargs.get("user")
-                if user:
-                    runtime.logger.trace(f"User:\n{pretty_repr(user.to_dict())}")
+            # Step 3: Log authenticated user information if available
+            user = kwargs.get("user")
+            if user:
+                runtime.logger.trace(f"User:\n{pretty_repr(user.to_dict())}")
 
-                # Step 4: Execute the route handler
+            # Step 4: Extract SID from request headers
+            sid = None
+            if request := kwargs.get("request"):
+                if isinstance(request, Request):
+                    sid = request.headers.get("X-SID")
+            try:
+                # Step 5: Execute the route handler
                 result = await func(*args, **kwargs)
 
-                # Step 5: if result is file, return as-is:
+                # Step 6: if result is file, return as-is:
                 if isinstance(result, FileResponse):
                     return result
 
@@ -193,15 +200,36 @@ def api_route(
                 if result is not None and "process_id" in result:
                     headers["Process-ID"] = result.pop("process_id")
 
-                # Step 7: Return formatted JSON response
+                # Step 8: Return formatted JSON response
                 return JSONResponse(
                     status_code=status_code,
                     content=jsonable_encoder(result),
                     headers=headers,
                 )
             except ApiException as e:
+                # Step 9: Special handling for warnings (ApiException with status_code=200)
+                if e.status_code == 200:
+                    # Send warning notification if SID is available
+                    if sid:
+                        notification = UserNotification(
+                            process_id=kwargs.get("process_id", gen_id(8)),
+                            type=func.__name__,
+                            message=e.user_message,
+                            status="warning",
+                            error={"detail": e.tech_message},
+                        )
+                        await emit_user_notification(
+                            notification=notification, room_id=sid
+                        )
+                    else:
+                        runtime.logger.warning(
+                            f"Add 'request: Request' parameter to the {func.__name__} to enable warning notifications."
+                        )
+                # Step 10: Return standard API exception response
+                # TODO Cuurently no difference in handling warnings/errors, add status (non-http)?
                 return api_e_response_json(e)
             except Exception as e:
+                # Step 11: Handle generic exceptions
                 context_message = f"Error in {beautify_func_name(func.__name__)}"
                 return handle_exception(e, context_message)
 

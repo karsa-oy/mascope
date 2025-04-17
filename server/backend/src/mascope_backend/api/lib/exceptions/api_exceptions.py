@@ -112,6 +112,18 @@ def raise_api_warning(message: str, tech_message: dict):
     """
     Raises an ApiException with a status code of 200, indicating a warning during operation.
 
+    This function creates a standardized way to raise warning level issues
+    in the application. The warning will:
+    1. Be logged to the server logs
+    2. Be returned as a response with status code 200
+    3. Be displayed as a notification in the UI if a valid SID is available
+
+    Example:
+        raise_api_warning(
+            "Some items could not be processed",
+            {"skipped_items": ["item1", "item2"]}
+        )
+
     :param message: The user-facing warning message.
     :type message: str
     :param tech_message: The technical details to include in the warning.
@@ -122,5 +134,5 @@ def raise_api_warning(message: str, tech_message: dict):
     raise ApiException(
         user_message=message,
         tech_message=tech_message,
-        status_code=200,
+        status_code=200,  # makes it a warning instead of an error
     )
