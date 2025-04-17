@@ -104,8 +104,11 @@ async def populate_time_range(session):
 
     for sample_item in sample_items:
         filename = sample_item.filename
-        scan_timestamps = get_scan_timestamps(filename)
-
+        try:
+            scan_timestamps = get_scan_timestamps(filename)
+        except Exception as e:
+            runtime.logger.warning(f"Failed to get scan timestamps for {filename}: {e}")
+            continue
         # Set t0 and t1 based on the scan timestamps
         sample_item.t0 = scan_timestamps[0]
         sample_item.t1 = scan_timestamps[-1]
