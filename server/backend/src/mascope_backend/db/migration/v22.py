@@ -102,7 +102,10 @@ async def populate_time_range(session):
     result = await session.execute(stmt)
     sample_items = result.scalars().all()
 
-    for sample_item in sample_items:
+    for i, sample_item in enumerate(sample_items):
+        runtime.logger.info(
+            f"Populating t0 and t1 for sample_item {i + 1}/{len(sample_items)}"
+        )
         filename = sample_item.filename
         try:
             scan_timestamps = get_scan_timestamps(filename)
