@@ -88,7 +88,7 @@ const formatter = new Intl.NumberFormat('en-US', {
         <template #body="{ data }">
           <BaseMatchTag
             :row="data"
-            :tooltip="`Peak intensity sum: ${num.peakIntensity.format(data?.sample_peak_intensity_sum)}`"
+            :tooltip="`Total peak intensity: ${num.peakIntensity.format(data?.sample_peak_intensity_sum)} (cps)`"
           />
         </template>
       </Column>

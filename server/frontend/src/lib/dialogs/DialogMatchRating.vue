@@ -257,7 +257,7 @@ const peak = new Intl.NumberFormat('en-US', {
                 <template #body="{ data }">
                   <BaseMatchTag
                     :row="data"
-                    :tooltip="`Peak intensity sum: ${peak.format(data?.sample_peak_intensity_sum)}`"
+                    :tooltip="`Total peak intensity: ${peak.format(data?.sample_peak_intensity_sum)} (cps)`"
                   />
                 </template>
               </Column>

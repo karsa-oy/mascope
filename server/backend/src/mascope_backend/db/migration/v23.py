@@ -115,5 +115,5 @@ async def rename_columns(session):
                 """
             )
         )
-    session.commit()
+    await session.commit()
     runtime.logger.info("Column renaming completed.")

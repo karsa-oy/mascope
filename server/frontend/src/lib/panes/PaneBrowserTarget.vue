@@ -364,7 +364,7 @@ watch(
           <template #body="{ data }">
             <BaseMatchTag
               :row="data"
-              :tooltip="`Peak intensity sum: ${num.peakIntensity.format(data?.sample_peak_intensity_sum)}`"
+              :tooltip="`Total peak intensity: ${num.peakIntensity.format(data?.sample_peak_intensity_sum)} (cps)`"
             />
           </template>
         </Column>
@@ -448,7 +448,7 @@ watch(
               <template #body="{ data }">
                 <BaseMatchTag
                   :row="data"
-                  :tooltip="`Peak intensity sum: ${num.peakIntensity.format(data?.sample_peak_intensity_sum)}`"
+                  :tooltip="`Total peak intensity: ${num.peakIntensity.format(data?.sample_peak_intensity_sum)} (cps)`"
                 />
               </template>
             </Column>
@@ -493,7 +493,7 @@ watch(
                   <template #body="{ data }">
                     <BaseMatchTag
                       :row="data"
-                      :tooltip="`Peak intensity sum: ${num.peakIntensity.format(data?.sample_peak_intensity_sum)}`"
+                      :tooltip="`Total peak intensity: ${num.peakIntensity.format(data?.sample_peak_intensity_sum)} (cps)`"
                     />
                   </template>
                 </Column>
@@ -573,7 +573,7 @@ watch(
                         <div :id="data.match_key" style="height: 100%" />
                         <BaseMatchTag
                           :row="data"
-                          :tooltip="`Peak intensity sum: ${num.peakIntensity.format(data?.sample_peak_intensity)}`"
+                          :tooltip="`Peak intensity: ${num.peakIntensity.format(data?.sample_peak_intensity)} (cps)`"
                         />
                       </template>
                     </Column>
