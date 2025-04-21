@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 
 import { useConfirm } from 'primevue/useconfirm'
 
+import { api } from '@/api'
 import { useApp } from '@/stores'
 
 import { useBatchContextMenu } from './batchContextMenu.js'
@@ -125,6 +126,22 @@ export const useSampleContextMenu = defineStore('browser.sample.sampleCtxMenu', 
                 sample_item_name
               })
             )
+          )
+        }
+      },
+      {
+        label: `Download sample${s}`,
+        icon: 'pi pi-download',
+        command: () => {
+          api.http.post(
+            `/file/download`,
+            {
+              sample_file_ids: app.data.sample.selected.map(({ sample_file_id }) => sample_file_id)
+            },
+            {
+              use: 'process',
+              type: 'download_sample_files'
+            }
           )
         }
       },
