@@ -8,6 +8,7 @@ import Chip from 'primevue/chip'
 
 import { beautifySnakeCase } from '@/lib/utils'
 import { useApp } from '@/stores'
+import { ToolbarIntensityScale } from '@/lib/toolbars'
 
 import BaseChartPlotly from '../BaseChartPlotly.vue'
 import { useChartData } from './data'
@@ -15,11 +16,15 @@ import { useChartData } from './data'
 const app = useApp()
 const data = useChartData()
 
-const yMode = ref('average')
-const log = ref(true)
+const scale = ref({
+  mode: 'average',
+  max: null,
+  log: true
+})
+
 const unit = computed(() =>
   // Adjust the y-axis unit based on "average / sum" toggle
-  yMode.value == 'average' ? '[cps]' : '[counts]'
+  scale.value.mode == 'average' ? '[cps]' : '[counts]'
 )
 
 const traces = computed(() => {
@@ -29,7 +34,7 @@ const traces = computed(() => {
     (o, sample) => ({ ...o, [sample.sample_item_id]: sample.length }),
     {}
   )
-  return yMode.value == 'average'
+  return scale.value.mode == 'average'
     ? data.traces.map((trace) => {
         let newTrace = structuredClone(toRaw(trace))
         newTrace.customdata = trace.customdata.map((cd) => [cd[0], 'counts/s'])
@@ -125,6 +130,10 @@ const xAxis = computed(() => ({
   ticktext: data.samples.map(toField(xField.value ?? 'index'))
 }))
 
+const rangeY = computed(() =>
+  scale.value.max && scale.value.max > 0 ? { range: [0, scale.value.max] } : { autorange: true }
+)
+
 const layout = computed(() => ({
   xaxis: {
     title: xField.value?.label,
@@ -139,12 +148,12 @@ const layout = computed(() => ({
   },
   yaxis: {
     title: `Intensity ${unit.value}`,
-    type: log.value ? 'log' : 'lin',
+    type: scale.value.log ? 'log' : 'lin',
     showgrid: true,
     gridcolor: '#33333399',
-    autorange: true,
     rangemode: 'tozero',
-    gridwidth: 1
+    gridwidth: 1,
+    ...rangeY.value
   },
   margin: { l: 50, r: 50, t: 50, b: 50 },
   minreducedheight: 300,
@@ -231,7 +240,11 @@ const anyFilters = computed(
       :data="traces"
       :layout="layout"
       @click="onClick"
-    />
+    >
+      <template v-slot:settings>
+        <ToolbarIntensityScale v-model="scale" />
+      </template>
+    </BaseChartPlotly>
   </figure>
   <div
     class="row"
@@ -243,11 +256,6 @@ const anyFilters = computed(
       right: 2rem;
     `"
   >
-    <div class="row">
-      <SelectButton v-model="yMode" :options="['average', 'sum']" />
-      <ToggleSwitch v-model="log" style="margin-left: 1rem" />
-      <span> log scale </span>
-    </div>
     <Select
       v-model:modelValue="xField"
       :options="xFields"
