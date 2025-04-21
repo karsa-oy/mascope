@@ -114,6 +114,7 @@ const config = {
         :data="traces"
         :layout="layout"
         :config="config"
+        :loading="data.loading"
         @click="
           ({ x, event, data }) => {
             if (event.button === 0 && data.name === 'Peak') {

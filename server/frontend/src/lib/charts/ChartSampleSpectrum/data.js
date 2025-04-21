@@ -109,6 +109,7 @@ export const useChartData = defineStore('chart.sample.spectrum', () => {
     ]
     unit.value = data.intensity_unit
     length.value = data.intensity.length
+    loading.value = false
   }
   const focusTrace = computed(() => {
     const focused = app.data.peak.focused
