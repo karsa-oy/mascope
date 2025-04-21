@@ -3,6 +3,8 @@ import { ref, computed, onMounted, onBeforeUnmount, watchEffect, watch } from 'v
 
 import Plotly from 'plotly.js-dist-min'
 
+import ProgressSpinner from 'primevue/progressspinner'
+
 import { useWindowSize } from '@vueuse/core'
 
 import { useApp } from '@/stores'
@@ -29,6 +31,10 @@ const props = defineProps({
     type: Object
   },
   hideTitle: {
+    type: Boolean,
+    default: false
+  },
+  loading: {
     type: Boolean,
     default: false
   }
@@ -144,18 +150,23 @@ watchEffect(
 </script>
 
 <template>
-  <div
-    ref="plot"
-    :id="id"
-    class="plot"
-    style="width: 100%; height: 100%"
-    :key="`${width}-${height}`"
-    @contextmenu="
-      (e) => {
-        e.preventDefault()
-      }
-    "
-  />
+  <div style="position: relative; width: 100%; height: 100%" :class="props.loading ? 'faded' : ''">
+    <div class="overlay" v-if="props.loading">
+      <ProgressSpinner />
+    </div>
+    <div
+      ref="plot"
+      :id="id"
+      class="plot"
+      style="width: 100%; height: 100%"
+      :key="`${width}-${height}`"
+      @contextmenu="
+        (e) => {
+          e.preventDefault()
+        }
+      "
+    />
+  </div>
 </template>
 
 <style scoped>
@@ -180,5 +191,20 @@ div {
 
 :deep(.bg) {
   fill: var(--p-togglebutton-background) !important;
+}
+
+.faded {
+  opacity: 0.3;
+}
+
+.overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 100;
+  display: grid;
+  place-items: center;
 }
 </style>
