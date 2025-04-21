@@ -11,12 +11,7 @@ const app = useApp()
 
 const data = useChartData()
 
-const { settings } = defineProps({
-  settings: {
-    type: Object,
-    required: true
-  }
-})
+const scale = defineModel()
 
 const sampleLength = computed(() =>
   // Length of the selected sample in seconds
@@ -28,7 +23,7 @@ const traces = computed(() => {
   if (sampleLength.value === null) {
     return []
   }
-  return settings.yMode == 'average'
+  return scale.value.mode == 'average'
     ? data.traces.map((trace) => {
         let newTrace = structuredClone(toRaw(trace))
         newTrace.fill = 'none'

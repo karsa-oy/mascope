@@ -19,9 +19,10 @@ const compound = computed(() =>
   )
 )
 
-const settings = reactive({
-  intensityScale: null,
-  yMode: 'average'
+const scale = ref({
+  mode: 'average',
+  max: null,
+  log: false
 })
 
 // recompute match category with the UI's param state
@@ -57,16 +58,10 @@ const sidebarOpen = ref(false)
         <i>{{ app.data.match.visualized.ion?.sample_item_name }}</i> with target
         <i>{{ compound?.target_compound_formula }}</i>
       </h1>
-      <div class="row">
-        <ToolbarMatchCharts
-          v-model:scale="settings.intensityScale"
-          v-model:yMode="settings.yMode"
-        />
-        <ToolbarMatchRating />
-      </div>
+      <ToolbarMatchRating />
     </menu>
-    <ChartMatchSpectra :settings="settings" :sidebarOpen="sidebarOpen" />
-    <ChartMatchTimeseries :settings="settings" />
+    <ChartMatchSpectra v-model="scale" :sidebarOpen="sidebarOpen" />
+    <ChartMatchTimeseries v-model="scale" />
   </div>
 </template>
 

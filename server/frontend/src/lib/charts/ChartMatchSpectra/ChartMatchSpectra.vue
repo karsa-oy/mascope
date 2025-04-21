@@ -10,6 +10,7 @@ import { BaseMatchTag } from '@/lib/base'
 import { clone } from '@/lib/utils'
 import { num } from '@/lib/formatters'
 import { useApp } from '@/stores'
+import { ToolbarIntensityScale } from '@/lib/toolbars'
 
 import BaseChartPlotly from '../BaseChartPlotly.vue'
 import { useChartData } from './data.js'
@@ -21,16 +22,14 @@ const { height, width } = useWindowSize()
 
 const plots = ref({})
 
-const { settings } = defineProps({
-  settings: {
-    type: Object,
-    required: true
-  },
+defineProps({
   sidebarOpen: {
     type: Boolean,
     required: true
   }
 })
+
+const scale = defineModel()
 
 const sampleLength = computed(() =>
   app.data.sample.selected.length != 1 ? null : app.data.sample.selected[0].length
@@ -41,7 +40,7 @@ const traces = computed(() => {
   if (sampleLength === null) {
     return []
   }
-  return settings.yMode == 'average'
+  return scale.value.mode == 'average'
     ? data.traces
     : data.traces.map((trace) => {
         // Scale chart traces by multiplying all y-values by sampleLength
@@ -81,25 +80,26 @@ const isotopeCharts = computed(() => {
 })
 
 // auto vs manual scale
-const scale = computed(
+const rangeY = computed(
   () =>
-    settings.intensityScale // if user set the scale
-      ? { range: [0, settings.intensityScale] } // use set scale
+    scale.value.max // if user set the scale
+      ? { range: [0, scale.value.max] } // use set scale
       : {} // otherwise auto set scale
 )
 // standard plotly layout
 const layout = computed(() => ({
   yaxis: {
-    title: `Signal intensity [${settings.yMode == 'average' ? 'counts/s' : 'counts'}]`,
+    title: `Signal intensity [${scale.value.max == 'average' ? 'counts/s' : 'counts'}]`,
     gridcolor: '#33333399',
     rangemode: 'nonnegative',
-    ...scale.value
+    type: scale.value.log ? 'log' : 'lin',
+    ...rangeY.value
   },
   xaxis: {
     title: 'm/z [Th]',
     gridcolor: '#33333399'
   },
-  margin: { l: 50, r: 5, t: 30, b: 40 },
+  margin: { l: 50, r: 5, t: 40, b: 40 },
   dragmode: 'zoom',
   showlegend: false,
   height: 250,
@@ -167,10 +167,14 @@ watch(
           :data="isotopeChart.traces"
           :layout="layout"
           hideTitle
-        />
+        >
+          <template v-slot:settings>
+            <ToolbarIntensityScale v-model="scale" />
+          </template>
+        </BaseChartPlotly>
         <div class="float">
           <Tag
-            :value="`Peak ${settings.yMode} intensity: ${num.peakIntensity.format(settings.yMode == 'average' ? isotopeChart.sample_peak_intensity : isotopeChart.sample_peak_intensity * sampleLength)}`"
+            :value="`Peak ${scale.mode} intensity: ${num.peakIntensity.format(scale.mode == 'average' ? isotopeChart.sample_peak_intensity : isotopeChart.sample_peak_intensity * sampleLength)}`"
             :severity="
               isotopeChart.sample_peak_intensity < app.data.match.params.ui.peak_min_intensity
                 ? 'warn'
