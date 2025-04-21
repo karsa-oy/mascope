@@ -1,9 +1,11 @@
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, watchEffect, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watchEffect, useSlots } from 'vue'
 
 import Plotly from 'plotly.js-dist-min'
 
 import ProgressSpinner from 'primevue/progressspinner'
+import Button from 'primevue/button'
+import Popover from 'primevue/popover'
 
 import { useWindowSize } from '@vueuse/core'
 
@@ -39,11 +41,13 @@ const props = defineProps({
     default: false
   }
 })
+const slots = useSlots()
 
 const emit = defineEmits(['click', 'zoom'])
 
 const plot = ref(null)
 const created = ref(false)
+const settings = ref()
 
 // reset chart zoom to autorange
 const resetZoom = () => {
@@ -166,6 +170,22 @@ watchEffect(
         }
       "
     />
+    <div class="topleft" v-if="slots.settings">
+      <Button
+        v-tooltip.right="'Chart settings'"
+        severity="secondary"
+        text
+        @click="
+          (event) => {
+            settings.toggle(event)
+          }
+        "
+        icon="pi pi-chart-bar"
+      />
+      <Popover ref="settings">
+        <slot name="settings"> </slot>
+      </Popover>
+    </div>
   </div>
 </template>
 
@@ -174,7 +194,7 @@ div {
   max-width: 95%;
 }
 
-:deep(*) {
+.plot :deep(*) {
   font-family: Inter !important;
 }
 :deep(.legendtext),
@@ -206,5 +226,12 @@ div {
   z-index: 100;
   display: grid;
   place-items: center;
+}
+
+.topleft {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 50;
 }
 </style>
