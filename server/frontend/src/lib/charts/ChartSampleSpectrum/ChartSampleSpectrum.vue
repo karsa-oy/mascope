@@ -8,6 +8,7 @@ import ProgressSpinner from 'primevue/progressspinner'
 import { BaseParamField } from '@/lib/base'
 import { useApp } from '@/stores'
 import { usePreview } from '@/lib/panes'
+import { ToolbarIntensityScale } from '@/lib/toolbars'
 
 import BaseChartPlotly from '../BaseChartPlotly.vue'
 import { useChartData } from './data.js'
@@ -17,9 +18,11 @@ const data = useChartData()
 
 const preview = usePreview()
 
-const yMode = ref('average')
-const scale = ref()
-const log = ref()
+const scale = ref({
+  mode: 'average',
+  max: null,
+  log: false
+})
 const peakAssign = reactive({
   dialog: false,
   mz: null
@@ -27,12 +30,12 @@ const peakAssign = reactive({
 
 const unit = computed(() =>
   // Adjust the y-axis unit based on "average / sum" toggle
-  yMode.value == 'average' ? 'counts/s' : 'counts'
+  scale.value.mode == 'average' ? 'counts/s' : 'counts'
 )
 const sampleLength = computed(() => app.data.sample.focused.length) // duration in seconds
 
 const traces = computed(() =>
-  yMode.value === 'average'
+  scale.value.mode === 'average'
     ? data.traces
     : data.traces.map((trace) => {
         // Scale chart traces by dividing all y-values by sampleLength
@@ -53,19 +56,22 @@ const zoom = reactive({
   rangeY: null
 })
 
-watch([yMode, log], () => {
-  zoom.rangeY = { autorange: true }
-})
+watch(
+  () => [scale.value.mode, scale.value.log],
+  () => {
+    zoom.rangeY = { autorange: true }
+  }
+)
 
 watchEffect(() => {
   if (app.data.peak.focused) {
     const mz = preview.peak?.mz ?? app.data.peak.focused.mz
-    const factor = yMode.value == 'sum' ? sampleLength.value : 1
+    const factor = scale.value.mode == 'sum' ? sampleLength.value : 1
     const height = preview.peak
       ? factor * data.mzRangeMax(mz, 0.3)
       : factor * Math.max(app.data.peak.focused.height, data.mzRangeMax(mz, 0.3))
     zoom.rangeX = { range: [mz - 0.3, mz + 0.3] }
-    zoom.rangeY = log.value ? { autorange: true } : { range: [0, height * 1.2] }
+    zoom.rangeY = scale.value.log ? { autorange: true } : { range: [0, height * 1.2] }
   } else {
     zoom.rangeX = null
     zoom.rangeY = null
@@ -73,7 +79,8 @@ watchEffect(() => {
 })
 
 const layout = computed(() => {
-  const scaleRangeY = scale.value && scale.value > 0 ? { range: [0, scale.value] } : null
+  const scaleRangeY =
+    scale.value.max && scale.value.max > 0 ? { range: [0, scale.value.max] } : null
   const autorange = { autorange: true }
   const yRange = scaleRangeY ?? zoom.rangeY ?? autorange
   const xRange = zoom.rangeX ?? autorange
@@ -91,7 +98,7 @@ const layout = computed(() => {
       rangemode: 'nonnegative',
       gridcolor: '#33333399',
       gridwidth: 1,
-      type: log.value ? 'log' : 'lin',
+      type: scale.value.log ? 'log' : 'lin',
       ...yRange
     },
     margin: { l: 30, r: 10, t: 45, b: 30 },
@@ -131,20 +138,11 @@ const config = {
             zoom.rangeY = rangeY ?? zoom.rangeY
           }
         "
-      />
-    </div>
-    <div class="row" style="width: 100%">
-      <div class="row">
-        <SelectButton v-model="yMode" :options="['average', 'sum']" :allowEmpty="false" />
-        <ToggleSwitch v-model="log" />
-        <span> log scale </span>
-      </div>
-      <BaseParamField
-        label="Intensity scale"
-        v-model:param="scale"
-        :range="{ min: 0, max: 100000, step: 2000 }"
-        hideSlider
-      />
+      >
+        <template v-slot:settings>
+          <ToolbarIntensityScale v-model="scale" />
+        </template>
+      </BaseChartPlotly>
     </div>
   </div>
 </template>
