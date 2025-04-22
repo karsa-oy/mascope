@@ -16,6 +16,10 @@ from mascope_file.name import get_instrument_type
 
 from mascope_signal.compute import get_tic_per_scan
 from mascope_signal.peak import detect_peaks
+from mascope_match import (
+    ORBI_FITTING_THRESHOLD,
+    TOF_FITTING_THRESHOLD,
+)
 
 from mascope_backend.socket import sio
 from mascope_backend.socket.notifications import (
@@ -61,10 +65,6 @@ from mascope_backend.api.new.instrument_configs.schemas import (
 )
 from mascope_backend.api.new.instrument_configs.process.service import (
     process_instrument_config,
-)
-from mascope_backend.api.new.match.params.schema import (
-    ORBI_FITTING_THRESHOLD,
-    TOF_FITTING_THRESHOLD,
 )
 
 from mascope_backend.runtime import runtime

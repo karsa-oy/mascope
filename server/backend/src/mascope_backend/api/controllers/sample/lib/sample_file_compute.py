@@ -1,10 +1,10 @@
 from typing import Literal
-from mascope_backend.api.new.instrument_configs.lib import (
-    read_instrument_functions,
-)
-from mascope_backend.api.new.match.params.schema import (
+from mascope_match import (
     ORBI_FITTING_THRESHOLD,
     TOF_FITTING_THRESHOLD,
+)
+from mascope_backend.api.new.instrument_configs.lib import (
+    read_instrument_functions,
 )
 from mascope_file.name import get_instrument_type
 from mascope_signal.peak import detect_peaks

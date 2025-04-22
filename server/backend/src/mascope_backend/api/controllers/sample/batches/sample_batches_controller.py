@@ -13,6 +13,10 @@ from sqlalchemy.orm import joinedload
 
 from mascope_file.name import get_instrument_type
 from mascope_signal.peak import detect_peaks, get_peaks
+from mascope_match import (
+    ORBI_FITTING_THRESHOLD,
+    TOF_FITTING_THRESHOLD,
+)
 
 from mascope_backend.db import async_session
 from mascope_backend.db.id import gen_id
@@ -85,11 +89,6 @@ from mascope_backend.socket.notifications import (
     UserNotification,
     send_progress_user_notification,
 )
-from mascope_backend.api.new.match.params.schema import (
-    ORBI_FITTING_THRESHOLD,
-    TOF_FITTING_THRESHOLD,
-)
-
 
 from mascope_backend.runtime import runtime
 
