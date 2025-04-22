@@ -68,8 +68,6 @@ def process_file_upload(filepath: str) -> None:
     """
     try:
         upload_sample_file(filepath)
-        # Delete file after successful upload
-        os.remove(filepath)
     except Exception as e:  # pylint: disable=broad-except
         runtime.logger.error(f"Exception {e.__class__.__name__}({str(e)})")
         # Move failed file into a separate directory
