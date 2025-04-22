@@ -201,6 +201,12 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
     mzCalibration.value = lastMzCalibration
   }
 
+  const resetFilters = () => {
+    selected.value = []
+    time.mode = initTime().mode
+    time.range = initTime().range
+  }
+
   return {
     // state
     mode,
@@ -214,7 +220,8 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
     time,
     mzCalibration,
     // actions
-    load
+    load,
+    resetFilters
   }
 })
 

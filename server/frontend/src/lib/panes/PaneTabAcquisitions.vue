@@ -90,6 +90,19 @@ const acquisitions = computed(
           polarity === '+-')
     ) ?? []
 )
+watch(
+  acquisitions,
+  () => {
+    app.data.acquisition.selected = []
+  },
+  { deep: true }
+)
+
+const clearFilters = () => {
+  app.data.acquisition.resetFilters()
+  search.value = ''
+  polarityDropdown.value = ''
+}
 
 const uploadedFiles = ref([])
 
@@ -149,6 +162,13 @@ watchEffect(() => {
   >
     <template #header="{ chooseCallback }">
       <menu class="acquisition-menu">
+        <Button
+          icon="pi pi-filter-slash"
+          @click="clearFilters"
+          text
+          severity="secondary"
+          v-tooltip.left="'Clear filters and selection'"
+        />
         <Select
           inputId="time"
           v-model="app.data.acquisition.time.mode"
