@@ -156,9 +156,8 @@ const layout = computed(() => ({
     ...rangeY.value
   },
   margin: { l: 50, r: 50, t: 50, b: 50 },
-  minreducedheight: 300,
   showlegend: true,
-  height: 650
+  autosize: true
 }))
 
 function onClick({ pointIndex, curveNumber }) {
@@ -195,7 +194,7 @@ const anyFilters = computed(
 </script>
 
 <template>
-  <figure>
+  <figure style="height: calc(100vh - 200px)">
     <div
       class="row"
       :style="`
