@@ -323,7 +323,7 @@ async def delete_sample_files(sample_file_ids: list[str]):
     4. Delete only the files without associated sample items
     5. Delete the corresponding filestore directories
     6. Conditionally reload instruments
-    7. Trigger acquisitions reload.
+    7. Trigger acquisitions reload
     8. Return results with information about deleted and skipped files
 
     :param sample_file_ids: List of IDs of the sample files to delete

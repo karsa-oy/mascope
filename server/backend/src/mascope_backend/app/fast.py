@@ -7,6 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from mascope_file.gc import gc_filestore
+
 from mascope_backend.api.lib.exceptions.api_exceptions import handle_exception
 from mascope_backend.api.routes import routers
 from mascope_backend.db import init_db
@@ -87,6 +89,14 @@ async def init_temp_dir():
     if os.path.exists(temp_dir):
         shutil.rmtree(temp_dir)
     os.mkdir(temp_dir)
+
+
+# filestore
+@fast.on_event("startup")
+def clean_filestore():
+    """Remove empty filestore folders"""
+    runtime.logger.info("Fast App startup: garbage collecting the filestore")
+    gc_filestore()
 
 
 # exception handlers
