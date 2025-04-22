@@ -186,6 +186,9 @@ watchEffect(
         <slot name="settings"> </slot>
       </Popover>
     </div>
+    <div class="bottomleft" v-if="slots.origin">
+      <slot name="origin"> </slot>
+    </div>
   </div>
 </template>
 
@@ -231,6 +234,13 @@ div {
 .topleft {
   position: absolute;
   top: 0;
+  left: 0;
+  z-index: 50;
+}
+
+.bottomleft {
+  position: absolute;
+  bottom: 0;
   left: 0;
   z-index: 50;
 }
