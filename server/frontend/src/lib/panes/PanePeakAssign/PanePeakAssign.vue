@@ -26,7 +26,12 @@ const visible = defineModel('visible')
 
 const preview = usePreview()
 
-const add = () => {}
+const props = defineProps({
+  height: {
+    type: Number,
+    required: true
+  }
+})
 
 const invalid = computed(() => false)
 
@@ -99,13 +104,15 @@ const columns = [
   { field: 'target_isotope_mz_error_ppm', label: 'm/z error (ppm)' }
 ]
 
-const height = 250
-
 const expanded = ref({})
 </script>
 
 <template>
-  <Panel class="browser" style="border: none; flex-grow: 1; max-width: 900px">
+  <Panel
+    class="browser"
+    style="border: none; flex-grow: 1; max-width: 900px"
+    :pt="{ content: { style: { padding: 0 } } }"
+  >
     <template #header>
       <TabMenu
         :model="[{ label: 'Assign Peak', icon: 'pi ph ph-magnifying-glass' }]"
@@ -151,7 +158,7 @@ const expanded = ref({})
         sortField="match_score"
         :sortOrder="-1"
         scrollable
-        :scrollHeight="`${height}px`"
+        :scrollHeight="`${height - 100}px`"
         size="small"
         v-model:expandedRows="expanded"
       >
@@ -216,8 +223,6 @@ const expanded = ref({})
             selectionMode="single"
             v-model:selection="preview.peak"
             sortField="mz"
-            scrollable
-            :scrollHeight="`${height}px`"
             size="small"
             style="margin-left: 3rem; margin-right: 10rem"
           >

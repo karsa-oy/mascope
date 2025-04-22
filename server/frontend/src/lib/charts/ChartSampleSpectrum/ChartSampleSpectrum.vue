@@ -18,6 +18,13 @@ const data = useChartData()
 
 const preview = usePreview()
 
+const props = defineProps({
+  height: {
+    type: Number,
+    required: true
+  }
+})
+
 const scale = ref({
   mode: 'average',
   max: null,
@@ -113,38 +120,35 @@ const config = {
 </script>
 
 <template>
-  <div class="col" style="gap: 0.5rem; height: 450px; width: 100%">
-    <div style="flex-grow: 1" class="center">
-      <BaseChartPlotly
-        id="ChartSampleSpectrum"
-        title="Spectrum"
-        :data="traces"
-        :layout="layout"
-        :config="config"
-        :loading="data.loading"
-        @click="
-          ({ x, event, data }) => {
-            if (event.button === 0 && data.name === 'Peak') {
-              app.data.peak.focus({ mz: x })
-            }
-          }
-        "
-        @zoom="
-          ({ rangeX, rangeY }) => {
-            if (rangeX == null && rangeY == null) {
-              app.data.peak.unfocus()
-            }
-            zoom.rangeX = rangeX ?? zoom.rangeX
-            zoom.rangeY = rangeY ?? zoom.rangeY
-          }
-        "
-      >
-        <template v-slot:settings>
-          <ToolbarIntensityScale v-model="scale" />
-        </template>
-      </BaseChartPlotly>
-    </div>
-  </div>
+  <BaseChartPlotly
+    id="ChartSampleSpectrum"
+    title="Spectrum"
+    :data="traces"
+    :layout="layout"
+    :config="config"
+    :loading="data.loading"
+    @click="
+      ({ x, event, data }) => {
+        if (event.button === 0 && data.name === 'Peak') {
+          app.data.peak.focus({ mz: x })
+        }
+      }
+    "
+    @zoom="
+      ({ rangeX, rangeY }) => {
+        if (rangeX == null && rangeY == null) {
+          app.data.peak.unfocus()
+        }
+        zoom.rangeX = rangeX ?? zoom.rangeX
+        zoom.rangeY = rangeY ?? zoom.rangeY
+      }
+    "
+    :height="height"
+  >
+    <template v-slot:settings>
+      <ToolbarIntensityScale v-model="scale" />
+    </template>
+  </BaseChartPlotly>
 </template>
 
 <style scoped>

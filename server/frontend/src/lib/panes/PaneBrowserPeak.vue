@@ -12,10 +12,11 @@ import { useApp } from '@/stores'
 
 const app = useApp()
 
-const formatter = new Intl.NumberFormat('en-US', {
-  minimumIntegerDigits: 2,
-  minimumFractionDigits: 3,
-  maximumFractionDigits: 3
+const props = defineProps({
+  height: {
+    type: Number,
+    required: true
+  }
 })
 </script>
 
@@ -37,7 +38,7 @@ const formatter = new Intl.NumberFormat('en-US', {
       :sortOrder="-1"
       size="small"
       scrollable
-      scrollHeight="340px"
+      :scrollHeight="`${height}px`"
       :virtualScrollerOptions="{ itemSize: 20 }"
     >
       <Column field="mz" header="m/z" sortable style="height: 20px">
