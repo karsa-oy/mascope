@@ -92,6 +92,11 @@ tags = ['lib']
 log_path = './logs'
 color = "white"
 
+[match-lib]
+tags = ['lib']
+log_path = './logs'
+color = "white"
+
 # hardware
 
 [thermo-lib]

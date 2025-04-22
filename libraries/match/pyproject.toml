@@ -1,0 +1,23 @@
+[project]
+name = "mascope_match"
+version = "0.0.0"
+description = "Mascope's match computation library"
+authors = [{ name = "Karsa Oy", email = "support@karsa.fi" }]
+requires-python = ">=3.12,<3.13"
+license.text = "LicenseRef-Proprietary"
+dependencies = [
+    "mascope_runtime",
+    "mascope_file",
+    "mascope_chem",
+    "mascope_signal",
+    "numpy~=1.26",
+    "pandas~=2.2",
+    "scipy~=1.13",
+    "xarray==2024.11.0",
+    "nanoid~=2.0.0",
+    "pydantic>=2.8.2,<3",
+]
+
+[build-system]
+requires = ["uv_build>=0.6,<0.7"]
+build-backend = "uv_build"

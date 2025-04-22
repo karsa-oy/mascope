@@ -145,6 +145,14 @@ class SignalLibConfig(ModuleConfig):
     pass
 
 
+class MatchLibConfig(ModuleConfig):
+    """
+    Standard Library module specific configuration options
+    """
+
+    pass
+
+
 class TofwerkLibConfig(ModuleConfig):
     """
     Hardware Library module specific configuration options
@@ -192,6 +200,7 @@ class RuntimeConfig(BaseModel):
     # libraries
     chemistry_lib: ChemistryLibConfig | None = None
     signal_lib: SignalLibConfig | None = None
+    match_lib: MatchLibConfig | None = None
     file_lib: FileLibConfig | None = None
     tofwerk_lib: TofwerkLibConfig | None = None
     thermo_lib: ThermoLibConfig | None = None
