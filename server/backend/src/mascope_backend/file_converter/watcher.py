@@ -16,7 +16,6 @@ class FSWatcher(Thread):
         file_queue,
         interval=1,
         shutdown_event=Event(),
-        recursive=False,
     ):
         Thread.__init__(self)
         self.log = runtime.logger.bind(key=self.name)
@@ -29,14 +28,19 @@ class FSWatcher(Thread):
         self.file_queue = file_queue
         self.interval = interval
         self.shutdown_event = shutdown_event
-        self.recursive = recursive
 
-    def walk(self):
-        if self.recursive:
-            search_path = os.path.join(self.path, "**", self.pattern)
-        else:
-            search_path = os.path.join(self.path, self.pattern)
-        return glob.glob(search_path, recursive=self.recursive)
+    def walk(self) -> list[str]:
+        """Find all files matching the pattern in the path.
+        This method is case-insensitive and will find files with both lower and upper case extensions.
+
+        :return: List of files matching the pattern in the path.
+        :rtype: list[str]
+        """
+        search_path_lower = os.path.join(self.path, self.pattern.lower())
+        search_path_upper = os.path.join(self.path, self.pattern.upper())
+        files = glob.glob(search_path_lower)
+        files.extend(glob.glob(search_path_upper))
+        return files
 
     def on_created(self, filelist):
         # Check for ready files in the filelist,
