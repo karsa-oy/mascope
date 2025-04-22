@@ -11,7 +11,7 @@ import { useWindowSize } from '@vueuse/core'
 
 import { useApp } from '@/stores'
 
-const { width, height } = useWindowSize()
+const win = useWindowSize()
 
 const app = useApp()
 
@@ -39,6 +39,10 @@ const props = defineProps({
   loading: {
     type: Boolean,
     default: false
+  },
+  height: {
+    type: Number,
+    required: false
   }
 })
 const slots = useSlots()
@@ -145,6 +149,7 @@ const ready = computed(
 watchEffect(
   () => {
     if (ready.value) {
+      console.log(`📊 [chart] redrawing chart ${props.id} with height ${props.height}`)
       // adapt to changes
       Plotly.react(plot.value, props.data, derived.value.layout, derived.value.config)
     }
@@ -163,7 +168,7 @@ watchEffect(
       :id="id"
       class="plot"
       style="width: 100%; height: 100%"
-      :key="`${width}-${height}`"
+      :key="`${win.width}-${win.height}-${height}`"
       @contextmenu="
         (e) => {
           e.preventDefault()
@@ -193,10 +198,6 @@ watchEffect(
 </template>
 
 <style scoped>
-div {
-  max-width: 95%;
-}
-
 .plot :deep(*) {
   font-family: Inter !important;
 }
