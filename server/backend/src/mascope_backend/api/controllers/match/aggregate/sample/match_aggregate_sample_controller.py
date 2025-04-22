@@ -3,6 +3,7 @@ from sqlalchemy import (
     select,
 )
 from mascope_file.string import norm
+from mascope_match import compute_match_isotopes
 from mascope_backend.db.id import gen_id
 from mascope_backend.db import async_session
 from mascope_backend.db.models import (
@@ -18,8 +19,8 @@ from mascope_backend.api.controllers.target.ions.target_ions_controller import (
 )
 from mascope_backend.api.controllers.samples.lib.samples_fetch import fetch_sample
 from mascope_backend.api.new.match.params import apply_match_params
-from mascope_backend.api.controllers.match.lib.match_compute import (
-    compute_match_isotopes,
+from mascope_backend.api.new.instrument_configs.lib import (
+    read_instrument_functions,
 )
 from mascope_backend.api.controllers.match.lib.match_aggregate import (
     aggregate_match_ions,
@@ -257,10 +258,15 @@ async def aggregate_sample_match_compound(
         target_isotopes_df = pd.DataFrame(ion_creation_result["created_isotopes"])
 
         # Step 4: Compute matches for the isotopes in the sample file.
+
+        # Get instrument functions for filename
+        instrument_functions = await read_instrument_functions(sample.filename)
+
         match_isotope_df = await compute_match_isotopes(
             filename=sample.filename,
             target_isotopes_df=target_isotopes_df,
             min_isotope_abundance=match_params.min_isotope_abundance,
+            instrument_functions=instrument_functions,
             polarity=sample.polarity,
         )
 
@@ -433,10 +439,15 @@ async def aggregate_sample_match_compounds(
     results = []
     if len(target_isotopes_df) > 0:
         # Step 4: Compute matches for the isotopes in the sample file.
+
+        # Get instrument functions for filename
+        instrument_functions = await read_instrument_functions(sample.filename)
+
         match_isotope_df = await compute_match_isotopes(
             filename=sample.filename,
             target_isotopes_df=target_isotopes_df,
             min_isotope_abundance=match_params.min_isotope_abundance,
+            instrument_functions=instrument_functions,
             polarity=sample.polarity,
         )
 

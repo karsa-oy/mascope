@@ -9,16 +9,17 @@ from zarr.errors import PathNotFoundError
 
 from mascope_tofwerk.calibration import mz_calibrate
 
-from mascope_file.io import load_coord, load_file, update_props, update_zarr_array_coord
+from mascope_file.io import load_coord, update_props, update_zarr_array_coord
 from mascope_file.name import get_sample_file_type
 
 from mascope_signal.compute import get_sum_signal, get_tic_per_scan
 
+from mascope_match import compute_match_isotopes
 from mascope_backend.api.lib.api_features import (
     api_controller,
 )
-from mascope_backend.api.controllers.match.lib.match_compute import (
-    compute_match_isotopes,
+from mascope_backend.api.new.instrument_configs.lib import (
+    read_instrument_functions,
 )
 from mascope_backend.api.controllers.target.isotopes.target_isotopes_controller import (
     get_target_isotopes,
@@ -85,10 +86,15 @@ async def mz_fit(
         ionization_mechanism_ids=ionization_mechanism_ids,
     )
     target_isotopes_df = pd.DataFrame(target_isotopes_result["data"])
+
+    # Get instrument functions for filename
+    instrument_functions = await read_instrument_functions(filename)
+
     match_isotope_df = await compute_match_isotopes(
         filename=filename,
         target_isotopes_df=target_isotopes_df,
         min_isotope_abundance=isotope_abundance_min,
+        instrument_functions=instrument_functions,
     )
 
     # Filter matches

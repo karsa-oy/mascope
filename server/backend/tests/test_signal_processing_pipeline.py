@@ -22,9 +22,7 @@ from tests.config import *
 
 from mascope_file.name import get_instrument_type
 from mascope_signal.peak import detect_peaks
-from mascope_backend.api.controllers.match.lib.match_compute import (
-    compute_match_isotopes,
-)
+from mascope_match import compute_match_isotopes
 
 from mascope_backend.runtime import runtime
 

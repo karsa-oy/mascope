@@ -37,8 +37,8 @@ from mascope_backend.runtime import runtime
 @api_controller()
 async def compute_and_create_sample_match_isotope_data(
     sample: MatchComputeSample,
-    target_isotopes_df,
-    notification: UserNotification = None,
+    target_isotopes_df: pd.DataFrame,
+    notification: UserNotification | None = None,
 ) -> dict[str, pd.DataFrame]:
     """
     Computes matc isotopes and match interferences for a given sample against a set of target isotopes.
@@ -67,6 +67,9 @@ async def compute_and_create_sample_match_isotope_data(
     polarity = sample.polarity
     sample_item_name = sample.sample_item_name
 
+    # Get instrument functions for filename
+    instrument_functions = await read_instrument_functions(filename)
+
     #  Sent progress user notificaton if notification is provided
     if notification:
         await send_progress_user_notification(notification, 0.25)
@@ -74,7 +77,9 @@ async def compute_and_create_sample_match_isotope_data(
     # Step 2: Compute match interferences for the given sample and target isotopes.
     runtime.logger.info(f"Computing match interferences for file: {filename}")
     match_interference_df = await compute_match_interferences(
-        filename, target_isotopes_df
+        filename=filename,
+        target_isotopes_df=target_isotopes_df,
+        instrument_functions=instrument_functions,
     )
     if match_interference_df.empty:
         runtime.logger.warning(
@@ -92,6 +97,7 @@ async def compute_and_create_sample_match_isotope_data(
         filename=filename,
         target_isotopes_df=target_isotopes_df,
         min_isotope_abundance=DEFAULT_MIN_ISOTOPE_ABUNDANCE,
+        instrument_functions=instrument_functions,
         polarity=polarity,
     )
     if match_isotope_df.empty:
