@@ -244,24 +244,15 @@ const anyFilters = computed(
       <template v-slot:settings>
         <ToolbarIntensityScale v-model="scale" />
       </template>
+      <template v-slot:origin>
+        <Select
+          v-model:modelValue="xField"
+          :options="xFields"
+          optionLabel="label"
+          dataKey="field"
+          filter
+        />
+      </template>
     </BaseChartPlotly>
   </figure>
-  <div
-    class="row"
-    :style="`
-      justify-content: space-between;
-      width: calc(${app.ui.split.right}vw - 6rem);
-      position: fixed;
-      bottom: 35px;
-      right: 2rem;
-    `"
-  >
-    <Select
-      v-model:modelValue="xField"
-      :options="xFields"
-      optionLabel="label"
-      dataKey="field"
-      filter
-    />
-  </div>
 </template>
