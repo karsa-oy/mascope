@@ -17,7 +17,8 @@ const app = useApp()
 
 const padding = 180
 
-const [initTop, initBottom] = JSON.parse(localStorage.getItem('spectrum-tab-split'))
+const storedState = localStorage.getItem('spectrum-tab-split')
+const [initTop, initBottom] = JSON.parse(storedState ?? '[50, 50]')
 
 const topSplit = ref(initTop)
 const bottomSplit = ref(initBottom)

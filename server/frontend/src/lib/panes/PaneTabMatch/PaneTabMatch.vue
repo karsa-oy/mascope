@@ -42,7 +42,8 @@ const uiScoredIon = computed(() => {
 
 const sidebarOpen = ref(false)
 
-const [initTop, initBottom] = JSON.parse(localStorage.getItem('match-tab-split'))
+const storedState = localStorage.getItem('match-tab-split')
+const [initTop, initBottom] = JSON.parse(storedState ?? '[50, 50]')
 
 const top = ref(initTop)
 const bottom = ref(initBottom)
