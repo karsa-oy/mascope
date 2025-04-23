@@ -93,14 +93,14 @@ const layout = computed(() => {
   const xRange = zoom.rangeX ?? autorange
   return {
     xaxis: {
-      title: 'm/z [Th]',
+      title: { text: 'm/z [Th]' },
       showgrid: true,
       gridcolor: '#33333399',
       gridwidth: 1,
       ...xRange
     },
     yaxis: {
-      title: `Signal intensity [${unit.value}]`,
+      title: { text: `Signal intensity [${unit.value}]` },
       showgrid: true,
       rangemode: 'nonnegative',
       gridcolor: '#33333399',
@@ -108,7 +108,7 @@ const layout = computed(() => {
       type: scale.value.log ? 'log' : 'lin',
       ...yRange
     },
-    margin: { l: 30, r: 10, t: 45, b: 30 },
+    margin: { l: 60, r: 10, t: 45, b: 50 },
     dragmode: 'zoom',
     showlegend: false
   }

@@ -93,14 +93,14 @@ const rangeY = computed(
 // standard plotly layout
 const layout = computed(() => ({
   yaxis: {
-    title: `Signal intensity [${scale.value.max == 'average' ? 'counts/s' : 'counts'}]`,
+    title: { text: `Signal intensity [${scale.value.max == 'average' ? 'counts/s' : 'counts'}]` },
     gridcolor: '#33333399',
     rangemode: 'nonnegative',
     type: scale.value.log ? 'log' : 'lin',
     ...rangeY.value
   },
   xaxis: {
-    title: 'm/z [Th]',
+    title: { text: 'm/z [Th]' },
     gridcolor: '#33333399'
   },
   margin: { l: 50, r: 50, t: 40, b: 40 },

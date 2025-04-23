@@ -137,7 +137,7 @@ const rangeY = computed(() =>
 
 const layout = computed(() => ({
   xaxis: {
-    title: xField.value?.label,
+    title: { text: xField.value?.label },
     autorange: true,
     automargin: true,
     showgrid: true,
@@ -148,7 +148,7 @@ const layout = computed(() => ({
     ...xAxis.value
   },
   yaxis: {
-    title: `Intensity ${unit.value}`,
+    title: { text: `Intensity ${unit.value}` },
     type: scale.value.log ? 'log' : 'lin',
     showgrid: true,
     gridcolor: '#33333399',

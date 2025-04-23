@@ -44,14 +44,14 @@ const traces = computed(() => {
 
 const layout = computed(() => ({
   xaxis: {
-    title: 'Time [s]',
+    title: { text: 'Time [s]' },
     autorange: true,
     showgrid: true,
     gridcolor: '#33333399',
     gridwidth: 1
   },
   yaxis: {
-    title: `Peak intensity [counts/s]`,
+    title: { text: `Peak intensity [counts/s]` },
     showgrid: true,
     autorange: true,
     rangemode: 'tozero',
