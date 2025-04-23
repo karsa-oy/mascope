@@ -443,6 +443,9 @@ Then restart the agent, and the correct config is loaded and the agent is ready 
 > [!IMPORTANT]
 > In case the config schema is changed, any existing configuration in the target environment must be deleted prior to running the updated version of TofAgent, in order to initialize correct configs.
 
+> [!IMPORTANT]
+> Windows prevents applications from writing into `Program Files` directory. Therefore, when testing the agent with TofDaq Recorder, its data directory must be outside `Program Files`.
+
 ## Backend
 
 ```sh
