@@ -130,16 +130,19 @@ const derivedPolarity = computed(() => {
   if (['+', '-'].includes(polarityDropdown.value)) {
     return polarityDropdown.value
   }
-  const hasPositive = app.data.acquisition.selected.some(({ polarity }) => polarity === '+')
-  const hasNegative = app.data.acquisition.selected.some(({ polarity }) => polarity === '-')
-  const hasMixed = app.data.acquisition.selected.some(({ polarity }) => polarity === '+-')
-  if (hasPositive && hasMixed) {
+  const positive = app.data.acquisition.selected.every(({ polarity }) =>
+    ['+', '+-'].includes(polarity)
+  )
+  const negative = app.data.acquisition.selected.every(({ polarity }) =>
+    ['-', '+-'].includes(polarity)
+  )
+  if (positive) {
     return '+'
-  }
-  if (hasNegative && hasMixed) {
+  } else if (negative) {
     return '-'
+  } else {
+    return null
   }
-  return null
 })
 
 watchEffect(() => {
