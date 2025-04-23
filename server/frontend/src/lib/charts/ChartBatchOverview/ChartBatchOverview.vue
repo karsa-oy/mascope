@@ -4,6 +4,7 @@ import { ref, computed, watchEffect, watch, toRaw } from 'vue'
 import SelectButton from 'primevue/selectbutton'
 import ToggleSwitch from 'primevue/toggleswitch'
 import Select from 'primevue/select'
+import FloatLabel from 'primevue/floatlabel'
 import Chip from 'primevue/chip'
 
 import { beautifySnakeCase } from '@/lib/utils'
@@ -248,15 +249,18 @@ const anyFilters = computed(
     >
       <template v-slot:settings>
         <ToolbarIntensityScale v-model="scale" />
-      </template>
-      <template v-slot:origin>
-        <Select
-          v-model:modelValue="xField"
-          :options="xFields"
-          optionLabel="label"
-          dataKey="field"
-          filter
-        />
+        <div style="height: 0.5rem" />
+        <FloatLabel>
+          <Select
+            v-model:modelValue="xField"
+            :options="xFields"
+            optionLabel="label"
+            dataKey="field"
+            filter
+            fluid
+          />
+          <label>X-axis</label>
+        </FloatLabel>
       </template>
     </BaseChartPlotly>
   </figure>
