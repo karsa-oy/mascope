@@ -105,13 +105,13 @@ export const useMatchParams = defineStore('app.data.match.params', () => {
   // compute match category using UI param values
   function uiCategory(record) {
     if (!ui.value) {
-      return record.match_category
+      return record?.match_category
     }
     let match_category = 0
-    if (record.match_score > ui.value.possible_match_threshold) {
+    if (record?.match_score > ui.value.possible_match_threshold) {
       match_category = 1
     }
-    if (record.match_score > ui.value.probable_match_threshold) {
+    if (record?.match_score > ui.value.probable_match_threshold) {
       match_category = 2
     }
     return match_category

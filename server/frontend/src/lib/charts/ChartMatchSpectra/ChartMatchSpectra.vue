@@ -18,14 +18,18 @@ import { useChartData } from './data.js'
 const app = useApp()
 const data = useChartData()
 
-const { height, width } = useWindowSize()
+const { width } = useWindowSize()
 
 const plots = ref({})
 
-defineProps({
+const props = defineProps({
   sidebarOpen: {
     type: Boolean,
     required: true
+  },
+  height: {
+    type: Number,
+    required: false
   }
 })
 
@@ -53,7 +57,7 @@ const traces = computed(() => {
 // transform raw visualiation data into seperate charts
 const isotopeCharts = computed(() => {
   // create an array corresponding to visualized isotopes
-  return clone(app.data.match.visualized.isotopes).map((isotope) => {
+  return clone(app.data.match.visualized.isotopes)?.map((isotope) => {
     // split up the chart's traces by isotope
     const start = traces.value?.findIndex(
       (trace) => trace.target_isotope_id === isotope.target_isotope_id
@@ -99,17 +103,17 @@ const layout = computed(() => ({
     title: 'm/z [Th]',
     gridcolor: '#33333399'
   },
-  margin: { l: 50, r: 5, t: 40, b: 40 },
+  margin: { l: 50, r: 50, t: 40, b: 40 },
   dragmode: 'zoom',
   showlegend: false,
-  height: 250,
-  width: (width * (app.ui.split.right / 100)) / isotopeCharts.value.length
+  height: props.height,
+  width: (width.value * (app.ui.split.right / 100)) / isotopeCharts.value.length
 }))
 
 // reset chart zoom when changing targets
 watch(
   // follow visualization, not focused target
-  () => app.data.match.visualized.ion.target_ion_id,
+  () => app.data.match.visualized.ion?.target_ion_id,
   (visualized) => {
     // reset zoom for all isotope charts
     isotopeCharts.value.forEach((_, index) => {
@@ -134,15 +138,13 @@ watch(
           align-items: flex-start;
           justify-content: flex-start;
           max-width: calc(${app.ui.split.right}vw - 4rem);
-          height: 300px;
         `"
     >
       <figure
         v-for="(isotopeChart, index) of isotopeCharts"
-        :key="isotopeChart.target_isotope_id"
+        :key="`${isotopeChart.target_isotope_id}-${height}`"
         :style="`
             width: calc(${app.ui.split.right}vw / ${isotopeCharts.length} - 2rem);
-            height: calc((100vh - 40rem) / 2);
             position: relative;
           `"
         :class="sidebarOpen ? 'sidebarOpen' : ''"
@@ -166,6 +168,7 @@ watch(
           :ref="(el) => (plots[index] = el)"
           :data="isotopeChart.traces"
           :layout="layout"
+          :height="height"
           hideTitle
         >
           <template v-slot:settings>

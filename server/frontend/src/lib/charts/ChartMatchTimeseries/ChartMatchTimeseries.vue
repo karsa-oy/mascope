@@ -1,5 +1,8 @@
 <script setup>
 import { computed, toRaw } from 'vue'
+
+import { useWindowSize } from '@vueuse/core'
+
 import Tag from 'primevue/tag'
 
 import { useApp } from '@/stores'
@@ -8,10 +11,17 @@ import BaseChartPlotly from '../BaseChartPlotly.vue'
 import { useChartData } from './data.js'
 
 const app = useApp()
-
 const data = useChartData()
+const { width } = useWindowSize()
 
 const scale = defineModel()
+
+const props = defineProps({
+  height: {
+    type: Number,
+    required: false
+  }
+})
 
 const sampleLength = computed(() =>
   // Length of the selected sample in seconds
@@ -56,7 +66,8 @@ const layout = computed(() => ({
     x: 1,
     y: 1
   },
-  height: 350
+  height: props.height,
+  width: width.value * (app.ui.split.right / 100)
 }))
 
 const corr = new Intl.NumberFormat('en-US', {
@@ -71,15 +82,21 @@ const corr = new Intl.NumberFormat('en-US', {
     <span style="margin-bottom: 1rem">
       isotope correlation coefficient:
       <Tag
-        :value="corr.format(app.data.match.visualized.isotopes[0].match_isotope_correlation)"
+        :value="corr.format(app.data.match.visualized.isotopes?.[0].match_isotope_correlation)"
         :severity="
-          Math.abs(app.data.match.visualized.isotopes[0].match_isotope_correlation) >
-          app.data.match.params.ui.min_isotope_correlation
+          Math.abs(app.data.match.visualized.isotopes?.[0].match_isotope_correlation) >
+          app.data.match.params.ui?.min_isotope_correlation
             ? 'info'
             : 'warn'
         "
       />
     </span>
-    <BaseChartPlotly id="ChartMatchTimeseries" title="Timeseries" :data="traces" :layout="layout" />
+    <BaseChartPlotly
+      id="ChartMatchTimeseries"
+      title="Timeseries"
+      :data="traces"
+      :layout="layout"
+      :height="height"
+    />
   </figure>
 </template>

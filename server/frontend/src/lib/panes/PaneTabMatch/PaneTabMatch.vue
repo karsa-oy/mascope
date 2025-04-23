@@ -1,7 +1,11 @@
 <script setup>
-import ScrollPanel from 'primevue/scrollpanel'
-
 import { computed, ref, reactive } from 'vue'
+
+import ScrollPanel from 'primevue/scrollpanel'
+import Splitter from 'primevue/splitter'
+import SplitterPanel from 'primevue/splitterpanel'
+
+import { useWindowSize } from '@vueuse/core'
 
 import { BaseMatchTag } from '@/lib/base'
 import { ChartMatchSpectra, ChartMatchTimeseries } from '@/lib/charts'
@@ -9,6 +13,8 @@ import { ToolbarMatchCharts, ToolbarMatchRating } from '@/lib/toolbars'
 import { useApp } from '@/stores'
 
 import SidebarMatchParams from './SidebarMatchParams.vue'
+
+const { height } = useWindowSize()
 
 const app = useApp()
 
@@ -35,34 +41,50 @@ const uiScoredIon = computed(() => {
 })
 
 const sidebarOpen = ref(false)
+
+const [initTop, initBottom] = JSON.parse(localStorage.getItem('match-tab-split'))
+
+const top = ref(initTop)
+const bottom = ref(initBottom)
+const heights = computed(() => [
+  ((height.value - 300) * top.value) / 100,
+  ((height.value - 300) * bottom.value) / 100
+])
 </script>
 
 <template>
-  <div
-    :style="`
-      height: calc(100vh - 150px); 
-      width: calc(${app.ui.split.right}vw - 5rem);
-      overflow-y: auto;
-      overflow-x: hidden;
-    `"
-    v-if="app.data.match.params.ui"
+  <menu class="topbar">
+    <div>
+      <SidebarMatchParams v-model:open="sidebarOpen" />
+    </div>
+    <h1>
+      <BaseMatchTag :row="uiScoredIon" :style="'font-size: large'" />
+      match: ion <i>{{ app.data.match.visualized.ion?.target_ion_formula }}</i>
+      for
+      <i>{{ app.data.match.visualized.ion?.sample_item_name }}</i> with target
+      <i>{{ compound?.target_compound_formula }}</i>
+    </h1>
+    <ToolbarMatchRating />
+  </menu>
+  <Splitter
+    layout="vertical"
+    stateStorage="local"
+    stateKey="match-tab-split"
+    style="height: calc(100vh - 200px); width: 100%"
+    @resizeend="
+      ({ sizes }) => {
+        top = sizes[0]
+        bottom = sizes[1]
+      }
+    "
   >
-    <menu class="topbar">
-      <div>
-        <SidebarMatchParams v-model:open="sidebarOpen" />
-      </div>
-      <h1>
-        <BaseMatchTag :row="uiScoredIon" :style="'font-size: large'" />
-        match: ion <i>{{ app.data.match.visualized.ion?.target_ion_formula }}</i>
-        for
-        <i>{{ app.data.match.visualized.ion?.sample_item_name }}</i> with target
-        <i>{{ compound?.target_compound_formula }}</i>
-      </h1>
-      <ToolbarMatchRating />
-    </menu>
-    <ChartMatchSpectra v-model="scale" :sidebarOpen="sidebarOpen" />
-    <ChartMatchTimeseries v-model="scale" />
-  </div>
+    <SplitterPanel :size="50">
+      <ChartMatchSpectra v-model="scale" :sidebarOpen="sidebarOpen" :height="heights[0]" />
+    </SplitterPanel>
+    <SplitterPanel :size="50">
+      <ChartMatchTimeseries v-model="scale" :height="heights[1]" />
+    </SplitterPanel>
+  </Splitter>
 </template>
 
 <style scoped>

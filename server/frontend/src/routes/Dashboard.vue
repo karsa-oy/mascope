@@ -129,9 +129,7 @@ const tabs = computed(() => [
                 <PaneTabSpectrum v-if="app.ui.tab.active == 'spectrum'" />
               </TabPanel>
               <TabPanel value="match" :pt="{ content: { style: { padding: 0 } } }">
-                <PaneTabMatch
-                  v-if="app.data.match.visualized.ion && app.ui.tab.active == 'match'"
-                />
+                <PaneTabMatch />
               </TabPanel>
             </TabPanels>
           </Tabs>

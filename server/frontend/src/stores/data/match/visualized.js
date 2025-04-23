@@ -28,8 +28,8 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
     collectionId: null
   })
 
-  const instrument = computed(() => sample.focused.instrument)
-  const instrumentType = computed(() => getInstrumentType(sample.focused.instrument))
+  const instrument = computed(() => sample.focused?.instrument)
+  const instrumentType = computed(() => getInstrumentType(sample.focused?.instrument))
 
   // actions
   /**
