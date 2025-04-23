@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watchEffect, toRaw } from 'vue'
+import { ref, computed, watchEffect, watch, toRaw } from 'vue'
 
 import SelectButton from 'primevue/selectbutton'
 import ToggleSwitch from 'primevue/toggleswitch'
@@ -161,27 +161,33 @@ const layout = computed(() => ({
 }))
 
 function onClick({ pointIndex, curveNumber }) {
-  if (!pointIndex || !curveNumber) return
+  if (pointIndex == null || curveNumber == null) return
   // Select sample corresponding to the clicked data point
   const sample = app.data.sample.list[pointIndex]
+
+  watch(
+    () => app.data.match.ion.list,
+    (list) => {
+      // Focus on the corresponding compound/ion using the trace index
+      const trace = data.traces[curveNumber]
+      // Guard for matchData availability
+      if (!trace.matchData) {
+        return
+      }
+      const { level, match_key } = trace.matchData
+      if (level && level === 'compound') {
+        app.data.match.compound.focus({ match_key })
+      } else if (level && level === 'ion') {
+        app.data.match.ion.focus({ match_key })
+      }
+    },
+    { once: true }
+  )
 
   if (sample) {
     app.data.sample.focus(sample)
   } else {
     app.data.sample.unfocus()
-  }
-
-  // Focus on the corresponding compound/ion using the trace index
-  const trace = data.traces[curveNumber]
-
-  // Guard for matchData availability
-  if (!trace.matchData) return
-
-  const { level, match_key } = trace.matchData
-  if (level && level === 'compound') {
-    app.data.match.compound.focus({ match_key })
-  } else if (level && level === 'ion') {
-    app.data.match.ion.focus({ match_key })
   }
 }
 

@@ -174,7 +174,6 @@ export const useChartData = defineStore('chart.batch.overview', () => {
           case 'compound': {
             name = target_compound_name.trim() ? target_compound_name : target_compound_formula
             match_key = `${target_collection_id}_${target_compound_id}`
-            all_matches = [...app.data.match.compound.list]
             break
           }
           case 'ion': {
@@ -183,7 +182,6 @@ export const useChartData = defineStore('chart.batch.overview', () => {
               : target_compound_formula
             name = `${compound_prefix}: ${target_ion_formula}`
             match_key = `${target_collection_id}_${target_ion_id}`
-            all_matches = [...app.data.match.ion.list]
             break
           }
         }
@@ -203,7 +201,7 @@ export const useChartData = defineStore('chart.batch.overview', () => {
           matchData: {
             level: level,
             match_key,
-            collection_ids: all_matches
+            collection_ids: targetMatches
               .filter((match) => match[`target_${level}_id`] === targetId)
               .map(({ target_collection_id }) => target_collection_id)
           },

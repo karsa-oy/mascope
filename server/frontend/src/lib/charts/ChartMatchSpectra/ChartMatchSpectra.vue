@@ -116,7 +116,7 @@ watch(
   () => app.data.match.visualized.ion?.target_ion_id,
   (visualized) => {
     // reset zoom for all isotope charts
-    isotopeCharts.value.forEach((_, index) => {
+    isotopeCharts.value?.forEach((_, index) => {
       // use isotope index to preserve chart
       // correspondence between position & zoom
       const plot = plots.value[index]
