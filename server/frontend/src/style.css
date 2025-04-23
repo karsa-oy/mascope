@@ -110,9 +110,14 @@
 
   .browser .scroller {
     height: 100%;
+    overflow-x: auto;
     overflow-y: auto;
     scrollbar-width: thin;
     padding-right: 1rem;
+
+    .p-datatable-table-container {
+      overflow: visible !important;
+    }
   }
 
   .browser .p-panel-content-container,
