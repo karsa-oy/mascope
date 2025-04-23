@@ -125,10 +125,10 @@ const tabs = computed(() => [
               <TabPanel value="batch">
                 <ChartBatchOverview v-if="app.data.batch.focused && app.ui.tab.active == 'batch'" />
               </TabPanel>
-              <TabPanel value="spectrum">
+              <TabPanel value="spectrum" :pt="{ content: { style: { padding: 0 } } }">
                 <PaneTabSpectrum v-if="app.ui.tab.active == 'spectrum'" />
               </TabPanel>
-              <TabPanel value="match">
+              <TabPanel value="match" :pt="{ content: { style: { padding: 0 } } }">
                 <PaneTabMatch
                   v-if="app.data.match.visualized.ion && app.ui.tab.active == 'match'"
                 />
