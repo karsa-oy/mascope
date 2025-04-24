@@ -167,7 +167,7 @@ watch(
   async (match) => {
     const ionId =
       match?.target_ion_id ??
-      app.data.match.ion.list?.find((ion) => ion.target_compound_id === match.target_compound_id)
+      app.data.match.ion.list?.find((ion) => ion.target_compound_id === match?.target_compound_id)
         ?.target_ion_id
     if (
       ionId &&
