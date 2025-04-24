@@ -141,56 +141,65 @@ export const useBatchContextMenu = defineStore('browser.sample.batchCtxMenu', ()
     },
     { separator: true, visible: row.value !== null },
     {
-      label: 'Export batch',
-
+      label: `Download`,
       icon: 'pi pi-file-export',
-      command: async () => {
-        await app.data.batch.exportCsv(row.value)
-      },
-      visible: row.value !== null
-    },
-    {
-      label: 'Export peaks',
-      icon: 'pi pi-file-export',
-      command: () => {
-        confirm.require({
-          icon: 'pi pi-info-circle',
-          header: 'Export batch peak data',
-          message: `Export peak data for batch "${row.value.sample_batch_name}"?`,
-          accept: () => {
-            app.data.batch.exportPeaks(row.value)
-          },
-          acceptProps: {
-            icon: 'pi pi-file-export',
-            label: 'Export'
-          },
-          rejectProps: {
-            icon: 'pi pi-times',
-            label: 'Cancel',
-            severity: 'secondary'
-          }
-        })
-      },
-      visible: row.value !== null
-    },
-    {
-      separator: true,
+      visible: row.value !== null,
+      items: [
+        {
+          label: 'Batch data',
 
-      visible: row.value !== null
+          icon: 'pi ph ph-table',
+          command: async () => {
+            await app.data.batch.exportCsv(row.value)
+          },
+          visible: row.value !== null
+        },
+        {
+          label: 'Peak data',
+          icon: 'pi pi-wave-pulse',
+          command: () => {
+            confirm.require({
+              icon: 'pi pi-info-circle',
+              header: 'Export batch peak data',
+              message: `Export peak data for batch "${row.value.sample_batch_name}"?`,
+              accept: () => {
+                app.data.batch.exportPeaks(row.value)
+              },
+              acceptProps: {
+                icon: 'pi pi-file-export',
+                label: 'Export'
+              },
+              rejectProps: {
+                icon: 'pi pi-times',
+                label: 'Cancel',
+                severity: 'secondary'
+              }
+            })
+          },
+          visible: row.value !== null
+        }
+      ]
     },
     {
-      label: `Recalibrate batch`,
-      icon: 'pi pi-replay',
-      command: () => {
-        dialog.calibration = true
-      },
-      visible: row.value !== null
-    },
-    {
-      label: 'Rematch batch',
-      icon: 'pi pi-replay',
-      command: () => app.data.batch.rematch(row.value),
-      visible: row.value !== null
+      label: 'Process',
+      icon: 'pi ph ph-hourglass-medium',
+      visible: row.value !== null,
+      items: [
+        {
+          label: `Recalibrate`,
+          icon: 'pi ph ph-scales',
+          command: () => {
+            dialog.calibration = true
+          },
+          visible: row.value !== null
+        },
+        {
+          label: 'Rematch',
+          icon: 'pi ph ph-binoculars',
+          command: () => app.data.batch.rematch(row.value),
+          visible: row.value !== null
+        }
+      ]
     }
   ])
 

@@ -130,22 +130,6 @@ export const useSampleContextMenu = defineStore('browser.sample.sampleCtxMenu', 
         }
       },
       {
-        label: `Download sample${s}`,
-        icon: 'pi pi-download',
-        command: () => {
-          api.http.post(
-            `/file/download`,
-            {
-              sample_file_ids: app.data.sample.selected.map(({ sample_file_id }) => sample_file_id)
-            },
-            {
-              use: 'process',
-              type: 'download_sample_files'
-            }
-          )
-        }
-      },
-      {
         label: `Delete sample${s}`,
         icon: 'pi pi-trash',
         command: () => {
@@ -177,38 +161,69 @@ export const useSampleContextMenu = defineStore('browser.sample.sampleCtxMenu', 
           })
         }
       },
-      { separator: true, visible: !multiselecting },
+      { separator: true },
       {
-        label: 'Export peaks',
+        label: `Download`,
         icon: 'pi pi-file-export',
-        command: async () => {
-          await app.data.sample.exportPeaks(row.value)
-        },
-        visible: !multiselecting
+        items: [
+          {
+            label: `Sample file${s}`,
+            icon: 'pi ph ph-test-tube',
+            command: () => {
+              api.http.post(
+                `/file/download`,
+                {
+                  sample_file_ids: app.data.sample.selected.map(
+                    ({ sample_file_id }) => sample_file_id
+                  )
+                },
+                {
+                  use: 'process',
+                  type: 'download_sample_files'
+                }
+              )
+            }
+          },
+          {
+            label: 'Peak data',
+            icon: 'pi pi-wave-pulse',
+            command: async () => {
+              await app.data.sample.exportPeaks(row.value)
+            },
+            visible: !multiselecting
+          }
+        ]
       },
       {
-        label: `Recalibrate sample`,
-        icon: 'pi pi-replay',
-        command: () => {
-          dialog.calibration = true
-        },
-        visible: !multiselecting
-      },
-      {
-        label: `Rematch sample`,
-        icon: 'pi pi-replay',
-        command: async () => {
-          await app.data.sample.rematch(row.value)
-        },
-        visible: !multiselecting
-      },
-      {
-        label: `Compute all peaks`,
-        icon: 'pi pi-wave-pulse',
-        command: async () => {
-          await app.data.peak.computeAll(row.value)
-        },
-        visible: !multiselecting
+        label: 'Process',
+        icon: 'pi ph ph-hourglass-medium',
+        visible: !multiselecting,
+        items: [
+          {
+            label: `Recalibrate`,
+            icon: 'pi ph ph-scales',
+            command: () => {
+              dialog.calibration = true
+            },
+            visible: !multiselecting
+          },
+          {
+            label: `Rematch`,
+            icon: 'pi ph ph-binoculars',
+            command: async () => {
+              await app.data.sample.rematch(row.value)
+            },
+            visible: !multiselecting
+          },
+          {
+            label: `Detect peaks`,
+            icon: 'pi pi-wave-pulse',
+            command: async () => {
+              await app.data.peak.computeAll(row.value)
+            },
+            visible: !multiselecting
+          }
+        ]
       }
     ]
   })
