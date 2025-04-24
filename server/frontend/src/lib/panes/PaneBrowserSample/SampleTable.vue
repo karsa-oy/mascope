@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
@@ -34,6 +34,31 @@ const formatter = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2
 })
+
+/**
+ * Utility function to allow scrolling to samples in the watchers below
+ *
+ * A lock prevents race conditions, especially if later other watchers are added.
+ */
+let lock = false
+function scrollTo(sampleId) {
+  if (!lock && sampleId) {
+    lock = true
+    setTimeout(() => {
+      document.getElementById(sampleId)?.scrollIntoViewIfNeeded()
+      lock = false
+    }, 1000)
+  }
+}
+
+watch(
+  () => app.data.sample.focusedId,
+  (sampleId, oldSampleId) => {
+    if (sampleId !== oldSampleId) {
+      scrollTo(sampleId)
+    }
+  }
+)
 </script>
 
 <template>
@@ -80,6 +105,7 @@ const formatter = new Intl.NumberFormat('en-US', {
         }
       "
       size="small"
+      :pt="{ bodyRow: ({ context }) => ({ id: samples[context.index]?.sample_item_id }) }"
     >
       <Column field="match_score" sortable class="match-column">
         <template #header>
