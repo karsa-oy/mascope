@@ -427,7 +427,7 @@ cd agents/tof
 
 Then run the executable found in `agents/tof/dist`.
 
-When you run this executable, the `MASCOPE_PATH` will be `%AppData%\Mascope\TofAgent` and the runtime environment will therefore be `%AppData%\Mascope\TofAgent\runtime\env\prod`.
+When you run this executable, the `MASCOPE_PATH` will be `%AppData%\Mascope\TofAgent` and the runtime environment will therefore be `%AppData%\Mascope\TofAgent\.runtime\env\prod`.
 
 You will need to run the agent once so that it initializes the directory structure, but it will fail to resolve some paths because the configuration needs to be updated. Then go to the env path listed above and update `prod.mascope.toml` with:
 
@@ -437,6 +437,12 @@ You will need to run the agent once so that it initializes the directory structu
    - Click the user profile icon to open the sidebar
    - In the "API Access Tokens" section, select "TOF Agent" from the dropdown
    - Generate and copy the access token (note: token is shown only once)
+
+You will also need to manually edit the `state.json` file in the `.runtime/` directory to correctly resolve the config path:
+
+1. Open `state.json` in a text editor
+2. Change `env.active` variable to `"prod"`
+3. Change `mode.active` variable to `"prod"`
 
 Then restart the agent, and the correct config is loaded and the agent is ready to go.
 
