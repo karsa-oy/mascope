@@ -89,7 +89,7 @@ function install_tooling() {
     if [[ -z $(command -v uv) ]]; then
         write_line "uv not detected, installing..."
         
-        curl -LsSf https://astral.sh/uv/install.sh | sh
+        sudo snap install --classic astral-uv
     else
 
         write_line "uv detected, skipping install."
@@ -104,6 +104,23 @@ function install_tooling() {
         sudo apt-get install -y nodejs
     else
         write_line "Node 22 detected, skipping install."
+    fi
+
+    # use jemalloc to ensure no free() pointer errors
+    write_line "installing jemalloc"
+    sudo apt install --yes --no-install-recommends libjemalloc2
+    set_envvar 'LD_PRELOAD' "/usr/lib/x86_64-linux-gnu/libjemalloc.so.2"
+    
+    if [[ -z $(command -v dotnet) ]]; then
+        write_line "dotnet runtime not detected, installing..."
+
+        wget https://packages.microsoft.com/config/debian/12/packages-microsoft-prod.deb -O packages-microsoft-prod.deb \
+            && sudo dpkg -i packages-microsoft-prod.deb \
+            && rm packages-microsoft-prod.deb \
+            && sudo apt update \
+            && sudo apt install -y dotnet-runtime-9.0
+    else
+        write_line "dotnet detected, skipping install."
     fi
 
     # cli depedencency
@@ -127,6 +144,7 @@ function install_mascope() {
     write_section "INSTALLING MASCOPE BINARIES"
 
     uv tool install --force .
+    uv tool update-shell
 }
 
 function uninstall_mascope() {
