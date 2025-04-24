@@ -139,7 +139,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
   plot.value.removeEventListener('plotly_click', handleClick)
   plot.value.removeEventListener('plotly_relayout', handleZoom)
-  Plotly.purge(plot.value)
 })
 
 const ready = computed(
