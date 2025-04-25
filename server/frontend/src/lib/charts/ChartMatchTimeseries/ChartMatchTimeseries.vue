@@ -58,7 +58,7 @@ const layout = computed(() => ({
     gridcolor: '#33333399',
     gridwidth: 1
   },
-  margin: { l: 50, r: 20, t: 30, b: 40 },
+  margin: { l: 50, r: 30, t: 30, b: 40 },
   dragmode: 'zoom',
   showlegend: true,
   legend: {
@@ -66,8 +66,7 @@ const layout = computed(() => ({
     x: 1,
     y: 1
   },
-  height: props.height,
-  width: width.value * (app.ui.split.right / 100)
+  height: props.height
 }))
 
 const corr = new Intl.NumberFormat('en-US', {

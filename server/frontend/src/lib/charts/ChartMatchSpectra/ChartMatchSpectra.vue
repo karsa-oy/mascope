@@ -103,11 +103,10 @@ const layout = computed(() => ({
     title: { text: 'm/z [Th]' },
     gridcolor: '#33333399'
   },
-  margin: { l: 50, r: 50, t: 40, b: 40 },
+  margin: { l: 50, r: 20, t: 40, b: 40 },
   dragmode: 'zoom',
   showlegend: false,
-  height: props.height,
-  width: (width.value * (app.ui.split.right / 100)) / isotopeCharts.value.length
+  height: props.height
 }))
 
 // reset chart zoom when changing targets
@@ -135,16 +134,20 @@ watch(
       class="row"
       :style="`
           gap: 0rem;
-          align-items: flex-start;
+          align-items: space-between;
           justify-content: flex-start;
-          max-width: calc(${app.ui.split.right}vw - 4rem);
+          width: 100%;
+          max-width: 100%;
+          padding: 0;
+          margin: 0;
         `"
     >
       <figure
         v-for="(isotopeChart, index) of isotopeCharts"
         :key="`${isotopeChart.target_isotope_id}-${height}`"
         :style="`
-            width: calc(${app.ui.split.right}vw / ${isotopeCharts.length} - 2rem);
+            flex-shrink: 1;
+            flex-grow: 1;
             position: relative;
           `"
         :class="sidebarOpen ? 'sidebarOpen' : ''"
