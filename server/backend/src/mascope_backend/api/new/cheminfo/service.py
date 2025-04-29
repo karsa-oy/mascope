@@ -6,6 +6,7 @@ from mascope_backend.db.models import (
 )
 from mascope_backend.api.lib.api_features import (
     api_controller,
+    api_controller_background_task,
 )
 from mascope_backend.api.controllers.match.aggregate.sample.match_aggregate_sample_controller import (
     aggregate_sample_match_compounds,
@@ -153,28 +154,63 @@ async def retrieve_cheminfo_by_mz(
     }
 
 
-@api_controller()
-async def cheminfo_by_mz_matched(
-    mz: float,
+@api_controller_background_task(
+    success_notification_rooms=["sid"],
+    error_notification_rooms=["sid"],
+)
+async def match_cheminfo_by_mz(
     sample_item_id: str,
+    mz: float,
     mz_precision: float = 30,
     formula_ranges: str | None = "C0-100 H0-100 O0-100 N0-100",
     ionization_mechanism_ids: list[str] | None = None,
     match_params: BaseMatchParams | None = None,
     limit: int = 20,
+    page: int = 0,
+    sort: None | str = None,
+    order: None | str = "asc",
+    independent_transaction: bool = False,
+    sid: None | str = None,
+    process_id: None | str = None,
+    parent_id: None | str = None,
 ) -> dict:
     """
-    Query the ChemInfo database by mz and other optional parameters.
+    Match a specific m/z value against molecular structures from ChemInfo and compute potential
+    match data for specified sample.
 
-    :param mz: the m/z to search for
+    Steps:
+    1. Query ChemInfo for compounds matching the m/z value
+    2. Match these compounds against a specified sample
+    3. Combine and format the results
+
+    :param sample_item_id: Sample item ID to match against
+    :type sample_item_id: str
+    :param mz: The m/z value to search for
     :type mz: float
-    :param sample_item_id: the sample item ID to match for
-    :param mzPrecision: the tolerance of m/z of matches to the queried m/z
-    :type mzPrecision: float | None
-    :param formulaRanges: formula ranges permitted in the results
-    :type formulaRanges: str | None
-    :param ionization_mechanisms: list of ionization mechanisms to query against
-    :type ionization_mechanisms: list[str] | None
+    :param mz_precision: The tolerance for m/z matching in ppm
+    :type mz_precision: float
+    :param formula_ranges: Formula ranges permitted in the results
+    :type formula_ranges: None | str
+    :param ionization_mechanism_ids: List of ionization mechanism IDs to query against
+    :type ionization_mechanism_ids: None | list[str]
+    :param match_params: Parameters for customizing the matching algorithm
+    :type match_params: None | BaseMatchParams
+    :param limit: Maximum number of results to return
+    :type limit: int
+    :param page: Page number for pagination
+    :type page: int
+    :param sort: Field to sort results by
+    :type sort: None | str
+    :param order: Sort order ('asc' or 'desc')
+    :type order: None | str
+    :param independent_transaction: Whether this is an independent transaction
+    :type independent_transaction: bool
+    :param sid: Socket ID for notifications
+    :type sid: None | str
+    :param process_id: Process ID for tracking
+    :type process_id: None | str
+    :param parent_id: Parent process ID for nested operations
+    :type parent_id: None | str
     :return: Metadata and a result array of records containing the following fields:
         - target_compound_formula
         - target_compound_unsaturation
@@ -183,40 +219,89 @@ async def cheminfo_by_mz_matched(
         - target_isotope_mz_error_ppm
     :rtype: dict
     """
-    cheminfo = (
-        await cheminfo_by_mz(
-            mz=mz,
-            mz_precision=mz_precision,
-            formula_ranges=formula_ranges,
-            ionization_mechanism_ids=ionization_mechanism_ids,
-            limit=limit,
-        )
-    )["data"]
-    matches = (
-        await aggregate_sample_match_compounds(
-            sample_item_id=sample_item_id,
-            target_compound_formulas=[
-                info["target_compound_formula"] for info in cheminfo
-            ],
-            ion_mechanism_ids=ionization_mechanism_ids,
-            match_params=match_params,
-        )
-    )["data"]
-    results = [
-        {
-            **match,
-            "cheminfo": info,
-            "children": [
-                ion["children"]
-                for ion in match["children"]
-                if ion["ionization_mechanism_id"]
-                == info["ionization_mechanism"]["ionization_mechanism_id"]
-            ][0],
+    # Step 1: Get ChemInfo data
+    runtime.logger.info(f"Starting ChemInfo query for m/z {mz}")
+    cheminfo_result = await retrieve_cheminfo_by_mz(
+        mz=mz,
+        mz_precision=mz_precision,
+        formula_ranges=formula_ranges,
+        ionization_mechanism_ids=ionization_mechanism_ids,
+        limit=limit,
+        page=page,
+        sort=sort,
+        order=order,
+    )
+
+    cheminfo_data = cheminfo_result.get("data", [])
+    cheminfo_results = cheminfo_result.get("results", [])
+    cheminfo_total = cheminfo_result.get("total", [])
+
+    # Return early if no ChemInfo data
+    if not cheminfo_data:
+        return {
+            "message": "No ChemInfo data available to match",
+            "results": 0,
+            "total": 0,
+            "data": [],
+            "_notification_data": {
+                "mz": mz,
+                "sample_item_id": sample_item_id,
+            },
         }
-        for match, info in zip(matches, cheminfo)
-    ]
+
+    # Step 2: Get matches against the sample
+    runtime.logger.info(
+        f"Matching {cheminfo_results} compounds against sample {sample_item_id}"
+    )
+    matches_result = await aggregate_sample_match_compounds(
+        sample_item_id=sample_item_id,
+        target_compound_formulas=[
+            info["target_compound_formula"] for info in cheminfo_data
+        ],
+        ion_mechanism_ids=ionization_mechanism_ids,
+        match_params=match_params,
+    )
+
+    matches = matches_result.get("data", [])
+
+    # Step 3: Combine results data with cheminfo data
+    data = []
+    for match, info in zip(matches, cheminfo_data):
+        # Find the children with matching ionization mechanism
+        children = []
+        if match.get("children"):
+            for ion in match["children"]:
+                if ion.get("ionization_mechanism_id") == info.get(
+                    "ionization_mechanism", {}
+                ).get("ionization_mechanism_id"):
+                    children = ion.get("children", [])
+                    break
+
+        # Create combined result entry
+        data.append(
+            {
+                **match,
+                "cheminfo": info,
+                "children": children,
+            }
+        )
+
+    # Step 4: Return formatted response with notification data
+    result_data = {
+        "results": len(data),
+        "total": cheminfo_total,
+        "data": data,
+    }
+    message = (
+        f"Matched {len(data)} potential compounds with m/z {mz:.4f} from ChemInfo."
+    )
+    runtime.logger.info(message)
     return {
-        "message": f"Retrieved and matched {len(results)} mz query results from ChemInfo",
-        "results": len(results),
-        "data": results,
+        "message": message,
+        **result_data,
+        "_notification_data": {
+            "mz": mz,
+            "sample_item_id": sample_item_id,
+            **result_data,
+        },
     }

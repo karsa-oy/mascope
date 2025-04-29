@@ -1,15 +1,16 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, BackgroundTasks, Request
 from mascope_backend.api.new.auth.dependencies import guest_user
 from mascope_backend.api.lib.api_features import api_route
 
 from mascope_backend.api.new.cheminfo.service import (
-    cheminfo_by_mz,
-    cheminfo_by_mz_matched,
+    retrieve_cheminfo_by_mz,
+    match_cheminfo_by_mz,
 )
 from mascope_backend.api.new.cheminfo.schema import (
     CheminfoQueryBody,
     CheminfoMatchedQueryBody,
 )
+from mascope_backend.db.id import gen_id
 
 
 cheminfo_router = APIRouter(prefix="/api/cheminfo", tags=["cheminfo"])
@@ -35,22 +36,49 @@ async def retrieve_cheminfo_by_mz_route(
     return await retrieve_cheminfo_by_mz(**body.model_dump())
 
 
-@cheminfo_router.post("/mz/match")
-@api_route(status_code=200)
-async def match_cheminfo_mz(body: CheminfoMatchedQueryBody, user=Depends(guest_user)):
+@cheminfo_router.post("/mz/match/sample/{sample_item_id}")
+@api_route(status_code=202)
+async def match_cheminfo_mz_route(
+    request: Request,
+    sample_item_id: str,
+    body: CheminfoMatchedQueryBody,
+    background_tasks: BackgroundTasks,
+    user=Depends(guest_user),
+) -> dict:
     """
-    Query the ChemInfo database by mz and other optional parameters.
+    Query the ChemInfo database by m/zz and other optional parameters.
+
+    This endpoint first queries the ChemInfo database for potential molecular formulas
+    matching the given m/z, then matches these formulas against a specific sample.
 
     :param body: request query options; the only required field is `mz`
     :type body: CheminfoQueryBody
     :rtype dict:
     """
-    return await cheminfo_by_mz_matched(
+    # Get the socket ID from request headers for notifications
+    sid = request.headers.get("X-SID")
+    process_id = gen_id(8)
+
+    # Add background task for processing
+    background_tasks.add_task(
+        match_cheminfo_by_mz,
+        sample_item_id=sample_item_id,
+        # **body.model_dump(),
         mz=body.mz,
-        sample_item_id=body.sample_item_id,
         mz_precision=body.mz_precision,
         formula_ranges=body.formula_ranges,
         ionization_mechanism_ids=body.ionization_mechanism_ids,
         match_params=body.match_params,
         limit=body.limit,
+        page=body.page,
+        sort=body.sort,
+        order=body.order,
+        independent_transaction=True,
+        sid=sid,
+        process_id=process_id,
     )
+
+    return {
+        "message": f"Matching potential molecular formulas for m/z {body.mz}, please wait.",
+        "process_id": process_id,
+    }

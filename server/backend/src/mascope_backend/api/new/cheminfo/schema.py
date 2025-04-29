@@ -36,9 +36,6 @@ class CheminfoQueryBody(BaseModel):
 
 
 class CheminfoMatchedQueryBody(CheminfoQueryBody):
-    sample_item_id: str = (
-        Field(..., description="The sample item ID to match against"),
-    )
     match_params: BaseMatchParams | None = Field(
         None, description="Match parameters to use"
     )
