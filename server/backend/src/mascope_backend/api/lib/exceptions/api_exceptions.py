@@ -1,3 +1,4 @@
+import httpx
 import traceback
 from fastapi import HTTPException, status
 from fastapi.responses import JSONResponse
@@ -38,43 +39,76 @@ def process_exception(e: Exception, context_message: str) -> ApiException:
     # Encode the technical message details into JSON-compatible format
     tech_message = jsonable_encoder(tech_message_details)
 
-    if isinstance(e, SQLAlchemyError):
-        user_message = f"{context_message}. Database operation failed."
-        status_code = 400  # Bad Request
-    elif isinstance(e, ApiException):
-        user_message = e.user_message
-        status_code = e.status_code
-    elif isinstance(e, HTTPException):
-        if e.status_code == status.HTTP_401_UNAUTHORIZED:
-            user_message = f"{context_message}. Please sign in to the Mascope."
-        elif (
-            e.status_code == status.HTTP_400_BAD_REQUEST
-            and str(e.detail) == "ErrorCode.LOGIN_BAD_CREDENTIALS"
-        ):
-            user_message = "Invalid login credentials. Please check email and password."
-        elif isinstance(e, InvalidRoleException):
-            user_message = "The role is invalid. Please contact the administrator."
-        else:
-            user_message = f"{context_message}. {e.detail}"
-        status_code = e.status_code
-    elif isinstance(e, ValueError):
-        user_message = error_message.replace("\n", "; ")
-        status_code = 400  # Bad Request
-    elif isinstance(e, RequestValidationError):
-        error_messages = [error["msg"] for error in e.errors()]
-        combined_error_message = "; ".join(error_messages)
-        user_message = f"{context_message}. {combined_error_message}"
-        status_code = 422  # Unprocessable entity
-    elif isinstance(e, AttributeError):
-        user_message = error_message
-        status_code = 400  # Bad Request
-    elif isinstance(e, RuntimeError):
-        user_message = error_message
-        status_code = 500  # Internal Server Error
-    else:
-        user_message = f"{context_message}. Unexpected error. {str(e)}."
-        status_code = 500  # Internal Server Error
+    # Use pattern matching to determine user message and status code
+    match e:
+        case SQLAlchemyError():
+            user_message = f"{context_message}. Database operation failed."
+            status_code = 400  # Bad Request
 
+        case ApiException():
+            user_message = e.user_message
+            status_code = e.status_code
+
+        case HTTPException():
+            status_code = e.status_code
+
+            match e:
+                case _ if e.status_code == status.HTTP_401_UNAUTHORIZED:
+                    user_message = f"{context_message}. Please sign in to the Mascope."
+                case _ if (
+                    e.status_code == status.HTTP_400_BAD_REQUEST
+                    and str(e.detail) == "ErrorCode.LOGIN_BAD_CREDENTIALS"
+                ):
+                    user_message = (
+                        "Invalid login credentials. Please check email and password."
+                    )
+                case InvalidRoleException():
+                    user_message = (
+                        "The role is invalid. Please contact the administrator."
+                    )
+                case _:
+                    user_message = f"{context_message}. {e.detail}"
+
+        # Handling for httpx timeout errors
+        case httpx.TimeoutException():
+            user_message = (
+                f"{context_message}. Connection timed out. Please try again later."
+            )
+            status_code = 504  # Gateway Timeout
+
+        case httpx.ConnectError():
+            user_message = f"{context_message}. Unable to connect to the service. Please check your connection and try again."
+            status_code = 503  # Service Unavailable
+
+        case httpx.RequestError():
+            user_message = (
+                f"{context_message}. Error making the request to external service."
+            )
+            status_code = 502  # Bad Gateway
+
+        case ValueError():
+            user_message = error_message.replace("\n", "; ")
+            status_code = 400  # Bad Request
+
+        case RequestValidationError():
+            error_messages = [error["msg"] for error in e.errors()]
+            combined_error_message = "; ".join(error_messages)
+            user_message = f"{context_message}. {combined_error_message}"
+            status_code = 422  # Unprocessable entity
+
+        case AttributeError():
+            user_message = error_message
+            status_code = 400  # Bad Request
+
+        case RuntimeError():
+            user_message = error_message
+            status_code = 500  # Internal Server Error
+
+        case _:  # Default case
+            user_message = f"{context_message}. Unexpected error. {str(e)}."
+            status_code = 500  # Internal Server Error
+
+    # Log the exception with context
     with runtime.logger.contextualize(status_code=status_code):
         runtime.logger.exception(e)
 
