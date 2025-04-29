@@ -1,21 +1,19 @@
 <script setup>
-import { ref, reactive, computed, watchEffect, toRaw } from 'vue'
+import { ref, reactive, computed, watchEffect, onMounted, onUnmounted } from 'vue'
 
 import Panel from 'primevue/panel'
 import TabMenu from 'primevue/tabmenu'
 import FloatLabel from 'primevue/floatlabel'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
-import Button from 'primevue/button'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import ProgressSpinner from 'primevue/progressspinner'
 import MultiSelect from 'primevue/multiselect'
-import ScrollPanel from 'primevue/scrollpanel'
 
 import { useApp } from '@/stores'
 import { api } from '@/api'
-import { BaseMatchTag, BaseCopyableField } from '@/lib/base'
+import { BaseMatchTag } from '@/lib/base'
 import { PopoverTargetCompoundAdd } from '@/lib/dialogs'
 
 import { usePreview } from './preview.js'
@@ -54,7 +52,46 @@ const params = reactive({
   limit: 20
 })
 const results = ref([])
+const totalMatches = ref(0)
+const displayedMatches = ref(0)
 const loading = ref(false)
+
+// Set up notification handler for ChemInfo match results
+onMounted(() => {
+  // Listen for ChemInfo match notifications
+  const handler = app.ui.notification.on('match_cheminfo_by_mz', (payload) => {
+    if (payload.status === 'error') {
+      loading.value = false
+      return
+    }
+    if (!payload) return
+
+    // Only process results if they match current focus
+    const isFocusedSample = payload?.data?.sample_item_id === app.data.sample.focusedId
+    const isFocusedMz = payload?.data?.mz === app.data.peak.focused?.mz
+    if (!isFocusedSample || !isFocusedMz) return
+
+    // Process successful results
+    if (payload.status === 'success') {
+      if (payload.data?.data) {
+        totalMatches.value = payload?.data?.total || 0
+        displayedMatches.value = payload?.data?.results || 0
+
+        results.value = payload.data.data.map((res) => {
+          const existing = app.data.target.compound.list.filter(
+            ({ target_compound_formula }) => target_compound_formula === res.target_compound_formula
+          )
+          return { ...res, existing }
+        })
+      }
+      loading.value = false
+    }
+  })
+
+  onUnmounted(() => {
+    handler?.unmount?.()
+  })
+})
 
 watchEffect(() => {
   ionMechs.value = app.data.batch.focused.build_params.ion_mechanisms.map((id) =>
@@ -65,35 +102,34 @@ watchEffect(() => {
 })
 watchEffect(async () => {
   if (app.data.peak.focused) {
+    // Clear existing results and start loading
     loading.value = true
-    results.value = (
-      await api.http.post(
-        `/cheminfo/mz/match`,
-        {
-          mz: app.data.peak.focused.mz,
-          sample_item_id: app.data.sample.focusedId,
-          ionization_mechanism_ids: ionMechs.value.map(
-            ({ ionization_mechanism_id }) => ionization_mechanism_id
-          ),
-          mz_precision: params.mzPrecision,
-          formula_range: params.formulaRange,
-          limit: params.limit,
-          match_params: app.data.match.params.typeDefaults
-        },
-        {
-          use: 'read',
-          type: 'query_mz_cheminfo'
-        }
-      )
-    )?.map((res) => {
-      const existing = app.data.target.compound.list.filter(
-        ({ target_compound_formula }) => target_compound_formula === res.target_compound_formula
-      )
-      return { ...res, existing }
-    })
-    loading.value = false
-  } else {
     results.value = []
+    totalMatches.value = 0
+    displayedMatches.value = 0
+    // Make the request to start the background task
+    await api.http.post(
+      `/cheminfo/mz/match/sample/${app.data.sample.focusedId}`,
+      {
+        mz: app.data.peak.focused.mz,
+        sample_item_id: app.data.sample.focusedId,
+        ionization_mechanism_ids: ionMechs.value.map(
+          ({ ionization_mechanism_id }) => ionization_mechanism_id
+        ),
+        mz_precision: params.mzPrecision,
+        formula_ranges: params.formulaRange,
+        limit: params.limit,
+        match_params: app.data.match.params.typeDefaults
+      },
+      {
+        use: 'read',
+        type: 'match_cheminfo_by_mz'
+      }
+    )
+  } else {
+    // No peak focused, clear results
+    results.value = []
+    loading.value = false
   }
 })
 
@@ -121,7 +157,9 @@ const expanded = ref({})
     </template>
     <template #icons>
       <span style="opacity: 0.5" v-if="app.data.peak.focused">
-        Found {{ results.length }} potential matches for peak
+        Found {{ totalMatches }} potential {{ totalMatches === 1 ? 'compound' : 'compounds' }},
+        displaying {{ displayedMatches }} {{ displayedMatches === 1 ? 'match' : 'matches' }} for
+        peak
         {{ mzFmt.format(app.data.peak.focused.mz) }}
       </span>
     </template>
