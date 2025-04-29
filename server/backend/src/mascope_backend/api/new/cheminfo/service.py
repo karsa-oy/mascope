@@ -24,11 +24,11 @@ from mascope_backend.runtime import runtime
 @api_controller()
 async def retrieve_cheminfo_by_mz(
     mz: float,
-    mz_precision: float = 30,
+    mz_precision: float = cheminfo_config.DEFAULT_MZ_PRECISION,
     formula_ranges: None | str = "C0-100 H0-100 O0-100 N0-100",
     ionization_mechanism_ids: None | list[str] = None,
-    limit: int = 20,
-    page: int = 0,
+    limit: int = cheminfo_config.DEFAULT_RESULT_LIMIT,
+    page: int = cheminfo_config.DEFAULT_PAGE,
     sort: None | str = None,
     order: None | str = None,
 ) -> dict:
@@ -140,7 +140,7 @@ async def retrieve_cheminfo_by_mz(
     paginated_results = results[start_idx:end_idx]
 
     # Apply sorting if requested
-    if sort and sort in (paginated_results[0] if paginated_results else {}):
+    if sort and all(sort in item for item in paginated_results):
         reverse = order.lower() == "desc"
         paginated_results.sort(key=lambda x: x.get(sort, 0), reverse=reverse)
 
@@ -233,8 +233,8 @@ async def match_cheminfo_by_mz(
     )
 
     cheminfo_data = cheminfo_result.get("data", [])
-    cheminfo_results = cheminfo_result.get("results", [])
-    cheminfo_total = cheminfo_result.get("total", [])
+    cheminfo_results = cheminfo_result.get("results", 0)
+    cheminfo_total = cheminfo_result.get("total", 0)
 
     # Return early if no ChemInfo data
     if not cheminfo_data:

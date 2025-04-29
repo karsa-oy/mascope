@@ -204,15 +204,29 @@ async def handle_notifications(
     :type sid: str | None
     """
     for room in rooms:
+        # Step 1: Check if room_id is in kwargs
         room_id = kwargs.get(room)
-        if not room_id and result:
-            # Try to find room_id in result
-            room_id = (
-                result.get(room)
-                or result.get("data", {}).get(room)
-                or result.get("_notification_data", {}).get(room)
-            )
 
+        #  Step 2:Try to find room_id in result
+        if not room_id and result:
+            if isinstance(result, dict):
+                # Try to find room_id directly in result
+                if room in result:
+                    room_id = result.get(room)
+
+                # Check if 'data' exists and is a dictionary
+                data = result.get("data")
+                if room_id is None and isinstance(data, dict) and room in data:
+                    room_id = data.get(room)
+
+                # Check if '_notification_data' exists and is a dictionary
+                notification_data = result.get("_notification_data")
+                if (
+                    room_id is None
+                    and isinstance(notification_data, dict)
+                    and room in notification_data
+                ):
+                    room_id = notification_data.get(room)
         if not room_id:
             runtime.logger.warning(
                 f"No room ID found for user notification in room '{room}'"

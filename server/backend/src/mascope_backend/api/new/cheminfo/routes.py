@@ -46,7 +46,7 @@ async def match_cheminfo_mz_route(
     user=Depends(guest_user),
 ) -> dict:
     """
-    Query the ChemInfo database by m/zz and other optional parameters.
+    Query the ChemInfo database by m/z and other optional parameters.
 
     This endpoint first queries the ChemInfo database for potential molecular formulas
     matching the given m/z, then matches these formulas against a specific sample.
@@ -63,7 +63,6 @@ async def match_cheminfo_mz_route(
     background_tasks.add_task(
         match_cheminfo_by_mz,
         sample_item_id=sample_item_id,
-        # **body.model_dump(),
         mz=body.mz,
         mz_precision=body.mz_precision,
         formula_ranges=body.formula_ranges,

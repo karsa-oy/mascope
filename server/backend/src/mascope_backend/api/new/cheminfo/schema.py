@@ -27,7 +27,7 @@ class CheminfoQueryBody(BaseModel):
     )
     sort: None | str = Field(
         None,
-        description="The field to sort results by",
+        description="The field to sort results by, should be one of the fields in the result data structure",
     )
     order: None | str = Field(
         None,
