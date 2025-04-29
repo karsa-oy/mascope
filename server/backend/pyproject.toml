@@ -16,9 +16,10 @@ dependencies = [
     # external
     "aiosqlite>=0.21,<0.22",
     "colorcet~=3.1",
-    "isospecpy>=2.2.2,<3",
     "fastapi>=0.115,<0.116",
     "fastapi-users[oauth, sqlalchemy]>=14.0.0,<15",
+    "httpx>=0.28.0,<0.29",
+    "isospecpy>=2.2.2,<3",
     "nanoid~=2.0",
     "nest-asyncio~=1.6",
     "numpy~=1.26",

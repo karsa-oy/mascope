@@ -16,22 +16,23 @@ cheminfo_router = APIRouter(prefix="/api/cheminfo", tags=["cheminfo"])
 
 
 @cheminfo_router.post("/mz/query")
-@api_route(status_code=200)
-async def query_cheminfo_mz(body: CheminfoQueryBody, user=Depends(guest_user)):
+@api_route()
+async def retrieve_cheminfo_by_mz_route(
+    body: CheminfoQueryBody, user=Depends(guest_user)
+) -> dict:
     """
-    Query the ChemInfo database by mz and other optional parameters.
+    Query the ChemInfo database for molecular formulas matching a given m/z value.
 
-    :param body: request query options; the only required field is `mz`
+    This endpoint queries the external ChemInfo API to find potential molecular formulas
+    that match the provided m/z value within the specified precision. Results can be
+    filtered by formula ranges and ionization mechanisms.
+
+    :param body: Query parameters including m/z value, precision, formula ranges, and ionization mechanisms
     :type body: CheminfoQueryBody
-    :rtype dict:
+    :return: List of potential molecular formulas matching the m/z value
+    :rtype: dict
     """
-    return await cheminfo_by_mz(
-        mz=body.mz,
-        mz_precision=body.mz_precision,
-        formula_ranges=body.formula_ranges,
-        ionization_mechanism_ids=body.ionization_mechanism_ids,
-        limit=body.limit,
-    )
+    return await retrieve_cheminfo_by_mz(**body.model_dump())
 
 
 @cheminfo_router.post("/mz/match")
