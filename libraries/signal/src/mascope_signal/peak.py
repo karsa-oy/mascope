@@ -23,7 +23,11 @@ from mascope_file.io import (
     write_peaks,
 )
 
-from mascope_signal.compute import get_sum_signal, get_peak_profiles
+from mascope_signal.compute import (
+    get_sum_signal,
+    get_peak_profiles,
+    get_scan_timestamps,
+)
 from mascope_signal.runtime import runtime
 
 # Restrict large chunks for dask
@@ -122,14 +126,18 @@ def calculate_tic(filename: str) -> float:
         raise RuntimeError("Calculating TIC for an Orbitrap file is not supported")
 
 
-def segment_spec(sum_spec):
+def segment_spec(sum_spec, threshold: float = 0) -> list:
     """Perform segmentation of Orbitrap spectrum
 
     :param sum_spec: sum of spectra along time dimension
     :type sum_spec: array-like
+    :param threshold: threshold for noise removal, defaults to 0
+    :type threshold: float
     :return: list of segment indices
     :rtype: list
     """
+    # Remove tiny noise from the sum spectrum
+    sum_spec[sum_spec < threshold] = 0
     # Get non-zero indices
     non_zero_indices = np.flatnonzero(sum_spec)
     if len(non_zero_indices) == 0:
@@ -285,7 +293,8 @@ async def detect_peaks(
             specs_to_fit = []
         else:
             # Get mz/spectrum pairs to fit from segmented spectrum
-            seg_spec_indices = segment_spec(sum_spec)
+            n_scans = get_scan_timestamps(filename).size
+            seg_spec_indices = segment_spec(sum_spec, threshold=n_scans)
             specs_to_fit = [(mz[chunk], sum_spec[chunk]) for chunk in seg_spec_indices]
     if instrument_type == "tof":
         sum_mz = sum_signal.mz.compute().values
