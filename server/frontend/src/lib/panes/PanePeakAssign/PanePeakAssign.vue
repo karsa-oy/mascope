@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, computed, watchEffect, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, watch, watchEffect, onMounted, onUnmounted } from 'vue'
 
 import Panel from 'primevue/panel'
 import TabMenu from 'primevue/tabmenu'
@@ -17,6 +17,11 @@ import { BaseMatchTag } from '@/lib/base'
 import { PopoverTargetCompoundAdd } from '@/lib/dialogs'
 
 import { usePreview } from './preview.js'
+
+//  TODO_configuration default Configuration settings for the ChemInfo API integration
+const DEFAULT_MZ_PRECISION = 30
+const DEFAULT_FORMULA_RANGE = 'C0-100 H0-100 O0-100 N0-100'
+const DEFAULT_RESULT_LIMIT = 20
 
 const app = useApp()
 
@@ -47,14 +52,19 @@ const formattedMz = computed(() => mzFmt.format(app.data.peak.focused.mz))
 
 const ionMechs = ref([])
 const params = reactive({
-  mzPrecision: 30,
-  formulaRange: 'C0-100 H0-100 O0-100 N0-100',
-  limit: 20
+  mzPrecision: DEFAULT_MZ_PRECISION,
+  formulaRange: DEFAULT_FORMULA_RANGE,
+  limit: DEFAULT_RESULT_LIMIT
 })
+const formulaRangeModel = ref(DEFAULT_FORMULA_RANGE)
 const results = ref([])
 const totalMatches = ref(0)
 const displayedMatches = ref(0)
 const loading = ref(false)
+
+const updateFormulaRange = () => {
+  params.formulaRange = formulaRangeModel.value
+}
 
 // Set up notification handler for ChemInfo match results
 onMounted(() => {
@@ -93,12 +103,22 @@ onMounted(() => {
   })
 })
 
+watch(
+  () => params.formulaRange,
+  (newValue) => {
+    if (formulaRangeModel.value !== newValue) {
+      formulaRangeModel.value = newValue
+    }
+  }
+)
+
 watchEffect(() => {
   ionMechs.value = app.data.batch.focused.build_params.ion_mechanisms.map((id) =>
     app.data.mechanism.list.find(({ ionization_mechanism_id }) => id === ionization_mechanism_id)
   )
-  params.mzPrecision = 30
-  params.formulaRange = 'C0-100 H0-100 O0-100 N0-100'
+  params.mzPrecision = DEFAULT_MZ_PRECISION
+  params.formulaRange = DEFAULT_FORMULA_RANGE
+  formulaRangeModel.value = DEFAULT_FORMULA_RANGE
 })
 watchEffect(async () => {
   if (app.data.peak.focused) {
@@ -174,7 +194,13 @@ const expanded = ref({})
           <label for="limit">results limit</label>
         </FloatLabel>
         <FloatLabel style="flex-grow: 1">
-          <InputText v-model="params.formulaRange" id="formulaRange" fluid />
+          <InputText
+            v-model="formulaRangeModel"
+            id="formulaRange"
+            fluid
+            @blur="updateFormulaRange"
+            @keydown.enter="updateFormulaRange"
+          />
           <label for="formulaRange">formula range</label>
         </FloatLabel>
         <FloatLabel style="min-width: 100px">
