@@ -458,3 +458,74 @@ def get_peak_profiles(
             coords={"mz": mzs, "time": np.array(scan_time)},
             name="signal",
         )
+
+
+def get_centroids(
+    datafile_path: str,
+    u_list: Iterable[float],
+    t_min: float | None = None,
+    t_max: float | None = None,
+    average: bool = False,
+    ppm: int = 1,
+    polarity: Literal["+", "-"] | None = None,
+) -> tuple:
+    """
+    Extract centroided peaks from a Thermo Fisher raw file within a specified time range and for specified m/z values.
+
+    This function reads the centroided spectrum by averaging scans in the given time window and (optionally) polarity.
+    It then selects centroid peaks whose m/z values are within ±0.5 of any value in `u_list`.
+    The function returns the filtered centroid m/z values, their intensities, and resolutions.
+
+    :param datafile_path: Path to the Thermo Fisher raw file (.raw) containing the data.
+    :type datafile_path: str
+    :param u_list: Iterable of m/z values to select centroid peaks near (within ±0.5).
+    :type u_list: Iterable[float]
+    :param t_min: Minimum time [s] for scan selection, optional, defaults to None (start of run).
+    :type t_min: float | None, optional
+    :param t_max: Maximum time [s] for scan selection, optional, defaults to None (end of run).
+    :type t_max: float | None, optional
+    :param average: If True, return averaged intensities; if False, scale intensities by number of scans.
+    :type average: bool, optional
+    :param ppm: Mass tolerance in parts-per-million for centroid binning, defaults to 1.
+    :type ppm: int, optional
+    :param polarity: Polarity of scans to use ('+' or '-'), optional, defaults to None (all polarities).
+    :type polarity: Literal['+', '-'], optional
+    :return: Tuple of (masses, intensities, resolutions) for centroid peaks matching the criteria.
+    :rtype: tuple of np.ndarray
+    """
+    with open_raw_file(datafile_path) as raw_file:
+        num_of_scans = raw_file.RunHeaderEx.SpectraCount
+        scan_indices = list(range(1, num_of_scans + 1))
+
+        if polarity:
+            scan_indices = filter_by_polarity(raw_file, scan_indices, polarity)
+
+        scan_indices, _ = filter_by_time(raw_file, scan_indices, t_min, t_max)
+
+        # Setup mz tolerance - counts within ppm are binned
+        mass_option = MassOptions(ppm, ToleranceUnits.ppm)
+
+        # Get averaged spectrum in time range (t_max, t_max)
+        net_scan_indices = List[int]()
+        for index in scan_indices:
+            net_scan_indices.Add(index)
+        average_scan = Extensions.AverageScans(raw_file, net_scan_indices, mass_option)
+        averaged_centroids = average_scan.CentroidScan
+
+        masses = np.frombuffer(averaged_centroids.Masses)
+        intensities = np.frombuffer(averaged_centroids.Intensities)
+        resolutions = np.frombuffer(averaged_centroids.Resolutions)
+
+        if not average:
+            # Multiply by number of averaged scans
+            intensities *= average_scan.ScansCombined
+
+        # Create a mask for the masses that are within 0.5 of any value in u_list
+        mz_mask = np.zeros_like(masses, dtype=bool)
+        for mz in u_list:
+            mz_mask |= (masses >= mz - 0.5) & (masses <= mz + 0.5)
+        masses = masses[mz_mask]
+        intensities = intensities[mz_mask]
+        resolutions = resolutions[mz_mask]
+
+        return masses, intensities, resolutions

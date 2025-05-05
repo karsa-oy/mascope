@@ -27,6 +27,7 @@ from mascope_signal.compute import (
     get_sum_signal,
     get_peak_profiles,
     get_scan_timestamps,
+    get_orbi_centroids,
 )
 from mascope_signal.runtime import runtime
 
@@ -273,30 +274,42 @@ async def detect_peaks(
     executor = ProcessPoolExecutor(max_workers=max_workers)
     loop = asyncio.get_event_loop()
 
-    runtime.logger.debug("Segment spectrum for peak detection")
     if instrument_type == "orbi":
-        # Stack mass ranges
-        u_range = np.vstack([u_list - 0.5, u_list + 0.5])
-        # Broadcast the u_range array to have the same shape as mz
-        u_range = u_range[:, :, np.newaxis]
-        # Create boolean masks indicating which elements of spec fall within each range
-        mask_u_list = (sum_signal.mz.values >= u_range[0]) & (
-            sum_signal.mz.values <= u_range[1]
+        # Try to get centroids from the sum spectrum
+        new_peak_mzs, new_peak_heights, resolutions = get_orbi_centroids(
+            filename, u_list
         )
-        mask_u_list = mask_u_list.any(axis=0)
-        # Update mz and spec
-        mz = sum_signal.mz.values[mask_u_list]
-        sum_spec = sum_signal.values[mask_u_list]
+        if new_peak_mzs is None:
+            runtime.logger.debug("Segment Orbi spectrum for peak detection")
+            # The sample file does not contain RAW file
+            # Stack mass ranges
+            u_range = np.vstack([u_list - 0.5, u_list + 0.5])
+            # Broadcast the u_range array to have the same shape as mz
+            u_range = u_range[:, :, np.newaxis]
+            # Create boolean masks indicating which elements of spec fall within each range
+            mask_u_list = (sum_signal.mz.values >= u_range[0]) & (
+                sum_signal.mz.values <= u_range[1]
+            )
+            mask_u_list = mask_u_list.any(axis=0)
+            # Update mz and spec
+            mz = sum_signal.mz.values[mask_u_list]
+            sum_spec = sum_signal.values[mask_u_list]
 
-        if sum_spec.size == 0:
-            # Nothing to fit
-            specs_to_fit = []
+            if sum_spec.size == 0:
+                # Nothing to fit
+                specs_to_fit = []
+            else:
+                # Get mz/spectrum pairs to fit from segmented spectrum
+                n_scans = get_scan_timestamps(filename).size
+                seg_spec_indices = segment_spec(sum_spec, threshold=n_scans)
+                specs_to_fit = [
+                    (mz[chunk], sum_spec[chunk]) for chunk in seg_spec_indices
+                ]
         else:
-            # Get mz/spectrum pairs to fit from segmented spectrum
-            n_scans = get_scan_timestamps(filename).size
-            seg_spec_indices = segment_spec(sum_spec, threshold=n_scans)
-            specs_to_fit = [(mz[chunk], sum_spec[chunk]) for chunk in seg_spec_indices]
+            runtime.logger.debug("The peaks were read from the Thermo file")
+            specs_to_fit = []
     if instrument_type == "tof":
+        runtime.logger.debug("Segment TOF spectrum for peak detection")
         sum_mz = sum_signal.mz.compute().values
         sum_values = sum_signal.compute().values
         specs_to_fit = [
@@ -307,49 +320,65 @@ async def detect_peaks(
             for u in u_list
         ]
 
-    # Fill in asynchronous operations
-    futures = [
-        loop.run_in_executor(
-            executor,
-            fit_n_peaks,
-            mz_to_fit,
-            spec_to_fit,
-            peakshape,
-            R(mz_to_fit.mean()),
-            add_peak_threshold,
-            sample_interval,
-            max_n_peaks,
-        )
-        for mz_to_fit, spec_to_fit in specs_to_fit
-    ]
+    if specs_to_fit:
+        # Fit as usual
+        # Fill in asynchronous operations
+        futures = [
+            loop.run_in_executor(
+                executor,
+                fit_n_peaks,
+                mz_to_fit,
+                spec_to_fit,
+                peakshape,
+                R(mz_to_fit.mean()),
+                add_peak_threshold,
+                sample_interval,
+                max_n_peaks,
+            )
+            for mz_to_fit, spec_to_fit in specs_to_fit
+        ]
 
-    new_peaks = []
-    last_progress = None
-    fit_warnings = set()
-    runtime.logger.debug("Run peak detection")
-    for i, future in enumerate(asyncio.as_completed(futures)):
-        fit, peaks, captured_warnings = await future
-        if fit:
-            new_peaks.extend(peaks)
-        for warning in captured_warnings:
-            fit_warnings.add(warning)
-        progress = 100 * (i + 1) / len(futures)
-        rounded_progress = math.floor(progress / 10) * 10
-        if rounded_progress != last_progress:
-            runtime.logger.info(f"Peak detection progress: {rounded_progress}%")
-        last_progress = rounded_progress
+        new_peaks = []
+        last_progress = None
+        fit_warnings = set()
+        runtime.logger.debug("Run peak detection")
+        for i, future in enumerate(asyncio.as_completed(futures)):
+            fit, peaks, captured_warnings = await future
+            if fit:
+                new_peaks.extend(peaks)
+            for warning in captured_warnings:
+                fit_warnings.add(warning)
+            progress = 100 * (i + 1) / len(futures)
+            rounded_progress = math.floor(progress / 10) * 10
+            if rounded_progress != last_progress:
+                runtime.logger.info(f"Peak detection progress: {rounded_progress}%")
+            last_progress = rounded_progress
 
-    # Log unique warnings
-    for warning in fit_warnings:
-        runtime.logger.debug(f"Peak detection warning: {warning}")
+        # Log unique warnings
+        for warning in fit_warnings:
+            runtime.logger.debug(f"Peak detection warning: {warning}")
 
-    executor.shutdown()
+        executor.shutdown()
 
-    if new_peaks:
         new_peak_mzs, new_peak_heights, new_peak_areas = zip(
             *[(p[0], p[1], p[3]) for p in new_peaks]
         )
+    elif "new_peak_mzs" in locals() and new_peak_mzs is not None:
+        # Peak were read as centroids from Thermo file
+        # Compute peak areas using the peak shape
+        new_peak_areas = []
+        for i, mass in enumerate(new_peak_mzs):
+            mass_range = sum_signal.sel(mz=slice(mass - dmz, mass + dmz)).values
+            new_peak_areas.append(
+                calculate_peak_area(
+                    mass_range,
+                    peakshape,
+                    (new_peak_mzs[i], new_peak_heights[i], resolutions[i]),
+                    sample_interval,
+                )
+            )
     else:
+        # Nothing was fitted
         new_peak_mzs, new_peak_heights, new_peak_areas = [], [], []
 
     if if_exists == "append":
@@ -393,6 +422,8 @@ async def detect_peaks(
 
     peak_areas = all_peak_areas[unique_peak_index]
     peak_heights = all_peak_heights[unique_peak_index]
+
+    runtime.logger.debug("Compute peak profiles")
 
     # Get the tof values corresponding to the peak mzs using np.searchsorted
     tofs = np.arange(len(sum_signal.mz)).astype(np.float32)
@@ -727,6 +758,10 @@ def gen_peak(x, ppos, phei, pres, ps, trim_borders=False):
         input parameter 'x'. Otherwise returns tuple with new x and the peak.
     """
     sigma = ppos / pres / SIGMA_MULTIPLIER
+
+    # Make sure peakshape consists of numpy arrays
+    ps["x"] = np.asarray(ps["x"], dtype=np.float64)
+    ps["y"] = np.asarray(ps["y"], dtype=np.float64)
 
     # Rescale peak shape
     xi = ps["x"] * sigma + ppos
