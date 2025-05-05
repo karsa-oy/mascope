@@ -25,7 +25,7 @@ from mascope_backend.runtime import runtime
 async def retrieve_cheminfo_by_mz(
     mz: float,
     mz_precision: float = cheminfo_config.DEFAULT_MZ_PRECISION,
-    formula_ranges: None | str = "C0-100 H0-100 O0-100 N0-100",
+    formula_ranges: str = cheminfo_config.DEFAULT_FORMULA_RANGE,
     ionization_mechanism_ids: None | list[str] = None,
     limit: int = cheminfo_config.DEFAULT_RESULT_LIMIT,
     page: int = cheminfo_config.DEFAULT_PAGE,
@@ -47,7 +47,7 @@ async def retrieve_cheminfo_by_mz(
     :param mz_precision: The tolerance for m/z matching in ppm
     :type mz_precision: float
     :param formula_ranges: Formula ranges permitted in the results
-    :type formula_ranges: None | str
+    :type formula_ranges: str
     :param ionization_mechanism_ids: List of ionization mechanism IDs to query against
     :type ionization_mechanism_ids: None | list[str]
     :param limit: Maximum number of results to return

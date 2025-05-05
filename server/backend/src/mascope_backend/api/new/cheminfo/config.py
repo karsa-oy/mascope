@@ -19,6 +19,9 @@ class ChemInfoConfig(BaseModel):
     # Default precision for m/z matching in ppm
     DEFAULT_MZ_PRECISION: float = 30.0
 
+    # Default formula range for queries
+    DEFAULT_FORMULA_RANGE: str = "C0-100 H0-100 O0-100 N0-100"
+
     # Default page number for pagination
     DEFAULT_PAGE: int = 0
 

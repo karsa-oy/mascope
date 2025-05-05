@@ -9,14 +9,24 @@ def to_cheminfo_ionization_format(ionization: str) -> str:
     """
     Convert Mascope ionization mechanism format to ChemInfo API format.
 
-    The ChemInfo API expects ionizations in a specific format:
-    - Positive charges as "H+", "Na+", "K+"
-    - Negative charges in parentheses like "Cl(-)"
-    - With optional additional modifiers
+    Mascope ionization mechanisms are defined in the format:
+        <modification operation><modification formula><polarity>
+    where:
+    - "modification operation" is either "+" for addition or "-" for subtraction
+    - "modification formula" is the chemical formula subtracted from or added to the parent molecule
+    - "polarity" is the charge polarity of the resulting ion ("+" or "-").
 
-    Examples:
-    - "+H+" (Mascope) becomes "+(H)+" (ChemInfo)
-    - "-Cl-" (Mascope) becomes "(-)(Cl)-1" (ChemInfo)
+    The ChemInfo API accepts ionizations in the format:
+        <polarity>(<modification formula>)<modification operation>
+    where:
+    - "polarity" is the charge polarity of the resulting ion ("+" or "-")
+    - "modification formula" is the chemical formula subtracted from or added to the parent molecule in the parentheses
+    - "modification operation" is either "-1" for subtraction or "" (empty string) for addition.
+
+    Examples how Mascope ionization mechanisms get converted:
+    - "+H+" (Mascope) becomes "+(H)" (ChemInfo)
+    - "-Cl-" (Mascope) becomes "-(Cl)-1" (ChemInfo)
+    - "+" (Mascope) becomes "+()" (ChemInfo)
 
     :param ionization: Ionization mechanism string in Mascope format
     :type ionization: str
