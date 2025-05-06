@@ -19,16 +19,11 @@ import { PopoverTargetCompoundAdd } from '@/lib/dialogs'
 
 import { usePreview } from './preview.js'
 
-//  TODO_configuration default Configuration settings for the ChemInfo API integration
-const DEFAULT_MZ_PRECISION = 30
-const DEFAULT_FORMULA_RANGE = 'C0-100 H0-100 O0-100 N0-100'
-const DEFAULT_RESULT_LIMIT = 20
-
 const app = useApp()
 
-const visible = defineModel('visible')
-
 const preview = usePreview()
+
+const visible = defineModel('visible')
 
 const props = defineProps({
   height: {
@@ -51,17 +46,39 @@ const relAbuFmt = new Intl.NumberFormat('en-US', {
 })
 const formattedMz = computed(() => mzFmt.format(app.data.peak.focused.mz))
 
+// TODO: make global params store
+const chemConfig = ref(null)
 const ionMechs = ref([])
 const params = reactive({
-  mzPrecision: DEFAULT_MZ_PRECISION,
-  formulaRange: DEFAULT_FORMULA_RANGE,
-  limit: DEFAULT_RESULT_LIMIT
+  mzPrecision: null,
+  formulaRange: null,
+  limit: null
 })
-const formulaRangeModel = ref(DEFAULT_FORMULA_RANGE)
+const formulaRangeModel = ref('')
 const results = ref([])
 const totalMatches = ref(0)
 const displayedMatches = ref(0)
 const loading = ref(false)
+
+// Load  configuration from api on component creation
+api.http
+  .get('/params', {
+    type: 'read_params'
+  })
+  .then(({ data }) => {
+    // Store the cheminfo config
+    chemConfig.value = data?.data?.params?.cheminfo_config
+    // Initialize parameters with values from API response
+    if (chemConfig.value) {
+      params.mzPrecision = chemConfig.value.DEFAULT_MZ_PRECISION
+      params.formulaRange = chemConfig.value.DEFAULT_FORMULA_RANGE
+      params.limit = chemConfig.value.DEFAULT_RESULT_LIMIT
+      formulaRangeModel.value = chemConfig.value.DEFAULT_FORMULA_RANGE
+    }
+  })
+  .catch((err) => {
+    console.error('Error fetching params:', err)
+  })
 
 const updateFormulaRange = () => {
   params.formulaRange = formulaRangeModel.value
@@ -114,28 +131,36 @@ watch(
 
 // Initialize ionization mechanisms and reset params to defaults when batch focus changes
 watchEffect(() => {
+  // Only proceed if chemConfig is loaded
+  if (!chemConfig.value) return
+
   ionMechs.value = app.data.batch.focused.build_params.ion_mechanisms.map((id) =>
     app.data.mechanism.list.find(({ ionization_mechanism_id }) => id === ionization_mechanism_id)
   )
-  params.mzPrecision = DEFAULT_MZ_PRECISION
-  params.formulaRange = DEFAULT_FORMULA_RANGE
-  formulaRangeModel.value = DEFAULT_FORMULA_RANGE
+  params.mzPrecision = chemConfig.value.DEFAULT_MZ_PRECISION
+  params.formulaRange = chemConfig.value.DEFAULT_FORMULA_RANGE
+  formulaRangeModel.value = chemConfig.value.DEFAULT_FORMULA_RANGE
 })
 
 // Debounced API request that triggers when any dependency changes (single computed object `deps`)
 watchDebounced(
-  () => ({
-    peakFocused: app.data.peak.focused ? app.data.peak.focused.mz : null,
-    sampleId: app.data.sample.focusedId,
-    mzPrecision: params.mzPrecision,
-    formulaRange: params.formulaRange,
-    limit: params.limit,
-    ionMechanismIds: ionMechs.value.map((m) => m.ionization_mechanism_id).join(',')
-  }),
+  () => {
+    // Only track dependencies if chemConfig is loaded
+    if (!chemConfig.value) return {}
+
+    return {
+      peakFocused: app.data.peak.focused ? app.data.peak.focused.mz : null,
+      sampleId: app.data.sample.focusedId,
+      mzPrecision: params.mzPrecision,
+      formulaRange: params.formulaRange,
+      limit: params.limit,
+      ionMechanismIds: ionMechs.value.map((m) => m.ionization_mechanism_id).join(',')
+    }
+  },
   // The callback function that runs 800ms after dependencies stop changing
   async (deps) => {
-    // Early return if no peak selected
-    if (!deps.peakFocused) {
+    // Skip if config not loaded or no peak selected
+    if (!chemConfig.value || !deps.peakFocused) {
       results.value = []
       loading.value = false
       return
@@ -167,8 +192,11 @@ watchDebounced(
       }
     )
   },
-  // Options: 800ms debounce delay, deep comparison for proper nested reactivity
-  { debounce: 800, deep: true }
+  // Options: debounce delay, deep comparison for proper nested reactivity
+  {
+    debounce: computed(() => chemConfig.value.DEBOUNCE_DELAY_MS),
+    deep: true
+  }
 )
 
 const columns = [

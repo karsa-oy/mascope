@@ -28,6 +28,9 @@ class ChemInfoConfig(BaseModel):
     # Default limit for query results
     DEFAULT_RESULT_LIMIT: int = 20
 
+    # Debounce delay in milliseconds for frontend API requests
+    DEBOUNCE_DELAY_MS: int = 800
+
 
 # Global config instance for ChemInfo integration
 cheminfo_config = ChemInfoConfig()
