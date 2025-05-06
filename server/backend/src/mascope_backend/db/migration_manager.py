@@ -11,6 +11,7 @@ from datetime import datetime
 from importlib import import_module
 
 from mascope_backend.runtime import runtime
+import traceback
 
 db_dir = runtime.config.database
 
@@ -106,7 +107,9 @@ async def migrate(current_version: int, target_version: int) -> int:
                 f"mascope_backend.db.migration.v{next_version}"
             )
         except Exception as error:
-            runtime.logger.error(f"Failed to import migration module: {error}")
+            runtime.logger.error(
+                f"Failed to import migration module for v{next_version}: {type(error).__name__}: {error}\n{traceback.format_exc()}"
+            )
             raise RuntimeError(
                 f"Could not import migration script for v{next_version}"
             ) from error
@@ -117,7 +120,9 @@ async def migrate(current_version: int, target_version: int) -> int:
             runtime.logger.info(f"Migration {migration_label} succeeded!")
             current_version = get_current_db_version()
         except Exception as error:
-            runtime.logger.error(f"Migration {migration_label} failed: {error}")
+            runtime.logger.error(
+                f"Migration {migration_label} failed: {type(error).__name__}: {error}\n{traceback.format_exc()}"
+            )
 
             # Mark the migration as failed
             mark_migration_failed(next_version, str(error))
