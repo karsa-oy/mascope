@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, computed, watch, watchEffect, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, watch, watchEffect, onUnmounted } from 'vue'
 
 import Panel from 'primevue/panel'
 import TabMenu from 'primevue/tabmenu'
@@ -67,40 +67,37 @@ const updateFormulaRange = () => {
 }
 
 // Set up notification handler for ChemInfo match results
-onMounted(() => {
-  // Listen for ChemInfo match notifications
-  const handler = app.ui.notification.on('match_cheminfo_by_mz', (payload) => {
-    if (payload.status === 'error') {
-      loading.value = false
-      return
+const notificationHandler = app.ui.notification.on('match_cheminfo_by_mz', (payload) => {
+  if (payload.status === 'error') {
+    loading.value = false
+    return
+  }
+  if (!payload) return
+
+  // Only process results if they match current focus
+  const isFocusedSample = payload?.data?.sample_item_id === app.data.sample.focusedId
+  const isFocusedMz = payload?.data?.mz === app.data.peak.focused?.mz
+  if (!isFocusedSample || !isFocusedMz) return
+
+  // Process successful results
+  if (payload.status === 'success') {
+    if (payload.data?.data) {
+      totalMatches.value = payload?.data?.total || 0
+      displayedMatches.value = payload?.data?.results || 0
+
+      results.value = payload.data.data.map((res) => {
+        const existing = app.data.target.compound.list.filter(
+          ({ target_compound_formula }) => target_compound_formula === res.target_compound_formula
+        )
+        return { ...res, existing }
+      })
     }
-    if (!payload) return
+    loading.value = false
+  }
+})
 
-    // Only process results if they match current focus
-    const isFocusedSample = payload?.data?.sample_item_id === app.data.sample.focusedId
-    const isFocusedMz = payload?.data?.mz === app.data.peak.focused?.mz
-    if (!isFocusedSample || !isFocusedMz) return
-
-    // Process successful results
-    if (payload.status === 'success') {
-      if (payload.data?.data) {
-        totalMatches.value = payload?.data?.total || 0
-        displayedMatches.value = payload?.data?.results || 0
-
-        results.value = payload.data.data.map((res) => {
-          const existing = app.data.target.compound.list.filter(
-            ({ target_compound_formula }) => target_compound_formula === res.target_compound_formula
-          )
-          return { ...res, existing }
-        })
-      }
-      loading.value = false
-    }
-  })
-
-  onUnmounted(() => {
-    handler?.unmount?.()
-  })
+onUnmounted(() => {
+  notificationHandler?.unmount?.()
 })
 
 watch(
@@ -177,9 +174,8 @@ const expanded = ref({})
     </template>
     <template #icons>
       <span style="opacity: 0.5" v-if="app.data.peak.focused">
-        Found {{ totalMatches }} potential {{ totalMatches === 1 ? 'compound' : 'compounds' }},
-        displaying {{ displayedMatches }} {{ displayedMatches === 1 ? 'match' : 'matches' }} for
-        peak
+        Showing {{ displayedMatches }} {{ displayedMatches === 1 ? 'match' : 'matches' }} out of
+        {{ totalMatches }} potential {{ totalMatches === 1 ? 'compound' : 'compounds' }} for peak
         {{ mzFmt.format(app.data.peak.focused.mz) }}
       </span>
     </template>
