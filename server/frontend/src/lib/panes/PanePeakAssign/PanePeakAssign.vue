@@ -1,5 +1,6 @@
 <script setup>
 import { ref, reactive, computed, watch, watchEffect, onUnmounted } from 'vue'
+import { watchDebounced } from '@vueuse/core'
 
 import Panel from 'primevue/panel'
 import TabMenu from 'primevue/tabmenu'
@@ -96,10 +97,12 @@ const notificationHandler = app.ui.notification.on('match_cheminfo_by_mz', (payl
   }
 })
 
+// Clean up event listener when component is unmounted
 onUnmounted(() => {
   notificationHandler?.unmount?.()
 })
 
+// Synchronize formulaRangeModel with params.formulaRange when the latter changes
 watch(
   () => params.formulaRange,
   (newValue) => {
@@ -109,6 +112,7 @@ watch(
   }
 )
 
+// Initialize ionization mechanisms and reset params to defaults when batch focus changes
 watchEffect(() => {
   ionMechs.value = app.data.batch.focused.build_params.ion_mechanisms.map((id) =>
     app.data.mechanism.list.find(({ ionization_mechanism_id }) => id === ionization_mechanism_id)
@@ -117,25 +121,44 @@ watchEffect(() => {
   params.formulaRange = DEFAULT_FORMULA_RANGE
   formulaRangeModel.value = DEFAULT_FORMULA_RANGE
 })
-watchEffect(async () => {
-  if (app.data.peak.focused) {
-    // Clear existing results and start loading
+
+// Debounced API request that triggers when any dependency changes (single computed object `deps`)
+watchDebounced(
+  () => ({
+    peakFocused: app.data.peak.focused ? app.data.peak.focused.mz : null,
+    sampleId: app.data.sample.focusedId,
+    mzPrecision: params.mzPrecision,
+    formulaRange: params.formulaRange,
+    limit: params.limit,
+    ionMechanismIds: ionMechs.value.map((m) => m.ionization_mechanism_id).join(',')
+  }),
+  // The callback function that runs 800ms after dependencies stop changing
+  async (deps) => {
+    // Early return if no peak selected
+    if (!deps.peakFocused) {
+      results.value = []
+      loading.value = false
+      return
+    }
+
+    // Update UI to show loading state immediately
     loading.value = true
     results.value = []
     totalMatches.value = 0
     displayedMatches.value = 0
+
     // Make the request to start the background task
     await api.http.post(
-      `/cheminfo/mz/match/sample/${app.data.sample.focusedId}`,
+      `/cheminfo/mz/match/sample/${deps.sampleId}`,
       {
         mz: app.data.peak.focused.mz,
-        sample_item_id: app.data.sample.focusedId,
+        sample_item_id: deps.sampleId,
         ionization_mechanism_ids: ionMechs.value.map(
           ({ ionization_mechanism_id }) => ionization_mechanism_id
         ),
-        mz_precision: params.mzPrecision,
-        formula_ranges: params.formulaRange,
-        limit: params.limit,
+        mz_precision: deps.mzPrecision,
+        formula_ranges: deps.formulaRange,
+        limit: deps.limit,
         match_params: app.data.match.params.typeDefaults
       },
       {
@@ -143,12 +166,10 @@ watchEffect(async () => {
         type: 'match_cheminfo_by_mz'
       }
     )
-  } else {
-    // No peak focused, clear results
-    results.value = []
-    loading.value = false
-  }
-})
+  },
+  // Options: 800ms debounce delay, deep comparison for proper nested reactivity
+  { debounce: 800, deep: true }
+)
 
 const columns = [
   { field: 'target_compound_formula', label: 'Formula' },
