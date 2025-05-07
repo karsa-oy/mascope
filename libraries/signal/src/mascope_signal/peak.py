@@ -207,14 +207,16 @@ async def detect_peaks(
         )
     peakshape, R = instrument_functions
     sample_file_props = load_file(filename, vars=[]).props
+    sample_file_type = get_sample_file_type(filename)
     sum_signal = get_sum_signal(filename)
 
-    # Check if there are any peaks already fitted
+    # -- Get previously fitted peaks if they exist and list of unit masses to fit -- ##
+
     try:
-        peak_heights = load_array(filename, "peak_heights").peak_heights
-        peak_areas = load_array(filename, "peak_areas").peak_areas
+        peak_heights_xarr = load_array(filename, "peak_heights").peak_heights
+        peak_areas_xarr = load_array(filename, "peak_areas").peak_areas
     except FileNotFoundError:
-        peak_heights, peak_areas = None, None
+        peak_heights_xarr, peak_areas_xarr = None, None
 
     mz_top = sample_file_props["range"][1]
 
@@ -228,20 +230,19 @@ async def detect_peaks(
 
     old_peak_mzs, old_peak_areas, old_peak_heights = [], [], []
 
-    # Fit peaks to given unit masses
-    if peak_areas is not None and if_exists != "replace":
+    if peak_areas_xarr is not None and if_exists != "replace":
         if if_exists == "fail":
             raise FileExistsError("Peak data exists!")
 
         runtime.logger.debug(f"Access peak data from {filename}")
-        sample_file_type = get_sample_file_type(filename)
+
         if sample_file_type in ["tof_zarr", "orbi_zarr"]:
             # Drop nans for old files containing signal as zarr
-            peak_areas = peak_areas.dropna(dim="mz")
-            peak_heights = peak_heights.dropna(dim="mz")
+            peak_areas_xarr = peak_areas_xarr.dropna(dim="mz")
+            peak_heights_xarr = peak_heights_xarr.dropna(dim="mz")
 
         # Get previously fitted unit masses
-        old_peak_mzs = peak_areas.mz.values.tolist()
+        old_peak_mzs = peak_areas_xarr.mz.values.tolist()
         u_list_fitted = np.unique(np.round(old_peak_mzs))
 
         if if_exists == "append":
@@ -256,8 +257,8 @@ async def detect_peaks(
             )
 
         runtime.logger.debug("Getting sums of previously fitted peak areas and heights")
-        old_peak_areas = peak_areas.sum(dim="time").compute().values.tolist()
-        old_peak_heights = peak_heights.sum(dim="time").compute().values.tolist()
+        old_peak_areas = peak_areas_xarr.sum(dim="time").compute().values.tolist()
+        old_peak_heights = peak_heights_xarr.sum(dim="time").compute().values.tolist()
 
     runtime.logger.info(f"Fitting {u_list.size} unit masses")
 
@@ -269,59 +270,47 @@ async def detect_peaks(
         else None
     )
 
-    cpu_cores = os.cpu_count()
-    max_workers = max(1, cpu_cores // 2)
-    executor = ProcessPoolExecutor(max_workers=max_workers)
-    loop = asyncio.get_event_loop()
+    # -- Read centroids as peaks directly from RAW file for orbi_raw -- ##
 
-    if instrument_type == "orbi":
-        # Try to get centroids from the sum spectrum
+    if sample_file_type == "orbi_raw":
         new_peak_mzs, new_peak_heights, resolutions = get_orbi_centroids(
             filename, u_list
         )
-        if new_peak_mzs is None:
-            runtime.logger.debug("Segment Orbi spectrum for peak detection")
-            # The sample file does not contain RAW file
-            # Stack mass ranges
-            u_range = np.vstack([u_list - 0.5, u_list + 0.5])
-            # Broadcast the u_range array to have the same shape as mz
-            u_range = u_range[:, :, np.newaxis]
-            # Create boolean masks indicating which elements of spec fall within each range
-            mask_u_list = (sum_signal.mz.values >= u_range[0]) & (
-                sum_signal.mz.values <= u_range[1]
-            )
-            mask_u_list = mask_u_list.any(axis=0)
-            # Update mz and spec
-            mz = sum_signal.mz.values[mask_u_list]
-            sum_spec = sum_signal.values[mask_u_list]
+        runtime.logger.debug("The fitted peaks were read from the Thermo file")
 
-            if sum_spec.size == 0:
-                # Nothing to fit
-                specs_to_fit = []
-            else:
-                # Get mz/spectrum pairs to fit from segmented spectrum
-                n_scans = get_scan_timestamps(filename).size
-                seg_spec_indices = segment_spec(sum_spec, threshold=n_scans)
-                specs_to_fit = [
-                    (mz[chunk], sum_spec[chunk]) for chunk in seg_spec_indices
-                ]
-        else:
-            runtime.logger.debug("The peaks were read from the Thermo file")
-            specs_to_fit = []
-    if instrument_type == "tof":
-        runtime.logger.debug("Segment TOF spectrum for peak detection")
-        sum_mz = sum_signal.mz.compute().values
-        sum_values = sum_signal.compute().values
-        specs_to_fit = [
-            (
-                sum_mz[(sum_mz >= u - dmz) & (sum_mz <= u + dmz)],
-                sum_values[(sum_mz >= u - dmz) & (sum_mz <= u + dmz)],
+        new_peak_areas = []
+        runtime.logger.debug("Computing peak areas...")
+        mz_arr = sum_signal.mz.values
+
+        # Precompute all mz ranges for peak area calculation
+        sigmas = new_peak_mzs / resolutions / SIGMA_MULTIPLIER
+        mz_mins = new_peak_mzs - 3 * sigmas
+        mz_maxs = new_peak_mzs + 3 * sigmas
+        left_indices = np.searchsorted(mz_arr, mz_mins, side="left")
+        right_indices = np.searchsorted(mz_arr, mz_maxs, side="right")
+
+        new_peak_areas = [
+            calculate_peak_area(
+                mz_arr[left_indices[i] : right_indices[i]],
+                peakshape,
+                (new_peak_mzs[i], new_peak_heights[i], resolutions[i]),
+                sample_interval,
             )
-            for u in u_list
+            for i in range(len(new_peak_mzs))
         ]
 
-    if specs_to_fit:
-        # Fit as usual
+    # -- Fit peaks if sample_file_type is orbi_zarr, tof_zarr, tof_h5  -- ##
+
+    if sample_file_type in ["orbi_zarr", "tof_zarr", "tof_h5"]:
+        cpu_cores = os.cpu_count()
+        max_workers = max(1, cpu_cores // 2)
+        executor = ProcessPoolExecutor(max_workers=max_workers)
+        loop = asyncio.get_event_loop()
+
+        specs_to_fit = _segment_spectrum_for_fitting(
+            filename, sample_file_type, sum_signal, u_list, dmz
+        )
+
         # Fill in asynchronous operations
         futures = [
             loop.run_in_executor(
@@ -360,87 +349,41 @@ async def detect_peaks(
 
         executor.shutdown()
 
-        new_peak_mzs, new_peak_heights, new_peak_areas = zip(
-            *[(p[0], p[1], p[3]) for p in new_peaks]
-        )
-    elif "new_peak_mzs" in locals() and new_peak_mzs is not None:
-        # Peak were read as centroids from Thermo file
-        # Compute peak areas using the peak shape
-        new_peak_areas = []
-        for i, mass in enumerate(new_peak_mzs):
-            mass_range = sum_signal.sel(mz=slice(mass - dmz, mass + dmz)).values
-            new_peak_areas.append(
-                calculate_peak_area(
-                    mass_range,
-                    peakshape,
-                    (new_peak_mzs[i], new_peak_heights[i], resolutions[i]),
-                    sample_interval,
-                )
+        if len(new_peaks) > 0:
+            new_peak_mzs, new_peak_heights, new_peak_areas = zip(
+                *[(p[0], p[1], p[3]) for p in new_peaks]
             )
-    else:
-        # Nothing was fitted
-        new_peak_mzs, new_peak_heights, new_peak_areas = [], [], []
+        else:
+            # Nothing was fitted
+            new_peak_mzs, new_peak_heights, new_peak_areas = [], [], []
 
     if if_exists == "append":
+        # Append new peaks to the old ones
         all_peak_mzs = np.concatenate([old_peak_mzs, new_peak_mzs])
         all_peak_areas = np.concatenate([old_peak_areas, new_peak_areas])
         all_peak_heights = np.concatenate([old_peak_heights, new_peak_heights])
     else:
+        # Use only new peaks
         all_peak_mzs = np.array(new_peak_mzs)
         all_peak_areas = np.array(new_peak_areas)
         all_peak_heights = np.array(new_peak_heights)
 
-    all_peak_ind = np.argsort(all_peak_mzs)
-    all_peak_mzs = all_peak_mzs[all_peak_ind]
-    all_peak_areas = all_peak_areas[all_peak_ind]
-    all_peak_heights = all_peak_heights[all_peak_ind]
-    peak_mz_coord = sum_signal.mz.sel(
-        mz=all_peak_mzs,
-        method="nearest",
+    ## -- Remove junk from the fitted peaks -- ##
+
+    peak_mzs, peak_areas, peak_heights = _sort_and_filter_peaks(
+        sum_signal, all_peak_mzs, all_peak_areas, all_peak_heights
     )
 
-    # Filter out zero height peaks to prevent division by zero in peak profiles
-    valid_indices = sum_signal.sel(mz=peak_mz_coord, method="nearest").values > 0
-    peak_mz_coord = peak_mz_coord[valid_indices]
-    all_peak_mzs = all_peak_mzs[valid_indices]
-    all_peak_areas = all_peak_areas[valid_indices]
-    all_peak_heights = all_peak_heights[valid_indices]
+    ## -- Calculate and write peak profiles -- ##
 
-    peak_mzs, unique_peak_index = np.unique(peak_mz_coord, return_index=True)
-    all_peak_mzs = all_peak_mzs[unique_peak_index]
+    runtime.logger.debug("Computing peak profiles...")
 
-    # TODO: Fix this block for TOF, see issue https://github.com/Karsa-Oy/Mascope/issues/573
-    if instrument_type == "orbi":
-        # Difference between fitted peak positions and binded to the mz grid
-        peak_mz_diff = np.abs(all_peak_mzs - peak_mzs)
-        # Recalculate peak position difference to ppm
-        peak_mz_diff_ppm = 1e6 * peak_mz_diff / all_peak_mzs
-        # Find where ppm difference is > 1 ppm
-        peak_mz_mask = np.where(peak_mz_diff_ppm > 1)
-        # Replace mz values where ppm > 1 with exact fitted peak positions
-        peak_mzs[peak_mz_mask] = all_peak_mzs[peak_mz_mask]
-
-    peak_areas = all_peak_areas[unique_peak_index]
-    peak_heights = all_peak_heights[unique_peak_index]
-
-    runtime.logger.debug("Compute peak profiles")
-
-    # Get the tof values corresponding to the peak mzs using np.searchsorted
-    tofs = np.arange(len(sum_signal.mz)).astype(np.float32)
-    indices = np.searchsorted(sum_signal.mz.values, all_peak_mzs)
-    indices = np.clip(indices, 0, len(tofs) - 1)  # Ensure indices are within bounds
-    unique_tofs = tofs[indices]
-    # Get the peak profiles and assign the tof coordinate
-    peak_profiles = get_peak_profiles(filename, all_peak_mzs).assign_coords(
-        tof=("mz", unique_tofs)
+    peak_profiles_area, peak_profiles_height = _calculate_peak_profiles(
+        filename, peak_mzs, sum_signal, peak_areas, peak_heights
     )
-    # Normalize peak profiles
-    peak_profiles_norm = peak_profiles / peak_profiles.sum(dim="time")
-    # Calculate peak areas and heights
-    peak_profiles_area = peak_profiles_norm * peak_areas.reshape(-1, 1)
-    peak_profiles_height = peak_profiles_norm * peak_heights.reshape(-1, 1)
 
     runtime.logger.info(f"Writing peaks to file {filename}")
+
     overwrite_peak_dataset = if_exists in {"append", "replace"}
     write_peaks(
         peak_profiles_area,
@@ -448,14 +391,163 @@ async def detect_peaks(
         filename,
         overwrite_peak_dataset,
     )
+
     runtime.logger.info("Complete")
     sample_file_data = load_file(
         filename,
         vars=["peak_areas", "peak_heights", "sum_signal"],
     )
     if return_peak_mzs:
-        return (sample_file_data, all_peak_mzs)
+        return (sample_file_data, peak_mzs)
     return sample_file_data
+
+
+def _segment_spectrum_for_fitting(
+    filename: str,
+    sample_file_type: str,
+    sum_signal: xarray.DataArray,
+    u_list: np.ndarray,
+    dmz: float,
+) -> list:
+    """Helper function to segment spectrum for fitting in detect_peaks
+
+    :param filename: Sample file name
+    :type filename: str
+    :param sample_file_type: Sample file type
+    :type sample_file_type: str
+    :param sum_signal: Sum signal array
+    :type sum_signal: xarray.DataArray
+    :param u_list: m/z values to fit
+    :type u_list: np.ndarray
+    :param dmz: m/z window width for peak detection
+    :type dmz: float
+    :return: List of tuples containing m/z and spectrum pairs to fit
+    :rtype: list
+    """
+    if sample_file_type == "orbi_zarr":
+        runtime.logger.debug("Segment Orbi spectrum for peak detection")
+        # Stack mass ranges
+        u_range = np.vstack([u_list - 0.5, u_list + 0.5])
+        # Broadcast the u_range array to have the same shape as mz
+        u_range = u_range[:, :, np.newaxis]
+        # Create boolean masks indicating which elements of spec fall within each range
+        mask_u_list = (sum_signal.mz.values >= u_range[0]) & (
+            sum_signal.mz.values <= u_range[1]
+        )
+        mask_u_list = mask_u_list.any(axis=0)
+        # Update mz and spec
+        mz = sum_signal.mz.values[mask_u_list]
+        sum_spec = sum_signal.values[mask_u_list]
+
+        if sum_spec.size == 0:
+            # Nothing to fit
+            specs_to_fit = []
+        else:
+            # Get mz/spectrum pairs to fit from segmented spectrum
+            n_scans = get_scan_timestamps(filename).size
+            seg_spec_indices = segment_spec(sum_spec, threshold=n_scans)
+            specs_to_fit = [(mz[chunk], sum_spec[chunk]) for chunk in seg_spec_indices]
+
+    if sample_file_type in ["tof_zarr", "tof_h5"]:
+        runtime.logger.debug("Segment TOF spectrum for peak detection")
+        sum_mz = sum_signal.mz.compute().values
+        sum_values = sum_signal.compute().values
+        specs_to_fit = [
+            (
+                sum_mz[(sum_mz >= u - dmz) & (sum_mz <= u + dmz)],
+                sum_values[(sum_mz >= u - dmz) & (sum_mz <= u + dmz)],
+            )
+            for u in u_list
+        ]
+    return specs_to_fit
+
+
+def _sort_and_filter_peaks(
+    sum_signal: xarray.DataArray,
+    all_peak_mzs: np.ndarray,
+    all_peak_areas: np.ndarray,
+    all_peak_heights: np.ndarray,
+) -> tuple:
+    """Helper function to sort and filter fitted peak data in detect_peaks
+
+    :param sum_signal: Sum signal array
+    :type sum_signal: xarray.DataArray
+    :param all_peak_mzs: m/z values of the fitted peaks
+    :type all_peak_mzs: np.ndarray
+    :param all_peak_areas: Peak areas of the fitted peaks
+    :type all_peak_areas: np.ndarray
+    :param all_peak_heights: Peak heights of the fitted peaks
+    :type all_peak_heights: np.ndarray
+    :return: Tuple of fitted peak mzs, areas and height as numpy arrays
+    :rtype: tuple
+    """
+    # Sort fitted peaks by m/z
+    sorted_peak_ind = np.argsort(all_peak_mzs)
+    all_peak_mzs = all_peak_mzs[sorted_peak_ind]
+    all_peak_areas = all_peak_areas[sorted_peak_ind]
+    all_peak_heights = all_peak_heights[sorted_peak_ind]
+
+    # lmfit returns peaks with negative or zero heights, which are not valid
+    # filter out zero height peaks to prevent division by zero in peak profiles
+    peak_mz_coord = sum_signal.mz.sel(
+        mz=all_peak_mzs,
+        method="nearest",
+    )
+    valid_indices = sum_signal.sel(mz=peak_mz_coord, method="nearest").values > 0
+    peak_mz_coord = peak_mz_coord[valid_indices]
+    all_peak_mzs = all_peak_mzs[valid_indices]
+    all_peak_areas = all_peak_areas[valid_indices]
+    all_peak_heights = all_peak_heights[valid_indices]
+
+    # Remove duplicate peaks if any
+    _, unique_peak_index = np.unique(peak_mz_coord, return_index=True)
+    peak_mzs = all_peak_mzs[unique_peak_index]
+    peak_areas = all_peak_areas[unique_peak_index]
+    peak_heights = all_peak_heights[unique_peak_index]
+
+    return peak_mzs, peak_areas, peak_heights
+
+
+def _calculate_peak_profiles(
+    filename: str,
+    all_peak_mzs: np.ndarray,
+    sum_signal: xarray.DataArray,
+    peak_areas: np.ndarray,
+    peak_heights: np.ndarray,
+) -> tuple:
+    """Helper function to calculate peak profiles in detect_peaks
+
+    :param filename: Sample file name
+    :type filename: str
+    :param all_peak_mzs: m/z values of the fitted peaks
+    :type all_peak_mzs: np.ndarray
+    :param sum_signal: Sum signal array
+    :type sum_signal: xarray.DataArray
+    :param peak_areas: Peak areas of the fitted peaks
+    :type peak_areas: np.ndarray
+    :param peak_heights: Peak heights of the fitted peaks
+    :type peak_heights: np.ndarray
+    :return: Tuple of peak profiles area and height (vs scan/time)
+    :rtype: tuple
+    """
+    # Get the tof values corresponding to the peak mzs
+    tofs = np.arange(len(sum_signal.mz)).astype(np.float32)
+    indices = np.searchsorted(sum_signal.mz.values, all_peak_mzs)
+    indices = np.clip(indices, 0, len(tofs) - 1)  # Ensure indices are within bounds
+    unique_tofs = tofs[indices]
+
+    peak_profiles = get_peak_profiles(filename, all_peak_mzs).assign_coords(
+        tof=("mz", unique_tofs)
+    )
+    # Normalize peak profile intensities to 1
+    peak_profiles_norm = peak_profiles / peak_profiles.sum(dim="time")
+
+    # Restore peak profiles intensities using peak areas and heights of the fitted peaks,
+    # that are, presumably, the correct integral of the peak profiles
+    peak_profiles_area = peak_profiles_norm * peak_areas.reshape(-1, 1)
+    peak_profiles_height = peak_profiles_norm * peak_heights.reshape(-1, 1)
+
+    return peak_profiles_area, peak_profiles_height
 
 
 def filter_peaks(
