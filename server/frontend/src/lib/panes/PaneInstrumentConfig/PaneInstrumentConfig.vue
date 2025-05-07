@@ -88,7 +88,7 @@ api.http
           const currentConfig = sampleFileConfigValid ? sampleFileConfig : null
           // find the latest config
           const latestConfig = instrument_configs.sort((a, b) =>
-            a.datetime_utc < b.datetime_utc ? -1 : a.datetime_utc > b.datetime_utc ? 1 : 0
+            a.datetime_utc > b.datetime_utc ? -1 : a.datetime_utc < b.datetime_utc ? 1 : 0
           )[0]?.method_file
           // autoselect initial config
           const initialConfig = currentConfig ?? latestConfig
