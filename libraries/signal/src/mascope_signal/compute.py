@@ -325,13 +325,14 @@ def get_tic_per_scan(
     :rtype: tuple
     """
     sample_type = get_sample_file_type(base_filename)
-    datafile_path = filename_to_datafile_path(base_filename)
     match sample_type:
         case "orbi_raw":
+            datafile_path = filename_to_datafile_path(base_filename)
             tic_time, tic_per_scan = thermo.get_tic_per_scan(
                 datafile_path, timestamps, polarity
             )
         case "tof_h5":
+            datafile_path = filename_to_datafile_path(base_filename)
             tic_time, tic_per_scan = tofwerk.get_tic_per_scan(datafile_path, timestamps)
         case "tof_zarr" | "orbi_zarr":
             zarr_path = filename_to_zarr_path(base_filename, "signal")
@@ -411,8 +412,8 @@ def get_orbi_centroids(
     :rtype: tuple
     """
     sample_type = get_sample_file_type(base_filename)
-    datafile_path = filename_to_datafile_path(base_filename)
     if sample_type == "orbi_raw":
+        datafile_path = filename_to_datafile_path(base_filename)
         return thermo.get_centroids(
             datafile_path, u_list, t_min, t_max, polarity=polarity
         )
@@ -442,13 +443,14 @@ def get_peak_profiles(
     :rtype: xr.DataArray
     """
     sample_type = get_sample_file_type(base_filename)
-    datafile_path = filename_to_datafile_path(base_filename)
     match sample_type:
         case "orbi_raw":
+            datafile_path = filename_to_datafile_path(base_filename)
             return thermo.get_peak_profiles(datafile_path, mzs, t_min, t_max, polarity)
         case "tof_h5":
             # Get calibrated m/z values
             sum_signal_mz = get_sum_signal(base_filename).mz.values
+            datafile_path = filename_to_datafile_path(base_filename)
             return tofwerk.get_peak_profiles(
                 datafile_path, mzs, sum_signal_mz, t_min, t_max
             )

@@ -86,7 +86,7 @@ def filename_to_datafile_path(base_filename):
         case "orbi_raw":
             return os.path.join(sample_data_path, "data.raw")
         case "tof_zarr" | "orbi_zarr":
-            FileNotFoundError(
+            raise FileNotFoundError(
                 f"Sample file {sample_data_path} does not contain h5 or raw datafile"
             )
 
