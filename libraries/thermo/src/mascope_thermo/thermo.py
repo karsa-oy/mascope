@@ -13,12 +13,18 @@ from contextlib import contextmanager
 from typing import Iterable, Literal
 
 import numpy as np
-from scipy.interpolate import interp1d
 import xarray as xr
 import dask.array as da
 
 from ThermoFisher.CommonCore.RawFileReader import RawFileReaderAdapter
-from ThermoFisher.CommonCore.Data.Business import Device, MassOptions
+from ThermoFisher.CommonCore.Data.Business import (
+    Device,
+    MassOptions,
+    ChromatogramSignal,
+    ChromatogramTraceSettings,
+    TraceType,
+    Range,
+)
 from ThermoFisher.CommonCore.Data import ToleranceUnits, Extensions
 
 from System.Collections.Generic import List
@@ -398,6 +404,7 @@ def get_peak_profiles(
     t_min: float | None = None,
     t_max: float | None = None,
     polarity: Literal["+", "-"] | None = None,
+    ppm: int = 10,
 ) -> xr.Dataset:
     """Extracts the peak profiles for the specified m/z values in the time range (t_min, t_max).
 
@@ -411,15 +418,16 @@ def get_peak_profiles(
     :type t_max: float
     :param polarity: + or -, Polarity of the scans to be retrieved, optional, defaults to None
     :type polarity: str
+    :param ppm: Mass tolerance in parts-per-million for centroid binning, defaults to 10.
+    :type ppm: int, optional
     :return: An xarray Dataset containing the peak profiles
     :rtype: xr.Dataset
     """
-    with open_raw_file(datafile_path) as raw_file:
-        mzs = np.asarray(mzs)
+    mzs = np.asarray(mzs, dtype=float)
 
+    with open_raw_file(datafile_path) as raw_file:
         num_of_scans = raw_file.RunHeaderEx.SpectraCount
         scan_indices = list(range(1, num_of_scans + 1))
-        scans = tuple(Extensions.GetScans(raw_file, 1, num_of_scans))
 
         if polarity:
             scan_indices = filter_by_polarity(raw_file, scan_indices, polarity)
@@ -428,36 +436,49 @@ def get_peak_profiles(
             raw_file, scan_indices, t_min, t_max
         )  # [s]
 
-        intensities = [
-            np.frombuffer(scans[i - 1].SegmentedScan.Intensities) for i in scan_indices
-        ]
-        positions = [
-            np.frombuffer(scans[i - 1].SegmentedScan.Positions) for i in scan_indices
-        ]
+        # Convert scan indices to 0-based for Python
+        py_scan_indices = [i - 1 for i in scan_indices]
 
-        # Prepare interpolation functions for all scans
-        interpolation_funcs = [
-            interp1d(pos, intens, bounds_error=False, fill_value=0)
-            for pos, intens in zip(positions, intensities)
-        ]
-
-        # Interpolate intensities for all scans at once
-        intensities_for_mz_values = np.array(
-            [interp_func(mzs) for interp_func in interpolation_funcs]
+        # Preallocate the array for intensities
+        intensities_for_mz_values = np.zeros(
+            (len(mzs), len(py_scan_indices)), dtype=np.float64
         )
 
-        # Convert to dask array, transpose to have mz values as columns
-        peak_profiles_dask = da.from_array(
-            np.array(intensities_for_mz_values).T, chunks="auto"
-        )
+        # Precompute the mass ranges for each m/z value
+        mz_lows = mzs - (mzs * ppm / 1e6)
+        mz_highs = mzs + (mzs * ppm / 1e6)
+
+        settings = []
+        for i, (mz_low, mz_high) in enumerate(zip(mz_lows, mz_highs)):
+            mz_range = Range()
+            mz_range.Low = mz_low
+            mz_range.High = mz_high
+
+            setting = ChromatogramTraceSettings(TraceType.MassRange)
+            setting.MassRanges = [mz_range]
+            settings.append(setting)
+
+        # Get profiles for the m/z values, -1 for all scans
+        chromatogram = raw_file.GetChromatogramData(settings, -1, -1)
+        traces = ChromatogramSignal.FromChromatogramData(chromatogram)
+
+        for i, trace in enumerate(traces):
+            # Save the intensities from required scans
+            intensities_for_mz_values[i] = np.fromiter(
+                trace.Intensities, dtype=np.float64, count=len(trace.Intensities)
+            )[py_scan_indices]
+
+        peak_profiles_dask = da.from_array(intensities_for_mz_values, chunks="auto")
 
         # Export xarray array with time and mz coordinates
-        return xr.DataArray(
+        result = xr.DataArray(
             peak_profiles_dask,
             dims=("mz", "time"),
             coords={"mz": mzs, "time": np.array(scan_time)},
             name="signal",
         )
+
+    return result
 
 
 def get_centroids(

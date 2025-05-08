@@ -541,6 +541,7 @@ def _calculate_peak_profiles(
     )
     # Normalize peak profile intensities to 1
     peak_profiles_norm = peak_profiles / peak_profiles.sum(dim="time")
+    peak_profiles_norm = peak_profiles_norm.fillna(0)
 
     # Restore peak profiles intensities using peak areas and heights of the fitted peaks,
     # that are, presumably, the correct integral of the peak profiles
