@@ -1,5 +1,5 @@
 services:
-  backend:
+  backend: &backend
     command: "api-server"
     image: ghcr.io/karsa-oy/mascope/backend:latest
     build:
@@ -20,23 +20,9 @@ services:
       - jwt_secret_key
       - server_owner_secret_key
   file_converter:
+    <<: *backend
     command: "file-converter"
-    image: ghcr.io/karsa-oy/mascope/file_converter:latest
-    build:
-      dockerfile: server/backend/Dockerfile
-      context: .
-    tty: true
-    volumes:
-      - ./.runtime/env/${MASCOPE_ENV:-default}:/app/.runtime/env/prod
-      - ${MASCOPE_FILESTORE}:/app/.runtime/env/prod/filestore
-    environment:
-      MASCOPE_LOGLEVEL: ${MASCOPE_LOGLEVEL}
-      MASCOPE_TIMEZONE: ${MASCOPE_TIMEZONE}
-      JWT_SECRET_KEY_FILE: /run/secrets/jwt_secret_key
-      SERVER_OWNER_SECRET_KEY_FILE: /run/secrets/server_owner_secret_key
-    secrets:
-      - jwt_secret_key
-      - server_owner_secret_key
+    ports: []
   frontend:
     image: ghcr.io/karsa-oy/mascope/frontend:latest
     build:

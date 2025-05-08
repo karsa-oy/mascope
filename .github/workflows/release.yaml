@@ -62,7 +62,7 @@ jobs:
           # execute build using the CLI
           uv run mascope prod build
 
-          for service in backend file_converter frontend; do
+          for service in backend frontend; do
             # alias image name
             IMAGE=ghcr.io/${{ github.repository }}/$service
             
