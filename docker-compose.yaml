@@ -1,6 +1,7 @@
 services:
   backend:
     command: "api-server"
+    image: ghcr.io/karsa-oy/mascope/backend:latest
     build:
       dockerfile: server/backend/Dockerfile
       context: .
@@ -20,6 +21,7 @@ services:
       - server_owner_secret_key
   file_converter:
     command: "file-converter"
+    image: ghcr.io/karsa-oy/mascope/file_converter:latest
     build:
       dockerfile: server/backend/Dockerfile
       context: .
@@ -36,6 +38,7 @@ services:
       - jwt_secret_key
       - server_owner_secret_key
   frontend:
+    image: ghcr.io/karsa-oy/mascope/frontend:latest
     build:
       context: server/frontend
       args:

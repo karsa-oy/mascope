@@ -33,3 +33,43 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           release_branches: ${{ env.BRANCH }}
           custom_tag: ${{ steps.make_version.outputs.version }}
+
+  docker-build-push:
+    runs-on: ubuntu-latest
+    needs: release-tag
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push Docker images
+        run: |
+          # install uv to run the CLI
+          sudo snap install --classic astral-uv
+
+          export MASCOPE_PATH=/home/runner/work/mascope/mascope/          
+          VERSION=${{ needs.release-tag.outputs.version }}
+          
+          # execute build using the CLI
+          uv run mascope prod build
+
+          for service in backend file_converter frontend; do
+            # alias image name
+            IMAGE=ghcr.io/${{ github.repository }}/$service
+            
+            # tag with generated version and latest
+            docker tag $IMAGE:latest $IMAGE:$VERSION
+            
+            # push to the github container registry
+            docker push --all-tags $IMAGE
+          done
+

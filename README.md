@@ -14,6 +14,7 @@ This document is structured as follows:
 - 📡 **[Backend](#backend)** - Python API server
 - 🖥️ **[Frontend](#frontend)** - VueJS user interface
 - 📚 **[Libraries](#libraries)** - shared Python libraries
+- 🚚 **[Deploying](#deploying)** - prod operations guide
 - 📒 **[Notebooks](#notebooks)** - Jupyter lab environment
 
 The monorepo is structured as follows:
@@ -1287,6 +1288,31 @@ uv publish --token <MY TOKEN>         # Publish in PyPI
 You should manually set the package version in `pyproject.toml` to the last commit date in ISO format (use `git log -1 --date=format:"%Y.%m.%d" --format="%ad"` on the branch you are releasing from to find it). After releasing you should set it back to `0.0.0`.
 
 ---
+
+## Deploying
+
+### Ubuntu host setup
+
+Mascope expects an Ubuntu 24.04 machine to run on, although in principle it could potentially run on other Debian-based distributions with little to no modifications. To setup a Mascope host, clone the Mascope repo and run `./tooling/ubuntu.sh install`. This will install the `mascope` CLI to Ubuntu.
+
+### GitHub releases
+
+Mascope docker images are built by a release CI/CD pipeline (found in `.github/workflows/release.yaml`).  This pipeline triggers whenver we merge to master; you can follow [release workflow runs](https://github.com/karsa-oy/mascope/actions/workflows/release.yaml). The pipeline builds and tags production images and pushes them to the GitHub Container Registry (ghcr.io). You can see these images in [Karsa's GitHub packages page](https://github.com/orgs/karsa-oy/packages).
+
+### Pulling images
+
+To pull images from the registry, you need the right permissions. Assuming you have a GitHub account with read permissions for the Karsa organization, do the following:
+1. Follow [these instructions](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-personal-access-token-classic) to create a classic personal access token for your GitHub account. The **only** required scope is `packages:read`, and it is recommended *not* to add any others. Save this token somewhere safe, since its only shown once.
+2. [Authenticate with your new access token](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry#authenticating-with-a-personal-access-token-classic) on the machine you need to pull from, to ensure you can pull images from our package registry.
+
+> [!CAUTION]
+> Your access token is **not** scoped at all, which means creating it grands the token read access to packages **all** the repositories you have access too. If this is undesirable, you can use the Karsa Developer account instead.
+
+Now you should be able to run `mascope prod pull` to pull the latest images from the registry. If no images exist on the system (which would be the case if you never built or pulled any) then `mascope prod up` would automatically pull the latest.
+
+### Running the latest release
+
+To ensure you are running the latest release, execute `mascope prod pull` and then `mascope prod up`.
 
 ## Notebooks
 
