@@ -155,6 +155,30 @@ class GetSampleFilePeakTimeseriesBody(BaseModel):
     peak_mz_tolerance_ppm: Optional[float] = 1
 
 
+class GetSampleFilePeakNoiseBody(BaseModel):
+    mzs: list[float] = Field(
+        ..., description="List of peak m/z values to compute noise for"
+    )
+    t_min: Optional[float] = Field(None, description="Start time (optional)")
+    t_max: Optional[float] = Field(None, description="End time (optional)")
+    ppm: Optional[int] = Field(
+        1, description="ppm precision for binning, defaults to 1"
+    )
+    polarity: Optional[Literal["+", "-"]] = Field(
+        None, description="Polarity of the scans, '+' or '-', optional"
+    )
+
+    @model_validator(mode="after")
+    @classmethod
+    def validate_time_range(cls, values):
+        t_min = values.t_min
+        t_max = values.t_max
+        if t_min is not None and t_max is not None:
+            if t_max <= t_min:
+                raise ValueError("t_max must be greater than t_min")
+        return values
+
+
 class GetSpectrumQueryParams(QueryParamsModel):
     t_min: Optional[Annotated[float, Field(ge=0)]] = Field(
         None, description="Start of the time range"
@@ -200,4 +224,6 @@ class GetSpectrumQueryParams(QueryParamsModel):
 
 
 class DeleteSampleFilesBody(BaseModel):
-    sample_file_ids: list[str] = Field(..., description="List of sample file IDs to delete")
+    sample_file_ids: list[str] = Field(
+        ..., description="List of sample file IDs to delete"
+    )

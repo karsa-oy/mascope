@@ -12,7 +12,11 @@ from sqlalchemy import (
 from mascope_file.io import load_file
 from mascope_file.name import parse_path_from_item_filename
 
-from mascope_signal.compute import sum_signal_for_time_range, get_sum_signal
+from mascope_signal.compute import (
+    sum_signal_for_time_range,
+    get_sum_signal,
+    compute_noise,
+)
 from mascope_signal.peak import get_peaks
 
 from mascope_backend.socket import sio
@@ -800,6 +804,72 @@ async def get_sample_file_peak_timeseries(
             "mz": peak_mz_data,
             "height": peak_timeseries.values.tolist(),
             "time": peak_timeseries.time.values.tolist(),
+        },
+    }
+
+
+@api_controller()
+async def compute_sample_file_peak_noise(
+    sample_file_id: str,
+    mzs: list[float],
+    t_min: float = None,
+    t_max: float = None,
+    ppm: int = 1,
+    polarity: Literal["+", "-"] | None = None,
+) -> dict:
+    """
+    Compute noise for given m/z values in a sample file.
+
+    :param sample_file_id: The ID of the sample file.
+    :type sample_file_id: str
+    :param mzs: List of m/z values to compute noise for.
+    :type mzs: list[float]
+    :param t_min: Start time (optional).
+    :type t_min: float, optional
+    :param t_max: End time (optional).
+    :type t_max: float, optional
+    :param ppm: ppm precision for binning, defaults to 1.
+    :type ppm: int, optional
+    :param polarity: Polarity of the scans, "+" or "-", optional.
+    :type polarity: Literal["+", "-"], optional
+    :return: Dictionary with m/z values and corresponding noise values.
+    :rtype: dict
+    """
+    # Step 1: Fetch the sample file details
+    sample_file_data = await get_sample_file(sample_file_id)
+    filename = sample_file_data.get("data").get("filename")
+
+    # Step 2: Compute noise
+    try:
+        mzs_out, noise, warning_msg = compute_noise(
+            filename,
+            mzs,
+            t_min=t_min,
+            t_max=t_max,
+            ppm=ppm,
+            polarity=polarity,
+        )
+        msg = f"Successfully computed noise for {len(mzs_out)} m/z values in '{filename}'."
+        if warning_msg:
+            msg += f"\nWarning: {warning_msg}"
+    except NotImplementedError as e:
+        return {
+            "message": f"Noise calculation is not implemented for this file type: {e}",
+            "results": 0,
+            "data": {
+                "mz": [],
+                "noise": [],
+            },
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to compute noise: {e}")
+
+    return {
+        "message": msg,
+        "results": len(mzs_out),
+        "data": {
+            "mz": mzs_out.tolist(),
+            "noise": noise.tolist(),
         },
     }
 

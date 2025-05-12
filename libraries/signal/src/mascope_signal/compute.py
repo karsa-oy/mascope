@@ -488,3 +488,69 @@ def get_polarity_options(base_filename: str) -> str:
             else:
                 # If polarity is not specified, return None (get all scans)
                 return None
+
+
+def compute_noise(
+    base_filename: str,
+    mzs: Iterable[float],
+    t_min: float | None = None,
+    t_max: float | None = None,
+    ppm: int = 1,
+    polarity: Literal["+", "-"] | None = None,
+) -> tuple:
+    """Compute noise for given m/z values in the time range [t_min, t_max] for the given polarity.
+    Noise values are interpolated to provided m/z values.
+
+    :param base_filename: Sample file filename
+    :type base_filename: str
+    :param mzs: List of target m/z values
+    :type mzs: Iterable[float]
+    :param t_min: Start time [s]
+    :type t_min: float, optional
+    :param t_max: End time [s]
+    :type t_max: float, optional
+    :param ppm: ppm precision for binning, defaults to 1, used for Orbitrap data.
+                This value determines the mass tolerance for grouping m/z values,
+                where a smaller ppm value results in finer binning and higher precision.
+    :type ppm: int, optional
+    :param polarity: + or -, Polarity of the scans to be retrieved, optional, defaults to None
+    :type polarity: str, optional
+    :raises NotImplementedError: The case for h5 TOF files is not implemented
+    :raises NotImplementedError: The case for zarr files is not implemented
+    :return: Interpolated m/z values, corresponding noise values as numpy arrays, and warning message as str or None.
+    :rtype: tuple
+    """
+    sample_type = get_sample_file_type(base_filename)
+    mzs = np.asarray(mzs)
+
+    match sample_type:
+        case "orbi_raw":
+            datafile_path = filename_to_datafile_path(base_filename)
+            peak_noise = thermo.get_noise(datafile_path, t_min, t_max, ppm, polarity)
+        case "tof_h5":
+            raise NotImplementedError(
+                "Noise calculation for h5 files is not implemented yet"
+            )
+        case "tof_zarr" | "orbi_zarr":
+            raise NotImplementedError(
+                "Noise calculation for zarr files is not implemented yet"
+            )
+
+    # Log a warning if mzs are outside peak_noise range
+    warning_msg = None
+    if mzs.min() < peak_noise.mz.min() or mzs.max() > peak_noise.mz.max():
+        peak_noise_mzs = peak_noise.mz.values
+        warning_msg = (
+            "Some of the provided m/z values are outside the range of peak noise m/z values: "
+            f"{peak_noise_mzs.min():.2f} - {peak_noise_mzs.max():.2f}. "
+            "The extrapolated values may not be accurate."
+        )
+        runtime.logger.warning(warning_msg)
+
+    # select the closest m/z values
+    peak_noise = peak_noise.sel(mz=mzs, method="nearest")
+
+    # Interpolate peak_noise at mzs positions to get accurate values
+    peak_noise_interpolated = np.interp(mzs, peak_noise.mz.values, peak_noise.values)
+
+    return mzs, peak_noise_interpolated, warning_msg
