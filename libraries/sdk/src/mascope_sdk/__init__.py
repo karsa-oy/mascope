@@ -801,6 +801,43 @@ def get_sample_file_instrument_config(
     return instrument_config
 
 
+def get_sample_file_metadata(
+    mascope_url: str,
+    access_token: str,
+    sample_file_id: str,
+) -> dict | None:
+    """
+    Retrieve metadata for a specific sample file by its ID.
+
+    :param mascope_url: The base URL of the Mascope instance.
+    :type mascope_url: str
+    :param access_token: Authorization token for API access
+    :type access_token: str
+    :param sample_file_id: The ID of the sample file.
+    :type sample_file_id: str
+    :return: Metadata dictionary for the sample file, or None if not found or error.
+    :rtype: dict or None
+    """
+    resp = api_get(
+        url=mascope_url,
+        path=f"sample/files/{sample_file_id}/metadata",
+        access_token=access_token,
+    )
+    if not resp:
+        print(
+            f"Failed to retrieve metadata for sample file with ID {sample_file_id} from {mascope_url}."
+        )
+        return None
+
+    content = resp.json()
+    metadata = content.get("data", None)
+    if not metadata:
+        print(f"No metadata found for sample file with ID {sample_file_id}.")
+        return None
+
+    return metadata
+
+
 ##########################
 # Instrument functions API
 

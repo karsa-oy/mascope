@@ -12,6 +12,7 @@ from itertools import compress
 from contextlib import contextmanager
 from typing import Iterable, Literal
 
+import pandas as pd
 import numpy as np
 import xarray as xr
 import dask.array as da
@@ -607,3 +608,226 @@ def get_noise(
         return xr.DataArray(
             data=noise_dask, dims=["mz"], coords={"mz": masses}, name="noise"
         )
+
+
+class RawFileMetadata:
+    """Class to access metadata of a Thermo Fisher raw file."""
+
+    def __init__(self, datafile_path: str):
+        self.datafile_path = datafile_path
+
+    @property
+    def num_of_scans(self):
+        """Number of scans in the raw file."""
+        with open_raw_file(self.datafile_path) as raw_file:
+            return raw_file.RunHeaderEx.SpectraCount
+
+    @property
+    def instrument(self):
+        """Instrument metadata. The following information is available:
+        Name
+        Model
+        SerialNumber
+        SoftwareVersion
+        HardwareVersion
+        Flags
+        AxisLabelX
+        AxisLabelY
+        IsValid
+        HasAccurateMassPrecursors
+        """
+        with open_raw_file(self.datafile_path) as raw_file:
+            instrument_data = raw_file.GetInstrumentData()
+
+            instrument_data_list = [
+                "Name",
+                "Model",
+                "SerialNumber",
+                "SoftwareVersion",
+                "HardwareVersion",
+                # "ChannelLabels", not serializable
+                # "Units", not serializable
+                "Flags",
+                "AxisLabelX",
+                "AxisLabelY",
+                "IsValid",
+                "HasAccurateMassPrecursors",
+            ]
+
+            instrument_df = pd.DataFrame(columns=["Value"])
+            for row in instrument_data_list:
+                instrument_df.loc[row] = getattr(instrument_data, row)
+
+            return instrument_df
+
+    @property
+    def trailer(self):
+        """Trailer information of the raw file. The following information is available:
+
+        Scan Description
+        Multiple Injection
+        Multi Inject Info
+        AGC
+        Micro Scan Count
+        Scan Segment
+        Scan Event
+        Master Index
+        Master Scan Number
+        Charge State
+        Monoisotopic M/Z
+        Error in isotopic envelope fit
+        Ion Injection Time (ms)
+        Max. Ion Time (ms)
+        FT Resolution
+        MS2 Isolation Width
+        MS2 Isolation Offset
+        AGC Target
+        HCD Energy
+        HCD Energy V
+        Analyzer Temperature
+
+        === Mass Calibration: ===
+        Conversion Parameter B
+        Conversion Parameter C
+        Temperature Comp. (ppm)
+        RF Comp. (ppm)
+        Space Charge Comp. (ppm)
+        Resolution Comp. (ppm)
+        Number of Lock Masses
+        Lock Mass #1 (m/z)
+        Lock Mass #2 (m/z)
+        Lock Mass #3 (m/z)
+        LM Search Window (ppm)
+        LM Search Window (mmu)
+        Number of LM Found
+        Last Locking (sec)
+        LM m/z-Correction (ppm)
+
+        === Ion Optics Settings: ===
+        S-Lens RF Level
+
+        ====  Diagnostic Data:  ====
+        Application Mode
+        Mild Trapping Mode
+        APD
+        OT Intens Comp Factor
+        Res. Dep. Intens
+        Q Trans Comp
+        PrOSA NumF
+        PrOSA Comp
+        PrOSA ScScr
+        RawOvFtT
+        Dynamic RT Shift (min)
+        LC FWHM parameter
+        PS Inj. Time (ms)
+        AGC PS Mode
+        AGC PS Diag
+        AGC Target Adjust
+        AGC Diag 1
+        AGC Diag 2
+        HCD abs. Offset
+        Source CID eV
+        AGC Fill
+        Injection t0
+        t0 FLP
+        Iso Para R
+        Inj Para R
+        Access Id
+        Analog In A (V)
+        Analog In B (V)
+        FAIMS Attached
+        FAIMS Voltage On
+        FAIMS CV
+        """
+        with open_raw_file(self.datafile_path) as raw_file:
+
+            trailer_df = pd.DataFrame()
+            for i in range(1, self.num_of_scans + 1):
+                # Extract instrument metadata for the second scan
+                header = raw_file.GetTrailerExtraInformation(i)
+                trailer_df[i] = list(header.Values)
+
+            trailer_df.index = list(header.Labels)
+
+            return trailer_df
+
+    @property
+    def statistics(self):
+        """Get per scan statistics:
+
+        HighMass
+        LowMass
+        LongWavelength
+        ShortWavelength
+        BasePeakIntensity
+        BasePeakMass
+        TIC
+        StartTime
+        PacketCount
+        NumberOfChannels
+        ScanNumber
+        ScanEventNumber
+        SegmentNumber
+        IsCentroidScan
+        Frequency
+        IsUniformTime
+        AbsorbanceUnitScale
+        WavelengthStep
+        ScanType
+        CycleNumber
+        """
+        with open_raw_file(self.datafile_path) as raw_file:
+            num_of_scans = raw_file.RunHeaderEx.SpectraCount
+
+            scan_statistics = [
+                raw_file.GetScanStatsForScanNumber(i)
+                for i in range(1, num_of_scans + 1)
+            ]
+
+            stat_list = [
+                "HighMass",
+                "LowMass",
+                "LongWavelength",
+                "ShortWavelength",
+                "BasePeakIntensity",
+                "BasePeakMass",
+                "TIC",
+                "StartTime",
+                "PacketCount",
+                "NumberOfChannels",
+                "ScanNumber",
+                "ScanEventNumber",
+                "SegmentNumber",
+                "IsCentroidScan",
+                "Frequency",
+                "IsUniformTime",
+                "AbsorbanceUnitScale",
+                "WavelengthStep",
+                "ScanType",
+                "CycleNumber",
+            ]
+
+            scan_stats_df = pd.DataFrame(index=stat_list)
+            for i in range(num_of_scans):
+                scan_stats_df[i + 1] = [
+                    getattr(scan_statistics[i], stat) for stat in stat_list
+                ]
+
+            return scan_stats_df
+
+    def to_dict(self):
+        """Convert the metadata to a dictionary.
+
+        The dictionary contains the number of scans, statistics per scan, and statistics per file.
+        The statistics per scan and per file are represented as dictionaries.
+        """
+        # Concat scan-related data into a single dataframe
+        per_scan_df = pd.concat([self.statistics, self.trailer], axis=0)
+        # Merge per file data into a single dataframe (we currently have only one file)
+        per_file_df = self.instrument
+
+        return {
+            "num_of_scans": self.num_of_scans,
+            "stats_per_scan": per_scan_df.to_dict(),
+            "stats_per_file": per_file_df.to_dict(),
+        }

@@ -16,6 +16,7 @@ from mascope_signal.compute import (
     sum_signal_for_time_range,
     get_sum_signal,
     compute_noise,
+    get_metadata,
 )
 from mascope_signal.peak import get_peaks
 
@@ -950,4 +951,44 @@ async def get_sample_file_spectrum(
             "intensity": intensity_values,
             "intensity_unit": intensity_unit,
         },
+    }
+
+
+# ---------------------
+# Sample file metadata controller
+# ---------------------
+
+
+@api_controller()
+async def get_sample_file_metadata(sample_file_id: str) -> dict:
+    """
+    Retrieves metadata for a specific sample file.
+
+    Steps:
+    1. Fetch the sample file details using the provided ID.
+    2. Extract metadata from the file.
+    3. Return the metadata as a dictionary.
+
+    :param sample_file_id: Unique identifier for the sample file.
+    :type sample_file_id: str
+    :raises NotFoundException: If the sample file or its metadata is not found.
+    :return: Dictionary containing the sample file metadata.
+    :rtype: dict
+    """
+    # Step 1: Fetch sample file info from the database
+    sample_file_data = await get_sample_file(sample_file_id)
+    filename = sample_file_data.get("data").get("filename")
+
+    # Step 2: Get metadata
+    try:
+        metadata = get_metadata(filename)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get metadata: {e}")
+
+    # Step 3: Convert metadata to dict
+    metadata_dict = metadata.to_dict()
+
+    return {
+        "message": f"Metadata for sample file '{filename}' retrieved successfully.",
+        "data": metadata_dict,
     }

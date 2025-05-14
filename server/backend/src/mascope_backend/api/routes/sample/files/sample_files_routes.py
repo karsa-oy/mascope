@@ -17,6 +17,7 @@ from mascope_backend.api.controllers.sample.files.sample_files_controller import
     get_sample_file_peak_timeseries,
     get_sample_file_spectrum,
     compute_sample_file_peak_noise,
+    get_sample_file_metadata,
 )
 from mascope_backend.api.models.sample.files.sample_file_pydantic_model import (
     SampleFileCreate,
@@ -292,3 +293,19 @@ async def get_sample_file_spectrum_route(
     :return: Spectrum data for the sample file.
     """
     return await get_sample_file_spectrum(sample_file_id, **query_params.model_dump())
+
+
+@sample_files_router.get("/{sample_file_id}/metadata")
+@api_route(token_access=True)
+async def get_sample_file_metadata_route(
+    sample_file_id: str,
+    user=Depends(guest_user),
+):
+    """
+    Retrieve metadata for a specific sample file.
+
+    :param sample_file_id: ID of the sample file.
+    :param user: Authenticated user with guest access.
+    :return: Metadata for the sample file.
+    """
+    return await get_sample_file_metadata(sample_file_id)

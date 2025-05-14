@@ -554,3 +554,28 @@ def compute_noise(
     peak_noise_interpolated = np.interp(mzs, peak_noise.mz.values, peak_noise.values)
 
     return mzs, peak_noise_interpolated, warning_msg
+
+
+def get_metadata(
+    base_filename: str,
+) -> thermo.RawFileMetadata | None:
+    """Get metadata from the sample file
+
+    :param base_filename: Sample file filename
+    :type base_filename: str
+    :return: Metadata class instance or None if the file type is not supported
+    :rtype: RawFileMetadata | None
+    """
+    sample_type = get_sample_file_type(base_filename)
+    match sample_type:
+        case "orbi_raw":
+            datafile_path = filename_to_datafile_path(base_filename)
+            return thermo.RawFileMetadata(datafile_path)
+        case "tof_h5":
+            raise NotImplementedError(
+                "Metadata retrieval for h5 files is not implemented"
+            )
+        case "tof_zarr" | "orbi_zarr":
+            raise NotImplementedError(
+                "Metadata retrieval for zarr files is not implemented"
+            )
