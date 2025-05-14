@@ -766,6 +766,41 @@ def get_sample_file_spectrum(
     return spectrum_data
 
 
+def get_sample_file_instrument_config(
+    mascope_url: str,
+    access_token: str,
+    sample_file_name: str,
+) -> dict:
+    """
+    Retrieve the instrument config for a sample file using its filename.
+
+    :param mascope_url: The base URL of the Mascope instance.
+    :type mascope_url: str
+    :param access_token: Authorization token for API access
+    :type access_token: str
+    :param sample_file_name: The name of the sample file.
+    :type sample_file_name: str
+    :return: The instrument config dictionary, or None if not found.
+    :rtype: dict or None
+    """
+    resp = api_get(
+        url=mascope_url,
+        path=f"instrument_configs/by_filename/{sample_file_name}",
+        access_token=access_token,
+    )
+    if not resp:
+        print(f"Failed to retrieve instrument config for filename {sample_file_name}.")
+        return None
+
+    content = json.loads(resp.content)
+    instrument_config = content.get("data", None)
+    if not instrument_config:
+        print(f"No instrument config found for filename {sample_file_name}.")
+        return None
+
+    return instrument_config
+
+
 ##########################
 # Instrument functions API
 

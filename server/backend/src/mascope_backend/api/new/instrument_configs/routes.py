@@ -46,7 +46,7 @@ async def get_instrument_configs_route(
 
 
 @instrument_configs_router.get("/by_filename/{filename}")
-@api_route()
+@api_route(token_access=True)
 async def get_instrument_config_by_filename_route(
     filename: str,
     user=Depends(guest_user),
