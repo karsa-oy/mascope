@@ -225,43 +225,47 @@ class H5Processor(Thread):
             except Empty:
                 # No file to process, continue
                 continue
+            try:
+                # Get filename
+                self.filename = Path(self.file_to_process).stem
+                self.log.info(f"Processing file: {self.filename}")
+                # set active flag
+                self.active.set()
 
-            # Get filename
-            self.filename = Path(self.file_to_process).stem
-            self.log.info(f"Processing file: {self.filename}")
-            # set active flag
-            self.active.set()
+                # Get UTC offset
+                now = datetime.now()
+                utc_offset = (
+                    now - now.astimezone(timezone.utc).replace(tzinfo=None)
+                ).seconds
 
-            # Get UTC offset
-            now = datetime.now()
-            utc_offset = (
-                now - now.astimezone(timezone.utc).replace(tzinfo=None)
-            ).seconds
+                # Get sample file properties
+                sample_file_props = {
+                    "filename": self.filename.replace(" ", "_"),
+                    "length": self.length,
+                    "committed_length": self.length,
+                    "range": self.mz_range,
+                    "single_ion_signal": self.single_ion_signal,
+                    "sample_interval": self.sample_interval,
+                    "mass_calibration": self.mass_calibration,
+                    "utc_offset": utc_offset,
+                    "polarity": self.polarity,
+                    # Not applicable for TOF
+                    "method_file": None,
+                }
 
-            # Get sample file properties
-            sample_file_props = {
-                "filename": self.filename.replace(" ", "_"),
-                "length": self.length,
-                "committed_length": self.length,
-                "range": self.mz_range,
-                "single_ion_signal": self.single_ion_signal,
-                "sample_interval": self.sample_interval,
-                "mass_calibration": self.mass_calibration,
-                "utc_offset": utc_offset,
-                "polarity": self.polarity,
-                # Not applicable for TOF
-                "method_file": None,
-            }
-
-            if_processed = self._process_h5_file(
-                sample_file_props, self.file_to_process
-            )
-
-            self._finalize()
-            self.log.info(
-                f"Finished processing file: {Path(self.file_to_process).name}"
-            )
-
+                if_processed = self._process_h5_file(
+                    sample_file_props, self.file_to_process
+                )
+                self.log.info(
+                    f"Finished processing file: {Path(self.file_to_process).name}"
+                )
+            except Exception as e:
+                self.log.error(
+                    f"Failed to process file {Path(self.file_to_process).name}: {e}"
+                )
+                if_processed = False
+            finally:
+                self._finalize()
             if if_processed:
                 self.log.info("Deleting file from the streams folder")
                 try:

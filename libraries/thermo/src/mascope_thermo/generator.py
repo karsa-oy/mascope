@@ -220,41 +220,45 @@ class RawProcessor(Thread):
             except Empty:
                 # No file to stream, keep waiting
                 continue
+            try:
+                # Start processing
+                self.log.info(f"Processing started: {Path(file_to_process).name}")
+                # Set active flag
+                self.active.set()
 
-            # Start processing
-            self.log.info(f"Processing started: {Path(file_to_process).name}")
-            # Set active flag
-            self.active.set()
+                # Get UTC offset
+                now = datetime.now()
+                utc_offset = (
+                    now - now.astimezone(timezone.utc).replace(tzinfo=None)
+                ).seconds
 
-            # Get UTC offset
-            now = datetime.now()
-            utc_offset = (
-                now - now.astimezone(timezone.utc).replace(tzinfo=None)
-            ).seconds
-
-            # Gather sample file data
-            sample_file_props = {
-                "filename": self.filename.replace(" ", "_"),
-                "length": self.length,
-                "range": self.mz_range,
-                "utc_offset": utc_offset,
-                "method_file": self.method_file,
-                "timestamp": self.timestamp.isoformat(),  # for DB record
-                "polarity": self.polarity,
-                # streaming leftovers:
-                "committed_length": self.length,
-                # non-applicable for Orbi:
-                "single_ion_signal": None,
-                "sample_interval": None,
-                "mz_calibration": None,
-            }
-
-            if_processed = self._process_raw_file(sample_file_props, file_to_process)
-
-            # Out of loop
-            self._finalize()
-            self.log.info("Processing finished")
-
+                # Gather sample file data
+                sample_file_props = {
+                    "filename": self.filename.replace(" ", "_"),
+                    "length": self.length,
+                    "range": self.mz_range,
+                    "utc_offset": utc_offset,
+                    "method_file": self.method_file,
+                    "timestamp": self.timestamp.isoformat(),  # for DB record
+                    "polarity": self.polarity,
+                    # streaming leftovers:
+                    "committed_length": self.length,
+                    # non-applicable for Orbi:
+                    "single_ion_signal": None,
+                    "sample_interval": None,
+                    "mz_calibration": None,
+                }
+                if_processed = self._process_raw_file(
+                    sample_file_props, file_to_process
+                )
+                self.log.info(f"Finished processing file: {Path(file_to_process).name}")
+            except Exception as e:
+                self.log.error(
+                    f"Failed to process file {Path(file_to_process).name}: {e}"
+                )
+                if_processed = False
+            finally:
+                self._finalize()
             if if_processed:
                 self.log.info("Deleting file from the streams folder")
                 try:
