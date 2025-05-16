@@ -151,6 +151,27 @@ class H5Processor(Thread):
             self.filename = None
         self.cancel_event.clear()
 
+    def _handle_failed_file(self, file_path: str) -> None:
+        """Handle failed file
+
+        Moves the file to the folder of failed files
+
+        :param file_path: Path to the failed file
+        :type file_path: str
+        """
+        self.log.info(
+            f"File {file_path} was not processed, moving to the folder of failed files"
+        )
+        try:
+            failed_folder = os.path.join(os.path.dirname(file_path), "failed_files")
+            os.makedirs(failed_folder, exist_ok=True)
+            # Use full path to enable overwrite if the file already exists
+            failed_file = os.path.join(failed_folder, os.path.basename(file_path))
+            shutil.move(file_path, failed_file)
+        except Exception as e:
+            self.log.error(f"Failed to move file {file_path} to the error folder")
+            self.log.exception(e)
+
     def _process_h5_file(self, sample_file_props: dict, h5_filepath: str) -> bool:
         """Main function processing the h5 files:
         1. Writes properties into the sample file
@@ -221,6 +242,7 @@ class H5Processor(Thread):
                     self.log.error(
                         f"Failed to open file {Path(self.file_to_process)}: {e}"
                     )
+                    self._handle_failed_file(self.file_to_process)
                     continue
             except Empty:
                 # No file to process, continue
@@ -276,24 +298,7 @@ class H5Processor(Thread):
                     )
                     self.log.exception(e)
             else:
-                self.log.info(
-                    f"File {self.file_to_process} was not processed, moving to the folder of failed files"
-                )
-                try:
-                    failed_folder = os.path.join(
-                        os.path.dirname(self.file_to_process), "failed_files"
-                    )
-                    os.makedirs(failed_folder, exist_ok=True)
-                    # Use full path to enable overwrite if the file already exists
-                    failed_file = os.path.join(
-                        failed_folder, os.path.basename(self.file_to_process)
-                    )
-                    shutil.move(self.file_to_process, failed_file)
-                except Exception as e:
-                    self.log.error(
-                        f"Failed to move file {self.file_to_process} to the error folder"
-                    )
-                    self.log.exception(e)
+                self._handle_failed_file(self.file_to_process)
 
         # Out of main loop
         self.log.info(f"Exiting h5 processor ({self.name})")
