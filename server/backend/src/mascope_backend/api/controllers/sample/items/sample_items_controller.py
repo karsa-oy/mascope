@@ -327,7 +327,7 @@ async def update_sample_item(
     current_instrument_id = getattr(sample, "instrument_function_id", None)
 
     # Process only if there's a new record or the instrument_function_id changed
-    if (
+    if instrument_config is not None and (
         instrument_config.new_record
         or instrument_config.instrument_function_id != current_instrument_id
     ):
