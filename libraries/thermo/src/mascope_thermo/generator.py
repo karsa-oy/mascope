@@ -268,6 +268,25 @@ class RawProcessor(Thread):
                         f"Failed to delete file {file_to_process} from streams folder"
                     )
                     self.log.exception(e)
+            else:
+                self.log.info(
+                    f"File {file_to_process} was not processed, moving to the folder of failed files"
+                )
+                try:
+                    failed_folder = os.path.join(
+                        os.path.dirname(file_to_process), "failed_files"
+                    )
+                    os.makedirs(failed_folder, exist_ok=True)
+                    # Use full path to enable overwrite if the file already exists
+                    failed_file = os.path.join(
+                        failed_folder, os.path.basename(file_to_process)
+                    )
+                    shutil.move(file_to_process, failed_file)
+                except Exception as e:
+                    self.log.error(
+                        f"Failed to move file {file_to_process} to the error folder"
+                    )
+                    self.log.exception(e)
         # Out of main loop
         self.log.info(f"Exiting raw processor ({self.name})")
         self.shutdown()

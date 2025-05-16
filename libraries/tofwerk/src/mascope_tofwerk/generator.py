@@ -275,6 +275,25 @@ class H5Processor(Thread):
                         f"Failed to delete file {self.file_to_process} from streams folder"
                     )
                     self.log.exception(e)
+            else:
+                self.log.info(
+                    f"File {self.file_to_process} was not processed, moving to the folder of failed files"
+                )
+                try:
+                    failed_folder = os.path.join(
+                        os.path.dirname(self.file_to_process), "failed_files"
+                    )
+                    os.makedirs(failed_folder, exist_ok=True)
+                    # Use full path to enable overwrite if the file already exists
+                    failed_file = os.path.join(
+                        failed_folder, os.path.basename(self.file_to_process)
+                    )
+                    shutil.move(self.file_to_process, failed_file)
+                except Exception as e:
+                    self.log.error(
+                        f"Failed to move file {self.file_to_process} to the error folder"
+                    )
+                    self.log.exception(e)
 
         # Out of main loop
         self.log.info(f"Exiting h5 processor ({self.name})")
