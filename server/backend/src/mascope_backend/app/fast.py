@@ -1,6 +1,7 @@
 import uuid
 import os
 import shutil
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,7 +16,38 @@ from mascope_backend.db import init_db
 
 from mascope_backend.runtime import runtime
 
-fast = FastAPI()
+
+# Define the lifespan context manager
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Lifespan context manager for FastAPI application.
+    Handles startup and shutdown events.
+    """
+    # --- STARTUP TASKS ---
+    # Initialize database
+    runtime.logger.info("Fast App startup: initializing database")
+    await init_db()
+
+    # Reset temp directory
+    runtime.logger.info("Fast App startup: initializing temp directory")
+    temp_dir = runtime.env.path("temp")
+    if os.path.exists(temp_dir):
+        shutil.rmtree(temp_dir)
+    os.mkdir(temp_dir)
+
+    # Clean filestore
+    runtime.logger.info("Fast App startup: garbage collecting the filestore")
+    gc_filestore()
+
+    # Yield control back to FastAPI
+    yield
+
+    # --- SHUTDOWN TASKS ---
+
+
+# Initialize FastAPI with the lifespan
+fast = FastAPI(lifespan=lifespan)
 
 
 # logging middleware
@@ -70,38 +102,7 @@ for router in routers:
     fast.include_router(router)
 
 
-# database
-@fast.on_event("startup")
-async def init_database():
-    """Init database at application startup"""
-    runtime.logger.info("Fast App startup: initializing database")
-    # database init
-    await init_db()
-
-
-# temp directory
-@fast.on_event("startup")
-async def init_temp_dir():
-    """Recreate temp directory on startup, erasing all files"""
-    runtime.logger.info("Fast App startup: initializing temp directory")
-    # reset temp folder
-    temp_dir = runtime.env.path("temp")
-    if os.path.exists(temp_dir):
-        shutil.rmtree(temp_dir)
-    os.mkdir(temp_dir)
-
-
-# filestore
-@fast.on_event("startup")
-def clean_filestore():
-    """Remove empty filestore folders"""
-    runtime.logger.info("Fast App startup: garbage collecting the filestore")
-    gc_filestore()
-
-
 # exception handlers
-
-
 @fast.exception_handler(RequestValidationError)
 async def validation_exception_handler(
     request: Request, exc: RequestValidationError
