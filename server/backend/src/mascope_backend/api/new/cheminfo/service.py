@@ -19,6 +19,7 @@ from mascope_backend.api.new.cheminfo.utils import (
 )
 
 from mascope_backend.runtime import runtime
+import re
 
 
 @api_controller()
@@ -256,10 +257,22 @@ async def match_cheminfo_by_mz(
     runtime.logger.info(
         f"Matching {cheminfo_results} compounds against sample {sample_item_id}"
     )
+
+    def normalize_formula(formula: str) -> str:
+        """Normalize molecular formula by removing isotopic labels like [81Br] -> Br
+
+        :param formula: Formula to normalize
+        :type formula: str
+        :return: Normalized formula
+        :rtype: str
+        """
+        formula_norm = re.sub(r"\[\d+([A-Za-z]+)\]", r"\1", formula)
+        return formula_norm
+
     matches_result = await aggregate_sample_match_compounds(
         sample_item_id=sample_item_id,
         target_compound_formulas=[
-            info["target_compound_formula"] for info in cheminfo_data
+            normalize_formula(info["target_compound_formula"]) for info in cheminfo_data
         ],
         ion_mechanism_ids=ionization_mechanism_ids,
         match_params=match_params,
@@ -275,7 +288,7 @@ async def match_cheminfo_by_mz(
             (
                 index
                 for index, match_compound in enumerate(matches)
-                if info["target_compound_formula"]
+                if normalize_formula(info["target_compound_formula"])
                 == match_compound["target_compound_formula"]
             ),
             None,
@@ -293,7 +306,7 @@ async def match_cheminfo_by_mz(
         # of the current ChemInfo result
         for match_ion in match_compound.get("children", []):
             match_ion.update(
-                {"target_compound_formula": match_compound["target_compound_formula"]}
+                {"target_compound_formula": info["target_compound_formula"]}
             )
             # Find isotopes matching the ionization mechanism
             info_ionization_mechanism = info.get("ionization_mechanism", {})
