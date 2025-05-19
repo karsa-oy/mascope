@@ -2,6 +2,7 @@ import typer
 from typing import Annotated
 import subprocess
 import os
+import re
 
 from rich.console import Console
 from rich.table import Table
@@ -140,7 +141,38 @@ def sync(
     src = resolve(source)
     dest = resolve(destination)
 
-    cmd = f"rsync {flags} {src} {dest}"
+    def to_cygwin_path(path: str) -> str:
+        """Replace Windows path with Cygwin path
+
+        :param path: Path to convert
+        :type path: str
+        :return: Cygwin path
+        :rtype: str
+        """
+        # Replace Windows drive letter with Cygwin /cygdrive path
+        cygwin_path = re.sub(
+            r"^([A-Z]):\\", lambda m: f"/cygdrive/{m.group(1).lower()}/", path
+        )
+        # Replace backslashes with forward slashes
+        cygwin_path = cygwin_path.replace("\\", "/")
+        runtime.logger.info(f"Converting path {path} to Cygwin format: {cygwin_path}")
+        return cygwin_path
+
+    on_windows = os.name == "nt"
+    if on_windows:
+        rsync = r"C://cygwin64//bin//rsync.exe"
+        ssh = r"C://cygwin64//bin//ssh.exe"
+        if not os.path.exists(rsync) or not os.path.exists(ssh):
+            raise RuntimeError(
+                "Cygwin with rsync and ssh not installed at C://cygwin64/. Please install!"
+            )
+        src = to_cygwin_path(src)
+        dest = to_cygwin_path(dest)
+    else:
+        rsync = "rsync"
+        ssh = "ssh"
+
+    cmd = f"{rsync} {flags} -e {ssh} {src} {dest}"
 
     runtime.logger.info(
         f"Syncing {src} -> {dest}" + (" (skipping filestore)" if skip_filestore else "")
