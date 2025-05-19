@@ -14,7 +14,9 @@
     // Specific directories/files not covered by .gitignore, or those we want to exclude for performance or relevance reasons:
     "**/.legacy": true, // Exclude legacy files
     "runtime/testfiles/**": true, // Exclude test files directory within runtime
-    "**/__pycache__": true // Exclude Python cache directories
+    "**/__pycache__": true, // Exclude Python cache directories
+    "**/.venv/**": true,
+    "**/node_modules/**": true
   },
   "python.analysis.exclude": [
     "runtime/env",
@@ -22,6 +24,7 @@
     "**/node_modules",
     "**/__pycache__",
     "**/build",
-    ".git"
+    ".git",
+    "**/.venv/**" // exclude virtual environment
   ]
 }
