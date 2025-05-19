@@ -269,32 +269,37 @@ async def match_cheminfo_by_mz(
 
     # Step 3: Combine results data with cheminfo data
     data = []
-    for match in matches:
-        # Find the cheminfo data for the current match
-        cheminfo_index = next(
+    for info in cheminfo_data:
+        # Find match data for the current ChemInfo result
+        match_index = next(
             (
                 index
-                for index, info in enumerate(cheminfo_data)
-                if info["target_compound_formula"] == match["target_compound_formula"]
+                for index, match_compound in enumerate(matches)
+                if info["target_compound_formula"]
+                == match_compound["target_compound_formula"]
             ),
             None,
         )
-        if cheminfo_index is None:
+        if match_index is None:
             raise RuntimeError(
-                f"Unexpected error: ChemInfo data not found for match: {match['target_compound_formula']}"
+                (
+                    "Unexpected error: Match data not found for ChemInfo result: ",
+                    f"{info['target_compound_formula']}",
+                )
             )
-        info = cheminfo_data[cheminfo_index]
+        match_compound = matches[match_index]
 
         # Iterate over match ions to find the one that matches the ionization mechanism
         # of the current ChemInfo result
-        for match_ion in match.get("children", []):
+        for match_ion in match_compound.get("children", []):
             match_ion.update(
-                {"target_compound_formula": match["target_compound_formula"]}
+                {"target_compound_formula": match_compound["target_compound_formula"]}
             )
             # Find isotopes matching the ionization mechanism
-            if match_ion.get("ionization_mechanism_id") == info.get(
-                "ionization_mechanism", {}
-            ).get("ionization_mechanism_id"):
+            info_ionization_mechanism = info.get("ionization_mechanism", {})
+            if match_ion.get(
+                "ionization_mechanism_id"
+            ) == info_ionization_mechanism.get("ionization_mechanism_id"):
                 match_isotopes = match_ion.get("children", [])
                 # Create combined result entry
                 matched_info = {
