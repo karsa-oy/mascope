@@ -183,6 +183,9 @@ async def match_cheminfo_by_mz(
     2. Match these compounds against a specified sample
     3. Combine and format the results
 
+    Match ion aggregation level is used to represent the match score of each formula result.
+    Match isotopes are included in the result data for more detailed information.
+
     :param sample_item_id: Sample item ID to match against
     :type sample_item_id: str
     :param mz: The m/z value to search for
@@ -282,23 +285,25 @@ async def match_cheminfo_by_mz(
             )
         info = cheminfo_data[cheminfo_index]
 
-        # Find the children with matching ionization mechanism
-        children = []
-        if match.get("children"):
-            for ion in match["children"]:
-                if ion.get("ionization_mechanism_id") == info.get(
-                    "ionization_mechanism", {}
-                ).get("ionization_mechanism_id"):
-                    children = ion.get("children", [])
-                    break
-
-        # Create combined result entry
-        matched_info = {
-            **match,
-            "cheminfo": info,
-            "children": children,
-        }
-        data.append(matched_info)
+        # Iterate over match ions to find the one that matches the ionization mechanism
+        # of the current ChemInfo result
+        for match_ion in match.get("children", []):
+            match_ion.update(
+                {"target_compound_formula": match["target_compound_formula"]}
+            )
+            # Find isotopes matching the ionization mechanism
+            if match_ion.get("ionization_mechanism_id") == info.get(
+                "ionization_mechanism", {}
+            ).get("ionization_mechanism_id"):
+                match_isotopes = match_ion.get("children", [])
+                # Create combined result entry
+                matched_info = {
+                    **match_ion,
+                    "cheminfo": info,
+                    "children": match_isotopes,
+                }
+                data.append(matched_info)
+                break
 
     # Step 4: Return formatted response with notification data
     result_data = {
