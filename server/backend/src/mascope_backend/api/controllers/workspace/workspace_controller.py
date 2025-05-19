@@ -13,6 +13,7 @@ from mascope_backend.api.lib.api_features import api_controller
 from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
 from mascope_backend.api.models.workspace.workspace_pydantic_model import (
     WorkspaceCreate,
+    WorkspaceRead,
     WorkspaceUpdate,
 )
 
@@ -67,11 +68,14 @@ async def get_workspaces(
             select(func.count()).select_from(Workspace)  # pylint: disable=not-callable
         )
 
-    # Step 5: Return the total count and the list of workspaces
+    # Step 5: Return the total count and the list of validated workspaces
     return {
         "message": "Workspaces retrieved successfully",
         "results": total,
-        "data": [workspace.to_dict() for workspace in workspaces],
+        "data": [
+            WorkspaceRead.model_validate(workspace).model_dump()
+            for workspace in workspaces
+        ],
     }
 
 
@@ -102,7 +106,7 @@ async def get_workspace(workspace_id: str) -> dict:
     # Step 3: Return workspace details
     return {
         "message": f"Workspace '{workspace.workspace_name}' retrieved successfully",
-        "data": workspace.to_dict(),
+        "data": WorkspaceRead.model_validate(workspace).model_dump(),
     }
 
 
@@ -142,7 +146,7 @@ async def create_workspace(workspace: WorkspaceCreate) -> dict:
     # Step 4: Return the new workspace details
     return {
         "message": f"Workspace '{new_workspace.workspace_name}' created successfully.",
-        "data": new_workspace.to_dict(),
+        "data": WorkspaceRead.model_validate(new_workspace).model_dump(),
     }
 
 
@@ -173,7 +177,7 @@ async def update_workspace(workspace_id: str, workspace: WorkspaceUpdate) -> dic
             raise NotFoundException(f"Workspace with ID '{workspace_id}' not found")
 
         # Step 2: Update the workspace properties
-        update_data = workspace.dict(exclude_unset=True)
+        update_data = workspace.model_dump(exclude_unset=True)
         for key, value in update_data.items():
             setattr(existing_workspace, key, value)
 
@@ -189,8 +193,8 @@ async def update_workspace(workspace_id: str, workspace: WorkspaceUpdate) -> dic
     await sio.emit("workspace_reload", room=workspace_id, namespace="/")
 
     return {
-        "message": f"Workspace '{existing_workspace.workspace_name}' created successfully.",
-        "data": existing_workspace.to_dict(),
+        "message": f"Workspace '{existing_workspace.workspace_name}' updated successfully.",
+        "data": WorkspaceRead.model_validate(existing_workspace).model_dump(),
     }
 
 

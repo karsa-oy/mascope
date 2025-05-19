@@ -1,12 +1,11 @@
-from typing import Optional, Dict, Any
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 
 class UserNotification(BaseModel):
     process_id: str = Field(
         ..., description="Unique identifier for the notification process."
     )
-    parent_id: Optional[str] = Field(
+    parent_id: str | None = Field(
         None,
         description="Identifier of the parent process if this notification is part of a larger workflow.",
     )
@@ -17,23 +16,22 @@ class UserNotification(BaseModel):
     message: str = Field(
         ..., description="User-friendly message describing the notification context."
     )
-    progress: Optional[float] = Field(
+    progress: float | None = Field(
         None, description="Current progress percentage of the process, if applicable"
     )
     status: str = Field(
         ...,
         description="Current status of the process, e.g., 'success', 'error', 'pending', 'warning'",
     )
-    data: Optional[Dict[str, Any]] = Field(
+    data: dict[str, object] | None = Field(
         None,
         description="Optional data payload containing additional information or results.",
     )
-    error: Optional[Dict[str, Any]] = Field(
+    error: dict[str, object] | None = Field(
         None, description="Optional details about an error if the status is 'error'."
     )
 
-    class Config:
-        exclude_none = True  # Exclude fields with None values from output
+    model_config = ConfigDict(exclude_none=True)
 
     @field_validator("status")
     @classmethod
