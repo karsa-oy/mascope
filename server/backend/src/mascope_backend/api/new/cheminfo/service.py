@@ -266,7 +266,22 @@ async def match_cheminfo_by_mz(
 
     # Step 3: Combine results data with cheminfo data
     data = []
-    for match, info in zip(matches, cheminfo_data):
+    for match in matches:
+        # Find the cheminfo data for the current match
+        cheminfo_index = next(
+            (
+                index
+                for index, info in enumerate(cheminfo_data)
+                if info["target_compound_formula"] == match["target_compound_formula"]
+            ),
+            None,
+        )
+        if cheminfo_index is None:
+            raise RuntimeError(
+                f"Unexpected error: ChemInfo data not found for match: {match['target_compound_formula']}"
+            )
+        info = cheminfo_data[cheminfo_index]
+
         # Find the children with matching ionization mechanism
         children = []
         if match.get("children"):
@@ -278,13 +293,12 @@ async def match_cheminfo_by_mz(
                     break
 
         # Create combined result entry
-        data.append(
-            {
-                **match,
-                "cheminfo": info,
-                "children": children,
-            }
-        )
+        matched_info = {
+            **match,
+            "cheminfo": info,
+            "children": children,
+        }
+        data.append(matched_info)
 
     # Step 4: Return formatted response with notification data
     result_data = {
