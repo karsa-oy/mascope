@@ -140,10 +140,27 @@ mascope prod build         # build the production containers
 ### Env Commands
 
 ```sh
-mascope env list            # list runtime env
-mascope env use foo         # set foo as the active env
-mascope env use default     # revert to the default env
+mascope env list                  # list runtime env
+mascope env use foo               # set foo as the active env
+mascope env use default           # revert to the default env
+mascope env sync <source> <dest>  # synchronize source env into dest env
 ```
+
+#### Env sync
+
+The `env sync` command can be used to synchronize runtime environments locally, or to/from a remote host. It uses [rsync](https://linux.die.net/man/1/rsync) and thus supports incremental synchronization. To use it on Windows, [Cygwin](https://www.cygwin.com/) needs to be installed.
+
+[!IMPORTANT] Install Cygwin into the default location `C:\cygwin64`. During installation, select `rsync` and `ssh` packages to be installed.
+
+Usage examples:
+
+```sh
+mascope env sync default foo      # synchronize local env "default" into local env "foo"
+mascope env sync foo user@192.168.1.100:bar # sync local env "foo" into a remote env "bar"
+mascope env sync user@192.168.1.100:bar baz --skip-filestore # sync remote env "bar" into a local env "baz", without filestore
+```
+
+The `sync` command follows symbolic links on Linux filesystem both ways; syncing into and from a symlinked directory.
 
 ### Dependency management
 
@@ -1297,12 +1314,13 @@ Mascope expects an Ubuntu 24.04 machine to run on, although in principle it coul
 
 ### GitHub releases
 
-Mascope docker images are built by a release CI/CD pipeline (found in `.github/workflows/release.yaml`).  This pipeline triggers whenver we merge to master; you can follow [release workflow runs](https://github.com/karsa-oy/mascope/actions/workflows/release.yaml). The pipeline builds and tags production images and pushes them to the GitHub Container Registry (ghcr.io). You can see these images in [Karsa's GitHub packages page](https://github.com/orgs/karsa-oy/packages).
+Mascope docker images are built by a release CI/CD pipeline (found in `.github/workflows/release.yaml`). This pipeline triggers whenver we merge to master; you can follow [release workflow runs](https://github.com/karsa-oy/mascope/actions/workflows/release.yaml). The pipeline builds and tags production images and pushes them to the GitHub Container Registry (ghcr.io). You can see these images in [Karsa's GitHub packages page](https://github.com/orgs/karsa-oy/packages).
 
 ### Pulling images
 
 To pull images from the registry, you need the right permissions. Assuming you have a GitHub account with read permissions for the Karsa organization, do the following:
-1. Follow [these instructions](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-personal-access-token-classic) to create a classic personal access token for your GitHub account. The **only** required scope is `packages:read`, and it is recommended *not* to add any others. Save this token somewhere safe, since its only shown once.
+
+1. Follow [these instructions](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-personal-access-token-classic) to create a classic personal access token for your GitHub account. The **only** required scope is `packages:read`, and it is recommended _not_ to add any others. Save this token somewhere safe, since its only shown once.
 2. [Authenticate with your new access token](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry#authenticating-with-a-personal-access-token-classic) on the machine you need to pull from, to ensure you can pull images from our package registry.
 
 > [!CAUTION]
