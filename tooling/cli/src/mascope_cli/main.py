@@ -19,6 +19,7 @@ app.add_typer(cmd.logs_app, name="logs")
 app.add_typer(cmd.backend_app, name="backend")
 app.add_typer(cmd.agent_app, name="agent")
 app.add_typer(cmd.cert_app, name="cert")
+app.add_typer(cmd.test_app, name="test")
 
 
 @app.callback()
