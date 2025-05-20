@@ -1,0 +1,47 @@
+name: Mascope Tests
+run-name: Running tests for PR to develop
+
+on:
+  pull_request:
+    branches: [develop]
+    types: [opened, synchronize, reopened]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv via snap
+        run: |
+          sudo snap install --classic astral-uv
+
+      - name: Set up environment
+        run: |
+          # Set MASCOPE_PATH
+          echo "MASCOPE_PATH=$GITHUB_WORKSPACE" >> $GITHUB_ENV
+
+          # Set up test secrets for authentication
+          echo "JWT_SECRET_KEY_FILE=test_jwt_secret.txt" >> $GITHUB_ENV
+          echo "test_secret_key_for_testing_only" > test_jwt_secret.txt
+
+          echo "SERVER_OWNER_SECRET_KEY_FILE=test_server_owner_secret.txt" >> $GITHUB_ENV
+          echo "test_server_owner_secret_key_for_testing_only" > test_server_owner_secret.txt
+
+      - name: Create virtual environment and install dependencies
+        run: |
+          # Create a virtual environment
+          uv venv
+          # Install the package itself in development mode
+          uv pip install -e .
+
+          # Install the dev group using uv sync
+          uv sync --group dev
+
+      - name: Run tests
+        run: |
+          uv run pytest server/backend/tests/ -v
