@@ -111,7 +111,7 @@ server/backend/tests/
 │       │   └── test_concurrent_users.py  # Test with normal expected users
 │       └── stress/                # Extreme conditions testing
 │           └── test_high_concurrency.py  # Test with excessive concurrent requests
-└── old/                           # tests preserved for future refactorin
+└── old/                           # Tests preserved for future refactoring
     ├── test_signal_processing_pipeline.py
     ├── test_peak_fitting.py
     └── test_target_ion_compute.py

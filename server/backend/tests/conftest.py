@@ -74,9 +74,8 @@ def async_engine_factory():
     yield _create_engine
 
     # Cleanup all engines
-    for engine, category in created_engines:
+    async def cleanup_engines():
+        for engine, category in created_engines:
+            await engine.dispose()
 
-        async def close_engine(eng):
-            await eng.dispose()
-
-        asyncio.run(close_engine(engine))
+    asyncio.run(cleanup_engines())
