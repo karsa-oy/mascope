@@ -815,6 +815,55 @@ class RawFileMetadata:
 
             return scan_stats_df
 
+    @property
+    def centroids_meta(self):
+        """
+        Returns a dictionary with centroided peak data for each scan.
+
+        Structure:
+        {
+            "time": [...],  # list of scan times [s]
+            "data": [
+                {
+                    "intensities": ...,
+                    "mzs": ...,
+                    "resolutions": ...,
+                    "noises": ...
+                    }
+                    ...
+                ],
+                ...
+            }
+        }
+        """
+        result = {"time": [], "data": []}
+        with open_raw_file(self.datafile_path) as raw_file:
+            num_of_scans = raw_file.RunHeaderEx.SpectraCount
+            scans = tuple(Extensions.GetScans(raw_file, 1, num_of_scans))
+            for i, scan in enumerate(scans):
+                centroid_scan = scan.CentroidScan
+                if centroid_scan is not None and centroid_scan.Length > 0:
+                    mzs = np.frombuffer(centroid_scan.Masses).tolist()
+                    intensities = np.frombuffer(centroid_scan.Intensities).tolist()
+                    resolutions = np.frombuffer(centroid_scan.Resolutions).tolist()
+                    noises = np.frombuffer(centroid_scan.Noises).tolist()
+                else:
+                    mzs = []
+                    intensities = []
+                    resolutions = []
+                    noises = []
+                scan_time = raw_file.GetScanStatsForScanNumber(i).StartTime * 60
+                result["time"].append(scan_time)
+                result["data"].append(
+                    {
+                        "intensities": intensities,
+                        "mzs": mzs,
+                        "resolutions": resolutions,
+                        "noises": noises,
+                    }
+                )
+        return result
+
     def to_dict(self):
         """Convert the metadata to a dictionary.
 
@@ -830,4 +879,5 @@ class RawFileMetadata:
             "num_of_scans": self.num_of_scans,
             "stats_per_scan": per_scan_df.to_dict(),
             "stats_per_file": per_file_df.to_dict(),
+            "centroids_meta": self.centroids_meta,
         }
