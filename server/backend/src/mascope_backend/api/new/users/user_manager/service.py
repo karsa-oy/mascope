@@ -18,8 +18,8 @@ from mascope_backend.api.new.users import exceptions
 from mascope_backend.api.new.users.schemas import UserCreate
 from mascope_backend.api.new.auth.access_token.service import regenerate_access_token
 from mascope_backend.api.new.users.access_token.service import delete_user_access_tokens
-from mascope_backend.socket import (
-    event_emitter,
+from mascope_backend.socket import event_emitter
+from mascope_backend.socket.auth import (
     authenticate_socket_connection,
     SocketUnauthenticatedError,
 )

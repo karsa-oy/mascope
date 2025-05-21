@@ -3,7 +3,6 @@
 from mascope_backend.runtime import runtime
 from .server import sio
 from .emitter import event_emitter
-from .auth import authenticate_socket_connection, SocketUnauthenticatedError
 
 
 def init_socket():
