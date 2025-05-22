@@ -3,12 +3,8 @@ import os
 import math
 from concurrent.futures import ProcessPoolExecutor
 from typing import Iterable
-import warnings
-
-import lmfit
 import numpy as np
 from scipy.signal._peak_finding_utils import _select_by_peak_distance
-from scipy.stats import norm
 from scipy.integrate import simpson
 import xarray
 import dask
@@ -29,38 +25,15 @@ from mascope_signal.compute import (
     get_scan_timestamps,
     get_orbi_centroids,
 )
+from mascope_signal.fitting import (
+    fit_n_peaks,
+    calculate_peak_area,
+    SIGMA_MULTIPLIER,
+)
 from mascope_signal.runtime import runtime
 
 # Restrict large chunks for dask
 dask.config.set(**{"array.slicing.split_large_chunks": True})
-
-# Precompute sigma multiplier for peak generation
-SIGMA_MULTIPLIER = 2 * np.sqrt(2 * np.log(2))
-
-
-def calculate_peak_area(
-    x: np.ndarray, peakshape: dict, peak: tuple, sample_interval: float
-) -> float:
-    """Calculate the area of a peak.
-
-    This function calculates the area under a peak shape using Simpson's rule.
-
-    :param x: The array of x values corresponding to the peak.
-    :type x: numpy.ndarray
-    :param peakshape: The median peak shape.
-    :type peakshape: dict
-    :param peak: A tuple containing the position, height, and resolution of the peak.
-    :type peak: tuple
-    :return: The area under the peak shape.
-    :rtype: float
-    """
-    pos, hei, res = peak
-    peak_y = gen_peak(x, pos, hei, res, peakshape)
-    if sample_interval:
-        # calculate peak area in TOF space
-        return np.sum(peak_y) * sample_interval
-    # calculate peak area in mz space
-    return simpson(y=peak_y, x=x)
 
 
 def calculate_signal_area(
@@ -552,361 +525,74 @@ def _calculate_peak_profiles(
 
 
 def filter_peaks(
-    peaks,
-    mz_range=None,
-    t_range=None,
-    intensity=None,
-    distance=None,
-):
+    peaks: xarray.DataArray,
+    mz_range: tuple = None,
+    t_range: tuple = None,
+    intensity: float = None,
+    distance: float = None,
+) -> xarray.DataArray:
+    """
+    Filter peaks by m/z range, time range, intensity, and minimum distance.
+
+    :param peaks: Peak data array.
+    :type peaks: xarray.DataArray
+    :param mz_range: Tuple (min_mz, max_mz) to filter m/z, defaults to None.
+    :type mz_range: tuple, optional
+    :param t_range: Tuple (min_time, max_time) to filter time, defaults to None.
+    :type t_range: tuple, optional
+    :param intensity: Minimum intensity threshold, defaults to None.
+    :type intensity: float, optional
+    :param distance: Minimum distance between peaks, defaults to None.
+    :type distance: float, optional
+    :return: Filtered peaks as xarray.DataArray.
+    :rtype: xarray.DataArray
+    """
+    # Filter by m/z and time ranges
     if mz_range is not None:
         peaks = peaks.sel(mz=slice(*mz_range))
     if t_range is not None:
         peaks = peaks.sel(time=slice(*t_range))
+
     peaks = peaks.dropna(dim="mz", how="all")
+
+    # Compute peak intensities
     if "time" in peaks.dims:
         peak_intensities = peaks.sum(dim="time").values
     else:
         peak_intensities = peaks.values
 
-    keep = np.array([True] * len(peaks))
+    keep = np.ones(len(peaks), dtype=bool)
 
+    # Filter by intensity
     if intensity is not None:
-        # Evaluate height condition
-        keep_intensity = peak_intensities > intensity
-        keep = np.logical_and(keep, keep_intensity)
+        keep &= peak_intensities > intensity
 
+    # Filter by distance
     if distance is not None:
         peak_indices = peaks.tof.values
-        # Evaluate distance condition
-        keep_distance = _select_by_peak_distance(
-            peak_indices.astype(np.intp), peak_intensities.astype(np.float64), distance
+        keep &= _select_by_peak_distance(
+            peak_indices.astype(np.intp),
+            peak_intensities.astype(np.float64),
+            distance,
         )
-        keep = np.logical_and(keep, keep_distance)
 
-    return peaks[keep].compute()
+    # Return filtered peaks
+    filtered = peaks[keep]
+    return filtered.compute() if hasattr(filtered, "compute") else filtered
 
 
-def fit_peaks(
-    x,
-    y,
-    ps,
-    npeaks,
-    ppos,
-    phei,
-    pres,
-    fit_pos=True,
-    fit_hei=True,
-    fit_res=True,
-    dpos=None,
-    max_iter=1000,
-):
-    """Try to fit a set of peaks to signal 'y', minimizing the reconstruction
-    residual as defined in the function 'peak_kernel_residual'.
-
-    Parameters
-    ----------
-    x : array
-        Sample numbers
-    y : array
-        Signal to be fitted
-    ps : dict
-        Peak shape
-    npeaks : int
-        Number of peaks to fit
-    ppos : list
-        Initial guesses for peak positions, must have length 'npeaks'.
-        If 'fit_pos' is False, positions are not altered.
-    phei : list
-        Initial guesses for peak heights, must have length 'npeaks'.
-        If 'fit_hei' is False, heights are not altered.
-    pres : list
-        Initial guesses for peak resolutions, must have length 'npeaks'.
-        If 'fit_res' is False, widths are not altered.
-    fit_pos : bool, optional
-        Whether to optimize peak positions, by default True
-    fit_hei : bool, optional
-        Whether to optimize peak heights, by default True
-    fit_res : bool, optional
-        Whether to optimize peak widths, by default True
-    dpos : float, optional
-        Maximum allowed change in peak position (in one direction)
-        during fitting, by default None. If None, only restricted to be
-        non-negative.
-    max_iter : int, optional
-        Maximum number of minimizer iterations, by default 1000.
-
-    Returns
-    -------
-    dict
-        Resulted fit with parameters for each peak and the residual.
+def get_peaks(sample_file: xarray.Dataset, intensity_mode="area"):
     """
+    Retrieve peak data from a sample file.
 
-    # Normalize y
-    ymax = y.max()
-    if ymax == 0:
-        return None, None
-    yn = y / ymax
-    # Initialize parameters
-    params = lmfit.Parameters()
-    params.add("npeaks", value=npeaks, vary=False)
-    for p in range(npeaks):
-        if dpos is not None:
-            posmin = ppos[p] - dpos
-            posmax = ppos[p] + dpos
-        else:
-            posmin = 0
-            posmax = np.inf
-        params.add(f"peak{p}pos", value=ppos[p], min=posmin, max=posmax, vary=fit_pos)
-        params.add(f"peak{p}hei", value=phei[p] / ymax, min=0, vary=fit_hei)
-        params.add(f"peak{p}res", value=pres[p], min=0, vary=fit_res)
-    # Check if number of varying parameters hit the limit
-    num_of_params = npeaks * np.sum([fit_pos, fit_hei, fit_res])
-    if num_of_params > len(x):
-        return None, None
-    # Fit
-    minner = lmfit.Minimizer(
-        peak_kernel_residual, params, fcn_args=(x, yn, ps), ftol=1e-6, xtol=1e-6
-    )
-    fit = minner.minimize(method="least_s", max_nfev=max_iter)
-    # Rescale fit results
-    fit.residual *= ymax
-    for par in fit.params:
-        if "hei" in par:
-            fit.params[par].value *= ymax
-            if fit.params[par].stderr is not None:
-                fit.params[par].stderr *= ymax
-    peaks = [fit.params[par].value for par in fit.params if par.startswith("peak")]
-    peaks = [tuple(peaks[i : i + 3]) for i in range(0, len(peaks), 3)]
-    return fit, peaks
-
-
-def fit_n_peaks(
-    x: Iterable,
-    y: Iterable,
-    peak_shape: dict,
-    resolution_function: callable,
-    threshold: float,
-    sample_interval: float = None,
-    max_n_peaks: int = 5,
-    fit_pos: bool = True,
-    fit_hei: bool = True,
-    fit_res: bool = False,
-) -> tuple:
-    """Fit a number of peaks to a signal.
-    The function tries to fit a number of peaks to the signal 'y' using the
-    specified peak shape and resolution function. It iteratively adds peaks
-    until the residual norm does not decrease significantly.
-
-    :param x: x-values of the signal (m/z values)
-    :type x: Iterable
-    :param y: y-values of the signal (intensity values)
-    :type y: Iterable
-    :param peak_shape: The shape of the peak to be fitted.
-    :type peak_shape: dict
-    :param resolution_function: A function that returns the resolution of the peak
-    :type resolution_function: callable
-    :param threshold: Threshold for adding a new peak.
-    :type threshold: float
-    :param sample_interval: signal sampling interval, defaults to None
-    :type sample_interval: float, optional
-    :param max_n_peaks: max number of peaks to fit, defaults to 5
-    :type max_n_peaks: int, optional
-    :param fit_pos: if vary peak positions, defaults to True
-    :type fit_pos: bool, optional
-    :param fit_hei: if vary peak heights, defaults to True
-    :type fit_hei: bool, optional
-    :param fit_res: if vary peak resolution, defaults to False
-    :type fit_res: bool, optional
-    :return: tuple containing the fit result, the fitted peaks, and caught warnings
-    :rtype: tuple
+    :param sample_file: Sample file dataset containing peak data.
+    :type sample_file: xarray.Dataset
+    :param intensity_mode: Which intensity to return, "area" or "height". Defaults to "area".
+    :type intensity_mode: str, optional
+    :raises ValueError: If intensity_mode is not "area" or "height".
+    :return: Peak data array (areas or heights).
+    :rtype: xarray.DataArray
     """
-    if not len(y):
-        return None, None, []
-
-    # Convert peak shape
-    peak_shape["x"] = np.array(peak_shape["x"], dtype=np.float64)
-    peak_shape["y"] = np.array(peak_shape["y"], dtype=np.float64)
-
-    spec_norm = np.linalg.norm(y)
-    residual_norm = spec_norm
-    prev_fit = None
-    prev_peaks = []
-    for i in range(max_n_peaks):
-        if i == 0:
-            # Initialize first peak
-            max_ind = np.argmax(y)
-            init_pos = [x[max_ind]]
-            init_hei = [y[max_ind]]
-            init_res = [
-                (
-                    resolution_function(x[max_ind])
-                    if callable(resolution_function)
-                    else resolution_function
-                )
-            ]
-
-        dpos = x[-1] - x[0]
-
-        # Capture warnings during the fitting process
-        captured_warnings = []
-        with warnings.catch_warnings(record=True) as ws:
-            warnings.simplefilter("always")
-            fit, peaks = fit_peaks(
-                x,
-                y,
-                peak_shape,
-                i + 1,
-                init_pos,
-                init_hei,
-                init_res,
-                fit_pos,
-                fit_hei,
-                fit_res,
-                dpos=dpos,
-                max_iter=100,
-            )
-            captured_warnings.extend(str(w.message) for w in ws)
-
-        if not fit:
-            return None, [], []
-
-        new_residual_norm = np.linalg.norm(fit.residual)
-        # Check for add new peak condition
-        if new_residual_norm > threshold * residual_norm:
-            fit = prev_fit
-            peaks = prev_peaks
-            break
-        residual_norm = new_residual_norm
-        prev_fit = fit
-        prev_peaks = peaks
-        # Find the place to add next peak
-        # Loop through already fitted peaks
-        max_residual_ind = np.argmax(fit.residual)
-        max_residual = fit.residual[max_residual_ind]
-        max_residual_mz = x[max_residual_ind]
-        for peak_pos, peak_hei, peak_res in peaks:
-            while max_residual > 0:
-                hwhm = (peak_pos / peak_res) / 2
-                # If the maximum of the residual is within the fitted peak, set
-                # it to 0 in order to ignore it
-                if max_residual_mz > (peak_pos - hwhm) and max_residual_mz < (
-                    peak_pos + hwhm
-                ):
-                    fit.residual[max_residual_ind] = 0
-                    max_residual_ind = np.argmax(fit.residual)
-                    max_residual = fit.residual[max_residual_ind]
-                    max_residual_mz = x[max_residual_ind]
-                else:
-                    break
-        # Set the position of next peak to the maximum of residual
-        init_pos.append(max_residual_mz)
-        init_hei.append(max_residual)
-        init_res.append(
-            resolution_function(max_residual_mz)
-            if callable(resolution_function)
-            else resolution_function
-        )
-    # Calculate peak areas
-    peaks = [
-        (*peak, calculate_peak_area(x, peak_shape, peak, sample_interval))
-        for peak in peaks
-    ]
-    return fit, peaks, captured_warnings
-
-
-def fwhm_to_sigma(fwhm):
-    return 0.4246609 * fwhm
-
-
-def gen_gaussian_peakshape():
-    x = np.linspace(-30, 30, 601)
-    y = norm.pdf(x, 0, 1)
-    y_norm = y / max(y)
-
-    return {"x": x, "y": y_norm}
-
-
-def gen_peak(x, ppos, phei, pres, ps, trim_borders=False):
-    """Generate a peak of certain height and with and shape in domain 'x'.
-
-    Parameters
-    ----------
-    x : array
-        Array of sample numbers where to generate the peak
-    ppos : float
-        Peak position (sample number)
-    phei : float
-        Peak height
-    pres : float
-        Peak resolution
-    ps : dict
-        Peak shape
-    trim_borders : bool, optional
-        Trim close-to-zero values from edges, by default False
-
-    Returns
-    -------
-    array or tuple
-        If trim_borders=False returns an array of values corresponding to
-        input parameter 'x'. Otherwise returns tuple with new x and the peak.
-    """
-    sigma = ppos / pres / SIGMA_MULTIPLIER
-
-    # Make sure peakshape consists of numpy arrays
-    ps["x"] = np.asarray(ps["x"], dtype=np.float64)
-    ps["y"] = np.asarray(ps["y"], dtype=np.float64)
-
-    # Rescale peak shape
-    xi = ps["x"] * sigma + ppos
-    yi = ps["y"] / np.max(ps["y"]) * phei
-
-    # Interpolate to a new x scale
-    peak = np.interp(x, xi, yi)
-
-    peak = np.nan_to_num(peak, nan=0.0)
-    peak[peak < 0] = 0
-
-    if trim_borders:
-        thr = 1e-5
-        i = np.argmax(peak >= thr)
-        j = np.argmax(peak[::-1] >= thr)
-        j = len(x) - j if j > 0 else -1
-        return x[i:j], peak[i:j]
-
-    return peak
-
-
-def gen_peak_kernel(params, x, ps):
-    """Return a kernel for a set of peaks in domain 'x'.
-
-    Parameters
-    ----------
-    params : dict
-        Parameters of peaks to be included in the kernel, in the format
-        returned by the function 'fit_peaks'.
-    x : array
-        Array of sample numbers for which to calculate the kernel.
-    ps : dict
-        Peak shape
-
-    Returns
-    -------
-    array
-        Peak kernel in domain 'x'.
-    """
-    npeaks = params["npeaks"].value
-    peaks = np.zeros((npeaks, len(x)))
-
-    for p in range(npeaks):
-        ppos = params[f"peak{p}pos"].value
-        phei = params[f"peak{p}hei"].value
-        pres = params[f"peak{p}res"].value
-        peaks[p] = gen_peak(x, ppos, phei, pres, ps)
-
-    return np.sum(peaks, axis=0)
-
-
-def get_peaks(sample_file, intensity_mode="area"):
     if intensity_mode == "area":
         peaks = sample_file.peak_areas
     elif intensity_mode == "height":
@@ -917,29 +603,3 @@ def get_peaks(sample_file, intensity_mode="area"):
     if sample_file_type == "tof_zarr" or sample_file_type == "orbi_zarr":
         peaks = peaks.dropna(dim="mz", how="all")
     return peaks
-
-
-def peak_kernel_residual(params, x, y, ps):
-    """Generate a kernel of peaks and calculate the residual with regards
-    to 'y'. Objective function for the function 'fit_peaks'.
-
-    Parameters
-    ----------
-    params :  dict
-        Parameters of peaks to be included in the kernel, in the format
-        returned by the function 'fit_peaks'.
-    x : array
-        Array of sample numbers for which to calculate the kernel.
-    y : array
-        The signal regards to which the residual is to be calculated.
-    ps : dict
-        Peak shape
-
-    Returns
-    -------
-    array
-        The residual 'y - kernel'
-    """
-
-    kernel = gen_peak_kernel(params, x, ps)
-    return y - kernel
