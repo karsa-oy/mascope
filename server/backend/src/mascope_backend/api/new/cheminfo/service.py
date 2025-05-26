@@ -294,12 +294,15 @@ async def match_cheminfo_by_mz(
             None,
         )
         if match_index is None:
-            raise RuntimeError(
+            runtime.logger.warning(
                 (
-                    "Unexpected error: Match data not found for ChemInfo result: ",
+                    "Match data not found for ChemInfo result: ",
                     f"{info['target_compound_formula']}",
                 )
             )
+            runtime.logger.debug(f"ChemInfo result: {info}")
+            # Skip this ChemInfo result if no match found
+            continue
         match_compound = matches[match_index]
 
         # Iterate over match ions to find the one that matches the ionization mechanism
