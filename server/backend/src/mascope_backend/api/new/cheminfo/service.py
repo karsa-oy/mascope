@@ -82,7 +82,7 @@ async def retrieve_cheminfo_by_mz(
         ]
         if len(ionization_mechanisms) == 0:
             raise ValueError(
-                "No ionization mechanisms found with the provided IDs: {ionization_mechanism_ids}"
+                f"No ionization mechanisms found with the provided IDs: {ionization_mechanism_ids}"
             )
 
     # Step 2: Prepare request parameters and convert ionization mechanisms to ChemInfo format
