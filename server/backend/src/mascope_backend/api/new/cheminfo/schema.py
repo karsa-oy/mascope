@@ -14,8 +14,8 @@ class CheminfoQueryBody(BaseModel):
         cheminfo_config.DEFAULT_FORMULA_RANGE,
         description="The formula range to query, defaults to 'C0-100 H0-100 O0-100 N0-100'",
     )
-    ionization_mechanism_ids: None | list[str] = Field(
-        None, description="The ionization mechanism IDs to query against"
+    ionization_mechanism_ids: list[str] = Field(
+        ..., description="The ionization mechanism IDs to query against"
     )
     page: int = Field(
         cheminfo_config.DEFAULT_PAGE,

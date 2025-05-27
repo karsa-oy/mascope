@@ -25,9 +25,9 @@ import re
 @api_controller()
 async def retrieve_cheminfo_by_mz(
     mz: float,
+    ionization_mechanism_ids: list[str],
     mz_precision: float = cheminfo_config.DEFAULT_MZ_PRECISION,
     formula_ranges: str = cheminfo_config.DEFAULT_FORMULA_RANGE,
-    ionization_mechanism_ids: None | list[str] = None,
     limit: int = cheminfo_config.DEFAULT_RESULT_LIMIT,
     page: int = cheminfo_config.DEFAULT_PAGE,
     sort: None | str = None,
@@ -69,21 +69,21 @@ async def retrieve_cheminfo_by_mz(
     """
     # Step 1: Fetch ionization mechanisms from database
     async with async_session() as session:
-        if ionization_mechanism_ids:
-            result = await session.execute(
-                select(IonizationMechanism).filter(
-                    IonizationMechanism.ionization_mechanism_id.in_(
-                        ionization_mechanism_ids
-                    )
+        result = await session.execute(
+            select(IonizationMechanism).filter(
+                IonizationMechanism.ionization_mechanism_id.in_(
+                    ionization_mechanism_ids
                 )
             )
-            all_ionization_mechanisms = result.scalars().all()
-            ionization_mechanisms = [
-                i.ionization_mechanism for i in all_ionization_mechanisms
-            ]
-        else:
-            all_ionization_mechanisms = []
-            ionization_mechanisms = []
+        )
+        all_ionization_mechanisms = result.scalars().all()
+        ionization_mechanisms = [
+            i.ionization_mechanism for i in all_ionization_mechanisms
+        ]
+        if len(ionization_mechanisms) == 0:
+            raise ValueError(
+                "No ionization mechanisms found with the provided IDs: {ionization_mechanism_ids}"
+            )
 
     # Step 2: Prepare request parameters and convert ionization mechanisms to ChemInfo format
 
@@ -94,8 +94,6 @@ async def retrieve_cheminfo_by_mz(
         # "limit": limit,
         "ionizations": (
             ",".join([to_cheminfo_ionization_format(i) for i in ionization_mechanisms])
-            if ionization_mechanisms
-            else None
         ),
         "precision": mz_precision,
         "ranges": formula_ranges,
@@ -227,9 +225,9 @@ async def match_cheminfo_by_mz(
     runtime.logger.info(f"Starting ChemInfo query for m/z {mz}")
     cheminfo_result = await retrieve_cheminfo_by_mz(
         mz=mz,
+        ionization_mechanism_ids=ionization_mechanism_ids,
         mz_precision=mz_precision,
         formula_ranges=formula_ranges,
-        ionization_mechanism_ids=ionization_mechanism_ids,
         limit=limit,
         page=page,
         sort=sort,
