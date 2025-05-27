@@ -22,7 +22,78 @@ from datetime import datetime, timezone
 import pytest
 import pytest_asyncio
 
-from mascope_backend.db.models import Workspace
+from mascope_backend.db.models import IonizationMechanism, Workspace
+
+
+@pytest_asyncio.fixture(scope="session")
+async def test_ionization_mechanisms(
+    async_session_factory,
+) -> list[IonizationMechanism]:
+    """Create test ionization mechanism records in the unit test database.
+
+    This fixture populates the database with ionization mechanisms that can be used
+    by multiple unit tests.
+
+    :param async_session_factory: Factory for creating database sessions
+    :return: List of created ionization mechanism objects
+    :rtype: list
+    """
+    async with async_session_factory() as session:
+        ionization_mechanisms = [
+            IonizationMechanism(
+                ionization_mechanism_id="unit-test-1",
+                ionization_mechanism_polarity="-",
+                ionization_mechanism="-H-",
+                reagent=None,
+            ),
+            IonizationMechanism(
+                ionization_mechanism_id="unit-test-2",
+                ionization_mechanism_polarity="-",
+                ionization_mechanism="+Br-",
+                reagent="CH2Br2",
+            ),
+            IonizationMechanism(
+                ionization_mechanism_id="unit-test-3",
+                ionization_mechanism_polarity="-",
+                ionization_mechanism="+NO3-",
+                reagent="HNO3",
+            ),
+            IonizationMechanism(
+                ionization_mechanism_id="unit-test-4",
+                ionization_mechanism_polarity="+",
+                ionization_mechanism="+H+",
+                reagent=None,
+            ),
+            IonizationMechanism(
+                ionization_mechanism_id="unit-test-5",
+                ionization_mechanism_polarity="+",
+                ionization_mechanism="+(CH4N2O)H+",
+                reagent="CH4N2O",
+            ),
+            IonizationMechanism(
+                ionization_mechanism_id="unit-test-6",
+                ionization_mechanism_polarity="+",
+                ionization_mechanism="+",
+                reagent=None,
+            ),
+            IonizationMechanism(
+                ionization_mechanism_id="unit-test-7",
+                ionization_mechanism_polarity="-",
+                ionization_mechanism="-",
+                reagent=None,
+            ),
+        ]
+
+        for ionization_mechanism in ionization_mechanisms:
+            session.add(ionization_mechanism)
+
+        await session.commit()
+
+        # Refresh to get all attributes
+        for ionization_mechanism in ionization_mechanisms:
+            await session.refresh(ionization_mechanism)
+
+        return ionization_mechanisms
 
 
 @pytest_asyncio.fixture(scope="session")
