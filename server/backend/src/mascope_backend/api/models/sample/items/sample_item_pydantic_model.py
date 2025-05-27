@@ -4,7 +4,10 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from mascope_backend.api.models.calibration.calibration_pydantic_model import (
     MzCalibrationParams,
 )
-from mascope_backend.api.models.base_pydantic_model import QueryParamsModel
+from mascope_backend.api.models.base_pydantic_model import (
+    QueryParamsModel,
+    CommonValidators,
+)
 from mascope_backend.api.new.instrument_configs.schemas import (
     SetInstrumentConfigBody,
 )
@@ -120,24 +123,36 @@ class SampleItemUpdate(SampleItemBase):
     pass
 
 
-class GetSampleItemsQueryParams(QueryParamsModel):
-    sample_batch_id: Optional[str] = Field(
+class GetSampleItemsQueryParams(CommonValidators, QueryParamsModel):
+    """
+    This model defines the query parameters that can be passed to the GET /api/sample/items endpoint
+    to control filtering, sorting, ordering, and pagination of sample results.
+    Inherits polarity validation from CommonValidators and URL decoding from QueryParamsModel.
+    """
+
+    sample_batch_id: str | None = Field(
         None,
-        description="The sample batch ID for which you want to fetch the sample items.",
+        description="The sample batch ID for which you want to fetch the sample items",
     )
-    filename: Optional[str] = Field(
-        None, description="The filename for which you want to fetch the sample items."
+    filename: str | None = Field(
+        None, description="The filename for which you want to fetch the sample items"
     )
-    sort: Optional[str] = Field(
+    polarity: str | None = Field(
+        None,
+        description="Ion polarity mode of the sample item to filter by, either '+' for positive ion mode or '-' for negative ion mode",
+    )
+    sort: str | None = Field(
         "sample_item_utc_created",
-        description="The column name by which you want to sort the results. The column name should be one of the columns in the sample_Item table.",
+        description="Column name by which to sort the results. Default is 'sample_item_utc_created'",
     )
-    order: Optional[str] = Field(
+    order: str | None = Field(
         "asc",
-        description="Can either be asc for ascending order or desc for descending order.",
+        description="Sorting order, either 'asc' for ascending or 'desc' for descending. Default is 'asc'",
     )
-    page: int = Field(0, description="The page number for pagination, default 0")
-    limit: int = Field(10000, description="The number of results per page.")
+    page: int = Field(0, description="Page number for pagination. Default is 0")
+    limit: int = Field(
+        10000, description="Number of results per page. Default is 10000"
+    )
 
 
 class SampleItemUpdateBody(BaseModel):

@@ -1,6 +1,6 @@
 # pylint: disable=line-too-long
 from datetime import datetime
-from typing import Optional
+from typing import Literal
 from sqlalchemy import (
     asc,
     desc,
@@ -23,15 +23,16 @@ from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
 
 @api_controller()
 async def get_samples(
-    sample_item_id: str = None,
-    sample_file_id: str = None,
-    sample_batch_id: str = None,
-    filename: str = None,
-    instrument: str = None,
-    sample_item_type: str = None,
-    datetime_min: datetime = None,
-    datetime_max: datetime = None,
-    match_category_min: Optional[int] = None,
+    sample_item_id: str | None = None,
+    sample_file_id: str | None = None,
+    sample_batch_id: str | None = None,
+    filename: str | None = None,
+    instrument: str | None = None,
+    sample_item_type: str | None = None,
+    datetime_min: datetime | None = None,
+    datetime_max: datetime | None = None,
+    polarity: Literal["+", "-"] | None = None,
+    match_category_min: int | None = None,
     sort: str = "datetime_utc",
     order: str = "asc",
     page: int = 0,
@@ -64,6 +65,8 @@ async def get_samples(
     :type datetime_min: datetime, optional
     :param datetime_max: Filter samples before this datetime of the sample file.
     :type datetime_max: datetime, optional
+    :param polarity: Filter by ion polarity mode of the sample item, '+' for positive or '-' for negative.
+    :type polarity: Literal["+", "-"] | None
     :param match_category_min: Filter by match_category to include specified category and higher (e.g., 1 includes categories 1 and higher), defaults to None.
     :type match_category_min:int, optional
     :param sort: Column to sort the results by.
@@ -128,6 +131,10 @@ async def get_samples(
                     <= func.julianday(datetime_max),
                 )
             )
+
+        if polarity is not None:
+            stmt = stmt.filter(Sample.polarity == polarity)
+
         if match_category_min is not None:
             stmt = stmt.filter(MatchSample.match_category >= match_category_min)
 

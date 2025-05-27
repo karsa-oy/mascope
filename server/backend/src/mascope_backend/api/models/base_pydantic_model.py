@@ -8,6 +8,7 @@ class QueryParamsModel(BaseModel):
     """
 
     @field_validator(
+        "polarity",
         "ionization_mechanism_polarity",
         "ionization_mechanism",
         "reagent",
@@ -39,6 +40,23 @@ class CommonValidators:
     """
     Mixin class with common validators.
     """
+
+    @field_validator("polarity", mode="after", check_fields=False)
+    @classmethod
+    def validate_polarity(cls, polarity: str | None) -> str | None:
+        """
+        Validates that polarity is either '+' or '-'.
+        This should run after URL decoding for query parameters.
+        check_fields=False tells Pydantic that it's OK if the model doesn't have a polarity field
+
+        :param polarity: The polarity value to validate
+        :raises ValueError: If polarity is not '+' or '-'
+        :return: The validated polarity value
+        """
+        if polarity is not None and polarity not in ["+", "-"]:
+            raise ValueError("Polarity must be '+' or '-'")
+        return polarity
+
     @model_validator(mode="after")
     @classmethod
     def validate_time_range(cls, values):

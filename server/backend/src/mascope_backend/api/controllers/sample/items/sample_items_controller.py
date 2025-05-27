@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from typing import Literal
 from fastapi import BackgroundTasks
 
 
@@ -72,8 +73,9 @@ from mascope_backend.runtime import runtime
 
 @api_controller()
 async def get_sample_items(
-    sample_batch_id: str = None,
-    filename: str = None,
+    sample_batch_id: str | None = None,
+    filename: str | None = None,
+    polarity: Literal["+", "-"] | None = None,
     sort: str = "sample_item_utc_created",
     order: str = "asc",
     page: int = 0,
@@ -94,6 +96,8 @@ async def get_sample_items(
     :type sample_batch_id: str, optional
     :param filename: The filename for which you want to fetch the sample items, defaults to None
     :type filename: str, optional
+    :param polarity: Filter by ion polarity mode of the sample item, '+' for positive or '-' for negative
+    :type polarity: Literal["+", "-"] | None
     :param sort:  Column to sort by, defaults to "sample_item_utc_created"
     :type sort: str, optional
     :param order: Sorting order ('asc' for ascending, 'desc' for descending), defaults to "asc"
@@ -114,6 +118,9 @@ async def get_sample_items(
 
         if filename:
             stmt = stmt.filter(SampleItem.filename == filename)
+
+        if polarity is not None:
+            stmt = stmt.filter(SampleItem.polarity == polarity)
 
         # Step 2: Apply sorting if specified
         if sort:
