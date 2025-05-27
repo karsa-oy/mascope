@@ -660,6 +660,10 @@ def get_sample_file_peak_timeseries(
         - "time": list of time coordinates (empty if no peak within tolerance)
         Returns None if no timeseries data is found or if an error occurs.
     :rtype: dict or None
+
+    TODO:
+    **DEPRECATED**: Use get_sample_peak_timeseries() instead for sample polarity and time limits filtering.
+    This function is kept for backwards compatibility with existing notebooks.
     """
     # Prepare the payload for the POST request
     body = (
@@ -691,6 +695,71 @@ def get_sample_file_peak_timeseries(
         return None
 
     # Return the timeseries data
+    return timeseries_data
+
+
+def get_sample_peak_timeseries(
+    mascope_url: str,
+    access_token: str,
+    sample_item_id: str,
+    peak_mz: float,
+    peak_mz_tolerance_ppm: float = 1.0,
+    t_min: float | None = None,
+    t_max: float | None = None,
+) -> dict | None:
+    """Get timeseries data for the specified peak of the sample from the Mascope API.
+
+    This function uses the sample-based endpoint that provides sample polarity filtering
+    and time limits controls based on the sample item's acquisition parameters.
+
+    :param mascope_url: The base URL of the Mascope instance.
+    :type mascope_url: str
+    :param access_token: Authorization token for API access
+    :type access_token: str
+    :param sample_item_id: The ID of the sample item from which to retrieve peak timeseries data.
+    :type sample_item_id: str
+    :param peak_mz: The m/z of the peak to request timeseries for.
+    :type peak_mz: float
+    :param peak_mz_tolerance_ppm: The m/z tolerance within which the peak should be compared (ppm), defaults to 1.0.
+    :type peak_mz_tolerance_ppm: float, optional
+    :param t_min: Minimum time limit in seconds for filtering. If not provided, uses sample's acquisition start time.
+    :type t_min: float, optional
+    :param t_max: Maximum time limit in seconds for filtering. If not provided, uses sample's acquisition end time.
+    :type t_max: float, optional
+    :return: A dictionary with keys:
+        - "mz": m/z of the peak in sample (None if no peak within tolerance)
+        - "height": list of peak intensity at time points (empty if no peak within tolerance)
+        - "time": list of time coordinates (empty if no peak within tolerance)
+        Returns None if no timeseries data is found or if an error occurs.
+    :rtype: dict or None
+    """
+    # Prepare the request body
+    body = {
+        "peak_mz": peak_mz,
+        "peak_mz_tolerance_ppm": peak_mz_tolerance_ppm,
+        **{k: v for k, v in {"t_min": t_min, "t_max": t_max}.items() if v is not None},
+    }
+
+    # Check if the API request was successful
+    if not (
+        resp := api_post(
+            url=mascope_url,
+            path=f"samples/{sample_item_id}/peaks/timeseries",
+            access_token=access_token,
+            data=body,
+        )
+    ):
+        print(
+            f"Failed to retrieve peak timeseries data for sample {sample_item_id}, m/z {peak_mz}"
+        )
+        return None
+
+    # Parse the content of the response
+    content = json.loads(resp.content)
+    if not (timeseries_data := content.get("data", None)):
+        print(f"No timeseries data found for sample {sample_item_id}, m/z {peak_mz}")
+        return None
+
     return timeseries_data
 
 
