@@ -1,7 +1,8 @@
 from datetime import datetime
-from pydantic import Field
+from pydantic import Field, ConfigDict
 from mascope_backend.api.models.base_pydantic_model import (
     QueryParamsModel,
+    RequestBodyModel,
     CommonValidators,
 )
 
@@ -60,3 +61,30 @@ class GetSamplesQueryParams(CommonValidators, QueryParamsModel):
     limit: int = Field(
         10000, description="Number of results per page. Default is 10000"
     )
+
+
+class GetSamplePeakTimeseriesBody(CommonValidators, RequestBodyModel):
+    """
+    Request body for retrieving timeseries data of a specific peak in a sample.
+
+    This model defines the parameters needed to extract and return timeseries data
+    for the closest peak to a given m/z value within specified tolerance and time limits.
+    """
+
+    peak_mz: float = Field(
+        ..., description="The m/z value of the peak to retrieve timeseries for"
+    )
+    peak_mz_tolerance_ppm: float = Field(
+        DEFAULT_PEAK_MZ_TOLERANCE_PPM,
+        description="Tolerance for m/z difference between the requested peak and the nearest one found in data, specified in parts per million (ppm)",
+    )
+    t_min: float | None = Field(
+        None,
+        description="Minimum time limit in seconds for filtering the timeseries data. If not provided, uses the sample's acquisition start time. Must be within the sample's acquisition time range",
+    )
+    t_max: float | None = Field(
+        None,
+        description="Maximum time limit in seconds for filtering the timeseries data. If not provided, uses the sample's acquisition end time. Must be within the sample's acquisition time range",
+    )
+
+    model_config = ConfigDict(from_attributes=True)

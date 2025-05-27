@@ -1,6 +1,9 @@
 # pylint: disable=line-too-long
 from datetime import datetime
 from typing import Literal
+from mascope_file.io import load_file
+from mascope_signal.compute import get_scan_timestamps
+from mascope_signal.peak import get_peaks
 from sqlalchemy import (
     asc,
     desc,
@@ -233,4 +236,132 @@ async def get_sample(
     return {
         "message": f"Sample '{sample.sample_item_name}' retrieved successfully.",
         "data": sample_data,
+    }
+
+
+@api_controller()
+async def get_sample_peak_timeseries(
+    sample_item_id: str,
+    peak_mz: float,
+    peak_mz_tolerance_ppm: float,
+    t_min: float | None = None,
+    t_max: float | None = None,
+) -> dict:
+    """
+    Get timeseries of a given peak in a specified sample.
+
+    Returns the timeseries of the closest peak to a given m/z, filtered by the sample's
+    polarity and time range, if found within given m/z tolerance.
+
+    Steps:
+    1. Get sample data and extract required fields.
+    2. Validate and set time limits based on sample's t0/t1 values.
+    3. Get filtered scan timestamps using the sample's polarity and time range.
+    4. Load the sample file data and get peaks.
+    5. Filter sample file peaks by the scan timestamps and select the nearest peak
+        to the requested m/z within the specified tolerance.
+    6. Validate m/z tolerance and return timeseries data of the selected peak.
+
+    :param sample_item_id: Sample item ID
+    :type sample_item_id: str
+    :param peak_mz: m/z of the peak to get timeseries for
+    :type peak_mz: float
+    :param peak_mz_tolerance_ppm: Tolerance for m/z difference
+        for the requested peak and the nearest one found from data
+    :type peak_mz_tolerance_ppm: float
+    :param t_min: Minimum time limit in seconds, must be within sample's acquisition time range
+    :type t_min: float | None
+    :param t_max: Maximum time limit in seconds, must be within sample's acquisition time range
+    :type t_max: float | None
+    :raises HTTPException: Raised if sample is not found or time limits are invalid
+    :return: Dictionary with keys:
+        "mz": m/z of the peak in sample (None if no peak within tolerance)
+        "height": peak height at time points (empty if no peak within tolerance)
+        "time": time coordinates (empty if no peak within tolerance)
+    :rtype: dict
+    """
+    # Step 1: Get sample data and extract required fields
+    sample_data = await get_sample(sample_item_id)
+    sample = sample_data["data"]
+    filename, sample_t0, sample_t1, sample_polarity = (
+        sample["filename"],
+        sample["t0"],
+        sample["t1"],
+        sample["polarity"],
+    )
+
+    # Step 2: Set effective time limits and validate
+    effective_t_min = t_min or sample_t0
+    effective_t_max = t_max or sample_t1
+
+    # Validate time limits are within sample acquisition range
+    match (sample_t0, sample_t1, effective_t_min, effective_t_max):
+        case (t0, _, t_min_eff, _) if t0 is not None and t_min_eff < t0:
+            raise ValueError(
+                f"Minimum time limit ({t_min_eff}s) cannot be less than acquisition start ({t0}s)"
+            )
+        case (_, t1, _, t_max_eff) if t1 is not None and t_max_eff > t1:
+            raise ValueError(
+                f"Maximum time limit ({t_max_eff}s) cannot be greater than acquisition end ({t1}s)"
+            )
+        case (_, _, t_min_eff, t_max_eff) if t_min_eff >= t_max_eff:
+            raise ValueError(
+                f"Minimum time limit ({t_min_eff}s) must be less than maximum ({t_max_eff}s)"
+            )
+
+    # Step 3: Get filtered scan timestamps using sample's polarity and time range
+    time_array = get_scan_timestamps(
+        base_filename=filename,
+        t_min=effective_t_min,
+        t_max=effective_t_max,
+        polarity=sample_polarity,
+    )
+
+    if len(time_array) == 0:
+        return {
+            "message": f"No scans found for sample '{filename}' with polarity '{sample_polarity}' in time range [{effective_t_min}, {effective_t_max}]",
+            "results": 0,
+            "data": {
+                "mz": None,
+                "height": [],
+                "time": [],
+            },
+        }
+
+    # Step 4: Load sample file data
+    try:
+        sample_file = load_file(filename, vars=["peak_heights"])
+        peaks = get_peaks(sample_file, "height")
+    except FileNotFoundError:
+        raise NotFoundException(f"Sample file '{filename}' not found")
+
+    # Step 5: Filter sample file peaks to include times in filtered time_array and
+    # select nearest to requested peak m/z
+    peak_timeseries = peaks.sel(time=time_array, method="nearest").sel(
+        mz=peak_mz, method="nearest"
+    )
+
+    # Step 6: Validate m/z tolerance and return timeseries data
+    peak_mz_data = peak_timeseries.mz.item()
+
+    # Calculate difference of the sample peak m/z to requested peak m/z
+    mz_diff = peak_mz_data - peak_mz  # [Th]
+    mz_diff_ppm = mz_diff / peak_mz * 1e6  # [ppm]
+
+    # No peak found within given m/z tolerance
+    if abs(mz_diff_ppm) > peak_mz_tolerance_ppm:
+        return {
+            "message": f"No peak found within given m/z tolerance {peak_mz_tolerance_ppm} ppm of requested m/z {peak_mz} in sample '{sample.get('sample_item_name', filename)}' with '{sample_polarity}' polarity.",
+            "results": 0,
+            "data": {"mz": None, "height": [], "time": []},
+        }
+
+    return {
+        "message": f"Retrieved timeseries with {len(peak_timeseries.time.values)} data points for peak m/z {peak_mz} in sample '{sample.get('sample_item_name', filename)}' with '{sample_polarity}' polarity.",
+        "results": len(peak_timeseries.time.values),
+        "data": {
+            "mz": peak_mz_data,
+            "height": peak_timeseries.values.tolist(),
+            "time": peak_timeseries.time.values.tolist(),
+        },
     }

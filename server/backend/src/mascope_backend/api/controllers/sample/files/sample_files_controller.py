@@ -768,6 +768,10 @@ async def get_sample_file_peak_timeseries(
         "height": peak height at time points (empty if no peak within tolerance)
         "time": time coordinates (empty if no peak within tolerance)
     :rtype: dict
+
+    TODO: Remove this function after all notebooks are updated to use get_sample_peak_timeseries
+    This is kept for backwards compatibility with existing notebooks
+    The new sample-based `get_sample_peak_timeseries` endpoint provides filtering with sample polarity and time limits
     """
     # Step 1: Fetch the sample file details using the provided ID.
     sample_file_data = await get_sample_file(sample_file_id)
