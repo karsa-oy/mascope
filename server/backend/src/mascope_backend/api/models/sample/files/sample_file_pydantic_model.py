@@ -4,7 +4,11 @@ from datetime import datetime as dt
 from pydantic import BaseModel, Field, field_validator, model_validator
 from fastapi import UploadFile
 from fastapi.exceptions import RequestValidationError
-from mascope_backend.api.models.base_pydantic_model import QueryParamsModel
+from mascope_backend.api.models.base_pydantic_model import (
+    QueryParamsModel,
+    RequestBodyModel,
+    CommonValidators,
+)
 
 # TODO_configuration Default sample file upload params
 FILE_UPLOAD_EXTENSIONS = {".h5", ".raw"}
@@ -155,71 +159,73 @@ class GetSampleFilePeakTimeseriesBody(BaseModel):
     peak_mz_tolerance_ppm: Optional[float] = 1
 
 
-class GetSampleFilePeakNoiseBody(BaseModel):
+class GetSampleFilePeakNoiseBody(CommonValidators, RequestBodyModel):
+    """
+    Request body for computing peak noise.
+    Uses shared polarity and time range validation from CommonValidators.
+    """
+
     mzs: list[float] = Field(
         ..., description="List of peak m/z values to compute noise for"
     )
-    t_min: Optional[float] = Field(None, description="Start time (optional)")
-    t_max: Optional[float] = Field(None, description="End time (optional)")
-    ppm: Optional[int] = Field(
-        1, description="ppm precision for binning, defaults to 1"
-    )
-    polarity: Optional[Literal["+", "-"]] = Field(
+    t_min: float | None = Field(None, description="Start time (optional)")
+    t_max: float | None = Field(None, description="End time (optional)")
+    ppm: int | None = Field(1, description="ppm precision for binning, defaults to 1")
+    polarity: Literal["+", "-"] | None = Field(
         None, description="Polarity of the scans, '+' or '-', optional"
     )
 
-    @model_validator(mode="after")
-    @classmethod
-    def validate_time_range(cls, values):
-        t_min = values.t_min
-        t_max = values.t_max
-        if t_min is not None and t_max is not None:
-            if t_max <= t_min:
-                raise ValueError("t_max must be greater than t_min")
-        return values
 
+class GetSpectrumQueryParams(CommonValidators, QueryParamsModel):
+    """
+    Query parameters for spectrum data with special requirement that both time fields must be provided together.
+    Inherits basic time range validation from CommonValidators and adds additional constraint.
+    """
 
-class GetSpectrumQueryParams(QueryParamsModel):
-    t_min: Optional[Annotated[float, Field(ge=0)]] = Field(
+    t_min: Annotated[float, Field(ge=0)] | None = Field(
         None, description="Start of the time range"
     )
-    t_max: Optional[Annotated[float, Field(gt=0)]] = Field(
+    t_max: Annotated[float, Field(gt=0)] | None = Field(
         None, description="End of the time range"
     )
-    mz_min: Optional[Annotated[float, Field(ge=0)]] = Field(
+    mz_min: Annotated[float, Field(ge=0)] | None = Field(
         None, description="Start of the m/z range"
     )
-    mz_max: Optional[Annotated[float, Field(gt=0)]] = Field(
+    mz_max: Annotated[float, Field(gt=0)] | None = Field(
         None, description="End of the m/z range"
     )
 
     @model_validator(mode="after")
     @classmethod
-    def validate_time_range(cls, values):
-        t_min = values.t_min
-        t_max = values.t_max
-        if t_min is not None and t_max is not None:
-            if t_max <= t_min:
-                raise ValueError("t_max must be greater than t_min")
-        elif t_min is None and t_max is not None or t_min is not None and t_max is None:
-            raise ValueError("Both t_min and t_max must be provided")
+    def validate_time_fields_required_together(cls, values):
+        """
+        Additional validation: both t_min and t_max must be provided together.
+        The basic t_max > t_min validation is inherited from CommonValidators.
+        """
+        t_min = getattr(values, "t_min", None)
+        t_max = getattr(values, "t_max", None)
+
+        # Specific model logic: both must be provided together
+        if (t_min is None) != (t_max is None):  # XOR - exactly one is None
+            raise ValueError("Both t_min and t_max must be provided together")
+
         return values
 
     @model_validator(mode="after")
     @classmethod
     def validate_mz_range(cls, values):
-        mz_min = values.mz_min
-        mz_max = values.mz_max
-        if mz_min is not None and mz_max is not None:
-            if mz_max <= mz_min:
-                raise ValueError("mz_max must be greater than mz_min")
-        elif (
-            mz_min is None
-            and mz_max is not None
-            or mz_min is not None
-            and mz_max is None
-        ):
-            raise ValueError("Both mz_min and mz_max must be provided")
+        """
+        Validates m/z range with same logic as time range.
+        """
+        mz_min = getattr(values, "mz_min", None)
+        mz_max = getattr(values, "mz_max", None)
+
+        if (mz_min is None) != (mz_max is None):
+            raise ValueError("Both mz_min and mz_max must be provided together")
+
+        if mz_min is not None and mz_max is not None and mz_max <= mz_min:
+            raise ValueError("mz_max must be greater than mz_min")
+
         return values
 
 
