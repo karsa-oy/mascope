@@ -6,7 +6,7 @@ from mascope_backend.api.models.base_pydantic_model import (
     CommonValidators,
 )
 
-# TODO_configuration
+# TODO_configuration move to sample configs when refactoring
 DEFAULT_PEAK_MZ_TOLERANCE_PPM = 1.0
 
 

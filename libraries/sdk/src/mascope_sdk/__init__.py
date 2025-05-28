@@ -644,6 +644,9 @@ def get_sample_file_peak_timeseries(
 ) -> dict:
     """Get timeseries data for the specified peak of the sample file from the Mascope API.
 
+    .. deprecated::
+        Use get_sample_peak_timeseries() instead for enhanced polarity and time filtering capabilities.
+
     :param mascope_url: The base URL of the Mascope instance.
     :type mascope_url: str
     :param access_token: Authorization token for API access
@@ -660,11 +663,14 @@ def get_sample_file_peak_timeseries(
         - "time": list of time coordinates (empty if no peak within tolerance)
         Returns None if no timeseries data is found or if an error occurs.
     :rtype: dict or None
-
-    TODO:
-    **DEPRECATED**: Use get_sample_peak_timeseries() instead for sample polarity and time limits filtering.
-    This function is kept for backwards compatibility with existing notebooks.
     """
+    # Issue deprecation warning
+    warnings.warn(
+        "get_sample_file_peak_timeseries is deprecated and will be removed in a future release. "
+        "Use get_sample_peak_timeseries instead for sample-based polarity filtering and time limits controls.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     # Prepare the payload for the POST request
     body = (
         {"peak_mz": peak_mz, "peak_mz_tolerance_ppm": peak_mz_tolerance_ppm}
