@@ -22,6 +22,7 @@ from mascope_backend.db.models import (
 )
 from mascope_backend.api.lib.api_features import api_controller
 from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
+from mascope_backend.runtime import runtime
 
 
 @api_controller()
@@ -290,36 +291,50 @@ async def get_sample_peak_timeseries(
         sample["polarity"],
     )
 
-    # Step 2: Set effective time limits and validate
-    effective_t_min = t_min or sample_t0
-    effective_t_max = t_max or sample_t1
+    # Step 2: Set effective time limits with validation and auto-correction
+    t_min_eff = t_min if t_min is not None else sample_t0
+    t_max_eff = t_max if t_max is not None else sample_t1
 
-    # Validate time limits are within sample acquisition range
-    match (sample_t0, sample_t1, effective_t_min, effective_t_max):
-        case (t0, _, t_min_eff, _) if t0 is not None and t_min_eff < t0:
-            raise ValueError(
-                f"Minimum time limit ({t_min_eff}s) cannot be less than acquisition start ({t0}s)"
-            )
-        case (_, t1, _, t_max_eff) if t1 is not None and t_max_eff > t1:
-            raise ValueError(
-                f"Maximum time limit ({t_max_eff}s) cannot be greater than acquisition end ({t1}s)"
-            )
-        case (_, _, t_min_eff, t_max_eff) if t_min_eff >= t_max_eff:
-            raise ValueError(
-                f"Minimum time limit ({t_min_eff}s) must be less than maximum ({t_max_eff}s)"
-            )
+    # Check for completely invalid ranges (user provided values outside sample window)
+    if t_min is not None and t_min > sample_t1:
+        raise ValueError(
+            f"Requested minimum time ({t_min:.2f}s) is after sample's acquisition end time ({sample_t1:.2f}s)"
+        )
 
-    # Step 3: Get filtered scan timestamps using sample's polarity and time range
+    if t_max is not None and t_max < sample_t0:
+        raise ValueError(
+            f"Requested maximum time ({t_max:.2f}s) is before sample's acquisition start time ({sample_t0:.2f}s)"
+        )
+
+    # Auto-correct slight overshoots and track what was adjusted
+    adjustments = []
+    if t_min is not None and t_min < sample_t0:
+        t_min_eff = max(sample_t0, t_min_eff)
+        adjustments.append(f"minimum time from {t_min:.2f}s to {sample_t0:.2f}s")
+
+    if t_max is not None and t_max > sample_t1:
+        t_max_eff = min(sample_t1, t_max_eff)
+        adjustments.append(f"maximum time from {t_max:.2f}s to {sample_t1:.2f}s")
+
+    # Build user message if adjustments were made
+    time_adjustment_info = ""
+    if adjustments:
+        adjustment_text = " and ".join(adjustments)
+        warning_msg = f"Time range adjusted: {adjustment_text} to fit sample acquisition window [{sample_t0:.2f}s, {sample_t1:.2f}s]"
+        runtime.logger.warning(warning_msg)
+        time_adjustment_info = f" {warning_msg}."
+
+    # Step 3: Get filtered scan timestamps using sample's polarity and time range (adjusted values)
     time_array = get_scan_timestamps(
         base_filename=filename,
-        t_min=effective_t_min,
-        t_max=effective_t_max,
+        t_min=t_min_eff,
+        t_max=t_max_eff,
         polarity=sample_polarity,
     )
 
     if len(time_array) == 0:
         return {
-            "message": f"No scans found for sample '{filename}' with polarity '{sample_polarity}' in time range [{effective_t_min}, {effective_t_max}]",
+            "message": f"No scans found for sample '{filename}' with polarity '{sample_polarity}' in time range [{t_min_eff}, {t_max_eff}] seconds.",
             "results": 0,
             "data": {
                 "mz": None,
@@ -356,8 +371,12 @@ async def get_sample_peak_timeseries(
             "data": {"mz": None, "height": [], "time": []},
         }
 
+    message = f"Retrieved timeseries with {len(peak_timeseries.time.values)} data points for peak m/z {peak_mz} in sample '{sample.get('sample_item_name', filename)}' with '{sample_polarity}' polarity."
+    if time_adjustment_info:
+        message += time_adjustment_info
+
     return {
-        "message": f"Retrieved timeseries with {len(peak_timeseries.time.values)} data points for peak m/z {peak_mz} in sample '{sample.get('sample_item_name', filename)}' with '{sample_polarity}' polarity.",
+        "message": message,
         "results": len(peak_timeseries.time.values),
         "data": {
             "mz": peak_mz_data,
