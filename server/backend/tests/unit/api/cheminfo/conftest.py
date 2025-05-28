@@ -83,15 +83,3 @@ def cheminfo_matched_query_data(test_ionization_mechanisms: list):
 def cheminfo_matched_query_model(cheminfo_matched_query_data: dict):
     """A sample CheminfoQueryBody model for testing."""
     return CheminfoMatchedQueryBody(**cheminfo_matched_query_data)
-
-
-@pytest.fixture
-def mock_sio_cheminfo(mock_sio_factory):
-    """Mock Socket.IO for the cheminfo service.
-
-    :param mock_sio_factory: Factory function for creating Socket.IO mocks
-    :type mock_sio_factory: callable from mock_sio_factory fixture
-    :return: Configured AsyncMock for Socket.IO in the cheminfo service
-    :rtype: MagicMock
-    """
-    return mock_sio_factory("mascope_backend.api.new.cheminfo.service")
