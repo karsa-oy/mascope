@@ -1,6 +1,5 @@
 """
-Unit tests for Workspace Pydantic models.
-Tests schema validation for workspace-related models.
+Unit tests for ChemInfo Pydantic models.
 """
 
 import pytest
@@ -24,14 +23,9 @@ def assert_cheminfo_query_model(cheminfo_query_data: dict):
         assert getattr(cheminfo_query_model, key) == value
 
 
-def test_cheminfo_basic_query_valid(cheminfo_query_data_basic):
+def test_cheminfo_query_valid(cheminfo_query_data):
     """Test making a cheminfo query with valid data."""
-    assert_cheminfo_query_model(cheminfo_query_data_basic)
-
-
-def test_cheminfo_extended_query_valid(cheminfo_query_data_extended):
-    """Test making a cheminfo query with valid data."""
-    assert_cheminfo_query_model(cheminfo_query_data_extended)
+    assert_cheminfo_query_model(cheminfo_query_data)
 
 
 def test_cheminfo_query_invalid():
@@ -55,7 +49,6 @@ def test_cheminfo_matched_query_valid(
     assert cheminfo_matched_query_model.mz == cheminfo_matched_query_data["mz"]
     # Test all default values
     for key, value in cheminfo_matched_query_data.items():
-        print(key, value)
         # Check if the model value is equal to the query data value
         assert key in cheminfo_matched_query_model.__dict__
         assert getattr(cheminfo_matched_query_model, key) == value
