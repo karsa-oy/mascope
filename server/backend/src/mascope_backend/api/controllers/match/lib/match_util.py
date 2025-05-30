@@ -81,3 +81,23 @@ def deduplicate_match_df(df: pd.DataFrame, id_keys: tuple) -> pd.DataFrame:
     # Apply deduplication
     deduplicated_df = df.groupby(list(id_keys), as_index=False).apply(prioritize_group)
     return deduplicated_df.reset_index(drop=True)
+
+
+def similarity_factor(
+    cos_sim: float, threshold: float = 0.75, sharpness: int = 26
+) -> float:
+    """
+    Calculate a similarity factor based on cosine similarity.
+    This function applies a sigmoid-like transformation to the cosine similarity value,
+    where values below the threshold are penalized more heavily.
+
+    The default values are set so to reach a similarity factor of ~0.98 at a cosine similarity of 0.9,
+    and a similarity factor of ~0 at a cosine similarity of 0.5.
+
+    :param cos_sim: Cosine similarity value (between 0 and 1)
+    :param threshold: Threshold below which the similarity factor drops sharply
+    :param sharpness: Controls how steep the drop is
+    :return: Similarity factor (between 0 and 1)
+    :rtype: float
+    """
+    return 1 / (1 + np.exp(sharpness * (threshold - cos_sim)))

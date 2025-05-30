@@ -1,6 +1,7 @@
 from typing import Optional, Tuple
 import pandas as pd
 from mascope_backend.api.new.match.params import BaseMatchParams
+from mascope_backend.api.controllers.match.lib.match_util import similarity_factor
 
 # TODO_configuration
 # Default Filter Parameters
@@ -12,7 +13,7 @@ APP_ALARMING_COLLECTION_TYPES = ["TARGETS"]
 
 
 def aggregate_params(df: pd.DataFrame) -> pd.Series:
-    """Aggregation function no get the aggregated parameters.
+    """Aggregation function to get the aggregated parameters.
 
     Set match_score, match_category of the top row (the most alarming row).
     Sums sample_peak_intensity_sum/sample_peak_interference_sum for the group.
@@ -39,7 +40,7 @@ async def set_ions_match_category(
     """Set the match_category field for each ion in the DataFrame.
 
     This function determines the match_category for each ion based on match score and predefined thresholds.
-    It uses provided filters, if no filters are provided then set the ion-specific filters are used, otherwise defaults used as a fall back thresholds.
+    It uses provided filters, or defaults if none are provided, and falls back to ion-specific filters when available.
 
     :param match_ions_df: DataFrame containing ion data with match scores.
     :type match_ions_df: pd.DataFrame
@@ -104,7 +105,7 @@ async def aggregate_match_isotopes(
     filtered_match_isotope_df: pd.DataFrame,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
-    Filter the fields of aggreagated filtered match isotopes dataframe.
+    Filter the fields of aggregated filtered match isotopes dataframe.
     (used for backwards compatibility of get_sample_aggregate_matches, may be removed further)
 
     This function processes the sample/batch match filter dataframe to aggregate isotope data.
@@ -116,8 +117,6 @@ async def aggregate_match_isotopes(
     :type filtered_match_isotope_df: pd.DataFrame
     :return: Tuple of DataFrames with aggregated matchIsotopes data.
     :rtype: (pd.DataFrame, pd.DataFrame)
-
-    TODO move to the match_aggregate module, use in get_sample_compound_matches controller
     (compute_match_isotopes, apply_match_params, optionally compute_match_interferences and combine data, aggregate_match_isotopes)
     """
     # Select relevant columns for detailed aggregation (backend processing)
@@ -180,7 +179,7 @@ async def aggregate_match_ions(
     match_params: Optional[BaseMatchParams] = None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
-    Aggregate fields for match ions from aggreagated filtered match isotopes dataframe.
+    Aggregate fields for match ions from aggregated filtered match isotopes dataframe.
     Provided filters are passed to set_ions_match_category, if none match_params are provided, stored ion-specidic or default params will be applied.
 
     It prepares two DataFrames:
@@ -220,7 +219,13 @@ async def aggregate_match_ions(
         .agg(
             {
                 "match_score": lambda x: (
-                    x * filtered_match_isotope_df.loc[x.index, "relative_abundance"]
+                    x
+                    * similarity_factor(
+                        filtered_match_isotope_df.loc[
+                            x.index, "match_isotope_correlation"
+                        ]
+                    )
+                    * filtered_match_isotope_df.loc[x.index, "relative_abundance"]
                 ).sum(),
                 "sample_peak_intensity": "sum",
                 "sample_peak_interference": "sum",
@@ -427,7 +432,7 @@ async def aggregate_match_samples(compounds_df: pd.DataFrame) -> pd.DataFrame:
     :return: pandas DataFrame with aggregated match samples data.
     :rtype: pd.DataFrame
     """
-    # Set the alarm_mode based on alarms_list and target_collectio_type
+    # Set the alarm_mode based on alarms_list and target_collection_type
     compounds_df = await set_alarm_mode(compounds_df)
     match_samples_df = (
         compounds_df.sort_values(
@@ -492,7 +497,7 @@ async def compile_samples_df(
 
     # Add matched column
     samples_df["matched"] = samples_df["match_score"].apply(
-        lambda x: 0 if pd.isna(x) else 1
+        lambda x: int(not pd.isna(x))
     )
 
     # Replace NaNs with 0
