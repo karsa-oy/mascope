@@ -74,43 +74,13 @@ async def compute_match_isotopes(
         target_isotopes_df = target_isotopes_df.query(query).reset_index(drop=True)
 
         # Step 2: - Detect peaks in the sample file
-
-        # Find peaks and write to file
-        u_list = list(np.unique(np.round(target_isotopes_df.mz)))
-
-        # Assign peak fitting threshold depending on the instrument type
-        # Correct instrument type ensured by get_instrument_type
-        if instrument_type == "orbi":
-            threshold = ORBI_FITTING_THRESHOLD
-        if instrument_type == "tof":
-            threshold = TOF_FITTING_THRESHOLD
-
-        # Detect peaks in the sample file
-        await detect_peaks(
-            filename,
-            instrument_functions,
-            threshold,
-            u_list,
-            if_exists="append",
+        peaks = await detect_and_load_peaks(
+            filename=filename,
             instrument_type=instrument_type,
+            instrument_functions=instrument_functions,
+            target_mzs=target_isotopes_df.mz,
+            polarity=polarity,
         )
-
-        runtime.logger.debug("Start matching")
-
-        # Load the appropriate peak data based on instrument type
-        if instrument_type == "orbi":
-            peaks = load_array(filename, "peak_heights").peak_heights
-        if instrument_type == "tof":
-            peaks = load_array(filename, "peak_areas").peak_areas
-
-        sample_file_type = get_sample_file_type(filename)
-        if sample_file_type in ["orbi_zarr", "tof_zarr"]:
-            peaks = peaks.dropna(dim="mz", how="all")
-
-        if polarity:
-            # Filter peaks based on polarity
-            time_scan = get_scan_timestamps(filename, polarity=polarity)
-            peaks = peaks.sel(time=time_scan, method="nearest")
 
         # Step 3: Create initial dataframe with default values for all isotopes
         match_isotope_df = target_isotopes_df.copy().assign(
@@ -130,148 +100,282 @@ async def compute_match_isotopes(
 
         # Step 4: Extract peak data for matching
         runtime.logger.debug("Parse peak data")
-        peak_intensities = peaks.mean(dim="time").compute().values
-        # Filter for non-zero intensities
-        non_zero_peaks = peak_intensities > 0
-        peak_intensities = peak_intensities[non_zero_peaks]
-        peak_mzs = peaks.mz.values[non_zero_peaks]
-        peak_tofs = peaks.tof.values[non_zero_peaks]
-        peak_sorting = np.argsort(peak_mzs)
+
+        parsed_peaks = parse_and_filter_peaks(peaks)
 
         # Step 5: Perform matching
-        def match(row):
-            # Get all peaks within unit mass window
-            mz_tolerance = 0.5
-            target_mz = row.mz
-            match_indices, _ = match_mz(
-                target_mz, peak_mzs[peak_sorting], tolerance=mz_tolerance
-            )
-
-            # Find closest match
-            for match_index in match_indices:
-                # Get match peak
-                peak_index = peak_sorting[match_index]
-                peak_mz = peak_mzs[peak_index]
-                peak_intensity = peak_intensities[peak_index]
-
-                # Check if better than current match
-                best_match = row.sample_peak_id
-                if not np.isnan(best_match):
-                    prev_mz_err = abs(row.sample_peak_mz - target_mz)
-                    new_mz_err = abs(peak_mz - target_mz)
-                    if new_mz_err > prev_mz_err:
-                        continue
-
-                # Save match
-                row["sample_peak_id"] = peak_index
-                row["sample_peak_mz"] = peak_mz
-                row["sample_peak_tof"] = peak_tofs[int(peak_index)]
-                row["sample_peak_intensity"] = peak_intensity
-            return row
-
-        # Apply matching to all isotopes
-        match_isotope_df = match_isotope_df.apply(match, axis=1).reset_index()
+        match_isotope_df = match_isotope_df.apply(
+            match, args=(parsed_peaks,), axis=1
+        ).reset_index()
 
         # Create a mask for matched isotopes (those with actual peak data)
         matched_mask = ~match_isotope_df["sample_peak_mz"].isna()
 
         # Step 6: - Calculate match stats for isotopes with actual matches
         if matched_mask.any():
-            # Calculate ion-level statistics - isotope ratios, sum matched sample peak intensities for each ion
-            ion_level_peak_sums = match_isotope_df.groupby(
-                "target_ion_id", as_index=False
-            )["sample_peak_intensity"].sum()
-
-            # Join sums back to the isotope level
-            isotope_level_peak_sums = pd.merge(
-                match_isotope_df,
-                ion_level_peak_sums.rename(
-                    columns={"sample_peak_intensity": "sample_peak_intensity_sum"}
-                ),
-                on="target_ion_id",
-                how="left",
-            )
-
-            # Calculate relative peak intensities
-            match_isotope_df.loc[:, "sample_peak_intensity_relative"] = (
-                match_isotope_df["sample_peak_intensity"]
-                / isotope_level_peak_sums["sample_peak_intensity_sum"]
-            )
-
-            # Calculate abundance matching errors
-            match_isotope_df.loc[:, "match_abundance_error"] = match_isotope_df[
-                "relative_abundance"
-            ] * (
-                match_isotope_df["sample_peak_intensity_relative"]
-                - match_isotope_df["relative_abundance"]
-            )
-
-            # Calculate isotope correlations by ion group
-            match_isotope_df = match_isotope_df.groupby(
-                ["target_ion_id"], group_keys=False
-            ).apply(
-                lambda ion_group: (
-                    ion_group.assign(
-                        match_isotope_correlation=(
-                            mean_cosine_similarity(
-                                np.array(
-                                    [
-                                        peaks.sel(mz=peak_mz, method="nearest")
-                                        for peak_mz in ion_group["sample_peak_mz"]
-                                    ]
-                                )
-                            )
-                            if len(ion_group) > 1
-                            else 1.0
-                        )
-                    )
-                )
-            )
-            match_isotope_df["match_isotope_correlation"] = match_isotope_df[
-                "match_isotope_correlation"
-            ].fillna(0.0)
-
-            # Calculate m/z errors (in ppm)
-            match_isotope_df.loc[:, "match_mz_error"] = (
-                1e6
-                * (match_isotope_df["sample_peak_mz"] - match_isotope_df["mz"])
-                / match_isotope_df["mz"]
-            )
-
-            # Calculate match scores
-            def score(row):
-                row["match_score"] = (1 - abs(row.match_abundance_error)) * max(
-                    0, (1 - 1e-2 * abs(row.match_mz_error))
-                )
-                return row
-
-            match_isotope_df = match_isotope_df.apply(
-                score, axis=1, result_type="broadcast"
-            )
+            match_isotope_df = calculate_match_stats(match_isotope_df, peaks)
 
         # Step 7: Set default values for unmatched isotopes
         unmatched_mask = ~matched_mask
         if unmatched_mask.any():
-            unmatched_count = unmatched_mask.sum()
-            runtime.logger.info(
-                f"Found {unmatched_count} isotopes without matching peaks"
+            match_isotope_df = assign_defaults_to_unmatched(
+                match_isotope_df, unmatched_mask
             )
-
-            # Set sample_peak_mz for unmatched isotopes using target m/z values
-            match_isotope_df.loc[unmatched_mask, "sample_peak_mz"] = (
-                match_isotope_df.loc[unmatched_mask, "mz"]
-            )
-
-            # Apply all defaults except sample_peak_mz which was handled above
-            for column, value in unmatched_defaults.model_dump().items():
-                if column != "sample_peak_mz":
-                    match_isotope_df.loc[unmatched_mask, column] = value
 
         return match_isotope_df
     except Exception as e:
         error_message = f"Computing matches failed: {e}"
         runtime.logger.error(error_message)
         raise ValueError(error_message) from e
+
+
+# --- Helper Functions ---
+
+
+async def detect_and_load_peaks(
+    filename: str,
+    instrument_type: str,
+    instrument_functions: tuple,
+    target_mzs: pd.Series,
+    polarity: Literal["+", "-"] | None = None,
+):
+    """Detect peaks in the sample file and load them into a DataArray.
+
+    :param filename: Path to the sample file to be analyzed for matches.
+    :type filename: str
+    :param instrument_type: Type of the instrument used for the sample file, e.g., "orbi" or "tof".
+    :type instrument_type: str
+    :param instrument_functions: Tuple containing peak shape and a resolution function.
+    :type instrument_functions: tuple
+    :param target_mzs: Series of target m/z values to be matched against the sample peaks.
+    :type target_mzs: pd.Series
+    :param polarity: Polarity of the sample, either "+", "-", or "+-". Defaults to None.
+    :type polarity: Literal["+", "-"], optional
+    :return: DataArray containing detected peaks with their m/z, intensity, and time information.
+    :rtype: xarray.DataArray
+    """
+    # Get list of nominal m/z values
+    u_list = list(np.unique(np.round(target_mzs)))
+
+    if instrument_type == "orbi":
+        peak_fit_threshold = ORBI_FITTING_THRESHOLD
+    if instrument_type == "tof":
+        peak_fit_threshold = TOF_FITTING_THRESHOLD
+
+    # Detect peaks in the sample file
+    await detect_peaks(
+        filename,
+        instrument_functions,
+        peak_fit_threshold,
+        u_list,
+        if_exists="append",
+        instrument_type=instrument_type,
+    )
+
+    runtime.logger.debug("Start matching")
+
+    if instrument_type == "orbi":
+        peaks = load_array(filename, "peak_heights").peak_heights
+    if instrument_type == "tof":
+        peaks = load_array(filename, "peak_areas").peak_areas
+
+    sample_file_type = get_sample_file_type(filename)
+    if sample_file_type in ["orbi_zarr", "tof_zarr"]:
+        peaks = peaks.dropna(dim="mz", how="all")
+
+    if polarity:
+        # Filter peaks based on polarity
+        time_scan = get_scan_timestamps(filename, polarity=polarity)
+        peaks = peaks.sel(time=time_scan, method="nearest")
+
+    return peaks
+
+
+def parse_and_filter_peaks(peaks: "xarray.DataArray") -> dict:
+    """
+    Parse and filter peaks from the detected peaks DataArray.
+
+    :param peaks: Detected peaks DataArray containing m/z, intensity, and time information.
+    :type peaks: xarray.DataArray
+    :return: Dictionary containing parsed peak intensities, m/z values, and TOF values.
+    :rtype: dict
+    """
+    peak_intensities = peaks.mean(dim="time").compute().values
+    non_zero_peaks = peak_intensities > 0
+
+    parsed_peaks = {
+        "peak_intensities": peak_intensities[non_zero_peaks],
+        "peak_mzs": peaks.mz.values[non_zero_peaks],
+        "peak_tofs": peaks.tof.values[non_zero_peaks],
+    }
+
+    parsed_peaks["peak_sorting"] = np.argsort(parsed_peaks["peak_mzs"])
+
+    return parsed_peaks
+
+
+def match(row, parsed_peaks):
+    """Match a target isotope with the closest peak in the sample spectrum.
+
+    :param row: Row of the DataFrame containing target isotope properties.
+    :type row: pd.Series
+    :param parsed_peaks: Parsed peak data containing intensities, m/z values, and TOF values.
+    :type parsed_peaks: dict
+    :return: Row with matched peak information, including sample_peak_id, sample_peak_mz,
+                sample_peak_tof, and sample_peak_intensity.
+    :rtype: pd.Series
+    """
+    # Extract parsed peak data for ease of use
+    peak_intensities = parsed_peaks["peak_intensities"]
+    peak_mzs = parsed_peaks["peak_mzs"]
+    peak_tofs = parsed_peaks["peak_tofs"]
+    peak_sorting = parsed_peaks["peak_sorting"]
+
+    # Get all peaks within unit mass window
+    mz_tolerance = 0.5
+    target_mz = row.mz
+    match_indices, _ = match_mz(
+        target_mz, peak_mzs[peak_sorting], tolerance=mz_tolerance
+    )
+
+    # Find closest match
+    for match_index in match_indices:
+        # Get match peak
+        peak_index = peak_sorting[match_index]
+        peak_mz = peak_mzs[peak_index]
+        peak_intensity = peak_intensities[peak_index]
+
+        # Check if better than current match
+        best_match = row.sample_peak_id
+        if not np.isnan(best_match):
+            prev_mz_err = abs(row.sample_peak_mz - target_mz)
+            new_mz_err = abs(peak_mz - target_mz)
+            if new_mz_err > prev_mz_err:
+                continue
+
+        # Save match
+        row["sample_peak_id"] = peak_index
+        row["sample_peak_mz"] = peak_mz
+        row["sample_peak_tof"] = peak_tofs[int(peak_index)]
+        row["sample_peak_intensity"] = peak_intensity
+    return row
+
+
+def calculate_match_stats(
+    match_isotope_df: pd.DataFrame, peaks: "xarray.DataArray"
+) -> pd.DataFrame:
+    """Calculate match statistics for isotopes.
+
+    :param match_isotope_df: DataFrame containing matched isotopes with their properties.
+    :type match_isotope_df: pd.DataFrame
+    :param peaks: Detected peaks DataArray containing m/z, intensity, and time information.
+    :type peaks: xarray.DataArray
+    :return: DataFrame with match statistics for each isotope, including relative peak intensities,
+              abundance matching errors, isotope correlations, m/z errors, and match scores.
+    :rtype: pd.DataFrame
+    """
+    ion_level_peak_sums = match_isotope_df.groupby("target_ion_id", as_index=False)[
+        "sample_peak_intensity"
+    ].sum()
+
+    # Join sums back to the isotope level
+    isotope_level_peak_sums = pd.merge(
+        match_isotope_df,
+        ion_level_peak_sums.rename(
+            columns={"sample_peak_intensity": "sample_peak_intensity_sum"}
+        ),
+        on="target_ion_id",
+        how="left",
+    )
+
+    match_isotope_df.loc[:, "sample_peak_intensity_relative"] = (
+        match_isotope_df["sample_peak_intensity"]
+        / isotope_level_peak_sums["sample_peak_intensity_sum"]
+    )
+
+    match_isotope_df.loc[:, "match_abundance_error"] = match_isotope_df[
+        "relative_abundance"
+    ] * (
+        match_isotope_df["sample_peak_intensity_relative"]
+        - match_isotope_df["relative_abundance"]
+    )
+
+    # Calculate isotope similarities by ion group
+    match_isotope_df = match_isotope_df.groupby(
+        ["target_ion_id"], group_keys=False
+    ).apply(
+        lambda ion_group: (
+            ion_group.assign(
+                match_isotope_correlation=(
+                    mean_cosine_similarity(
+                        np.array(
+                            [
+                                peaks.sel(mz=peak_mz, method="nearest")
+                                for peak_mz in ion_group["sample_peak_mz"]
+                            ]
+                        )
+                    )
+                    if len(ion_group) > 1
+                    else 1.0
+                )
+            )
+        )
+    )
+    match_isotope_df["match_isotope_correlation"] = match_isotope_df[
+        "match_isotope_correlation"
+    ].fillna(0.0)
+
+    # Calculate m/z errors (in ppm)
+    match_isotope_df.loc[:, "match_mz_error"] = (
+        1e6
+        * (match_isotope_df["sample_peak_mz"] - match_isotope_df["mz"])
+        / match_isotope_df["mz"]
+    )
+
+    # Calculate match scores
+    def score(row):
+        row["match_score"] = (1 - abs(row.match_abundance_error)) * max(
+            0, (1 - 1e-2 * abs(row.match_mz_error))
+        )
+        return row
+
+    match_isotope_df = match_isotope_df.apply(score, axis=1, result_type="broadcast")
+
+    return match_isotope_df
+
+
+def assign_defaults_to_unmatched(
+    match_isotope_df: pd.DataFrame,
+    unmatched_mask: pd.Series,
+) -> pd.DataFrame:
+    """
+    Assign default values to unmatched isotopes in the match DataFrame.
+
+    This function sets default values for isotopes that did not find a matching peak,
+    ensuring that all required fields are populated with appropriate defaults.
+
+    :param match_isotope_df: DataFrame containing matched isotopes with their properties.
+    :type match_isotope_df: pd.DataFrame
+    :param unmatched_mask: Boolean mask indicating which isotopes do not have matching peaks.
+    :type unmatched_mask: pd.Series
+    :return: DataFrame with default values assigned to unmatched isotopes.
+    :rtype: pd.DataFrame
+    """
+    unmatched_defaults = UnmatchedIsotopeParams()
+    unmatched_count = unmatched_mask.sum()
+    runtime.logger.info(f"Found {unmatched_count} isotopes without matching peaks")
+
+    # Set sample_peak_mz for unmatched isotopes using target m/z values
+    match_isotope_df.loc[unmatched_mask, "sample_peak_mz"] = match_isotope_df.loc[
+        unmatched_mask, "mz"
+    ]
+
+    # Apply all defaults except sample_peak_mz which was handled above
+    for column, value in unmatched_defaults.model_dump().items():
+        if column != "sample_peak_mz":
+            match_isotope_df.loc[unmatched_mask, column] = value
+
+    return match_isotope_df
 
 
 def mean_cosine_similarity(arr: np.ndarray) -> float:
