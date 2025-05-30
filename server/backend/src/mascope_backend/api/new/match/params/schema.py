@@ -11,7 +11,6 @@ DEFAULT_POSSIBLE_MATCH_THRESHOLD = 0.7
 TOF_DEFAULT_MZ_TOLERANCE = 15
 TOF_DEFAULT_ISOTOPE_RATIO_TOLERANCE = 0.15
 TOF_DEFAULT_PEAK_MIN_INTENSITY = 0
-TOF_DEFAULT_MIN_ISOTOPE_CORRELATION = 0
 
 # Default TOF calibration parameters
 MZ_ERROR_TOLERANCE = 10
@@ -21,7 +20,6 @@ TIC_THRESHOLD = 1e6
 ORBI_DEFAULT_MZ_TOLERANCE = 5
 ORBI_DEFAULT_ISOTOPE_RATIO_TOLERANCE = 0.2
 ORBI_DEFAULT_PEAK_MIN_INTENSITY = 0
-ORBI_DEFAULT_MIN_ISOTOPE_CORRELATION = 0
 
 
 class BaseMatchParams(BaseModel):
@@ -47,9 +45,6 @@ class BaseMatchParams(BaseModel):
     )
     peak_min_intensity: float = Field(
         description="Minimum peak intensity threshold for considering a match.",
-    )
-    min_isotope_correlation: float = Field(
-        description="Minimum correlation of isotopic pattern required for a match.",
     )
 
     @model_validator(mode="after")
@@ -82,10 +77,6 @@ class TofMatchParams(BaseMatchParams):
         TOF_DEFAULT_PEAK_MIN_INTENSITY,
         description="Minimum peak intensity threshold for considering a match.",
     )
-    min_isotope_correlation: float = Field(
-        TOF_DEFAULT_MIN_ISOTOPE_CORRELATION,
-        description="Minimum correlation of isotopic pattern required for a match.",
-    )
 
 
 class OrbiMatchParams(BaseMatchParams):
@@ -100,10 +91,6 @@ class OrbiMatchParams(BaseMatchParams):
     peak_min_intensity: float = Field(
         ORBI_DEFAULT_PEAK_MIN_INTENSITY,
         description="Minimum peak intensity threshold for considering a match.",
-    )
-    min_isotope_correlation: float = Field(
-        ORBI_DEFAULT_MIN_ISOTOPE_CORRELATION,
-        description="Minimum correlation of isotopic pattern required for a match.",
     )
 
 

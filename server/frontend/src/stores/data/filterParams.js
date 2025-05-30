@@ -13,7 +13,6 @@ export const useFilterParams = defineStore('app.data.filterParams', () => {
     min_isotope_abundance: 0.15,
     isotope_ratio_tolerance: 0.15,
     peak_min_intensity: 0,
-    min_isotope_correlation: 0.8,
     probable_match_threshold: 0.8,
     possible_match_threshold: 0.7
   }
@@ -37,8 +36,6 @@ export const useFilterParams = defineStore('app.data.filterParams', () => {
     current.isotope_ratio_tolerance =
       params?.isotope_ratio_tolerance ?? defaults.isotope_ratio_tolerance
     current.peak_min_intensity = params?.peak_min_intensity ?? defaults.peak_min_intensity
-    current.min_isotope_correlation =
-      params?.min_isotope_correlation ?? defaults.min_isotope_correlation
     current.probable_match_threshold =
       params?.probable_match_threshold ?? defaults.probable_match_threshold
     current.possible_match_threshold =

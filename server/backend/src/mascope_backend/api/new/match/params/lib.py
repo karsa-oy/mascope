@@ -86,8 +86,6 @@ def apply_match_params(
                     abs(row["match_mz_error"]) <= params["mz_tolerance"],
                     abs(row["match_abundance_error"])
                     <= params["isotope_ratio_tolerance"],
-                    max(row.get("match_isotope_correlation", 0), 0)
-                    >= params["min_isotope_correlation"],
                     row["sample_peak_intensity"] >= params["peak_min_intensity"],
                     row["relative_abundance"] >= params["min_isotope_abundance"],
                 ]
@@ -102,8 +100,6 @@ def apply_match_params(
                     abs(row["match_mz_error"]) <= params["mz_tolerance"],
                     abs(row["match_abundance_error"])
                     <= params["isotope_ratio_tolerance"],
-                    max(row.get("match_isotope_correlation", 0), 0)
-                    >= params["min_isotope_correlation"],
                     row["relative_abundance"] >= params["min_isotope_abundance"],
                 ]
             )

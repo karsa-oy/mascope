@@ -188,14 +188,6 @@ const matchRangeMiddle = computed(
         small
         :key="key"
       />
-      <BaseParamField
-        label="Min. isotope correlation"
-        v-model:param="app.data.match.params.ui.min_isotope_correlation"
-        @change="app.data.match.visualized.reload"
-        :range="{ min: 0, max: 1, step: 0.1 }"
-        small
-        :key="key"
-      />
     </section>
     <section>
       <h3>Peak settings</h3>

@@ -89,16 +89,6 @@ const isotopes = computed(() =>
         threshold: app.data.match.params.ui.peak_min_intensity
       })
     }
-    if (
-      Math.max(isotope.match_isotope_correlation, 0) <
-      app.data.match.params.ui.min_isotope_correlation
-    ) {
-      failures.push({
-        filter: 'Minimum isotope correlation',
-        isotopeValue: `Match isotope correlation is ${isotope.match_isotope_correlation.toFixed(3)}`,
-        threshold: app.data.match.params.ui.min_isotope_correlation
-      })
-    }
     return { ...isotope, failures, failure_count: failures.length }
   })
 )
