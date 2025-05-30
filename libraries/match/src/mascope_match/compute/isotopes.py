@@ -1,6 +1,7 @@
 from typing import Literal
 import numpy as np
 import pandas as pd
+from scipy.spatial.distance import pdist
 
 from mascope_file.io import load_array
 from mascope_file.name import get_instrument_type, get_sample_file_type
@@ -65,7 +66,7 @@ async def compute_match_isotopes(
     try:
         # Step 1: Initialize parameters and load data
         instrument_type = get_instrument_type(filename)
-        resolution_type = "LOW" if instrument_type == "tof" else "HIGH"
+        resolution_type = "LOW" if instrument_type == "tof" else "HIGH"  # noqa: F841
         unmatched_defaults = UnmatchedIsotopeParams()
 
         # Filter isotopes below threshold and with incorrect resolution
@@ -78,7 +79,7 @@ async def compute_match_isotopes(
         u_list = list(np.unique(np.round(target_isotopes_df.mz)))
 
         # Assign peak fitting threshold depending on the instrument type
-        # Correct intrument type unsured by get_instrument_type
+        # Correct instrument type ensured by get_instrument_type
         if instrument_type == "orbi":
             threshold = ORBI_FITTING_THRESHOLD
         if instrument_type == "tof":
@@ -212,16 +213,16 @@ async def compute_match_isotopes(
                 lambda ion_group: (
                     ion_group.assign(
                         match_isotope_correlation=(
-                            np.corrcoef(
+                            mean_cosine_similarity(
                                 np.array(
                                     [
                                         peaks.sel(mz=peak_mz, method="nearest")
                                         for peak_mz in ion_group["sample_peak_mz"]
                                     ]
                                 )
-                            )[0, 1]
+                            )
                             if len(ion_group) > 1
-                            else 1
+                            else 1.0
                         )
                     )
                 )
@@ -271,3 +272,22 @@ async def compute_match_isotopes(
         error_message = f"Computing matches failed: {e}"
         runtime.logger.error(error_message)
         raise ValueError(error_message) from e
+
+
+def mean_cosine_similarity(arr: np.ndarray) -> float:
+    """
+    Calculate mean cosine similarity.
+
+    This function computes the pairwise cosine distances between vectors in a 2D array
+    and returns the mean cosine similarity of the upper triangle of the similarity matrix.
+    :param arr: 2D array where each row is a vector (e.g., isotope profiles)
+    :type arr: np.ndarray
+    :return: Mean cosine similarity of the upper triangle of the similarity matrix
+    :rtype: float
+    """
+    n = arr.shape[0]
+    if n < 2:
+        return 1.0
+
+    distances = pdist(arr, "cosine")
+    return 1.0 - distances.mean()
