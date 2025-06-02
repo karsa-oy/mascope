@@ -40,6 +40,9 @@ async def configure_database_engine(version):
         database_url,
         pool_pre_ping=True,  # Check connection liveness before using a connection from the pool
         echo=trace_mode,  # Enable logging of all SQL queries for trace debugging purposes
+        pool_size=20,  # Base pool size - max persistent connections kept open (default: 5)
+        max_overflow=30,  # Additional connections allowed beyond pool_size when needed (default: 10)
+        pool_timeout=60,  # Seconds to wait for available connection before timeout (default: 30)
         connect_args={
             "timeout": 15
         },  # Set a timeout of 15 seconds for establishing connections and waiting for table locks
