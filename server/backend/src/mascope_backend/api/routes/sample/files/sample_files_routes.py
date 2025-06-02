@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-from fastapi import APIRouter, BackgroundTasks, Request, Depends, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Request, Depends, UploadFile
 from mascope_backend.api.new.auth.access_token.service import get_access_token
 from mascope_backend.db.id import gen_id
 from mascope_backend.api.new.auth.dependencies import guest_user, editor_user
@@ -11,7 +11,7 @@ from mascope_backend.api.controllers.sample.files.sample_files_controller import
     delete_sample_file,
     delete_sample_files,
     update_sample_file,
-    sample_file_upload,
+    upload_sample_files,
     get_sample_file_peaks,
     compute_sample_file_peaks,
     get_sample_file_peak_timeseries,
@@ -22,7 +22,6 @@ from mascope_backend.api.controllers.sample.files.sample_files_controller import
 from mascope_backend.api.models.sample.files.sample_file_pydantic_model import (
     SampleFileCreate,
     SampleFileUpdate,
-    SampleFileUpload,
     GetSampleFilesQueryParams,
     GetRecentSampleFilesQueryParams,
     GetSampleFilePeaksQueryParams,
@@ -31,6 +30,7 @@ from mascope_backend.api.models.sample.files.sample_file_pydantic_model import (
     GetSpectrumQueryParams,
     DeleteSampleFilesBody,
     GetSampleFilePeakNoiseBody,
+    SampleFilesUpload,
 )
 
 sample_files_router = APIRouter(prefix="/api/sample/files", tags=["Sample Files"])
@@ -147,31 +147,41 @@ async def delete_sample_files_route(
 
 @sample_files_router.post("/upload")
 @api_route(status_code=201, token_access=True)
-async def sample_file_upload_route(
+async def upload_sample_files_route(
     request: Request,
-    file: UploadFile = Depends(SampleFileUpload),
+    files: list[UploadFile] = File(..., description="Multiple files to upload"),
     user=Depends(editor_user),
-):
+) -> dict:
     """
-    Uploads a sample file to the server.
+    Uploads multiple sample files to the server in a single batch operation.
 
-    This route takes an uploaded file from a form field and saves it in the `filestreams` directory
-    on the server. It validates the file's size and extension before uploading.
+    This route takes an uploaded files from a form field and saves it in the `filestreams` directory
+    on the server. Files are validated for size and extension before processing.
 
-    :param file: The file to be uploaded, provided in a form field.
-    :type file: UploadFile
+    :param request: HTTP request object containing headers and metadata
+    :type request: Request
+    :param files: List of files to be uploaded via multipart form data
+    :type files: list[UploadFile]
     :param user: The authenticated user from dependency injection
     :type user: User
-    :return: A JSON response indicating the success or failure of the upload.
-    :rtype: JSONResponse
+    :return: A dict response with sample files upload results including success/failure details
+    :rtype: dict
     """
-    # Access the file using file.file
-    user_sid = request.headers.get("X-SID")
+    # Validate files using Pydantic model
+    validated_files = SampleFilesUpload(files=files)
 
-    # Validate the user's file-converter access_token, to prevent unauthorized access
-    await get_access_token(user=user, service_name="file-converter")
+    # Extract user session ID from headers
+    sid = request.headers.get("X-SID")
 
-    return await sample_file_upload(file=file.file, user=user, user_sid=user_sid)
+    # Single token validation for the entire upload process
+    access_token = await get_access_token(user=user, service_name="file-converter")
+
+    return await upload_sample_files(
+        files=validated_files.files,
+        user=user,
+        access_token=access_token,
+        sid=sid,
+    )
 
 
 @sample_files_router.get("/{sample_file_id}/peaks")

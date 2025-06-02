@@ -27,7 +27,6 @@ from mascope_backend.db.models import SampleFile, User
 from mascope_backend.api.controllers.sample.lib.sample_file_compute import (
     compute_peaks,
 )
-from mascope_backend.api.new.auth.access_token.service import get_access_token
 from mascope_backend.api.new.instruments import get_instruments
 
 from mascope_backend.api.lib.api_features import (
@@ -517,56 +516,125 @@ FILE_UPLOAD_CHUNK_SIZE = 2 * 1024 * 1024  # 2 MB
 
 
 @api_controller()
-async def sample_file_upload(
-    file: UploadFile, user: User, user_sid: str = None
+async def upload_sample_files(
+    files: list[UploadFile],
+    user: User,
+    access_token: str,
+    sid: str | None = None,
 ) -> dict:
     """
-    Handles the upload of a sample file and saves it to the `filestreams` directory.
+    Handles upload of multiple sample files to the `filestreams` directory.
 
-    The file is read in chunks to avoid high memory usage and stored in the specified
-    directory as defined in the runtime configuration.
+    Each file is read in chunks to avoid high memory usage and stored in the specified
+    directory as defined in the runtime configuration. Files are processed sequentially
+    to avoid I/O bottlenecks for reliable uploads.
 
-    :param file: The uploaded file to be processed.
-    :type file: UploadFile
-    :param user: The authenticated user
+    :param files: List of uploaded files to process.
+    :type files: list[UploadFile]
+    :param user: The authenticated user performing the upload.
     :type user: User
-    :param user_sid : Scocket client session ID, used for protecting events received from file-converter service.
-    :type user_sid : str, optional
-    :return: A dictionary containing the success message.
+    :param access_token: Pre-validated user's access token for file converter service.
+    :type access_token: str
+    :param sid: User's socket client session ID.
+    :type sid: str | None
+    :return: Dictionary with files upload results.
     :rtype: dict
     """
-    path = os.path.join(runtime.config.filestreams, file.filename)
+    successful_uploads: list[dict] = []
+    failed_uploads: list[dict] = []
 
-    try:
-        with open(path, "wb") as f:
-            # read the file in chunks to ensure it doesn't fill memory
-            while contents := file.file.read(FILE_UPLOAD_CHUNK_SIZE):
-                f.write(contents)
+    # Check if filestreams directory exists
+    os.makedirs(runtime.config.filestreams, exist_ok=True)
 
-        # Get service token for file converter, check it's valid
-        access_token = await get_access_token(user=user, service_name="file-converter")
-        # Emit internal event for file upload
-        await event_emitter.emit(
-            "file-converter.auth",
-            {
-                "filename": file.filename,
-                "user_id": user.id,
-                "username": user.username,
-                "role_id": user.role_id,
-                "access_token": access_token,
+    # Process files sequentially to avoid I/O bottlenecks
+    for file in files:
+        filename = file.filename
+
+        try:
+            file_path = os.path.join(runtime.config.filestreams, filename)
+
+            # Write file in chunks to manage memory usage
+            with open(file_path, "wb") as f:
+                while chunk := file.file.read(FILE_UPLOAD_CHUNK_SIZE):
+                    f.write(chunk)
+
+            # Emit event for file converter service to register the file
+            await event_emitter.emit(
+                "file-converter.auth",
+                {
+                    "filename": filename,
+                    "user_id": user.id,
+                    "username": user.username,
+                    "role_id": user.role_id,
+                    "access_token": access_token,
+                },
+            )
+
+            successful_uploads.append(
+                {
+                    "filename": filename,
+                    "message": f"Successfully uploaded {filename}",
+                }
+            )
+
+            runtime.logger.debug(f"Successfully uploaded file: {filename}")
+
+        except ApiException as e:
+            failed_uploads.append(
+                {
+                    "filename": filename,
+                    "error": e.user_message,
+                    "message": f"Failed to upload {filename}: {e.user_message}",
+                }
+            )
+            runtime.logger.error(f"Failed to upload file {filename}: {e.user_message}")
+        except Exception as e:
+            error_msg = str(e)
+            failed_uploads.append(
+                {
+                    "filename": filename,
+                    "error": error_msg,
+                    "message": f"Failed to upload {filename}: {error_msg}",
+                }
+            )
+            runtime.logger.error(f"Failed to upload file {filename}: {e}")
+
+        finally:
+            # Check if file handle is properly closed
+            if hasattr(file, "file") and file.file:
+                file.file.close()
+
+    # Calculate results
+    total_files = len(files)
+    successful_count = len(successful_uploads)
+    failed_count = len(failed_uploads)
+
+    # Determine status and message
+    if failed_count == 0:
+        status = "success"
+        message = f"Successfully uploaded all {successful_count} files"
+    elif successful_count == 0:
+        status = "error"
+        message = f"Failed to upload all {failed_count} files"
+    else:
+        status = "partial"
+        message = f"Uploaded {successful_count} of {total_files} files successfully"
+
+    return {
+        "message": message,
+        "status": status,
+        "results": successful_count,
+        "data": {
+            "total_files": total_files,
+            "successful_uploads": successful_uploads,
+            "failed_uploads": failed_uploads,
+            "summary": {
+                "successful": successful_count,
+                "failed": failed_count,
+                "total": total_files,
             },
-        )
-    except ApiException:
-        raise
-    except Exception as e:
-        raise RuntimeError(f"Failed to upload file {file.filename}: {e}") from e
-    finally:
-        file.file.close()
-
-    message = f"Successfully uploaded file {file.filename}"
-    runtime.logger.info(message)
-
-    return {"message": message}
+        },
+    }
 
 
 # ---------------------

@@ -67,41 +67,66 @@ class SampleFileUpdate(BaseModel):
     polarity: str = Field("", description="Polarities present in the sample file")
 
 
-class SampleFileUpload(BaseModel):
-    file: UploadFile = Field(..., description="The uploaded file")
+class SampleFilesUpload(BaseModel):
+    """Model for validating multiple file uploads with size and extension checks."""
 
-    @field_validator("file")
+    files: list[UploadFile] = Field(..., description="List of files to upload")
+
+    @field_validator("files")
     @classmethod
-    def validate_extension(cls, file: UploadFile):
-        if os.path.splitext(file.filename)[1].lower() not in FILE_UPLOAD_EXTENSIONS:
-            # Raise a RequestValidationError directly
+    def validate_files(cls, files: list[UploadFile]) -> list[UploadFile]:
+        """
+        Validate all uploading files for extension and size requirements.
+
+        :param files: List of uploaded files to validate
+        :type files: list[UploadFile]
+        :return: Validated list of files
+        :rtype: list[UploadFile]
+        :raises RequestValidationError: If any file fails validation
+        """
+        if not files:
             raise RequestValidationError(
                 [
                     {
-                        "loc": ("file",),
-                        "msg": f"Invalid file extension, allowed extensions: {', '.join(FILE_UPLOAD_EXTENSIONS)}",
-                        "type": "value_error.file_extension",
+                        "loc": ("files",),
+                        "msg": "At least one file must be provided",
+                        "type": "value_error.empty_list",
                     }
                 ]
             )
-        return file
 
-    @field_validator("file")
-    @classmethod
-    def validate_size(cls, file: UploadFile):
-        if hasattr(file, "size") and file.size > FILE_UPLOAD_SIZE_LIMIT:
-            size_limit_gb = FILE_UPLOAD_SIZE_LIMIT / 1024**3
-            # Raise a RequestValidationError directly
-            raise RequestValidationError(
-                [
-                    {
-                        "loc": ("file",),
-                        "msg": f"File exceeds the size limit of {size_limit_gb} GB.",
-                        "type": "value_error.file_size",
-                    }
-                ]
-            )
-        return file
+        for i, file in enumerate(files):
+            # Validate extension
+            file_ext = os.path.splitext(file.filename or "")[1].lower()
+            if file_ext not in FILE_UPLOAD_EXTENSIONS:
+                raise RequestValidationError(
+                    [
+                        {
+                            "loc": ("files", i),
+                            "msg": f"Invalid file extension for {file.filename}. Allowed: {', '.join(FILE_UPLOAD_EXTENSIONS)}",
+                            "type": "value_error.file_extension",
+                        }
+                    ]
+                )
+
+            # Validate size
+            if (
+                hasattr(file, "size")
+                and file.size
+                and file.size > FILE_UPLOAD_SIZE_LIMIT
+            ):
+                size_limit_gb = FILE_UPLOAD_SIZE_LIMIT / (1024**3)
+                raise RequestValidationError(
+                    [
+                        {
+                            "loc": ("files", i),
+                            "msg": f"File {file.filename} exceeds size limit of {size_limit_gb:.1f} GB",
+                            "type": "value_error.file_size",
+                        }
+                    ]
+                )
+
+        return files
 
 
 class GetSampleFilesQueryParams(QueryParamsModel):
