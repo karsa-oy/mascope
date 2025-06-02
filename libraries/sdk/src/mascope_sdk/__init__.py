@@ -172,7 +172,7 @@ def api_post_file(
         with open(filepath, "rb") as file:
             resp = requests.post(
                 full_url,
-                files={"file": file},
+                files=[("files", file)],
                 headers=headers,
                 verify=False,
                 timeout=30,
