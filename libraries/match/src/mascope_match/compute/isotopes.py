@@ -92,7 +92,7 @@ async def compute_match_isotopes(
             sample_peak_intensity=np.nan,
             sample_peak_intensity_relative=np.nan,
             match_abundance_error=np.nan,
-            match_isotope_correlation=np.nan,
+            match_isotope_similarity=np.nan,
             match_mz_error=np.nan,
             match_score=unmatched_defaults.match_score,
             sample_peak_tof=np.nan,
@@ -191,7 +191,7 @@ async def detect_and_load_peaks(
     return peaks
 
 
-def parse_and_filter_peaks(peaks: "xarray.DataArray") -> dict:
+def parse_and_filter_peaks(peaks: "xarray.DataArray") -> dict:  # type: ignore # noqa: F821
     """
     Parse and filter peaks from the detected peaks DataArray.
 
@@ -262,7 +262,7 @@ def match(row, parsed_peaks):
 
 
 def calculate_match_stats(
-    match_isotope_df: pd.DataFrame, peaks: "xarray.DataArray"
+    match_isotope_df: pd.DataFrame, peaks: "xarray.DataArray"  # type: ignore # noqa: F821
 ) -> pd.DataFrame:
     """Calculate match statistics for isotopes.
 
@@ -271,7 +271,7 @@ def calculate_match_stats(
     :param peaks: Detected peaks DataArray containing m/z, intensity, and time information.
     :type peaks: xarray.DataArray
     :return: DataFrame with match statistics for each isotope, including relative peak intensities,
-              abundance matching errors, isotope correlations, m/z errors, and match scores.
+              abundance matching errors, isotope similarities, m/z errors, and match scores.
     :rtype: pd.DataFrame
     """
     ion_level_peak_sums = match_isotope_df.groupby("target_ion_id", as_index=False)[
@@ -306,7 +306,7 @@ def calculate_match_stats(
     ).apply(
         lambda ion_group: (
             ion_group.assign(
-                match_isotope_correlation=(
+                match_isotope_similarity=(
                     mean_cosine_similarity(
                         np.array(
                             [
@@ -321,8 +321,8 @@ def calculate_match_stats(
             )
         )
     )
-    match_isotope_df["match_isotope_correlation"] = match_isotope_df[
-        "match_isotope_correlation"
+    match_isotope_df["match_isotope_similarity"] = match_isotope_df[
+        "match_isotope_similarity"
     ].fillna(0.0)
 
     # Calculate m/z errors (in ppm)

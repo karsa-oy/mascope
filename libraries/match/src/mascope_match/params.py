@@ -18,7 +18,7 @@ DEFAULT_UNMATCHED_SAMPLE_PEAK_INTENSITY = 0.0
 DEFAULT_UNMATCHED_SAMPLE_PEAK_INTENSITY_RELATIVE = 0.0
 DEFAULT_UNMATCHED_MATCH_ABUNDANCE_ERROR = 1.0
 DEFAULT_UNMATCHED_MATCH_MZ_ERROR = 0.0
-DEFAULT_UNMATCHED_MATCH_ISOTOPE_CORRELATION = 0.0
+DEFAULT_UNMATCHED_MATCH_ISOTOPE_SIMILARITY = 0.0
 DEFAULT_UNMATCHED_MATCH_SCORE = 0.0
 DEFAULT_UNMATCHED_SAMPLE_PEAK_TOF = 0.0
 
@@ -46,9 +46,9 @@ class UnmatchedIsotopeParams(BaseModel):
         DEFAULT_UNMATCHED_MATCH_MZ_ERROR,
         description="Default m/z error for isotopes without matching peaks.",
     )
-    match_isotope_correlation: float = Field(
-        DEFAULT_UNMATCHED_MATCH_ISOTOPE_CORRELATION,
-        description="Default isotope correlation for isotopes without matching peaks.",
+    match_isotope_similarity: float = Field(
+        DEFAULT_UNMATCHED_MATCH_ISOTOPE_SIMILARITY,
+        description="Default isotope similarity for isotopes without matching peaks.",
     )
     match_score: float = Field(
         DEFAULT_UNMATCHED_MATCH_SCORE,

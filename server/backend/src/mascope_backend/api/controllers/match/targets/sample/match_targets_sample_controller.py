@@ -460,7 +460,7 @@ async def get_match_sample_isotopes(
                 "sample_peak_tof": None,
                 "match_abundance_error": None,
                 "match_mz_error": None,
-                "match_isotope_correlation": None,
+                "match_isotope_similarity": None,
                 "match_score": None,
                 "match_isotope_utc_created": None,
                 "match_isotope_utc_modified": None,

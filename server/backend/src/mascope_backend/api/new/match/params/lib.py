@@ -66,7 +66,7 @@ def apply_match_params(
         for field in [
             "match_mz_error",
             "match_abundance_error",
-            "match_isotope_correlation",
+            "match_isotope_similarity",
             "sample_peak_intensity",
             "relative_abundance",
         ]:

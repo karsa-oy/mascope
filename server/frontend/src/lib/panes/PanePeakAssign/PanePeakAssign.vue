@@ -357,9 +357,9 @@ const expanded = ref({})
                 {{ mzFmt.format(data.mz) }}
               </template>
             </Column>
-            <Column field="data.match_isotope_correlation" header="Correlation" sortable>
+            <Column field="data.match_isotope_similarity" header="Similarity" sortable>
               <template #body="{ data }">
-                {{ relAbuFmt.format(data.match_isotope_correlation) }}
+                {{ relAbuFmt.format(data.match_isotope_similarity) }}
               </template>
             </Column>
             <Column field="match_mz_error" header="Error (ppm)" sortable>

@@ -220,7 +220,7 @@ def test_matching(filepath):
             )
         )
         # Filter dataframes
-        df_query = "match_isotope_correlation > 0.9"
+        df_query = "match_isotope_similarity > 0.9"
         true_matches = true_matches.query(df_query)
         match_isotope_df = match_isotope_df.query(df_query)
         # Check if same matches found as in True matches

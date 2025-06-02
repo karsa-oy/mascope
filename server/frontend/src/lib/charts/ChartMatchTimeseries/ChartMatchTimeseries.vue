@@ -69,7 +69,7 @@ const layout = computed(() => ({
   height: props.height
 }))
 
-const corr = new Intl.NumberFormat('en-US', {
+const similarity = new Intl.NumberFormat('en-US', {
   style: 'percent',
   minimumFractionDigits: 2,
   maximumFractionDigits: 2
@@ -79,9 +79,9 @@ const corr = new Intl.NumberFormat('en-US', {
 <template>
   <figure style="padding: 0">
     <span style="margin-bottom: 1rem">
-      isotope correlation coefficient:
+      isotope similarity:
       <Tag
-        :value="corr.format(app.data.match.visualized.isotopes?.[0].match_isotope_correlation)"
+        :value="similarity.format(app.data.match.visualized.isotopes?.[0].match_isotope_similarity)"
       />
     </span>
     <BaseChartPlotly

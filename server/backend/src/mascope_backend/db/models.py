@@ -682,7 +682,7 @@ class MatchIsotope(Base):
     sample_peak_tof = Column(Float, nullable=False)
     match_abundance_error = Column(Float, nullable=False)
     match_mz_error = Column(Float, nullable=False)
-    match_isotope_correlation = Column(Float, nullable=False)
+    match_isotope_similarity = Column(Float, nullable=False)
     match_score = Column(
         Float, CheckConstraint("match_score BETWEEN 0 AND 1"), nullable=False
     )

@@ -144,7 +144,7 @@ async def aggregate_match_isotopes(
             "relative_abundance",
             "match_mz_error",
             "match_abundance_error",
-            "match_isotope_correlation",
+            "match_isotope_similarity",
             "sample_peak_intensity",
             "sample_peak_intensity_relative",
             "sample_peak_mz",
@@ -222,7 +222,7 @@ async def aggregate_match_ions(
                     x
                     * similarity_factor(
                         filtered_match_isotope_df.loc[
-                            x.index, "match_isotope_correlation"
+                            x.index, "match_isotope_similarity"
                         ]
                     )
                     * filtered_match_isotope_df.loc[x.index, "relative_abundance"]
