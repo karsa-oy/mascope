@@ -117,100 +117,74 @@ export const useSample = defineModule({
   upload: async (files) => {
     const ui = useUi()
     const mainProcessId = genId(8) // Generate a unique ID for the overall upload process
-    let successes = 0 // Counter to track the number of successful uploads
-    let errors = 0 // Counter to track the number of failed uploads
 
-    // Use Promise.all to handle multiple file uploads in parallel
-    await Promise.all(
-      files.map(async (file) => {
-        const process_id = genId(8) // Generate a unique ID for each file upload
-        try {
-          // Make the upload request with progress tracking
-          const response = await api.http.postForm(
-            `/sample/files/upload`,
-            {
-              file // The file being uploaded
-            },
-            {
-              type: 'sample_file_upload',
-              timeout: FILE_UPLOAD_TIMEOUT,
-              onUploadProgress: (progressEvent) => {
-                const percentCompleted = progressEvent.progress * 100 // Calculate progress percentage
+    try {
+      // Create FormData for sample files batch upload
+      const formData = new FormData()
+      files.forEach((file) => formData.append('files', file))
 
-                // Update the progress for the current file
-                ui.notification.push({
-                  type: 'sample_file_upload',
-                  process_id,
-                  parent_id: mainProcessId,
-                  status: 'pending',
-                  message: `${file.name} - ${percentCompleted.toFixed(2)}% uploaded`,
-                  progress: percentCompleted
-                })
-              }
-            }
-          )
+      // Initial notification
+      ui.notification.push({
+        type: 'sample_file_upload',
+        process_id: mainProcessId,
+        status: 'pending',
+        message: `Uploading ${files.length} file${files.length > 1 ? 's' : ''}...`,
+        progress: 0
+      })
 
-          // If the upload is successful, send a success notification for this file
-          if (response?.status === 201) {
-            successes += 1
-            ui.notification.push({
-              type: 'sample_file_upload',
-              process_id,
-              parent_id: mainProcessId,
-              status: 'success',
-              message: `File ${file.name} uploaded successfully!`,
-              progress: 100
-            })
-          }
-        } catch (error) {
-          errors += 1
-          // Handle upload errors for this specific file
-          const errorMessage = `Failed to upload file ${file.name}: ${error.response?.data?.error ?? error.message}`
+      // Make sample files batch upload request with progress tracking
+      const response = await api.http.post('/sample/files/upload', formData, {
+        timeout: FILE_UPLOAD_TIMEOUT * Math.max(files.length, 1),
+        headers: { 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: ({ progress }) => {
+          const percentCompleted = progress * 100
           ui.notification.push({
             type: 'sample_file_upload',
-            process_id,
-            parent_id: mainProcessId,
-            status: 'error',
-            message: errorMessage
+            process_id: mainProcessId,
+            status: 'pending',
+            message: `Uploading ${files.length} file${files.length > 1 ? 's' : ''}... ${percentCompleted.toFixed(1)}%`,
+            progress: percentCompleted
           })
-          console.error(`Sample file upload failed for ${file.name}:`, error)
         }
       })
-    )
-    // Emit a summary notification based on the success and error counts
-    if (successes > 0 && errors === 0) {
-      // All uploads were successful
-      const s = successes > 1 ? 's' : ''
+
+      if (response?.status === 201) {
+        const { message, status, data } = response.data
+
+        // Success notification
+        ui.notification.push({
+          type: 'sample_file_upload',
+          process_id: mainProcessId,
+          status: status === 'partial' ? 'warning' : 'success',
+          message,
+          progress: 100
+        })
+
+        // Show individual failed file notifications for partial uploads
+        if (status === 'partial' && data?.failed_uploads) {
+          data.failed_uploads.forEach(({ filename, error }) => {
+            ui.notification.push({
+              type: 'sample_file_upload',
+              status: 'error',
+              message: `${filename}: ${error}`
+            })
+          })
+        }
+
+        return { data, resolved: true }
+      }
+
+      throw new Error(`Unexpected response status: ${response.status}`)
+    } catch (error) {
       ui.notification.push({
         type: 'sample_file_upload',
-        status: 'success',
         process_id: mainProcessId,
-        progress: 100,
-        message: `Successfully uploaded ${successes} file${s}`
-      })
-    } else if (successes > 0 && errors > 0) {
-      // Some uploads were successful, some failed
-      const s = successes > 1 ? 's' : ''
-      ui.notification.push({
-        type: 'sample_file_upload',
-        status: 'warning',
-        process_id: mainProcessId,
-        progress: 100,
-        message: `Successfully uploaded ${successes} file${s}, but failed to upload ${errors} file${errors > 1 ? 's' : ''}`
-      })
-    } else if (errors > 0) {
-      // All uploads failed
-      ui.notification.push({
-        type: 'sample_file_upload',
         status: 'error',
-        process_id: mainProcessId,
-        progress: 100,
-        message: `Failed to upload all ${errors} file${errors > 1 ? 's' : ''}`
+        message: error.response?.data?.error || error.message || 'Failed to upload files',
+        progress: 100
       })
-    }
-    return {
-      data: null,
-      resolved: true
+
+      return { data: null, resolved: false }
     }
   }
 })

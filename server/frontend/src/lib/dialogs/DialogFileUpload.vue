@@ -1,15 +1,8 @@
 <script setup>
-import { ref, reactive, computed, watch, watchEffect } from 'vue'
+import { reactive, computed, watch, nextTick } from 'vue'
 
 import Button from 'primevue/button'
 import Select from 'primevue/select'
-import DatePicker from 'primevue/datepicker'
-import DataTable from 'primevue/datatable'
-import Column from 'primevue/column'
-import IconField from 'primevue/iconfield'
-import InputIcon from 'primevue/inputicon'
-import InputText from 'primevue/inputtext'
-import FileUpload from 'primevue/fileupload'
 import FloatLabel from 'primevue/floatlabel'
 import Dialog from 'primevue/dialog'
 import Message from 'primevue/message'
@@ -96,19 +89,26 @@ const invalid = computed(() => {
 })
 
 // handle file selection
-watchEffect(() => {
-  // validate file sizes
-  if (count.value.valid > 0 && count.value.total == count.value.valid) {
-    // autoupload if all files are valid
-    app.data.sample.upload(props.files)
-  } else {
-    if (count.value.total > 0) {
-      // launch the dialog otherwise
-      active.value = true
-    }
-  }
-})
+watch(
+  () => props.files,
+  (files) => {
+    if (!files?.length) return
 
+    nextTick(() => {
+      // validate file sizes
+      if (count.value.valid > 0 && count.value.total === count.value.valid) {
+        // All files valid - auto upload
+        app.data.sample.upload(files)
+      } else if (count.value.total > 0) {
+        // Some files need manual handling - show dialog
+        active.value = true
+      }
+    })
+  },
+  { immediate: true }
+)
+
+// Manual upload for renamed files
 const upload = () => {
   const renamedTofFiles = processed.value.invalid.tof.map(
     (file) => new File([file], `${instrument.tof}_${file.name}`, { type: file.type })
