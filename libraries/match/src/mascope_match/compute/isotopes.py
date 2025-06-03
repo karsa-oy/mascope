@@ -155,10 +155,11 @@ async def detect_and_load_peaks(
     # Get list of nominal m/z values
     u_list = list(np.unique(np.round(target_mzs)))
 
-    if instrument_type == "orbi":
-        peak_fit_threshold = ORBI_FITTING_THRESHOLD
-    if instrument_type == "tof":
-        peak_fit_threshold = TOF_FITTING_THRESHOLD
+    match instrument_type:
+        case "orbi":
+            peak_fit_threshold = ORBI_FITTING_THRESHOLD
+        case "tof":
+            peak_fit_threshold = TOF_FITTING_THRESHOLD
 
     # Detect peaks in the sample file
     await detect_peaks(
@@ -172,10 +173,11 @@ async def detect_and_load_peaks(
 
     runtime.logger.debug("Start matching")
 
-    if instrument_type == "orbi":
-        peaks = load_array(filename, "peak_heights").peak_heights
-    if instrument_type == "tof":
-        peaks = load_array(filename, "peak_areas").peak_areas
+    match instrument_type:
+        case "orbi":
+            peaks = load_array(filename, "peak_heights").peak_heights
+        case "tof":
+            peaks = load_array(filename, "peak_areas").peak_areas
 
     sample_file_type = get_sample_file_type(filename)
     if sample_file_type in ["orbi_zarr", "tof_zarr"]:
@@ -301,24 +303,8 @@ def calculate_match_stats(
     # Calculate isotope similarities by ion group
     match_isotope_df = match_isotope_df.groupby(
         ["target_ion_id"], group_keys=False
-    ).apply(
-        lambda ion_group: (
-            ion_group.assign(
-                match_isotope_similarity=(
-                    mean_cosine_similarity(
-                        np.array(
-                            [
-                                peaks.sel(mz=peak_mz, method="nearest")
-                                for peak_mz in ion_group["sample_peak_mz"]
-                            ]
-                        )
-                    )
-                    if len(ion_group) > 1
-                    else 1.0
-                )
-            )
-        )
-    )
+    ).apply(assign_isotope_similarity, peaks=peaks)
+
     match_isotope_df["match_isotope_similarity"] = match_isotope_df[
         "match_isotope_similarity"
     ].fillna(0.0)
@@ -340,6 +326,32 @@ def calculate_match_stats(
     match_isotope_df = match_isotope_df.apply(score, axis=1, result_type="broadcast")
 
     return match_isotope_df
+
+
+def assign_isotope_similarity(ion_group, peaks):
+    """
+    Assign isotope similarity to a group of isotopes
+
+    :param ion_group: Group of isotopes sharing the same target ion ID.
+    :type ion_group: pd.DataFrame
+    :param peaks: Detected peaks DataArray containing m/z, intensity, and time information.
+    :type peaks: xarray.DataArray
+    :return: Group of isotopes with an additional column for match_isotope_similarity.
+    :rtype: pd.DataFrame
+    """
+    if len(ion_group) > 1:
+        similarity = mean_cosine_similarity(
+            np.array(
+                [
+                    peaks.sel(mz=peak_mz, method="nearest")
+                    for peak_mz in ion_group["sample_peak_mz"]
+                ]
+            )
+        )
+    else:
+        similarity = 1.0
+    ion_group = ion_group.assign(match_isotope_similarity=similarity)
+    return ion_group
 
 
 def assign_defaults_to_unmatched(
