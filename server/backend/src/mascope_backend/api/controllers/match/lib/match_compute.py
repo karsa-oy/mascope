@@ -3,9 +3,7 @@ from mascope_match import (
     compute_match_isotopes,
     compute_match_interferences,
 )
-from mascope_backend.api.new.match.params.schema import (
-    DEFAULT_MIN_ISOTOPE_ABUNDANCE,
-)
+from mascope_backend.api.new.match.params.lib import default_match_params
 from mascope_backend.socket.notifications import (
     UserNotification,
     send_progress_user_notification,
@@ -41,7 +39,7 @@ async def compute_and_create_sample_match_isotope_data(
     notification: UserNotification | None = None,
 ) -> dict[str, pd.DataFrame]:
     """
-    Computes matc isotopes and match interferences for a given sample against a set of target isotopes.
+    Computes match isotopes and match interferences for a given sample against a set of target isotopes.
 
     It updates the computation progress if progress properties are provided. Match isotopes and interferences are then saved to the database.
 
@@ -70,7 +68,7 @@ async def compute_and_create_sample_match_isotope_data(
     # Get instrument functions for filename
     instrument_functions = await read_instrument_functions(filename)
 
-    #  Sent progress user notificaton if notification is provided
+    #  Sent progress user notification if notification is provided
     if notification:
         await send_progress_user_notification(notification, 0.25)
 
@@ -86,17 +84,18 @@ async def compute_and_create_sample_match_isotope_data(
             f"No match interferences found for sample '{sample_item_name}'"
         )
 
-    # Send progress user notificaton after computing interferences
+    # Send progress user notification after computing interferences
     if notification:
         await send_progress_user_notification(notification, 0.5)
 
     # Step 3: Compute match isotopes for the given sample and target isotopes.
     runtime.logger.info(f"Computing match isotopes for file: {filename}")
 
+    match_params = await default_match_params(sample_item_id)
     match_isotope_df = await compute_match_isotopes(
         filename=filename,
         target_isotopes_df=target_isotopes_df,
-        min_isotope_abundance=DEFAULT_MIN_ISOTOPE_ABUNDANCE,
+        match_params=match_params,
         instrument_functions=instrument_functions,
         polarity=polarity,
     )
@@ -105,7 +104,7 @@ async def compute_and_create_sample_match_isotope_data(
             f"No match isotopes found for sample '{sample_item_name}'"
         )
 
-    # Send progress user notificaton after computing match isotopes
+    # Send progress user notification after computing match isotopes
     if notification:
         await send_progress_user_notification(notification, 0.75)
 
@@ -128,7 +127,7 @@ async def compute_and_create_sample_match_isotope_data(
         ]
         await create_match_isotopes(match_isotopes)
 
-    # Send progress user notificaton indicating completion of compute_and_create_sample_match_isotope_data process
+    # Send progress user notification indicating completion of compute_and_create_sample_match_isotope_data process
     if notification:
         await send_progress_user_notification(notification, 0.95)
 

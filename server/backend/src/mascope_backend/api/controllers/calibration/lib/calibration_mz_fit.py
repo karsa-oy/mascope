@@ -27,6 +27,7 @@ from mascope_backend.api.controllers.target.isotopes.target_isotopes_controller 
 from mascope_backend.api.controllers.target.associations.target_compound_in_target_collection_controller import (
     get_target_compound_in_target_collection,
 )
+from mascope_backend.api.new.match.params import TofMatchParams
 from mascope_backend.socket.notifications import (
     UserNotification,
     send_progress_user_notification,
@@ -90,10 +91,16 @@ async def mz_fit(
     # Get instrument functions for filename
     instrument_functions = await read_instrument_functions(filename)
 
+    match_params = TofMatchParams(
+        mz_tolerance=mz_error_tolerance,
+        peak_min_intensity=peak_intensity_min,
+    )
+    match_params.min_isotope_abundance = isotope_abundance_min
+
     match_isotope_df = await compute_match_isotopes(
         filename=filename,
         target_isotopes_df=target_isotopes_df,
-        min_isotope_abundance=isotope_abundance_min,
+        match_params=match_params,
         instrument_functions=instrument_functions,
     )
 

@@ -265,7 +265,7 @@ async def aggregate_sample_match_compound(
         match_isotope_df = await compute_match_isotopes(
             filename=sample.filename,
             target_isotopes_df=target_isotopes_df,
-            min_isotope_abundance=match_params.min_isotope_abundance,
+            match_params=match_params,
             instrument_functions=instrument_functions,
             polarity=sample.polarity,
         )
@@ -446,7 +446,7 @@ async def aggregate_sample_match_compounds(
         match_isotope_df = await compute_match_isotopes(
             filename=sample.filename,
             target_isotopes_df=target_isotopes_df,
-            min_isotope_abundance=match_params.min_isotope_abundance,
+            match_params=match_params,
             instrument_functions=instrument_functions,
             polarity=sample.polarity,
         )

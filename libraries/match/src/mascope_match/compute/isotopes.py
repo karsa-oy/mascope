@@ -21,7 +21,7 @@ from mascope_match.id import generate_id
 async def compute_match_isotopes(
     filename: str,
     target_isotopes_df: pd.DataFrame,
-    min_isotope_abundance: float,
+    match_params: "MatchParams",  # noqa: F821 # type: ignore
     instrument_functions: tuple[dict, callable],
     polarity: Literal["+", "-"] | None = None,
 ) -> pd.DataFrame:
@@ -45,8 +45,8 @@ async def compute_match_isotopes(
     :type filename: str
     :param target_isotopes_df: DataFrame containing target isotopes with their m/z values and other properties.
     :type target_isotopes_df: pd.DataFrame
-    :param min_isotope_abundance: Minimum relative abundance threshold for isotopes to be considered in matching.
-    :type min_isotope_abundance: float
+    :param match_params: Match parameters containing settings for the matching process.
+    :type match_params: BaseMatchParams
     :param instrument_functions: Tuple containing peak shape details and a resolution function R.
     :type instrument_functions: tuple[dict, callable]
     :param polarity: Polarity of the sample, either "+", "-", or "+-".
@@ -60,8 +60,6 @@ async def compute_match_isotopes(
       aggregated in a separate process.
     - Isotopes without matching peaks are assigned a match score of 0 and placeholder values
       for the required database fields.
-
-    TODO min_isotope_abundance will be passed from the match_params
     """
     try:
         # Step 1: Initialize parameters and load data
@@ -70,7 +68,7 @@ async def compute_match_isotopes(
         unmatched_defaults = UnmatchedIsotopeParams()
 
         # Filter isotopes below threshold and with incorrect resolution
-        query = "relative_abundance >= @min_isotope_abundance and resolution == @resolution_type"
+        query = "relative_abundance >= @match_params.min_isotope_abundance and resolution == @resolution_type"
         target_isotopes_df = target_isotopes_df.query(query).reset_index(drop=True)
 
         # Step 2: - Detect peaks in the sample file
