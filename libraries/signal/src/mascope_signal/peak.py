@@ -6,6 +6,7 @@ from typing import Iterable
 import numpy as np
 from scipy.signal._peak_finding_utils import _select_by_peak_distance
 from scipy.integrate import simpson
+from scipy.optimize import curve_fit
 import xarray
 import dask
 
@@ -246,10 +247,15 @@ async def detect_peaks(
     # -- Read centroids as peaks directly from RAW file for orbi_raw -- ##
 
     if sample_file_type == "orbi_raw":
+        runtime.logger.debug("Reading centroids from the Thermo file...")
         new_peak_mzs, new_peak_heights, resolutions = get_orbi_centroids(
             filename, u_list
         )
-        runtime.logger.debug("The fitted peaks were read from the Thermo file")
+
+        runtime.logger.debug("Filter centroids by height and resolution...")
+        new_peak_mzs, new_peak_heights, resolutions = _filter_centroids(
+            new_peak_mzs, new_peak_heights, resolutions, n_sigma=2
+        )
 
         new_peak_areas = []
         runtime.logger.debug("Computing peak areas...")
@@ -373,6 +379,68 @@ async def detect_peaks(
     if return_peak_mzs:
         return (sample_file_data, peak_mzs)
     return sample_file_data
+
+
+def _filter_centroids(
+    peak_mzs: np.ndarray,
+    peak_heights: np.ndarray,
+    resolutions: np.ndarray,
+    n_sigma: float = 1.0,
+) -> tuple:
+    """Filter centroids less than 1 count and with the resolution
+    within n_sigma standard deviations from the fitted resolution
+
+    :param peak_mzs: m/z values of the fitted peaks
+    :type peak_mzs: np.ndarray
+    :param peak_heights: Peak heights of the fitted peaks
+    :type peak_heights: np.ndarray
+    :param resolutions: Resolutions of the fitted peaks
+    :type resolutions: np.ndarray
+    :return: Filtered peak m/z values, heights and resolutions
+    :rtype: tuple
+    """
+    # Filter out peaks with heights less than 1 count
+    valid_mask = peak_heights >= 1
+    peak_mzs = peak_mzs[valid_mask]
+    peak_heights = peak_heights[valid_mask]
+    resolutions = resolutions[valid_mask]
+
+    # Pick 10 most intense peaks from each 100 m/z range
+    bin_width = 100
+    bins = np.arange(peak_mzs.min(), peak_mzs.max() + bin_width, bin_width)
+
+    selected_indices = []
+    for i in range(len(bins) - 1):
+        bin_mask = (peak_mzs >= bins[i]) & (peak_mzs < bins[i + 1])
+        if np.any(bin_mask):
+            bin_heights = peak_heights[bin_mask]
+            bin_indices = np.where(bin_mask)[0]
+            # Get indices of 10 most intense peaks in this bin
+            top_in_bin = np.argsort(bin_heights)[-10:]
+            selected_indices.extend(bin_indices[top_in_bin])
+
+    selected_indices = np.array(selected_indices)
+
+    # Fit resolution to the picked peaks
+    popt, _ = curve_fit(
+        lambda mz, a: a / np.sqrt(mz),
+        peak_mzs[selected_indices],
+        resolutions[selected_indices],
+    )
+    a_fit = popt[0]
+
+    # Calculate std error of the residuals
+    residuals = resolutions - a_fit / np.sqrt(peak_mzs)
+    sigma = np.std(residuals)
+
+    # Filter peaks based on the resolution mask
+    # Keep peaks with residuals within n_sigma standard deviations
+    resolution_mask = np.abs(residuals) < n_sigma * sigma
+    peak_mzs = peak_mzs[resolution_mask]
+    peak_heights = peak_heights[resolution_mask]
+    resolutions = resolutions[resolution_mask]
+
+    return peak_mzs, peak_heights, resolutions
 
 
 def _segment_spectrum_for_fitting(
@@ -512,6 +580,23 @@ def _calculate_peak_profiles(
     peak_profiles = get_peak_profiles(filename, all_peak_mzs).assign_coords(
         tof=("mz", unique_tofs)
     )
+
+    def has_consecutive_positive(arr):
+        # arr is a 1D numpy array for a single mz value along time
+        return np.any((arr[:-1] > 0) & (arr[1:] > 0))
+
+    # Apply along mz axis (i.e., for each mz, check along time)
+    consecutive_mask = peak_profiles.reduce(
+        lambda x, axis: np.apply_along_axis(has_consecutive_positive, axis, x),
+        dim="time",
+    ).values
+
+    # Filter out mz values that do not have consecutive positive values
+    peak_profiles = peak_profiles.isel(mz=consecutive_mask)
+
+    peak_areas = peak_areas[consecutive_mask]
+    peak_heights = peak_heights[consecutive_mask]
+
     # Normalize peak profile intensities to 1
     peak_profiles_norm = peak_profiles / peak_profiles.sum(dim="time")
     peak_profiles_norm = peak_profiles_norm.fillna(0)
