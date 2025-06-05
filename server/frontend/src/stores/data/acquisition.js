@@ -157,22 +157,6 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
     }
   })
 
-  ui.notification.on('instrument_conversion', ({ process_id, data, status }) => {
-    if (mode.value) {
-      // conversion started
-      if (process_id !== pending.conversion) {
-        pending.conversion = process_id
-        if (orbi.value) {
-          pending.filename = data?.filename
-        }
-      } else {
-        if (status !== 'pending') {
-          pending.conversion = null
-        }
-      }
-    }
-  })
-
   // measurement mode
   ui.notification.on('create_sample_file', async () => {
     load()
