@@ -151,7 +151,7 @@ mascope env sync <source> <dest>  # synchronize source env into dest env
 
 The `env sync` command can be used to synchronize runtime environments locally, or to/from a remote host. It uses [rsync](https://linux.die.net/man/1/rsync) and thus supports incremental synchronization. To use it on Windows, [Cygwin](https://www.cygwin.com/) needs to be installed.
 
-[!IMPORTANT] Install Cygwin into the default location `C:\cygwin64`. During installation, select `rsync` and `ssh` packages to be installed.
+[!IMPORTANT] Install Cygwin into the default location `C:\cygwin64`. During installation, select `rsync` and `openssh` packages to be installed.
 
 Usage examples:
 
