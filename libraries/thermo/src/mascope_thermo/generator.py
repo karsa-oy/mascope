@@ -142,9 +142,7 @@ class RawProcessor(Thread):
         self.cancel_event.clear()
 
     def _handle_failed_file(self, file_path: str) -> None:
-        """Handle failed file
-
-        Moves the file to the folder of failed files
+        """Handle failed file - moves file to failed_files folder if possible
 
         :param file_path: Path to the failed file
         :type file_path: str
@@ -158,23 +156,62 @@ class RawProcessor(Thread):
             # Use full path to enable overwrite if the file already exists
             failed_file = os.path.join(failed_folder, os.path.basename(file_path))
             shutil.move(file_path, failed_file)
+            self.log.info(f"Moved failed file to: {failed_file}")
+        except PermissionError as e:
+            # File is locked - this indicates the file is still being processed
+            self.log.warning(f"Could not move locked file {file_path}: {e}")
+            self.log.warning(
+                "File will remain in streams folder - manual cleanup may be needed"
+            )
         except Exception as e:
             self.log.error(f"Failed to move file {file_path} to the error folder")
             self.log.exception(e)
 
-    def _process_raw_file(self, sample_file_props: dict, raw_file_path: str) -> bool:
+    def _cleanup_successful_file(self, file_to_process: str, file_basename: str):
+        """Handle successful file processing cleanup
+
+        NOTE: This should only be called AFTER _finalize() to ensure file is not locked
+        """
+        try:
+            # Delete file from streams folder
+            self.log.info("Deleting file from the streams folder")
+            os.remove(file_to_process)
+            self.log.info(f"Successfully deleted file: {file_to_process}")
+        except FileNotFoundError:
+            # File already deleted - this is not critical
+            self.log.warning(
+                f"File {file_to_process} was already deleted from streams folder"
+            )
+        except PermissionError as e:
+            # File locked - this indicates a problem with file handle cleanup
+            self.log.warning(f"Could not delete file {file_to_process}: {e}")
+            self.log.warning(
+                "File will remain in streams folder - manual cleanup may be needed"
+            )
+            self.log.warning(
+                "This may indicate an issue with file handle cleanup in _finalize()"
+            )
+        except Exception as e:
+            # Other deletion errors - log but don't fail
+            self.log.error(
+                f"Unexpected error during file deletion {file_to_process}: {e}"
+            )
+
+        # Always clear context at the end, regardless of file deletion success
+        self.socket_client.context_manager.clear_context(file_basename)
+
+    def _process_raw_file(self, sample_file_props: dict, raw_file_path: str) -> None:
         """Main function processing the raw files:
         1. Writes properties into the sample file
         2. Copies raw file into the sample file folder
-        3. Creates sum_signal.zarr
-        4. Creates a record in the database
+        3. Creates a record in the database
 
         :param sample_file_props: Sample file properties
         :type sample_file_props: dict
         :param raw_file_path: Path to the target raw file
         :type raw_file_path: str
-        :return: True if raw file processed successfully, False otherwise
-        :rtype: bool
+        :raises FileExistsError: If sample file already exists
+        :raises Exception: If any processing step fails
         """
         data_path = parse_path_from_item_filename(sample_file_props["filename"])
 
@@ -189,26 +226,25 @@ class RawProcessor(Thread):
             data_raw_path = os.path.join(data_path, "data.raw")
             shutil.copy(raw_file_path, data_raw_path)
 
+            # Create database record (raises exceptions on failure)
             self._create_db_record(sample_file_props)
-            return True
-        except FileExistsError:
-            self.log.error(
-                f"Processing error: sample file {sample_file_props['filename']} already exists!"
-            )
-            return False
+        except FileExistsError as exc:
+            raise FileExistsError(
+                "File already exists in the filestore. Please contact the administrator or rename the file."
+            ) from exc
         except Exception as e:
-            self.log.error(f"Processing error: {e}")
-            return False
+            raise Exception(str(e)) from e
 
     def _create_db_record(self, sample_file_props: dict):
         """
         Creates a record in the database.
 
         Requires file to be registered in the file converter service context.
-        Raises error if file context is not found.
+
+        :raises RuntimeError: If file context is not found or database creation fails
         """
+        base_filename = os.path.basename(self.raw.FileName)
         try:
-            base_filename = os.path.basename(self.raw.FileName)
             file_context = self.socket_client.context_manager.get_context(base_filename)
             if file_context is None:
                 raise RuntimeError(
@@ -219,7 +255,9 @@ class RawProcessor(Thread):
                 sample_file_props, access_token=file_context.access_token
             )
         except Exception as e:
-            self.log.error(f"Failed to create database record: {e}")
+            error_msg = f"Failed to create database record: {str(e)}"
+            self.log.error(error_msg)
+            raise RuntimeError(error_msg) from e
 
     def run(self):
         self.log.info(f"Running raw processor ({self.name})")
@@ -227,72 +265,115 @@ class RawProcessor(Thread):
         while not self.shutdown_event.is_set():
             try:
                 file_to_process = self.file_queue.get(timeout=0.1)
-                # Initialize Raw file reader
+                file_basename = os.path.basename(file_to_process)
+                instrument = file_basename.split("_")[0]
+
+                # Initialize Raw file reader (separate error handling)
                 try:
                     with self.lock:
                         self.raw = RawFileReaderAdapter.FileFactory(file_to_process)
                         self.raw.SelectInstrument(Device.MS, 1)
                         self.raw.IncludeReferenceAndExceptionData = True
                 except Exception as e:
-                    self.log.error(
-                        f"Failed to read file {Path(file_to_process).name}: {e}"
+                    error_msg = f"Failed to read file {Path(file_to_process).name}: {e}"
+                    self.log.error(error_msg)
+                    self.socket_client.emit(
+                        "file_processing_error",
+                        {
+                            "filename": file_basename,
+                            "instrument": instrument,
+                            "error": error_msg,
+                        },
                     )
                     self._finalize()
                     self._handle_failed_file(file_to_process)
                     continue
+
+                # Main processing block (centralized error handling)
+                try:
+                    # Start processing
+                    self.log.info(f"Processing started: {Path(file_to_process).name}")
+                    # Set active flag
+                    self.active.set()
+
+                    # Get UTC offset
+                    now = datetime.now()
+                    utc_offset = (
+                        now - now.astimezone(timezone.utc).replace(tzinfo=None)
+                    ).seconds
+
+                    # Gather sample file data
+                    sample_file_props = {
+                        "filename": self.filename.replace(" ", "_"),
+                        "length": self.length,
+                        "range": self.mz_range,
+                        "utc_offset": utc_offset,
+                        "method_file": self.method_file,
+                        "timestamp": self.timestamp.isoformat(),  # for DB record
+                        "polarity": self.polarity,
+                        # streaming leftovers:
+                        "committed_length": self.length,
+                        # non-applicable for Orbi:
+                        "single_ion_signal": None,
+                        "sample_interval": None,
+                        "mz_calibration": None,
+                    }
+                    # Process file (will raise exception on failure)
+                    self._process_raw_file(sample_file_props, file_to_process)
+
+                    self.log.info(
+                        f"Finished processing file: {Path(file_to_process).name}"
+                    )
+
+                    # CRITICAL: Finalize BEFORE cleanup to release file locks
+                    self._finalize()
+
+                    # Success: delete file and clear context
+                    self._cleanup_successful_file(file_to_process, file_basename)
+                except Exception as e:
+                    error_msg = str(e)
+                    self.log.error(
+                        f"Failed to process file {Path(file_to_process).name}: {e}"
+                    )
+
+                    # CRITICAL: Finalize BEFORE error emission to ensure raw file is disposed
+                    self._finalize()
+
+                    self.socket_client.emit(
+                        "file_processing_error",
+                        {
+                            "filename": file_basename,
+                            "instrument": instrument,
+                            "error": error_msg,
+                        },
+                    )
+                    # Clear context after error emission
+                    self.socket_client.context_manager.clear_context(file_basename)
+                    self._handle_failed_file(file_to_process)
+
             except Empty:
                 # No file to stream, keep waiting
                 continue
-            try:
-                # Start processing
-                self.log.info(f"Processing started: {Path(file_to_process).name}")
-                # Set active flag
-                self.active.set()
-
-                # Get UTC offset
-                now = datetime.now()
-                utc_offset = (
-                    now - now.astimezone(timezone.utc).replace(tzinfo=None)
-                ).seconds
-
-                # Gather sample file data
-                sample_file_props = {
-                    "filename": self.filename.replace(" ", "_"),
-                    "length": self.length,
-                    "range": self.mz_range,
-                    "utc_offset": utc_offset,
-                    "method_file": self.method_file,
-                    "timestamp": self.timestamp.isoformat(),  # for DB record
-                    "polarity": self.polarity,
-                    # streaming leftovers:
-                    "committed_length": self.length,
-                    # non-applicable for Orbi:
-                    "single_ion_signal": None,
-                    "sample_interval": None,
-                    "mz_calibration": None,
-                }
-                if_processed = self._process_raw_file(
-                    sample_file_props, file_to_process
-                )
-                self.log.info(f"Finished processing file: {Path(file_to_process).name}")
             except Exception as e:
-                self.log.error(
-                    f"Failed to process file {Path(file_to_process).name}: {e}"
-                )
-                if_processed = False
-            finally:
-                self._finalize()
-            if if_processed:
-                self.log.info("Deleting file from the streams folder")
-                try:
-                    os.remove(file_to_process)
-                except FileNotFoundError as e:
-                    self.log.error(
-                        f"Failed to delete file {file_to_process} from streams folder"
+                # Catch any unexpected errors (e.g., issues with file queue, etc.)
+                self.log.error(f"Unexpected error in processor: {e}")
+                if file_to_process and file_basename:
+                    # Check that finalize is called before event emission
+                    if self.raw:
+                        self._finalize()
+
+                    self.socket_client.emit(
+                        "file_processing_error",
+                        {
+                            "filename": file_basename,
+                            "instrument": instrument or "unknown",
+                            "error": f"Unexpected processor error: {str(e)}",
+                        },
                     )
-                    self.log.exception(e)
-            else:
-                self._handle_failed_file(file_to_process)
+
+                    # Clear context after emission
+                    self.socket_client.context_manager.clear_context(file_basename)
+
         # Out of main loop
         self.log.info(f"Exiting raw processor ({self.name})")
         self.shutdown()
