@@ -199,7 +199,7 @@ def generate_target_ions_from_mass(
             is_addition = mechanism[0] == "-"
             me = 0.00054858  # mass of an electron [Da]
             raw_isotopes = [(me if is_addition else -me, 1.0)]
-
+        # Store high resolution isotopes
         target_isotopes.extend(
             [
                 TargetIsotope(
@@ -207,6 +207,20 @@ def generate_target_ions_from_mass(
                     target_ion_id=ion.target_ion_id,
                     mz=(target_compound_mass + reagent_mz),
                     relative_abundance=reagent_rel_abu,
+                    resolution="HIGH",
+                )
+                for reagent_mz, reagent_rel_abu in raw_isotopes
+            ]
+        )
+        # Store low resolution isotopes
+        target_isotopes.extend(
+            [
+                TargetIsotope(
+                    target_isotope_id=gen_id(16),
+                    target_ion_id=ion.target_ion_id,
+                    mz=(target_compound_mass + reagent_mz),
+                    relative_abundance=reagent_rel_abu,
+                    resolution="LOW",
                 )
                 for reagent_mz, reagent_rel_abu in raw_isotopes
             ]
