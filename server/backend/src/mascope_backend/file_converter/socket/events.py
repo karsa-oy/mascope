@@ -28,5 +28,6 @@ class SocketEventHandler:
                 username=data["username"],
                 role_id=data["role_id"],
                 access_token=data["access_token"],
+                user_sid=data["user_sid"],
             )
             self.client.context_manager.register_file(context)

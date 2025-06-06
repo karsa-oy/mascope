@@ -14,6 +14,7 @@ file_processing_notification_process_id = gen_id(8)
 async def file_processing_error(sid, error_data):
     """Handle file processing error events from file converter service."""
     instrument = error_data.get("instrument")
+    user_sid = error_data.get("user_sid")
     filename = error_data.get("filename")
     error_message = error_data.get("error", "Unknown processing error")
 
@@ -31,4 +32,4 @@ async def file_processing_error(sid, error_data):
         },
     )
 
-    await emit_user_notification(file_processing_notification, instrument)
+    await emit_user_notification(file_processing_notification, user_sid)
