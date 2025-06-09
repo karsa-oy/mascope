@@ -49,7 +49,7 @@ def charge_string(raw_ion: Formula) -> str:
 def generate_target_ions_from_composition(
     target_compound: TargetCompoundBase,
     ionization_mechanisms: List[IonizationMechanism],
-) -> tuple:
+) -> tuple[list[TargetIon], list[TargetIsotope]]:
     """Generate target ions and isotopes based on target compound composition and given ionization mechanisms
 
     :param target_compound: Target compound to use as a base for the ions
@@ -152,7 +152,7 @@ def generate_target_ions_from_mass(
     target_compound_mass: float,
     target_compound: TargetCompoundBase,
     ionization_mechanisms: List[IonizationMechanism],
-) -> tuple:
+) -> tuple[list[TargetIon], list[TargetIsotope]]:
     """Generate target ions and isotopes based on target compound mass and given ionization mechanisms
 
     :param target_compound_mass: Mass of the target compound (composition not known)
