@@ -22,7 +22,7 @@ from datetime import datetime, timezone
 import pytest
 import pytest_asyncio
 
-from mascope_backend.db.models import IonizationMechanism, Workspace
+from mascope_backend.db.models import IonizationMechanism, TargetCompound, Workspace
 
 
 @pytest_asyncio.fixture(scope="session")
@@ -94,6 +94,101 @@ async def test_ionization_mechanisms(
             await session.refresh(ionization_mechanism)
 
         return ionization_mechanisms
+
+
+@pytest_asyncio.fixture(scope="session")
+async def test_target_compounds_by_composition(
+    async_session_factory: callable,
+) -> list[TargetCompound]:
+    """Create test target compound records by composition in the unit test database.
+
+    :param async_session_factory: Factory for creating database sessions
+    :type async_session_factory: callable
+
+    :return: List of created target compound objects
+    :rtype: list[TargetCompound]
+    """
+
+    async with async_session_factory() as session:
+        # These are example target compounds created for testing purposes.
+        # They are not exhaustive and can be adjusted as needed for your tests.
+        target_compounds = [
+            TargetCompound(
+                target_compound_id="target-compound-by-composition-1",
+                target_compound_name=None,
+                target_compound_formula="()",
+                cas_number=None,
+            ),
+            TargetCompound(
+                target_compound_id="target-compound-by-composition-2",
+                target_compound_name="Water",
+                target_compound_formula="H2O",
+                cas_number="7732-18-5",
+            ),
+            TargetCompound(
+                target_compound_id="target-compound-by-composition-3",
+                target_compound_name="Urea",
+                target_compound_formula="CH4N2O",
+                cas_number="57-13-6",
+            ),
+            TargetCompound(
+                target_compound_id="target-compound-by-composition-4",
+                target_compound_name="a-Pinene",
+                target_compound_formula="C10H16",
+                cas_number="80-56-8",
+            ),
+        ]
+        for target_compound in target_compounds:
+            session.add(target_compound)
+        await session.commit()
+
+        # Refresh to get all attributes
+        for target_compound in target_compounds:
+            await session.refresh(target_compound)
+
+        return target_compounds
+
+
+@pytest_asyncio.fixture(scope="session")
+async def test_target_compounds_by_mass(
+    async_session_factory,
+) -> list[tuple[float, TargetCompound]]:
+    """Create test target compound records by mass instead of composition.
+
+    This fixture populates the database with target compounds that can be used
+    by multiple unit tests. The compounds are created once per test session.
+
+    :param async_session_factory: Factory for creating database sessions
+    :type async_session_factory: callable
+
+    :return: List of tuples containing target compound masses and their corresponding objects
+    :rtype: list[tuple[float, TargetCompound]]
+    """
+
+    # Define the target compound masses to be used in tests
+    # These are example masses, you can adjust them as needed for your tests
+    masses = [0.0, 18.01056, 60.03236, 136.12520]
+
+    async with async_session_factory() as session:
+        target_compounds = [
+            TargetCompound(
+                target_compound_id=f"target-compound-by-mass-{i+1}",
+                target_compound_name=None,
+                target_compound_formula=mass,
+                cas_number=None,
+            )
+            for i, mass in enumerate(masses)
+        ]
+        for target_compound in target_compounds:
+            session.add(target_compound)
+
+        await session.commit()
+
+        # Refresh to get all attributes
+        for target_compound in target_compounds:
+            await session.refresh(target_compound)
+
+    return list(zip(masses, target_compounds))
 
 
 @pytest_asyncio.fixture(scope="session")
