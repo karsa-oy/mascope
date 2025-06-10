@@ -1342,53 +1342,11 @@ Jupyter lab. To use it, run `mascope dev run ==lab` and navigate to `localhost:8
 
 ## 📝 Git conventions
 
-To encourage consistency and homogenousity in the Git history across developers, the following practices should be followed when contributing to the repository.
+To encourage consistency and homogenousity in the Git history across developers, the guidelines presented in the [organization README](https://github.com/karsa-oy) should be followed. For project specific additions to the general guidelines, see below.
 
-### Branching
+#### Commit message _scopes_
 
-We have two main branches (_trunks_) in the repository:
-
-- `develop` (default) - development/staging branch
-- `main` - production release branch
-
-When tackling an issue, a new branch should be created off of `develop`. The branch should be put into a directory based on intention:
-
-- `feature/` - new feature
-- `fix/` - bug fix
-- `refactor/` - reorganizing code, no changes to logic
-
-The branch name should include the issue number and a short descriptive title, e.g. `1337-solitaire-loading-screen`. Thus, the complete branch name would be e.g. `feature/1337-solitaire-loading-screen`. The branch should be deleted after merging into `develop` via pull request.
-
-### Commit messages
-
-Commit messages should follow a flavor of the [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/) specification, as summarized in the following.
-
-Each commit message should be structured as follows (note the white space):
-
-```
-<type>(optional scope): <description>
-
-<optional body>
-
-<optional footer(s)>
-```
-
-Each field is explained below, followed by a few examples.
-
-#### Type
-
-The following _types_ are used:
-
-- `fix` - bug fix
-- `feat` - new feature
-- `chore` - code clean up or other maintenance work, such as dependency update
-- `doc` - documentation update
-- `test` - new test
-- `refactor` - code refactoring, no change in logic
-
-#### Scope (optional)
-
-The **optional** _scope_ field may be used to provide context for the change, e.g.:
+The optional _scope_ field may be used to provide context for the change. The scopes specific to this repository are listed below:
 
 - `(ui)`
 - `(backend)`
@@ -1399,47 +1357,3 @@ The **optional** _scope_ field may be used to provide context for the change, e.
 - `(sdk)`
 - `(cli)`
 - `(test)`
-
-#### Description & body
-
-- The _description_ field should contain short yet descriptive summary of the change.
-
-- The optional _body_ field may contain a longer description and explanation of the change. Providing the _body_ is highly recommended, as it can provide very useful context to the commit for the reader.
-
-#### Extras
-
-- _Breaking change_ should be denoted by using an exclamation mark, e.g. `feat(api)!: Changed everything`. Optionally, also a `BREAKING CHANGE:` footer can be added to describe what was broken.
-  s
-- `Refs:` footer may be used to link _issues_ or _commits_, e.g. `Refs: #123, 72d6fe3`
-
-#### Examples
-
-- _Minimal:_
-
-  `fix: Fix a typo in user notification`
-
-- _Complete:_
-
-  ```
-  fix(api): Fix a typo in user notification
-
-  There was a mistake in the user notification for successful log-in, telling the user to screw off. Changed to "welcome".
-
-  Refs: #666
-  ```
-
-- _Breaking change:_
-
-  ```
-  feat(api, agent, sdk)!: Add authentication to file upload endpoint
-
-  User authentication added to the file upload endpoint to prevent unauthorized file uploads. Corresponding changes made to Mascope SDK.
-
-  BREAKING CHANGE: Agent applications need to be authenticated in order to upload files. Requires agents to be updated.
-
-  Refs: #456
-  ```
-
-### Pull requests
-
-> TODO: Write up best practices for preparing a PR.
