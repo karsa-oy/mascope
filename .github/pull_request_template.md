@@ -34,9 +34,9 @@ Relevant visual evidence demonstrating the changes with before/after comparisons
 
 ### Linked Issues
 
-- **Closes:** #issue-number
-- **Related:** #issue-number _(if applicable)_
-- **Follow-up needed:** #issue-number _(if applicable)_
+- Closes #issue-number
+- Related #issue-number _(if applicable)_
+- Follow-up needed #issue-number _(if applicable)_
 
 ### External References
 
