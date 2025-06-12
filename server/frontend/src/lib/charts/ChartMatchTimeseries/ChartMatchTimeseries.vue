@@ -6,6 +6,7 @@ import { useWindowSize } from '@vueuse/core'
 import Tag from 'primevue/tag'
 
 import { useApp } from '@/stores'
+import { num } from '@/lib/formatters'
 
 import BaseChartPlotly from '../BaseChartPlotly.vue'
 import { useChartData } from './data.js'
@@ -68,12 +69,6 @@ const layout = computed(() => ({
   },
   height: props.height
 }))
-
-const similarity = new Intl.NumberFormat('en-US', {
-  style: 'percent',
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2
-})
 </script>
 
 <template>
@@ -81,7 +76,11 @@ const similarity = new Intl.NumberFormat('en-US', {
     <span style="margin-bottom: 1rem">
       isotope similarity:
       <Tag
-        :value="similarity.format(app.data.match.visualized.isotopes?.[0].match_isotope_similarity)"
+        :value="
+          num.isotopeSimilarity.format(
+            app.data.match.visualized.isotopes?.[0].match_isotope_similarity
+          )
+        "
       />
     </span>
     <BaseChartPlotly

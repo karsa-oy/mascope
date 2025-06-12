@@ -16,6 +16,7 @@ import { useApp } from '@/stores'
 import { api } from '@/api'
 import { BaseMatchTag } from '@/lib/base'
 import { PopoverTargetCompoundAdd } from '@/lib/dialogs'
+import { num } from '@/lib/formatters'
 
 import { usePreview } from './preview.js'
 
@@ -31,20 +32,6 @@ const props = defineProps({
     required: true
   }
 })
-
-const invalid = computed(() => false)
-
-const mzFmt = new Intl.NumberFormat('en-US', {
-  minimumIntegerDigits: 2,
-  minimumFractionDigits: 3,
-  maximumFractionDigits: 3
-})
-const relAbuFmt = new Intl.NumberFormat('en-US', {
-  minimumIntegerDigits: 1,
-  minimumFractionDigits: 3,
-  maximumFractionDigits: 3
-})
-const formattedMz = computed(() => mzFmt.format(app.data.peak.focused.mz))
 
 // TODO: make global params store
 const chemConfig = ref(null)
@@ -225,7 +212,7 @@ const expanded = ref({})
       <span style="opacity: 0.5" v-if="app.data.peak.focused">
         Showing {{ displayedMatches }} {{ displayedMatches === 1 ? 'match' : 'matches' }} out of
         {{ totalMatches }} potential {{ totalMatches === 1 ? 'compound' : 'compounds' }} for peak
-        {{ mzFmt.format(app.data.peak.focused.mz) }}
+        {{ num.mz.format(app.data.peak.focused.mz) }}
       </span>
     </template>
     <div class="col" style="gap: 1rem; align-items: stretch; max-width: 900px">
@@ -275,7 +262,7 @@ const expanded = ref({})
         <Column field="target_compound_formula" header="Formula" sortable />
         <Column field="cheminfo.target_isotope_mz" header="Isotope m/z" sortable>
           <template #body="{ data }">
-            {{ mzFmt.format(data.cheminfo.target_isotope_mz) }}
+            {{ num.mz.format(data.cheminfo.target_isotope_mz) }}
           </template>
         </Column>
         <Column
@@ -285,7 +272,7 @@ const expanded = ref({})
         />
         <Column field="cheminfo.target_isotope_mz_error_ppm" header="Error (ppm)" sortable>
           <template #body="{ data }">
-            {{ mzFmt.format(data.cheminfo.target_isotope_mz_error_ppm) }}
+            {{ num.mzError.format(data.cheminfo.target_isotope_mz_error_ppm) }}
           </template>
         </Column>
         <Column field="match_score" sortable>
@@ -349,22 +336,22 @@ const expanded = ref({})
             </Column>
             <Column field="relative_abundance" header="Rel. Abu." sortable>
               <template #body="{ data }">
-                {{ relAbuFmt.format(data.relative_abundance) }}
+                {{ num.relativeAbundance.format(data.relative_abundance) }}
               </template>
             </Column>
             <Column field="mz" header="Isotope m/z" sortable>
               <template #body="{ data }">
-                {{ mzFmt.format(data.mz) }}
+                {{ num.mz.format(data.mz) }}
               </template>
             </Column>
             <Column field="data.match_isotope_similarity" header="Similarity" sortable>
               <template #body="{ data }">
-                {{ relAbuFmt.format(data.match_isotope_similarity) }}
+                {{ num.isotopeSimilarity.format(data.match_isotope_similarity) }}
               </template>
             </Column>
             <Column field="match_mz_error" header="Error (ppm)" sortable>
               <template #body="{ data }">
-                {{ mzFmt.format(data.match_mz_error) }}
+                {{ num.mzError.format(data.match_mz_error) }}
               </template>
             </Column>
             <Column field="match_score" sortable>

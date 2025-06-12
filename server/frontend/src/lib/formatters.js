@@ -9,6 +9,11 @@ export const num = {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1
   }),
+  isotopeSimilarity: new Intl.NumberFormat('en-US', {
+    style: 'percent',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }),
   peakIntensity: new Intl.NumberFormat('en-US', {
     notation: 'scientific',
     minimumSignificantDigits: 4,
