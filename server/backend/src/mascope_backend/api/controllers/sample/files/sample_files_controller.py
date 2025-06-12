@@ -42,6 +42,7 @@ from mascope_backend.api.models.sample.files.sample_file_pydantic_model import (
     SampleFileCreate,
     SampleFileUpdate,
 )
+from mascope_backend.api.controllers.samples.samples_controller import get_samples
 from mascope_backend.socket import event_emitter
 from mascope_backend.socket.notifications import (
     UserNotification,
@@ -240,207 +241,310 @@ async def create_sample_file(sample_file: SampleFileCreate) -> dict:
         }
 
 
+# ---------------------
+# Sample file deletion controllers
+# ---------------------
+
+
 @api_controller()
-async def delete_sample_file(sample_file_id: str):
+async def delete_sample_file_db_record(sample_file_id: str) -> dict[str, str]:
     """
-    Deletes a sample file by its unique ID and removes the corresponding filestore directory.
+    Deletes a sample file database record by its unique identifier.
 
     Steps:
-    1. Fetch the sample file from the database using the provided ID.
-    2. Check if any sample items are associated with this file. If so, raise an error.
-    3. Delete the fetched sample file from the session and commit the changes to the database.
-    4. Delete the corresponding filestore directory.
-    5. Conditionally reload instruments.
-    6. Trigger acquisitions reload.
+    1. Fetch the sample file by its ID from the database.
+    2. If the sample file is found, delete it from the session and commit the changes to the database.
 
-    :param sample_file_id: The ID of the sample file to delete.
+    :param sample_file_id: The unique identifier of the sample file to delete.
     :type sample_file_id: str
-    :raises NotFoundException: If the sample file with the given ID is not found.
-    :raises HTTPException: If sample items are associated with this file.
+    :raises NotFoundException: If no sample file is found with the provided ID.
+    :return: Dictionary with status and success message.
+    :rtype: dict[str, str]
     """
-    from mascope_backend.api.controllers.sample.items.sample_items_controller import (
-        get_sample_items,
-    )
-
+    # Step 1: Fetch the sample file
     async with async_session() as session:
-        # Step 1: Fetch the sample file
         sample_file = await session.get(SampleFile, sample_file_id)
         if not sample_file:
             raise NotFoundException(f"Sample file with ID '{sample_file_id}' not found")
 
-        # Step 2: Check if any sample items are associated with this file
-        sample_items = (await get_sample_items(filename=sample_file.filename))["data"]
-        if sample_items:
-            # raise a warning and abort if some found
-            message = (
-                f"Cannot delete sample file '{sample_file.filename}' because it is associated with {len(sample_items)} sample item(s). Delete the sample items first.",
-            )
-            data = {"sample_item_ids": [i["sample_item_id"] for i in sample_items]}
-            raise_api_warning(message, data)
-            return {"message": message, "data": data}
+        filename = sample_file.filename
 
-        # Step 3: Delete from database and commit
+        # Step 2: Delete the sample file and commit changes
         await session.delete(sample_file)
         await session.commit()
 
-        # Step 4: Delete the corresponding filestore directory
-        try:
-            filestore_path = parse_path_from_item_filename(sample_file.filename)
-            if os.path.exists(filestore_path):
-                shutil.rmtree(filestore_path)
-                runtime.logger.info(f"Deleted filestore directory: {filestore_path}")
-        except Exception as e:
-            runtime.logger.error(
-                f"Failed to delete filestore directory for '{sample_file.filename}': {e}"
-            )
-            # Continue execution even if file deletion fails
-
-        # Step 5: Trigger instruments reload
-        final_instruments = [i["instrument"] for i in (await get_instruments())["data"]]
-        if sample_file.instrument not in final_instruments:
-            # instrument removed by deletion and needs reload
-            await sio.emit(
-                "instruments_reload",
-                namespace="/",
-            )
-
-        # Step 6: Trigger acquisitions reload
-        await sio.emit(
-            "acquisitions_reload", namespace="/", room=sample_file.instrument
-        )
-
     return {
-        "message": f"Sample file '{sample_file.filename}' deleted successfully.",
+        "status": "success",
+        "message": f"Sample file '{filename}' deleted from database successfully.",
     }
 
 
+async def delete_sample_file_from_filestore(filename: str) -> dict[str, str]:
+    """
+    Removes a sample file from the filestore directory.
+
+    Steps:
+    1. Parse the filestore path from the filename.
+    2. Check if the filestore directory exists.
+    3. Remove the directory if it exists.
+
+    :param filename: The filename to construct the filestore path.
+    :type filename: str
+    :return: Dictionary with status and message.
+    :rtype: dict[str, str]
+    """
+    # Step 1: Parse filestore path from filename
+    try:
+        filestore_path = parse_path_from_item_filename(filename)
+    except Exception as e:
+        runtime.logger.error(f"Failed to parse filestore path for '{filename}': {e}")
+        return {
+            "status": "error",
+            "message": f"Failed to parse filestore path for '{filename}': {e}",
+        }
+
+    # Step 2: Check if filestore directory exists
+    if not os.path.exists(filestore_path):
+        return {
+            "status": "success",
+            "message": f"Filestore directory for '{filename}' does not exist.",
+        }
+
+    # Step 3: Remove the directory
+    try:
+        shutil.rmtree(filestore_path)
+        runtime.logger.info(f"Deleted filestore directory: {filestore_path}")
+        return {
+            "status": "success",
+            "message": f"Filestore directory for '{filename}' deleted successfully.",
+        }
+    except Exception as e:
+        runtime.logger.error(
+            f"Failed to delete filestore directory for '{filename}': {e}"
+        )
+        return {
+            "status": "error",
+            "message": f"Failed to delete filestore directory for '{filename}': {e}",
+        }
+
+
 @api_controller()
-async def delete_sample_files(sample_file_ids: list[str]):
+async def delete_sample_file(
+    sample_file_id: str | None = None, filename: str | None = None
+) -> dict[str, str]:
+    """
+    Deletes a sample file by either ID or filename, removing both database record and filestore file.
+    Performs sample item association check for safety.
+
+    Steps:
+    1. Validate that exactly one parameter is provided.
+    2. If sample_file_id is provided, fetch sample file and get filename.
+    3. If filename is provided, try to find corresponding database record.
+    4. Check for associated sample items and block deletion if found.
+    5. Delete database record if exists.
+    6. Delete filestore file.
+
+    :param sample_file_id: The ID of the sample file to delete (optional).
+    :type sample_file_id: str | None
+    :param filename: The filename of the sample file to delete (optional).
+    :type filename: str | None
+    :raises ValueError: If both or neither parameters are provided.
+    :raises NotFoundException: If sample_file_id is provided but not found.
+    :raises HTTPException: If sample items are associated with this file.
+    :return: Dictionary with status and message.
+    :rtype: dict[str, str]
+    """
+    # Step 1: Validate parameters
+    if not (sample_file_id or filename) or (sample_file_id and filename):
+        raise ValueError(
+            "Exactly one parameter must be provided: either sample_file_id or filename"
+        )
+
+    db_record_deleted = False
+    target_filename = filename
+
+    # Step 2: Handle sample_file_id case
+    if sample_file_id:
+        target_filename = (await get_sample_file(sample_file_id))["data"]["filename"]
+
+    # Step 3: Handle filename case - try to find database record
+    elif filename:
+        async with async_session() as session:
+            stmt = select(SampleFile).where(SampleFile.filename == filename)
+            result = await session.execute(stmt)
+            if sample_file := result.scalar_one_or_none():
+                sample_file_id = sample_file.sample_file_id
+
+    # Step 4: Safety check - verify no associated sample items exist
+    if associated_samples := (await get_samples(filename=target_filename))["data"]:
+        sample_item_ids = [sample["sample_item_id"] for sample in associated_samples]
+        message = (
+            f"Cannot delete sample file '{target_filename}' because it is associated with "
+            f"{len(sample_item_ids)} sample item(s). Delete the sample items first."
+        )
+        data = {"sample_item_ids": sample_item_ids}
+        raise_api_warning(message, data)
+        return {"status": "error", "message": message}
+
+    # Step 5: Delete database record if exists
+    if sample_file_id:
+        try:
+            db_record_deleted = (await delete_sample_file_db_record(sample_file_id))[
+                "status"
+            ] == "success"
+        except NotFoundException:
+            # Record doesn't exist, continue with filestore deletion
+            pass
+
+    # Step 6: Delete filestore file
+    filestore_result = await delete_sample_file_from_filestore(target_filename)
+    filestore_deleted = filestore_result["status"] == "success"
+
+    # Step 7: Determine overall status and message
+    match (db_record_deleted, filestore_deleted):
+        case (True, True):
+            status = "success"
+            message = f"Sample file '{target_filename}' deleted successfully from database and filestore."
+        case (True, False):
+            status = "partial"
+            message = f"Sample file '{target_filename}' deleted from database but filestore deletion failed."
+        case (False, True):
+            status = "partial"
+            message = f"Sample file '{target_filename}' deleted from filestore but no database record found."
+        case (False, False):
+            status = "error"
+            message = f"Failed to delete sample file '{target_filename}' from both database and filestore."
+
+    return {"status": status, "message": message}
+
+
+@api_controller()
+async def delete_sample_files(sample_file_ids: list[str]) -> dict[str, str | dict]:
     """
     Deletes multiple sample files by their unique IDs and removes the corresponding filestore directories.
     Only deletes files that don't have existing sample items associated with them.
 
     Steps:
-    1. Check for duplicate sample file IDs
-    2. Fetch all sample files from the database using the provided IDs
-    3. For each file, check if any sample items are associated with it
-    4. Delete only the files without associated sample items
-    5. Delete the corresponding filestore directories
-    6. Conditionally reload instruments
-    7. Trigger acquisitions reload
-    8. Return results with information about deleted and skipped files
+    1. Collect all sample file data and check associations upfront.
+    2. Delete files that have no associations.
+    3. Emit socket events for instruments and acquisitions.
+    4. Return results with information about deleted and skipped files.
 
-    :param sample_file_ids: List of IDs of the sample files to delete
+    :param sample_file_ids: List of IDs of the sample files to delete.
     :type sample_file_ids: list[str]
-    :raises NotFoundException: If any of the sample files with the given IDs are not found
-    :raises ApiException: If any files were skipped due to associated sample items
-    :return: A dictionary with information about deleted and skipped files
-    :rtype: dict
+    :raises NotFoundException: If any of the sample files with the given IDs are not found.
+    :raises ApiException: If any files were skipped due to associated sample items.
+    :return: Dictionary with information about deleted and skipped files.
+    :rtype: dict[str, str | dict]
     """
-    from mascope_backend.api.controllers.sample.items.sample_items_controller import (
-        get_sample_items,
-    )
-
-    # Step 1: Check for duplicate sample file IDs
-    if len(set(sample_file_ids)) < len(sample_file_ids):
-        raise ValueError("delete sample files: sample file IDs must be unique")
-
     deleted_files = []
     skipped_files = []
-    sample_item_ids = []
+    all_sample_item_ids = []
     instruments_affected = set()
+    files_to_delete = []
 
-    async with async_session() as session:
-        # Step 2: Fetch all sample files
-        for sample_file_id in sample_file_ids:
-            sample_file = await session.get(SampleFile, sample_file_id)
-            if not sample_file:
-                raise NotFoundException(
-                    f"Sample file with ID '{sample_file_id}' not found"
-                )
+    # Step 1: Collect all sample file data and check sample_item associations
+    for sample_file_id in sample_file_ids:
+        try:
+            # Get sample file data
+            sample_file_data = (await get_sample_file(sample_file_id))["data"]
+            filename, instrument = (
+                sample_file_data["filename"],
+                sample_file_data["instrument"],
+            )
 
-            # Step 3: Check if any sample items are associated with this file
-            sample_items = (await get_sample_items(filename=sample_file.filename))[
-                "data"
-            ]
-            if sample_items:
-                # Skip this file and record the reason
+            # Check for associated sample items
+            if associated_samples := (await get_samples(filename=filename))["data"]:
                 skipped_files.append(sample_file_id)
-                sample_item_ids += [i["sample_item_id"] for i in sample_items]
-                continue
-
-            # Step 4: Delete from database
-            instruments_affected.add(sample_file.instrument)
-            await session.delete(sample_file)
-
-            # Step 5: Delete the corresponding filestore directory
-            try:
-                filestore_path = parse_path_from_item_filename(sample_file.filename)
-                if os.path.exists(filestore_path):
-                    shutil.rmtree(filestore_path)
-                    runtime.logger.info(
-                        f"Deleted filestore directory: {filestore_path}"
-                    )
-            except Exception as e:
-                runtime.logger.error(
-                    f"Failed to delete filestore directory for '{sample_file.filename}': {e}"
+                all_sample_item_ids.extend(
+                    [sample["sample_item_id"] for sample in associated_samples]
                 )
-                # Continue execution even if file deletion fails
-
-            deleted_files.append(
-                {"sample_file_id": sample_file_id, "filename": sample_file.filename}
-            )
-
-        # Commit all deletions at once
-        await session.commit()
-
-        # Step 6: Trigger instruments reload if needed
-        if instruments_affected:
-            final_instruments = [
-                i["instrument"] for i in (await get_instruments())["data"]
-            ]
-            missing_instruments = [
-                i for i in instruments_affected if i not in final_instruments
-            ]
-            if missing_instruments:
-                await sio.emit(
-                    "instruments_reload",
-                    namespace="/",
+            else:
+                files_to_delete.append(
+                    {
+                        "sample_file_id": sample_file_id,
+                        "filename": filename,
+                        "instrument": instrument,
+                    }
                 )
 
-        # Step 7: Trigger acquisitions reload
-        for instrument_affected in instruments_affected:
-            await sio.emit(
-                "acquisitions_reload", namespace="/", room=instrument_affected
+        except NotFoundException:
+            skipped_files.append(sample_file_id)
+
+    # Step 2: Delete files without sample_item associations
+    for file_data in files_to_delete:
+        try:
+            result = await delete_sample_file(
+                sample_file_id=file_data["sample_file_id"]
             )
 
-    # Step 8: Return results and raise exception if any files were skipped
+            if result["status"] in ["success", "partial"]:
+                deleted_files.append(
+                    {
+                        "sample_file_id": file_data["sample_file_id"],
+                        "filename": file_data["filename"],
+                    }
+                )
+                instruments_affected.add(file_data["instrument"])
+            else:
+                skipped_files.append(file_data["sample_file_id"])
+
+        except Exception as e:
+            runtime.logger.error(
+                f"Unexpected error deleting sample file {file_data['sample_file_id']}: {e}"
+            )
+            skipped_files.append(file_data["sample_file_id"])
+
+    # Step 3: Emit reload events if instruments were affected
+    if instruments_affected:
+        # Get current instruments list after deletions
+        final_instruments = [
+            instrument["instrument"] for instrument in (await get_instruments())["data"]
+        ]
+
+        # Check if any affected instruments are now missing from the database
+        # This happens when we deleted the last sample file for an instrument
+        if missing_instruments := [
+            instrument
+            for instrument in instruments_affected
+            if instrument not in final_instruments
+        ]:
+            # Tell UI to reload instruments list since some instruments disappeared
+            await sio.emit("instruments_reload", namespace="/")
+
+        # Tell UI to reload acquisition data for each affected instrument
+        # This refreshes the file lists and related data in the UI
+        for instrument in instruments_affected:
+            await sio.emit("acquisitions_reload", namespace="/", room=instrument)
+
+    # Step 4: Prepare response data and message
     data = {
         "deleted": deleted_files,
         "skipped_files": skipped_files,
-        "sample_item_ids": sample_item_ids,
+        "sample_item_ids": all_sample_item_ids,
     }
-    message = ""
+
+    message_parts = []
     if deleted_files:
-        s = "s" if len(deleted_files) > 1 else ""
-        message += f"Deleted {len(deleted_files)} sample file{s}. "
+        count = len(deleted_files)
+        plural = "s" if count > 1 else ""
+        message_parts.append(f"Deleted {count} sample file{plural}")
+
     if skipped_files:
-        s = "s" if len(skipped_files) > 1 else ""
-        sample_items = (
-            f"{len(sample_item_ids)} sample items"
-            if len(skipped_files) > 1
-            else "a sample item"
+        count = len(skipped_files)
+        plural = "s" if count > 1 else ""
+        item_count = len(all_sample_item_ids)
+        item_text = f"{item_count} sample items" if item_count > 1 else "a sample item"
+        message_parts.append(
+            f"Skipped {count} sample file{plural} because it is associated with {item_text}"
         )
-        message += f"Skipped {len(skipped_files)} sample file{s} because it is associated with {sample_items}."
-        raise_api_warning(
-            message,
-            data,
-        )
-    else:
-        return {
-            "message": message,
-            "data": data,
-        }
+
+    message = ". ".join(message_parts) + "." if message_parts else "No files processed."
+
+    if skipped_files:
+        raise_api_warning(message, data)
+
+    return {"message": message, "data": data}
 
 
 @api_controller()

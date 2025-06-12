@@ -254,7 +254,15 @@ class GetSpectrumQueryParams(CommonValidators, QueryParamsModel):
         return values
 
 
-class DeleteSampleFilesBody(BaseModel):
+class DeleteSampleFilesBody(RequestBodyModel):
     sample_file_ids: list[str] = Field(
-        ..., description="List of sample file IDs to delete"
+        ..., description="List of sample file IDs to delete", min_length=1
     )
+
+    @field_validator("sample_file_ids")
+    @classmethod
+    def validate_unique_ids(cls, v: list[str]) -> list[str]:
+        """Validate that sample file IDs are unique."""
+        if len(set(v)) != len(v):
+            raise ValueError("Sample file IDs must be unique")
+        return v
