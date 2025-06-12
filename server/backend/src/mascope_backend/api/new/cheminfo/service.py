@@ -116,6 +116,7 @@ async def retrieve_cheminfo_by_mz(
         try:
             results.append(
                 {
+                    "sample_peak_mz": mz,
                     "target_compound_formula": raw["mf"] if len(raw["mf"]) else "()",
                     "target_compound_unsaturation": raw["unsaturation"],
                     "ionization_mechanism": to_mascope_ion_mech(
@@ -311,10 +312,28 @@ async def match_cheminfo_by_mz(
             )
             # Find isotopes matching the ionization mechanism
             info_ionization_mechanism = info.get("ionization_mechanism", {})
-            if match_ion.get(
-                "ionization_mechanism_id"
-            ) == info_ionization_mechanism.get("ionization_mechanism_id"):
+            if (
+                match_ion["ionization_mechanism_id"]
+                == info_ionization_mechanism["ionization_mechanism_id"]
+            ):
                 match_isotopes = match_ion.get("children", [])
+                # Make sure the matched peak is the one in the original ChemInfo result
+                # This is important because when computing matches, the closest peak
+                # to target m/z is selected, which may not be the same as the one used in
+                # the ChemInfo query.
+                if not info["sample_peak_mz"] in [
+                    iso["sample_peak_mz"] for iso in match_isotopes
+                ]:
+                    runtime.logger.warning(
+                        (
+                            "Matched peak m/z does not match ChemInfo result m/z: ",
+                            f"{match_isotopes[0]['sample_peak_mz']} != {info['sample_peak_mz']}, ",
+                            "skipping this result.",
+                        )
+                    )
+                    # Skip this result as the match is for a wrong peak
+                    continue
+
                 # Create combined result entry
                 matched_info = {
                     **match_ion,
