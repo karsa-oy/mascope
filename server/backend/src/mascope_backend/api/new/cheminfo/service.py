@@ -321,15 +321,11 @@ async def match_cheminfo_by_mz(
                 # This is important because when computing matches, the closest peak
                 # to target m/z is selected, which may not be the same as the one used in
                 # the ChemInfo query.
-                if not info["sample_peak_mz"] in [
-                    iso["sample_peak_mz"] for iso in match_isotopes
-                ]:
-                    runtime.logger.warning(
-                        (
-                            "Matched peak m/z does not match ChemInfo result m/z: ",
-                            f"{match_isotopes[0]['sample_peak_mz']} != {info['sample_peak_mz']}, ",
-                            "skipping this result.",
-                        )
+                match_mzs = [iso["sample_peak_mz"] for iso in match_isotopes]
+                if not info["sample_peak_mz"] in match_mzs:
+                    runtime.logger.debug(
+                        f"Requested peak m/z ({info['sample_peak_mz']}) is not in matched m/zs: {match_mzs}. "
+                        + f"Skipping the result ({info["target_compound_formula"]})",
                     )
                     # Skip this result as the match is for a wrong peak
                     continue
