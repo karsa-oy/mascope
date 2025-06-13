@@ -56,6 +56,14 @@ export default {
         status: 'success'
       })
       return null
+    } else if (status == 207) {
+      // warning for partial deletion
+      app.ui.notification.push({
+        type,
+        message: response?.data?.error || message || 'Some items were not deleted.',
+        status: 'warning'
+      })
+      return null
     } else {
       unhandled(response)
       return
