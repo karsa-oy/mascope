@@ -255,14 +255,38 @@ class GetSpectrumQueryParams(CommonValidators, QueryParamsModel):
 
 
 class DeleteSampleFilesBody(RequestBodyModel):
-    sample_file_ids: list[str] = Field(
-        ..., description="List of sample file IDs to delete", min_length=1
+    sample_file_ids: list[str] | None = Field(
+        None, description="List of sample file IDs to delete", min_length=1
+    )
+    filenames: list[str] | None = Field(
+        None, description="List of filenames to delete", min_length=1
     )
 
     @field_validator("sample_file_ids")
     @classmethod
-    def validate_unique_ids(cls, v: list[str]) -> list[str]:
+    def validate_unique_ids(cls, v: list[str] | None) -> list[str] | None:
         """Validate that sample file IDs are unique."""
-        if len(set(v)) != len(v):
+        if v is not None and len(set(v)) != len(v):
             raise ValueError("Sample file IDs must be unique")
         return v
+
+    @field_validator("filenames")
+    @classmethod
+    def validate_unique_filenames(cls, v: list[str] | None) -> list[str] | None:
+        """Validate that filenames are unique."""
+        if v is not None and len(set(v)) != len(v):
+            raise ValueError("Filenames must be unique")
+        return v
+
+    @model_validator(mode="after")
+    def validate_exactly_one_field(self):
+        """Validate that exactly one of sample_file_ids or filenames is provided."""
+        has_ids = self.sample_file_ids is not None
+        has_filenames = self.filenames is not None
+
+        if not (has_ids or has_filenames):
+            raise ValueError("Either sample_file_ids or filenames must be provided")
+        if has_ids and has_filenames:
+            raise ValueError("Cannot provide both sample_file_ids and filenames")
+
+        return self

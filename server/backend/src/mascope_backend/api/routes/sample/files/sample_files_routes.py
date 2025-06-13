@@ -133,16 +133,16 @@ async def delete_sample_file_route(
 async def delete_sample_files_route(
     request: Request, body: DeleteSampleFilesBody, user=Depends(editor_user)
 ):
-    """Delete multiple sample files by their IDs.
+    """Delete multiple sample files by their IDs or filenames.
 
     Only deletes files that don't have existing sample items associated with them.
     Returns information about which files were deleted and which were skipped.
 
-    :param body: Request body containing list of sample file IDs to delete.
+    :param body: Request body containing either list of sample file IDs or filenames to delete.
     :param user: Authenticated user with editor access.
     :return: Information about deleted and skipped files.
     """
-    return await delete_sample_files(sample_file_ids=body.sample_file_ids)
+    return await delete_sample_files(**body.model_dump())
 
 
 @sample_files_router.post("/upload")
