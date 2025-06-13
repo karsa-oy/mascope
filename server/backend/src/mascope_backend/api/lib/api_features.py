@@ -75,7 +75,20 @@ def api_controller(
                 return result
             except ApiException as e:
                 # Handle already processed exceptions
-                context_message = f"Failed to {beautify_func_name(func.__name__)}"
+                if e.status_code == 200:
+                    # General warning
+                    context_message = (
+                        f"Warning during {beautify_func_name(func.__name__)}"
+                    )
+                elif e.status_code == 207:
+                    # Batch multi-status response, partial success
+                    context_message = (
+                        f"Partially succeeded to {beautify_func_name(func.__name__)}"
+                    )
+                else:
+                    # Error cases
+                    context_message = f"Failed to {beautify_func_name(func.__name__)}"
+
                 user_message = f"{context_message}. {e.user_message}"
 
                 # Emit error reload events if this is an independent transaction
@@ -207,26 +220,6 @@ def api_route(
                     headers=headers,
                 )
             except ApiException as e:
-                # Step 9: Special handling for warnings (ApiException with status_code=200)
-                if e.status_code == 200:
-                    # Send warning notification if SID is available
-                    if sid:
-                        notification = UserNotification(
-                            process_id=kwargs.get("process_id", gen_id(8)),
-                            type=func.__name__,
-                            message=e.user_message,
-                            status="warning",
-                            error={"detail": e.tech_message},
-                        )
-                        await emit_user_notification(
-                            notification=notification, room_id=sid
-                        )
-                    else:
-                        runtime.logger.warning(
-                            f"Add 'request: Request' parameter to the {func.__name__} to enable warning notifications."
-                        )
-                # Step 10: Return standard API exception response
-                # TODO Cuurently no difference in handling warnings/errors, add status (non-http)?
                 return api_e_response_json(e)
             except Exception as e:
                 # Step 11: Handle generic exceptions
@@ -344,12 +337,12 @@ def api_controller_background_task(
 
                 return result
             except ApiException as e:
-                if e.status_code == 200:
-                    # Handle warning notifications, status code 200
+                if e.status_code in [200, 207]:
+                    # Handle warning notifications - both general warnings (200) and multi-status (207)
                     notification.status = "warning"
-                    # notification.message = f"Warning during {beautify_func_name(func.__name__)}. {e.user_message}"
                     notification.message = e.user_message
                     notification.error = {"detail": e.tech_message}
+
                     #  Emit warning user notifications for both independent and dependent transactions
                     await handle_notifications(
                         error_notification_rooms, notification, kwargs, None, sid

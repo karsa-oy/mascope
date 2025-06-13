@@ -116,9 +116,7 @@ async def update_sample_file_route(
 
 @sample_files_router.delete("/{sample_file_id}")
 @api_route()
-async def delete_sample_file_route(
-    request: Request, sample_file_id: str, user=Depends(editor_user)
-):
+async def delete_sample_file_route(sample_file_id: str, user=Depends(editor_user)):
     """Delete a specific sample file by ID.
 
     :param sample_file_id: ID of the sample file to delete.
@@ -131,7 +129,7 @@ async def delete_sample_file_route(
 @sample_files_router.post("/delete")
 @api_route()
 async def delete_sample_files_route(
-    request: Request, body: DeleteSampleFilesBody, user=Depends(editor_user)
+    body: DeleteSampleFilesBody, user=Depends(editor_user)
 ):
     """Delete multiple sample files by their IDs or filenames.
 

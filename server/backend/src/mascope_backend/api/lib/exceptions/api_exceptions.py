@@ -1,5 +1,5 @@
-import httpx
 import traceback
+import httpx
 from fastapi import HTTPException, status
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
@@ -142,31 +142,45 @@ def handle_exception(
     # other response types like "sio" can be added here
 
 
-def raise_api_warning(message: str, tech_message: dict):
+def raise_api_warning(message: str, tech_message: dict, status_code: int = 200) -> None:
     """
-    Raises an ApiException with a status code of 200, indicating a warning during operation.
+    Raises an ApiException with a warning status code, indicating a warning during operation.
 
     This function creates a standardized way to raise warning level issues
     in the application. The warning will:
     1. Be logged to the server logs
-    2. Be returned as a response with status code 200
+    2. Be returned as a response with the specified status code
     3. Be displayed as a notification in the UI if a valid SID is available
 
+    Status code usage:
+    - 200: General warnings for both regular controllers and background tasks
+    - 207: Multi-status/batch operations with partial success (some succeeded, some failed)
+
     Example:
+    1) For general warnings (both controllers and background tasks)
+        raise_api_warning(
+            "Processing completed with warnings",
+            {"warning_details": "..."}
+        )
+
+    2) For batch operations with partial success
         raise_api_warning(
             "Some items could not be processed",
-            {"skipped_items": ["item1", "item2"]}
+            {"skipped_items": ["item1", "item2"]},
+            status_code=207
         )
 
     :param message: The user-facing warning message.
     :type message: str
     :param tech_message: The technical details to include in the warning.
     :type tech_message: dict
+    :param status_code: HTTP status code (200 for general warnings, 207 for multi-status operations).
+    :type status_code: int
     :raises ApiException: Always raises an ApiException with the provided message and tech details.
     """
     runtime.logger.warning(message)
     raise ApiException(
         user_message=message,
         tech_message=tech_message,
-        status_code=200,  # makes it a warning instead of an error
+        status_code=status_code,
     )
