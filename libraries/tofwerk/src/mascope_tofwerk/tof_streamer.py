@@ -22,6 +22,7 @@ from mascope_tofwerk.lib.TofDaq import (
     TSharedMemoryPointer,
     TwCleanupDll,
     TwDaqActive,
+    TwGetDaqParameterBool,
     TwGetDescriptor,
     TwRetVal,
     TwTofDaqRunning,
@@ -83,6 +84,7 @@ class TofDaqStreamer(Thread):
         self._buf_time = np.zeros((1,), dtype=np.float64)
         self._base_filename = None
         self._filepath = None
+        self._polarity = None
 
     @property
     def progress(self) -> float:
@@ -142,11 +144,13 @@ class TofDaqStreamer(Thread):
         self._my_bufs_processed = 0
         self._filepath = self.desc.currentDataFileName.decode()
         self._base_filename = strip_filepath(self._filepath)
+        self._polarity = "-" if TwGetDaqParameterBool(b"NegativeIonMode") else "+"
         self.active.set()
         runtime.logger.info(f"Acquisition of file {self._base_filename} started")
         self.notification_queue.put(
             {
                 "filename": self._base_filename,
+                "polarity": self._polarity,
                 "i": -1,
             }
         )
@@ -197,6 +201,7 @@ class TofDaqStreamer(Thread):
         self._my_bufs_processed = None
         self._base_filename = None
         self._filepath = None
+        self._polarity = None
         TwCleanupDll()
 
     def on_recorder_closed(self):

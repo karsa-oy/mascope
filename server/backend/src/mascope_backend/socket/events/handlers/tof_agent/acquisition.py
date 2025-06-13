@@ -15,6 +15,7 @@ instrument_acquisition_notification_process_id = gen_id(8)
 async def instrument_acquisition_started(sid, acquisition_data):
     instrument = acquisition_data.get("instrument")
     filename = acquisition_data.get("filename")
+    polarity = acquisition_data["polarity"]
 
     instrument_acquisition_notification = UserNotification(
         process_id=instrument_acquisition_notification_process_id,

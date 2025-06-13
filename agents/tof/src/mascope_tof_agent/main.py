@@ -194,10 +194,12 @@ async def streamer_processor(streamer) -> None:
         """
         filename = data["filename"]
         instrument_name = filename.split("_")[0]
+        polarity = data.get("polarity")
         spec_i = data["i"]  # scan index
         notification_data = {
             "filename": filename,
             "instrument": instrument_name,
+            "polarity": polarity,
             "progress": streamer.progress,
         }
         match spec_i:
