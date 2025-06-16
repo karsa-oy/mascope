@@ -146,7 +146,6 @@ async def detect_peaks(
     max_n_peaks: int = 5,
     if_exists: str = "fail",  # 'fail', 'append', 'replace'
     dmz: float = 0.5,
-    return_peak_mzs: bool = False,
     instrument_type: str = "tof",
 ) -> xarray.Dataset | tuple:
     """Detect peaks in a sample file sum spectrum
@@ -163,14 +162,12 @@ async def detect_peaks(
     :type max_n_peaks: int, optional
     :param if_exists: Action if peak data exists, defaults to "fail"
     :type if_exists: str, optional
-    :param return_peak_mzs: Return fitted peak m/z values, defaults to False
-    :type return_peak_mzs: bool, optional
     :param instrument_type: Instrument type, defaults to "tof"
     :type instrument_type: str, optional
     :raises ValueError: if_exists is incorrect
     :raises FileExistsError: Peak data exists and if_exists is "fail"
-    :return: Sample file data with peak data, with peak m/z values if return_peak_mzs is True
-    :rtype: xarray.Dataset|tuple
+    :return: Sample file data with peak data
+    :rtype: xarray.Dataset
     """
     runtime.logger.info(f"Detecting peaks for file {filename}")
     if if_exists not in ["fail", "append", "replace"]:
@@ -376,8 +373,6 @@ async def detect_peaks(
         filename,
         vars=["peak_areas", "peak_heights", "sum_signal"],
     )
-    if return_peak_mzs:
-        return (sample_file_data, peak_mzs)
     return sample_file_data
 
 

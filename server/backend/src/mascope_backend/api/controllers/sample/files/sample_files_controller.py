@@ -949,10 +949,10 @@ async def compute_sample_file_peaks(
     filename = sample_file_data.get("data").get("filename")
 
     # Step 2: Load instrument functions and determine instrument type.
-    sample_file, list_of_peaks = await compute_peaks(filename, if_exists)
+    sample_file = await compute_peaks(filename, if_exists)
 
     # Return completion message and peak details.
-    message = f"Detected {list_of_peaks.size} peaks for file '{filename}'"
+    message = f"Detected {sample_file.peak_heights.mz.size} peaks for file '{filename}'"
     runtime.logger.info(message)
 
     await sio.emit("peak_reload", room=sample_file_id, namespace="/")

@@ -12,7 +12,7 @@ from mascope_signal.peak import detect_peaks
 
 async def compute_peaks(
     filename: str, if_exists: Literal["append", "replace"] = "append"
-) -> tuple:
+) -> "xarray.Dataset":  # noqa: F821
     """Compute peaks for a sample file.
     This function loads the instrument functions, determines the instrument type,
     sets the threshold based on the instrument type, and then detects peaks in the
@@ -22,8 +22,8 @@ async def compute_peaks(
     :type filename: str
     :param if_exists: Whether to append or replace existing peaks, defaults to "append"
     :type if_exists: Literal["append", "replace"], optional
-    :return: Returns the sample file and a list of detected peaks.
-    :rtype: tuple
+    :return: Returns the sample file.
+    :rtype: xarray.Dataset
     """
 
     # Step 1: Load instrument functions and determine instrument type.
@@ -37,13 +37,12 @@ async def compute_peaks(
         threshold = TOF_FITTING_THRESHOLD
 
     # Step 3: Detect peaks.
-    sample_file, list_of_peaks = await detect_peaks(
+    sample_file = await detect_peaks(
         filename,
         instrument_functions,
         threshold,
         u_list=None,
         if_exists=if_exists,
-        return_peak_mzs=True,
         instrument_type=instrument_type,
     )
-    return sample_file, list_of_peaks
+    return sample_file
