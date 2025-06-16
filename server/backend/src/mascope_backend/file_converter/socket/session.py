@@ -69,7 +69,7 @@ class FileContextManager:
         normalized_filename = self._normalize_filename(filename)
         file_context = self._file_contexts.get(normalized_filename)
         if file_context is None:
-            runtime.logger.trace(
+            runtime.logger.debug(
                 f"No context found for filename: {normalized_filename}"
             )
             runtime.logger.trace(f"Registered contexts: {self._file_contexts}")

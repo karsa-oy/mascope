@@ -5,14 +5,17 @@ from multiprocessing import Event, Lock, Queue
 from queue import Empty
 from threading import Thread
 from datetime import datetime, timezone
-import numpy as np
 
 from ThermoFisher.CommonCore.RawFileReader import RawFileReaderAdapter
 from ThermoFisher.CommonCore.Data.Business import Device
 
 from mascope_file.io import write_props
 from mascope_file.name import parse_path_from_item_filename
-from mascope_file.record import create_sample_file_db_record
+from mascope_file.record import (
+    create_sample_file_db_record,
+    check_sample_file_db_record,
+    delete_sample_file_by_filename,
+)
 from mascope_thermo.thermo import get_polarity_options
 
 from mascope_thermo.runtime import runtime
@@ -200,64 +203,153 @@ class RawProcessor(Thread):
         # Always clear context at the end, regardless of file deletion success
         self.socket_client.context_manager.clear_context(file_basename)
 
+    def _get_file_context(self):
+        """Get file context for the current raw file being processed.
+
+        :return: File context object
+        :raises RuntimeError: If file context is not found
+        """
+        base_filename = os.path.basename(self.raw.FileName)
+
+        if not (
+            file_context := self.socket_client.context_manager.get_context(
+                base_filename
+            )
+        ):
+            raise RuntimeError(
+                f"File {base_filename} not registered in file converter service"
+            )
+        return file_context
+
+    def _check_orphan_sample_file_filestore(self, filename: str) -> bool:
+        """Check if file's directory exists in filestore without corresponding database record.
+
+        :param filename: Sample filename to check
+        :type filename: str
+        :return: True if directory is orphaned (exists but no DB record), False otherwise
+        :rtype: bool
+        """
+        try:
+            # Check if filestore directory exists
+            data_path = parse_path_from_item_filename(filename)
+            if not os.path.exists(data_path):
+                return False
+
+            # Get file context and check database record
+            file_context = self._get_file_context()
+            return not check_sample_file_db_record(filename, file_context.access_token)
+
+        except RuntimeError:
+            raise
+        except Exception as e:
+            self.log.error(f"Error checking orphaned filestore {filename}: {e}")
+            return False
+
+    def _remove_orphaned_filestore(self, filename: str) -> None:
+        """Remove orphaned filestore directory and any database record.
+
+        :param filename: Sample filename to clean up
+        :type filename: str
+        """
+        try:
+            file_context = self._get_file_context()
+            delete_sample_file_by_filename(filename, file_context.access_token)
+        except Exception as e:
+            self.log.error(f"Error removing orphaned filestore {filename}: {e}")
+            raise
+
+    def _create_filestore_directory(
+        self, sample_file_props: dict, raw_file_path: str
+    ) -> None:
+        """Create filestore directory, write properties, and copy raw file.
+
+        :param sample_file_props: Sample file properties
+        :type sample_file_props: dict
+        :param raw_file_path: Path to the source raw file
+        :type raw_file_path: str
+        :raises FileExistsError: If directory already exists
+        """
+        filename = sample_file_props["filename"]
+        data_path = parse_path_from_item_filename(filename)
+
+        # Create sample file directory, will raise FileExistsError if directory exists
+        os.makedirs(data_path)
+
+        try:
+            # Write properties to the sample file
+            write_props(filename, sample_file_props)
+
+            # Copy raw file to the sample file folder
+            data_raw_path = os.path.join(data_path, "data.raw")
+            shutil.copy(raw_file_path, data_raw_path)
+
+        except Exception:
+            # Cleanup directory if file operations fail
+            if os.path.exists(data_path):
+                shutil.rmtree(data_path)
+            raise
+
+    def _create_db_record(self, sample_file_props: dict) -> None:
+        """Create database record for the sample file.
+
+        :param sample_file_props: Sample file properties
+        :type sample_file_props: dict
+        :raises RuntimeError: If database creation fails
+        """
+        try:
+            file_context = self._get_file_context()
+            create_sample_file_db_record(
+                sample_file_props, access_token=file_context.access_token
+            )
+
+        except Exception as e:
+            error_msg = f"Failed to create database record: {e}"
+            self.log.error(error_msg)
+            raise RuntimeError(error_msg) from e
+
     def _process_raw_file(self, sample_file_props: dict, raw_file_path: str) -> None:
-        """Main function processing the raw files:
-        1. Writes properties into the sample file
-        2. Copies raw file into the sample file folder
-        3. Creates a record in the database
+        """Process raw files with orphaned directory handling.
+
+        Steps:
+        1. Create filestore directory, write properties, and copy raw file
+        2. Create database record
+        If FileExistsError occurs, check for orphaned filestore and retry creation steps.
 
         :param sample_file_props: Sample file properties
         :type sample_file_props: dict
         :param raw_file_path: Path to the target raw file
         :type raw_file_path: str
-        :raises FileExistsError: If sample file already exists
+        :raises FileExistsError: If sample file already exists with valid database record
         :raises Exception: If any processing step fails
         """
-        data_path = parse_path_from_item_filename(sample_file_props["filename"])
+        filename = sample_file_props["filename"]
 
         try:
-            # Create sample file directory
-            os.makedirs(data_path)
+            # Step 1: Create filestore directory, write properties, and copy file
+            self._create_filestore_directory(sample_file_props, raw_file_path)
 
-            # Write properties to the sample_file
-            write_props(sample_file_props["filename"], sample_file_props)
-
-            # Copy raw file to the sample_file folder
-            data_raw_path = os.path.join(data_path, "data.raw")
-            shutil.copy(raw_file_path, data_raw_path)
-
-            # Create database record (raises exceptions on failure)
+            # Step 2: Create database record
             self._create_db_record(sample_file_props)
+
         except FileExistsError as exc:
-            raise FileExistsError(
-                "File already exists in the filestore. Please contact the administrator or rename the file."
-            ) from exc
-        except Exception as e:
-            raise Exception(str(e)) from e
-
-    def _create_db_record(self, sample_file_props: dict):
-        """
-        Creates a record in the database.
-
-        Requires file to be registered in the file converter service context.
-
-        :raises RuntimeError: If file context is not found or database creation fails
-        """
-        base_filename = os.path.basename(self.raw.FileName)
-        try:
-            file_context = self.socket_client.context_manager.get_context(base_filename)
-            if file_context is None:
-                raise RuntimeError(
-                    f"File {base_filename} not registered in file converter service"
+            # Check if filestore exists without database record (orphaned)
+            if self._check_orphan_sample_file_filestore(filename):
+                self.log.info(
+                    f"Found orphaned filestore for {filename}, cleaning up and retrying..."
                 )
 
-            create_sample_file_db_record(
-                sample_file_props, access_token=file_context.access_token
-            )
-        except Exception as e:
-            error_msg = f"Failed to create database record: {str(e)}"
-            self.log.error(error_msg)
-            raise RuntimeError(error_msg) from e
+                self._remove_orphaned_filestore(filename)
+
+                # Retry after cleanup
+                self._create_filestore_directory(sample_file_props, raw_file_path)
+                self._create_db_record(sample_file_props)
+            else:
+                self.log.error(
+                    f"File already exists in the filestore with valid database record: {filename}"
+                )
+                raise FileExistsError(
+                    "File already exists, please delete the old file, rename the file you want to upload or contact the administrator."
+                ) from exc
 
     def run(self):
         self.log.info(f"Running raw processor ({self.name})")

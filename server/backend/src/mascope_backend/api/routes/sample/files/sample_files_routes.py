@@ -37,7 +37,7 @@ sample_files_router = APIRouter(prefix="/api/sample/files", tags=["Sample Files"
 
 
 @sample_files_router.get("")
-@api_route()
+@api_route(token_access=True)
 async def get_sample_files_route(
     query_params: GetSampleFilesQueryParams = Depends(), user=Depends(guest_user)
 ):
@@ -127,7 +127,7 @@ async def delete_sample_file_route(sample_file_id: str, user=Depends(editor_user
 
 
 @sample_files_router.post("/delete")
-@api_route()
+@api_route(token_access=True)
 async def delete_sample_files_route(
     body: DeleteSampleFilesBody, user=Depends(editor_user)
 ):
