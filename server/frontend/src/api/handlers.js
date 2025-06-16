@@ -48,7 +48,7 @@ export default {
   delete: (response) => {
     const { type, status, message } = unpack(response)
     const app = useApp()
-    if (status == 200) {
+    if (status === 200) {
       // notify users
       app.ui.notification.push({
         type,
@@ -56,7 +56,7 @@ export default {
         status: 'success'
       })
       return null
-    } else if (status == 207) {
+    } else if (status === 207) {
       // warning for partial deletion
       app.ui.notification.push({
         type,
