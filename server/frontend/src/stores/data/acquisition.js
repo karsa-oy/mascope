@@ -33,7 +33,7 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
     instrument: null,
     polarity: null,
     sample: null,
-    method_file: null,
+    instrument_config: null,
     measurement: null,
     conversion: null
   })
@@ -167,9 +167,10 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
     if (pending.sample) {
       await sample.process({
         sample: pending.sample,
-        method_file: pending.method_file
+        instrument_config: pending.instrument_config
       })
       pending.sample = null
+      pending.instrument_config = null
     } else {
       ready.filename = pending.filename
     }

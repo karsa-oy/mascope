@@ -81,10 +81,10 @@ api.http
           // populate options
           input.value.options = instrument_configs
           // resolve current config (if valid)
-          const sampleFileConfig = sample_file.method_file
-          const sampleFileConfigValid = instrument_configs
-            .map(({ method_file }) => method_file)
-            .includes(sampleFileConfig)
+          const sampleFileConfig = sample_file ? sample_file.method_file : null
+          const sampleFileConfigValid = sampleFileConfig
+            ? instrument_configs.map(({ method_file }) => method_file).includes(sampleFileConfig)
+            : false
           const currentConfig = sampleFileConfigValid ? sampleFileConfig : null
           // find the latest config
           const latestConfig = instrument_configs.sort((a, b) =>
