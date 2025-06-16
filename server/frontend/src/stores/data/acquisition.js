@@ -168,7 +168,7 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
       await sample.process({
         sample: pending.sample,
         instrument_config: pending.instrument_config
-      })
+      }) // TODO: this causes some issue with notifications, see issue #1008
       pending.sample = null
       pending.instrument_config = null
     } else {
