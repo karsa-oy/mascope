@@ -261,9 +261,23 @@ const invalid = computed(() => {
     input.fields?.filter((f) => f?.required).length !=
     input.fields?.filter((f) => f?.required).filter((f) => f.value).length
   const invalidUpdate = action.value === 'update' && !changedInput.value // * see note below
-  const allowedPolarities = ['+', '-'];
-  const polarityInvalid = !allowedPolarities.includes(input.polarity);
-  return !input.type || polarityInvalid || missingRequiredFields || instrumentConfig.status?.invalid || invalidUpdate
+  const allowedPolarities = ['+', '-']
+  const polarityInvalid = !allowedPolarities.includes(input.polarity)
+  return (
+    !input.type ||
+    polarityInvalid ||
+    missingRequiredFields ||
+    instrumentConfig.status?.invalid ||
+    invalidUpdate
+  )
+})
+
+const invalidMessage = computed(() => {
+  if (invalid.value && action.value !== 'update') {
+    return 'Please fill in all required fields'
+  } else {
+    return ''
+  }
 })
 
 const polarityOptions = computed(() => {
@@ -411,6 +425,9 @@ const polarityOptions = computed(() => {
         {{ instrumentConfig.status?.message?.contents }}
       </Message>
       <menu>
+        <Message v-if="invalidMessage" severity="error">
+          {{ invalidMessage }}
+        </Message>
         <Button label="Cancel" @click="() => (action = null)" severity="secondary" />
         <Button label="Save" @click="() => save()" :disabled="invalid" />
       </menu>
