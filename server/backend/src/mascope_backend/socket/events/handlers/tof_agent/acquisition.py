@@ -12,9 +12,20 @@ instrument_acquisition_notification_process_id = gen_id(8)
 
 @sio.event(namespace="/tof-agent")
 @socket_auth(minimum_role="editor", service_name="tof-agent")
-async def instrument_acquisition_started(sid, acquisition_data):
-    instrument = acquisition_data.get("instrument")
-    filename = acquisition_data.get("filename")
+async def instrument_acquisition_started(sid: str, acquisition_data: dict):
+    """Handle the start of an instrument acquisition.
+
+    This event is triggered by TofAgent when an instrument acquisition starts, and it emits
+    a user notification with the acquisitions details.
+
+    :param sid: The session ID of the client.
+    :type sid: str
+    :param acquisition_data: A dictionary containing details about the acquisition,
+                            including instrument name, filename, and polarity.
+    :type acquisition_data: dict
+    """
+    instrument = acquisition_data["instrument"]
+    filename = acquisition_data["filename"]
     polarity = acquisition_data["polarity"]
 
     instrument_acquisition_notification = UserNotification(
@@ -31,10 +42,22 @@ async def instrument_acquisition_started(sid, acquisition_data):
 
 @sio.event(namespace="/tof-agent")
 @socket_auth(minimum_role="editor", service_name="tof-agent")
-async def instrument_acquisition_progress(sid, acquisition_data):
-    instrument = acquisition_data.get("instrument")
-    filename = acquisition_data.get("filename")
-    progress = acquisition_data.get("progress")
+async def instrument_acquisition_progress(sid: str, acquisition_data: dict):
+    """Handle the progress of an instrument acquisition.
+
+    This event is triggered by TofAgent to update the progress of an ongoing instrument
+    acquisition.
+
+    :param sid: The session ID of the client.
+    :type sid: str
+    :param acquisition_data: A dictionary containing details about the acquisition,
+                            including instrument name, filename, and progress percentage.
+    :type acquisition_data: dict
+    """
+
+    instrument = acquisition_data["instrument"]
+    filename = acquisition_data["filename"]
+    progress = acquisition_data["progress"]
 
     instrument_acquisition_notification = UserNotification(
         process_id=instrument_acquisition_notification_process_id,
@@ -50,10 +73,22 @@ async def instrument_acquisition_progress(sid, acquisition_data):
 
 @sio.event(namespace="/tof-agent")
 @socket_auth(minimum_role="editor", service_name="tof-agent")
-async def instrument_acquisition_finished(sid, acquisition_data):
-    instrument = acquisition_data.get("instrument")
-    filename = acquisition_data.get("filename")
-    progress = acquisition_data.get("progress", 100)
+async def instrument_acquisition_finished(sid: str, acquisition_data: dict):
+    """Handle the completion of an instrument acquisition.
+
+    This event is triggered by TofAgent when an instrument acquisition is completed,
+    and it emits a user notification with the acquisition details.
+
+    :param sid: The session ID of the client.
+    :type sid: str
+    :param acquisition_data: A dictionary containing details about the acquisition,
+                            including instrument name, filename, and progress percentage.
+    :type acquisition_data: dict
+    """
+
+    instrument = acquisition_data["instrument"]
+    filename = acquisition_data["filename"]
+    progress = acquisition_data["progress"]
 
     instrument_acquisition_notification = UserNotification(
         process_id=instrument_acquisition_notification_process_id,

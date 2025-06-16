@@ -49,7 +49,7 @@ def socket_auth(minimum_role: str, service_name: Optional[str] = None):
                 runtime.logger.error(f"Socket auth error for {sid}: {str(e)}")
 
             except Exception as e:
-                runtime.logger.error(f"Unexpected socket auth error: {str(e)}")
+                runtime.logger.error(f"Unexpected socket error: {str(e)}")
 
         return wrapper
 
