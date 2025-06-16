@@ -400,6 +400,10 @@ def _filter_centroids(
     peak_heights = peak_heights[valid_mask]
     resolutions = resolutions[valid_mask]
 
+    if peak_mzs.size == 0:
+        runtime.logger.info("No new valid peaks found after filtering by height.")
+        return peak_mzs, peak_heights, resolutions
+
     # Pick 10 most intense peaks from each 100 m/z range
     bin_width = 100
     bins = np.arange(peak_mzs.min(), peak_mzs.max() + bin_width, bin_width)
@@ -575,6 +579,17 @@ def _calculate_peak_profiles(
     peak_profiles = get_peak_profiles(filename, all_peak_mzs).assign_coords(
         tof=("mz", unique_tofs)
     )
+
+    # Check if peak_profiles is empty along "time" or "mz"
+    if peak_profiles.sizes.get("time", 0) == 0 or peak_profiles.sizes.get("mz", 0) == 0:
+        # No data to process, return empty arrays with correct shapes
+        peak_profiles_area = peak_profiles.copy(
+            data=np.zeros_like(peak_profiles.values)
+        )
+        peak_profiles_height = peak_profiles.copy(
+            data=np.zeros_like(peak_profiles.values)
+        )
+        return peak_profiles_area, peak_profiles_height
 
     def has_consecutive_positive(arr):
         # arr is a 1D numpy array for a single mz value along time
