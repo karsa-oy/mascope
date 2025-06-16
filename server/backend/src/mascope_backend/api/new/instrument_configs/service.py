@@ -6,7 +6,7 @@ from sqlalchemy import (
     func,
 )
 from mascope_signal.instrument_func.fit import fit_instrument_functions
-from mascope_file.name import get_instrument_type
+from mascope_file.name import get_instrument_name, get_instrument_type
 from mascope_backend.db.id import gen_id
 from mascope_backend.db import async_session
 from mascope_backend.db.models import SampleFile, InstrumentFunction as InstrumentConfig
@@ -15,9 +15,6 @@ from mascope_backend.api.lib.api_features import (
     api_controller_background_task,
 )
 from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
-from mascope_backend.api.controllers.sample.lib.sample_file_fetch import (
-    fetch_sample_file,
-)
 from mascope_backend.api.new.instrument_configs.schemas import (
     CreateInstrumentConfigBody,
     InstrumentFunctionData,
@@ -88,10 +85,8 @@ async def get_instrument_configs(
         if method_file:
             stmt = stmt.where(InstrumentConfig.method_file == method_file)
         if filename:
-            sample_file = await fetch_sample_file(filename)
-            stmt = stmt.where(
-                InstrumentConfig.instrument == sample_file.instrument,
-            )
+            instrument = get_instrument_name(filename)
+            stmt = stmt.where(InstrumentConfig.instrument == instrument)
         if datetime_utc:
             stmt = stmt.where(InstrumentConfig.datetime_utc == datetime_utc)
 
