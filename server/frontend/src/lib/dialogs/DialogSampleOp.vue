@@ -79,7 +79,8 @@ const input = reactive({
   filename: null,
   filterId: null,
   instrument: null,
-  type: null
+  type: null,
+  polarity: null
 })
 const initial = ref()
 const changedInput = computed(
@@ -111,17 +112,23 @@ async function init(active) {
   tab.value = 'sample-details'
   template.selected = defaultTemplate.value
   // reset inputs
-  input.filename =
-    action.value !== 'create_pending'
-      ? original.value?.filename
-      : app.data.acquisition.pending.filename
-  input.instrument = original.value?.instrument
+  if (action.value === 'create_pending') {
+    // Measurement mode is active, acquisition started
+    input.filename = app.data.acquisition.pending.filename
+    input.instrument = app.data.acquisition.pending.instrument
+    input.polarity = app.data.acquisition.pending.polarity
+  } else {
+    // User is creating or updating a sample item
+    input.filename = original.value?.filename
+    input.instrument = original.value?.instrument
+    input.polarity = original.value?.polarity ?? null
+    if (polarityOptions.value.length === 1) {
+      input.polarity = polarityOptions.value[0].value
+    }
+  }
   input.filterId = original.value?.filter_id ?? null
   input.type = original.value?.sample_item_type ?? null
-  input.polarity = original.value?.polarity ?? null
-  if (polarityOptions.value.length === 1) {
-    input.polarity = polarityOptions.value[0].value
-  }
+
   instrumentConfig.status = {}
   instrumentConfig.input = {}
   instrumentConfig.payload = {}
@@ -212,7 +219,7 @@ async function save() {
         ...sample_item,
         filename: app.data.acquisition.pending.filename
       }
-      app.data.acquisition.pending.method_file = instrumentConfig.input.new.method_file
+      app.data.acquisition.pending.instrument_config = instrument_config
     } else {
       // submitted after conversion completed
       app.data.sample.process({
@@ -260,18 +267,19 @@ const invalid = computed(() => {
 })
 
 const polarityOptions = computed(() => {
-  switch (original.value?.polarity) {
+  const from = original?.value ?? input
+  switch (from.polarity) {
     case '+':
-      return [{ label: 'Positive', value: '+' }];
+      return [{ label: 'Positive', value: '+' }]
     case '-':
-      return [{ label: 'Negative', value: '-' }];
+      return [{ label: 'Negative', value: '-' }]
     case '+-':
       return [
         { label: 'Positive', value: '+' },
         { label: 'Negative', value: '-' }
-      ];
+      ]
     default:
-      return [{label: 'Unknown', value: null }];
+      return [{ label: 'Unknown', value: null }]
   }
 })
 

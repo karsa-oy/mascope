@@ -23,7 +23,7 @@ async def instrument_acquisition_started(sid, acquisition_data):
         status="pending",
         message=f"Acquisition {filename} ({instrument})",
         progress=0,
-        data={"instrument": instrument, "filename": filename},
+        data={"instrument": instrument, "filename": filename, "polarity": polarity},
     )
 
     await emit_user_notification(instrument_acquisition_notification, instrument)

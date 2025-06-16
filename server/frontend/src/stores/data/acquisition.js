@@ -30,6 +30,8 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
   }
   const pending = reactive({
     filename: null,
+    instrument: null,
+    polarity: null,
     sample: null,
     method_file: null,
     measurement: null,
@@ -149,6 +151,8 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
         pending.filename = null
         pending.measurement = process_id
         pending.filename = data?.filename
+        pending.instrument = data?.instrument
+        pending.polarity = data?.polarity
       } else {
         if (status !== 'pending') {
           pending.measurement = null
