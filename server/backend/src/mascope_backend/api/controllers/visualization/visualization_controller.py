@@ -7,7 +7,10 @@ from colorcet import glasbey_hv as colormap
 from mascope_file.io import load_file
 from mascope_file.name import get_instrument_type
 
-from mascope_signal.compute import get_sum_signal, get_scan_timestamps
+from mascope_signal.compute import (
+    get_scan_timestamps,
+    sum_signal_for_time_range,
+)
 from mascope_signal.peak import filter_peaks, get_peaks
 
 from mascope_backend.db import async_session
@@ -68,7 +71,12 @@ async def visualize_ion_focus(
     filename = sample.get("filename")
     if not filename:
         raise NotFoundException(f"Sample with ID {sample_item_id} not found")
-    polarity = sample.get("polarity")
+    filename, sample_t0, sample_t1, sample_polarity = (
+        sample.get("filename"),
+        sample.get("t0"),
+        sample.get("t1"),
+        sample.get("polarity"),
+    )
 
     instrument_type = get_instrument_type(filename)
     isotope_resolution = "LOW" if instrument_type == "tof" else "HIGH"
@@ -93,7 +101,9 @@ async def visualize_ion_focus(
     # Step 2: Load the sample file and prepare data slice
     runtime.logger.info(f"Loading file: {filename}")
     sample_file = load_file(filename, vars=["peak_areas", "peak_heights"])
-    averaged_signal = get_sum_signal(filename, average=True)
+    averaged_signal = sum_signal_for_time_range(
+        filename, sample_t0, sample_t1, polarity=sample_polarity, average=True
+    )
 
     # Step 3: Convert target ion data to DataFrame and prepare data
     target_ion_list = [ion.to_dict() for ion in target_ion_data]
@@ -120,6 +130,10 @@ async def visualize_ion_focus(
         # Extract the specific isotope slice and compute the sum spectrum
         isotope_slice = sample_file.sel(mz=slice(*mz_range)).compute()
         isotope_averaged_spec = averaged_signal.sel(mz=slice(*mz_range)).compute()
+        # Get polarity-specific time scans for filtering
+        time_scan = get_scan_timestamps(
+            filename, t_min=sample_t0, t_max=sample_t1, polarity=sample_polarity
+        )
         # Check if the spectrum slice is empty
         if isotope_averaged_spec.size == 0:
             # No signal in the requested range, plot 0-line still
@@ -159,8 +173,12 @@ async def visualize_ion_focus(
             }
         )
         peak_profiles = get_peaks(isotope_slice, peak_profile_type)
-        # Peak traces (vertical lines)
-        peaks = isotope_slice.peak_heights.mean(dim="time").compute()
+        # Peak traces (vertical lines), filter peak heights by sample polarity before averaging (white peak traces)
+        peaks = (
+            isotope_slice.peak_heights.sel(time=time_scan, method="nearest")
+            .mean(dim="time")
+            .compute()
+        )
         runtime.logger.debug(f"Peaks in the range {mz_range}: {peaks.mz.values}")
         peaks = filter_peaks(peaks, intensity=peak_min_intensity)
         runtime.logger.debug(
@@ -187,11 +205,9 @@ async def visualize_ion_focus(
             if match:
                 # Timeseries trace
                 match_timeseries = peak_profiles.sel(mz=peak_mz)
-                if polarity:
-                    time_scan = get_scan_timestamps(filename, polarity=polarity)
-                    match_timeseries = match_timeseries.sel(
-                        time=time_scan, method="nearest"
-                    )
+                match_timeseries = match_timeseries.sel(
+                    time=time_scan, method="nearest"
+                )
                 timeseries_time = match_timeseries.time.values.astype(np.float32)
                 timeseries_y = match_timeseries.values.astype(np.float32)
                 timeseries_rgb = colormap[i + COLOR_OFFSET]
