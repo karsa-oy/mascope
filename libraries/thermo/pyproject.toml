@@ -9,7 +9,7 @@ dependencies = [
     "mascope_file",
     "numpy~=1.26",
     "pythonnet~=3.0",
-    "xarray==2024.11.0",
+    "xarray>=2025.06.1",
 ]
 
 [build-system]

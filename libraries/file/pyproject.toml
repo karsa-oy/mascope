@@ -8,8 +8,8 @@ dependencies = [
     "mascope_runtime",
     "datetime-glob~=1.0",
     "numpy~=1.26",
-    "xarray==2024.11.0",
-    "zarr==2.18.2", # TODO: Resolve dependency issue https://github.com/Karsa-Oy/Mascope/issues/479
+    "xarray>=2025.06.1",
+    "zarr",
     "numcodecs==0.15.1", # TODO: See issue above 
 ]
 
