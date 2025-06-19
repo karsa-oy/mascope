@@ -63,6 +63,76 @@ class GetSamplesQueryParams(CommonValidators, QueryParamsModel):
     )
 
 
+class GetSamplePeaksQueryParams(CommonValidators, QueryParamsModel):
+    """
+    Query parameters for retrieving peak data from a sample with optional time filtering.
+
+    Time limits are optional - if not provided, the sample's acquisition time range (t0/t1) will be used.
+    M/z range filtering requires both mz_min and mz_max to be provided together.
+    Peak data is aggregated across the time dimension after applying all filters, including sample's polarity.
+    It can include areas, heights, or both, with configurable aggregation method.
+    """
+
+    areas: bool = Field(
+        True,
+        description="Include peak areas in the response. Represents the integrated area under the curve for each peak, reflecting the total intensity over time.",
+    )
+    heights: bool = Field(
+        True,
+        description="Include peak heights in the response. Represents the maximum intensity at the apex of each peak, showing the peak's highest intensity value.",
+    )
+    average: bool = Field(
+        True,
+        description="If True, return averaged peak data across time dimension. If False, return summed peak data.",
+    )
+    t_min: float | None = Field(
+        None,
+        ge=0,
+        description="Minimum time limit in seconds for filtering the peak data. If not provided, uses the sample's acquisition start time. Must be within the sample's acquisition time range",
+    )
+    t_max: float | None = Field(
+        None,
+        gt=0,
+        description="Maximum time limit in seconds for filtering the peak data. If not provided, uses the sample's acquisition end time. Must be within the sample's acquisition time range",
+    )
+    mz_min: float | None = Field(
+        None, ge=0, description="Start of the m/z range for spectrum filtering"
+    )
+    mz_max: float | None = Field(
+        None, gt=0, description="End of the m/z range for spectrum filtering"
+    )
+
+    @model_validator(mode="after")
+    @classmethod
+    def validate_peak_variables(cls, values):
+        """
+        Validates that at least one peak type (areas or heights) must be requested.
+        """
+        if not values.areas and not values.heights:
+            raise ValueError(
+                "You need to request either peak areas, peak heights, or both. At least one of 'areas' or 'heights' must be set to True."
+            )
+        return values
+
+    @model_validator(mode="after")
+    @classmethod
+    def validate_mz_range(cls, values):
+        """
+        Validates that both mz_min and mz_max must be provided together.
+        """
+        mz_min = getattr(values, "mz_min", None)
+        mz_max = getattr(values, "mz_max", None)
+
+        # Both must be provided together for m/z filtering
+        if (mz_min is None) != (mz_max is None):  # XOR - exactly one is None
+            raise ValueError("Both mz_min and mz_max must be provided together")
+
+        if mz_min is not None and mz_max is not None and mz_max <= mz_min:
+            raise ValueError("mz_max must be greater than mz_min")
+
+        return values
+
+
 class GetSamplePeakTimeseriesBody(CommonValidators, RequestBodyModel):
     """
     Request body for retrieving timeseries data of a specific peak in a sample.

@@ -4,11 +4,13 @@ from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.controllers.samples.samples_controller import (
     get_samples,
     get_sample,
+    get_sample_peaks,
     get_sample_peak_timeseries,
     get_sample_spectrum,
 )
 from mascope_backend.api.models.samples.sample_pydantic_model import (
     GetSamplePeakTimeseriesBody,
+    GetSamplePeaksQueryParams,
     GetSamplesQueryParams,
     GetSampleSpectrumQueryParams,
 )
@@ -40,6 +42,31 @@ async def get_sample_route(sample_item_id: str, user=Depends(guest_user)):
     :return: A dictionary containing the sample details.
     """
     return await get_sample(sample_item_id=sample_item_id)
+
+
+@samples_router.get("/{sample_item_id}/peaks")
+@api_route(token_access=True)
+async def get_sample_peaks_route(
+    sample_item_id: str,
+    query_params: GetSamplePeaksQueryParams = Depends(),
+    user=Depends(guest_user),
+):
+    """
+    Retrieve peak data from a sample with automatic polarity filtering and optional range filtering.
+
+    This endpoint extracts peak areas and/or heights for a sample, automatically filtered by the sample's
+    polarity so that only scans matching the sample's polarity are included. Supports optional time
+    range filtering within the sample's acquisition window (t0/t1) and m/z range filtering.
+    The peak data is aggregated across the time dimension (averaged or summed) after applying all filters.
+
+    :param sample_item_id: The unique identifier of the sample
+    :param query_params: Query parameters for peak filtering including time range and data selection
+    :param user: Authenticated user with guest access
+    :return: Peak data filtered by sample's polarity and time range
+    """
+    return await get_sample_peaks(
+        sample_item_id=sample_item_id, **query_params.model_dump()
+    )
 
 
 @samples_router.post("/{sample_item_id}/peaks/timeseries")

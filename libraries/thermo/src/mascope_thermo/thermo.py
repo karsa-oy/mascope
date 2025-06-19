@@ -287,6 +287,9 @@ def compute_sum_signal_in_time_range(
             scan_indices = filter_by_polarity(raw_file, scan_indices, polarity)
 
         scan_indices, _ = filter_by_time(raw_file, scan_indices, t_min, t_max)
+        runtime.logger.debug(
+            f"Computing sum signal for {len(scan_indices)} scans in time range ({t_min}, {t_max}) s"
+        )
 
         # Setup mz tolerance - counts within ppm are binned
         mass_option = MassOptions(ppm, ToleranceUnits.ppm)

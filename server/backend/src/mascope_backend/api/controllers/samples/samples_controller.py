@@ -244,6 +244,216 @@ async def get_sample(
 
 
 @api_controller()
+async def get_sample_peaks(
+    sample_item_id: str,
+    areas: bool = True,
+    heights: bool = True,
+    average: bool = True,
+    t_min: float | None = None,
+    t_max: float | None = None,
+    mz_min: float | None = None,
+    mz_max: float | None = None,
+) -> dict:
+    """
+    Retrieve peak data from a sample.
+    Retrieve peak data from a sample with automatic sample's polarity filtering and optional time and m/z range filtering.
+
+    This controller extracts peak areas and/or heights for a sample, automatically filtered
+    by the sample's polarity. It supports optional time range filtering within the sample's
+    acquisition window (t0/t1) and m/z range filtering
+
+    Steps:
+    1. Get sample data and extract polarity/time metadata
+    2. Validate and set effective time limits with auto-correction
+    3. Get polarity-filtered scan timestamps for the specified time range
+    4. Load peak data from the sample file
+    5. Apply time filtering using polarity-specific timestamps
+    6. Apply m/z range filtering if specified
+    7. Aggregate peak data across the filtered time dimension
+    8. Return formatted peak data
+
+    :param sample_item_id: Unique identifier for the sample
+    :type sample_item_id: str
+    :param areas: If True, include peak areas in the response
+    :type areas: bool
+    :param heights: If True, include peak heights in the response
+    :type heights: bool
+    :param average: If True, return averaged peak data; if False, return summed peak data
+    :type average: bool
+    :param t_min: Minimum time limit in seconds, defaults to sample's t0 if not provided
+    :type t_min: float | None
+    :param t_max: Maximum time limit in seconds, defaults to sample's t1 if not provided
+    :type t_max: float | None
+    :param mz_min: Start of the optional m/z range, defaults to None
+    :type mz_min: float | None
+    :param mz_max: End of the optional m/z range, defaults to None
+    :type mz_max: float | None
+    :raises ValueError: If time limits are invalid or m/z range is invalid
+    :raises NotFoundException: If sample or sample file is not found or hasn't been processed
+    :return: Dictionary containing filtered peak data with m/z values and areas/heights
+    :rtype: dict
+    """
+
+    # Step 1: Get sample data and extract required fields
+    sample_data = await get_sample(sample_item_id)
+    sample = sample_data["data"]
+    sample_item_name, filename, sample_t0, sample_t1, sample_polarity = (
+        sample["sample_item_name"],
+        sample["filename"],
+        sample["t0"],
+        sample["t1"],
+        sample["polarity"],
+    )
+
+    # Step 2: Set effective time limits with validation and auto-correction
+    t_min_eff = t_min if t_min is not None else sample_t0
+    t_max_eff = t_max if t_max is not None else sample_t1
+
+    # Check for completely invalid ranges (user provided values outside sample window)
+    if t_min is not None and t_min > sample_t1:
+        raise ValueError(
+            f"Requested minimum time ({t_min:.2f}s) is after sample's acquisition end time ({sample_t1:.2f}s)"
+        )
+    if t_max is not None and t_max < sample_t0:
+        raise ValueError(
+            f"Requested maximum time ({t_max:.2f}s) is before sample's acquisition start time ({sample_t0:.2f}s)"
+        )
+
+    # Auto-correct slight overshoots and track what was adjusted
+    adjustments = []
+    if t_min is not None and t_min < sample_t0:
+        t_min_eff = max(sample_t0, t_min_eff)
+        adjustments.append(f"minimum time from {t_min:.2f}s to {sample_t0:.2f}s")
+    if t_max is not None and t_max > sample_t1:
+        t_max_eff = min(sample_t1, t_max_eff)
+        adjustments.append(f"maximum time from {t_max:.2f}s to {sample_t1:.2f}s")
+
+    # Build user message if adjustments were made
+    time_adjustment_info = ""
+    if adjustments:
+        adjustment_text = " and ".join(adjustments)
+        warning_msg = f"Time range adjusted: {adjustment_text} to fit sample acquisition window [{sample_t0:.2f}s, {sample_t1:.2f}s]"
+        runtime.logger.warning(warning_msg)
+        time_adjustment_info = f" {warning_msg}."
+
+    # Step 3: Get filtered scan timestamps using sample's polarity and time range
+    time_array = get_scan_timestamps(
+        base_filename=filename,
+        t_min=t_min_eff,
+        t_max=t_max_eff,
+        polarity=sample_polarity,
+    )
+
+    if len(time_array) == 0:
+        return {
+            "message": f"No scans found for sample '{sample_item_name}' with polarity '{sample_polarity}' in time range [{t_min_eff:.2f}s, {t_max_eff:.2f}s].",
+            "results": 0,
+            "data": {
+                "mz": [],
+                "area": [] if areas else None,
+                "height": [] if heights else None,
+            },
+        }
+
+    # Step 4: Load appropriate sample file peak data based on the query params
+    vars_to_load = []
+    if areas:
+        vars_to_load.append("peak_areas")
+    if heights:
+        vars_to_load.append("peak_heights")
+
+    try:
+        sample_file_data = load_file(filename, vars=vars_to_load)
+    except FileNotFoundError as e:
+        raise NotFoundException(
+            f"Sample file with name '{filename}' was not found or has not been processed"
+        ) from e
+
+    # Step 5: Extract and format the data with polarity filtering
+    response_data = {}
+
+    if areas:
+        if "peak_areas" not in sample_file_data:
+            raise NotFoundException(
+                f"No peak areas found in sample file '{filename}', file may not have been processed"
+            )
+
+        peak_areas = get_peaks(sample_file_data, "area")
+
+        # Filter by polarity-specific scan timestamps
+        peak_areas = peak_areas.sel(time=time_array, method="nearest")
+
+        # Step 6: Apply m/z range filtering if specified
+        if mz_min is not None and mz_max is not None:
+            peak_areas = peak_areas.sel(mz=slice(mz_min, mz_max))
+
+        # Step 7: Aggregate over filtered time dimension
+        peak_areas = (
+            peak_areas.mean(dim="time") if average else peak_areas.sum(dim="time")
+        )
+        response_data["mz"] = peak_areas.mz.values.tolist()
+        response_data["area"] = peak_areas.values.tolist()
+
+    if heights:
+        if "peak_heights" not in sample_file_data:
+            raise NotFoundException(
+                f"No peak heights found in sample file '{filename}', file may not have been processed"
+            )
+        peak_heights = get_peaks(sample_file_data, "height")
+
+        # Filter by polarity-specific scan timestamps
+        peak_heights = peak_heights.sel(time=time_array, method="nearest")
+
+        # Step 6: Apply m/z range filtering if specified
+        if mz_min is not None and mz_max is not None:
+            peak_heights = peak_heights.sel(mz=slice(mz_min, mz_max))
+
+        # Step 7: Aggregate over filtered time dimension
+        peak_heights = (
+            peak_heights.mean(dim="time") if average else peak_heights.sum(dim="time")
+        )
+
+        # If 'mz' was not populated from areas, populate it from heights
+        if "mz" not in response_data:
+            response_data["mz"] = peak_heights.mz.values.tolist()
+        response_data["height"] = peak_heights.values.tolist()
+
+    # Step 8: Format the response for the case where no peaks were detected
+    if not response_data.get("mz", []):
+        message = (
+            f"No peaks found in sample '{sample_item_name}' with polarity '{sample_polarity}'. "
+            f"The file was processed, but no peaks were detected in the target m/z range."
+        )
+        return {
+            "message": message,
+            "results": 0,
+            "data": {
+                "mz": [],
+                "area": [] if areas else None,
+                "height": [] if heights else None,
+            },
+        }
+
+    # Step 7: Remove empty fields from the response
+    if not areas:
+        response_data.pop("area", None)
+    if not heights:
+        response_data.pop("height", None)
+
+    # Step 8: Return success response
+    message = f"Successfully loaded {len(response_data['mz'])} peaks from sample '{sample_item_name}' with polarity '{sample_polarity}'"
+
+    if time_adjustment_info:
+        message += time_adjustment_info
+
+    return {
+        "message": message,
+        "results": len(response_data["mz"]),
+        "data": response_data,
+    }
+
+
+@api_controller()
 async def get_sample_peak_timeseries(
     sample_item_id: str,
     peak_mz: float,
