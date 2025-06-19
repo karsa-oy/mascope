@@ -79,7 +79,9 @@ def deduplicate_match_df(df: pd.DataFrame, id_keys: tuple) -> pd.DataFrame:
         ).head(1)
 
     # Apply deduplication
-    deduplicated_df = df.groupby(list(id_keys), as_index=False).apply(prioritize_group)
+    deduplicated_df = df.groupby(list(id_keys), as_index=False).apply(
+        prioritize_group, include_groups=False
+    )
     return deduplicated_df.reset_index(drop=True)
 
 

@@ -332,7 +332,7 @@ async def aggregate_match_compounds(
                 "target_collection_type",
             ]
         )
-        .apply(aggregate_params)
+        .apply(aggregate_params, include_groups=False)
         .reset_index()
     )
     # Explicitly cast match_category to int
@@ -407,7 +407,7 @@ async def aggregate_match_collections(compounds_df: pd.DataFrame) -> pd.DataFram
                 "target_collection_type",
             ]
         )
-        .apply(aggregate_params)
+        .apply(aggregate_params, include_groups=False)
         .reset_index()
     )
     # Explicitly cast match_category to int
@@ -447,7 +447,7 @@ async def aggregate_match_samples(compounds_df: pd.DataFrame) -> pd.DataFrame:
                 "sample_item_name",
             ]
         )
-        .apply(aggregate_params)
+        .apply(aggregate_params, include_groups=False)
         .reset_index()
     )
     # Cast match_category to int

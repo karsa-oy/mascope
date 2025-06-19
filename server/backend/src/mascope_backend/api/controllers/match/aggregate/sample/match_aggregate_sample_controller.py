@@ -493,7 +493,8 @@ async def aggregate_sample_match_compounds(
                             "sample_peak_intensity_sum"
                         ].sum(),
                     }
-                )
+                ),
+                include_groups=False,
             )
             .reset_index()
         )
