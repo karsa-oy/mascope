@@ -124,7 +124,7 @@ mascope -l debug dev run                      # set log level to debug
 ```
 
 > [!IMPORTANT]
-> On **Windows** you need to use `mascope dev run --reload` to enable hot module reloading on the backend. This launches the backend on a seperate Windows Terminal window.
+> On **Windows** you need to use `mascope dev run --reload` to enable hot module reloading on the backend. This launches the backend on a separate Windows Terminal window.
 
 ### Prod Commands
 
@@ -165,11 +165,11 @@ The `sync` command follows symbolic links on Linux filesystem both ways; syncing
 
 ### Dependency management
 
-To add Python dependencies, use `uv add`. Be sure to add the depedency to the right package. If you need to add development envirionment dependencies, add them to the root project, with `uv add --dev`.
+To add Python dependencies, use `uv add`. Be sure to add the dependency to the right package. If you need to add development environment dependencies, add them to the root project, with `uv add --dev`.
 
 To add JavaScript dependencies, use `npm install` in the `server/frontend` folder.
 
-Usually, `uv` will automatically sync dependencies. In rare cases such as modifying the `uv` workspace package interdepdencies, you may need to fully reinstall the project with the `tooling` script for your platform.
+Usually, `uv` will automatically sync dependencies. In rare cases such as modifying the `uv` workspace package interdependencies, you may need to fully reinstall the project with the `tooling` script for your platform.
 
 ### Secrets
 
@@ -181,6 +181,8 @@ Running Mascope in `prod` mode requires the following "secrets" to be present in
 - `server_owner_secret_key.txt`: First owner registration private key (arbitrary string)
 
 For testing the `prod` mode in local development environment, a self-signed SSL certificate can be generated using the script: `mascope cert gen`. The certificate as well as other secrets must be in place prior to building the containers.
+
+**Known issues:** On Windows, for the local environment, you may need to point to a proper `cnf` file first with `$env:OPENSSL_CONF="C:\Program Files\Git\usr\ssl\openssl.cnf"` command. Another problem - `mascope cert gen` may create folders instead of files in the `.runtime/secrets` directory. In this case, you can manually create the files and rerun the command.
 
 ---
 
@@ -388,7 +390,7 @@ modified_logger = runtime.logger.bind(some_metadata="foo")
 modified_logger.info("I include the metadata")
 ```
 
-Our logger has a special `key` metadata field which will appear in the terminal logs as well as the file logs. Its intentended to identify entities like objects and processes more granularly than the file level. In the terminal logs, this field is appended after the Python module.
+Our logger has a special `key` metadata field which will appear in the terminal logs as well as the file logs. It's intended to identify entities like objects and processes more granularly than the file level. In the terminal logs, this field is appended after the Python module.
 
 For example the File converter streamer thread is used as a key:
 
@@ -429,7 +431,7 @@ To run all services needed to emulate the Orbitrap acquisition workflow in devel
 
 ### TOF Agent
 
-The TOF Agent is responsible for transforming and transfering files from Tofwerk instrument machines to the server.
+The TOF Agent is responsible for transforming and transferring files from Tofwerk instrument machines to the server.
 
 To run all services needed to emulate the Tofwerk acquisition workflow in development, run `mascope dev run tof`.
 
@@ -949,7 +951,7 @@ app.data.batch.focus({ sample_batch_id }); // but only the id is actually needed
 app.data.batch.unfocus(); // unfocusing requires no arguments
 ```
 
-The implentation has a currently unutilized feature to enable multiselection. This was implemented for future use. Since it shouldn't really be used at the moment, it will not be documented yet.
+The implementation has a currently unutilized feature to enable multiselection. This was implemented for future use. Since it shouldn't really be used at the moment, it will not be documented yet.
 
 **_Data module operatons_**
 
@@ -1311,7 +1313,7 @@ Mascope expects an Ubuntu 24.04 machine to run on, although in principle it coul
 
 ### GitHub releases
 
-Mascope docker images are built by a release CI/CD pipeline (found in `.github/workflows/release.yaml`). This pipeline triggers whenver we merge to master; you can follow [release workflow runs](https://github.com/karsa-oy/mascope/actions/workflows/release.yaml). The pipeline builds and tags production images and pushes them to the GitHub Container Registry (ghcr.io). You can see these images in [Karsa's GitHub packages page](https://github.com/orgs/karsa-oy/packages).
+Mascope docker images are built by a release CI/CD pipeline (found in `.github/workflows/release.yaml`). This pipeline triggers whenever we merge to master; you can follow [release workflow runs](https://github.com/karsa-oy/mascope/actions/workflows/release.yaml). The pipeline builds and tags production images and pushes them to the GitHub Container Registry (ghcr.io). You can see these images in [Karsa's GitHub packages page](https://github.com/orgs/karsa-oy/packages).
 
 ### Pulling images
 
