@@ -2,7 +2,10 @@
 from datetime import datetime
 from typing import Literal
 from mascope_file.io import load_file
-from mascope_signal.compute import get_scan_timestamps
+from mascope_signal.compute import (
+    get_scan_timestamps,
+    sum_signal_for_time_range,
+)
 from mascope_signal.peak import get_peaks
 from sqlalchemy import (
     asc,
@@ -382,5 +385,127 @@ async def get_sample_peak_timeseries(
             "mz": peak_mz_data,
             "height": peak_timeseries.values.tolist(),
             "time": peak_timeseries.time.values.tolist(),
+        },
+    }
+
+
+@api_controller()
+async def get_sample_spectrum(
+    sample_item_id: str,
+    t_min: float | None = None,
+    t_max: float | None = None,
+    mz_min: float | None = None,
+    mz_max: float | None = None,
+) -> dict:
+    """
+    Retrieves the spectrum data from a sample.
+
+    This endpoint extracts averaged spectrum data for a sample, automatically filtered
+    by the sample's polarity and optional time and/or m/z ranges.
+
+    Steps:
+    1. Get sample data and extract required fields (t0, t1, polarity).
+    2. Set effective time limits with validation and auto-correction.
+    3. Compute averaged spectrum in the time range with polarity filtering.
+    4. Filter by m/z range if provided.
+    5. Extract m/z values and their corresponding intensities from the spectrum.
+    6. Return the spectrum data, including the total number of m/z points and optional metadata.
+
+    :param sample_item_id: Unique identifier for the sample from which to retrieve the spectrum
+    :type sample_item_id: str
+    :param t_min: Minimum time limit in seconds, defaults to sample's t0 if not provided
+    :type t_min: float | None
+    :param t_max: Maximum time limit in seconds, defaults to sample's t1 if not provided
+    :type t_max: float | None
+    :param mz_min: Start of the optional m/z range, defaults to None
+    :type mz_min: float | None
+    :param mz_max: End of the optional m/z range, defaults to None
+    :type mz_max: float | None
+    :return: A dictionary containing spectrum data with m/z values, intensities, and metadata
+    :rtype: dict
+    """
+    # Step 1: Get sample data and extract required fields
+    sample_data = await get_sample(sample_item_id)
+    sample = sample_data["data"]
+    sample_item_name, filename, sample_t0, sample_t1, sample_polarity = (
+        sample["sample_item_name"],
+        sample["filename"],
+        sample["t0"],
+        sample["t1"],
+        sample["polarity"],
+    )
+
+    # Step 2: Set effective time limits with validation and auto-correction
+    t_min_eff = t_min if t_min is not None else sample_t0
+    t_max_eff = t_max if t_max is not None else sample_t1
+
+    # Check for completely invalid ranges (user provided values outside sample window)
+    if t_min is not None and t_min > sample_t1:
+        raise ValueError(
+            f"Requested minimum time ({t_min:.2f}s) is after sample's acquisition end time ({sample_t1:.2f}s)"
+        )
+    if t_max is not None and t_max < sample_t0:
+        raise ValueError(
+            f"Requested maximum time ({t_max:.2f}s) is before sample's acquisition start time ({sample_t0:.2f}s)"
+        )
+
+    # Auto-correct slight overshoots and track what was adjusted
+    adjustments = []
+    if t_min is not None and t_min < sample_t0:
+        t_min_eff = max(sample_t0, t_min_eff)
+        adjustments.append(f"minimum time from {t_min:.2f}s to {sample_t0:.2f}s")
+    if t_max is not None and t_max > sample_t1:
+        t_max_eff = min(sample_t1, t_max_eff)
+        adjustments.append(f"maximum time from {t_max:.2f}s to {sample_t1:.2f}s")
+
+    # Build user message if adjustments were made
+    time_adjustment_info = ""
+    if adjustments:
+        adjustment_text = " and ".join(adjustments)
+        warning_msg = f"Time range adjusted: {adjustment_text} to fit sample acquisition window [{sample_t0:.2f}s, {sample_t1:.2f}s]"
+        runtime.logger.warning(warning_msg)
+        time_adjustment_info = f" {warning_msg}."
+
+    # Step 3: Compute averaged spectrum in the time range with polarity filtering
+    intensity_unit = "counts/s"
+
+    # Use specific time range with polarity filtering
+    spectrum = sum_signal_for_time_range(
+        filename, t_min_eff, t_max_eff, polarity=sample_polarity, average=True
+    )
+
+    # Check if spectrum computation returned None (no data found)
+    if spectrum is None:
+        return {
+            "message": f"No spectrum data found for sample '{sample_item_name}' with '{sample_polarity}' polarity in time range [{t_min_eff:.2f}s, {t_max_eff:.2f}s]. The sample file may not contain scans of this polarity in the specified time window.",
+            "results": 0,
+            "data": {
+                "mz": [],
+                "intensity": [],
+                "intensity_unit": intensity_unit,
+            },
+        }
+
+    # Step 4: Filter by m/z range if provided
+    if mz_min is not None and mz_max is not None:
+        spectrum = spectrum.sel(mz=slice(mz_min, mz_max)).compute()
+
+    # Step 5: Extract m/z values and intensities
+    mz_values = spectrum.mz.values.tolist()
+    intensity_values = spectrum.values.tolist()
+
+    # Step 6: Return the spectrum data with metadata
+    message = f"Retrieved spectrum data with {len(mz_values)} m/z points from sample '{sample_item_name}' with '{sample_polarity}' polarity."
+
+    if time_adjustment_info:
+        message += time_adjustment_info
+
+    return {
+        "message": message,
+        "results": len(mz_values),
+        "data": {
+            "mz": mz_values,
+            "intensity": intensity_values,
+            "intensity_unit": intensity_unit,
         },
     }

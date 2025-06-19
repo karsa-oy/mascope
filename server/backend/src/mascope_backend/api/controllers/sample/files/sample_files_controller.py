@@ -1147,9 +1147,6 @@ async def get_sample_file_spectrum(
     filename = sample_file_data.get("data").get("filename")
     intensity_unit = "counts/s"
 
-    runtime.logger.info(f"Loading file: {filename}")
-    time_data_points = None
-
     # Step 2: Compute averaged spectrum in the time range
     if t_min is None and t_max is None:
         # Try to get previously computed sum signal
@@ -1167,15 +1164,9 @@ async def get_sample_file_spectrum(
 
     # Step 5: Return the total count, optional spectrum count, and data
     message = f"Retrieved spectrum data with {len(mz_values)} m/z points from sample file '{filename}'."
-    if time_data_points is not None:
-        message += f" Time range specified with {time_data_points} data points."
-
     return {
         "message": message,
         "results": len(mz_values),
-        **(
-            {"spectrum_count": time_data_points} if time_data_points is not None else {}
-        ),
         "data": {
             "mz": mz_values,
             "intensity": intensity_values,
