@@ -317,8 +317,8 @@ def write_peaks(
     peak_heights.name = "peak_heights"
 
     try:
-        peak_areas.to_zarr(filename_peak_areas)
-        peak_heights.to_zarr(filename_peak_heights)
+        peak_areas.to_zarr(filename_peak_areas, align_chunks=True)
+        peak_heights.to_zarr(filename_peak_heights, align_chunks=True)
     except FileNotFoundError as e:
         if ".partial" in str(e):
             # peak_heights in Exception because it's longer than peak_areas and sum_signal
