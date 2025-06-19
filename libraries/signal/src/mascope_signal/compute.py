@@ -267,6 +267,7 @@ def load_signal(
                 return signal.assign_coords(mz=sum_signal_mz)
             case "tof_zarr" | "orbi_zarr":
                 signal_ds = load_array(base_filename, "signal")
+                signal_ds = signal_ds.chunk(dict(mz=-1, time=-1))
                 if sample_type == "tof_zarr":
                     # Correct by scan duration
                     interval_ds = load_array(base_filename, "signal_period")

@@ -223,9 +223,7 @@ async def detect_peaks(
         if u_list.size == 0:
             # Nothing to fit
             runtime.logger.info("Nothing to fit")
-            return load_file(
-                filename, vars=["peak_areas", "peak_heights", "sum_signal"]
-            )
+            return load_file(filename, vars=["peak_areas", "peak_heights"])
 
         runtime.logger.debug("Getting sums of previously fitted peak areas and heights")
         old_peak_areas = peak_areas_xarr.sum(dim="time").compute().values.tolist()
@@ -371,7 +369,7 @@ async def detect_peaks(
     runtime.logger.info("Complete")
     sample_file_data = load_file(
         filename,
-        vars=["peak_areas", "peak_heights", "sum_signal"],
+        vars=["peak_areas", "peak_heights"],
     )
     return sample_file_data
 
