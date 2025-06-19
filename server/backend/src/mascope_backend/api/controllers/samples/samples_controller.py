@@ -497,7 +497,8 @@ async def get_sample_peak_timeseries(
     # Step 1: Get sample data and extract required fields
     sample_data = await get_sample(sample_item_id)
     sample = sample_data["data"]
-    filename, sample_t0, sample_t1, sample_polarity = (
+    sample_item_name, filename, sample_t0, sample_t1, sample_polarity = (
+        sample["sample_item_name"],
         sample["filename"],
         sample["t0"],
         sample["t1"],
@@ -578,13 +579,22 @@ async def get_sample_peak_timeseries(
 
     # No peak found within given m/z tolerance
     if abs(mz_diff_ppm) > peak_mz_tolerance_ppm:
+        message = (
+            f"No peak found within given m/z tolerance {peak_mz_tolerance_ppm} ppm "
+            f"of requested m/z {peak_mz} in sample '{sample_item_name}' "
+            f"with '{sample_polarity}' polarity."
+        )
         return {
-            "message": f"No peak found within given m/z tolerance {peak_mz_tolerance_ppm} ppm of requested m/z {peak_mz} in sample '{sample.get('sample_item_name', filename)}' with '{sample_polarity}' polarity.",
+            "message": message,
             "results": 0,
             "data": {"mz": None, "height": [], "time": []},
         }
 
-    message = f"Retrieved timeseries with {len(peak_timeseries.time.values)} data points for peak m/z {peak_mz} in sample '{sample.get('sample_item_name', filename)}' with '{sample_polarity}' polarity."
+    message = (
+        f"Retrieved timeseries with {len(peak_timeseries.time.values)} data points "
+        f"for peak m/z {peak_mz} in sample '{sample_item_name}' "
+        f"with '{sample_polarity}' polarity."
+    )
     if time_adjustment_info:
         message += time_adjustment_info
 
@@ -686,8 +696,14 @@ async def get_sample_spectrum(
 
     # Check if spectrum computation returned None (no data found)
     if spectrum is None:
+        message = (
+            f"No spectrum data found for sample '{sample_item_name}' "
+            f"with '{sample_polarity}' polarity in time range "
+            f"[{t_min_eff:.2f}s, {t_max_eff:.2f}s]. The sample file may not "
+            f"contain scans of this polarity in the specified time window."
+        )
         return {
-            "message": f"No spectrum data found for sample '{sample_item_name}' with '{sample_polarity}' polarity in time range [{t_min_eff:.2f}s, {t_max_eff:.2f}s]. The sample file may not contain scans of this polarity in the specified time window.",
+            "message": message,
             "results": 0,
             "data": {
                 "mz": [],
