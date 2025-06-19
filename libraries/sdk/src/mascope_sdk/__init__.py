@@ -1,10 +1,8 @@
 import json
-import requests
 import warnings
+import requests
 from requests.exceptions import HTTPError, Timeout, RequestException
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
-
-# TODO add the message to every response in the fastapi, including success with number of results.
 
 # Suppress only the InsecureRequestWarning from requests
 warnings.simplefilter("ignore", InsecureRequestWarning)
@@ -522,6 +520,10 @@ def get_sample_file_peaks(
     """
     Get peaks of a given sample file, with options to include areas and/or heights.
 
+    .. deprecated::
+        Use get_sample_peaks() instead for enhanced polarity filtering and time/m/z range controls.
+
+
     :param mascope_url: The base URL of the Mascope instance.
     :type mascope_url: str
     :param access_token: Authorization token for API access
@@ -539,6 +541,13 @@ def get_sample_file_peaks(
         Returns None if no peaks are found or if an error occurs.
     :rtype: dict or None
     """
+    # Deprecation warning
+    warnings.warn(
+        "get_sample_file_peaks is deprecated and will be removed in a future releases. "
+        "Use get_sample_peaks instead for sample-based polarity filtering and time or m/z range controls.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     # Prepare query parameters for areas and heights
     query_params = {
         "areas": str(areas).lower(),  # Convert bool to string (lowercase)
@@ -703,71 +712,6 @@ def get_sample_file_peak_timeseries(
     return timeseries_data
 
 
-def get_sample_peak_timeseries(
-    mascope_url: str,
-    access_token: str,
-    sample_item_id: str,
-    peak_mz: float,
-    peak_mz_tolerance_ppm: float = 1.0,
-    t_min: float | None = None,
-    t_max: float | None = None,
-) -> dict | None:
-    """Get timeseries data for the specified peak of the sample from the Mascope API.
-
-    This function uses the sample-based endpoint that provides sample polarity filtering
-    and time limits controls based on the sample item's acquisition parameters.
-
-    :param mascope_url: The base URL of the Mascope instance.
-    :type mascope_url: str
-    :param access_token: Authorization token for API access
-    :type access_token: str
-    :param sample_item_id: The ID of the sample item from which to retrieve peak timeseries data.
-    :type sample_item_id: str
-    :param peak_mz: The m/z of the peak to request timeseries for.
-    :type peak_mz: float
-    :param peak_mz_tolerance_ppm: The m/z tolerance within which the peak should be compared (ppm), defaults to 1.0.
-    :type peak_mz_tolerance_ppm: float, optional
-    :param t_min: Minimum time limit in seconds for filtering. If not provided, uses sample's acquisition start time.
-    :type t_min: float, optional
-    :param t_max: Maximum time limit in seconds for filtering. If not provided, uses sample's acquisition end time.
-    :type t_max: float, optional
-    :return: A dictionary with keys:
-        - "mz": m/z of the peak in sample (None if no peak within tolerance)
-        - "height": list of peak intensity at time points (empty if no peak within tolerance)
-        - "time": list of time coordinates (empty if no peak within tolerance)
-        Returns None if no timeseries data is found or if an error occurs.
-    :rtype: dict or None
-    """
-    # Prepare the request body
-    body = {
-        "peak_mz": peak_mz,
-        "peak_mz_tolerance_ppm": peak_mz_tolerance_ppm,
-        **{k: v for k, v in {"t_min": t_min, "t_max": t_max}.items() if v is not None},
-    }
-
-    # Check if the API request was successful
-    if not (
-        resp := api_post(
-            url=mascope_url,
-            path=f"samples/{sample_item_id}/peaks/timeseries",
-            access_token=access_token,
-            data=body,
-        )
-    ):
-        print(
-            f"Failed to retrieve peak timeseries data for sample {sample_item_id}, m/z {peak_mz}"
-        )
-        return None
-
-    # Parse the content of the response
-    content = json.loads(resp.content)
-    if not (timeseries_data := content.get("data", None)):
-        print(f"No timeseries data found for sample {sample_item_id}, m/z {peak_mz}")
-        return None
-
-    return timeseries_data
-
-
 def get_sample_file_spectrum(
     mascope_url: str,
     access_token: str,
@@ -779,6 +723,9 @@ def get_sample_file_spectrum(
 ) -> dict:
     """
     Get the mass spectrum from a specified sample file within optional time and m/z ranges.
+
+    .. deprecated::
+        Use get_sample_spectrum() instead for enhanced polarity filtering capabilities.
 
     :param mascope_url: The base URL of the Mascope instance.
     :type mascope_url: str
@@ -801,6 +748,14 @@ def get_sample_file_spectrum(
         Returns None if no spectrum data is found or if an error occurs.
     :rtype: dict or None
     """
+    # Ddeprecation warning
+    warnings.warn(
+        "get_sample_file_spectrum is deprecated and will be removed in a future release. "
+        "Use get_sample_spectrum instead for sample-based polarity filtering capabilities.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
     # Prepare query parameters as a dictionary
     query_params = {}
     if t_min is not None:
@@ -910,6 +865,249 @@ def get_sample_file_metadata(
         return None
 
     return metadata
+
+
+#############
+# Samples API
+
+
+def get_sample_peaks(
+    mascope_url: str,
+    access_token: str,
+    sample_item_id: str,
+    areas: bool = True,
+    heights: bool = True,
+    average: bool = True,
+    t_min: float | None = None,
+    t_max: float | None = None,
+    mz_min: float | None = None,
+    mz_max: float | None = None,
+) -> dict | None:
+    """
+    Get peak data from a sample with automatic polarity filtering and optional range filtering.
+
+    This function uses the sample-based endpoint that provides sample polarity filtering,
+    time limits controls, and m/z range filtering based on the sample's acquisition parameters.
+
+    :param mascope_url: The base URL of the Mascope instance.
+    :type mascope_url: str
+    :param access_token: Authorization token for API access
+    :type access_token: str
+    :param sample_item_id: The ID of the sample item from which to retrieve peak data.
+    :type sample_item_id: str
+    :param areas: Include peak areas in the response. Represents the integrated area under the curve
+                  for each peak, reflecting the total intensity over time. Defaults to True.
+    :type areas: bool, optional
+    :param heights: Include peak heights in the response. Represents the maximum intensity at the apex
+                   of each peak, showing the peak's highest intensity value. Defaults to True.
+    :type heights: bool, optional
+    :param average: If True, return averaged peak data across time dimension. If False, return summed
+                   peak data. Defaults to True.
+    :type average: bool, optional
+    :param t_min: Minimum time limit in seconds for filtering the peak data. If not provided, uses the
+                  sample's acquisition start time. Must be within the sample's acquisition time range.
+    :type t_min: float, optional
+    :param t_max: Maximum time limit in seconds for filtering the peak data. If not provided, uses the
+                  sample's acquisition end time. Must be within the sample's acquisition time range.
+    :type t_max: float, optional
+    :param mz_min: Minimum m/z value for filtering peaks. Must be used together with mz_max for m/z
+                   range filtering.
+    :type mz_min: float, optional
+    :param mz_max: Maximum m/z value for filtering peaks. Must be used together with mz_min for m/z
+                   range filtering.
+    :type mz_max: float, optional
+    :return: A dictionary with keys:
+        - "mz": list of m/z values of the peaks in the sample
+        - "area": list of peak areas (if requested)
+        - "height": list of peak heights (if requested)
+        Returns None if no peaks are found or if an error occurs.
+    :rtype: dict or None
+    """
+    # Prepare query parameters
+    query_params = {
+        "areas": str(areas).lower(),
+        "heights": str(heights).lower(),
+        "average": str(average).lower(),
+        **{
+            k: v
+            for k, v in {
+                "t_min": t_min,
+                "t_max": t_max,
+                "mz_min": mz_min,
+                "mz_max": mz_max,
+            }.items()
+            if v is not None
+        },
+    }
+
+    # Make the GET request to the API endpoint with query parameters
+    resp = api_get(
+        url=mascope_url,
+        path=f"samples/{sample_item_id}/peaks",
+        access_token=access_token,
+        params=query_params,
+    )
+
+    # Check if the API request was successful
+    if not resp:
+        print(
+            f"Failed to retrieve peaks for sample {sample_item_id} from {mascope_url}."
+        )
+        return None
+
+    # Parse the content of the response
+    content = json.loads(resp.content)
+    if not (peaks_data := content.get("data", None)):
+        print(f"No peaks found for sample {sample_item_id}.")
+        return None
+
+    return peaks_data
+
+
+def get_sample_peak_timeseries(
+    mascope_url: str,
+    access_token: str,
+    sample_item_id: str,
+    peak_mz: float,
+    peak_mz_tolerance_ppm: float = 1.0,
+    t_min: float | None = None,
+    t_max: float | None = None,
+) -> dict | None:
+    """Get timeseries data for the specified peak of the sample from the Mascope API.
+
+    This function uses the sample-based endpoint that provides sample polarity filtering
+    and time limits controls based on the sample item's acquisition parameters.
+
+    :param mascope_url: The base URL of the Mascope instance.
+    :type mascope_url: str
+    :param access_token: Authorization token for API access
+    :type access_token: str
+    :param sample_item_id: The ID of the sample item from which to retrieve peak timeseries data.
+    :type sample_item_id: str
+    :param peak_mz: The m/z of the peak to request timeseries for.
+    :type peak_mz: float
+    :param peak_mz_tolerance_ppm: The m/z tolerance within which the peak should be compared (ppm), defaults to 1.0.
+    :type peak_mz_tolerance_ppm: float, optional
+    :param t_min: Minimum time limit in seconds for filtering. If not provided, uses sample's acquisition start time.
+    :type t_min: float, optional
+    :param t_max: Maximum time limit in seconds for filtering. If not provided, uses sample's acquisition end time.
+    :type t_max: float, optional
+    :return: A dictionary with keys:
+        - "mz": m/z of the peak in sample (None if no peak within tolerance)
+        - "height": list of peak intensity at time points (empty if no peak within tolerance)
+        - "time": list of time coordinates (empty if no peak within tolerance)
+        Returns None if no timeseries data is found or if an error occurs.
+    :rtype: dict or None
+    """
+    # Prepare the request body
+    body = {
+        "peak_mz": peak_mz,
+        "peak_mz_tolerance_ppm": peak_mz_tolerance_ppm,
+        **{k: v for k, v in {"t_min": t_min, "t_max": t_max}.items() if v is not None},
+    }
+
+    # Check if the API request was successful
+    if not (
+        resp := api_post(
+            url=mascope_url,
+            path=f"samples/{sample_item_id}/peaks/timeseries",
+            access_token=access_token,
+            data=body,
+        )
+    ):
+        print(
+            f"Failed to retrieve peak timeseries data for sample {sample_item_id}, m/z {peak_mz}"
+        )
+        return None
+
+    # Parse the content of the response
+    content = json.loads(resp.content)
+    if not (timeseries_data := content.get("data", None)):
+        print(f"No timeseries data found for sample {sample_item_id}, m/z {peak_mz}")
+        return None
+
+    return timeseries_data
+
+
+def get_sample_spectrum(
+    mascope_url: str,
+    access_token: str,
+    sample_item_id: str,
+    t_min: float | None = None,
+    t_max: float | None = None,
+    mz_min: float | None = None,
+    mz_max: float | None = None,
+) -> dict | None:
+    """
+    Get spectrum data from a sample with automatic polarity filtering and optional range filtering.
+
+    This function uses the sample-based endpoint that provides automatic polarity filtering
+    based on the sample's metadata, ensuring only scans matching the sample's polarity are included.
+    Supports optional time range filtering within the sample's acquisition window and m/z range
+    filtering for targeted spectral analysis.
+
+    The spectrum represents the averaged intensity across all matching scans in the specified time window,
+    providing a comprehensive view of the sample's spectral characteristics for the given polarity.
+
+    :param mascope_url: The base URL of the Mascope instance.
+    :type mascope_url: str
+    :param access_token: Authorization token for API access
+    :type access_token: str
+    :param sample_item_id: The ID of the sample item from which to retrieve spectrum data.
+    :type sample_item_id: str
+    :param t_min: Minimum time limit in seconds for filtering the spectrum data. If not provided, uses the
+                  sample's acquisition start time. Must be within the sample's acquisition time range.
+    :type t_min: float, optional
+    :param t_max: Maximum time limit in seconds for filtering the spectrum data. If not provided, uses the
+                  sample's acquisition end time. Must be within the sample's acquisition time range.
+    :type t_max: float, optional
+    :param mz_min: Minimum m/z value for filtering spectrum. Must be used together with mz_max for m/z
+                   range filtering.
+    :type mz_min: float, optional
+    :param mz_max: Maximum m/z value for filtering spectrum. Must be used together with mz_min for m/z
+                   range filtering.
+    :type mz_max: float, optional
+    :return: A dictionary with keys:
+        - "mz": list of m/z values
+        - "intensity": list of intensity values
+        - "intensity_unit": unit of intensity measurements
+        Returns None if no spectrum data is found or if an error occurs.
+    :rtype: dict or None
+    """
+    # Prepare query parameters
+    query_params = {
+        k: v
+        for k, v in {
+            "t_min": t_min,
+            "t_max": t_max,
+            "mz_min": mz_min,
+            "mz_max": mz_max,
+        }.items()
+        if v is not None
+    }
+
+    # Make the GET request to the API endpoint with query parameters
+    resp = api_get(
+        url=mascope_url,
+        path=f"samples/{sample_item_id}/spectrum",
+        access_token=access_token,
+        params=query_params,
+    )
+
+    # Check if the API request was successful
+    if not resp:
+        print(
+            f"Failed to retrieve spectrum data for sample {sample_item_id} from {mascope_url}."
+        )
+        return None
+
+    # Parse the content of the response
+    content = json.loads(resp.content)
+    if not (spectrum_data := content.get("data", None)):
+        print(f"No spectrum data found for sample {sample_item_id}.")
+        return None
+
+    return spectrum_data
 
 
 ##########################
