@@ -48,11 +48,11 @@ export const useChartData = defineStore('chart.sample.spectrum', () => {
 
   // load spectrum data
   async function load() {
-    const sampleFileId = app.data.sample.focused?.sample_file_id
+    const sampleItemId = app.data.sample.focused?.sample_item_id
     // start loading
     loading.value = true
     // get spectrum data from the backend
-    const data = await api.http.get(`/sample/files/${sampleFileId}/spectrum`, {
+    const data = await api.http.get(`/samples/${sampleItemId}/spectrum`, {
       use: 'read',
       type: 'get_spectrum'
     })

@@ -8,8 +8,8 @@ export const usePeak = defineModule({
   key: 'mz',
   useParent: useSample,
   reloadOn: 'peak_reload',
-  load: async ({ sample_file_id }) => {
-    const data = await api.http.get(`/sample/files/${sample_file_id}/peaks`, {
+  load: async ({ sample_item_id }) => {
+    const data = await api.http.get(`/samples/${sample_item_id}/peaks`, {
       params: {
         areas: true,
         heights: true
