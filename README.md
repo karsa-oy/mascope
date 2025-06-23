@@ -1274,36 +1274,32 @@ flowchart LR
 
 This library exposes a public Python SDK for end-users to leverage especially in Jupyter notebooks.
 
-#### Test publish
-
-To make a test publish in [Test Python Package Index (TestPyPI)](https://test.pypi.org/), you need to register an account, generate an API token and then configure the `test-pypi` repository in `poetry`:
-
-```sh
-poetry config repositories.test-pypi https://test.pypi.org/legacy/
-poetry config pypi-token.test-pypi <YOUR-API-TOKEN>
-```
-
-Once configured, to make a test publish, run the following commands:
-
-```sh
-poetry version patch            # Bump version number (<major>.<minor>.<patch>)
-poetry build                    # Build distributable
-poetry publish -r test-pypi     # Publish in PyPI
-```
-
-To verify that the publish worked as expected, run the Powershell script `/libraries/mascope_sdk/tests/test_install.ps1`. It will create a virtual environment, install the `mascope_sdk` package from TestPyPI and run `/libraries/mascope_sdk/tests/test_import.py`. You should see the package version number printed in the terminal.
-
 #### Publish
 
-To publish the package in the _real_ [Python Package Index (PyPI)](https://pypi.org/), you need to register an account and generate an API token. Then, when running commands, you pass the token with `--token`.
-To publish the package, run the following commands:
+To publish the package in the _real_ [Python Package Index (PyPI)](https://pypi.org/), you need to register an account and generate an API token. Then follow the steps:
 
-```sh
-uv build                              # Build distributable
-uv publish --token <MY TOKEN>         # Publish in PyPI
-```
+1. Set the package version manually in `libraries/sdk/pyproject.toml` to the last commit date in ISO format on the branch you are releasing from:
 
-You should manually set the package version in `pyproject.toml` to the last commit date in ISO format (use `git log -1 --date=format:"%Y.%m.%d" --format="%ad"` on the branch you are releasing from to find it). After releasing you should set it back to `0.0.0`.
+   ```sh
+   git log -1 --date=format:"%Y.%m.%d" --format="%ad"   # Get the commit date
+   2025.6.19                                            # Example date output to copy
+   ```
+
+2. Build the distributable from the SDK directory:
+
+   ```sh
+   cd libraries/sdk
+   uv build                                             # Build distributable
+   ```
+
+3. Publish from the mascope repo root (important: `uv build` creates `dist/` in the root directory, not in `libraries/sdk/`):
+
+   ```sh
+   cd ../..                                             # Navigate back to mascope root
+   uv publish --token <MY_TOKEN>                        # Publish from root where dist/ exists
+   ```
+
+4. Reset the version in `libraries/sdk/pyproject.toml` back to `0.0.0` after successful release.
 
 ---
 
