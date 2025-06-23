@@ -10,7 +10,7 @@ sio = socketio.AsyncServer(
         "/file-converter",  # namespace for file converter service
         "/tof-agent",  # namespace for TOF-instrument agent
     ],
-    ping_timeout=60,
+    ping_timeout=300,  # 5 minutes for ping response
     logger=get_socket_logger(),
     engineio_logger=False,
 )
