@@ -1181,3 +1181,32 @@ def create_instrument_function(
         return None
 
     return created_instrument_function
+
+
+###########################
+# Ionization mechanisms API
+
+
+def get_ionization_mechanisms(mascope_url: str, access_token: str) -> list[dict]:
+    """Get ionization mechanisms from the Mascope API.
+
+    This function retrieves the list of ionization mechanisms available in the Mascope instance.
+
+    :param mascope_url: Base URL of the Mascope API.
+    :type mascope_url: str
+    :param access_token: Authorization token for API access
+    :type access_token: str
+    :return: Ionization mechanisms data as a list of dictionaries
+    :rtype: list[dict]
+    """
+    resp = api_get(
+        url=mascope_url, path="ionization_mechanisms", access_token=access_token
+    )
+    # Check if the API request was successful
+    if not resp:
+        print(f"Failed to get ionization mechanisms from {mascope_url}")
+        return None
+
+    # Successfully fetched ionization mechanisms, extract 'data' from the response JSON
+    content = resp.json()
+    return content.get("data", [])

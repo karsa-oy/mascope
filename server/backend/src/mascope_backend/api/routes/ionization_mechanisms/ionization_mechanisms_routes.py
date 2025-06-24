@@ -19,7 +19,7 @@ ionization_mechanisms_router = APIRouter(
 
 
 @ionization_mechanisms_router.get("")
-@api_route()
+@api_route(token_access=True)
 async def get_ionization_mechanisms_route(
     query_params: GetIonizationMechanismsQueryParams = Depends(),
     user=Depends(guest_user),
