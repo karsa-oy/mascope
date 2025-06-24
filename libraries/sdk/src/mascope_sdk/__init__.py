@@ -1210,3 +1210,57 @@ def get_ionization_mechanisms(mascope_url: str, access_token: str) -> list[dict]
     # Successfully fetched ionization mechanisms, extract 'data' from the response JSON
     content = resp.json()
     return content.get("data", [])
+
+
+##############
+# ChemInfo API
+
+
+def get_cheminfo_by_mz(
+    mascope_url: str,
+    access_token: str,
+    mz: float,
+    ionization_mechanism_ids: list[str],
+    formula_ranges: str = "C0-100 H0-100 O0-100 N0-100",
+    mz_tolerance: float = 30.0,
+) -> list[dict]:
+    """Query ChemInfo service for potential elemental compositions for a given m/z value.
+
+    :param mascope_url: Base URL of the Mascope API.
+    :type mascope_url: str
+    :param access_token: Authorization token for API access
+    :type access_token: str
+    :param mz: The m/z value to query for potential elemental compositions.
+    :type mz: float
+    :param ionization_mechanism_ids: List of ionization mechanism IDs to filter the results.
+    :type ionization_mechanism_ids: list[str]
+    :param formula_ranges: String representing the ranges of elements to consider in the formula
+                           Defaults to "C0-100 H0-100 O0-100 N0-100".
+    :type formula_ranges: str, optional
+    :param mz_tolerance: The m/z tolerance for matching in ppm, defaults to 30.0.
+    :type mz_tolerance: float, optional
+    :return: List of dictionaries containing potential elemental compositions for the given m/z
+    :rtype: list[dict]
+    """
+
+    query_params = {
+        "mz": mz,
+        "mz_precision": mz_tolerance,
+        "formula_ranges": formula_ranges,
+        "ionization_mechanism_ids": ionization_mechanism_ids,
+    }
+    # Make the POST request to the instrument_functions endpoint
+    resp = api_post(
+        url=mascope_url,
+        path="cheminfo/mz/query",
+        access_token=access_token,
+        data=query_params,
+    )
+    # Check if the API request was successful
+    if not resp:
+        print(f"Failed to retrieve cheminfo for m/z {mz} via {mascope_url}.")
+        return None
+
+    # Successfully fetched cheminfo, extract 'data' from the response JSON
+    response_json = resp.json()
+    return response_json.get("data", [])

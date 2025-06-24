@@ -17,7 +17,7 @@ cheminfo_router = APIRouter(prefix="/api/cheminfo", tags=["cheminfo"])
 
 
 @cheminfo_router.post("/mz/query")
-@api_route()
+@api_route(token_access=True)
 async def retrieve_cheminfo_by_mz_route(
     body: CheminfoQueryBody, user=Depends(guest_user)
 ) -> dict:
