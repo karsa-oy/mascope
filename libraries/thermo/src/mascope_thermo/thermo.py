@@ -408,7 +408,7 @@ def get_peak_profiles(
     t_min: float | None = None,
     t_max: float | None = None,
     polarity: Literal["+", "-"] | None = None,
-    ppm: int = 10,
+    ppm: float = 5,
 ) -> xr.Dataset:
     """Extracts the peak profiles for the specified m/z values in the time range (t_min, t_max).
 
@@ -423,7 +423,7 @@ def get_peak_profiles(
     :param polarity: + or -, Polarity of the scans to be retrieved, optional, defaults to None
     :type polarity: str
     :param ppm: Mass tolerance in parts-per-million for centroid binning, defaults to 10.
-    :type ppm: int, optional
+    :type ppm: float, optional
     :return: An xarray Dataset containing the peak profiles
     :rtype: xr.Dataset
     """
