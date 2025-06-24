@@ -243,13 +243,13 @@ async def detect_peaks(
 
     if sample_file_type == "orbi_raw":
         runtime.logger.debug("Reading centroids from the Thermo file...")
-        new_peak_mzs, new_peak_heights, resolutions = get_orbi_centroids(
-            filename, u_list
+        new_peak_mzs, new_peak_heights, resolutions, signal_to_noise = (
+            get_orbi_centroids(filename, u_list)
         )
 
         runtime.logger.debug("Filter centroids by height and resolution...")
         new_peak_mzs, new_peak_heights, resolutions = _filter_centroids(
-            new_peak_mzs, new_peak_heights, resolutions, n_sigma=2
+            new_peak_mzs, new_peak_heights, resolutions, signal_to_noise
         )
 
         new_peak_areas = []
@@ -378,6 +378,7 @@ def _filter_centroids(
     peak_mzs: np.ndarray,
     peak_heights: np.ndarray,
     resolutions: np.ndarray,
+    signal_to_noise: np.ndarray,
     n_sigma: float = 1.0,
 ) -> tuple:
     """Filter centroids less than 1 count and with the resolution
@@ -389,14 +390,33 @@ def _filter_centroids(
     :type peak_heights: np.ndarray
     :param resolutions: Resolutions of the fitted peaks
     :type resolutions: np.ndarray
+    :param signal_to_noise: Signal to noise ratio of the fitted peaks
+    :type signal_to_noise: np.ndarray
+    :param n_sigma: Number of standard deviations for resolution filtering, defaults to 1.0
+    :type n_sigma: float, optional
     :return: Filtered peak m/z values, heights and resolutions
     :rtype: tuple
     """
+    runtime.logger.debug(f"Found {len(peak_mzs)} peaks")
+
     # Filter out peaks with heights less than 1 count
     valid_mask = peak_heights >= 1
     peak_mzs = peak_mzs[valid_mask]
     peak_heights = peak_heights[valid_mask]
     resolutions = resolutions[valid_mask]
+    signal_to_noise = signal_to_noise[valid_mask]
+
+    runtime.logger.debug(f"{len(peak_mzs)} peaks left after filtering by height")
+
+    # Filter out peaks with signal to noise ratio less than 10
+    sn_mask = signal_to_noise >= 10
+    peak_mzs = peak_mzs[sn_mask]
+    peak_heights = peak_heights[sn_mask]
+    resolutions = resolutions[sn_mask]
+
+    runtime.logger.debug(
+        f"{len(peak_mzs)} peaks left after filtering by signal to noise ratio >= 10"
+    )
 
     if peak_mzs.size == 0:
         runtime.logger.info("No new valid peaks found after filtering by height.")
@@ -431,11 +451,14 @@ def _filter_centroids(
     sigma = np.std(residuals)
 
     # Filter peaks based on the resolution mask
-    # Keep peaks with residuals within n_sigma standard deviations
-    resolution_mask = np.abs(residuals) < n_sigma * sigma
+    # Keep peaks with residuals within n_sigma standard deviations,
+    # Only discard peaks with resolution much higher (i.e., too narrow peaks)
+    resolution_mask = residuals < n_sigma * sigma
     peak_mzs = peak_mzs[resolution_mask]
     peak_heights = peak_heights[resolution_mask]
     resolutions = resolutions[resolution_mask]
+
+    runtime.logger.debug(f"{len(peak_mzs)} peaks left after filtering by resolution")
 
     return peak_mzs, peak_heights, resolutions
 

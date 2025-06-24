@@ -515,7 +515,7 @@ def get_centroids(
     :type ppm: int, optional
     :param polarity: Polarity of scans to use ('+' or '-'), optional, defaults to None (all polarities).
     :type polarity: Literal['+', '-'], optional
-    :return: Tuple of (masses, intensities, resolutions) for centroid peaks matching the criteria.
+    :return: Tuple of (masses, intensities, resolutions, signal-to-noise ratios) for centroid peaks matching the criteria.
     :rtype: tuple of np.ndarray
     """
     with open_raw_file(datafile_path) as raw_file:
@@ -535,11 +535,28 @@ def get_centroids(
         for index in scan_indices:
             net_scan_indices.Add(index)
         average_scan = Extensions.AverageScans(raw_file, net_scan_indices, mass_option)
-        averaged_centroids = average_scan.CentroidScan
+        averaged_centroids = average_scan.CentroidScan.GetLabelPeaks()
 
-        masses = np.frombuffer(averaged_centroids.Masses)
-        intensities = np.frombuffer(averaged_centroids.Intensities)
-        resolutions = np.frombuffer(averaged_centroids.Resolutions)
+        masses = np.fromiter(
+            (c.Mass for c in averaged_centroids),
+            dtype=np.float64,
+            count=len(averaged_centroids),
+        )
+        intensities = np.fromiter(
+            (c.Intensity for c in averaged_centroids),
+            dtype=np.float64,
+            count=len(averaged_centroids),
+        )
+        resolutions = np.fromiter(
+            (c.Resolution for c in averaged_centroids),
+            dtype=np.float64,
+            count=len(averaged_centroids),
+        )
+        signal_to_noise = np.fromiter(
+            (c.SignalToNoise for c in averaged_centroids),
+            dtype=np.float64,
+            count=len(averaged_centroids),
+        )
 
         if not average:
             # Multiply by number of averaged scans
@@ -552,8 +569,9 @@ def get_centroids(
         masses = masses[mz_mask]
         intensities = intensities[mz_mask]
         resolutions = resolutions[mz_mask]
+        signal_to_noise = signal_to_noise[mz_mask]
 
-        return masses, intensities, resolutions
+        return masses, intensities, resolutions, signal_to_noise
 
 
 def get_noise(

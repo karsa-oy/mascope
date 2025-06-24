@@ -394,8 +394,8 @@ def get_orbi_centroids(
     """
     Extract centroided peaks from an Orbitrap (Thermo .raw) file for specified m/z values and time range.
 
-    This function determines the sample type and, if the sample file contains the Orbitrap raw file, extracts centroided
-    peaks whose m/z values are within ±0.5 of any value in `u_list` and within the specified
+    This function determines the sample type and, if the sample file contains the Orbitrap raw file,
+    extracts centroided peaks whose m/z values are within ±0.5 of any value in `u_list` and within the specified
     time range and polarity. Returns the filtered centroid m/z values, their intensities, and resolutions.
 
     :param base_filename: Sample file name (base, not full path).
@@ -408,8 +408,8 @@ def get_orbi_centroids(
     :type t_max: float | None, optional
     :param polarity: Polarity of scans to use ('+' or '-'), optional, defaults to None (all polarities).
     :type polarity: Literal['+', '-'], optional
-    :return: Tuple of (masses, intensities, resolutions) for centroid peaks matching the criteria,
-    or (None, None, None) if raw file was not found.
+    :return: Tuple of (masses, intensities, resolutions, signal-to-noise) for centroid peaks
+    matching the criteria, or (None, None, None, None) if raw file was not found.
     :rtype: tuple
     """
     sample_type = get_sample_file_type(base_filename)
@@ -418,7 +418,7 @@ def get_orbi_centroids(
         return thermo.get_centroids(
             datafile_path, u_list, t_min, t_max, polarity=polarity
         )
-    return None, None, None
+    return None, None, None, None
 
 
 def get_peak_profiles(
