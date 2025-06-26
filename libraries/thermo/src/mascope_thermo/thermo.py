@@ -675,10 +675,12 @@ class RawFileMetadata:
                 "HasAccurateMassPrecursors",
             ]
 
-            instrument_df = pd.DataFrame(columns=["Value"])
-            for row in instrument_data_list:
-                instrument_df.loc[row] = getattr(instrument_data, row)
-
+            instrument_dict = {
+                row: getattr(instrument_data, row) for row in instrument_data_list
+            }
+            instrument_df = pd.DataFrame.from_dict(
+                instrument_dict, orient="index", columns=["Value"]
+            )
             return instrument_df
 
     @property
@@ -761,15 +763,16 @@ class RawFileMetadata:
         FAIMS CV
         """
         with open_raw_file(self.datafile_path) as raw_file:
-
-            trailer_df = pd.DataFrame()
+            trailer_dict = {}
+            header_labels = None
             for i in range(1, self.num_of_scans + 1):
-                # Extract instrument metadata for the second scan
                 header = raw_file.GetTrailerExtraInformation(i)
-                trailer_df[i] = list(header.Values)
+                if header_labels is None:
+                    header_labels = list(header.Labels)
+                trailer_dict[i] = list(header.Values)
 
-            trailer_df.index = list(header.Labels)
-
+            trailer_df = pd.DataFrame.from_dict(trailer_dict, orient="columns")
+            trailer_df.index = header_labels
             return trailer_df
 
     @property
@@ -828,11 +831,14 @@ class RawFileMetadata:
                 "CycleNumber",
             ]
 
-            scan_stats_df = pd.DataFrame(index=stat_list)
+            scan_stats = dict()
             for i in range(num_of_scans):
-                scan_stats_df[i + 1] = [
+                scan_stats[i + 1] = [
                     getattr(scan_statistics[i], stat) for stat in stat_list
                 ]
+
+            scan_stats_df = pd.DataFrame.from_dict(scan_stats, orient="columns")
+            scan_stats_df.index = stat_list
 
             return scan_stats_df
 
