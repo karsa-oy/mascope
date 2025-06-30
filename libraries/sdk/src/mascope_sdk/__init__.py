@@ -1223,6 +1223,7 @@ def get_cheminfo_by_mz(
     ionization_mechanism_ids: list[str],
     formula_ranges: str = "C0-100 H0-100 O0-100 N0-100",
     mz_tolerance: float = 30.0,
+    limit: int = 20,
 ) -> list[dict]:
     """Query ChemInfo service for potential elemental compositions for a given m/z value.
 
@@ -1239,6 +1240,8 @@ def get_cheminfo_by_mz(
     :type formula_ranges: str, optional
     :param mz_tolerance: The m/z tolerance for matching in ppm, defaults to 30.0.
     :type mz_tolerance: float, optional
+    :param limit: Maximum number of results to return, defaults to 20.
+    :type limit: int, optional
     :return: List of dictionaries containing potential elemental compositions for the given m/z
     :rtype: list[dict]
     """
@@ -1248,6 +1251,7 @@ def get_cheminfo_by_mz(
         "mz_precision": mz_tolerance,
         "formula_ranges": formula_ranges,
         "ionization_mechanism_ids": ionization_mechanism_ids,
+        "limit": limit,
     }
     # Make the POST request to the instrument_functions endpoint
     resp = api_post(
