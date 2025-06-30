@@ -301,9 +301,9 @@ def calculate_match_stats(
     )
 
     # Calculate isotope similarities by ion group
-    match_isotope_df = match_isotope_df.groupby(
-        ["target_ion_id"], group_keys=False
-    ).apply(assign_isotope_similarity, peaks=peaks, include_groups=False)
+    match_isotope_df = match_isotope_df.groupby(["target_ion_id"], group_keys=False)[
+        match_isotope_df.columns
+    ].apply(assign_isotope_similarity, peaks=peaks)
 
     match_isotope_df["match_isotope_similarity"] = match_isotope_df[
         "match_isotope_similarity"

@@ -483,7 +483,7 @@ async def aggregate_sample_match_compounds(
             match_ions_df.sort_values(
                 by=["match_category", "match_score"], ascending=[False, False]
             )
-            .groupby("target_compound_id")
+            .groupby("target_compound_id")[match_ions_df.columns]
             .apply(
                 lambda df: pd.Series(
                     {
@@ -494,7 +494,6 @@ async def aggregate_sample_match_compounds(
                         ].sum(),
                     }
                 ),
-                include_groups=False,
             )
             .reset_index()
         )
