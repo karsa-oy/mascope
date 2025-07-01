@@ -436,29 +436,34 @@ def _filter_centroids(
             top_in_bin = np.argsort(bin_heights)[-10:]
             selected_indices.extend(bin_indices[top_in_bin])
 
-    selected_indices = np.array(selected_indices)
+    if len(selected_indices) == 0:
+        runtime.logger.info("Unable to filter peaks by resolution, no peaks selected.")
+    else:
+        selected_indices = np.array(selected_indices)
 
-    # Fit resolution to the picked peaks
-    popt, _ = curve_fit(
-        lambda mz, a: a / np.sqrt(mz),
-        peak_mzs[selected_indices],
-        resolutions[selected_indices],
-    )
-    a_fit = popt[0]
+        # Fit resolution to the picked peaks
+        popt, _ = curve_fit(
+            lambda mz, a: a / np.sqrt(mz),
+            peak_mzs[selected_indices],
+            resolutions[selected_indices],
+        )
+        a_fit = popt[0]
 
-    # Calculate std error of the residuals
-    residuals = resolutions - a_fit / np.sqrt(peak_mzs)
-    sigma = np.std(residuals)
+        # Calculate std error of the residuals
+        residuals = resolutions - a_fit / np.sqrt(peak_mzs)
+        sigma = np.std(residuals)
 
-    # Filter peaks based on the resolution mask
-    # Keep peaks with residuals within n_sigma standard deviations,
-    # Only discard peaks with resolution much higher (i.e., too narrow peaks)
-    resolution_mask = residuals < n_sigma * sigma
-    peak_mzs = peak_mzs[resolution_mask]
-    peak_heights = peak_heights[resolution_mask]
-    resolutions = resolutions[resolution_mask]
+        # Filter peaks based on the resolution mask
+        # Keep peaks with residuals within n_sigma standard deviations,
+        # Only discard peaks with resolution much higher (i.e., too narrow peaks)
+        resolution_mask = residuals < n_sigma * sigma
+        peak_mzs = peak_mzs[resolution_mask]
+        peak_heights = peak_heights[resolution_mask]
+        resolutions = resolutions[resolution_mask]
 
-    runtime.logger.debug(f"{len(peak_mzs)} peaks left after filtering by resolution")
+        runtime.logger.debug(
+            f"{len(peak_mzs)} peaks left after filtering by resolution"
+        )
 
     return peak_mzs, peak_heights, resolutions
 
