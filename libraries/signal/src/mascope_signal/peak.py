@@ -6,7 +6,6 @@ from typing import Iterable
 import numpy as np
 from scipy.signal._peak_finding_utils import _select_by_peak_distance
 from scipy.integrate import simpson
-from scipy.optimize import curve_fit
 import xarray
 import dask
 
@@ -379,10 +378,11 @@ def _filter_centroids(
     peak_heights: np.ndarray,
     resolutions: np.ndarray,
     signal_to_noise: np.ndarray,
-    n_sigma: float = 1.0,
+    signal_to_noise_threshold: int = 3,
 ) -> tuple:
-    """Filter centroids less than 1 count and with the resolution
-    within n_sigma standard deviations from the fitted resolution
+    """Filter centroids less than 1 count and with the S/N ratio less than signal_to_noise_threshold.
+
+    # NOTE: Filtering by resolution and height was removed, see issue #1043
 
     :param peak_mzs: m/z values of the fitted peaks
     :type peak_mzs: np.ndarray
@@ -392,78 +392,26 @@ def _filter_centroids(
     :type resolutions: np.ndarray
     :param signal_to_noise: Signal to noise ratio of the fitted peaks
     :type signal_to_noise: np.ndarray
-    :param n_sigma: Number of standard deviations for resolution filtering, defaults to 1.0
-    :type n_sigma: float, optional
+    :param signal_to_noise_threshold: Threshold for signal to noise ratio, defaults to 10
+    :type signal_to_noise_threshold: int, optional
     :return: Filtered peak m/z values, heights and resolutions
     :rtype: tuple
     """
     runtime.logger.debug(f"Found {len(peak_mzs)} peaks")
 
-    # Filter out peaks with heights less than 1 count
-    valid_mask = peak_heights >= 1
-    peak_mzs = peak_mzs[valid_mask]
-    peak_heights = peak_heights[valid_mask]
-    resolutions = resolutions[valid_mask]
-    signal_to_noise = signal_to_noise[valid_mask]
-
-    runtime.logger.debug(f"{len(peak_mzs)} peaks left after filtering by height")
-
-    # Filter out peaks with signal to noise ratio less than 10
-    sn_mask = signal_to_noise >= 10
+    # Filter out peaks with signal to noise ratio less than signal_to_noise_threshold
+    sn_mask = signal_to_noise >= signal_to_noise_threshold
     peak_mzs = peak_mzs[sn_mask]
     peak_heights = peak_heights[sn_mask]
     resolutions = resolutions[sn_mask]
 
     runtime.logger.debug(
-        f"{len(peak_mzs)} peaks left after filtering by signal to noise ratio >= 10"
+        f"{len(peak_mzs)} peaks left after filtering by signal to noise ratio >= {signal_to_noise_threshold}"
     )
 
     if peak_mzs.size == 0:
         runtime.logger.info("No new valid peaks found after filtering by height.")
         return peak_mzs, peak_heights, resolutions
-
-    # Pick 10 most intense peaks from each 100 m/z range
-    bin_width = 100
-    bins = np.arange(peak_mzs.min(), peak_mzs.max() + bin_width, bin_width)
-
-    selected_indices = []
-    for i in range(len(bins) - 1):
-        bin_mask = (peak_mzs >= bins[i]) & (peak_mzs < bins[i + 1])
-        if np.any(bin_mask):
-            bin_heights = peak_heights[bin_mask]
-            bin_indices = np.where(bin_mask)[0]
-            # Get indices of 10 most intense peaks in this bin
-            top_in_bin = np.argsort(bin_heights)[-10:]
-            selected_indices.extend(bin_indices[top_in_bin])
-
-    if len(selected_indices) == 0:
-        runtime.logger.info("Unable to filter peaks by resolution, no peaks selected.")
-    else:
-        selected_indices = np.array(selected_indices)
-
-        # Fit resolution to the picked peaks
-        popt, _ = curve_fit(
-            lambda mz, a: a / np.sqrt(mz),
-            peak_mzs[selected_indices],
-            resolutions[selected_indices],
-        )
-        a_fit = popt[0]
-
-        # Calculate std error of the residuals
-        residuals = resolutions - a_fit / np.sqrt(peak_mzs)
-        sigma = np.std(residuals)
-
-        # Filter peaks based on the resolution mask
-        # Keep peaks with residuals within n_sigma standard deviations,
-        # Only discard peaks with resolution much higher (i.e., too narrow peaks)
-        resolution_mask = residuals < n_sigma * sigma
-        peak_mzs = peak_mzs[resolution_mask]
-        peak_heights = peak_heights[resolution_mask]
-        resolutions = resolutions[resolution_mask]
-
-        runtime.logger.debug(
-            f"{len(peak_mzs)} peaks left after filtering by resolution"
-        )
 
     return peak_mzs, peak_heights, resolutions
 
@@ -617,21 +565,23 @@ def _calculate_peak_profiles(
         )
         return peak_profiles_area, peak_profiles_height
 
-    def has_consecutive_positive(arr):
+    # NOTE: Instead of filtering out peaks with non-consecutive scans
+    # we now remove peaks that have signal in only one scan for a given mz value (see issue #1043).
+    def has_more_than_one_positive(arr):
         # arr is a 1D numpy array for a single mz value along time
-        return np.any((arr[:-1] > 0) & (arr[1:] > 0))
+        return np.sum(arr > 0) > 1
 
     # Apply along mz axis (i.e., for each mz, check along time)
-    consecutive_mask = peak_profiles.reduce(
-        lambda x, axis: np.apply_along_axis(has_consecutive_positive, axis, x),
+    has_more_than_one_positive_mask = peak_profiles.reduce(
+        lambda x, axis: np.apply_along_axis(has_more_than_one_positive, axis, x),
         dim="time",
     ).values
 
     # Filter out mz values that do not have consecutive positive values
-    peak_profiles = peak_profiles.isel(mz=consecutive_mask)
+    peak_profiles = peak_profiles.isel(mz=has_more_than_one_positive_mask)
 
-    peak_areas = peak_areas[consecutive_mask]
-    peak_heights = peak_heights[consecutive_mask]
+    peak_areas = peak_areas[has_more_than_one_positive_mask]
+    peak_heights = peak_heights[has_more_than_one_positive_mask]
 
     # Normalize peak profile intensities to 1
     peak_profiles_norm = peak_profiles / peak_profiles.sum(dim="time")
