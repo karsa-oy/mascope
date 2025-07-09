@@ -115,16 +115,16 @@ const title = computed(() => {
   let title = ''
   switch (action.value) {
     case 'create':
-      title = `Create a new target collection "${info.name}" and add to ${batchLabel.value}`
+      title = 'Create a new target collection'
       break
     case 'update':
-      title = `Edit target collection "${info.name}"`
+      title = 'Edit target collection'
       break
     case 'update_batches':
-      title = `Manage batches of "${info.name}" target collection`
+      title = 'Manage target collection batches'
       break
     case 'delete':
-      title = `Delete target collection "${info.name}"`
+      title = 'Delete target collection'
       break
   }
   return title
