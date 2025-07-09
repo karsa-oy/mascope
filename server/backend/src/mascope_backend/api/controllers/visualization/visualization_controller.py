@@ -1,6 +1,6 @@
-import asyncio
+from typing import Any
 import numpy as np
-import pandas as pd
+from dataclasses import dataclass, field
 from sqlalchemy import select
 from colorcet import glasbey_hv as colormap
 
@@ -18,12 +18,14 @@ from mascope_backend.db.models import TargetIsotope
 from mascope_backend.socket import sio
 from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
 from mascope_backend.api.lib.api_features import api_controller_background_task
-from mascope_backend.api.controllers.samples.samples_controller import get_sample
+from mascope_backend.api.controllers.samples.lib.samples_fetch import fetch_sample
 
 from mascope_backend.runtime import runtime
 
 # TODO_configuration shift traces color
 COLOR_OFFSET = 5
+DMZ = 0.3
+UNITS = "counts/s"
 
 
 @api_controller_background_task(
@@ -34,7 +36,7 @@ async def visualize_ion_focus(
     target_ion_id: str,
     min_isotope_abundance: float,
     peak_min_intensity: float,
-    mz_tolerance: int,
+    mz_tolerance: float,
     independent_transaction: bool = False,
     sid: str = None,
     process_id: str = None,
@@ -45,9 +47,8 @@ async def visualize_ion_focus(
     The function performs the following steps:
     1. Fetches sample filename and target ion data from the database.
     2. Loads the sample file and prepares a data slice for analysis.
-    3. Converts target ion data to a DataFrame and prepares m/z values, relative abundances, and target isotope IDs for processing.
-    4. Iterates over each target isotope, computing and emitting visualization traces for the sum spectrum and time series.
-    5. Constructs and emits the sum timeseries trace if applicable.
+    3. Iterates over each target isotope, computing and emitting visualization traces for the sum spectrum and time series.
+    4. Constructs and emits the sum timeseries trace if applicable.
 
     :param sample_item_id: ID of the sample item to visualize.
     :type sample_item_id: str
@@ -65,28 +66,176 @@ async def visualize_ion_focus(
     :type sid: str, optional
     :raises NotFoundException: If the sample item or target ion does not exist or does not meet the specified criteria.
     """
-    # Step 1: Fetch sample filename and target ion data from the database
-    sample_result = await get_sample(sample_item_id)
-    sample = sample_result.get("data")
-    filename = sample.get("filename")
-    if not filename:
-        raise NotFoundException(f"Sample with ID {sample_item_id} not found")
-    filename, sample_t0, sample_t1, sample_polarity = (
-        sample.get("filename"),
-        sample.get("t0"),
-        sample.get("t1"),
-        sample.get("polarity"),
+    sample = await fetch_sample(sample_item_id)
+    instrument_property = InstrumentPropertyResolver(sample)
+    target_isotopes = await _fetch_target_isotopes(
+        target_ion_id, min_isotope_abundance, instrument_property
     )
 
-    instrument_type = get_instrument_type(filename)
-    isotope_resolution = "LOW" if instrument_type == "tof" else "HIGH"
+    peak_data, averaged_signal = _load_peaks_and_averaged_signal(
+        sample, target_isotopes
+    )
 
+    isotope_relative_abundances = [
+        isotope.relative_abundance for isotope in target_isotopes
+    ]
+
+    scan_timestamps = get_scan_timestamps(
+        sample.filename, t_min=sample.t0, t_max=sample.t1, polarity=sample.polarity
+    )
+
+    match_counter = 0
+    sum_timeseries = None
+    main_isotope_height = 0
+    all_spectrum_traces = []
+    all_timeseries_traces = []
+    for i, isotope in enumerate(target_isotopes):
+        ctx = IsotopeContext(
+            index=i,
+            isotope=isotope,
+            relative_abundances=isotope_relative_abundances,
+            averaged_signal=averaged_signal,
+            peak_data=peak_data,
+            time_scan=scan_timestamps,
+            peak_min_intensity=peak_min_intensity,
+            mz_tolerance=mz_tolerance,
+            main_isotope_height=main_isotope_height,
+            instrument_property=instrument_property,
+        )
+        isotope_result = await _process_isotope(ctx, sum_timeseries)
+        match_counter += isotope_result.match_count
+        sum_timeseries = isotope_result.sum_timeseries
+        main_isotope_height = isotope_result.main_isotope_height
+
+        all_spectrum_traces.extend(isotope_result.spectrum_traces)
+        all_timeseries_traces.extend(isotope_result.timeseries_traces)
+
+    if match_counter > 1 and sum_timeseries is not None:
+        sum_timeseries_time = sum_timeseries.time.values.astype(np.float32)
+        sum_timeseries_y = sum_timeseries.values.astype(np.float32)
+        all_timeseries_traces.append(
+            {
+                "name": "sum",
+                "type": "scatter",
+                "fill": "tozeroy",
+                "fillcolor": "rgba(136, 136, 136, .3)",
+                "line": {"color": "rgb(136, 136, 136)"},
+                "x": sum_timeseries_time.tobytes(),
+                "y": sum_timeseries_y.tobytes(),
+                "unit": UNITS,
+            },
+        )
+
+    await sio.emit("visualization_signal_sum_spectrum", all_spectrum_traces, room=sid)
+    await sio.emit("visualization_signal_timeseries", all_timeseries_traces, room=sid)
+
+
+# --- Helpers --- #
+
+
+class InstrumentPropertyResolver:
+    """Resolves preferred peak data type and resolution"""
+
+    def __init__(self, sample):
+        self.instrument_type = get_instrument_type(sample.filename)
+
+    @property
+    def peak_data_type(self):
+        if self.instrument_type == "tof":
+            return "area"
+        if self.instrument_type == "orbi":
+            return "height"
+        raise ValueError(f"Unknown instrument type: {self.instrument_type}")
+
+    @property
+    def resolution(self):
+        if self.instrument_type == "tof":
+            return "LOW"
+        if self.instrument_type == "orbi":
+            return "HIGH"
+        raise ValueError(f"Unknown instrument type: {self.instrument_type}")
+
+
+@dataclass
+class IsotopeContext:
+    index: int
+    isotope: Any
+    relative_abundances: list
+    averaged_signal: Any
+    peak_data: Any
+    time_scan: Any
+    peak_min_intensity: float
+    mz_tolerance: int
+    main_isotope_height: float
+    instrument_property: Any
+    color_offset: int = COLOR_OFFSET
+
+
+@dataclass
+class IsotopeResult:
+    spectrum_traces: list = field(default_factory=list)
+    timeseries_traces: list = field(default_factory=list)
+    match_count: int = 0
+    sum_timeseries: Any = None
+    main_isotope_height: float = 0
+
+
+def _load_peaks_and_averaged_signal(sample, target_isotopes):
+    """
+    Loads peak data and averaged signal for the specified sample and target isotopes.
+
+    :param sample: The sample object containing filename and time range.
+    :type sample: Any
+    :param target_isotopes: List of target isotope objects with m/z values.
+    :type target_isotopes: list
+    :return: Tuple of (peak_data, averaged_signal) for the specified m/z window.
+    :rtype: tuple
+    """
+    runtime.logger.info(f"Loading file: {sample.filename}")
+    mz_windows = [(iso.mz - DMZ, iso.mz + DMZ) for iso in target_isotopes]
+    mz_min = min(w[0] for w in mz_windows)
+    mz_max = max(w[1] for w in mz_windows)
+    peak_data = (
+        load_file(sample.filename, vars=["peak_areas", "peak_heights"])
+        .sel(mz=slice(mz_min, mz_max))
+        .compute()
+    )
+    averaged_signal = (
+        sum_signal_for_time_range(
+            sample.filename,
+            sample.t0,
+            sample.t1,
+            polarity=sample.polarity,
+            average=True,
+        )
+        .sel(mz=slice(mz_min, mz_max))
+        .compute()
+    )
+    return peak_data, averaged_signal
+
+
+async def _fetch_target_isotopes(
+    target_ion_id, min_isotope_abundance, instrument_property
+):
+    """
+    Fetches target isotopes for a given target ion ID, minimum isotope abundance, and instrument property.
+
+    :param target_ion_id: ID of the target ion to fetch isotopes for.
+    :type target_ion_id: str
+    :param min_isotope_abundance: Minimum relative abundance threshold for isotopes.
+    :type min_isotope_abundance: float
+    :param instrument_property: Instrument property resolver with resolution information.
+    :type instrument_property: InstrumentPropertyResolver
+    :raises NotFoundException: If no isotopes are found matching the criteria.
+    :return: List of TargetIsotope objects matching the criteria.
+    :rtype: list
+    """
     async with async_session() as session:
         # Fetch target ion data
         stmt = select(TargetIsotope).where(
             TargetIsotope.target_ion_id == target_ion_id,
             TargetIsotope.relative_abundance >= min_isotope_abundance,
-            TargetIsotope.resolution == isotope_resolution,
+            TargetIsotope.resolution == instrument_property.resolution,
         )
         result = await session.execute(stmt)
         target_ion_data = result.scalars().all()
@@ -94,180 +243,152 @@ async def visualize_ion_focus(
             raise NotFoundException(
                 f"Target ion with ID {target_ion_id} not found or does not meet abundance threshold"
             )
-    # Set units and peak data type based on instrument type
-    units = "counts/s"
-    peak_profile_type = "area" if instrument_type == "tof" else "height"
+        return target_ion_data
 
-    # Step 2: Load the sample file and prepare data slice
-    runtime.logger.info(f"Loading file: {filename}")
-    sample_file = load_file(filename, vars=["peak_areas", "peak_heights"])
-    averaged_signal = sum_signal_for_time_range(
-        filename, sample_t0, sample_t1, polarity=sample_polarity, average=True
+
+async def _process_isotope(
+    ctx: IsotopeContext, sum_timeseries: Any | None
+) -> IsotopeResult:
+    """
+    Processes a single isotope for visualization, generating spectrum and timeseries traces,
+    and updating the sum timeseries if peaks match the target isotope.
+
+    :param ctx: The context containing isotope and processing parameters.
+    :type ctx: IsotopeContext
+    :param sum_timeseries: The current sum timeseries to update, or None.
+    :type sum_timeseries: xarray.Dataarray | None
+    :return: Result object containing traces, match count, updated sum_timeseries, and main isotope height.
+    :rtype: IsotopeResult
+    """
+    isotope_result = IsotopeResult(
+        main_isotope_height=ctx.main_isotope_height, sum_timeseries=sum_timeseries
+    )
+    mz_range = (ctx.isotope.mz - DMZ, ctx.isotope.mz + DMZ)
+    isotope_averaged_spec = ctx.averaged_signal.sel(mz=slice(*mz_range))
+
+    if isotope_averaged_spec.size == 0:
+        averaged_spec_mz = np.array(list(mz_range), dtype=np.float32)
+        averaged_spec_y = np.array([0, 0], dtype=np.float32)
+        isotope_expected_height = 0
+    else:
+        isotope_height = isotope_averaged_spec.dropna(dim="mz").sel(
+            mz=ctx.isotope.mz, method="nearest"
+        )
+        averaged_spec_mz = isotope_averaged_spec.mz.values.astype(np.float32)
+        averaged_spec_y = isotope_averaged_spec.values.astype(np.float32)
+        if ctx.index == 0:
+            isotope_result.main_isotope_height = isotope_height.item()
+        isotope_expected_height = isotope_result.main_isotope_height * (
+            ctx.isotope.relative_abundance / ctx.relative_abundances[0]
+        )
+
+    isotope_result.spectrum_traces.append(
+        {
+            "name": "{:d}".format(round(ctx.isotope.mz)),
+            "target_isotope_id": ctx.isotope.target_isotope_id,
+            "type": "scatter",
+            "mode": "lines",
+            "line": {
+                "color": "rgb({},{},{})".format(*colormap[ctx.index + ctx.color_offset])
+            },
+            "fill": "tozeroy",
+            "fillcolor": "rgba({},{},{}, .3)".format(
+                *colormap[ctx.index + ctx.color_offset]
+            ),
+            "x": averaged_spec_mz.tobytes(),
+            "y": averaged_spec_y.tobytes(),
+            "unit": UNITS,
+        }
     )
 
-    # Step 3: Convert target ion data to DataFrame and prepare data
-    target_ion_list = [ion.to_dict() for ion in target_ion_data]
-    target_ion_df = pd.DataFrame(target_ion_list)
-    mzs = target_ion_df["mz"].tolist()
-    rel_abus = target_ion_df["relative_abundance"].tolist()
-    target_isotope_ids = target_ion_df["target_isotope_id"].tolist()
+    isotope_slice = ctx.peak_data.sel(mz=slice(*mz_range))
+    peak_profiles = get_peaks(isotope_slice, ctx.instrument_property.peak_data_type)
+    peaks = isotope_slice.peak_heights.sel(time=ctx.time_scan, method="nearest").mean(
+        dim="time"
+    )
+    peaks = filter_peaks(peaks, intensity=ctx.peak_min_intensity)
 
-    # Step 4: Iterate over each target isotope to process visualization data
-    # Initialize variables for sum timeseries trace
-    main_isotope_i = 0
-    main_isotope_height = 0
-    sum_timeseries = None
-    match_isotope_counter = 0
-    for i, mz in enumerate(mzs):
-        runtime.logger.info("{:d}/{:d}: {:3f}".format(i + 1, len(mzs), mz))
-        spectrum_traces = []
-        timeseries_traces = []
-        dmz = 0.3
-        mz_range = (mz - dmz, mz + dmz)
-        rel_abu = rel_abus[i]
-        current_target_isotope_id = target_isotope_ids[i]
-
-        # Extract the specific isotope slice and compute the sum spectrum
-        isotope_slice = sample_file.sel(mz=slice(*mz_range)).compute()
-        isotope_averaged_spec = averaged_signal.sel(mz=slice(*mz_range)).compute()
-        # Get polarity-specific time scans for filtering
-        time_scan = get_scan_timestamps(
-            filename, t_min=sample_t0, t_max=sample_t1, polarity=sample_polarity
+    for peak in peaks:
+        peak_result = await _process_peak(
+            peak, ctx, peak_profiles, isotope_result.sum_timeseries
         )
-        # Check if the spectrum slice is empty
-        if isotope_averaged_spec.size == 0:
-            # No signal in the requested range, plot 0-line still
-            runtime.logger.warning(
-                f"No data found in the mz range {mz_range} for requested mz {mz}"
-            )
-            averaged_spec_mz = np.array(list(mz_range), dtype=np.float32)
-            averaged_spec_y = np.array([0, 0], dtype=np.float32)
-            isotope_expected_height = 0
-        else:
-            # Prepare signal to be plotted
-            isotope_height = isotope_averaged_spec.dropna(dim="mz").sel(
-                mz=mz, method="nearest"
-            )
-            # Sum spectrum traces
-            averaged_spec_mz = isotope_averaged_spec.mz.values.astype(np.float32)
-            averaged_spec_y = isotope_averaged_spec.values.astype(np.float32)
-            if i == 0:
-                # Set signal normalization constant
-                main_isotope_height = float(isotope_height)
-            isotope_expected_height = main_isotope_height * (
-                rel_abu / rel_abus[main_isotope_i]
-            )
-        # MS signal trace
-        spectrum_traces.append(
-            {
-                "name": "{:d}".format(round(mz)),
-                "target_isotope_id": current_target_isotope_id,
-                "type": "scatter",
-                "mode": "lines",
-                "line": {"color": "rgb({},{},{})".format(*colormap[i + COLOR_OFFSET])},
-                "fill": "tozeroy",
-                "fillcolor": "rgba({},{},{}, .3)".format(*colormap[i + COLOR_OFFSET]),
-                "x": averaged_spec_mz.tobytes(),
-                "y": averaged_spec_y.tobytes(),
-                "unit": units,
-            }
-        )
-        peak_profiles = get_peaks(isotope_slice, peak_profile_type)
-        # Peak traces (vertical lines), filter peak heights by sample polarity before averaging (white peak traces)
-        peaks = (
-            isotope_slice.peak_heights.sel(time=time_scan, method="nearest")
-            .mean(dim="time")
-            .compute()
-        )
-        runtime.logger.debug(f"Peaks in the range {mz_range}: {peaks.mz.values}")
-        peaks = filter_peaks(peaks, intensity=peak_min_intensity)
-        runtime.logger.debug(
-            f"Peaks above threshold {peak_min_intensity}: {peaks.mz.values}"
-        )
-        # Get peak profiles/timeseries
-        for peak in peaks:
-            peak_mz = peak.mz.item()
-            match = True if abs((peak_mz - mz) / mz * 1e6) <= mz_tolerance else False
-            peak_height = peak.values.item()
-            spectrum_traces.append(
-                {
-                    "name": "{:.4f}".format(peak_mz),
-                    "type": "scatter",
-                    "mode": "lines+markers" if match else "lines",
-                    "line": {
-                        "color": "white" if match else "grey",
-                    },
-                    "x": [peak_mz, peak_mz],
-                    "y": [0, peak_height],
-                    "unit": units,
-                }
-            )
-            if match:
-                # Timeseries trace
-                match_timeseries = peak_profiles.sel(mz=peak_mz)
-                match_timeseries = match_timeseries.sel(
-                    time=time_scan, method="nearest"
-                )
-                timeseries_time = match_timeseries.time.values.astype(np.float32)
-                timeseries_y = match_timeseries.values.astype(np.float32)
-                timeseries_rgb = colormap[i + COLOR_OFFSET]
-                timeseries_traces.append(
-                    {
-                        "name": "{:.4f}".format(mz),
-                        "type": "scatter",
-                        "mode": "lines",
-                        "line": {"color": "rgb({},{},{})".format(*timeseries_rgb)},
-                        "fill": "tozeroy",
-                        "fillcolor": "rgba({},{},{},.3)".format(*timeseries_rgb),
-                        "x": timeseries_time.tobytes(),
-                        "y": timeseries_y.tobytes(),
-                        "unit": units,
-                    }
-                )
-                if i == 0 and sum_timeseries is None:
-                    sum_timeseries = match_timeseries
-                elif i > 0 and sum_timeseries is not None:
-                    sum_timeseries += match_timeseries
-                match_isotope_counter += 1
+        isotope_result.spectrum_traces.append(peak_result["peak_trace"])
+        if peak_result["timeseries_trace"]:
+            isotope_result.timeseries_traces.append(peak_result["timeseries_trace"])
+        if peak_result["is_match"]:
+            isotope_result.match_count += 1
+            isotope_result.sum_timeseries = peak_result["sum_timeseries"]
 
-        # Target mz trace (red vertical line)
-        spectrum_traces.append(
-            {
-                "name": "target m/z",
-                "type": "scatter",
-                "mode": "lines",
-                "line": {
-                    "color": "red",
-                },
-                "x": [float(mz), float(mz)],
-                "y": [0, isotope_expected_height],
-                "unit": units,
-            }
-        )
-
-        await sio.emit("visualization_signal_sum_spectrum", spectrum_traces, room=sid)
-
-        await sio.emit("visualization_signal_timeseries", timeseries_traces, room=sid)
-        # Sleep 0 to let other tasks be scheduled before next iteration
-        await asyncio.sleep(0)
-
-    # Step 5: Constructs and emits the sum timeseries trace if applicable.
-    # If no data to visualize, return early
-    if match_isotope_counter <= 1 or sum_timeseries is None:
-        return
-    # Sum timeseries trace
-    timeseries_time = sum_timeseries.time.values.astype(np.float32)
-    timeseries_y = sum_timeseries.values.astype(np.float32)
-    timeseries_traces = [
+    # Target mz trace (red vertical line)
+    isotope_result.spectrum_traces.append(
         {
-            "name": "sum",
+            "name": "target m/z",
             "type": "scatter",
+            "mode": "lines",
+            "line": {"color": "red"},
+            "x": [float(ctx.isotope.mz), float(ctx.isotope.mz)],
+            "y": [0, isotope_expected_height],
+            "unit": UNITS,
+        }
+    )
+
+    return isotope_result
+
+
+async def _process_peak(peak, ctx: IsotopeContext, peak_profiles, sum_timeseries):
+    """
+    Processes a single peak for a given isotope,
+    generating visualization traces and updating the sum timeseries if the peak matches.
+
+    :param peak: The peak object to process.
+    :type peak: xarray.DataArray or similar
+    :param ctx: The context containing isotope and processing parameters.
+    :type ctx: IsotopeContext
+    :param peak_profiles: The peak profiles for the isotope.
+    :type peak_profiles: xarray.DataArray or similar
+    :param sum_timeseries: The current sum timeseries to update, or None.
+    :type sum_timeseries: xarray.DataArray or None
+    :return: Dictionary with peak trace, timeseries trace, match status, and updated sum_timeseries.
+    :rtype: dict
+    """
+    peak_mz = peak.mz.item()
+    match = abs((peak_mz - ctx.isotope.mz) / ctx.isotope.mz * 1e6) <= ctx.mz_tolerance
+    peak_height = peak.item()
+    peak_trace = {
+        "name": "{:.4f}".format(peak_mz),
+        "type": "scatter",
+        "mode": "lines+markers" if match else "lines",
+        "line": {"color": "white" if match else "grey"},
+        "x": [peak_mz, peak_mz],
+        "y": [0, peak_height],
+        "unit": UNITS,
+    }
+    timeseries_trace = None
+    if match:
+        match_timeseries = peak_profiles.sel(mz=peak_mz).sel(
+            time=ctx.time_scan, method="nearest"
+        )
+        timeseries_time = match_timeseries.time.values.astype(np.float32)
+        timeseries_y = match_timeseries.values.astype(np.float32)
+        timeseries_rgb = colormap[ctx.index + ctx.color_offset]
+        timeseries_trace = {
+            "name": "{:.4f}".format(ctx.isotope.mz),
+            "type": "scatter",
+            "mode": "lines",
+            "line": {"color": "rgb({},{},{})".format(*timeseries_rgb)},
             "fill": "tozeroy",
-            "fillcolor": "rgba(136, 136, 136, .3)",
-            "line": {"color": "rgb(136, 136, 136)"},
+            "fillcolor": "rgba({},{},{},.3)".format(*timeseries_rgb),
             "x": timeseries_time.tobytes(),
             "y": timeseries_y.tobytes(),
-            "unit": units,
-        },
-    ]
-    await sio.emit("visualization_signal_timeseries", timeseries_traces, room=sid)
+            "unit": UNITS,
+        }
+        if sum_timeseries is None:
+            sum_timeseries = match_timeseries.copy()
+        else:
+            sum_timeseries += match_timeseries
+    return {
+        "peak_trace": peak_trace,
+        "timeseries_trace": timeseries_trace,
+        "is_match": match,
+        "sum_timeseries": sum_timeseries,
+    }
