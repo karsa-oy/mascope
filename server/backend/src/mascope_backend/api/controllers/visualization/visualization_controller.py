@@ -365,11 +365,14 @@ async def _process_peak(peak, ctx: IsotopeContext, peak_profiles, sum_timeseries
     }
     timeseries_trace = None
     if match:
-        match_timeseries = peak_profiles.sel(mz=peak_mz).sel(
-            time=ctx.time_scan, method="nearest"
-        )
+        match_timeseries = peak_profiles.sel(mz=peak_mz).copy()
         timeseries_time = match_timeseries.time.values.astype(np.float32)
+
+        # Unsure gap in timeseries in case of several polarities within one sample file
+        signal_gap_mask = ~np.isin(timeseries_time, ctx.time_scan.astype(np.float32))
+        match_timeseries.values[signal_gap_mask] = np.nan
         timeseries_y = match_timeseries.values.astype(np.float32)
+
         timeseries_rgb = colormap[ctx.index + ctx.color_offset]
         timeseries_trace = {
             "name": "{:.4f}".format(ctx.isotope.mz),
