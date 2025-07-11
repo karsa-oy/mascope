@@ -162,6 +162,9 @@ async def init_db():
 
         # Test the database connection after initialization
         await test_database_connection()
+
+        # Check WAL mode status after initialization
+        await check_async_wal_status()
     except Exception as error:
         runtime.logger.error(f"Database initialization error: {error}")
         raise
@@ -181,3 +184,19 @@ async def test_database_connection():
     except Exception as e:
         runtime.logger.error(f"Error while establishing the database connection: {e}")
         raise
+
+
+async def check_async_wal_status():
+    """
+    Check WAL status using configured SQLAlchemy async session.
+    """
+    try:
+        async with async_session() as session:
+            journal_mode = (await session.execute(text("PRAGMA journal_mode"))).scalar()
+            busy_timeout = (await session.execute(text("PRAGMA busy_timeout"))).scalar()
+
+            runtime.logger.debug(
+                f"Database WAL status: journal mode - {journal_mode}, busy timeout - {busy_timeout}ms"
+            )
+    except Exception as e:
+        runtime.logger.error(f"Error checking async WAL status: {e}")
