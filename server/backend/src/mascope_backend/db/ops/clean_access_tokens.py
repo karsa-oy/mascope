@@ -10,9 +10,9 @@ import asyncio
 from mascope_backend.db import (
     async_session,
     configure_database_engine,
-    get_current_db_version,
 )
 from mascope_backend.db.models import AccessToken
+from mascope_backend.db.utils import get_current_db_version
 from mascope_backend.db.ops.backup import create_db_backup
 from mascope_backend.runtime import runtime
 

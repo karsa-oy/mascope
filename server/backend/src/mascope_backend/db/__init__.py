@@ -1,15 +1,19 @@
 import os
 from typing import AsyncGenerator
 
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import (
+    create_async_engine,
+    AsyncSession,
+    async_sessionmaker,
+)
 from sqlalchemy import text
+from mascope_backend.db.config import db_config
 from mascope_backend.db.migration_manager import (
-    get_current_db_version,
-    get_available_db_version,
     detect_failed_database,
     migrate,
     DatabaseFailedError,
 )
+from mascope_backend.db.utils import get_available_db_version, get_current_db_version
 from mascope_backend.runtime import runtime
 
 
@@ -38,22 +42,22 @@ async def configure_database_engine(version):
     # Create the async engine for SQLAlchemy
     engine = create_async_engine(
         database_url,
-        pool_pre_ping=True,  # Check connection liveness before using a connection from the pool
-        echo=trace_mode,  # Enable logging of all SQL queries for trace debugging purposes
-        pool_size=20,  # Base pool size - max persistent connections kept open (default: 5)
-        max_overflow=30,  # Additional connections allowed beyond pool_size when needed (default: 10)
-        pool_timeout=60,  # Seconds to wait for available connection before timeout (default: 30)
-        connect_args={
-            "timeout": 15
-        },  # Set a timeout of 15 seconds for establishing connections and waiting for table locks
+        pool_pre_ping=db_config.POOL_PRE_PING,
+        echo=trace_mode,
+        pool_size=db_config.POOL_SIZE,
+        max_overflow=db_config.MAX_OVERFLOW,
+        pool_timeout=db_config.POOL_TIMEOUT,
+        connect_args=db_config.connect_args,
     )
 
     # Define the global session maker using async_sessionmaker
     global ASYNC_SESSION_MAKER
-    ASYNC_SESSION_MAKER = async_sessionmaker(engine, expire_on_commit=False)
+    ASYNC_SESSION_MAKER = async_sessionmaker(
+        engine, expire_on_commit=db_config.EXPIRE_ON_COMMIT
+    )
 
 
-def async_session() -> AsyncSession:
+def async_session() -> AsyncSession | None:
     """
     Session getter for manual session management.
 
@@ -72,7 +76,7 @@ def async_session() -> AsyncSession:
             session.flush()  # Optionally flush without committing
 
     :return: A new SQLAlchemy async session.
-    :rtype: AsyncSession
+    :rtype: AsyncSession | None
     """
     return ASYNC_SESSION_MAKER()
 

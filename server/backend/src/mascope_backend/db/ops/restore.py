@@ -3,7 +3,7 @@ import gc
 import sqlite3
 import asyncio
 
-from mascope_backend.db import get_current_db_version
+from mascope_backend.db.utils import get_current_db_version
 from mascope_backend.db.ops.backup import create_db_backup
 from mascope_backend.db.tables_config import get_table_configs
 

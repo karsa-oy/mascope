@@ -10,12 +10,11 @@ import os
 import asyncio
 from sqlalchemy import text
 from mascope_backend.db import (
-    get_available_db_version,
-    get_current_db_version,
     configure_database_engine,
     async_session,
 )
 from mascope_backend.db.ops.backup import create_db_backup
+from mascope_backend.db.utils import get_available_db_version, get_current_db_version
 
 from mascope_backend.runtime import runtime
 from mascope_backend.db.models import Base, Sample

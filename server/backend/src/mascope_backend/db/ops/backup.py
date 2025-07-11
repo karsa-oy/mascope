@@ -3,7 +3,7 @@ import os
 import asyncio
 import sqlite3
 from datetime import datetime
-from mascope_backend.db import get_current_db_version
+from mascope_backend.db.utils import get_current_db_version
 from mascope_backend.runtime import runtime
 
 
