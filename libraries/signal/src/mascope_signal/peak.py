@@ -392,7 +392,7 @@ def _filter_centroids(
     :type resolutions: np.ndarray
     :param signal_to_noise: Signal to noise ratio of the fitted peaks
     :type signal_to_noise: np.ndarray
-    :param signal_to_noise_threshold: Threshold for signal to noise ratio, defaults to 10
+    :param signal_to_noise_threshold: Threshold for signal to noise ratio, defaults to 3
     :type signal_to_noise_threshold: int, optional
     :return: Filtered peak m/z values, heights and resolutions
     :rtype: tuple
