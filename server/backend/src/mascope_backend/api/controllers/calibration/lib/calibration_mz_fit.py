@@ -4,10 +4,9 @@ Functionalities related to the m/z fitting calibration processes.
 
 import numpy as np
 import pandas as pd
-from scipy.optimize import fsolve
 from zarr.errors import PathNotFoundError
 
-from mascope_tofwerk.calibration import mz_calibrate
+from mascope_tofwerk.calibration import mz_calibrate, tof_to_mass
 
 from mascope_file.io import load_coord, update_props, update_zarr_array_coord
 from mascope_file.name import get_sample_file_type
@@ -187,57 +186,3 @@ def signal_mz_calibration_update(fit, filename):
     except PathNotFoundError:
         pass
     return new_mz
-
-
-def tof_to_mass(tof: np.ndarray, mode: int, par: list) -> float | np.ndarray:
-    """Convert between sample indices and mass.
-
-    :param tof: Values to convert
-    :type tof: np.ndarray
-    :param mode: Mass calibration function to use
-    :type mode: int
-    :param par: List containing the calibration parameters (number depends on mode)
-    :type par: list
-    """
-
-    def solve_numerically(objective, tof_val):
-        m_initial_guess = 1.0
-        (m_solution,) = fsolve(objective, m_initial_guess, args=(tof_val,))
-        return m_solution
-
-    match mode:
-        case 0:
-            # from i(m) = p1 * np.sqrt(m) + p2
-            return ((tof - par[1]) / par[0]) ** 2
-        case 1:
-            # from i(m) = p1/np.sqrt(m) + p2
-            return (par[0] / (tof - par[1])) ** 2
-        case 2:
-            # from i(m) = p1 * np.power(m, p3) + p2
-            return ((tof - par[1]) / par[0]) ** (1 / par[2])
-        case 3:
-            objective = (
-                lambda m, tof_val: par[0] * np.sqrt(m)
-                + par[1]
-                + par[2] * (m - par[3]) ** 2
-                - tof_val
-            )
-            return np.vectorize(lambda tof_val: solve_numerically(objective, tof_val))(
-                tof
-            )
-        case 4:
-            objective = (
-                lambda m, tof_val: par[0] * np.sqrt(m)
-                + par[1]
-                + par[2] * m**2
-                + par[3] * m
-                + par[4]
-                - tof_val
-            )
-            return np.vectorize(lambda tof_val: solve_numerically(objective, tof_val))(
-                tof
-            )
-        case 5:
-            return par[0] * tof**2 + par[1] * tof + par[2]
-        case _:
-            raise ValueError(f"Unknown mass calibration mode: {mode}")
