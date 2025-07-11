@@ -7,8 +7,13 @@ from mascope_backend.db.ops.create_database import run_db_create
 from mascope_backend.db.ops.filestore import ACTIONS, run_action
 from mascope_backend.db.ops.restore import run_db_restore
 from mascope_backend.db.ops.maintenance import run_db_maintenance
+from mascope_backend.db.wal.cli import journal_app, wal_app
 
 db_app = typer.Typer()
+
+# Register the sub-apps
+db_app.add_typer(journal_app)
+db_app.add_typer(wal_app)
 
 
 @db_app.callback()
