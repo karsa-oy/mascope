@@ -13,6 +13,7 @@ from mascope_file.gc import gc_filestore
 from mascope_backend.api.lib.exceptions.api_exceptions import handle_exception
 from mascope_backend.api.routes import routers
 from mascope_backend.db import init_db
+from mascope_backend.db.wal.engine import wal_checkpoint
 
 from mascope_backend.runtime import runtime
 
@@ -44,6 +45,7 @@ async def lifespan(app: FastAPI):
     yield
 
     # --- SHUTDOWN TASKS ---
+    await wal_checkpoint()
 
 
 # Initialize FastAPI with the lifespan

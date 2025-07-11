@@ -10,6 +10,7 @@ import asyncio
 from sqlalchemy import select, delete
 from mascope_backend.db import async_session
 from mascope_backend.db.id import gen_id
+from mascope_backend.db.wal.engine import wal_checkpoint
 from mascope_backend.db.models import (
     Sample,
     SampleBatch,
@@ -937,7 +938,10 @@ async def rematch_batch(
             parent_id=process_id,
         )  # Compute matches for all targets
 
-    # Step 6: Return sample batch data and message
+    # Step 6: Perform WAL checkpoint
+    await wal_checkpoint()
+
+    # Step 7: Return sample batch data and message
 
     # Include match status info in the message if available
     message = (

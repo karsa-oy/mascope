@@ -12,6 +12,7 @@ from datetime import datetime
 from importlib import import_module
 
 from mascope_backend.db.utils import get_current_db_version
+from mascope_backend.db.wal.direct import get_journal_mode, direct_wal_checkpoint
 from mascope_backend.runtime import runtime
 
 db_dir = runtime.config.database
@@ -31,8 +32,9 @@ async def migrate(current_version: int, target_version: int) -> int:
 
     Steps:
     1. Create database directory if needed
-    2. Clean up any existing failure markers for versions to be migrated
-    3. For each version between current and target:
+    2. Checkpoint WAL databases before migration to ensure data consistency
+    3. Clean up any existing failure markers for versions to be migrated
+    4. For each version between current and target:
        a. Import the migration script
        b. Run the migration script
        c. If it fails, mark the failure and raise an error
@@ -52,6 +54,25 @@ async def migrate(current_version: int, target_version: int) -> int:
     # Create database directory if it doesn't exist
     if current_version == 0 and not os.path.exists(db_dir):
         os.mkdir(db_dir)
+
+    # If database exists and is in WAL mode, checkpoint before migration
+    if current_version > 0:
+        try:
+            journal_mode = get_journal_mode()
+            if journal_mode == "wal":
+                runtime.logger.info(
+                    "Database in WAL mode, performing TRUNCATE checkpoint before migration"
+                )
+                success = direct_wal_checkpoint("TRUNCATE")
+                if success:
+                    runtime.logger.debug("WAL checkpoint completed successfully")
+                else:
+                    runtime.logger.warning(
+                        "WAL checkpoint may not have completed fully"
+                    )
+        except Exception as e:
+            runtime.logger.warning(f"Error during pre-migration WAL checkpoint: {e}")
+            # Continue with migration - this is not a fatal error, backup will still be created
 
     # Clean up any existing failure markers for versions to be migrated
     for version in range(current_version + 1, target_version + 1):

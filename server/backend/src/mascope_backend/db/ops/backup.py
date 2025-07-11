@@ -4,12 +4,16 @@ import asyncio
 import sqlite3
 from datetime import datetime
 from mascope_backend.db.utils import get_current_db_version
+from mascope_backend.db.wal.direct import get_journal_mode, direct_wal_checkpoint
 from mascope_backend.runtime import runtime
 
 
 async def create_db_backup():
     """
     Asynchronously create a timestamped backup of the SQLite database using SQLite's backup API.
+
+    For WAL-mode databases, performs a checkpoint before backup to transfer
+    all WAL data into the main database file for a complete backup.
     """
     # Get the current database version and path
     database_dir = runtime.config.database
@@ -20,6 +24,23 @@ async def create_db_backup():
     # Create the backup directory if it doesn't exist
     if not os.path.exists(backup_dir):
         os.makedirs(backup_dir)
+
+    # Check if database is in WAL mode and checkpoint if needed
+    try:
+        journal_mode = get_journal_mode()
+        if journal_mode and journal_mode.lower() == "wal":
+            runtime.logger.debug(
+                "Database in WAL mode, performing checkpoint before backup"
+            )
+            success = direct_wal_checkpoint("TRUNCATE")
+            if success:
+                runtime.logger.debug("WAL checkpoint completed successfully")
+            else:
+                runtime.logger.warning(
+                    "WAL checkpoint may not have completed fully, proceeding with backup"
+                )
+    except Exception as e:
+        runtime.logger.warning(f"Error during pre-backup WAL checkpoint: {e}")
 
     # Create a timestamped backup file name
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

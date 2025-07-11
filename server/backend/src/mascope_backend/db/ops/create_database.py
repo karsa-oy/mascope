@@ -15,6 +15,7 @@ from mascope_backend.db import (
 )
 from mascope_backend.db.ops.backup import create_db_backup
 from mascope_backend.db.utils import get_available_db_version, get_current_db_version
+from mascope_backend.db.wal.engine import enable_wal_mode
 
 from mascope_backend.runtime import runtime
 from mascope_backend.db.models import Base, Sample
@@ -92,6 +93,7 @@ async def init_db_and_create():
     2. Backs up any existing database before removing it
     3. Configures the database engine with the latest version
     4. Creates a new database with all required tables and views
+    5. Enables WAL mode for improved concurrent access
 
     :return: None
     """
@@ -127,6 +129,9 @@ async def init_db_and_create():
 
     # Create all tables defined in the SQLAlchemy models
     await create_database()
+
+    # Enable WAL mode for new databases to support concurrent access
+    await enable_wal_mode()
 
     runtime.logger.info(f"Database mascope.v{last_version} setup completed.")
 
