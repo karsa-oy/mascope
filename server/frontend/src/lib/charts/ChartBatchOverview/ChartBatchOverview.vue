@@ -1,13 +1,10 @@
 <script setup>
-import { ref, computed, watchEffect, watch, toRaw } from 'vue'
+import { ref, computed, watch, toRaw } from 'vue'
 
-import SelectButton from 'primevue/selectbutton'
-import ToggleSwitch from 'primevue/toggleswitch'
 import Select from 'primevue/select'
 import FloatLabel from 'primevue/floatlabel'
 import Chip from 'primevue/chip'
 
-import { beautifySnakeCase } from '@/lib/utils'
 import { useApp } from '@/stores'
 import { ToolbarIntensityScale } from '@/lib/toolbars'
 
@@ -54,42 +51,6 @@ const traces = computed(() => {
       })
 })
 
-const inferType = (field) => {
-  const withField = app.data.sample.list.filter((item) => field in item)
-  const types = [
-    ...new Set(withField.map((item) => (item[field] ? typeof item[field] : 'null')))
-  ].filter((type) => type !== 'null')
-  return types.length == 1 ? types[0] : 'unknown'
-}
-const xFields = computed(() => {
-  const standard = [
-    ...new Set(
-      app.data.sample.list
-        ?.map((item) => Object.keys(item ?? {}))
-        .flat()
-        .filter((field) => field !== 'sample_item_attributes')
-    )
-  ].map((field) => ({ field, kind: 'standard' }))
-  const custom = [
-    ...new Set(
-      app.data.sample.list?.map((item) => Object.keys(item?.sample_item_attributes ?? {})).flat()
-    )
-  ].map((field) => ({ field, kind: 'custom' }))
-  return [...standard, { field: 'time', kind: 'custom', label: 'Time' }, ...custom]
-    .map(({ field, kind }) => ({
-      field,
-      kind,
-      label: beautifySnakeCase(field),
-      type: kind == 'custom' ? 'string' : inferType(field)
-    }))
-    .filter(({ type }) => type !== 'object')
-})
-const xField = ref()
-
-watchEffect(() => {
-  xField.value = xFields.value.find(({ field }) => field == 'sample_item_name')
-})
-
 const num = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2
@@ -128,7 +89,7 @@ const toField =
   }
 const xAxis = computed(() => ({
   tickvals: data.samples.map((_, i) => i),
-  ticktext: data.samples.map(toField(xField.value ?? 'index'))
+  ticktext: data.samples.map(toField(data.xField ?? 'index'))
 }))
 
 const rangeY = computed(() =>
@@ -137,7 +98,7 @@ const rangeY = computed(() =>
 
 const layout = computed(() => ({
   xaxis: {
-    title: { text: xField.value?.label },
+    title: { text: data.xField?.label },
     autorange: true,
     automargin: true,
     showgrid: true,
@@ -245,8 +206,8 @@ const anyFilters = computed(
         <div style="height: 0.5rem" />
         <FloatLabel>
           <Select
-            v-model:modelValue="xField"
-            :options="xFields"
+            v-model:modelValue="data.xField"
+            :options="data.xFields"
             optionLabel="label"
             dataKey="field"
             filter

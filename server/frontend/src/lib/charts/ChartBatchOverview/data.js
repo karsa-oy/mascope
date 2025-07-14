@@ -1,6 +1,7 @@
 import { ref, computed, watchEffect, onMounted, toRaw } from 'vue'
 import { defineStore } from 'pinia'
 import { api } from '@/api/client.js'
+import { beautifySnakeCase } from '@/lib/utils'
 import { useApp } from '@/stores'
 import { glasbey } from '../colors.js'
 
@@ -110,6 +111,43 @@ export const useChartData = defineStore('chart.batch.overview', () => {
         ? app.data.sample.selected.sort((a, b) => Number(a.index) - Number(b.index)) // filter chart to selection
         : (app.data.sample.list ?? []) // otherwise show everything
   )
+
+  const inferType = (field) => {
+    const withField = app.data.sample.list.filter((item) => field in item)
+    const types = [
+      ...new Set(withField.map((item) => (item[field] ? typeof item[field] : 'null')))
+    ].filter((type) => type !== 'null')
+    return types.length == 1 ? types[0] : 'unknown'
+  }
+  const xFields = computed(() => {
+    const standard = [
+      ...new Set(
+        app.data.sample.list
+          ?.map((item) => Object.keys(item ?? {}))
+          .flat()
+          .filter((field) => field !== 'sample_item_attributes')
+      )
+    ].map((field) => ({ field, kind: 'standard' }))
+    const custom = [
+      ...new Set(
+        app.data.sample.list?.map((item) => Object.keys(item?.sample_item_attributes ?? {})).flat()
+      )
+    ].map((field) => ({ field, kind: 'custom' }))
+    return [...standard, { field: 'time_of_day', kind: 'custom' }, ...custom]
+      .map(({ field, kind }) => ({
+        field,
+        kind,
+        label: beautifySnakeCase(field),
+        type: kind == 'custom' ? 'string' : inferType(field)
+      }))
+      .filter(({ type }) => type !== 'object')
+  })
+  const xField = ref()
+
+  watchEffect(() => {
+    xField.value = xFields.value.find(({ field }) => field == 'sample_item_name')
+  })
+
   /**
    * Render visualization traces based on match data
    */
@@ -282,6 +320,8 @@ export const useChartData = defineStore('chart.batch.overview', () => {
 
   return {
     samples,
-    traces
+    traces,
+    xFields,
+    xField
   }
 })
