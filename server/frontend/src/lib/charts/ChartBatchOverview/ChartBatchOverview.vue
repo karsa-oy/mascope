@@ -60,42 +60,6 @@ const traces = computed(() => {
       })
 })
 
-const num = new Intl.NumberFormat('en-US', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2
-})
-const score = new Intl.NumberFormat('en-US', {
-  style: 'percent',
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2
-})
-const toField =
-  ({ field, type }) =>
-  (item) => {
-    let value
-    if (field in item) {
-      value = item[field]
-    } else if (field in item.sample_item_attributes) {
-      value = item.sample_item_attributes[field]
-    } else {
-      value = 'NA'
-    }
-    let formatted
-    switch (field) {
-      case 'match_score':
-        formatted = score.format(value)
-        break
-      case 'matched':
-        formatted = value > 0.5 ? 'true' : 'false'
-        break
-      case 'time':
-        formatted = item['datetime'].split('T')[1].split('.')[0]
-        break
-      default:
-        formatted = type == 'number' ? num.format(value) : value
-    }
-    return formatted
-  }
 const xAxis = computed(() => ({
   // Do not display dummy date for 'Time of day' x-axis, default for others
   tickformat: data.xField.field == 'time_of_day' ? '%H:%M:%S' : undefined
