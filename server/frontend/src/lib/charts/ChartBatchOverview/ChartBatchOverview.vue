@@ -232,13 +232,6 @@ const anyFilters = computed(
         removable
         @remove="app.ui.filter.mechanism = null"
       />
-      <Chip
-        v-if="app.data.sample.selected.length > 1"
-        icon="pi pi-tags"
-        :label="`${app.data.sample.selected.length} samples`"
-        removable
-        @remove="app.data.sample.unfocus()"
-      />
     </div>
     <BaseChartPlotly
       id="ChartSampleIntensity"

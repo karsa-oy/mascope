@@ -1,10 +1,13 @@
 <script setup>
+import { ref } from 'vue'
+
 import Toolbar from 'primevue/toolbar'
 
 import { useApp } from '@/stores'
 import { BaseKarsaLogo } from '@/lib/base'
 import { HelpButton } from '@/lib/help'
 
+import AppFilterChips from './AppFilterChips.vue'
 import AcquisitionMode from './AcquisitionMode.vue'
 import SidebarNotifications from './SidebarNotifications.vue'
 import SidebarUser from './SidebarUser.vue'
@@ -12,6 +15,8 @@ import InstrumentSelector from './InstrumentSelector.vue'
 import WorkspaceSelector from './WorkspaceSelector.vue'
 
 const app = useApp()
+
+const filtering = ref(false)
 </script>
 
 <template>
@@ -37,7 +42,8 @@ const app = useApp()
       </div>
     </template>
     <template #center>
-      <BaseKarsaLogo />
+      <AppFilterChips v-model:filtering="filtering" v-show="filtering" />
+      <BaseKarsaLogo v-show="!filtering" />
     </template>
     <template #end>
       <div class="row">

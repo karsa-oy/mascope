@@ -111,7 +111,7 @@ function inferType(field) {
 function createLabel(field) {
   const custom = {
     index: '#',
-    sample_item_name: 'Item',
+    sample_item_name: 'Sample',
     filter_id: 'Filter'
   }
   if (field in custom) {
