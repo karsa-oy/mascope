@@ -112,7 +112,7 @@ export const useChartData = defineStore('chart.batch.overview', () => {
     const types = [
       ...new Set(withField.map((item) => (item[field] ? typeof item[field] : 'null')))
     ].filter((type) => type !== 'null')
-    return types.length == 1 ? types[0] : 'unknown'
+    return types.length === 1 ? types[0] : 'unknown'
   }
   const xFields = computed(() => {
     const standard = [
@@ -133,14 +133,14 @@ export const useChartData = defineStore('chart.batch.overview', () => {
         field,
         kind,
         label: beautifySnakeCase(field),
-        type: kind == 'custom' ? 'string' : inferType(field)
+        type: kind === 'custom' ? 'string' : inferType(field)
       }))
       .filter(({ type }) => type !== 'object')
   })
   const xField = ref()
 
   watchEffect(() => {
-    xField.value = xFields.value.find(({ field }) => field == 'datetime')
+    xField.value = xFields.value.find(({ field }) => field === 'datetime')
   })
 
   /**
@@ -158,17 +158,11 @@ export const useChartData = defineStore('chart.batch.overview', () => {
     )
     //  Generate x-values based on the selected xField
     const xFieldName = xField.value ? xField.value.field : 'index'
-    let xValues
-    switch (xFieldName) {
-      case 'time_of_day':
-        // Replace actual date with a fixed dummy for all samples
-        xValues = samples.value.map(
-          (sample) => `1970-01-01T${sample.datetime.split('T')[1].split('.')[0]}`
-        )
-        break
-      default:
-        xValues = samples.value.map((sample) => sample[xFieldName])
-    }
+    const xValues = samples.value.map(
+      xFieldName === 'time_of_day'
+        ? (sample) => `1970-01-01T${sample.datetime.split('T')[1].split('.')[0]}`
+        : (sample) => sample[xFieldName]
+    )
     // build traces
     const traces = targetIds
       .map((targetId) => {

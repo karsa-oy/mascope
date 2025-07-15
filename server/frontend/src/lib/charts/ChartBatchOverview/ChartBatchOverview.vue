@@ -16,12 +16,11 @@ const data = useChartData()
 
 const plot = ref({})
 
-const chartTitle = computed(() => {
-  // Use the focused sample batch name or a default title
-  return app.data.batch.focused.sample_batch_name
-    ? app.data.batch.focused.sample_batch_name + ' <i>(N=' + app.data.sample.list.length + ')</i>'
+const chartTitle = computed(() =>
+  app.data.batch.focused.sample_batch_name
+    ? `${app.data.batch.focused.sample_batch_name} <i>(${app.data.sample.list.length} samples)</i>`
     : ''
-})
+)
 
 const scale = ref({
   mode: 'average',
@@ -62,7 +61,7 @@ const traces = computed(() => {
 
 const xAxis = computed(() => ({
   // Do not display dummy date for 'Time of day' x-axis, default for others
-  tickformat: data.xField.field == 'time_of_day' ? '%H:%M:%S' : undefined
+  tickformat: data.xField.field === 'time_of_day' ? '%H:%M:%S' : undefined
 }))
 
 const rangeY = computed(() =>
