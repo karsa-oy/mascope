@@ -145,7 +145,7 @@ export const useChartData = defineStore('chart.batch.overview', () => {
   const xField = ref()
 
   watchEffect(() => {
-    xField.value = xFields.value.find(({ field }) => field == 'sample_item_name')
+    xField.value = xFields.value.find(({ field }) => field == 'datetime')
   })
 
   /**
@@ -161,6 +161,19 @@ export const useChartData = defineStore('chart.batch.overview', () => {
     const colors = Object.fromEntries(
       targetIds.map((targetId, index) => [[targetId], theme.value[index]])
     )
+    //  Generate x-values based on the selected xField
+    const xFieldName = xField.value ? xField.value.field : 'index'
+    let xValues
+    switch (xFieldName) {
+      case 'time_of_day':
+        // Replace actual date with a fixed dummy for all samples
+        xValues = samples.value.map(
+          (sample) => `1970-01-01T${sample.datetime.split('T')[1].split('.')[0]}`
+        )
+        break
+      default:
+        xValues = samples.value.map((sample) => sample[xFieldName])
+    }
     // build traces
     const traces = targetIds
       .map((targetId) => {
@@ -226,7 +239,7 @@ export const useChartData = defineStore('chart.batch.overview', () => {
         // Add trace for the match
         return {
           name,
-          x: samples.value.map((sample) => sample.sample_item_id),
+          x: xValues,
           y: intensities,
           mode: 'markers',
           type: 'scatter',
@@ -274,7 +287,7 @@ export const useChartData = defineStore('chart.batch.overview', () => {
     traces.push({
       // Make trace for TIC
       name: 'TIC',
-      x: samples.value.map((sample) => sample.sample_item_id),
+      x: xValues,
       y: samples.value.map((sample) => sample.tic),
       customdata: samples.value.map((item) => item.datetime),
       text: samples.value.map((item) => item.sample_item_name),

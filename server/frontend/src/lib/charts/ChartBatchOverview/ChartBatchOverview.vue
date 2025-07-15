@@ -88,8 +88,8 @@ const toField =
     return formatted
   }
 const xAxis = computed(() => ({
-  tickvals: data.samples.map((_, i) => i),
-  ticktext: data.samples.map(toField(data.xField ?? 'index'))
+  // Do not display dummy date for 'Time of day' x-axis, default for others
+  tickformat: data.xField.field == 'time_of_day' ? '%H:%M:%S' : undefined
 }))
 
 const rangeY = computed(() =>
