@@ -144,12 +144,6 @@ const derivedPolarity = computed(() => {
     return null
   }
 })
-
-watchEffect(() => {
-  if (app.data.acquisition.pending.filename && app.data.acquisition.mode && props.active) {
-    dialog.sample = 'create_pending'
-  }
-})
 </script>
 
 <template>
@@ -177,7 +171,6 @@ watchEffect(() => {
           v-model="app.data.acquisition.time.mode"
           :options="['Last 24 hours', 'Last 7 days', 'Last 30 days', 'Last 90 days']"
           style="flex-direction: row-reverse"
-          :disabled="app.data.acquisition.mode"
           placeholder="Custom range"
         />
         <FloatLabel>

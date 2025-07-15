@@ -11,14 +11,6 @@ export const useTab = defineStore('app.ui.tab', () => {
   const data = useData()
 
   watch(
-    () => data.acquisition.mode,
-    (measuring) => {
-      if (measuring) {
-        active.value = 'acquisitions'
-      }
-    }
-  )
-  watch(
     () => data.match.visualized.ion,
     (visualized) => {
       if (visualized && active.value !== 'spectrum') {

@@ -8,7 +8,6 @@ import { BaseKarsaLogo } from '@/lib/base'
 import { HelpButton } from '@/lib/help'
 
 import AppFilterChips from './AppFilterChips.vue'
-import AcquisitionMode from './AcquisitionMode.vue'
 import SidebarNotifications from './SidebarNotifications.vue'
 import SidebarUser from './SidebarUser.vue'
 import InstrumentSelector from './InstrumentSelector.vue'
@@ -47,7 +46,6 @@ const filtering = ref(false)
     </template>
     <template #end>
       <div class="row">
-        <AcquisitionMode />
         <InstrumentSelector />
         <HelpButton />
         <SidebarNotifications />

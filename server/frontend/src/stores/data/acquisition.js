@@ -14,7 +14,6 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
   const sample = useSample()
   const instrument = useInstrument()
 
-  const mode = ref(false)
   const list = ref([])
   const selected = ref([])
   const focused = computed(() => {
@@ -50,17 +49,6 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
       time.mode = 'range'
     } else if (time.mode == 'range') {
       time.mode = 'Last 24 hours'
-    }
-  })
-  watchEffect(() => {
-    if (mode.value) {
-      time.mode = 'Last 24 hours'
-    }
-  })
-  // Clear or reset notifications when mode changes
-  watchEffect(() => {
-    if (!mode.value) {
-      ui.notification.clearLatest()
     }
   })
   watch(time, () => unfocus())
@@ -144,38 +132,6 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
     load()
   })
 
-  ui.notification.on('instrument_acquisition', ({ process_id, data, status }) => {
-    if (mode.value) {
-      // acquisition started
-      if (process_id !== pending.measurement) {
-        pending.filename = null
-        pending.measurement = process_id
-        pending.filename = data?.filename
-        pending.instrument = data?.instrument
-        pending.polarity = data?.polarity
-      } else {
-        if (status !== 'pending') {
-          pending.measurement = null
-        }
-      }
-    }
-  })
-
-  // measurement mode
-  ui.notification.on('create_sample_file', async () => {
-    load()
-    if (pending.sample) {
-      await sample.process({
-        sample: pending.sample,
-        instrument_config: pending.instrument_config
-      }) // TODO: this causes some issue with notifications, see issue #1008
-      pending.sample = null
-      pending.instrument_config = null
-    } else {
-      ready.filename = pending.filename
-    }
-  })
-
   // mz calibration
 
   async function loadMzCalibration() {
@@ -198,13 +154,11 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
 
   return {
     // state
-    mode,
     list,
     selected,
     focused,
     multiselected,
     unfocus,
-    pending,
     ready,
     time,
     mzCalibration,

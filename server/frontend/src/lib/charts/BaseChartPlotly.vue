@@ -213,7 +213,8 @@ watchEffect(
 }
 
 :deep(.bg) {
-  fill: var(--p-togglebutton-background) !important;
+  fill: var(--p-chip-background) !important;
+  opacity: 0.3;
 }
 
 .faded {

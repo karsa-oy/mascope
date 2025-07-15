@@ -39,7 +39,7 @@ const emit = defineEmits(['submit'])
 const original = computed(() => props.item)
 
 // dialog visibility reactivity
-const action = defineModel('action') // create, create_pending update
+const action = defineModel('action') // create, update
 const visible = ref(false)
 watch(action, (value) => {
   visible.value = !!value
@@ -99,7 +99,6 @@ const title = computed(
   () =>
     ({
       create: `Create a new sample item`,
-      create_pending: `Create a new sample item`,
       update: `Update sample item "${original.value?.sample_item_name}"`
     })[action.value]
 )
@@ -112,19 +111,12 @@ async function init(active) {
   tab.value = 'sample-details'
   template.selected = defaultTemplate.value
   // reset inputs
-  if (action.value === 'create_pending') {
-    // Measurement mode is active, acquisition started
-    input.filename = app.data.acquisition.pending.filename
-    input.instrument = app.data.acquisition.pending.instrument
-    input.polarity = app.data.acquisition.pending.polarity
-  } else {
-    // User is creating or updating a sample item
-    input.filename = original.value?.filename
-    input.instrument = original.value?.instrument
-    input.polarity = original.value?.polarity ?? null
-    if (polarityOptions.value.length === 1) {
-      input.polarity = polarityOptions.value[0].value
-    }
+  // User is creating or updating a sample item
+  input.filename = original.value?.filename
+  input.instrument = original.value?.instrument
+  input.polarity = original.value?.polarity ?? null
+  if (polarityOptions.value.length === 1) {
+    input.polarity = polarityOptions.value[0].value
   }
   input.filterId = original.value?.filter_id ?? null
   input.type = original.value?.sample_item_type ?? null
@@ -212,26 +204,6 @@ async function save() {
       },
       instrument_config
     })
-  } else if (props.action == 'create_pending') {
-    if (!(app.data.acquisition.ready.filename == input.filename)) {
-      // submitted before conversion completed
-      app.data.acquisition.pending.sample = {
-        ...sample_item,
-        filename: app.data.acquisition.pending.filename
-      }
-      app.data.acquisition.pending.instrument_config = instrument_config
-    } else {
-      // submitted after conversion completed
-      app.data.sample.process({
-        sample: {
-          ...sample_item,
-          filename: input.filename
-        },
-        instrument_config
-      })
-      app.data.acquisition.ready.filename = null
-    }
-    app.data.acquisition.pending.filename = null
   } else if (props.action == 'update') {
     await app.data.sample.update({
       sample: {
@@ -316,9 +288,7 @@ const polarityOptions = computed(() => {
       <Tabs v-model:value="tab">
         <TabList>
           <Tab value="sample-details">Sample Details</Tab>
-          <Tab value="instrument-config" :disabled="!input.filename || action == 'create_pending'">
-            Instrument Config
-          </Tab>
+          <Tab value="instrument-config" :disabled="!input.filename"> Instrument Config </Tab>
         </TabList>
         <TabPanel value="sample-details">
           <ScrollPanel style="width: 100%; height: 50vh">
@@ -380,21 +350,6 @@ const polarityOptions = computed(() => {
               <InstrumentConfigSelector v-model="instrumentConfig" />
             </div>
           </ScrollPanel>
-          <Message
-            v-if="action == 'create_pending' && instrumentConfig.input?.creating"
-            severity="info"
-            icon="pi pi-info-circle"
-            style="
-              text-align: center;
-              width: 500px;
-              display: block;
-              margin: 0.5rem auto;
-              opacity: 0.7;
-            "
-          >
-            You have entered a new instrument config: when the sample is processed, the config will
-            be automatically fitted and created.
-          </Message>
         </TabPanel>
         <TabPanel value="instrument-config">
           <ScrollPanel style="width: 100%; height: 50vh">
