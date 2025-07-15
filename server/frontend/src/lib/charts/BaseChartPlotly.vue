@@ -47,7 +47,7 @@ const props = defineProps({
 })
 const slots = useSlots()
 
-const emit = defineEmits(['click', 'zoom'])
+const emit = defineEmits(['click', 'select', 'zoom'])
 
 const plot = ref(null)
 const created = ref(false)
@@ -116,6 +116,17 @@ function handleClick(event) {
   emit('click', { data, x, y, event: event.event, ...event.points[0] })
 }
 
+function handleSelect(event) {
+  if (event && event.points.length === 0) {
+    // Skip selection event for programmatically triggered selections
+    return
+  }
+  const pointIndices = event
+    ? [...new Set(event.points.map((point) => point.pointIndex))].sort()
+    : []
+  emit('select', { points: pointIndices })
+}
+
 function handleZoom(data) {
   const xmin = data['xaxis.range[0]']
   const xmax = data['xaxis.range[1]']
@@ -133,12 +144,14 @@ onMounted(() => {
   // add the event listener
   plot.value.on('plotly_click', handleClick)
   plot.value.on('plotly_relayout', handleZoom)
+  plot.value.on('plotly_selected', handleSelect)
   // mark as created
   created.value = true
 })
 onBeforeUnmount(() => {
   plot.value.removeEventListener('plotly_click', handleClick)
   plot.value.removeEventListener('plotly_relayout', handleZoom)
+  plot.value.removeEventListener('plotly_selected', handleSelect)
 })
 
 const ready = computed(
