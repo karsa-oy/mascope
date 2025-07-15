@@ -8,8 +8,6 @@ import FloatLabel from 'primevue/floatlabel'
 import Slider from 'primevue/slider'
 import InputNumber from 'primevue/inputnumber'
 
-import { BaseParamField } from '@/lib/base'
-
 const scale = defineModel()
 
 watch(
@@ -40,7 +38,7 @@ watch(
         size="small"
         :disabled="scale.log"
       />
-      <label for="intensity-scale-max">Intensity scale</label>
+      <label for="intensity-scale-max">Y-range max.</label>
     </FloatLabel>
     <Button
       v-tooltip.right="'Clear scale'"
