@@ -43,7 +43,7 @@ const traces = computed(() => {
         let newTrace = structuredClone(toRaw(trace))
         // Use x-coordinate (sample_item_id) to retrieve sample length
         newTrace.y = trace.y.map((value, i) =>
-          value !== null ? value * sampleLengths[trace.x[i]] : null
+          value !== null ? value * sampleLengths[app.data.sample.list[i].sample_item_id] : null
         )
         // Unit is in the second element of customdata. Append with "counts"
         newTrace.customdata = trace.customdata.map((cd) => [cd[0], 'counts'])
