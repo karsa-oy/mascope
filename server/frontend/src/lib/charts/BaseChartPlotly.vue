@@ -53,6 +53,15 @@ const plot = ref(null)
 const created = ref(false)
 const settings = ref()
 
+const resetSelection = () => {
+  if (plot.value && props.data.length > 0) {
+    // removes the selection
+    Plotly.update(plot.value, {}, { selections: [] })
+    // removes the selection overlay
+    Plotly.restyle(plot.value, { selectedpoints: [null] })
+  }
+}
+
 // reset chart zoom to autorange
 const resetZoom = () => {
   if (plot.value) {
@@ -62,8 +71,20 @@ const resetZoom = () => {
     })
   }
 }
+
+const selectPoints = (pointIndices) => {
+  if (plot.value && props.data.length > 0) {
+    // Make the selection
+    Plotly.update(plot.value, {}, { selections: pointIndices })
+    // Make the selection overlay
+    Plotly.restyle(plot.value, { selectedpoints: [pointIndices] })
+  }
+}
+
 defineExpose({
-  resetZoom
+  resetSelection,
+  resetZoom,
+  selectPoints
 })
 
 const derived = computed(() => ({

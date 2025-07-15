@@ -14,6 +14,8 @@ import { useChartData } from './data'
 const app = useApp()
 const data = useChartData()
 
+const plot = ref({})
+
 const chartTitle = computed(() => {
   // Use the focused sample batch name or a default title
   return app.data.batch.focused.sample_batch_name
@@ -166,6 +168,20 @@ function onSelect({ points }) {
   app.data.sample.selected = samples
 }
 
+// Update chart selection when sample selection changes
+watch(
+  () => app.data.sample.selected,
+  (selected) => {
+    if (selected.length <= 1) {
+      plot.value.resetSelection()
+    } else if (selected.length > 1) {
+      // Select samples in the chart
+      const pointIndices = selected.map((sample) => app.data.sample.list.indexOf(sample))
+      plot.value.selectPoints(pointIndices)
+    }
+  }
+)
+
 const anyFilters = computed(
   () =>
     app.ui.filter.collections.length ||
@@ -210,6 +226,7 @@ const anyFilters = computed(
     <BaseChartPlotly
       id="ChartSampleIntensity"
       :title="chartTitle"
+      :ref="(el) => (plot = el)"
       :data="traces"
       :layout="layout"
       @click="onClick"
