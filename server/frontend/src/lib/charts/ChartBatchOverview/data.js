@@ -152,7 +152,7 @@ export const useChartData = defineStore('chart.batch.overview', () => {
    * Render visualization traces based on match data
    */
   const rawTraces = computed(() => {
-    if (!match.value || !match.value?.data || !match.value?.data.length) {
+    if (!match.value || !match.value?.data || !match.value.data === null) {
       return []
     }
     const { data, level } = toRaw(match.value)
