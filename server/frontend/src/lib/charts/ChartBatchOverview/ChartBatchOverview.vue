@@ -14,6 +14,13 @@ import { useChartData } from './data'
 const app = useApp()
 const data = useChartData()
 
+const chartTitle = computed(() => {
+  // Use the focused sample batch name or a default title
+  return app.data.batch.focused.sample_batch_name
+    ? app.data.batch.focused.sample_batch_name + ' <i>(N=' + app.data.sample.list.length + ')</i>'
+    : ''
+})
+
 const scale = ref({
   mode: 'average',
   max: null,
@@ -196,7 +203,7 @@ const anyFilters = computed(
     </div>
     <BaseChartPlotly
       id="ChartSampleIntensity"
-      :title="app.data.batch.focused.sample_batch_name ?? ''"
+      :title="chartTitle"
       :data="traces"
       :layout="layout"
       @click="onClick"
