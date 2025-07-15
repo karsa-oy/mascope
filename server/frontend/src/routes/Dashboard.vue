@@ -93,7 +93,17 @@ const tabs = computed(() => [
       "
     >
       <SplitterPanel :size="20">
-        <Splitter layout="vertical" stateStorage="local" stateKey="mascope-browser-split">
+        <Splitter
+          layout="vertical"
+          stateStorage="local"
+          stateKey="mascope-browser-split"
+          @resize="
+            ({ sizes }) => {
+              app.ui.split.top = sizes[0]
+              app.ui.split.bottom = sizes[1]
+            }
+          "
+        >
           <SplitterPanel :size="50">
             <PaneBrowserSample />
           </SplitterPanel>
