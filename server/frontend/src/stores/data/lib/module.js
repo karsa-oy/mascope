@@ -66,7 +66,7 @@ export const defineModule = ({
     const focusedId = computed(() => (focused.value ? focused.value[key] : null))
     const selectedIds = computed(() => selected.value.map((record) => record[key]))
     const isSelected = (arg) =>
-      arg ? selected.value.map((record) => record[key]).includes(arg[key]) : false
+      arg ? selected?.value.map((record) => record[key]).includes(arg[key]) : false
     const isFocused = (arg) => (arg && focused.value ? focused.value[key] === arg[key] : false)
 
     // methods

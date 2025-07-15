@@ -126,7 +126,8 @@ const layout = computed(() => ({
   },
   margin: { l: 50, r: 50, t: 50, b: 50 },
   showlegend: true,
-  autosize: true
+  autosize: true,
+  dragmode: 'select'
 }))
 
 function onClick({ pointIndex, curveNumber }) {
@@ -158,6 +159,11 @@ function onClick({ pointIndex, curveNumber }) {
   } else {
     app.data.sample.unfocus()
   }
+}
+
+function onSelect({ points }) {
+  const samples = points.map((i) => app.data.sample.list[i])
+  app.data.sample.selected = samples
 }
 
 const anyFilters = computed(
@@ -207,6 +213,7 @@ const anyFilters = computed(
       :data="traces"
       :layout="layout"
       @click="onClick"
+      @select="onSelect"
     >
       <template v-slot:settings>
         <ToolbarIntensityScale v-model="scale" />

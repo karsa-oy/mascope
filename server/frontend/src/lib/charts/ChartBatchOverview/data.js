@@ -105,12 +105,7 @@ export const useChartData = defineStore('chart.batch.overview', () => {
   /**
    * Filter samples based on selection
    */
-  const samples = computed(
-    () =>
-      app.data.sample.selected.length > 1 // if multiselecting
-        ? app.data.sample.selected.sort((a, b) => Number(a.index) - Number(b.index)) // filter chart to selection
-        : (app.data.sample.list ?? []) // otherwise show everything
-  )
+  const samples = computed(() => app.data.sample.list ?? [])
 
   const inferType = (field) => {
     const withField = app.data.sample.list.filter((item) => field in item)
