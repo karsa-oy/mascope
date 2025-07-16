@@ -69,26 +69,9 @@ async function execute() {
         workspace_name: info.name,
         workspace_description: info.desc
       })
-
-      // Logic to focus new workspace
-      if (response?.data?.workspace_id) {
-        const newWorkspaceId = response.data.workspace_id
-
-        const unwatch = watch(
-          () => app.data.workspace.list,
-          (newList) => {
-            const createdWorkspace = newList.find(
-              (workspace) => workspace.workspace_id === newWorkspaceId
-            )
-
-            if (createdWorkspace) {
-              app.data.workspace.focus(createdWorkspace)
-              nextTick()
-              unwatch() // Stop watching after focusing
-            }
-          }
-        )
-      }
+      app.data.workspace.lazyFocus({
+        workspace_id: response.data.workspace_id
+      })
       break
     }
     case 'edit': {

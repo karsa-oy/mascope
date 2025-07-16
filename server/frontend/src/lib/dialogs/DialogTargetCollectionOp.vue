@@ -483,7 +483,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onEnter))
           :disabled="action == 'update_batches'"
         />
       </div>
-      <Tabs v-model:value="selected.tab">
+      <Tabs v-model:value="selected.tab" lazy>
         <TabList>
           <Tab value="compounds" :disabled="action == 'update_batches'">Compounds</Tab>
           <Tab value="batches" :disabled="action == 'update'">Batches</Tab>
@@ -566,8 +566,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onEnter))
                         { field: 'target_compound_formula', order: 1 }
                       ]"
                       scrollable
-                      scrollHeight="350px"
-                      style="flex-grow: 1; height: 350px"
+                      scrollHeight="360px"
+                      :virtualScrollerOptions="{ itemSize: 49.69 }"
+                      style="height: 360px; width: 500px"
                     >
                       <Column
                         header="Status"
@@ -605,12 +606,28 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onEnter))
                         </template>
                       </Column>
                       <Column
-                        v-for="col of columns.filter(({ field }) => field !== 'status')"
-                        :key="col.field"
-                        :field="col.field"
-                        :header="col.label"
+                        v-for="{ field, label } of columns.filter(
+                          ({ field }) => field !== 'status'
+                        )"
+                        :key="field"
+                        :field="field"
+                        :header="label"
                         sortable
-                      />
+                      >
+                        <template #body="{ data }">
+                          <div
+                            v-tooltip="data[field]"
+                            style="
+                              max-width: 100px;
+                              white-space: nowrap;
+                              overflow: hidden;
+                              text-overflow: ellipsis;
+                            "
+                          >
+                            {{ data[field] }}
+                          </div>
+                        </template>
+                      </Column>
                       <Column headerStyle="width: 3rem">
                         <template #body="slotProps">
                           <Button
@@ -710,8 +727,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onEnter))
                     "
                     sortField="mz"
                     scrollable
-                    scrollHeight="300px"
-                    style="min-width: 500px"
+                    scrollHeight="310px"
+                    :virtualScrollerOptions="{ itemSize: 37.4 }"
+                    style="height: 310px; width: 500px"
                   >
                     <Column selectionMode="multiple" header="" headerStyle="width: 3rem">
                       <template #header>
@@ -746,12 +764,26 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onEnter))
                       </template>
                     </Column>
                     <Column
-                      v-for="col of columns.filter(({ field }) => field !== 'status')"
-                      :key="col.field"
-                      :field="col.field"
-                      :header="col.label"
+                      v-for="{ field, label } of columns.filter(({ field }) => field !== 'status')"
+                      :key="field"
+                      :field="field"
+                      :header="label"
                       sortable
-                    />
+                    >
+                      <template #body="{ data }">
+                        <div
+                          v-tooltip="data[field]"
+                          style="
+                            max-width: 100px;
+                            white-space: nowrap;
+                            overflow: hidden;
+                            text-overflow: ellipsis;
+                          "
+                        >
+                          {{ data[field] }}
+                        </div>
+                      </template>
+                    </Column>
                   </DataTable>
                   <div
                     v-if="selected.source == 'input'"
@@ -807,6 +839,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onEnter))
                           : `${workspace.workspace_name} (current)`
                     }))
                 "
+                scrollHeight="380px"
+                :virtualScrollerOptions="{ itemSize: 28.41 }"
                 style="min-width: 200px; min-height: 350px"
               />
               <!-- batches -->
@@ -817,9 +851,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onEnter))
                   v-model:selection="batches.selected"
                   :value="batches.loaded"
                   scrollable
-                  scrollHeight="400px"
-                  tableStyle="min-width: 500px;"
-                  style="min-width: 400px"
+                  scrollHeight="350px"
+                  :virtualScrollerOptions="{ itemSize: 36.34 }"
+                  tableStyle="width: 450px;"
+                  style="min-width: 500px"
                   sortField="sample_batch_utc_created"
                   :sortOrder="-1"
                 >
@@ -855,7 +890,21 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onEnter))
                       />
                     </template>
                   </Column>
-                  <Column header="Batch" field="sample_batch_name" />
+                  <Column header="Batch" field="sample_batch_name">
+                    <template #body="{ data }">
+                      <div
+                        v-tooltip="data.sample_batch_name"
+                        style="
+                          max-width: 350px;
+                          white-space: nowrap;
+                          overflow: hidden;
+                          text-overflow: ellipsis;
+                        "
+                      >
+                        {{ data.sample_batch_name }}
+                      </div>
+                    </template>
+                  </Column>
                 </DataTable>
               </Panel>
             </div>
