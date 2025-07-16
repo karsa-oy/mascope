@@ -300,14 +300,17 @@ export const defineModule = ({
 
     // reload children on refocus
     watch(focused, async (focused) => {
-      await Promise.all(
-        children.value.map(({ sync }) =>
-          sync({
-            name,
-            focused
-          })
+      if (children.value.length > 0) {
+        await Promise.all(
+          children.value.map(({ sync }) =>
+            sync({
+              name,
+              focused
+            })
+          )
         )
-      )
+        debug('children synced')
+      }
       onRefocus()
     })
 
