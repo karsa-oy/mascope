@@ -68,6 +68,7 @@ export const defineModule = ({
     const isSelected = (arg) =>
       arg ? selected.value.map((record) => record[key]).includes(arg[key]) : false
     const isFocused = (arg) => (arg && focused.value ? focused.value[key] === arg[key] : false)
+    const toFocus = ref(null)
 
     // methods
     const select = multiselect
@@ -138,6 +139,9 @@ export const defineModule = ({
             focused.value = null
           }
         }
+    const lazyFocus = (arg) => {
+      toFocus.value = arg
+    }
 
     // focus logging
     if (singleselect) {
@@ -213,6 +217,14 @@ export const defineModule = ({
 
     // automatically reassign next focus after reload
     const refocus = (previousId) => {
+      // scheduled lazy focus takes priority
+      const nextId = toFocus.value?.[key]
+      const nextValid = records.value.map((record) => record[key]).includes(nextId)
+      if (nextId && nextValid) {
+        toFocus.value = null
+        focus({ [key]: nextId })
+        return focused.value
+      }
       // using the previously focused value
       const previousValid = records.value.map((record) => record[key]).includes(previousId)
       if (previousId && previousValid) {
@@ -427,6 +439,7 @@ export const defineModule = ({
       isFocused,
       focus,
       unfocus,
+      lazyFocus,
       // children
       name,
       register,
