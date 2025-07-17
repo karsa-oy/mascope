@@ -106,6 +106,7 @@ const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top)
         }
       "
       reorderableColumns
+      resizableColumns
       :sortField="customizer.config.sortField"
       :sortOrder="customizer.config.sortOrder"
       @sort="

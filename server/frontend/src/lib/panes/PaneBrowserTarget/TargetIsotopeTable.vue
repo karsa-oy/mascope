@@ -45,6 +45,7 @@ const tableHeight = inject('target-table-height')
       v-model:selection="app.data.match.isotope.focused"
       selectionMode="single"
       :metaKeySelection="false"
+      resizableColumns
       size="small"
       scrollable
       :scrollHeight="`${tableHeight}px`"

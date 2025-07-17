@@ -233,6 +233,12 @@
     display: flex;
     flex-flow: column;
     align-items: flex-start;
+
+    * {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
   }
 
   .field> :deep(span) {

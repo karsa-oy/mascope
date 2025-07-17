@@ -107,6 +107,7 @@ const tableHeight = inject('target-table-height')
           contextMenuRef.show(event.originalEvent)
         }
       "
+      resizableColumns
       size="small"
       scrollable
       :scrollHeight="`${tableHeight}px`"

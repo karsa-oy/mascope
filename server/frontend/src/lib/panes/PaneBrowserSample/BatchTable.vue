@@ -101,6 +101,7 @@ const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top)
           await contextMenu.onClick(event)
         }
       "
+      resizableColumns
       sortField="sample_batch_utc_created"
       :sortOrder="-1"
       size="small"
