@@ -4,6 +4,7 @@ import { ref, watchEffect, provide } from 'vue'
 import { useMagicKeys } from '@vueuse/core'
 
 import FilterSample from './FilterSample.vue'
+import FilterTarget from './FilterTarget.vue'
 
 const { alt, c } = useMagicKeys()
 
@@ -30,6 +31,7 @@ watchEffect(() => {
   <menu>
     <span v-if="filtering" class="pi pi-filter" style="opacity: 0.5" />
     <FilterSample />
+    <FilterTarget />
   </menu>
 </template>
 
