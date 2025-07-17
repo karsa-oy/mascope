@@ -161,22 +161,27 @@
   }
 
   .browser .spinner {
-    display: flex;
-    flex-flow: row nowrap;
-    align-items: center;
-    justify-content: flex-start;
-    gap: 0.5rem;
+    display: grid;
+    place-items: center;
+    gap: 1rem;
     padding: 0.5rem;
-    padding-left: 2rem;
+    height: 100%;
+
+    div {
+      height: 80px;
+      display: grid;
+      place-items: center;
+
+      .p-progressspinner {
+        width: 25px;
+        height: 25px;
+        padding: 0;
+        margin: 0;
+        flex-shrink: 1;
+      }
+    }
   }
 
-  .browser .spinner .p-progressspinner {
-    width: 15px;
-    height: 15px;
-    padding: 0;
-    margin: 0;
-    flex-shrink: 1;
-  }
 
   .browser .spinner .p-progressspinner::before {
     height: 15px;
