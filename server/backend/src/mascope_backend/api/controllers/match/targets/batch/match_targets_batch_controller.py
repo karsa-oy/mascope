@@ -8,6 +8,9 @@ from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
 from mascope_backend.api.controllers.sample.batches.sample_batches_controller import (
     get_sample_batch,
 )
+from mascope_backend.api.controllers.sample.items.sample_items_controller import (
+    get_sample_items,
+)
 from mascope_backend.api.controllers.samples.samples_controller import get_samples
 from mascope_backend.api.controllers.match.compounds.match_compounds_controller import (
     get_match_compounds,
@@ -33,6 +36,7 @@ from mascope_backend.api.controllers.target.ions.target_ions_controller import (
 from mascope_backend.api.controllers.target.isotopes.target_isotopes_controller import (
     get_target_isotopes,
 )
+from mascope_file.name import get_instrument_name, resolve_instrument_type
 
 
 @api_controller()
@@ -407,10 +411,19 @@ async def get_match_batch_isotopes(
     sample_batch = sample_batch_result.get("data")
     sample_batch_name = sample_batch["sample_batch_name"]
 
+    sample_items = await get_sample_items(sample_batch_id=sample_batch_id)
+    instrument_types = set(
+        [
+            resolve_instrument_type(get_instrument_name(sample_item["filename"]))
+            for sample_item in sample_items["data"]
+        ]
+    )
+
     # Fetch target isotopes for the sample batch with filter parameters
     target_isotopes = await get_target_isotopes(
         target_ion_id=target_ion_id,
         min_relative_abundance=min_relative_abundance,
+        resolution="HIGH" if "orbi" in instrument_types else "LOW",
         sample_batch_id=sample_batch_id,
         target_collection_id=target_collection_id,
         show_target_collection=True,
