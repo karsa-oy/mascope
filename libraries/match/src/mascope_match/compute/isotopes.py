@@ -274,33 +274,49 @@ def calculate_match_stats(
               abundance matching errors, isotope similarities, m/z errors, and match scores.
     :rtype: pd.DataFrame
     """
-    ion_level_peak_sums = match_isotope_df.groupby("target_ion_id", as_index=False)[
-        "sample_peak_intensity"
-    ].sum()
 
-    # Join sums back to the isotope level
-    isotope_level_peak_sums = pd.merge(
+    # Step 1: Collect abundance and intensity reference values
+    ## Find the rows with maximum relative_abundance per target ion; "main isotopes"
+    idx_max_abundance = (
+        match_isotope_df.groupby("target_ion_id")["relative_abundance"].idxmax().values
+    )
+    ## Get the sample_peak_intensity values for the main isotopes
+    main_isotope_df = match_isotope_df.loc[
+        idx_max_abundance,
+        ["target_ion_id", "sample_peak_intensity", "relative_abundance"],
+    ].reset_index(drop=True)
+    ## Join the main isotopes with the full match_isotope_df to get the reference values
+    abundance_reference_df = pd.merge(
         match_isotope_df,
-        ion_level_peak_sums.rename(
-            columns={"sample_peak_intensity": "sample_peak_intensity_sum"}
+        main_isotope_df.rename(
+            columns={
+                "sample_peak_intensity": "sample_peak_intensity_reference",
+                "relative_abundance": "relative_abundance_reference",
+            }
         ),
         on="target_ion_id",
         how="left",
     )
-
+    # Step 2: Compute match abundance error
+    ## Compute relative peak intensities -> [0, 1]
     match_isotope_df.loc[:, "sample_peak_intensity_relative"] = (
         match_isotope_df["sample_peak_intensity"]
-        / isotope_level_peak_sums["sample_peak_intensity_sum"]
+        / abundance_reference_df["sample_peak_intensity_reference"]
+    ).fillna(0.0)
+    ## Normalize relative abundances by the main isotope's relative abundance -> [0, 1]
+    match_isotope_df.loc[:, "relative_abundance_norm"] = (
+        match_isotope_df["relative_abundance"]
+        / abundance_reference_df["relative_abundance_reference"]
     )
-
-    match_isotope_df.loc[:, "match_abundance_error"] = match_isotope_df[
-        "relative_abundance"
-    ] * (
+    ## Calculate abundance error as relative difference
+    match_isotope_df.loc[:, "match_abundance_error"] = (
         match_isotope_df["sample_peak_intensity_relative"]
-        - match_isotope_df["relative_abundance"]
+        / match_isotope_df["relative_abundance_norm"]
+        - 1.0
     )
+    match_isotope_df.drop(columns=["relative_abundance_norm"], inplace=True)
 
-    # Calculate isotope similarities by ion group
+    # Step 3: Calculate isotope similarities by ion group
     match_isotope_df = match_isotope_df.groupby(["target_ion_id"], group_keys=False)[
         match_isotope_df.columns
     ].apply(assign_isotope_similarity, peaks=peaks)
@@ -309,16 +325,16 @@ def calculate_match_stats(
         "match_isotope_similarity"
     ].fillna(0.0)
 
-    # Calculate m/z errors (in ppm)
+    # Step 4: Calculate m/z errors (in ppm)
     match_isotope_df.loc[:, "match_mz_error"] = (
         1e6
         * (match_isotope_df["sample_peak_mz"] - match_isotope_df["mz"])
         / match_isotope_df["mz"]
     )
 
-    # Calculate match scores
+    # Step 5: Calculate match scores
     def score(row):
-        row["match_score"] = (1 - abs(row.match_abundance_error)) * max(
+        row["match_score"] = (1 - min(1.0, abs(row.match_abundance_error))) * max(
             0, (1 - 1e-2 * abs(row.match_mz_error))
         )
         return row
