@@ -226,6 +226,7 @@ async def aggregate_match_ions(
                         ]
                     )
                     * filtered_match_isotope_df.loc[x.index, "relative_abundance"]
+                    / filtered_match_isotope_df.loc[x.index, "relative_abundance"].sum()
                 ).sum(),
                 "sample_peak_intensity": "sum",
                 "sample_peak_interference": "sum",
@@ -281,7 +282,9 @@ def aggregate_match_ions_light(
             match_score=(
                 "match_score",
                 lambda x: (
-                    x * filtered_match_isotope_df.loc[x.index, "relative_abundance"]
+                    x
+                    * filtered_match_isotope_df.loc[x.index, "relative_abundance"]
+                    / filtered_match_isotope_df.loc[x.index, "relative_abundance"].sum()
                 ).sum(),
             ),
             sample_peak_intensity_sum=("sample_peak_intensity", "sum"),
