@@ -145,12 +145,7 @@ watch(
   }
 )
 
-const anyFilters = computed(
-  () =>
-    app.ui.filter.collections.length ||
-    app.ui.filter.mechanism ||
-    app.data.sample.selected.length > 1
-)
+const anyFilters = computed(() => app.ui.filter.collections.length || app.ui.filter.mechanism)
 </script>
 
 <template>

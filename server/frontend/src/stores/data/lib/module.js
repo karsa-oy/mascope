@@ -60,6 +60,8 @@ export const defineModule = ({
     const selected = multiselect
       ? shallowRef([])
       : computed(() => (focused.value ? [focused.value] : []))
+    const filtered = computed(() => (selected.value.length > 0 ? selected.value : list.value))
+    const filteredIds = computed(() => filtered.value.map((record) => record[key]))
     const focused = singleselect
       ? shallowRef(null)
       : computed(() => (selected.value?.length === 1 ? selected.value[0] : null))
@@ -422,6 +424,8 @@ export const defineModule = ({
     return {
       // data
       list,
+      filtered,
+      filteredIds,
       loading,
       hash,
       // options

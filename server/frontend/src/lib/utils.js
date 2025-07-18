@@ -32,6 +32,10 @@ export function beautifyConstant(str) {
     .join(' ')
 }
 
+export function prettyTrim(label, length = 15) {
+  return label && label.length > length ? label.slice(0, length) + '...' : label
+}
+
 // MISC
 
 export function genId(len, case_sensitive = true) {

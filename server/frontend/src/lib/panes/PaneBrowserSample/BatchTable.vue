@@ -54,7 +54,7 @@ const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top)
 
 <template v-if="app.data.batch.list">
   <BaseTabbedPanel
-    label="Samples"
+    label="Batches"
     icon="pi pi-tags"
     :contextMenu="contextMenu"
     :pt="
@@ -101,6 +101,7 @@ const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top)
           await contextMenu.onClick(event)
         }
       "
+      resizableColumns
       sortField="sample_batch_utc_created"
       :sortOrder="-1"
       size="small"
@@ -136,10 +137,6 @@ const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top)
           <slot name="toolbar" v-if="data.sample_batch_id in batch.expanded"></slot>
         </template>
       </Column>
-      <!-- sample table expansion -->
-      <template #expansion="{ data }">
-        <slot name="expansion" :batch="data"></slot>
-      </template>
     </DataTable>
     <!-- modals etc -->
     <ContextMenu ref="contextMenuRef" :model="contextMenu.entries" @hide="contextMenu.clear" />

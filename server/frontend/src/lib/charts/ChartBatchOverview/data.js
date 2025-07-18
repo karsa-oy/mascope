@@ -209,7 +209,7 @@ export const useChartData = defineStore('chart.batch.overview', () => {
           ) ?? {}
 
         // level specific match data
-        let name, match_key, all_matches
+        let name, match_key
         switch (level) {
           case 'compound': {
             name = target_compound_name.trim() ? target_compound_name : target_compound_formula
