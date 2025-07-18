@@ -427,6 +427,8 @@ async def get_match_batch_isotopes(
         sample_batch_id=sample_batch_id,
         target_collection_id=target_collection_id,
         show_target_collection=True,
+        sort="mz",
+        order="asc",
         # show_match_params=True,
     )
     if not target_isotopes["data"]:

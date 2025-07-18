@@ -50,8 +50,8 @@ const tableHeight = inject('target-table-height')
       scrollable
       :scrollHeight="`${tableHeight}px`"
       :virtualScrollerOptions="{ itemSize: 35.74 }"
-      sortField="match_score"
-      :sortOrder="-1"
+      sortField="mz"
+      :sortOrder="1"
     >
       <Column field="match_score" sortable class="match-column">
         <template #header>
