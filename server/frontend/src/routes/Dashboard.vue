@@ -21,7 +21,7 @@ import {
   PaneTabSpectrum
 } from '@/lib/panes'
 import { ChartBatchOverview } from '@/lib/charts'
-import { HelpPopover } from '@/lib/help'
+import { HelpButton, HelpPopover } from '@/lib/help'
 
 import { useApp } from '@/stores'
 
@@ -77,10 +77,13 @@ const tabs = computed(() => [
 </script>
 
 <template>
-  <article>
+  <article style="position: relative">
     <menu id="filters">
       <ToolbarAppFilters />
     </menu>
+    <div style="position: absolute; top: 80px; right: 1rem; z-index: 100">
+      <HelpButton />
+    </div>
     <Splitter
       style="grid-area: dashboard; height: 100%"
       stateStorage="local"

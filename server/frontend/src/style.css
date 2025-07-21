@@ -264,24 +264,3 @@
     display: none !important;
   }
 }
-
-/* notification drawer */
-
-.p-drawer-content .p-message {
-  margin: 1rem 0;
-}
-
-/* Notification button */
-
-.notification-button .p-badge {
-  position: absolute;
-  bottom: 0.5rem;
-  right: 1.2rem;
-  padding: 0.25rem;
-  transform: translate(50%, 50%);
-}
-
-/* Hide the badge if it's empty (i.e., no content) */
-.notification-button.hidden-badge .p-badge {
-  visibility: hidden;
-}

@@ -3,6 +3,8 @@ import { ref, watchEffect, provide } from 'vue'
 
 import { useMagicKeys } from '@vueuse/core'
 
+import Button from 'primevue/button'
+
 import FilterSample from './FilterSample.vue'
 import FilterTarget from './FilterTarget.vue'
 
@@ -14,10 +16,13 @@ provide('register-filter', (filter) => {
   filters.value.push(filter)
 })
 
+const clearAllFilters = () => {
+  filters.value.forEach(({ clear }) => clear())
+}
 // clear all filters when alt+c is pressed
 watchEffect(() => {
   if (alt.value && c.value) {
-    filters.value.forEach(({ clear }) => clear())
+    clearAllFilters()
   }
 })
 
@@ -29,9 +34,19 @@ watchEffect(() => {
 
 <template>
   <menu>
-    <span v-if="filtering" class="pi pi-filter" style="opacity: 0.5" />
+    <Button
+      v-if="filtering"
+      icon="pi pi-filter-slash"
+      @click="() => clearAllFilters()"
+      label="clear all"
+      v-tooltip.bottom="'alt+c'"
+      text
+      severity="secondary"
+      style="opacity: 0.5"
+    />
     <FilterSample />
     <FilterTarget />
+    <span v-if="filtering" class="pi pi-filter" style="opacity: 0.5" />
   </menu>
 </template>
 

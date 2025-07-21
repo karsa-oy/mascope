@@ -8,39 +8,29 @@ import { prettyTrim } from '@/lib/utils'
 
 const app = useApp()
 
-const active = computed(() => app.data.batch.focused || app.data.sample.focused)
+const active = computed(() => app.data.sample.selected.length > 0)
 
 const register = inject('register-filter')
 register({
-  clear: () => app.data.batch.unfocus(),
+  clear: () => app.data.sample.unfocus(),
   active
 })
 
 const label = computed(() => {
-  const batchName = app.data.batch.focused?.sample_batch_name
-  if (!batchName) {
-    return null
-  }
   const sampleCount = app.data.sample.selected.length
-  if (sampleCount === 0) {
-    return {
-      short: prettyTrim(batchName),
-      full: `Batch selected
-            ${batchName}`
-    }
-  } else if (sampleCount === 1) {
+  if (sampleCount === 1) {
     const sampleName = app.data.sample.focused?.sample_item_name
     return {
-      short: `${prettyTrim(batchName)} ❯ ${prettyTrim(sampleName)}`,
+      short: `${prettyTrim(sampleName)}`,
       full: `Sample selected
-             ${batchName} ❯ ${sampleName}`
+             ${sampleName}`
     }
   } else {
     const samplesLabel = `${sampleCount} Samples`
     return {
-      short: `${prettyTrim(batchName)} ❯ ${samplesLabel}`,
+      short: `${samplesLabel}`,
       full: `Samples selected
-             ${batchName} ❯ ${samplesLabel}`
+             ${samplesLabel}`
     }
   }
 })

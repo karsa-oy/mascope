@@ -37,25 +37,25 @@ const label = computed(() => {
     : null
   if (isotopeLabel) {
     return {
-      short: `${prettyTrim(collectionLabel)} ❯ ${compoundLabel} ❯ ${ionLabel} ❯ ${isotopeLabel}`,
+      short: `${ionLabel} ❯ ${isotopeLabel}`,
       full: `Target Isotope
              ${collectionLabel} ❯ ${compoundLabel} ❯ ${ionLabel} ❯ ${isotopeLabel}`
     }
   } else if (ionLabel) {
     return {
-      short: `${prettyTrim(collectionLabel)} ❯ ${compoundLabel} ❯ ${ionLabel}`,
+      short: `${compoundLabel} ❯ ${ionLabel}`,
       full: `Target Ion
-             ${collectionLabel} ❯ ${compoundLabel} ❯ ${ionLabel}`
+             ${compoundLabel} ❯ ${ionLabel}`
     }
   } else if (compoundLabel) {
     return {
-      short: `${prettyTrim(collectionLabel)} ❯ ${compoundLabel}`,
+      short: `${compoundLabel}`,
       full: `Target Compound
-             ${collectionLabel} ❯ ${compoundLabel}`
+             ${compoundLabel}`
     }
   } else if (collectionLabel) {
     return {
-      short: prettyTrim(collectionLabel),
+      short: collectionLabel,
       full: `Target Collection
              ${collectionLabel}`
     }

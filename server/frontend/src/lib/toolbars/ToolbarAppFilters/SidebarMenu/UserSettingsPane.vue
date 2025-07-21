@@ -1,11 +1,10 @@
 <script setup>
 import { ref, reactive, computed, watchEffect, watch } from 'vue'
 
-import Button from 'primevue/button'
-import Drawer from 'primevue/drawer'
 import ToggleSwitch from 'primevue/toggleswitch'
 import Message from 'primevue/message'
 import Select from 'primevue/select'
+import Button from 'primevue/button'
 
 import { api } from '@/api'
 import { useApp } from '@/stores'
@@ -108,112 +107,73 @@ const vHelpLayer = app.ui.help.directive(layer)
 </script>
 
 <template>
-  <Button
-    v-tooltip.bottom="'Account'"
-    icon="pi pi-user"
-    severity="secondary"
-    text
-    @click="
-      (event) => {
-        drawer = true
-      }
+  <h2>Settings</h2>
+  <section v-help-layer.right="'Manage your sign-in details and session'">
+    <h3>Account</h3>
+    <BaseEditableField
+      :field="app.auth.user.username"
+      :save="(username) => app.data.user.update({ username })"
+    />
+    <ul>
+      <li>📧 {{ app.auth.user.email }}</li>
+      <li>{{ prettyRoleName(app.auth.user) }}</li>
+    </ul>
+    <Button
+      label="Change password"
+      @click="() => (dialog.password = true)"
+      severity="secondary"
+      text
+      icon="pi ph ph-lock-key"
+    />
+  </section>
+  <section v-help-layer.right="'Pick the theme for Mascope'">
+    <h3>Theme</h3>
+    <div class="row" style="width: fit-content">
+      <span>Light</span>
+      <span class="pi pi-sun" />
+      <ToggleSwitch v-model="app.ui.darkmode.active" />
+      <span class="pi pi-moon" />
+      <span>Dark</span>
+    </div>
+  </section>
+  <section
+    v-help-layer.right="
+      'API tokens are used for Jupyter notebooks and other development tools. Tokens can only be viewed once for security reasons.'
     "
-    :pt="
-      app.ui.help.bottom_start(`
-          <h1>User Sidebar</h1>
-
-          <p>Manage your account, pick between light/dark theme
-          and generate API tokens.</p>
-
-          <p>Admin users can access admin features here.</p>
-    `)
-    "
-  />
-  <Drawer v-model:visible="drawer" header="Account" position="left" style="width: 350px">
-    <section v-help-layer.right="'Manage your sign-in details and session'">
-      <div class="row">
-        <div>
-          <h4>
-            <BaseEditableField
-              :field="app.auth.user.username"
-              :save="(username) => app.data.user.update({ username })"
-            />
-          </h4>
-          <ul>
-            <li>📧 {{ app.auth.user.email }}</li>
-            <li>{{ prettyRoleName(app.auth.user) }}</li>
-          </ul>
-        </div>
-        <div class="col" style="gap: 2rem; align-items: flex-end">
-          <Button
-            icon="pi pi-sign-out"
-            label="Logout"
-            @click="app.auth.logout"
-            style="margin-top: 1rem"
-          />
-          <Button
-            label="Change password"
-            @click="() => (dialog.password = true)"
-            severity="secondary"
-            text
-          />
-        </div>
+  >
+    <h3>API Access Tokens</h3>
+    <div class="token-container">
+      <div class="token-controls">
+        <Select
+          v-model="selectedTokenType"
+          :options="tokenItems"
+          optionLabel="label"
+          optionValue="value"
+          class="service-select"
+          @change="token = null"
+        />
+        <Button
+          icon="pi pi-refresh"
+          label="Regenerate"
+          @click="regenerateToken"
+          class="token-button"
+        />
       </div>
-    </section>
-    <section v-help-layer.right="'Pick the theme for Mascope'">
-      <h4>Theme</h4>
-      <div class="row" style="width: fit-content">
-        <span>Light</span>
-        <span class="pi pi-sun" />
-        <ToggleSwitch v-model="app.ui.darkmode.active" />
-        <span class="pi pi-moon" />
-        <span>Dark</span>
-      </div>
-    </section>
-    <section
-      v-help-layer.right="
-        'API tokens are used for Jupyter notebooks and other development tools. Tokens can only be viewed once for security reasons.'
-      "
-    >
-      <h4>API Access Tokens</h4>
-      <div class="token-container">
-        <div class="token-controls">
-          <Select
-            v-model="selectedTokenType"
-            :options="tokenItems"
-            optionLabel="label"
-            optionValue="value"
-            class="service-select"
-            @change="token = null"
-          />
-          <Button
-            icon="pi pi-refresh"
-            label="Regenerate"
-            @click="regenerateToken"
-            class="token-button"
-          />
+      <div v-if="token" class="token-info">
+        <div class="token-display">
+          <span class="pi pi-lock" style="opacity: 0.3" />
+          <BaseCopyableField :field="token" />
         </div>
-        <div v-if="token" class="token-info">
-          <div class="token-display">
-            <span class="pi pi-lock" style="opacity: 0.3" />
-            <BaseCopyableField :field="token" />
-          </div>
-          <Message icon="pi pi-info-circle" severity="info" closable>
-            <p>
-              Token is shown only once for security reasons; if you lose it, regenerate a new one
-            </p>
-          </Message>
-        </div>
+        <Message icon="pi pi-info-circle" severity="info" closable>
+          <p>Token is shown only once for security reasons; if you lose it, regenerate a new one</p>
+        </Message>
       </div>
-    </section>
-    <section
-      v-if="app.auth.user.role_id >= 300"
-      v-help-layer.right="'Add, remove and modify users'"
-    >
-      <h4>Admin</h4>
-      <Button icon="pi pi-users" @click="() => (dialog.users = true)" label="Manage users" />
-    </section>
-  </Drawer>
+    </div>
+  </section>
+  <section v-if="app.auth.user.role_id >= 300" v-help-layer.right="'Add, remove and modify users'">
+    <h3>Admin</h3>
+    <Button icon="pi pi-users" @click="() => (dialog.users = true)" label="Manage users" />
+  </section>
   <DialogUserManagement v-model:visible="dialog.users" />
   <DialogPasswordChange v-model:visible="dialog.password" />
 </template>

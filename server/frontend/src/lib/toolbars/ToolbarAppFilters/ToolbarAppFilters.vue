@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 
 import Toolbar from 'primevue/toolbar'
 
@@ -8,10 +8,9 @@ import { BaseKarsaLogo } from '@/lib/base'
 import { HelpButton } from '@/lib/help'
 
 import AppFilterChips from './AppFilterChips.vue'
-import SidebarNotifications from './SidebarNotifications.vue'
-import SidebarUser from './SidebarUser.vue'
 import InstrumentSelector from './InstrumentSelector.vue'
-import WorkspaceSelector from './WorkspaceSelector.vue'
+
+import { SidebarMenu } from './SidebarMenu'
 
 const app = useApp()
 
@@ -36,19 +35,16 @@ const filtering = ref(false)
   >
     <template #start>
       <div class="row">
-        <SidebarUser />
-        <WorkspaceSelector />
+        <SidebarMenu />
       </div>
     </template>
     <template #center>
-      <AppFilterChips v-model:filtering="filtering" v-show="filtering" />
-      <BaseKarsaLogo v-show="!filtering" />
+      <BaseKarsaLogo v-show="!app.data.batch.focused" />
     </template>
     <template #end>
       <div class="row">
+        <AppFilterChips v-model:filtering="filtering" v-show="filtering" />
         <InstrumentSelector />
-        <HelpButton />
-        <SidebarNotifications />
       </div>
     </template>
   </Toolbar>
