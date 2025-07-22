@@ -1,5 +1,5 @@
 """
-Migration script for v22 to v23 database migration.
+Migration script for v28 to v29 database migration.
 """
 
 import os
