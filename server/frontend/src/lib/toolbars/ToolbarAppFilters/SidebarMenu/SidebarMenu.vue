@@ -89,9 +89,9 @@ const hiddenBadge = computed(() => {
     <span class="pi ph ph-caret-right" style="opacity: 0.5" />
     <Button
       icon="pi ph ph-folder"
-      :label="app.data.workspace.focused.workspace_name"
+      :label="app.data.workspace.focused?.workspace_name"
       v-tooltip.bottom="
-        `${app.data.workspace.focused.workspace_description}
+        `${app.data.workspace.focused?.workspace_description}
                          (right click for options)`
       "
       severity="secondary"
