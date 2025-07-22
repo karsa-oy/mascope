@@ -285,8 +285,12 @@ async def _process_isotope(
         averaged_spec_mz = isotope_averaged_spec.mz.values.astype(np.float32)
         averaged_spec_y = isotope_averaged_spec.values.astype(np.float32)
         if ctx.index == 0:
-            peak = peaks.sel(mz=ctx.isotope.mz, method="nearest")
-            peak_height = peak.item()
+            try:
+                peak = peaks.sel(mz=ctx.isotope.mz, method="nearest")
+                peak_height = peak.item()
+            except KeyError:
+                # Fall-back if no peak is found
+                peak_height = np.max(averaged_spec_mz)
             isotope_result.main_isotope_height = peak_height
         isotope_expected_height = isotope_result.main_isotope_height * (
             ctx.isotope.relative_abundance / ctx.relative_abundances[0]
