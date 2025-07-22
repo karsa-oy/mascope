@@ -290,7 +290,7 @@ async def _process_isotope(
                 peak_height = peak.item()
             except KeyError:
                 # Fall-back if no peak is found
-                peak_height = np.max(averaged_spec_mz)
+                peak_height = np.max(averaged_spec_y)
             isotope_result.main_isotope_height = peak_height
         isotope_expected_height = isotope_result.main_isotope_height * (
             ctx.isotope.relative_abundance / ctx.relative_abundances[0]
