@@ -232,10 +232,14 @@ async def _fetch_target_isotopes(
     """
     async with async_session() as session:
         # Fetch target ion data
-        stmt = select(TargetIsotope).where(
-            TargetIsotope.target_ion_id == target_ion_id,
-            TargetIsotope.relative_abundance >= min_isotope_abundance,
-            TargetIsotope.resolution == instrument_property.resolution,
+        stmt = (
+            select(TargetIsotope)
+            .where(
+                TargetIsotope.target_ion_id == target_ion_id,
+                TargetIsotope.relative_abundance >= min_isotope_abundance,
+                TargetIsotope.resolution == instrument_property.resolution,
+            )
+            .order_by(TargetIsotope.relative_abundance.desc())
         )
         result = await session.execute(stmt)
         target_ion_data = result.scalars().all()
@@ -266,18 +270,24 @@ async def _process_isotope(
     mz_range = (ctx.isotope.mz - DMZ, ctx.isotope.mz + DMZ)
     isotope_averaged_spec = ctx.averaged_signal.sel(mz=slice(*mz_range))
 
+    isotope_slice = ctx.peak_data.sel(mz=slice(*mz_range))
+    peak_profiles = get_peaks(isotope_slice, ctx.instrument_property.peak_data_type)
+    peaks = isotope_slice.peak_heights.sel(time=ctx.time_scan, method="nearest").mean(
+        dim="time"
+    )
+    peaks = filter_peaks(peaks, intensity=ctx.peak_min_intensity)
+
     if isotope_averaged_spec.size == 0:
         averaged_spec_mz = np.array(list(mz_range), dtype=np.float32)
         averaged_spec_y = np.array([0, 0], dtype=np.float32)
         isotope_expected_height = 0
     else:
-        isotope_height = isotope_averaged_spec.dropna(dim="mz").sel(
-            mz=ctx.isotope.mz, method="nearest"
-        )
         averaged_spec_mz = isotope_averaged_spec.mz.values.astype(np.float32)
         averaged_spec_y = isotope_averaged_spec.values.astype(np.float32)
         if ctx.index == 0:
-            isotope_result.main_isotope_height = isotope_height.item()
+            peak = peaks.sel(mz=ctx.isotope.mz, method="nearest")
+            peak_height = peak.item()
+            isotope_result.main_isotope_height = peak_height
         isotope_expected_height = isotope_result.main_isotope_height * (
             ctx.isotope.relative_abundance / ctx.relative_abundances[0]
         )
@@ -300,13 +310,6 @@ async def _process_isotope(
             "unit": UNITS,
         }
     )
-
-    isotope_slice = ctx.peak_data.sel(mz=slice(*mz_range))
-    peak_profiles = get_peaks(isotope_slice, ctx.instrument_property.peak_data_type)
-    peaks = isotope_slice.peak_heights.sel(time=ctx.time_scan, method="nearest").mean(
-        dim="time"
-    )
-    peaks = filter_peaks(peaks, intensity=ctx.peak_min_intensity)
 
     for peak in peaks:
         peak_result = await _process_peak(
