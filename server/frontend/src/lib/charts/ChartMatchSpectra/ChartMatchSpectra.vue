@@ -90,42 +90,28 @@ const rangeY = computed(
       ? { range: [0, scale.value.max] } // use set scale
       : {} // otherwise auto set scale
 )
-// standard plotly layout
-const layout = computed(() => ({
-  yaxis: {
-    title: { text: `Signal intensity [${scale.value.mode == 'average' ? 'counts/s' : 'counts'}]` },
-    gridcolor: '#33333399',
-    rangemode: 'nonnegative',
-    type: scale.value.log ? 'log' : 'lin',
-    ...rangeY.value
-  },
-  xaxis: {
-    title: { text: 'm/z [Th]' },
-    gridcolor: '#33333399'
-  },
-  margin: { l: 50, r: 20, t: 40, b: 40 },
-  dragmode: 'zoom',
-  showlegend: false,
-  height: props.height
-}))
-
-// reset chart zoom when changing targets
-watch(
-  // follow visualization, not focused target
-  () => app.data.match.visualized.ion?.target_ion_id,
-  (visualized) => {
-    // reset zoom for all isotope charts
-    isotopeCharts.value?.forEach((_, index) => {
-      // use isotope index to preserve chart
-      // correspondence between position & zoom
-      const plot = plots.value[index]
-      if (visualized && plot) {
-        console.log('📊 [chart] resetting match spectra zoom')
-        plot.resetZoom()
-      }
-    })
+// standard plotly layout, a clone of this is used for each chart
+const layout = computed(() => {
+  return {
+    yaxis: {
+      title: {
+        text: `Signal intensity [${scale.value.mode == 'average' ? 'counts/s' : 'counts'}]`
+      },
+      gridcolor: '#33333399',
+      rangemode: 'nonnegative',
+      type: scale.value.log ? 'log' : 'lin',
+      ...rangeY.value
+    },
+    xaxis: {
+      title: { text: 'm/z [Th]' },
+      gridcolor: '#33333399'
+    },
+    margin: { l: 50, r: 20, t: 40, b: 40 },
+    dragmode: 'zoom',
+    showlegend: false,
+    height: props.height
   }
-)
+})
 </script>
 
 <template>
@@ -170,7 +156,7 @@ watch(
           :title="`Isotope ${num.mz.format(isotopeChart.mz)}`"
           :ref="(el) => (plots[index] = el)"
           :data="isotopeChart.traces"
-          :layout="layout"
+          :layout="clone(layout)"
           :height="height"
           hideTitle
         >
