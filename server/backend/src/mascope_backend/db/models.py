@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from typing import Optional
 from sqlalchemy import (
     TIMESTAMP,
     Column,
@@ -23,6 +24,12 @@ from fastapi_users.db import (
 )
 from fastapi_users_db_sqlalchemy.access_token import (
     SQLAlchemyBaseAccessTokenTable,
+)
+from mascope_backend.api.models.workspace.config import workspace_config
+from mascope_backend.api.models.sample.batches.config import sample_batch_config
+from mascope_backend.api.models.sample.items.config import sample_item_config
+from mascope_backend.api.models.target.collections.config import (
+    target_collection_config,
 )
 
 
@@ -162,12 +169,27 @@ class AccessToken(SQLAlchemyBaseAccessTokenTable[int], Base):
 
 class Workspace(Base):
     __tablename__ = "workspace"
-    workspace_id = Column(String(16), nullable=False, primary_key=True)
-    workspace_name = Column(String(256), nullable=False)
-    workspace_description = Column(Text)
-    workspace_utc_created = Column(TIMESTAMP)
-    workspace_utc_modified = Column(TIMESTAMP)
-
+    workspace_id: Mapped[str] = mapped_column(String(16), primary_key=True)
+    workspace_name: Mapped[str] = mapped_column(String(256), nullable=False)
+    workspace_description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    workspace_type: Mapped[str] = mapped_column(
+        String(64),
+        nullable=False,
+        server_default=text(f"{workspace_config.DEFAULT_WORKSPACE_TYPE}"),
+    )
+    locked: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text(f"{workspace_config.DEFAULT_LOCKED_STATUS}"),
+    )
+    instrument: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    icon: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    workspace_utc_created: Mapped[Optional[str]] = mapped_column(
+        TIMESTAMP, nullable=True
+    )
+    workspace_utc_modified: Mapped[Optional[str]] = mapped_column(
+        TIMESTAMP, nullable=True
+    )
     # Define relationships
     sample_batch = relationship(
         "SampleBatch", back_populates="workspace", cascade="all, delete, delete-orphan"
@@ -176,17 +198,36 @@ class Workspace(Base):
 
 class SampleBatch(Base):
     __tablename__ = "sample_batch"
-    sample_batch_id = Column(String(16), primary_key=True)
-    workspace_id = Column(
+    sample_batch_id: Mapped[str] = mapped_column(String(16), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(
         String(16),
         ForeignKey("workspace.workspace_id", ondelete="CASCADE"),
         nullable=False,
     )
-    sample_batch_name = Column(String, nullable=False)
-    sample_batch_description = Column(Text)
-    build_params = Column(JSON)
-    sample_batch_utc_created = Column(TIMESTAMP)
-    sample_batch_utc_modified = Column(TIMESTAMP)
+    sample_batch_name: Mapped[str] = mapped_column(String, nullable=False)
+    sample_batch_description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    sample_batch_type: Mapped[str] = mapped_column(
+        String(64),
+        nullable=False,
+        server_default=text(f"{sample_batch_config.DEFAULT_SAMPLE_BATCH_TYPE}"),
+    )
+    locked: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text(f"{sample_batch_config.DEFAULT_LOCKED_STATUS}"),
+    )
+    polarity: Mapped[str] = mapped_column(
+        String(4),
+        nullable=False,
+        server_default=text(f"'{sample_batch_config.ANALYSIS_POLARITY}'"),
+    )
+    build_params: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    sample_batch_utc_created: Mapped[Optional[str]] = mapped_column(
+        TIMESTAMP, nullable=True
+    )
+    sample_batch_utc_modified: Mapped[Optional[str]] = mapped_column(
+        TIMESTAMP, nullable=True
+    )
 
     # Define relationships
     workspace = relationship("Workspace", back_populates="sample_batch")
@@ -204,23 +245,32 @@ class SampleBatch(Base):
 
 class SampleItem(Base):
     __tablename__ = "sample_item"
-    sample_item_id = Column(String(16), nullable=False, primary_key=True)
-    sample_batch_id = Column(
+    sample_item_id: Mapped[str] = mapped_column(String(16), primary_key=True)
+    sample_batch_id: Mapped[str] = mapped_column(
         String(16),
         ForeignKey("sample_batch.sample_batch_id", ondelete="CASCADE"),
         nullable=False,
     )
-    filename = Column(String(256), nullable=False)
-    sample_item_name = Column(String(256), nullable=False)
-    sample_item_type = Column(String(64), nullable=False)
-    sample_item_attributes = Column(JSON)
-    sample_item_utc_created = Column(TIMESTAMP)
-    sample_item_utc_modified = Column(TIMESTAMP)
-    filter_id = Column(String(6))
-    tic = Column(Float)
-    polarity = Column(String(1))
-    t0 = Column(Float)
-    t1 = Column(Float)
+    filename: Mapped[str] = mapped_column(String(256), nullable=False)
+    sample_item_name: Mapped[str] = mapped_column(String(256), nullable=False)
+    sample_item_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    locked: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text(f"{sample_item_config.DEFAULT_LOCKED_STATUS}"),
+    )
+    sample_item_attributes: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    filter_id: Mapped[Optional[str]] = mapped_column(String(6), nullable=True)
+    tic: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    polarity: Mapped[Optional[str]] = mapped_column(String(1), nullable=True)
+    t0: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    t1: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    sample_item_utc_created: Mapped[Optional[str]] = mapped_column(
+        TIMESTAMP, nullable=True
+    )
+    sample_item_utc_modified: Mapped[Optional[str]] = mapped_column(
+        TIMESTAMP, nullable=True
+    )
 
     # Define relationships
     sample_batch = relationship("SampleBatch", back_populates="sample_item")
@@ -306,8 +356,9 @@ class TargetCollection(Base):
     target_collection_type = Column(
         String(64),
         nullable=False,
-        # the default is set at the database level using server_default
-        server_default=text("'TARGETS'"),
+        server_default=text(
+            f"{target_collection_config.DEFAULT_TARGET_COLLECTION_TYPE}"
+        ),
     )
 
     # Define relationships
@@ -723,29 +774,43 @@ class Sample(Base):
     __tablename__ = "sample_view"
     __table_args__ = {"extend_existing": True}
     # All columns are read-only as this is a view, not a base table
-    sample_item_id = Column(String(16), primary_key=True)
-    sample_file_id = Column(String(16))
-    instrument_function_id = Column(
+
+    sample_item_id: Mapped[str] = mapped_column(String(16), primary_key=True)
+    sample_file_id: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    instrument_function_id: Mapped[Optional[str]] = mapped_column(
         String(32),
         ForeignKey("instrument_function.instrument_function_id", ondelete="SET NULL"),
         nullable=True,
     )
-    sample_batch_id = Column(String(16), ForeignKey("sample_batch.sample_batch_id"))
-    sample_item_name = Column(String(256))
-    t0 = Column(Float)
-    t1 = Column(Float)
-    filename = Column(String(256))
-    instrument = Column(String(64))
-    method_file = Column(String(256))
-    sample_item_type = Column(String(64))
-    sample_item_attributes = Column(JSON)
-    filter_id = Column(String(6))
-    length = Column(Float)
-    tic = Column(Float)
-    polarity = Column(String(1))
-    range = Column(JSON)
-    mz_calibration = Column(JSON)
-    datetime = Column(TIMESTAMP)
-    datetime_utc = Column(TIMESTAMP)
-    sample_item_utc_created = Column(TIMESTAMP)
-    sample_item_utc_modified = Column(TIMESTAMP)
+    sample_batch_id: Mapped[str] = mapped_column(
+        String(16),
+        ForeignKey("sample_batch.sample_batch_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    sample_item_name: Mapped[Optional[str]] = mapped_column(String(256), nullable=False)
+    filename: Mapped[Optional[str]] = mapped_column(String(256), nullable=False)
+    instrument: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    sample_item_type: Mapped[Optional[str]] = mapped_column(String(64), nullable=False)
+    locked: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text(f"{sample_item_config.DEFAULT_LOCKED_STATUS}"),
+    )
+    method_file: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+    t0: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    t1: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    sample_item_attributes: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    filter_id: Mapped[Optional[str]] = mapped_column(String(6), nullable=True)
+    length: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    tic: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    polarity: Mapped[Optional[str]] = mapped_column(String(1), nullable=True)
+    range: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    mz_calibration: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    datetime: Mapped[Optional[str]] = mapped_column(TIMESTAMP, nullable=True)
+    datetime_utc: Mapped[Optional[str]] = mapped_column(TIMESTAMP, nullable=True)
+    sample_item_utc_created: Mapped[Optional[str]] = mapped_column(
+        TIMESTAMP, nullable=True
+    )
+    sample_item_utc_modified: Mapped[Optional[str]] = mapped_column(
+        TIMESTAMP, nullable=True
+    )
