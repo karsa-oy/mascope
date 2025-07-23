@@ -77,15 +77,16 @@ async def get_workspaces(
             else:
                 stmt = stmt.order_by(asc(getattr(Workspace, sort)))
 
-        # Step 3: Apply pagination
+        # Step 3: Get total count
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total = await session.scalar(count_stmt)
+
+        # Step 4: Apply pagination
         stmt = stmt.offset(page * limit).limit(limit)
 
-        # Step 4: Execute the query
+        # Step 5: Execute the query
         result = await session.execute(stmt)
         workspaces = result.scalars().all()
-
-        # Step 5: Get total count for pagination
-        total = await session.scalar(select(func.count()).select_from(stmt))
 
     # Step 6: Return the total count and the list of validated workspaces
     return {

@@ -294,6 +294,7 @@ def workspace_create_data():
     return {
         "workspace_name": "New Test Workspace",
         "workspace_description": "Created during integration test",
+        "workspace_type": "ANALYSIS",
     }
 
 

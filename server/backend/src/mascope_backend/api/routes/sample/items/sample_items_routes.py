@@ -196,7 +196,7 @@ async def move_sample_items_route(
     :param body: The data for copying the sample item.
     :param background_tasks: Background tasks for processing the copy.
     :param user: The current authenticated user with editor permissions.
-    :return: A dictionary confirming the copy process has started.`
+    :return: A dictionary confirming the copy process has started.
     """
     # Cant move locked sample items
     await locked_access(user, SampleItem, body.sample_item_ids)

@@ -1,5 +1,5 @@
 """
-Migration script for v29: Acquisition Workspace System Implementation.
+Migration script for v30: Acquisition Workspace System Implementation.
 
 This migration implements the unified type-based approach to distinguish acquisition
 vs analysis instances across the data hierarchy (workspaces → batches → samples).

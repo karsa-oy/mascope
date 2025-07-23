@@ -136,7 +136,7 @@ class SampleItemRead(SampleItemBase):
     )
     polarity: str | None = Field(
         None,
-        description="Polarity of the sample item, made optional for old samles withou polarity",
+        description="Polarity of the sample item, made optional for old samples without polarity",
     )
     locked: int = Field(
         ..., description="Lock status of the sample item (0=unlocked, 1=locked)"
