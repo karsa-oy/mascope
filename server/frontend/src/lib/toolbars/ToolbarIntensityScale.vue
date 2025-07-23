@@ -31,7 +31,7 @@ watch(
         id="intensity-scale-max"
         showButtons
         :min="0"
-        :max="100_000"
+        :max="1_000_000_000"
         :step="2000"
         :maxFractionDigits="3"
         :allowEmpty="true"
