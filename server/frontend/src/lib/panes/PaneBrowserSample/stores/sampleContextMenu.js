@@ -75,12 +75,12 @@ export const useSampleContextMenu = defineStore('browser.sample.sampleCtxMenu', 
             if (clipboard.op === 'copy') {
               await app.data.sample.copy({
                 sample_item_ids: clipboard.samples.map((s) => s.sample_item_id),
-                sample_batch_id: row.value.sample_batch_id
+                sample_batch_id: row.value?.sample_batch_id ?? app.data.batch.focusedId
               })
             } else if (clipboard.op === 'cut') {
               await app.data.sample.move({
                 sample_item_ids: clipboard.samples.map((s) => s.sample_item_id),
-                sample_batch_id: row.value.sample_batch_id
+                sample_batch_id: row.value?.sample_batch_id ?? app.data.batch.focusedId
               })
               clipboard.clear()
             }
