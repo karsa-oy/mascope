@@ -1,6 +1,7 @@
 import asyncio
 
 from mascope_file.io import delete_peaks
+from mascope_backend.db import db_semaphore
 from mascope_backend.db.id import gen_id
 from mascope_backend.api.models.sample.files.sample_file_pydantic_model import (
     SampleFileUpdate,
@@ -156,10 +157,12 @@ async def process_instrument_config(
             "method_file": method_file,
             "instrument_function_id": instrument_function_id,
         }
-        await update_sample_file(
-            sample_file.sample_file_id,
-            SampleFileUpdate(**sample_file_fields),
-        )
+        # Limit concurrent updates with the semaphore to prevent database overload ("QueuePool limit reached")
+        async with db_semaphore:
+            await update_sample_file(
+                sample_file.sample_file_id,
+                SampleFileUpdate(**sample_file_fields),
+            )
 
     update_tasks = [process_file(sample_file) for sample_file in sample_files]
     await asyncio.gather(*update_tasks)

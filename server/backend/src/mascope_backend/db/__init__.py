@@ -1,3 +1,4 @@
+import asyncio
 import os
 from typing import AsyncGenerator
 
@@ -20,6 +21,9 @@ from mascope_backend.runtime import runtime
 # Initialize global variables at module load
 ASYNC_SESSION_MAKER = None  # Global async session maker
 db_dir = runtime.config.database
+
+# Semaphore to limit concurrent database operations
+db_semaphore = asyncio.Semaphore(db_config.POOL_SIZE)
 
 
 # Database configuration and session management
