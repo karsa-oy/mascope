@@ -1,5 +1,13 @@
+"""
+Sample batch pydantic models for API validation and serialization.
+
+Defines data models for sample batch related requests and responses
+with validation rules and business logic constraints.
+"""
+
+from datetime import datetime
 from typing import Optional, List
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 
 from mascope_file.name import get_instrument_type
 
@@ -13,6 +21,7 @@ from mascope_backend.api.models.sample.items.sample_item_pydantic_model import (
     SampleItemCreate,
 )
 from mascope_backend.api.models.base_pydantic_model import QueryParamsModel
+from mascope_backend.api.models.sample.batches.config import sample_batch_config
 
 
 class BuildParams(BaseModel):
@@ -41,7 +50,71 @@ class BuildParams(BaseModel):
         return v
 
 
-class SampleBatchBase(BaseModel):
+class SampleBatchBaseValidator:
+    """Base validation logic for sample batch shared fields."""
+
+    @field_validator("sample_batch_name")
+    @classmethod
+    def validate_sample_batch_name(cls, sample_batch_name: str | None) -> str | None:
+        """Validate sample batch name is not empty or whitespace."""
+        if sample_batch_name is not None and sample_batch_name.strip() == "":
+            raise ValueError(
+                "Sample batch name cannot be empty or contain only whitespace."
+            )
+        return sample_batch_name
+
+
+class SampleBatchValidator(SampleBatchBaseValidator):
+    """Validators for all fields."""
+
+    @field_validator("sample_batch_type")
+    @classmethod
+    def validate_sample_batch_type(cls, sample_batch_type: str | None) -> str | None:
+        """Complete validation logic for all sample batch fields."""
+        if (
+            sample_batch_type
+            and sample_batch_type not in sample_batch_config.SAMPLE_BATCH_TYPES
+        ):
+            raise ValueError(
+                f"Invalid sample batch type. Must be one of: {', '.join(sample_batch_config.SAMPLE_BATCH_TYPES)}"
+            )
+        return sample_batch_type
+
+    @field_validator("polarity")
+    @classmethod
+    def validate_polarity(cls, polarity: str | None) -> str | None:
+        """Validate polarity values."""
+        if polarity and polarity not in sample_batch_config.all_sample_batch_polarities:
+            raise ValueError(
+                f"Invalid sample batch polarity. Must be one of: {', '.join(sample_batch_config.all_sample_batch_polarities)}"
+            )
+        return polarity
+
+    @model_validator(mode="after")
+    @classmethod
+    def validate_polarity_by_batch_type(cls, values):
+        """Validate polarity constraints based on sample batch type."""
+        sample_batch_type, polarity = values.sample_batch_type, values.polarity
+
+        if sample_batch_type == "ACQUISITION":
+            if polarity not in sample_batch_config.ACQUISITION_POLARITY:
+                raise ValueError(
+                    f"Invalid acquisition batch polarity. Must be one of: {', '.join(sample_batch_config.ACQUISITION_POLARITY)}. "
+                    f"Got: '{polarity}'"
+                )
+        elif sample_batch_type == "ANALYSIS":
+            if polarity != sample_batch_config.ANALYSIS_POLARITY:
+                raise ValueError(
+                    f"Analysis batch should have polarity '{sample_batch_config.ANALYSIS_POLARITY}'. "
+                    f"Got: '{polarity}'"
+                )
+
+        return values
+
+
+class SampleBatchBase(SampleBatchValidator, BaseModel):
+    """Base model with common fields for SampleBatch."""
+
     workspace_id: str = Field(
         ..., description="ID of the workspace associated with the sample batch"
     )
@@ -49,21 +122,66 @@ class SampleBatchBase(BaseModel):
     sample_batch_description: Optional[str] = Field(
         "", description="Description of the sample batch"
     )
+    sample_batch_type: str = Field(
+        default=sample_batch_config.DEFAULT_SAMPLE_BATCH_TYPE,
+        description="Type of sample batch (ACQUISITION or ANALYSIS)",
+    )
+    polarity: str = Field(
+        default=sample_batch_config.ANALYSIS_POLARITY,
+        description="Polarity of the sample batch (+, -, or +-)",
+    )
     build_params: BuildParams = Field(
         ..., description="Build parameters of the sample batch"
     )
 
+    model_config = ConfigDict(from_attributes=True)
 
-class SampleBatchCreateBody(SampleBatchBase):
+
+class SampleBatchCreate(SampleBatchBase):
+    """Model used for sample batch creation requests."""
+
     target_collection_ids: List[str] = Field(
         ..., description="IDs of target collections associated with the sample batch"
     )
 
 
-class SampleBatchUpdateBody(SampleBatchBase):
+class SampleBatchRead(SampleBatchBase):
+    """Sample batch response model with added database fields."""
+
+    sample_batch_id: str = Field(
+        ..., description="Unique identifier for the sample batch"
+    )
+    locked: int = Field(
+        ..., description="Lock status of the sample batch (0=unlocked, 1=locked)"
+    )
+    sample_batch_utc_created: datetime = Field(
+        ..., description="Timestamp when sample batch was created"
+    )
+    sample_batch_utc_modified: datetime | None = Field(
+        None, description="Timestamp when sample batch was last modified"
+    )
+
+
+class SampleBatchUpdate(SampleBatchBaseValidator, BaseModel):
+    """
+    Model for updating sample batches - only user-editable fields.
+
+    Target collections associations and build parameters are always included
+    in the update request, on service level they are handled separately.
+    """
+
+    sample_batch_name: str | None = Field(None, description="Name of the sample batch")
+    sample_batch_description: str | None = Field(
+        None, description="Description of the sample batch"
+    )
+    build_params: BuildParams = Field(
+        ..., description="Build parameters of the sample batch"
+    )
     target_collection_ids: List[str] = Field(
         ..., description="IDs of target collections associated with the sample batch"
     )
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class GetSampleBatchesQueryParams(QueryParamsModel):

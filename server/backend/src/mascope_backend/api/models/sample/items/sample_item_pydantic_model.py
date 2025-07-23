@@ -1,6 +1,14 @@
+"""
+Sample item pydantic models for API validation and serialization.
+
+Defines data models for sample item related requests and responses
+with validation rules and business logic constraints.
+"""
+
+from datetime import datetime
 import re
 from typing import Optional, Dict
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 from mascope_backend.api.models.calibration.calibration_pydantic_model import (
     MzCalibrationParams,
 )
@@ -11,17 +19,89 @@ from mascope_backend.api.models.base_pydantic_model import (
 from mascope_backend.api.new.instrument_configs.schemas import (
     SetInstrumentConfigBody,
 )
-
-# TODO_configuration possible sample item types list, split by filter_id presence
-SAMPLE_TYPES_FILTER_ID_REQUIRED = ["FILTER_REGENERATION", "FILTER_BACKGROUND"]
-SAMPLE_TYPES_FILTER_ID_OPTIONAL = ["BLANK", "SAMPLE", "UNKNOWN"]
-SAMPLE_TYPES_FILTER_ID_NOT_ALLOWED = ["INSTRUMENT_BACKGROUND", "ONLINE"]
-
-# Regular expression for filter_id validation
-FILTER_ID_REGEX = r"^[0-9A-Z]{6}$"
+from mascope_backend.api.models.sample.items.config import sample_item_config
 
 
-class SampleItemBase(BaseModel):
+class SampleItemBaseValidator:
+    """Base validator with common validations for all sample item models."""
+
+    @field_validator("sample_item_name")
+    @classmethod
+    def validate_sample_item_name(cls, sample_item_name: str | None) -> str | None:
+        """Validate sample item name is not empty or whitespace."""
+        if sample_item_name is not None and sample_item_name.strip() == "":
+            raise ValueError(
+                "Sample item name cannot be empty or contain only whitespace."
+            )
+        return sample_item_name
+
+    @field_validator("filter_id")
+    @classmethod
+    def validate_filter_id_format(cls, filter_id):
+        """Validate filter_id matches required format (6 uppercase alphanumeric chars)."""
+        if filter_id and not re.match(sample_item_config.FILTER_ID_REGEX, filter_id):
+            raise ValueError(
+                "Invalid filter_id format. Must be 6 characters long and contain only uppercase letters and numbers."
+            )
+        return filter_id
+
+
+class SampleItemValidator(SampleItemBaseValidator, CommonValidators):
+    """Full validator for sample items with all field validations."""
+
+    @field_validator("sample_item_type")
+    @classmethod
+    def validate_sample_item_type(cls, sample_type):
+        """Validate sample_item_type is in allowed types list."""
+        if sample_type and sample_type not in sample_item_config.all_sample_types:
+            allowed_types = ", ".join(sample_item_config.all_sample_types)
+            raise ValueError(
+                f"Invalid sample item type '{sample_type}'. Allowed types are: {allowed_types}."
+            )
+        return sample_type
+
+    @field_validator("t0", "t1")
+    @classmethod
+    def validate_time_values(cls, v):
+        """Validate time values are non-negative."""
+        if v is not None and v < 0:
+            raise ValueError("Time values must be non-negative")
+        return v
+
+    @model_validator(mode="after")
+    @classmethod
+    def validate_time_range(cls, values):
+        """Validate t0 is less than t1 when both are provided."""
+        t0, t1 = values.t0, values.t1
+        if t0 is not None and t1 is not None and t0 >= t1:
+            raise ValueError("t0 must be less than t1")
+        return values
+
+    @model_validator(mode="after")
+    @classmethod
+    def validate_sample_type_filter_requirements(cls, values):
+        """Validate filter_id requirements based on sample_item_type."""
+        sample_type, filter_id = values.sample_item_type, values.filter_id
+
+        if (
+            sample_type in sample_item_config.SAMPLE_TYPES_FILTER_ID_REQUIRED
+            and not filter_id
+        ):
+            raise ValueError(f"Sample item type '{sample_type}' requires a filter ID.")
+        elif (
+            sample_type in sample_item_config.SAMPLE_TYPES_FILTER_ID_NOT_ALLOWED
+            and filter_id
+        ):
+            raise ValueError(
+                f"Sample item type '{sample_type}' cannot have a filter ID."
+            )
+
+        return values
+
+
+class SampleItemBase(SampleItemValidator, BaseModel):
+    """Base model with common fields for sample items."""
+
     sample_batch_id: str = Field(..., description="ID of the associated sample batch")
     filename: str = Field(..., description="Name of the sample file")
     sample_item_name: str = Field(..., description="Name of the sample item")
@@ -37,90 +117,86 @@ class SampleItemBase(BaseModel):
     t0: float = Field(..., description="Start time of the sample item")
     t1: float = Field(..., description="End time of the sample item")
 
-    @field_validator("t0", "t1")
-    @classmethod
-    def validate_time(cls, v):
-        if v < 0:
-            raise ValueError("Time values must be non-negative")
-        return v
-
-    @model_validator(mode="after")
-    @classmethod
-    def validate_time_range(cls, values):
-        t0, t1 = values.t0, values.t1
-        if t0 is not None and t1 is not None and t0 >= t1:
-            raise ValueError("t0 must be less than t1")
-        return values
-
-    @field_validator("polarity")
-    @classmethod
-    def validate_polarity(cls, v):
-        if v not in ["+", "-"]:
-            raise ValueError("Polarity must be '+' or '-'")
-        return v
-
-    @field_validator("filter_id")
-    @classmethod
-    def validate_filter_id(cls, filter_id):
-        if filter_id and not re.match(FILTER_ID_REGEX, filter_id):
-            raise ValueError(
-                "Invalid filter_id format. Must be 6 characters long and contain only uppercase letters and numbers."
-            )
-        return filter_id
-
-    @field_validator("sample_item_type")
-    @classmethod
-    def validate_sample_item_type(cls, sample_type):
-        """Ensure `sample_item_type` is one of the allowed types."""
-        all_sample_types = (
-            SAMPLE_TYPES_FILTER_ID_REQUIRED
-            + SAMPLE_TYPES_FILTER_ID_OPTIONAL
-            + SAMPLE_TYPES_FILTER_ID_NOT_ALLOWED
-        )
-        if sample_type not in all_sample_types:
-            allowed_types = ", ".join(all_sample_types)
-            raise ValueError(
-                f"Invalid sample item type '{sample_type}'. Allowed types are: {allowed_types}."
-            )
-        return sample_type
-
-    @model_validator(mode="after")
-    @classmethod
-    def validate_sample_item_type_based_on_filter_id(cls, values):
-        """
-        Validates sample_item_type options based on filter_id presence:
-        - For types in SAMPLE_TYPES_FILTER_ID_REQUIRED, filter_id is mandatory.
-        - For types in SAMPLE_TYPES_FILTER_ID_NOT_ALLOWED, filter_id must be absent.
-        """
-        sample_type, filter_id = values.sample_item_type, values.filter_id
-
-        # Determine allowed types based on the presence or absence of filter_id
-        if sample_type in SAMPLE_TYPES_FILTER_ID_REQUIRED and not filter_id:
-            raise ValueError(f"Sample item type '{sample_type}' requires a filter ID.")
-        elif sample_type in SAMPLE_TYPES_FILTER_ID_NOT_ALLOWED and filter_id:
-            raise ValueError(
-                f"Sample item type '{sample_type}' cannot have a filter ID."
-            )
-
-        return values
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SampleItemCreate(SampleItemBase):
-    tic: Optional[float] = Field(None, description="TIC of the sample item")
-    t0: Optional[float] = Field(None, description="Start time of the sample item")
-    t1: Optional[float] = Field(None, description="End time of the sample item")
+    """Model for creating sample items with optional time and TIC values."""
 
-    @model_validator(mode="after")
-    @classmethod
-    def validate_time_range(cls, values):
-        t0, t1 = values.t0, values.t1
-        if t0 is not None and t1 is not None and t0 >= t1:
-            raise ValueError("t0 must be less than t1")
-        return values
+    tic: float | None = Field(None, description="TIC of the sample item")
+    t0: float | None = Field(None, description="Start time of the sample item")
+    t1: float | None = Field(None, description="End time of the sample item")
+
+
+class SampleItemRead(SampleItemBase):
+    """Model for reading sample items - includes database fields."""
+
+    sample_item_id: str = Field(
+        ..., description="Unique identifier for the sample item"
+    )
+    polarity: str | None = Field(
+        None,
+        description="Polarity of the sample item, made optional for old samles withou polarity",
+    )
+    locked: int = Field(
+        ..., description="Lock status of the sample item (0=unlocked, 1=locked)"
+    )
+    sample_item_utc_created: datetime = Field(
+        ..., description="Timestamp when sample item was created"
+    )
+    sample_item_utc_modified: datetime | None = Field(
+        None, description="Timestamp when sample item was last modified"
+    )
 
 
 class SampleItemUpdate(SampleItemBase):
-    pass
+    """Model for updating sample items - excludes system-only sample item types."""
+
+    @field_validator("sample_item_type")
+    @classmethod
+    def validate_user_editable_sample_type(cls, sample_type):
+        """Validate sample_item_type is user-editable (excludes system-only types)."""
+        if (
+            sample_type
+            and sample_type not in sample_item_config.user_editable_sample_types
+        ):
+            raise ValueError(
+                f"Cannot manually set sample item type to '{sample_type}'. "
+                f"This type is system-managed."
+            )
+        return sample_type
+
+
+class GetSampleItemsQueryValidator:
+    """Validator with common validations for common sample items query parameters."""
+
+    @field_validator("polarity")
+    @classmethod
+    def validate_polarity_list(cls, polarities: list[str] | None) -> list[str] | None:
+        """Validate polarities in the list."""
+        if polarities:
+            valid_polarities = sample_item_config.SAMPLE_POLARITY
+            for polarity in polarities:
+                if polarity not in valid_polarities:
+                    raise ValueError(
+                        f"Invalid polarity '{polarity}'. Must be one of: {', '.join(valid_polarities)}"
+                    )
+        return polarities
+
+    @field_validator("sample_item_type")
+    @classmethod
+    def validate_sample_item_type_list(
+        cls, sample_item_types: list[str] | None
+    ) -> list[str] | None:
+        """Validate sample item types in the list."""
+        if sample_item_types:
+            valid_types = sample_item_config.all_sample_types
+            for sample_item_type in sample_item_types:
+                if sample_item_type not in valid_types:
+                    raise ValueError(
+                        f"Invalid sample item type '{sample_item_type}'. Must be one of: {valid_types}"
+                    )
+        return sample_item_types
 
 
 class GetSampleItemsQueryParams(CommonValidators, QueryParamsModel):

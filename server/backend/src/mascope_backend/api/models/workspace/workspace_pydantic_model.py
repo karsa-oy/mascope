@@ -1,10 +1,35 @@
-from pydantic import BaseModel, Field, field_validator, ConfigDict
-from mascope_backend.api.models.base_pydantic_model import QueryParamsModel
+"""
+Workspace pydantic models for API validation and serialization.
+
+Defines data models for workspace related requests and responses
+with validation rules and business logic constraints.
+"""
+
 from datetime import datetime
+from typing import Annotated
+from fastapi import Query
+from pydantic import BaseModel, Field, field_validator, ConfigDict, model_validator
+from mascope_backend.api.models.base_pydantic_model import QueryParamsModel
+from mascope_backend.api.models.workspace.config import workspace_config
 
 
-class WorkspaceValidator:
-    """Mixin class with common validators."""
+class WorkspaceIcon(BaseModel):
+    """Icon configuration for workspace."""
+
+    icon_id: str = Field(..., description="Icon identifier/class name")
+    color: str = Field(..., description="Color in hex format (e.g., #3B82F6)")
+
+    @field_validator("color")
+    @classmethod
+    def validate_color_format(cls, color: str) -> str:
+        """Validate color is in hex format."""
+        if not color.startswith("#") or len(color) != 7:
+            raise ValueError("Color must be in hex format (e.g., #3B82F6)")
+        return color
+
+
+class WorkspaceBaseValidator:
+    """Mixin class with common schemas fields validators."""
 
     @field_validator("workspace_name")
     @classmethod
@@ -23,6 +48,28 @@ class WorkspaceValidator:
         return workspace_name
 
 
+class WorkspaceValidator(WorkspaceBaseValidator):
+    """Validators for all fields."""
+
+    @field_validator("workspace_type")
+    @classmethod
+    def validate_workspace_type(cls, workspace_type: str | None) -> str | None:
+        """Validate workspace type."""
+        if workspace_type and workspace_type not in workspace_config.WORKSPACE_TYPES:
+            raise ValueError(
+                f"Invalid workspace type. Must be one of: {workspace_config.WORKSPACE_TYPES}"
+            )
+        return workspace_type
+
+    @field_validator("instrument")
+    @classmethod
+    def validate_instrument(cls, instrument: str | None) -> str | None:
+        """Validate instrument is not empty."""
+        if instrument is not None and instrument.strip() == "":
+            raise ValueError("Instrument cannot be empty or contain only whitespace")
+        return instrument
+
+
 class WorkspaceBase(WorkspaceValidator, BaseModel):
     """Base model with common fields for Workspace."""
 
@@ -30,19 +77,55 @@ class WorkspaceBase(WorkspaceValidator, BaseModel):
     workspace_description: str | None = Field(
         None, description="Description of the workspace"
     )
+    workspace_type: str = Field(
+        default=workspace_config.DEFAULT_WORKSPACE_TYPE,
+        description="Type of workspace (ACQUISITION or ANALYSIS)",
+    )
+    instrument: str | None = Field(
+        None, description="Instrument associated with the workspace"
+    )
+    icon: WorkspaceIcon | None = Field(
+        None, description="Icon configuration with icon_id and color"
+    )
+
     model_config = ConfigDict(from_attributes=True)
 
 
 class WorkspaceCreate(WorkspaceBase):
     """Model used for workspace creation requests."""
 
-    pass
+    @model_validator(mode="after")
+    @classmethod
+    def validate_acquisition_constraints(cls, values):
+        """Validate rules for ACQUISITION workspaces."""
+        workspace_type, instrument, workspace_name = (
+            values.workspace_type,
+            values.instrument,
+            values.workspace_name,
+        )
+
+        if workspace_type == "ACQUISITION":
+            # ACQUISITION workspaces must have instrument
+            if not instrument:
+                raise ValueError("Acquisition workspaces must specify an instrument")
+
+            # Validate name ends with instrument (case-insensitive)
+            if not workspace_name.lower().endswith(instrument.lower()):
+                raise ValueError(
+                    f"Acquisition workspace name should end with the instrument name. "
+                    f"Suggested: '{workspace_config.ACQUISITION_NAME_PREFIX} {instrument}'"
+                )
+
+        return values
 
 
 class WorkspaceRead(WorkspaceBase):
-    """Model used for reading workspaces, includes all database fields."""
+    """Model used for reading workspaces, includes database fields."""
 
     workspace_id: str = Field(..., description="Unique identifier for the workspace")
+    locked: int = Field(
+        description="Lock status of the workspace (0=unlocked, 1=locked)",
+    )
     workspace_utc_created: datetime = Field(
         ..., description="Timestamp when workspace was created"
     )
@@ -51,12 +134,15 @@ class WorkspaceRead(WorkspaceBase):
     )
 
 
-class WorkspaceUpdate(WorkspaceValidator, BaseModel):
-    """Model used for workspace update requests - all fields optional."""
+class WorkspaceUpdate(WorkspaceBaseValidator, BaseModel):
+    """Model used for workspace update requests - only user-editable fields, all fields optional."""
 
     workspace_name: str | None = Field(None, description="Name of the workspace")
     workspace_description: str | None = Field(
         None, description="Description of the workspace"
+    )
+    icon: WorkspaceIcon | None = Field(
+        None, description="Icon configuration with icon_id and color"
     )
 
     model_config = ConfigDict(from_attributes=True)
