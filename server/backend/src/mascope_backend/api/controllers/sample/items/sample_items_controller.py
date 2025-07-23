@@ -253,6 +253,12 @@ async def create_sample_item(
         new_sample_item = SampleItem(
             sample_item_id=gen_id(),
             **sample_item_dict,
+            locked=(
+                1
+                if sample_item.sample_item_type == "ACQUISITION"
+                and sample_item_config.ACQUISITION_AUTO_LOCK
+                else 0
+            ),  # Auto-lock acquisition sample items
             sample_item_utc_created=datetime.now(timezone.utc),
             sample_item_utc_modified=datetime.now(timezone.utc),
         )

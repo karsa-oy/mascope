@@ -1,9 +1,17 @@
-from fastapi import APIRouter, Depends
+"""
+Workspace management routes.
+
+This module provides endpoints for workspace operations including
+CRUD operations and workspace management functionality.
+"""
+
 from fastapi import APIRouter, Depends, Query
+from mascope_backend.db.models import Workspace
 from mascope_backend.api.new.auth.dependencies import (
-    editor_user,
     guest_user,
+    editor_user,
 )
+from mascope_backend.api.new.auth.access_rules import locked_access
 from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.controllers.workspace.workspace_controller import (
     get_workspaces,
@@ -65,6 +73,8 @@ async def update_workspace_route(
 ):
     """Update an existing workspace's details.
 
+    Locked workspaces can only be updated by owners.
+
     :param workspace_id: The unique identifier of the workspace.
     :type workspace_id: str
     :param workspace: The workspace update data.
@@ -74,6 +84,8 @@ async def update_workspace_route(
     :return: A dictionary containing the updated workspace details.
     :rtype: dict
     """
+    # Check if locked workspace - only owners can update
+    await locked_access(user, Workspace, workspace_id, min_role="owner")
     return await update_workspace(workspace_id, workspace)
 
 
@@ -97,6 +109,8 @@ async def create_workspace_route(workspace: WorkspaceCreate, user=Depends(editor
 async def delete_workspace_route(workspace_id: str, user=Depends(editor_user)):
     """Delete a specific workspace by ID.
 
+    Locked workspaces can only be deleted by owners.
+
     :param workspace_id: The unique identifier of the workspace.
     :type workspace_id: str
     :param user: The current authenticated user with editor permissions, defaults to Depends(editor_user).
@@ -104,4 +118,6 @@ async def delete_workspace_route(workspace_id: str, user=Depends(editor_user)):
     :return: A dictionary confirming deletion (if applicable).
     :rtype: dict or None
     """
+    # Check if locked workspace - only owners can delete
+    await locked_access(user, Workspace, workspace_id, min_role="owner")
     return await delete_workspace(workspace_id)

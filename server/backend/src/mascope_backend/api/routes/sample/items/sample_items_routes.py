@@ -1,6 +1,8 @@
 from fastapi import APIRouter, BackgroundTasks, Depends, Request, Query
 from mascope_backend.db.id import gen_id
+from mascope_backend.db.models import SampleBatch, SampleItem
 from mascope_backend.api.lib.api_features import api_route
+from mascope_backend.api.new.auth.access_rules import locked_access
 from mascope_backend.api.new.auth.dependencies import editor_user, guest_user
 from mascope_backend.api.new.instrument_configs.service import get_instrument_config
 from mascope_backend.api.controllers.sample.items.sample_items_controller import (
@@ -90,6 +92,9 @@ async def update_sample_item_route(
     :param user: The current authenticated user with editor permissions.
     :return: A dictionary containing the updated sample item details.
     """
+    # Check if locked sample item - only owners can update
+    await locked_access(user, SampleItem, sample_item_id, min_role="owner")
+
     sid = request.headers.get("X-SID")
     process_id = gen_id(8)  # generate id for potential process_instrument_config
 
@@ -116,6 +121,9 @@ async def delete_sample_items_route(
     :param user: The current authenticated user with editor permissions.
     :return: A dictionary confirming deletion.
     """
+    # Check if any sample items are locked - only owners can delete locked items
+    await locked_access(user, SampleItem, body.sample_item_ids, min_role="owner")
+
     return await delete_sample_items(
         sample_item_ids=body.sample_item_ids, independent_transaction=True
     )
@@ -130,8 +138,11 @@ async def delete_sample_item_route(sample_item_id: str, user=Depends(editor_user
     :param user: The current authenticated user with editor permissions.
     :return: A dictionary confirming deletion.
     """
+    # Check if locked sample item - only owners can delete
+    await locked_access(user, SampleItem, sample_item_id, min_role="owner")
+
     return await delete_sample_items(
-        sample_item_ids=[sample_item_id], independented_transaction=True
+        sample_item_ids=[sample_item_id], independent_transaction=True
     )
 
 
@@ -151,6 +162,9 @@ async def copy_sample_items_route(
     :param user: The current authenticated user with editor permissions.
     :return: A dictionary confirming the copy process has started.
     """
+    # Can't copy to locked sample batch
+    await locked_access(user, SampleBatch, body.sample_batch_id)
+
     sid = request.headers.get("X-SID")
     process_id = gen_id(8)
     background_tasks.add_task(
@@ -182,8 +196,14 @@ async def move_sample_items_route(
     :param body: The data for copying the sample item.
     :param background_tasks: Background tasks for processing the copy.
     :param user: The current authenticated user with editor permissions.
-    :return: A dictionary confirming the copy process has started.
+    :return: A dictionary confirming the copy process has started.`
     """
+    # Cant move locked sample items
+    await locked_access(user, SampleItem, body.sample_item_ids)
+
+    # Can't move to locked sample batch
+    await locked_access(user, SampleBatch, body.sample_batch_id)
+
     sid = request.headers.get("X-SID")
     process_id = gen_id(8)
     background_tasks.add_task(
@@ -196,7 +216,7 @@ async def move_sample_items_route(
         process_id=process_id,
     )
     return {
-        "message": f"Copying {len(body.sample_item_ids)} samples, please wait.",
+        "message": f"Moving {len(body.sample_item_ids)} samples, please wait.",
         "process_id": process_id,
     }
 

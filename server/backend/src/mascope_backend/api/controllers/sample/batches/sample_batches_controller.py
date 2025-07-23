@@ -309,10 +309,15 @@ async def create_sample_batch(
         # Step 1: Construct new sample batch
         new_sample_batch = SampleBatch(
             sample_batch_id=gen_id(16),
-            workspace_id=sample_batch.workspace_id,
-            sample_batch_name=sample_batch.sample_batch_name,
-            sample_batch_description=sample_batch.sample_batch_description,
-            build_params=sample_batch.build_params.model_dump(),
+            **sample_batch.model_dump(
+                exclude={"target_collection_ids"}
+            ),  # Exclude collections associations from unpacking
+            locked=(
+                1
+                if sample_batch.sample_batch_type == "ACQUISITION"
+                and sample_batch_config.ACQUISITION_AUTO_LOCK
+                else 0
+            ),  # Auto-lock acquisition
             sample_batch_utc_created=datetime.now(timezone.utc),
         )
         # Step 2: Add to session

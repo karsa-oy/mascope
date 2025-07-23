@@ -11,8 +11,8 @@ from mascope_backend.api.controllers.target.collections.target_collections_contr
 )
 from mascope_backend.api.models.target.collections.target_collection_pydantic_model import (
     GetTargetCollectionsQueryParams,
-    TargetCollectionCreateBody,
-    TargetCollectionUpdateBody,
+    TargetCollectionCreate,
+    TargetCollectionUpdate,
 )
 
 target_collections_router = APIRouter(
@@ -54,7 +54,7 @@ async def get_target_collection_route(
 @api_route(status_code=201)
 async def create_target_collection_route(
     request: Request,
-    body: TargetCollectionCreateBody,
+    body: TargetCollectionCreate,
     background_tasks: BackgroundTasks,
     user=Depends(editor_user),
 ):
@@ -70,7 +70,7 @@ async def create_target_collection_route(
     # generate process_id for the background task ramatch_batches
     process_id = gen_id(8)
     result = await create_target_collection(
-        target_collection_create_body=body,
+        target_collection_create=body,
         background_tasks=background_tasks,
         sid=sid,
         process_id=process_id,
@@ -89,7 +89,7 @@ async def create_target_collection_route(
 async def update_target_collection_route(
     request: Request,
     target_collection_id: str,
-    body: TargetCollectionUpdateBody,
+    body: TargetCollectionUpdate,
     background_tasks: BackgroundTasks,
     user=Depends(editor_user),
 ):
@@ -107,7 +107,7 @@ async def update_target_collection_route(
     process_id = gen_id(8)
     result = await update_target_collection(
         target_collection_id=target_collection_id,
-        target_collection_update_body=body,
+        target_collection_update=body,
         background_tasks=background_tasks,
         sid=sid,
         process_id=process_id,

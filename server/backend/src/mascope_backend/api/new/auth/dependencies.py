@@ -1,5 +1,5 @@
-""" 
-Route dependencies  
+"""
+Route dependencies
 """
 
 from fastapi import Depends

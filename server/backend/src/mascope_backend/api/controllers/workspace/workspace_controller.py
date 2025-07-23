@@ -149,8 +149,13 @@ async def create_workspace(workspace: WorkspaceCreate) -> dict:
         # Step 1: Generate unique ID and create new workspace
         new_workspace = Workspace(
             workspace_id=gen_id(16),
-            workspace_name=workspace.workspace_name,
-            workspace_description=workspace.workspace_description,
+            **workspace.model_dump(),
+            locked=(
+                1
+                if workspace.workspace_type == "ACQUISITION"
+                and workspace_config.ACQUISITION_AUTO_LOCK
+                else 0
+            ),  # Auto-lock acquisition workspaces
             workspace_utc_created=datetime.now(timezone.utc),
         )
 

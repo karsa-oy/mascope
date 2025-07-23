@@ -1,6 +1,8 @@
 from fastapi import APIRouter, BackgroundTasks, Request, Depends, Query
 from mascope_backend.db.id import gen_id
+from mascope_backend.db.models import SampleBatch, Workspace
 from mascope_backend.api.lib.api_features import api_route
+from mascope_backend.api.new.auth.access_rules import locked_access
 from mascope_backend.api.new.auth.dependencies import editor_user, guest_user
 from mascope_backend.api.new.instrument_configs.service import get_instrument_config
 from mascope_backend.api.controllers.sample.batches.sample_batches_controller import (
@@ -15,8 +17,8 @@ from mascope_backend.api.controllers.sample.batches.sample_batches_controller im
     sample_batch_export_peaks,
 )
 from mascope_backend.api.models.sample.batches.sample_batch_pydantic_model import (
-    SampleBatchCreateBody,
-    SampleBatchUpdateBody,
+    SampleBatchCreate,
+    SampleBatchUpdate,
     GetSampleBatchesQueryParams,
     GetSampleBatchTargetsQueryParams,
     SampleBatchImportSamplesBody,
@@ -86,13 +88,13 @@ async def get_batch_targets_route(
 @sample_batches_router.post("")
 @api_route(status_code=201)
 async def create_sample_batch_route(
-    body: SampleBatchCreateBody,
+    body: SampleBatchCreate,
     user=Depends(editor_user),
 ):
     """Create a new sample batch.
 
     :param body: The data required to create a sample batch.
-    :type body: SampleBatchCreateBody
+    :type body: SampleBatchCreate
     :param user: The current authenticated user with editor permissions.
     :type user: User
     :return: A dictionary containing the newly created sample batch's details.
@@ -106,7 +108,7 @@ async def create_sample_batch_route(
 async def update_sample_batch_route(
     request: Request,
     sample_batch_id: str,
-    body: SampleBatchUpdateBody,
+    body: SampleBatchUpdate,
     background_tasks: BackgroundTasks,
     user=Depends(editor_user),
 ):
@@ -115,7 +117,7 @@ async def update_sample_batch_route(
     :param sample_batch_id: The unique identifier of the sample batch to be updated.
     :type sample_batch_id: str
     :param body: The update data for the sample batch.
-    :type body: SampleBatchUpdateBody
+    :type body: SampleBatchUpdate
     :param background_tasks: Background task handler.
     :type background_tasks: BackgroundTasks
     :param user: The current authenticated user with editor permissions.
@@ -123,13 +125,16 @@ async def update_sample_batch_route(
     :return: A dictionary containing the updated sample batch details and a process ID.
     :rtype: dict
     """
+    # Check if locked sample batch - only owners can update
+    await locked_access(user, SampleBatch, sample_batch_id, min_role="owner")
+
     sid = request.headers.get("X-SID")
     # generate process_id for the background task ramatch_batches
     process_id = gen_id(8)
 
     result = await update_sample_batch(
         sample_batch_id=sample_batch_id,
-        sample_batch_update_body=body,
+        sample_batch_update=body,
         background_tasks=background_tasks,
         sid=sid,
         process_id=process_id,
@@ -165,6 +170,9 @@ async def delete_sample_batch_route(
     sample_batch_result = await get_sample_batch(sample_batch_id)
     sample_batch = sample_batch_result.get("data")
     sample_batch_name = sample_batch["sample_batch_name"]
+
+    # Check if locked sample batch - only owners can delete
+    await locked_access(user, SampleBatch, sample_batch_id, min_role="owner")
 
     sid = request.headers.get("X-SID")
     process_id = gen_id(8)
@@ -206,6 +214,9 @@ async def import_sample_items_route(
     :return: A dictionary containing a message and process ID.
     :rtype: dict
     """
+    # Can't import to locked sample batch
+    await locked_access(user, SampleBatch, sample_batch_id)
+
     # Ensure that sample_batch_id in path matches sample_batch_id in sample_items
     if any(si.sample_batch_id != sample_batch_id for si in body.sample_items):
         raise ValueError("The sample_batch_id in the route and sample_items must match")
@@ -263,6 +274,9 @@ async def copy_sample_batch_route(
     :return: A dictionary containing a message and process ID.
     :rtype: dict
     """
+    # Can't copy to locked workspace
+    await locked_access(user, Workspace, body.workspace_id)
+
     sid = request.headers.get("X-SID")
     process_id = gen_id(8)
 
