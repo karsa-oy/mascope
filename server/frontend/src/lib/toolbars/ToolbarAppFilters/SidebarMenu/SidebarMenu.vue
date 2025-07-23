@@ -9,13 +9,13 @@ import Tab from 'primevue/tab'
 import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 import ContextMenu from 'primevue/contextmenu'
-import OverlayBadge from 'primevue/overlaybadge'
 
 import { DialogWorkspaceOp } from '@/lib/dialogs'
 
 import WorkspacePane from './WorkspacePane.vue'
 import UserSettingsPane from './UserSettingsPane.vue'
 import NotificationPane from './NotificationPane.vue'
+import NotificationOverlay from './NotificationOverlay.vue'
 
 import { api } from '@/api'
 import { useApp } from '@/stores'
@@ -33,47 +33,18 @@ watchEffect(() => {
   tab.value = 'workspaces'
 })
 
+watchEffect(() => {
+  if (drawer.value && tab.value === 'notifications') {
+    app.ui.notification.clearRecentBadge()
+  }
+})
+
 provide('sidebar-open', drawer)
-
-/**
- * Computes the badge count to display based on recentErrors or recentWarnings.
- * If there are recent errors, their count is displayed.
- * If there are no errors but warnings, the warning count is displayed.
- * If there are neither, an empty string is returned, hiding the badge.
- *
- *  @returns {String} The badge value as a string.
- */
-const badgeValue = computed(() => {
-  const errors = app.ui.notification.recentErrors
-  const warnings = app.ui.notification.recentWarnings
-  return errors > 0 ? String(errors) : warnings > 0 ? String(warnings) : ''
-})
-
-/**
- * Determines the severity of the badge.
- * If there are any recent errors, the badge severity is set to 'danger'.
- * Otherwise, if there are only warnings, the badge severity is set to 'warn'.
- *
- * @returns {String} The badge severity ('danger' or 'warn').
- */
-const badgeSeverity = computed(() => {
-  return app.ui.notification.recentErrors > 0 ? 'danger' : 'warn'
-})
-
-/**
- * Controls the visibility of the notification badge.
- * If there are no recent errors or warnings, the badge is hidden.
- *
- * @returns {Boolean} True if the badge should be hidden, otherwise false.
- */
-const hiddenBadge = computed(() => {
-  return app.ui.notification.recentWarnings === 0 && app.ui.notification.recentErrors === 0
-})
 </script>
 
 <template>
   <menu class="breadcrum">
-    <OverlayBadge :value="badgeValue" :severity="badgeSeverity" size="small">
+    <NotificationOverlay>
       <Button
         v-tooltip.bottom="'Home menu'"
         icon="pi ph ph-house"
@@ -85,7 +56,7 @@ const hiddenBadge = computed(() => {
           }
         "
       />
-    </OverlayBadge>
+    </NotificationOverlay>
     <span class="pi ph ph-caret-right" style="opacity: 0.5" />
     <Button
       icon="pi ph ph-folder"
@@ -136,11 +107,13 @@ const hiddenBadge = computed(() => {
           <Tab value="workspaces" v-tooltip.bottom="'Workspaces'">
             <span class="pi ph ph-folder" />
           </Tab>
-          <Tab value="notifications" v-tooltip.bottom="'Notifications'"
-            ><span class="pi ph ph-bell" />
+          <Tab value="notifications" v-tooltip.bottom="'Notifications'">
+            <NotificationOverlay>
+              <span class="pi ph ph-bell" />
+            </NotificationOverlay>
           </Tab>
-          <Tab value="settings" v-tooltip.bottom="'Settings'"
-            ><span class="pi ph ph-gear-six" />
+          <Tab value="settings" v-tooltip.bottom="'Settings'">
+            <span class="pi ph ph-gear-six" />
           </Tab>
         </TabList>
       </template>

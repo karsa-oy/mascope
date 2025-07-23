@@ -13,7 +13,6 @@ export const useNotification = defineStore('app.ui.notification', () => {
     recentWarnings: 0, // Track the number of recent warnings
     recentErrors: 0 // Track the number of recent errors
   })
-  const drawer = ref(false) // UI state for the notification drawer, can be expanded or collapsed
 
   // Socket listener for incoming notifications
   api.socket.on('user_notification', handleNotification)
@@ -223,18 +222,11 @@ export const useNotification = defineStore('app.ui.notification', () => {
     }
   )
 
-  // Watch drawer state and clear badge when opened
-  watch(drawer, (isOpen) => {
-    if (isOpen) {
-      clearRecentBadge()
-    }
-  })
-
   return {
-    drawer,
     on,
     push: handleNotification,
     clearLatest,
+    clearRecentBadge,
     latest: computed(() => state.latest),
     log: computed(() => state.log),
     progress: computed(() => state.progress),
