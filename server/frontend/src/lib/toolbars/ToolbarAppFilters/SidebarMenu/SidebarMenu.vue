@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watchEffect, computed, provide } from 'vue'
+import { ref, watchEffect, computed } from 'vue'
 
 import Button from 'primevue/button'
 import Drawer from 'primevue/drawer'
@@ -12,6 +12,7 @@ import ContextMenu from 'primevue/contextmenu'
 
 import { DialogWorkspaceOp } from '@/lib/dialogs'
 
+import { useSidebarMenu } from './state.js'
 import WorkspacePane from './WorkspacePane.vue'
 import UserSettingsPane from './UserSettingsPane.vue'
 import NotificationPane from './NotificationPane.vue'
@@ -21,25 +22,27 @@ import { api } from '@/api'
 import { useApp } from '@/stores'
 
 const app = useApp()
+const sidebarMenu = useSidebarMenu()
 
-const drawer = ref(false)
-const tab = ref('workspaces')
 const dialog = ref()
 const menu = ref()
 
-const open = defineModel('open')
 watchEffect(() => {
-  open.value = drawer.value
-  tab.value = 'workspaces'
-})
-
-watchEffect(() => {
-  if (drawer.value && tab.value === 'notifications') {
-    app.ui.notification.clearRecentBadge()
+  if (!sidebarMenu.open) {
+    sidebarMenu.tab = 'workspaces'
   }
 })
 
-provide('sidebar-open', drawer)
+watchEffect(() => {
+  if (sidebarMenu.open && sidebarMenu.tab === 'notifications') {
+    app.ui.notification.clearRecentBadge()
+  }
+})
+watchEffect(() => {
+  if (!sidebarMenu.open) {
+    app.ui.help.set(null)
+  }
+})
 </script>
 
 <template>
@@ -52,7 +55,7 @@ provide('sidebar-open', drawer)
         text
         @click="
           (event) => {
-            drawer = true
+            sidebarMenu.open = true
           }
         "
       />
@@ -94,9 +97,9 @@ provide('sidebar-open', drawer)
       />
     </template>
   </menu>
-  <Tabs v-model:value="tab">
+  <Tabs v-model:value="sidebarMenu.tab">
     <Drawer
-      v-model:visible="drawer"
+      v-model:visible="sidebarMenu.open"
       header="Mascope"
       position="left"
       :style="`width: calc(${app.ui.split.left}vw + 1rem);`"

@@ -25,6 +25,7 @@ export const useHelp = defineStore('app.ui.help', () => {
   })
 
   const set = (current) => {
+    console.log(current)
     layer.value = current
   }
 

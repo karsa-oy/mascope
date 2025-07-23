@@ -112,15 +112,7 @@ const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top)
       <!-- batch columns -->
       <Column header="Batch" field="sample_batch_name" sortable>
         <template #body="{ data }">
-          <div
-            class="row"
-            style="justify-content: flex-start"
-            v-help.right="
-              `<h1>Batch</h1>
-
-                <p>A group of samples. Right click to perform actions.</p>`
-            "
-          >
+          <div class="row" style="justify-content: flex-start">
             <span
               :class="`pi pi-chevron-${data.sample_batch_id in batch.expanded ? 'down' : 'right'}`"
               style="font-size: smaller; margin-right: 0.5rem"
