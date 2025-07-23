@@ -520,23 +520,32 @@ async def copy_sample_items(
                 for c in SampleItem.__table__.columns
                 if c.name != "sample_item_id"
             }
+
+            # Determine sample type: ACQUISITION → UNKNOWN, others stay the same
+            sample_item_type = (
+                "UNKNOWN"
+                if original.sample_item_type == "ACQUISITION"
+                else original.sample_item_type
+            )
+
             # update some fields for the copy
             fields.update(
                 {
                     "sample_item_id": gen_id(),  # generate a new id
                     "sample_batch_id": sample_batch_id,  # use the provided batch ID
-                    "sample_item_utc_created": datetime.now(  # treat as new sample created now *
-                        timezone.utc
-                    ),
-                    "sample_item_utc_modified": datetime.now(  # same for last modification
-                        timezone.utc
-                    ),
                     "sample_item_name": (
                         generate_copy_name(  # generate copy name from the original
                             original.sample_item_name
                         )
                         if original.sample_batch_id == sample_batch_id
                         else original.sample_item_name
+                    ),
+                    "sample_item_type": sample_item_type,  # Apply type transformation
+                    "sample_item_utc_created": datetime.now(  # treat as new sample created now *
+                        timezone.utc
+                    ),
+                    "sample_item_utc_modified": datetime.now(  # same for last modification
+                        timezone.utc
                     ),
                 }
             )

@@ -306,7 +306,20 @@ async def create_sample_batch(
     :rtype: dict
     """
     async with async_session() as session:
-        # Step 1: Construct new sample batch
+        # Step 1: Validate workspace type for ACQUISITION batches
+        if sample_batch.sample_batch_type == "ACQUISITION":
+            if not (
+                workspace := await session.get(Workspace, sample_batch.workspace_id)
+            ):
+                raise NotFoundException(
+                    f"Workspace with ID '{sample_batch.workspace_id}' not found"
+                )
+
+            if workspace.workspace_type != "ACQUISITION":
+                raise ValueError(
+                    "ACQUISITION sample batches can only be created in ACQUISITION workspaces. "
+                    f"Workspace '{workspace.workspace_name}' is of type '{workspace.workspace_type}'"
+                )
         new_sample_batch = SampleBatch(
             sample_batch_id=gen_id(16),
             **sample_batch.model_dump(
@@ -911,12 +924,22 @@ async def copy_sample_batch(
         tc.target_collection_id for tc in original_sample_batch.target_collection
     ]
 
-    # Step 4: Create a new sample batch with a new ID, name, description, workspace and time of creation, but copy all other data
-    # Form SampleBatchCreateBody instance with new details
-    new_sample_batch_body = SampleBatchCreateBody(
+    # Step 4: Create a new sample batch with type conversion
+    # batch type: ACQUISITION → ANALYSIS, polarity "+" or "-" to "+-".
+    new_sample_batch_body = SampleBatchCreate(
         workspace_id=workspace_id,
         sample_batch_name=sample_batch_name,
         sample_batch_description=sample_batch_description,
+        sample_batch_type=(
+            sample_batch_config.DEFAULT_SAMPLE_BATCH_TYPE
+            if original_sample_batch.sample_batch_type == "ACQUISITION"
+            else original_sample_batch.sample_batch_type
+        ),
+        polarity=(
+            sample_batch_config.ANALYSIS_POLARITY
+            if original_sample_batch.sample_batch_type == "ACQUISITION"
+            else original_sample_batch.polarity
+        ),
         build_params=original_sample_batch.build_params,
         target_collection_ids=target_collection_ids,
     )
