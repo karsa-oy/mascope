@@ -1,51 +1,22 @@
 <script setup>
-import { ref, reactive, computed, watchEffect, onMounted } from 'vue'
+import { ref, computed } from 'vue'
 
 import { useWindowSize } from '@vueuse/core'
 
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
-import ContextMenu from 'primevue/contextmenu'
 import Button from 'primevue/button'
 
 import { BaseTabbedPanel, BaseCopyableField } from '@/lib/base'
-import { DialogBatchOp, DialogCalibration } from '@/lib/dialogs'
 import { useApp } from '@/stores'
 
 import SampleTable from './SampleTable.vue'
 import SampleTableCustomizer from './SampleTableCustomizer.vue'
+import BatchContextMenu from './BatchContextMenu.vue'
 import { useBatchContextMenu } from './stores'
 
 const app = useApp()
-
 const contextMenu = useBatchContextMenu()
-
-const contextMenuRef = ref()
-onMounted(() => {
-  contextMenu.ref = contextMenuRef.value
-})
-
-const batch = reactive({
-  expanded: {}
-})
-
-// computed
-const tree = computed(() => {
-  return app.data.batch.list.map((batch) => ({
-    ...batch,
-    children:
-      app.data.sample.list?.filter((sample) => sample.sample_batch_id == batch.sample_batch_id) ??
-      []
-  }))
-})
-
-watchEffect(() => {
-  if (app.data.batch.focused) {
-    batch.expanded = { [app.data.batch.focusedId]: true }
-  } else {
-    batch.expanded = {}
-  }
-})
 
 const { height } = useWindowSize()
 const padding = 100
@@ -86,12 +57,11 @@ const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top)
       />
     </template>
     <DataTable
-      :value="tree"
+      :value="app.data.batch.list"
       dataKey="sample_batch_id"
       selectionMode="single"
       :metaKeySelection="false"
       v-model:selection="app.data.batch.focused"
-      v-model:expandedRows="batch.expanded"
       v-model:contextMenuSelection="contextMenu.selection"
       contextMenu
       @rowContextmenu="
@@ -113,10 +83,7 @@ const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top)
       <Column header="Batch" field="sample_batch_name" sortable>
         <template #body="{ data }">
           <div class="row" style="justify-content: flex-start">
-            <span
-              :class="`pi pi-chevron-${data.sample_batch_id in batch.expanded ? 'down' : 'right'}`"
-              style="font-size: smaller; margin-right: 0.5rem"
-            />
+            <span :class="`pi pi-chevron-right`" style="font-size: smaller; margin-right: 0.5rem" />
             <BaseCopyableField
               :field="data.sample_batch_name"
               v-tooltip="{ value: `${data.sample_batch_description}`, showDelay: 1000 }"
@@ -124,18 +91,7 @@ const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top)
           </div>
         </template>
       </Column>
-      <Column>
-        <template #body="{ data }">
-          <slot name="toolbar" v-if="data.sample_batch_id in batch.expanded"></slot>
-        </template>
-      </Column>
     </DataTable>
-    <!-- modals etc -->
-    <ContextMenu ref="contextMenuRef" :model="contextMenu.entries" @hide="contextMenu.clear" />
-    <DialogBatchOp v-model:action="contextMenu.dialog.op" :batch="contextMenu.row" />
-    <DialogCalibration
-      v-model:visible="contextMenu.dialog.calibration"
-      :context="contextMenu.row"
-    />
+    <BatchContextMenu />
   </BaseTabbedPanel>
 </template>
