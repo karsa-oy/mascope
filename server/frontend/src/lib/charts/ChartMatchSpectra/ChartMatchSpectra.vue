@@ -1,9 +1,6 @@
 <script setup>
-import { ref, computed, watch, toRaw } from 'vue'
+import { ref, computed, toRaw } from 'vue'
 
-import { useWindowSize } from '@vueuse/core'
-
-import ScrollPanel from 'primevue/scrollpanel'
 import Tag from 'primevue/tag'
 
 import { BaseMatchTag } from '@/lib/base'
@@ -17,8 +14,6 @@ import { useChartData } from './data.js'
 
 const app = useApp()
 const data = useChartData()
-
-const { width } = useWindowSize()
 
 const plots = ref({})
 

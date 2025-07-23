@@ -1,8 +1,6 @@
 <script setup>
 import { computed, toRaw } from 'vue'
 
-import { useWindowSize } from '@vueuse/core'
-
 import Tag from 'primevue/tag'
 
 import { useApp } from '@/stores'
@@ -14,7 +12,6 @@ import { useChartData } from './data.js'
 
 const app = useApp()
 const data = useChartData()
-const { width } = useWindowSize()
 
 const scale = defineModel()
 
