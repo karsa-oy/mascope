@@ -87,8 +87,8 @@ const isotopeCharts = computed(() => {
 const rangeY = computed(
   () =>
     scale.value.max // if user set the scale
-      ? { range: [0, scale.value.max] } // use set scale
-      : {} // otherwise auto set scale
+      ? { range: [0, scale.value.max], autorange: false } // use set scale
+      : { range: null, autorange: true } // otherwise auto set scale
 )
 // standard plotly layout, a clone of this is used for each chart
 const layout = computed(() => {

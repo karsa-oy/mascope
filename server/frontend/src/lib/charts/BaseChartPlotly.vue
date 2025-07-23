@@ -185,6 +185,11 @@ watchEffect(
       console.log(`📊 [chart] redrawing chart ${props.id} with height ${props.height}`)
       // adapt to changes
       Plotly.react(plot.value, props.data, derived.value.layout, derived.value.config)
+      // Relayout to autoranges to fix horizontal-only zoom
+      Plotly.relayout(plot.value, {
+        'xaxis.autorange': true,
+        'yaxis.autorange': derived.value.layout.yaxis.autorange ? true : false
+      })
     }
   },
   { flush: 'post' }

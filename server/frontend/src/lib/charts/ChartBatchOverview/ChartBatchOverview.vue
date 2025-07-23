@@ -64,9 +64,11 @@ const xAxis = computed(() => ({
   tickformat: data.xField.field === 'time_of_day' ? '%H:%M:%S' : undefined
 }))
 
-const rangeY = computed(() =>
-  scale.value.max && scale.value.max > 0 ? { range: [0, scale.value.max] } : { autorange: true }
-)
+const rangeY = computed(() => {
+  return scale.value.max && scale.value.max > 0
+    ? { range: [0, scale.value.max], autorange: false }
+    : { range: null, autorange: true }
+})
 
 const layout = computed(() => ({
   xaxis: {

@@ -6,6 +6,7 @@ import { useWindowSize } from '@vueuse/core'
 import Tag from 'primevue/tag'
 
 import { useApp } from '@/stores'
+import { clone } from '@/lib/utils'
 import { num } from '@/lib/formatters'
 
 import BaseChartPlotly from '../BaseChartPlotly.vue'
@@ -49,7 +50,8 @@ const layout = computed(() => ({
     autorange: true,
     showgrid: true,
     gridcolor: '#33333399',
-    gridwidth: 1
+    gridwidth: 1,
+    autorange: true
   },
   yaxis: {
     title: { text: `Peak intensity [counts/s]` },
@@ -57,7 +59,8 @@ const layout = computed(() => ({
     autorange: true,
     rangemode: 'tozero',
     gridcolor: '#33333399',
-    gridwidth: 1
+    gridwidth: 1,
+    autorange: true
   },
   margin: { l: 50, r: 30, t: 30, b: 40 },
   dragmode: 'zoom',
@@ -87,7 +90,7 @@ const layout = computed(() => ({
       id="ChartMatchTimeseries"
       title="Timeseries"
       :data="traces"
-      :layout="layout"
+      :layout="clone(layout)"
       :height="height"
     />
   </figure>
