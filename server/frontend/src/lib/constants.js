@@ -2,6 +2,32 @@ export const alarmsList = ['TARGETS']
 
 export const collectionTypes = ['TARGETS', 'DIAGNOSTICS', 'CALIBRANTS']
 
+export const batchTypes = ['ACQUISITION', 'ANALYSIS']
+
+// Collection type constraints for sample batch types
+export const collectionBatchTypes = {
+  TARGETS: ['ANALYSIS'],
+  DIAGNOSTICS: ['ACQUISITION', 'ANALYSIS'],
+  CALIBRANTS: ['ANALYSIS']
+}
+
+export const batchCollectionTypes = {
+  ANALYSIS: ['TARGETS', 'DIAGNOSTICS', 'CALIBRANTS'],
+  ACQUISITION: ['DIAGNOSTICS']
+}
+
+export const getAllowedWorkspaceTypes = (collectionType) => {
+  return collectionBatchTypes[collectionType] || []
+}
+
+export const getAllowedBatchTypes = (collectionType) => {
+  return collectionBatchTypes[collectionType] || []
+}
+
+export const getAllowedCollectionTypes = (batchType) => {
+  return batchCollectionTypes[batchType] || []
+}
+
 // Sample types by filter ID requirement
 export const sampleTypesFilterIdRequired = ['FILTER_REGENERATION', 'FILTER_BACKGROUND']
 export const sampleTypesFilterIdOptional = ['BLANK', 'SAMPLE', 'UNKNOWN']

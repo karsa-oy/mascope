@@ -54,7 +54,8 @@ const tab = ref('info')
 const initial = reactive({
   info: {
     name: '',
-    desc: ''
+    desc: '',
+    type: ''
   },
   mechanisms: {
     matching: [],
@@ -65,7 +66,8 @@ const initial = reactive({
 const selected = reactive({
   info: {
     name: '',
-    desc: ''
+    desc: '',
+    type: ''
   },
   mechanisms: {
     matching: [], // matching mechanisms
@@ -161,6 +163,7 @@ async function init(value) {
     // init information
     selected.info.name = original.value.sample_batch_name
     selected.info.desc = original.value.sample_batch_description
+    selected.info.type = original.value.sample_batch_type
     // init ionization mechanisms
     selected.mechanisms.matching = app.data.mechanism.list.filter((mech) =>
       original.value.build_params?.ion_mechanisms?.includes(mech.ionization_mechanism_id)
@@ -191,6 +194,7 @@ async function init(value) {
     // init information
     selected.info.name = ''
     selected.info.desc = ''
+    selected.info.type = ''
     // init ionization mechanisms
     selected.mechanisms.matching = []
     // init target collections with defaults
@@ -248,7 +252,7 @@ async function execute() {
     <Tabs v-model:value="tab">
       <TabList>
         <Tab value="info">Info</Tab>
-        <Tab value="targets">Targets</Tab>
+        <Tab value="targets" :disabled="action == 'update'">Targets</Tab>
         <Tab value="mechanisms" :disabled="action == 'update_targets'">Mechanisms</Tab>
         <Tab value="calibrants" :disabled="action == 'update_targets'">Calibrants</Tab>
       </TabList>
@@ -280,7 +284,7 @@ async function execute() {
         <TabPanel value="targets">
           <PaneSelectTargets
             mode="targets"
-            :batch="selected.info.name"
+            :batch="selected.info"
             v-model:selected="selected.targets"
           />
         </TabPanel>
@@ -295,7 +299,7 @@ async function execute() {
         <TabPanel value="calibrants">
           <PaneSelectTargets
             mode="calibrants"
-            :batch="selected.info.name"
+            :batch="selected.info"
             v-model:selected="selected.calibrants"
           />
         </TabPanel>

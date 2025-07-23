@@ -9,9 +9,11 @@ import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
 import InputText from 'primevue/inputtext'
 
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 
 import { useApp } from '@/stores'
+import { collectionTypes, getAllowedCollectionTypes } from '@/lib/constants'
+import { beautifyConstant } from '@/lib/utils'
 
 const app = useApp()
 
@@ -23,33 +25,78 @@ const props = defineProps({
     type: String
   },
   batch: {
-    type: String
+    type: Object
   }
 })
 
 const search = ref()
 
-const categories = ['Targets', 'Calibrants', 'Diagnostics', 'All']
-const category = ref(categories.find((c) => c.toLowerCase() == props.mode.toLowerCase()))
+const allowedTypes = computed(() =>
+  props.batch?.type ? getAllowedCollectionTypes(props.batch.type) : collectionTypes
+)
 
+const categoryOptions = computed(() => [
+  ...collectionTypes.map((type) => ({
+    label: beautifyConstant(type),
+    value: beautifyConstant(type),
+    disabled: !allowedTypes.value.includes(type)
+  })),
+  {
+    label: 'All',
+    value: 'All',
+    disabled: allowedTypes.value.length <= 1
+  }
+])
+
+const category = ref()
+
+// Initialize category based on mode and available options
+watch(
+  allowedTypes,
+  () => {
+    const modeOption = beautifyConstant(props.mode.toUpperCase())
+    category.value = allowedTypes.value.includes(props.mode.toUpperCase())
+      ? modeOption
+      : allowedTypes.value.length > 1
+        ? 'All'
+        : beautifyConstant(allowedTypes.value[0])
+  },
+  { immediate: true }
+)
 const targetCollections = computed(() =>
-  app.data.target.collection.list
-    .filter((coll) => {
-      const type = category.value.toUpperCase()
-      return type == 'ALL' ? true : coll.target_collection_type == type
-    })
-    .filter(
-      (coll) =>
-        coll.target_collection_name.toLowerCase().includes(search.value?.toLowerCase() ?? '') ||
-        coll.target_collection_description.toLowerCase().includes(search.value?.toLowerCase() ?? '')
+  app.data.target.collection.list.filter((coll) => {
+    // Filter by allowed types for this batch
+    if (!allowedTypes.value.includes(coll.target_collection_type)) return false
+
+    // Filter by selected category
+    if (
+      category.value !== 'All' &&
+      beautifyConstant(coll.target_collection_type) !== category.value
+    ) {
+      return false
+    }
+
+    // Filter by search
+    const query = search.value?.toLowerCase() ?? ''
+    return (
+      coll.target_collection_name.toLowerCase().includes(query) ||
+      coll.target_collection_description?.toLowerCase().includes(query)
     )
+  })
 )
 </script>
 
 <template>
   <Panel>
     <div class="row">
-      <SelectButton v-model="category" :options="categories" :allowEmpty="false" />
+      <SelectButton
+        v-model="category"
+        :options="categoryOptions"
+        optionLabel="label"
+        optionValue="value"
+        optionDisabled="disabled"
+        :allowEmpty="false"
+      />
       <FloatLabel style="flex-grow: 1; max-width: 250px">
         <IconField class="full">
           <InputIcon>

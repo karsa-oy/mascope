@@ -29,7 +29,7 @@ import { useApp } from '@/stores'
 import { fromSpreadsheet, equals } from '@/lib/table'
 import { BaseClipboardContext } from '@/lib/base'
 import { clone } from '@/lib/utils'
-import { collectionTypes } from '@/lib/constants'
+import { collectionTypes, getAllowedWorkspaceTypes, getAllowedBatchTypes } from '@/lib/constants'
 
 const confirm = useConfirm()
 
@@ -174,6 +174,25 @@ const changes = computed(() =>
   })
 )
 
+const filteredWorkspaces = computed(() => {
+  if (!info.type) return app.data.workspace.list
+
+  const allowedWorkspaceTypes = getAllowedWorkspaceTypes(info.type)
+  return app.data.workspace.list
+    .filter((workspace) => allowedWorkspaceTypes.includes(workspace.workspace_type))
+    .sort((a, b) => {
+      // ensure the current workspace comes first if it's allowed
+      if (a.workspace_id == app.data.workspace.focusedId) return -1
+      if (b.workspace_id == app.data.workspace.focusedId) return 1
+      return 0
+    })
+    .map((workspace, index) => ({
+      // create labels, demarcating the current one
+      ...workspace,
+      label: index > 0 ? workspace.workspace_name : `${workspace.workspace_name} (current)`
+    }))
+})
+
 function remove(compound) {
   if (compound.status == '1 create') {
     compounds.created = compounds.created.filter(
@@ -245,34 +264,63 @@ function loadSpreadsheet({ rows }) {
   compounds.selected.push(...reconciled.filter(unselected))
 }
 
-watchEffect(() => loadBatches(selected.workspace))
+watchEffect(() => loadBatches(selected.workspace, info.type))
 
-async function loadBatches(workspace) {
-  if (workspace) {
-    const latest = await api.http.get(`/sample/batches`, {
-      params: {
-        workspace_id: workspace.workspace_id
-      },
-      use: 'read',
-      type: 'load_batches'
-    })
-    // reconcile with existing data
-    batches.loaded = latest.map(
-      (batch) =>
-        batches.loaded.find(({ sample_batch_id }) => sample_batch_id === batch.sample_batch_id) ??
-        batch
-    )
-    // select all checkbox state
-    selected.all.batches =
-      batches.loaded.length > 0
-        ? batches.loaded.every((batch) =>
-            batches.selected
-              .map(({ sample_batch_id }) => sample_batch_id)
-              .includes(batch.sample_batch_id)
-          )
-        : false
+async function loadBatches(workspace, collectionType) {
+  if (!workspace || !collectionType) {
+    batches.loaded = []
+    return
   }
+  const allowedBatchTypes = getAllowedBatchTypes(collectionType)
+
+  const latest = await api.http.get(`/sample/batches`, {
+    params: {
+      workspace_id: workspace.workspace_id,
+      sample_batch_type: allowedBatchTypes
+    },
+    use: 'read',
+    type: 'load_batches'
+  })
+  // reconcile with existing data
+  batches.loaded = latest.map(
+    (batch) =>
+      batches.loaded.find(({ sample_batch_id }) => sample_batch_id === batch.sample_batch_id) ??
+      batch
+  )
+  // select all checkbox state
+  selected.all.batches =
+    batches.loaded.length > 0
+      ? batches.loaded.every((batch) =>
+          batches.selected
+            .map(({ sample_batch_id }) => sample_batch_id)
+            .includes(batch.sample_batch_id)
+        )
+      : false
 }
+
+// watcher to reset batch selections when collection type changes
+watch(
+  () => info.type,
+  (newType, oldType) => {
+    if (oldType && newType !== oldType) {
+      // Reset workspace if it becomes invalid
+      if (selected.workspace) {
+        const allowedWorkspaceTypes = getAllowedWorkspaceTypes(newType)
+        if (!allowedWorkspaceTypes.includes(selected.workspace.workspace_type)) {
+          selected.workspace = null
+        }
+      }
+
+      // Reset batch selections if they become invalid
+      if (batches.selected.length > 0) {
+        const allowedBatchTypes = getAllowedBatchTypes(newType)
+        batches.selected = batches.selected.filter((batch) =>
+          allowedBatchTypes.includes(batch.sample_batch_type)
+        )
+      }
+    }
+  }
+)
 
 function execute() {
   const common = {
@@ -418,7 +466,6 @@ async function init(mode) {
   }
   compounds.initial = clone(compounds.selected)
   batches.initial = clone(batches.selected)
-  loadBatches(selected.workspace)
 }
 
 /**
@@ -822,23 +869,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onEnter))
                 v-model="selected.workspace"
                 dataKey="workspace_id"
                 optionLabel="label"
-                :options="
-                  app.data.workspace.list
-                    .sort((a, b) => {
-                      // ensure the current workspace comes first
-                      if (a.workspace_id == app.data.workspace.focusedId) return -1
-                      if (b.workspace_id == app.data.workspace.focusedId) return 1
-                      return 0
-                    })
-                    .map((workspace, index) => ({
-                      // create labels, demarcating the current one
-                      ...workspace,
-                      label:
-                        index > 0
-                          ? workspace.workspace_name
-                          : `${workspace.workspace_name} (current)`
-                    }))
-                "
+                :options="filteredWorkspaces"
                 scrollHeight="380px"
                 :virtualScrollerOptions="{ itemSize: 28.41 }"
                 style="min-width: 200px; min-height: 350px"
