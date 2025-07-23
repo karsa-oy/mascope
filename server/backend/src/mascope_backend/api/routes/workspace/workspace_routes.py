@@ -17,8 +17,12 @@ from mascope_backend.api.models.workspace.workspace_pydantic_model import (
     WorkspaceUpdate,
     GetWorkspacesQueryParams,
 )
+from mascope_backend.api.routes.workspace.acquisition.routes import (
+    acquisition_workspaces_router,
+)
 
 workspace_router = APIRouter(prefix="/api/workspaces", tags=["Workspace"])
+workspace_router.include_router(acquisition_workspaces_router)
 
 
 @workspace_router.get("")

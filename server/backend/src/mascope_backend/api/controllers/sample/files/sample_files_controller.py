@@ -20,12 +20,14 @@ from mascope_signal.compute import (
 )
 from mascope_signal.peak import get_peaks
 
-from mascope_backend.socket import sio
 from mascope_backend.db import async_session
 from mascope_backend.db.id import gen_id
 from mascope_backend.db.models import SampleFile, User
-from mascope_backend.api.controllers.sample.lib.sample_file_compute import (
-    compute_peaks,
+from mascope_backend.socket import sio
+from mascope_backend.socket import event_emitter
+from mascope_backend.socket.notifications import (
+    UserNotification,
+    emit_user_notification,
 )
 from mascope_backend.api.new.instruments import get_instruments
 
@@ -38,15 +40,17 @@ from mascope_backend.api.lib.exceptions.api_exceptions import (
     NotFoundException,
     raise_api_warning,
 )
+from mascope_backend.api.controllers.samples.samples_controller import get_samples
+from mascope_backend.api.controllers.workspace.acquisition.service import (
+    create_acquisition_workspaces,
+    delete_acquisition_workspaces,
+)
+from mascope_backend.api.controllers.sample.lib.sample_file_compute import (
+    compute_peaks,
+)
 from mascope_backend.api.models.sample.files.sample_file_pydantic_model import (
     SampleFileCreate,
     SampleFileUpdate,
-)
-from mascope_backend.api.controllers.samples.samples_controller import get_samples
-from mascope_backend.socket import event_emitter
-from mascope_backend.socket.notifications import (
-    UserNotification,
-    emit_user_notification,
 )
 
 from mascope_backend.runtime import runtime
@@ -174,7 +178,7 @@ async def create_sample_file(sample_file: SampleFileCreate) -> dict:
     3. Commit the transaction to persist the new sample file in the database.
     4. Refresh the instance to get the created data from the database.
     5. Emit a 'sample_file_created' event with the filename and instrument.
-    6. Ensure instruments are reloaded
+    6. Reload instruments and create acquisition workspaces if needed
     7. Return the created sample file data.
 
     :param sample_file: Data for creating the sample file.
@@ -224,11 +228,9 @@ async def create_sample_file(sample_file: SampleFileCreate) -> dict:
 
         # Step 6. Trigger instruments reload
         if sample_file.instrument not in initial_instruments:
-            # instrument added by creation and needs reload
-            await sio.emit(
-                "instruments_reload",
-                namespace="/",
-            )
+            # New instrument detected - reload instruments and create acquisition workspaces
+            await create_acquisition_workspaces()
+            await sio.emit("instruments_reload", namespace="/")
 
         # Step 7: Return created sample file
         return {
@@ -548,6 +550,9 @@ async def delete_sample_files(
             for instrument in instruments_affected
             if instrument not in final_instruments
         ]:
+            # Clean up orphaned acquisition workspaces for removed instruments
+            await delete_acquisition_workspaces()
+
             # Tell UI to reload instruments list since some instruments disappeared
             await sio.emit("instruments_reload", namespace="/")
 
@@ -650,11 +655,14 @@ async def update_sample_file(
             [i["instrument"] for i in (await get_instruments())["data"]]
         )
         if initial_instruments != final_instruments:
-            # instruments changed by update and need reloading
-            await sio.emit(
-                "instruments_reload",
-                namespace="/",
-            )
+            # Handle instrument changes and handle acquisition workspaces creation/deletion
+            if added_instruments := final_instruments - initial_instruments:
+                await create_acquisition_workspaces()
+            if removed_instruments := initial_instruments - final_instruments:
+                await delete_acquisition_workspaces()
+
+            # Reload instruments list since instruments changed
+            await sio.emit("instruments_reload", namespace="/")
 
         # Step 6: Return updated sample file
         return {

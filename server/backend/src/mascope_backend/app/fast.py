@@ -1,3 +1,8 @@
+"""
+Application initialization functions.
+Contains startup procedures and system checks.
+"""
+
 import uuid
 import os
 import shutil
@@ -9,11 +14,13 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from mascope_file.gc import gc_filestore
-
-from mascope_backend.api.lib.exceptions.api_exceptions import handle_exception
-from mascope_backend.api.routes import routers
 from mascope_backend.db import init_db
 from mascope_backend.db.wal.engine import wal_checkpoint
+from mascope_backend.api.routes import routers
+from mascope_backend.api.lib.exceptions.api_exceptions import handle_exception
+from mascope_backend.api.controllers.workspace.acquisition.service import (
+    create_acquisition_workspaces,
+)
 
 from mascope_backend.runtime import runtime
 
@@ -40,6 +47,10 @@ async def lifespan(app: FastAPI):
     # Clean filestore
     runtime.logger.info("Fast App startup: garbage collecting the filestore")
     gc_filestore()
+
+    # Initialize application components
+    runtime.logger.info("Fast App startup: initializing application")
+    await init_app()
 
     # Yield control back to FastAPI
     yield
@@ -181,3 +192,14 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
     context_message = "An error occurred"
     # Handle the exception and get the response
     return handle_exception(exc, context_message, response_type="http")
+
+
+async def init_app() -> None:
+    """
+    Initialize application components and perform startup system checks.
+
+    This function orchestrates all initialization procedures that need
+    to happen after database setup but before the app starts serving requests.
+    """
+    # Auto-create acquisition workspaces for all instruments
+    await create_acquisition_workspaces()
