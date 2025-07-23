@@ -33,7 +33,7 @@ export const useBatchContextMenu = defineStore('browser.sample.batchCtxMenu', ()
   // actions
   async function onClick(event) {
     await clipboard.read()
-    row.value = event?.data ?? null
+    row.value = event?.data ?? app.data.batch.focused ?? null
     if (row.value || clipboard.batch !== null) {
       show(event)
     } else {

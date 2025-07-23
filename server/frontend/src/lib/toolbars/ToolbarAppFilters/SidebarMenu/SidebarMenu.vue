@@ -11,6 +11,7 @@ import TabPanel from 'primevue/tabpanel'
 import ContextMenu from 'primevue/contextmenu'
 
 import { DialogWorkspaceOp } from '@/lib/dialogs'
+import { BatchContextMenu, useBatchContextMenu } from '@/lib/panes'
 
 import { useSidebarMenu } from './state.js'
 import WorkspacePane from './WorkspacePane.vue'
@@ -25,7 +26,8 @@ const app = useApp()
 const sidebarMenu = useSidebarMenu()
 
 const dialog = ref()
-const menu = ref()
+const workspaceContextMenu = ref()
+const batchContextMenu = useBatchContextMenu()
 
 watchEffect(() => {
   if (!sidebarMenu.open) {
@@ -78,7 +80,7 @@ watchEffect(() => {
       @contextmenu="
         (event) => {
           event.preventDefault()
-          menu.toggle(event)
+          workspaceContextMenu.toggle(event)
         }
       "
     />
@@ -92,6 +94,12 @@ watchEffect(() => {
         @click="
           () => {
             app.data.sample.unfocus()
+          }
+        "
+        @contextmenu="
+          (event) => {
+            event.preventDefault()
+            batchContextMenu.onClick(event)
           }
         "
       />
@@ -145,7 +153,7 @@ watchEffect(() => {
     </Drawer>
   </Tabs>
   <ContextMenu
-    ref="menu"
+    ref="workspaceContextMenu"
     appendTo="self"
     :model="[
       {
@@ -172,6 +180,7 @@ watchEffect(() => {
     ]"
   />
   <DialogWorkspaceOp v-model:action="dialog" />
+  <BatchContextMenu />
 </template>
 
 <style scoped>

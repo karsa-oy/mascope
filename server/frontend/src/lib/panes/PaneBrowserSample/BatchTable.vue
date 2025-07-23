@@ -12,7 +12,6 @@ import { useApp } from '@/stores'
 
 import SampleTable from './SampleTable.vue'
 import SampleTableCustomizer from './SampleTableCustomizer.vue'
-import BatchContextMenu from './BatchContextMenu.vue'
 import { useBatchContextMenu } from './stores'
 
 const app = useApp()
@@ -92,6 +91,5 @@ const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top)
         </template>
       </Column>
     </DataTable>
-    <BatchContextMenu />
   </BaseTabbedPanel>
 </template>
