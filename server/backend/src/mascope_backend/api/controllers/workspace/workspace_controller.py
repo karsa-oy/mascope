@@ -196,23 +196,37 @@ async def update_workspace(workspace_id: str, workspace: WorkspaceUpdate) -> dic
     """
     # Step 1: Fetch the existing workspace
     async with async_session() as session:
+        update_data = workspace.model_dump(exclude_unset=True)
         existing_workspace = await session.get(Workspace, workspace_id)
         if not existing_workspace:
             raise NotFoundException(f"Workspace with ID '{workspace_id}' not found")
 
-        # Step 2: Update the workspace properties
-        update_data = workspace.model_dump(exclude_unset=True)
+        # Step 2: Validate ACQUISITION workspace constraints
+        if (
+            existing_workspace.workspace_type == "ACQUISITION"
+            and "workspace_name" in update_data
+        ):
+            new_name = update_data.get("workspace_name", None)
+            instrument = existing_workspace.instrument
+
+            if new_name and not new_name.lower().endswith(instrument.lower()):
+                raise ValueError(
+                    f"Acquisition workspace name should end with the instrument name. "
+                    f"Suggested: '{workspace_config.ACQUISITION_NAME_PREFIX} {instrument}'"
+                )
+
+        # Step 3: Update the workspace properties
         for key, value in update_data.items():
             setattr(existing_workspace, key, value)
 
-        # Step 3: Update modification timestamp
+        # Step 4: Update modification timestamp
         existing_workspace.workspace_utc_modified = datetime.now(timezone.utc)
 
-        # Step 4: Commit the updates
+        # Step 5: Commit the updates
         await session.commit()
         await session.refresh(existing_workspace)
 
-    # Step 5: Emit socket.io events
+    # Step 6: Emit socket.io events
     await sio.emit("org_reload", namespace="/")
     await sio.emit("workspace_reload", room=workspace_id, namespace="/")
 

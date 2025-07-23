@@ -185,7 +185,7 @@ async def get_sample_item(sample_item_id: str) -> dict:
     # Step 3: Return sample item details
     return {
         "message": f"Sample item '{sample_item.sample_item_name}' retrieved successfully.",
-        "data": sample_item.to_dict(),
+        "data": SampleItemRead.model_validate(sample_item).model_dump(),
     }
 
 
@@ -271,7 +271,7 @@ async def create_sample_item(
     # Step 5: Return the new sample item details
     return {
         "message": f"Sample item '{new_sample_item.sample_item_name}' was created successfully.",
-        "data": new_sample_item.to_dict(),
+        "data": SampleItemRead.model_validate(new_sample_item).model_dump(),
     }
 
 
@@ -373,7 +373,7 @@ async def update_sample_item(
 
     return {
         "message": f"Sample '{existing_sample_item.sample_item_name}' was updated.",
-        "data": existing_sample_item.to_dict(),
+        "data": SampleItemRead.model_validate(existing_sample_item).model_dump(),
     }
 
 

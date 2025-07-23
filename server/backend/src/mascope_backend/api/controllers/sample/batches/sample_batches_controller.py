@@ -1,3 +1,4 @@
+# pylint: disable=not-callable
 import asyncio
 from datetime import datetime, timezone
 from fastapi import BackgroundTasks
@@ -50,6 +51,9 @@ from mascope_backend.api.controllers.target.ions.target_ions_controller import (
 )
 from mascope_backend.api.controllers.target.isotopes.target_isotopes_controller import (
     get_target_isotopes,
+)
+from mascope_backend.api.controllers.target.lib.fetch.target_collections_fetch import (
+    validate_collections_for_batch,
 )
 from mascope_backend.api.controllers.sample.lib.sample_items_fetch import (
     fetch_sample_item_ids,
@@ -202,7 +206,7 @@ async def get_sample_batch(sample_batch_id: str) -> dict:
     # Step 3: Return sample batch details
     return {
         "message": f"Sample batch '{sample_batch.sample_batch_name}' retrieved successfully",
-        "data": sample_batch.to_dict(),
+        "data": SampleBatchRead.model_validate(sample_batch).model_dump(),
     }
 
 
@@ -283,23 +287,24 @@ async def get_batch_targets(sample_batch_id: str, deduplicate: bool = False) -> 
     ],  # TODO_invalidation
 )
 async def create_sample_batch(
-    sample_batch: SampleBatchCreateBody,
+    sample_batch: SampleBatchCreate,
     independent_transaction: bool = False,
 ) -> dict:
     """
-    Creates a new sample batch with the specified details. Emits a workspace reload event if the operation is independent.
+    Creates a new sample batch with the specified details.
+    Validates constraints for ACQUISITION batches.
 
     Steps:
-    1. Construct a new SampleBatch object with the provided details and a generated unique ID.
-    2. Add the new sample batch to the session.
-    3. Associate the new sample batch with target collections if any are provided in the request.
-    4. Commit the transaction to persist the new sample batch in the database.
-    5. If independent_transaction is True, emit a 'workspace_reload' event with the workspace ID.
-        Done in the api_controller by providing success_reload_events.
+    1. Validate workspace type constraints for ACQUISITION batches
+    2. Validate target collection type constraints
+    3. Construct a new SampleBatch object with the provided details and a generated unique ID.
+    4. Associate the new sample batch with target collections if any are provided in the request.
+    5. Commit the transaction to persist the new sample batch in the database.
     6. Return the details of the created sample batch as a dictionary.
+    7. If independent_transaction is True, emit a 'workspace_reload' event to workspace_id room.
 
     :param sample_batch: Data for creating the sample batch.
-    :type sample_batch: SampleBatchCreateBody
+    :type sample_batch: SampleBatchCreate
     :param independent_transaction: Flag indicating if the operation is an independent transaction, defaults to False.
     :type independent_transaction: bool, optional
     :return: The created sample batch data.
@@ -320,6 +325,14 @@ async def create_sample_batch(
                     "ACQUISITION sample batches can only be created in ACQUISITION workspaces. "
                     f"Workspace '{workspace.workspace_name}' is of type '{workspace.workspace_type}'"
                 )
+
+        # Step 2: Validate target collection type constraints
+        await validate_collections_for_batch(
+            target_collection_ids=sample_batch.target_collection_ids,
+            sample_batch_type=sample_batch.sample_batch_type,
+        )
+
+        # Step 3: Construct new sample batch
         new_sample_batch = SampleBatch(
             sample_batch_id=gen_id(16),
             **sample_batch.model_dump(
@@ -333,10 +346,10 @@ async def create_sample_batch(
             ),  # Auto-lock acquisition
             sample_batch_utc_created=datetime.now(timezone.utc),
         )
-        # Step 2: Add to session
+
         session.add(new_sample_batch)
 
-        # Step 3: Associate with target collections if provided
+        # Step 4: Associate with target collections if provided
         for target_collection_id in sample_batch.target_collection_ids:
             new_target_collection_in_sample_batch = TargetCollectionInSampleBatch(
                 target_collection_id=target_collection_id,
@@ -344,21 +357,21 @@ async def create_sample_batch(
             )
             session.add(new_target_collection_in_sample_batch)
 
-        # Step 4: Commit transaction and refresh instance
+        # Step 5: Commit transaction and refresh instance
         await session.commit()
         await session.refresh(new_sample_batch)
 
     # Step 6: Return created sample batch
     return {
         "message": f"Sample batch '{new_sample_batch.sample_batch_name}' was created.",
-        "data": new_sample_batch.to_dict(),
+        "data": SampleBatchRead.model_validate(new_sample_batch).model_dump(),
     }
 
 
 @api_controller()
 async def update_sample_batch(
     sample_batch_id: str,
-    sample_batch_update_body: SampleBatchUpdateBody,
+    sample_batch_update: SampleBatchUpdate,
     background_tasks: BackgroundTasks,
     sid: str = None,
     process_id=None,
@@ -370,7 +383,7 @@ async def update_sample_batch(
     and emits appropriate events to notify clients of changes.
 
     Steps:
-    1. Fetch the existing sample batch data.
+    1. Fetch the existing sample batch data and validate target collection type constraints.
     2. Determine if a rematch is needed based on changes in collections or ionization mechanisms.
     3. Update the basic information of the sample batch and its associations with target collections.
     4. If needed, prepare and execute the rematch, identifying added or removed compounds and ionization mechanisms.
@@ -378,8 +391,8 @@ async def update_sample_batch(
 
     :param sample_batch_id: ID of the sample batch to be updated.
     :type sample_batch_id: str
-    :param sample_batch_update_body: Updated data for the sample batch.
-    :type sample_batch_update_body: SampleBatchUpdateBody
+    :param sample_batch_update: Updated data for the sample batch.
+    :type sample_batch_update: SampleBatchUpdate
     :param background_tasks: Background tasks for asynchronous execution.
     :type background_tasks: BackgroundTasks
     :raises NotFoundException: Raised if the sample batch is not found in the database.
@@ -411,9 +424,15 @@ async def update_sample_batch(
                 f"Sample batch with ID '{sample_batch_id}' not found"
             )
 
+        # Validate target collection type constraints for tc assignments
+        await validate_collections_for_batch(
+            target_collection_ids=sample_batch_update.target_collection_ids,
+            sample_batch_type=existing_sample_batch.sample_batch_type,
+        )
+
         # Step 2: Determine if a rematch is needed based on changes in collections or ion mechanisms
         # Checks for changes in collections and ionization mechanisms.
-        new_collections = set(sample_batch_update_body.target_collection_ids)
+        new_collections = set(sample_batch_update.target_collection_ids)
         existing_collections = {
             item.target_collection_id
             for item in existing_sample_batch.target_collection
@@ -421,7 +440,7 @@ async def update_sample_batch(
         existing_ion_mechanisms = set(
             existing_sample_batch.build_params["ion_mechanisms"]
         )
-        new_ion_mechanisms = set(sample_batch_update_body.build_params.ion_mechanisms)
+        new_ion_mechanisms = set(sample_batch_update.build_params.ion_mechanisms)
 
         # Check if target_compounds were added/remoced
         if new_collections != existing_collections:
@@ -441,7 +460,7 @@ async def update_sample_batch(
 
         # Step 3: Update the sample batch.
         # Applies the updates to the sample batch and commits to the database.
-        update_data = sample_batch_update_body.dict(exclude_unset=True)
+        update_data = sample_batch_update.model_dump(exclude_unset=True)
         for key, value in update_data.items():
             if key in ["build_params", "target_collection_ids"]:
                 continue  # Skip build_params and target_collections assosiations as they are handled separately below
@@ -466,14 +485,14 @@ async def update_sample_batch(
             existing_sample_batch.build_params.get("calibration_ion_mechanisms", [])
         )
         new_calibration_mechanisms = set(
-            sample_batch_update_body.build_params.calibration_ion_mechanisms
+            sample_batch_update.build_params.calibration_ion_mechanisms
         )
         if existing_calibration_mechanisms != new_calibration_mechanisms:
             sample_batch_reload = True
 
         # Update build_params and associations with target collections
         existing_sample_batch.build_params = (
-            sample_batch_update_body.build_params.model_dump()
+            sample_batch_update.build_params.model_dump()
         )
 
         if "target_collection_ids" in update_data and (
@@ -576,7 +595,7 @@ async def update_sample_batch(
         )
     return {
         "message": f"Sample '{updated_sample_batch.sample_batch_name}' was updated.",
-        "data": updated_sample_batch.to_dict(),
+        "data": SampleBatchRead.model_validate(updated_sample_batch).model_dump(),
     }
 
 

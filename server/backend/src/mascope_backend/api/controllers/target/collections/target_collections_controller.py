@@ -23,6 +23,7 @@ from mascope_backend.api.controllers.target.lib.fetch.target_compounds_fetch imp
 )
 from mascope_backend.api.controllers.target.lib.fetch.target_collections_fetch import (
     fetch_target_collection,
+    validate_sample_batches_for_collection,
 )
 from mascope_backend.api.controllers.target.lib.filter.target_compounds_filter import (
     compare_batches_compounds,
@@ -205,7 +206,7 @@ async def get_target_collection(target_collection_id: str) -> dict:
 
 @api_controller()
 async def create_target_collection(
-    target_collection_create_body: TargetCollectionCreateBody,
+    target_collection_create: TargetCollectionCreate,
     background_tasks: BackgroundTasks,
     sid=None,
     process_id=None,
@@ -222,7 +223,7 @@ async def create_target_collection(
     The function  compounds and sample batches. It also handles rematch operations for affected sample batches and emits necessary reload events.
 
     Steps:
-    1. Initialize control variables and unpack the creation payload.
+    1. Initialize control variables and unpack the creation payload and validate sample batch type constraints.
     2. Create a new target collection object with provided details.
     3. Process and create new target compounds if provided and log the creation details.
     4. Verify the existence of provided target compound IDs and log any excluded compounds.
@@ -234,8 +235,8 @@ async def create_target_collection(
     10. Return the newly created target collection with its associations and a log of significant events during the creation process.
 
 
-    :param target_collection_create_body: The data for creating the new target collection.
-    :type target_collection_create_body: TargetCollectionCreateBody
+    :param target_collection_create: The data for creating the new target collection.
+    :type target_collection_create: TargetCollectionCreate
     :param background_tasks: FastAPI background tasks for asynchronous execution of operations like rematching.
     :type background_tasks: BackgroundTasks
     :param sid: Session ID, used for emitting notifications to specific client, defaults to None.
@@ -253,18 +254,24 @@ async def create_target_collection(
     sample_batches_to_reload = set()
 
     # Unpack create fields
-    new_target_collection_name = target_collection_create_body.target_collection_name
-    target_compounds_to_create = target_collection_create_body.target_compounds_create
-    target_compound_ids = target_collection_create_body.target_compound_ids
-    sample_batch_ids = target_collection_create_body.sample_batch_ids
+    new_target_collection_name = target_collection_create.target_collection_name
+    target_compounds_to_create = target_collection_create.target_compounds_create
+    target_compound_ids = target_collection_create.target_compound_ids
+    sample_batch_ids = target_collection_create.sample_batch_ids
+
+    # Validate sample batch type constraints for target collection assignments
+    await validate_sample_batches_for_collection(
+        sample_batch_ids=sample_batch_ids,
+        target_collection_type=target_collection_create.target_collection_type,
+    )
 
     # Step 2: Create the new  target collection object
     async with async_session() as session:
         new_target_collection = TargetCollection(
             target_collection_id=gen_id(16),
             target_collection_name=new_target_collection_name,
-            target_collection_description=target_collection_create_body.target_collection_description,
-            target_collection_type=target_collection_create_body.target_collection_type,
+            target_collection_description=target_collection_create.target_collection_description,
+            target_collection_type=target_collection_create.target_collection_type,
         )
         session.add(new_target_collection)
 
@@ -440,7 +447,7 @@ async def create_target_collection(
 @api_controller()
 async def update_target_collection(
     target_collection_id: str,
-    target_collection_update_body: TargetCollectionUpdateBody,
+    target_collection_update: TargetCollectionUpdate,
     background_tasks: BackgroundTasks,
     sid=None,
     process_id=None,
@@ -468,8 +475,8 @@ async def update_target_collection(
 
     :param target_collection_id: The ID of the target collection to be updated.
     :type target_collection_id: str
-    :param target_collection_update_body: The updated data for the target collection.
-    :type target_collection_update_body: TargetCollectionUpdateBody
+    :param target_collection_update: The updated data for the target collection.
+    :type target_collection_update: TargetCollectionUpdate
     :param background_tasks:  FastAPI background tasks for asynchronous execution of long-running operations like rematching.
     :type background_tasks: BackgroundTasks
     :param sid: Session ID, used for emitting notifications to specific clients, defaults to None.
@@ -487,21 +494,21 @@ async def update_target_collection(
     targets_all_reload = False
     message_logs = {}
     # Unpack update fields
-    target_collection_name_update = target_collection_update_body.target_collection_name
-    target_collection_type_update = target_collection_update_body.target_collection_type
+    target_collection_name_update = target_collection_update.target_collection_name
+    target_collection_type_update = target_collection_update.target_collection_type
     sample_batches_update = (
-        target_collection_update_body.sample_batch_ids
-        if target_collection_update_body.sample_batch_ids is not None
+        target_collection_update.sample_batch_ids
+        if target_collection_update.sample_batch_ids is not None
         else None
     )
     target_compounds_update = (
-        target_collection_update_body.target_compound_ids
-        if target_collection_update_body.target_compound_ids
+        target_collection_update.target_compound_ids
+        if target_collection_update.target_compound_ids
         else None
     )
     target_compounds_to_create = (
-        target_collection_update_body.target_compounds_create
-        if target_collection_update_body.target_compounds_create
+        target_collection_update.target_compounds_create
+        if target_collection_update.target_compounds_create
         else None
     )
 
@@ -518,6 +525,19 @@ async def update_target_collection(
             association.target_compound_id
             for association in existing_target_collection.target_compound
         }
+
+        # Validate sample batch type constraints for new sample batch assignments
+        if sample_batches_update is not None:
+            # Use the new collection type if being updated, otherwise use existing type
+            target_collection_type = (
+                target_collection_type_update
+                if target_collection_type_update
+                else existing_target_collection.target_collection_type
+            )
+            await validate_sample_batches_for_collection(
+                sample_batch_ids=sample_batches_update,
+                target_collection_type=target_collection_type,
+            )
 
         # Step 3: Process and create new target compounds if provided
         created_target_compound_ids = []
@@ -621,7 +641,7 @@ async def update_target_collection(
 
         # Step 7: Update the target collection
         # Update basic fields
-        update_data = target_collection_update_body.dict(exclude_unset=True)
+        update_data = target_collection_update.dict(exclude_unset=True)
         for key, value in update_data.items():
             if key in [
                 "target_compound_ids",
