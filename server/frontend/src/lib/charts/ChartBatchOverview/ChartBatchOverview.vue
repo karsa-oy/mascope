@@ -137,9 +137,9 @@ function onSelect({ points }) {
 watch(
   () => app.data.sample.selected,
   (selected) => {
-    if (selected.length <= 1) {
+    if (selected.length <= 0) {
       plot.value.resetSelection()
-    } else if (selected.length > 1) {
+    } else {
       // Select samples in the chart
       const pointIndices = selected.map((sample) => app.data.sample.list.indexOf(sample))
       plot.value.selectPoints(pointIndices)
