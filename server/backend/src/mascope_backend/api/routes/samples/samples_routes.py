@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from mascope_backend.api.new.auth.dependencies import guest_user
 from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.controllers.samples.samples_controller import (
@@ -21,7 +21,7 @@ samples_router = APIRouter(prefix="/api/samples", tags=["Samples Loading"])
 @samples_router.get("")
 @api_route(token_access=True)
 async def get_samples_route(
-    query_params: GetSamplesQueryParams = Depends(), user=Depends(guest_user)
+    query_params: GetSamplesQueryParams = Query(), user=Depends(guest_user)
 ):
     """Retrieve a list of samples based on query filters.
 

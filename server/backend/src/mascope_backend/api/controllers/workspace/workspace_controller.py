@@ -1,3 +1,4 @@
+# pylint: disable=not-callable
 from datetime import datetime, timezone
 from sqlalchemy import (
     select,
@@ -16,10 +17,14 @@ from mascope_backend.api.models.workspace.workspace_pydantic_model import (
     WorkspaceRead,
     WorkspaceUpdate,
 )
+from mascope_backend.api.models.workspace.config import workspace_config
 
 
 @api_controller()
 async def get_workspaces(
+    workspace_name: str | None = None,
+    workspace_type: list[str] | None = None,
+    instrument: list[str] | None = None,
     sort: str = "workspace_utc_created",
     order: str = "asc",
     page: int = 0,
@@ -35,6 +40,12 @@ async def get_workspaces(
     4. Execute the query to fetch the results.
     5. Convert the results into a list of dictionaries for JSON serialization.
 
+    :param workspace_name: Filter workspaces by name, defaults to None
+    :type workspace_name: str | None, optional
+    :param workspace_type: Filter workspaces by type (ACQUISITION or ANALYSIS), defaults to None
+    :type workspace_type: list[str] | None, optional
+    :param instrument: Filter workspaces by instrument associated with the workspace, defaults to None
+    :type instrument: list[str] | None, optional
     :param sort: Column to sort by, defaults to "workspace_utc_created"
     :type sort: str, optional
     :param order: Sorting order ('asc' for ascending, 'desc' for descending), defaults to "asc"
@@ -49,26 +60,34 @@ async def get_workspaces(
     async with async_session() as session:
         stmt = select(Workspace)
 
-        # Step 1: Apply sorting if specified
+        # Step 1: Filter by provided parameters
+        if workspace_name:
+            stmt = stmt.filter(Workspace.workspace_name == workspace_name)
+
+        if workspace_type:
+            stmt = stmt.filter(Workspace.workspace_type.in_(workspace_type))
+
+        if instrument:
+            stmt = stmt.filter(Workspace.instrument.in_(instrument))
+
+        # Step 2: Apply sorting if specified
         if sort:
             if order == "desc":
                 stmt = stmt.order_by(desc(getattr(Workspace, sort)))
             else:
                 stmt = stmt.order_by(asc(getattr(Workspace, sort)))
 
-        # Step 2: Apply pagination
+        # Step 3: Apply pagination
         stmt = stmt.offset(page * limit).limit(limit)
 
-        # Step 3: Execute the query
+        # Step 4: Execute the query
         result = await session.execute(stmt)
         workspaces = result.scalars().all()
 
-        # Step 4: Get total count for pagination
-        total = await session.scalar(
-            select(func.count()).select_from(Workspace)  # pylint: disable=not-callable
-        )
+        # Step 5: Get total count for pagination
+        total = await session.scalar(select(func.count()).select_from(stmt))
 
-    # Step 5: Return the total count and the list of validated workspaces
+    # Step 6: Return the total count and the list of validated workspaces
     return {
         "message": "Workspaces retrieved successfully",
         "results": total,

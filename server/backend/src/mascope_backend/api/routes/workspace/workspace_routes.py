@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from mascope_backend.api.new.auth.dependencies import (
     editor_user,
     guest_user,
@@ -23,7 +24,7 @@ workspace_router = APIRouter(prefix="/api/workspaces", tags=["Workspace"])
 @workspace_router.get("")
 @api_route(token_access=True)
 async def get_workspaces_route(
-    query_params: GetWorkspacesQueryParams = Depends(),
+    query_params: GetWorkspacesQueryParams = Query(),
     user=Depends(guest_user),
 ):
     """Retrieve a list of workspaces.

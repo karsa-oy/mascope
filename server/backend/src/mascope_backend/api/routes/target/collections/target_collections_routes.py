@@ -23,7 +23,7 @@ target_collections_router = APIRouter(
 @target_collections_router.get("")
 @api_route()
 async def get_target_collections_route(
-    query_params: GetTargetCollectionsQueryParams = Depends(),
+    query_params: GetTargetCollectionsQueryParams = Query(),
     user=Depends(guest_user),
 ):
     """Retrieve a list of target collections.

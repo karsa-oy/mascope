@@ -55,8 +55,10 @@ from mascope_backend.api.controllers.sample.lib.fetch_affected_sample_data impor
     fetch_affected_sample_data,
 )
 from mascope_backend.api.controllers.match.match_controller import match_compute_samples
+from mascope_backend.api.models.sample.items.config import sample_item_config
 from mascope_backend.api.models.sample.items.sample_item_pydantic_model import (
     SampleItemCreate,
+    SampleItemRead,
     SampleItemUpdate,
 )
 from mascope_backend.api.new.instrument_configs.lib import read_instrument_functions
@@ -75,7 +77,8 @@ from mascope_backend.runtime import runtime
 async def get_sample_items(
     sample_batch_id: str | None = None,
     filename: str | None = None,
-    polarity: Literal["+", "-"] | None = None,
+    sample_item_type: list[str] | None = None,
+    polarity: list[str] | None = None,
     sort: str = "sample_item_utc_created",
     order: str = "asc",
     page: int = 0,
@@ -96,8 +99,10 @@ async def get_sample_items(
     :type sample_batch_id: str, optional
     :param filename: The filename for which you want to fetch the sample items, defaults to None
     :type filename: str, optional
+    :param sample_item_type: Filter by sample item types, can specify multiple types, defaults to None
+    :type sample_item_type: list[str] | None
     :param polarity: Filter by ion polarity mode of the sample item, '+' for positive or '-' for negative
-    :type polarity: Literal["+", "-"] | None
+    :type polarity: list[str] | None
     :param sort:  Column to sort by, defaults to "sample_item_utc_created"
     :type sort: str, optional
     :param order: Sorting order ('asc' for ascending, 'desc' for descending), defaults to "asc"
@@ -119,8 +124,11 @@ async def get_sample_items(
         if filename:
             stmt = stmt.filter(SampleItem.filename == filename)
 
-        if polarity is not None:
-            stmt = stmt.filter(SampleItem.polarity == polarity)
+        if sample_item_type:
+            stmt = stmt.filter(SampleItem.sample_item_type.in_(sample_item_type))
+
+        if polarity:
+            stmt = stmt.filter(SampleItem.polarity.in_(polarity))
 
         # Step 2: Apply sorting if specified
         if sort:
@@ -144,7 +152,10 @@ async def get_sample_items(
         return {
             "message": "Sample items retrieved successfully.",
             "results": total,
-            "data": [sample_item.to_dict() for sample_item in sample_items],
+            "data": [
+                SampleItemRead.model_validate(sample_item).model_dump()
+                for sample_item in sample_items
+            ],
         }
 
 

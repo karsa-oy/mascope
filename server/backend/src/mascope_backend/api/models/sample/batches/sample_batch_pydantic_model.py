@@ -185,20 +185,54 @@ class SampleBatchUpdate(SampleBatchBaseValidator, BaseModel):
 
 
 class GetSampleBatchesQueryParams(QueryParamsModel):
-    workspace_id: Optional[str] = Field(
+    workspace_id: str | None = Field(
         None,
         description="Filter by the workspace ID for which you want to fetch the sample batches.",
     )
-    sort: Optional[str] = Field(
+    sample_batch_type: list[str] | None = Field(
+        default=None,
+        description="Filter by sample batch types (ACQUISITION, ANALYSIS). Can specify multiple types.",
+    )
+    polarity: list[str] | None = Field(
+        default=None,
+        description="Filter by polarities (+, -, +-). Can specify multiple polarities.",
+    )
+    sort: str | None = Field(
         "sample_batch_utc_created",
         description="Column name by which you want to sort the results. The column name should be one of the columns in the sample batch table.",
     )
-    order: Optional[str] = Field(
+    order: str | None = Field(
         "asc",
         description="Sorting order which can be asc for ascending or desc for descending.",
     )
     page: int = Field(0, description="Page number for pagination.")
     limit: int = Field(10000, description="Number of results per page.")
+
+    @field_validator("sample_batch_type")
+    @classmethod
+    def validate_sample_batch_type_list(
+        cls, sample_batch_types: list[str] | None
+    ) -> list[str] | None:
+        """Validate sample batch types."""
+        if sample_batch_types:
+            for sample_batch_type in sample_batch_types:
+                if sample_batch_type not in sample_batch_config.SAMPLE_BATCH_TYPES:
+                    raise ValueError(
+                        f"Invalid sample batch type '{sample_batch_type}'. Must be one of: {', '.join(sample_batch_config.SAMPLE_BATCH_TYPES)}"
+                    )
+        return sample_batch_types
+
+    @field_validator("polarity")
+    @classmethod
+    def validate_polarity_list(cls, polarities: list[str] | None) -> list[str] | None:
+        """Validate polarities."""
+        if polarities:
+            for polarity in polarities:
+                if polarity not in sample_batch_config.all_sample_batch_polarities:
+                    raise ValueError(
+                        f"Invalid polarity '{polarity}'. Must be one of: {', '.join(sample_batch_config.all_sample_batch_polarities)}"
+                    )
+        return polarities
 
 
 class GetSampleBatchTargetsQueryParams(QueryParamsModel):

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Request, Query
 from mascope_backend.db.id import gen_id
 from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.new.auth.dependencies import editor_user, guest_user
@@ -35,7 +35,7 @@ sample_items_router = APIRouter(prefix="/api/sample/items", tags=["Sample Items"
 @sample_items_router.get("")
 @api_route()
 async def get_sample_items_route(
-    query_params: GetSampleItemsQueryParams = Depends(), user=Depends(guest_user)
+    query_params: GetSampleItemsQueryParams = Query(), user=Depends(guest_user)
 ):
     """Retrieve a list of sample items.
 

@@ -21,9 +21,15 @@ class QueryParamsModel(BaseModel):
     def decode_plus_sign(cls, value):
         """
         Automatically decode '+' signs for specific string fields in the query parameters.
+        Handles both single strings and lists of strings.
         """
         if isinstance(value, str) and value:
             return value.replace(" ", "+")
+        elif isinstance(value, list):
+            return [
+                item.replace(" ", "+") if isinstance(item, str) and item else item
+                for item in value
+            ]
         return value
 
 

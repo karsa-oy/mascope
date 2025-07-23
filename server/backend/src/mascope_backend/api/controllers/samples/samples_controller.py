@@ -1,6 +1,5 @@
 # pylint: disable=line-too-long
 from datetime import datetime
-from typing import Literal
 from mascope_file.io import load_file
 from mascope_signal.compute import (
     get_scan_timestamps,
@@ -35,10 +34,10 @@ async def get_samples(
     sample_batch_id: str | None = None,
     filename: str | None = None,
     instrument: str | None = None,
-    sample_item_type: str | None = None,
+    sample_item_type: list[str] | None = None,
     datetime_min: datetime | None = None,
     datetime_max: datetime | None = None,
-    polarity: Literal["+", "-"] | None = None,
+    polarity: list[str] | None = None,
     match_category_min: int | None = None,
     sort: str = "datetime_utc",
     order: str = "asc",
@@ -66,14 +65,14 @@ async def get_samples(
     :type filename: str, optional
     :param instrument: Filter by instrument name.
     :type instrument: str, optional
-    :param sample_item_type: Filter by sample item type.
-    :type sample_item_type: str, optional
+    :param sample_item_type: Filter by sample item types, can specify multiple, defaults to None.
+    :type sample_item_type: list[str] | None, optional
     :param datetime_min: Filter samples after this datetime of the sample file.
     :type datetime_min: datetime, optional
     :param datetime_max: Filter samples before this datetime of the sample file.
     :type datetime_max: datetime, optional
-    :param polarity: Filter by ion polarity mode of the sample item, '+' for positive or '-' for negative.
-    :type polarity: Literal["+", "-"] | None
+    :param polarity: Filter by ion polarity modes (+, -), can specify multiple, defaults to None.
+    :type polarity: list[str] | None, optional
     :param match_category_min: Filter by match_category to include specified category and higher (e.g., 1 includes categories 1 and higher), defaults to None.
     :type match_category_min:int, optional
     :param sort: Column to sort the results by.
@@ -127,7 +126,7 @@ async def get_samples(
             stmt = stmt.filter(Sample.instrument == instrument)
 
         if sample_item_type:
-            stmt = stmt.filter(Sample.sample_item_type == sample_item_type)
+            stmt = stmt.filter(Sample.sample_item_type.in_(sample_item_type))
 
         if datetime_min and datetime_max:
             stmt = stmt.where(
@@ -140,7 +139,7 @@ async def get_samples(
             )
 
         if polarity is not None:
-            stmt = stmt.filter(Sample.polarity == polarity)
+            stmt = stmt.filter(Sample.polarity.in_(polarity))
 
         if match_category_min is not None:
             stmt = stmt.filter(MatchSample.match_category >= match_category_min)

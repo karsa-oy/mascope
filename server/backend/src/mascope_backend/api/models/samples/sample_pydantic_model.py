@@ -5,12 +5,15 @@ from mascope_backend.api.models.base_pydantic_model import (
     RequestBodyModel,
     CommonValidators,
 )
+from mascope_backend.api.models.sample.items.sample_item_pydantic_model import (
+    GetSampleItemsQueryValidator,
+)
 
 # TODO_configuration move to sample configs when refactoring
 DEFAULT_PEAK_MZ_TOLERANCE_PPM = 1.0
 
 
-class GetSamplesQueryParams(CommonValidators, QueryParamsModel):
+class GetSamplesQueryParams(GetSampleItemsQueryValidator, QueryParamsModel):
     """
     This model defines the query parameters that can be passed to the GET /api/samples endpoint
     to control filtering, sorting, ordering, and pagination of sample results.
@@ -32,8 +35,9 @@ class GetSamplesQueryParams(CommonValidators, QueryParamsModel):
     instrument: str | None = Field(
         None, description="Instrument name to filter results by"
     )
-    sample_item_type: str | None = Field(
-        None, description="Type of the sample item to filter results by"
+    sample_item_type: list[str] | None = Field(
+        default=None,
+        description="Filter by sample item types. Can specify multiple types.",
     )
     datetime_min: datetime | None = Field(
         None, description="Minimum datetime of the sample file to filter results by"
@@ -41,9 +45,9 @@ class GetSamplesQueryParams(CommonValidators, QueryParamsModel):
     datetime_max: datetime | None = Field(
         None, description="Maximum datetime of the sample file to filter results by"
     )
-    polarity: str | None = Field(
-        None,
-        description="Ion polarity mode of the sample item to filter by, either '+' for positive ion mode or '-' for negative ion mode",
+    polarity: list[str] | None = Field(
+        default=None,
+        description="Filter by ion polarity modes (+, -). Can specify multiple polarities.",
     )
     match_category_min: int | None = Field(
         None,

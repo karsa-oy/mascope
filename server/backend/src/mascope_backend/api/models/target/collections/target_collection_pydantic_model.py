@@ -40,9 +40,32 @@ class TargetCollectionBaseValidator:
         return tc_type
 
 
+class TargetCollectionValidator(TargetCollectionBaseValidator):
+    """Validators for all fields."""
+
+    @model_validator(mode="after")
+    @classmethod
+    def validate_diagnostics_compound_limit(cls, values):
+        """Validate compound limits for DIAGNOSTICS collections."""
+        target_collection_type = values.target_collection_type
+
+        if target_collection_type == "DIAGNOSTICS":
+            # Count total compounds
+            compound_ids_count = len(values.target_compound_ids or [])
+            compounds_create_count = len(values.target_compounds_create or [])
+            total_compounds = compound_ids_count + compounds_create_count
+
+            max_compounds = target_collection_config.DIAGNOSTICS_MAX_COMPOUNDS
+            if total_compounds > max_compounds:
+                raise ValueError(
+                    f"DIAGNOSTICS collections are limited to {max_compounds} compounds. "
+                    f"Provided {total_compounds} compounds"
+                )
+
+        return values
 
 
-class TargetCollectionBase(BaseModel):
+class TargetCollectionBase(TargetCollectionBaseValidator, BaseModel):
     """Base model with common fields for TargetCollection."""
 
     target_collection_name: str = Field(
@@ -124,43 +147,58 @@ class TargetCollectionUpdate(TargetCollectionValidator, TargetCollectionBase):
 
 
 class GetTargetCollectionsQueryParams(QueryParamsModel):
-    target_collection_type: Optional[str] = Field(
-        None,
-        description="The target collection type for which you want to fetch the target collections.",
-    )
-    target_collection_name: Optional[str] = Field(
+    target_collection_name: str | None = Field(
         None,
         description="The name of the target collection for which you want to fetch the target collections.",
     )
-    sample_batch_id: Optional[str] = Field(
+    sample_batch_id: str | None = Field(
         None, description="The ID of the sample batch to filter collections by."
     )
-    sort: Optional[str] = Field(
+    target_collection_type: list[str] | None = Field(
+        default=None,
+        description="Filter by target collection types (TARGETS, DIAGNOSTICS, CALIBRANTS). Can specify multiple types.",
+    )
+    sort: str | None = Field(
         None,
         description="The column name by which you want to sort the results. The column name should be one of the fields of target_collection.",
     )
-    order: Optional[str] = Field(
+    order: str | None = Field(
         None,
         description="Can either be asc for ascending order or desc for descending order.",
     )
     page: int = Field(0, description="The page number for pagination, default 0")
     limit: int = Field(10000, description="The number of results per page.")
 
+    @field_validator("target_collection_type")
+    @classmethod
+    def validate_target_collection_type_list(
+        cls, target_collection_types: list[str] | None
+    ) -> list[str] | None:
+        """Validate target collection types query parameters."""
+        if target_collection_types:
+            for target_collection_type in target_collection_types:
+                valid_types = target_collection_config.TARGET_COLLECTION_TYPES
+                if target_collection_type not in valid_types:
+                    raise ValueError(
+                        f"Invalid target collection type '{target_collection_type}'. Must be one of: {', '.join(valid_types)}"
+                    )
+        return target_collection_types
+
 
 class GetTargetCollectionsInSampleBatchQueryParams(QueryParamsModel):
-    sample_batch_id: Optional[str] = Field(
+    sample_batch_id: str | None = Field(
         None,
-        description="The sample batch ID filter for which you want to fetch the assosiated target collections ids.",
+        description="The sample batch ID filter for which you want to fetch the associated target collections ids.",
     )
-    target_collection_id: Optional[str] = Field(
+    target_collection_id: str | None = Field(
         None,
-        description="The target collection ID filter for which you want to fetch the assosiated sample batches ids.",
+        description="The target collection ID filter for which you want to fetch the associated sample batches ids.",
     )
-    sort: Optional[str] = Field(
+    sort: str | None = Field(
         None,
         description="The column name by which you want to sort the results. The column name should be either sample_batch_id or target_collection_id.",
     )
-    order: Optional[str] = Field(
+    order: str | None = Field(
         None,
         description="Can either be asc for ascending order or desc for descending order.",
     )

@@ -36,8 +36,8 @@ from mascope_backend.api.controllers.match.aggregate.match_aggregate_controller 
     aggregate_and_recreate_matches,
 )
 from mascope_backend.api.models.target.collections.target_collection_pydantic_model import (
-    TargetCollectionCreateBody,
-    TargetCollectionUpdateBody,
+    TargetCollectionCreate,
+    TargetCollectionUpdate,
 )
 from mascope_backend.api.models.match.match_pydantic_model import (
     RematchBatchesBody,
@@ -46,9 +46,9 @@ from mascope_backend.api.models.match.match_pydantic_model import (
 
 @api_controller()
 async def get_target_collections(
-    target_collection_type: Optional[str] = None,
-    target_collection_name: Optional[str] = None,
-    sample_batch_id: Optional[str] = None,
+    target_collection_name: str | None = None,
+    sample_batch_id: str | None = None,
+    target_collection_type: list[str] | None = None,
     sort: str = None,
     order: str = None,
     page: int = 0,
@@ -65,12 +65,12 @@ async def get_target_collections(
     4. Execute the query to fetch the results.
     5. Convert the results into a list of dictionaries for JSON serialization.
 
-    :param target_collection_type: The target collection type for which you want to fetch the target collections, defaults to None
-    :type target_collection_type: str, optional
     :param target_collection_name: The name of the target collection for which you want to fetch the target collections, defaults to None
-    :type target_collection_name: str, optional
+    :type target_collection_name: str | None, optional
     :param sample_batch_id: Filter collections associated with a specific sample batch ID, defaults to None.
-    :type sample_batch_id: Optional[str], optional
+    :type sample_batch_id: str | None, optional
+    :param target_collection_type: Filter by target collection types, can specify multiple types, defaults to None
+    :type target_collection_type: list[str] | None, optional
     :param sort:  Column to sort by, defaults to "sample_item_utc_created"
     :type sort: str, optional
     :param order: Sorting order ('asc' for ascending, 'desc' for descending), defaults to "asc"
@@ -86,10 +86,6 @@ async def get_target_collections(
         stmt = select(TargetCollection)
 
         # Step 1: Apply filters if specified
-        if target_collection_type:
-            stmt = stmt.where(
-                TargetCollection.target_collection_type == target_collection_type
-            )
         if target_collection_name:
             stmt = stmt.where(
                 TargetCollection.target_collection_name == target_collection_name
@@ -102,6 +98,10 @@ async def get_target_collections(
                 == TargetCollection.target_collection_id,
             ).where(TargetCollectionInSampleBatch.sample_batch_id == sample_batch_id)
 
+        if target_collection_type:
+            stmt = stmt.where(
+                TargetCollection.target_collection_type.in_(target_collection_type)
+            )
         # Step 2: Apply sorting if specified
         if sort:
             if order == "desc":

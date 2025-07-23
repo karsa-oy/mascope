@@ -75,9 +75,11 @@ from mascope_backend.api.new.instrument_configs.lib import (
 from mascope_backend.api.new.instrument_configs.schemas import (
     SetInstrumentConfigBody,
 )
+from mascope_backend.api.models.sample.batches.config import sample_batch_config
 from mascope_backend.api.models.sample.batches.sample_batch_pydantic_model import (
-    SampleBatchCreateBody,
-    SampleBatchUpdateBody,
+    SampleBatchCreate,
+    SampleBatchRead,
+    SampleBatchUpdate,
 )
 from mascope_backend.api.models.sample.items.sample_item_pydantic_model import (
     SampleItemCreate,
@@ -95,7 +97,9 @@ from mascope_backend.runtime import runtime
 
 @api_controller()
 async def get_sample_batches(
-    workspace_id: str = None,
+    workspace_id: str | None = None,
+    sample_batch_type: list[str] | None = None,
+    polarity: list[str] | None = None,
     sort: str = "sample_batch_utc_created",
     order: str = "asc",
     page: int = 0,
@@ -114,6 +118,10 @@ async def get_sample_batches(
 
     :param workspace_id: ID of the workspace to filter sample batches by, defaults to None.
     :type workspace_id: str, optional
+    :param sample_batch_type: Type of sample batch to filter by (ACQUISITION or ANALYSIS), defaults to None.
+    :type sample_batch_type: list[str], optional
+    :param polarity: Polarity to filter by (+, -, or +-), defaults to None.
+    :type polarity: list[str], optional
     :param sort: Column name to sort the results by, defaults to "sample_batch_utc_created".
     :type sort: str, optional
     :param order: Sorting order, "asc" for ascending or "desc" for descending, defaults to "asc".
@@ -129,9 +137,15 @@ async def get_sample_batches(
         # Step 1: Construct base query
         stmt = select(SampleBatch)
 
-        # Step 2: Filter by workspace_id if provided
+        # Step 2: Filter by provided parameters
         if workspace_id:
             stmt = stmt.filter(SampleBatch.workspace_id == workspace_id)
+
+        if sample_batch_type:
+            stmt = stmt.filter(SampleBatch.sample_batch_type.in_(sample_batch_type))
+
+        if polarity:
+            stmt = stmt.filter(SampleBatch.polarity.in_(polarity))
 
         # Step 3: Apply sorting
         if sort:
@@ -141,9 +155,7 @@ async def get_sample_batches(
                 stmt = stmt.order_by(asc(getattr(SampleBatch, sort)))
 
         # Step 4: Apply pagination
-        count_stmt = select(func.count()).select_from(  # pylint: disable=not-callable
-            stmt
-        )
+        count_stmt = select(func.count()).select_from(stmt)
         total = await session.scalar(count_stmt)
         stmt = stmt.offset(page * limit).limit(limit)
 
@@ -151,11 +163,14 @@ async def get_sample_batches(
         result = await session.execute(stmt)
         sample_batches = result.scalars().all()
 
-    # Step 6: Convert the results into a list of dictionaries for JSON serialization and return
+    # Step 6: Return the total count and the list of validated sample batches
     return {
         "message": "Sample batches retrieved successfully",
         "results": total,
-        "data": [sample_batch.to_dict() for sample_batch in sample_batches],
+        "data": [
+            SampleBatchRead.model_validate(sample_batch).model_dump()
+            for sample_batch in sample_batches
+        ],
     }
 
 

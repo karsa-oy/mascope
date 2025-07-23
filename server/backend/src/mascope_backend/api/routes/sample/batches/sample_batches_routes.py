@@ -1,4 +1,4 @@
-from fastapi import APIRouter, BackgroundTasks, Request, Depends
+from fastapi import APIRouter, BackgroundTasks, Request, Depends, Query
 from mascope_backend.db.id import gen_id
 from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.new.auth.dependencies import editor_user, guest_user
@@ -29,7 +29,7 @@ sample_batches_router = APIRouter(prefix="/api/sample/batches", tags=["Sample Ba
 @sample_batches_router.get("")
 @api_route(token_access=True)
 async def get_sample_batches_route(
-    query_params: GetSampleBatchesQueryParams = Depends(),
+    query_params: GetSampleBatchesQueryParams = Query(),
     user=Depends(guest_user),
 ):
     """Retrieve a list of sample batches.

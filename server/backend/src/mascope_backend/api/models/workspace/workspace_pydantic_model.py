@@ -148,7 +148,7 @@ class WorkspaceUpdate(WorkspaceBaseValidator, BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class GetWorkspacesQueryParams(QueryParamsModel):
+class GetWorkspacesQueryParams(WorkspaceBaseValidator, QueryParamsModel):
     """
     Query parameters for filtering and paginating workspace listings.
 
@@ -156,6 +156,18 @@ class GetWorkspacesQueryParams(QueryParamsModel):
     to control sorting, ordering, and pagination of workspace results.
     """
 
+    workspace_name: str | None = Field(
+        None,
+        description="Filter by workspace name.",
+    )
+    workspace_type: list[str] | None = Field(
+        default=None,
+        description="Filter by workspace types (ACQUISITION, ANALYSIS). Can specify multiple types.",
+    )
+    instrument: list[str] | None = Field(
+        None,
+        description="Filter by instrument associated with the workspace.  Can specify multiple instruments.",
+    )
     sort: str | None = Field(
         "workspace_utc_created",
         description="Column name by which you want to sort the results. The column name should be one of the columns in the workspace table.",
@@ -166,3 +178,17 @@ class GetWorkspacesQueryParams(QueryParamsModel):
     )
     page: int = Field(0, description="Page number for pagination.")
     limit: int = Field(10000, description="Number of results per page.")
+
+    @field_validator("workspace_type")
+    @classmethod
+    def validate_workspace_type_list(
+        cls, workspace_types: list[str] | None
+    ) -> list[str] | None:
+        """Validate workspace types in the list."""
+        if workspace_types:
+            for workspace_type in workspace_types:
+                if workspace_type not in workspace_config.WORKSPACE_TYPES:
+                    raise ValueError(
+                        f"Invalid workspace type '{workspace_type}'. Must be one of: {workspace_config.WORKSPACE_TYPES}"
+                    )
+        return workspace_types

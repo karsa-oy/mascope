@@ -199,7 +199,7 @@ class GetSampleItemsQueryValidator:
         return sample_item_types
 
 
-class GetSampleItemsQueryParams(CommonValidators, QueryParamsModel):
+class GetSampleItemsQueryParams(GetSampleItemsQueryValidator, QueryParamsModel):
     """
     This model defines the query parameters that can be passed to the GET /api/sample/items endpoint
     to control filtering, sorting, ordering, and pagination of sample results.
@@ -213,9 +213,13 @@ class GetSampleItemsQueryParams(CommonValidators, QueryParamsModel):
     filename: str | None = Field(
         None, description="The filename for which you want to fetch the sample items"
     )
-    polarity: str | None = Field(
-        None,
-        description="Ion polarity mode of the sample item to filter by, either '+' for positive ion mode or '-' for negative ion mode",
+    sample_item_type: list[str] | None = Field(
+        default=None,
+        description="Filter by sample item types. Can specify multiple types.",
+    )
+    polarity: list[str] | None = Field(
+        default=None,
+        description="Filter by ion polarity modes (+, -). Can specify multiple polarities.",
     )
     sort: str | None = Field(
         "sample_item_utc_created",
