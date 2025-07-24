@@ -147,7 +147,7 @@ watch(
   }
 )
 
-const anyFilters = computed(() => app.ui.filter.collections.length || app.ui.filter.mechanism)
+const anyFilters = computed(() => app.ui.filter.mechanism)
 </script>
 
 <template>
@@ -163,18 +163,6 @@ const anyFilters = computed(() => app.ui.filter.collections.length || app.ui.fil
       `"
     >
       <span v-if="anyFilters" class="pi pi-filter" style="opacity: 0.5" />
-      <Chip
-        v-for="coll in app.ui.filter.collections"
-        icon="pi pi-bullseye"
-        :label="coll.target_collection_name"
-        removable
-        @remove="
-          app.ui.filter.collections = app.ui.filter.collections.filter(
-            ({ target_collection_id }) => target_collection_id !== coll.target_collection_id
-          )
-        "
-        :key="coll.target_collection_id"
-      />
       <Chip
         v-if="app.ui.filter.mechanism"
         icon="pi pi-cog"

@@ -8,7 +8,6 @@ export const useFilter = defineStore('app.ui.filter', () => {
 
   // state
   const mechanism = ref(null)
-  const collections = ref([])
 
   // autoremoval of mechanism filters
   watch(
@@ -21,18 +20,8 @@ export const useFilter = defineStore('app.ui.filter', () => {
       }
     }
   )
-  // autoremoval of collection filters
-  watch(
-    () => data.match.collection.list?.map(({ target_collection_id }) => target_collection_id) ?? [],
-    (activeCollectionIds) => {
-      collections.value = collections.value.filter(({ target_collection_id }) =>
-        activeCollectionIds.includes(target_collection_id)
-      )
-    }
-  )
 
   return {
-    mechanism,
-    collections
+    mechanism
   }
 })

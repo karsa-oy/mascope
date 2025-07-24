@@ -143,6 +143,11 @@ export const useChartData = defineStore('chart.batch.overview', () => {
     xField.value = xFields.value.find(({ field }) => field === 'datetime')
   })
 
+  const byTarget = (level) => (record) =>
+    app.data.match[level].focused
+      ? record[`target_${level}_id`] === app.data.match[level]?.focused[`target_${level}_id`]
+      : true
+
   /**
    * Render visualization traces based on match data
    */
@@ -151,8 +156,16 @@ export const useChartData = defineStore('chart.batch.overview', () => {
       return []
     }
     const { data, level } = toRaw(match.value)
+    // filter data by target selection
+    const targetIds = [
+      ...new Set(
+        data
+          .filter(byTarget('collection'))
+          .filter(byTarget('compound'))
+          .map((match) => match[`target_${level}_id`]) ?? []
+      )
+    ]
     //  Generate color mapping for target compounds
-    const targetIds = [...new Set(data.map((match) => match[`target_${level}_id`]) ?? [])]
     const colors = Object.fromEntries(
       targetIds.map((targetId, index) => [[targetId], theme.value[index]])
     )
@@ -240,10 +253,7 @@ export const useChartData = defineStore('chart.batch.overview', () => {
           // selection metadata
           matchData: {
             level: level,
-            match_key,
-            collection_ids: targetMatches
-              .filter((match) => match[`target_${level}_id`] === targetId)
-              .map(({ target_collection_id }) => target_collection_id)
+            match_key
           },
           // tooltip
           customdata: [...Array(samples.value.length).keys()].map((i) => [
@@ -301,28 +311,9 @@ export const useChartData = defineStore('chart.batch.overview', () => {
     return traces
   })
 
-  /**
-   * Filter traces by collection
-   */
-  const traces = computed(
-    () =>
-      app.ui.filter.collections.length
-        ? rawTraces.value.filter(
-            ({ matchData }) =>
-              matchData // TIC has no match data
-                ? matchData.collection_ids.some((collId) =>
-                    app.ui.filter.collections
-                      .map(({ target_collection_id }) => target_collection_id)
-                      .includes(collId)
-                  ) // normal data filtered by collection
-                : true // TIC is always shown
-          )
-        : rawTraces.value // show all traces if no filter exists
-  )
-
   return {
     samples,
-    traces,
+    traces: rawTraces,
     xFields,
     xField
   }
