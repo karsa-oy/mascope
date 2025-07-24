@@ -12,9 +12,12 @@ import { BaseCopyableField, BaseEditableField } from '@/lib/base'
 import { DialogUserManagement, DialogPasswordChange } from '@/lib/dialogs'
 import { prettyRoleName } from '@/lib/roles'
 
-const app = useApp()
+import { useSidebarMenu } from './state.js'
 
-const drawer = ref()
+const app = useApp()
+const sidebarMenu = useSidebarMenu()
+
+const open = computed(() => sidebarMenu.open && sidebarMenu.tab === 'settings')
 
 const dialog = reactive({
   users: false,
@@ -84,7 +87,7 @@ const clear = () => {
 }
 
 // Watch drawer visibility to clear state
-watch(drawer, (visible) => {
+watch(open, (visible) => {
   if (!visible) clear()
 })
 
@@ -98,9 +101,11 @@ watchEffect(() => {
   }
 })
 
-const layer = 'user_sidebar'
+const layer = 'sidebar_settings_tab'
 watchEffect(() => {
-  app.ui.help.set(drawer.value ? layer : null)
+  if (open.value) {
+    app.ui.help.set(layer)
+  }
 })
 
 const vHelpLayer = app.ui.help.directive(layer)

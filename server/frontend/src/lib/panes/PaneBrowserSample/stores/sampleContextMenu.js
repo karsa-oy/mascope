@@ -29,6 +29,17 @@ export const useSampleContextMenu = defineStore('browser.sample.sampleCtxMenu', 
     instrumentConfig: false
   })
 
+  // paste context
+  const pasteBatchId = computed(() => row.value?.sample_batch_id ?? app.data.batch.focusedId)
+  const pasteValid = computed(
+    () =>
+      pasteBatchId.value &&
+      (clipboard.op === 'copy' ||
+        (clipboard.op === 'cut' &&
+          clipboard.samples.every(({ sample_batch_id }) => sample_batch_id !== pasteBatchId.value)))
+  )
+  const sampleContext = computed(() => row.value || app.data.sample.selected.length > 0)
+
   // actions
   async function onClick(event) {
     await clipboard.read()
@@ -36,7 +47,9 @@ export const useSampleContextMenu = defineStore('browser.sample.sampleCtxMenu', 
     if (!app.data.sample.isSelected(row.value)) {
       app.data.sample.focus(row.value)
     }
-    show(event)
+    if (pasteValid.value || sampleContext.value) {
+      show(event)
+    }
   }
   function show(event) {
     batchContextMenu.hide()
@@ -50,16 +63,6 @@ export const useSampleContextMenu = defineStore('browser.sample.sampleCtxMenu', 
   function clear() {
     selection.value = null
   }
-
-  const pasteValid = computed(
-    () =>
-      row.value &&
-      (clipboard.op === 'copy' ||
-        (clipboard.op === 'cut' &&
-          clipboard.samples.every(
-            ({ sample_batch_id }) => sample_batch_id !== row.value?.sample_batch_id
-          )))
-  )
 
   // context menu entries
   const entries = computed(() => {
@@ -75,12 +78,12 @@ export const useSampleContextMenu = defineStore('browser.sample.sampleCtxMenu', 
             if (clipboard.op === 'copy') {
               await app.data.sample.copy({
                 sample_item_ids: clipboard.samples.map((s) => s.sample_item_id),
-                sample_batch_id: row.value.sample_batch_id
+                sample_batch_id: pasteBatchId.value
               })
             } else if (clipboard.op === 'cut') {
               await app.data.sample.move({
                 sample_item_ids: clipboard.samples.map((s) => s.sample_item_id),
-                sample_batch_id: row.value.sample_batch_id
+                sample_batch_id: pasteBatchId.value
               })
               clipboard.clear()
             }
@@ -89,7 +92,7 @@ export const useSampleContextMenu = defineStore('browser.sample.sampleCtxMenu', 
       },
       {
         separator: true,
-        visible: clipboard.samples !== null && pasteValid.value
+        visible: clipboard.samples !== null && pasteValid.value && sampleContext.value
       },
       {
         label: `Edit sample`,
@@ -102,6 +105,7 @@ export const useSampleContextMenu = defineStore('browser.sample.sampleCtxMenu', 
       {
         label: `Copy sample${s}`,
         icon: 'pi pi-copy',
+        visible: sampleContext.value,
         command: async () => {
           clipboard.copy(
             app.data.sample.selected.map(
@@ -117,6 +121,7 @@ export const useSampleContextMenu = defineStore('browser.sample.sampleCtxMenu', 
       {
         label: `Cut sample${s}`,
         icon: 'pi ph ph-scissors',
+        visible: sampleContext.value,
         command: async () => {
           clipboard.cut(
             app.data.sample.selected.map(
@@ -132,6 +137,7 @@ export const useSampleContextMenu = defineStore('browser.sample.sampleCtxMenu', 
       {
         label: `Delete sample${s}`,
         icon: 'pi pi-trash',
+        visible: sampleContext.value,
         command: () => {
           confirm.require({
             icon: 'pi pi-exclamation-triangle',
@@ -161,10 +167,11 @@ export const useSampleContextMenu = defineStore('browser.sample.sampleCtxMenu', 
           })
         }
       },
-      { separator: true },
+      { separator: true, visible: sampleContext.value },
       {
         label: `Download`,
         icon: 'pi pi-file-export',
+        visible: sampleContext.value,
         items: [
           {
             label: `Sample file${s}`,
@@ -197,7 +204,7 @@ export const useSampleContextMenu = defineStore('browser.sample.sampleCtxMenu', 
       {
         label: 'Process',
         icon: 'pi ph ph-hourglass-medium',
-        visible: !multiselecting,
+        visible: !multiselecting && sampleContext.value,
         items: [
           {
             label: `Recalibrate`,

@@ -43,6 +43,6 @@ const label = computed(() => {
     :label="label.short"
     v-tooltip.bottom="label.full"
     removable
-    @remove="app.data.batch.unfocus()"
+    @remove="app.data.sample.unfocus()"
   />
 </template>

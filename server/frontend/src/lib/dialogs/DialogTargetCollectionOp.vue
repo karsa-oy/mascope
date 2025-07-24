@@ -435,7 +435,9 @@ async function init(mode) {
     info.name = original.value?.target_collection_name
     info.desc = original.value?.target_collection_description
     info.type = original.value?.target_collection_type
-    compounds.selected = original.value?.target_compounds ?? original.value?.children ?? []
+    compounds.selected = app.data.match.compound.list.filter(
+      (comp) => comp.target_collection_id === original.value.target_collection_id
+    )
   }
   switch (mode) {
     case 'create': {

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watchEffect, computed, provide } from 'vue'
+import { ref, watchEffect, computed } from 'vue'
 
 import Button from 'primevue/button'
 import Drawer from 'primevue/drawer'
@@ -9,71 +9,47 @@ import Tab from 'primevue/tab'
 import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 import ContextMenu from 'primevue/contextmenu'
-import OverlayBadge from 'primevue/overlaybadge'
 
 import { DialogWorkspaceOp } from '@/lib/dialogs'
+import { BatchContextMenu, useBatchContextMenu } from '@/lib/panes'
 
+import { useSidebarMenu } from './state.js'
 import WorkspacePane from './WorkspacePane.vue'
 import UserSettingsPane from './UserSettingsPane.vue'
 import NotificationPane from './NotificationPane.vue'
+import NotificationOverlay from './NotificationOverlay.vue'
 
 import { api } from '@/api'
 import { useApp } from '@/stores'
 
 const app = useApp()
+const sidebarMenu = useSidebarMenu()
 
-const drawer = ref(false)
-const tab = ref('workspaces')
 const dialog = ref()
-const menu = ref()
+const workspaceContextMenu = ref()
+const batchContextMenu = useBatchContextMenu()
 
-const open = defineModel('open')
 watchEffect(() => {
-  open.value = drawer.value
-  tab.value = 'workspaces'
+  if (!sidebarMenu.open) {
+    sidebarMenu.tab = 'workspaces'
+  }
 })
 
-provide('sidebar-open', drawer)
-
-/**
- * Computes the badge count to display based on recentErrors or recentWarnings.
- * If there are recent errors, their count is displayed.
- * If there are no errors but warnings, the warning count is displayed.
- * If there are neither, an empty string is returned, hiding the badge.
- *
- *  @returns {String} The badge value as a string.
- */
-const badgeValue = computed(() => {
-  const errors = app.ui.notification.recentErrors
-  const warnings = app.ui.notification.recentWarnings
-  return errors > 0 ? String(errors) : warnings > 0 ? String(warnings) : ''
+watchEffect(() => {
+  if (sidebarMenu.open && sidebarMenu.tab === 'notifications') {
+    app.ui.notification.clearRecentBadge()
+  }
 })
-
-/**
- * Determines the severity of the badge.
- * If there are any recent errors, the badge severity is set to 'danger'.
- * Otherwise, if there are only warnings, the badge severity is set to 'warn'.
- *
- * @returns {String} The badge severity ('danger' or 'warn').
- */
-const badgeSeverity = computed(() => {
-  return app.ui.notification.recentErrors > 0 ? 'danger' : 'warn'
-})
-
-/**
- * Controls the visibility of the notification badge.
- * If there are no recent errors or warnings, the badge is hidden.
- *
- * @returns {Boolean} True if the badge should be hidden, otherwise false.
- */
-const hiddenBadge = computed(() => {
-  return app.ui.notification.recentWarnings === 0 && app.ui.notification.recentErrors === 0
+watchEffect(() => {
+  if (!sidebarMenu.open) {
+    app.ui.help.set(null)
+  }
 })
 </script>
 
 <template>
   <menu class="breadcrum">
-    <OverlayBadge :value="badgeValue" :severity="badgeSeverity" size="small">
+    <NotificationOverlay>
       <Button
         v-tooltip.bottom="'Home menu'"
         icon="pi ph ph-house"
@@ -81,11 +57,11 @@ const hiddenBadge = computed(() => {
         text
         @click="
           (event) => {
-            drawer = true
+            sidebarMenu.open = true
           }
         "
       />
-    </OverlayBadge>
+    </NotificationOverlay>
     <span class="pi ph ph-caret-right" style="opacity: 0.5" />
     <Button
       icon="pi ph ph-folder"
@@ -104,7 +80,7 @@ const hiddenBadge = computed(() => {
       @contextmenu="
         (event) => {
           event.preventDefault()
-          menu.toggle(event)
+          workspaceContextMenu.toggle(event)
         }
       "
     />
@@ -120,12 +96,18 @@ const hiddenBadge = computed(() => {
             app.data.sample.unfocus()
           }
         "
+        @contextmenu="
+          (event) => {
+            event.preventDefault()
+            batchContextMenu.onClick(event)
+          }
+        "
       />
     </template>
   </menu>
-  <Tabs v-model:value="tab">
+  <Tabs v-model:value="sidebarMenu.tab">
     <Drawer
-      v-model:visible="drawer"
+      v-model:visible="sidebarMenu.open"
       header="Mascope"
       position="left"
       :style="`width: calc(${app.ui.split.left}vw + 1rem);`"
@@ -136,11 +118,13 @@ const hiddenBadge = computed(() => {
           <Tab value="workspaces" v-tooltip.bottom="'Workspaces'">
             <span class="pi ph ph-folder" />
           </Tab>
-          <Tab value="notifications" v-tooltip.bottom="'Notifications'"
-            ><span class="pi ph ph-bell" />
+          <Tab value="notifications" v-tooltip.bottom="'Notifications'">
+            <NotificationOverlay>
+              <span class="pi ph ph-bell" />
+            </NotificationOverlay>
           </Tab>
-          <Tab value="settings" v-tooltip.bottom="'Settings'"
-            ><span class="pi ph ph-gear-six" />
+          <Tab value="settings" v-tooltip.bottom="'Settings'">
+            <span class="pi ph ph-gear-six" />
           </Tab>
         </TabList>
       </template>
@@ -169,7 +153,7 @@ const hiddenBadge = computed(() => {
     </Drawer>
   </Tabs>
   <ContextMenu
-    ref="menu"
+    ref="workspaceContextMenu"
     appendTo="self"
     :model="[
       {
@@ -196,6 +180,7 @@ const hiddenBadge = computed(() => {
     ]"
   />
   <DialogWorkspaceOp v-model:action="dialog" />
+  <BatchContextMenu />
 </template>
 
 <style scoped>
