@@ -5,6 +5,11 @@ import { api } from '@/api'
 export const useInstrument = defineModule({
   name: 'instrument',
   key: 'instrument',
+  selection: {
+    mode: 'single',
+    persist: true,
+    subscribe: true
+  },
   load: {
     method: async () =>
       await api.http.get(`/instruments`, {
@@ -12,8 +17,5 @@ export const useInstrument = defineModule({
         type: 'load_instruments'
       }),
     events: ['instruments_reload']
-  },
-  subscribe: true,
-  allowUnfocus: false,
-  persist: true
+  }
 })

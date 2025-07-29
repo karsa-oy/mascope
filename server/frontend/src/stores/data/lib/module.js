@@ -9,12 +9,7 @@ export const defineModule = ({
   name, // module name (snake_case)
   key, // data key (normally id)
   load, // load options
-  subscribe = false, // make socket io subscription for key
-  unfocusBefore = [], // unfucus before running these ops
-  multiselect = false, // currently not in use
-  allowUnfocus = true, // whether to allow unfocusing
-  persist = false, // whether to save focus to local storage
-  onRefocus = () => {}, // lifecycle hook executed after refocus
+  selection, // selection options
   // api
   read, // get one record by id
   ...ops // other operations optional
@@ -29,14 +24,28 @@ export const defineModule = ({
       ...load
     }
 
+    selection = {
+      mode: 'binary', // | 'multiple' | 'single'
+      subscribe: false,
+      persist: false,
+      hook: () => {},
+      ...selection
+    }
+
     // CONFIG
 
+    // logging
     const prefix = `[app.data.${name.replaceAll('_', ' ')}]`
     const log = (message, ...rest) => console.log(`🔄 ${prefix} ${message}`, ...rest)
     const warn = (message, ...rest) => console.warn(`🔄 ${prefix} ${message}`, ...rest)
     const debug = (message, ...rest) => console.debug(`🔄 ${prefix} ${message}`, ...rest)
 
-    const singleselect = !multiselect
+    // selection
+    const singleselect = selection.mode === 'single' || selection.mode === 'binary'
+    const multiselect = selection.mode === 'multiple'
+    const allowUnfocus = selection.mode !== 'single'
+
+    // loading
     const parent = load.parent?.() ?? null
 
     // DATA
@@ -54,10 +63,10 @@ export const defineModule = ({
     // a dual API is exposed, which augments its behavior
     // based on the module's configuration:
 
-    //  API       |  Type          |  Singleselect mode      |  Multiselect mode
-    //  ---------------------------------------------------------------------------
-    //  selected  |  record array  |  Computed (read-only)   |  Bindable (read/write)
-    //  focused   |  record / null |  Bindable (read/write)  |  Computed (read-only)
+    //  API       |  Type          |  Binary & Singleselect modes |  Multiselect mode
+    //  -------------------------------------------------------------------------------------
+    //  selected  |  record array  |  Computed (read-only)        |  Bindable (read/write)
+    //  focused   |  record / null |  Bindable (read/write)       |  Computed (read-only)
 
     // This allows you to count on both APIs being available for read scenarios
     // but ensures you don't accidently corrupt state through inconsisteshallowRe binds.
@@ -197,7 +206,7 @@ export const defineModule = ({
     const stateLoaded = ref(false)
     const storageKey = `module[${name}]`
     const restoreState = () => {
-      if (!stateLoaded.value && persist) {
+      if (!stateLoaded.value && selection.persist) {
         const state = localStorage.getItem(storageKey)
         if (!state) {
           debug('state not found storage')
@@ -217,7 +226,7 @@ export const defineModule = ({
         localStorage.setItem(storageKey, record[key])
       }
     }
-    if (persist) {
+    if (selection.persist) {
       watch(focused, persistState)
     }
 
@@ -336,23 +345,8 @@ export const defineModule = ({
         )
         debug('children synced')
       }
-      onRefocus()
+      selection.hook()
     })
-
-    // unfocus before calling certain methods
-    const wrappedOps = Object.fromEntries(
-      Object.entries(ops).map(([name, func]) =>
-        unfocusBefore.includes(name)
-          ? [
-              name,
-              (...args) => {
-                unfocus()
-                return func(...args)
-              }
-            ]
-          : [name, func]
-      )
-    )
 
     // event triggered reloading
 
@@ -364,16 +358,16 @@ export const defineModule = ({
     const reloadHandler =
       // Check if the parent is a virtual parent (used for special cases like match data)
       parent && parent.name.includes('virtual')
-        ? sync // For virtual parents, reload without passing trigger arguments
-        : () =>
+        ? (event) => sync() // For virtual parents, reload without passing trigger arguments
+        : (event) =>
             sync({
               name: parent?.name,
               focused: parent?.focused, // Pass the parent's focused record
-              event: reloadOn // Include the event that triggered the reload
+              event // Include the event that triggered the reload
             })
     load.events.forEach((event) => {
       api.socket.on(event, async () => {
-        await reloadHandler()
+        await reloadHandler(event)
         load.hook()
       })
     })
@@ -381,10 +375,10 @@ export const defineModule = ({
     // EVENTS
 
     // manage socket room subscription
-    if (subscribe) {
+    if (selection.subscribe) {
       let room = (record) => record[key]
-      if (typeof subscribe === 'function') {
-        room = subscribe
+      if (typeof selection.subscribe === 'function') {
+        room = selection.subscribe
       }
       watch(focused, (next, prev) => {
         if (prev) {
@@ -460,6 +454,6 @@ export const defineModule = ({
       register,
       // api
       read,
-      ...wrappedOps
+      ...ops
     }
   })

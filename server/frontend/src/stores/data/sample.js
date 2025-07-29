@@ -15,7 +15,10 @@ const FILE_UPLOAD_TIMEOUT = 600_000
 export const useSample = defineModule({
   name: 'sample',
   key: 'sample_item_id',
-  multiselect: true,
+  selection: {
+    mode: 'multiple',
+    subscribe: ({ sample_file_id }) => sample_file_id
+  },
   load: {
     parent: useBatch,
     method: ({ sample_batch_id }) =>
@@ -28,7 +31,6 @@ export const useSample = defineModule({
         type: 'load_samples'
       })
   },
-  subscribe: ({ sample_file_id }) => sample_file_id,
   create: (sample) =>
     api.http.post(`/sample/items`, sample, {
       use: 'create',

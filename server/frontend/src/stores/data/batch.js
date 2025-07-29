@@ -17,6 +17,21 @@ import { useAcquisition } from './acquisition'
 export const useBatch = defineModule({
   name: 'batch',
   key: 'sample_batch_id',
+  selection: {
+    subscribe: true,
+    hook: () => {
+      const sample = useSample()
+      const ui = useUi()
+      const acquistion = useAcquisition()
+      if (sample.list.length > 0) {
+        if (acquistion.selected.length === 0) {
+          ui.tab.active = 'batch'
+        }
+      } else if (ui.tab.active == 'batch') {
+        ui.tab.default()
+      }
+    }
+  },
   load: {
     parent: useWorkspace,
     method: ({ workspace_id }) =>
@@ -32,19 +47,6 @@ export const useBatch = defineModule({
       if (sample.list.length == 0 && ui.tab.active == 'batch') {
         ui.tab.default()
       }
-    }
-  },
-  subscribe: true,
-  onRefocus: () => {
-    const sample = useSample()
-    const ui = useUi()
-    const acquistion = useAcquisition()
-    if (sample.list.length > 0) {
-      if (acquistion.selected.length === 0) {
-        ui.tab.active = 'batch'
-      }
-    } else if (ui.tab.active == 'batch') {
-      ui.tab.default()
     }
   },
   read: (sample_batch_id) =>

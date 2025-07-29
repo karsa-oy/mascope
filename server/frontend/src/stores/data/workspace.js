@@ -5,7 +5,11 @@ import { api } from '@/api'
 export const useWorkspace = defineModule({
   name: 'workspace',
   key: 'workspace_id',
-  subscribe: true,
+  selection: {
+    mode: 'single',
+    persist: true,
+    subscribe: true
+  },
   load: {
     method: () =>
       api.http.get(`/workspaces`, {
@@ -14,8 +18,6 @@ export const useWorkspace = defineModule({
       }),
     events: ['workspace_reload']
   },
-  allowUnfocus: false,
-  persist: true,
   read: (workspace_id) =>
     api.http.get(`/workspaces/${workspace_id}`, {
       use: 'read',
