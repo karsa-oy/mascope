@@ -16,17 +16,19 @@ export const useSample = defineModule({
   name: 'sample',
   key: 'sample_item_id',
   multiselect: true,
-  useParent: useBatch,
+  load: {
+    parent: useBatch,
+    method: ({ sample_batch_id }) =>
+      api.http.get(`/samples`, {
+        params: {
+          sample_batch_id,
+          sort: 'datetime_utc'
+        },
+        use: 'read',
+        type: 'load_samples'
+      })
+  },
   subscribe: ({ sample_file_id }) => sample_file_id,
-  load: ({ sample_batch_id }) =>
-    api.http.get(`/samples`, {
-      params: {
-        sample_batch_id,
-        sort: 'datetime_utc'
-      },
-      use: 'read',
-      type: 'load_samples'
-    }),
   create: (sample) =>
     api.http.post(`/sample/items`, sample, {
       use: 'create',

@@ -20,14 +20,16 @@ const sudo = (execute) => {
 export const useUser = defineModule({
   name: 'user',
   key: 'id',
-  reloadOn: 'user_reload_all',
-  load: () =>
-    sudo(() =>
-      api.http.get(`/users`, {
-        use: 'read',
-        type: 'load_users'
-      })
-    ) ?? [],
+  load: {
+    method: () =>
+      sudo(() =>
+        api.http.get(`/users`, {
+          use: 'read',
+          type: 'load_users'
+        })
+      ) ?? [],
+    events: ['user_reload_all']
+  },
   read: (id) =>
     api.http.get(`/users/${id}`, {
       use: 'read',

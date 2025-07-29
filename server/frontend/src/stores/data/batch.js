@@ -17,9 +17,24 @@ import { useAcquisition } from './acquisition'
 export const useBatch = defineModule({
   name: 'batch',
   key: 'sample_batch_id',
-  useParent: useWorkspace,
+  load: {
+    parent: useWorkspace,
+    method: ({ workspace_id }) =>
+      api.http.get(`/sample/batches`, {
+        params: { workspace_id },
+        use: 'read',
+        type: 'load_batches'
+      }),
+    events: ['sample_batch_reload'],
+    hook: () => {
+      const sample = useSample()
+      const ui = useUi()
+      if (sample.list.length == 0 && ui.tab.active == 'batch') {
+        ui.tab.default()
+      }
+    }
+  },
   subscribe: true,
-  reloadOn: 'sample_batch_reload',
   onRefocus: () => {
     const sample = useSample()
     const ui = useUi()
@@ -32,19 +47,6 @@ export const useBatch = defineModule({
       ui.tab.default()
     }
   },
-  onEvent: () => {
-    const sample = useSample()
-    const ui = useUi()
-    if (sample.list.length == 0 && ui.tab.active == 'batch') {
-      ui.tab.default()
-    }
-  },
-  load: ({ workspace_id }) =>
-    api.http.get(`/sample/batches`, {
-      params: { workspace_id },
-      use: 'read',
-      type: 'load_batches'
-    }),
   read: (sample_batch_id) =>
     api.http.get(`/sample/batches/${sample_batch_id}`, {
       use: 'read',

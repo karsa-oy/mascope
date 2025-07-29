@@ -5,11 +5,13 @@ import { api } from '@/api'
 export const useTemplate = defineModule({
   name: 'template',
   key: 'attribute_template_id',
-  load: () =>
-    api.http.get(`/attribute_templates`, {
-      use: 'read',
-      type: 'load_attribute_templates'
-    }),
+  load: {
+    method: () =>
+      api.http.get(`/attribute_templates`, {
+        use: 'read',
+        type: 'load_attribute_templates'
+      })
+  },
   create: (template) =>
     api.http.post(`/attribute_templates`, template, {
       use: 'create',

@@ -975,26 +975,28 @@ export const useBatch = defineModule({
   name: "batch",
   // Unique row id enables data replacement   [required]
   key: "sample_batch_id",
-  // Define the parent by passing its hook
-  useParent: useWorkspace,
+  load: {
+    // Load function fetching the data
+    // from the backend. If the module
+    // has a parent, the arg is its key;
+    // otherwise no arg is provided. The
+    // function should return the data.         [required]
+    method: ({ workspace_id }) =>
+      api.http.get(`/sample/batches`, {
+        params: { workspace_id },
+        use: "read",
+        type: "load_batches",
+      }),
+    // Define the parent by passing its hook
+    parent: useWorkspace,
+  // Define events that trigger reload
+  // other then parent selection change
+    events: ["sample_batch_reload"],
+  }
   // Subscribe to socket io rooms by key
   // in this case, selecting a row will
   // create a sub for its sample_batch_id
   subscribe: true,
-  // Define events that trigger reload
-  // other then parent selection change
-  reloadOn: "sample_batch_reload",
-  // Load function fetching the data
-  // from the backend. If the module
-  // has a parent, the arg is its key;
-  // otherwise no arg is provided. The
-  // function should return the data.         [required]
-  load: ({ workspace_id }) =>
-    api.http.get(`/sample/batches`, {
-      params: { workspace_id },
-      use: "read",
-      type: "load_batches",
-    }),
   // We can also (optionally) define
   // standard CRUD operations
   read: (sample_batch_id) =>

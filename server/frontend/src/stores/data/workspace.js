@@ -6,14 +6,16 @@ export const useWorkspace = defineModule({
   name: 'workspace',
   key: 'workspace_id',
   subscribe: true,
-  reloadOn: 'workspace_reload',
+  load: {
+    method: () =>
+      api.http.get(`/workspaces`, {
+        use: 'read',
+        type: 'load_workspaces'
+      }),
+    events: ['workspace_reload']
+  },
   allowUnfocus: false,
   persist: true,
-  load: () =>
-    api.http.get(`/workspaces`, {
-      use: 'read',
-      type: 'load_workspaces'
-    }),
   read: (workspace_id) =>
     api.http.get(`/workspaces/${workspace_id}`, {
       use: 'read',

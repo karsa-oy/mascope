@@ -8,21 +8,27 @@ import { genId } from '@/lib/utils'
 export const defineModule = ({
   name, // module name (snake_case)
   key, // data key (normally id)
-  useParent = null, // optionally define a parent module
+  load, // load options
   subscribe = false, // make socket io subscription for key
-  reloadOn = null, // events to reload the module on
   unfocusBefore = [], // unfucus before running these ops
   multiselect = false, // currently not in use
   allowUnfocus = true, // whether to allow unfocusing
   persist = false, // whether to save focus to local storage
   onRefocus = () => {}, // lifecycle hook executed after refocus
-  onEvent = () => {}, // lifecycle hook executed after event reload
   // api
-  load, // async func, may accept parent record
   read, // get one record by id
   ...ops // other operations optional
 }) =>
   defineStore(`app.data.${name.replaceAll('_', '.')}`, () => {
+    // DEFAULTS
+
+    load = {
+      parent: null,
+      events: [],
+      hook: () => {}, // runs on event only for now; TODO: make universal
+      ...load
+    }
+
     // CONFIG
 
     const prefix = `[app.data.${name.replaceAll('_', ' ')}]`
@@ -31,7 +37,7 @@ export const defineModule = ({
     const debug = (message, ...rest) => console.debug(`🔄 ${prefix} ${message}`, ...rest)
 
     const singleselect = !multiselect
-    const parent = useParent ? useParent() : null
+    const parent = load.parent?.() ?? null
 
     // DATA
 
@@ -268,16 +274,20 @@ export const defineModule = ({
 
     // hook
     const sync = async (trigger) => {
+      // gather previous state
       const oldCount = records.value.length
       const oldFocusedId = focused.value ? focused.value[key] : null
       debug(`sync triggered by ${trigger?.event ?? trigger?.name ?? 'unknown'}`)
       loading.value = true
+      // load data
       if (trigger?.name) {
-        records.value = trigger?.focused ? await load(trigger.focused) : []
+        records.value = trigger?.focused ? await load.method(trigger.focused) : []
       } else {
-        records.value = await load()
+        records.value = await load.method()
       }
+      // build index field
       records.value.forEach((record, index) => (record.index = (index + 1).toString()))
+      // log load outcome
       const newCount = records.value.length
       if (newCount == 0) {
         log('data unloaded')
@@ -286,6 +296,7 @@ export const defineModule = ({
       } else if (newCount > 0 && oldCount > 0) {
         log('data reloaded')
       }
+      // refocus
       const newFocused = refocus(oldFocusedId)
       // propegate to children
       if (children.value.length > 0) {
@@ -360,12 +371,12 @@ export const defineModule = ({
               focused: parent?.focused, // Pass the parent's focused record
               event: reloadOn // Include the event that triggered the reload
             })
-    if (reloadOn) {
-      api.socket.on(reloadOn, async () => {
+    load.events.forEach((event) => {
+      api.socket.on(event, async () => {
         await reloadHandler()
-        onEvent()
+        load.hook()
       })
-    }
+    })
 
     // EVENTS
 

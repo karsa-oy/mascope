@@ -14,48 +14,50 @@ const defineMatch = (level) => {
   return defineModule({
     name: `match.${level.toLowerCase()}`,
     key: `match_key`,
-    useParent: () => ({
-      // 'virtual' parent ensures matches react
-      // to batch and sample selections
-      name: 'virtual match parent',
-      multiselect: false,
-      register: ({ sync }) => {
-        const batch = useBatch()
-        const sample = useSample()
-        watch(
-          () => batch.hash + sample.hash + sample.focusedId,
-          () => {
-            sync({ focused: sample.focused ?? batch.focused, name: 'virtual parent (sample)' })
-          }
-        )
-      }
-    }),
-    load: async (focused) => {
-      if (focused?.sample_item_id) {
-        // If a sample is focused, load sample level matches
-        return (
-          await api.http.get(
-            `/match/targets/sample/${focused.sample_item_id}/${level.toLowerCase()}s`,
-            {
-              use: 'read',
-              type: `load_sample_match_${level.toLowerCase()}s`
+    load: {
+      parent: () => ({
+        // 'virtual' parent ensures matches react
+        // to batch and sample selections
+        name: 'virtual match parent',
+        multiselect: false,
+        register: ({ sync }) => {
+          const batch = useBatch()
+          const sample = useSample()
+          watch(
+            () => batch.hash + sample.hash + sample.focusedId,
+            () => {
+              sync({ focused: sample.focused ?? batch.focused, name: 'virtual parent (sample)' })
             }
           )
-        ).map(generateKey(level))
-      } else if (focused?.sample_batch_id) {
-        // If a batch is focused, load batch level matches
-        return (
-          await api.http.get(
-            `/match/targets/batch/${focused.sample_batch_id}/${level.toLowerCase()}s`,
-            {
-              use: 'read',
-              type: `load_batch_match_${level.toLowerCase()}s`
-            }
-          )
-        ).map(generateKey(level))
-      } else {
-        // Otherwise unload the data
-        return []
+        }
+      }),
+      method: async (focused) => {
+        if (focused?.sample_item_id) {
+          // If a sample is focused, load sample level matches
+          return (
+            await api.http.get(
+              `/match/targets/sample/${focused.sample_item_id}/${level.toLowerCase()}s`,
+              {
+                use: 'read',
+                type: `load_sample_match_${level.toLowerCase()}s`
+              }
+            )
+          ).map(generateKey(level))
+        } else if (focused?.sample_batch_id) {
+          // If a batch is focused, load batch level matches
+          return (
+            await api.http.get(
+              `/match/targets/batch/${focused.sample_batch_id}/${level.toLowerCase()}s`,
+              {
+                use: 'read',
+                type: `load_batch_match_${level.toLowerCase()}s`
+              }
+            )
+          ).map(generateKey(level))
+        } else {
+          // Otherwise unload the data
+          return []
+        }
       }
     }
   })

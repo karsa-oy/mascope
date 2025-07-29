@@ -5,12 +5,14 @@ import { api } from '@/api'
 export const useTargetCollection = defineModule({
   name: 'target_collection',
   key: 'target_collection_id',
-  reloadOn: 'targets_all_reload',
-  load: () =>
-    api.http.get(`/target/collections`, {
-      use: 'read',
-      type: 'load_target_collections'
-    }),
+  load: {
+    method: () =>
+      api.http.get(`/target/collections`, {
+        use: 'read',
+        type: 'load_target_collections'
+      }),
+    events: ['targets_all_reload']
+  },
   read: (target_collection_id) =>
     api.http.get(`/target/collections/${target_collection_id}`, {
       use: 'read',
@@ -37,10 +39,12 @@ export const useTargetCollection = defineModule({
 export const useTargetCompound = defineModule({
   name: 'target_compound',
   key: 'target_compound_id',
-  reloadOn: 'targets_all_reload',
-  load: () =>
-    api.http.get(`/target/compounds`, {
-      use: 'read',
-      type: 'read_target_compounds'
-    })
+  load: {
+    method: () =>
+      api.http.get(`/target/compounds`, {
+        use: 'read',
+        type: 'read_target_compounds'
+      }),
+    events: ['targets_all_reload']
+  }
 })
