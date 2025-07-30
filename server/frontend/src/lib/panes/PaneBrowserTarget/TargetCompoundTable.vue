@@ -74,7 +74,7 @@ const tableHeight = inject('target-table-height')
   <BaseTabbedPanel
     label="Target Compounds"
     :clear="app.data.match.collection.unfocus"
-    icon="pi pi-bullseye"
+    icon="pi ph ph-crosshair"
     :loading="app.data.match.compound.loading"
     :pt="
       app.ui.help.right(`

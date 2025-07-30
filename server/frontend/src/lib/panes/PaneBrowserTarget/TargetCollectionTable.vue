@@ -48,12 +48,18 @@ const dialog = reactive({
 })
 
 const tableHeight = inject('target-table-height')
+
+const icon = {
+  TARGETS: 'pi ph ph-target',
+  DIAGNOSTICS: 'pi ph ph-stethoscope',
+  CALIBRANTS: 'pi ph ph-scales'
+}
 </script>
 
 <template v-if="collections">
   <BaseTabbedPanel
     label="Target Collections"
-    icon="pi pi-bullseye"
+    icon="pi ph ph-crosshair"
     :loading="app.data.match.collection.loading"
     :pt="
       app.ui.help.right(`
@@ -132,12 +138,9 @@ const tableHeight = inject('target-table-height')
         <template #body="{ data }">
           <div :id="data.match_key" class="row" style="justify-content: flex-start">
             <span
-              :class="`pi pi-chevron-${
-                data.target_collection_id == app.data.match.collection.focused?.target_collection_id
-                  ? 'down'
-                  : 'right'
-              }`"
-              style="font-size: smaller; margin-right: 0.5rem"
+              :class="icon[data.target_collection_type]"
+              v-tooltip.top="data.target_collection_type.toLowerCase()"
+              style="margin-right: 0.5rem"
             />
             <BaseCopyableField :field="data.target_collection_name" />
           </div>
