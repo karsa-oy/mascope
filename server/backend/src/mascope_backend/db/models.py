@@ -28,6 +28,9 @@ from fastapi_users_db_sqlalchemy.access_token import (
 from mascope_backend.api.models.workspace.config import workspace_config
 from mascope_backend.api.models.sample.batches.config import sample_batch_config
 from mascope_backend.api.models.sample.items.config import sample_item_config
+from mascope_backend.api.models.ionization_mechanisms.config import (
+    ionization_mechanism_config,
+)
 from mascope_backend.api.models.target.collections.config import (
     target_collection_config,
 )
@@ -494,10 +497,20 @@ class TargetIon(Base):
 
 class IonizationMechanism(Base):
     __tablename__ = "ionization_mechanism"
-    ionization_mechanism_id = Column(String(16), nullable=False, primary_key=True)
-    ionization_mechanism_polarity = Column(String(1), nullable=False)
-    ionization_mechanism = Column(String, nullable=False, unique=True)
-    reagent = Column(String, nullable=True)
+
+    ionization_mechanism_id: Mapped[str] = mapped_column(String(16), primary_key=True)
+    ionization_mechanism_polarity: Mapped[str] = mapped_column(
+        String(1), nullable=False
+    )
+    ionization_mechanism: Mapped[str] = mapped_column(
+        String, nullable=False, unique=True
+    )
+    reagent: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    is_default: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text(f"{ionization_mechanism_config.DEFAULT_IS_DEFAULT_STATUS}"),
+    )
 
     # Define relationships
     target_ion = relationship(
