@@ -1,11 +1,6 @@
 <script setup>
 import { ref, reactive, computed, toRaw, watch, watchEffect } from 'vue'
 
-import SelectButton from 'primevue/selectbutton'
-import ToggleSwitch from 'primevue/toggleswitch'
-import ProgressSpinner from 'primevue/progressspinner'
-
-import { BaseParamField } from '@/lib/base'
 import { useApp } from '@/stores'
 import { usePreview } from '@/lib/panes'
 import { ToolbarIntensityScale } from '@/lib/toolbars'
@@ -29,10 +24,6 @@ const scale = ref({
   mode: 'average',
   max: null,
   log: false
-})
-const peakAssign = reactive({
-  dialog: false,
-  mz: null
 })
 
 const unit = computed(() =>
