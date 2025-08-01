@@ -16,7 +16,7 @@ import TextArea from 'primevue/textarea'
 import { api } from '@/api'
 
 import { equals } from '@/lib/table'
-import { clone } from '@/lib/utils'
+import { clone, instrumentType as getInstrumentType } from '@/lib/utils'
 import { useMzFit } from '@/lib/mzFit'
 
 import { useApp } from '@/stores'
@@ -152,6 +152,7 @@ const invalid = computed(() => {
       return false
   }
 })
+const instrumentType = computed(() => getInstrumentType(app.data.workspace.focused?.instrument))
 
 // initialization
 watch(action, init)
@@ -254,7 +255,11 @@ async function execute() {
         <Tab value="info">Info</Tab>
         <Tab value="targets" :disabled="action == 'update'">Targets</Tab>
         <Tab value="mechanisms" :disabled="action == 'update_targets'">Mechanisms</Tab>
-        <Tab value="calibrants" :disabled="action == 'update_targets'">Calibrants</Tab>
+        <Tab
+          value="calibrants"
+          :disabled="action == 'update_targets' || instrumentType.value !== 'tof'"
+          >Calibrants</Tab
+        >
       </TabList>
       <TabPanels>
         <TabPanel value="info">

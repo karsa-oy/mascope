@@ -13,7 +13,7 @@ import { ref, computed, watch } from 'vue'
 
 import { useApp } from '@/stores'
 import { collectionTypes, getAllowedCollectionTypes } from '@/lib/constants'
-import { beautifyConstant } from '@/lib/utils'
+import { beautifyConstant, instrumentType } from '@/lib/utils'
 
 const app = useApp()
 
@@ -31,9 +31,13 @@ const props = defineProps({
 
 const search = ref()
 
-const allowedTypes = computed(() =>
-  props.batch?.type ? getAllowedCollectionTypes(props.batch.type) : collectionTypes
-)
+const allowedTypes = computed(() => {
+  if (props.mode === 'calibrants') {
+    return ['CALIBRANTS']
+  }
+  // For targets mode, use batch type constraints
+  return props.batch?.type ? getAllowedCollectionTypes(props.batch.type) : []
+})
 
 const categoryOptions = computed(() => [
   ...collectionTypes.map((type) => ({
