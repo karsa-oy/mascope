@@ -68,11 +68,13 @@ watchEffect(() => {
     const height = preview.peak
       ? factor * data.mzRangeMax(mz, 0.3)
       : factor * Math.max(app.data.peak.focused.height, data.mzRangeMax(mz, 0.3))
-    zoom.rangeX = { range: [mz - 0.3, mz + 0.3] }
-    zoom.rangeY = scale.value.log ? { autorange: true } : { range: [0, height * 1.2] }
+    zoom.rangeX = { range: [mz - 0.3, mz + 0.3], autorange: false }
+    zoom.rangeY = scale.value.log
+      ? { range: null, autorange: true }
+      : { range: [0, height * 1.2], autorange: false }
   } else {
-    zoom.rangeX = null
-    zoom.rangeY = null
+    zoom.rangeX = { range: null, autorange: true }
+    zoom.rangeY = { range: null, autorange: true }
   }
 })
 
@@ -123,15 +125,6 @@ const config = {
         if (event.button === 0 && data.name === 'Peak') {
           app.data.peak.focus({ mz: x })
         }
-      }
-    "
-    @zoom="
-      ({ rangeX, rangeY }) => {
-        if (rangeX == null && rangeY == null) {
-          app.data.peak.unfocus()
-        }
-        zoom.rangeX = rangeX ?? zoom.rangeX
-        zoom.rangeY = rangeY ?? zoom.rangeY
       }
     "
     :height="height"

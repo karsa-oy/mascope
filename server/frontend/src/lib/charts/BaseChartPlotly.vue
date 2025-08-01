@@ -187,7 +187,7 @@ watchEffect(
       Plotly.react(plot.value, props.data, derived.value.layout, derived.value.config)
       // Relayout to autoranges to fix horizontal-only zoom
       Plotly.relayout(plot.value, {
-        'xaxis.autorange': true,
+        'xaxis.autorange': derived.value.layout.xaxis.autorange ? true : false,
         'yaxis.autorange': derived.value.layout.yaxis.autorange ? true : false
       })
     }

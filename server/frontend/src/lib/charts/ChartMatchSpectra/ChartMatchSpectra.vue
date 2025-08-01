@@ -99,7 +99,8 @@ const layout = computed(() => {
     },
     xaxis: {
       title: { text: 'm/z [Th]' },
-      gridcolor: '#33333399'
+      gridcolor: '#33333399',
+      autorange: true
     },
     margin: { l: 50, r: 20, t: 40, b: 40 },
     dragmode: 'zoom',
