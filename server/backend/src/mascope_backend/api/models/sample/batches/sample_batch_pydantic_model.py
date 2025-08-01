@@ -206,6 +206,9 @@ class GetSampleBatchesQueryParams(QueryParamsModel):
         None,
         description="Filter by the workspace ID for which you want to fetch the sample batches.",
     )
+    sample_batch_name: str | None = Field(
+        None, description="Filter by name of the sample batch"
+    )
     sample_batch_type: list[str] | None = Field(
         default=None,
         description="Filter by sample batch types (ACQUISITION, ANALYSIS). Can specify multiple types.",

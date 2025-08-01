@@ -102,6 +102,7 @@ from mascope_backend.runtime import runtime
 @api_controller()
 async def get_sample_batches(
     workspace_id: str | None = None,
+    sample_batch_name: str | None = None,
     sample_batch_type: list[str] | None = None,
     polarity: list[str] | None = None,
     sort: str = "sample_batch_utc_created",
@@ -122,6 +123,8 @@ async def get_sample_batches(
 
     :param workspace_id: ID of the workspace to filter sample batches by, defaults to None.
     :type workspace_id: str, optional
+    :param sample_batch_name: Name of the sample batch to filter by, defaults to None.
+    :type sample_batch_name: str, optional
     :param sample_batch_type: Type of sample batch to filter by (ACQUISITION or ANALYSIS), defaults to None.
     :type sample_batch_type: list[str], optional
     :param polarity: Polarity to filter by (+, -, or +-), defaults to None.
@@ -144,6 +147,9 @@ async def get_sample_batches(
         # Step 2: Filter by provided parameters
         if workspace_id:
             stmt = stmt.filter(SampleBatch.workspace_id == workspace_id)
+
+        if sample_batch_name:
+            stmt = stmt.filter(SampleBatch.sample_batch_name == sample_batch_name)
 
         if sample_batch_type:
             stmt = stmt.filter(SampleBatch.sample_batch_type.in_(sample_batch_type))

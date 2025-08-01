@@ -22,6 +22,15 @@ class QueryParamsModel(BaseModel):
         """
         Automatically decode '+' signs for specific string fields in the query parameters.
         Handles both single strings and lists of strings.
+
+        NOTE: This approach only works for fields that contain ONLY symbols (like polarity: "+", "-", "+-")
+        and do NOT contain legitimate spaces. For fields that can contain both spaces and plus signs
+        (like sample_batch_name: "Test + sign"), this approach fails because it cannot distinguish
+        between spaces that were originally plus signs vs. legitimate spaces.
+
+        TODO: This validator is a temporary workaround for symbol-only fields.
+        Fix client-side URL encoding instead of server-side workarounds.
+        See GitHub issue: [#1076](https://github.com/karsa-oy/mascope/issues/1076)
         """
         if isinstance(value, str) and value:
             return value.replace(" ", "+")
