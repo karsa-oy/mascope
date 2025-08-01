@@ -14,16 +14,23 @@ from mascope_backend.api.lib.api_features import (
     api_controller,
     api_controller_background_task,
 )
-from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
+from mascope_backend.api.lib.exceptions.api_exceptions import (
+    ApiException,
+    NotFoundException,
+)
 from mascope_backend.api.new.instrument_configs.schemas import (
     CreateInstrumentConfigBody,
     InstrumentFunctionData,
     PeakShape,
     InstrumentConfigFitParams,
+    SetInstrumentConfigBody,
 )
 from mascope_backend.api.new.instrument_configs.lib import (
     fetch_instrument_config_by_filename,
 )
+
+from mascope_backend.runtime import runtime
+
 
 # This service reinforces the a uniqueness constraint:
 #    "Each instrument config must have a unique
@@ -209,9 +216,19 @@ async def create_instrument_config(
         )
     )["data"]
     if conflicts:
-        raise ValueError(
-            f"An instrument config with method_file {instrument_config.method_file} already exists for instrument {instrument_config.instrument}"
+        # If conflict exists, log warning and return existing config
+        existing_config = conflicts[0]
+        message = (
+            f"Instrument config with method_file '{instrument_config.method_file}' "
+            f"already exists for instrument '{instrument_config.instrument}'. "
+            f"Using existing config: {existing_config.get('method_file')}"
         )
+        runtime.logger.warning(message)
+
+        return {
+            "message": message,
+            "data": existing_config,
+        }
 
     async with async_session() as session:
         # Step 2: Construct new instrument function
@@ -360,3 +377,54 @@ async def fit_instrument_config(
             "statistics": stats,
         },
     }
+
+
+@api_controller()
+async def resolve_instrument_config(
+    sample_file: SampleFile,
+) -> SetInstrumentConfigBody:
+    """
+    Resolve instrument configuration for sample file processing.
+
+    Attempts to find existing instrument config by filename. If not found, prepares
+    configuration body for creating new instrument config using sample_file.method_file
+    if available, otherwise generates backup method_file name based on timestamp and instrument.
+
+    This function handles the business logic for determining whether to use existing
+    or create new instrument configurations during the auto-processing pipeline.
+
+    :param sample_file: Sample file record from database
+    :type sample_file: SampleFile
+    :return: Instrument config body for processing
+    :rtype: SetInstrumentConfigBody
+    """
+    try:
+        existing_config = await get_instrument_config(filename=sample_file.filename)
+        instrument_config = SetInstrumentConfigBody(
+            instrument_function_id=existing_config["data"]["instrument_function_id"]
+        )
+        runtime.logger.debug(
+            f"Using existing instrument config: {existing_config['data']['method_file']}"
+        )
+        return instrument_config
+
+    except ApiException:
+        # Create new instrument config - check if sample_file has method_file reference,
+        # otherwise use auto-generated backup
+        if sample_file.method_file and sample_file.method_file.strip():
+            # Use existing method_file from sample_file record
+            method_file = sample_file.method_file
+            runtime.logger.debug(f"Using sample_file method_file: {method_file}")
+        else:
+            # Fallback to auto-generated method file name
+            timestamp = sample_file.datetime.strftime("%Y-%m-%d %H:%M:%S")
+            method_file = f"{timestamp} Acquisition {sample_file.instrument}"
+            runtime.logger.debug(f"Generated backup method_file: {method_file}")
+
+        instrument_config = SetInstrumentConfigBody(
+            new_record=CreateInstrumentConfigBody(
+                method_file=method_file,
+            )
+        )
+        runtime.logger.debug(f"Creating new instrument config: {method_file}")
+        return instrument_config

@@ -2,10 +2,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from mascope_backend.api.models.base_pydantic_model import QueryParamsModel
-from mascope_backend.api.new.instrument_configs.params import InstrumentConfigParams
-
-
-instrument_config_params = InstrumentConfigParams()
+from mascope_backend.api.new.instrument_configs.params import instrument_config_params
 
 
 class GetInstrumentConfigsQueryParams(QueryParamsModel):

@@ -6,3 +6,6 @@ class InstrumentConfigParams(BaseModel):
         0.95,
         description="R-squared threshold filtering non-(skewed) Gaussian peaks from instrument function evaluation",
     )
+
+
+instrument_config_params = InstrumentConfigParams()
