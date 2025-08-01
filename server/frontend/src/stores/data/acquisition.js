@@ -152,10 +152,6 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
     time.range = initTime().range
   }
 
-  ui.notification.on('create_sample_file', async () => {
-    load()
-  })
-
   return {
     // state
     list,

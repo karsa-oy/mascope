@@ -2,7 +2,7 @@ import os
 import shutil
 from typing import Literal
 from datetime import datetime
-from fastapi import HTTPException, UploadFile
+from fastapi import HTTPException, UploadFile, BackgroundTasks
 from sqlalchemy import (
     select,
     asc,
@@ -25,10 +25,6 @@ from mascope_backend.db.id import gen_id
 from mascope_backend.db.models import SampleFile, User
 from mascope_backend.socket import sio
 from mascope_backend.socket import event_emitter
-from mascope_backend.socket.notifications import (
-    UserNotification,
-    emit_user_notification,
-)
 from mascope_backend.api.new.instruments import get_instruments
 
 from mascope_backend.api.lib.api_features import (
@@ -168,7 +164,12 @@ async def get_sample_file(sample_file_id: str) -> dict:
 
 
 @api_controller()
-async def create_sample_file(sample_file: SampleFileCreate) -> dict:
+async def create_sample_file(
+    sample_file_create: SampleFileCreate,
+    background_tasks: BackgroundTasks,
+    sid: str | None = None,
+    process_id: str | None = None,
+) -> dict:
     """
     Creates a new sample file with the given data.
 
@@ -177,23 +178,29 @@ async def create_sample_file(sample_file: SampleFileCreate) -> dict:
     2. Construct a new SampleFile object with provided data and add it to the session.
     3. Commit the transaction to persist the new sample file in the database.
     4. Refresh the instance to get the created data from the database.
-    5. Emit a 'sample_file_created' event with the filename and instrument.
-    6. Reload instruments and create acquisition workspaces if needed
+    5. Reload instruments and create acquisition workspaces if needed
+    6. Trigger automatic processing of the sample file
     7. Return the created sample file data.
 
-    :param sample_file: Data for creating the sample file.
-    :type sample_file: SampleFileCreate
+    :param sample_file_create: Data for creating the sample file.
+    :type sample_file_create: SampleFileCreate
+    :param background_tasks:  Background tasks for triggering an automatic processing for sample file after creation.
+    :type background_tasks: BackgroundTasks
+    :param sid: User socketSession ID, used for emitting notifications to specific client, defaults to None.
+    :type sid: str | None
+    :param process_id: Process ID for tracking the background task.
+    :type process_id: str | None
     :raises NotFoundException: If the new sample file is not found after creation.
     :return: The created sample file data.
     :rtype: dict
     """
     # Step 1: Check if a sample file with the given filename already exists
-    existing_files = await get_sample_files(filename=sample_file.filename)
+    existing_files = await get_sample_files(filename=sample_file_create.filename)
 
     if existing_files["results"] > 0:
         raise HTTPException(
             status_code=409,
-            detail=f"Sample file with filename '{sample_file.filename}' already exists",
+            detail=f"Sample file with filename '{sample_file_create.filename}' already exists",
         )
 
     async with async_session() as session:
@@ -203,7 +210,7 @@ async def create_sample_file(sample_file: SampleFileCreate) -> dict:
 
         # Step 2: Construct new sample file
         new_sample_file = SampleFile(
-            sample_file_id=gen_id(16), **sample_file.model_dump()
+            sample_file_id=gen_id(16), **sample_file_create.model_dump()
         )
         session.add(new_sample_file)
 
@@ -213,24 +220,29 @@ async def create_sample_file(sample_file: SampleFileCreate) -> dict:
         # Step 4: Refresh instance
         await session.refresh(new_sample_file)
 
-        # Step 5: Emit create_sample_file event
-        notification = UserNotification(
-            process_id=gen_id(8),
-            type="create_sample_file",
-            status="success",
-            message=f"Sample file record '{sample_file.filename}' created.",
-            data={
-                "filename": sample_file.filename,
-                "instrument": sample_file.instrument,
-            },
+        # Step 5. Trigger instruments and acquisitions reload
+        # This refreshes the file lists and related data in the UI
+        await sio.emit(
+            "acquisitions_reload", namespace="/", room=new_sample_file.instrument
         )
-        await emit_user_notification(notification, sample_file.instrument)
 
-        # Step 6. Trigger instruments reload
-        if sample_file.instrument not in initial_instruments:
+        if new_sample_file.instrument not in initial_instruments:
             # New instrument detected - reload instruments and create acquisition workspaces
             await create_acquisition_workspaces()
             await sio.emit("instruments_reload", namespace="/")
+
+        # Step 6: Trigger automatic processing of the sample file
+        from mascope_backend.api.controllers.sample.files.process.service import (
+            auto_process_sample_file,
+        )
+
+        background_tasks.add_task(
+            auto_process_sample_file,
+            sample_file_id=new_sample_file.sample_file_id,
+            independent_transaction=True,
+            sid=sid,
+            process_id=process_id,
+        )
 
         # Step 7: Return created sample file
         return {
