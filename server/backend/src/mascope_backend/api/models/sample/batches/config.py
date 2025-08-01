@@ -25,6 +25,9 @@ class SampleBatchConfig(BaseModel):
     ACQUISITION_POLARITY: list = ["+", "-"]
     ANALYSIS_POLARITY: str = "+-"
 
+    # Polarity-based batch naming configuration
+    ACQUISITION_POLARITY_NAMES: dict = {"+": "positive", "-": "negative"}
+
     # Business rules
     ACQUISITION_AUTO_LOCK: bool = True
 
@@ -40,6 +43,10 @@ class SampleBatchConfig(BaseModel):
     def get_allowed_collection_types(self, sample_batch_type: str) -> list:
         """Get allowed collection types for a sample batch type."""
         return getattr(self, f"{sample_batch_type}_COLLECTION_TYPES", [])
+
+    def get_acquisition_polarity_name(self, polarity: str) -> str:
+        """Get batch name for acquisition polarity symbol."""
+        return self.ACQUISITION_POLARITY_NAMES.get(polarity)
 
 
 # Global sample batch configuration instance

@@ -4,6 +4,9 @@ from mascope_backend.api.new.auth.access_token.service import get_access_token
 from mascope_backend.db.id import gen_id
 from mascope_backend.api.new.auth.dependencies import guest_user, editor_user
 from mascope_backend.api.lib.api_features import api_route
+from mascope_backend.api.controllers.sample.files.process.service import (
+    auto_process_sample_file,
+)
 from mascope_backend.api.controllers.sample.files.sample_files_controller import (
     get_sample_files,
     get_sample_file,
@@ -88,15 +91,25 @@ async def get_sample_file_route(sample_file_id: str, user=Depends(guest_user)):
 @sample_files_router.post("")
 @api_route(status_code=201, token_access=True)
 async def create_sample_file_route(
-    sample_file: SampleFileCreate, user=Depends(editor_user)
+    request: Request,
+    sample_file_create: SampleFileCreate,
+    background_tasks: BackgroundTasks,
+    user=Depends(editor_user),
 ):
     """Create a new sample file record.
 
-    :param sample_file: Data required for creating a sample file.
+    :param request: The request object.
+    :param sample_file_create: Data required for creating a sample file.
+    :param background_tasks: Background tasks for triggering an automatic processing for sample file after creation.
     :param user: Authenticated user with editor access.
     :return: The created sample file's details.
     """
-    return await create_sample_file(sample_file)
+    return await create_sample_file(
+        sample_file_create=sample_file_create,
+        background_tasks=background_tasks,
+        sid=request.headers.get("X-SID"),
+        process_id=gen_id(8),
+    )
 
 
 @sample_files_router.patch("/{sample_file_id}")
@@ -317,3 +330,39 @@ async def get_sample_file_metadata_route(
     :return: Metadata for the sample file.
     """
     return await get_sample_file_metadata(sample_file_id)
+
+
+@sample_files_router.post("/{sample_file_id}/process")
+@api_route(status_code=202)
+async def process_sample_item_route(
+    sample_file_id: str,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    user=Depends(editor_user),
+):
+    """Process a sample item, including creation, calibration, and matching.
+
+    :param body: The data for processing the sample item.
+    :param background_tasks: Background tasks for processing the item.
+    :param user: The current authenticated user with editor permissions.
+    :return: A dictionary confirming the processing has started.
+    """
+    # Verify the existence of sample file
+    sample_file = (await get_sample_file(sample_file_id)).get("data")
+
+    # Get data for notifications
+    sid = request.headers.get("X-SID")
+    process_id = gen_id(8)
+
+    background_tasks.add_task(
+        auto_process_sample_file,
+        sample_file_id=sample_file_id,
+        independent_transaction=True,
+        sid=sid,
+        process_id=process_id,
+    )
+
+    return {
+        "message": f"Processing sample file '{sample_file.get('filename')}', please wait.",
+        "process_id": process_id,
+    }

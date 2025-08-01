@@ -2,7 +2,6 @@
 # -------------------------------------------------------------------
 # Imports
 # -------------------------------------------------------------------
-from typing import Optional
 from fastapi import BackgroundTasks
 from sqlalchemy import asc, desc, func, select
 from sqlalchemy.orm import joinedload
