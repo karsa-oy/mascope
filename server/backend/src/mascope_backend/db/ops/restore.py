@@ -288,6 +288,38 @@ def create_indexes(conn, table_name, schema_info):
                     runtime.logger.info(f"🆕 Index {index_name} created.")
 
 
+def normalize_default_value(value):
+    """
+    Normalize default values for schema comparison.
+
+    SQLite PRAGMA table_info returns string defaults with quotes included,
+    but table configs may have them without quotes. This function normalizes
+    both formats for consistent comparison.
+
+    :param value: Default value from PRAGMA or table config
+    :return: Normalized default value
+    """
+    if value and isinstance(value, str):
+        # Check if it's a quoted string value
+        if value.startswith("'") and value.endswith("'") and len(value) > 2:
+            return value[1:-1]  # Strip outer quotes
+    return value
+
+
+def normalize_columns_for_comparison(columns_dict):
+    """
+    Normalize column definitions for comparison by normalizing default values.
+
+    :param columns_dict: Dictionary of column definitions
+    :return: Normalized dictionary with default values normalized
+    """
+    normalized = {}
+    for col_name, (col_type, notnull, default_val, pk) in columns_dict.items():
+        normalized_default = normalize_default_value(default_val)
+        normalized[col_name] = (col_type, notnull, normalized_default, pk)
+    return normalized
+
+
 def restore_table(conn, table_name, schema_info):
     """
     Handles the restoration of a table's schema if it does not match the expected schema.
@@ -335,11 +367,22 @@ def restore_table(conn, table_name, schema_info):
     cursor.execute(f"PRAGMA foreign_key_list({table_name})")
     current_fks = {fk[3]: (fk[2], fk[4], fk[5], fk[6]) for fk in cursor.fetchall()}
 
-    runtime.logger.debug(f"Current columns: {current_columns}")
-    runtime.logger.debug(f"Correct columns: {schema_info["columns"]}")
+    # Normalize columns for comparison (handles string default value quirks)
+    normalized_current_columns = normalize_columns_for_comparison(current_columns)
+    normalized_expected_columns = normalize_columns_for_comparison(
+        schema_info["columns"]
+    )
+
+    runtime.logger.debug(f"Current columns: {normalized_current_columns}")
+    runtime.logger.debug(f"Correct columns: {normalized_expected_columns}")
     runtime.logger.debug(f"Current foreign keys: {current_fks}")
-    runtime.logger.debug(f"Correct foreign keys: {schema_info["fks"]}")
-    if current_columns != schema_info["columns"] or current_fks != schema_info["fks"]:
+    runtime.logger.debug(f"Correct foreign keys: {schema_info['fks']}")
+
+    # Compare normalized schemas
+    if (
+        normalized_current_columns != normalized_expected_columns
+        or current_fks != schema_info["fks"]
+    ):
         runtime.logger.warning(f"⚙️ Schema mismatch detected, restoring {table_name}.")
         create_table_backup(cursor, table_name)
         update_backup_table(cursor, table_name)
