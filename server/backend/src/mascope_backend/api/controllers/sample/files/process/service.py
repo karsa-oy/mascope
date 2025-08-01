@@ -100,7 +100,7 @@ async def auto_process_sample_file(
     # Step 2: Handle instrument config assignment (existing or create new) and processing
     instrument_config = await resolve_instrument_config(sample_file)
 
-    proces_instrument_config_result = await process_instrument_config(
+    process_instrument_config_result = await process_instrument_config(
         filenames=[sample_file.filename],
         instrument_config=instrument_config,
         independent_transaction=False,
@@ -110,7 +110,7 @@ async def auto_process_sample_file(
     )
     # Collect affected items from instrument config processing
     all_affected_sample_item_ids.update(
-        proces_instrument_config_result["_notification_data"].get(
+        process_instrument_config_result["_notification_data"].get(
             "affected_sample_item_ids", []
         )
     )
@@ -160,14 +160,14 @@ async def auto_process_sample_file(
         asyncio.create_task(
             rematch_samples(
                 sample_item_ids=other_affected_sample_item_ids,
-                independent_transaction=True,  # Set to true to handle reloads independantly
+                independent_transaction=True,  # Set to true to handle reloads independently
                 sid=sid,
                 process_id=gen_id(8),
             )
         )
 
         runtime.logger.info(
-            f"Started independant rematch task for {len(other_affected_sample_item_ids)} affected samples"
+            f"Started independent rematch task for {len(other_affected_sample_item_ids)} affected samples"
         )
 
     # Step 7: Prepare response with processing results
@@ -179,7 +179,7 @@ async def auto_process_sample_file(
         processed_samples.append(sample_result["data"])
 
     return {
-        "message": f"Auto-processing complete for {sample_file.filename}, preocessed {len(processed_samples)} samples.",
+        "message": f"Auto-processing complete for {sample_file.filename}, processed {len(processed_samples)} samples.",
         "data": processed_samples,
         "_notification_data": {
             "affected_sample_batch_ids": affected_sample_batch_ids,

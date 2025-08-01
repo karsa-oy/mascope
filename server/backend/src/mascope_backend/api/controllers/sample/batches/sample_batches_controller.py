@@ -847,14 +847,14 @@ async def import_sample_items(
         asyncio.create_task(
             rematch_samples(
                 sample_item_ids=other_affected_sample_item_ids,
-                independent_transaction=True,  # Set to true to handle reloads independantly
+                independent_transaction=True,  # Set to true to handle reloads independently
                 sid=sid,
                 process_id=gen_id(8),
             )
         )
 
         runtime.logger.info(
-            f"Started independant rematch task for {len(other_affected_sample_item_ids)} affected samples"
+            f"Started independent rematch task for {len(other_affected_sample_item_ids)} affected samples"
         )
 
     # Step 8: Raise a warning if encountered during calibration
