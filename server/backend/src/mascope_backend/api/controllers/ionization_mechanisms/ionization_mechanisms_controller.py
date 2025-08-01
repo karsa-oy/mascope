@@ -1,3 +1,7 @@
+# pylint: disable=not-callable
+"""
+Ionization mechanisms controller for managing ionization mechanism operations.
+"""
 from fastapi import HTTPException
 from sqlalchemy import (
     select,
@@ -26,16 +30,18 @@ from mascope_backend.api.controllers.target.ions.target_ions_controller import (
 )
 from mascope_backend.api.models.ionization_mechanisms.ionization_mechanism_pydantic_model import (
     IonizationMechanismCreate,
+    IonizationMechanismRead,
 )
 
 
 @api_controller()
 async def get_ionization_mechanisms(
-    ionization_mechanism_polarity: str = None,
-    ionization_mechanism: str = None,
-    reagent: str = None,
-    sort: str = None,
-    order: str = None,
+    ionization_mechanism_polarity: str | None = None,
+    ionization_mechanism: list | None = None,
+    reagent: str | None = None,
+    is_default: bool | None = None,
+    sort: str | None = None,
+    order: str | None = None,
     page: int = 0,
     limit: int = 10000,
 ) -> dict:
@@ -53,7 +59,10 @@ async def get_ionization_mechanisms(
 
     :param ionization_mechanism_polarity: Filter by polarity, defaults to None.
     :param ionization_mechanism: Filter by mechanism, defaults to None.
+    :type ionization_mechanism: list | None
     :param reagent: Filter by reagent, defaults to None.
+    :param is_default: Filter by default acquisition ionization mechanism, defaults to None.
+    :type is_default: bool | None
     :param sort: Column to sort by, defaults to None.
     :param order: Sorting order, defaults to None.
     :param page: Page number for pagination, defaults to 0.
@@ -70,11 +79,16 @@ async def get_ionization_mechanisms(
                 == ionization_mechanism_polarity
             )
         if ionization_mechanism:
-            stmt = stmt.filter(
-                IonizationMechanism.ionization_mechanism == ionization_mechanism
+            stmt = stmt.where(
+                IonizationMechanism.ionization_mechanism.in_(ionization_mechanism)
             )
         if reagent:
             stmt = stmt.filter(IonizationMechanism.reagent == reagent)
+
+        if is_default is not None:
+            stmt = stmt.filter(
+                IonizationMechanism.is_default == (1 if is_default else 0)
+            )
 
         # Step 3: Apply sorting
         if sort:
@@ -86,9 +100,7 @@ async def get_ionization_mechanisms(
             stmt = stmt.order_by(sort_expression)
 
         # Step 4: Apply pagination
-        total = await session.scalar(
-            select(func.count()).select_from(stmt)  # pylint: disable=not-callable
-        )
+        total = await session.scalar(select(func.count()).select_from(stmt))
         stmt = stmt.offset(page * limit).limit(limit)
         # Step 5: Execute the query
         result = await session.execute(stmt)
@@ -99,7 +111,9 @@ async def get_ionization_mechanisms(
             "message": "Retrieved ionization mechanisms successfully.",
             "results": total,
             "data": [
-                ionization_mechanism.to_dict()
+                IonizationMechanismRead.model_validate(
+                    ionization_mechanism
+                ).model_dump()
                 for ionization_mechanism in ionization_mechanisms
             ],
         }
@@ -149,18 +163,20 @@ async def get_ionization_mechanism(ionization_mechanism_id: str) -> dict:
                 )
 
         # Step 4: Return ionization mechanism details with sample batches
-        ionization_mechanism_dict = ionization_mechanism.to_dict()
-        ionization_mechanism_dict["sample_batches_count"] = len(affected_sample_batches)
-        ionization_mechanism_dict["sample_batches"] = affected_sample_batches
+        ionization_mechanism_data = IonizationMechanismRead.model_validate(
+            ionization_mechanism
+        ).model_dump()
+        ionization_mechanism_data["sample_batches_count"] = len(affected_sample_batches)
+        ionization_mechanism_data["sample_batches"] = affected_sample_batches
         return {
             "message": f"Ionization mechanism '{ionization_mechanism.ionization_mechanism}' retrieved successfully.",
-            "data": ionization_mechanism_dict,
+            "data": ionization_mechanism_data,
         }
 
 
 @api_controller()
 async def create_ionization_mechanism(
-    ionization_mechanism: IonizationMechanismCreate,
+    ionization_mechanism_create: IonizationMechanismCreate,
 ) -> dict:
     """
     Creates a new ionization mechanism and generates corresponding ions for each existing target compound in the database.
@@ -182,19 +198,20 @@ async def create_ionization_mechanism(
     """
     # Step 1: Check if the ionization mechanism already exists
     existing_mechanisms = await get_ionization_mechanisms(
-        ionization_mechanism=ionization_mechanism.ionization_mechanism
+        ionization_mechanism=[ionization_mechanism_create.ionization_mechanism]
     )
 
     if existing_mechanisms["results"] != 0:
         raise HTTPException(
             status_code=409,
-            detail=f"Ionization mechanism '{ionization_mechanism.ionization_mechanism}' already exists",
+            detail=f"Ionization mechanism '{ionization_mechanism_create.ionization_mechanism}' already exists",
         )
 
     # Step 2: Create a new ionization mechanism instance and add it to the session.
     async with async_session() as session:
         new_ionization_mechanism = IonizationMechanism(
-            ionization_mechanism_id=gen_id(11), **ionization_mechanism.model_dump()
+            ionization_mechanism_id=gen_id(11),
+            **ionization_mechanism_create.model_dump(),
         )
         session.add(new_ionization_mechanism)
 
@@ -238,7 +255,9 @@ async def create_ionization_mechanism(
     # Step 7: Return created ionization mechanism details with a success message
     return {
         "message": f"Ionization mechanism '{new_ionization_mechanism.ionization_mechanism}' was created successfully.",
-        "data": new_ionization_mechanism.to_dict(),
+        "data": IonizationMechanismRead.model_validate(
+            new_ionization_mechanism
+        ).model_dump(),
     }
 
 

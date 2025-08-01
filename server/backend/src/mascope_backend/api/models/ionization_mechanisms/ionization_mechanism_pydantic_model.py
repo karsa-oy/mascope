@@ -1,32 +1,26 @@
+"""
+Ionization mechanism pydantic models for API validation and serialization.
+
+Defines data models for ionization mechanism related requests and responses
+with validation rules and business logic constraints.
+"""
+
 import re
-from typing import Optional
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
+
 from mascope_backend.api.models.base_pydantic_model import QueryParamsModel
+from mascope_backend.api.models.ionization_mechanisms.config import (
+    ionization_mechanism_config,
+)
 
 
-class IonizationMechanismCreate(BaseModel):
-    ionization_mechanism_polarity: str = Field(
-        ...,
-        description="Polarity of the ionization mechanism ('+' or '-')",
-    )
-    ionization_mechanism: str = Field(
-        ...,
-        description="Chemical formula modification (addition/abstraction) representing the ionized form.",
-    )
-    reagent: Optional[str] = Field(
-        None, description="Reagent used in the ionization process, if applicable."
-    )
-
-    @field_validator("ionization_mechanism_polarity")
-    @classmethod
-    def validate_polarity(cls, value):
-        if value not in ["+", "-"]:
-            raise ValueError(f"Invalid polarity '{value}'. Must be '+' or '-'.")
-        return value
+class IonizationMechanismBaseValidator:
+    """Base validation logic for ionization mechanism shared fields."""
 
     @field_validator("ionization_mechanism")
     @classmethod
-    def validate_ionization_mechanism(cls, value):
+    def validate_ionization_mechanism(cls, value: str) -> str:
+        """Validate ionization mechanism format and structure."""
         if not value.strip():
             raise ValueError("ionization_mechanism cannot be empty or just whitespace.")
 
@@ -50,9 +44,21 @@ class IonizationMechanismCreate(BaseModel):
 
         return value
 
+    @field_validator("ionization_mechanism_polarity")
+    @classmethod
+    def validate_polarity(cls, value: str) -> str:
+        """Validate polarity is '+' or '-'."""
+        allowed_polarities = ionization_mechanism_config.IONIZATION_MECHANISM_POLARITY
+        if value not in allowed_polarities:
+            raise ValueError(
+                f"Invalid polarity '{value}'. Must be one of {allowed_polarities}."
+            )
+        return value
+
     @field_validator("reagent")
     @classmethod
-    def validate_reagent(cls, value):
+    def validate_reagent(cls, value: str | None) -> str | None:
+        """Validate reagent is not empty string."""
         if value is not None and not value.strip():
             raise ValueError("reagent cannot be an empty string.")
         return value
@@ -60,37 +66,125 @@ class IonizationMechanismCreate(BaseModel):
     @model_validator(mode="after")
     @classmethod
     def validate_ionization_mechanism_and_polarity(cls, values):
+        """Validate ionization mechanism polarity matches ending charge."""
         polarity = values.ionization_mechanism_polarity
         ionization_mechanism = values.ionization_mechanism
 
         # Match the polarity with the final ion charge
         if polarity == "+" and not ionization_mechanism.endswith("+"):
             raise ValueError(
-                "Polarity is '+', but the ionization mechanism does not end with '+'. The ion should carry a positive charge."
+                "Polarity is '+', but the ionization mechanism does not end with '+'. "
+                "The ion should carry a positive charge."
             )
         if polarity == "-" and not ionization_mechanism.endswith("-"):
             raise ValueError(
-                "Polarity is '-', but the ionization mechanism does not end with '-'. The ion should carry a negative charge."
+                "Polarity is '-', but the ionization mechanism does not end with '-'. "
+                "The ion should carry a negative charge."
             )
 
         return values
 
 
+class IonizationMechanismBase(IonizationMechanismBaseValidator, BaseModel):
+    """Base model with common fields for IonizationMechanism schemas."""
+
+    ionization_mechanism_polarity: str = Field(
+        ..., description="Polarity of the ionization mechanism ('+' or '-')"
+    )
+    ionization_mechanism: str = Field(
+        ...,
+        description="Chemical formula modification (addition/abstraction) representing the ionized form.",
+    )
+    reagent: str | None = Field(
+        None, description="Reagent used in the ionization process, if applicable."
+    )
+    is_default: bool = Field(
+        ..., description="Whether this is a default acquisition ionization mechanism"
+    )
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class IonizationMechanismCreate(IonizationMechanismBase):
+    """Model used for ionization mechanism creation requests."""
+
+    @model_validator(mode="before")
+    @classmethod
+    def auto_derive_fields(cls, values):
+        """Auto-derive polarity and is_default fields."""
+        mechanism = values.get("ionization_mechanism")
+
+        # Auto-derive polarity from the last character if not provided
+        if not values.get("ionization_mechanism_polarity"):
+            values["ionization_mechanism_polarity"] = mechanism[-1]
+
+        # Auto-determine is_default if not explicitly set
+        if values.get("is_default") is None:
+            values["is_default"] = (
+                mechanism in ionization_mechanism_config.DEFAULT_ACQUISITION_MECHANISMS
+            )
+
+        return values
+
+
+class IonizationMechanismRead(IonizationMechanismBase):
+    """Model used for reading ionization mechanisms, includes database fields."""
+
+    ionization_mechanism_id: str = Field(
+        ..., description="Unique identifier for the ionization mechanism"
+    )
+
+
+class IonizationMechanismUpdate(IonizationMechanismBaseValidator, BaseModel):
+    """Model used for ionization mechanism update requests - only user-editable fields."""
+
+    ionization_mechanism_polarity: str | None = Field(
+        None, description="Polarity of the ionization mechanism ('+' or '-')"
+    )
+    ionization_mechanism: str | None = Field(
+        None, description="Chemical formula modification representing the ionized form."
+    )
+    reagent: str | None = Field(
+        None, description="Reagent used in the ionization process"
+    )
+    is_default: bool | None = Field(
+        None, description="Whether this is a default acquisition mechanism"
+    )
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class GetIonizationMechanismsQueryParams(QueryParamsModel):
-    ionization_mechanism_polarity: Optional[str] = Field(
-        None, description="Filter by the polarity of the ionization mechanism."
-    )
-    ionization_mechanism: Optional[str] = Field(
+    """Query parameters for filtering and paginating ionization mechanism listings."""
+
+    ionization_mechanism_polarity: str | None = Field(
         None,
-        description="Filter by the chemical formula modification of the ionization mechanism.",
+        description="Filter by the polarity of the ionization mechanism ('+' or '-')",
     )
-    reagent: Optional[str] = Field(
-        None, description="Filter by the reagent used in the ionization process."
-    )
-    sort: Optional[str] = Field(None, description="Field to sort by.")
-    order: Optional[str] = Field(
+    ionization_mechanism: list[str] | None = Field(
         None,
-        description="Order of sorting, can be either 'asc' for ascending or 'desc' for descending.",
+        description="Filter by the chemical formula modification of the ionization mechanism. Can specify multiple values.",
     )
-    page: int = Field(0, description="Pagination page number.")
-    limit: int = Field(10000, description="Number of items per page.")
+    reagent: str | None = Field(
+        None, description="Filter by the reagent used in the ionization process"
+    )
+    is_default: bool | None = Field(
+        None,
+        description="Filter by default status (true for default acquisition mechanisms)",
+    )
+    sort: str | None = Field("ionization_mechanism", description="Field to sort by")
+    order: str | None = Field(
+        "asc",
+        description="Order of sorting ('asc' for ascending, 'desc' for descending)",
+    )
+    page: int = Field(0, description="Pagination page number")
+    limit: int = Field(10000, description="Number of items per page")
+
+    @field_validator("ionization_mechanism_polarity")
+    @classmethod
+    def validate_polarity_filter(cls, value: str | None) -> str | None:
+        """Validate polarity filter values."""
+        allowed_polarities = ionization_mechanism_config.IONIZATION_MECHANISM_POLARITY
+        if value is not None and value not in allowed_polarities:
+            raise ValueError(f"Polarity filter must be one of {allowed_polarities}")
+        return value

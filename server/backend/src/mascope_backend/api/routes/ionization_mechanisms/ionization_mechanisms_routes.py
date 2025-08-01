@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Body
+from fastapi import APIRouter, Depends, Body, Query
 from mascope_backend.api.new.auth.dependencies import guest_user, editor_user
 from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.controllers.ionization_mechanisms.ionization_mechanisms_controller import (
@@ -21,7 +21,7 @@ ionization_mechanisms_router = APIRouter(
 @ionization_mechanisms_router.get("")
 @api_route(token_access=True)
 async def get_ionization_mechanisms_route(
-    query_params: GetIonizationMechanismsQueryParams = Depends(),
+    query_params: GetIonizationMechanismsQueryParams = Query(),
     user=Depends(guest_user),
 ):
     """Retrieve a list of ionization mechanisms.
