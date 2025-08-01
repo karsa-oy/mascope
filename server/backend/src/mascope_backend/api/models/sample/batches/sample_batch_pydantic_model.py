@@ -6,7 +6,6 @@ with validation rules and business logic constraints.
 """
 
 from datetime import datetime
-from typing import Optional, List
 from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 
 from mascope_file.name import get_instrument_type
@@ -25,20 +24,21 @@ from mascope_backend.api.models.sample.batches.config import sample_batch_config
 
 
 class BuildParams(BaseModel):
-    calibration_collection: str = Field(
-        ..., description="ID of the calibration collection"
+    calibration_collection: str | None = Field(
+        None, description="ID of the calibration collection (optional for ACQUISITION)"
     )
-    ion_mechanisms: List[str] = Field(
+    ion_mechanisms: list[str] = Field(
         ..., description="List of ionisation mechanism IDs for matching"
     )
-    calibration_ion_mechanisms: Optional[List[str]] = Field(
+    calibration_ion_mechanisms: list[str] | None = Field(
         [], description="List of ionisation mechanism IDs for calibration"
     )
 
     @field_validator("calibration_collection")
     @classmethod
     def check_calibration_collection_length(cls, v):
-        if len(v) != 16:
+        """Validate length if calibration_collection is provided"""
+        if v is not None and len(v) != 16:
             raise ValueError("Only one calibration collection can be applied")
         return v
 
@@ -111,6 +111,23 @@ class SampleBatchValidator(SampleBatchBaseValidator):
 
         return values
 
+    @model_validator(mode="after")
+    @classmethod
+    def validate_calibration_collection_by_batch_type(cls, values):
+        """Calibration collection can only be None for ACQUISITION batch type."""
+        build_params = getattr(values, "build_params", None)
+
+        if (
+            build_params
+            and values.sample_batch_type == "ANALYSIS"
+            and build_params.calibration_collection is None
+        ):
+            raise ValueError(
+                "ANALYSIS sample batches must have a calibration collection specified"
+            )
+
+        return values
+
 
 class SampleBatchBase(SampleBatchValidator, BaseModel):
     """Base model with common fields for SampleBatch."""
@@ -119,7 +136,7 @@ class SampleBatchBase(SampleBatchValidator, BaseModel):
         ..., description="ID of the workspace associated with the sample batch"
     )
     sample_batch_name: str = Field(..., description="Name of the sample batch")
-    sample_batch_description: Optional[str] = Field(
+    sample_batch_description: str | None = Field(
         "", description="Description of the sample batch"
     )
     sample_batch_type: str = Field(
@@ -140,7 +157,7 @@ class SampleBatchBase(SampleBatchValidator, BaseModel):
 class SampleBatchCreate(SampleBatchBase):
     """Model used for sample batch creation requests."""
 
-    target_collection_ids: List[str] = Field(
+    target_collection_ids: list[str] = Field(
         ..., description="IDs of target collections associated with the sample batch"
     )
 
@@ -177,7 +194,7 @@ class SampleBatchUpdate(SampleBatchBaseValidator, BaseModel):
     build_params: BuildParams = Field(
         ..., description="Build parameters of the sample batch"
     )
-    target_collection_ids: List[str] = Field(
+    target_collection_ids: list[str] = Field(
         ..., description="IDs of target collections associated with the sample batch"
     )
 
@@ -236,14 +253,14 @@ class GetSampleBatchesQueryParams(QueryParamsModel):
 
 
 class GetSampleBatchTargetsQueryParams(QueryParamsModel):
-    deduplicate: Optional[bool] = Field(
+    deduplicate: bool | None = Field(
         False,
         description="Drop the potential duplicates (added to several target collections). Target collection info added if deduplicate is False.",
     )
 
 
 class SampleBatchImportSamplesBody(BaseModel):
-    sample_items: List[SampleItemCreate] = Field(
+    sample_items: list[SampleItemCreate] = Field(
         ..., description="Sample items to be created and imported to the sample batch"
     )
     mz_calibration_params: MzCalibrationParams = MzCalibrationParams()
@@ -278,6 +295,6 @@ class SampleBatchCopyBody(BaseModel):
         ..., description="ID of the workspace where to copy the batch"
     )
     sample_batch_name: str = Field(..., description="Name of the new sample batch")
-    sample_batch_description: Optional[str] = Field(
+    sample_batch_description: str | None = Field(
         None, description="Description of the new sample batch"
     )
