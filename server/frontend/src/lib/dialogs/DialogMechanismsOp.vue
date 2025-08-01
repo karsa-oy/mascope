@@ -30,10 +30,8 @@ const resetFields = () => {
   add.reagent = null
 }
 
-const polarity = computed(() => add.mechanism.trim().slice(-1))
-const polarityValid = computed(() => ['+', '-'].includes(polarity.value))
-const prefix = computed(() => ['+', '-'].includes(add.mechanism.trim()[0]))
-const prefixValid = computed(() => ['+', '-'].includes(prefix.value))
+const polarityValid = computed(() => ['+', '-'].includes(add.mechanism.trim().slice(-1)))
+const prefixValid = computed(() => ['+', '-'].includes(add.mechanism.trim()[0]))
 
 // reset when modal closed/opened
 watch(visible, resetFields)
@@ -75,13 +73,14 @@ watch(
         @click="
           () =>
             app.data.mechanism.create({
-              ionization_mechanism_polarity: polarity,
               ionization_mechanism: add.mechanism.trim(),
               reagent: add.reagent?.trim() || null
             })
         "
         :disabled="
-          (!add.mechanism.trim() && !(add.reagent && add.reagent.trim())) || !polarityValid
+          (!add.mechanism.trim() && !(add.reagent && add.reagent.trim())) ||
+          !prefixValid ||
+          !polarityValid
         "
       />
     </menu>
