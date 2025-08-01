@@ -5,17 +5,39 @@ This module provides endpoints for automatic creation and cleanup
 of acquisition workspaces based on available instruments.
 """
 
-from fastapi import APIRouter, Depends
-from mascope_backend.api.new.auth.dependencies import owner_user
+from fastapi import APIRouter, Depends, Query
+from mascope_backend.api.new.auth.dependencies import guest_user, owner_user
 from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.controllers.workspace.acquisition.service import (
+    get_acquisition_workspace,
     create_acquisition_workspaces,
     delete_acquisition_workspaces,
+)
+from mascope_backend.api.models.workspace.acquisition.schemas import (
+    GetAcquisitionWorkspaceQueryParams,
 )
 
 acquisition_workspaces_router = APIRouter(
     prefix="/acquisition", tags=["Acquisition Workspace Management"]
 )
+
+
+@acquisition_workspaces_router.get("")
+@api_route(token_access=True)
+async def get_acquisition_workspace_route(
+    query_params: GetAcquisitionWorkspaceQueryParams = Query(),
+    user=Depends(guest_user),
+):
+    """Retrieve a list of workspaces.
+
+    :param query_params: Query parameters for sorting and pagination, defaults to Depends().
+    :type query_params: GetWorkspacesQueryParams, optional
+    :param user: The current authenticated user, defaults to Depends(guest_user).
+    :type user: User, optional
+    :return: A dictionary containing total count and list of workspaces.
+    :rtype: dict
+    """
+    return await get_acquisition_workspace(**query_params.model_dump())
 
 
 @acquisition_workspaces_router.post("")

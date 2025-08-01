@@ -9,8 +9,12 @@ from mascope_backend.db import async_session
 from mascope_backend.db.id import gen_id
 from mascope_backend.db.models import Workspace
 from mascope_backend.api.lib.api_features import api_controller
+from mascope_backend.api.lib.exceptions.api_exceptions import (
+    NotFoundException,
+)
 from mascope_backend.api.controllers.workspace.workspace_controller import (
     delete_workspace,
+    get_workspaces,
 )
 from mascope_backend.api.models.workspace.workspace_pydantic_model import (
     WorkspaceCreate,
@@ -20,6 +24,45 @@ from mascope_backend.api.models.workspace.config import workspace_config
 from mascope_backend.api.new.instruments.service import get_instruments
 
 from mascope_backend.runtime import runtime
+
+
+@api_controller()
+async def get_acquisition_workspace(instrument: str | None) -> dict:
+    """
+    Retrieve ACQUISITION workspace for the specified instrument.
+
+    Searches for existing ACQUISITION workspace matching the instrument.
+    Validates that exactly one workspace exists, logs warning if multiple found.
+
+    :param instrument: Instrument name to find workspace for
+    :type instrument: str | None, optional
+    :raises NotFoundException: If no ACQUISITION workspace found for instrument
+    :return: A dictionary containing ACQUISITION workspace details
+    :rtype: dict
+    """
+    workspaces_data = (
+        await get_workspaces(workspace_type=["ACQUISITION"], instrument=[instrument])
+    ).get("data", [])
+
+    if not workspaces_data:
+        raise NotFoundException(
+            f"No ACQUISITION workspace found for instrument '{instrument}'"
+        )
+
+    if len(workspaces_data) > 1:
+        runtime.logger.warning(
+            f"Found {len(workspaces_data)} ACQUISITION workspaces, using first one"
+        )
+
+    acquisition_workspace = workspaces_data[0]
+    runtime.logger.debug(
+        f"Using existing ACQUISITION workspace: {acquisition_workspace['workspace_name']}"
+    )
+
+    return {
+        "message": f"Acquisition workspace '{acquisition_workspace['workspace_name']}' retrieved successfully",
+        "data": WorkspaceRead.model_validate(acquisition_workspace).model_dump(),
+    }
 
 
 @api_controller()
