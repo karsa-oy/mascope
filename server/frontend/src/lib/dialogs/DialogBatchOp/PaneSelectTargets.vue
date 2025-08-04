@@ -33,10 +33,25 @@ const search = ref()
 
 const allowedTypes = computed(() => {
   if (props.mode === 'calibrants') {
-    return ['CALIBRANTS']
+    return ['CALIBRANTS'] // Only CALIBRANTS collections for calibrants mode
   }
+
+  if (!props.batch?.type) {
+    return collectionTypes // Show all types if batch type not set
+  }
+
   // For targets mode, use batch type constraints
-  return props.batch?.type ? getAllowedCollectionTypes(props.batch.type) : []
+  let allowed = getAllowedCollectionTypes(props.batch.type)
+
+  // Special case: TOF instruments can use CALIBRANTS for ACQUISITION batches
+  if (props.batch.type === 'ACQUISITION') {
+    const currentInstrument = app.data.workspace.focused?.instrument
+    if (instrumentType(currentInstrument) === 'tof') {
+      allowed = [...allowed, 'CALIBRANTS']
+    }
+  }
+
+  return allowed
 })
 
 const categoryOptions = computed(() => [

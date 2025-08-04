@@ -16,6 +16,7 @@ import TextArea from 'primevue/textarea'
 import { api } from '@/api'
 
 import { equals } from '@/lib/table'
+import { DEFAULT_SAMPLE_BATCH_TYPE } from '@/lib/constants'
 import { clone, instrumentType as getInstrumentType } from '@/lib/utils'
 import { useMzFit } from '@/lib/mzFit'
 
@@ -154,6 +155,8 @@ const invalid = computed(() => {
 })
 const instrumentType = computed(() => getInstrumentType(app.data.workspace.focused?.instrument))
 
+const isTofInstrument = computed(() => instrumentType.value === 'tof')
+
 // initialization
 watch(action, init)
 async function init(value) {
@@ -195,7 +198,7 @@ async function init(value) {
     // init information
     selected.info.name = ''
     selected.info.desc = ''
-    selected.info.type = ''
+    selected.info.type = DEFAULT_SAMPLE_BATCH_TYPE // Set default type
     // init ionization mechanisms
     selected.mechanisms.matching = []
     // init target collections with defaults
@@ -255,9 +258,7 @@ async function execute() {
         <Tab value="info">Info</Tab>
         <Tab value="targets" :disabled="action == 'update'">Targets</Tab>
         <Tab value="mechanisms" :disabled="action == 'update_targets'">Mechanisms</Tab>
-        <Tab
-          value="calibrants"
-          :disabled="action == 'update_targets' || instrumentType.value !== 'tof'"
+        <Tab value="calibrants" :disabled="action == 'update_targets' || !isTofInstrument"
           >Calibrants</Tab
         >
       </TabList>

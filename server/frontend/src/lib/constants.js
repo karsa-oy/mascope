@@ -3,6 +3,7 @@ export const alarmsList = ['TARGETS']
 export const collectionTypes = ['TARGETS', 'DIAGNOSTICS', 'CALIBRANTS']
 
 export const batchTypes = ['ACQUISITION', 'ANALYSIS']
+export const DEFAULT_SAMPLE_BATCH_TYPE = 'ANALYSIS' // TODO should read from api configs DEFAULT_SAMPLE_BATCH_TYPE?
 
 // Collection type constraints for sample batch types
 export const collectionBatchTypes = {

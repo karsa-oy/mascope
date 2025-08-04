@@ -26,6 +26,7 @@ export function capitalizeFirstLetter(str) {
  * e.g., 'FILTER_REGENERATION' -> 'Filter Regeneration'
  */
 export function beautifyConstant(str) {
+  if (!str) return str
   return str
     .split('_')
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
