@@ -93,7 +93,7 @@ const updated = computed(() => {
     sample_batch_description: selected.info.desc,
     workspace_id: app.data.workspace.focusedId,
     build_params: {
-      calibration_collection: selected.calibrants.target_collection_id,
+      calibration_collection: selected.calibrants?.target_collection_id,
       ion_mechanisms: selected.mechanisms.matching.map((mech) => mech.ionization_mechanism_id),
       calibration_ion_mechanisms: selected.mechanisms.calibration.map(
         (mech) => mech.ionization_mechanism_id
