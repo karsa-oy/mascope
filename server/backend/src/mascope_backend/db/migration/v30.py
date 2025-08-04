@@ -15,13 +15,20 @@ Schema changes:
 import os
 import shutil
 import asyncio
-from sqlalchemy import text
+from sqlalchemy import text, select
 
 from mascope_backend.db import configure_database_engine, async_session
 from mascope_backend.db.models import Workspace, SampleBatch, SampleItem
 from mascope_backend.db.ops.backup import create_db_backup
 from mascope_backend.db.ops.maintenance import db_maintenance
 from mascope_backend.db.ops.restore import db_restore
+from mascope_backend.api.controllers.match.match_controller import (
+    rematch_batches,
+)
+from mascope_backend.api.models.match.match_pydantic_model import (
+    RematchBatchesBody,
+    RematchBatchBody,
+)
 from mascope_backend.runtime import runtime
 
 
@@ -57,7 +64,10 @@ async def run():
     # restore to fix inconsistencies in TargetCollection target_collection_type default value "'TARGETS'" -> 'TARGETS'
     await db_restore()
 
-    # Step 4: Run database maintenance
+    # Step 4: Perform rematching (moved from v29 after models schema changes)
+    await perform_rematching()
+
+    # Step 5: Run database maintenance
     await db_maintenance()
 
     runtime.logger.info(f"Migration to v{new_version} completed successfully")
@@ -271,6 +281,36 @@ async def update_sample_view():
 
         await session.commit()
         runtime.logger.info("Sample view updated successfully")
+
+
+async def perform_rematching():
+    """
+    Perform rematching of all sample batches.
+    This was moved from v29 migration to avoid schema compatibility issues.
+    """
+    async with async_session() as session:
+        stmt = select(SampleBatch.sample_batch_id)
+        result = await session.execute(stmt)
+        sample_batch_ids = result.scalars().all()
+
+    runtime.logger.info(f"Rematching {len(sample_batch_ids)} sample batches")
+
+    rematch_batch_bodies = [
+        RematchBatchBody(sample_batch_id=sample_batch_id)
+        for sample_batch_id in sample_batch_ids
+    ]
+    rematch_batches_body = RematchBatchesBody(sample_batches=rematch_batch_bodies)
+
+    try:
+        await rematch_batches(
+            rematch_batches_body, independent_transaction=True, sid="", process_id=""
+        )
+        runtime.logger.info("Rematching completed successfully")
+    except Exception as e:
+        runtime.logger.error(f"Rematching failed with error: {str(e)}")
+        runtime.logger.warning(
+            "Migration will continue, but manual rematching may be required"
+        )
 
 
 if __name__ == "__main__":
