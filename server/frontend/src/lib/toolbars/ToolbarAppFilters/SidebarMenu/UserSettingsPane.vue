@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, computed, watchEffect, watch } from 'vue'
+import { ref, reactive, computed, watchEffect, watch, useTemplateRef } from 'vue'
 
 import ToggleSwitch from 'primevue/toggleswitch'
 import Message from 'primevue/message'
@@ -109,6 +109,8 @@ watchEffect(() => {
 })
 
 const vHelpLayer = app.ui.help.directive(layer)
+
+const tokenServiceSelector = useTemplateRef('token-service-selector')
 </script>
 
 <template>
@@ -147,25 +149,29 @@ const vHelpLayer = app.ui.help.directive(layer)
     "
   >
     <h3>API Access Tokens</h3>
-    <div class="token-container">
-      <div class="token-controls">
+    <div id="token-container">
+      <div id="token-controls">
         <Select
           v-model="selectedTokenType"
           :options="tokenItems"
           optionLabel="label"
           optionValue="value"
-          class="service-select"
+          id="token-service-select"
           @change="token = null"
+          :appendTo="tokenServiceSelector"
         />
+        <!-- DOM element for attaching the dropdown -->
+        <!-- prevents bug which closes the sidebar -->
+        <div ref="token-service-selector" />
         <Button
           icon="pi pi-refresh"
           label="Regenerate"
           @click="regenerateToken"
-          class="token-button"
+          id="token-button"
         />
       </div>
-      <div v-if="token" class="token-info">
-        <div class="token-display">
+      <div v-if="token" id="token-info">
+        <div id="token-display">
           <span class="pi pi-lock" style="opacity: 0.3" />
           <BaseCopyableField :field="token" />
         </div>
@@ -188,43 +194,44 @@ const vHelpLayer = app.ui.help.directive(layer)
   gap: 0rem;
 }
 
-.token-container {
+#token-container {
   display: flex;
   flex-direction: column;
   gap: 1rem;
   min-height: 3rem;
-}
 
-.token-controls {
-  display: flex;
-  align-items: flex-start;
-  gap: 1.5rem;
-  width: 100%;
-}
+  #token-controls {
+    display: flex;
+    align-items: flex-start;
+    gap: 1.5rem;
+    width: 100%;
 
-.token-button {
-  flex-shrink: 0;
-}
+    #token-button {
+      flex-shrink: 0;
+    }
 
-.service-select {
-  width: 100%;
-}
+    #token-service-select {
+      width: 100%;
+    }
+  }
 
-.token-info {
-  display: flex;
-  flex-direction: column;
-}
+  #token-info {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
 
-.token-display {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  border: 1px solid var(--p-drawer-border-color);
-  padding: 0.75rem;
-  border-radius: 1rem;
-  font-size: smaller;
-  width: 100%;
-  word-break: break-all;
+    #token-display {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      border: 1px solid var(--p-drawer-border-color);
+      padding: 0.75rem;
+      border-radius: 1rem;
+      font-size: smaller;
+      width: 100%;
+      word-break: break-all;
+    }
+  }
 }
 
 section:not(:first-child) {
