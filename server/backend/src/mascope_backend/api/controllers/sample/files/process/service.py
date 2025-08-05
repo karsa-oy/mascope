@@ -29,6 +29,9 @@ from mascope_backend.api.controllers.samples.samples_controller import get_sampl
 from mascope_backend.api.controllers.sample.items.sample_items_controller import (
     create_sample_item,
 )
+from mascope_backend.api.controllers.sample.files.sample_files_controller import (
+    compute_sample_file_peaks,
+)
 from mascope_backend.api.controllers.match.match_controller import (
     match_compute_sample,
     rematch_samples,
@@ -75,9 +78,10 @@ async def auto_process_sample_file(
     2. Handle instrument config assignment (existing or create new) and processing
     3. Get ACQUISITION workspace for the instrument
     4. Create ACQUISITION batches and sample items for each sample file polarity
-    5. Perform match computation for created sample items
-    6. Schedule rematch tasks for other affected samples
-    7. Return processing results with affected IDs or UI reloads
+    5. Compute peak data for the sample file
+    6. Perform match computation for created sample items
+    7. Schedule rematch tasks for other affected samples
+    8. Return processing results with affected IDs or UI reloads
 
     :param sample_file_id: ID of the uploaded sample file
     :type sample_file_id: str
@@ -137,7 +141,17 @@ async def auto_process_sample_file(
     for sample_item in acquisition_sample_items:
         all_affected_sample_item_ids.add(sample_item["sample_item_id"])
 
-    # Step 5: Perform match computation for created ACQUISITION samples
+    # Step 5: Compute peak data for the sample file
+    await compute_sample_file_peaks(
+        sample_file_id=sample_file_id,
+        if_exists="append",
+        independent_transaction=False,
+        sid=sid,
+        process_id=gen_id(8),
+        parent_id=process_id,
+    )
+
+    # Step 6: Perform match computation for created ACQUISITION samples
     for sample_item in acquisition_sample_items:
         await match_compute_sample(
             sample_item_id=sample_item.get("sample_item_id"),
@@ -147,7 +161,7 @@ async def auto_process_sample_file(
             parent_id=process_id,
         )
 
-    # Step 6: Create separate independent task to recompute matches for other affected samples
+    # Step 7: Create separate independent task to recompute matches for other affected samples
     acquisition_sample_item_ids = [
         item["sample_item_id"] for item in acquisition_sample_items
     ]
@@ -170,7 +184,7 @@ async def auto_process_sample_file(
             f"Started independent rematch task for {len(other_affected_sample_item_ids)} affected samples"
         )
 
-    # Step 7: Prepare response with processing results
+    # Step 8: Prepare response with processing results
     processed_samples = []
     for sample_item in acquisition_sample_items:
         sample_result = await get_sample(
