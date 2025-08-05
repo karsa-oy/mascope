@@ -138,9 +138,7 @@ const changed = computed(() =>
 const invalid = computed(() => {
   switch (action.value) {
     case 'create': {
-      return (
-        !selected.info.name || !selected.calibrants || !(selected.mechanisms.matching?.length > 0)
-      )
+      return !selected.info.name || !(selected.mechanisms.matching?.length > 0)
     }
     case 'update': {
       const infoValid = selected.info.name.length > 0
@@ -153,9 +151,21 @@ const invalid = computed(() => {
       return false
   }
 })
-const instrumentType = computed(() => getInstrumentType(app.data.workspace.focused?.instrument))
 
-const isTofInstrument = computed(() => instrumentType.value === 'tof')
+const showCalibrantsTab = computed(() => {
+  if (action.value === 'update_targets') return false
+
+  // For ANALYSIS batches, always show calibrants tab
+  if (selected.info.type === 'ANALYSIS') return true
+
+  // For ACQUISITION batches, only show for TOF instruments
+  if (selected.info.type === 'ACQUISITION') {
+    const instrument = app.data.workspace.focused?.instrument
+    return getInstrumentType(instrument) === 'tof'
+  }
+
+  return true // Default fallback
+})
 
 // initialization
 watch(action, init)
@@ -203,10 +213,8 @@ async function init(value) {
     selected.mechanisms.matching = []
     // init target collections with defaults
     selected.targets = []
-    // init calibrants with defaults
-    selected.calibrants = app.data.target.collection.list.find(
-      ({ target_collection_type }) => target_collection_type == 'CALIBRANTS'
-    ) // use first calibrant collection otherwise
+    // init calibrants as null (optional)
+    selected.calibrants = null
   }
   // save initial state
   initial.info = clone(selected.info)
@@ -258,9 +266,7 @@ async function execute() {
         <Tab value="info">Info</Tab>
         <Tab value="targets" :disabled="action == 'update'">Targets</Tab>
         <Tab value="mechanisms" :disabled="action == 'update_targets'">Mechanisms</Tab>
-        <Tab value="calibrants" :disabled="action == 'update_targets' || !isTofInstrument"
-          >Calibrants</Tab
-        >
+        <Tab value="calibrants" :disabled="!showCalibrantsTab">Calibrants</Tab>
       </TabList>
       <TabPanels>
         <TabPanel value="info">

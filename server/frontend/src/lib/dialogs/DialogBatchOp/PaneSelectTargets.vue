@@ -47,7 +47,7 @@ const allowedTypes = computed(() => {
   if (props.batch.type === 'ACQUISITION') {
     const currentInstrument = app.data.workspace.focused?.instrument
     if (instrumentType(currentInstrument) === 'tof') {
-      allowed = [...allowed, 'CALIBRANTS']
+      allowed = [...new Set([...allowed, 'CALIBRANTS'])]
     }
   }
 
