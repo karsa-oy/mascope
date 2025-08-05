@@ -38,8 +38,13 @@ class BuildParams(BaseModel):
     @classmethod
     def check_calibration_collection_length(cls, v):
         """Validate length if calibration_collection is provided"""
-        if v is not None and len(v) != 16:
-            raise ValueError("Only one calibration collection can be applied")
+        if v is not None:
+            # Convert empty strings to None
+            if isinstance(v, str) and v.strip() == "":
+                return None
+            # Validate length for non-empty values
+            if len(v) != 16:
+                raise ValueError("Only one calibration collection can be applied")
         return v
 
     @field_validator("ion_mechanisms")
@@ -108,23 +113,6 @@ class SampleBatchValidator(SampleBatchBaseValidator):
                     f"Analysis batch should have polarity '{sample_batch_config.ANALYSIS_POLARITY}'. "
                     f"Got: '{polarity}'"
                 )
-
-        return values
-
-    @model_validator(mode="after")
-    @classmethod
-    def validate_calibration_collection_by_batch_type(cls, values):
-        """Calibration collection can only be None for ACQUISITION batch type."""
-        build_params = getattr(values, "build_params", None)
-
-        if (
-            build_params
-            and values.sample_batch_type == "ANALYSIS"
-            and build_params.calibration_collection is None
-        ):
-            raise ValueError(
-                "ANALYSIS sample batches must have a calibration collection specified"
-            )
 
         return values
 
