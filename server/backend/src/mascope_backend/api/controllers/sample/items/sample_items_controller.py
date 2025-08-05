@@ -521,12 +521,16 @@ async def copy_sample_items(
                 if c.name != "sample_item_id"
             }
 
+            # Handle ACQUISITION transformations
+            is_acquisition = original.sample_item_type == "ACQUISITION"
+
             # Determine sample type: ACQUISITION → UNKNOWN, others stay the same
             sample_item_type = (
-                "UNKNOWN"
-                if original.sample_item_type == "ACQUISITION"
-                else original.sample_item_type
+                "UNKNOWN" if is_acquisition else original.sample_item_type
             )
+
+            # Determine locked status: unlock when ACQUISITION → UNKNOWN
+            locked_status = 0 if is_acquisition else original.locked
 
             # update some fields for the copy
             fields.update(
@@ -541,6 +545,7 @@ async def copy_sample_items(
                         else original.sample_item_name
                     ),
                     "sample_item_type": sample_item_type,  # Apply type transformation
+                    "locked": locked_status,  # unlock when ACQUISITION → UNKNOWN
                     "sample_item_utc_created": datetime.now(  # treat as new sample created now *
                         timezone.utc
                     ),
