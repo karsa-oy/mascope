@@ -149,7 +149,7 @@ const tableHeight = inject('target-table-height')
     </DataTable>
     <ContextMenu ref="contextMenuRef" :model="context.menuItems" />
   </BaseTabbedPanel>
-  <DialogTargetCompoundUpdate v-model:visible="dialog.compound" :compound="context.compound" />
+  <DialogTargetCompoundUpdate v-model:visible="dialog.compound" :compound="context.record" />
 </template>
 
 <style scoped>
