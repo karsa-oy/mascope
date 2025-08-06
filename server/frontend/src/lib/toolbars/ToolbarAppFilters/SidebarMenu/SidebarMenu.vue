@@ -112,6 +112,7 @@ watchEffect(() => {
       position="left"
       :style="`width: calc(${app.ui.split.left}vw + 1rem);`"
       :modal="false"
+      :dismissable="false"
     >
       <template #header>
         <TabList>
