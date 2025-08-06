@@ -30,21 +30,22 @@ const context = reactive({
       label: 'Remove compound',
       icon: 'pi pi-minus',
       command: () => {
-        const collection = app.data.collection.list.find(
-          (coll) => coll.target_collection_id == context.compound.target_collection_id
+        const collection = app.data.target.collection.list.find(
+          (coll) => coll.target_collection_id == context.record.target_collection_id
         )
         confirm.require({
           icon: 'pi pi-exclamation-triangle',
-          header: `Remove target compound '${context.compound.target_compound_formula}'`,
-          message: `Are you sure you want to remove the compound '${context.compound.target_compound_formula}' from the '${collection.target_collection_name}' collection?`,
+          header: `Remove target compound '${context.record.target_compound_formula}'`,
+          message: `Are you sure you want to remove the compound '${context.record.target_compound_formula}' from the '${collection.target_collection_name}' collection?`,
           accept: () => {
             app.data.target.collection.update({
               target_collection_id: collection.target_collection_id,
               target_collection_name: collection.target_collection_name,
               target_collection_type: collection.target_collection_type,
-              target_compound_ids: collection.children
-                .map(({ target_compound_id }) => target_compound_id)
-                .filter((id) => id !== context.compound.target_compound_id)
+              target_compound_ids: app.data.match.compound.list
+                .filter((comp) => comp.target_collection_id === collection.target_collection_id)
+                .map((comp) => comp.target_compound_id)
+                .filter((id) => id !== context.record.target_compound_id)
             })
           },
           acceptProps: {
