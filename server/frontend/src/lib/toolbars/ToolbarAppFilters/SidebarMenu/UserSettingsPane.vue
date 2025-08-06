@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, computed, watchEffect, watch, useTemplateRef } from 'vue'
+import { ref, reactive, computed, watchEffect, watch } from 'vue'
 
 import ToggleSwitch from 'primevue/toggleswitch'
 import Message from 'primevue/message'
@@ -109,8 +109,6 @@ watchEffect(() => {
 })
 
 const vHelpLayer = app.ui.help.directive(layer)
-
-const tokenServiceSelector = useTemplateRef('token-service-selector')
 </script>
 
 <template>
@@ -158,11 +156,7 @@ const tokenServiceSelector = useTemplateRef('token-service-selector')
           optionValue="value"
           id="token-service-select"
           @change="token = null"
-          :appendTo="tokenServiceSelector"
         />
-        <!-- DOM element for attaching the dropdown -->
-        <!-- prevents bug which closes the sidebar -->
-        <div ref="token-service-selector" />
         <Button
           icon="pi pi-refresh"
           label="Regenerate"
