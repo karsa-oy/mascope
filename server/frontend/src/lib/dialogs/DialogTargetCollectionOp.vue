@@ -196,11 +196,21 @@ const filteredWorkspaces = computed(() => {
 function remove(compound) {
   if (compound.status == '1 create') {
     compounds.created = compounds.created.filter(
-      (selected) => selected.target_compound_formula !== compound.target_compound_formula
+      (selected) =>
+        !findExistingCompound([selected], {
+          target_compound_formula: compound.target_compound_formula,
+          target_compound_name: compound.target_compound_name,
+          cas_number: compound.cas_number
+        })
     )
   } else {
     compounds.selected = compounds.selected.filter(
-      (selected) => selected.target_compound_formula !== compound.target_compound_formula
+      (selected) =>
+        !findExistingCompound([selected], {
+          target_compound_formula: compound.target_compound_formula,
+          target_compound_name: compound.target_compound_name,
+          cas_number: compound.cas_number
+        })
     )
   }
 }
@@ -256,9 +266,11 @@ function loadSpreadsheet({ rows }) {
       index.get(compound.target_compound_id ?? compound.target_compound_formula) ?? compound
   )
   const unselected = (added) =>
-    !compounds.selected.find(
-      (selected) => selected.target_compound_formula == added.target_compound_formula
-    )
+    !findExistingCompound(compounds.selected, {
+      target_compound_formula: added.target_compound_formula,
+      target_compound_name: added.target_compound_name,
+      cas_number: added.cas_number
+    })
   compounds.selected.push(...reconciled.filter(unselected))
 }
 
