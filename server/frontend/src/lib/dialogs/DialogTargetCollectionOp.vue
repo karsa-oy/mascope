@@ -18,7 +18,6 @@ import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import InlineMessage from 'primevue/inlinemessage'
 import Listbox from 'primevue/listbox'
-import Avatar from 'primevue/avatar'
 import Select from 'primevue/select'
 import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
@@ -28,6 +27,7 @@ import { api } from '@/api'
 import { useApp } from '@/stores'
 import { fromSpreadsheet, equals } from '@/lib/table'
 import { BaseClipboardContext } from '@/lib/base'
+import { isValidChemicalFormula, findExistingCompound } from '@/lib/chem'
 import { clone } from '@/lib/utils'
 import { collectionTypes, getAllowedWorkspaceTypes, getAllowedBatchTypes } from '@/lib/constants'
 
@@ -232,9 +232,7 @@ watchEffect(async () => {
 function loadSpreadsheet({ rows }) {
   let prexisting = []
   rows.forEach((compound) => {
-    const record = app.data.target.compound.list.find(
-      (comp) => comp.target_compound_formula === compound.target_compound_formula
-    )
+    const record = findExistingCompound(app.data.target.compound.list, compound)
     if (record) {
       prexisting.push(record)
     } else {
@@ -411,6 +409,79 @@ const invalidated = computed(() => {
       return false
   }
 })
+
+const invalidFormula = computed(
+  () => add.formula.length > 0 && !isValidChemicalFormula(add.formula)
+)
+
+// Check for existing compound in db for manual input
+const existingInputCompound = computed(() =>
+  findExistingCompound(app.data.target.compound.list, {
+    target_compound_formula: add.formula,
+    target_compound_name: add.name,
+    cas_number: add.cas
+  })
+)
+
+// Check if compound would be duplicate in current selection
+const alreadyInSelection = computed(() => {
+  if (!add.formula.trim()) return false
+
+  return (
+    compounds.selected.some((comp) =>
+      findExistingCompound([comp], {
+        target_compound_formula: add.formula,
+        target_compound_name: add.name,
+        cas_number: add.cas
+      })
+    ) ||
+    compounds.created.some((comp) =>
+      findExistingCompound([comp], {
+        target_compound_formula: add.formula,
+        target_compound_name: add.name,
+        cas_number: add.cas
+      })
+    )
+  )
+})
+
+// Button configuration for manual input
+const addCompoundButtonConfig = computed(() => {
+  if (!add.formula.trim()) {
+    return {
+      label: 'Add compound',
+      tooltip: 'Enter formula to add compound'
+    }
+  }
+  if (invalidFormula.value) {
+    return {
+      label: 'Add compound',
+      tooltip: 'Invalid chemical formula'
+    }
+  }
+  if (alreadyInSelection.value) {
+    return {
+      label: 'Add compound',
+      tooltip: 'Compound already in selection'
+    }
+  }
+  if (existingInputCompound.value) {
+    return {
+      label: 'Add compound',
+      severity: 'info',
+      tooltip: 'Add existing compound'
+    }
+  }
+  return {
+    label: 'Create compound',
+    severity: 'primary',
+    tooltip: 'Create new compound'
+  }
+})
+
+const addCompoundButtonDisabled = computed(
+  () => !add.formula.trim() || invalidFormula.value || alreadyInSelection.value
+)
 
 watch(action, init)
 async function init(mode) {
@@ -852,10 +923,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onEnter))
                         <label for="add-compound-cas">CAS Number</label>
                       </FloatLabel>
                       <Button
-                        label="Add compound"
+                        :label="addCompoundButtonConfig?.label ?? 'Add compound'"
                         icon="pi pi-plus"
                         @click="addCompound"
-                        :disabled="!add.formula.trim()"
+                        :disabled="addCompoundButtonDisabled"
+                        :severity="addCompoundButtonConfig?.severity ?? 'primary'"
+                        v-tooltip="addCompoundButtonConfig?.tooltip ?? 'Add compound'"
                         style="width: 210px; margin-top: 2rem"
                       />
                     </div>
