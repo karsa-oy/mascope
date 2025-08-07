@@ -8,6 +8,7 @@ import Button from 'primevue/button'
 import { useConfirm } from 'primevue/useconfirm'
 
 import { api } from '@/api'
+import { isValidChemicalFormula, findExistingCompound } from '@/lib/chem'
 import { useApp } from '@/stores'
 
 const confirm = useConfirm()
@@ -33,25 +34,81 @@ const input = reactive({
 })
 
 const targetCollection = computed(() => props.collection ?? app.data.match.collection.focused)
-const targetCompounds = computed(
-  () => targetCollection.value?.children ?? app.data.match.compound.list
+
+const targetCompounds = computed(() =>
+  (targetCollection.value?.children ?? app.data.match.compound.list).filter(
+    // Filter compounds that belong to focused collection
+    (comp) => comp.target_collection_id === targetCollection.value.target_collection_id
+  )
 )
 
+// Check for existing compound based on input
+const existingCompound = computed(() =>
+  findExistingCompound(app.data.target.compound.list, {
+    target_compound_formula: input.target_compound_formula,
+    target_compound_name: input.target_compound_name,
+    cas_number: input.cas_number
+  })
+)
+
+// Check if existing compound is already in collection
+const alreadyInCollection = computed(
+  () =>
+    existingCompound.value &&
+    targetCompounds.value.some(
+      (comp) => comp.target_compound_id === existingCompound.value.target_compound_id
+    )
+)
+
+// UI status and button configuration
+const buttonConfig = computed(() => {
+  if (!input.target_compound_formula.trim()) {
+    return {
+      label: 'Add',
+      severity: undefined,
+      tooltip: 'Enter formula to add compound'
+    }
+  }
+  if (invalidFormula.value) {
+    return {
+      label: 'Add compound',
+      tooltip: 'Invalid chemical formula'
+    }
+  }
+  if (alreadyInCollection.value) {
+    return {
+      label: 'Add',
+      tooltip: 'Compound is already in collection'
+    }
+  }
+  if (existingCompound.value) {
+    return {
+      label: 'Add',
+      severity: 'info',
+      tooltip: 'Add existing compound'
+    }
+  }
+  return {
+    label: 'Create',
+    severity: 'primary',
+    tooltip: 'Create new compound'
+  }
+})
+
 const addCompound = () => {
-  const prexisting = app.data.target.compound.list.find(
-    (comp) => comp.target_compound_formula === input.target_compound_formula
-  )
   const common = {
     target_collection_id: targetCollection.value.target_collection_id,
     target_collection_name: targetCollection.value.target_collection_name,
     target_collection_type: targetCollection.value.target_collection_type
   }
-  if (prexisting) {
+  if (existingCompound.value) {
     app.data.target.collection.update({
       ...common,
       target_compound_ids: [
-        ...targetCompounds.value.map(({ target_compound_id }) => target_compound_id),
-        prexisting.target_compound_id
+        ...new Set([
+          ...targetCompounds.value.map(({ target_compound_id }) => target_compound_id),
+          existingCompound.value.target_compound_id
+        ])
       ]
     })
   } else {
@@ -69,6 +126,13 @@ const addCompound = () => {
       ]
     })
   }
+  // Clear form
+  Object.assign(input, {
+    target_compound_formula: '',
+    target_compound_name: null,
+    cas_number: null
+  })
+
   popover.value.hide()
 }
 
@@ -100,15 +164,15 @@ const confirmation = async () => {
   }
 }
 
-const invalidFormula = computed(() => {
-  const regex = /^(?:[A-Z][a-z]?\d*|\([^()]*(?:\(.*\))?[^()]*\)\d+)+$/
-  const trimmed = input.target_compound_formula?.trim()
-  return !regex.test(trimmed)
-  // See:
-  //   Debugger: https://regex101.com/r/Mbjq8C/1
-  //   Inspiration: https://stackoverflow.com/questions/23602175/regex-for-parsing-chemical-formulas#23602425
-})
-const disabled = computed(() => !props.collection && !app.data.match.collection.focused)
+const invalidFormula = computed(
+  () =>
+    input.target_compound_formula.length > 0 &&
+    !isValidChemicalFormula(input.target_compound_formula)
+)
+const plusButtonDisabled = computed(() => !props.collection && !app.data.match.collection.focused)
+const addButtonDisabled = computed(
+  () => !input.target_compound_formula.trim() || invalidFormula.value || alreadyInCollection.value
+)
 </script>
 
 <template>
@@ -122,8 +186,8 @@ const disabled = computed(() => !props.collection && !app.data.match.collection.
         popover.toggle(event)
       }
     "
-    v-tooltip="disabled ? 'Open a target collection to add a compound' : 'Add compound'"
-    :disabled="disabled"
+    v-tooltip="plusButtonDisabled ? 'Open a target collection to add a compound' : 'Add compound'"
+    :disabled="plusButtonDisabled"
   />
   <Popover ref="popover">
     <div class="col" style="gap: 0rem">
@@ -148,7 +212,15 @@ const disabled = computed(() => !props.collection && !app.data.match.collection.
         <InputText id="add-compound-cas" v-model="input.cas_number" />
         <label for="add-compound-cas"> CAS </label>
       </FloatLabel>
-      <Button label="Add" style="width: 100%" @click="confirmation" :disabled="invalidFormula" />
+      <Button
+        :label="buttonConfig?.label ?? 'Add'"
+        icon="pi pi-plus"
+        style="width: 100%"
+        @click="confirmation"
+        :disabled="addButtonDisabled"
+        :severity="buttonConfig?.severity ?? 'primary'"
+        v-tooltip="buttonConfig?.tooltip ?? 'Add compound'"
+      />
     </div>
   </Popover>
 </template>

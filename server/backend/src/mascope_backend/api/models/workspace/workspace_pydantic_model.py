@@ -6,8 +6,6 @@ with validation rules and business logic constraints.
 """
 
 from datetime import datetime
-from typing import Annotated
-from fastapi import Query
 from pydantic import BaseModel, Field, field_validator, ConfigDict, model_validator
 from mascope_backend.api.models.base_pydantic_model import QueryParamsModel
 from mascope_backend.api.models.workspace.config import workspace_config
