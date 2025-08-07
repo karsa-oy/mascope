@@ -33,6 +33,25 @@ export function beautifyConstant(str) {
     .join(' ')
 }
 
+/**
+ * Normalize a string by stripping leading/trailing spaces, normalizing internal whitespace,
+ * and optionally converting to lowercase. Matches backend norm() function in
+ * libraries\file\src\mascope_file\string.py.
+ *
+ * @param {string} str - The string to normalize
+ * @param {boolean} lower - Whether to convert to lowercase (default: false)
+ * @returns {string} The normalized string
+ *
+ * Examples:
+ * norm("  Hello   World  ") → "Hello World"
+ * norm("  Hello   World  ", true) → "hello world"
+ */
+export function norm(str, lower = false) {
+  if (!str) return ''
+  const normalized = str.trim().split(/\s+/).join(' ')
+  return lower ? normalized.toLowerCase() : normalized
+}
+
 export function prettyTrim(label, length = 15) {
   return label && label.length > length ? label.slice(0, length) + '...' : label
 }
