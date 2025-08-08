@@ -592,6 +592,11 @@ async def update_target_compound(target_compounds: List[TargetCompoundUpdate]):
                 room=sample_batch_id,
                 namespace="/",
             )
+        # Emit global targets reload event to update ui
+        await sio.emit(
+            "targets_all_reload",
+            namespace="/",
+        )
 
         return {
             "not_changed_compounds": not_changed_target_compounds,
