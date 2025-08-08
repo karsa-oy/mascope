@@ -72,7 +72,11 @@ const layout = computed(() => {
       ? { range: [0, scale.value.max], autorange: false }
       : null
   const autorange = { range: null, autorange: true }
-  const yRange = (scaleRangeY ?? zoom.rangeY) ? { ...zoom.rangeY, autorange: false } : autorange
+  const yRange = scaleRangeY
+    ? { ...scaleRangeY, autorange: false }
+    : zoom.rangeY
+      ? { ...zoom.rangeY, autorange: false }
+      : autorange
   const xRange = zoom.rangeX ? { ...zoom.rangeX, autorange: false } : autorange
   return {
     xaxis: {
