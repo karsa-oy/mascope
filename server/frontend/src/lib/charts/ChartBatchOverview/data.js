@@ -288,7 +288,10 @@ export const useChartData = defineStore('chart.batch.overview', () => {
       name: 'TIC',
       x: xValues,
       y: samples.value.map((sample) => sample.tic),
-      customdata: samples.value.map((item) => item.datetime),
+      customdata: [...Array(samples.value.length).keys()].map((i) => [
+        samples.value[i].datetime,
+        ''
+      ]), // Add [datetime, unit] in customdata field to use in the hovertemplate
       text: samples.value.map((item) => item.sample_item_name),
       hovertemplate: `
         <b># %{x}</b>
@@ -297,7 +300,7 @@ export const useChartData = defineStore('chart.batch.overview', () => {
         <br>
         TIC: %{y:,.2e}
         <br>
-        %{customdata}
+        %{customdata[0]}
         <extra></extra>
       `, // use "<extra></extra>" to get rid of extra block from the hoverbox
       mode: 'markers',
