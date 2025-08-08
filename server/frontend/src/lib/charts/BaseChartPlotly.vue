@@ -47,7 +47,7 @@ const props = defineProps({
 })
 const slots = useSlots()
 
-const emit = defineEmits(['click', 'select', 'zoom'])
+const emit = defineEmits(['click', 'dragmode', 'select', 'zoom'])
 
 const plot = ref(null)
 const created = ref(false)
@@ -148,7 +148,8 @@ function handleSelect(event) {
   emit('select', { points: pointIndices })
 }
 
-function handleZoom(data) {
+function handleRelayout(data) {
+  // Handle zoom events
   const xmin = data['xaxis.range[0]']
   const xmax = data['xaxis.range[1]']
   const ymin = data['yaxis.range[0]']
@@ -157,6 +158,12 @@ function handleZoom(data) {
     rangeX: xmin != null && xmax != null ? { range: [xmin, xmax] } : null,
     rangeY: ymin != null && ymax != null ? { range: [ymin, ymax] } : null
   })
+  // Handle dragmode changes
+  const dragmode = data['dragmode']
+  if (dragmode) {
+    // Update dragmode state
+    emit('dragmode', dragmode)
+  }
 }
 
 onMounted(() => {
@@ -164,14 +171,14 @@ onMounted(() => {
   Plotly.newPlot(plot.value, props.data, derived.value.layout, derived.value.config)
   // add the event listener
   plot.value.on('plotly_click', handleClick)
-  plot.value.on('plotly_relayout', handleZoom)
+  plot.value.on('plotly_relayout', handleRelayout)
   plot.value.on('plotly_selected', handleSelect)
   // mark as created
   created.value = true
 })
 onBeforeUnmount(() => {
   plot.value.removeEventListener('plotly_click', handleClick)
-  plot.value.removeEventListener('plotly_relayout', handleZoom)
+  plot.value.removeEventListener('plotly_relayout', handleRelayout)
   plot.value.removeEventListener('plotly_selected', handleSelect)
 })
 
