@@ -99,7 +99,7 @@ const layout = computed(() => {
     margin: { l: 50, r: 50, t: 50, b: 50 },
     showlegend: true,
     autosize: true,
-    dragmode: dragmode
+    dragmode: dragmode.value
   }
 })
 
@@ -189,6 +189,11 @@ const anyFilters = computed(() => app.ui.filter.mechanism)
       :data="traces"
       :layout="layout"
       @click="onClick"
+      @dragmode="
+        (mode) => {
+          dragmode = mode
+        }
+      "
       @select="onSelect"
       @zoom="
         ({ rangeX, rangeY }) => {
