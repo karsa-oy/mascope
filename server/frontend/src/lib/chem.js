@@ -30,6 +30,31 @@ export function isValidChemicalFormula(formula) {
 }
 
 /**
+ * Checks if two compounds are the same using matching by CAS number OR (name AND formula) combination
+ *
+ * @param {Object} compound1 - First compound to compare
+ * @param {Object} compound2 - Second compound to compare
+ * @returns {boolean} True if compounds match by CAS OR (name + formula)
+ */
+export function isSameCompound(compound1, compound2) {
+  if (!compound1?.target_compound_formula?.trim() || !compound2?.target_compound_formula?.trim()) {
+    return false
+  }
+
+  const casMatch =
+    compound1.cas_number &&
+    compound2.cas_number &&
+    norm(compound1.cas_number) === norm(compound2.cas_number)
+
+  const nameFormulaMatch =
+    norm(compound1.target_compound_formula, true) ===
+      norm(compound2.target_compound_formula, true) &&
+    norm(compound1.target_compound_name, true) === norm(compound2.target_compound_name, true)
+
+  return casMatch || nameFormulaMatch
+}
+
+/**
  * Finds existing compound in database using backend matching logic
  * Matches by CAS number OR (name AND formula) combination
  *
@@ -43,17 +68,5 @@ export function isValidChemicalFormula(formula) {
 export function findExistingCompound(compoundList, searchCompound) {
   if (!searchCompound?.target_compound_formula?.trim()) return null
 
-  return compoundList.find((comp) => {
-    const casMatch =
-      searchCompound.cas_number &&
-      comp.cas_number &&
-      norm(comp.cas_number) === norm(searchCompound.cas_number)
-
-    const nameFormulaMatch =
-      norm(comp.target_compound_formula, true) ===
-        norm(searchCompound.target_compound_formula, true) &&
-      norm(comp.target_compound_name, true) === norm(searchCompound.target_compound_name, true)
-
-    return casMatch || nameFormulaMatch
-  })
+  return compoundList.find((comp) => isSameCompound(comp, searchCompound))
 }

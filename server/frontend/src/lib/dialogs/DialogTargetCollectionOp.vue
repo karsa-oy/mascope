@@ -27,7 +27,7 @@ import { api } from '@/api'
 import { useApp } from '@/stores'
 import { fromSpreadsheet, equals } from '@/lib/table'
 import { BaseClipboardContext } from '@/lib/base'
-import { isValidChemicalFormula, findExistingCompound } from '@/lib/chem'
+import { isValidChemicalFormula, isSameCompound, findExistingCompound } from '@/lib/chem'
 import { clone } from '@/lib/utils'
 import { collectionTypes, getAllowedWorkspaceTypes, getAllowedBatchTypes } from '@/lib/constants'
 
@@ -147,9 +147,7 @@ const changes = computed(() =>
     const prexisting = compounds.initial.some(
       (init) => init.target_compound_id == comp.target_compound_id
     )
-    const created = compounds.created.some(
-      (created) => created.target_compound_formula == comp.target_compound_formula
-    )
+    const created = compounds.created.some((created) => isSameCompound(created, comp))
     const added = comp.target_compound_id && !prexisting
     const removed = prexisting && !selected
     let status
@@ -195,22 +193,10 @@ const filteredWorkspaces = computed(() => {
 
 function remove(compound) {
   if (compound.status == '1 create') {
-    compounds.created = compounds.created.filter(
-      (selected) =>
-        !findExistingCompound([selected], {
-          target_compound_formula: compound.target_compound_formula,
-          target_compound_name: compound.target_compound_name,
-          cas_number: compound.cas_number
-        })
-    )
+    compounds.created = compounds.created.filter((selected) => !isSameCompound(selected, compound))
   } else {
     compounds.selected = compounds.selected.filter(
-      (selected) =>
-        !findExistingCompound([selected], {
-          target_compound_formula: compound.target_compound_formula,
-          target_compound_name: compound.target_compound_name,
-          cas_number: compound.cas_number
-        })
+      (selected) => !isSameCompound(selected, compound)
     )
   }
 }
@@ -246,9 +232,7 @@ function loadSpreadsheet({ rows }) {
     if (record) {
       prexisting.push(record)
     } else {
-      const created = compounds.created.find(
-        ({ target_compound_formula }) => target_compound_formula == compound.target_compound_formula
-      )
+      const created = findExistingCompound(compounds.created, compound)
       if (!created) {
         compounds.created.push(compound)
       }
@@ -265,12 +249,7 @@ function loadSpreadsheet({ rows }) {
     (compound) =>
       index.get(compound.target_compound_id ?? compound.target_compound_formula) ?? compound
   )
-  const unselected = (added) =>
-    !findExistingCompound(compounds.selected, {
-      target_compound_formula: added.target_compound_formula,
-      target_compound_name: added.target_compound_name,
-      cas_number: added.cas_number
-    })
+  const unselected = (added) => !compounds.selected.some((comp) => isSameCompound(comp, added))
   compounds.selected.push(...reconciled.filter(unselected))
 }
 
@@ -339,8 +318,9 @@ function execute() {
     target_collection_type: info.type
   }
   const target_collection_id = original.value?.target_collection_id
-  const target_compound_ids =
-    compounds.selected?.map(({ target_compound_id }) => target_compound_id) ?? []
+  const target_compound_ids = [
+    ...new Set(compounds.selected?.map(({ target_compound_id }) => target_compound_id) ?? [])
+  ]
   const sample_batch_ids = batches.selected.map(({ sample_batch_id }) => sample_batch_id)
   const target_compounds_create = compounds.created
 
@@ -439,21 +419,15 @@ const existingInputCompound = computed(() =>
 const alreadyInSelection = computed(() => {
   if (!add.formula.trim()) return false
 
+  const searchCompound = {
+    target_compound_formula: add.formula,
+    target_compound_name: add.name,
+    cas_number: add.cas
+  }
+
   return (
-    compounds.selected.some((comp) =>
-      findExistingCompound([comp], {
-        target_compound_formula: add.formula,
-        target_compound_name: add.name,
-        cas_number: add.cas
-      })
-    ) ||
-    compounds.created.some((comp) =>
-      findExistingCompound([comp], {
-        target_compound_formula: add.formula,
-        target_compound_name: add.name,
-        cas_number: add.cas
-      })
-    )
+    compounds.selected.some((comp) => isSameCompound(comp, searchCompound)) ||
+    compounds.created.some((comp) => isSameCompound(comp, searchCompound))
   )
 })
 
