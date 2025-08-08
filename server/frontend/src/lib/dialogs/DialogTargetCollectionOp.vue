@@ -244,13 +244,22 @@ function loadSpreadsheet({ rows }) {
       compound
     ])
   )
-  // reconcile with exisiting compounds
-  const reconciled = prexisting.map(
-    (compound) =>
-      index.get(compound.target_compound_id ?? compound.target_compound_formula) ?? compound
-  )
+  const reconciled = prexisting.map((compound) => {
+    // Use object from compounds.loaded if available (for proper DataTable selection)
+    const loadedCompound = compounds.loaded.find(
+      (loaded) => loaded.target_compound_id === compound.target_compound_id
+    )
+
+    return (
+      loadedCompound ||
+      index.get(compound.target_compound_id ?? compound.target_compound_formula) ||
+      compound
+    )
+  })
   const unselected = (added) => !compounds.selected.some((comp) => isSameCompound(comp, added))
   compounds.selected.push(...reconciled.filter(unselected))
+  // force DataTable re-render
+  key.targets += 1
 }
 
 watchEffect(() => loadBatches(selected.workspace, info.type))
@@ -631,6 +640,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onEnter))
                     "
                     :validate="
                       (data) => {
+                        if (!data || !Array.isArray(data) || data.length === 0 || !data[0]) {
+                          return {
+                            valid: false,
+                            severity: 'error',
+                            message: 'No valid data found in paste'
+                          }
+                        }
                         const cols = Object.keys(data[0]).length
                         const rows = data.length
                         if (cols == 1 && rows == 1) {
@@ -663,7 +679,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onEnter))
                     :persistMessage="changes.length == 0"
                   >
                     <DataTable
-                      dataKey="target_compound_formula"
+                      :dataKey="
+                        (item) =>
+                          item.target_compound_id ||
+                          `create_${item.target_compound_formula}_${item.target_compound_name || ''}_${item.cas_number || ''}`
+                      "
                       v-if="changes.length"
                       :value="changes"
                       sortMode="multiple"
