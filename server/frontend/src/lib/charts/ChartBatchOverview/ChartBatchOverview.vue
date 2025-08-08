@@ -64,38 +64,49 @@ const xAxis = computed(() => ({
   tickformat: data.xField.field === 'time_of_day' ? '%H:%M:%S' : undefined
 }))
 
-const rangeY = computed(() => {
-  return scale.value.max && scale.value.max > 0
-    ? { range: [0, scale.value.max], autorange: false }
-    : { range: null, autorange: true }
+const dragmode = ref('select')
+
+const layout = computed(() => {
+  const scaleRangeY =
+    scale.value.max && scale.value.max > 0
+      ? { range: [0, scale.value.max], autorange: false }
+      : null
+  const autorange = { range: null, autorange: true }
+  const yRange = (scaleRangeY ?? zoom.rangeY) ? { ...zoom.rangeY, autorange: false } : autorange
+  const xRange = zoom.rangeX ? { ...zoom.rangeX, autorange: false } : autorange
+  return {
+    xaxis: {
+      title: { text: data.xField?.label },
+      autorange: true,
+      automargin: true,
+      showgrid: true,
+      gridcolor: '#33333399',
+      tickmode: 'array',
+      tickangle: 45,
+      gridwidth: 1,
+      ...xAxis.value,
+      ...xRange
+    },
+    yaxis: {
+      title: { text: `Intensity ${unit.value}` },
+      type: scale.value.log ? 'log' : 'lin',
+      showgrid: true,
+      gridcolor: '#33333399',
+      rangemode: 'tozero',
+      gridwidth: 1,
+      ...yRange
+    },
+    margin: { l: 50, r: 50, t: 50, b: 50 },
+    showlegend: true,
+    autosize: true,
+    dragmode: dragmode
+  }
 })
 
-const layout = computed(() => ({
-  xaxis: {
-    title: { text: data.xField?.label },
-    autorange: true,
-    automargin: true,
-    showgrid: true,
-    gridcolor: '#33333399',
-    tickmode: 'array',
-    tickangle: 45,
-    gridwidth: 1,
-    ...xAxis.value
-  },
-  yaxis: {
-    title: { text: `Intensity ${unit.value}` },
-    type: scale.value.log ? 'log' : 'lin',
-    showgrid: true,
-    gridcolor: '#33333399',
-    rangemode: 'tozero',
-    gridwidth: 1,
-    ...rangeY.value
-  },
-  margin: { l: 50, r: 50, t: 50, b: 50 },
-  showlegend: true,
-  autosize: true,
-  dragmode: 'select'
-}))
+const zoom = {
+  rangeX: null,
+  rangeY: null
+}
 
 function onClick({ pointIndex, curveNumber }) {
   if (pointIndex == null || curveNumber == null) return
@@ -179,6 +190,12 @@ const anyFilters = computed(() => app.ui.filter.mechanism)
       :layout="layout"
       @click="onClick"
       @select="onSelect"
+      @zoom="
+        ({ rangeX, rangeY }) => {
+          zoom.rangeX = rangeX ?? zoom.rangeX
+          zoom.rangeY = rangeY ?? zoom.rangeY
+        }
+      "
     >
       <template v-slot:settings>
         <ToolbarIntensityScale v-model="scale" />
