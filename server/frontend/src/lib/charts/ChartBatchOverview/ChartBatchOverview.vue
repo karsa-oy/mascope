@@ -64,7 +64,7 @@ const xAxis = computed(() => ({
   tickformat: data.xField.field === 'time_of_day' ? '%H:%M:%S' : undefined
 }))
 
-const dragmode = ref('select')
+const dragmode = ref('zoom')
 
 const layout = computed(() => {
   const scaleRangeY =
