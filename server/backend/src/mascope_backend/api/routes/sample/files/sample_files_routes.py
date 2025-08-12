@@ -19,7 +19,6 @@ from mascope_backend.api.controllers.sample.files.sample_files_controller import
     compute_sample_file_peaks,
     get_sample_file_peak_timeseries,
     get_sample_file_spectrum,
-    compute_sample_file_peak_noise,
     get_sample_file_metadata,
 )
 from mascope_backend.api.models.sample.files.sample_file_pydantic_model import (
@@ -248,36 +247,6 @@ async def compute_sample_file_peaks_route(
         "message": f"Computing all peaks data for sample file '{filename}', please wait.",
         "process_id": process_id,
     }
-
-
-@sample_files_router.post("/{sample_file_id}/peaks/noise")
-@api_route(token_access=True)
-async def compute_sample_file_peak_noise_route(
-    sample_file_id: str,
-    body: GetSampleFilePeakNoiseBody,
-    user=Depends(guest_user),
-):
-    """
-    Compute noise for the peaks at given m/z values in a sample file.
-
-    :param sample_file_id: ID of the sample file.
-    :param body: Dictionary with keys:
-        - mzs: list[float] (required)
-        - t_min: float (optional)
-        - t_max: float (optional)
-        - ppm: int (optional, default 1)
-        - polarity: "+" or "-" (optional)
-    :param user: Authenticated user with at least guest access.
-    :return: Noise data for the specified peak m/z values.
-    """
-    return await compute_sample_file_peak_noise(
-        sample_file_id=sample_file_id,
-        mzs=body.mzs,
-        t_min=body.t_min,
-        t_max=body.t_max,
-        ppm=body.ppm,
-        polarity=body.polarity,
-    )
 
 
 @sample_files_router.post("/{sample_file_id}/peaks/timeseries")

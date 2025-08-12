@@ -574,63 +574,6 @@ def get_centroids(
         return masses, intensities, resolutions, signal_to_noise
 
 
-def get_noise(
-    datafile_path: str,
-    t_min: float | None = None,
-    t_max: float | None = None,
-    ppm: int = 1,
-    polarity: Literal["+", "-"] | None = None,
-) -> xr.core.dataarray.DataArray:
-    """Reads peak noise for the specified time range (t_min, t_max).
-    Polarity filter may be optionally provided.
-
-    :param datafile_path: Path to the Thermo Fisher raw file (.raw) containing the data.
-    :type datafile_path: str
-    :param t_min: Start time [s]
-    :type t_min: float, optional
-    :param t_max: End time [s]
-    :type t_max: float, optional
-    :param ppm: ppm precision for binning, defaults to 1. This value determines the mass tolerance for grouping m/z values,
-                where a smaller ppm value results in finer binning and higher precision.
-    :type ppm: int, optional
-    :param polarity: + or -, Polarity of the scans to be retrieved, optional, defaults to None
-    :type polarity: str, optional
-    :raises ValueError: If the specified time range is invalid, or if no data is found in the specified filters,
-                        or the specified polarity is not found in the raw file.
-    :return: Peak noise in the specified time range for specified polarity as an xarray DataArray.
-    :rtype: xr.core.dataarray.DataArray
-    """
-    with open_raw_file(datafile_path) as raw_file:
-        num_of_scans = raw_file.RunHeaderEx.SpectraCount
-        scan_indices = list(range(1, num_of_scans + 1))
-
-        if polarity:
-            scan_indices = filter_by_polarity(raw_file, scan_indices, polarity)
-
-        scan_indices, _ = filter_by_time(raw_file, scan_indices, t_min, t_max)
-
-        # Setup mz tolerance - counts within ppm are binned
-        mass_option = MassOptions(ppm, ToleranceUnits.ppm)
-
-        # Get averaged centroids in time range (t_max, t_max)
-        net_scan_indices = List[int]()
-        for index in scan_indices:
-            net_scan_indices.Add(index)
-        average_scan = Extensions.AverageScans(raw_file, net_scan_indices, mass_option)
-        averaged_centroids = average_scan.CentroidScan
-
-        masses = np.frombuffer(averaged_centroids.Masses)
-        noises = np.frombuffer(averaged_centroids.Noises)
-
-        # Convert noise to dask array
-        noise_dask = da.from_array(noises, chunks="auto")
-
-        # Convert to xarray.DataArray
-        return xr.DataArray(
-            data=noise_dask, dims=["mz"], coords={"mz": masses}, name="noise"
-        )
-
-
 class RawFileMetadata:
     """Class to access metadata of a Thermo Fisher raw file."""
 
