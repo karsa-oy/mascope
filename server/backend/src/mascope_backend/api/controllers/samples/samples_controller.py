@@ -25,6 +25,7 @@ from mascope_backend.db.models import (
 from mascope_backend.api.lib.api_features import api_controller
 from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
 from mascope_backend.runtime import runtime
+from dataclasses import dataclass
 
 
 @api_controller()
@@ -294,58 +295,24 @@ async def get_sample_peaks(
     """
 
     # Step 1: Get sample data and extract required fields
-    sample_data = await get_sample(sample_item_id)
-    sample = sample_data["data"]
-    sample_item_name, filename, sample_t0, sample_t1, sample_polarity = (
-        sample["sample_item_name"],
-        sample["filename"],
-        sample["t0"],
-        sample["t1"],
-        sample["polarity"],
+    sample = await _load_sample_data(sample_item_id)
+
+    # Step 2: Validate and set effective time limits with auto-correction
+    t_min_eff, t_max_eff, time_adjustment_info = _validate_time_range(
+        t_min, t_max, sample.t0, sample.t1
     )
-
-    # Step 2: Set effective time limits with validation and auto-correction
-    t_min_eff = t_min if t_min is not None else sample_t0
-    t_max_eff = t_max if t_max is not None else sample_t1
-
-    # Check for completely invalid ranges (user provided values outside sample window)
-    if t_min is not None and t_min > sample_t1:
-        raise ValueError(
-            f"Requested minimum time ({t_min:.2f}s) is after sample's acquisition end time ({sample_t1:.2f}s)"
-        )
-    if t_max is not None and t_max < sample_t0:
-        raise ValueError(
-            f"Requested maximum time ({t_max:.2f}s) is before sample's acquisition start time ({sample_t0:.2f}s)"
-        )
-
-    # Auto-correct slight overshoots and track what was adjusted
-    adjustments = []
-    if t_min is not None and t_min < sample_t0:
-        t_min_eff = max(sample_t0, t_min_eff)
-        adjustments.append(f"minimum time from {t_min:.2f}s to {sample_t0:.2f}s")
-    if t_max is not None and t_max > sample_t1:
-        t_max_eff = min(sample_t1, t_max_eff)
-        adjustments.append(f"maximum time from {t_max:.2f}s to {sample_t1:.2f}s")
-
-    # Build user message if adjustments were made
-    time_adjustment_info = ""
-    if adjustments:
-        adjustment_text = " and ".join(adjustments)
-        warning_msg = f"Time range adjusted: {adjustment_text} to fit sample acquisition window [{sample_t0:.2f}s, {sample_t1:.2f}s]"
-        runtime.logger.warning(warning_msg)
-        time_adjustment_info = f" {warning_msg}."
 
     # Step 3: Get filtered scan timestamps using sample's polarity and time range
     time_array = get_scan_timestamps(
-        base_filename=filename,
+        base_filename=sample.filename,
         t_min=t_min_eff,
         t_max=t_max_eff,
-        polarity=sample_polarity,
+        polarity=sample.polarity,
     )
 
     if len(time_array) == 0:
         return {
-            "message": f"No scans found for sample '{sample_item_name}' with polarity '{sample_polarity}' in time range [{t_min_eff:.2f}s, {t_max_eff:.2f}s].",
+            "message": f"No scans found for sample '{sample.sample_item_name}' with polarity '{sample.polarity}' in time range [{t_min_eff:.2f}s, {t_max_eff:.2f}s].",
             "results": 0,
             "data": {
                 "mz": [],
@@ -362,10 +329,10 @@ async def get_sample_peaks(
         vars_to_load.append("peak_heights")
 
     try:
-        sample_file_data = load_file(filename, vars=vars_to_load)
+        sample_file_data = load_file(sample.filename, vars=vars_to_load)
     except FileNotFoundError as e:
         raise NotFoundException(
-            f"Sample file with name '{filename}' was not found or has not been processed"
+            f"Sample file with name '{sample.filename}' was not found or has not been processed"
         ) from e
 
     # Step 5: Extract and format the data with polarity filtering
@@ -374,7 +341,7 @@ async def get_sample_peaks(
     if areas:
         if "peak_areas" not in sample_file_data:
             raise NotFoundException(
-                f"No peak areas found in sample file '{filename}', file may not have been processed"
+                f"No peak areas found in sample file '{sample.filename}', file may not have been processed"
             )
 
         peak_areas = get_peaks(sample_file_data, "area")
@@ -396,7 +363,7 @@ async def get_sample_peaks(
     if heights:
         if "peak_heights" not in sample_file_data:
             raise NotFoundException(
-                f"No peak heights found in sample file '{filename}', file may not have been processed"
+                f"No peak heights found in sample file '{sample.filename}', file may not have been processed"
             )
         peak_heights = get_peaks(sample_file_data, "height")
 
@@ -420,7 +387,7 @@ async def get_sample_peaks(
     # Step 8: Format the response for the case where no peaks were detected
     if not response_data.get("mz", []):
         message = (
-            f"No peaks found in sample '{sample_item_name}' with polarity '{sample_polarity}'. "
+            f"No peaks found in sample '{sample.sample_item_name}' with polarity '{sample.polarity}'. "
             f"The file was processed, but no peaks were detected in the target m/z range."
         )
         return {
@@ -440,7 +407,7 @@ async def get_sample_peaks(
         response_data.pop("height", None)
 
     # Step 8: Return success response
-    message = f"Successfully loaded {len(response_data['mz'])} peaks from sample '{sample_item_name}' with polarity '{sample_polarity}'"
+    message = f"Successfully loaded {len(response_data['mz'])} peaks from sample '{sample.sample_item_name}' with polarity '{sample.polarity}'"
 
     if time_adjustment_info:
         message += time_adjustment_info
@@ -494,60 +461,24 @@ async def get_sample_peak_timeseries(
     :rtype: dict
     """
     # Step 1: Get sample data and extract required fields
-    sample_data = await get_sample(sample_item_id)
-    sample = sample_data["data"]
-    sample_item_name, filename, sample_t0, sample_t1, sample_polarity = (
-        sample["sample_item_name"],
-        sample["filename"],
-        sample["t0"],
-        sample["t1"],
-        sample["polarity"],
+    sample = await _load_sample_data(sample_item_id)
+
+    # Step 2: Validate and set effective time limits with auto-correction
+    t_min_eff, t_max_eff, time_adjustment_info = _validate_time_range(
+        t_min, t_max, sample.t0, sample.t1
     )
-
-    # Step 2: Set effective time limits with validation and auto-correction
-    t_min_eff = t_min if t_min is not None else sample_t0
-    t_max_eff = t_max if t_max is not None else sample_t1
-
-    # Check for completely invalid ranges (user provided values outside sample window)
-    if t_min is not None and t_min > sample_t1:
-        raise ValueError(
-            f"Requested minimum time ({t_min:.2f}s) is after sample's acquisition end time ({sample_t1:.2f}s)"
-        )
-
-    if t_max is not None and t_max < sample_t0:
-        raise ValueError(
-            f"Requested maximum time ({t_max:.2f}s) is before sample's acquisition start time ({sample_t0:.2f}s)"
-        )
-
-    # Auto-correct slight overshoots and track what was adjusted
-    adjustments = []
-    if t_min is not None and t_min < sample_t0:
-        t_min_eff = max(sample_t0, t_min_eff)
-        adjustments.append(f"minimum time from {t_min:.2f}s to {sample_t0:.2f}s")
-
-    if t_max is not None and t_max > sample_t1:
-        t_max_eff = min(sample_t1, t_max_eff)
-        adjustments.append(f"maximum time from {t_max:.2f}s to {sample_t1:.2f}s")
-
-    # Build user message if adjustments were made
-    time_adjustment_info = ""
-    if adjustments:
-        adjustment_text = " and ".join(adjustments)
-        warning_msg = f"Time range adjusted: {adjustment_text} to fit sample acquisition window [{sample_t0:.2f}s, {sample_t1:.2f}s]"
-        runtime.logger.warning(warning_msg)
-        time_adjustment_info = f" {warning_msg}."
 
     # Step 3: Get filtered scan timestamps using sample's polarity and time range (adjusted values)
     time_array = get_scan_timestamps(
-        base_filename=filename,
+        base_filename=sample.filename,
         t_min=t_min_eff,
         t_max=t_max_eff,
-        polarity=sample_polarity,
+        polarity=sample.polarity,
     )
 
     if len(time_array) == 0:
         return {
-            "message": f"No scans found for sample '{filename}' with polarity '{sample_polarity}' in time range [{t_min_eff}, {t_max_eff}] seconds.",
+            "message": f"No scans found for sample '{sample.filename}' with polarity '{sample.polarity}' in time range [{t_min_eff}, {t_max_eff}] seconds.",
             "results": 0,
             "data": {
                 "mz": None,
@@ -558,10 +489,10 @@ async def get_sample_peak_timeseries(
 
     # Step 4: Load sample file data
     try:
-        sample_file = load_file(filename, vars=["peak_heights"])
+        sample_file = load_file(sample.filename, vars=["peak_heights"])
         peaks = get_peaks(sample_file, "height")
     except FileNotFoundError:
-        raise NotFoundException(f"Sample file '{filename}' not found")
+        raise NotFoundException(f"Sample file '{sample.filename}' not found")
 
     # Step 5: Filter sample file peaks to include times in filtered time_array and
     # select nearest to requested peak m/z
@@ -580,8 +511,8 @@ async def get_sample_peak_timeseries(
     if abs(mz_diff_ppm) > peak_mz_tolerance_ppm:
         message = (
             f"No peak found within given m/z tolerance {peak_mz_tolerance_ppm} ppm "
-            f"of requested m/z {peak_mz} in sample '{sample_item_name}' "
-            f"with '{sample_polarity}' polarity."
+            f"of requested m/z {peak_mz} in sample '{sample.sample_item_name}' "
+            f"with '{sample.polarity}' polarity."
         )
         return {
             "message": message,
@@ -591,8 +522,8 @@ async def get_sample_peak_timeseries(
 
     message = (
         f"Retrieved timeseries with {len(peak_timeseries.time.values)} data points "
-        f"for peak m/z {peak_mz} in sample '{sample_item_name}' "
-        f"with '{sample_polarity}' polarity."
+        f"for peak m/z {peak_mz} in sample '{sample.sample_item_name}' "
+        f"with '{sample.polarity}' polarity."
     )
     if time_adjustment_info:
         message += time_adjustment_info
@@ -643,18 +574,117 @@ async def get_sample_spectrum(
     :return: A dictionary containing spectrum data with m/z values, intensities, and metadata
     :rtype: dict
     """
-    # Step 1: Get sample data and extract required fields
-    sample_data = await get_sample(sample_item_id)
-    sample = sample_data["data"]
-    sample_item_name, filename, sample_t0, sample_t1, sample_polarity = (
-        sample["sample_item_name"],
-        sample["filename"],
-        sample["t0"],
-        sample["t1"],
-        sample["polarity"],
+    # Step 1: Get sample data
+    sample = await _load_sample_data(sample_item_id)
+
+    # Step 2: Validate and set effective time limits with auto-correction
+    t_min_eff, t_max_eff, time_adjustment_info = _validate_time_range(
+        t_min, t_max, sample.t0, sample.t1
     )
 
-    # Step 2: Set effective time limits with validation and auto-correction
+    # Step 3: Compute averaged spectrum in the time range with polarity filtering
+    intensity_unit = "counts/s"
+
+    # Use specific time range with polarity filtering
+    spectrum = sum_signal_for_time_range(
+        sample.filename, t_min_eff, t_max_eff, polarity=sample.polarity, average=True
+    )
+
+    # Check if spectrum computation returned None (no data found)
+    if spectrum is None:
+        message = (
+            f"No spectrum data found for sample '{sample.sample_item_name}' "
+            f"with '{sample.polarity}' polarity in time range "
+            f"[{t_min_eff:.2f}s, {t_max_eff:.2f}s]. The sample file may not "
+            f"contain scans of this polarity in the specified time window."
+        )
+        return {
+            "message": message,
+            "results": 0,
+            "data": {
+                "mz": [],
+                "intensity": [],
+                "intensity_unit": intensity_unit,
+            },
+        }
+
+    # Step 4: Filter by m/z range if provided
+    if mz_min is not None and mz_max is not None:
+        spectrum = spectrum.sel(mz=slice(mz_min, mz_max)).compute()
+
+    # Step 5: Extract m/z values and intensities
+    mz_values = spectrum.mz.values.tolist()
+    intensity_values = spectrum.values.tolist()
+
+    # Step 6: Return the spectrum data with metadata
+    message = f"Retrieved spectrum data with {len(mz_values)} m/z points from sample '{sample.sample_item_name}' with '{sample.polarity}' polarity."
+
+    if time_adjustment_info:
+        message += time_adjustment_info
+
+    return {
+        "message": message,
+        "results": len(mz_values),
+        "data": {
+            "mz": mz_values,
+            "intensity": intensity_values,
+            "intensity_unit": intensity_unit,
+        },
+    }
+
+
+@dataclass
+class SampleData:
+    """
+    Data class to hold sample information.
+    """
+
+    sample_item_id: str
+    sample_item_name: str
+    filename: str
+    t0: float
+    t1: float
+    polarity: str
+
+
+async def _load_sample_data(sample_item_id: str) -> SampleData:
+    """Load sample data from the database by sample item ID.
+
+    :param sample_item_id: Unique identifier for the sample item
+    :type sample_item_id: str
+    :return: SampleData object containing sample information
+    :rtype: SampleData
+    """
+    sample = await get_sample(sample_item_id)
+    sample = sample["data"]
+    sample_data = SampleData(
+        sample_item_id=sample["sample_item_id"],
+        sample_item_name=sample["sample_item_name"],
+        filename=sample["filename"],
+        t0=sample["t0"],
+        t1=sample["t1"],
+        polarity=sample["polarity"],
+    )
+    return sample_data
+
+
+def _validate_time_range(
+    t_min: float | None, t_max: float | None, sample_t0: float, sample_t1: float
+) -> tuple[float, float]:
+    """
+    Validate and set effective time limits based on sample's acquisition window.
+
+    :param t_min: Minimum time limit in seconds
+    :type t_min: float | None
+    :param t_max: Maximum time limit in seconds
+    :type t_max: float | None
+    :param sample_t0: Sample acquisition start time in seconds
+    :type sample_t0: float
+    :param sample_t1: Sample acquisition end time in seconds
+    :type sample_t1: float
+    :return: Tuple of effective minimum and maximum time limits
+    :rtype: tuple[float, float]
+    """
     t_min_eff = t_min if t_min is not None else sample_t0
     t_max_eff = t_max if t_max is not None else sample_t1
 
@@ -684,53 +714,6 @@ async def get_sample_spectrum(
         warning_msg = f"Time range adjusted: {adjustment_text} to fit sample acquisition window [{sample_t0:.2f}s, {sample_t1:.2f}s]"
         runtime.logger.warning(warning_msg)
         time_adjustment_info = f" {warning_msg}."
-
-    # Step 3: Compute averaged spectrum in the time range with polarity filtering
-    intensity_unit = "counts/s"
-
-    # Use specific time range with polarity filtering
-    spectrum = sum_signal_for_time_range(
-        filename, t_min_eff, t_max_eff, polarity=sample_polarity, average=True
-    )
-
-    # Check if spectrum computation returned None (no data found)
-    if spectrum is None:
-        message = (
-            f"No spectrum data found for sample '{sample_item_name}' "
-            f"with '{sample_polarity}' polarity in time range "
-            f"[{t_min_eff:.2f}s, {t_max_eff:.2f}s]. The sample file may not "
-            f"contain scans of this polarity in the specified time window."
-        )
-        return {
-            "message": message,
-            "results": 0,
-            "data": {
-                "mz": [],
-                "intensity": [],
-                "intensity_unit": intensity_unit,
-            },
-        }
-
-    # Step 4: Filter by m/z range if provided
-    if mz_min is not None and mz_max is not None:
-        spectrum = spectrum.sel(mz=slice(mz_min, mz_max)).compute()
-
-    # Step 5: Extract m/z values and intensities
-    mz_values = spectrum.mz.values.tolist()
-    intensity_values = spectrum.values.tolist()
-
-    # Step 6: Return the spectrum data with metadata
-    message = f"Retrieved spectrum data with {len(mz_values)} m/z points from sample '{sample_item_name}' with '{sample_polarity}' polarity."
-
-    if time_adjustment_info:
-        message += time_adjustment_info
-
-    return {
-        "message": message,
-        "results": len(mz_values),
-        "data": {
-            "mz": mz_values,
-            "intensity": intensity_values,
-            "intensity_unit": intensity_unit,
-        },
-    }
+    else:
+        time_adjustment_info = " No adjustments made to time range."
+    return t_min_eff, t_max_eff, time_adjustment_info
