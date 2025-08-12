@@ -749,6 +749,44 @@ def get_sample_spectrum(
     return spectrum_data
 
 
+def get_sample_centroids_per_scan(
+    mascope_url: str,
+    access_token: str,
+    sample_item_ids: list[str],
+) -> dict | None:
+    """Get centroids for a list of sample items.
+
+    :param mascope_url: The base URL of the Mascope instance.
+    :type mascope_url: str
+    :param access_token: Authorization token for API access
+    :type access_token: str
+    :param sample_item_ids: List of sample item IDs for which to retrieve centroids.
+    :type sample_item_ids: list[str]
+    :return: A dictionary containing the centroids data for each sample item ID.
+    :rtype: dict | None
+    """
+    sample_item_ids = ",".join(sample_item_ids)
+    resp = api_get(
+        url=mascope_url,
+        path=f"sample/items/{sample_item_ids}/centroids",
+        access_token=access_token,
+    )
+
+    # Check if the API request was successful
+    if not resp:
+        print(
+            f"Failed to retrieve centroids for sample items {sample_item_ids} from {mascope_url}."
+        )
+        return None
+
+    # Parse the content of the response
+    content = json.loads(resp.content)
+    if not (centroids_data := content.get("data", None)):
+        print(f"No centroids data found for sample items {sample_item_ids}.")
+        return None
+    return centroids_data
+
+
 ##################
 # Sample files API
 

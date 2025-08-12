@@ -1,5 +1,4 @@
 from datetime import datetime, timezone
-from typing import Literal
 from fastapi import BackgroundTasks
 
 
@@ -15,7 +14,7 @@ from sqlalchemy import (
 
 from mascope_file.name import get_instrument_type
 
-from mascope_signal.compute import get_tic_per_scan
+import mascope_signal.compute as m_compute
 from mascope_signal.peak import detect_peaks
 from mascope_match import (
     ORBI_FITTING_THRESHOLD,
@@ -231,7 +230,7 @@ async def create_sample_item(
         # Add TIC, t0, t1 to the sample item dictionary
         # TODO add a possibility to specify t0 and t1 in the request body?
         try:
-            tic_time, tic_values = get_tic_per_scan(
+            tic_time, tic_values = m_compute.get_tic_per_scan(
                 sample_file.filename, polarity=sample_item.polarity
             )
         except TypeError:
@@ -414,7 +413,7 @@ async def delete_sample_items(
             raise NotFoundException(
                 f"Failed to find {len(missing_ids)} sample item{'s' if len(missing_ids) > 1 else ''}: {missing_ids}"
             )
-        # Step 3: Retreive affected batch ids
+        # Step 3: Retrieve affected batch ids
         _, affected_sample_batch_ids, *_ = await fetch_affected_sample_data(
             sample_item_ids=sample_item_ids
         )
@@ -448,7 +447,7 @@ async def copy_sample_items(
     parent_id=None,
 ) -> dict:
     """
-    TODO_api_circular_import  destinguish sample and sample_item controller, should be mocveved to samples_controller.py?
+    TODO_api_circular_import  distinguish sample and sample_item controller, should be moved to samples_controller.py?
     The function copies the specified sample item and associates the new copy with a specified sample batch.
     May be a part of the copy sample batch operation or independent.
     Copies matches, match interferences of the original sample if part of a larger copy batch operation
@@ -610,7 +609,7 @@ async def copy_sample_items(
             parent_id=process_id,
         )
 
-    # Step 7: Return the copied samle and message
+    # Step 7: Return the copied sample and message
     return {
         "message": f"Copied {len(copied_samples)} samples successfully to batch '{batch.sample_batch_name}'.",
         "data": [s.to_dict() for s in copied_samples],
@@ -645,7 +644,7 @@ async def move_sample_items(
     2. Validate samples existence
     3. Validate move is between different batches
     4. Copy sample items over to the batch
-    5. Delete the original sample items if succesful
+    5. Delete the original sample items if successful
 
     :param sample_item_ids: ID of the original sample items to be moved.
     :type sample_item_ids: list[str[]
@@ -720,6 +719,77 @@ async def move_sample_items(
             "affected_sample_item_ids": sample_item_ids,
             "affected_sample_batch_ids": [sample_batch_id, *affected_sample_batch_ids],
         },
+    }
+
+
+@api_controller_background_task(
+    success_notification_rooms=["sid"],
+    error_notification_rooms=["sid"],
+)
+async def sample_items_get_centroids(
+    sample_item_ids: list[str],
+    independent_transaction: bool = False,
+    sid=None,
+    process_id=None,
+    parent_id=None,
+) -> dict:
+    """Extracts centroids for a list of sample items by their IDs.
+
+    :param sample_item_ids: List of sample item IDs for which to extract centroids.
+    :type sample_item_ids: list[str]
+    :param independent_transaction: Flag to indicate if the operation should be treated as an independent transaction, defaults to False.
+    :type independent_transaction: bool, optional
+    :param sid: Session ID for targeting specific clients when emitting events, defaults to None.
+    :type sid: optional
+    :param process_id: Process identifier for tracking background operations, defaults to None.
+    :type process_id: optional
+    :param parent_id: Parent process identifier for tracking background operations, defaults to None.
+    :type parent_id: optional
+    :return: A dictionary containing the extracted centroids for each sample item ID.
+    :rtype: dict
+    """
+    if not sample_item_ids:
+        return {
+            "message": "No sample items provided for centroid extraction.",
+            "data": [],
+        }
+
+    # Step 1: Fetch sample items from the database in one go
+    async with async_session() as session:
+        stmt = select(SampleItem)
+        stmt = stmt.where(SampleItem.sample_item_id.in_(sample_item_ids))
+        result = await session.execute(stmt)
+        sample_items = result.scalars().all()
+
+    # Step 2: Extract centroids for each sample item
+    centroids = dict()
+    for sample in sample_items:
+        sample_item_centroids = m_compute.get_orbi_centroids_per_scan(
+            base_filename=sample.filename,
+            t_min=sample.t0,
+            t_max=sample.t1,
+            polarity=sample.polarity,
+        )
+        mzs = [cen["masses"].tolist() for cen in sample_item_centroids]
+        intensities = [cen["intensities"].tolist() for cen in sample_item_centroids]
+        resolutions = [cen["resolutions"].tolist() for cen in sample_item_centroids]
+        signal_to_noise = [
+            cen["signal_to_noise"].tolist() for cen in sample_item_centroids
+        ]
+        timestamps = [cen["timestamp"] for cen in sample_item_centroids]
+
+        centroids[sample.sample_item_id] = {
+            "masses": mzs,
+            "intensities": intensities,
+            "resolutions": resolutions,
+            "signal_to_noise": signal_to_noise,
+            "timestamp": timestamps,
+        }
+
+    # Step 3: Return the extracted centroids
+    return {
+        "message": f"Extracted centroids for {len(sample_item_ids)} sample items.",
+        "data": centroids,
     }
 
 
@@ -832,7 +902,7 @@ async def sample_item_export_peaks(
     base_datetime_utc = sample["datetime_utc"]
     scan_timestamps_utc = sample_peak_timedelta + pd.Timestamp(base_datetime_utc)
     # Get ticks for each time scan
-    _, scan_tics = get_tic_per_scan(filename)
+    _, scan_tics = m_compute.get_tic_per_scan(filename)
 
     mz_values = sample_peak_data.mz.values
     intensities = sample_peak_data.values

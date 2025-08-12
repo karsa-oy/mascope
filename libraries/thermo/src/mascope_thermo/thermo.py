@@ -7,16 +7,12 @@ There may be a confusion with indices since the Thermo library uses 1-based inde
 while Python uses 0-based indexing. scan_indices are 1-based, while scan_indices_python are 0-based.
 """
 
-from pathlib import Path
 from itertools import compress
-from contextlib import contextmanager
 from typing import Iterable, Literal
-
 import pandas as pd
 import numpy as np
 import xarray as xr
 import dask.array as da
-
 from ThermoFisher.CommonCore.RawFileReader import RawFileReaderAdapter
 from ThermoFisher.CommonCore.Data.Business import (
     Device,
@@ -27,35 +23,50 @@ from ThermoFisher.CommonCore.Data.Business import (
     Range,
 )
 from ThermoFisher.CommonCore.Data import ToleranceUnits, Extensions
-
 from System.Collections.Generic import List
-
 from mascope_thermo.runtime import runtime
 
 
-@contextmanager
-def open_raw_file(datafile_path: str):
-    """Context manager for safely opening and closing Thermo raw-files.
+SECONDS_PER_MINUTE = 60
 
-    :param datafile_path: Path to the Thermo Fisher raw file (.raw) containing the data.
-    :type datafile_path: str
-    :yield: RawFile object
-    :rtype: ThermoFisher.CommonCore.Data.Interfaces.IRawDataExtended
-    """
-    try:
-        raw_file = RawFileReaderAdapter.FileFactory(datafile_path)
-        try:
-            # Default configurations
-            raw_file.SelectInstrument(Device.MS, 1)
-            raw_file.IncludeReferenceAndExceptionData = True
 
-            yield raw_file
-        finally:
-            # Ensure file is always closed
-            if raw_file is not None:
-                raw_file.Dispose()
-    except Exception as e:
-        runtime.logger.error(f"Failed to open the file {Path(datafile_path).name}: {e}")
+class InvalidRangeError(ValueError):
+    pass
+
+
+class PolarityError(ValueError):
+    pass
+
+
+def _validate_mz_range(
+    RawFile, mz_min: float | None, mz_max: float | None
+) -> tuple[float, float]:
+    low = RawFile.RunHeaderEx.LowMass if mz_min is None else mz_min
+    high = RawFile.RunHeaderEx.HighMass if mz_max is None else mz_max
+    if low > high:
+        raise InvalidRangeError(
+            f"Invalid m/z range: mz_min={low}, mz_max={high}, where mz_min > mz_max"
+        )
+    return low, high
+
+
+class RawFileManager:
+    """Handles safe open/close operations on raw file at datafile_path"""
+
+    def __init__(self, datafile_path: str):
+        self.path = datafile_path
+        self.RawFile = None
+
+    def __enter__(self):
+        self.RawFile = RawFileReaderAdapter.FileFactory(self.path)
+        self.RawFile.SelectInstrument(Device.MS, 1)
+        # This includes the base peak into the spectrum
+        self.RawFile.IncludeReferenceAndExceptionData = True
+        return self.RawFile
+
+    def __exit__(self, *args):
+        if self.RawFile:
+            self.RawFile.Dispose()
 
 
 def get_polarity_options(datafile_path: str) -> str:
@@ -66,12 +77,12 @@ def get_polarity_options(datafile_path: str) -> str:
     :return: "-" if only negative polarities are present, "+" if only positive, "+-" if both are present.
     :rtype: str
     """
-    with open_raw_file(datafile_path) as raw_file:
-        num_of_scans = raw_file.RunHeaderEx.SpectraCount
+    with RawFileManager(datafile_path) as RawFile:
+        num_of_scans = RawFile.RunHeaderEx.SpectraCount
         scan_indices = list(range(1, num_of_scans + 1))
 
         polarities = set(
-            raw_file.GetFilterForScanNumber(i).Polarity.ToString() for i in scan_indices
+            RawFile.GetFilterForScanNumber(i).Polarity.ToString() for i in scan_indices
         )
 
         has_positive = "Positive" in polarities
@@ -84,16 +95,16 @@ def get_polarity_options(datafile_path: str) -> str:
         elif has_negative:
             return "-"
         else:
-            raise ValueError("No valid polarities found in the raw file.")
+            raise PolarityError("No valid polarities found in the raw file.")
 
 
 def filter_by_polarity(
-    raw_file, scan_indices: list, polarity: Literal["+", "-"]
+    RawFile, scan_indices: list, polarity: Literal["+", "-"]
 ) -> list:
     """Filter scan indices by polarity. Can be used to verify if the specified polarity is available in the raw file.
 
-    :param raw_file: The raw file object containing scan data.
-    :type raw_file: ThermoFisher.CommonCore.Data.Interfaces.IRawDataExtended
+    :param RawFile: The raw file object containing scan data.
+    :type RawFile: ThermoFisher.CommonCore.Data.Interfaces.IRawDataExtended
     :param scan_indices: List of scan indices to filter.
     :type scan_indices: list
     :param polarity: Polarity of the scans to be retrieved, either '+' or '-'.
@@ -109,22 +120,22 @@ def filter_by_polarity(
     polarity = "Negative" if polarity == "-" else "Positive"
 
     polarity_mask = [
-        raw_file.GetFilterForScanNumber(i).Polarity.ToString() == polarity
+        RawFile.GetFilterForScanNumber(i).Polarity.ToString() == polarity
         for i in scan_indices
     ]
     scan_indices = list(compress(scan_indices, polarity_mask))
 
     if not scan_indices:
-        raise ValueError(f"{polarity} polarity not found in the raw file.")
+        raise PolarityError(f"{polarity} polarity not found in the raw file.")
 
     return scan_indices
 
 
-def filter_by_time(raw_file, scan_indices: list, t_min: float, t_max: float) -> tuple:
+def filter_by_time(RawFile, scan_indices: list, t_min: float, t_max: float) -> tuple:
     """Filter scan indices by time range.
 
-    :param raw_file: The raw file object containing scan data.
-    :type raw_file: ThermoFisher.CommonCore.Data.Interfaces.IRawDataExtended
+    :param RawFile: The raw file object containing scan data.
+    :type RawFile: ThermoFisher.CommonCore.Data.Interfaces.IRawDataExtended
     :param scan_indices: List of scan indices to filter.
     :type scan_indices: list
     :param t_min: Minimum time [s].
@@ -135,14 +146,17 @@ def filter_by_time(raw_file, scan_indices: list, t_min: float, t_max: float) -> 
     :rtype: tuple
     """
     # Set default time range if not provided
-    t_min = raw_file.RunHeaderEx.StartTime * 60 if t_min is None else t_min
-    t_max = raw_file.RunHeaderEx.EndTime * 60 if t_max is None else t_max
+    t_min = (
+        RawFile.RunHeaderEx.StartTime * SECONDS_PER_MINUTE if t_min is None else t_min
+    )
+    t_max = RawFile.RunHeaderEx.EndTime * SECONDS_PER_MINUTE if t_max is None else t_max
 
     if t_min > t_max:
         raise ValueError(f"Invalid time range: {t_min:.1f} s > {t_max:.1f} s")
 
     scan_time = [
-        raw_file.GetScanStatsForScanNumber(i).StartTime * 60 for i in scan_indices
+        RawFile.GetScanStatsForScanNumber(i).StartTime * SECONDS_PER_MINUTE
+        for i in scan_indices
     ]  # [s]
 
     # Create a mask for scan times within the specified range
@@ -194,22 +208,16 @@ def get_signal(
     :return: An xarray Dataset containing the signal data
     :rtype: xr.Dataset
     """
-    with open_raw_file(datafile_path) as raw_file:
-        mz_min = raw_file.RunHeaderEx.LowMass if mz_min is None else mz_min
-        mz_max = raw_file.RunHeaderEx.HighMass if mz_max is None else mz_max
-        if mz_min > mz_max:
-            raise ValueError(
-                f"Invalid m/z range: mz_min={mz_min}, mz_max={mz_max}, where mz_min > mz_max"
-            )
-
-        num_of_scans = raw_file.RunHeaderEx.SpectraCount
+    with RawFileManager(datafile_path) as RawFile:
+        mz_min, mz_max = _validate_mz_range(RawFile, mz_min, mz_max)
+        num_of_scans = RawFile.RunHeaderEx.SpectraCount
         scan_indices = list(range(1, num_of_scans + 1))
-        scans = tuple(Extensions.GetScans(raw_file, 1, num_of_scans))
+        scans = tuple(Extensions.GetScans(RawFile, 1, num_of_scans))
 
         if polarity:
-            scan_indices = filter_by_polarity(raw_file, scan_indices, polarity)
+            scan_indices = filter_by_polarity(RawFile, scan_indices, polarity)
 
-        scan_indices, scan_time = filter_by_time(raw_file, scan_indices, t_min, t_max)
+        scan_indices, scan_time = filter_by_time(RawFile, scan_indices, t_min, t_max)
 
         # Extract scan spectra and m/z values
         scan_mzs, scan_specs = [], []
@@ -225,7 +233,7 @@ def get_signal(
         if not scan_mzs:
             raise ValueError(
                 f"""No data found in the specified m/z range.
-                M/z range of the raw file: {raw_file.RunHeaderEx.LowMass} - {raw_file.RunHeaderEx.HighMass}
+                M/z range of the raw file: {RawFile.RunHeaderEx.LowMass} - {RawFile.RunHeaderEx.HighMass}
                 """
             )
 
@@ -279,14 +287,14 @@ def compute_sum_signal_in_time_range(
     :return: Sum signal in the specified time range for specified polarity as an xarray DataArray.
     :rtype: xr.core.dataarray.DataArray
     """
-    with open_raw_file(datafile_path) as raw_file:
-        num_of_scans = raw_file.RunHeaderEx.SpectraCount
+    with RawFileManager(datafile_path) as RawFile:
+        num_of_scans = RawFile.RunHeaderEx.SpectraCount
         scan_indices = list(range(1, num_of_scans + 1))
 
         if polarity:
-            scan_indices = filter_by_polarity(raw_file, scan_indices, polarity)
+            scan_indices = filter_by_polarity(RawFile, scan_indices, polarity)
 
-        scan_indices, _ = filter_by_time(raw_file, scan_indices, t_min, t_max)
+        scan_indices, _ = filter_by_time(RawFile, scan_indices, t_min, t_max)
         runtime.logger.debug(
             f"Computing sum signal for {len(scan_indices)} scans in time range ({t_min}, {t_max}) s"
         )
@@ -298,7 +306,7 @@ def compute_sum_signal_in_time_range(
         net_scan_indices = List[int]()
         for index in scan_indices:
             net_scan_indices.Add(index)
-        average_scan = Extensions.AverageScans(raw_file, net_scan_indices, mass_option)
+        average_scan = Extensions.AverageScans(RawFile, net_scan_indices, mass_option)
         averaged_spec = average_scan.SegmentedScan
 
         # Extract averaged signal, multiply by num_of_scans to restore sum signal
@@ -336,18 +344,18 @@ def get_tic_per_scan(
     :return: Tuple containing the scan timestamps [s] and TIC values as numpy arrays
     :rtype: tuple
     """
-    with open_raw_file(datafile_path) as raw_file:
-        num_of_scans = raw_file.RunHeaderEx.SpectraCount
+    with RawFileManager(datafile_path) as RawFile:
+        num_of_scans = RawFile.RunHeaderEx.SpectraCount
         scan_indices = list(range(1, num_of_scans + 1))
 
-        scan_statistics = [raw_file.GetScanStatsForScanNumber(i) for i in scan_indices]
+        scan_statistics = [RawFile.GetScanStatsForScanNumber(i) for i in scan_indices]
         scan_tic = np.asarray([scan_stat.TIC for scan_stat in scan_statistics])
         scan_timestamp = np.asarray(
             [scan_stat.StartTime for scan_stat in scan_statistics]
         )
 
         if polarity:
-            scan_indices = filter_by_polarity(raw_file, scan_indices, polarity)
+            scan_indices = filter_by_polarity(RawFile, scan_indices, polarity)
             scan_indices_python = [i - 1 for i in scan_indices]
             scan_tic = scan_tic[scan_indices_python]
             scan_timestamp = scan_timestamp[scan_indices_python]
@@ -366,7 +374,7 @@ def get_tic_per_scan(
             scan_timestamp = scan_timestamp[scan_indices_python]
 
         # Convert timestamp from minutes to seconds
-        scan_timestamp = scan_timestamp * 60
+        scan_timestamp = scan_timestamp * SECONDS_PER_MINUTE
 
         return scan_timestamp, scan_tic
 
@@ -390,14 +398,14 @@ def get_scan_timestamps(
     :return: Array of filtered scan timestamps [s]
     :rtype: np.ndarray
     """
-    with open_raw_file(datafile_path) as raw_file:
-        num_of_scans = raw_file.RunHeaderEx.SpectraCount
+    with RawFileManager(datafile_path) as RawFile:
+        num_of_scans = RawFile.RunHeaderEx.SpectraCount
         scan_indices = list(range(1, num_of_scans + 1))
 
         if polarity:
-            scan_indices = filter_by_polarity(raw_file, scan_indices, polarity)
+            scan_indices = filter_by_polarity(RawFile, scan_indices, polarity)
 
-        _, scan_time = filter_by_time(raw_file, scan_indices, t_min, t_max)
+        _, scan_time = filter_by_time(RawFile, scan_indices, t_min, t_max)
 
         return np.asarray(scan_time)
 
@@ -429,15 +437,15 @@ def get_peak_profiles(
     """
     mzs = np.asarray(mzs, dtype=float)
 
-    with open_raw_file(datafile_path) as raw_file:
-        num_of_scans = raw_file.RunHeaderEx.SpectraCount
+    with RawFileManager(datafile_path) as RawFile:
+        num_of_scans = RawFile.RunHeaderEx.SpectraCount
         scan_indices = list(range(1, num_of_scans + 1))
 
         if polarity:
-            scan_indices = filter_by_polarity(raw_file, scan_indices, polarity)
+            scan_indices = filter_by_polarity(RawFile, scan_indices, polarity)
 
         scan_indices, scan_time = filter_by_time(
-            raw_file, scan_indices, t_min, t_max
+            RawFile, scan_indices, t_min, t_max
         )  # [s]
 
         # Convert scan indices to 0-based for Python
@@ -463,7 +471,7 @@ def get_peak_profiles(
             settings.append(setting)
 
         # Get profiles for the m/z values, -1 for all scans
-        chromatogram = raw_file.GetChromatogramData(settings, -1, -1)
+        chromatogram = RawFile.GetChromatogramData(settings, -1, -1)
         traces = ChromatogramSignal.FromChromatogramData(chromatogram)
 
         for i, trace in enumerate(traces):
@@ -518,14 +526,14 @@ def get_centroids(
     :return: Tuple of (masses, intensities, resolutions, signal-to-noise ratios) for centroid peaks matching the criteria.
     :rtype: tuple of np.ndarray
     """
-    with open_raw_file(datafile_path) as raw_file:
-        num_of_scans = raw_file.RunHeaderEx.SpectraCount
+    with RawFileManager(datafile_path) as RawFile:
+        num_of_scans = RawFile.RunHeaderEx.SpectraCount
         scan_indices = list(range(1, num_of_scans + 1))
 
         if polarity:
-            scan_indices = filter_by_polarity(raw_file, scan_indices, polarity)
+            scan_indices = filter_by_polarity(RawFile, scan_indices, polarity)
 
-        scan_indices, _ = filter_by_time(raw_file, scan_indices, t_min, t_max)
+        scan_indices, _ = filter_by_time(RawFile, scan_indices, t_min, t_max)
 
         # Setup mz tolerance - counts within ppm are binned
         mass_option = MassOptions(ppm, ToleranceUnits.ppm)
@@ -534,7 +542,7 @@ def get_centroids(
         net_scan_indices = List[int]()
         for index in scan_indices:
             net_scan_indices.Add(index)
-        average_scan = Extensions.AverageScans(raw_file, net_scan_indices, mass_option)
+        average_scan = Extensions.AverageScans(RawFile, net_scan_indices, mass_option)
         averaged_centroids = average_scan.CentroidScan.GetLabelPeaks()
 
         masses = np.fromiter(
@@ -574,6 +582,84 @@ def get_centroids(
         return masses, intensities, resolutions, signal_to_noise
 
 
+def get_centroids_per_scan(
+    datafile_path: str,
+    t_min: float | None = None,
+    t_max: float | None = None,
+    mz_min: float | None = None,
+    mz_max: float | None = None,
+    polarity: Literal["+", "-"] | None = None,
+) -> list[dict[str, np.ndarray]]:
+    """Reads centroided peaks from a Thermo Fisher raw file within a specified time range and m/z range.
+
+    t_min=None is equal to min scan time, t_max=None is equal to max scan time.
+    mz_min=None is equal to min m/z, mz_max=None is equal to max m/z.
+
+    :param datafile_path: Path to the Thermo Fisher raw file (.raw) containing the data.
+    :type datafile_path: str
+    :param t_min: Minimum time [s], optional, defaults to None
+    :type t_min: float
+    :param t_max: Maximum time [s], optional, defaults to None
+    :type t_max: float
+    :param mz_min: Minimum m/z, optional, defaults to None
+    :type mz_min: float
+    :param mz_max: Maximum m/z, optional, defaults to None
+    :type mz_max: float
+    :param polarity: + or -, Polarity of the scans to be retrieved, optional, defaults to None
+    :type polarity: str
+    :return: List of dictionaries, each containing per-scan centroid masses, intensities, resolutions,
+              signal-to-noise ratios, and timestamps.
+    :rtype: list[dict[str, np.ndarray]]
+    """
+    with RawFileManager(datafile_path) as RawFile:
+        mz_min, mz_max = _validate_mz_range(RawFile, mz_min, mz_max)
+        num_of_scans = RawFile.RunHeaderEx.SpectraCount
+        scan_indices = list(range(1, num_of_scans + 1))
+        scans = tuple(Extensions.GetScans(RawFile, 1, num_of_scans))
+
+        if polarity:
+            scan_indices = filter_by_polarity(RawFile, scan_indices, polarity)
+
+        scan_indices, scan_time = filter_by_time(RawFile, scan_indices, t_min, t_max)
+
+        # Extract scan spectra and m/z values
+        centroids = []
+        for i in scan_indices:
+            scan_centroids = scans[i - 1].CentroidScan.GetLabelPeaks()
+
+            masses = np.fromiter(
+                (c.Mass for c in scan_centroids),
+                dtype=np.float64,
+                count=len(scan_centroids),
+            )
+            intensities = np.fromiter(
+                (c.Intensity for c in scan_centroids),
+                dtype=np.float64,
+                count=len(scan_centroids),
+            )
+            resolutions = np.fromiter(
+                (c.Resolution for c in scan_centroids),
+                dtype=np.float64,
+                count=len(scan_centroids),
+            )
+            signal_to_noise = np.fromiter(
+                (c.SignalToNoise for c in scan_centroids),
+                dtype=np.float64,
+                count=len(scan_centroids),
+            )
+            centroids.append(
+                {
+                    "masses": masses,
+                    "intensities": intensities,
+                    "resolutions": resolutions,
+                    "signal_to_noise": signal_to_noise,
+                    "timestamp": scan_time[i - 1],
+                }
+            )
+
+        return centroids
+
+
 class RawFileMetadata:
     """Class to access metadata of a Thermo Fisher raw file."""
 
@@ -583,8 +669,8 @@ class RawFileMetadata:
     @property
     def num_of_scans(self):
         """Number of scans in the raw file."""
-        with open_raw_file(self.datafile_path) as raw_file:
-            return raw_file.RunHeaderEx.SpectraCount
+        with RawFileManager(self.datafile_path) as RawFile:
+            return RawFile.RunHeaderEx.SpectraCount
 
     @property
     def instrument(self):
@@ -600,8 +686,8 @@ class RawFileMetadata:
         IsValid
         HasAccurateMassPrecursors
         """
-        with open_raw_file(self.datafile_path) as raw_file:
-            instrument_data = raw_file.GetInstrumentData()
+        with RawFileManager(self.datafile_path) as RawFile:
+            instrument_data = RawFile.GetInstrumentData()
 
             instrument_data_list = [
                 "Name",
@@ -705,11 +791,11 @@ class RawFileMetadata:
         FAIMS Voltage On
         FAIMS CV
         """
-        with open_raw_file(self.datafile_path) as raw_file:
+        with RawFileManager(self.datafile_path) as RawFile:
             trailer_dict = {}
             header_labels = None
             for i in range(1, self.num_of_scans + 1):
-                header = raw_file.GetTrailerExtraInformation(i)
+                header = RawFile.GetTrailerExtraInformation(i)
                 if header_labels is None:
                     header_labels = list(header.Labels)
                 trailer_dict[i] = list(header.Values)
@@ -743,12 +829,11 @@ class RawFileMetadata:
         ScanType
         CycleNumber
         """
-        with open_raw_file(self.datafile_path) as raw_file:
-            num_of_scans = raw_file.RunHeaderEx.SpectraCount
+        with RawFileManager(self.datafile_path) as RawFile:
+            num_of_scans = RawFile.RunHeaderEx.SpectraCount
 
             scan_statistics = [
-                raw_file.GetScanStatsForScanNumber(i)
-                for i in range(1, num_of_scans + 1)
+                RawFile.GetScanStatsForScanNumber(i) for i in range(1, num_of_scans + 1)
             ]
 
             stat_list = [
@@ -807,9 +892,9 @@ class RawFileMetadata:
         }
         """
         result = {"time": [], "data": []}
-        with open_raw_file(self.datafile_path) as raw_file:
-            num_of_scans = raw_file.RunHeaderEx.SpectraCount
-            scans = tuple(Extensions.GetScans(raw_file, 1, num_of_scans))
+        with RawFileManager(self.datafile_path) as RawFile:
+            num_of_scans = RawFile.RunHeaderEx.SpectraCount
+            scans = tuple(Extensions.GetScans(RawFile, 1, num_of_scans))
             for i, scan in enumerate(scans):
                 centroid_scan = scan.CentroidScan
                 if centroid_scan is not None and centroid_scan.Length > 0:
@@ -822,7 +907,9 @@ class RawFileMetadata:
                     intensities = []
                     resolutions = []
                     noises = []
-                scan_time = raw_file.GetScanStatsForScanNumber(i).StartTime * 60
+                scan_time = (
+                    RawFile.GetScanStatsForScanNumber(i).StartTime * SECONDS_PER_MINUTE
+                )
                 result["time"].append(scan_time)
                 result["data"].append(
                     {

@@ -421,6 +421,38 @@ def get_orbi_centroids(
     return None, None, None, None
 
 
+def get_orbi_centroids_per_scan(
+    base_filename: str,
+    t_min: float | None = None,
+    t_max: float | None = None,
+    polarity: Literal["+", "-"] | None = None,
+) -> list:
+    """
+    Extract per-scan centroids from an Orbitrap raw file
+
+    :param base_filename: Sample file name (base, not full path).
+    :type base_filename: str
+    :param u_list: Iterable of m/z values to select centroid peaks near (within ±0.5).
+    :type u_list: Iterable[float]
+    :param t_min: Minimum time [s] for scan selection, optional, defaults to None (start of run).
+    :type t_min: float | None, optional
+    :param t_max: Maximum time [s] for scan selection, optional, defaults to None (end of run).
+    :type t_max: float | None, optional
+    :param polarity: Polarity of scans to use ('+' or '-'), optional, defaults to None (all polarities).
+    :type polarity: Literal['+', '-'], optional
+    :return: List of dictionaries with per-scan centroid data, each containing
+            centroid masses, intensities, resolutions, signal-to-noise ratios, and timestamps.
+    :rtype: list
+    """
+    sample_type = get_sample_file_type(base_filename)
+    if sample_type == "orbi_raw":
+        datafile_path = filename_to_datafile_path(base_filename)
+        return thermo.get_centroids_per_scan(
+            datafile_path, t_min, t_max, polarity=polarity
+        )
+    return []
+
+
 def get_peak_profiles(
     base_filename: str,
     mzs: Iterable[float],
