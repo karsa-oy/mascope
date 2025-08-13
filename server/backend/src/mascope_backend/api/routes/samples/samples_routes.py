@@ -7,6 +7,7 @@ from mascope_backend.api.controllers.samples.samples_controller import (
     get_sample_peaks,
     get_sample_peak_timeseries,
     get_sample_spectrum,
+    get_samples_spectra,
 )
 from mascope_backend.api.models.samples.sample_pydantic_model import (
     GetSamplePeakTimeseriesBody,
@@ -111,4 +112,30 @@ async def get_sample_spectrum_route(
     """
     return await get_sample_spectrum(
         sample_item_id=sample_item_id, **query_params.model_dump()
+    )
+
+
+@samples_router.get("/{sample_item_ids}/spectra")
+@api_route(token_access=True)
+async def get_samples_spectra_route(
+    sample_item_ids: str,
+    query_params: GetSampleSpectrumQueryParams = Depends(),
+    user=Depends(guest_user),
+):
+    """
+    Retrieve spectrum data for multiple samples with automatic polarity filtering and optional range filtering.
+
+    This endpoint extracts time-averaged spectrum data for multiple samples, automatically filtered by each sample's
+    polarity. Supports optional time range filtering (t_min/t_max) within each sample's acquisition window (t0/t1)
+    and m/z range filtering.
+
+    :param sample_item_ids: Comma-separated list of sample item IDs to retrieve spectra for
+    :param query_params: Query parameters for spectrum filtering including optional time and m/z ranges
+    :param user: Authenticated user with guest access
+    :return: Spectrum data with m/z values and intensities, filtered by sample polarity
+    """
+    sample_item_ids = sample_item_ids.split(",")
+
+    return await get_samples_spectra(
+        sample_item_ids=sample_item_ids, **query_params.model_dump()
     )

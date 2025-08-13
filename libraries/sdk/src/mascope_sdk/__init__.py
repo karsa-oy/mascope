@@ -313,7 +313,7 @@ def get_sample_batch_data(
     Retrieve detailed data for all samples in a sample batch.
 
     This function interacts with the Mascope API to fetch comprehensive data
-    for a given sample batch. It retrieves data for samples and combinned match/targets data
+    for a given sample batch. It retrieves data for samples and combined match/targets data
     for compounds, ions, isotopes and interferences (included to isotopes).
 
     :param mascope_url: The base URL of the Mascope instance.
@@ -755,6 +755,72 @@ def get_sample_spectrum(
     content = json.loads(resp.content)
     if not (spectrum_data := content.get("data", None)):
         logger.error(f"No spectrum data found for sample {sample_item_id}.")
+        return None
+
+    return spectrum_data
+
+
+def get_samples_spectra(
+    mascope_url: str,
+    access_token: str,
+    sample_item_ids: list[str],
+    t_min: float | None = None,
+    t_max: float | None = None,
+    mz_min: float | None = None,
+    mz_max: float | None = None,
+) -> list[dict[str, list]] | None:
+    """Get averaged spectra for a list of sample items with optional time and m/z range filtering.
+
+    :param mascope_url: The base URL of the Mascope instance.
+    :type mascope_url: str
+    :param access_token: Authorization token for API access
+    :type access_token: str
+    :param sample_item_ids: List of sample item IDs for which to retrieve spectra.
+    :type sample_item_ids: list[str]
+    :param t_min: Minimum time limit in seconds for filtering the spectrum data, defaults to None.
+    :type t_min: float | None, optional
+    :param t_max: Maximum time limit in seconds for filtering the spectrum data, defaults to None.
+    :type t_max: float | None, optional
+    :param mz_min: Minimum m/z value for filtering spectrum, defaults to None.
+    :type mz_min: float | None, optional
+    :param mz_max: Maximum m/z value for filtering spectrum, defaults to None.
+    :type mz_max: float | None, optional
+    :return: A list of dictionaries, each containing:
+        - "mz": list of m/z values for the spectrum
+        - "intensity": list of intensity values for the spectrum
+        - "intensity_unit": unit of intensity measurements
+        Returns None if no spectrum data is found or if an error occurs.
+    :rtype: list[dict[str, list]] | None
+    """
+    query_params = {
+        k: v
+        for k, v in {
+            "t_min": t_min,
+            "t_max": t_max,
+            "mz_min": mz_min,
+            "mz_max": mz_max,
+        }.items()
+        if v is not None
+    }
+    sample_item_ids = ",".join(sample_item_ids)
+
+    response = api_get(
+        url=mascope_url,
+        path=f"samples/{sample_item_ids}/spectra",
+        access_token=access_token,
+        params=query_params,
+    )
+
+    # Check if the API request was successful
+    if not response:
+        logger.error(
+            f"Failed to retrieve spectrum data for samples {sample_item_ids} from {mascope_url}."
+        )
+        return None
+
+    content = json.loads(response.content)
+    if not (spectrum_data := content.get("data", None)):
+        logger.error(f"No spectrum data found for samples {sample_item_ids}.")
         return None
 
     return spectrum_data

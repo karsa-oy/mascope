@@ -1,5 +1,6 @@
 # pylint: disable=line-too-long
 from datetime import datetime
+import asyncio
 from mascope_file.io import load_file
 from mascope_signal.compute import (
     get_scan_timestamps,
@@ -630,6 +631,57 @@ async def get_sample_spectrum(
             "intensity": intensity_values,
             "intensity_unit": intensity_unit,
         },
+    }
+
+
+@api_controller()
+async def get_samples_spectra(
+    sample_item_ids: list[str],
+    t_min: float | None = None,
+    t_max: float | None = None,
+    mz_min: float | None = None,
+    mz_max: float | None = None,
+) -> dict:
+    """Retrieves the spectrum data from several sample items
+
+    :param sample_item_ids: List of unique identifiers for the sample items from which to retrieve the spectra
+    :type sample_item_ids: list[str]
+    :param t_min: Minimum time limit in seconds, defaults to None
+    :type t_min: float | None, optional
+    :param t_max: Maximum time limit in seconds, defaults to None
+    :type t_max: float | None, optional
+    :param mz_min: Start of the optional m/z range, defaults to None
+    :type mz_min: float | None, optional
+    :param mz_max: End of the optional m/z range, defaults to None
+    :type mz_max: float | None, optional
+    :raises ValueError: If no sample_item_ids are provided or if more than 100 sample_item_ids are provided
+    :raises ValueError: If the time limits are invalid or if the m/z range is invalid
+    :return: A dictionary containing the spectra data for each sample item, including m/z values and intensities.
+    :rtype: dict
+    """
+    if not sample_item_ids:
+        raise ValueError("At least one sample_item_id must be provided")
+
+    if len(sample_item_ids) > 100:
+        raise ValueError("Cannot retrieve spectra for more than 100 samples at once")
+
+    # Load all sample data in parallel
+    sample_data_list = await asyncio.gather(
+        *[_load_sample_data(sample_id) for sample_id in sample_item_ids]
+    )
+
+    # Prepare the response data
+    spectra_data = []
+    for sample in sample_data_list:
+        spectrum_response = await get_sample_spectrum(
+            sample.sample_item_id, t_min, t_max, mz_min, mz_max
+        )
+        spectra_data.append(spectrum_response["data"])
+
+    return {
+        "message": "Spectra retrieved successfully.",
+        "results": len(spectra_data),
+        "data": spectra_data,
     }
 
 
