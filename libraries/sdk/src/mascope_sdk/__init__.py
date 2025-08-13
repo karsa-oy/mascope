@@ -1,8 +1,17 @@
 import json
 import warnings
 import requests
+import sys
+from loguru import logger
 from requests.exceptions import HTTPError, Timeout, RequestException
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
+
+logger.remove()
+logger.add(
+    sys.stderr,
+    format="<green>{time:HH:mm:ss}</green> | <level>{level}</level> | <level>{message}</level>",
+    colorize=True,
+)
 
 # Suppress only the InsecureRequestWarning from requests
 warnings.simplefilter("ignore", InsecureRequestWarning)
@@ -41,12 +50,12 @@ def api_get(url: str, path: str, access_token: str, params: dict = None):
         resp.raise_for_status()  # Raise HTTPError for bad responses
         message = json.loads(resp.content).get("message", None)
         if message is not None:
-            print(message)
+            logger.info(message)
     except HTTPError as http_err:
         if resp.status_code == 401 or resp.status_code == 403:
             response = json.loads(resp.content)
             error_message = response.get("detail", {}).get("error_message", None)
-            print(f"{error_message} Please check your API token.")
+            logger.error(f"{error_message} Please check your API token.")
         else:
             try:
                 error_message = (
@@ -59,20 +68,20 @@ def api_get(url: str, path: str, access_token: str, params: dict = None):
                 )
             except json.JSONDecodeError:
                 error_message = "Failed to decode error message from server response."
-            print(
+            logger.error(
                 f"HTTP error: Unable to retrieve data from {full_url}. \nDetails: {http_err} \nServer message: {error_message}"
             )
         return None
     except Timeout:
-        print(f"Timeout error: The request to {full_url} timed out.")
+        logger.error(f"Timeout error: The request to {full_url} timed out.")
         return None
     except RequestException as req_err:
-        print(
+        logger.error(
             f"Connection error: Could not connect to {full_url}. Please check the URL and your network connection. \nDetails: {req_err}"
         )
         return None
     except Exception as e:
-        print(
+        logger.error(
             f"Error: An unexpected error occurred while trying to reach {full_url}. \nDetails: {str(e)}"
         )
         return None
@@ -105,12 +114,12 @@ def api_post(url: str, path: str, access_token: str, data: dict):
         resp.raise_for_status()  # Raise HTTPError for bad responses
         message = json.loads(resp.content).get("message", None)
         if message is not None:
-            print(message)
+            logger.info(message)
     except HTTPError as http_err:
         if resp.status_code == 401 or resp.status_code == 403:
             response = json.loads(resp.content)
             error_message = response.get("detail", {}).get("error_message", None)
-            print(f"{error_message} Please check your API token.")
+            logger.error(f"{error_message} Please check your API token.")
         else:
             try:
                 error_message = (
@@ -123,20 +132,20 @@ def api_post(url: str, path: str, access_token: str, data: dict):
                 )
             except json.JSONDecodeError:
                 error_message = "Failed to decode error message from server response."
-            print(
+            logger.error(
                 f"HTTP error: Unable to retrieve data from {full_url}. \nDetails: {http_err} \nServer message: {error_message}"
             )
         return None
     except Timeout:
-        print(f"Timeout error: The request to {full_url} timed out.")
+        logger.error(f"Timeout error: The request to {full_url} timed out.")
         return None
     except RequestException as req_err:
-        print(
+        logger.error(
             f"Connection error: Could not connect to {full_url}. Please check the URL and your network connection. \nDetails: {req_err}"
         )
         return None
     except Exception as e:
-        print(
+        logger.error(
             f"Error: An unexpected error occurred while trying to reach {full_url}. \nDetails: {str(e)}"
         )
         return None
@@ -182,12 +191,12 @@ def api_post_file(
         resp.raise_for_status()  # Raise HTTPError for bad responses
         message = json.loads(resp.content).get("message", None)
         if message is not None:
-            print(message)
+            logger.info(message)
     except HTTPError as http_err:
         if resp.status_code == 401 or resp.status_code == 403:
             response = json.loads(resp.content)
             error_message = response.get("detail", {}).get("error_message", None)
-            print(f"{error_message} Please check your API token.")
+            logger.error(f"{error_message} Please check your API token.")
         else:
             try:
                 error_message = (
@@ -200,20 +209,20 @@ def api_post_file(
                 )
             except json.JSONDecodeError:
                 error_message = "Failed to decode error message from server response."
-            print(
+            logger.error(
                 f"HTTP error: Unable to retrieve data from {full_url}. \nDetails: {http_err} \nServer message: {error_message}"
             )
         return None
     except Timeout:
-        print(f"Timeout error: The request to {full_url} timed out.")
+        logger.error(f"Timeout error: The request to {full_url} timed out.")
         return None
     except RequestException as req_err:
-        print(
+        logger.error(
             f"Connection error: Could not connect to {full_url}. Please check the URL and your network connection. \nDetails: {req_err}"
         )
         return None
     except Exception as e:
-        print(
+        logger.error(
             f"Error: An unexpected error occurred while trying to reach {full_url}. \nDetails: {str(e)}"
         )
         return None
@@ -237,7 +246,7 @@ def get_workspaces(mascope_url: str, access_token: str) -> list:
     resp = api_get(url=mascope_url, path="workspaces", access_token=access_token)
     # Check if the request was successful
     if not resp:
-        print(
+        logger.error(
             f"Failed to retrieve workspaces from {mascope_url}. Please check the URL and try again."
         )
         return []
@@ -245,7 +254,7 @@ def get_workspaces(mascope_url: str, access_token: str) -> list:
     content = json.loads(resp.content)
     workspaces = content.get("data", [])
     if not workspaces:
-        print("No workspaces found. Please create a new workspace.")
+        logger.error("No workspaces found. Please create a new workspace.")
 
     return workspaces
 
@@ -281,7 +290,7 @@ def get_sample_batches(mascope_url: str, access_token: str, workspace_id: str) -
 
     # Check if the request was successful
     if not resp:
-        print(
+        logger.error(
             f"Failed to retrieve sample batches from {mascope_url}. Please check the URL and try again."
         )
         return []
@@ -290,7 +299,7 @@ def get_sample_batches(mascope_url: str, access_token: str, workspace_id: str) -
     batches = content.get("data", [])
 
     if not batches:
-        print("No sample batches found. Please create a new sample batch.")
+        logger.error("No sample batches found. Please create a new sample batch.")
 
     return batches
 
@@ -330,7 +339,7 @@ def get_sample_batch_data(
         access_token=access_token,
     )
     if not resp:
-        print(
+        logger.error(
             f"Failed to retrieve match data for sample batch with ID {sample_batch_id}."
         )
         return {}
@@ -338,7 +347,7 @@ def get_sample_batch_data(
     # Step 2: Parse the response content
     batch_data = json.loads(resp.content)
     if not batch_data:
-        print(f"No data returned for sample batch with ID {sample_batch_id}.")
+        logger.error(f"No data returned for sample batch with ID {sample_batch_id}.")
         return {}
 
     # Step 3: Extract relevant information from the aggregate match data
@@ -390,7 +399,7 @@ def get_samples(mascope_url: str, access_token: str, sample_batch_id: str) -> li
 
     # Check if the API request was successful
     if not resp:
-        print(
+        logger.error(
             f"Failed to retrieve samples from {mascope_url}. Please check the URL and try again."
         )
         return []
@@ -398,7 +407,7 @@ def get_samples(mascope_url: str, access_token: str, sample_batch_id: str) -> li
     content = json.loads(resp.content)
     samples = content.get("data", [])
     if not samples:
-        print(f"No samples found for sample batch with ID {sample_batch_id}.")
+        logger.error(f"No samples found for sample batch with ID {sample_batch_id}.")
 
     return samples
 
@@ -422,12 +431,12 @@ def get_sample(mascope_url: str, access_token: str, sample_item_id: str) -> dict
         access_token=access_token,
     )
     if not resp:
-        print(f"Failed to retrieve sample details from {mascope_url}.")
+        logger.error(f"Failed to retrieve sample details from {mascope_url}.")
         return None
 
     sample = json.loads(resp.content)
     if not sample:
-        print(f"No sample with ID {sample_item_id} found.")
+        logger.error(f"No sample with ID {sample_item_id} found.")
     return sample
 
 
@@ -492,7 +501,7 @@ def get_sample_compound_matches(
 
     # Check if the API request was successful
     if not resp:
-        print(
+        logger.error(
             f"Failed to retrieve compound '{target_compound_formula}' match data for for sample item ID {sample_item_id} from {mascope_url}."
         )
         return None
@@ -502,7 +511,7 @@ def get_sample_compound_matches(
     match_data = response_json.get("data", None)
 
     if not match_data:
-        print(
+        logger.error(
             f"No compound matches found for sample item ID {sample_item_id} and target compound {target_compound_formula}."
         )
         return None
@@ -589,7 +598,7 @@ def get_sample_peaks(
 
     # Check if the API request was successful
     if not resp:
-        print(
+        logger.error(
             f"Failed to retrieve peaks for sample {sample_item_id} from {mascope_url}."
         )
         return None
@@ -597,7 +606,7 @@ def get_sample_peaks(
     # Parse the content of the response
     content = json.loads(resp.content)
     if not (peaks_data := content.get("data", None)):
-        print(f"No peaks found for sample {sample_item_id}.")
+        logger.error(f"No peaks found for sample {sample_item_id}.")
         return None
 
     return peaks_data
@@ -654,7 +663,7 @@ def get_sample_peak_timeseries(
             data=body,
         )
     ):
-        print(
+        logger.error(
             f"Failed to retrieve peak timeseries data for sample {sample_item_id}, m/z {peak_mz}"
         )
         return None
@@ -662,7 +671,9 @@ def get_sample_peak_timeseries(
     # Parse the content of the response
     content = json.loads(resp.content)
     if not (timeseries_data := content.get("data", None)):
-        print(f"No timeseries data found for sample {sample_item_id}, m/z {peak_mz}")
+        logger.error(
+            f"No timeseries data found for sample {sample_item_id}, m/z {peak_mz}"
+        )
         return None
 
     return timeseries_data
@@ -735,7 +746,7 @@ def get_sample_spectrum(
 
     # Check if the API request was successful
     if not resp:
-        print(
+        logger.error(
             f"Failed to retrieve spectrum data for sample {sample_item_id} from {mascope_url}."
         )
         return None
@@ -743,7 +754,7 @@ def get_sample_spectrum(
     # Parse the content of the response
     content = json.loads(resp.content)
     if not (spectrum_data := content.get("data", None)):
-        print(f"No spectrum data found for sample {sample_item_id}.")
+        logger.error(f"No spectrum data found for sample {sample_item_id}.")
         return None
 
     return spectrum_data
@@ -774,7 +785,7 @@ def get_sample_centroids_per_scan(
 
     # Check if the API request was successful
     if not resp:
-        print(
+        logger.error(
             f"Failed to retrieve centroids for sample items {sample_item_ids} from {mascope_url}."
         )
         return None
@@ -782,7 +793,7 @@ def get_sample_centroids_per_scan(
     # Parse the content of the response
     content = json.loads(resp.content)
     if not (centroids_data := content.get("data", None)):
-        print(f"No centroids data found for sample items {sample_item_ids}.")
+        logger.error(f"No centroids data found for sample items {sample_item_ids}.")
         return None
     return centroids_data
 
@@ -843,7 +854,7 @@ def get_sample_file_peaks(
     )
     # Check if the API request was successful
     if not resp:
-        print(
+        logger.error(
             f"Failed to retrieve peaks for sample file with ID {sample_file_id} from {mascope_url}."
         )
         return None
@@ -853,7 +864,7 @@ def get_sample_file_peaks(
     peaks_data = content.get("data", None)
 
     if not peaks_data:
-        print(f"No peaks found for sample file with ID {sample_file_id}.")
+        logger.error(f"No peaks found for sample file with ID {sample_file_id}.")
         return None
 
     # Return the peaks data
@@ -910,7 +921,7 @@ def get_sample_file_peak_timeseries(
     )
     # Check if the API request was successful
     if not resp:
-        print(
+        logger.error(
             f"Failed to retrieve peak timeseries data from {mascope_url} for file ID {sample_file_id} and peak m/z {peak_mz}."
         )
         return None
@@ -920,7 +931,7 @@ def get_sample_file_peak_timeseries(
     timeseries_data = content.get("data", None)
 
     if not timeseries_data:
-        print(
+        logger.error(
             f"No timeseries data found for sample file with ID {sample_file_id} and peak m/z {peak_mz}."
         )
         return None
@@ -994,7 +1005,7 @@ def get_sample_file_spectrum(
 
     # Check if the API request was successful
     if not resp:
-        print(
+        logger.error(
             f"Failed to retrieve spectrum data for sample file with ID {sample_file_id} from {mascope_url}."
         )
         return None
@@ -1004,7 +1015,7 @@ def get_sample_file_spectrum(
     spectrum_data = content.get("data", None)
 
     if not spectrum_data:
-        print(
+        logger.error(
             f"No spectrum data found for sample file with ID {sample_file_id} and the given time or m/z ranges."
         )
         return None
@@ -1035,13 +1046,15 @@ def get_sample_file_instrument_config(
         access_token=access_token,
     )
     if not resp:
-        print(f"Failed to retrieve instrument config for filename {sample_file_name}.")
+        logger.error(
+            f"Failed to retrieve instrument config for filename {sample_file_name}."
+        )
         return None
 
     content = json.loads(resp.content)
     instrument_config = content.get("data", None)
     if not instrument_config:
-        print(f"No instrument config found for filename {sample_file_name}.")
+        logger.error(f"No instrument config found for filename {sample_file_name}.")
         return None
 
     return instrument_config
@@ -1070,7 +1083,7 @@ def get_sample_file_metadata(
         access_token=access_token,
     )
     if not resp:
-        print(
+        logger.error(
             f"Failed to retrieve metadata for sample file with ID {sample_file_id} from {mascope_url}."
         )
         return None
@@ -1078,7 +1091,7 @@ def get_sample_file_metadata(
     content = resp.json()
     metadata = content.get("data", None)
     if not metadata:
-        print(f"No metadata found for sample file with ID {sample_file_id}.")
+        logger.error(f"No metadata found for sample file with ID {sample_file_id}.")
         return None
 
     return metadata
@@ -1143,7 +1156,7 @@ def create_instrument_function(
     )
     # Check if the API request was successful
     if not resp:
-        print(f"Failed to create instrument function from {mascope_url}")
+        logger.error(f"Failed to create instrument function from {mascope_url}")
         return None
 
     # Successfully created the instrument function, extract 'data' from the response JSON
@@ -1151,7 +1164,9 @@ def create_instrument_function(
     created_instrument_function = response_json.get("data", None)
 
     if not created_instrument_function:
-        print(f"Failed to create instrument function. Status code: {resp.status_code}")
+        logger.error(
+            f"Failed to create instrument function. Status code: {resp.status_code}"
+        )
         return None
 
     return created_instrument_function
@@ -1178,7 +1193,7 @@ def get_ionization_mechanisms(mascope_url: str, access_token: str) -> list[dict]
     )
     # Check if the API request was successful
     if not resp:
-        print(f"Failed to get ionization mechanisms from {mascope_url}")
+        logger.error(f"Failed to get ionization mechanisms from {mascope_url}")
         return None
 
     # Successfully fetched ionization mechanisms, extract 'data' from the response JSON
@@ -1236,7 +1251,7 @@ def get_cheminfo_by_mz(
     )
     # Check if the API request was successful
     if not resp:
-        print(f"Failed to retrieve cheminfo for m/z {mz} via {mascope_url}.")
+        logger.error(f"Failed to retrieve cheminfo for m/z {mz} via {mascope_url}.")
         return None
 
     # Successfully fetched cheminfo, extract 'data' from the response JSON
