@@ -39,6 +39,7 @@ from mascope_backend.api.controllers.target.lib.filter.target_isotopes_filter im
 )
 from mascope_backend.api.controllers.target.lib.fetch.target_isotopes_fetch import (
     fetch_batch_target_isotopes_for_match_compute,
+    filter_target_isotopes_by_polarity,
 )
 from mascope_backend.api.controllers.match.aggregate.match_aggregate_controller import (
     aggregate_and_create_matches,
@@ -346,6 +347,7 @@ async def match_compute_sample(
 
     This function handles the entire match computation process for a given sample item. It includes:
     - Fetching target isotopes relevant for match computation, either specific to added compounds/ionization mechanisms or for all targets associated with the sample's batch.
+    - Filter target isotopes by sample polarity
     - Filtering out existing matches to avoid redundant computations.
     - Performing the actual match computation at the isotope level.
     - Aggregating and creating higher-level matches, such as ions, compounds, collections, and sample matches, based on the computed match isotopes.
@@ -383,7 +385,7 @@ async def match_compute_sample(
     sample_batch_id = sample["sample_batch_id"]
     filename = sample["filename"]
     instrument = sample["instrument"]
-    polarity = sample["polarity"]
+    sample_polarity = sample["polarity"]
 
     # Check if 'verified' exists in mz_calibration. If not, provide a default value of False
     verified = (
@@ -399,26 +401,35 @@ async def match_compute_sample(
     # Step 2: Fetch target isotopes for match computation
     #   If compounds/ion_mechanisms were added get isotopes with specific filters.
     #   If no compounds/ion_mechanisms were added get all target isotopes for the sample's batch.
-    target_isotopes_df = await fetch_batch_target_isotopes_for_match_compute(
+    batch_target_isotopes_df = await fetch_batch_target_isotopes_for_match_compute(
         sample_batch_id=sample_batch_id,
         added_target_compound_ids=added_target_compound_ids,
         added_ionization_mechanism_ids=added_ionization_mechanism_ids,
     )
+    # Skip computation if no target isotopes associated with the batch
+    if batch_target_isotopes_df.empty:
+        warning_message = f"There are no targets associated with the sample batch '{sample_batch_id}'."
+        raise_api_warning(warning_message, {"sample_batch_id": sample_batch_id})
+
+    # Filter target isotopes by sample polarity
+    polarity_filtered_isotopes_df = filter_target_isotopes_by_polarity(
+        batch_target_isotopes_df, sample_polarity
+    )
 
     # Skip computation if no target isotopes associated with the sample
-    if target_isotopes_df.empty or target_isotopes_df is None:
+    if polarity_filtered_isotopes_df.empty or polarity_filtered_isotopes_df is None:
         warning_message = (
             f"There is no targets associated with the sample '{sample_item_name}'."
         )
         raise_api_warning(warning_message, {"sample_item_id": sample_item_id})
 
     # Step 3: Filter out existing matches to avoid redundant computations
-    target_isotopes_df = await filter_existing_sample_match_isotope_data(
-        target_isotopes_df, sample_item_id
+    filtered_target_isotopes_df = await filter_existing_sample_match_isotope_data(
+        polarity_filtered_isotopes_df, sample_item_id
     )
 
     # Skip computation if no new target isotopes are found for this sample item
-    if target_isotopes_df.empty or target_isotopes_df is None:
+    if filtered_target_isotopes_df.empty or filtered_target_isotopes_df is None:
         warning_message = f"No new target isotopes to compute match isotopes and interferences for the sample '{sample_item_name}'."
         raise_api_warning(warning_message, {"sample_item_id": sample_item_id})
 
@@ -435,7 +446,7 @@ async def match_compute_sample(
         sample_batch_id=sample_batch_id,
         filename=filename,
         instrument=instrument,
-        polarity=polarity,
+        polarity=sample_polarity,
     )
 
     # Prepare progress user notification.
@@ -460,7 +471,7 @@ async def match_compute_sample(
 
     # Compute match data
     match_data = await compute_and_create_sample_match_isotope_data(
-        sample_pydantic, target_isotopes_df, notification
+        sample_pydantic, filtered_target_isotopes_df, notification
     )
 
     # Step 5: Aggregate and save match_ions, match_compounds, match_collections and match_samples
@@ -1048,6 +1059,7 @@ async def match_compute_batch(
 
     This function orchestrates the complete match computation process for each sample in a specified batch. It performs the following key steps:
     - Fetching target isotopes relevant for match computation, either specific to added compounds/ionization mechanisms or for all targets associated with the sample's batch.
+    - Filter target isotopes by sample polarity
     - Filtering out existing matches to avoid redundant computations.
     - Computing matches at the isotope level after ensuring that all necessary preconditions (e.g., verified m/z calibration) are met.
     - Aggregating higher-level matches such as match_ion, match_compound, match_collection, and match_sample based on the computed match_isotope.
@@ -1101,18 +1113,18 @@ async def match_compute_batch(
     # Step 3: Identify target isotopes for computation.
     #   If compounds/ion_mechanisms were added get isotopes with specific filters.
     #   If no compounds/ion_mechanisms were added get all target isotopes for the sample's batch.
-    target_isotopes_df = await fetch_batch_target_isotopes_for_match_compute(
+    batch_target_isotopes_df = await fetch_batch_target_isotopes_for_match_compute(
         sample_batch_id=sample_batch_id,
         added_target_compound_ids=added_target_compound_ids,
         added_ionization_mechanism_ids=added_ionization_mechanism_ids,
     )
 
     # Skip computation if no target isotopes associated with the batch
-    if target_isotopes_df.empty:
+    if batch_target_isotopes_df.empty:
         warning_message = f"There are no targets associated with the sample batch '{sample_batch_name}'."
         raise_api_warning(warning_message, {"sample_batch_id": sample_batch_id})
 
-    # Step 4: Process each sample item for match computation and send progress user notification.
+    # Step 4: Process each sample item for match computation
     samples_compute_failed = []
     samples_with_matches = []
     total_samples = len(samples)
@@ -1165,10 +1177,25 @@ async def match_compute_batch(
                     warning_message, {"sample_item_id": sample.sample_item_id}
                 )
 
-            # Filter existing matches and match interferences for the target isotopes fot each sample item.
+            # Filter batch target isotopes by sample polarity
+            polarity_filtered_isotopes_df = filter_target_isotopes_by_polarity(
+                batch_target_isotopes_df, sample.polarity
+            )
+
+            # Skip computation if no polarity-compatible target isotopes found
+            if polarity_filtered_isotopes_df.empty:
+                warning_message = (
+                    f"No polarity-compatible target isotopes found for sample '{sample.sample_item_name}' "
+                    f"(polarity: {sample.polarity})."
+                )
+                raise_api_warning(
+                    warning_message, {"sample_item_id": sample.sample_item_id}
+                )
+
+            # Filter existing matches and match interferences for the target isotopes
             filtered_target_isotopes_df = (
                 await filter_existing_sample_match_isotope_data(
-                    target_isotopes_df, sample.sample_item_id
+                    polarity_filtered_isotopes_df, sample.sample_item_id
                 )
             )
 

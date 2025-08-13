@@ -116,6 +116,7 @@ async def aggregate_match_isotope_filtered_data(
             Sample.instrument,
             Sample.sample_item_name,
             Sample.sample_item_type,
+            Sample.polarity,
         ).where(Sample.sample_batch_id == sample_batch_id)
 
         # Apply sample_item_id filter if provided
@@ -133,6 +134,9 @@ async def aggregate_match_isotope_filtered_data(
             return samples_df
 
         sample_item_ids = samples_df["sample_item_id"].tolist()
+        # Extract unique polarities from samples for ionization mechanism filtering
+        # Note: polarity is required for new samples, nullable only for legacy compatibility
+        sample_polarities = samples_df["polarity"].unique().tolist()
 
         # b) Query to get relevant Target data
         target_query = (
@@ -180,9 +184,14 @@ async def aggregate_match_isotope_filtered_data(
                 == TargetIon.ionization_mechanism_id,
             )
             .where(
-                IonizationMechanism.ionization_mechanism_id.in_(
-                    sample_batch_ion_mechanisms
-                ),
+                and_(
+                    IonizationMechanism.ionization_mechanism_id.in_(
+                        sample_batch_ion_mechanisms
+                    ),
+                    IonizationMechanism.ionization_mechanism_polarity.in_(
+                        sample_polarities
+                    ),
+                )
             )
             .join(
                 TargetIsotope,
@@ -294,6 +303,7 @@ async def aggregate_match_isotope_filtered_data(
             "instrument",
             "sample_item_name",
             "sample_item_type",
+            "polarity",
             "target_collection_id",
             "target_collection_name",
             "target_collection_description",

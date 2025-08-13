@@ -1,5 +1,11 @@
+"""
+Target isotope fetching utilities for match computation.
+
+Provides data fetching operations for target isotopes, polarity filtering
+capabilities, optimized for batch processing scenarios.
+"""
+
 import pandas as pd
-from typing import Optional, List
 from mascope_backend.api.controllers.sample.lib.sample_batches_fetch import (
     fetch_sample_batch_data,
 )
@@ -15,15 +21,17 @@ from mascope_backend.runtime import runtime
 
 async def fetch_batch_target_isotopes_for_match_compute(
     sample_batch_id: str,
-    added_target_compound_ids: Optional[List[str]] = None,
-    added_ionization_mechanism_ids: Optional[List[str]] = None,
+    added_target_compound_ids: list[str] | None = None,
+    added_ionization_mechanism_ids: list[str] | None = None,
 ) -> pd.DataFrame:
     """
     Retrieves a DataFrame of target isotopes associated with a given sample batch.
 
     Optionally retrieves target isotope IDs that are associated with specific added compounds or
     ionization mechanisms and sample batch.
-    This function helps in identifying the isotopes that require new match isotope lvl computation after the update in batch composition.
+    Include ionization mechanism polarity data for further sample-level polarity filtering.
+    This function helps in identifying the isotopes that require new match isotope lvl computation
+    after the update in batch composition.
 
     Steps:
     1. Fetch the batch data, including ionization mechanisms and target compounds.
@@ -65,6 +73,7 @@ async def fetch_batch_target_isotopes_for_match_compute(
             added_compounds_isotopes_result = await get_target_isotopes(
                 target_compound_ids=added_target_compound_ids,
                 ionization_mechanism_ids=sample_batch_data.ion_mechanisms,
+                show_ionization_mechanism=True,
             )
             add_unique_isotopes(
                 added_compounds_isotopes_result["data"],
@@ -79,6 +88,7 @@ async def fetch_batch_target_isotopes_for_match_compute(
             added_ion_mechanism_isotopes_result = await get_target_isotopes(
                 target_compound_ids=list(all_target_compound_ids),
                 ionization_mechanism_ids=added_ionization_mechanism_ids,
+                show_ionization_mechanism=True,  #
             )
             add_unique_isotopes(
                 added_ion_mechanism_isotopes_result["data"],
@@ -93,6 +103,7 @@ async def fetch_batch_target_isotopes_for_match_compute(
     else:
         target_isotopes_result = await get_target_isotopes(
             sample_batch_id=sample_batch_id,
+            show_ionization_mechanism=True,
         )
         target_isotopes_df = pd.DataFrame(target_isotopes_result["data"])
         runtime.logger.info(
@@ -100,3 +111,42 @@ async def fetch_batch_target_isotopes_for_match_compute(
         )
 
     return target_isotopes_df
+
+
+def filter_target_isotopes_by_polarity(
+    target_isotopes_df: pd.DataFrame, sample_polarity: str
+) -> pd.DataFrame:
+    """
+    Filter target isotopes DataFrame by sample polarity.
+
+    :param target_isotopes_df: DataFrame containing target isotopes with ionization mechanism polarity.
+    :type target_isotopes_df: pd.DataFrame
+    :param sample_polarity: The polarity of the sample ('+', '-').
+    :type sample_polarity: str
+    :return: Filtered DataFrame containing only polarity-compatible target isotopes.
+    :rtype: pd.DataFrame
+    """
+    if (
+        target_isotopes_df.empty
+        or "ionization_mechanism_polarity" not in target_isotopes_df.columns
+    ):
+        runtime.logger.warning(
+            f"Target isotopes DataFrame is empty or missing polarity data for sample polarity '{sample_polarity}'"
+        )
+        return pd.DataFrame()
+
+    # Filter isotopes by ionisation_mechanism and sample polarity
+    polarity_filtered_df = (
+        target_isotopes_df[
+            target_isotopes_df["ionization_mechanism_polarity"] == sample_polarity
+        ]
+        .copy()
+        .reset_index(drop=True)
+    )
+
+    runtime.logger.debug(
+        f"Filtered batch target isotopes by ionization_mechanism_polarity matching sample_polarity '{sample_polarity}': "
+        f"{len(polarity_filtered_df)}/{len(target_isotopes_df)} isotopes are compatible"
+    )
+
+    return polarity_filtered_df
