@@ -530,6 +530,9 @@ async def update_sample_batch(
         removed_ionization_mechanism_ids = set()
         # batch/workspace reload will be done in the end of rematching process
         sample_batch_reload = False
+        # Fix the current store state, where the sample batch is being edited without being focused ->
+        # user sid client not in a room and ui do not recieve the reolad event
+        workspace_reload = True
 
         # Calculate added and removed compounds and ionization mechanisms
         if rematch_compounds:
