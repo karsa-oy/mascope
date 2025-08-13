@@ -26,8 +26,9 @@ export const useTargetCollection = defineModule({
       use: 'update',
       type: 'update_target_collection'
     }),
-  delete: ({ collectionId }) =>
+  delete: ({ collectionId, deleteOrphanCompounds }) =>
     api.http.delete(`/target/collections/${collectionId}`, {
+      params: { delete_orphan_compounds: deleteOrphanCompounds },
       use: 'delete',
       type: 'delete_target_collection'
     })
