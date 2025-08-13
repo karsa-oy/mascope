@@ -44,6 +44,11 @@ export const useSampleContextMenu = defineStore('browser.sample.sampleCtxMenu', 
   async function onClick(event) {
     await clipboard.read()
     row.value = event?.data ?? null
+    if (!row.value) {
+      // If clicking on empty space in SampleTable - show batch context menu
+      batchContextMenu.onClick(event)
+      return
+    }
     if (!app.data.sample.isSelected(row.value)) {
       app.data.sample.focus(row.value)
     }
