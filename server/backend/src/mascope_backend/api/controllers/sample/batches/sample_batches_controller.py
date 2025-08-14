@@ -367,7 +367,7 @@ async def create_sample_batch(
 
         session.add(new_sample_batch)
 
-        # Step34: Associate with target collections if provided
+        # Step3: Associate with target collections if provided
         for target_collection_id in sample_batch.target_collection_ids:
             new_target_collection_in_sample_batch = TargetCollectionInSampleBatch(
                 target_collection_id=target_collection_id,

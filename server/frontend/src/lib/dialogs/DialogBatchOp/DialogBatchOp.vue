@@ -16,7 +16,7 @@ import TextArea from 'primevue/textarea'
 import { api } from '@/api'
 
 import { equals } from '@/lib/table'
-import { DEFAULT_SAMPLE_BATCH_TYPE } from '@/lib/constants'
+import { DEFAULT_SAMPLE_BATCH_TYPE, ANALYSIS_POLARITY } from '@/lib/constants'
 import { clone, instrumentType as getInstrumentType } from '@/lib/utils'
 import { useMzFit } from '@/lib/mzFit'
 
@@ -56,7 +56,8 @@ const initial = reactive({
   info: {
     name: '',
     desc: '',
-    type: ''
+    type: '',
+    polarity: ''
   },
   mechanisms: {
     matching: [],
@@ -68,7 +69,8 @@ const selected = reactive({
   info: {
     name: '',
     desc: '',
-    type: ''
+    type: '',
+    polarity: ''
   },
   mechanisms: {
     matching: [], // matching mechanisms
@@ -91,6 +93,7 @@ const updated = computed(() => {
   const common = {
     sample_batch_name: selected.info.name,
     sample_batch_description: selected.info.desc,
+    sample_batch_polarity: selected.info.polarity,
     workspace_id: app.data.workspace.focusedId,
     build_params: {
       calibration_collection: selected.calibrants?.target_collection_id,
@@ -178,6 +181,7 @@ async function init(value) {
     selected.info.name = original.value.sample_batch_name
     selected.info.desc = original.value.sample_batch_description
     selected.info.type = original.value.sample_batch_type
+    selected.info.polarity = original.value.polarity
     // init ionization mechanisms
     selected.mechanisms.matching = app.data.mechanism.list.filter((mech) =>
       original.value.build_params?.ion_mechanisms?.includes(mech.ionization_mechanism_id)
@@ -209,6 +213,7 @@ async function init(value) {
     selected.info.name = ''
     selected.info.desc = ''
     selected.info.type = DEFAULT_SAMPLE_BATCH_TYPE // Set default type
+    selected.info.polarity = ANALYSIS_POLARITY // Default polarity for ANALYSIS batches
     // init ionization mechanisms
     selected.mechanisms.matching = []
     // init target collections with defaults
@@ -303,6 +308,7 @@ async function execute() {
 
         <TabPanel value="mechanisms">
           <PaneSelectMechanisms
+            :batch="selected.info"
             v-model:matchingMechanisms="selected.mechanisms.matching"
             v-model:calibrationMechanisms="selected.mechanisms.calibration"
           />

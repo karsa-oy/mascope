@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watchEffect } from 'vue'
+import { ref, watchEffect, computed } from 'vue'
 
 import Panel from 'primevue/panel'
 import ScrollPanel from 'primevue/scrollpanel'
@@ -7,20 +7,43 @@ import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import ToggleSwitch from 'primevue/toggleswitch'
 
+import { DEFAULT_SAMPLE_BATCH_TYPE, ANALYSIS_POLARITY } from '@/lib/constants'
 import { useApp } from '@/stores'
 
 const app = useApp()
 
+const props = defineProps({
+  batch: {
+    type: Object
+  }
+})
+
 // external API
 const matchingMechanisms = defineModel('matchingMechanisms')
 const calibrationMechanisms = defineModel('calibrationMechanisms')
+
+const filteredMechanisms = computed(() => {
+  if (!props.batch?.polarity) {
+    return app.data.mechanism.list
+  }
+
+  // If polarity is "+-", show all mechanisms
+  if (props.batch.polarity === ANALYSIS_POLARITY) {
+    return app.data.mechanism.list
+  }
+
+  // Otherwise filter by exact polarity match
+  return app.data.mechanism.list.filter(
+    (mech) => mech.ionization_mechanism_polarity === props.batch.polarity
+  )
+})
 
 // internal selection
 const calibrationSelection = ref(
   // modeled as { [ionization_mechanism_id]: boolean }
   Object.fromEntries(
     // initialized from the mechanism store
-    app.data.mechanism.list.map(({ ionization_mechanism_id }) => [
+    filteredMechanisms.value.map(({ ionization_mechanism_id }) => [
       ionization_mechanism_id,
       // and the externally provided initial
       // calibration mechanism list
@@ -36,7 +59,7 @@ watchEffect(() => {
   calibrationMechanisms.value = Object.entries(calibrationSelection.value)
     .filter(([, selected]) => selected)
     .map(([ionization_mechanism_id]) =>
-      app.data.mechanism.list.find(
+      filteredMechanisms.value.find(
         (mech) => mech.ionization_mechanism_id == ionization_mechanism_id
       )
     )
@@ -50,7 +73,7 @@ watchEffect(() => {
       const matchMechanismIds = matchingMechanisms.value.map((m) => m.ionization_mechanism_id)
       if (!matchMechanismIds.includes(ionization_mechanism_id)) {
         matchingMechanisms.value.push(
-          app.data.mechanism.list.find(
+          filteredMechanisms.value.find(
             (mech) => mech.ionization_mechanism_id == ionization_mechanism_id
           )
         )
@@ -64,7 +87,7 @@ watchEffect(() => {
     <ScrollPanel style="width: 100%; height: 300px">
       <DataTable
         v-model:selection="matchingMechanisms"
-        :value="app.data.mechanism.list"
+        :value="filteredMechanisms"
         tableStyle="min-width: 70ch;"
         @rowUnselect="
           ({ data }) => {

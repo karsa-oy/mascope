@@ -88,7 +88,7 @@ async def fetch_batch_target_isotopes_for_match_compute(
             added_ion_mechanism_isotopes_result = await get_target_isotopes(
                 target_compound_ids=list(all_target_compound_ids),
                 ionization_mechanism_ids=added_ionization_mechanism_ids,
-                show_ionization_mechanism=True,  #
+                show_ionization_mechanism=True,
             )
             add_unique_isotopes(
                 added_ion_mechanism_isotopes_result["data"],
@@ -135,7 +135,7 @@ def filter_target_isotopes_by_polarity(
         )
         return pd.DataFrame()
 
-    # Filter isotopes by ionisation_mechanism and sample polarity
+    # Filter isotopes by ionization_mechanism and sample polarity
     polarity_filtered_df = (
         target_isotopes_df[
             target_isotopes_df["ionization_mechanism_polarity"] == sample_polarity
