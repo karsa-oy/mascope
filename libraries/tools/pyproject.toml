@@ -18,12 +18,9 @@ license.text = "MIT"
 requires-python = ">=3.12"
 readme = "README.md"
 dependencies = [
-    "ipykernel>=6.29.5",
     "isospecpy>=2.2.3",
-    "jupyterlab>=4.4.2",
-    "mascope-jupyter-widgets>=2025.8.7",
     "mascope-sdk>=2025.6.30",
-    "numpy>=2.2.6",
+    "numpy>=1.26",
     "polars>=1.31.0",
     "pyarrow>=21.0.0",
     "pyteomics>=4.7.5",

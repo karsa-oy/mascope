@@ -16,6 +16,7 @@ dependencies = [
     "mascope_signal",
     "mascope_tofwerk",
     "mascope_thermo",
+    "mascope_tools"
 ]
 
 [project.scripts]
@@ -58,6 +59,7 @@ mascope_sdk = { workspace =  true }
 mascope_signal = { workspace = true }
 mascope_tofwerk = { workspace = true }
 mascope_thermo = { workspace = true }
+mascope_tools = { workspace = true }
 mascope_runtime = { workspace = true }
 
 [build-system]
