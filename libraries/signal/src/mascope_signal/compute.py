@@ -432,8 +432,6 @@ def get_orbi_centroids_per_scan(
 
     :param base_filename: Sample file name (base, not full path).
     :type base_filename: str
-    :param u_list: Iterable of m/z values to select centroid peaks near (within ±0.5).
-    :type u_list: Iterable[float]
     :param t_min: Minimum time [s] for scan selection, optional, defaults to None (start of run).
     :type t_min: float | None, optional
     :param t_max: Maximum time [s] for scan selection, optional, defaults to None (end of run).

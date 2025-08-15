@@ -795,6 +795,7 @@ def get_samples_spectra(
     query_params = {
         k: v
         for k, v in {
+            "sample_item_ids": sample_item_ids,
             "t_min": t_min,
             "t_max": t_max,
             "mz_min": mz_min,
@@ -802,11 +803,10 @@ def get_samples_spectra(
         }.items()
         if v is not None
     }
-    sample_item_ids = ",".join(sample_item_ids)
 
     response = api_get(
         url=mascope_url,
-        path=f"samples/{sample_item_ids}/spectra",
+        path="samples/spectra",
         access_token=access_token,
         params=query_params,
     )
@@ -842,11 +842,14 @@ def get_sample_centroids_per_scan(
     :return: A dictionary containing the centroids data for each sample item ID.
     :rtype: dict | None
     """
-    sample_item_ids = ",".join(sample_item_ids)
+    params = {
+        "sample_item_ids": sample_item_ids,
+    }
     resp = api_get(
         url=mascope_url,
-        path=f"sample/items/{sample_item_ids}/centroids",
+        path="samples/centroids",
         access_token=access_token,
+        params=params,
     )
 
     # Check if the API request was successful

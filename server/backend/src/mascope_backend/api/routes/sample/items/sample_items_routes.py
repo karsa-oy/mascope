@@ -14,7 +14,6 @@ from mascope_backend.api.controllers.sample.items.sample_items_controller import
     update_sample_item,
     copy_sample_items,
     move_sample_items,
-    sample_items_get_centroids,
 )
 from mascope_backend.api.controllers.sample.items.sample_items_process_controller import (
     process_sample_item,
@@ -305,38 +304,3 @@ async def sample_item_export_peaks_route(
         "message": f"Exporting peak data for a sample item '{sample_item_name}', please wait.",
         "process_id": process_id,
     }
-
-
-@sample_items_router.get("/{sample_item_ids}/centroids")
-@api_route(status_code=202, token_access=True)
-async def sample_items_get_centroids_route(
-    request: Request,
-    sample_item_ids: str,
-    background_tasks: BackgroundTasks,
-    user=Depends(editor_user),
-) -> dict:
-    """Retrieve centroids for multiple sample items.
-
-    :param request: The HTTP request object.
-    :type request: Request
-    :param sample_item_ids: List of sample item IDs to retrieve centroids for (separated by commas).
-    :type sample_item_ids: str
-    :param background_tasks: Background task handler for processing.
-    :type background_tasks: BackgroundTasks
-    :param user: The current authenticated user with editor permissions.
-    :type user: User
-    :return: A dictionary containing the process ID for retrieving centroids.
-    :rtype: dict
-    """
-
-    sid = request.headers.get("X-SID")
-    process_id = gen_id(8)
-
-    sample_item_ids = sample_item_ids.split(",")
-
-    return await sample_items_get_centroids(
-        sample_item_ids=sample_item_ids,
-        independent_transaction=True,
-        sid=sid,
-        process_id=process_id,
-    )

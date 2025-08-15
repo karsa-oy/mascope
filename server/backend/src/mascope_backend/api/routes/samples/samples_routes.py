@@ -8,6 +8,7 @@ from mascope_backend.api.controllers.samples.samples_controller import (
     get_sample_peak_timeseries,
     get_sample_spectrum,
     get_samples_spectra,
+    get_samples_centroids,
 )
 from mascope_backend.api.models.samples.sample_pydantic_model import (
     GetSamplePeakTimeseriesBody,
@@ -31,6 +32,58 @@ async def get_samples_route(
     :return: A dictionary containing the total count and list of samples.
     """
     return await get_samples(**query_params.model_dump())
+
+
+@samples_router.get("/centroids")
+@api_route(token_access=True)
+async def get_samples_centroids_route(
+    sample_item_ids: list[str] = Query(..., description="List of sample item IDs"),
+    user=Depends(guest_user),
+) -> dict:
+    """Retrieve centroids for multiple sample items.
+
+    :param request: The HTTP request object.
+    :param sample_item_ids: List of sample item IDs to retrieve centroids for.
+    :param user: The current authenticated user with editor permissions.
+    :return: A dictionary containing the process ID for retrieving centroids.
+    """
+    return await get_samples_centroids(sample_item_ids=sample_item_ids)
+
+
+@samples_router.get("/spectra")
+@api_route(token_access=True)
+async def get_samples_spectra_route(
+    sample_item_ids: list[str] = Query(..., description="List of sample item IDs"),
+    t_min: float | None = Query(None),
+    t_max: float | None = Query(None),
+    mz_min: float | None = Query(None),
+    mz_max: float | None = Query(None),
+    user=Depends(guest_user),
+):
+    """Retrieve spectra for multiple samples with optional filtering.
+
+    :param sample_item_ids: List of sample item IDs to retrieve spectra for.
+    :type sample_item_ids: list[str], optional
+    :param t_min: Minimum time value for filtering spectra, defaults to Query(None)
+    :type t_min: float | None, optional
+    :param t_max: Maximum time value for filtering spectra, defaults to Query(None)
+    :type t_max: float | None, optional
+    :param mz_min: Minimum m/z value for filtering spectra, defaults to Query(None)
+    :type mz_min: float | None, optional
+    :param mz_max: Maximum m/z value for filtering spectra, defaults to Query(None)
+    :type mz_max: float | None, optional
+    :param user: The current authenticated user with guest permissions.
+    :type user: optional
+    :return: A dictionary containing the spectra for the specified samples.
+    :rtype: dict
+    """
+    return await get_samples_spectra(
+        sample_item_ids=sample_item_ids,
+        t_min=t_min,
+        t_max=t_max,
+        mz_min=mz_min,
+        mz_max=mz_max,
+    )
 
 
 @samples_router.get("/{sample_item_id}")
@@ -112,30 +165,4 @@ async def get_sample_spectrum_route(
     """
     return await get_sample_spectrum(
         sample_item_id=sample_item_id, **query_params.model_dump()
-    )
-
-
-@samples_router.get("/{sample_item_ids}/spectra")
-@api_route(token_access=True)
-async def get_samples_spectra_route(
-    sample_item_ids: str,
-    query_params: GetSampleSpectrumQueryParams = Depends(),
-    user=Depends(guest_user),
-):
-    """
-    Retrieve spectrum data for multiple samples with automatic polarity filtering and optional range filtering.
-
-    This endpoint extracts time-averaged spectrum data for multiple samples, automatically filtered by each sample's
-    polarity. Supports optional time range filtering (t_min/t_max) within each sample's acquisition window (t0/t1)
-    and m/z range filtering.
-
-    :param sample_item_ids: Comma-separated list of sample item IDs to retrieve spectra for
-    :param query_params: Query parameters for spectrum filtering including optional time and m/z ranges
-    :param user: Authenticated user with guest access
-    :return: Spectrum data with m/z values and intensities, filtered by sample polarity
-    """
-    sample_item_ids = sample_item_ids.split(",")
-
-    return await get_samples_spectra(
-        sample_item_ids=sample_item_ids, **query_params.model_dump()
     )

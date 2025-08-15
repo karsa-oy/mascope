@@ -2,10 +2,7 @@
 from datetime import datetime
 import asyncio
 from mascope_file.io import load_file
-from mascope_signal.compute import (
-    get_scan_timestamps,
-    sum_signal_for_time_range,
-)
+import mascope_signal.compute as m_compute
 from mascope_signal.peak import get_peaks
 from sqlalchemy import (
     asc,
@@ -304,7 +301,7 @@ async def get_sample_peaks(
     )
 
     # Step 3: Get filtered scan timestamps using sample's polarity and time range
-    time_array = get_scan_timestamps(
+    time_array = m_compute.get_scan_timestamps(
         base_filename=sample.filename,
         t_min=t_min_eff,
         t_max=t_max_eff,
@@ -470,7 +467,7 @@ async def get_sample_peak_timeseries(
     )
 
     # Step 3: Get filtered scan timestamps using sample's polarity and time range (adjusted values)
-    time_array = get_scan_timestamps(
+    time_array = m_compute.get_scan_timestamps(
         base_filename=sample.filename,
         t_min=t_min_eff,
         t_max=t_max_eff,
@@ -587,7 +584,7 @@ async def get_sample_spectrum(
     intensity_unit = "counts/s"
 
     # Use specific time range with polarity filtering
-    spectrum = sum_signal_for_time_range(
+    spectrum = m_compute.sum_signal_for_time_range(
         sample.filename, t_min_eff, t_max_eff, polarity=sample.polarity, average=True
     )
 
@@ -631,6 +628,78 @@ async def get_sample_spectrum(
             "intensity": intensity_values,
             "intensity_unit": intensity_unit,
         },
+    }
+
+
+@api_controller()
+async def get_samples_centroids(
+    sample_item_ids: list[str],
+    independent_transaction: bool = False,
+    sid=None,
+    process_id=None,
+    parent_id=None,
+) -> dict:
+    """Extracts centroids for a list of sample items by their IDs.
+
+    :param sample_item_ids: List of sample item IDs for which to extract centroids.
+    :type sample_item_ids: list[str]
+    :param independent_transaction: Flag to indicate if the operation should be treated as an independent transaction, defaults to False.
+    :type independent_transaction: bool, optional
+    :param sid: Session ID for targeting specific clients when emitting events, defaults to None.
+    :type sid: optional
+    :param process_id: Process identifier for tracking background operations, defaults to None.
+    :type process_id: optional
+    :param parent_id: Parent process identifier for tracking background operations, defaults to None.
+    :type parent_id: optional
+    :return: A dictionary containing the extracted centroids for each sample item ID.
+    :rtype: dict
+    """
+    if not sample_item_ids:
+        return {
+            "message": "No sample items provided for centroid extraction.",
+            "data": [],
+        }
+
+    runtime.logger.info(
+        f"Extracting centroids for {len(sample_item_ids)} sample items: {sample_item_ids}"
+    )
+
+    # Step 1: Fetch sample items from the database in one go
+    async with async_session() as session:
+        stmt = select(Sample)
+        stmt = stmt.where(Sample.sample_item_id.in_(sample_item_ids))
+        result = await session.execute(stmt)
+        sample_items = result.scalars().all()
+
+    # Step 2: Extract centroids for each sample item
+    centroids = dict()
+    for sample in sample_items:
+        sample_item_centroids = m_compute.get_orbi_centroids_per_scan(
+            base_filename=sample.filename,
+            t_min=sample.t0,
+            t_max=sample.t1,
+            polarity=sample.polarity,
+        )
+        mzs = [cen["masses"].tolist() for cen in sample_item_centroids]
+        intensities = [cen["intensities"].tolist() for cen in sample_item_centroids]
+        resolutions = [cen["resolutions"].tolist() for cen in sample_item_centroids]
+        signal_to_noise = [
+            cen["signal_to_noise"].tolist() for cen in sample_item_centroids
+        ]
+        timestamps = [cen["timestamp"] for cen in sample_item_centroids]
+
+        centroids[sample.sample_item_id] = {
+            "masses": mzs,
+            "intensities": intensities,
+            "resolutions": resolutions,
+            "signal_to_noise": signal_to_noise,
+            "timestamp": timestamps,
+        }
+
+    # Step 3: Return the extracted centroids
+    return {
+        "message": f"Extracted centroids for {len(sample_item_ids)} sample items.",
+        "data": centroids,
     }
 
 
@@ -722,7 +791,7 @@ async def _load_sample_data(sample_item_id: str) -> SampleData:
 
 def _validate_time_range(
     t_min: float | None, t_max: float | None, sample_t0: float, sample_t1: float
-) -> tuple[float, float]:
+) -> tuple[float, float, str]:
     """
     Validate and set effective time limits based on sample's acquisition window.
 
@@ -735,7 +804,7 @@ def _validate_time_range(
     :param sample_t1: Sample acquisition end time in seconds
     :type sample_t1: float
     :return: Tuple of effective minimum and maximum time limits
-    :rtype: tuple[float, float]
+    :rtype: tuple[float, float, str]
     """
     t_min_eff = t_min if t_min is not None else sample_t0
     t_max_eff = t_max if t_max is not None else sample_t1
@@ -767,5 +836,5 @@ def _validate_time_range(
         runtime.logger.warning(warning_msg)
         time_adjustment_info = f" {warning_msg}."
     else:
-        time_adjustment_info = " No adjustments made to time range."
+        time_adjustment_info = ""
     return t_min_eff, t_max_eff, time_adjustment_info
