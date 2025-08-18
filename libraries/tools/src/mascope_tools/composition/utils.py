@@ -20,8 +20,11 @@ def combine_formula_and_ionization(
         if ionization_mechanism
         else Composition(formula="")
     )
-    # Sum element counts
-    combined_composition = comp_formula + comp_ionization
+    if ionization_mechanism.addition:
+        combined_composition = comp_formula + comp_ionization
+    else:
+        combined_composition = comp_formula - comp_ionization
+
     charge_sign = (
         "+" if ionization_mechanism and ionization_mechanism.charge > 0 else "-"
     )
