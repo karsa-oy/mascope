@@ -8,8 +8,8 @@ import numpy as np
 from scipy.spatial.distance import cosine
 import polars as pl
 from IsoSpecPy import IsoThreshold
-from composition.models import HeuristicRuleWarning
-from composition.constants import (
+from mascope_tools.composition.models import HeuristicRuleWarning
+from mascope_tools.composition.constants import (
     DEFAULT_ELEMENTAL_RATIO_RANGE,
     ISOTOPE_ABUNDANCE_THRESHOLD,
     ELECTRON_MASS,
@@ -142,7 +142,7 @@ def apply_heuristic_rules(
                 HeuristicRuleWarning,
             )
             break
-        rule_mask = rule(candidates, params)
+        rule_mask = rule(candidates, params=params)
         candidates = candidates.filter(rule_mask)
 
     return candidates.to_dicts()

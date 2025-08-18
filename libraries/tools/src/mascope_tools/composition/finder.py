@@ -5,10 +5,18 @@ import pandas as pd
 import polars as pl
 import numpy as np
 from pyteomics.mass import calculate_mass
-from composition.heuristic_filter import apply_heuristic_rules, match_isotopic_pattern
-from composition import utils
-from composition.models import SearchContext, Atom, Result, CompositionFinderWarning
-from composition.constants import (
+from mascope_tools.composition.heuristic_filter import (
+    apply_heuristic_rules,
+    match_isotopic_pattern,
+)
+from mascope_tools.composition import utils
+from mascope_tools.composition.models import (
+    SearchContext,
+    Atom,
+    Result,
+    CompositionFinderWarning,
+)
+from mascope_tools.composition.constants import (
     DEFAULT_SEARCH_ELEMENT_COUNT_RANGES,
     DEFAULT_MAXIMUM_ROWS,
     UNSATURATION_COEFFICIENTS,

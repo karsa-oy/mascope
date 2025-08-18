@@ -1,5 +1,8 @@
 from dataclasses import dataclass, asdict
-from .constants import DEFAULT_MAXIMUM_UNSATURATION, DEFAULT_MAXIMUM_ROWS
+from mascope_tools.composition.constants import (
+    DEFAULT_MAXIMUM_UNSATURATION,
+    DEFAULT_MAXIMUM_ROWS,
+)
 
 
 class CompositionFinderException(Exception):

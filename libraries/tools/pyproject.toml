@@ -21,9 +21,12 @@ dependencies = [
     "isospecpy>=2.2.3",
     "mascope-sdk>=2025.6.30",
     "numpy>=1.26",
+    "scipy>=1.16.1",
+    "pandas>=2.3.1",
     "polars>=1.31.0",
     "pyarrow>=21.0.0",
     "pyteomics>=4.7.5",
+    "tqdm>=4.67.1",
 ]
 
 [project.urls]

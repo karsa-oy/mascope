@@ -3,9 +3,27 @@ import pickle
 import mascope_sdk as msdk
 import numpy as np
 import pandas as pd
-from tqdm.notebook import tqdm
 from .calibration import CentroidedSpectrum, Spectra
-from mascope_jupyter_widgets import MascopeDataBrowser
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from mascope_jupyter_widgets import MascopeDataBrowser
+
+
+def _is_notebook():
+    try:
+        from IPython import get_ipython
+
+        shell = get_ipython().__class__.__name__
+        return shell == "ZMQInteractiveShell"
+    except Exception:
+        return False
+
+
+if _is_notebook():
+    from tqdm.notebook import tqdm
+else:
+    from tqdm import tqdm
 
 
 CACHE_FOLDER = os.path.join(os.path.dirname(__file__), "..", "cached_spectra")
@@ -53,7 +71,7 @@ def ppm_to_da(mz0: float, ppm: float) -> float:
 
 
 def collect_spectra(
-    data_browser: MascopeDataBrowser,
+    data_browser: "MascopeDataBrowser",
     samples: pd.DataFrame,
     update_cached: bool = False,
 ) -> Spectra:
@@ -101,7 +119,8 @@ def collect_spectra(
 
     # Fetch missing (or all, if update_cached)
     if to_fetch:
-        chunk_size = 100
+        # TODO increase chunk size after resolving the issue with blocked server
+        chunk_size = 1
         num_chunks = (len(to_fetch) + chunk_size - 1) // chunk_size
         for chunk_idx in tqdm(range(num_chunks), desc="Fetching centroided spectra"):
             chunk = to_fetch[chunk_idx * chunk_size : (chunk_idx + 1) * chunk_size]
@@ -143,7 +162,7 @@ def collect_spectra(
 
 
 def average_sample_item_spectra(
-    sample_item_ids: list[str], data_browser: MascopeDataBrowser, method="mean"
+    sample_item_ids: list[str], data_browser: "MascopeDataBrowser", method="mean"
 ) -> dict[str, np.ndarray]:
     """Calculate the averaged spectrum from the spectra of multiple sample items.
     This function retrieves the spectra for each sample item ID, interpolates them onto a common m/z grid,
@@ -160,8 +179,8 @@ def average_sample_item_spectra(
     :rtype: dict
     """
     averaged_specs = []
-
-    chunk_size = 100
+    # TODO increase chunk size after resolving the issue with blocked server
+    chunk_size = 1
     num_chunks = (len(sample_item_ids) + chunk_size - 1) // chunk_size
 
     for chunk_idx in tqdm(range(num_chunks), desc="Processing sample_item_ids"):
