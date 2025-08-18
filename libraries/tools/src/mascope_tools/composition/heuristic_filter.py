@@ -10,11 +10,10 @@ import polars as pl
 from IsoSpecPy import IsoThreshold
 from composition.models import HeuristicRuleWarning
 from composition.constants import (
-    MAXIMUM_UNSATURATION,
-    ELEMENTAL_RATIO_RANGE,
+    DEFAULT_ELEMENTAL_RATIO_RANGE,
     ISOTOPE_ABUNDANCE_THRESHOLD,
     ELECTRON_MASS,
-    MZ_TOLERANCE_PPM,
+    ISOTOPE_MATCHING_MZ_TOLERANCE_PPM,
     ISOTOPIC_PATTERN_THRESHOLD,
 )
 
@@ -37,7 +36,14 @@ def _cached_isotope_pattern(ion_formula: str, threshold: float):
     return (tuple(peaks.masses), tuple(peaks.probs))
 
 
-def rule_element_ratio(candidates: pl.DataFrame) -> pl.Series:
+def rule_element_ratio(candidates: pl.DataFrame, **kwargs) -> pl.Series:
+
+    params = kwargs.get("params", {})
+    if "elemental_ratio_range" in params:
+        element_ratio_range = params["elemental_ratio_range"]
+    else:
+        element_ratio_range = DEFAULT_ELEMENTAL_RATIO_RANGE
+
     """Elemental ratio constraints (e.g., H/C, N/C, O/C)."""
     formulas = candidates.get_column("formula").to_list()
     # Fast cached parsing
@@ -57,7 +63,7 @@ def rule_element_ratio(candidates: pl.DataFrame) -> pl.Series:
 
     has_carbon = counts["C"] > 0
 
-    for ratio, (min_val, max_val) in ELEMENTAL_RATIO_RANGE.items():
+    for ratio, (min_val, max_val) in element_ratio_range.items():
         num, denom = ratio.split("/")
         if num not in counts.columns or denom not in counts.columns:
             continue  # Skip if ratio elements are not present
@@ -79,39 +85,19 @@ def rule_element_ratio(candidates: pl.DataFrame) -> pl.Series:
     return element_ratio_mask
 
 
-def rule_unsaturation(candidates: pl.DataFrame) -> pl.Series:
-    """Rings and double bond equivalents (DBE)."""
-    if "unsaturation" not in candidates.columns:
-        warnings.warn(
-            "Unsaturation not found in results, skipping the rule.",
-            HeuristicRuleWarning,
-        )
-        return pl.Series([True] * candidates.height)
-
-    unsat = candidates.get_column("unsaturation")
-    if unsat.is_null().any():
-        # Replace NaN values with 0
-        unsat = unsat.fill_null(0.0)
-        warnings.warn(
-            "Missing values in unsaturation were replaced with 0.",
-            HeuristicRuleWarning,
-        )
-    return (unsat >= 0) & (unsat <= MAXIMUM_UNSATURATION)
-
-
-def rule_valence(candidates: pl.DataFrame) -> pl.Series:
+def rule_valence(candidates: pl.DataFrame, **kwargs) -> pl.Series:
     """Valence rules (even/odd electron)."""
     # TODO: requires charge and electron count info
     return pl.Series([True] * candidates.height)  # Placeholder, always returns True
 
 
-def rule_senior(candidates: pl.DataFrame) -> pl.Series:
+def rule_senior(candidates: pl.DataFrame, **kwargs) -> pl.Series:
     """Senior's rules (structural feasibility)."""
     # TODO: requires graph theory/structure generation
     return pl.Series([True] * candidates.height)  # Placeholder, always returns True
 
 
-def rule_known_chemical_space(candidates: pl.DataFrame) -> pl.Series:
+def rule_known_chemical_space(candidates: pl.DataFrame, **kwargs) -> pl.Series:
     """Known chemical space (database matching)."""
     # TODO: requires access to some chemical database
     return pl.Series([True] * candidates.height)  # Placeholder, always returns True
@@ -119,7 +105,6 @@ def rule_known_chemical_space(candidates: pl.DataFrame) -> pl.Series:
 
 # From lightweight to heavyweight, these rules are applied in order.
 HEURISTIC_RULES = [
-    rule_unsaturation,
     rule_element_ratio,
     rule_valence,
     rule_senior,
@@ -129,6 +114,7 @@ HEURISTIC_RULES = [
 
 def apply_heuristic_rules(
     candidates: list[dict[str, Any]],
+    params: dict[str, Any] = {},
 ) -> list[dict[str, Any]]:
     """
     Filter candidate formulas using the heuristic rules.
@@ -156,7 +142,7 @@ def apply_heuristic_rules(
                 HeuristicRuleWarning,
             )
             break
-        rule_mask = rule(candidates)
+        rule_mask = rule(candidates, params)
         candidates = candidates.filter(rule_mask)
 
     return candidates.to_dicts()
@@ -246,7 +232,7 @@ def match_isotopic_pattern(
         observed_intensities = np.zeros_like(predicted_intensities)
 
         for i, p_mz in enumerate(predicted_mzs):
-            mz_delta = p_mz * MZ_TOLERANCE_PPM * 1e-6
+            mz_delta = p_mz * ISOTOPE_MATCHING_MZ_TOLERANCE_PPM * 1e-6
             mz_min, mz_max = p_mz - mz_delta, p_mz + mz_delta
 
             start_idx = np.searchsorted(mzs, mz_min, side="left")

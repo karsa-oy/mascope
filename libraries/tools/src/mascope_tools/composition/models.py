@@ -1,5 +1,5 @@
 from dataclasses import dataclass, asdict
-from .constants import MAXIMUM_UNSATURATION, DEFAULT_MAXIMUM_ROWS
+from .constants import DEFAULT_MAXIMUM_UNSATURATION, DEFAULT_MAXIMUM_ROWS
 
 
 class CompositionFinderException(Exception):
@@ -40,7 +40,7 @@ class SearchContext:
     mass_range: float = None
     use_unsaturation: bool = False
     min_unsaturation: float = 0.0
-    max_unsaturation: float = MAXIMUM_UNSATURATION
+    max_unsaturation: float = DEFAULT_MAXIMUM_UNSATURATION
     only_integer_unsaturation: bool = False
     max_result_rows: int = DEFAULT_MAXIMUM_ROWS
     ionization_mechanism: IonizationMechanism | None = None

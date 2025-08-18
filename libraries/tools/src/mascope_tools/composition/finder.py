@@ -12,11 +12,13 @@ from composition.constants import (
     DEFAULT_SEARCH_ELEMENT_COUNT_RANGES,
     DEFAULT_MAXIMUM_ROWS,
     UNSATURATION_COEFFICIENTS,
-    MASS_RANGE_THRESHOLD_PPM,
+    DEFAULT_MASS_RANGE_THRESHOLD_PPM,
 )
 
 
-def assign_compositions(peaks: pd.DataFrame, params: dict) -> pd.DataFrame:
+def assign_compositions(
+    peaks: pd.DataFrame, params: dict, heuristic_params: dict = {}
+) -> pd.DataFrame:
     """Assign molecular compositions to a DataFrame based on given params."""
     # Convert peaks to Polars DataFrame for better performance
     peaks = pl.from_pandas(peaks)
@@ -46,7 +48,7 @@ def assign_compositions(peaks: pd.DataFrame, params: dict) -> pd.DataFrame:
         )
 
         if comp_results:
-            results = apply_heuristic_rules(comp_results)
+            results = apply_heuristic_rules(comp_results, params=heuristic_params)
             # Fast path: if nothing survives heuristics, avoid isotopic work
             if results:
                 results, composition_isotope_masses = match_isotopic_pattern(
@@ -122,7 +124,9 @@ def find_compositions(params: dict[str, str]) -> dict:
     """
     # --- Build search context from parameters ---
     ctx = SearchContext()
-    ctx.mass_range = float(params.get("mass_range_ppm", MASS_RANGE_THRESHOLD_PPM))
+    ctx.mass_range = float(
+        params.get("mass_range_ppm", DEFAULT_MASS_RANGE_THRESHOLD_PPM)
+    )
     ctx.max_result_rows = int(params.get("max_result_rows", DEFAULT_MAXIMUM_ROWS))
     ctx.element_count_ranges = params.get(
         "element_count_ranges", DEFAULT_SEARCH_ELEMENT_COUNT_RANGES
