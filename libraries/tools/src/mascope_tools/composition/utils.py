@@ -113,7 +113,7 @@ def parse_ionization(ionization_string: str) -> IonizationMechanism:
             composition = parse_composition(match.group(2))
             formula = to_hill_order(composition)
             charge = 1 if match.group(3) == "+" else -1
-            mass = composition.mass()
+            mass = composition.mass() - ELECTRON_MASS * charge
         else:
             raise CompositionFinderException(
                 f"Unsupported ionization mechanism: '{ionization_string}'"
