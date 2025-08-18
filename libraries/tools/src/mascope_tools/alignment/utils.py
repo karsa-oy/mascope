@@ -26,7 +26,7 @@ else:
     from tqdm import tqdm
 
 
-CACHE_FOLDER = os.path.join(os.path.dirname(__file__), "..", "cached_spectra")
+CACHE_FOLDER = os.path.abspath(os.path.join(os.getcwd(), "cached_spectra"))
 
 
 def _cache_path(sample_item_id: str) -> str:
