@@ -319,7 +319,7 @@ def gen_peak_kernel(params: dict, x: np.ndarray, peak_shape: dict) -> np.ndarray
     :return: Peak kernel in domain 'x'.
     :rtype: np.ndarray
     """
-    npeaks = params["npeaks"].value
+    npeaks = int(params["npeaks"].value)
     peaks = np.zeros((npeaks, len(x)))
 
     for p in range(npeaks):
