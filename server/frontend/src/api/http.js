@@ -71,6 +71,22 @@ function handleClientError(error) {
 }
 
 /**
+ * Handles unauthorized access (401 responses)
+ * Triggers auth check which will show login page if token is expired or cookie is removed
+ */
+function handleUnauthorizedError(error) {
+  const app = useApp()
+  app.ui.notification.push({
+    type: 'user_session_expired',
+    status: 'warning',
+    message: 'Your session has expired. Please log in again.'
+  })
+
+  app.auth.identify()
+  return Promise.reject(error)
+}
+
+/**
  * Handles server-side errors from API responses.
  * Part of axios interceptor chain, runs after handleResponseData and specific handlers.
  * One of purposes is catching unhandled 401s to trigger auth check.
@@ -79,11 +95,9 @@ function handleServerError(error) {
   const { method, url, headers } = error?.config
   const type = headers['X-Type'] ?? 'unknown'
 
-  // Any unhandled 401 triggers auth check, which will "redirect: to login if needed
+  // Any unhandled 401 triggers auth check
   if (error?.response?.status === 401) {
-    const app = useApp()
-    app.auth.expire()
-    return Promise.reject(error)
+    return handleUnauthorizedError(error)
   }
 
   // log to console for developers

@@ -94,8 +94,21 @@ export default {
       return status === 200 ? { status } : null
     }
 
-    // Handle unauthorized access
-    if (status === 401 && type !== 'identify_user') {
+    // Handle identify_user responses
+    if (type === 'identify_user') {
+      switch (status) {
+        case 200:
+          return data.data
+        case 401:
+          return null
+        default:
+          unhandled(response)
+          return null
+      }
+    }
+
+    // Handle unauthorized access for other auth types
+    if (status === 401) {
       app.ui.notification.push({
         type: 'user_signed_out',
         message: data?.error || 'Please sign in to the Mascope.',
@@ -104,24 +117,22 @@ export default {
       return null
     }
 
-    // Handle successful responses
+    // Handle successful responses for other auth types
     if (status === 200 || status === 204) {
-      if (type !== 'identify_user') {
-        const message = {
-          user_sign_in: 'Signed in successfully',
-          user_sign_out: 'Signed out succesfully',
-          user_session_expired:
-            'Your login session expired, so you have been signed out. Please sign in again.'
-        }
-        const knownEvent = type in message
-        app.ui.notification.push({
-          type,
-          message: knownEvent ? message[type] : 'Authentication successful',
-          status: 'info'
-        })
-        if (!knownEvent) {
-          console.warn(`⚠️ [api:http] unknown succesful auth event type ${type}`, response)
-        }
+      const message = {
+        user_sign_in: 'Signed in successfully',
+        user_sign_out: 'Signed out successfully',
+        user_session_expired:
+          'Your login session expired, so you have been signed out. Please sign in again.'
+      }
+      const knownEvent = type in message
+      app.ui.notification.push({
+        type,
+        message: knownEvent ? message[type] : 'Authentication successful',
+        status: 'info'
+      })
+      if (!knownEvent) {
+        console.warn(`⚠️ [api:http] unknown succesful auth event type ${type}`, response)
       }
       return data.data
     }
