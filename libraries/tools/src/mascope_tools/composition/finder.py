@@ -38,6 +38,7 @@ def assign_compositions(
     masses = peaks_to_match["mz"].to_numpy()
     results_per_peak = []
     assigned_mzs = set()
+    mass_log_messages = {}
 
     for mass in masses:
         if mass in assigned_mzs:
@@ -56,7 +57,10 @@ def assign_compositions(
         )
 
         if comp_results:
-            results = apply_heuristic_rules(comp_results, params=heuristic_params)
+            results, log_messages = apply_heuristic_rules(
+                comp_results, params=heuristic_params
+            )
+            mass_log_messages[mass] = log_messages
             # Fast path: if nothing survives heuristics, avoid isotopic work
             if results:
                 results, composition_isotope_masses = match_isotopic_pattern(
@@ -104,8 +108,8 @@ def assign_compositions(
                     }
                 )
 
-    # Return compact Pandas DataFrame of assignments
-    return pd.DataFrame(results_per_peak)
+    # Return compact Pandas DataFrame of assignments and log messages
+    return pd.DataFrame(results_per_peak), mass_log_messages
 
 
 def find_compositions(params: dict[str, str]) -> dict:

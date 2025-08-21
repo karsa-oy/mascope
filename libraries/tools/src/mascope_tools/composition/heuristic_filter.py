@@ -1,14 +1,14 @@
-"""Based on 7 Golden Rules by https://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-8-105"""
+"""
+Based on 7 Golden Rules by https://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-8-105
+"""
 
 from typing import Any
 import re
-import warnings
 from functools import lru_cache
 import numpy as np
 from scipy.spatial.distance import cosine
 import polars as pl
 from IsoSpecPy import IsoThreshold
-from mascope_tools.composition.models import HeuristicRuleWarning
 from mascope_tools.composition.constants import (
     DEFAULT_ELEMENTAL_RATIO_RANGE,
     ISOTOPE_ABUNDANCE_THRESHOLD,
@@ -37,7 +37,7 @@ def _cached_isotope_pattern(ion_formula: str, threshold: float):
 
 
 def rule_element_ratio(candidates: pl.DataFrame, **kwargs) -> pl.Series:
-
+    log_messages = []
     params = kwargs.get("params", {})
     if "elemental_ratio_range" in params:
         element_ratio_range = params["elemental_ratio_range"]
@@ -55,11 +55,10 @@ def rule_element_ratio(candidates: pl.DataFrame, **kwargs) -> pl.Series:
 
     # Only apply ratio rules where carbon is present
     if "C" not in counts.columns:
-        warnings.warn(
-            "No carbon atoms found in formulas; element ratios were skipped.",
-            HeuristicRuleWarning,
+        log_messages.append(
+            f"No carbon atoms found in {formulas}; element ratios were skipped."
         )
-        return element_ratio_mask
+        return element_ratio_mask, log_messages
 
     has_carbon = counts["C"] > 0
 
@@ -76,31 +75,39 @@ def rule_element_ratio(candidates: pl.DataFrame, **kwargs) -> pl.Series:
         mask = (ratio_val >= min_val) & (ratio_val <= max_val)
         element_ratio_mask = element_ratio_mask & (~has_carbon | mask)
 
-    if (~has_carbon).sum() > 0:
-        warnings.warn(
-            "Some formulas have zero carbon atoms; element ratios were skipped for these.",
-            HeuristicRuleWarning,
+    no_carbon_count = (~has_carbon).sum()
+    if no_carbon_count > 0:
+        log_messages.append(
+            f"{no_carbon_count} formulas have zero carbon atoms; element ratios were skipped for these."
         )
 
-    return element_ratio_mask
+    return element_ratio_mask, log_messages
 
 
-def rule_valence(candidates: pl.DataFrame, **kwargs) -> pl.Series:
+def rule_valence(candidates: pl.DataFrame, **kwargs) -> tuple[pl.Series, list[str]]:
     """Valence rules (even/odd electron)."""
     # TODO: requires charge and electron count info
-    return pl.Series([True] * candidates.height)  # Placeholder, always returns True
+    mask = pl.Series([True] * candidates.height)
+    log_messages = []
+    return mask, log_messages  # Placeholder, always returns True
 
 
-def rule_senior(candidates: pl.DataFrame, **kwargs) -> pl.Series:
+def rule_senior(candidates: pl.DataFrame, **kwargs) -> tuple[pl.Series, list[str]]:
     """Senior's rules (structural feasibility)."""
     # TODO: requires graph theory/structure generation
-    return pl.Series([True] * candidates.height)  # Placeholder, always returns True
+    mask = pl.Series([True] * candidates.height)
+    log_messages = []
+    return mask, log_messages  # Placeholder, always returns True
 
 
-def rule_known_chemical_space(candidates: pl.DataFrame, **kwargs) -> pl.Series:
+def rule_known_chemical_space(
+    candidates: pl.DataFrame, **kwargs
+) -> tuple[pl.Series, list[str]]:
     """Known chemical space (database matching)."""
     # TODO: requires access to some chemical database
-    return pl.Series([True] * candidates.height)  # Placeholder, always returns True
+    mask = pl.Series([True] * candidates.height)
+    log_messages = []
+    return mask, log_messages  # Placeholder, always returns True
 
 
 # From lightweight to heavyweight, these rules are applied in order.
@@ -114,7 +121,7 @@ HEURISTIC_RULES = [
 
 def apply_heuristic_rules(
     candidates: list[dict[str, Any]],
-    params: dict[str, Any] = {},
+    params: dict[str, Any] = None,
 ) -> list[dict[str, Any]]:
     """
     Filter candidate formulas using the heuristic rules.
@@ -123,12 +130,12 @@ def apply_heuristic_rules(
     :param candidates: List of candidate formula dicts (or Result objects).
     :return: Filtered list of candidates.
     """
+    if params is None:
+        params = {}
+    log_messages = []
     candidates = pl.DataFrame(candidates)
     if candidates.is_empty():
-        warnings.warn(
-            "No candidates provided for heuristic filtering.",
-            HeuristicRuleWarning,
-        )
+        log_messages.append("No candidates provided for heuristic filtering.")
         return []
 
     if "Ionization peak" in candidates.get_column("formula").to_list():
@@ -137,15 +144,15 @@ def apply_heuristic_rules(
 
     for i, rule in enumerate(HEURISTIC_RULES):
         if candidates.is_empty():
-            warnings.warn(
-                f"No candidates passed the rule: {HEURISTIC_RULES[i-1].__name__}",
-                HeuristicRuleWarning,
+            log_messages.append(
+                f"No candidates from passed the rule: {HEURISTIC_RULES[i-1].__name__}"
             )
             break
-        rule_mask = rule(candidates, params=params)
+        rule_mask, rule_log_messages = rule(candidates, params=params)
+        log_messages.extend(rule_log_messages)
         candidates = candidates.filter(rule_mask)
 
-    return candidates.to_dicts()
+    return candidates.to_dicts(), log_messages
 
 
 def match_isotopic_pattern(
