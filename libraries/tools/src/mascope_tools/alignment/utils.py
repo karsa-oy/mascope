@@ -82,8 +82,8 @@ def collect_spectra(
     :type data_browser: MascopeDataBrowser
     :param samples: DataFrame containing sample metadata, must include 'datetime', 'sample_file_id', and 'polarity' columns.
     :type samples: pd.DataFrame
-    :param update_cache: If True, will update the cache with new spectra, defaults to False.
-    :type update_cache: bool, optional
+    :param update_cached: If True, will update the cache with new spectra, defaults to False.
+    :type update_cached: bool, optional
     :return: Spectra object containing the collected centroided spectra and their timestamps.
     :rtype: Spectra
     """
@@ -162,22 +162,32 @@ def collect_spectra(
 
 
 def average_sample_item_spectra(
-    sample_item_ids: list[str], data_browser: "MascopeDataBrowser", method="mean"
+    sample_item_ids: list[str],
+    data_browser: "MascopeDataBrowser",
+    calibration_factors: list | None = None,
+    method="mean",
 ) -> dict[str, np.ndarray]:
     """Calculate the averaged spectrum from the spectra of multiple sample items.
-    This function retrieves the spectra for each sample item ID, interpolates them onto a common m/z grid,
+    This function retrieves the spectra for each sample item ID, calibrates their m/z values if
+    calibration factors are provided, interpolates them onto a common m/z grid,
     and then averages the intensities at each m/z value.
 
-    :param spectra: List of sample item IDs for which to average spectra.
-    :type spectra: list[str]
+    :param sample_item_ids: List of sample item IDs for which to average spectra.
+    :type sample_item_ids: list[str]
     :param data_browser: MascopeDataBrowser instance for accessing Mascope data.
     :type data_browser: MascopeDataBrowser
+    :param calibration_factors: List of m/z calibration factors for each sample item ID, defaults to None
     :param method: Averaging method, defaults to "mean"
     :type method: str, optional
     :raises ValueError: If the method is not 'mean' or 'median'.
     :return: A dictionary with 'mz' and 'intensity' keys, where 'mz' is the common m/z grid and 'intensity' is the averaged intensity at each m/z.
     :rtype: dict
     """
+    if calibration_factors is not None:
+        calibration_factors = np.asarray(calibration_factors, dtype=float)
+    else:
+        calibration_factors = np.ones(len(sample_item_ids), dtype=float)
+
     averaged_specs = []
     # TODO increase chunk size after resolving the issue with blocked server
     chunk_size = 1
@@ -193,6 +203,11 @@ def average_sample_item_spectra(
                     access_token=data_browser.access_token,
                 )
             )
+    # Apply calibration to m/z values
+    for i, cal in enumerate(calibration_factors):
+        mz_arr = np.asarray(averaged_specs[i]["mz"], dtype=float)
+        averaged_specs[i]["mz"] = mz_arr * cal
+
     # 1. Get all unique m/z values across all spectra
     union_mz = np.unique(np.concatenate([spec["mz"] for spec in averaged_specs]))
     union_mz = np.sort(union_mz)
@@ -389,10 +404,10 @@ def flag_satellite_peaks(
 
             if mirror is not None:
                 intensity_ratio_candidate = intensity_sorted[i] / base_intensity
-                right_symmetry_index = intensity_sorted[mirror] / base_intensity
+                mirror_intensity_ratio = intensity_sorted[mirror] / base_intensity
                 if (
-                    min(intensity_ratio_candidate, right_symmetry_index)
-                    / max(intensity_ratio_candidate, right_symmetry_index)
+                    min(intensity_ratio_candidate, mirror_intensity_ratio)
+                    / max(intensity_ratio_candidate, mirror_intensity_ratio)
                     >= 0.5
                 ):  # similar magnitude
                     is_satellite_sorted[i] = True

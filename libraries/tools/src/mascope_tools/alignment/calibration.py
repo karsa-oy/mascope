@@ -3,7 +3,6 @@ Implementation of the virtual lock mass (VLM) algorithm based on https://doi.org
 """
 
 from abc import ABC, abstractmethod
-from typing import List
 import numpy as np
 import pandas as pd
 import heapq
@@ -65,7 +64,7 @@ class CentroidedSpectrum(Spectrum):
 
 
 class Spectra:
-    def __init__(self, spectra: List[Spectrum], timestamps: np.ndarray):
+    def __init__(self, spectra: list[Spectrum], timestamps: np.ndarray):
         self.spectra = spectra
         self.timestamps = pd.to_datetime(timestamps, unit="s")
 
@@ -227,7 +226,7 @@ class MassAligner:
         self,
         window_factor: float,
         min_peak_intensity: float = 0.0,
-        min_fraction: float = 1,
+        min_fraction: float = 1.0,
     ):
         """
         :param window_factor: Factor to determine the window size for alignment points.
@@ -414,7 +413,7 @@ def calibrate_aligned_spectra(
     spectra: Spectra,
     target_mz: float,
     tol_ppm: float = 10.0,
-) -> Spectra:
+) -> tuple[Spectra, list[float]]:
     """
     Calibrates spectra using a proportional (multiplicative) one-point correction.
 
@@ -424,11 +423,15 @@ def calibrate_aligned_spectra(
     :type target_mz: float
     :param tol_ppm: Tolerance in ppm for matching m/z values, defaults to 10.0.
     :type tol_ppm: float, optional
-    :return: Calibrated Spectra object.
-    :rtype: Spectra
+    :return: A tuple containing:
+        - A new Spectra object with calibrated m/z values.
+        - A list of correction factors applied to each spectrum.
+    :rtype: tuple[Spectra, list[float]]
+    :raises ValueError: If no peaks are found within the specified tolerance.
     """
     delta = target_mz * tol_ppm * 1e-6
     calibrated_spectra = []
+    correction_factors = []
     for spectrum in spectra:
         mask = np.abs(spectrum.mz - target_mz) <= delta
         if not np.any(mask):
@@ -438,29 +441,27 @@ def calibrate_aligned_spectra(
 
         observed_mz = spectrum.mz[mask]
         observed_intensity = spectrum.intensity[mask]
-        if observed_mz.size > 0:
-            max_intensity_index = np.argmax(observed_intensity)
-            observed_lock_mass = observed_mz[max_intensity_index]
 
-            correction_factor = target_mz / observed_lock_mass
+        max_intensity_index = np.argmax(observed_intensity)
+        observed_lock_mass = observed_mz[max_intensity_index]
 
-            new_mz = spectrum.mz * correction_factor
+        correction_factors.append(target_mz / observed_lock_mass)
 
-            calibrated_spectrum = CentroidedSpectrum(
-                mz=new_mz,
-                intensity=spectrum.intensity,
-                resolution=spectrum.resolution,
-                signal_to_noise=spectrum.signal_to_noise,
-                metadata=spectrum.metadata,
-            )
-            calibrated_spectra.append(calibrated_spectrum)
+        calibrated_spectrum = CentroidedSpectrum(
+            mz=spectrum.mz * correction_factors[-1],
+            intensity=spectrum.intensity,
+            resolution=spectrum.resolution,
+            signal_to_noise=spectrum.signal_to_noise,
+            metadata=spectrum.metadata,
+        )
+        calibrated_spectra.append(calibrated_spectrum)
 
-    return Spectra(calibrated_spectra, spectra.timestamps)
+    return Spectra(calibrated_spectra, spectra.timestamps), correction_factors
 
 
 class _Heap:
 
-    def __init__(self, spectra_list: list[tuple[np.ndarray, np.ndarray]]):
+    def __init__(self, spectra_list: list[tuple[np.ndarray, np.ndarray, np.ndarray]]):
         self._heap = []
         self._spectra_list = spectra_list
         # For each spectrum, track the index of the next peak to be added
@@ -477,12 +478,12 @@ class _Heap:
                 heapq.heappush(self._heap, (mz, spec_idx, resolution))
                 self._next_peak_indices[spec_idx] = 1
 
-    def top(self) -> tuple[float, int] | None:
-        """Returns the (m/z, spec_idx) of the peak at the top of the heap."""
+    def top(self) -> tuple[float, int, float] | None:
+        """Returns the (m/z, spec_idx, resolution) of the peak at the top of the heap."""
         return self._heap[0] if not self.empty() else None
 
-    def pop_and_feed(self) -> tuple[float, int] | None:
-        """Removes the top peak and adds the next peak from the same spectrum."""
+    def pop_and_feed(self) -> tuple[float, int, float] | None:
+        """Removes the top peak and adds the next peak from the same spectrum. Returns (m/z, spec_idx, resolution)."""
         if self.empty():
             return None
 
