@@ -258,10 +258,9 @@ def recursive_search(idx, counts, mass, ctx):
                     return
             else:
                 unsat = None
-            formula = "".join(
-                f"{ctx.atoms[i].symbol}{counts[i]}"
-                for i in range(len(ctx.atoms))
-                if counts[i] > 0
+
+            formula = utils.to_hill_order(
+                {ctx.atoms[i].symbol: counts[i] for i in range(len(ctx.atoms))}
             )
             ctx.results_found += 1  # Increment the counter
             ion_formula = utils.combine_formula_and_ionization(

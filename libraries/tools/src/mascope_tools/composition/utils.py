@@ -77,10 +77,17 @@ def to_hill_order(elements: dict) -> str:
     """Convert a dictionary of elements to Hill notation string."""
     atomic_symbols = list(elements.keys())
     atomic_symbols.sort(key=lambda x: (0 if x == "C" else 1 if x == "H" else 2, x))
-    return "".join(
+    formula = "".join(
         f"{symbol}{elements[symbol] if elements[symbol] > 1 else ''}"
         for symbol in atomic_symbols
     )
+    formula = remove_ones_from_formula(formula)
+    return formula
+
+
+def remove_ones_from_formula(formula: str) -> str:
+    formula = re.sub(r"([A-Za-z]+)1(?![0-9])", r"\1", formula)
+    return formula
 
 
 def parse_ionization(ionization_string: str) -> IonizationMechanism:
