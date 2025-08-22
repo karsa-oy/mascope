@@ -1,5 +1,5 @@
 """
-Fetch helper providing a consistent way to collect affected sample data for the current 
+Fetch helper providing a consistent way to collect affected sample data for the current
 UI reload  notifications system.
 """
 

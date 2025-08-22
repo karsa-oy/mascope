@@ -2,7 +2,7 @@ from typing import NamedTuple
 from sqlalchemy import (
     select,
 )
-import math
+from mascope_backend.db import async_session
 from mascope_backend.db.models import (
     MatchIsotope,
     MatchInterference,
@@ -25,12 +25,11 @@ class CopyMatches(NamedTuple):
 
 async def copy_sample_items_match_data(
     copy_commands: list[CopyMatches],
-    session,
     notification: UserNotification = None,
 ):
     """
     Copies all match-related records (MatchIsotope, MatchInterference, MatchIon, MatchCompound, MatchCollection, MatchSample)
-    from the original sample item to the new sample item within the provided session.
+    from the original sample item to the new sample item
 
     This function performs the copying operation in the context of the given session, but it does not commit the changes.
     The calling function is responsible for committing the session if needed.
@@ -46,26 +45,28 @@ async def copy_sample_items_match_data(
     """
 
     async def copy_match_records(command, model, progress_increment):
-        query = select(model).where(
-            model.sample_item_id == command.original_sample_item_id
-        )
-        result = await session.execute(query)
-        match_records = result.scalars().all()
-
-        for match_record in match_records:
-            new_record_data = {
-                c.name: getattr(match_record, c.name)
-                for c in model.__table__.columns
-                if c.name != f"{model.__tablename__}_id"
-            }
-            new_record_data.update(
-                {
-                    f"{model.__tablename__}_id": gen_id(32),
-                    "sample_item_id": command.new_sample_item_id,
-                }
+        async with async_session() as session:
+            query = select(model).where(
+                model.sample_item_id == command.original_sample_item_id
             )
-            new_record = model(**new_record_data)
-            session.add(new_record)
+            result = await session.execute(query)
+            match_records = result.scalars().all()
+
+            for match_record in match_records:
+                new_record_data = {
+                    c.name: getattr(match_record, c.name)
+                    for c in model.__table__.columns
+                    if c.name != f"{model.__tablename__}_id"
+                }
+                new_record_data.update(
+                    {
+                        f"{model.__tablename__}_id": gen_id(32),
+                        "sample_item_id": command.new_sample_item_id,
+                    }
+                )
+                new_record = model(**new_record_data)
+                session.add(new_record)
+            await session.commit()
 
         if notification:
             await send_progress_user_notification(notification, progress_increment)

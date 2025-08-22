@@ -516,9 +516,7 @@ async def copy_sample_items(
     """
     async with async_session() as session:
         # Step 1: Validate the batch into which the sample is being copied.
-        batch = await session.get(SampleBatch, sample_batch_id)
-
-        if not batch:
+        if not (sample_batch := await session.get(SampleBatch, sample_batch_id)):
             raise NotFoundException(
                 f"Sample batch with ID '{sample_batch_id}' not found"
             )
@@ -527,117 +525,89 @@ async def copy_sample_items(
             raise ValueError("sample_item_ids to be copied must be unique")
 
         # Step 2: Fetch and validate the original sample items
-        stmt = select(SampleItem).where(SampleItem.sample_item_id.in_(sample_item_ids))
-        result = await session.execute(stmt)
-        original_samples = result.scalars().all()
-        original_sample_item_ids = [
-            original.sample_item_id for original in original_samples
-        ]
+        result = await session.execute(
+            select(SampleItem).where(SampleItem.sample_item_id.in_(sample_item_ids))
+        )
+        original_sample_items = result.scalars().all()
 
-        missing_sample_item_ids = [
-            id for id in sample_item_ids if id not in original_sample_item_ids
-        ]
-        for missing_sample_item_id in missing_sample_item_ids:
-            raise NotFoundException(
-                f"Sample item with ID '{missing_sample_item_id}' not found"
+        if missing_ids := set(sample_item_ids) - {
+            si.sample_item_id for si in original_sample_items
+        }:
+            raise NotFoundException(f"Sample items not found: {list(missing_ids)}")
+
+    # Step 3: Prepare SampleItemCreate objects with copy transformations
+    sample_items_to_create = []
+    for original in original_sample_items:
+        sample_item_create = SampleItemCreate(
+            **SampleItemBase.model_validate(original).model_dump(
+                exclude={"sample_batch_id", "sample_item_name", "sample_item_type"}
+            ),
+            sample_batch_id=sample_batch_id,
+            sample_item_name=(
+                generate_copy_name(original.sample_item_name)
+                if original.sample_batch_id == sample_batch_id
+                else original.sample_item_name
+            ),
+            sample_item_type=(
+                "UNKNOWN"
+                if original.sample_item_type == "ACQUISITION"
+                else original.sample_item_type
+            ),
+        )
+
+        sample_items_to_create.append(sample_item_create)
+
+    # Step 4: Bulk create sample items
+    creation_result = await create_sample_items(
+        sample_items=sample_items_to_create,
+        independent_transaction=False,
+    )
+
+    created_items_data = creation_result["data"]
+
+    # Step 4: Prepare match operations using zip for cleaner iteration
+    sample_match_copies = []
+    samples_to_rematch_ids = []
+
+    for original, created_item in zip(original_sample_items, created_items_data):
+        new_item_id = created_item["sample_item_id"]
+
+        if original.sample_batch_id == sample_batch_id or always_copy_matches:
+            sample_match_copies.append(
+                CopyMatches(original.sample_item_id, new_item_id)
             )
+        else:
+            samples_to_rematch_ids.append(new_item_id)
 
-        # Step 3: Create new sample items in session
-        copied_samples = []
-        samples_to_rematch = []
-        sample_match_copies = []
-        for original in original_samples:
-            # copy original fields except id
-            fields = {
-                c.name: getattr(original, c.name)
-                for c in SampleItem.__table__.columns
-                if c.name != "sample_item_id"
-            }
+    # Step 5: Copy match records if necessary
+    if sample_match_copies:
+        notification = UserNotification(
+            process_id=process_id,
+            parent_id=parent_id,
+            type="copy_sample_items",
+            status="pending",
+            message=f"Copying match records for {len(sample_item_ids)} samples.",
+            data={
+                "sample_match_copies": [copy._asdict() for copy in sample_match_copies],
+                "sample_batch_id": sample_batch_id,
+                "_room_ids": [sid],
+                "_sid": sid,
+            },
+        )
+        await copy_sample_items_match_data(
+            sample_match_copies,
+            notification,
+        )
 
-            # Handle ACQUISITION transformations
-            is_acquisition = original.sample_item_type == "ACQUISITION"
-
-            # Determine sample type: ACQUISITION → UNKNOWN, others stay the same
-            sample_item_type = (
-                "UNKNOWN" if is_acquisition else original.sample_item_type
-            )
-
-            # Determine locked status: unlock when ACQUISITION → UNKNOWN
-            locked_status = 0 if is_acquisition else original.locked
-
-            # update some fields for the copy
-            fields.update(
-                {
-                    "sample_item_id": gen_id(),  # generate a new id
-                    "sample_batch_id": sample_batch_id,  # use the provided batch ID
-                    "sample_item_name": (
-                        generate_copy_name(  # generate copy name from the original
-                            original.sample_item_name
-                        )
-                        if original.sample_batch_id == sample_batch_id
-                        else original.sample_item_name
-                    ),
-                    "sample_item_type": sample_item_type,  # Apply type transformation
-                    "locked": locked_status,  # unlock when ACQUISITION → UNKNOWN
-                    "sample_item_utc_created": datetime.now(  # treat as new sample created now *
-                        timezone.utc
-                    ),
-                    "sample_item_utc_modified": datetime.now(  # same for last modification
-                        timezone.utc
-                    ),
-                }
-            )
-            copy = SampleItem(**fields)
-            copied_samples.append(copy)
-            # * It is tempting to create the timestamp once and reuse it for all samples,
-            #   but this does not ensure the order of copied samples is well preserved.
-            if original.sample_batch_id == sample_batch_id or always_copy_matches:
-                sample_match_copies.append(
-                    CopyMatches(original.sample_item_id, copy.sample_item_id)
-                )
-            else:
-                samples_to_rematch.append(copy)
-        # add to session
-        session.add_all(copied_samples)
-
-        # Steps 4: Copy match records if necessary
-        if sample_match_copies:
-            # Prepare progress user notification for match copying
-            notification = UserNotification(
-                process_id=process_id,
-                parent_id=parent_id,
-                type="copy_sample_items",
-                status="pending",
-                message=f"Copying match records for {len(sample_item_ids)} samples.",
-                data={
-                    "sample_match_copies": [
-                        copy._asdict() for copy in sample_match_copies
-                    ],
-                    "sample_batch_id": sample_batch_id,
-                    "_room_ids": [sid],
-                    "_sid": sid,
-                },
-            )
-            # execute copy commands
-            await copy_sample_items_match_data(
-                sample_match_copies,
-                session,
-                notification,
-            )
-
-        # Step 5: Commit the transaction
-        await session.commit()
-        for copied_sample in copied_samples:
-            await session.refresh(copied_sample)
-
-    # Step 6: Compute matches if necessary
-    if samples_to_rematch:
+    # Step 6: Compute matches if necessary for copied samples
+    # (not the whole target batch, since it may be not empty)
+    if samples_to_rematch_ids:
         background_tasks.add_task(
             match_compute_samples,
-            sample_item_ids=[s.sample_item_id for s in samples_to_rematch],
+            sample_item_ids=samples_to_rematch_ids,
             added_target_compound_ids=None,
             added_ionization_mechanism_ids=None,
-            independent_transaction=True,
+            independent_transaction=True,  # TODO_invalidation - reload each sample when it is computed
             sid=sid,
             process_id=gen_id(8),
             parent_id=process_id,
@@ -645,11 +615,11 @@ async def copy_sample_items(
 
     # Step 7: Return the copied sample and message
     return {
-        "message": f"Copied {len(copied_samples)} samples successfully to batch '{batch.sample_batch_name}'.",
-        "data": [s.to_dict() for s in copied_samples],
+        "message": f"Copied {len(created_items_data)} samples successfully to batch '{sample_batch.sample_batch_name}'.",
+        "data": created_items_data,
         "_notification_data": {
             "affected_sample_item_ids": [
-                copy.sample_item_id for copy in copied_samples
+                si["sample_item_id"] for si in created_items_data
             ],
         },
     }
