@@ -8,7 +8,7 @@ from mascope_backend.api.new.instrument_configs.service import get_instrument_co
 from mascope_backend.api.controllers.sample.items.sample_items_controller import (
     get_sample_items,
     get_sample_item,
-    create_sample_item,
+    create_sample_items,
     sample_item_export_peaks,
     delete_sample_items,
     update_sample_item,
@@ -71,8 +71,8 @@ async def create_sample_item_route(
     :param user: The current authenticated user with editor permissions.
     :return: A dictionary containing the newly created sample item's details.
     """
-    return await create_sample_item(
-        sample_item=sample_item, independent_transaction=True
+    return await create_sample_items(
+        sample_items=[sample_item], independent_transaction=True
     )
 
 

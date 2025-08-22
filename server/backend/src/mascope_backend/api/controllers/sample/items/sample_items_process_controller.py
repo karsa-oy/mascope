@@ -17,7 +17,7 @@ from mascope_backend.api.models.sample.items.sample_item_pydantic_model import (
     SampleItemCreate,
 )
 from mascope_backend.api.controllers.sample.items.sample_items_controller import (
-    create_sample_item,
+    create_sample_items,
 )
 from mascope_backend.api.controllers.sample.lib.fetch_affected_sample_data import (
     fetch_affected_sample_data,
@@ -125,10 +125,11 @@ async def process_sample_item(
 
     # TODO_invalidation
     # Set independent_transaction to true to trigger sample_batch_reload after creating the sample item record
-    create_sample_result = await create_sample_item(
-        sample_item=sample_item, independent_transaction=True
-    )
-    created_sample_item = create_sample_result.get("data")
+    created_sample_item = (
+        await create_sample_items(
+            sample_items=[sample_item], independent_transaction=True
+        )
+    ).get("data", [])
     created_sample_item_id = created_sample_item["sample_item_id"]
 
     # Add newly created item to affected items

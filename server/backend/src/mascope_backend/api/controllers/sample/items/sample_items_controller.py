@@ -1,10 +1,10 @@
 from datetime import datetime, timezone
 from fastapi import BackgroundTasks
 
-
 import numpy as np
 import pandas as pd
 from sqlalchemy import (
+    insert,
     select,
     delete,
     asc,
@@ -56,6 +56,7 @@ from mascope_backend.api.controllers.sample.lib.fetch_affected_sample_data impor
 from mascope_backend.api.controllers.match.match_controller import match_compute_samples
 from mascope_backend.api.models.sample.items.config import sample_item_config
 from mascope_backend.api.models.sample.items.sample_item_pydantic_model import (
+    SampleItemBase,
     SampleItemCreate,
     SampleItemRead,
     SampleItemUpdate,
@@ -190,87 +191,120 @@ async def get_sample_item(sample_item_id: str) -> dict:
 
 @api_controller(
     success_reload_events=[
-        ("sample_batch_reload", "sample_batch_id"),
-    ],  # TODO_invalidation
+        ("sample_batch_reload", "affected_sample_batch_ids"),
+    ],
 )
-async def create_sample_item(
-    sample_item: SampleItemCreate, independent_transaction: bool = False
+async def create_sample_items(
+    sample_items: list[SampleItemCreate], independent_transaction: bool = False
 ) -> dict:
     """
-    Creates a new sample item after verifying the associated sample file exists.
+    Creates multiple sample items in bulk after verifying associated sample files exist.
 
     Steps:
-    1. Verify the existence of the sample file with the given filename.
-    2. Add missing fields to the sample item.
-    3. Create a new sample item with the provided details and a generated ID.
-    4. Add the new sample item to the session, commit, and refresh.
+    1. Validate all sample files exist.
+    2. Process each sample item and conditionally compute missing TIC, t0, t1 fields.
+    3. Bulk create new sample items.
+    4. Fetch created sample items for response and affected sample batches.
     5. Return the created sample item's details.
 
-    :param sample_item: Details for creating the sample item.
-    :type sample_item: SampleItemCreate
+    :param sample_items: List of sample item details for bulk creation
+    :type sample_items: list[SampleItemCreate]
     :param independent_transaction: Flag for independent transaction, defaults to False.
     :type independent_transaction: bool, optional
-    :return: Details of the created sample item.
+    :return: Details of created sample items
     :rtype: dict
-    :raises NotFoundException: If the associated sample file does not exist.
+    :raises NotFoundException: If any associated sample file does not exist
     """
+    if not sample_items:
+        return {
+            "message": "No sample items to create.",
+            "results": 0,
+            "data": [],
+        }
     async with async_session() as session:
-        # Step 1: Verify the existence of the sample file
-        sample_file = await session.scalar(
-            select(SampleFile).where(SampleFile.filename == sample_item.filename)
-        )
-        if not sample_file:
-            raise NotFoundException(
-                f"Sample file with filename '{sample_item.filename}' not found"
-            )
-
-        # Step 2: Add missing fields to the sample item
-        # Convert the sample item to a dictionary for creating a new instance
-        sample_item_dict = sample_item.model_dump()
-        # Add TIC, t0, t1 to the sample item dictionary
-        # TODO add a possibility to specify t0 and t1 in the request body?
-        try:
-            tic_time, tic_values = m_compute.get_tic_per_scan(
-                sample_file.filename, polarity=sample_item.polarity
-            )
-        except TypeError:
-            verbose_polarity = "positive" if sample_item.polarity == "+" else "negative"
-            raise NotFoundException(
-                f"No scans with '{verbose_polarity}' polarity were found in the file '{sample_item.filename}'."
-            )
-        sample_item_dict["tic"] = (
-            float(np.sum(tic_values)) if sample_item.tic is None else sample_item.tic
-        )
-        sample_item_dict["t0"] = (
-            float(tic_time[0]) if sample_item.t0 is None else sample_item.t0
-        )
-        sample_item_dict["t1"] = (
-            float(tic_time[-1]) if sample_item.t1 is None else sample_item.t1
+        # Step 1: Verify all sample files exist
+        sample_filenames = {si.filename for si in sample_items}
+        existing_filenames = set(
+            (
+                await session.execute(
+                    select(SampleFile.filename).where(
+                        SampleFile.filename.in_(sample_filenames)
+                    )
+                )
+            ).scalars()
         )
 
-        # Step 3: Create a new sample item
-        new_sample_item = SampleItem(
-            sample_item_id=gen_id(),
-            **sample_item_dict,
-            locked=(
-                1
-                if sample_item.sample_item_type == "ACQUISITION"
-                and sample_item_config.ACQUISITION_AUTO_LOCK
-                else 0
-            ),  # Auto-lock acquisition sample items
-            sample_item_utc_created=datetime.now(timezone.utc),
-            sample_item_utc_modified=datetime.now(timezone.utc),
-        )
+        if missing_files := list(sample_filenames - existing_filenames):
+            raise NotFoundException(f"Sample files not found: {missing_files}")
 
-        # Step 4: Add to session, commit, and refresh
-        session.add(new_sample_item)
+        # Step 2: Process each sample item and conditionally compute missing TIC, t0, t1 fields
+        sample_items_data = []
+        for sample_item in sample_items:
+            # Determine if TIC computation is needed
+            tic_computation_needed = (
+                sample_item.tic is None
+                or sample_item.t0 is None
+                or sample_item.t1 is None
+            )
+            # Compute TIC data if needed
+            computed_tic = computed_t0 = computed_t1 = None
+            if tic_computation_needed:
+                try:
+                    tic_time, tic_values = m_compute.get_tic_per_scan(
+                        base_filename=sample_item.filename,
+                        polarity=sample_item.polarity,
+                    )
+                    computed_tic = float(np.sum(tic_values))
+                    computed_t0 = float(tic_time[0])
+                    computed_t1 = float(tic_time[-1])
+                except TypeError as e:
+                    verbose_polarity = (
+                        "positive" if sample_item.polarity == "+" else "negative"
+                    )
+                    raise NotFoundException(
+                        f"No scans with '{verbose_polarity}' polarity were found "
+                        f"in the file '{sample_item.filename}'."
+                    ) from e
+
+            sample_item_dict = {
+                "sample_item_id": gen_id(),
+                **sample_item.model_dump(),
+                "tic": sample_item.tic if sample_item.tic is not None else computed_tic,
+                "t0": sample_item.t0 if sample_item.t0 is not None else computed_t0,
+                "t1": sample_item.t1 if sample_item.t1 is not None else computed_t1,
+                "locked": (
+                    1
+                    if sample_item.sample_item_type == "ACQUISITION"
+                    and sample_item_config.ACQUISITION_AUTO_LOCK
+                    else 0
+                ),
+                "sample_item_utc_created": datetime.now(timezone.utc),
+            }
+
+            sample_items_data.append(sample_item_dict)
+
+        # Step 3: Bulk insert using raw SQL to avoid event listeners
+        await session.execute(insert(SampleItem).values(sample_items_data))
         await session.commit()
-        await session.refresh(new_sample_item)
 
-    # Step 5: Return the new sample item details
+    # Step 4: Fetch created sample items for response and affected sample batches
+    _, affected_sample_batch_ids, created_sample_items, _ = (
+        await fetch_affected_sample_data(
+            sample_item_ids=[si["sample_item_id"] for si in sample_items_data],
+            include_objects=True,
+        )
+    )
+
+    message = f"Successfully created {len(created_sample_items)} sample items."
+    runtime.logger.debug(message)
     return {
-        "message": f"Sample item '{new_sample_item.sample_item_name}' was created successfully.",
-        "data": SampleItemRead.model_validate(new_sample_item).model_dump(),
+        "message": message,
+        "results": len(created_sample_items),
+        "data": [
+            SampleItemRead.model_validate(si).model_dump()
+            for si in created_sample_items
+        ],
+        "_notification_data": {"affected_sample_batch_ids": affected_sample_batch_ids},
     }
 
 

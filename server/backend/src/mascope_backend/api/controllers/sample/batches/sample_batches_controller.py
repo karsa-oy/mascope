@@ -59,7 +59,7 @@ from mascope_backend.api.controllers.sample.lib.sample_items_fetch import (
     fetch_sample_item_ids,
 )
 from mascope_backend.api.controllers.sample.items.sample_items_controller import (
-    create_sample_item,
+    create_sample_items,
     copy_sample_items,
 )
 from mascope_backend.api.controllers.samples.samples_controller import get_sample
@@ -795,12 +795,14 @@ async def import_sample_items(
     await send_progress_user_notification(notification, 0.15)
 
     # Step 3: Create provided sample items and save to database
-    created_sample_item_ids = []
-    for sample_item in sample_items:
-        sample_item_id = (await create_sample_item(sample_item=sample_item))["data"][
-            "sample_item_id"
-        ]
-        created_sample_item_ids.append(sample_item_id)
+    created_sample_items_data = (
+        await create_sample_items(
+            sample_items=sample_items, independent_transaction=False
+        )
+    ).get("data", [])
+    created_sample_item_ids = [
+        item["sample_item_id"] for item in created_sample_items_data
+    ]
 
     # Add created sample items to the rematch set
     all_affected_sample_item_ids.update(created_sample_item_ids)

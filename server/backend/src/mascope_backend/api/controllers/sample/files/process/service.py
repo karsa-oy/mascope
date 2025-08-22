@@ -27,7 +27,7 @@ from mascope_backend.api.controllers.sample.batches.sample_batches_controller im
 )
 from mascope_backend.api.controllers.samples.samples_controller import get_sample
 from mascope_backend.api.controllers.sample.items.sample_items_controller import (
-    create_sample_item,
+    create_sample_items,
 )
 from mascope_backend.api.controllers.sample.files.sample_files_controller import (
     compute_sample_file_peaks,
@@ -220,7 +220,7 @@ async def create_acquisition_batches_and_items(
     :return: Tuple of (created sample items, created/retrieved batches)
     :rtype: tuple[list[dict], list[dict]]
     """
-    acquisition_sample_items = []
+    sample_items_to_create = [] = []
     acquisition_sample_batches = []
 
     for polarity in sample_file.polarity:
@@ -306,24 +306,22 @@ async def create_acquisition_batches_and_items(
 
         acquisition_sample_batches.append(acquisition_sample_batch)
 
-        # Step 3: Create ACQUISITION sample item for this polarity
-        acquisition_sample_item = (
-            await create_sample_item(
-                sample_item=SampleItemCreate(
-                    sample_batch_id=acquisition_sample_batch["sample_batch_id"],
-                    filename=sample_file.filename,
-                    sample_item_name=sample_file.datetime.strftime("%Y-%m-%d %H:%M:%S"),
-                    sample_item_type="ACQUISITION",
-                    sample_item_attributes={},
-                    polarity=polarity,
-                ),
-                independent_transaction=True,
+        # Prepare ACQUISITION sample item for this polarity
+        sample_items_to_create.append(
+            SampleItemCreate(
+                sample_batch_id=acquisition_sample_batch["sample_batch_id"],
+                filename=sample_file.filename,
+                sample_item_name=sample_file.datetime.strftime("%Y-%m-%d %H:%M:%S"),
+                sample_item_type="ACQUISITION",
+                sample_item_attributes={},
+                polarity=polarity,
             )
-        ).get("data", [])
-
-        acquisition_sample_items.append(acquisition_sample_item)
-        runtime.logger.debug(
-            f"Created sample item: {acquisition_sample_item['sample_item_name']}"
         )
+    # Step 3: Create ACQUISITION sample items
+    acquisition_sample_items = (
+        await create_sample_items(
+            sample_items=sample_items_to_create, independent_transaction=True
+        )
+    ).get("data", [])
 
     return acquisition_sample_items, acquisition_sample_batches
