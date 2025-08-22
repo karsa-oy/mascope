@@ -27,6 +27,8 @@ else:
 
 
 CACHE_FOLDER = os.path.abspath(os.path.join(os.getcwd(), "cached_spectra"))
+# TODO increase chunk size after resolving the issue with blocked server
+DOWNLOAD_CHUNK_SIZE = 1
 
 
 def _cache_path(sample_item_id: str) -> str:
@@ -119,16 +121,21 @@ def collect_spectra(
 
     # Fetch missing (or all, if update_cached)
     if to_fetch:
-        # TODO increase chunk size after resolving the issue with blocked server
-        chunk_size = 1
-        num_chunks = (len(to_fetch) + chunk_size - 1) // chunk_size
+        num_chunks = (len(to_fetch) + DOWNLOAD_CHUNK_SIZE - 1) // DOWNLOAD_CHUNK_SIZE
         for chunk_idx in tqdm(range(num_chunks), desc="Fetching centroided spectra"):
-            chunk = to_fetch[chunk_idx * chunk_size : (chunk_idx + 1) * chunk_size]
+            chunk = to_fetch[
+                chunk_idx * DOWNLOAD_CHUNK_SIZE : (chunk_idx + 1) * DOWNLOAD_CHUNK_SIZE
+            ]
             centroided_map = msdk.get_sample_centroids_per_scan(
                 mascope_url=data_browser.mascope_url,
                 access_token=data_browser.access_token,
                 sample_item_ids=chunk,
             )
+            if not centroided_map:
+                raise ValueError(
+                    f"No centroided data found for sample_item_ids: {chunk}. "
+                    "Check if Mascope server is running and has centroided data."
+                )
             for sample_item_id, centroids in centroided_map.items():
                 # Build CentroidedSpectrum list per scan
                 spec_list = [
@@ -189,20 +196,24 @@ def average_sample_item_spectra(
         calibration_factors = np.ones(len(sample_item_ids), dtype=float)
 
     averaged_specs = []
-    # TODO increase chunk size after resolving the issue with blocked server
-    chunk_size = 1
-    num_chunks = (len(sample_item_ids) + chunk_size - 1) // chunk_size
+    num_chunks = (len(sample_item_ids) + DOWNLOAD_CHUNK_SIZE - 1) // DOWNLOAD_CHUNK_SIZE
 
     for chunk_idx in tqdm(range(num_chunks), desc="Processing sample_item_ids"):
-        chunk = sample_item_ids[chunk_idx * chunk_size : (chunk_idx + 1) * chunk_size]
-        for sample_item_id in chunk:
-            averaged_specs.append(
-                msdk.get_sample_spectrum(
-                    mascope_url=data_browser.mascope_url,
-                    sample_item_id=sample_item_id,
-                    access_token=data_browser.access_token,
-                )
+        chunk = sample_item_ids[
+            chunk_idx * DOWNLOAD_CHUNK_SIZE : (chunk_idx + 1) * DOWNLOAD_CHUNK_SIZE
+        ]
+        chunk_averaged_specs = msdk.get_samples_spectra(
+            mascope_url=data_browser.mascope_url,
+            access_token=data_browser.access_token,
+            sample_item_ids=chunk,
+        )
+        if not chunk_averaged_specs:
+            raise ValueError(
+                f"No spectra found for sample_item_ids: {chunk}. "
+                "Check if Mascope server is running and has spectrum data."
             )
+        averaged_specs.extend(chunk_averaged_specs)
+
     # Apply calibration to m/z values
     for i, cal in enumerate(calibration_factors):
         mz_arr = np.asarray(averaged_specs[i]["mz"], dtype=float)
