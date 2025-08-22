@@ -25,7 +25,7 @@ from mascope_tools.composition.constants import (
 
 
 def assign_compositions(
-    peaks: pd.DataFrame, params: dict, heuristic_params: dict = {}
+    peaks: pd.DataFrame, params: dict, heuristic_params: dict | None = None
 ) -> pd.DataFrame:
     """Assign molecular compositions to a DataFrame based on given params."""
     # Convert peaks to Polars DataFrame for better performance

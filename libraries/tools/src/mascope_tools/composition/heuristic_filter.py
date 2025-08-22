@@ -4,6 +4,7 @@ Based on 7 Golden Rules by https://bmcbioinformatics.biomedcentral.com/articles/
 
 from typing import Any
 import re
+from pyteomics.mass import Composition
 from functools import lru_cache
 import numpy as np
 from scipy.spatial.distance import cosine
@@ -24,11 +25,6 @@ ISOTOPE_CANDIDATE_LIMIT = 64
 _FORMULA_RE = re.compile(r"([A-Z][a-z]?(?:\[\d+\])?)(\d+)")
 
 
-@lru_cache(maxsize=16384)
-def _parse_counts(formula: str) -> dict[str, int]:
-    return {el: int(n) for el, n in _FORMULA_RE.findall(formula)}
-
-
 @lru_cache(maxsize=20000)
 def _cached_isotope_pattern(ion_formula: str, threshold: float):
     peaks = IsoThreshold(formula=ion_formula, threshold=threshold)
@@ -46,8 +42,8 @@ def rule_element_ratio(candidates: pl.DataFrame, **kwargs) -> pl.Series:
 
     """Elemental ratio constraints (e.g., H/C, N/C, O/C)."""
     formulas = candidates.get_column("formula").to_list()
-    # Fast cached parsing
-    counts_list = [_parse_counts(f) for f in formulas]
+
+    counts_list = [Composition(f) for f in formulas]
     counts = pl.DataFrame(counts_list).fill_null(0)
 
     # Start with all True
