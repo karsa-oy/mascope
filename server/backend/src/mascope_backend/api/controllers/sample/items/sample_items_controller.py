@@ -44,6 +44,9 @@ from mascope_backend.api.lib.exceptions.api_exceptions import (
 from mascope_backend.api.controllers.sample.lib.sample_batches_fetch import (
     fetch_sample_batch_data,
 )
+from mascope_backend.api.controllers.sample.lib.sample_modified_timestamps_manager import (
+    update_sample_batches_modified_timestamp,
+)
 from mascope_backend.api.controllers.samples.samples_controller import get_sample
 from mascope_backend.api.controllers.sample.lib.sample_items_copy import (
     copy_sample_items_match_data,
@@ -205,7 +208,7 @@ async def create_sample_items(
     2. Process each sample item and conditionally compute missing TIC, t0, t1 fields.
     3. Bulk create new sample items.
     4. Fetch created sample items for response and affected sample batches.
-    5. Return the created sample item's details.
+    5. Update modified timestamps for affected batches.
 
     :param sample_items: List of sample item details for bulk creation
     :type sample_items: list[SampleItemCreate]
@@ -293,6 +296,10 @@ async def create_sample_items(
             sample_item_ids=[si["sample_item_id"] for si in sample_items_data],
             include_objects=True,
         )
+    )
+    # Step 5: Update modified timestamps for affected batches
+    await update_sample_batches_modified_timestamp(
+        sample_batch_ids=affected_sample_batch_ids
     )
 
     message = f"Successfully created {len(created_sample_items)} sample items."
@@ -458,9 +465,16 @@ async def delete_sample_items(
         await session.execute(delete_query)
         await session.commit()
 
+    # Step 5: Update modified timestamps for affected batches
+    await update_sample_batches_modified_timestamp(
+        sample_batch_ids=affected_sample_batch_ids
+    )
+
     s = "s" if len(sample_item_ids) > 1 else ""
+    message = (f"Deleted {len(sample_item_ids)} sample item{s}.",)
+    runtime.logger.debug(message)
     return {
-        "message": f"Deleted {len(sample_item_ids)} sample item{s}.",
+        "message": message,
         "_notification_data": {"affected_sample_batch_ids": affected_sample_batch_ids},
     }
 

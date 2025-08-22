@@ -47,6 +47,9 @@ from mascope_backend.api.controllers.match.aggregate.match_aggregate_controller 
 from mascope_backend.api.controllers.sample.lib.fetch_affected_sample_data import (
     fetch_affected_sample_data,
 )
+from mascope_backend.api.controllers.sample.lib.sample_modified_timestamps_manager import (
+    update_sample_modified_timestamps,
+)
 from mascope_backend.api.controllers.samples.samples_controller import (
     get_samples,
     get_sample,
@@ -314,6 +317,9 @@ async def match_remove_sample(
         removed_target_compound_ids=removed_target_compound_ids,
         removed_ionization_mechanism_ids=removed_ionization_mechanism_ids,
     )
+
+    await update_sample_modified_timestamps(sample_item_ids=[sample_item_id])
+
     message_logs = remove_matches_reult["message_logs"]
     message = f"{remove_matches_reult['message']} for sample '{sample_item_name}'."
 
@@ -482,6 +488,8 @@ async def match_compute_sample(
         message = f"Match isotopes and interferences computed for sample '{sample_item_name}'."
     else:
         message = f"No matches found for sample '{sample_item_name}'."
+
+    await update_sample_modified_timestamps(sample_item_ids=[sample_item_id])
 
     # Step 6: Return sample with computed match data and status message
     sample_data = await get_sample(sample_item_id)
@@ -1021,6 +1029,9 @@ async def match_remove_batch(
         removed_target_compound_ids=removed_target_compound_ids,
         removed_ionization_mechanism_ids=removed_ionization_mechanism_ids,
     )
+
+    await update_sample_modified_timestamps(sample_batch_ids=[sample_batch_id])
+
     message_logs = remove_matches_result["message_logs"]
     message = (
         f"{remove_matches_result['message']} for sample batch '{sample_batch_name}'."
@@ -1233,6 +1244,8 @@ async def match_compute_batch(
     # Step 6: Aggregate and save match_ions, match_compounds, match_collections and match_samples
     # for the sample batch based on  computed and saved match_isotopes and match_interferences
     await aggregate_and_create_matches(sample_batch_id=sample_batch_id)
+
+    await update_sample_modified_timestamps(sample_batch_ids=[sample_batch_id])
 
     # Step 7: If there are any failed samples, raise warning with the list of failed samples included in the error message
     if samples_compute_failed:
