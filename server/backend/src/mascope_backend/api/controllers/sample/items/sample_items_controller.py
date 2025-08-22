@@ -436,16 +436,16 @@ async def delete_sample_items(
         raise ValueError("delete sample items: sample item IDs must be unique")
     async with async_session() as session:
         # Step 2: Check sample items to delete exist
-        select_query = select(SampleItem).where(
-            SampleItem.sample_item_id.in_(sample_item_ids)
+        result = await session.execute(
+            select(SampleItem).where(SampleItem.sample_item_id.in_(sample_item_ids))
         )
-        result = await session.execute(select_query)
         sample_items = result.scalars().all()
-        found_ids = [s.sample_item_id for s in sample_items]
-        missing_ids = [id for id in sample_item_ids if id not in found_ids]
-        if missing_ids:
+        if missing_ids := list(
+            set(sample_item_ids) - {s.sample_item_id for s in sample_items}
+        ):
+            s = "s" if len(missing_ids) > 1 else ""
             raise NotFoundException(
-                f"Failed to find {len(missing_ids)} sample item{'s' if len(missing_ids) > 1 else ''}: {missing_ids}"
+                f"Failed to find {len(missing_ids)} sample item{s}: {missing_ids}"
             )
         # Step 3: Retrieve affected batch ids
         _, affected_sample_batch_ids, *_ = await fetch_affected_sample_data(
