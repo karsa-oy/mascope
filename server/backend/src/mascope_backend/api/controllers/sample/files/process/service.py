@@ -220,7 +220,7 @@ async def create_acquisition_batches_and_items(
     :return: Tuple of (created sample items, created/retrieved batches)
     :rtype: tuple[list[dict], list[dict]]
     """
-    sample_items_to_create = [] = []
+    sample_items_to_create = []
     acquisition_sample_batches = []
 
     for polarity in sample_file.polarity:

@@ -286,7 +286,7 @@ async def create_sample_items(
 
             sample_items_data.append(sample_item_dict)
 
-        # Step 3: Bulk insert using raw SQL to avoid event listeners
+        # Step 3: Bulk insert to avoid event listeners
         await session.execute(insert(SampleItem).values(sample_items_data))
         await session.commit()
 
@@ -471,7 +471,7 @@ async def delete_sample_items(
     )
 
     s = "s" if len(sample_item_ids) > 1 else ""
-    message = (f"Deleted {len(sample_item_ids)} sample item{s}.",)
+    message = f"Deleted {len(sample_item_ids)} sample item{s}."
     runtime.logger.debug(message)
     return {
         "message": message,
@@ -572,12 +572,12 @@ async def copy_sample_items(
         sample_items_to_create.append(sample_item_create)
 
     # Step 4: Bulk create sample items
-    creation_result = await create_sample_items(
-        sample_items=sample_items_to_create,
-        independent_transaction=False,
-    )
-
-    created_items_data = creation_result["data"]
+    created_items_data = (
+        await create_sample_items(
+            sample_items=sample_items_to_create,
+            independent_transaction=False,
+        )
+    ).get("data", [])
 
     # Step 4: Prepare match operations using zip for cleaner iteration
     sample_match_copies = []

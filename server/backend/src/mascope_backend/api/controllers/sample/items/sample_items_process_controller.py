@@ -129,7 +129,7 @@ async def process_sample_item(
         await create_sample_items(
             sample_items=[sample_item], independent_transaction=True
         )
-    ).get("data", [])
+    ).get("data")[0]
     created_sample_item_id = created_sample_item["sample_item_id"]
 
     # Add newly created item to affected items

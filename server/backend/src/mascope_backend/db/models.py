@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from typing import Optional
 from sqlalchemy import (
+    event,
     TIMESTAMP,
     Column,
     Boolean,
@@ -15,6 +16,7 @@ from sqlalchemy import (
     or_,
     select,
     text,
+    update,
 )
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.sql.schema import CheckConstraint
@@ -34,6 +36,7 @@ from mascope_backend.api.models.ionization_mechanisms.config import (
 from mascope_backend.api.models.target.collections.config import (
     target_collection_config,
 )
+from mascope_backend.runtime import runtime
 
 
 class BaseMixin(object):
@@ -246,6 +249,23 @@ class SampleBatch(Base):
     )
 
 
+@event.listens_for(SampleBatch, "after_insert")
+@event.listens_for(SampleBatch, "after_update")
+@event.listens_for(SampleBatch, "after_delete")
+def update_workspace_on_sample_batch_change(mapper, connection, target):
+    """Update Workspace timestamp when SampleBatch changes"""
+    if target.workspace_id:
+        stmt = (
+            update(Workspace)
+            .where(Workspace.workspace_id == target.workspace_id)
+            .values(workspace_utc_modified=datetime.now(timezone.utc))
+        )
+        connection.execute(stmt)
+        runtime.logger.debug(
+            f"Updated Workspace '{target.workspace_id}' timestamp due to SampleBatch change."
+        )
+
+
 class SampleItem(Base):
     __tablename__ = "sample_item"
     sample_item_id: Mapped[str] = mapped_column(String(16), primary_key=True)
@@ -324,6 +344,21 @@ class SampleItem(Base):
 
     # Define indexes
     __table_args__ = (Index("idx_sample_item_sample_batch", "sample_batch_id"),)
+
+
+@event.listens_for(SampleItem, "after_update")
+def update_sample_batch_on_sample_item_change(mapper, connection, target):
+    """Update SampleBatch timestamp when SampleItem changes."""
+    if target.sample_batch_id:
+        stmt = (
+            update(SampleBatch)
+            .where(SampleBatch.sample_batch_id == target.sample_batch_id)
+            .values(sample_batch_utc_modified=datetime.now(timezone.utc))
+        )
+        connection.execute(stmt)
+        runtime.logger.debug(
+            f"Updated SampleBatch '{target.sample_batch_id}' timestamp due to SampleItem change."
+        )
 
 
 class SampleFile(Base):
