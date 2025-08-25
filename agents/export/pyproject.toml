@@ -1,0 +1,19 @@
+[project]
+name = "mascope-csv-export-agent"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "mascope_sdk"
+]
+
+[dependency-groups]
+dev = [
+  "pyinstaller~=6.12"
+]
+
+[tool.uv.sources]
+mascope_sdk = { path = "../../libraries/sdk", editable = true }
+
+[build-system]
+requires = ["uv_build>=0.6,<0.7"]
+build-backend = "uv_build"
