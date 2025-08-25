@@ -1,10 +1,10 @@
 # pylint: disable=logging-fstring-interpolation,logging-format-interpolation,broad-exception-caught
 #!/usr/bin/env python3
 """
-Periodic Data Monitor Script
+Mascope CSV Export Agent
 
-This script periodically checks for new sample data on a Mascope server,
-processes new samples with compound matching, and saves results to text files.
+This application exports sample data from a Mascope server to CSV files,
+performing compound matching and saving results for further analysis.
 """
 
 import json
