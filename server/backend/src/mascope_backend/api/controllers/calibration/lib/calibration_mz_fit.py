@@ -119,8 +119,8 @@ async def mz_fit(
     await send_progress_user_notification(notification, 0.75)
 
     if (
-        n_relevant_isotopes > 3
-        and len(good_matches_df) > 3
+        n_relevant_isotopes >= 3
+        and len(good_matches_df) >= 3
         and (n_relevant_isotopes - len(good_matches_df) <= 2)
     ):
         # Fit mz calibration
