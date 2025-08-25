@@ -2,7 +2,7 @@ import asyncio
 import os
 import math
 from concurrent.futures import ProcessPoolExecutor
-from typing import Iterable
+from typing import Iterable, Literal
 import numpy as np
 from scipy.signal._peak_finding_utils import _select_by_peak_distance
 from scipy.integrate import simpson
@@ -143,7 +143,7 @@ async def detect_peaks(
     add_peak_threshold: float,
     u_list: Iterable[float] = None,
     max_n_peaks: int = 5,
-    if_exists: str = "fail",  # 'fail', 'append', 'replace'
+    if_exists: Literal["fail", "append", "replace"] = "fail",
     dmz: float = 0.5,
     instrument_type: str = "tof",
 ) -> xarray.Dataset | tuple:
@@ -546,8 +546,7 @@ def _calculate_peak_profiles(
     """
     # Get the tof values corresponding to the peak mzs
     tofs = np.arange(len(sum_signal.mz)).astype(np.float32)
-    indices = np.searchsorted(sum_signal.mz.values, all_peak_mzs)
-    indices = np.clip(indices, 0, len(tofs) - 1)  # Ensure indices are within bounds
+    indices = find_closest_indices(sum_signal.mz.values, all_peak_mzs)
     unique_tofs = tofs[indices]
 
     peak_profiles = get_peak_profiles(filename, all_peak_mzs).assign_coords(
@@ -674,3 +673,13 @@ def get_peaks(sample_file: xarray.Dataset, intensity_mode="area"):
     if sample_file_type == "tof_zarr" or sample_file_type == "orbi_zarr":
         peaks = peaks.dropna(dim="mz", how="all")
     return peaks
+
+
+def find_closest_indices(axis, values):
+    # axis and values must be 1D numpy arrays
+    idxs = np.searchsorted(axis, values)
+    idxs = np.clip(idxs, 1, len(axis) - 1)
+    left = axis[idxs - 1]
+    right = axis[idxs]
+    idxs -= values - left < right - values
+    return idxs
