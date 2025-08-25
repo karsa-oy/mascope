@@ -151,6 +151,7 @@ def sum_signal_for_time_range(
     """
     sample_type = get_sample_file_type(base_filename)
     sample_path = parse_path_from_item_filename(base_filename)
+    is_full_sum_computation = t_min is None and t_max is None and polarity is None
 
     match sample_type:
         case "orbi_raw":
@@ -170,13 +171,14 @@ def sum_signal_for_time_range(
                 t_max=t_max,
                 average=average,
             )
-            # Load sum signal m/z values from the sample file
-            sum_signal_mz = get_sum_signal(base_filename).mz.values
-            # Check if m/z axis calibration was applied to sample file
-            # by comparing m/z in sum signal and in h5 file
-            if not np.array_equal(sum_signal.mz.values, sum_signal_mz):
-                # M/z in sum signal and in h5 file do not match, replace m/z in signal
-                sum_signal = sum_signal.assign_coords(mz=sum_signal_mz)
+            if not is_full_sum_computation:
+                # Load sum signal m/z values from the sample file
+                sum_signal_mz = get_sum_signal(base_filename).mz.values
+                # Check if m/z axis calibration was applied to sample file
+                # by comparing m/z in sum signal and in h5 file
+                if not np.array_equal(sum_signal.mz.values, sum_signal_mz):
+                    # M/z in sum signal and in h5 file do not match, replace m/z in signal
+                    sum_signal = sum_signal.assign_coords(mz=sum_signal_mz)
         case "tof_zarr" | "orbi_zarr":
             # Load the 'signal' data for specific time range
             signal = load_signal(base_filename)
