@@ -519,6 +519,67 @@ def get_sample_compound_matches(
     return match_data
 
 
+def get_sample_compounds_matches(
+    mascope_url: str,
+    access_token: str,
+    sample_item_id: str,
+    target_compound_formulas: list[str],
+    match_params: dict = None,
+    ion_mechanism_ids: list[str] = None,
+) -> dict:
+    """
+    Retrieves matches for multiple compounds within a sample based on a list of target compound formulas,
+    applying specified filter parameters to filter the matches.
+
+    :param mascope_url: Base URL of the Mascope API.
+    :type mascope_url: str
+    :param access_token: Authorization token for API access
+    :type access_token: str
+    :param sample_item_id: Unique identifier of the sample item to analyze.
+    :type sample_item_id: str
+    :param target_compound_formulas: List of chemical formulas of the target compounds.
+    :type target_compound_formulas: list[str]
+    :param match_params: Parameters to filter the match results, affecting which matches are considered significant.
+    :type match_params: dict, optional
+    :param ion_mechanism_ids: List of ionization mechanism IDs to use in matching.
+    :type ion_mechanism_ids: list[str], optional
+    :return: A dictionary containing the match data (compound->ions->isotopes).
+             Returns None if no match data is found or if an error occurs.
+    :rtype: dict
+    """
+    body = {
+        "target_compound_formulas": target_compound_formulas,
+    }
+    if match_params is not None:
+        body["match_params"] = match_params
+    if ion_mechanism_ids is not None:
+        body["ion_mechanism_ids"] = ion_mechanism_ids
+
+    resp = api_post(
+        url=mascope_url,
+        path=f"match/aggregate/sample/{sample_item_id}/compounds",
+        access_token=access_token,
+        data=body,
+    )
+
+    if not resp:
+        logger.error(
+            f"Failed to retrieve compound matches for sample item ID {sample_item_id} from {mascope_url}."
+        )
+        return None
+
+    response_json = resp.json()
+    match_data = response_json.get("data", None)
+
+    if not match_data:
+        logger.error(
+            f"No compound matches found for sample item ID {sample_item_id} and target compounds {target_compound_formulas}."
+        )
+        return None
+
+    return match_data
+
+
 def get_sample_peaks(
     mascope_url: str,
     access_token: str,
