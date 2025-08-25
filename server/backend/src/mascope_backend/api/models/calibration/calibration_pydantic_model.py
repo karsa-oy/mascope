@@ -1,6 +1,7 @@
-from typing import Optional
+from typing import List
 from pydantic import BaseModel, Field, model_validator
 from mascope_backend.api.models.base_pydantic_model import QueryParamsModel
+from mascope_backend.api.new.match.params import MZ_ERROR_TOLERANCE, TIC_THRESHOLD
 
 
 # TODO_configuration default calibration parameters
@@ -11,11 +12,11 @@ DEFAULT_ISOTOPE_ABUNDANCE_MIN = 0.1
 
 
 class GetMzCalibrationQueryParams(QueryParamsModel):
-    sample_item_id: Optional[str] = Field(
+    sample_item_id: str | None = Field(
         None,
         description="Filter by the sample item ID for which you want to fetch m/z calibration.",
     )
-    instrument: Optional[str] = Field(
+    instrument: str | None = Field(
         None,
         description="The instrument name to query for the last m/z calibration of that instrument.",
     )
@@ -50,5 +51,18 @@ class MzCalibrationParams(BaseModel):
     )
 
 
+class CalibrationFitParams(MzCalibrationParams):
+    tic_threshold: float = Field(TIC_THRESHOLD, description="TIC threshold")
+    mz_error_tolerance: float = Field(
+        MZ_ERROR_TOLERANCE, description="m/z error tolerance"
+    )
+    calibration_collection_id: str | None = Field(
+        None, description="Calibration collection ID"
+    )
+    ionization_mechanism_ids: List[str | None] = Field(
+        None, description="Ionization mechanism IDs"
+    )
+
+
 class CalibrationMzApplyBody(BaseModel):
-    fit: dict = Field(..., description="Fit parameteres")
+    fit: dict = Field(..., description="Fit parameters")

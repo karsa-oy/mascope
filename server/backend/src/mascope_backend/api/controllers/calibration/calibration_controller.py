@@ -5,6 +5,7 @@ background tasks to process calibration and related operations.
 
 """
 
+from mascope_signal.compute import get_sum_signal
 from sqlalchemy import select, func, and_
 from mascope_backend.db import async_session
 from mascope_backend.db.id import gen_id
@@ -20,8 +21,7 @@ from mascope_backend.api.lib.exceptions.api_exceptions import (
 )
 
 from mascope_backend.api.controllers.calibration.lib.calibration_mz_fit import (
-    mz_fit,
-    signal_mz_calibration_update,
+    get_calibration_handler,
 )
 from mascope_backend.api.controllers.match.match_controller import match_remove_sample
 from mascope_backend.api.controllers.sample.files.sample_files_controller import (
@@ -39,6 +39,7 @@ from mascope_backend.api.models.sample.files.sample_file_pydantic_model import (
 )
 from mascope_backend.api.models.calibration.calibration_pydantic_model import (
     MzCalibrationParams,
+    CalibrationFitParams,
 )
 from mascope_backend.socket.notifications import (
     UserNotification,
@@ -140,7 +141,6 @@ async def calibration_mz_fit(
         if not sample:
             raise NotFoundException(f"Sample item with ID '{sample_item_id}' not found")
 
-    async with async_session() as session:
         sample_batch = await session.get(SampleBatch, sample.sample_batch_id)
         if not sample_batch:
             raise NotFoundException(
@@ -176,7 +176,6 @@ async def calibration_mz_fit(
             "sample_item_id": sample_item_id,
             "filename": sample.filename,
             "_room_ids": [sid],
-            # "_sid": sid,
         },
     )
 
@@ -187,19 +186,19 @@ async def calibration_mz_fit(
     runtime.logger.debug(
         f"Calibrating mz fit using {'calibration' if calibration_mechs else 'matching'} ionization mechanisms"
     )
-    fit, stats, error, warning = await mz_fit(
-        filename=sample.filename,
+
+    calibration_parameters = CalibrationFitParams(
         calibration_collection_id=build_params["calibration_collection"],
         ionization_mechanism_ids=mechanisms,
-        peak_intensity_min=mz_calibration_params.peak_intensity_min,
-        isotope_abundance_min=mz_calibration_params.isotope_abundance_min,
-        match_score_min=mz_calibration_params.match_score_min,
-        refine_window=mz_calibration_params.refine_window,
-        notification=notification,
+        **mz_calibration_params.model_dump(),
     )
+    calibration_handler = get_calibration_handler(
+        sample.filename, calibration_parameters, notification
+    )
+    await calibration_handler.fit()
+    calibration_data = calibration_handler.to_dict()
 
     # Step 5: Handle errors and warnings
-    calibration_data = {"fit": fit, "stats": stats}
     notification_data = {
         "affected_sample_item_ids": affected_sample_item_ids,
         "affected_sample_batch_ids": affected_sample_batch_ids,
@@ -207,38 +206,32 @@ async def calibration_mz_fit(
         "filename": sample.filename,
     }
 
-    if error is not None:
-        # Raise an error if the m/z fit failed, error user notification will be send in wrapper
-        error_message = (
-            f"m/z fitting for sample '{sample.sample_item_name}' failed: {error}"
-        )
-        runtime.logger.error(error)
+    if calibration_data["error"] is not None:
+        error_message = f"m/z fitting for sample '{sample.sample_item_name}' failed: {calibration_data["error"]}"
+        runtime.logger.error(calibration_data["error"])
         raise ApiException(
             error_message,
             {
-                "data": {**calibration_data, "error": error},
+                "data": calibration_data,
                 "_notification_data": notification_data,
             },
             422,
         )
-    elif warning is not None:
-        warning_message = (
-            f"m/z fitting sample '{sample.sample_item_name}' warning: {warning}"
-        )
+    elif calibration_data["warning"] is not None:
+        warning_message = f"m/z fitting sample '{sample.sample_item_name}' warning: {calibration_data["warning"]}"
         raise_api_warning(
             warning_message,
             {
-                "data": {**calibration_data, "warning": warning},
+                "data": calibration_data,
                 "_notification_data": notification_data,
             },
         )
     # Step 6: Return m/z fit result data and message
     return {
-        "data": {**calibration_data},
+        "data": calibration_data,
         "message": f"Finished to m/z fit sample '{sample.sample_item_name}'.",
         "_notification_data": {
             **calibration_data,
-            "error": None,
             **notification_data,
         },
     }
@@ -294,24 +287,25 @@ async def calibration_mz_apply(
 
     await send_progress_user_notification(notification, 0.1)
 
-    # Retrieve the sample file data
+    # Step 3: Get sample file data and apply m/z fit
     sample_file_data = await get_sample_files(filename=filename)
     if not sample_file_data["data"]:
         raise NotFoundException(f"Sample file '{filename}' not found")
 
     sample_file = sample_file_data["data"][0]
 
-    # Update zarr files
-    new_mz = signal_mz_calibration_update(fit, sample_file["filename"])
-    new_range = [new_mz[0], new_mz[-1]]
+    calibration_handler = get_calibration_handler(filename, None, notification)
+    await calibration_handler.apply(fit)
+    updated_mz_axis = get_sum_signal(filename).mz.values
+    new_mz_range = [updated_mz_axis[0], updated_mz_axis[-1]]
 
     fit.update({"verified": True})
 
     await send_progress_user_notification(notification, 0.3)
 
-    # Update database record
+    # Step 4: Update sample file database record
     sample_file["mz_calibration"] = fit
-    sample_file["range"] = new_range
+    sample_file["range"] = new_mz_range
     runtime.logger.info(sample_file)
     await update_sample_file(
         sample_file["sample_file_id"], SampleFileUpdate(**sample_file)
@@ -319,7 +313,7 @@ async def calibration_mz_apply(
 
     await send_progress_user_notification(notification, 0.8)
 
-    # Step 3: Notify completion for each affected batch
+    # Step 5: Notify completion for each affected batch
     for sample_batch in affected_sample_batches:
         sample_batch_id = sample_batch.sample_batch_id
         sample_batch_name = sample_batch.sample_batch_name
@@ -345,7 +339,7 @@ async def calibration_mz_apply(
         )
         await send_progress_user_notification(batch_notification)
 
-        # FAQ_match removes mathces in all samples assosiated with filename
+        # FAQ_match removes matches in all samples associated with filename
         # Delete outdated matches, sid is not send to not receive the match_remove_sample notification for every sample
         for sample_item in batch_samples:
             await match_remove_sample(
@@ -355,7 +349,7 @@ async def calibration_mz_apply(
                 parent_id=process_id,
             )
 
-    # Step 4: Return m/z fit result data and message
+    # Step 6: Return m/z fit result data and message
     return {
         "data": {
             "fit": fit,
