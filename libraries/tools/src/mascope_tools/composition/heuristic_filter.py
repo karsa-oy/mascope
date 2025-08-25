@@ -3,13 +3,10 @@ Based on 7 Golden Rules by https://bmcbioinformatics.biomedcentral.com/articles/
 """
 
 from typing import Any
-import re
-from pyteomics.mass import Composition
-from functools import lru_cache
 import numpy as np
 from scipy.spatial.distance import cosine
 import polars as pl
-from IsoSpecPy import IsoThreshold
+from IsoSpecPy import IsoThreshold, ParseFormula, PeriodicTbl
 from mascope_tools.composition.constants import (
     DEFAULT_ELEMENTAL_RATIO_RANGE,
     ISOTOPE_ABUNDANCE_THRESHOLD,
@@ -20,16 +17,6 @@ from mascope_tools.composition.constants import (
 
 # Limit isotopic matching to the most plausible candidates
 ISOTOPE_CANDIDATE_LIMIT = 64
-
-# Lightweight, cached formula parser (much faster than pyteomics.Composition)
-_FORMULA_RE = re.compile(r"([A-Z][a-z]?(?:\[\d+\])?)(\d+)")
-
-
-@lru_cache(maxsize=20000)
-def _cached_isotope_pattern(ion_formula: str, threshold: float):
-    peaks = IsoThreshold(formula=ion_formula, threshold=threshold)
-    # Return tuples to keep cacheable
-    return (tuple(peaks.masses), tuple(peaks.probs))
 
 
 def rule_element_ratio(candidates: pl.DataFrame, **kwargs) -> pl.Series:
@@ -43,7 +30,7 @@ def rule_element_ratio(candidates: pl.DataFrame, **kwargs) -> pl.Series:
     """Elemental ratio constraints (e.g., H/C, N/C, O/C)."""
     formulas = candidates.get_column("formula").to_list()
 
-    counts_list = [Composition(f) for f in formulas]
+    counts_list = [ParseFormula(f) for f in formulas]
     counts = pl.DataFrame(counts_list).fill_null(0)
 
     # Start with all True
@@ -153,31 +140,16 @@ def apply_heuristic_rules(
 
 def match_isotopic_pattern(
     candidates: list[dict[str, Any]], peaks: pl.DataFrame
-) -> tuple[list[dict[str, Any]], np.ndarray]:
+) -> tuple[list[dict[str, Any]], np.ndarray, np.ndarray, list[str]]:
     """Matches isotopic patterns against candidates.
 
-    :param candidates: DataFrame of candidate formulas.
-    :type candidates: pl.DataFrame
-    :param peaks: DataFrame of peaks with 'mz' and 'intensity' columns.
+    :param candidates: List of candidate formula dicts.
+    :type candidates: list[dict[str, Any]]
+    :param peaks: Sorted dataframe of peaks with 'mz' and 'intensity' columns.
     :type peaks: pl.DataFrame
-    :return: Tuple of filtered candidates and their corresponding isotope masses.
-    :rtype: tuple[list[dict[str, Any]], np.ndarray]
+    :return: Tuple of filtered candidates, their corresponding isotope masses, isotope mass errors, and isotope labels.
+    :rtype: tuple[list[dict[str, Any]], np.ndarray, np.ndarray, list[str]]
     """
-    if peaks is None or peaks.height == 0:
-        # Return candidates untouched with zero scores, and no isotope masses
-        if isinstance(candidates, list):
-            if len(candidates) == 0:
-                return [], np.array([])
-            for c in candidates:
-                c["isotopic_pattern_score"] = 0.0
-            return candidates, np.array([])
-        else:
-            df = pl.DataFrame(candidates).with_columns(
-                pl.lit(0.0, dtype=pl.Float64).alias("isotopic_pattern_score")
-            )
-            return df.to_dicts(), np.array([])
-
-    peaks = peaks.sort("mz")
     mzs = peaks["mz"].to_numpy()
     intensities = peaks["intensity"].to_numpy()
 
@@ -187,6 +159,8 @@ def match_isotopic_pattern(
             pl.lit(0.0, dtype=pl.Float64).alias("isotopic_pattern_score")
         )
         return candidates.to_dicts(), np.array([])
+    # Keep only the most promising candidates for heavy work
+    candidates = candidates.sort("error_ppm").head(ISOTOPE_CANDIDATE_LIMIT)
 
     # If ionization peak: skip isotopic matching and return score 1.0
     if "Ionization peak" in candidates.get_column("formula").to_list():
@@ -195,35 +169,38 @@ def match_isotopic_pattern(
         )
         return candidates.to_dicts(), np.array([])
 
-    # Keep only the most promising candidates for heavy work
-    if "error_ppm" in candidates.columns:
-        candidates = candidates.sort("error_ppm").head(ISOTOPE_CANDIDATE_LIMIT)
+    ion_formulas, ion_charges = _extract_formulae_and_charges(
+        candidates.get_column("ion")
+    )
 
-    ion_series = candidates.get_column("ion")
-    ion_formulas = []
-    ion_charges = []
-    for i in ion_series:
-        if i and isinstance(i, str) and len(i) >= 2 and i[-1] in "+-":
-            ion_formulas.append(i[:-1])
-            ion_charges.append(1 if i[-1] == "+" else -1)
-        else:
-            ion_formulas.append(i or "")
-            ion_charges.append(1)  # default +1 if missing
-
-    scores = np.zeros(len(candidates), dtype=float)
-    best_observed_masses = np.array([])
+    scores = np.zeros(candidates.height, dtype=float)
+    isotope_labels = []
 
     for ind, (ion_formula, ion_charge) in enumerate(zip(ion_formulas, ion_charges)):
         if not ion_formula:
             continue
         try:
-            masses_t, probs_t = _cached_isotope_pattern(
-                ion_formula, ISOTOPE_ABUNDANCE_THRESHOLD
+            predicted_peaks = IsoThreshold(
+                formula=ion_formula,
+                threshold=ISOTOPE_ABUNDANCE_THRESHOLD,
+                get_confs=True,
             )
+            masses_t = predicted_peaks.masses
+            probs_t = predicted_peaks.probs
+
             if not masses_t:
                 continue
+
             predicted_masses_neutral = np.fromiter(masses_t, dtype=float)
             predicted_intensities = np.fromiter(probs_t, dtype=float)
+
+            formula_dict = ParseFormula(ion_formula)
+            elements = list(formula_dict.keys())
+            isotope_masses = [PeriodicTbl.symbol_to_masses[el] for el in elements]
+            isotope_labels = [
+                conf_to_label(conf, elements, isotope_masses)
+                for conf in predicted_peaks.confs
+            ]
         except Exception:
             continue
 
@@ -232,6 +209,7 @@ def match_isotopic_pattern(
         )
 
         observed_masses = np.zeros_like(predicted_mzs)
+        observed_mass_errors_ppm = np.zeros_like(predicted_mzs)
         observed_intensities = np.zeros_like(predicted_intensities)
 
         for i, p_mz in enumerate(predicted_mzs):
@@ -242,15 +220,22 @@ def match_isotopic_pattern(
             end_idx = np.searchsorted(mzs, mz_max, side="right")
 
             if start_idx < end_idx:
-                # Take the max intensity in the window
-                window = intensities[start_idx:end_idx]
-                if window.size:
-                    max_index = int(np.argmax(window))
-                    observed_intensities[i] = window[max_index]
-                    observed_masses[i] = mzs[start_idx + max_index]
+                # Take the intensity at the closest m/z in the window
+                window_mzs = mzs[start_idx:end_idx]
+                window_intensities = intensities[start_idx:end_idx]
+                if window_mzs.size:
+                    closest_idx = int(np.argmin(np.abs(window_mzs - p_mz)))
+                    observed_intensities[i] = window_intensities[closest_idx]
+                    observed_masses[i] = window_mzs[closest_idx]
+                    observed_mass_errors_ppm[i] = (
+                        abs(window_mzs[closest_idx] - p_mz) / p_mz * 1e6
+                    )
 
+        top_candidate_isotope_masses = np.array([])
+        top_candidate_isotope_mass_errors = np.array([])
         # Require monoisotopic detection
-        if observed_intensities[0] > 0:
+        # If only M0 is detected, score stays 0.0
+        if observed_intensities[0] > 0 and np.sum(observed_intensities[1:]) > 0:
             observed_intensities /= observed_intensities[0]
             if predicted_intensities[0] > 0:
                 predicted_intensities /= predicted_intensities[0]
@@ -260,12 +245,70 @@ def match_isotopic_pattern(
             scores[ind] = score
             # Keep the observed masses from the best scoring candidate
             if score >= ISOTOPIC_PATTERN_THRESHOLD and (
-                best_observed_masses.size == 0 or score > scores.max(initial=0.0)
+                top_candidate_isotope_masses.size == 0
+                or score > scores.max(initial=0.0)
             ):
-                best_observed_masses = observed_masses
+                top_candidate_isotope_masses = observed_masses
+                top_candidate_isotope_mass_errors = observed_mass_errors_ppm
 
     candidates = candidates.with_columns(
         pl.Series(values=scores, name="isotopic_pattern_score")
     ).sort("isotopic_pattern_score", descending=True)
 
-    return candidates.to_dicts(), best_observed_masses
+    return (
+        candidates.to_dicts(),
+        top_candidate_isotope_masses,
+        top_candidate_isotope_mass_errors,
+        isotope_labels,
+    )
+
+
+def conf_to_label(conf, elements, isotope_masses):
+    """Return isotope label string.
+
+    :param conf: isotope counts for each element in the formula.
+    :type conf: list[list[int]]
+    :param elements: list of elements in the formula.
+    :type elements: list[str]
+    :param isotope_masses: list of isotope masses for each element.
+    :type isotope_masses: list[list[float]]
+    """
+    label_parts = []
+    for el, iso_counts, iso_masses in zip(elements, conf, isotope_masses):
+        for idx, count in enumerate(iso_counts):
+            if count == 0:
+                continue
+
+            # For the most abundant isotope (usually index 0), skip label unless it's the only one (M0)
+            if idx == 0:
+                continue
+
+            mass_number = int(round(iso_masses[idx]))
+
+            label_parts.append(f"{mass_number}{el}{count if count > 1 else ''}")
+
+    if not label_parts:
+        return "M0"
+    return "+".join(label_parts)
+
+
+def _extract_formulae_and_charges(ions: pl.Series) -> tuple[list[str], list[int]]:
+    """Extracts formulae and charges from ion strings
+
+    :param ions: Array of ion strings.
+    :type ions: pl.Series
+    :return: Tuple of lists containing ion formulas and their charges.
+    :rtype: tuple[list[str], list[int]]
+    """
+    ions_arr = ions.to_numpy().astype(str)
+    # Get last character for each ion string
+    last_chars = np.array([s[-1] if len(s) >= 1 else "" for s in ions_arr])
+    # Check if last char is + or -
+    is_charged = np.isin(last_chars, ["+", "-"])
+    # Remove last char if charged, else keep as is
+    ion_formulas = [
+        s[:-1] if charged else s for s, charged in zip(ions_arr, is_charged)
+    ]
+    # Assign charge: +1 for '+', -1 for '-', else 1
+    ion_charges = [1 if c == "+" else -1 if c == "-" else 1 for c in last_chars]
+    return ion_formulas, ion_charges

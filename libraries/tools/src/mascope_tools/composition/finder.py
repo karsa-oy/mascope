@@ -24,28 +24,44 @@ from mascope_tools.composition.constants import (
 )
 
 
+def _is_notebook():
+    try:
+        from IPython import get_ipython
+
+        shell = get_ipython().__class__.__name__
+        return shell == "ZMQInteractiveShell"
+    except Exception:
+        return False
+
+
+if _is_notebook():
+    from tqdm.notebook import tqdm
+else:
+    from tqdm import tqdm
+
+
 def assign_compositions(
     peaks: pd.DataFrame, params: dict, heuristic_params: dict | None = None
 ) -> pd.DataFrame:
     """Assign molecular compositions to a DataFrame based on given params."""
     # Convert peaks to Polars DataFrame for better performance
-    peaks = pl.from_pandas(peaks)
+    peaks = pl.from_pandas(peaks).sort("mz")
     peak_height_threshold = params.get("peak_height_threshold", 0.0)
     peaks_to_match = peaks.filter(pl.col("intensity") >= peak_height_threshold).sort(
         "intensity", descending=True
     )
 
-    masses = peaks_to_match["mz"].to_numpy()
+    mzs = peaks_to_match["mz"].to_numpy()
     results_per_peak = []
     assigned_mzs = set()
     mass_log_messages = {}
 
-    for mass in masses:
-        if mass in assigned_mzs:
+    for mz in tqdm(mzs, desc="Assigning compositions..."):
+        if mz in assigned_mzs:
             continue  # Skip if this mass has already been processed
-        assigned_mzs.add(mass)
-        params["monoisotopic_mass"] = mass
-        params["target_monoisotopic_mass"] = mass
+        assigned_mzs.add(mz)
+        params["monoisotopic_mass"] = mz
+        params["target_monoisotopic_mass"] = mz
         compositions = find_compositions(params)
 
         # Guard for empty results
@@ -60,55 +76,70 @@ def assign_compositions(
             results, log_messages = apply_heuristic_rules(
                 comp_results, params=heuristic_params
             )
-            mass_log_messages[mass] = log_messages
+            mass_log_messages[mz] = log_messages
             # Fast path: if nothing survives heuristics, avoid isotopic work
             if results:
-                results, composition_isotope_masses = match_isotopic_pattern(
-                    results, peaks
-                )
+                (
+                    results,
+                    composition_isotope_mzs,
+                    composition_isotope_mz_errors_ppm,
+                    isotope_labels,
+                ) = match_isotopic_pattern(results, peaks)
             else:
-                composition_isotope_masses = np.array([])
+                composition_isotope_mzs = np.array([])
             if not results:
                 # No valid result for this peak
                 results_per_peak.append(
                     {
                         "formula": "Undefined",
-                        "mz": mass,
+                        "mz": mz,
                         "other_candidates": all_candidates,
                     }
                 )
                 continue
             main_result = results[0].copy()
-            main_result["mz"] = mass
+            main_result["mz"] = mz
             main_result["formula"] = main_result.get("formula", "Undefined")
+            main_result["isotope_label"] = "M0"
             main_result["other_candidates"] = all_candidates
             results_per_peak.append(main_result)
         else:
             results_per_peak.append(
-                {"formula": "Undefined", "mz": mass, "other_candidates": ""}
+                {
+                    "mz": mz,
+                    "formula": "Undefined",
+                    "isotope_label": "",
+                    "other_candidates": "",
+                }
             )
-            composition_isotope_masses = np.array([])
+            composition_isotope_mzs = np.array([])
 
         # Assign isotope peaks to the closest unassigned masses (if any were detected)
-        if composition_isotope_masses.size > 1:
-            for iso_mz in composition_isotope_masses[1:]:
+        if composition_isotope_mzs.size > 1:
+            m0_mass = composition_isotope_mzs[0]
+            for iso_mz, iso_mz_error_ppm, iso_label in zip(
+                composition_isotope_mzs[1:],
+                composition_isotope_mz_errors_ppm[1:],
+                isotope_labels[1:],
+            ):
                 if iso_mz == 0:
                     continue
-                # Find closest mass to the isotope
-                ind = (np.abs(masses - iso_mz)).argmin()
-                closest = masses[ind]
-                if closest in assigned_mzs:
+                if iso_mz in assigned_mzs:
                     continue
-                assigned_mzs.add(closest)
-                results_per_peak.append(
-                    {
-                        "formula": f"{main_result['formula']} isotope peak",
-                        "mz": closest,
-                        "other_candidates": "",
-                    }
-                )
+                assigned_mzs.add(iso_mz)
 
-    # Return compact Pandas DataFrame of assignments and log messages
+                # Create a copy of the main result and update it for the isotope
+                isotope_result = main_result.copy()
+                isotope_result["mz"] = iso_mz
+                isotope_result["isotope_label"] = iso_label
+                isotope_result["observed_mass"] = iso_mz
+                isotope_result["neutral_mass"] = isotope_result["neutral_mass"] + (
+                    iso_mz - m0_mass
+                )
+                isotope_result["error_ppm"] = iso_mz_error_ppm
+
+                results_per_peak.append(isotope_result)
+
     return pd.DataFrame(results_per_peak), mass_log_messages
 
 
@@ -286,13 +317,30 @@ def recursive_search(idx, counts, mass, ctx):
         return
 
     atom = ctx.atoms[idx]
-    # Local references to speed attribute access
     min_inner = ctx.min_inner_mass
     max_inner = ctx.max_inner_mass
     target = ctx.neutral_mass
     tol = ctx.abs_tolerance
 
-    for atom_count in range(atom.min_count, atom.max_count + 1):
+    # --- Tight feasible count range calculation ---
+    # Compute the minimum and maximum feasible count for this atom at this level
+    if atom.mass > 0:
+        feasible_min = max(
+            atom.min_count,
+            int(np.ceil((target - tol - mass - max_inner[idx]) / atom.mass)),
+        )
+        feasible_max = min(
+            atom.max_count,
+            int(np.floor((target + tol - mass - min_inner[idx]) / atom.mass)),
+        )
+    else:
+        feasible_min = atom.min_count
+        feasible_max = atom.max_count
+
+    if feasible_min > feasible_max:
+        return  # No feasible counts at this level
+
+    for atom_count in range(feasible_min, feasible_max + 1):
         # Stop recursion if we've reached the max number of results
         if ctx.results_found >= ctx.max_result_rows:
             return
