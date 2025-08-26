@@ -418,10 +418,26 @@ The best resource for learning about the Typer API is the [Typer docs Learn sect
 Agents are small Python programs installed with Pyinstaller on Windows instrument machines. They perform minimal transformations and move files to the server. As opposed to other packages, the agent dependencies are managed by separate Poetry environments, to avoid the need to compile whole uv workspace into the distributable.
 
 ```sh
-agents/           # Instrument machine agents
+agents/           # Agent applications
+  export/             # CSV Export Agent (to export match results into file)
   file/               # File Agent (for ThermoFisher Orbitrap instruments)
   tof_agent/          # TOF Agent (for Tofwerk TOF instruments)
 ```
+
+### CSV Export Agent
+
+The CSV Export Agent is an agent application designed to allow integrating Mascope data into external data architetures. It monitors new samples arriving in a specified workspace, and computes matches for a configurable list of target compounds. The results are exported into a structured text file, to be ingested into the external system.
+
+#### Build
+
+To run the agent build script, execute:
+
+```
+cd agents/export
+./build.ps1
+```
+
+Then run the executable found in `agents/export/dist`. See the agent README for details.
 
 ### File Agent
 
@@ -435,7 +451,7 @@ The TOF Agent is responsible for transforming and transferring files from Tofwer
 
 To run all services needed to emulate the Tofwerk acquisition workflow in development, run `mascope dev run tof`.
 
-### Building Agents for production
+### Building Instrument Agents (File/TOF) for production
 
 To build for production, you execute a build script _on a Windows machine_. In this section we use the TOF Agent as an example, but the the File Agent functions analogously.
 
