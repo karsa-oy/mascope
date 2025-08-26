@@ -1,3 +1,4 @@
+from functools import partial
 import numpy as np
 
 from sqlalchemy import (
@@ -5,7 +6,7 @@ from sqlalchemy import (
     desc,
 )
 
-from mascope_signal.instrument_func.fit import r_orbi
+from mascope_signal.instrument_func.fit import r_orbi, r_tof
 from mascope_backend.api.controllers.sample.lib.sample_file_fetch import (
     fetch_sample_file,
 )
@@ -63,7 +64,7 @@ def parse_instrument_functions(
                         in the expected format.
     """
     peakshape = instrument_config.peakshape
-    R_p = instrument_config.resolution_function
+    resolution_func_coeffs = instrument_config.resolution_function
 
     # Validate instrument configuration
     if not (
@@ -76,34 +77,28 @@ def parse_instrument_functions(
                 f"{instrument_config}.",
             )
         )
-    if not (isinstance(peakshape, dict) and isinstance(R_p, list)):
+    if not (isinstance(peakshape, dict) and isinstance(resolution_func_coeffs, list)):
         raise ValueError(
             (
                 "Instrument configurations are not in the expected format: ",
-                f"peakshape: {peakshape}, resolution_function: {R_p}.",
+                f"peakshape: {peakshape}, resolution_function: {resolution_func_coeffs}.",
             )
         )
 
     # Derive callable from resolution function parameters
-    if len(R_p) == 1:
+    if len(resolution_func_coeffs) == 1:
         # Use native Orbitrap resolution function
-        p1 = R_p[0]
-
-        def R(m):
-            return r_orbi(m, p1)
-
-    elif len(R_p) == 2:
+        p1 = resolution_func_coeffs[0]
+        resolution_function = partial(r_orbi, a=p1)
+    elif len(resolution_func_coeffs) == 2:
         # Use resolution function from Junninen's thesis for TOF
-        p1, p2 = R_p
-
-        def R(m):
-            return m / (p1 * m + p2)
-
-    elif len(R_p) == 3:
+        p1, p2 = resolution_func_coeffs
+        resolution_function = partial(r_tof, a=p1, b=p2)
+    elif len(resolution_func_coeffs) == 3:
         # Use 2nd order polynomial (backwards compatibility for Orbitrap) TODO: legacy
-        R = np.poly1d(R_p)
+        resolution_function = np.poly1d(resolution_func_coeffs)
 
-    return peakshape, R
+    return peakshape, resolution_function
 
 
 async def read_instrument_functions(filename: str) -> tuple[dict, callable]:
@@ -121,5 +116,5 @@ async def read_instrument_functions(filename: str) -> tuple[dict, callable]:
     instrument_config = await fetch_instrument_config_by_filename(filename)
     if instrument_config is None:
         raise ValueError(f"Instrument configuration not found for {filename}.")
-    peakshape, R = parse_instrument_functions(instrument_config)
-    return peakshape, R
+    peakshape, resolution_function = parse_instrument_functions(instrument_config)
+    return peakshape, resolution_function
