@@ -410,9 +410,9 @@ def get_peak_profiles(
         peak_profiles = np.zeros((len(mzs), len(scan_time)))
 
         # Get the coordinates of the scans
+        scan_indices = np.where(time_mask)[0]
         coordinates = np.indices(signal_ref.shape[:-1]).reshape(3, -1).T
-        # Keep same subset of coordinates as time_mask (they correspond in order)
-        coordinates = coordinates[time_mask]
+        coordinates = coordinates[scan_indices]
 
         # Populate result by iterating over the scans
         for j, coord in enumerate(coordinates):
