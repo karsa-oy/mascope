@@ -196,9 +196,9 @@ class TofCalibrationHandler(BaseCalibrationHandler):
 
         try:
             peak_tofs = load_coord(self.filename, "peak_areas", "tof")
-            new_peak_mzs = new_mz_axis[peak_tofs.astype(int)]
-            update_zarr_array_coord(self.filename, "peak_areas", "mz", new_peak_mzs)
-            update_zarr_array_coord(self.filename, "peak_heights", "mz", new_peak_mzs)
+            new_peak_mz = tof_to_mass(peak_tofs, fit_mode, fit_parameters)
+            update_zarr_array_coord(self.filename, "peak_areas", "mz", new_peak_mz)
+            update_zarr_array_coord(self.filename, "peak_heights", "mz", new_peak_mz)
         except PathNotFoundError:
             runtime.logger.warning(
                 f"Peak_areas/heights not found in {self.filename}, "

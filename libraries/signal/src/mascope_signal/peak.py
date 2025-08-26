@@ -545,9 +545,9 @@ def _calculate_peak_profiles(
     :rtype: tuple
     """
     # Get the tof values corresponding to the peak mzs
-    tofs = np.arange(len(sum_signal.mz)).astype(np.float32)
-    indices = find_closest_indices(sum_signal.mz.values, all_peak_mzs)
-    unique_tofs = tofs[indices]
+    mz_axis = sum_signal.mz.values
+    # Interpolate the index (tof) for each peak m/z
+    unique_tofs = np.interp(all_peak_mzs, mz_axis, np.arange(len(mz_axis)))
 
     peak_profiles = get_peak_profiles(filename, all_peak_mzs).assign_coords(
         tof=("mz", unique_tofs)
