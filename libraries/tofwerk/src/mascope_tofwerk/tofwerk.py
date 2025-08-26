@@ -387,6 +387,9 @@ def get_peak_profiles(
         last_non_zero_scan = np.where(scan_time != 0)[0][-1]
         scan_time = scan_time[: last_non_zero_scan + 1]
 
+        # Coefficient to convert signal intensity from [mV] -> [ions/sec]
+        conv_coeff = get_conversion_coefficient(h5_file)
+
         # Check if t_min and t_max are passed
         t_min = scan_time[0] if t_min is None else t_min
         t_max = scan_time[-1] if t_max is None else t_max
@@ -399,31 +402,31 @@ def get_peak_profiles(
         signal_ref = h5_file["FullSpectra"]["TofData"]
 
         # Find indices of m/z range
-        mz_start_ind = np.abs(true_mz_axis - mzs.min()).argmin()
-        mz_end_ind = np.abs(true_mz_axis - mzs.max()).argmin()
+        mz_start_ind = np.abs(true_mz_axis - mzs.min()).argmin() - 1
+        mz_end_ind = np.abs(true_mz_axis - mzs.max()).argmin() + 1
+        true_mz_slice = true_mz_axis[mz_start_ind : mz_end_ind + 1]
 
         # Initialize output array
         peak_profiles = np.zeros((len(mzs), len(scan_time)))
 
         # Get the coordinates of the scans
         coordinates = np.indices(signal_ref.shape[:-1]).reshape(3, -1).T
+        # Keep same subset of coordinates as time_mask (they correspond in order)
+        coordinates = coordinates[time_mask]
 
         # Populate result by iterating over the scans
-        for i, t in enumerate(scan_time):
-            scan_idx = np.abs(scan_time - t).argmin()
-            coordinate = coordinates[scan_idx]
-            signal = signal_ref[
-                coordinate[0],
-                coordinate[1],
-                coordinate[2],
-                mz_start_ind : mz_end_ind + 1,
+        for j, coord in enumerate(coordinates):
+            spec_segment = signal_ref[
+                coord[0], coord[1], coord[2], mz_start_ind : mz_end_ind + 1
             ]
-            peak_profiles[:, i] = np.interp(
-                mzs, true_mz_axis[mz_start_ind : mz_end_ind + 1], signal
+
+            spec_segment *= conv_coeff
+            peak_profiles[:, j] = np.interp(
+                mzs, true_mz_slice, spec_segment, left=0.0, right=0.0
             )
 
         # Convert to dask array
-        peak_profiles_dask = da.from_array(peak_profiles, chunks="auto")
+        peak_profiles_dask = da.from_array(peak_profiles, chunks=("auto", "auto"))
 
         # Export xarray array with time and mz coordinates
         return xr.DataArray(
