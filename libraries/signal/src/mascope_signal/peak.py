@@ -175,7 +175,7 @@ async def detect_peaks(
             Argument 'if_exists' must be one of 'fail', 'append', 'replace'
             """
         )
-    peakshape, R = instrument_functions
+    peakshape, resolution_function = instrument_functions
     sample_file_props = load_file(filename, vars=[]).props
     sample_file_type = get_sample_file_type(filename)
     sum_signal = get_sum_signal(filename)
@@ -292,7 +292,7 @@ async def detect_peaks(
                 mz_to_fit,
                 spec_to_fit,
                 peakshape,
-                R(mz_to_fit.mean()),
+                resolution_function,
                 add_peak_threshold,
                 sample_interval,
                 max_n_peaks,

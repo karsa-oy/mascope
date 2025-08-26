@@ -74,7 +74,7 @@ def fit_n_peaks(
                 )
             ]
 
-        dpos = x[-1] - x[0]
+        dpos = None  # Set dpos to None to allow fitting within x range
 
         # Capture warnings during the fitting process
         captured_warnings = []
@@ -204,8 +204,8 @@ def fit_peaks(
             posmin = ppos[p] - dpos
             posmax = ppos[p] + dpos
         else:
-            posmin = 0
-            posmax = np.inf
+            posmin = x[0]
+            posmax = x[-1]
         params.add(f"peak{p}pos", value=ppos[p], min=posmin, max=posmax, vary=fit_pos)
         params.add(f"peak{p}hei", value=phei[p] / ymax, min=0, vary=fit_hei)
         params.add(f"peak{p}res", value=pres[p], min=0, vary=fit_res)
