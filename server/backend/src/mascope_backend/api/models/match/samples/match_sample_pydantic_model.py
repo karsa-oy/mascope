@@ -10,9 +10,6 @@ class MatchSampleBase(BaseModel):
     sample_peak_intensity_sum: float = Field(
         ..., description="Sum of the intensity of the sample peak"
     )
-    sample_peak_interference_sum: float = Field(
-        ..., description="Sum of the intensity of the sample peak interference"
-    )
 
 
 class GetMatchSamplesQueryParams(QueryParamsModel):

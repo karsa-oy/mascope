@@ -5,7 +5,6 @@ from sqlalchemy import (
 from mascope_backend.db import async_session
 from mascope_backend.db.models import (
     MatchIsotope,
-    MatchInterference,
     MatchIon,
     MatchCompound,
     MatchCollection,
@@ -28,7 +27,7 @@ async def copy_sample_items_match_data(
     notification: UserNotification = None,
 ):
     """
-    Copies all match-related records (MatchIsotope, MatchInterference, MatchIon, MatchCompound, MatchCollection, MatchSample)
+    Copies all match-related records (MatchIsotope, MatchIon, MatchCompound, MatchCollection, MatchSample)
     from the original sample item to the new sample item
 
     This function performs the copying operation in the context of the given session, but it does not commit the changes.
@@ -81,8 +80,7 @@ async def copy_sample_items_match_data(
     for i, command in enumerate(copy_commands):
         await send_progress_user_notification(notification, progress(i, 0))
         await copy_match_records(command, MatchIsotope, progress(i, 0.25))
-        await copy_match_records(command, MatchInterference, progress(i, 0.5))
-        await copy_match_records(command, MatchIon, progress(i, 0.75))
-        await copy_match_records(command, MatchCompound, progress(i, 0.85))
-        await copy_match_records(command, MatchCollection, progress(i, 0.9))
+        await copy_match_records(command, MatchIon, progress(i, 0.50))
+        await copy_match_records(command, MatchCompound, progress(i, 0.75))
+        await copy_match_records(command, MatchCollection, progress(i, 0.90))
         await copy_match_records(command, MatchSample, progress(i, 0.95))

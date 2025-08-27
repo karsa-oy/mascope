@@ -331,11 +331,6 @@ class SampleItem(Base):
         back_populates="sample_item",
         cascade="all, delete, delete-orphan",
     )
-    match_interference = relationship(
-        "MatchInterference",
-        back_populates="sample_item",
-        cascade="all, delete, delete-orphan",
-    )
     match_rating = relationship(
         "MatchRating",
         back_populates="sample_item",
@@ -579,11 +574,6 @@ class TargetIsotope(Base):
 
     # Define relationships
     target_ion = relationship("TargetIon", back_populates="target_isotope")
-    match_interference = relationship(
-        "MatchInterference",
-        back_populates="target_isotope",
-        cascade="all, delete, delete-orphan",
-    )
     match_isotope = relationship(
         "MatchIsotope",
         back_populates="target_isotope",
@@ -606,7 +596,6 @@ class MatchSample(Base):
         Integer, CheckConstraint("match_category BETWEEN 0 AND 2"), nullable=False
     )
     sample_peak_intensity_sum = Column(Float, nullable=False)
-    sample_peak_interference_sum = Column(Float, nullable=False)
     match_sample_utc_created = Column(TIMESTAMP)
     match_sample_utc_modified = Column(TIMESTAMP)
 
@@ -637,7 +626,6 @@ class MatchCollection(Base):
         Integer, CheckConstraint("match_category BETWEEN 0 AND 2"), nullable=False
     )
     sample_peak_intensity_sum = Column(Float, nullable=False)
-    sample_peak_interference_sum = Column(Float, nullable=False)
     match_collection_utc_created = Column(TIMESTAMP)
     match_collection_utc_modified = Column(TIMESTAMP)
 
@@ -671,7 +659,6 @@ class MatchCompound(Base):
         Integer, CheckConstraint("match_category BETWEEN 0 AND 2"), nullable=False
     )
     sample_peak_intensity_sum = Column(Float, nullable=False)
-    sample_peak_interference_sum = Column(Float, nullable=False)
     match_compound_utc_created = Column(TIMESTAMP)
     match_compound_utc_modified = Column(TIMESTAMP)
 
@@ -703,7 +690,6 @@ class MatchIon(Base):
         Integer, CheckConstraint("match_category BETWEEN 0 AND 2"), nullable=False
     )
     sample_peak_intensity_sum = Column(Float, nullable=False)
-    sample_peak_interference_sum = Column(Float, nullable=False)
     match_ion_utc_created = Column(TIMESTAMP)
     match_ion_utc_modified = Column(TIMESTAMP)
 
@@ -736,29 +722,6 @@ class MatchRating(Base):
     # Define relationships
     sample_item = relationship("SampleItem", back_populates="match_rating")
     target_ion = relationship("TargetIon", back_populates="match_rating")
-
-
-class MatchInterference(Base):
-    __tablename__ = "match_interference"
-    match_interference_id = Column(String(32), nullable=False, primary_key=True)
-    target_isotope_id = Column(
-        String(16),
-        ForeignKey("target_isotope.target_isotope_id", ondelete="CASCADE"),
-        nullable=False,
-    )
-    sample_item_id = Column(
-        String(16),
-        ForeignKey("sample_item.sample_item_id", ondelete="CASCADE"),
-        nullable=False,
-    )
-    sample_peak_interference = Column(Float, nullable=False)
-
-    # Define relationships
-    sample_item = relationship("SampleItem", back_populates="match_interference")
-    target_isotope = relationship("TargetIsotope", back_populates="match_interference")
-
-    # Define indexes
-    __table_args__ = (Index("idx_match_interference_sample_item", "sample_item_id"),)
 
 
 class MatchIsotope(Base):

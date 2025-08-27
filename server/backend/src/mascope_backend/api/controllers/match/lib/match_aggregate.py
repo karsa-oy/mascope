@@ -16,7 +16,7 @@ def aggregate_params(df: pd.DataFrame) -> pd.Series:
     """Aggregation function to get the aggregated parameters.
 
     Set match_score, match_category of the top row (the most alarming row).
-    Sums sample_peak_intensity_sum/sample_peak_interference_sum for the group.
+    Sums sample_peak_intensity_sum for the group.
 
     :param df: The DataFrame containing the data to be aggregated.
     :type df: pd.DataFrame
@@ -29,7 +29,6 @@ def aggregate_params(df: pd.DataFrame) -> pd.Series:
             "match_score": top_row["match_score"],
             "match_category": top_row["match_category"],
             "sample_peak_intensity_sum": df["sample_peak_intensity_sum"].sum(),
-            "sample_peak_interference_sum": df["sample_peak_interference_sum"].sum(),
         }
     )
 
@@ -117,7 +116,7 @@ async def aggregate_match_isotopes(
     :type filtered_match_isotope_df: pd.DataFrame
     :return: Tuple of DataFrames with aggregated matchIsotopes data.
     :rtype: (pd.DataFrame, pd.DataFrame)
-    (compute_match_isotopes, apply_match_params, optionally compute_match_interferences and combine data, aggregate_match_isotopes)
+    (compute_match_isotopes, apply_match_params and combine data, aggregate_match_isotopes)
     """
     # Select relevant columns for detailed aggregation (backend processing)
     match_isotopes_data_df = filtered_match_isotope_df.loc[
@@ -149,7 +148,6 @@ async def aggregate_match_isotopes(
             "sample_peak_intensity_relative",
             "sample_peak_mz",
             "sample_peak_tof",
-            "sample_peak_interference",
             "match_category",
             "match_score",
         ],
@@ -187,7 +185,7 @@ async def aggregate_match_ions(
     2) match_ions_df with reduced data and dropped duplicates (same compound in different collections).
 
     The match_score is calculated as a weighted sum of individual isotopes' match scores, weighted by their relative abundance.
-    The sample_peak_intensity and sample_peak_interference are summed across all isotopes in the group, the _sum is added to the field name.
+    The sample_peak_intensity is summed across all isotopes in the group, the _sum is added to the field name.
 
     :param filtered_match_isotope_df: DataFrame containing isotope data to aggregate.
     :type filtered_match_isotope_df: pd.DataFrame
@@ -229,7 +227,6 @@ async def aggregate_match_ions(
                     / filtered_match_isotope_df.loc[x.index, "relative_abundance"].sum()
                 ).sum(),
                 "sample_peak_intensity": "sum",
-                "sample_peak_interference": "sum",
                 "filter_params": "first",
             }
         )
@@ -237,7 +234,6 @@ async def aggregate_match_ions(
         .rename(
             columns={
                 "sample_peak_intensity": "sample_peak_intensity_sum",
-                "sample_peak_interference": "sample_peak_interference_sum",
             }
         )
     )
@@ -302,9 +298,9 @@ async def aggregate_match_compounds(
 
     This function sorts the ions dataframe by match_category and match_score in descending order
     and then groups by target_compound_id and other relevant fields to compute the aggregated
-    values for match_score, match_category, sample_peak_intensity_sum, and sample_peak_interference_sum.
+    values for match_score, match_category, sample_peak_intensity_sum.
     It preserves the highest match_score of ion from the most alarming match_category (the most alarming ion)
-    and sums up the sample_peak_intensity_sum and sample_peak_interference_sum for the entire group.
+    and sums up the sample_peak_intensity_sum for the entire group.
 
     It prepares two DataFrames:
     1) match_compounds_data_df with detailed data for correct further aggregation on collection/sample lvl,
@@ -388,9 +384,9 @@ async def aggregate_match_collections(compounds_df: pd.DataFrame) -> pd.DataFram
 
     This function sorts the compounds dataframe by match_category and match_score in descending order
     and then groups by target_collection_id and other relevant fields to compute the aggregated
-    values for match_score, match_category, sample_peak_intensity_sum, and sample_peak_interference_sum.
+    values for match_score, match_category, sample_peak_intensity_sum.
     It preserves the highest match_score of compound from the most alarming match_category (the most alarming compound in collection)
-    and sums up the sample_peak_intensity_sum and sample_peak_interference_sum for the entire group.
+    and sums up the sample_peak_intensity_sum for the entire group.
 
     :param compounds_df: DataFrame containing aggregated match compound data.
     :type compounds_df: pd.DataFrame
@@ -426,9 +422,9 @@ async def aggregate_match_samples(compounds_df: pd.DataFrame) -> pd.DataFrame:
 
     This function sorts the compounds dataframe by alarm_mode, match_category and match_score in descending order
     and then groups by sample_item_id and other relevant fields to compute the aggregated
-    values for match_score, match_category, sample_peak_intensity_sum, and sample_peak_interference_sum.
+    values for match_score, match_category, sample_peak_intensity_sum.
     It preserves the highest match_score of compound where alarm_mode and match_category is the highest (the most alarming compound of sample)
-    and sums up the sample_peak_intensity_sum and sample_peak_interference_sum for the entire group.
+    and sums up the sample_peak_intensity_sum for the entire group.
 
     :param compounds_df: DataFrame containing aggregated match compound data.
     :type compounds_df: pd.DataFrame
@@ -466,12 +462,12 @@ async def compile_samples_df(
     """Compile samples dataframe data (from database SampleView) with aggregated match results.
 
     This function merges the samples dataframe with the aggregated match results from the match_samples dataframe.
-    It adds the match_score, match_category, sample_peak_intensity_sum, and sample_peak_interference_sum fields to each sample.
+    It adds the match_score, match_category, sample_peak_intensity_sum fields to each sample.
     The 'matched' field is calculated to indicate whether the sample has any match results.
 
     The aggregation logic in match_samples_df ensures that each sample's aggregated fields represent:
       - The highest match_score of compound from the most alarming match_category (the most alarming compound of sample)
-      - The sum of sample_peak_intensity and sample_peak_interference for all compounds of the sample
+      - The sum of sample_peak_intensity for all compounds of the sample
 
     NaN values in aggregated fields are replaced with 0, indicating no matches or data for those fields.
 
@@ -489,7 +485,6 @@ async def compile_samples_df(
             "match_score",
             "match_category",
             "sample_peak_intensity_sum",
-            "sample_peak_interference_sum",
         ]
     ]
 
@@ -510,7 +505,6 @@ async def compile_samples_df(
             "match_score",
             "match_category",
             "sample_peak_intensity_sum",
-            "sample_peak_interference_sum",
         ]
     ] = samples_df[
         [
@@ -518,7 +512,6 @@ async def compile_samples_df(
             "match_score",
             "match_category",
             "sample_peak_intensity_sum",
-            "sample_peak_interference_sum",
         ]
     ].fillna(
         0

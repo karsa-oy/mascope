@@ -14,7 +14,6 @@ from mascope_backend.db.wal.engine import wal_checkpoint
 from mascope_backend.db.models import (
     Sample,
     SampleBatch,
-    MatchInterference,
     MatchIsotope,
     MatchIon,
     MatchCompound,
@@ -282,16 +281,16 @@ async def match_remove_sample(
     parent_id=None,
 ) -> dict:
     """
-    Removes matches and match interferences for a specific sample item, potentially filtered by specific target compounds or ionization mechanisms.
+    Removes matches for a specific sample item, potentially filtered by specific target compounds or ionization mechanisms.
 
-    This function deletes matches (and associated match interferences) for a given sample item.
+    This function deletes matches for a given sample item.
     When provided, filters based on removed target compounds or ionization mechanisms are applied, limiting the deletion to matches associated with those criteria.
     If no filters are specified, all matches for the sample item are removed. This operation can be performed as part of a larger transaction (rematch_sample endpoint)
     or as an independent transaction (Postman), in which case a reload event is emitted for the sample batch.
 
     Steps:
     1. If specified, determine the target isotope IDs linked to the removed compounds or ionization mechanisms, which will limit the deletion of related matches.
-    2. Execute the deletion of matches and associated interferences based on the identified target isotope IDs or remove all matches if no filters are applied.
+    2. Execute the deletion of matches based on the identified target isotope IDs or remove all matches if no filters are applied.
 
     :param sample_item_id: Unique identifier for the sample item whose matches are to be removed.
     :type sample_item_id: str
@@ -365,8 +364,8 @@ async def match_compute_sample(
     Steps:
     1. Gather necessary sample information, including verification status of m/z calibration.
     2. Fetch the target isotopes required for match computation using the helper function `fetch_batch_target_isotopes_for_match_compute`.
-    3. Filter out isotopes that already have matches or interferences, ensuring only new matches are computed.
-    4. Perform the match computation for isotopes and interferences, checking that all necessary preconditions are met (e.g., m/z calibration).
+    3. Filter out isotopes that already have matches, ensuring only new matches are computed.
+    4. Perform the match computation for isotopes, checking that all necessary preconditions are met (e.g., m/z calibration).
     5. Aggregate and save higher-level matches (ions, compounds, collections, samples) based on the computed isotope matches.
     6. Return the computed match data and a status message.
 
@@ -401,7 +400,7 @@ async def match_compute_sample(
     )
 
     runtime.logger.info(
-        f"...Computing match isotopes and interferences for sample {sample_item_name}: {sample_item_id} ..."
+        f"...Computing match isotopes for sample {sample_item_name}: {sample_item_id} ..."
     )
 
     # Step 2: Fetch target isotopes for match computation
@@ -436,7 +435,7 @@ async def match_compute_sample(
 
     # Skip computation if no new target isotopes are found for this sample item
     if filtered_target_isotopes_df.empty or filtered_target_isotopes_df is None:
-        warning_message = f"No new target isotopes to compute match isotopes and interferences for the sample '{sample_item_name}'."
+        warning_message = f"No new target isotopes to compute match isotopes for the sample '{sample_item_name}'."
         raise_api_warning(warning_message, {"sample_item_id": sample_item_id})
 
     # Check if m/z calibration is verified for the sample
@@ -444,7 +443,7 @@ async def match_compute_sample(
         warning_message = f"m/z calibration is not verified for sample file: {filename}. Please try to calibrate the file."
         raise_api_warning(warning_message, {"sample_item_id": sample_item_id})
 
-    # Step 4: Compute match_isotopes and match_interferences for the sample if passed all checks,
+    # Step 4: Compute match_isotopes for the sample if passed all checks,
     # Prepare data for match computation
     sample_pydantic = MatchComputeSample(
         sample_item_id=sample_item_id,
@@ -461,7 +460,7 @@ async def match_compute_sample(
         parent_id=parent_id,
         type="match_compute_sample",
         status="pending",
-        message=f"Computing match isotopes and interferences for sample '{sample_item_name}'.",
+        message=f"Computing match isotopes for sample '{sample_item_name}'.",
         # NOTE: Set the internal metadata for the pending user_notifications like
         # room_ids and sid of the user.
         # The _instrument_room is provided separately to skip the check if the user
@@ -485,7 +484,7 @@ async def match_compute_sample(
     # Aggregate and save higher-level matches if isotope-level matches were computed and saved
     if not match_data["match_isotopes"].empty:
         await aggregate_and_create_matches(sample_item_id=sample_item_id)
-        message = f"Match isotopes and interferences computed for sample '{sample_item_name}'."
+        message = f"Match isotopes computed for sample '{sample_item_name}'."
     else:
         message = f"No matches found for sample '{sample_item_name}'."
 
@@ -566,7 +565,7 @@ async def match_compute_samples(
         *_,
     ) = await fetch_affected_sample_data(sample_item_ids=sample_item_ids)
     return {
-        "message": f"Match isotopes and interferences computed for {len(sample_item_ids)} samples.",
+        "message": f"Match isotopes computed for {len(sample_item_ids)} samples.",
         "_notification_data": {
             "affected_sample_item_ids": affected_sample_item_ids,
             "affected_sample_batch_ids": affected_sample_batch_ids,
@@ -845,6 +844,9 @@ async def rematch_batch(
     :return: _description_
     :rtype: _type_
     """
+    from time import time
+
+    t0 = time()
     # Step 1: Retrieve batch data.
     async with async_session() as session:
         sample_batch = await session.get(SampleBatch, sample_batch_id)
@@ -916,7 +918,6 @@ async def rematch_batch(
             # Remove match_collections and match_samples to overwrite the aggregates
             await remove_matches(
                 sample_batch_id=sample_batch_id,
-                match_interferences=False,
                 match_isotopes=False,
                 match_ions=False,
             )
@@ -968,6 +969,10 @@ async def rematch_batch(
         if compute_result
         else f"Sample batch '{sample_batch_name}' was rematched."
     )
+    t1 = time()
+    runtime.logger.warning(
+        f"--- rematch_batch {sample_batch_id} done in {t1 - t0} seconds"
+    )
     return {
         "data": sample_batch.to_dict(),
         "message": message,
@@ -992,14 +997,14 @@ async def match_remove_batch(
     """
     Removes matches associated with a sample batch, optionally filtering by removed target compounds or ionization mechanisms.
 
-    This function deletes matches (and associated match interferences) for a given sample batch. If removed target compound IDs or ionization
+    This function deletes matches for a given sample batch. If removed target compound IDs or ionization
     mechanism IDs are provided, the function fetches associated target isotope IDs and deletes matches specific to these isotopes.
     If no filters are provided, all matches for the batch are deleted.
 
     Steps:
     1. Retrieve batch data
     2. Determine the target isotope IDs that are associated with the removed compounds or ionization mechanisms.
-    3. Execute the deletion of matches and associated interferences based on the identified target isotope IDs or remove all matches if no filters are applied.
+    3. Execute the deletion of matches based on the identified target isotope IDs or remove all matches if no filters are applied.
 
     :param sample_batch_id: ID of the sample batch for which matches are to be removed.
     :type sample_batch_id: str
@@ -1080,11 +1085,11 @@ async def match_compute_batch(
     Steps:
     1. Retrieve all samples associated with the given sample batch.
     2. Fetch target isotopes required for match computation using the helper function `fetch_batch_target_isotopes_for_match_compute`.
-    3. Filter out isotopes that already have matches or interferences to focus on new match computations.
+    3. Filter out isotopes that already have matches to focus on new match computations.
     4. Process each sample in the batch:
        - Gather sample-specific information.
        - Ensure m/z calibration is verified.
-       - Compute matches for isotopes and interferences.
+       - Compute matches for isotopes.
     5. Aggregate and save higher-level matches (ions, compounds, collections, samples) for the entire batch based on the computed isotope matches.
     6. If any sample fails to compute matches, raise a warning with details on the failed samples.
     7. Return the computed match data for the batch along with a success message.
@@ -1118,7 +1123,7 @@ async def match_compute_batch(
     sample_batch_name = sample_batch.sample_batch_name
 
     runtime.logger.info(
-        f"...Computing match isotopes and interferences for sample batch '{sample_batch_name}' with ID '{sample_batch_id}' ..."
+        f"...Computing match isotopes for sample batch '{sample_batch_name}' with ID '{sample_batch_id}' ..."
     )
 
     # Step 3: Identify target isotopes for computation.
@@ -1156,7 +1161,7 @@ async def match_compute_batch(
             parent_id=parent_id,
             type="match_compute_batch",
             status="pending",
-            message=f"Computing match isotopes and interferences for sample batch '{sample_batch_name}'.",
+            message=f"Computing match isotopes for sample batch '{sample_batch_name}'.",
             # NOTE: Set the internal metadata for the pending user_notifications like
             # room_ids and sid of the user.
             # Internal metadata will be cleaned up the from data in send_progress_user_notification.
@@ -1171,7 +1176,7 @@ async def match_compute_batch(
 
         try:
             runtime.logger.info(
-                f"...Computing match isotopes and interferences for sample '{sample.sample_item_name}' with ID {sample.sample_item_id} ..."
+                f"...Computing match isotopes for sample '{sample.sample_item_name}' with ID {sample.sample_item_id} ..."
             )
             # Gather sample information
             # Check if 'verified' exists in mz_calibration. If not, provide a default value of False
@@ -1203,7 +1208,7 @@ async def match_compute_batch(
                     warning_message, {"sample_item_id": sample.sample_item_id}
                 )
 
-            # Filter existing matches and match interferences for the target isotopes
+            # Filter existing matches for the target isotopes
             filtered_target_isotopes_df = (
                 await filter_existing_sample_match_isotope_data(
                     polarity_filtered_isotopes_df, sample.sample_item_id
@@ -1212,12 +1217,12 @@ async def match_compute_batch(
 
             # Skip computation if no new target isotopes are found for this sample item
             if filtered_target_isotopes_df.empty:
-                warning_message = f"No new target isotopes to compute match isotopes and interferences for sample '{sample.sample_item_name}'."
+                warning_message = f"No new target isotopes to compute match isotopes for sample '{sample.sample_item_name}'."
                 raise_api_warning(
                     warning_message, {"sample_item_id": sample.sample_item_id}
                 )
 
-            # Step 5: Compute and save match_isotopes and match_interferences for the sample items that passed all checks,
+            # Step 5: Compute and save match_isotopes for the sample items that passed all checks,
             # where new target isotopes are identified, m/z calibration is verified.
             match_data = await compute_and_create_sample_match_isotope_data(
                 sample_pydantic, filtered_target_isotopes_df, notification
@@ -1242,14 +1247,14 @@ async def match_compute_batch(
                 }
             )
     # Step 6: Aggregate and save match_ions, match_compounds, match_collections and match_samples
-    # for the sample batch based on  computed and saved match_isotopes and match_interferences
+    # for the sample batch based on  computed and saved match_isotopes
     await aggregate_and_create_matches(sample_batch_id=sample_batch_id)
 
     await update_sample_modified_timestamps(sample_batch_ids=[sample_batch_id])
 
     # Step 7: If there are any failed samples, raise warning with the list of failed samples included in the error message
     if samples_compute_failed:
-        user_message = f"Failed to compute match isotopes and interferences for {len(samples_compute_failed)} sample{'s' if len(samples_compute_failed) != 1 else ''} in sample batch '{sample_batch_name}'."
+        user_message = f"Failed to compute match isotopes for {len(samples_compute_failed)} sample{'s' if len(samples_compute_failed) != 1 else ''} in sample batch '{sample_batch_name}'."
         raise_api_warning(
             user_message,
             {
@@ -1259,7 +1264,7 @@ async def match_compute_batch(
         )
 
     # Step 8: Return sample batch data and message
-    message = f"Match isotopes and interferences computed for sample batch '{sample_batch_name}'."
+    message = f"Match isotopes computed for sample batch '{sample_batch_name}'."
     if samples_with_matches:
         match_count = len(samples_with_matches)
         match_message = (
@@ -1287,10 +1292,6 @@ async def match_remove_all():
     """
     counts = {}
     async with async_session() as session:
-        # Deleting match interferences and counting deleted records
-        result = await session.execute(delete(MatchInterference))
-        counts["match_interferences"] = result.rowcount
-
         # Deleting match isotopes
         result = await session.execute(delete(MatchIsotope))
         counts["match_isotopes"] = result.rowcount

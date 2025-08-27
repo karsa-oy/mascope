@@ -53,7 +53,6 @@ async def aggregate_batch_match_isotope_filtered_data_route(
         sample_batch_id=sample_batch_id,
         target_ion_id=body.target_ion_id,
         match_params=body.match_params,
-        include_match_interference=body.include_match_interference,
     )
     if not data.empty:
         data_dict = data.to_dict("records")

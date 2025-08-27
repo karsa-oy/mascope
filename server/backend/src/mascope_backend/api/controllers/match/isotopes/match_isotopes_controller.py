@@ -236,7 +236,7 @@ async def create_match_isotopes(
     target_isotope_ids = [mi.target_isotope_id for mi in match_isotopes]
 
     async with async_session() as session:
-        # Step 1: Check for existing match interferences to avoid duplication.
+        # Step 1: Check for existing matches to avoid duplication.
         stmt = select(MatchIsotope).where(
             and_(
                 MatchIsotope.sample_item_id == sample_item_id,

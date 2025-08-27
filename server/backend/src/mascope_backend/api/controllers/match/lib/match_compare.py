@@ -33,12 +33,6 @@ def compare_match_samples(samples_data: list, match_samples: list) -> list:
                     mismatches.append(
                         f"sample_peak_intensity_sum: {sample.get('sample_peak_intensity_sum')} != {match_sample.get('sample_peak_intensity_sum')}"
                     )
-                if sample.get("sample_peak_interference_sum") != match_sample.get(
-                    "sample_peak_interference_sum"
-                ):
-                    mismatches.append(
-                        f"sample_peak_interference_sum: {sample.get('sample_peak_interference_sum')} != {match_sample.get('sample_peak_interference_sum')}"
-                    )
 
                 # Log warnings if mismatches are found
                 if mismatches:

@@ -314,7 +314,7 @@ def get_sample_batch_data(
 
     This function interacts with the Mascope API to fetch comprehensive data
     for a given sample batch. It retrieves data for samples and combined match/targets data
-    for compounds, ions, isotopes and interferences (included to isotopes).
+    for compounds, ions and isotopes
 
     :param mascope_url: The base URL of the Mascope instance.
     :type mascope_url: str
@@ -328,7 +328,7 @@ def get_sample_batch_data(
              - `samples`: A list of samples within the batch. Combination of samples (sample_item + sample_file) and match_samples
              - `compounds`: Data for compounds. Combination of match_compounds and target_compounds
              - `ions`: Data for ions. Combination of match_ions and target_ions
-             - `isotopes`: Data for isotopes. Combination of match_isotopes, match_interferences, and target_isotopes
+             - `isotopes`: Data for isotopes. Combination of match_isotopes, and target_isotopes
              Returns an empty dictionary if the request fails or no data is found.
     :rtype: dict
     """

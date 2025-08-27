@@ -9,9 +9,6 @@ from mascope_backend.api.controllers.target.lib.fetch.target_fetch import (
 from mascope_backend.api.controllers.match.isotopes.match_isotopes_controller import (
     delete_match_isotopes,
 )
-from mascope_backend.api.controllers.match.interferences.match_interferences_controller import (
-    delete_match_interferences,
-)
 from mascope_backend.api.controllers.match.ions.match_ions_controller import (
     delete_match_ions,
 )
@@ -34,7 +31,6 @@ async def remove_matches(
     sample_batch_id: Optional[str] = None,
     removed_target_compound_ids: Optional[List[str]] = None,
     removed_ionization_mechanism_ids: Optional[List[str]] = None,
-    match_interferences: Optional[bool] = True,
     match_isotopes: Optional[bool] = True,
     match_ions: Optional[bool] = True,
     match_compounds: Optional[bool] = True,
@@ -76,15 +72,6 @@ async def remove_matches(
     # List of operations including function references, description, and a dictionary of parameters
     delete_operations = []
     descriptions = []
-    if match_interferences:
-        delete_operations.append(
-            (
-                delete_match_interferences,
-                "match_interferences",
-                {"target_isotope_ids": targets["target_isotope_ids"]},
-            )
-        )
-        descriptions.append("match_interferences")
     if match_isotopes:
         delete_operations.append(
             (

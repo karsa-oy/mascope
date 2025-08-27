@@ -498,7 +498,7 @@ async def copy_sample_items(
     TODO_api_circular_import  distinguish sample and sample_item controller, should be moved to samples_controller.py?
     The function copies the specified sample item and associates the new copy with a specified sample batch.
     May be a part of the copy sample batch operation or independent.
-    Copies matches, match interferences of the original sample if part of a larger copy batch operation
+    Copies matches of the original sample if part of a larger copy batch operation
     or if it is copied to the same batch, since targets and ionization mechanisms are the same for original batch and new batch.
     Computes matches if it's an independent operation and target and original batch differ,
     since the targets and ionization mechanisms may differ between original batch and new batch.

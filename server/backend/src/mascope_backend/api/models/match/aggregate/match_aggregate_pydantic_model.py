@@ -17,9 +17,6 @@ class AggregateMatchIsotopeFilteredDataBody(BaseModel):
         None,
         description="Ion-specific filter parameters, used for match_score and sample_peak_intensity filtering, setting match_category",
     )
-    include_match_interference: bool = Field(
-        True, description="Include match interference data in the response"
-    )
 
 
 class AggregateSampleMatchIonBody(BaseModel):

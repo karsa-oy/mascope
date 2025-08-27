@@ -1,5 +1,4 @@
 from mascope_match.compute.isotopes import compute_match_isotopes
-from mascope_match.compute.interferences import compute_match_interferences
 from mascope_match.params import (
     ORBI_FITTING_THRESHOLD,
     TOF_FITTING_THRESHOLD,
@@ -7,7 +6,6 @@ from mascope_match.params import (
 
 __all__ = [
     "compute_match_isotopes",
-    "compute_match_interferences",
     "ORBI_FITTING_THRESHOLD",
     "TOF_FITTING_THRESHOLD",
 ]

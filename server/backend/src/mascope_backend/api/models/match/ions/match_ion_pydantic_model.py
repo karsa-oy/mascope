@@ -14,9 +14,6 @@ class MatchIonBase(BaseModel):
     sample_peak_intensity_sum: float = Field(
         ..., description="Intensity of the sample peak"
     )
-    sample_peak_interference_sum: float = Field(
-        ..., description="Interference of the sample peak"
-    )
 
 
 class GetMatchIonsQueryParams(QueryParamsModel):

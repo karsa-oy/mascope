@@ -16,7 +16,6 @@ from mascope_backend.db.models import (
     TargetIon,
     IonizationMechanism,
     TargetIsotope,
-    MatchInterference,
     TargetCompoundInTargetCollection,
     TargetCollection,
     TargetCollectionInSampleBatch,
@@ -77,7 +76,6 @@ async def aggregate_match_isotope_filtered_data(
     sample_item_id: str = None,
     target_ion_id: str = None,
     match_params: BaseMatchParams = None,
-    include_match_interference: bool = True,
 ) -> pd.DataFrame:
     async with async_session() as session:
         # Step 1: Verify existence of the entities and fetch required data
@@ -251,40 +249,6 @@ async def aggregate_match_isotope_filtered_data(
             )
             return match_isotopes_df
 
-        # Step 4: Optionally include match interference data.if the flag is true
-        if include_match_interference:
-            match_interference_query = (
-                select(
-                    MatchInterference.sample_peak_interference,
-                    MatchInterference.sample_item_id,
-                    MatchInterference.target_isotope_id,
-                )
-                .select_from(MatchInterference)
-                .where(
-                    and_(
-                        MatchInterference.sample_item_id.in_(sample_item_ids),
-                        MatchInterference.target_isotope_id.in_(target_isotope_ids),
-                    )
-                )
-            )
-
-            match_interference_result = await session.execute(match_interference_query)
-            match_interference_df = pd.DataFrame(match_interference_result.fetchall())
-
-            if match_interference_df.empty:
-                runtime.logger.info(
-                    f"No match interference found for the sample batch '{sample_batch.sample_batch_name}'"
-                )
-                return match_interference_df
-
-            # Merge interference data into the match_isotopes DataFrame
-            match_isotopes_df = pd.merge(
-                match_isotopes_df,
-                match_interference_df,
-                on=["sample_item_id", "target_isotope_id"],
-                how="left",
-            )
-
         # Merge DataFrames
         combined_sample_match_isotopes_df = pd.merge(
             match_isotopes_df, samples_df, on="sample_item_id", how="inner"
@@ -328,8 +292,6 @@ async def aggregate_match_isotope_filtered_data(
             "sample_peak_tof",
             "match_score",
         ]
-        if include_match_interference:
-            column_order.append("sample_peak_interference")
 
         # Reorder the columns according to the defined order and sort the DataFrame by 'mz'
         aggregated_sample_match_isotope_data_df = (
@@ -582,7 +544,6 @@ async def aggregate_and_recreate_matches(
     await remove_matches(
         sample_item_id=sample_item_id,
         sample_batch_id=sample_batch_id,
-        match_interferences=False,
         match_isotopes=False,
         match_ions=match_ions,
         match_compounds=match_compounds,

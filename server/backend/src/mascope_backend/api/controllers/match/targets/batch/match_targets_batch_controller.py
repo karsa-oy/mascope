@@ -21,9 +21,6 @@ from mascope_backend.api.controllers.match.ions.match_ions_controller import (
 from mascope_backend.api.controllers.match.isotopes.match_isotopes_controller import (
     get_match_isotopes,
 )
-from mascope_backend.api.controllers.match.interferences.match_interferences_controller import (
-    get_match_interferences,
-)
 from mascope_backend.api.controllers.target.collections.target_collections_controller import (
     get_target_collections,
 )
@@ -47,7 +44,7 @@ async def get_batch_data(
     Retrieve detailed data for all samples in a batch, including compounds, ions, and isotopes.
 
     This function fetches all samples in a batch and retrieves combined data for
-    compounds, ions, isotopes, match interferences, and samples, optionally applying deduplication
+    compounds, ions, isotopes, and samples, optionally applying deduplication
     based on collection priority.
 
     This function is used in the `mascope_sdk` library, serving as a wrapper for Jupyter
@@ -56,9 +53,8 @@ async def get_batch_data(
     Steps:
     1. Fetch the sample batch using the provided sample batch ID.
     2. Fetch all the samples within the batch.
-    3. Retrieve samples and targets joined with match data - compounds, ions, isotopes and interferences for the batch.
-    4. Merge match interference data into the match isotopes.
-    5. Combine all match data and prepare a structured response.
+    3. Retrieve samples and targets joined with match data - compounds, ions, isotopes for the batch.
+    4. Combine all match data and prepare a structured response.
 
     :param sample_batch_id: Unique identifier of the sample batch.
     :type sample_batch_id: str
@@ -92,7 +88,7 @@ async def get_batch_data(
                     "samples": [],  # combination of samples (sample_item + sample_file) and match_samples
                     "compounds": [],  # combination of match_compounds and target_compounds
                     "ions": [],  # combination of match_ions and target_ions
-                    "isotopes": [],  # combination of match_isotopes, match_interferences, and target_isotopes
+                    "isotopes": [],  # combination of match_isotopes and target_isotopes
                 },
             }
 
@@ -116,32 +112,11 @@ async def get_batch_data(
         )
         isotopes = match_isotopes_result.get("data", [])
 
-        match_interferences_result = await get_match_interferences(
-            sample_batch_id=sample_batch_id
-        )
-        match_interferences = match_interferences_result.get("data", [])
-
-        # Step 4: Merge sample_peak_interference into isotopes
-        # Create a mapping from (sample_item_id, target_isotope_id) to sample_peak_interference
-        match_interferences_dict = {
-            (
-                interference["sample_item_id"],
-                interference["target_isotope_id"],
-            ): interference["sample_peak_interference"]
-            for interference in match_interferences
-        }
-
-        # Update isotopes with sample_peak_interference
-        for isotope in isotopes:
-            key = (isotope["sample_item_id"], isotope["target_isotope_id"])
-            sample_peak_interference = match_interferences_dict.get(key, None)
-            isotope["sample_peak_interference"] = sample_peak_interference
-
-        # Step 5: Add sample_batch_name to each sample
+        # Add sample_batch_name to each sample
         for sample in samples:
             sample["sample_batch_name"] = sample_batch.sample_batch_name
 
-        # Step 6: Prepare the final output
+        # Step 4: Prepare the final output
         message = f"Successfully retrieved data for sample batch '{sample_batch.sample_batch_name}'."
 
         return {
@@ -206,7 +181,6 @@ async def get_match_batch_collections(
                     "match_score": None,
                     "match_category": None,
                     "sample_peak_intensity_sum": None,
-                    "sample_peak_interference_sum": None,
                     "match_collection_utc_created": None,
                     "match_collection_utc_modified": None,
                 },
@@ -283,7 +257,6 @@ async def get_match_batch_compounds(
                     "match_score": None,
                     "match_category": None,
                     "sample_peak_intensity_sum": None,
-                    "sample_peak_interference_sum": None,
                     "match_compound_utc_created": None,
                     "match_compound_utc_modified": None,
                 },
@@ -367,7 +340,6 @@ async def get_match_batch_ions(
                     "match_score": None,
                     "match_category": None,
                     "sample_peak_intensity_sum": None,
-                    "sample_peak_interference_sum": None,
                     "match_ion_utc_created": None,
                     "match_ion_utc_modified": None,
                 },
@@ -440,14 +412,10 @@ async def get_match_batch_isotopes(
 
     #  Placeholder for match batch aggregation logic
 
-    # Fetch match isotopes and interferences for the sample item
+    # Fetch match isotopes for the sample item
     # match_isotopes = await get_match_isotopes(sample_item_id=sample_item_id)
-    # match_interferences = await get_match_interferences(sample_item_id=sample_item_id)
     match_isotopes_data = {
         # item["target_isotope_id"]: item for item in match_isotopes["data"]
-    }
-    match_interferences_data = {
-        # item["target_isotope_id"]: item for item in match_interferences["data"]
     }
 
     # Merge target isotopes with match isotopes data
@@ -461,13 +429,6 @@ async def get_match_batch_isotopes(
             },
         )
         isotope.update(match_isotope_data)
-        match_interference_data = match_interferences_data.get(
-            isotope["target_isotope_id"],
-            {
-                "sample_peak_interference": None,
-            },
-        )
-        isotope.update(match_interference_data)
         match_batch_isotopes.append(isotope)
 
     # Sorting and pagination logic

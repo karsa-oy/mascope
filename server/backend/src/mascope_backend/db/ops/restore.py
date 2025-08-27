@@ -243,7 +243,7 @@ def delete_orphaned_records(conn, table_name):
                 f"🗑️ Deleted {deleted_count} orphaned sample_item records with missing corresponding sample_file references."
             )
 
-    elif table_name in ["match", "match_isotope", "match_interference"]:
+    elif table_name in ["match", "match_isotope"]:
         cursor.execute(
             f"""
             DELETE FROM {table_name}

@@ -37,9 +37,6 @@ from mascope_backend.api.routes.match.collections.match_collections_routes impor
 from mascope_backend.api.routes.match.compounds.match_compounds_routes import (
     match_compounds_router,
 )
-from mascope_backend.api.routes.match.interferences.match_interferences_routes import (
-    match_interferences_router,
-)
 from mascope_backend.api.routes.match.ions.match_ions_routes import match_ions_router
 from mascope_backend.api.routes.match.isotopes.match_isotopes_routes import (
     match_isotopes_router,
@@ -124,7 +121,6 @@ routers = [
     match_compounds_router,
     match_ions_router,
     match_rating_router,
-    match_interferences_router,
     match_isotopes_router,
     visualization_router,
     temp_router,

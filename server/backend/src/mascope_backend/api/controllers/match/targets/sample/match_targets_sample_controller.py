@@ -36,9 +36,6 @@ from mascope_backend.api.controllers.match.ions.match_ions_controller import (
 from mascope_backend.api.controllers.match.isotopes.match_isotopes_controller import (
     get_match_isotopes,
 )
-from mascope_backend.api.controllers.match.interferences.match_interferences_controller import (
-    get_match_interferences,
-)
 from mascope_backend.api.new.match.params import apply_match_params
 from mascope_backend.api.controllers.match.lib.match_util import (
     deduplicate_match_df,
@@ -115,7 +112,6 @@ async def get_match_sample_collections(
                     "match_score": None,
                     "match_category": None,
                     "sample_peak_intensity_sum": None,
-                    "sample_peak_interference_sum": None,
                     "match_collection_utc_created": None,
                     "match_collection_utc_modified": None,
                 },
@@ -218,7 +214,6 @@ async def get_match_sample_compounds(
                     "match_score": None,
                     "match_category": None,
                     "sample_peak_intensity_sum": None,
-                    "sample_peak_interference_sum": None,
                     "match_compound_utc_created": None,
                     "match_compound_utc_modified": None,
                 },
@@ -334,7 +329,6 @@ async def get_match_sample_ions(
                     "match_score": None,
                     "match_category": None,
                     "sample_peak_intensity_sum": None,
-                    "sample_peak_interference_sum": None,
                     "match_ion_utc_created": None,
                     "match_ion_utc_modified": None,
                 },
@@ -375,7 +369,7 @@ async def get_match_sample_isotopes(
     limit: int = 10000,
 ) -> dict:
     """
-    Retrieves a list of sample target isotopes joined with match isotope and interference data for a given sample item ID,
+    Retrieves a list of sample target isotopes joined with match isotope data for a given sample item ID,
     and allows sorting and pagination of the results. All data manipulation is handled within DataFrames and that NaNs
     and NaTs are replaced with None for JSON serialization.
 
@@ -383,8 +377,8 @@ async def get_match_sample_isotopes(
     1. Retrieve the sample item data, including batch ID, sample name, and instrument.
     2. Fetch target isotopes based on the filter parameters including batch, ion, and collection IDs.
     3. If no target isotopes are found, return a response indicating no data.
-    4. Fetch matched isotopes and interference data based on the sample item ID.
-    5. Merge target isotope data with matched isotopes and interference data.
+    4. Fetch matched isotopes based on the sample item ID.
+    5. Merge target isotope data with matched isotopes.
     6. Add sample instrument data to each merged record.
     7. Apply filtering parameters to adjust the match score and categorize match data.
     8. Sort the filtered DataFrame based on 'target_collection_id', 'match_category', and 'match_score', handling NaNs appropriately.
@@ -435,14 +429,10 @@ async def get_match_sample_isotopes(
             "message": f"No target isotopes found for sample '{sample_item_name}'.",
             "data": [],
         }
-    # Fetch match isotopes and interferences for the sample item
+    # Fetch match isotopes for the sample item
     match_isotopes = await get_match_isotopes(sample_item_id=sample_item_id)
-    match_interferences = await get_match_interferences(sample_item_id=sample_item_id)
     match_isotopes_data = {
         item["target_isotope_id"]: item for item in match_isotopes["data"]
-    }
-    match_interferences_data = {
-        item["target_isotope_id"]: item for item in match_interferences["data"]
     }
 
     # Merge target isotopes with match isotopes data
@@ -467,13 +457,6 @@ async def get_match_sample_isotopes(
             },
         )
         isotope.update(match_isotope_data)
-        match_interference_data = match_interferences_data.get(
-            isotope["target_isotope_id"],
-            {
-                "sample_peak_interference": None,
-            },
-        )
-        isotope.update(match_interference_data)
         # Add instrument data to each record for filtering logic
         isotope["instrument"] = instrument
         match_sample_isotopes.append(isotope)
