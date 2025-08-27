@@ -137,6 +137,12 @@ async def test_target_compounds_by_composition(
                 target_compound_formula="C10H16",
                 cas_number="80-56-8",
             ),
+            TargetCompound(
+                target_compound_id="target-compound-by-composition-5",
+                target_compound_name="Nitric acid dimer",
+                target_compound_formula="(HNO3)2",
+                cas_number=None,
+            ),
         ]
         for target_compound in target_compounds:
             session.add(target_compound)

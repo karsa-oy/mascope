@@ -13,6 +13,7 @@ from mascope_backend.api.controllers.target.ions.target_ions_controller import (
 from test_target_ions_compute import (
     assert_target_ions,
     assert_target_isotopes,
+    assert_target_ion_formulae,
 )
 
 
@@ -42,6 +43,11 @@ async def test_create_target_ions_by_composition(
         created_ions = target_ions_data["created_ions"]
         assert isinstance(created_ions, list)
         assert_target_ions(
+            target_compound,
+            test_ionization_mechanisms,
+            [TargetIon(**ion) for ion in created_ions],
+        )
+        assert_target_ion_formulae(
             target_compound,
             test_ionization_mechanisms,
             [TargetIon(**ion) for ion in created_ions],

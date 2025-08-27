@@ -12,6 +12,8 @@ from mascope_backend.api.controllers.target.lib.compute.target_ions_compute impo
     generate_target_ions_from_mass,
 )
 
+from mascope_chem.molmass import Formula
+
 
 def assert_target_ions(
     target_compound: TargetCompound,
@@ -80,6 +82,55 @@ def assert_target_ions(
             assert len(target_ions) == len(ionization_mechanisms) - skipped_mechanisms
         else:
             raise
+
+
+def assert_target_ion_formulae(
+    target_compound: TargetCompound,
+    ionization_mechanisms: list[IonizationMechanism],
+    target_ions: list[TargetIon],
+) -> None:
+    """Assert that target ions have the correct formulas based on the target compound and ionization mechanisms.
+
+    :param target_compound: The target compound for which ions were generated.
+    :type target_compound: TargetCompound
+    :param ionization_mechanisms: List of ionization mechanisms used for generating target ions.
+    :type ionization_mechanisms: list[IonizationMechanism]
+    :param target_ions: List of target ions generated for the target compound.
+    :type target_ions: list[TargetIon]
+
+    :return: None
+    """
+    # Handle special case of null formula "()"
+    if target_compound.target_compound_formula == "()":
+        return
+    # Check that the target ions have the correct formulas
+    for ion in target_ions:
+        for im in ionization_mechanisms:
+            if im.ionization_mechanism_id == ion.ionization_mechanism_id:
+                if im.ionization_mechanism in ["+", "-"]:
+                    # For electron abstraction/addition, the formula remains unchanged
+                    assert (
+                        Formula(ion.target_ion_formula).formula
+                        == (Formula(target_compound.target_compound_formula)).formula
+                    )
+                elif im.ionization_mechanism.startswith("+"):
+                    # For adducts, the formula is modified by adding the adduct
+                    assert (
+                        Formula(ion.target_ion_formula).formula
+                        == (
+                            Formula(target_compound.target_compound_formula)
+                            + Formula(im.ionization_mechanism)
+                        ).formula
+                    )
+                elif im.ionization_mechanism.startswith("-"):
+                    # For abstraction, the formula is modified by removing the abstracted group
+                    assert (
+                        Formula(ion.target_ion_formula).formula
+                        == (
+                            Formula(target_compound.target_compound_formula)
+                            - Formula(im.ionization_mechanism)
+                        ).formula
+                    )
 
 
 def assert_target_isotopes(
