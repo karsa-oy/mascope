@@ -74,11 +74,15 @@ def generate_target_ions_from_composition(
             if mechanism.startswith("-"):
                 # Cannot abstract from empty formula
                 continue
+            compound_formula = target_compound_formula
+        else:
+            # parse the compound formula first, to properly handle parenthesis (e.g. (HNO3)2)
+            compound_formula = Formula(target_compound_formula).formula
         try:
             # get and save ions
             raw_ion = Formula(
                 "("
-                + target_compound_formula
+                + compound_formula
                 + mechanism[:-1]  # remove polarity sign before parenthesis
                 + ")"
                 + mechanism[-1]  # add polarity sign at the end
