@@ -1,6 +1,7 @@
 """Based on https://github.com/cheminfo/chemcalc"""
 
 import warnings
+from typing import Any
 import pandas as pd
 import polars as pl
 import numpy as np
@@ -73,21 +74,17 @@ def assign_compositions(
         )
 
         if comp_results:
-            results, log_messages = apply_heuristic_rules(
+            candidates, log_messages = apply_heuristic_rules(
                 comp_results, params=heuristic_params
             )
             mass_log_messages[mz] = log_messages
             # Fast path: if nothing survives heuristics, avoid isotopic work
-            if results:
-                (
-                    results,
-                    composition_isotope_mzs,
-                    composition_isotope_mz_errors_ppm,
-                    isotope_labels,
-                ) = match_isotopic_pattern(results, peaks)
+            if candidates:
+                candidates, matched_isotopes = match_isotopic_pattern(candidates, peaks)
+                isotope_mzs = matched_isotopes.get("masses", np.array([]))
             else:
-                composition_isotope_mzs = np.array([])
-            if not results:
+                isotope_mzs = np.array([])
+            if not candidates:
                 # No valid result for this peak
                 results_per_peak.append(
                     {
@@ -97,10 +94,9 @@ def assign_compositions(
                     }
                 )
                 continue
-            main_result = results[0].copy()
+            main_result = candidates[0].copy()
             main_result["mz"] = mz
             main_result["formula"] = main_result.get("formula", "Undefined")
-            main_result["isotope_label"] = "M0"
             main_result["other_candidates"] = all_candidates
             results_per_peak.append(main_result)
         else:
@@ -112,15 +108,35 @@ def assign_compositions(
                     "other_candidates": "",
                 }
             )
-            composition_isotope_mzs = np.array([])
+            isotope_mzs = np.array([])
 
         # Assign isotope peaks to the closest unassigned masses (if any were detected)
-        if composition_isotope_mzs.size > 1:
-            m0_mass = composition_isotope_mzs[0]
-            for iso_mz, iso_mz_error_ppm, iso_label in zip(
-                composition_isotope_mzs[1:],
-                composition_isotope_mz_errors_ppm[1:],
+        if isotope_mzs.size >= 1:
+            isotope_mz_errors_ppm = matched_isotopes["mass_errors_ppm"]
+            isotope_intensity_errors = matched_isotopes["intensity_errors"]
+            isotope_labels = matched_isotopes["labels"]
+            isotope_predicted_mzs = matched_isotopes["predicted_masses"]
+            isotope_predicted_intensities = matched_isotopes["predicted_intensities"]
+
+            m0_mass = isotope_mzs[0]
+            main_result["predicted_mz"] = isotope_predicted_mzs[0]
+            main_result["predicted_intensity"] = isotope_predicted_intensities[0]
+            main_result["isotope_label"] = "M0"
+
+            for (
+                iso_mz,
+                iso_mz_error_ppm,
+                iso_int_error,
+                iso_label,
+                iso_pred_mz,
+                iso_pred_int,
+            ) in zip(
+                isotope_mzs[1:],
+                isotope_mz_errors_ppm[1:],
+                isotope_intensity_errors[1:],
                 isotope_labels[1:],
+                isotope_predicted_mzs[1:],
+                isotope_predicted_intensities[1:],
             ):
                 if iso_mz == 0:
                     continue
@@ -132,18 +148,21 @@ def assign_compositions(
                 isotope_result = main_result.copy()
                 isotope_result["mz"] = iso_mz
                 isotope_result["isotope_label"] = iso_label
+                isotope_result["predicted_mz"] = iso_pred_mz
+                isotope_result["predicted_intensity"] = iso_pred_int
                 isotope_result["observed_mass"] = iso_mz
                 isotope_result["neutral_mass"] = isotope_result["neutral_mass"] + (
                     iso_mz - m0_mass
                 )
-                isotope_result["error_ppm"] = iso_mz_error_ppm
+                isotope_result["mz_error_ppm"] = iso_mz_error_ppm
+                isotope_result["intensity_error"] = iso_int_error
 
                 results_per_peak.append(isotope_result)
 
     return pd.DataFrame(results_per_peak), mass_log_messages
 
 
-def find_compositions(params: dict[str, str]) -> dict:
+def find_compositions(params: dict[str, Any]) -> dict:
     """Find molecular compositions based on given parameters.
 
     :param params: Dictionary containing search parameters.
@@ -162,8 +181,6 @@ def find_compositions(params: dict[str, str]) -> dict:
     :raises CompositionFinderException: If the target monoisotopic mass is not greater than 0.
     :return: A dictionary containing the results of the search.
     :rtype: dict
-    :yield: An iterator yielding dictionaries with molecular formula, mass, difference from target mass, and unsaturation.
-    :rtype: Iterator[dict]
     """
     # --- Build search context from parameters ---
     ctx = SearchContext()

@@ -12,6 +12,7 @@ from mascope_tools.composition.constants import (
     ISOTOPE_ABUNDANCE_THRESHOLD,
     ELECTRON_MASS,
     ISOTOPE_MATCHING_MZ_TOLERANCE_PPM,
+    ISOTOPE_MATCHING_INTENSITY_TOLERANCE,
     ISOTOPIC_PATTERN_THRESHOLD,
 )
 
@@ -158,7 +159,7 @@ def match_isotopic_pattern(
         candidates = candidates.with_columns(
             pl.lit(0.0, dtype=pl.Float64).alias("isotopic_pattern_score")
         )
-        return candidates.to_dicts(), np.array([])
+        return candidates.to_dicts(), {}
     # Keep only the most promising candidates for heavy work
     candidates = candidates.sort("error_ppm").head(ISOTOPE_CANDIDATE_LIMIT)
 
@@ -167,7 +168,7 @@ def match_isotopic_pattern(
         candidates = candidates.with_columns(
             pl.lit(1.0, dtype=pl.Float64).alias("isotopic_pattern_score")
         )
-        return candidates.to_dicts(), np.array([])
+        return candidates.to_dicts(), {}
 
     ion_formulas, ion_charges = _extract_formulae_and_charges(
         candidates.get_column("ion")
@@ -211,6 +212,15 @@ def match_isotopic_pattern(
         observed_masses = np.zeros_like(predicted_mzs)
         observed_mass_errors_ppm = np.zeros_like(predicted_mzs)
         observed_intensities = np.zeros_like(predicted_intensities)
+        observed_intensity_error = np.zeros_like(predicted_intensities)
+
+        # Normalize predicted intensities relative to monoisotopic (base) peak
+        if predicted_intensities[0] > 0:
+            predicted_rel = predicted_intensities / predicted_intensities[0]
+        else:
+            predicted_rel = predicted_intensities  # fallback (unlikely)
+
+        base_peak_intensity = None
 
         for i, p_mz in enumerate(predicted_mzs):
             mz_delta = p_mz * ISOTOPE_MATCHING_MZ_TOLERANCE_PPM * 1e-6
@@ -219,23 +229,55 @@ def match_isotopic_pattern(
             start_idx = np.searchsorted(mzs, mz_min, side="left")
             end_idx = np.searchsorted(mzs, mz_max, side="right")
 
-            if start_idx < end_idx:
-                # Take the intensity at the closest m/z in the window
-                window_mzs = mzs[start_idx:end_idx]
-                window_intensities = intensities[start_idx:end_idx]
-                if window_mzs.size:
-                    closest_idx = int(np.argmin(np.abs(window_mzs - p_mz)))
-                    observed_intensities[i] = window_intensities[closest_idx]
-                    observed_masses[i] = window_mzs[closest_idx]
-                    observed_mass_errors_ppm[i] = (
-                        abs(window_mzs[closest_idx] - p_mz) / p_mz * 1e6
-                    )
+            if start_idx >= end_idx:
+                continue  # no peaks in window
+
+            window_mzs = mzs[start_idx:end_idx]
+            window_intensities = intensities[start_idx:end_idx]
+            if not window_mzs.size:
+                continue
+
+            closest_idx = int(np.argmin(np.abs(window_mzs - p_mz)))
+            closest_mz = window_mzs[closest_idx]
+            closest_intensity = window_intensities[closest_idx]
+
+            if i == 0:
+                # Always accept monoisotopic match if any peak is within m/z tolerance
+                base_peak_intensity = (
+                    closest_intensity if closest_intensity > 0 else None
+                )
+                if base_peak_intensity is None:
+                    continue
+                observed_intensities[0] = closest_intensity
+                observed_masses[0] = closest_mz
+                observed_mass_errors_ppm[0] = abs(closest_mz - p_mz) / p_mz * 1e6
+                observed_intensity_error[0] = 0.0
+                continue  # move to next isotope
+
+            # Require monoisotopic established before evaluating higher isotopes
+            if base_peak_intensity is None or base_peak_intensity == 0:
+                continue
+
+            obs_rel = closest_intensity / base_peak_intensity
+            pred_rel = predicted_rel[i] if predicted_rel[i] > 0 else 0.0
+
+            # Absolute difference (already on comparable relative scale)
+            intensity_error = abs(obs_rel - pred_rel)
+
+            if intensity_error <= ISOTOPE_MATCHING_INTENSITY_TOLERANCE:
+                observed_intensities[i] = closest_intensity
+                observed_masses[i] = closest_mz
+                observed_mass_errors_ppm[i] = abs(closest_mz - p_mz) / p_mz * 1e6
+                observed_intensity_error[i] = intensity_error
 
         top_candidate_isotope_masses = np.array([])
         top_candidate_isotope_mass_errors = np.array([])
+        top_candidate_predicted_isotope_masses = np.array([])
+        top_candidate_predicted_isotope_intensities = np.array([])
+        top_candidate_isotope_intensity_errors = np.array([])
         # Require monoisotopic detection
         # If only M0 is detected, score stays 0.0
-        if observed_intensities[0] > 0 and np.sum(observed_intensities[1:]) > 0:
+        if observed_intensities[0] > 0:
             observed_intensities /= observed_intensities[0]
             if predicted_intensities[0] > 0:
                 predicted_intensities /= predicted_intensities[0]
@@ -250,17 +292,24 @@ def match_isotopic_pattern(
             ):
                 top_candidate_isotope_masses = observed_masses
                 top_candidate_isotope_mass_errors = observed_mass_errors_ppm
+                top_candidate_isotope_intensity_errors = observed_intensity_error
+                top_candidate_predicted_isotope_masses = predicted_mzs
+                top_candidate_predicted_isotope_intensities = predicted_rel
 
     candidates = candidates.with_columns(
         pl.Series(values=scores, name="isotopic_pattern_score")
     ).sort("isotopic_pattern_score", descending=True)
 
-    return (
-        candidates.to_dicts(),
-        top_candidate_isotope_masses,
-        top_candidate_isotope_mass_errors,
-        isotope_labels,
-    )
+    matched_isotopes = {
+        "masses": top_candidate_isotope_masses,
+        "mass_errors_ppm": top_candidate_isotope_mass_errors,
+        "intensity_errors": top_candidate_isotope_intensity_errors,
+        "labels": isotope_labels,
+        "predicted_masses": top_candidate_predicted_isotope_masses,
+        "predicted_intensities": top_candidate_predicted_isotope_intensities,
+    }
+
+    return candidates.to_dicts(), matched_isotopes
 
 
 def conf_to_label(conf, elements, isotope_masses):
