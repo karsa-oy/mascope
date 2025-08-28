@@ -75,6 +75,8 @@ def parse_composition(formula_string: str, multiplier: int = 1) -> Composition:
 
 def to_hill_order(elements: dict) -> str:
     """Convert a dictionary of elements to Hill notation string."""
+    # Filter out negative counts (can be if -H- is the ionization mechanism)
+    elements = {k: v for k, v in elements.items() if v >= 0}
     atomic_symbols = list(elements.keys())
     atomic_symbols.sort(key=lambda x: (0 if x == "C" else 1 if x == "H" else 2, x))
     formula = "".join(
