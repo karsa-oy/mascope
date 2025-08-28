@@ -844,9 +844,6 @@ async def rematch_batch(
     :return: _description_
     :rtype: _type_
     """
-    from time import time
-
-    t0 = time()
     # Step 1: Retrieve batch data.
     async with async_session() as session:
         sample_batch = await session.get(SampleBatch, sample_batch_id)
@@ -968,10 +965,6 @@ async def rematch_batch(
         compute_result.get("message", "")
         if compute_result
         else f"Sample batch '{sample_batch_name}' was rematched."
-    )
-    t1 = time()
-    runtime.logger.warning(
-        f"--- rematch_batch {sample_batch_id} done in {t1 - t0} seconds"
     )
     return {
         "data": sample_batch.to_dict(),
