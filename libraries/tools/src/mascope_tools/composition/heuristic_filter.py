@@ -13,57 +13,50 @@ from mascope_tools.composition.constants import (
     ELECTRON_MASS,
     ISOTOPE_MATCHING_MZ_TOLERANCE_PPM,
     ISOTOPE_MATCHING_INTENSITY_TOLERANCE,
-    ISOTOPIC_PATTERN_THRESHOLD,
 )
 
 # Limit isotopic matching to the most plausible candidates
 ISOTOPE_CANDIDATE_LIMIT = 64
 
 
-def rule_element_ratio(candidates: pl.DataFrame, **kwargs) -> pl.Series:
+def rule_element_ratio(
+    candidates: pl.DataFrame, **kwargs
+) -> tuple[pl.Series, list[str]]:
     log_messages = []
     params = kwargs.get("params", {})
-    if "elemental_ratio_range" in params:
-        element_ratio_range = params["elemental_ratio_range"]
-    else:
-        element_ratio_range = DEFAULT_ELEMENTAL_RATIO_RANGE
+    carbon_element_ratio_range = params.get(
+        "carbon_element_ratio_range", DEFAULT_ELEMENTAL_RATIO_RANGE
+    )
+    non_carbon_element_ratio_range = params.get("non_carbon_element_ratio_range", {})
 
-    """Elemental ratio constraints (e.g., H/C, N/C, O/C)."""
     formulas = candidates.get_column("formula").to_list()
-
     counts_list = [ParseFormula(f) for f in formulas]
-    counts = pl.DataFrame(counts_list).fill_null(0)
+    counts = pl.DataFrame(counts_list)
+    if "C" in counts.columns:
+        has_carbon = counts.get_column("C") > 0
+    else:
+        has_carbon = pl.Series([False] * counts.height)
 
-    # Start with all True
-    element_ratio_mask = pl.Series([True] * counts.height)
+    def apply_ratio_rules(ratio_range, mask_condition):
+        mask = pl.Series([True] * counts.height)
+        for ratio, (min_val, max_val) in ratio_range.items():
+            num, denom = ratio.split("/")
+            if num not in counts.columns or denom not in counts.columns:
+                continue
+            numerator = counts[num]
+            denominator = counts[denom]
+            ratio_val = numerator / denominator
+            ratio_val = ratio_val.fill_nan(float("nan"))
+            rule_mask = (ratio_val >= min_val) & (ratio_val <= max_val)
+            mask = mask & (mask_condition | rule_mask)
+        return mask
 
-    # Only apply ratio rules where carbon is present
-    if "C" not in counts.columns:
-        log_messages.append(
-            f"No carbon atoms found in {formulas}; element ratios were skipped."
-        )
-        return element_ratio_mask, log_messages
-
-    has_carbon = counts["C"] > 0
-
-    for ratio, (min_val, max_val) in element_ratio_range.items():
-        num, denom = ratio.split("/")
-        if num not in counts.columns or denom not in counts.columns:
-            continue  # Skip if ratio elements are not present
-        numerator = counts[num]
-        denominator = counts[denom]
-        # Avoid division by zero
-        ratio_val = numerator / denominator
-        ratio_val = ratio_val.fill_nan(float("nan"))
-        # Only update mask for formulas with carbon
-        mask = (ratio_val >= min_val) & (ratio_val <= max_val)
-        element_ratio_mask = element_ratio_mask & (~has_carbon | mask)
-
-    no_carbon_count = (~has_carbon).sum()
-    if no_carbon_count > 0:
-        log_messages.append(
-            f"{no_carbon_count} formulas have zero carbon atoms; element ratios were skipped for these."
-        )
+    # Apply carbon ratios where C > 0
+    mask_carbon = apply_ratio_rules(carbon_element_ratio_range, ~has_carbon)
+    # Apply non-carbon ratios where C == 0
+    mask_non_carbon = apply_ratio_rules(non_carbon_element_ratio_range, has_carbon)
+    # Combine both masks
+    element_ratio_mask = mask_carbon & mask_non_carbon
 
     return element_ratio_mask, log_messages
 
@@ -141,116 +134,98 @@ def apply_heuristic_rules(
 
 def match_isotopic_pattern(
     candidates: list[dict[str, Any]], peaks: pl.DataFrame
-) -> tuple[list[dict[str, Any]], np.ndarray, np.ndarray, list[str]]:
+) -> tuple[list[dict[str, Any]], list[dict[str, np.ndarray | list[str]]]]:
     """Matches isotopic patterns against candidates.
 
     :param candidates: List of candidate formula dicts.
     :type candidates: list[dict[str, Any]]
     :param peaks: Sorted dataframe of peaks with 'mz' and 'intensity' columns.
     :type peaks: pl.DataFrame
-    :return: Tuple of filtered candidates, their corresponding isotope masses, isotope mass errors, and isotope labels.
-    :rtype: tuple[list[dict[str, Any]], np.ndarray, np.ndarray, list[str]]
+    :return: Tuple of filtered candidates, and a list of isotope data dicts (per candidate).
+    :rtype: tuple[list[dict[str, Any]], list[dict[str, np.ndarray | list[str]]]]
     """
     mzs = peaks["mz"].to_numpy()
     intensities = peaks["intensity"].to_numpy()
 
-    candidates = pl.DataFrame(candidates)
-    if candidates.is_empty():
-        candidates = candidates.with_columns(
+    candidates_df = pl.DataFrame(candidates)
+    if candidates_df.is_empty():
+        candidates_df = candidates_df.with_columns(
             pl.lit(0.0, dtype=pl.Float64).alias("isotopic_pattern_score")
         )
-        return candidates.to_dicts(), {}
+        return candidates_df.to_dicts(), []
+
     # Keep only the most promising candidates for heavy work
-    candidates = candidates.sort("error_ppm").head(ISOTOPE_CANDIDATE_LIMIT)
-
-    # If ionization peak: skip isotopic matching and return score 1.0
-    if "Ionization peak" in candidates.get_column("formula").to_list():
-        candidates = candidates.with_columns(
-            pl.lit(1.0, dtype=pl.Float64).alias("isotopic_pattern_score")
-        )
-        return candidates.to_dicts(), {}
-
-    ion_formulas, ion_charges = _extract_formulae_and_charges(
-        candidates.get_column("ion")
+    candidates_df = candidates_df.sort("composition_error_ppm").head(
+        ISOTOPE_CANDIDATE_LIMIT
     )
 
-    scores = np.zeros(candidates.height, dtype=float)
-    isotope_labels = []
+    # If ionization peak: skip isotopic matching and return score 1.0
+    if "Ionization peak" in candidates_df.get_column("formula").to_list():
+        candidates_df = candidates_df.with_columns(
+            pl.lit(1.0, dtype=pl.Float64).alias("isotopic_pattern_score")
+        )
+        return candidates_df.to_dicts(), []
+
+    ion_formulas, ion_charges = _extract_formulae_and_charges(
+        candidates_df.get_column("ion")
+    )
+
+    scores = np.zeros(candidates_df.height, dtype=float)
+    all_isotope_data = []
 
     for ind, (ion_formula, ion_charge) in enumerate(zip(ion_formulas, ion_charges)):
-        if not ion_formula:
-            continue
-        try:
-            predicted_peaks = IsoThreshold(
-                formula=ion_formula,
-                threshold=ISOTOPE_ABUNDANCE_THRESHOLD,
-                get_confs=True,
-            )
-            masses_t = predicted_peaks.masses
-            probs_t = predicted_peaks.probs
-
-            if not masses_t:
-                continue
-
-            predicted_masses_neutral = np.fromiter(masses_t, dtype=float)
-            predicted_intensities = np.fromiter(probs_t, dtype=float)
-
-            formula_dict = ParseFormula(ion_formula)
-            elements = list(formula_dict.keys())
-            isotope_masses = [PeriodicTbl.symbol_to_masses[el] for el in elements]
-            isotope_labels = [
-                conf_to_label(conf, elements, isotope_masses)
-                for conf in predicted_peaks.confs
-            ]
-        except Exception:
-            continue
-
-        predicted_mzs = (predicted_masses_neutral - ELECTRON_MASS * ion_charge) / abs(
-            ion_charge
+        predicted_mzs, predicted_intensities, isotope_labels = predict_isotopes(
+            ion_formula, ion_charge
         )
+        is_isotope_predicted = len(predicted_mzs) > 0
+        if not is_isotope_predicted:
+            all_isotope_data.append(
+                {
+                    "masses": [],
+                    "mass_errors_ppm": [],
+                    "intensity_errors": [],
+                    "labels": [],
+                    "predicted_masses": [],
+                    "predicted_intensities": [],
+                }
+            )
+            continue
 
         observed_masses = np.zeros_like(predicted_mzs)
-        observed_mass_errors_ppm = np.zeros_like(predicted_mzs)
-        observed_intensities = np.zeros_like(predicted_intensities)
-        observed_intensity_error = np.zeros_like(predicted_intensities)
+        observed_intensities = observed_masses.copy()
+        observed_mass_errors_ppm = observed_masses.copy()
+        observed_intensity_error = observed_masses.copy()
 
         # Normalize predicted intensities relative to monoisotopic (base) peak
-        if predicted_intensities[0] > 0:
-            predicted_rel = predicted_intensities / predicted_intensities[0]
-        else:
-            predicted_rel = predicted_intensities  # fallback (unlikely)
+        predicted_rel = predicted_intensities / predicted_intensities[0]
 
         base_peak_intensity = None
-
         for i, p_mz in enumerate(predicted_mzs):
             mz_delta = p_mz * ISOTOPE_MATCHING_MZ_TOLERANCE_PPM * 1e-6
             mz_min, mz_max = p_mz - mz_delta, p_mz + mz_delta
 
             start_idx = np.searchsorted(mzs, mz_min, side="left")
             end_idx = np.searchsorted(mzs, mz_max, side="right")
+            no_peaks_in_window = start_idx >= end_idx
 
-            if start_idx >= end_idx:
-                continue  # no peaks in window
+            if no_peaks_in_window:
+                continue
 
             window_mzs = mzs[start_idx:end_idx]
             window_intensities = intensities[start_idx:end_idx]
             if not window_mzs.size:
                 continue
 
-            closest_idx = int(np.argmin(np.abs(window_mzs - p_mz)))
-            closest_mz = window_mzs[closest_idx]
-            closest_intensity = window_intensities[closest_idx]
+            matched_index = np.argmin(np.abs(window_mzs - p_mz))
+            matched_mz = window_mzs[matched_index]
+            matched_intensity = window_intensities[matched_index]
+            is_base_peak = i == 0
 
-            if i == 0:
-                # Always accept monoisotopic match if any peak is within m/z tolerance
-                base_peak_intensity = (
-                    closest_intensity if closest_intensity > 0 else None
-                )
-                if base_peak_intensity is None:
-                    continue
-                observed_intensities[0] = closest_intensity
-                observed_masses[0] = closest_mz
-                observed_mass_errors_ppm[0] = abs(closest_mz - p_mz) / p_mz * 1e6
+            if is_base_peak:
+                base_peak_intensity = matched_intensity
+                observed_intensities[0] = matched_intensity
+                observed_masses[0] = matched_mz
+                observed_mass_errors_ppm[0] = abs(matched_mz - p_mz) / p_mz * 1e6
                 observed_intensity_error[0] = 0.0
                 continue  # move to next isotope
 
@@ -258,58 +233,134 @@ def match_isotopic_pattern(
             if base_peak_intensity is None or base_peak_intensity == 0:
                 continue
 
-            obs_rel = closest_intensity / base_peak_intensity
-            pred_rel = predicted_rel[i] if predicted_rel[i] > 0 else 0.0
-
-            # Absolute difference (already on comparable relative scale)
-            intensity_error = abs(obs_rel - pred_rel)
+            predicted_rel_intensity = predicted_rel[i]
+            observed_rel_intensity = matched_intensity / base_peak_intensity
+            intensity_error = (
+                abs(predicted_rel_intensity - observed_rel_intensity)
+                / predicted_rel_intensity
+            )
 
             if intensity_error <= ISOTOPE_MATCHING_INTENSITY_TOLERANCE:
-                observed_intensities[i] = closest_intensity
-                observed_masses[i] = closest_mz
-                observed_mass_errors_ppm[i] = abs(closest_mz - p_mz) / p_mz * 1e6
+                observed_intensities[i] = matched_intensity
+                observed_masses[i] = matched_mz
+                observed_mass_errors_ppm[i] = abs(matched_mz - p_mz) / p_mz * 1e6
                 observed_intensity_error[i] = intensity_error
 
-        top_candidate_isotope_masses = np.array([])
-        top_candidate_isotope_mass_errors = np.array([])
-        top_candidate_predicted_isotope_masses = np.array([])
-        top_candidate_predicted_isotope_intensities = np.array([])
-        top_candidate_isotope_intensity_errors = np.array([])
-        # Require monoisotopic detection
-        # If only M0 is detected, score stays 0.0
-        if observed_intensities[0] > 0:
-            observed_intensities /= observed_intensities[0]
-            if predicted_intensities[0] > 0:
-                predicted_intensities /= predicted_intensities[0]
+        scores[ind] = score_pattern(
+            observed_masses,
+            observed_mass_errors_ppm,
+            observed_intensities,
+            observed_intensity_error,
+            predicted_rel,
+        )
 
-            cosine_dist = cosine(predicted_intensities, observed_intensities)
-            score = 1 - cosine_dist if not np.isnan(cosine_dist) else 0.0
-            scores[ind] = score
-            # Keep the observed masses from the best scoring candidate
-            if score >= ISOTOPIC_PATTERN_THRESHOLD and (
-                top_candidate_isotope_masses.size == 0
-                or score > scores.max(initial=0.0)
-            ):
-                top_candidate_isotope_masses = observed_masses
-                top_candidate_isotope_mass_errors = observed_mass_errors_ppm
-                top_candidate_isotope_intensity_errors = observed_intensity_error
-                top_candidate_predicted_isotope_masses = predicted_mzs
-                top_candidate_predicted_isotope_intensities = predicted_rel
+        matched_isotopes = {
+            "masses": observed_masses,
+            "mass_errors_ppm": observed_mass_errors_ppm,
+            "intensity_errors": observed_intensity_error,
+            "labels": isotope_labels,
+            "predicted_masses": predicted_mzs,
+            "predicted_intensities": predicted_rel,
+        }
 
-    candidates = candidates.with_columns(
+        all_isotope_data.append(matched_isotopes)
+
+    candidates_df = candidates_df.with_columns(
         pl.Series(values=scores, name="isotopic_pattern_score")
     ).sort("isotopic_pattern_score", descending=True)
 
-    matched_isotopes = {
-        "masses": top_candidate_isotope_masses,
-        "mass_errors_ppm": top_candidate_isotope_mass_errors,
-        "intensity_errors": top_candidate_isotope_intensity_errors,
-        "labels": isotope_labels,
-        "predicted_masses": top_candidate_predicted_isotope_masses,
-        "predicted_intensities": top_candidate_predicted_isotope_intensities,
-    }
+    score_sorted_indices = np.argsort(scores)[::-1]
+    all_isotope_data = [all_isotope_data[i] for i in score_sorted_indices]
 
-    return candidates.to_dicts(), matched_isotopes
+    return candidates_df.to_dicts(), all_isotope_data
+
+
+def predict_isotopes(
+    ion_formula: str, ion_charge: int
+) -> tuple[np.ndarray, np.ndarray, list[str]]:
+    """Predict isotopic pattern for a given ion formula and charge.
+
+    :param ion_formula: Ion formula string.
+    :type ion_formula: str
+    :param ion_charge: Ion charge (e.g., +1, -1).
+    :type ion_charge: int
+    :return: Tuple of predicted m/z values, relative intensities, and isotope labels.
+    :rtype: tuple[np.ndarray, np.ndarray, list[str]]
+    """
+    try:
+        predicted_peaks = IsoThreshold(
+            formula=ion_formula,
+            threshold=ISOTOPE_ABUNDANCE_THRESHOLD,
+            get_confs=True,
+        )
+        predicted_masses_neutral = np.fromiter(predicted_peaks.masses, dtype=float)
+        predicted_intensities = np.fromiter(predicted_peaks.probs, dtype=float)
+
+        composition = ParseFormula(ion_formula)
+        elements = list(composition.keys())
+        elemental_masses = [PeriodicTbl.symbol_to_masses[el] for el in elements]
+        isotope_labels = [
+            conf_to_label(conf, elements, elemental_masses)
+            for conf in predicted_peaks.confs
+        ]
+        # Convert neutral masses to m/z
+        predicted_mzs = (predicted_masses_neutral - ELECTRON_MASS * ion_charge) / abs(
+            ion_charge
+        )
+    except Exception:
+        predicted_mzs, predicted_intensities, isotope_labels = [], [], []
+
+    return predicted_mzs, predicted_intensities, isotope_labels
+
+
+def score_pattern(
+    observed_masses: np.ndarray,
+    observed_mass_errors_ppm: np.ndarray,
+    observed_intensities: np.ndarray,
+    observed_intensity_error: np.ndarray,
+    predicted_rel: np.ndarray,
+) -> float:
+    """
+    Scores the match between observed and predicted isotopic patterns.
+    Returns a score between 0 and 1, where 1 is a perfect match.
+    """
+    # Require monoisotopic detection
+    if observed_intensities[0] > 0:
+        observed_rel_intensities = observed_intensities / observed_intensities[0]
+        matched_peaks_count = np.sum(observed_masses > 0)
+
+        # 1. Pattern scoring
+        cosine_dist = cosine(predicted_rel, observed_rel_intensities)
+        pattern_score = 1 - cosine_dist if not np.isnan(cosine_dist) else 0.0
+
+        # 2. Intensity scoring
+        total_intensity_error = np.sum(observed_intensity_error)
+        avg_intensity_error = (
+            total_intensity_error / matched_peaks_count
+            if matched_peaks_count > 0
+            else ISOTOPE_MATCHING_INTENSITY_TOLERANCE
+        )
+        intensity_score = max(
+            0, 1 - (avg_intensity_error / ISOTOPE_MATCHING_INTENSITY_TOLERANCE)
+        )
+
+        # 3. Mass Accuracy Score
+        total_mass_error_ppm = np.sum(observed_mass_errors_ppm)
+        avg_mass_error = (
+            total_mass_error_ppm / matched_peaks_count
+            if matched_peaks_count > 0
+            else ISOTOPE_MATCHING_MZ_TOLERANCE_PPM
+        )
+        mass_score = max(0, 1 - (avg_mass_error / ISOTOPE_MATCHING_MZ_TOLERANCE_PPM))
+
+        # 4. Combined score.
+        # pattern_score and intensity_score get lower weights because they are less reliable,
+        # we may have only base peak detected.
+        score = 0.2 * pattern_score + 0.2 * intensity_score + 0.6 * mass_score
+    else:
+        score = 0.0
+
+    return score
 
 
 def conf_to_label(conf, elements, isotope_masses):

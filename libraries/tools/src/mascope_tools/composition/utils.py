@@ -1,8 +1,9 @@
 import re
-from pyteomics.mass import Composition
+from pyteomics.mass import Composition, calculate_mass
 from mascope_tools.composition.models import (
     CompositionFinderException,
     IonizationMechanism,
+    Atom,
 )
 from mascope_tools.composition.constants import ELECTRON_MASS
 
@@ -75,8 +76,8 @@ def parse_composition(formula_string: str, multiplier: int = 1) -> Composition:
 
 def to_hill_order(elements: dict) -> str:
     """Convert a dictionary of elements to Hill notation string."""
-    # Filter out negative counts (can be if -H- is the ionization mechanism)
-    elements = {k: v for k, v in elements.items() if v >= 0}
+    # Filter out zero and negative counts (can be if -H- is the ionization mechanism)
+    elements = {k: v for k, v in elements.items() if v > 0}
     atomic_symbols = list(elements.keys())
     atomic_symbols.sort(key=lambda x: (0 if x == "C" else 1 if x == "H" else 2, x))
     formula = "".join(
@@ -112,6 +113,12 @@ def parse_ionization(ionization_string: str) -> IonizationMechanism:
         # Abstract electron being added
         addition = True
         charge = -1
+    elif ionization_string == "-H-":
+        # Deprotonation
+        addition = False
+        formula = "H"
+        charge = -1
+        mass = calculate_mass(formula="H")
     else:
         # Regex pattern: start charge, base, end charge
         pattern = r"^([+-])?(.*?)([+-])?$"
@@ -144,18 +151,25 @@ def parse_bool(val):
     return str(val).lower() in ("1", "true", "yes", "on")
 
 
-def parse_atom_count_ranges(count_ranges: str) -> dict:
-    """Parse a string of element count ranges into a dictionary.
+def parse_atom_count_ranges(count_ranges: str) -> list:
+    """Parse a string of element count ranges into a list of Atom objects.
 
     :param count_ranges: String containing element count ranges.
         e.g. "C0-30 H0-40 N0-3 O0-20 O[18]0-1 C[13]0-2"
     :type count_ranges: str
-    :return: Dictionary with element symbols as keys and tuples of (min, max) counts as values.
-    :rtype: dict
+    :return: List of Atom objects.
+    :rtype: list
     """
     pattern = r"([A-Z][a-z]?(?:\[\d+\])?)(\d+)-(\d+)"
-    counts_per_element = {}
+    atoms = []
     for match in re.finditer(pattern, count_ranges):
         element, min_count, max_count = match.groups()
-        counts_per_element[element] = (int(min_count), int(max_count))
-    return counts_per_element
+        atoms.append(
+            Atom(
+                symbol=element,
+                min_count=int(min_count),
+                max_count=int(max_count),
+                mass=calculate_mass(formula=element, charge=0),
+            )
+        )
+    return atoms

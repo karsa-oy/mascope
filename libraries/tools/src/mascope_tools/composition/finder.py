@@ -5,7 +5,6 @@ from typing import Any
 import pandas as pd
 import polars as pl
 import numpy as np
-from pyteomics.mass import calculate_mass
 from mascope_tools.composition.heuristic_filter import (
     apply_heuristic_rules,
     match_isotopic_pattern,
@@ -18,10 +17,7 @@ from mascope_tools.composition.models import (
     CompositionFinderWarning,
 )
 from mascope_tools.composition.constants import (
-    DEFAULT_SEARCH_ELEMENT_COUNT_RANGES,
-    DEFAULT_MAXIMUM_ROWS,
     UNSATURATION_COEFFICIENTS,
-    DEFAULT_MASS_RANGE_THRESHOLD_PPM,
 )
 
 
@@ -44,28 +40,33 @@ else:
 def assign_compositions(
     peaks: pd.DataFrame, params: dict, heuristic_params: dict | None = None
 ) -> pd.DataFrame:
-    """Assign molecular compositions to a DataFrame based on given params."""
-    # Convert peaks to Polars DataFrame for better performance
+    """Assign molecular compositions to a set of peaks.
+
+    :param peaks: DataFrame with 'mz' and 'intensity' columns.
+    :type peaks: pd.DataFrame
+    :param params: Parameters for composition finding.
+    :type params: dict
+    :param heuristic_params: Parameters for heuristic filtering.
+    :type heuristic_params: dict, optional
+    :return: A DataFrame with assigned compositions and related information.
+    :rtype: pd.DataFrame
+    """
+    # Convert peaks to Polars DataFrame
     peaks = pl.from_pandas(peaks).sort("mz")
     peak_height_threshold = params.get("peak_height_threshold", 0.0)
-    peaks_to_match = peaks.filter(pl.col("intensity") >= peak_height_threshold).sort(
-        "intensity", descending=True
-    )
+    peaks_to_match = peaks.filter(pl.col("intensity") >= peak_height_threshold)
+    peaks_to_match = peaks_to_match.sort("mz")
 
     mzs = peaks_to_match["mz"].to_numpy()
-    results_per_peak = []
-    assigned_mzs = set()
-    mass_log_messages = {}
+    results_per_peak, assigned_mzs, mass_log_messages = [], set(), {}
 
     for mz in tqdm(mzs, desc="Assigning compositions..."):
         if mz in assigned_mzs:
-            continue  # Skip if this mass has already been processed
-        assigned_mzs.add(mz)
+            continue
         params["monoisotopic_mass"] = mz
         params["target_monoisotopic_mass"] = mz
-        compositions = find_compositions(params)
 
-        # Guard for empty results
+        compositions = find_compositions(params)
         comp_results = compositions.get("results", [])
         all_candidates = (
             ", ".join([r["formula"] for r in comp_results[1:]])
@@ -78,198 +79,187 @@ def assign_compositions(
                 comp_results, params=heuristic_params
             )
             mass_log_messages[mz] = log_messages
-            # Fast path: if nothing survives heuristics, avoid isotopic work
             if candidates:
-                candidates, matched_isotopes = match_isotopic_pattern(candidates, peaks)
-                isotope_mzs = matched_isotopes.get("masses", np.array([]))
+                candidates, all_matched_isotopes = match_isotopic_pattern(
+                    candidates, peaks
+                )
             else:
-                isotope_mzs = np.array([])
+                all_matched_isotopes = []
             if not candidates:
-                # No valid result for this peak
                 results_per_peak.append(
                     {
-                        "formula": "Undefined",
+                        "formula": "---",
+                        "ion": "---",
                         "mz": mz,
                         "other_candidates": all_candidates,
+                        "isotope_label": "---",
                     }
                 )
                 continue
-            main_result = candidates[0].copy()
-            main_result["mz"] = mz
-            main_result["formula"] = main_result.get("formula", "Undefined")
-            main_result["other_candidates"] = all_candidates
-            results_per_peak.append(main_result)
-        else:
-            results_per_peak.append(
-                {
-                    "mz": mz,
-                    "formula": "Undefined",
-                    "isotope_label": "",
-                    "other_candidates": "",
-                }
-            )
-            isotope_mzs = np.array([])
+            main_candidate = candidates[0].copy()
+            main_candidate["mz"] = mz
+            main_candidate["formula"] = main_candidate.get("formula", "---")
+            main_candidate["other_candidates"] = all_candidates
 
-        # Assign isotope peaks to the closest unassigned masses (if any were detected)
-        if isotope_mzs.size >= 1:
-            isotope_mz_errors_ppm = matched_isotopes["mass_errors_ppm"]
-            isotope_intensity_errors = matched_isotopes["intensity_errors"]
-            isotope_labels = matched_isotopes["labels"]
-            isotope_predicted_mzs = matched_isotopes["predicted_masses"]
-            isotope_predicted_intensities = matched_isotopes["predicted_intensities"]
-
-            m0_mass = isotope_mzs[0]
-            main_result["predicted_mz"] = isotope_predicted_mzs[0]
-            main_result["predicted_intensity"] = isotope_predicted_intensities[0]
-            main_result["isotope_label"] = "M0"
-
-            for (
-                iso_mz,
-                iso_mz_error_ppm,
-                iso_int_error,
-                iso_label,
-                iso_pred_mz,
-                iso_pred_int,
-            ) in zip(
-                isotope_mzs[1:],
-                isotope_mz_errors_ppm[1:],
-                isotope_intensity_errors[1:],
-                isotope_labels[1:],
-                isotope_predicted_mzs[1:],
-                isotope_predicted_intensities[1:],
-            ):
-                if iso_mz == 0:
-                    continue
-                if iso_mz in assigned_mzs:
-                    continue
-                assigned_mzs.add(iso_mz)
-
-                # Create a copy of the main result and update it for the isotope
-                isotope_result = main_result.copy()
-                isotope_result["mz"] = iso_mz
-                isotope_result["isotope_label"] = iso_label
-                isotope_result["predicted_mz"] = iso_pred_mz
-                isotope_result["predicted_intensity"] = iso_pred_int
-                isotope_result["observed_mass"] = iso_mz
-                isotope_result["neutral_mass"] = isotope_result["neutral_mass"] + (
-                    iso_mz - m0_mass
+            if all_matched_isotopes:
+                isotopic_results, assigned_mzs = process_isotopes(
+                    main_candidate, all_matched_isotopes, assigned_mzs
                 )
-                isotope_result["mz_error_ppm"] = iso_mz_error_ppm
-                isotope_result["intensity_error"] = iso_int_error
+                results_per_peak.extend(isotopic_results)
+            else:
+                # No isotopic pattern matched, just add the main result
+                main_candidate["isotope_label"] = "M0"
+                results_per_peak.append(main_candidate)
+                assigned_mzs.add(main_candidate["mz"])
 
-                results_per_peak.append(isotope_result)
+    unmatched_peaks = set(mzs) - assigned_mzs
+    for mz in unmatched_peaks:
+        results_per_peak.append(
+            {
+                "mz": mz,
+                "formula": "---",
+                "ion": "---",
+                "isotope_label": "---",
+                "other_candidates": "",
+            }
+        )
 
-    return pd.DataFrame(results_per_peak), mass_log_messages
+    matches = pd.DataFrame(results_per_peak)
+    matches = matches.sort_values(by=["mz", "mz_error_ppm"])
+    # Drop duplicate m/z entries, keeping the one with the lowest mz_error_ppm
+    matches = matches.drop_duplicates(subset=["mz"], keep="first")
+
+    return matches, mass_log_messages
+
+
+def process_isotopes(
+    main_candidate: dict, all_matched_isotopes: list, assigned_mzs: set
+) -> tuple:
+    """Process and add isotopic pattern results
+
+    :param main_candidate: Most likely composition for the monoisotopic m/z and related data.
+    :type main_candidate: dict
+    :param all_matched_isotopes: List of matched isotopic patterns.
+    :type all_matched_isotopes: list
+    :param assigned_mzs: The m/z values that have already been assigned to a composition.
+    :type assigned_mzs: set
+    :return: A tuple containing:
+        - List of results per peak including isotopic variants.
+        - Updated set of assigned m/z values.
+    :rtype: tuple
+    """
+    results_per_peak = []
+    # Take the first matched isotopic pattern (best scoring)
+    matched_isotopes = all_matched_isotopes[0]
+    isotope_mzs = matched_isotopes["masses"]
+    isotope_labels = matched_isotopes["labels"]
+    isotope_pred_mzs = matched_isotopes["predicted_masses"]
+    isotope_pred_ints = matched_isotopes["predicted_intensities"]
+    isotope_mz_errors = matched_isotopes["mass_errors_ppm"]
+    isotope_intensity_errors = matched_isotopes["intensity_errors"]
+    if isotope_mzs[0] != 0:
+        # Extract and process base peak (M0)
+        m0_mass = isotope_mzs[0]
+        main_candidate["mz"] = m0_mass
+        main_candidate["observed_mass"] = m0_mass
+        main_candidate["predicted_mz"] = isotope_pred_mzs[0]
+        main_candidate["predicted_intensity"] = isotope_pred_ints[0]
+        main_candidate["isotope_label"] = "M0"
+        main_candidate["mz_error_ppm"] = isotope_mz_errors[0]
+        main_candidate["intensity_error"] = isotope_intensity_errors[0]
+        results_per_peak.append(main_candidate)
+        assigned_mzs.add(m0_mass)
+
+        # Extract and process higher isotopes
+        for idx in range(1, len(isotope_mzs)):
+            iso_mz = isotope_mzs[idx]
+            if iso_mz == 0:
+                continue
+            if iso_mz in assigned_mzs:
+                continue
+            iso_result = main_candidate.copy()
+            iso_result["mz"] = iso_mz
+            iso_result["observed_mass"] = iso_mz
+            iso_result["isotope_label"] = isotope_labels[idx]
+            iso_result["predicted_mz"] = isotope_pred_mzs[idx]
+            iso_result["predicted_intensity"] = isotope_pred_ints[idx]
+            iso_result["mz_error_ppm"] = isotope_mz_errors[idx]
+            iso_result["intensity_error"] = isotope_intensity_errors[idx]
+            iso_result["neutral_mass"] = iso_result["neutral_mass"] + (iso_mz - m0_mass)
+            results_per_peak.append(iso_result)
+            assigned_mzs.add(iso_mz)
+
+    return results_per_peak, assigned_mzs
 
 
 def find_compositions(params: dict[str, Any]) -> dict:
-    """Find molecular compositions based on given parameters.
+    """Find molecular compositions based on the provided parameters.
 
-    :param params: Dictionary containing search parameters.
-    :param params['mass_range_ppm']: Allowed deviation from the target mass in ppm
-    :param params['max_result_rows']: Maximum number of results to return.
-    :param params['element_count_ranges']: Element count ranges in the format "C0-100 H0-202 N0-10 O0-10 C[13]0-3 O[18]0-3".
-    :param params['monoisotopic_mass']: Target monoisotopic mass to search for.
-    :param params['min_unsaturation']: Minimum unsaturation (double bond equivalents).
-    :param params['max_unsaturation']: Maximum unsaturation (double bond equivalents).
-    :param params['only_integer_unsaturation']: Whether to only consider integer unsaturation values.
-    :param params['use_unsaturation']: Whether to use unsaturation in the search.
-    :param params['return_result_count_only']: If True, only return the count of results.
-    :param params['return_typed_format']: If True, return results in a typed format.
-
-    :type params: dict[str, str]
-    :raises CompositionFinderException: If the target monoisotopic mass is not greater than 0.
-    :return: A dictionary containing the results of the search.
+    :param params: Parameters for the composition search.
+    :type params: dict[str, Any]
+    :return: A dictionary containing the search results and related information.
     :rtype: dict
     """
-    # --- Build search context from parameters ---
     ctx = SearchContext()
-    ctx.mass_range = float(
-        params.get("mass_range_ppm", DEFAULT_MASS_RANGE_THRESHOLD_PPM)
-    )
-    ctx.max_result_rows = int(params.get("max_result_rows", DEFAULT_MAXIMUM_ROWS))
-    ctx.element_count_ranges = params.get(
-        "element_count_ranges", DEFAULT_SEARCH_ELEMENT_COUNT_RANGES
-    )
-    ctx.min_unsaturation = float(params.get("min_unsaturation", 0))
-    ctx.max_unsaturation = float(params.get("max_unsaturation", 50))
-    ctx.only_integer_unsaturation = utils.parse_bool(
-        params.get("only_integer_unsaturation", False)
-    )
-    ctx.use_unsaturation = utils.parse_bool(params.get("use_unsaturation", False))
-    ctx.target_monoisotopic_mass = float(
-        params.get("monoisotopic_mass", params.get("target_monoisotopic_mass", "-1"))
-    )
-
-    # --- Parse element count ranges ---
-    element_ranges = utils.parse_atom_count_ranges(ctx.element_count_ranges)
-    ctx.atoms = [
-        Atom(el, minv, maxv, calculate_mass(formula=el, charge=0))
-        for el, (minv, maxv) in element_ranges.items()
-    ]
-
-    # Sort atoms by mass to improve pruning efficiency
+    ctx.build(params)
+    ctx.atoms = utils.parse_atom_count_ranges(ctx.element_count_ranges)
     ctx.atoms.sort(key=lambda a: a.mass)
 
-    # --- Pruning arrays for search ---
     ctx.min_inner_mass, ctx.max_inner_mass = calc_min_max_inner_mass(ctx.atoms)
 
-    # --- Perform search for neutral mass ---
     ionization_mech_string_list = get_ionization_mech_string_list(params)
 
-    all_results = []
-    for ionization_mech_string in ionization_mech_string_list:
-        ctx.neutral_mass, ctx.ionization_mechanism = (
-            get_neutral_mass_and_ionization_mech(
-                ctx.target_monoisotopic_mass, ionization_mech_string
-            )
-        )
-        # Compute absolute tolerance in Da
-        ctx.abs_tolerance = max(ctx.neutral_mass * ctx.mass_range * 1e-6, 1e-6)
+    target_mz = ctx.target_monoisotopic_mass
+    ctx.abs_tolerance = target_mz * ctx.mass_range * 1e-6  # ppm -> Da around target m/z
 
-        # Handle pure ionization peak (neutral mass ~ 0 within a small absolute tolerance)
-        if abs(ctx.neutral_mass) <= ctx.abs_tolerance:
-            ion_formula = (
-                ctx.ionization_mechanism.formula + "+"
-                if ctx.ionization_mechanism and ctx.ionization_mechanism.charge > 0
-                else (
-                    ctx.ionization_mechanism.formula + "-"
-                    if ctx.ionization_mechanism
-                    else ""
-                )
-            )
+    all_results: list[Result] = []
+
+    for ionization_mech_string in ionization_mech_string_list:
+        ionization_mech = utils.parse_ionization(ionization_mech_string)
+
+        # Ion shift: ion m/z = neutral_mass + ion_shift
+        ion_shift = (
+            ionization_mech.mass if ionization_mech.addition else -ionization_mech.mass
+        )
+        required_neutral_mass = (
+            target_mz - ion_shift
+        )  # what neutral mass would give the target m/z
+
+        # Ionization peak case: no analyte mass (neutral mass ~ 0)
+        if abs(required_neutral_mass) <= ctx.abs_tolerance:
+            ion_charge = "+" if ionization_mech.charge > 0 else "-"
+            ion_formula = ionization_mech.formula + ion_charge
             all_results.append(
                 Result(
                     formula="Ionization peak",
                     neutral_mass=0.0,
-                    error_ppm=0.0,
+                    composition_error_ppm=0.0,
                     unsaturation=None,
                     ion=ion_formula,
-                    ionization_mechanism=(
-                        ctx.ionization_mechanism.mascope_notation
-                        if ctx.ionization_mechanism
-                        else None
-                    ),
-                    observed_mass=ctx.target_monoisotopic_mass,
+                    ionization_mechanism=ionization_mech.mascope_notation,
+                    observed_mass=target_mz,
                 )
             )
             continue
 
-        # Skip as peak not related to the current ionization mechanism
-        if ctx.neutral_mass < 0:
+        # Skip mechanisms that would imply negative / zero neutral masses
+        if required_neutral_mass <= 0:
             continue
 
-        for i in recursive_search(0, [], 0.0, ctx):
-            all_results.append(i)
+        # Store mechanism info in context for recursion
+        ctx.ionization_mechanism = ionization_mech
+        ctx.ion_shift = ion_shift
+        ctx.results_found = 0  # reset per ionization mechanism
 
-    # --- Sort and format results ---
-    all_results.sort(key=lambda r: r.error_ppm)
+        for res in recursive_search(0, [], 0.0, ctx):
+            all_results.append(res)
+
+    all_results.sort(key=lambda r: r.composition_error_ppm)
 
     return_result_count_only = utils.parse_bool(
         params.get("return_result_count_only", False)
     )
     return_typed_format = utils.parse_bool(params.get("return_typed_format", False))
-
     if return_result_count_only:
         return {"count": len(all_results)}
 
@@ -280,28 +270,27 @@ def find_compositions(params: dict[str, Any]) -> dict:
     }
 
 
-def recursive_search(idx, counts, mass, ctx):
-    """Recursive function to search for valid molecular compositions.
+def recursive_search(idx: int, counts: list, current_mass: float, ctx: SearchContext):
+    """A recursive function to explore all possible combinations of atom counts.
 
-    :param idx: Current index in the atoms list.
+    :param idx: Current index in the list of atoms.
     :type idx: int
-    :param counts: List of counts for each atom in the current composition.
-    :type counts: list[int]
-    :param mass: Current mass of the composition being built.
-    :type mass: float
-    :param ctx: SearchContext containing search parameters and state.
+    :param counts: Current counts of each atom type.
+    :type counts: list
+    :param current_mass: Current total mass of the composition.
+    :type current_mass: float
+    :param ctx: Search context containing parameters and state.
     :type ctx: SearchContext
-    :yield: A Result object if a valid composition is found.
+    :yield: Result objects for valid compositions.
     :rtype: Iterator[Result]
     """
-    # Stop recursion if we've reached the max number of results
     if ctx.results_found >= ctx.max_result_rows:
         return
 
+    # Evaluate full composition
     if idx == len(ctx.atoms):
-        # Use absolute Da tolerance for match
-        if abs(mass - ctx.neutral_mass) <= ctx.abs_tolerance:
-
+        ion_mz = current_mass + ctx.ion_shift
+        if abs(ion_mz - ctx.target_monoisotopic_mass) <= ctx.abs_tolerance:
             if ctx.use_unsaturation:
                 unsat = get_unsaturation(ctx.atoms, counts)
                 if not (ctx.min_unsaturation <= unsat <= ctx.max_unsaturation):
@@ -311,24 +300,26 @@ def recursive_search(idx, counts, mass, ctx):
             else:
                 unsat = None
 
-            formula = utils.to_hill_order(
-                {ctx.atoms[i].symbol: counts[i] for i in range(len(ctx.atoms))}
-            )
-            ctx.results_found += 1  # Increment the counter
+            atomic_counts = {
+                ctx.atoms[i].symbol: counts[i] for i in range(len(ctx.atoms))
+            }
+            formula = utils.to_hill_order(atomic_counts)
+            ctx.results_found += 1
             ion_formula = utils.combine_formula_and_ionization(
                 formula, ctx.ionization_mechanism
             )
+            error_ppm = (
+                abs(ion_mz - ctx.target_monoisotopic_mass)
+                / ctx.target_monoisotopic_mass
+                * 1e6
+            )
             yield Result(
                 formula=formula,
-                neutral_mass=mass,
-                error_ppm=(abs(mass - ctx.neutral_mass) / ctx.neutral_mass * 1e6),
+                neutral_mass=current_mass,
+                composition_error_ppm=error_ppm,
                 unsaturation=unsat,
                 ion=ion_formula,
-                ionization_mechanism=(
-                    ctx.ionization_mechanism.mascope_notation
-                    if ctx.ionization_mechanism
-                    else None
-                ),
+                ionization_mechanism=ctx.ionization_mechanism.mascope_notation,
                 observed_mass=ctx.target_monoisotopic_mass,
             )
         return
@@ -336,42 +327,50 @@ def recursive_search(idx, counts, mass, ctx):
     atom = ctx.atoms[idx]
     min_inner = ctx.min_inner_mass
     max_inner = ctx.max_inner_mass
-    target = ctx.neutral_mass
     tol = ctx.abs_tolerance
+    shift = ctx.ion_shift
+    target_mz = ctx.target_monoisotopic_mass
 
-    # --- Tight feasible count range calculation ---
-    # Compute the minimum and maximum feasible count for this atom at this level
-    if atom.mass > 0:
-        feasible_min = max(
-            atom.min_count,
-            int(np.ceil((target - tol - mass - max_inner[idx]) / atom.mass)),
+    # Feasible count bounds for this atom (neutral mass domain)
+    feasible_min = max(
+        atom.min_count,
+        int(
+            np.ceil(
+                ((target_mz - shift) - tol - current_mass - max_inner[idx]) / atom.mass
+            )
         )
-        feasible_max = min(
-            atom.max_count,
-            int(np.floor((target + tol - mass - min_inner[idx]) / atom.mass)),
+        - 1,
+    )
+    feasible_max = min(
+        atom.max_count,
+        int(
+            np.floor(
+                ((target_mz - shift) + tol - current_mass - min_inner[idx]) / atom.mass
+            )
         )
-    else:
-        feasible_min = atom.min_count
-        feasible_max = atom.max_count
-
+        + 1,
+    )
     if feasible_min > feasible_max:
-        return  # No feasible counts at this level
+        return
 
     for atom_count in range(feasible_min, feasible_max + 1):
-        # Stop recursion if we've reached the max number of results
         if ctx.results_found >= ctx.max_result_rows:
             return
-        new_mass = mass + atom_count * atom.mass
+        new_mass = current_mass + atom_count * atom.mass
+
         if idx < len(ctx.atoms) - 1:
-            # Tight pruning in Da
             min_mass = new_mass + min_inner[idx]
             max_mass = new_mass + max_inner[idx]
-            # If even the minimal possible final mass is already too heavy -> break
-            if (min_mass - target) > tol:
+            min_ion = min_mass + shift
+            max_ion = max_mass + shift
+
+            # Too heavy already (even minimal remaining mass overshoots)
+            if (min_ion - target_mz) > tol:
                 break
-            # If even the maximal possible final mass is still too light -> continue
-            if (target - max_mass) > tol:
+            # Still too light (even maximal remaining mass below window)
+            if (target_mz - max_ion) > tol:
                 continue
+
         yield from recursive_search(idx + 1, counts + [atom_count], new_mass, ctx)
 
 
@@ -384,12 +383,13 @@ def format_result(r, return_typed_format):
     return base
 
 
-def get_ionization_mech_string_list(options: dict) -> list:
-    """Get a list of ionizations from the options dictionary."""
-    ionizations = options.get("ionizations", "").strip()
+def get_ionization_mech_string_list(params: dict) -> list:
+    """Get a list of ionizations from the params dictionary."""
+    ionizations = params.get("ionizations", None)
     if ionizations:
-        return [x.strip() for x in ionizations.split(",") if x.strip()]
-    return [None]
+        return [ionization for ionization in ionizations.split(",")]
+    else:
+        raise ValueError("No ionization mechanisms provided.")
 
 
 def get_neutral_mass_and_ionization_mech(
@@ -408,15 +408,25 @@ def get_neutral_mass_and_ionization_mech(
 
 
 def calc_min_max_inner_mass(atoms):
-    """Calculate the minimum and maximum inner mass contributions for each atom."""
+    """Prepare suffix arrays of minimal and maximal remaining masses AFTER each index.
+
+    Returns:
+        min_suffix[i]: minimal mass contribution of atoms with index > i
+        max_suffix[i]: maximal mass contribution of atoms with index > i
+        For convenience lengths match len(atoms); min_suffix[-1] == max_suffix[-1] == 0.
+    """
     n = len(atoms)
-    min_inner = [0.0] * n
-    max_inner = [0.0] * n
-    for i in range(n):
-        for j in range(i + 1, n):
-            min_inner[i] += atoms[j].min_count * atoms[j].mass
-            max_inner[i] += atoms[j].max_count * atoms[j].mass
-    return min_inner, max_inner
+    min_suffix = [0.0] * n
+    max_suffix = [0.0] * n
+    running_min = 0.0
+    running_max = 0.0
+    # Build from the end toward the front; suffix after i
+    for i in range(n - 1, -1, -1):
+        min_suffix[i] = running_min
+        max_suffix[i] = running_max
+        running_min += atoms[i].min_count * atoms[i].mass
+        running_max += atoms[i].max_count * atoms[i].mass
+    return min_suffix, max_suffix
 
 
 def get_unsaturation(atoms: list[Atom], counts: list[int]) -> float:

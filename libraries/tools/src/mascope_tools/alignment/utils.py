@@ -90,7 +90,8 @@ def collect_spectra(
     :rtype: Spectra
     """
     create_cache_folder()
-
+    samples = samples.copy()
+    samples["datetime"] = pd.to_datetime(samples["datetime"])
     samples = samples.sort_values("datetime").reset_index(drop=True)
     cached_sample_item_ids = set(os.listdir(CACHE_FOLDER))
 
