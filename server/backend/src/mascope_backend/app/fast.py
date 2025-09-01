@@ -107,7 +107,18 @@ if runtime.mode == "dev":
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
-        expose_headers=["Process-ID"],  # expose custom process-id header
+        expose_headers=[
+            # mascope custom
+            "Process-ID",
+            # tus chunked uploads
+            "Location",
+            "Upload-Offset",
+            "Tus-Resumable",
+            "Tus-Version",
+            "Tus-Extension",
+            "Tus-Max-Size",
+            "Upload-Expires",
+        ],
     )
 
 # routing

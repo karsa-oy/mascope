@@ -814,6 +814,80 @@ async def upload_sample_files(
     }
 
 
+@api_controller()
+async def upload_sample_file(
+    file_path: str,
+    user: User,
+    access_token: str,
+    sid: str | None = None,
+) -> dict:
+    """
+    Handles upload of a single sample file from a given file path to the `filestreams` directory.
+
+    The file is moved to the specified directory as defined in the runtime configuration.
+
+    :param file_path: Path to the file to upload.
+    :type file_path: str
+    :param user: The authenticated user performing the upload.
+    :type user: User
+    :param access_token: Pre-validated user's access token for file converter service.
+    :type access_token: str
+    :param sid: User's socket client session ID.
+    :type sid: str | None
+    :return: Dictionary with file upload result.
+    :rtype: dict
+    """
+    # Check if filestreams directory exists
+    os.makedirs(runtime.config.filestreams, exist_ok=True)
+
+    filename = os.path.basename(file_path)
+    dest_path = os.path.join(runtime.config.filestreams, filename)
+
+    try:
+        # Move the file to the destination directory
+        shutil.move(file_path, dest_path)
+
+        # Emit event for file converter service to register the file
+        await event_emitter.emit(
+            "file-converter.auth",
+            {
+                "filename": filename,
+                "user_id": user.id,
+                "username": user.username,
+                "role_id": user.role_id,
+                "access_token": access_token,
+                "user_sid": sid,
+            },
+        )
+
+        runtime.logger.debug(f"Successfully uploaded file: {filename}")
+
+        return {
+            "message": f"Successfully uploaded {filename}",
+            "status": "success",
+            "data": {
+                "filename": filename,
+                "file_path": dest_path,
+            },
+        }
+
+    except ApiException as e:
+        runtime.logger.error(f"Failed to upload file {filename}: {e.user_message}")
+        return {
+            "message": f"Failed to upload {filename}: {e.user_message}",
+            "status": "error",
+            "error": e.user_message,
+        }
+    except Exception as e:
+        error_msg = str(e)
+        runtime.logger.error(f"Failed to upload file {filename}: {error_msg}")
+        return {
+            "message": f"Failed to upload {filename}: {error_msg}",
+            "status": "error",
+            "error": error_msg,
+        }
+
+
 # ---------------------
 # Sample file peaks controllers
 # ---------------------

@@ -59,6 +59,7 @@ from mascope_backend.api.routes.sample.batches.sample_batches_routes import (
 )
 from mascope_backend.api.routes.sample.files.sample_files_routes import (
     sample_files_router,
+    sample_files_upload_router,
 )
 from mascope_backend.api.routes.sample.items.sample_items_routes import (
     sample_items_router,
@@ -98,6 +99,7 @@ routers = [
     sample_batches_router,
     samples_router,
     sample_files_router,
+    sample_files_upload_router,
     sample_items_router,
     attribute_templates_router,
     target_collections_router,

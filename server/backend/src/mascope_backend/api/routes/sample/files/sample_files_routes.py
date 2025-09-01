@@ -1,5 +1,12 @@
+import os
+import shutil
+
 from datetime import datetime, timedelta, timezone
-from fastapi import APIRouter, BackgroundTasks, File, Request, Depends, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Request, Depends, UploadFile
+from typing import Callable
+
+from tuspyserver import create_tus_router
+
 from mascope_backend.api.new.auth.access_token.service import get_access_token
 from mascope_backend.db.id import gen_id
 from mascope_backend.api.new.auth.dependencies import guest_user, editor_user
@@ -34,6 +41,8 @@ from mascope_backend.api.models.sample.files.sample_file_pydantic_model import (
     GetSampleFilePeakNoiseBody,
     SampleFilesUpload,
 )
+
+from mascope_backend.runtime import runtime
 
 sample_files_router = APIRouter(prefix="/api/sample/files", tags=["Sample Files"])
 
@@ -335,3 +344,44 @@ async def process_sample_item_route(
         "message": f"Processing sample file '{sample_file.get('filename')}', please wait.",
         "process_id": process_id,
     }
+
+
+def get_upload_handler(
+    request: Request,
+    user=Depends(editor_user),
+) -> Callable[[str, dict], None]:
+    """Get the upload handler for processing file uploads.
+
+    :param request: The HTTP request object.
+    :type request: Request
+    :param user: The current authenticated user with editor permissions.
+    :type user: _type_, optional
+    :return: A callable that handles the file upload.
+    :rtype: Callable[[str, dict], None]
+    """
+
+    async def handler(file_path: str, metadata: dict):
+        print(f"file_path: {file_path}, metadata: {metadata}")
+        # Rename file from temporary name back to original
+        dest_path = os.path.join(os.path.dirname(file_path), metadata["filename"])
+        shutil.move(file_path, dest_path)
+        # Extract user session ID from headers
+        sid = request.headers.get("X-SID")
+        # Single token validation for the entire upload process
+        access_token = await get_access_token(user=user, service_name="file-converter")
+        # Process the uploaded file
+        await upload_sample_file(
+            dest_path,
+            user=user,
+            access_token=access_token,
+            sid=sid,
+        )
+
+    return handler
+
+
+sample_files_upload_router = create_tus_router(
+    files_dir=runtime.env.path("temp"),
+    upload_complete_dep=get_upload_handler,
+    prefix="api/sample/files/upload",
+)
