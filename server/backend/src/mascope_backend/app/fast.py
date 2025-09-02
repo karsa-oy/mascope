@@ -118,6 +118,7 @@ if runtime.mode == "dev":
             "Tus-Extension",
             "Tus-Max-Size",
             "Upload-Expires",
+            "Upload-Length",
         ],
     )
 
