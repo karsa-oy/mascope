@@ -71,9 +71,6 @@ app.ui.notification
 </template>
 
 <style>
-@import '@uppy/core/css/style.min.css';
-@import '@uppy/dashboard/css/style.min.css';
-@import '@uppy/drag-drop/css/style.min.css';
 @import './style.css';
 
 #loading {

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, computed, watch, onMounted, nextTick } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 
 import Button from 'primevue/button'
 import Select from 'primevue/select'
@@ -13,10 +13,12 @@ import FloatLabel from 'primevue/floatlabel'
 import ContextMenu from 'primevue/contextmenu'
 
 import { UppyContextProvider } from '@uppy/vue'
+import '@uppy/core/css/style.min.css'
 import Dashboard from '@uppy/dashboard'
-import DragDrop from '@uppy/drag-drop'
+import '@uppy/dashboard/css/style.min.css'
+import DropTarget from '@uppy/drop-target'
+import '@uppy/drop-target/css/style.min.css'
 
-import { runtime } from '@/lib/runtime'
 import { DialogSampleOp, DialogBatchImport, DialogFileUpload } from '@/lib/dialogs'
 
 import { api } from '@/api'
@@ -31,7 +33,7 @@ const uppy = app.uppy.get()
 
 onMounted(() => {
   uppy
-    .use(DragDrop, { target: '#uppy-dragdrop', clickToBrowse: false })
+    .use(DropTarget, { target: '#uppy-drop-target' })
     .on('file-added', (file) => {
       const dashboard = uppy.getPlugin('Dashboard')
       if (dashboard) {
@@ -48,6 +50,14 @@ onMounted(() => {
       proudlyDisplayPoweredByUppy: false,
       note: 'Supported file types: .h5 (TOF), .raw (Orbi)'
     })
+    .on('dashboard:modal-closed', () => {
+      uppy.clear()
+    })
+})
+
+onUnmounted(() => {
+  uppy.removePlugin(uppy.getPlugin('Dashboard'))
+  uppy.removePlugin(uppy.getPlugin('DropTarget'))
 })
 
 const props = defineProps({
@@ -255,73 +265,81 @@ const derivedPolarity = computed(() => {
     </menu>
   </div>
   <div>
-    <DataTable
-      v-if="acquisitions?.length"
-      v-model:selection="app.data.acquisition.selected"
-      v-model:contextMenuSelection="contextMenuRow"
-      :value="acquisitions"
-      :totalRecords="acquisitions.length"
-      scrollable
-      scrollHeight="calc(100vh - 320px)"
-      sortField="datetime"
-      :sortOrder="-1"
-      size="small"
-      selectionMode="multiple"
-      dataKey="filename"
-      :metaKeySelection="true"
-      @rowContextmenu="
-        (event) => {
-          contextMenuRow = event.data
-          event.originalEvent.preventDefault()
-          if (
-            !app.data.acquisition.selected.some(
-              ({ sample_file_id }) => sample_file_id === contextMenuRow.sample_file_id
-            )
-          ) {
-            app.data.acquisition.selected = [contextMenuRow]
-          }
-          contextMenuRef?.show(event.originalEvent)
-        }
-      "
-      :virtualScrollerOptions="{ itemSize: 28 }"
-    >
-      <Column header="Filename" field="filename" sortable />
-      <Column header="Polarity" field="polarity" sortable />
-      <Column header="Datetime" field="datetime" sortable />
-      <template #footer>
-        <div
-          style="
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0.5rem;
+    <UppyContextProvider :uppy="uppy">
+      <div id="uppy-drop-target">
+        <DataTable
+          v-if="acquisitions?.length"
+          v-model:selection="app.data.acquisition.selected"
+          v-model:contextMenuSelection="contextMenuRow"
+          :value="acquisitions"
+          :totalRecords="acquisitions.length"
+          scrollable
+          scrollHeight="calc(100vh - 320px)"
+          sortField="datetime"
+          :sortOrder="-1"
+          size="small"
+          selectionMode="multiple"
+          dataKey="filename"
+          :metaKeySelection="true"
+          @rowContextmenu="
+            (event) => {
+              contextMenuRow = event.data
+              event.originalEvent.preventDefault()
+              if (
+                !app.data.acquisition.selected.some(
+                  ({ sample_file_id }) => sample_file_id === contextMenuRow.sample_file_id
+                )
+              ) {
+                app.data.acquisition.selected = [contextMenuRow]
+              }
+              contextMenuRef?.show(event.originalEvent)
+            }
           "
+          :virtualScrollerOptions="{ itemSize: 28 }"
         >
-          <strong v-if="app.data.acquisition.multiselected" style="font-style: italic">
-            {{ app.data.acquisition.selected.length }} files selected
-          </strong>
-          <div v-else style="min-width: 11ch" />
+          <Column header="Filename" field="filename" sortable />
+          <Column header="Polarity" field="polarity" sortable />
+          <Column header="Datetime" field="datetime" sortable />
+          <template #footer>
+            <div
+              style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 0.5rem;
+              "
+            >
+              <strong v-if="app.data.acquisition.multiselected" style="font-style: italic">
+                {{ app.data.acquisition.selected.length }} files selected
+              </strong>
+              <div v-else style="min-width: 11ch" />
 
-          <div class="info-text">
-            <span v-if="!app.data.batch.focused">
-              <span class="pi pi-info-circle" />
-              Select a batch to process the files.
-            </span>
-            <span v-else-if="hasBothPolarities">
-              <span class="pi pi-info-circle" />
-              Cannot process files with both "+" and "-" polarities selected.
-            </span>
-            <span v-else-if="onlyMixedPolaritySelected">
-              <span class="pi pi-info-circle" />
-              Only mixed polarity files selected. Please choose a polarity from the dropdown.
-            </span>
-          </div>
+              <div class="info-text">
+                <span v-if="!app.data.batch.focused">
+                  <span class="pi pi-info-circle" />
+                  Select a batch to process the files.
+                </span>
+                <span v-else-if="hasBothPolarities">
+                  <span class="pi pi-info-circle" />
+                  Cannot process files with both "+" and "-" polarities selected.
+                </span>
+                <span v-else-if="onlyMixedPolaritySelected">
+                  <span class="pi pi-info-circle" />
+                  Only mixed polarity files selected. Please choose a polarity from the dropdown.
+                </span>
+              </div>
+            </div>
+          </template>
+        </DataTable>
+        <div v-else class="center" style="min-height: 150px">
+          <i class="info-line"> <span class="pi pi-inbox" /><span>No acquisitions found</span> </i>
         </div>
-      </template>
-    </DataTable>
-    <div v-else class="center" style="min-height: 150px">
-      <i class="info-line"> <span class="pi pi-inbox" /><span>No acquisitions found</span> </i>
-    </div>
+        <i class="info-line">
+          <span class="pi pi-file-arrow-up" /><span>Drag sample files here to upload them</span>
+        </i>
+      </div>
+    </UppyContextProvider>
+
     <DialogSampleOp
       v-model:action="dialog.sample"
       :item="app.data.acquisition.focused"
@@ -335,14 +353,6 @@ const derivedPolarity = computed(() => {
     />
     <DialogFileUpload :files="uploadedFiles" />
     <ContextMenu :model="contextMenuItems" ref="contextMenuRef" />
-    <div class="uppy-dragdrop-wrapper">
-      <UppyContextProvider :uppy="uppy">
-        <div id="uppy-dragdrop"></div>
-        <i class="info-line">
-          <span class="pi pi-file-arrow-up" /><span>Drag sample files here to upload them</span>
-        </i>
-      </UppyContextProvider>
-    </div>
   </div>
 </template>
 
@@ -352,6 +362,7 @@ const derivedPolarity = computed(() => {
   align-items: baseline;
   height: fit-content;
   width: 100%;
+  margin-bottom: 1rem;
 }
 
 menu {
@@ -400,24 +411,5 @@ menu :deep(.full) {
 
 .info-text {
   font-style: italic;
-}
-
-.uppy-dragdrop-wrapper {
-  position: relative;
-  width: 100%;
-}
-
-#uppy-dragdrop {
-  opacity: 0;
-  border: 2px dashed #1976d2;
-  border-radius: 8px;
-  background: transparent;
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 100%;
-  width: 100%;
-  min-height: 150px;
-  z-index: 1000;
 }
 </style>

@@ -33,7 +33,7 @@
     "@primevue/themes": "^4.0.7",
     "@uppy/core": "^5.0.1",
     "@uppy/dashboard": "^5.0.1",
-    "@uppy/drag-drop": "^5.0.1",
+    "@uppy/drop-target": "^4.0.0",
     "@uppy/tus": "^5.0.0",
     "@uppy/vue": "^3.0.2",
     "@vueuse/core": "^12.2.0",
