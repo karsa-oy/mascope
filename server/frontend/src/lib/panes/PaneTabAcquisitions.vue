@@ -408,7 +408,7 @@ menu :deep(.full) {
 }
 
 #uppy-dragdrop {
-  opacity: 0.5;
+  opacity: 0;
   border: 2px dashed #1976d2;
   border-radius: 8px;
   background: transparent;

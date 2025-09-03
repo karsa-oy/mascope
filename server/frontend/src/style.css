@@ -264,3 +264,90 @@
     display: none !important;
   }
 }
+
+
+/* Customize Uppy Dashboard */
+.uppy-Dashboard {
+  font-family: Inter, Arial, sans-serif !important;
+}
+
+.uppy-Dashboard-overlay {
+  background-color: transparent !important;
+}
+
+.uppy-Dashboard-inner,
+.uppy-Dashboard--modal {
+  border: 1px solid var(--p-panel-border-color) !important;
+  background-color: var(--p-panel-background) !important;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: none !important;
+  width: 800px !important;
+}
+
+.uppy-Dashboard-innerWrap {
+  margin: 10px !important;
+}
+
+.uppy-Dashboard-AddFiles,
+.uppy-Dashboard-AddFilesPanel,
+.uppy-StatusBar,
+.uppy-DashboardContent-bar,
+.uppy-DashboardContent-back,
+.uppy-DashboardContent-addMore,
+.uppy-Dashboard-browse {
+  color: #849770 !important;
+  background-color: var(--p-panel-background) !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+.uppy-DashboardContent-title,
+.uppy-Dashboard-AddFiles-title,
+.uppy-Dashboard-Item-name,
+.uppy-StatusBar-statusPrimary {
+  color: var(--p-dialog-color) !important;
+}
+
+.uppy-Dashboard-close {
+  color: var(--p-button-text-secondary-color) !important;
+  font-size: 25px;
+  inset-inline-end: 5px;
+  top: 5px;
+  height: var(--p-button-icon-only-width) !important;
+  width: var(--p-button-icon-only-width) !important;
+  text-align: center !important;
+}
+
+.uppy-Dashboard-close:hover {
+  background: var(--p-button-text-secondary-hover-background) !important;
+  border-radius: 50% !important;
+}
+
+.uppy-Dashboard-Item-previewInnerWrap {
+  background-color: #7a776a !important;
+}
+
+.uppy-StatusBar-actions {
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.uppy-StatusBar-actionBtn,
+.uppy-StatusBar-actionBtn--upload {
+  color: var(--p-panel-background) !important;
+  background-color: #849770 !important;
+  border: none !important;
+}
+
+.uppy-c-btn-primary:focus {
+  box-shadow: none !important;
+}
+
+.uppy-Dashboard-browse:hover,
+.uppy-Dashboard-browse:focus {
+  border-bottom: none !important;
+}
+
+/* End Uppy customization */
