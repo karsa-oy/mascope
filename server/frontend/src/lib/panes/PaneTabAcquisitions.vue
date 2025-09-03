@@ -43,6 +43,8 @@ onMounted(() => {
       showProgressDetails: true,
       theme: app.ui.darkmode.active ? 'dark' : 'light',
       closeModalOnClickOutside: true,
+      closeAfterFinish: true,
+      showProgressDetails: true,
       proudlyDisplayPoweredByUppy: false,
       note: 'Supported file types: .h5 (TOF), .raw (Orbi)'
     })

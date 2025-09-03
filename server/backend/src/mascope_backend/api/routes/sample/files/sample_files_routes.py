@@ -320,7 +320,6 @@ def get_upload_handler(
     """
 
     async def handler(file_path: str, metadata: dict):
-        print(f"file_path: {file_path}, metadata: {metadata}")
         # Rename file from temporary name back to original
         dest_path = os.path.join(os.path.dirname(file_path), metadata["filename"])
         shutil.copyfile(file_path, dest_path)
