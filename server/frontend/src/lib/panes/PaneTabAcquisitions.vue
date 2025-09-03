@@ -24,11 +24,7 @@ import { DialogSampleOp, DialogBatchImport, DialogFileUpload } from '@/lib/dialo
 import { api } from '@/api'
 import { useApp } from '@/stores'
 
-// TODO_configuration Default sample file upload params
-const FILE_UPLOAD_EXTENSIONS = ['.h5', '.raw']
-
 const app = useApp()
-
 const uppy = app.uppy.get()
 
 onMounted(() => {
@@ -138,8 +134,6 @@ const clearFilters = () => {
   search.value = ''
   polarityDropdown.value = ''
 }
-
-const uploadedFiles = ref([])
 
 // Check if files with both "+" and "-" polarities are selected
 const hasBothPolarities = computed(() => {
@@ -351,7 +345,18 @@ const derivedPolarity = computed(() => {
       :polarity="derivedPolarity"
       @submit="app.data.acquisition.unfocus()"
     />
-    <DialogFileUpload :files="uploadedFiles" />
+    <DialogFileUpload
+      :files="app.uppy.invalidFiles"
+      @upload="
+        $event.map((file) => {
+          try {
+            uppy.addFile(file)
+          } catch (error) {
+            uppy.info(error, 'error')
+          }
+        })
+      "
+    />
     <ContextMenu :model="contextMenuItems" ref="contextMenuRef" />
   </div>
 </template>

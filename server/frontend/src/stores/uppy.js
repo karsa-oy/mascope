@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { ref } from 'vue'
 
 import Uppy from '@uppy/core'
 import Tus from '@uppy/tus'
@@ -7,15 +8,44 @@ import { useUi } from './ui'
 
 import { api } from '@/api'
 import { runtime } from '@/lib/runtime.js'
-import { genId } from '@/lib/utils'
+import { genId, instrumentType } from '@/lib/utils'
+
+// TODO_configuration Default sample file upload params
+const FILE_UPLOAD_EXTENSIONS = ['.h5', '.raw']
+const FILE_UPLOAD_SIZE_LIMIT = 2.5 * 1024 * 1024 * 1024 // 2.5 GB
+
+function validateFile(file) {
+  // parse filename
+  const prefix = file.name.split('_')[0]
+  const prefixType = instrumentType(prefix)
+  const ext = file.name.split('.').slice(-1)[0].toLowerCase()
+  // check filename validity
+  if (ext == 'h5' && prefixType !== 'tof') {
+    return false
+  } else if (ext == 'raw' && prefixType !== 'orbi') {
+    return false
+  } else {
+    return true
+  }
+}
 
 export const useUppy = defineStore('app.uppy', () => {
   const ui = useUi()
+
+  const invalidFiles = ref([])
+
   const uppy = new Uppy({
     restrictions: {
-      allowedFileTypes: ['.h5', '.raw'],
-      maxFileSize: 4e9, // 4GB
+      allowedFileTypes: FILE_UPLOAD_EXTENSIONS,
+      maxFileSize: FILE_UPLOAD_SIZE_LIMIT,
       maxNumberOfFiles: 1000
+    },
+    onBeforeFileAdded: (currentFile, files) => {
+      let isValid = validateFile(currentFile)
+      if (!isValid) {
+        invalidFiles.value = [...invalidFiles.value, currentFile]
+        return false
+      }
     }
   }).use(Tus, {
     endpoint: `${runtime.api_path}/api/sample/files/upload`,
@@ -34,11 +64,10 @@ export const useUppy = defineStore('app.uppy', () => {
       console.log('Response', err.originalResponse)
     }
   })
-
+  // Register event handlers to track upload progress
   let process_id
 
   uppy.on('upload', () => {
-    console.log('upload')
     process_id = genId(8)
   })
   uppy.on('progress', (progress) => {
@@ -89,9 +118,16 @@ export const useUppy = defineStore('app.uppy', () => {
       console.error(`Sample file upload failed:`, error)
     })
   })
+  // End event handlers
 
   function get() {
+    // Return the Uppy instance. This is to not wrap it in a reactive ref
     return uppy
   }
-  return { get }
+
+  function clearInvalid() {
+    invalidFiles.value = []
+  }
+
+  return { get, clearInvalid, invalidFiles }
 })

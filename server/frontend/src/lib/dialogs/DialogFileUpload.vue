@@ -21,6 +21,8 @@ const props = defineProps({
 })
 const active = defineModel('active')
 
+const emit = defineEmits(['upload'])
+
 const instrument = reactive({
   tof: null,
   orbi: null
@@ -93,14 +95,21 @@ watch(
 
 // Manual upload for renamed files
 const upload = () => {
-  const renamedTofFiles = processed.value.invalid.tof.map(
-    (file) => new File([file], `${instrument.tof}_${file.name}`, { type: file.type })
-  )
-  const renamedOrbiFiles = processed.value.invalid.orbi.map(
-    (file) => new File([file], `${instrument.orbi}_${file.name}`, { type: file.type })
-  )
+  const renamedTofFiles = processed.value.invalid.tof.map((file) => {
+    return {
+      ...file,
+      name: `${instrument.tof}_${file.name}`
+    }
+  })
+  const renamedOrbiFiles = processed.value.invalid.orbi.map((file) => {
+    return {
+      ...file,
+      name: `${instrument.orbi}_${file.name}`
+    }
+  })
   active.value = false
-  app.data.sample.upload([...renamedTofFiles, ...renamedOrbiFiles, ...processed.value.valid])
+  app.uppy.clearInvalid()
+  emit('upload', [...renamedTofFiles, ...renamedOrbiFiles])
 }
 </script>
 
