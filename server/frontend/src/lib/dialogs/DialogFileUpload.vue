@@ -7,13 +7,9 @@ import FloatLabel from 'primevue/floatlabel'
 import Dialog from 'primevue/dialog'
 import Message from 'primevue/message'
 
-import { runtime } from '@/lib/runtime'
 import { instrumentType } from '@/lib/utils'
 
 import { useApp } from '@/stores'
-
-// TODO_configuration Default sample file upload params
-const FILE_UPLOAD_SIZE_LIMIT = 2.5 * 1024 * 1024 * 1024 // 2.5 GB
 
 const app = useApp()
 
@@ -34,15 +30,10 @@ const instrument = reactive({
 const processed = computed(() => {
   const invalid = {
     tof: [],
-    orbi: [],
-    oversized: []
+    orbi: []
   }
   const valid = []
   props.files.forEach((file) => {
-    // validate file size
-    if (file.size > FILE_UPLOAD_SIZE_LIMIT) {
-      invalid.oversized.push(file)
-    }
     // parse filename
     const prefix = file.name.split('_')[0]
     const prefixType = instrumentType(prefix)
@@ -60,10 +51,7 @@ const processed = computed(() => {
 })
 
 const count = computed(() => ({
-  invalid:
-    processed.value.invalid.tof.length +
-    processed.value.invalid.orbi.length +
-    processed.value.invalid.oversized.length,
+  invalid: processed.value.invalid.tof.length + processed.value.invalid.orbi.length,
   valid: processed.value.valid.length,
   total: props.files.length
 }))
@@ -93,13 +81,8 @@ watch(
   () => props.files,
   (files) => {
     if (!files?.length) return
-
     nextTick(() => {
-      // validate file sizes
-      if (count.value.valid > 0 && count.value.total === count.value.valid) {
-        // All files valid - auto upload
-        app.data.sample.upload(files)
-      } else if (count.value.total > 0) {
+      if (count.value.total > 0) {
         // Some files need manual handling - show dialog
         active.value = true
       }
@@ -222,20 +205,6 @@ const upload = () => {
           </i>
         </Message>
       </div>
-    </template>
-    <!-- OVERSIZED FILES -->
-    <template v-if="processed.invalid.oversized.length > 0">
-      <h3>Files exceeding the size limit</h3>
-      <p>
-        The following files exceeded the
-        {{ FILE_UPLOAD_SIZE_LIMIT / (1024 * 1024 * 1024) }} GB size limit:
-      </p>
-      <ul>
-        <li v-for="file in processed.invalid.oversized" :key="file.name">
-          {{ file.name }}
-        </li>
-      </ul>
-      <p>Please try to reduce their file size or upload smaller files.</p>
     </template>
     <!-- CONFIRM -->
     <menu style="justify-content: flex-end">
