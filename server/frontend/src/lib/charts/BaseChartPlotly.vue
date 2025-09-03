@@ -177,9 +177,9 @@ onMounted(() => {
   created.value = true
 })
 onBeforeUnmount(() => {
-  plot.value.removeEventListener('plotly_click', handleClick)
-  plot.value.removeEventListener('plotly_relayout', handleRelayout)
-  plot.value.removeEventListener('plotly_selected', handleSelect)
+  plot.value?.removeEventListener('plotly_click', handleClick)
+  plot.value?.removeEventListener('plotly_relayout', handleRelayout)
+  plot.value?.removeEventListener('plotly_selected', handleSelect)
 })
 
 const ready = computed(
