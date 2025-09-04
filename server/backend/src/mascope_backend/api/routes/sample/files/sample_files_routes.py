@@ -361,9 +361,11 @@ def get_upload_handler(
     """
 
     async def handler(file_path: str, metadata: dict):
+        # Sanitize filename to prevent path traversal
+        safe_filename = os.path.basename(metadata["filename"])
         # Rename file from temporary name back to original
-        dest_path = os.path.join(os.path.dirname(file_path), metadata["filename"])
-        shutil.copyfile(file_path, dest_path)
+        dest_path = os.path.join(os.path.dirname(file_path), safe_filename)
+        shutil.move(file_path, dest_path)
         # Extract user session ID from headers
         sid = request.headers.get("X-SID")
         # Single token validation for the entire upload process
