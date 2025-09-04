@@ -296,7 +296,7 @@
 .uppy-DashboardContent-back,
 .uppy-DashboardContent-addMore,
 .uppy-Dashboard-browse {
-  color: #849770 !important;
+  color: var(--p-button-primary-background) !important;
   background-color: var(--p-panel-background) !important;
   background-image: none !important;
   box-shadow: none !important;
@@ -325,7 +325,7 @@
 }
 
 .uppy-Dashboard-Item-previewInnerWrap {
-  background-color: #7a776a !important;
+  background-color: var(--p-listbox-option-selected-background) !important;
 }
 
 .uppy-StatusBar-actions {
@@ -337,7 +337,7 @@
 .uppy-StatusBar-actionBtn,
 .uppy-StatusBar-actionBtn--upload {
   color: var(--p-panel-background) !important;
-  background-color: #849770 !important;
+  background-color: var(--p-button-primary-background) !important;
   border: none !important;
 }
 
