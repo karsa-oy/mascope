@@ -48,7 +48,7 @@ export const useUppy = defineStore('app.uppy', () => {
       }
     }
   }).use(Tus, {
-    endpoint: `${runtime.api_path}/api/sample/files/upload`,
+    endpoint: `${runtime.api_path}/api/sample/files/upload/tus`,
     // settings
     retryDelays: [0, 3000, 5000, 10000, 20000],
     chunkSize: 1e8, // 100MB

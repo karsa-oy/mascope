@@ -701,9 +701,7 @@ async def upload_sample_files(
     """
     Handles upload of multiple sample files to the `filestreams` directory.
 
-    Each file is read in chunks to avoid high memory usage and stored in the specified
-    directory as defined in the runtime configuration. Files are processed sequentially
-    to avoid I/O bottlenecks for reliable uploads.
+    This controller is used by the file upload POST endpoint.
 
     :param files: List of uploaded files to process.
     :type files: list[UploadFile]
@@ -824,6 +822,7 @@ async def upload_sample_file(
     """
     Handles upload of a single sample file from a given file path to the `filestreams` directory.
 
+    This controller is used by the TUS file upload endpoint.
     The file is moved to the specified directory as defined in the runtime configuration.
 
     :param file_path: Path to the file to upload.

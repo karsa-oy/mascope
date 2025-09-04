@@ -2,7 +2,7 @@ import os
 import shutil
 
 from datetime import datetime, timedelta, timezone
-from fastapi import APIRouter, BackgroundTasks, Request, Depends, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Request, Depends, UploadFile
 from typing import Callable
 
 from tuspyserver import create_tus_router
@@ -22,6 +22,7 @@ from mascope_backend.api.controllers.sample.files.sample_files_controller import
     delete_sample_files,
     update_sample_file,
     upload_sample_file,
+    upload_sample_files,
     get_sample_file_peaks,
     compute_sample_file_peaks,
     get_sample_file_peak_timeseries,
@@ -31,6 +32,7 @@ from mascope_backend.api.controllers.sample.files.sample_files_controller import
 from mascope_backend.api.models.sample.files.sample_file_pydantic_model import (
     SampleFileCreate,
     SampleFileUpdate,
+    SampleFilesUpload,
     GetSampleFilesQueryParams,
     GetRecentSampleFilesQueryParams,
     GetSampleFilePeaksQueryParams,
@@ -305,6 +307,45 @@ async def process_sample_item_route(
     }
 
 
+@sample_files_router.post("/upload")
+@api_route(status_code=201, token_access=True)
+async def upload_sample_files_route(
+    request: Request,
+    files: list[UploadFile] = File(..., description="Multiple files to upload"),
+    user=Depends(editor_user),
+) -> dict:
+    """
+    Uploads multiple sample files to the server in a single batch operation.
+
+    This route takes an uploaded files from a form field and saves it in the `filestreams` directory
+    on the server. Files are validated for size and extension before processing.
+
+    :param request: HTTP request object containing headers and metadata
+    :type request: Request
+    :param files: List of files to be uploaded via multipart form data
+    :type files: list[UploadFile]
+    :param user: The authenticated user from dependency injection
+    :type user: User
+    :return: A dict response with sample files upload results including success/failure details
+    :rtype: dict
+    """
+    # Validate files using Pydantic model
+    validated_files = SampleFilesUpload(files=files)
+
+    # Extract user session ID from headers
+    sid = request.headers.get("X-SID")
+
+    # Single token validation for the entire upload process
+    access_token = await get_access_token(user=user, service_name="file-converter")
+
+    return await upload_sample_files(
+        files=validated_files.files,
+        user=user,
+        access_token=access_token,
+        sid=sid,
+    )
+
+
 def get_upload_handler(
     request: Request,
     user=Depends(editor_user),
@@ -341,5 +382,5 @@ def get_upload_handler(
 sample_files_upload_router = create_tus_router(
     files_dir=runtime.env.path("temp"),
     upload_complete_dep=get_upload_handler,
-    prefix="api/sample/files/upload",
+    prefix="api/sample/files/upload/tus",
 )
