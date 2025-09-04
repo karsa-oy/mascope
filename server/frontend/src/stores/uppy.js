@@ -20,9 +20,9 @@ function validateFile(file) {
   const prefixType = instrumentType(prefix)
   const ext = file.name.split('.').slice(-1)[0].toLowerCase()
   // check filename validity
-  if (ext == 'h5' && prefixType !== 'tof') {
+  if (ext === 'h5' && prefixType !== 'tof') {
     return false
-  } else if (ext == 'raw' && prefixType !== 'orbi') {
+  } else if (ext === 'raw' && prefixType !== 'orbi') {
     return false
   } else {
     return true
