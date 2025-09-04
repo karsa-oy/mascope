@@ -48,9 +48,6 @@ onMounted(() => {
       proudlyDisplayPoweredByUppy: false,
       note: 'Supported file types: .h5 (TOF), .raw (Orbi)'
     })
-    .on('dashboard:modal-closed', () => {
-      uppy.clear()
-    })
 })
 
 onUnmounted(() => {
