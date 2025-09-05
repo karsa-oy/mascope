@@ -107,8 +107,9 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
     :yield: Yields an active SQLAlchemy session for database interactions.
     :rtype: AsyncGenerator[AsyncSession, None]
     """
-    async with ASYNC_SESSION_MAKER() as session:
-        yield session
+    async with db_semaphore:
+        async with ASYNC_SESSION_MAKER() as session:
+            yield session
 
 
 # Initialization and main interface functions
