@@ -113,11 +113,14 @@ def apply_heuristic_rules(
     candidates = pl.DataFrame(candidates)
     if candidates.is_empty():
         log_messages.append("No candidates provided for heuristic filtering.")
-        return []
+        return [], log_messages
 
     if "Ionization peak" in candidates.get_column("formula").to_list():
         # Skip all rules for ionization peaks
-        return candidates.filter(pl.col("formula") == "Ionization peak").to_dicts()
+        return (
+            candidates.filter(pl.col("formula") == "Ionization peak").to_dicts(),
+            log_messages,
+        )
 
     for i, rule in enumerate(HEURISTIC_RULES):
         if candidates.is_empty():
