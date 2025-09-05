@@ -4,10 +4,6 @@ import mascope_sdk as msdk
 import numpy as np
 import pandas as pd
 from .calibration import CentroidedSpectrum, Spectra
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from mascope_jupyter_widgets import MascopeDataBrowser
 
 
 def _is_notebook():
@@ -73,15 +69,18 @@ def ppm_to_da(mz0: float, ppm: float) -> float:
 
 
 def collect_spectra(
-    data_browser: "MascopeDataBrowser",
+    mascope_url: str,
+    access_token: str,
     samples: pd.DataFrame,
     update_cached: bool = False,
 ) -> Spectra:
     """
     Collects centroided spectra and their corresponding timestamps from a set of samples.
 
-    :param data_browser: MascopeDataBrowser instance for accessing Mascope data.
-    :type data_browser: MascopeDataBrowser
+    :param mascope_url: URL of the Mascope server.
+    :type mascope_url: str
+    :param access_token: User's Jupyter access token.
+    :type access_token: str
     :param samples: DataFrame containing sample metadata, must include 'datetime', 'sample_file_id', and 'polarity' columns.
     :type samples: pd.DataFrame
     :param update_cached: If True, will update the cache with new spectra, defaults to False.
@@ -128,8 +127,8 @@ def collect_spectra(
                 chunk_idx * DOWNLOAD_CHUNK_SIZE : (chunk_idx + 1) * DOWNLOAD_CHUNK_SIZE
             ]
             centroided_map = msdk.get_sample_centroids_per_scan(
-                mascope_url=data_browser.mascope_url,
-                access_token=data_browser.access_token,
+                mascope_url=mascope_url,
+                access_token=access_token,
                 sample_item_ids=chunk,
             )
             if not centroided_map:
@@ -170,8 +169,9 @@ def collect_spectra(
 
 
 def average_sample_item_spectra(
+    mascope_url: str,
+    access_token: str,
     sample_item_ids: list[str],
-    data_browser: "MascopeDataBrowser",
     calibration_factors: list | None = None,
     method="mean",
 ) -> dict[str, np.ndarray]:
@@ -180,10 +180,12 @@ def average_sample_item_spectra(
     calibration factors are provided, interpolates them onto a common m/z grid,
     and then averages the intensities at each m/z value.
 
+    :param mascope_url: URL of the Mascope server.
+    :type mascope_url: str
+    :param access_token: User's Jupyter access token
+    :type access_token: str
     :param sample_item_ids: List of sample item IDs for which to average spectra.
     :type sample_item_ids: list[str]
-    :param data_browser: MascopeDataBrowser instance for accessing Mascope data.
-    :type data_browser: MascopeDataBrowser
     :param calibration_factors: List of m/z calibration factors for each sample item ID, defaults to None
     :param method: Averaging method, defaults to "mean"
     :type method: str, optional
@@ -204,8 +206,8 @@ def average_sample_item_spectra(
             chunk_idx * DOWNLOAD_CHUNK_SIZE : (chunk_idx + 1) * DOWNLOAD_CHUNK_SIZE
         ]
         chunk_averaged_specs = msdk.get_samples_spectra(
-            mascope_url=data_browser.mascope_url,
-            access_token=data_browser.access_token,
+            mascope_url=mascope_url,
+            access_token=access_token,
             sample_item_ids=chunk,
         )
         if not chunk_averaged_specs:
