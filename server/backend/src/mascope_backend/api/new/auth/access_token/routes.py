@@ -26,6 +26,7 @@ async def access_token_regenerate_route(
     - mascope_sdk: guest or higher - for Jupyter access
     - tof-agent: editor or higher - for TOF agent access
     - file-agent: editor or higher - for File agent access
+    - export-agent: editor or higher - for Export agent access
     - file-converter: internal service, managed automatically
     """
     service_name = access_token_request.service_name
@@ -35,6 +36,8 @@ async def access_token_regenerate_route(
     elif service_name == "tof-agent":
         await role_based_access(user, "editor")
     elif service_name == "file-agent":
+        await role_based_access(user, "editor")
+    elif service_name == "export-agent":
         await role_based_access(user, "editor")
     elif service_name == "file-converter":
         raise InternalServiceAccessException()

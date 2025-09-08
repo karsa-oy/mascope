@@ -40,6 +40,11 @@ const SERVICE_CONFIGS = [
     id: 'file-agent',
     label: 'File Agent',
     minRole: 200 // editor role_id
+  },
+  {
+    id: 'export-agent',
+    label: 'CSV Export Agent',
+    minRole: 200 // editor role_id
   }
 ]
 
