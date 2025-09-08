@@ -7,10 +7,7 @@ from colorcet import glasbey_hv as colormap
 from mascope_file.io import load_file
 from mascope_file.name import get_instrument_type
 
-from mascope_signal.compute import (
-    get_scan_timestamps,
-    sum_signal_for_time_range,
-)
+import mascope_signal.compute as m_compute
 from mascope_signal.peak import filter_peaks, get_peaks
 
 from mascope_backend.db import async_session
@@ -80,7 +77,7 @@ async def visualize_ion_focus(
         isotope.relative_abundance for isotope in target_isotopes
     ]
 
-    scan_timestamps = get_scan_timestamps(
+    scan_timestamps = m_compute.get_scan_timestamps(
         sample.filename, t_min=sample.t0, t_max=sample.t1, polarity=sample.polarity
     )
 
@@ -201,7 +198,7 @@ def _load_peaks_and_averaged_signal(sample, target_isotopes):
         .compute()
     )
     averaged_signal = (
-        sum_signal_for_time_range(
+        m_compute.get_sum_signal(
             sample.filename,
             sample.t0,
             sample.t1,

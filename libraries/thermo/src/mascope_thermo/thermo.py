@@ -258,14 +258,13 @@ def get_signal(
         )
 
 
-def compute_sum_signal_in_time_range(
+def compute_sum_signal(
     datafile_path: str,
     t_min: float | None = None,
     t_max: float | None = None,
-    average: bool = False,
     ppm: int = 1,
     polarity: Literal["+", "-"] | None = None,
-) -> xr.core.dataarray.DataArray:
+) -> tuple[xr.core.dataarray.DataArray, int]:
     """Computes sum signal in (t_min, t_max) time range, binning counts within "ppm" value.
     Polarity filter may be optionally provided.
 
@@ -275,8 +274,6 @@ def compute_sum_signal_in_time_range(
     :type t_min: float, optional
     :param t_max: End time [s]
     :type t_max: float, optional
-    :param average: If spectrum should be averaged, defaults to False
-    :type average: bool, optional
     :param ppm: ppm precision for binning, defaults to 1. This value determines the mass tolerance for grouping m/z values,
                 where a smaller ppm value results in finer binning and higher precision.
     :type ppm: int, optional
@@ -284,8 +281,8 @@ def compute_sum_signal_in_time_range(
     :type polarity: str, optional
     :raises ValueError: If the specified time range is invalid, or if no data is found in the specified filters,
                         or the specified polarity is not found in the raw file.
-    :return: Sum signal in the specified time range for specified polarity as an xarray DataArray.
-    :rtype: xr.core.dataarray.DataArray
+    :return: An xarray DataArray containing the sum signal and the number of combined scans
+    :rtype: tuple[xr.core.dataarray.DataArray, float]
     """
     with RawFileManager(datafile_path) as RawFile:
         num_of_scans = RawFile.RunHeaderEx.SpectraCount
@@ -309,21 +306,17 @@ def compute_sum_signal_in_time_range(
         average_scan = Extensions.AverageScans(RawFile, net_scan_indices, mass_option)
         averaged_spec = average_scan.SegmentedScan
 
-        # Extract averaged signal, multiply by num_of_scans to restore sum signal
+        # Extract averaged signal, multiply by number of combined scans to restore sum signal
+        num_of_combined_scans = average_scan.ScansCombined
         mz = np.frombuffer(averaged_spec.Positions)
-        sum_signal = np.frombuffer(averaged_spec.Intensities)
+        sum_signal = np.frombuffer(averaged_spec.Intensities) * num_of_combined_scans
 
-        if not average:
-            # Multiply by number of averaged scans
-            sum_signal *= average_scan.ScansCombined
-
-        # Convert sum signal to dask array
         sum_signal_dask = da.from_array(sum_signal, chunks="auto")
-
-        # Convert to xarray.DataArray
-        return xr.DataArray(
+        sum_signal = xr.DataArray(
             data=sum_signal_dask, dims=["mz"], coords={"mz": mz}, name="sum_signal"
         )
+
+        return sum_signal, num_of_combined_scans
 
 
 def get_tic_per_scan(

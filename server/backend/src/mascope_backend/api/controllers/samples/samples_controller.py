@@ -584,7 +584,7 @@ async def get_sample_spectrum(
     intensity_unit = "counts/s"
 
     # Use specific time range with polarity filtering
-    spectrum = m_compute.sum_signal_for_time_range(
+    spectrum = m_compute.get_sum_signal(
         sample.filename, t_min_eff, t_max_eff, polarity=sample.polarity, average=True
     )
 

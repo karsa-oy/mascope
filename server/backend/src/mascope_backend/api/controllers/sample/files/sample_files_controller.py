@@ -12,11 +12,7 @@ from sqlalchemy import (
 from mascope_file.io import load_file
 from mascope_file.name import parse_path_from_item_filename
 
-from mascope_signal.compute import (
-    sum_signal_for_time_range,
-    get_sum_signal,
-    get_metadata,
-)
+import mascope_signal.compute as m_compute
 from mascope_signal.peak import get_peaks
 
 from mascope_backend.db import async_session
@@ -49,6 +45,10 @@ from mascope_backend.api.models.sample.files.sample_file_pydantic_model import (
 )
 
 from mascope_backend.runtime import runtime
+
+
+# TODO_configuration Default sample file upload params
+FILE_UPLOAD_CHUNK_SIZE = 2 * 1024 * 1024  # 2 MB
 
 
 @api_controller()
@@ -687,10 +687,6 @@ async def update_sample_file(
 # ---------------------
 
 
-# TODO_configuration Default sample file upload params
-FILE_UPLOAD_CHUNK_SIZE = 2 * 1024 * 1024  # 2 MB
-
-
 @api_controller()
 async def upload_sample_files(
     files: list[UploadFile],
@@ -1174,11 +1170,7 @@ async def get_sample_file_spectrum(
     intensity_unit = "counts/s"
 
     # Step 2: Compute averaged spectrum in the time range
-    if t_min is None and t_max is None:
-        # Try to get previously computed sum signal
-        spectrum = get_sum_signal(filename, average=True)
-    else:
-        spectrum = sum_signal_for_time_range(filename, t_min, t_max, average=True)
+    spectrum = m_compute.get_sum_signal(filename, t_min, t_max, average=True)
 
     # Step 3: Filter by m/z range if provided
     if mz_min is not None and mz_max is not None:
@@ -1228,7 +1220,7 @@ async def get_sample_file_metadata(sample_file_id: str) -> dict:
 
     # Step 2: Get metadata
     try:
-        metadata = get_metadata(filename)
+        metadata = m_compute.get_metadata(filename)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get metadata: {e}")
 

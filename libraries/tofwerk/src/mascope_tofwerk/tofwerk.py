@@ -194,12 +194,11 @@ def get_signal(
         )
 
 
-def compute_sum_signal_in_time_range(
+def compute_sum_signal(
     datafile_path: str,
     t_min: float | None = None,
     t_max: float | None = None,
-    average: bool = False,
-) -> xr.core.dataarray.DataArray:
+) -> Tuple[xr.DataArray, float]:
     """
     Computes sum signal in (t_min, t_max) time range.
 
@@ -211,10 +210,8 @@ def compute_sum_signal_in_time_range(
     :type t_min: float, optional
     :param t_max: Optional end time in seconds (default is None).
     :type t_max: float, optional
-    :param average: If spectrum should be averaged, defaults to False.
-    :type average: bool, optional
-    :return: Sum signal [ions/sec] in the specified time range.
-    :rtype: xr.core.dataarray.DataArray
+    :return: An xarray DataArray containing the sum signal and the averaging factor
+    :rtype: tuple[xr.core.dataarray.DataArray, float]
     """
     with open_h5_file(datafile_path) as h5_file:
         # Get signal HDF5 dataset reference
@@ -254,9 +251,7 @@ def compute_sum_signal_in_time_range(
         last_chunk = signal_ref[end_coord[0], : end_coord[1] + 1, : end_coord[2] + 1, :]
         last_chunk_sum = last_chunk.sum(axis=(0, 1))
         sum_signal += last_chunk_sum
-
-        if average:
-            sum_signal = sum_signal / (t_end_ind - t_start_ind + 1)
+        averaging_factor = t_end_ind - t_start_ind + 1
 
         # Coefficient to convert signal intensity from [mV] -> [ions/sec]
         conversion_coefficient = get_conversion_coefficient(h5_file)
@@ -265,7 +260,7 @@ def compute_sum_signal_in_time_range(
         sum_signal *= conversion_coefficient
 
         sum_signal_da = xr.DataArray(sum_signal, dims=["mz"], coords={"mz": all_mzs})
-        return sum_signal_da.rename("sum_signal")
+        return sum_signal_da.rename("sum_signal"), averaging_factor
 
 
 def get_tic_per_scan(

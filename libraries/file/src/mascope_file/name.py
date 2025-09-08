@@ -52,7 +52,7 @@ def parse_path_from_item_filename(item_filename):
 
 
 def filename_to_zarr_path(base_filename, variable):
-    """Derive full path to a zarr data array from sample filename and the desired variable
+    """Derive full path to a zarr dataset from sample filename and the desired variable
 
     :param base_filename: Sample file filename
     :type base_filename: str
