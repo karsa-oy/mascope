@@ -334,32 +334,116 @@ class DataMonitor:
             return True
 
     def save_results(self, sample: Dict, results: List[Dict]) -> bool:
-        """Save match results to a text file."""
+        """Save match results to a single CSV file per day with columns for each compound."""
         self.logger.debug(
             f"Saving results for sample {sample['sample_item_id']}: results={results}"
         )
         try:
-            sample_filename = sample.get("filename")
-            sample_datetime_utc = sample["datetime_utc"]
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            sample_datetime_utc = sample.get("datetime_utc")
+            sample_filename = sample.get("filename", "")
 
-            filename = f"{timestamp}_orbion.txt"
+            # Create output directory if it doesn't exist
+            os.makedirs(self.config["output_directory"], exist_ok=True)
+
+            # Get today's date for the filename
+            today = datetime.now().strftime("%Y%m%d")
+            filename = f"{today}.csv"
             filepath = os.path.join(self.config["output_directory"], filename)
 
-            with open(filepath, "w", encoding="utf-8") as f:
-                f.write(f"{'=' * 50}\n")
-                f.write(f"Filename: {sample_filename}\n")
-                f.write(f"Sample Datetime (UTC): {sample_datetime_utc}\n")
-                f.write(f"{'=' * 50}\n\n")
+            # Extract formulas and intensities from results
+            formula_intensities = {}
+            for result in results:
+                formula = result.get("formula")
+                intensity = result.get("intensity", "")
+                if formula:
+                    formula_intensities[formula] = intensity
 
-                f.write("\nMatch data (JSON):\n")
-                f.write(json.dumps(results, indent=2))
+            # Check if file already exists
+            file_exists = os.path.isfile(filepath)
+            existing_formulas = set()
+
+            if file_exists:
+                # Read existing headers to check if we need to update the file structure
+                with open(filepath, "r", encoding="utf-8") as f:
+                    header_line = f.readline().strip()
+                    headers = header_line.split(",")
+                    # Skip datetime and filename columns
+                    existing_formulas = set(headers[2:])
+
+            # Check if any new formulas exist in the results
+            new_formulas = set(formula_intensities.keys()) - existing_formulas
+
+            # If there are new formulas, we need to create a new file with updated headers
+            if new_formulas and file_exists:
+                self.logger.info(
+                    f"Found new compounds: {new_formulas}. Creating updated CSV file."
+                )
+
+                # Read all existing data
+                with open(filepath, "r", encoding="utf-8") as f:
+                    existing_data = f.readlines()
+
+                # Create a new file with updated headers
+                temp_filepath = f"{filepath}.temp"
+                with open(temp_filepath, "w", encoding="utf-8", newline="") as f:
+                    # Combine existing headers with new formulas
+                    all_formulas = sorted(list(existing_formulas.union(new_formulas)))
+                    new_header = (
+                        "datetime_utc,filename," + ",".join(all_formulas) + "\n"
+                    )
+                    f.write(new_header)
+
+                    # Write existing data with placeholders for new columns
+                    for i, line in enumerate(existing_data):
+                        if i == 0:  # Skip header line
+                            continue
+
+                        parts = line.strip().split(",")
+                        line_datetime = parts[0]
+                        line_filename = parts[1]
+
+                        # Create a dictionary mapping formula to value
+                        # Adjust index to account for datetime and filename columns
+                        line_values = {
+                            headers[j]: parts[j] for j in range(2, len(parts))
+                        }
+
+                        # Create updated line with placeholders for new formulas
+                        new_line = [line_datetime, line_filename]
+                        for formula in all_formulas:
+                            new_line.append(line_values.get(formula, ""))
+
+                        f.write(",".join(new_line) + "\n")
+
+                # Replace the old file with the updated one
+                os.replace(temp_filepath, filepath)
+
+                # Update existing_formulas for the next step
+                existing_formulas = set(all_formulas)
+
+            # Append data to the file
+            with open(
+                filepath, "a" if file_exists else "w", encoding="utf-8", newline=""
+            ) as f:
+                # Write header if creating a new file
+                if not file_exists:
+                    all_formulas = sorted(list(formula_intensities.keys()))
+                    header = "datetime_utc,filename," + ",".join(all_formulas) + "\n"
+                    f.write(header)
+                    existing_formulas = set(all_formulas)
+
+                # Prepare the data row
+                data_row = [sample_datetime_utc, sample_filename]
+                for formula in sorted(list(existing_formulas)):
+                    data_row.append(str(formula_intensities.get(formula, "")))
+
+                f.write(",".join(data_row) + "\n")
 
             self.logger.info(f"Results saved to: {filepath}")
             return True
 
         except Exception as e:
-            self.logger.error(f"Error saving results: {e}")
+            self.logger.error(f"Error saving results: {e}\n{traceback.format_exc()}")
             return False
 
     def update_state(self, last_check_timestamp: str, checked_batch_ids: List[str]):
