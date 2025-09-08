@@ -3,7 +3,7 @@ name = "mascope-csv-export-agent"
 version = "0.1.0"
 requires-python = ">=3.10"
 dependencies = [
-    "mascope_sdk"
+    "mascope_sdk > 2025.8.28"
 ]
 
 [dependency-groups]

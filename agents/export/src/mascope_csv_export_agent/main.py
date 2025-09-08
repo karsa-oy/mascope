@@ -147,6 +147,7 @@ class DataMonitor:
                 mascope_url=self.config["mascope_url"],
                 access_token=self.config["access_token"],
                 workspace_id=self.config["workspace_id"],
+                service_name="export-agent",
             )
 
             if not batches:
@@ -217,6 +218,7 @@ class DataMonitor:
                 mascope_url=self.config["mascope_url"],
                 access_token=self.config["access_token"],
                 sample_batch_id=batch_id,
+                service_name="export-agent",
             )
 
             if not samples:
@@ -298,6 +300,7 @@ class DataMonitor:
                 sample_item_id=sample_id,
                 target_compound_formulas=formulae,
                 match_params=self.config["match_params"],
+                service_name="export-agent",
             )
             if len(match_data) > 0:
                 for compound in match_data:
