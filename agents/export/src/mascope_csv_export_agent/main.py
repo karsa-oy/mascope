@@ -51,6 +51,7 @@ class DataMonitor:
                 "mz_tolerance": 15.0,
                 "isotope_ratio_tolerance": 0.2,
                 "peak_min_intensity": 0.0,
+                "match_score_threshold": 0.5,
             },
             "output_directory": "./results",
             "check_interval_seconds": 10,
@@ -315,9 +316,10 @@ class DataMonitor:
                             {
                                 "formula": match_ion["target_ion_formula"],
                                 "intensity": match_ion["sample_peak_intensity_sum"],
-                                "match_score": match_ion["match_score"],
                             }
                             for match_ion in match_ions
+                            if match_ion["match_score"]
+                            >= self.config["match_params"]["match_score_threshold"]
                         ]
                     )
                 self.logger.info(
