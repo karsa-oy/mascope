@@ -18,16 +18,16 @@ On first run, the application will create a default configuration file and exit.
 
 ### 2. Configuration
 
-The application uses a JSON configuration file (`data_monitor_config.json`) to specify the configuration. The configurable parameters are explained in the following sections.
+The application uses a JSON configuration file (`config.json`) to specify the configuration. The configurable parameters are explained in the following sections.
 
 > **NOTE:** Any changes made to the configuration only take effect after restarting the application
 
 #### Required Settings
 
 - `mascope_url`: URL of your Mascope server (e.g., `"https://<org>.mascope.app"`)
-- `access_token`: Your Mascope API access token (of type _Jupyter Notebooks_)
+- `access_token`: Your Mascope API access token (of type _CSV Export Agent_)
 
-  > To generate the access token, log in to Mascope and via the _🏠Home menu_ enter _⚙️Settings_. In the _API access token_ section generate _Jupyter Notebooks_ token (or use an existing one).
+  > To generate the access token, log in to Mascope and via the _🏠Home menu_ enter _⚙️Settings_. In the _API access token_ section generate _CSV Export Agent_ token (or use an existing one).
 
 - `workspace_id`: The workspace ID to monitor for samples
 
@@ -43,14 +43,15 @@ The application uses a JSON configuration file (`data_monitor_config.json`) to s
   - `mz_tolerance`: Mass-to-charge ratio tolerance (ppm) for matching (default: 10.0)
   - `isotope_ratio_tolerance`: Isotope ratio tolerance (default: 0.2)
   - `peak_min_intensity`: Minimum peak intensity threshold (default: 0.0)
+  - `match_score_threshold`: Match score threshold. If the match score is below the threshold (default: 0.5), intensity will be set to 0
 
   `}`
 
 - `output_directory`: Directory to save result files (default: `"./results"`)
 - `check_interval_seconds`: How often to check for new samples (default: 10)
 - `log_level`: Logging level (`"DEBUG"`, `"INFO"`, `"WARNING"`, `"ERROR"`)
-- `log_file`: Log file path (default: `"data_monitor.log"`)
-- `state_file`: State file path (default: `"data_monitor_state.json"`)
+- `log_file`: Log file path (default: `"export_agent.log"`)
+- `state_file`: State file path (default: `"state.json"`)
 
 #### Example Configuration
 
@@ -61,9 +62,10 @@ The application uses a JSON configuration file (`data_monitor_config.json`) to s
   "workspace_id": "your-workspace-id",
   "target_compounds": ["H2SO4", "CH2O2", "C3H6O3", "NH3"],
   "match_params": {
-    "mz_tolerance": 10.0,
+    "mz_tolerance": 15.0,
     "isotope_ratio_tolerance": 0.2,
-    "peak_min_intensity": 0.0
+    "peak_min_intensity": 0.0,
+    "match_score_threshold": 0.5
   },
   "output_directory": "./results",
   "check_interval_seconds": 10,
@@ -77,15 +79,22 @@ After configuring, to run the monitor continuously (checks for new samples every
 
 > **NOTE**: When running the agent for the first time (after initial configuration), it will process all samples from all batches of the configured workspace.
 
-> Consequently, in case you wish to edit the target list and recompute data retrospectively, you may stop the agent, delete `data_monitor_state.json`, and relaunch to trigger re-processing.
+> Consequently, in case you wish to edit the target list and recompute data retrospectively, you may stop the agent, delete `state.json`, and relaunch to trigger re-processing.
 
 ## Output
 
 ### Result Files
 
-- Results are saved as timestamped text files in the configured output directory
-- Each file contains compound match data in JSON format
-- Files are named with format: `YYYYMMDD_HHMMSS_orbion.txt`
+- Results are saved as CSV files in the configured output directory
+- One file is created per day
+- Each file contains columns `datetime_utc`, `filename`, and a column for each configured target ion composition
+- If there is no match for the said target ion, the cell is filled with the value `0.0`
+- If the cell is empty, it means the ion was not matched (either due to polarity discrepancy or edited target list)
+- Files are named with format: `YYYYMMDD.csv`
+
+> **NOTE**: The rows in the CSV file are in the order in which they were processed, and thus not necessarily sorted by the datetime of the sample.
+
+> **NOTE**: Samples are not re-processed retrospectively when editing targets in the config file.
 
 ### Log Files
 
@@ -94,7 +103,7 @@ After configuring, to run the monitor continuously (checks for new samples every
 
 ### State Management
 
-- The application maintains state in `data_monitor_state.json`
+- The application maintains state in `state.json`
 - Tracks last check timestamps per batch to avoid reprocessing samples
 - State file is automatically created and updated
 
