@@ -22,7 +22,7 @@ from mascope_sdk import get_sample_batches, get_samples, get_sample_compounds_ma
 class DataMonitor:
     """Monitors Mascope server for new sample data and processes it."""
 
-    def __init__(self, config_file: str = "data_monitor_config.json"):
+    def __init__(self, config_file: str = "config.json"):
         """
         Initialize the data monitor.
 
@@ -30,7 +30,7 @@ class DataMonitor:
         """
         self.config_file = config_file
         self.config = self.load_config()
-        self.state_file = self.config.get("state_file", "data_monitor_state.json")
+        self.state_file = self.config.get("state_file", "state.json")
         self.state = self.load_state()
 
         # Setup logging
@@ -53,9 +53,9 @@ class DataMonitor:
             },
             "output_directory": "./results",
             "check_interval_seconds": 60,
-            "state_file": "data_monitor_state.json",
+            "state_file": "state.json",
             "log_level": "INFO",
-            "log_file": "data_monitor.log",
+            "log_file": "export_agent.log",
         }
 
         try:
@@ -119,7 +119,7 @@ class DataMonitor:
             level=log_level,
             format=log_format,
             handlers=[
-                logging.FileHandler(self.config.get("log_file", "data_monitor.log")),
+                logging.FileHandler(self.config.get("log_file", "export_agent.log")),
                 logging.StreamHandler(),
             ],
         )
@@ -561,7 +561,7 @@ def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(description="Mascope CSV Export Agent")
     parser.add_argument(
-        "--config", default="data_monitor_config.json", help="Configuration file path"
+        "--config", default="config.json", help="Configuration file path"
     )
     parser.add_argument(
         "--single",
