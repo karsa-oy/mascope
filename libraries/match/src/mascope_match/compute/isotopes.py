@@ -6,15 +6,11 @@ from scipy.spatial.distance import pdist
 from mascope_file.io import load_array
 from mascope_file.name import get_instrument_type, get_sample_file_type
 from mascope_signal.compute import get_scan_timestamps
-from mascope_signal.peak import detect_peaks
+from mascope_signal.peak import get_peak_detector
 from mascope_chem.mz import match_mz
 from mascope_match.runtime import runtime
 
-from mascope_match.params import (
-    ORBI_FITTING_THRESHOLD,
-    TOF_FITTING_THRESHOLD,
-    UnmatchedIsotopeParams,
-)
+from mascope_match.params import UnmatchedIsotopeParams
 from mascope_match.id import generate_id
 
 
@@ -155,21 +151,9 @@ async def detect_and_load_peaks(
     # Get list of nominal m/z values
     u_list = list(np.unique(np.round(target_mzs)))
 
-    match instrument_type:
-        case "orbi":
-            peak_fit_threshold = ORBI_FITTING_THRESHOLD
-        case "tof":
-            peak_fit_threshold = TOF_FITTING_THRESHOLD
-
     # Detect peaks in the sample file
-    await detect_peaks(
-        filename,
-        instrument_functions,
-        peak_fit_threshold,
-        u_list,
-        if_exists="append",
-        instrument_type=instrument_type,
-    )
+    peak_detector = get_peak_detector(filename, instrument_functions, u_list)
+    await peak_detector.detect_peaks(if_exists="append")
 
     runtime.logger.debug("Start matching")
 

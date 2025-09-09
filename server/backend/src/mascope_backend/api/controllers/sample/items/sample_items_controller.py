@@ -15,11 +15,7 @@ from sqlalchemy import (
 from mascope_file.name import get_instrument_type
 
 import mascope_signal.compute as m_compute
-from mascope_signal.peak import detect_peaks
-from mascope_match import (
-    ORBI_FITTING_THRESHOLD,
-    TOF_FITTING_THRESHOLD,
-)
+from mascope_signal.peak import get_peak_detector
 
 from mascope_backend.socket import sio
 from mascope_backend.socket.notifications import (
@@ -812,24 +808,13 @@ async def sample_item_export_peaks(
 
         await send_progress_user_notification(notification, 0.1)
 
-        # Assign peak fitting threshold and peak abundance units
-        # depending on the instrument type
-        # Correct intrument type unsured by get_instrument_type
+        peak_detector = get_peak_detector(filename, instrument_functions)
+        sample_file = await peak_detector.detect_peaks(if_exists="append")
+
         if instrument_type == "orbi":
-            threshold = ORBI_FITTING_THRESHOLD
             peak_data_type = "peak_heights"
         if instrument_type == "tof":
-            threshold = TOF_FITTING_THRESHOLD
             peak_data_type = "peak_areas"
-        sample_file = await detect_peaks(
-            filename,
-            instrument_functions,
-            threshold,
-            u_list=None,
-            if_exists="append",
-            instrument_type=instrument_type,
-        )
-
         sample_peak_data = sample_file[peak_data_type].dropna(dim="mz", how="all")
 
         await send_progress_user_notification(notification, 0.8)

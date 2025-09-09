@@ -1,21 +1,15 @@
 from typing import Literal
-from mascope_match import (
-    ORBI_FITTING_THRESHOLD,
-    TOF_FITTING_THRESHOLD,
-)
 from mascope_backend.api.new.instrument_configs.lib import (
     read_instrument_functions,
 )
-from mascope_file.name import get_instrument_type
-from mascope_signal.peak import detect_peaks
+from mascope_signal.peak import get_peak_detector
 
 
 async def compute_peaks(
     filename: str, if_exists: Literal["append", "replace"] = "append"
 ) -> "xarray.Dataset":  # noqa: F821
     """Compute peaks for a sample file.
-    This function loads the instrument functions, determines the instrument type,
-    sets the threshold based on the instrument type, and then detects peaks in the
+    This function loads the instrument functions, and then detects peaks in the
     sample file. The detected peaks are returned along with the sample file.
 
     :param filename: Sample file name
@@ -28,21 +22,8 @@ async def compute_peaks(
 
     # Step 1: Load instrument functions and determine instrument type.
     instrument_functions = await read_instrument_functions(filename=filename)
-    instrument_type = get_instrument_type(filename)
 
-    # Step 2: Set threshold based on instrument type.
-    if instrument_type == "orbi":
-        threshold = ORBI_FITTING_THRESHOLD
-    if instrument_type == "tof":
-        threshold = TOF_FITTING_THRESHOLD
-
-    # Step 3: Detect peaks.
-    sample_file = await detect_peaks(
-        filename,
-        instrument_functions,
-        threshold,
-        u_list=None,
-        if_exists=if_exists,
-        instrument_type=instrument_type,
-    )
+    # Step 2: Detect peaks in the sample file.
+    peak_detector = get_peak_detector(filename, instrument_functions)
+    sample_file = await peak_detector.detect_peaks(if_exists=if_exists)
     return sample_file

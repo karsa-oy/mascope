@@ -13,12 +13,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import joinedload
 
 from mascope_file.name import get_instrument_type
-from mascope_signal.peak import detect_peaks, get_peaks
-from mascope_match import (
-    ORBI_FITTING_THRESHOLD,
-    TOF_FITTING_THRESHOLD,
-)
-
+from mascope_signal.peak import get_peak_detector, get_peaks
 from mascope_backend.db import async_session
 from mascope_backend.db.id import gen_id
 from mascope_backend.db.models import (
@@ -1107,27 +1102,18 @@ async def sample_batch_export_peaks(
         try:
             filename = row["filename"]
             instrument_functions = await read_instrument_functions(filename=filename)
-            instrument_type = get_instrument_type(filename)
 
             await send_progress_user_notification(notification, 0.1)
 
-            # Assign peak fitting threshold and peak abundance units
-            # depending on the instrument type
-            # Correct intrument type unsured by get_instrument_type
+            peak_detector = get_peak_detector(filename, instrument_functions)
+            sample_file = await peak_detector.detect_peaks(if_exists="append")
+
+            # Assign peak abundance units
+            instrument_type = get_instrument_type(filename)
             if instrument_type == "orbi":
-                threshold = ORBI_FITTING_THRESHOLD
                 unit = "height"
             if instrument_type == "tof":
-                threshold = TOF_FITTING_THRESHOLD
                 unit = "area"
-            sample_file = await detect_peaks(
-                filename,
-                instrument_functions,
-                threshold,
-                u_list=None,
-                if_exists="append",
-                instrument_type=instrument_type,
-            )
 
             await send_progress_user_notification(notification, 0.9)
 
