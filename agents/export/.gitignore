@@ -1,6 +1,6 @@
 build
 src/mascope_csv_export_agent/results
-data_monitor.log
+export_agent.log*
 data_monitor_config.json
 data_monitor_state.json
 *.spec

@@ -7,14 +7,15 @@ This application exports sample data from a Mascope server to CSV files,
 performing compound matching and saving results for further analysis.
 """
 
+import argparse
 import json
 import os
 import time
 import logging
 import traceback
 from datetime import datetime, timezone
+from logging.handlers import RotatingFileHandler
 from typing import Dict, List
-import argparse
 
 from mascope_sdk import get_sample_batches, get_samples, get_sample_compounds_matches
 
@@ -119,7 +120,11 @@ class DataMonitor:
             level=log_level,
             format=log_format,
             handlers=[
-                logging.FileHandler(self.config.get("log_file", "export_agent.log")),
+                RotatingFileHandler(
+                    self.config.get("log_file", "export_agent.log"),
+                    maxBytes=10_000_000,  # 10MB
+                    backupCount=5,
+                ),
                 logging.StreamHandler(),
             ],
         )
@@ -316,7 +321,7 @@ class DataMonitor:
                         ]
                     )
                 self.logger.info(
-                    f"Found matches for {len(results)} in sample {sample_name}"
+                    f"Found matches for {len(results)} ions in sample {sample_name}"
                 )
             else:
                 self.logger.info(f"No matches found in sample {sample_name}")
@@ -330,7 +335,7 @@ class DataMonitor:
         if results:
             return self.save_results(sample, results)
         else:
-            self.logger.info(f"No compound matches found for sample {sample_name}")
+            self.logger.info(f"No matches found for sample {sample_name}")
             return True
 
     def save_results(self, sample: Dict, results: List[Dict]) -> bool:
