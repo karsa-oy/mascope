@@ -31,15 +31,12 @@ async def access_token_regenerate_route(
     """
     service_name = access_token_request.service_name
 
-    if service_name == "mascope_sdk":
-        await role_based_access(user, "guest")
-    elif service_name == "tof-agent":
-        await role_based_access(user, "editor")
-    elif service_name == "file-agent":
-        await role_based_access(user, "editor")
-    elif service_name == "export-agent":
-        await role_based_access(user, "editor")
-    elif service_name == "file-converter":
-        raise InternalServiceAccessException()
+    match service_name:
+        case "mascope_sdk":
+            await role_based_access(user, "guest")
+        case "tof-agent" | "file-agent" | "export-agent":
+            await role_based_access(user, "editor")
+        case "file-converter":
+            raise InternalServiceAccessException()
 
     return await regenerate_access_token(user=user, service_name=service_name)
