@@ -26,7 +26,7 @@ from mascope_backend.api.controllers.target.isotopes.target_isotopes_controller 
 from mascope_backend.api.controllers.target.associations.target_compound_in_target_collection_controller import (
     get_target_compound_in_target_collection,
 )
-from mascope_backend.api.new.match.params import TofMatchParams
+from mascope_backend.api.new.match.params import TofMatchParams, OrbiMatchParams
 from mascope_backend.socket.notifications import (
     send_progress_user_notification,
 )
@@ -51,6 +51,50 @@ class BaseCalibrationHandler:
         self.stats = None
         self.error = None
         self.warning = None
+
+    async def _match_calibration_compounds(
+        self, match_params
+    ) -> tuple[pd.DataFrame, pd.DataFrame]:
+        """Match calibration compounds in the sample file."""
+        target_compounds_result = await get_target_compound_in_target_collection(
+            target_collection_id=self.params.calibration_collection_id,
+        )
+        target_compound_ids = [
+            item["target_compound_id"] for item in target_compounds_result["data"]
+        ]
+
+        target_isotopes_result = await get_target_isotopes(
+            target_compound_ids=target_compound_ids,
+            ionization_mechanism_ids=self.params.ionization_mechanism_ids,
+        )
+        target_isotopes_df = pd.DataFrame(target_isotopes_result["data"])
+
+        instrument_functions = await read_instrument_functions(self.filename)
+
+        match_isotope_df = await compute_match_isotopes(
+            filename=self.filename,
+            target_isotopes_df=target_isotopes_df,
+            match_params=match_params,
+            instrument_functions=instrument_functions,
+        )
+
+        good_matches_df = match_isotope_df[
+            (match_isotope_df.relative_abundance >= self.params.isotope_abundance_min)
+            & (match_isotope_df.sample_peak_intensity >= self.params.peak_intensity_min)
+            & (abs(match_isotope_df.match_mz_error) <= self.params.refine_window)
+            & (match_isotope_df.match_score >= self.params.match_score_min)
+            & (match_isotope_df.sample_peak_id != -1)
+        ]
+
+        return match_isotope_df, good_matches_df
+
+    def _get_summary_row(self, calibration_df):
+        return {
+            "match_mz_error": abs(calibration_df["match_mz_error"]).mean(),
+            "calibration_mz_error": abs(calibration_df["calibration_mz_error"]).mean(),
+            "mz_error_diff": sum(calibration_df["mz_error_diff"]),
+            "calibrant_to_tic": sum(calibration_df["calibrant_to_tic"]),
+        }
 
     async def fit(self):
         """
@@ -78,6 +122,12 @@ class TofCalibrationHandler(BaseCalibrationHandler):
     @api_controller()
     async def fit(self):
         """Fit the m/z calibration for a TOF instrument."""
+        match_params = TofMatchParams(
+            mz_tolerance=self.params.mz_error_tolerance,
+            peak_min_intensity=self.params.peak_intensity_min,
+        )
+        match_params.min_isotope_abundance = self.params.isotope_abundance_min
+
         await send_progress_user_notification(self.notification, 0.25)
 
         _, tic_per_scan = get_tic_per_scan(self.filename)
@@ -88,41 +138,10 @@ class TofCalibrationHandler(BaseCalibrationHandler):
 
         await send_progress_user_notification(self.notification, 0.35)
 
-        # Compute matches for calibration compounds
-        target_compounds_result = await get_target_compound_in_target_collection(
-            target_collection_id=self.params.calibration_collection_id,
-        )
-        target_compound_ids = [
-            item["target_compound_id"] for item in target_compounds_result["data"]
-        ]
-
-        target_isotopes_result = await get_target_isotopes(
-            target_compound_ids=target_compound_ids,
-            ionization_mechanism_ids=self.params.ionization_mechanism_ids,
-        )
-        target_isotopes_df = pd.DataFrame(target_isotopes_result["data"])
-
-        instrument_functions = await read_instrument_functions(self.filename)
-
-        match_params = TofMatchParams(
-            mz_tolerance=self.params.mz_error_tolerance,
-            peak_min_intensity=self.params.peak_intensity_min,
-        )
-        match_params.min_isotope_abundance = self.params.isotope_abundance_min
-
-        match_isotope_df = await compute_match_isotopes(
-            filename=self.filename,
-            target_isotopes_df=target_isotopes_df,
-            match_params=match_params,
-            instrument_functions=instrument_functions,
+        match_isotope_df, good_matches_df = await self._match_calibration_compounds(
+            match_params
         )
 
-        good_matches_df = match_isotope_df[
-            (match_isotope_df.relative_abundance >= self.params.isotope_abundance_min)
-            & (match_isotope_df.sample_peak_intensity >= self.params.peak_intensity_min)
-            & (abs(match_isotope_df.match_mz_error) <= self.params.refine_window)
-            & (match_isotope_df.match_score >= self.params.match_score_min)
-        ]
         n_relevant_isotopes = len(
             match_isotope_df[
                 (
@@ -159,14 +178,7 @@ class TofCalibrationHandler(BaseCalibrationHandler):
             if calibration_inaccurate:
                 self.warning = "Calibration inaccurate"
             self.stats = calibration_df.to_dict("records")
-            summary_row = {
-                "match_mz_error": abs(calibration_df["match_mz_error"]).mean(),
-                "calibration_mz_error": abs(
-                    calibration_df["calibration_mz_error"]
-                ).mean(),
-                "mz_error_diff": sum(calibration_df["mz_error_diff"]),
-                "calibrant_to_tic": sum(calibration_df["calibrant_to_tic"]),
-            }
+            summary_row = self._get_summary_row(calibration_df)
             self.stats.append(summary_row)
 
             await send_progress_user_notification(self.notification, 0.95)
@@ -208,16 +220,97 @@ class TofCalibrationHandler(BaseCalibrationHandler):
 
 
 class OrbiCalibrationHandler(BaseCalibrationHandler):
-
+    @api_controller()
     async def fit(self):
-        self.warning = "Calibration fitting not implemented for Orbitrap instruments."
-        pass
+        """Fit the m/z calibration for an Orbitrap instrument."""
+        match_params = OrbiMatchParams(
+            mz_tolerance=self.params.mz_error_tolerance,
+            peak_min_intensity=self.params.peak_intensity_min,
+        )
+        match_params.min_isotope_abundance = self.params.isotope_abundance_min
+
+        await send_progress_user_notification(self.notification, 0.25)
+
+        match_isotope_df, good_matches_df = await self._match_calibration_compounds(
+            match_params
+        )
+
+        await send_progress_user_notification(self.notification, 0.75)
+
+        if good_matches_df.empty:
+            self.warning = "No calibration peaks found"
+            return
+
+        target_mzs = good_matches_df["mz"].to_numpy()
+        observed_mzs = good_matches_df["sample_peak_mz"].to_numpy()
+
+        mz_ratios = target_mzs / observed_mzs
+        calibration_factor = np.median(mz_ratios)
+
+        self.fit_result = {
+            "mode": "one-point",
+            "par": {"calibration_factor": calibration_factor},
+        }
+        self.stats = {
+            "mz": observed_mzs,
+            "new_mz": target_mzs * calibration_factor,
+            "pre_dmz": 1e6 * (observed_mzs - target_mzs) / target_mzs,
+            "post_dmz": 1e6
+            * (observed_mzs * calibration_factor - target_mzs)
+            / target_mzs,
+        }
+
+        _, tic_per_scan = get_tic_per_scan(self.filename)
+        tic = np.sum(tic_per_scan)
+        calibrant_signal_intensity = good_matches_df["sample_peak_intensity"]
+        calibrant_to_tic = calibrant_signal_intensity / tic
+
+        calibration_df = good_matches_df.copy().assign(
+            calibration_mz=self.stats["new_mz"],
+            calibration_mz_error=self.stats["post_dmz"],
+            mz_error_diff=abs(self.stats["post_dmz"]) - abs(self.stats["pre_dmz"]),
+            calibrant_to_tic=calibrant_to_tic,
+        )
+        calibration_inaccurate = (
+            abs(calibration_df["calibration_mz_error"]) > self.params.mz_error_tolerance
+        ).any()
+        if calibration_inaccurate:
+            self.warning = "Calibration inaccurate"
+
+        self.stats = calibration_df.to_dict("records")
+        summary_row = self._get_summary_row(calibration_df)
+        self.stats.append(summary_row)
+
+        await send_progress_user_notification(self.notification, 0.95)
 
     async def apply(self, fit: dict):
-        self.warning = (
-            "Calibration application not implemented for Orbitrap instruments."
-        )
-        pass
+        """Applies the m/z calibration fit to the sample file.
+        NOTE: fit is passed externally since fit() and apply() used in different controllers
+        and the instance of TofCalibrationHandler is not passed between them."""
+        fit_parameters = fit["par"]
+
+        old_mz_axis = get_sum_signal(self.filename).mz.values
+        new_mz_axis = old_mz_axis * fit_parameters["calibration_factor"]
+        new_mz_range = new_mz_axis[0], new_mz_axis[-1]
+
+        runtime.logger.info(f"Calibrating file: {self.filename}")
+        update_props(self.filename, {"range": new_mz_range, "mz_calibration": fit})
+        sample_file_type = get_sample_file_type(self.filename)
+        if sample_file_type == "orbi_zarr":
+            update_zarr_array_coord(self.filename, "signal", "mz", new_mz_axis)
+        update_zarr_array_coord(self.filename, "sum_signal", "mz", new_mz_axis)
+
+        try:
+            old_peak_mz = load_coord(self.filename, "peak_areas", "mz")
+            new_peak_mz = old_peak_mz * fit_parameters["calibration_factor"]
+            update_zarr_array_coord(self.filename, "peak_areas", "mz", new_peak_mz)
+            update_zarr_array_coord(self.filename, "peak_heights", "mz", new_peak_mz)
+        except PathNotFoundError:
+            runtime.logger.warning(
+                f"Peak_areas/heights not found in {self.filename}, "
+                "thus their m/z coordinates were not updated."
+            )
+        return new_mz_axis
 
 
 def get_calibration_handler(
