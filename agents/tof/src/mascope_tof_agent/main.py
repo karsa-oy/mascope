@@ -8,11 +8,15 @@ import textwrap
 from multiprocessing import Event
 from queue import Empty
 import socketio
+import socketio.exceptions
 
 from mascope_runtime import Runtime
 
+import mascope_sdk
+
+mascope_sdk.SERVICE_NAME = "tof-agent"
 from mascope_sdk import api_post_file
-import socketio.exceptions
+
 
 # TofDaqStreamer is imported in the run method after runtime initialization
 # from mascope_tofwerk.tof_streamer import TofDaqStreamer
@@ -108,7 +112,6 @@ def upload_sample_file(filepath: str) -> None:
         path="sample/files/upload",
         access_token=runtime.config.access_token,
         filepath=filepath,
-        service_name="tof-agent",
     )
 
     if resp is not None:

@@ -16,6 +16,8 @@ logger.add(
 # Suppress only the InsecureRequestWarning from requests
 warnings.simplefilter("ignore", InsecureRequestWarning)
 
+# Default service name to use in request header. Override SERVICE_NAME for specific agents
+SERVICE_NAME = "mascope_sdk"
 
 ######################
 # API request wrappers
@@ -40,7 +42,7 @@ def api_get(url: str, path: str, access_token: str, params: dict = None):
     try:
         headers = {
             "Authorization": f"Bearer {access_token}",
-            "X-Service-Name": "mascope_sdk",
+            "X-Service-Name": SERVICE_NAME,
         }
 
         # Send GET request with query parameters (if provided)
@@ -106,7 +108,7 @@ def api_post(url: str, path: str, access_token: str, data: dict):
     try:
         headers = {
             "Authorization": f"Bearer {access_token}",
-            "X-Service-Name": "mascope_sdk",
+            "X-Service-Name": SERVICE_NAME,
         }
         resp = requests.post(
             full_url, data=json.dumps(data), headers=headers, verify=False, timeout=30
@@ -157,7 +159,6 @@ def api_post_file(
     path: str,
     access_token: str,
     filepath: str,
-    service_name: str = "mascope_sdk",
 ):
     """Send a POST request to the specified API endpoint with a path file to be uploaded.
 
@@ -178,7 +179,7 @@ def api_post_file(
     try:
         headers = {
             "Authorization": f"Bearer {access_token}",
-            "X-Service-Name": service_name,
+            "X-Service-Name": SERVICE_NAME,
         }
         with open(filepath, "rb") as file:
             resp = requests.post(

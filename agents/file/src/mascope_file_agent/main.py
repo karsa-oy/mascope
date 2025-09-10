@@ -14,6 +14,9 @@ from watchdog.events import PatternMatchingEventHandler
 from watchdog.observers import Observer
 
 from mascope_runtime import Runtime
+import mascope_sdk
+
+mascope_sdk.SERVICE_NAME = "file-agent"
 from mascope_sdk import api_post_file
 
 
@@ -101,7 +104,6 @@ def upload_sample_file(filepath: str) -> None:
         path="sample/files/upload",
         access_token=runtime.config.access_token,
         filepath=filepath,
-        service_name="file-agent",
     )
 
     if resp is not None:

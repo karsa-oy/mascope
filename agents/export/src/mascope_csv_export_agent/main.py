@@ -13,10 +13,14 @@ import os
 import time
 import logging
 import traceback
+
 from datetime import datetime, timezone
 from logging.handlers import RotatingFileHandler
 from typing import Dict, List
 
+import mascope_sdk
+
+mascope_sdk.SERVICE_NAME = "export-agent"
 from mascope_sdk import get_sample_batches, get_samples, get_sample_compounds_matches
 
 
@@ -153,7 +157,6 @@ class DataMonitor:
                 mascope_url=self.config["mascope_url"],
                 access_token=self.config["access_token"],
                 workspace_id=self.config["workspace_id"],
-                service_name="export-agent",
             )
 
             if not batches:
@@ -224,7 +227,6 @@ class DataMonitor:
                 mascope_url=self.config["mascope_url"],
                 access_token=self.config["access_token"],
                 sample_batch_id=batch_id,
-                service_name="export-agent",
             )
 
             if not samples:
