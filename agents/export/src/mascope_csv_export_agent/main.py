@@ -24,6 +24,25 @@ mascope_sdk.SERVICE_NAME = "export-agent"
 from mascope_sdk import get_sample_batches, get_samples, get_sample_compounds_matches
 
 
+DEFAULT_CONFIG = {
+    "mascope_url": "http://localhost:8090",
+    "access_token": "",
+    "workspace_id": "",
+    "target_compounds": ["CH2O2", "C3H6O3"],
+    "match_params": {
+        "mz_tolerance": 15.0,
+        "isotope_ratio_tolerance": 0.2,
+        "peak_min_intensity": 0.0,
+        "match_score_threshold": 0.5,
+    },
+    "output_directory": "./results",
+    "check_interval_seconds": 10,
+    "state_file": "state.json",
+    "log_level": "INFO",
+    "log_file": "export_agent.log",
+}
+
+
 class DataMonitor:
     """Monitors Mascope server for new sample data and processes it."""
 
@@ -46,45 +65,27 @@ class DataMonitor:
 
     def load_config(self) -> Dict:
         """Load configuration from file or create default."""
-        default_config = {
-            "mascope_url": "http://localhost:8090",
-            "access_token": "",
-            "workspace_id": "",
-            "target_compounds": ["CH2O2", "C3H6O3"],
-            "match_params": {
-                "mz_tolerance": 15.0,
-                "isotope_ratio_tolerance": 0.2,
-                "peak_min_intensity": 0.0,
-                "match_score_threshold": 0.5,
-            },
-            "output_directory": "./results",
-            "check_interval_seconds": 10,
-            "state_file": "state.json",
-            "log_level": "INFO",
-            "log_file": "export_agent.log",
-        }
-
         try:
             if os.path.exists(self.config_file):
                 with open(self.config_file, "r", encoding="utf-8") as f:
                     config = json.load(f)
                 # Merge with defaults to ensure all keys exist
-                for key, value in default_config.items():
+                for key, value in DEFAULT_CONFIG.items():
                     if key not in config:
                         config[key] = value
                 return config
             else:
                 # Create default config file
                 with open(self.config_file, "w", encoding="utf-8") as f:
-                    json.dump(default_config, f, indent=2)
+                    json.dump(DEFAULT_CONFIG, f, indent=2)
                 print(f"Created default configuration file: {self.config_file}")
                 print(
                     "Please edit the configuration file with your Mascope server details."
                 )
-                return default_config
+                return DEFAULT_CONFIG
         except Exception as e:
             print(f"Error loading config: {e}")
-            return default_config
+            return DEFAULT_CONFIG
 
     def load_state(self) -> Dict:
         """Load state from file or create default."""
