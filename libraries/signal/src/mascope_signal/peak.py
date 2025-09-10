@@ -286,7 +286,7 @@ class OrbiPeakDetector(BasePeakDetector):
         """
         old_peak_mzs, old_peak_areas, old_peak_heights = self._load_old_peaks(if_exists)
         self._update_u_list(if_exists, old_peak_mzs)
-        no_peaks_to_fit = self._validate_u_list()
+        no_peaks_to_fit = not self._validate_u_list()
         if no_peaks_to_fit:
             # Nothing to fit, return existing data
             sample_file_data = load_file(
@@ -391,7 +391,7 @@ class TofPeakDetector(BasePeakDetector):
         """
         old_peak_mzs, old_peak_areas, old_peak_heights = self._load_old_peaks(if_exists)
         self._update_u_list(if_exists, old_peak_mzs)
-        no_peaks_to_fit = self._validate_u_list()
+        no_peaks_to_fit = not self._validate_u_list()
         if no_peaks_to_fit:
             # Nothing to fit, return existing data
             sample_file_data = load_file(

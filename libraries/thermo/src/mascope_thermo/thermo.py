@@ -25,7 +25,7 @@ from ThermoFisher.CommonCore.Data.Business import (
 from ThermoFisher.CommonCore.Data import ToleranceUnits, Extensions
 from System.Collections.Generic import List
 from mascope_thermo.runtime import runtime
-
+from System import NullReferenceException
 
 SECONDS_PER_MINUTE = 60
 
@@ -58,10 +58,13 @@ class RawFileManager:
         self.RawFile = None
 
     def __enter__(self):
-        self.RawFile = RawFileReaderAdapter.FileFactory(self.path)
-        self.RawFile.SelectInstrument(Device.MS, 1)
-        # This includes the base peak into the spectrum
-        self.RawFile.IncludeReferenceAndExceptionData = True
+        try:
+            self.RawFile = RawFileReaderAdapter.FileFactory(self.path)
+            self.RawFile.SelectInstrument(Device.MS, 1)
+            # This includes the base peak into the spectrum
+            self.RawFile.IncludeReferenceAndExceptionData = True
+        except NullReferenceException:
+            raise FileNotFoundError(f"Could not open raw file: {self.path}")
         return self.RawFile
 
     def __exit__(self, *args):
