@@ -1,4 +1,4 @@
-import { ref, shallowRef, watchEffect, computed } from 'vue'
+import { ref, shallowRef, watch, watchEffect, computed } from 'vue'
 import { defineStore } from 'pinia'
 
 import { useApp } from '@/stores'
@@ -7,10 +7,8 @@ import { usePreview } from '@/lib/panes'
 
 export const useChartData = defineStore('chart.sample.spectrum', () => {
   const mainTraces = shallowRef([])
-  const loadedFileId = ref()
   const length = ref()
   const unit = ref('')
-  const pending = ref()
   const loading = ref(false)
   const mzRangeMax = ref()
 
@@ -24,14 +22,13 @@ export const useChartData = defineStore('chart.sample.spectrum', () => {
     }
   })
 
+  const shouldLoad = computed(
+    () => app.ui.tab.active === 'spectrum' && app.data.peak.list.length > 0
+  )
+
   // load triggering
-  watchEffect(async () => {
-    const sampleFileId = app.data.sample.focused?.sample_file_id
-    const sampleFocused = sampleFileId !== null
-    const sampleFileChanged = loadedFileId.value !== sampleFileId
-    const peaksLoaded = app.data.peak.list.length > 0
-    const tabOpen = app.ui.tab.active === 'spectrum'
-    if (sampleFocused && sampleFileChanged && peaksLoaded && tabOpen) {
+  watchEffect(() => {
+    if (shouldLoad.value) {
       load()
     }
   })
@@ -48,7 +45,7 @@ export const useChartData = defineStore('chart.sample.spectrum', () => {
 
   // load spectrum data
   async function load() {
-    const sampleItemId = app.data.sample.focused?.sample_item_id
+    const sampleItemId = app.data.sample.focusedId
     // start loading
     loading.value = true
     // get spectrum data from the backend
@@ -162,8 +159,7 @@ export const useChartData = defineStore('chart.sample.spectrum', () => {
 
   // unload data and switch tab if necessary
   function unload() {
-    traces.value = []
-    loadedFileId.value = null
+    mainTraces.value = []
     const tabOpen = app.ui.tab.active === 'spectrum'
     if (tabOpen) {
       app.ui.tab.default()
