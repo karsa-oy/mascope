@@ -111,6 +111,7 @@ class DataMonitor:
     def save_state(self):
         """Save current state to file."""
         try:
+            self.logger.debug("Saving state to file")
             with open(self.state_file, "w", encoding="utf-8") as f:
                 json.dump(self.state, f, indent=2)
         except Exception as e:
@@ -168,8 +169,8 @@ class DataMonitor:
             last_batch_checks = self.state.get("last_batch_check_times", {})
 
             for batch in batches:
-                batch_id = batch.get("sample_batch_id")
-                batch_modified = batch.get("sample_batch_utc_modified", "")
+                batch_id = batch["sample_batch_id"]
+                batch_modified = batch["sample_batch_utc_modified"]
 
                 if not batch_id:
                     continue
@@ -245,10 +246,8 @@ class DataMonitor:
 
             new_samples = []
             for sample in samples:
-                sample_id = sample.get("sample_item_id")
-                created_at = sample.get("sample_item_utc_created", "") or sample.get(
-                    "created_at", ""
-                )
+                sample_id = sample["sample_item_id"]
+                created_at = sample["sample_item_utc_created"]
 
                 # If we have a last check timestamp, filter by creation time
                 if last_check and created_at:
@@ -349,8 +348,8 @@ class DataMonitor:
             f"Saving results for sample {sample['sample_item_id']}: results={results}"
         )
         try:
-            sample_datetime_utc = sample.get("datetime_utc")
-            sample_filename = sample.get("filename", "")
+            sample_datetime_utc = sample["datetime_utc"]
+            sample_filename = sample["filename"]
 
             # Create output directory if it doesn't exist
             os.makedirs(self.config["output_directory"], exist_ok=True)
@@ -497,8 +496,8 @@ class DataMonitor:
         total_new_samples = 0
 
         for batch in modified_batches:
-            batch_id = batch.get("sample_batch_id")
-            batch_name = batch.get("sample_batch_name", "Unknown")
+            batch_id = batch["sample_batch_id"]
+            batch_name = batch["sample_batch_name"]
 
             if not batch_id:
                 self.logger.error(f"Batch missing ID: {batch_name}")
