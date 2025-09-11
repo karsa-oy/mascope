@@ -23,7 +23,8 @@ def _get_sum_signal_hash_name(t_min, t_max, polarity):
         cached_name = "sum_signal"
     else:
         key_str = json.dumps([t_min, t_max, polarity])
-        cached_name = hashlib.sha1(key_str.encode()).hexdigest()[:12]
+        hash_addition = hashlib.sha1(key_str.encode()).hexdigest()[:12]
+        cached_name = f"sum_signal_{hash_addition}"
 
     return cached_name
 
@@ -105,7 +106,6 @@ def get_sum_signal(
     """
 
     cached_name = _get_sum_signal_hash_name(t_min, t_max, polarity)
-
     try:
         sum_signal = _get_cached_sum_signal(base_filename, cached_name, average)
         return sum_signal
@@ -116,8 +116,8 @@ def get_sum_signal(
     except (KeyError, AttributeError):
         # proceed if sample_file/dataset exists but is missing target sum_signal
         runtime.logger.debug(
-            f"No cached sum signal found for {base_filename} with parameters:"
-            f"t_min={t_min}, t_max={t_max}, polarity={polarity}, average={average}"
+            f"No cached sum signal found for {base_filename} with parameters: "
+            f"t_min={t_min}, t_max={t_max}, polarity={polarity}, average={average} "
             f"Computing sum signal..."
         )
 
@@ -178,32 +178,18 @@ def get_sum_signal(
             )
             averaging_factor = time_data_points
 
-    if cached_name != "sum_signal":
-        # Save time sliced sum signal with a unique hash name
-        # Make sure full sum signal and the time sliced have same m/z axis
-        full_sum_signal = get_sum_signal(base_filename)
-        full_sum_signal_mz = full_sum_signal.mz.values
-        sum_signal = sum_signal.assign_coords(mz=full_sum_signal_mz)
-
-        # Cache the computed sum signal in the sample file for future use
-        sample_file = m_io.load_file(base_filename, vars=["sum_signal"])
-        sample_file[cached_name] = sum_signal
-        filename_sum_signal = m_name.filename_to_zarr_path(base_filename, "sum_signal")
-        sample_file.to_zarr(filename_sum_signal, mode="a")
-    else:
-        # Save full sum signal
-        sum_signal_dataset_path = m_name.filename_to_zarr_path(
-            base_filename, "sum_signal"
-        )
-        try:
-            sum_signal.to_zarr(sum_signal_dataset_path)
-        except FileNotFoundError as fe:
-            if ".partial" in str(fe):
-                raise Exception(
-                    f"The path is probably too long: {sum_signal_dataset_path}"
-                ) from fe
-            else:
-                raise
+    # Save the computed sum signal to the sample file for future use
+    filename_sum_signal = m_name.filename_to_zarr_path(base_filename, cached_name)
+    runtime.logger.warning(f"Saving computed sum signal to {filename_sum_signal}")
+    try:
+        sum_signal.to_zarr(filename_sum_signal)
+    except FileNotFoundError as fe:
+        if ".partial" in str(fe):
+            raise Exception(
+                f"The path is probably too long: {filename_sum_signal}"
+            ) from fe
+        else:
+            raise
 
     if average:
         return sum_signal / averaging_factor
@@ -213,8 +199,8 @@ def get_sum_signal(
 
 def _get_cached_sum_signal(base_filename, cached_name, average):
     """Helper function to load cached sum signal from the sample file if it exists"""
-    sample_file = m_io.load_file(base_filename, vars=["sum_signal"])
-    sum_signal = sample_file[cached_name]
+    sample_file = m_io.load_file(base_filename, vars=[cached_name])
+    sum_signal = sample_file.sum_signal
     if average:
         time_coord = get_scan_timestamps(base_filename)
         averaging_factor = time_coord.size
@@ -374,7 +360,7 @@ def get_tic_per_scan(
 
             # Correct TIC values by total TIC value if available
             try:
-                total_tic = m_io.load_file(base_filename, vars=[]).props["tic"]
+                total_tic = m_io.read_props(base_filename)["tic"]
                 tic_per_scan = tic_per_scan / tic_per_scan.sum() * total_tic
             except KeyError:
                 runtime.logger.warning(
