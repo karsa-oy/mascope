@@ -86,15 +86,15 @@ After configuring, to run the monitor continuously (checks for new samples every
 ### Result Files
 
 - Results are saved as CSV files in the configured output directory
-- One file is created per day
-- Each file contains columns `datetime_utc`, `filename`, and a column for each configured target ion composition
-- If there is no match for the said target ion, the cell is filled with the value `0.0`
-- If the cell is empty, it means the ion was not matched (either due to polarity discrepancy or edited target list)
-- Files are named with format: `YYYYMMDD.csv`
+- One file is created per day, named with format: `YYYYMMDD.csv`
+- The CSV file contains columns `datetime_utc`, `filename`, and a column for each configured target ion composition
+- Each row represents a processed sample\*
+- If there is no match (match score below threshold) for the said target ion, the cell is filled with the value `0.0`
+- If the cell is empty, it means the ion was not matched (either due to polarity discrepancy or target list being edited after the file was processed\*\*)
 
-> **NOTE**: The rows in the CSV file are in the order in which they were processed, and thus not necessarily sorted by the datetime of the sample.
+> \***NOTE**: The rows in the CSV file are in the order in which they were processed, and thus not necessarily sorted by the datetime of the sample.
 
-> **NOTE**: Samples are not re-processed retrospectively when editing targets in the config file.
+> \*\***NOTE**: Samples are not re-processed retrospectively when editing targets in the config file.
 
 ### Log Files
 
