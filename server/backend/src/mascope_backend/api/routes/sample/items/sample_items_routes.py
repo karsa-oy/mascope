@@ -172,7 +172,6 @@ async def copy_sample_items_route(
         sample_item_ids=body.sample_item_ids,
         sample_batch_id=body.sample_batch_id,
         independent_transaction=True,
-        background_tasks=background_tasks,
         sid=sid,
         process_id=process_id,
     )
@@ -211,7 +210,6 @@ async def move_sample_items_route(
         sample_item_ids=body.sample_item_ids,
         sample_batch_id=body.sample_batch_id,
         independent_transaction=True,
-        background_tasks=background_tasks,
         sid=sid,
         process_id=process_id,
     )

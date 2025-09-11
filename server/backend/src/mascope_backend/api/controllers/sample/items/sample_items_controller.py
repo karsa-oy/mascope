@@ -25,7 +25,6 @@ from mascope_backend.socket.notifications import (
 from mascope_backend.db import async_session
 from mascope_backend.db.id import gen_id
 from mascope_backend.db.models import (
-    SampleBatch,
     SampleItem,
     SampleFile,
 )
@@ -38,21 +37,22 @@ from mascope_backend.api.lib.exceptions.api_exceptions import (
     NotFoundException,
 )
 from mascope_backend.api.controllers.sample.lib.sample_batches_fetch import (
-    fetch_sample_batch_data,
+    fetch_sample_batch,
 )
 from mascope_backend.api.controllers.sample.lib.sample_modified_timestamps_manager import (
     update_sample_batches_modified_timestamp,
 )
-from mascope_backend.api.controllers.samples.samples_controller import get_sample
 from mascope_backend.api.controllers.sample.lib.sample_items_copy import (
     copy_sample_items_match_data,
     CopyMatches,
 )
 from mascope_backend.api.controllers.samples.lib.samples_fetch import fetch_sample
+from mascope_backend.api.controllers.sample.batches.status.service import (
+    update_sample_batch_status,
+)
 from mascope_backend.api.controllers.sample.lib.fetch_affected_sample_data import (
     fetch_affected_sample_data,
 )
-from mascope_backend.api.controllers.match.match_controller import match_compute_samples
 from mascope_backend.api.models.sample.items.config import sample_item_config
 from mascope_backend.api.models.sample.items.sample_item_pydantic_model import (
     SampleItemBase,
@@ -479,34 +479,30 @@ async def delete_sample_items(
     success_notification_rooms=["sid"],
     success_reload=[("sample_batch_reload", "sample_batch_id")],
     error_notification_rooms=["sid"],
+    error_reload=[("sample_batch_reload", "sample_batch_id")],
 )
 async def copy_sample_items(
     sample_item_ids: list[str],
     sample_batch_id: str,
     always_copy_matches: bool = False,
     independent_transaction: bool = False,
-    background_tasks: BackgroundTasks = None,
-    sid=None,
-    process_id=None,
-    parent_id=None,
+    sid: str | None = None,
+    process_id: str | None = None,
+    parent_id: str | None = None,
 ) -> dict:
     """
-    TODO_api_circular_import  distinguish sample and sample_item controller, should be moved to samples_controller.py?
-    The function copies the specified sample item and associates the new copy with a specified sample batch.
-    May be a part of the copy sample batch operation or independent.
-    Copies matches of the original sample if part of a larger copy batch operation
-    or if it is copied to the same batch, since targets and ionization mechanisms are the same for original batch and new batch.
-    Computes matches if it's an independent operation and target and original batch differ,
-    since the targets and ionization mechanisms may differ between original batch and new batch.
+    Copies specified sample items to a target batch.
+    - Copies match data if copying within same batch or always_copy_matches=True
+    - Sets target batch to "rematch" status if copied samples need new match computation
+    - May be a part of the copy sample batch operation or independent.
 
 
     Steps:
-    1. Validate the batch into which the samples are copied
-    2. Fetch and validate the original sample items from the database.
-    3. Create and add to session a new sample items with updated information.
-    4. Copy match data if necessary.
-    5. Commit the transaction to the database.
-    6. Compute matches if necessary.
+    1. Validate target batch and source sample items
+    2. Create new sample items in target batch
+    3. Copy match data if conditions are met
+    4. Set target batch to rematch status if needed
+    5. Return results
 
     :param sample_item_ids: ID of the original sample items to be copied.
     :type sample_item_ids: list[str]
@@ -516,25 +512,22 @@ async def copy_sample_items(
     :type always_copy_matches: bool
     :param independent_transaction: Flag indicating whether the sample item copy is an independent transaction and if the operation should emit a reload event for the sample batch and if the sample should be rematched for new batch targets, defaults to False
     :type independent_transaction: bool, optional
-    :param background_tasks: FastAPI background tasks for computing matches post-copy, defaults to None
-    :type background_tasks: BackgroundTasks, optional
-    :param sid: Session ID, used for emitting notifications to specific clients, defaults to None
-    :type sid: str, optional
-    :raises NotFoundException: If the original sample item is not found.
-    :return: The newly created sample item dict.
+    :param sid: Session identifier for client notifications
+    :type sid: str | None
+    :param process_id: Process identifier for progress tracking
+    :type process_id: str | None
+    :param parent_id: Parent process identifier
+    :type parent_id: str | None
+    :raises NotFoundException: When batch or samples not found
+    :raises ValueError: When sample_item_ids are not unique
+    :return: Copy results with created sample data
     :rtype: dict
     """
+    # Step 1: Fetch and validate the original sample items
+    if len(set(sample_item_ids)) < len(sample_item_ids):
+        raise ValueError("sample_item_ids to be copied must be unique")
+
     async with async_session() as session:
-        # Step 1: Validate the batch into which the sample is being copied.
-        if not (sample_batch := await session.get(SampleBatch, sample_batch_id)):
-            raise NotFoundException(
-                f"Sample batch with ID '{sample_batch_id}' not found"
-            )
-
-        if len(set(sample_item_ids)) < len(sample_item_ids):
-            raise ValueError("sample_item_ids to be copied must be unique")
-
-        # Step 2: Fetch and validate the original sample items
         result = await session.execute(
             select(SampleItem).where(SampleItem.sample_item_id.in_(sample_item_ids))
         )
@@ -544,6 +537,9 @@ async def copy_sample_items(
             si.sample_item_id for si in original_sample_items
         }:
             raise NotFoundException(f"Sample items not found: {list(missing_ids)}")
+
+    # Step 2: Validate the batch into which the sample is being copied.
+    sample_batch = await fetch_sample_batch(sample_batch_id)
 
     # Step 3: Prepare SampleItemCreate objects with copy transformations
     sample_items_to_create = []
@@ -577,7 +573,7 @@ async def copy_sample_items(
 
     # Step 4: Prepare match operations using zip for cleaner iteration
     sample_match_copies = []
-    samples_to_rematch_ids = []
+    needs_rematch = False
 
     for original, created_item in zip(original_sample_items, created_items_data):
         new_item_id = created_item["sample_item_id"]
@@ -587,7 +583,7 @@ async def copy_sample_items(
                 CopyMatches(original.sample_item_id, new_item_id)
             )
         else:
-            samples_to_rematch_ids.append(new_item_id)
+            needs_rematch = True
 
     # Step 5: Copy match records if necessary
     if sample_match_copies:
@@ -609,23 +605,30 @@ async def copy_sample_items(
             notification,
         )
 
-    # Step 6: Compute matches if necessary for copied samples
-    # (not the whole target batch, since it may be not empty)
-    if samples_to_rematch_ids:
-        background_tasks.add_task(
-            match_compute_samples,
-            sample_item_ids=samples_to_rematch_ids,
-            added_target_compound_ids=None,
-            added_ionization_mechanism_ids=None,
-            independent_transaction=True,  # TODO_invalidation - reload each sample when it is computed
-            sid=sid,
-            process_id=gen_id(8),
-            parent_id=process_id,
+    # Step 6: Set rematch status if samples need recomputation
+    if needs_rematch:
+        await update_sample_batch_status(
+            sample_batch_ids=[sample_batch_id],
+            status="rematch",
+            independent_transaction=True,
         )
 
     # Step 7: Return the copied sample and message
+    message = (
+        f"Copied {len(created_items_data)} samples successfully "
+        f"to batch '{sample_batch.sample_batch_name}'."
+    )
+
+    if sample_match_copies:
+        message += " Match data was copied."
+
+    if needs_rematch:
+        message += " This batch may have different targets, please refresh the matches."
+
     return {
-        "message": f"Copied {len(created_items_data)} samples successfully to batch '{sample_batch.sample_batch_name}'.",
+        "status": "success",
+        "results": len(created_items_data),
+        "message": message,
         "data": created_items_data,
         "_notification_data": {
             "affected_sample_item_ids": [
@@ -644,10 +647,9 @@ async def move_sample_items(
     sample_item_ids: list[str],
     sample_batch_id: str,
     independent_transaction: bool = False,
-    background_tasks: BackgroundTasks = None,
-    sid=None,
-    process_id=None,
-    parent_id=None,
+    sid: str | None = None,
+    process_id: str | None = None,
+    parent_id: str | None = None,
 ) -> dict:
     """
     Move a set of samples to a specific batch. Leverages the copy_sample_items
@@ -666,25 +668,22 @@ async def move_sample_items(
     :type sample_batch_id: str
     :param independent_transaction: Flag indicating whether the sample item copy is an independent transaction and if the operation should emit a reload event for the sample batch and if the sample should be rematched for new batch targets, defaults to False
     :type independent_transaction: bool, optional
-    :param background_tasks: FastAPI background tasks for computing matches post-copy, defaults to None
-    :type background_tasks: BackgroundTasks, optional
-    :param sid: Session ID, used for emitting notifications to specific clients, defaults to None
-    :type sid: str, optional
+    :param sid: Session identifier for client notifications
+    :type sid: str | None
+    :param process_id: Process identifier for progress tracking
+    :type process_id: str | None
+    :param parent_id: Parent process identifier
+    :type parent_id: str | None
     :raises NotFoundException: If the original sample item is not found.
     :return: The newly created sample item dict.
     :rtype: dict
     """
 
     # Step 1. Validate batch existence
+    batch = await fetch_sample_batch(sample_batch_id)
+
+    # Step 2. Validate samples existence
     async with async_session() as session:
-        batch = await session.get(SampleBatch, sample_batch_id)
-
-        if not batch:
-            raise NotFoundException(
-                f"Sample batch with ID '{sample_batch_id}' not found"
-            )
-
-        # Step 2. Validate samples existence
         stmt = select(SampleItem).where(SampleItem.sample_item_id.in_(sample_item_ids))
         result = await session.execute(stmt)
         original_samples = result.scalars().all()
@@ -714,7 +713,6 @@ async def move_sample_items(
         sample_item_ids=sample_item_ids,
         sample_batch_id=sample_batch_id,
         independent_transaction=False,
-        background_tasks=background_tasks,
         sid=sid,
         process_id=gen_id(8),
         parent_id=process_id,
@@ -722,12 +720,16 @@ async def move_sample_items(
     moved_samples = copy_result["data"]
 
     # Step 5. Delete original samples if copy successful
-    if moved_samples:
+    if moved_samples and copy_result["status"] == "success":
         await delete_sample_items(
             sample_item_ids=sample_item_ids,
         )
+    message = f"Moved {len(sample_item_ids)} samples successfully to batch '{batch.sample_batch_name}'."
+
     return {
-        "message": f"Moved {len(sample_item_ids)} samples successfully to batch '{batch.sample_batch_name}'.",
+        "status": "success",
+        "results": len(moved_samples),
+        "message": message,
         "data": moved_samples,
         "_notification_data": {
             "affected_sample_item_ids": sample_item_ids,
@@ -773,15 +775,8 @@ async def sample_item_export_peaks(
     :param sid: Session ID for targeting specific clients when emitting events, defaults to None.
     :type sid: str, optional
     """
-    # Get sample item data as a sample view
-    sample_result = await get_sample(sample_item_id)
-    sample = sample_result.get("data")
-    sample_item_name = sample["sample_item_name"]
-
-    # Get sample batch name
-    sample_batch_id = sample["sample_batch_id"]
-    sample_batch_data = await fetch_sample_batch_data(sample_batch_id)
-    sample_batch_name = sample_batch_data.sample_batch_name
+    sample = await fetch_sample(sample_item_id)
+    sample_batch = await fetch_sample_batch(sample.sample_batch_id)
 
     # Prepare notification
     notification = UserNotification(
@@ -789,11 +784,11 @@ async def sample_item_export_peaks(
         parent_id=parent_id,
         type="sample_item_export_peaks",
         status="pending",
-        message=f"Exporting peak data for sample item '{sample_item_name}'",
+        message=f"Exporting peak data for sample item '{sample.sample_item_name}'",
         # NOTE set the internal room_ids for the pending user_notifications and sid of the user, will be removed from the data.
         data={
             "sample_item_id": sample_item_id,
-            "sample_batch_id": sample_batch_id,
+            "sample_batch_id": sample_batch.sample_batch_id,
             "_room_ids": [sid],
             "_sid": sid,
         },
@@ -860,8 +855,8 @@ async def sample_item_export_peaks(
         }
     ).assign(
         unit="ions" if instrument_type == "tof" else "counts",
-        sample_batch_name=sample_batch_name,
-        sample_item_name=sample_item_name,
+        sample_batch_name=sample_batch.sample_batch_name,
+        sample_item_name=sample.sample_item_name,
         filename=filename,
         filter_id=sample["filter_id"],
         sample_item_type=sample["sample_item_type"],
@@ -877,13 +872,13 @@ async def sample_item_export_peaks(
 
     # Save the peak data to a CSV file
     peakfile_filename = "_".join(
-        [dt_str, "peak_data", sample_item_name.replace(" ", "_") + ".csv"]
+        [dt_str, "peak_data", sample.sample_item_name.replace(" ", "_") + ".csv"]
     )
     runtime.logger.info(f"Writing peak data to file {peakfile_filename}")
     sample_peak_df.to_csv(
         runtime.env.path("temp", peakfile_filename), index=False, sep=";"
     )
-    message = f"Peak data for sample item '{sample_item_name}' was exported to file '{peakfile_filename}'."
+    message = f"Peak data for sample item '{sample.sample_item_name}' was exported to file '{peakfile_filename}'."
     runtime.logger.info(message)
 
     # Return the status message
