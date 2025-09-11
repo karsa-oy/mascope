@@ -10,37 +10,20 @@ from mascope_backend.db.models import SampleBatch
 from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
 
 
-class SampleBatchData:
+async def fetch_sample_batch(sample_batch_id: str) -> SampleBatch:
     """
-    A data container to allow dot notation access to sample batch data.
-    """
-
-    def __init__(self, sample_batch, ion_mechanisms):
-        self.__dict__.update(sample_batch.__dict__)
-        self.ion_mechanisms = ion_mechanisms
-
-
-async def fetch_sample_batch_data(sample_batch_id: str) -> SampleBatchData:
-    """
-    Fetches the sample batch and retrieves the associated ionization mechanisms, returning a SampleBatchData object.
+    Fetches the  SampleBatch object.
 
     :param sample_batch_id: ID of the sample batch to fetch.
     :type sample_batch_id: str
-    :return: A SampleBatchData object containing the sample batch data and ion mechanisms.
-    :rtype: SampleBatchData
+    :return: A SampleBatch object containing the sample batch data.
+    :rtype: SampleBatch
     :raises NotFoundException: If the sample batch with the specified ID is not found.
     """
     async with async_session() as session:
-        # Fetch the sample batch
         sample_batch = await session.get(SampleBatch, sample_batch_id)
         if not sample_batch:
             raise NotFoundException(
                 f"Sample batch with ID '{sample_batch_id}' not found"
             )
-
-        # Retrieve the ion mechanisms from build_params
-        build_params = sample_batch.build_params
-        ion_mechanisms = build_params.get("ion_mechanisms", [])
-
-        # Return the SampleBatchData object with unpacked data
-        return SampleBatchData(sample_batch, ion_mechanisms)
+        return sample_batch

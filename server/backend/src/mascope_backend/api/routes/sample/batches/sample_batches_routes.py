@@ -136,10 +136,8 @@ async def update_sample_batch_status_route(
 @sample_batches_router.patch("/{sample_batch_id}")
 @api_route()
 async def update_sample_batch_route(
-    request: Request,
     sample_batch_id: str,
     body: SampleBatchUpdate,
-    background_tasks: BackgroundTasks,
     user=Depends(editor_user),
 ):
     """Update details of an existing sample batch.
@@ -148,33 +146,19 @@ async def update_sample_batch_route(
     :type sample_batch_id: str
     :param body: The update data for the sample batch.
     :type body: SampleBatchUpdate
-    :param background_tasks: Background task handler.
-    :type background_tasks: BackgroundTasks
     :param user: The current authenticated user with editor permissions.
     :type user: User
-    :return: A dictionary containing the updated sample batch details and a process ID.
+    :return: Update results details
     :rtype: dict
     """
     # Check if locked sample batch - only owners can update
     await locked_access(user, SampleBatch, sample_batch_id, min_role="owner")
 
-    sid = request.headers.get("X-SID")
-    # generate process_id for the background task ramatch_batches
-    process_id = gen_id(8)
-
-    result = await update_sample_batch(
+    return await update_sample_batch(
         sample_batch_id=sample_batch_id,
         sample_batch_update=body,
-        background_tasks=background_tasks,
-        sid=sid,
-        process_id=process_id,
+        independent_transaction=True,
     )
-
-    return {
-        "message": result["message"],
-        "data": result["data"],
-        "process_id": process_id,
-    }
 
 
 @sample_batches_router.delete("/{sample_batch_id}")

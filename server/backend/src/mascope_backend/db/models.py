@@ -271,6 +271,12 @@ def update_workspace_on_sample_batch_change(mapper, connection, target):
         )
 
 
+@event.listens_for(SampleBatch, "before_update")
+def update_modified_timestamp(mapper, connection, target):
+    """Automatically update modification timestamp when SampleBatch is updated."""
+    target.sample_batch_utc_modified = datetime.now(timezone.utc)
+
+
 class SampleItem(Base):
     __tablename__ = "sample_item"
     sample_item_id: Mapped[str] = mapped_column(String(16), primary_key=True)

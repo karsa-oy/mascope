@@ -1,7 +1,6 @@
 # pylint: disable=not-callable
 import asyncio
 from datetime import datetime, timezone
-from fastapi import BackgroundTasks
 import pandas as pd
 
 from sqlalchemy import (
@@ -9,6 +8,8 @@ from sqlalchemy import (
     desc,
     select,
     func,
+    delete,
+    and_,
 )
 from sqlalchemy.orm import joinedload
 
@@ -32,8 +33,8 @@ from mascope_backend.api.lib.exceptions.api_exceptions import (
     raise_api_warning,
 )
 from mascope_backend.api.controllers.match.match_controller import (
-    rematch_batch,
     rematch_samples,
+    match_compute_samples,
 )
 from mascope_backend.api.controllers.target.collections.target_collections_controller import (
     get_target_collections,
@@ -61,7 +62,9 @@ from mascope_backend.api.controllers.samples.samples_controller import get_sampl
 from mascope_backend.api.controllers.sample.lib.fetch_affected_sample_data import (
     fetch_affected_sample_data,
 )
-
+from mascope_backend.api.controllers.sample.batches.lib.util import (
+    detect_update_batch_changes,
+)
 from mascope_backend.api.controllers.sample.batches.status.service import (
     update_sample_batch_status,
 )
@@ -388,264 +391,139 @@ async def create_sample_batch(
     }
 
 
-@api_controller()
+@api_controller(
+    # TODO_reload fix when the reload is working properly
+)
 async def update_sample_batch(
     sample_batch_id: str,
     sample_batch_update: SampleBatchUpdate,
-    background_tasks: BackgroundTasks,
-    sid: str = None,
-    process_id=None,
+    independent_transaction: bool = False,
 ) -> dict:
     """
-    Updates the specified sample batch with new information and associations. It checks for changes
-    in ionization mechanisms and target collections to determine if a rematch of the sample batch is
-    necessary. If so, it prepares and executes the rematch process using background tasks.
-    The function also handles the update of basic information like the batch name and description,
-    and emits appropriate events to notify clients of changes.
+    Updates the specified sample batch with new information and associations.
+    Changes to ion mechanisms or target collections set batch status to "rematch"
 
     Steps:
-    1. Fetch the existing sample batch data from the database.
-    2. Process ionization mechanism changes:
-        - Check if ionization mechanisms have changed
-        - Validate polarity compatibility if mechanisms changed
-        - Set rematch flag if ionization mechanisms changed
-    3. Process target collection changes:
-        - Validate target collection type constraints
-        - Check if target collections have changed
-        - Set rematch flag and fetch existing compounds if collections changed
-    4. Update the sample batch basic information, build parameters, and associations.
-    5. If needed, prepare and execute the rematch, identifying added or removed compounds and ionization mechanisms.
-    6. Based on the updates, emit appropriate reload events (workspace, batch, or targets).
+    1. Fetch existing batch data and validate existence
+    2. Detect changes between current and proposed state
+    3. Validate new configurations when changes are detected
+    4. Update batch data using automatic basic field handling
+    5. Set rematch status when recomputation is needed
+    6. Emit appropriate reload events based on change types
 
-    :param sample_batch_id: ID of the sample batch to be updated.
+    :param sample_batch_id: ID of the sample batch to update
     :type sample_batch_id: str
-    :param sample_batch_update: Updated data for the sample batch.
+    :param sample_batch_update: Updated data for the sample batch
     :type sample_batch_update: SampleBatchUpdate
-    :param background_tasks: Background tasks for asynchronous execution.
-    :type background_tasks: BackgroundTasks
-    :raises NotFoundException: Raised if the sample batch is not found in the database.
-    :raises ApiException: For handling any exceptions that occur during the update process.
-    :return: The dict with updated SampleBatch object, reflecting the changes made.
-    rtype: dict
+    :param independent_transaction: Controls sio event emission behavior and error handling.
+    :type independent_transaction: bool
+    :raises NotFoundException: When sample batch is not found
+    :raises ValueError: When validation fails
+    :return: Updated sample batch data with success message
+    :rtype: dict
     """
-    # Flags for determining if a rematch batch is needed
-    rematch_compounds = False  # because of changed collections => compounds
-    rematch_ion_mechanisms = False  # because of changed ion_mechanisms
-    targets_all_reload = False
-
-    # Flags for determining if a reload is needed
-    workspace_reload = False  # if name is changed
-    sample_batch_reload = False  # if other basic fields changed and no rematch
-
-    # Step 1: Fetch the existing sample batch data from the database
-    # Retrieves the current state of the sample batch with target collection associations
+    # Step 1: Fetch existing batch with target associations
     async with async_session() as session:
-        stmt = (
-            select(SampleBatch)
-            .options(joinedload(SampleBatch.target_collection))
-            .where(SampleBatch.sample_batch_id == sample_batch_id)
-        )
-        result = await session.execute(stmt)
-        existing_sample_batch = result.unique().scalar_one_or_none()
-        if not existing_sample_batch:
+        if not (
+            batch := await session.get(
+                SampleBatch,
+                sample_batch_id,
+                options=[joinedload(SampleBatch.target_collection)],
+            )
+        ):
             raise NotFoundException(
                 f"Sample batch with ID '{sample_batch_id}' not found"
             )
 
-        # Step 2: Process ionization mechanism changes
-        # Check if ionization mechanisms have changed and validate polarity compatibility
-        existing_ion_mechanisms = set(
-            existing_sample_batch.build_params["ion_mechanisms"]
-        )
-        new_ion_mechanisms = set(sample_batch_update.build_params.ion_mechanisms)
+        # Step 2: Detect changes between current and proposed state
+        changes = detect_update_batch_changes(batch, sample_batch_update)
 
-        if new_ion_mechanisms != existing_ion_mechanisms:
+        # Step 3: Validate new configurations when changes detected
+        if changes["ion_mechanisms"]:
             # Validate ionization mechanism polarity compatibility for changed mechanisms
             await validate_ionization_mechanisms_polarity(
                 ionization_mechanism_ids=sample_batch_update.build_params.ion_mechanisms,
-                batch_polarity=existing_sample_batch.polarity,
-                sample_batch_type=existing_sample_batch.sample_batch_type,
-            )
-            # Set rematch flag since ionization mechanisms changed
-            rematch_ion_mechanisms = True
-
-        # Step 3: Process target collection changes
-        # Validate target collection type constraints and check for collection changes
-        await validate_collections_for_batch(
-            target_collection_ids=sample_batch_update.target_collection_ids,
-            sample_batch_type=existing_sample_batch.sample_batch_type,
-        )
-
-        # Check if target collections have changed (which affects target compounds)
-        new_collections = set(sample_batch_update.target_collection_ids)
-        existing_collections = {
-            item.target_collection_id
-            for item in existing_sample_batch.target_collection
-        }
-
-        if new_collections != existing_collections:
-            # Set rematch flag since target collections (and thus compounds) changed
-            rematch_compounds = True
-
-            # Fetch and store the existing sample batch compounds for rematch calculation
-            batch_compounds_result = await get_target_compounds(
-                sample_batch_id=sample_batch_id
-            )
-            existing_compounds = set(
-                tc["target_compound_id"] for tc in batch_compounds_result["data"]
+                batch_polarity=batch.polarity,
+                sample_batch_type=batch.sample_batch_type,
             )
 
-        # Step 4: Update the sample batch basic information, build parameters, and associations
-        # Apply updates to basic fields (name, description) and track what changed for reload events
-        update_data = sample_batch_update.model_dump(exclude_unset=True)
-        for key, value in update_data.items():
-            if key in ["build_params", "target_collection_ids"]:
-                continue  # Skip build_params and target_collections associations as they are handled separately below
-            if key in ["sample_batch_name"]:
-                old_name = getattr(existing_sample_batch, key)
-                if old_name != value:  # name value changed
-                    # set flag to inform clients about sample batch basic fields changes (emit workspace reload event)
-                    workspace_reload = True
-                    # BUG_reload do we really need to reload whole workspace for batch name change? Improve listener sample_batch_reload
-            if key in ["sample_batch_description"]:
-                old_description = getattr(existing_sample_batch, key)
-                if old_description != value:  # description value changed
-                    # set flag to reload batch
-                    sample_batch_reload = True
-            setattr(existing_sample_batch, key, value)
+        if changes["collections"]:
+            # Validate target collection type constraints
+            await validate_collections_for_batch(
+                target_collection_ids=sample_batch_update.target_collection_ids,
+                sample_batch_type=batch.sample_batch_type,
+            )
 
-        # Update modification timestamp
-        existing_sample_batch.sample_batch_utc_modified = datetime.now(timezone.utc)
-
-        # Check if calibration mechanisms changed (requires batch reload)
-        existing_calibration_mechanisms = set(
-            existing_sample_batch.build_params.get("calibration_ion_mechanisms", [])
+        # Step 4: Update batch data
+        basic_fields = sample_batch_update.model_dump(
+            exclude={"build_params", "target_collection_ids"}, exclude_unset=True
         )
-        new_calibration_mechanisms = set(
-            sample_batch_update.build_params.calibration_ion_mechanisms
-        )
-        if existing_calibration_mechanisms != new_calibration_mechanisms:
-            sample_batch_reload = True
+        for field, value in basic_fields.items():
+            if hasattr(batch, field):
+                setattr(batch, field, value)
 
-        # Update build_params with new ionization mechanism configuration
-        existing_sample_batch.build_params = (
-            sample_batch_update.build_params.model_dump()
-        )
+        # Update complex fields only when changed
+        if changes["ion_mechanisms"] or changes["calibration"]:
+            batch.build_params = sample_batch_update.build_params.model_dump()
 
-        # Update target collection associations if they changed
-        if "target_collection_ids" in update_data and (
-            new_collections != existing_collections
-        ):
-            targets_all_reload = True
-            # Remove all previous target collection associations
-            existing_sample_batch.target_collection.clear()
-            # Add new target collection associations
-            for target_collection_id in new_collections:
-                new_target_collection_in_sample_batch = TargetCollectionInSampleBatch(
-                    target_collection_id=target_collection_id,
-                    sample_batch_id=existing_sample_batch.sample_batch_id,
+        if changes["collections"]:
+            # Remove specific collections
+            if changes["collections_to_remove"]:
+                await session.execute(
+                    delete(TargetCollectionInSampleBatch).where(
+                        and_(
+                            TargetCollectionInSampleBatch.sample_batch_id
+                            == sample_batch_id,
+                            TargetCollectionInSampleBatch.target_collection_id.in_(
+                                changes["collections_to_remove"]
+                            ),
+                        )
+                    )
                 )
-                session.add(new_target_collection_in_sample_batch)
 
-        # Save all changes to the database
+            # Add specific collections
+            for collection_id in changes["collections_to_add"]:
+                session.add(
+                    TargetCollectionInSampleBatch(
+                        target_collection_id=collection_id,
+                        sample_batch_id=sample_batch_id,
+                    )
+                )
+
         await session.commit()
-        await session.refresh(existing_sample_batch)
+        await session.refresh(batch)
 
-    # Rename for clarity after updates
-    updated_sample_batch = existing_sample_batch
+    # Step 5: Set rematch status when recomputation needed
+    needs_rematch = changes["ion_mechanisms"] or changes["collections"]
+    if needs_rematch:
+        await update_sample_batch_status(
+            sample_batch_ids=[sample_batch_id],
+            status="rematch",
+            independent_transaction=True,  # TODO_reload fix when the reload is working properly
+        )
+        batch.status = "rematch"  # update in-memory obj to reflect status change avoid extra db call
 
-    # Step 5: Prepare and execute rematch if needed
-    # Calculate the changes in compounds and ion mechanisms and prepare the data for rematch
-    if rematch_compounds or rematch_ion_mechanisms:
-        # Initialize parameters for rematching
-        added_target_compound_ids = set()
-        added_ionization_mechanism_ids = set()
-        removed_target_compound_ids = set()
-        removed_ionization_mechanism_ids = set()
-
-        # batch/workspace reload will be done at the end of rematching process
-        sample_batch_reload = False
-        # Fix the current store state, where the sample batch is being edited without being focused ->
-        # user sid client not in a room and ui do not receive the reload event
-        workspace_reload = True
-
-        # Calculate added and removed target compounds if collections changed
-        if rematch_compounds:
-            # Fetch the new current sample batch compounds after collection update
-            batch_compounds_result = await get_target_compounds(
-                sample_batch_id=sample_batch_id
-            )
-            current_compounds = set(
-                tc["target_compound_id"] for tc in batch_compounds_result["data"]
-            )
-
-            # Calculate compound changes for rematch
-            added_target_compound_ids = current_compounds - existing_compounds
-            removed_target_compound_ids = existing_compounds - current_compounds
-
-        # Calculate added and removed ionization mechanisms if mechanisms changed
-        if rematch_ion_mechanisms:
-            # Fetch the new current sample batch data to get updated ion mechanisms
-            async with async_session() as session:
-                stmt = (
-                    select(SampleBatch)
-                    .options(joinedload(SampleBatch.target_collection))
-                    .where(SampleBatch.sample_batch_id == sample_batch_id)
-                )
-                result = await session.execute(stmt)
-                current_sample_batch = result.scalars().first()
-
-            current_ion_mechanisms = set(
-                current_sample_batch.build_params["ion_mechanisms"]
-            )
-
-            # Calculate ionization mechanism changes for rematch
-            added_ionization_mechanism_ids = (
-                current_ion_mechanisms - existing_ion_mechanisms
-            )
-            removed_ionization_mechanism_ids = (
-                existing_ion_mechanisms - current_ion_mechanisms
-            )
-
-        # Create background task for rematch_batch process
-        background_tasks.add_task(
-            rematch_batch,
-            sample_batch_id=sample_batch_id,
-            added_target_compound_ids=list(added_target_compound_ids),
-            removed_target_compound_ids=list(removed_target_compound_ids),
-            added_ionization_mechanism_ids=list(added_ionization_mechanism_ids),
-            removed_ionization_mechanism_ids=list(removed_ionization_mechanism_ids),
-            independent_transaction=True,
-            sid=sid,
-            process_id=process_id,
+    # Step 6: Emit reload events based on change types
+    reload_events = []
+    if changes["collections"]:
+        reload_events.append(sio.emit("targets_all_reload", namespace="/"))
+    if changes["name"]:
+        reload_events.append(
+            sio.emit("workspace_reload", room=batch.workspace_id, namespace="/")
+        )
+    elif changes["description"] or changes["calibration"]:
+        reload_events.append(
+            sio.emit("sample_batch_reload", room=sample_batch_id, namespace="/")
         )
 
-    # Step 6: Based on the updates, emit appropriate reload events
-    # Emit events to notify clients about changes requiring UI updates
-    if workspace_reload:
-        # Emit workspace reload event if the name has changed or rematch is needed
-        await sio.emit(
-            "workspace_reload",
-            room=updated_sample_batch.workspace_id,
-            namespace="/",
-        )
-    if sample_batch_reload:
-        # Emit batch reload event if the description has changed and rematch was not needed
-        await sio.emit(
-            "sample_batch_reload",
-            room=updated_sample_batch.sample_batch_id,
-            namespace="/",
-        )
-    # If there are changes in sample batch associations emit an event to inform all clients
-    if targets_all_reload:
-        await sio.emit(
-            "targets_all_reload",
-            namespace="/",
-        )
+    if reload_events:  # TODO_reload remove when the reload is working properly
+        await asyncio.gather(*reload_events)
 
     return {
-        "message": f"Sample '{updated_sample_batch.sample_batch_name}' was updated.",
-        "data": SampleBatchRead.model_validate(updated_sample_batch).model_dump(),
+        "status": "success",
+        "message": f"Sample batch '{batch.sample_batch_name}' was updated"
+        + (" and flagged for rematch" if needs_rematch else ""),
+        "data": SampleBatchRead.model_validate(batch).model_dump(),
     }
 
 
