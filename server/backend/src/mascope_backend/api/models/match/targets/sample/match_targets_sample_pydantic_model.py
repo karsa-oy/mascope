@@ -1,9 +1,9 @@
 from typing import Optional
 from pydantic import Field
-from mascope_backend.api.new.match.params.schema import (
+from mascope_backend.api.models.base_pydantic_model import QueryParamsModel
+from mascope_match.params import (
     DEFAULT_MIN_ISOTOPE_ABUNDANCE,
 )
-from mascope_backend.api.models.base_pydantic_model import QueryParamsModel
 
 
 class SortingPaginationQueryParams(QueryParamsModel):

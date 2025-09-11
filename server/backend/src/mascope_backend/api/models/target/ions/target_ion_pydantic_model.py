@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, ConfigDict
 from mascope_backend.api.models.base_pydantic_model import QueryParamsModel
-from mascope_backend.api.new.match.params import BaseMatchParams
+from mascope_match.params import BaseMatchParams
 
 
 class TargetIonUpdate(BaseModel):

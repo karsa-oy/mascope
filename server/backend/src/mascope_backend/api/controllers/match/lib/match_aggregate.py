@@ -1,12 +1,14 @@
 from typing import Optional, Tuple
 import pandas as pd
-from mascope_backend.api.new.match.params import BaseMatchParams
+from mascope_match.params import (
+    BaseMatchParams,
+    DEFAULT_PROBABLE_MATCH_THRESHOLD,
+    DEFAULT_POSSIBLE_MATCH_THRESHOLD,
+)
 from mascope_backend.api.controllers.match.lib.match_util import similarity_factor
 
-# TODO_configuration
-# Default Filter Parameters
-DEFAULT_PROBABLE_MATCH_THRESHOLD = 0.8
-DEFAULT_POSSIBLE_MATCH_THRESHOLD = 0.7
+    target_collection_config,
+)
 
 # TODO_configuration list of alarming collection types
 APP_ALARMING_COLLECTION_TYPES = ["TARGETS"]

@@ -1,16 +1,29 @@
 """
 Parameters and configuration for match computation.
 
-This module defines constants and configurations used in the match computation process.
+This module defines constants, configurations, and parameter models used in match computation.
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
-# tof-specific defaults
+# Fitting thresholds
 TOF_FITTING_THRESHOLD = 0.9
-
-# orbi-specific defaults
 ORBI_FITTING_THRESHOLD = 0.6
+
+# Global match parameter defaults
+DEFAULT_MIN_ISOTOPE_ABUNDANCE = 0.1
+DEFAULT_PROBABLE_MATCH_THRESHOLD = 0.8
+DEFAULT_POSSIBLE_MATCH_THRESHOLD = 0.7
+
+# TOF-specific defaults
+TOF_DEFAULT_MZ_TOLERANCE = 15
+TOF_DEFAULT_ISOTOPE_RATIO_TOLERANCE = 0.15
+TOF_DEFAULT_PEAK_MIN_INTENSITY = 0
+
+# Orbi-specific defaults
+ORBI_DEFAULT_MZ_TOLERANCE = 5
+ORBI_DEFAULT_ISOTOPE_RATIO_TOLERANCE = 0.2
+ORBI_DEFAULT_PEAK_MIN_INTENSITY = 0
 
 # default values for unmatched isotopes
 DEFAULT_UNMATCHED_SAMPLE_PEAK_ID = -1
@@ -21,6 +34,88 @@ DEFAULT_UNMATCHED_MATCH_MZ_ERROR = 0.0
 DEFAULT_UNMATCHED_MATCH_ISOTOPE_SIMILARITY = 0.0
 DEFAULT_UNMATCHED_MATCH_SCORE = 0.0
 DEFAULT_UNMATCHED_SAMPLE_PEAK_TOF = 0.0
+
+
+class BaseMatchParams(BaseModel):
+    """Base class for instrument-specific match parameters."""
+
+    # global
+    min_isotope_abundance: float = Field(
+        DEFAULT_MIN_ISOTOPE_ABUNDANCE,
+        description="Minimum relative abundance of isotopes to consider in the match.",
+    )
+    possible_match_threshold: float = Field(
+        DEFAULT_POSSIBLE_MATCH_THRESHOLD,
+        description="Threshold score above which a match is considered possible, but below the probable match threshold.",
+    )
+    probable_match_threshold: float = Field(
+        DEFAULT_PROBABLE_MATCH_THRESHOLD,
+        description="Threshold score above which a match is considered probable.",
+    )
+    # instrument
+    mz_tolerance: int = Field(
+        description="Tolerance for mass-to-charge ratio (m/z) error.",
+    )
+    isotope_ratio_tolerance: float = Field(
+        description="Tolerance for the ratio of isotopic abundances.",
+    )
+    peak_min_intensity: float = Field(
+        description="Minimum peak intensity threshold for considering a match.",
+    )
+
+    @model_validator(mode="after")
+    @classmethod
+    def validate_thresholds(cls, values):
+        if (
+            values.possible_match_threshold is not None
+            and values.probable_match_threshold is not None
+            and values.possible_match_threshold > values.probable_match_threshold
+        ):
+            raise ValueError(
+                "Possible match threshold must be less than or equal to probable match threshold"
+            )
+        return values
+
+
+class TofMatchParams(BaseMatchParams):
+    """TOF instrument match parameters."""
+
+    mz_tolerance: int = Field(
+        TOF_DEFAULT_MZ_TOLERANCE,
+        description="Tolerance for mass-to-charge ratio (m/z) error.",
+    )
+    isotope_ratio_tolerance: float = Field(
+        TOF_DEFAULT_ISOTOPE_RATIO_TOLERANCE,
+        description="Tolerance for the ratio of isotopic abundances.",
+    )
+    peak_min_intensity: float = Field(
+        TOF_DEFAULT_PEAK_MIN_INTENSITY,
+        description="Minimum peak intensity threshold for considering a match.",
+    )
+
+
+class OrbiMatchParams(BaseMatchParams):
+    """Orbitrap instrument match parameters."""
+
+    mz_tolerance: int = Field(
+        ORBI_DEFAULT_MZ_TOLERANCE,
+        description="Tolerance for mass-to-charge ratio (m/z) error.",
+    )
+    isotope_ratio_tolerance: float = Field(
+        ORBI_DEFAULT_ISOTOPE_RATIO_TOLERANCE,
+        description="Tolerance for the ratio of isotopic abundances.",
+    )
+    peak_min_intensity: float = Field(
+        ORBI_DEFAULT_PEAK_MIN_INTENSITY,
+        description="Minimum peak intensity threshold for considering a match.",
+    )
+
+
+class MatchParams(BaseModel):
+    """Container for all instrument-specific match parameters."""
+
+    tof: TofMatchParams = TofMatchParams()
+    orbi: OrbiMatchParams = OrbiMatchParams()
 
 
 class UnmatchedIsotopeParams(BaseModel):
@@ -58,3 +153,6 @@ class UnmatchedIsotopeParams(BaseModel):
         DEFAULT_UNMATCHED_SAMPLE_PEAK_TOF,
         description="Default TOF value for isotopes without matching peaks.",
     )
+
+
+unmatched_isotope_params = UnmatchedIsotopeParams()

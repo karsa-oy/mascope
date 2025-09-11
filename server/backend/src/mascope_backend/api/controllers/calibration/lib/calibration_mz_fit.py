@@ -26,7 +26,7 @@ from mascope_backend.api.controllers.target.isotopes.target_isotopes_controller 
 from mascope_backend.api.controllers.target.associations.target_compound_in_target_collection_controller import (
     get_target_compound_in_target_collection,
 )
-from mascope_backend.api.new.match.params import TofMatchParams, OrbiMatchParams
+from mascope_match.params import TofMatchParams, OrbiMatchParams
 from mascope_backend.socket.notifications import (
     send_progress_user_notification,
 )

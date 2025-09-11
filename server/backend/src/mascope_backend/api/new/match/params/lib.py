@@ -1,10 +1,12 @@
 import pandas as pd
 
+from mascope_match.params import (
+    BaseMatchParams,
+    OrbiMatchParams,
+    TofMatchParams,
+)
 from mascope_backend.api.controllers.samples.lib.samples_fetch import fetch_sample
-
 from mascope_file.name import resolve_instrument_type
-
-from .schema import BaseMatchParams, TofMatchParams, OrbiMatchParams
 
 
 def instrument_default_match_params(instrument_name: str):

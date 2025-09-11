@@ -18,7 +18,10 @@ from mascope_backend.api.controllers.target.ions.target_ions_controller import (
     create_target_ions,
 )
 from mascope_backend.api.controllers.samples.lib.samples_fetch import fetch_sample
-from mascope_backend.api.new.match.params import apply_match_params
+from mascope_backend.api.new.match.params import (
+    apply_match_params,
+    default_match_params,
+)
 from mascope_backend.api.new.instrument_configs.lib import (
     read_instrument_functions,
 )
@@ -37,7 +40,7 @@ from mascope_backend.api.controllers.target.lib.compute.target_ions_compute impo
     generate_target_ions_from_composition,
     generate_target_ions_from_mass,
 )
-from mascope_backend.api.new.match.params import BaseMatchParams, default_match_params
+from mascope_match.params import BaseMatchParams
 
 
 @api_controller()

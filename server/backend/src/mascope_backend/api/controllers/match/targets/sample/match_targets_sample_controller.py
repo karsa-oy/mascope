@@ -4,9 +4,6 @@ import pandas as pd
 
 from mascope_file.name import get_instrument_type
 
-from mascope_backend.api.new.match.params.schema import (
-    DEFAULT_MIN_ISOTOPE_ABUNDANCE,
-)
 from mascope_backend.api.lib.api_features import api_controller
 from mascope_backend.api.controllers.samples.samples_controller import get_sample
 from mascope_backend.api.controllers.sample.items.sample_items_controller import (
@@ -40,6 +37,9 @@ from mascope_backend.api.new.match.params import apply_match_params
 from mascope_backend.api.controllers.match.lib.match_util import (
     deduplicate_match_df,
     sort_and_paginate_match_sample_df,
+)
+from mascope_match.params import (
+    DEFAULT_MIN_ISOTOPE_ABUNDANCE,
 )
 
 

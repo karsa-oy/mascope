@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 
-from mascope_backend.api.new.match.params import BaseMatchParams
 from mascope_backend.api.new.cheminfo.config import cheminfo_config
+from mascope_match.params import BaseMatchParams
 
 
 class CheminfoQueryBody(BaseModel):

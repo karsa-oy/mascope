@@ -6,6 +6,7 @@ from sqlalchemy import (
 )
 
 from mascope_file.name import get_instrument_type
+from mascope_match.params import BaseMatchParams
 
 from mascope_backend.db import async_session
 from mascope_backend.db.models import (
@@ -64,7 +65,6 @@ from mascope_backend.api.models.match.collections.match_collection_pydantic_mode
 from mascope_backend.api.models.match.samples.match_sample_pydantic_model import (
     MatchSampleBase,
 )
-from mascope_backend.api.new.match.params import BaseMatchParams
 
 
 from mascope_backend.runtime import runtime
