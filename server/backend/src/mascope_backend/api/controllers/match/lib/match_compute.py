@@ -69,13 +69,11 @@ async def compute_and_create_sample_match_isotope_data(
     # Step 2: Compute match isotopes for the given sample and target isotopes.
     runtime.logger.info(f"Computing match isotopes for file: {filename}")
 
-    match_params = await default_match_params(sample_item_id)
     match_isotope_df = await compute_match_isotopes(
-        filename=filename,
+        filename=sample.filename,
         target_isotopes_df=target_isotopes_df,
-        match_params=match_params,
         instrument_functions=instrument_functions,
-        polarity=polarity,
+        polarity=sample.polarity,
     )
     if match_isotope_df.empty:
         runtime.logger.warning(

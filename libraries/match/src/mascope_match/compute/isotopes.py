@@ -10,15 +10,15 @@ from mascope_signal.peak import get_peak_detector
 from mascope_chem.mz import match_mz
 from mascope_match.runtime import runtime
 
-from mascope_match.params import UnmatchedIsotopeParams
+from mascope_match.params import unmatched_isotope_params
 from mascope_match.id import generate_id
 
 
 async def compute_match_isotopes(
     filename: str,
     target_isotopes_df: pd.DataFrame,
-    match_params: "MatchParams",  # noqa: F821 # type: ignore
     instrument_functions: tuple[dict, callable],
+    match_params: BaseMatchParams | None = None,
     polarity: Literal["+", "-"] | None = None,
 ) -> pd.DataFrame:
     """
@@ -41,10 +41,10 @@ async def compute_match_isotopes(
     :type filename: str
     :param target_isotopes_df: DataFrame containing target isotopes with their m/z values and other properties.
     :type target_isotopes_df: pd.DataFrame
-    :param match_params: Match parameters containing settings for the matching process.
-    :type match_params: BaseMatchParams
     :param instrument_functions: Tuple containing peak shape details and a resolution function R.
     :type instrument_functions: tuple[dict, callable]
+    :param match_params: Match parameters containing settings for the matching process, default to None
+    :type match_params: BaseMatchParams | None
     :param polarity: Polarity of the sample, either "+", "-", or "+-".
     :type polarity: Literal["+", "-"], optional
     :return: DataFrame with match details for all target isotopes, including those without matches
@@ -56,18 +56,30 @@ async def compute_match_isotopes(
       aggregated in a separate process.
     - Isotopes without matching peaks are assigned a match score of 0 and placeholder values
       for the required database fields.
+    - Supports both database-pre-filtered isotopes (when match_params=None)
+      and legacy filtering (when match_params provided for backwards compatibility).
+      TODO remove match_params and target isotopes filtering form here? keep only actual computing
     """
     try:
         # Step 1: Initialize parameters and load data
         instrument_type = get_instrument_type(filename)
-        resolution_type = "LOW" if instrument_type == "tof" else "HIGH"  # noqa: F841
-        unmatched_defaults = UnmatchedIsotopeParams()
 
-        # Filter isotopes below threshold and with incorrect resolution
-        query = "relative_abundance >= @match_params.min_isotope_abundance and resolution == @resolution_type"
-        target_isotopes_df = target_isotopes_df.query(query).reset_index(drop=True)
+        # Step 2: Apply filtering only if match_params provided (backwards compatibility)
+        if match_params is not None:
+            # Filter isotopes below threshold and with incorrect resolution
+            resolution_type = (
+                "LOW" if instrument_type == "tof" else "HIGH"
+            )  # noqa: F841
+            query = "relative_abundance >= @match_params.min_isotope_abundance and resolution == @resolution_type"
+            target_isotopes_df = target_isotopes_df.query(query).reset_index(drop=True)
+        else:
+            runtime.logger.debug("Using database-pre-filtered target isotopes")
 
-        # Step 2: - Detect peaks in the sample file
+        if target_isotopes_df.empty:
+            runtime.logger.debug("No target isotopes to process")
+            return pd.DataFrame()
+
+        # Step 3: Detect peaks in the sample file
         peaks = await detect_and_load_peaks(
             filename=filename,
             instrument_type=instrument_type,
@@ -76,7 +88,7 @@ async def compute_match_isotopes(
             polarity=polarity,
         )
 
-        # Step 3: Create initial dataframe with default values for all isotopes
+        # Step 4: Create initial dataframe with default values
         match_isotope_df = target_isotopes_df.copy().assign(
             match_isotope_id=[
                 generate_id(length=32) for _ in range(len(target_isotopes_df))
@@ -88,28 +100,28 @@ async def compute_match_isotopes(
             match_abundance_error=np.nan,
             match_isotope_similarity=np.nan,
             match_mz_error=np.nan,
-            match_score=unmatched_defaults.match_score,
+            match_score=unmatched_isotope_params.match_score,
             sample_peak_tof=np.nan,
         )
 
-        # Step 4: Extract peak data for matching
+        # Step 5: Extract peak data and perform matching
         runtime.logger.debug("Parse peak data")
 
         parsed_peaks = parse_and_filter_peaks(peaks)
 
-        # Step 5: Perform matching
         match_isotope_df = match_isotope_df.apply(
             match, args=(parsed_peaks,), axis=1
         ).reset_index()
 
+        # Step 6: Calculate match stats and assign defaults
         # Create a mask for matched isotopes (those with actual peak data)
         matched_mask = ~match_isotope_df["sample_peak_mz"].isna()
 
-        # Step 6: - Calculate match stats for isotopes with actual matches
+        # Calculate match stats for isotopes with actual matches
         if matched_mask.any():
             match_isotope_df = calculate_match_stats(match_isotope_df, peaks)
 
-        # Step 7: Set default values for unmatched isotopes
+        # Set default values for unmatched isotopes
         unmatched_mask = ~matched_mask
         if unmatched_mask.any():
             match_isotope_df = assign_defaults_to_unmatched(
@@ -371,7 +383,6 @@ def assign_defaults_to_unmatched(
     :return: DataFrame with default values assigned to unmatched isotopes.
     :rtype: pd.DataFrame
     """
-    unmatched_defaults = UnmatchedIsotopeParams()
     unmatched_count = unmatched_mask.sum()
     runtime.logger.info(f"Found {unmatched_count} isotopes without matching peaks")
 
@@ -381,7 +392,7 @@ def assign_defaults_to_unmatched(
     ]
 
     # Apply all defaults except sample_peak_mz which was handled above
-    for column, value in unmatched_defaults.model_dump().items():
+    for column, value in unmatched_isotope_params.model_dump().items():
         if column != "sample_peak_mz":
             match_isotope_df.loc[unmatched_mask, column] = value
 
