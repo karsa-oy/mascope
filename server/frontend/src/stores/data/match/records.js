@@ -66,7 +66,6 @@ const defineMatch = (level) => {
 export const useMatchCollection = defineMatch('Collection')
 export const useMatchCompound = defineMatch('Compound')
 export const useMatchIon = defineMatch('Ion')
-export const useMatchIsotope = defineMatch('Isotope')
 
 // generate unique keys to ensure we can identify
 // records of the level correctly
@@ -97,15 +96,6 @@ function generateKey(level) {
           ...record,
           parent_key: `${target_collection_id}_${target_compound_id}`,
           match_key: `${target_collection_id}_${target_ion_id}`
-        }
-      }
-    case 'Isotope':
-      return (record) => {
-        const { target_collection_id, target_ion_id, target_isotope_id } = record
-        return {
-          ...record,
-          parent_key: `${target_collection_id}_${target_ion_id}`,
-          match_key: `${target_collection_id}_${target_isotope_id}`
         }
       }
   }

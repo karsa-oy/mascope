@@ -19,7 +19,6 @@ const tableHeight = inject('target-table-height')
     label="Target Isotopes"
     icon="pi pi-bullseye"
     :clear="app.data.match.ion.unfocus"
-    :loading="app.data.match.isotope.loading"
     :pt="
       app.ui.help.right(`
         <h1>Target Browser</h1>
@@ -34,17 +33,8 @@ const tableHeight = inject('target-table-height')
     "
   >
     <DataTable
-      :value="
-        app.data.match.isotope.list.filter(
-          (isotope) =>
-            isotope.target_ion_id === app.data.match.ion.focused.target_ion_id &&
-            isotope.target_collection_id === app.data.match.collection.focusedId
-        )
-      "
-      dataKey="match_key"
-      v-model:selection="app.data.match.isotope.focused"
-      selectionMode="single"
-      :metaKeySelection="false"
+      :value="app.data.match.visualized.isotopes"
+      dataKey="target_isotope_id"
       resizableColumns
       size="small"
       scrollable

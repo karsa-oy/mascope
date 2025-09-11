@@ -68,12 +68,6 @@ const tableHeight = inject('target-table-height')
       <Column header="Ion" field="target_ion_formula" sortable>
         <template #body="{ data }">
           <div :id="data.match_key" class="row" style="justify-content: flex-start">
-            <span
-              :class="`pi pi-chevron-${
-                data.target_ion_id == app.data.match.ion.focused?.target_ion_id ? 'down' : 'right'
-              }`"
-              style="font-size: smaller; margin-right: 0.5rem"
-            />
             <BaseCopyableField :field="data.target_ion_formula" />
           </div>
         </template>

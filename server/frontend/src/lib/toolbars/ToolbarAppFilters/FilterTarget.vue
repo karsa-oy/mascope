@@ -12,7 +12,6 @@ const app = useApp()
 const active = computed(() => app.data.match.collection.focused)
 
 const clear = () => {
-  app.data.match.isotope.unfocus()
   app.data.match.ion.unfocus()
   app.data.match.compound.unfocus()
   app.data.match.collection.unfocus()
@@ -32,16 +31,7 @@ const label = computed(() => {
       ? compoundName
       : app.data.match.compound.focused?.target_compound_formula
   const ionLabel = app.data.match.ion.focused?.target_ion_formula
-  const isotopeLabel = app.data.match.isotope.focused
-    ? num.mz.format(app.data.match.isotope.focused?.mz)
-    : null
-  if (isotopeLabel) {
-    return {
-      short: `${ionLabel} ❯ ${isotopeLabel}`,
-      full: `Target Isotope
-             ${collectionLabel} ❯ ${compoundLabel} ❯ ${ionLabel} ❯ ${isotopeLabel}`
-    }
-  } else if (ionLabel) {
+  if (ionLabel) {
     return {
       short: `${compoundLabel} ❯ ${ionLabel}`,
       full: `Target Ion

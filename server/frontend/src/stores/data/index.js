@@ -14,7 +14,6 @@ import {
   useMatchCollection,
   useMatchCompound,
   useMatchIon,
-  useMatchIsotope,
   // nonstandard
   useMatchParams,
   useMatchVisualized
@@ -45,7 +44,6 @@ export const useData = () => ({
     collection: useMatchCollection(),
     compound: useMatchCompound(),
     ion: useMatchIon(),
-    isotope: useMatchIsotope(),
     params: useMatchParams(),
     visualized: useMatchVisualized()
   },

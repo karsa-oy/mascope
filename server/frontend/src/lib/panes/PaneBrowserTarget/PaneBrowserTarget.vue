@@ -14,8 +14,7 @@ const app = useApp()
 
 // trigger visualization on match focus
 watch(
-  () =>
-    app.data.match.isotope.focused ?? app.data.match.ion.focused ?? app.data.match.compound.focused,
+  () => app.data.match.ion.focused ?? app.data.match.compound.focused,
   async (match) => {
     const ionId =
       match?.target_ion_id ??
@@ -109,22 +108,7 @@ watch(
     if (ion) {
       // focus parent if focused
       app.data.match.compound.focus((comp) => comp.match_key == ion.parent_key)
-      // unfocus unrelated isotopes
-      if (app.data.match.isotope.parent_key !== ion.match_key) {
-        app.data.match.isotope.unfocus()
-      }
       scrollTo(ion)
-    } else {
-      // unfocus child if unfocused
-      app.data.match.isotope.unfocus()
-    }
-  }
-)
-watch(
-  () => app.data.match.isotope.focused,
-  (isotope) => {
-    if (isotope) {
-      scrollTo(isotope)
     }
   }
 )
@@ -132,8 +116,7 @@ watch(
   () => app.data.sample.focused,
   (sample) => {
     scrollTo(
-      app.data.match.isotope.focused ??
-        app.data.match.ion.focused ??
+      app.data.match.ion.focused ??
         app.data.match.compound.focused ??
         app.data.match.collection.focused
     )
