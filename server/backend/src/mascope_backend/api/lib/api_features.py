@@ -375,10 +375,10 @@ def api_controller_background_task(
                             error_notification_rooms, notification, kwargs, None, sid
                         )
                         await handle_reloads(
-                            f"ApiException reload (status {e.status_code}) {func.__name__}",
-                            error_reload,
-                            kwargs,
-                            None,
+                            context=f"ApiException reload (status {e.status_code}) {func.__name__}",
+                            reload_events=error_reload,
+                            kwargs=kwargs,
+                            result=e.tech_message,
                         )
                     # If not an independent transaction, re-raise the ApiException
                     else:

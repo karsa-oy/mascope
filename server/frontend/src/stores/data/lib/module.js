@@ -305,8 +305,35 @@ export const defineModule = ({
       } else if (newCount > 0 && oldCount > 0) {
         log('data reloaded')
       }
+
       // refocus
-      const newFocused = refocus(oldFocusedId)
+      let newFocused = refocus(oldFocusedId)
+      // Reload the focused record with latest server data+
+      if (newFocused && read) {
+        try {
+          debug(`⚠️ reloading focused record ${newFocused[key]} from api`)
+
+          const freshRecord = await read(newFocused[key])
+
+          // Update the record in the list with fresh data
+          const index = records.value.findIndex((r) => r[key] === newFocused[key])
+          if (index >= 0) {
+            records.value[index] = freshRecord
+            debug(`updated record in list at index ${index}`)
+          }
+
+          // Update focused reference if in singleselect mode
+          if (singleselect) {
+            focused.value = freshRecord
+          }
+
+          // Use the fresh record for child propagation
+          newFocused = freshRecord
+        } catch (error) {
+          warn(`failed to refresh focused record after reload:`, error)
+        }
+      }
+
       // propegate to children
       if (children.value.length > 0) {
         await Promise.all(children.value.map(({ sync }) => sync({ name, focused: newFocused })))
