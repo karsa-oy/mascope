@@ -344,6 +344,7 @@ async def calibration_mz_apply(
         for sample_item in batch_samples:
             await match_remove_sample(
                 sample_item_id=sample_item.sample_item_id,
+                full_remove=True,
                 independent_transaction=False,
                 process_id=gen_id(8),
                 parent_id=process_id,

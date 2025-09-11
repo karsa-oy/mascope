@@ -405,9 +405,9 @@ async def create_match_ions(
 
 @api_controller()
 async def delete_match_ions(
-    sample_item_id: Optional[str] = None,
-    sample_batch_id: Optional[str] = None,
-    target_ion_ids: Optional[List[str]] = None,
+    sample_item_id: str | None = None,
+    sample_batch_id: str | None = None,
+    target_ion_ids: list[str] | None = None,
 ) -> dict:
     """
     Deletes match ions for specified sample items, optionally filtered by target ion IDs.
@@ -422,11 +422,11 @@ async def delete_match_ions(
     4. Commit the transaction and report the number of deleted records.
 
     :param sample_item_id: ID of the single sample item for which match ions are to be deleted, optional.
-    :type sample_item_id: Optional[str]
+    :type sample_item_id: str | None
     :param sample_batch_id: ID of the sample batch from which sample items are derived for deletion, optional.
-    :type sample_batch_id: Optional[str]
+    :type sample_batch_id: str | None
     :param target_ion_ids: Optional list of target ion IDs to further filter the match ions to be deleted.
-    :type target_ion_ids: Optional[List[str]]
+    :type target_ion_ids: list[str] | None
     :return: A message indicating the outcome of the deletion process including the count of deleted records.
     :rtype: dict
     """

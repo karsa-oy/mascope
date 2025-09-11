@@ -347,9 +347,9 @@ async def create_match_compounds(
 
 @api_controller()
 async def delete_match_compounds(
-    sample_item_id: Optional[str] = None,
-    sample_batch_id: Optional[str] = None,
-    target_compound_ids: Optional[List[str]] = None,
+    sample_item_id: str | None = None,
+    sample_batch_id: str | None = None,
+    target_compound_ids: list[str] | None = None,
 ):
     """
     Deletes match compounds for specified sample items, optionally filtered by target compound IDs.

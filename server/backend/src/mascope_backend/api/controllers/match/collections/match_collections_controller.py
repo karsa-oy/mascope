@@ -241,9 +241,9 @@ async def create_match_collections(
 
 @api_controller()
 async def delete_match_collections(
-    sample_item_id: Optional[str] = None,
-    sample_batch_id: Optional[str] = None,
-    target_collections_ids: Optional[List[str]] = None,
+    sample_item_id: str | None = None,
+    sample_batch_id: str | None = None,
+    target_collections_ids: list[str] | None = None,
 ):
     """
     Deletes match collections for specified sample items, optionally filtered by target collection IDs.

@@ -273,61 +273,57 @@ async def rematch_samples(
 )
 async def match_remove_sample(
     sample_item_id: str,
-    removed_target_compound_ids: list[str] | None = None,
-    removed_ionization_mechanism_ids: list[str] | None = None,
+    full_remove: bool = False,
     independent_transaction: bool = False,
-    sid: str = None,
-    process_id=None,
-    parent_id=None,
+    sid: str | None = None,
+    process_id: str | None = None,
+    parent_id: str | None = None,
 ) -> dict:
     """
-    Removes matches for a specific sample item, potentially filtered by specific target compounds or ionization mechanisms.
+    Removes matches for a specific sample.
 
-    This function deletes matches for a given sample item.
-    When provided, filters based on removed target compounds or ionization mechanisms are applied, limiting the deletion to matches associated with those criteria.
-    If no filters are specified, all matches for the sample item are removed. This operation can be performed as part of a larger transaction (rematch_sample endpoint)
-    or as an independent transaction (Postman), in which case a reload event is emitted for the sample batch.
+    By default, performs removal by comparing existing matches against
+    current sample-target associations. Use full_remove=True for full removal.
 
-    Steps:
-    1. If specified, determine the target isotope IDs linked to the removed compounds or ionization mechanisms, which will limit the deletion of related matches.
-    2. Execute the deletion of matches based on the identified target isotope IDs or remove all matches if no filters are applied.
-
-    :param sample_item_id: Unique identifier for the sample item whose matches are to be removed.
+    :param sample_item_id: Unique identifier for the sample
     :type sample_item_id: str
-    :param removed_target_compound_ids: List of target compound IDs to filter the matches that need to be removed, optional.
-    :type removed_target_compound_ids: list[str] | None
-    :param removed_ionization_mechanism_ids: List of ionization mechanism IDs to filter the matches that need to be removed, optional.
-    :type removed_ionization_mechanism_ids: list[str] | None
-    :param independent_transaction: Flag indicating whether the operation should be treated as an independent transaction, defaults to False.
+    :param full_remove: If True, removes all matches; if False, removes only orphaned matches, defaults to False.
+    :type full_remove: bool
+    :param independent_transaction: Flag for transaction handling, defaults to False.
     :type independent_transaction: bool
-    :raises HTTPException: Raises an HTTPException if the operation fails during an independent transaction.
-    :raises RuntimeError: Raises a RuntimeError for internal call failures when not in an independent transaction.
+    :param sid: Session ID for notifications
+    :param process_id: Process identifier
+    :param parent_id: Parent process identifier
     """
-    # Step 1: Retrieve batch data and associated sample item.
     sample = await fetch_sample(sample_item_id)
-    sample_item_name = sample.sample_item_name
     runtime.logger.info(
-        f"...Removing matches for sample '{sample_item_name}' with ID '{sample_item_id}' ..."
+        f"...{'Fully' if full_remove else 'Partially'} removing matches "
+        f"for sample '{sample.sample_item_name}' with ID '{sample_item_id}' ..."
+    )
+    result = await remove_matches(
+        sample=sample,
+        full_remove=full_remove,
+    )
+    status = result.get("status")
+    removed_match_isotopes_count = result.get("data", {}).get(
+        "removed_match_isotopes_count", 0
     )
 
-    # Step 2: Remove match data and associated sample item.
-    remove_matches_reult = await remove_matches(
-        sample_item_id=sample_item_id,
-        removed_target_compound_ids=removed_target_compound_ids,
-        removed_ionization_mechanism_ids=removed_ionization_mechanism_ids,
-    )
+    if status == "success":
+        await update_sample_modified_timestamps(sample_item_ids=[sample_item_id])
+        operation_type = (
+            "All matches removed" if full_remove else "Orphaned matches removed"
+        )
+        message = f"{operation_type} for sample '{sample.sample_item_name}'."
+    else:
+        message = f"No orphaned matches found for sample '{sample.sample_item_name}' - nothing to remove."
 
-    await update_sample_modified_timestamps(sample_item_ids=[sample_item_id])
-
-    message_logs = remove_matches_reult["message_logs"]
-    message = f"{remove_matches_reult['message']} for sample '{sample_item_name}'."
-
-    # Step 4: Return sample batch data and message
-    runtime.logger.info(message)
     return {
-        "data": sample.to_dict(),
+        "status": status,
         "message": message,
-        "message_logs": message_logs,
+        "data": {
+            "removed_match_isotopes_count": removed_match_isotopes_count,
+        },
         "_notification_data": {"sample_item_id": sample_item_id},
     }
 
@@ -980,67 +976,60 @@ async def rematch_batch(
 )
 async def match_remove_batch(
     sample_batch_id: str,
-    removed_target_compound_ids: list[str] | None = None,
-    removed_ionization_mechanism_ids: list[str] | None = None,
+    full_remove: bool = False,
     independent_transaction: bool = False,
-    sid: str = None,
-    process_id=None,
-    parent_id=None,
-):
+    sid: str | None = None,
+    process_id: str | None = None,
+    parent_id: str | None = None,
+) -> dict:
     """
-    Removes matches associated with a sample batch, optionally filtering by removed target compounds or ionization mechanisms.
+    Removes matches for all samples in the specified sample batch.
 
-    This function deletes matches for a given sample batch. If removed target compound IDs or ionization
-    mechanism IDs are provided, the function fetches associated target isotope IDs and deletes matches specific to these isotopes.
-    If no filters are provided, all matches for the batch are deleted.
-
-    Steps:
-    1. Retrieve batch data
-    2. Determine the target isotope IDs that are associated with the removed compounds or ionization mechanisms.
-    3. Execute the deletion of matches based on the identified target isotope IDs or remove all matches if no filters are applied.
+    By default, performs removal by comparing existing matches against
+    current sample-target associations. Use full_remove=True for full removal.
 
     :param sample_batch_id: ID of the sample batch for which matches are to be removed.
     :type sample_batch_id: str
-    :param removed_target_compound_ids: List of target compound IDs for which matches are to be removed, optional.
-    :type removed_target_compound_ids: list[str] | None
-    :param removed_ionization_mechanism_ids: List of ionization mechanism IDs for which matches are to be removed, optional.
-    :type removed_ionization_mechanism_ids: list[str] | None
+    :param full_remove: If True, removes all matches; if False, removes only orphaned matches, defaults to False.
+    :type full_remove: bool
     :param independent_transaction: Flag indicating if the operation should be an independent transaction, default to False.
     :type independent_transaction: bool
+    :param sid: Session identifier for client notifications
+    :param process_id: Process identifier for progress tracking
+    :param parent_id: Parent process identifier
+    :return: Batch data with removal results and status message
+    :rtype: dict
     """
-    # Step 1: Retrieve batch data and associated sample items.
-    async with async_session() as session:
-        sample_batch = await session.get(SampleBatch, sample_batch_id)
-        if not sample_batch:
-            raise NotFoundException(
-                f"Sample batch with ID '{sample_batch_id}' not found"
-            )
+    # Step 1: Retrieve batch data
+    sample_batch = await fetch_sample_batch(sample_batch_id)
 
-    sample_batch_name = sample_batch.sample_batch_name
     runtime.logger.info(
-        f"...Removing matches for sample batch '{sample_batch_name}' with ID '{sample_batch_id}' ..."
+        f"...{'Fully' if full_remove else 'Partially'} removing matches "
+        f"for sample batch '{sample_batch.sample_batch_name}' with ID '{sample_batch_id}' ..."
     )
 
     # Step 2: Remove match data and associated sample batch.
-    remove_matches_result = await remove_matches(
-        sample_batch_id=sample_batch_id,
-        removed_target_compound_ids=removed_target_compound_ids,
-        removed_ionization_mechanism_ids=removed_ionization_mechanism_ids,
+    result = await remove_matches(sample_batch=sample_batch, full_remove=full_remove)
+    status = result.get("status")
+    removed_match_isotopes_count = result.get("data", {}).get(
+        "removed_match_isotopes_count", 0
     )
 
-    await update_sample_modified_timestamps(sample_batch_ids=[sample_batch_id])
+    if status == "success":
+        await update_sample_modified_timestamps(sample_batch_ids=[sample_batch_id])
+        remove_message = f"{f"All {removed_match_isotopes_count}" if full_remove else f"{removed_match_isotopes_count} orphaned"} match isotopes removed"
+    else:
+        remove_message = "No orphaned matches found"
 
-    message_logs = remove_matches_result["message_logs"]
-    message = (
-        f"{remove_matches_result['message']} for sample batch '{sample_batch_name}'."
-    )
-
+    message = f"{remove_message} for sample batch '{sample_batch.sample_batch_name}'."
+    runtime.logger.debug(f"{message} Operation status: {status}.")
     # Step 4: Return sample batch data and message
-    runtime.logger.info(message)
     return {
-        "data": sample_batch.to_dict(),
+        "status": status,
         "message": message,
-        "message_logs": message_logs,
+        "data": {
+            "removed_match_isotopes_count": removed_match_isotopes_count,
+        },
         "_notification_data": {"sample_batch_id": sample_batch_id},
     }
 
