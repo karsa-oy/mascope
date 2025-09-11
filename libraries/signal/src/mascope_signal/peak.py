@@ -18,6 +18,7 @@ from mascope_file.name import (
 from mascope_file.io import (
     load_array,
     load_file,
+    read_props,
     write_peaks,
 )
 
@@ -55,7 +56,7 @@ class BasePeakDetector(ABC):
         self._peak_shape, self._resolution_function = instrument_functions
 
         self._u_list = u_list
-        self._sample_file_props = load_file(filename, vars=[]).props
+        self._sample_file_props = read_props(self._filename)
         self._sum_signal = get_sum_signal(self._filename)
 
     def _load_old_peaks(self, if_exists):

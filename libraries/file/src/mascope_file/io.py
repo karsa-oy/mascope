@@ -225,6 +225,19 @@ def open_mfzarr(path, sync=None, mode="r", concat_dim="time", prev_array=None):
     return x
 
 
+def read_props(base_filename: str) -> dict:
+    """Read properties from a sample file's .props JSON.
+
+    :param base_filename: Sample file filename
+    :type base_filename: str
+    :return: Properties dictionary
+    :rtype: dict
+    """
+    prop_path = os.path.join(parse_path_from_item_filename(base_filename), ".props")
+    with open(prop_path, "r") as f:
+        return json.load(f)
+
+
 # WRITE
 
 
