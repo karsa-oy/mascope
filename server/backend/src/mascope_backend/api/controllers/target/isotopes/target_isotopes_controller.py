@@ -247,8 +247,8 @@ async def get_target_isotope(target_isotope_id: str) -> dict:
     2. Check if the target isotope exists. If not, raise a NotFoundException.
     3. Return the target isotope's details as a dictionary.
 
-    :param sample_batch_id: Unique identifier of the target isotope to retrieve.
-    :type sample_batch_id: str
+    :param target_isotope_id: Unique identifier of the target isotope to retrieve.
+    :type target_isotope_id: str
     :raises NotFoundException: If the target isotope with the given ID is not found.
     :return: The requested target isotope's details.
     :rtype: dict

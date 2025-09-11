@@ -573,12 +573,7 @@ async def update_target_compound(target_compounds: List[TargetCompoundUpdate]):
 
         await session.commit()
 
-        # Rematch the affected sample batches where compound formula was updated
-        # for sample_batch_id in sample_batches_affected_rematch:
-        #     # FIX replace with request
-        #     # TODO_background Use the fastApi background tasks
-        #     task = asyncio.create_task(match_compute_batch(None, sample_batch_id))
-        #     await task
+        # TODO Rematch the affected sample batches where compound formula was updated
 
         # Exclude rematched ids since they've been reloaded
         sample_batches_affected_reload = (
