@@ -8,10 +8,10 @@ from zarr.errors import PathNotFoundError
 
 from mascope_tofwerk.calibration import mz_calibrate, tof_to_mass
 
-from mascope_file.io import load_coord, update_props, update_zarr_array_coord
-from mascope_file.name import get_sample_file_type, get_instrument_type
 
-from mascope_signal.compute import get_sum_signal, get_tic_per_scan
+import mascope_file.name as m_name
+import mascope_file.io as m_io
+import mascope_signal.compute as m_compute
 
 from mascope_match import compute_match_isotopes
 from mascope_backend.api.lib.api_features import (
@@ -130,7 +130,7 @@ class TofCalibrationHandler(BaseCalibrationHandler):
 
         await send_progress_user_notification(self.notification, 0.25)
 
-        _, tic_per_scan = get_tic_per_scan(self.filename)
+        _, tic_per_scan = m_compute.get_tic_per_scan(self.filename)
         tic = np.sum(tic_per_scan)
         if tic < self.params.tic_threshold:
             self.warning = "TIC is too low! Check ionization device."
@@ -194,23 +194,33 @@ class TofCalibrationHandler(BaseCalibrationHandler):
         fit_mode = fit["mode"]
         fit_parameters = fit["par"]
 
-        nbr_samples = get_sum_signal(self.filename).size
+        nbr_samples = m_compute.get_sum_signal(self.filename).size
         tof = np.arange(nbr_samples)
         new_mz_axis = tof_to_mass(tof, fit_mode, fit_parameters)
         new_mz_range = new_mz_axis[0], new_mz_axis[-1]
 
         runtime.logger.info(f"Calibrating file: {self.filename}")
-        sample_file_type = get_sample_file_type(self.filename)
-        update_props(self.filename, {"range": new_mz_range, "mz_calibration": fit})
+        sample_file_type = m_name.get_sample_file_type(self.filename)
+        m_io.update_props(self.filename, {"range": new_mz_range, "mz_calibration": fit})
         if sample_file_type == "tof_zarr":
-            update_zarr_array_coord(self.filename, "signal", "mz", new_mz_axis)
-        update_zarr_array_coord(self.filename, "sum_signal", "mz", new_mz_axis)
+            m_io.update_zarr_array_coord(self.filename, "signal", "mz", new_mz_axis)
+
+        # Update m/z axis for all sum signals
+        sample_data_path = m_name.parse_path_from_item_filename(self.filename)
+        sample_file_vars = m_io.get_file_data_vars(sample_data_path)
+        for sum_signal_var in sample_file_vars:
+            if sum_signal_var.startswith("sum_signal_"):
+                m_io.update_zarr_array_coord(
+                    self.filename, sum_signal_var, "mz", new_mz_axis
+                )
 
         try:
-            peak_tofs = load_coord(self.filename, "peak_areas", "tof")
+            peak_tofs = m_io.load_coord(self.filename, "peak_areas", "tof")
             new_peak_mz = tof_to_mass(peak_tofs, fit_mode, fit_parameters)
-            update_zarr_array_coord(self.filename, "peak_areas", "mz", new_peak_mz)
-            update_zarr_array_coord(self.filename, "peak_heights", "mz", new_peak_mz)
+            m_io.update_zarr_array_coord(self.filename, "peak_areas", "mz", new_peak_mz)
+            m_io.update_zarr_array_coord(
+                self.filename, "peak_heights", "mz", new_peak_mz
+            )
         except PathNotFoundError:
             runtime.logger.warning(
                 f"Peak_areas/heights not found in {self.filename}, "
@@ -253,14 +263,14 @@ class OrbiCalibrationHandler(BaseCalibrationHandler):
         }
         self.stats = {
             "mz": observed_mzs,
-            "new_mz": target_mzs * calibration_factor,
+            "new_mz": observed_mzs * calibration_factor,
             "pre_dmz": 1e6 * (observed_mzs - target_mzs) / target_mzs,
             "post_dmz": 1e6
             * (observed_mzs * calibration_factor - target_mzs)
             / target_mzs,
         }
 
-        _, tic_per_scan = get_tic_per_scan(self.filename)
+        _, tic_per_scan = m_compute.get_tic_per_scan(self.filename)
         tic = np.sum(tic_per_scan)
         calibrant_signal_intensity = good_matches_df["sample_peak_intensity"]
         calibrant_to_tic = calibrant_signal_intensity / tic
@@ -288,23 +298,38 @@ class OrbiCalibrationHandler(BaseCalibrationHandler):
         NOTE: fit is passed externally since fit() and apply() used in different controllers
         and the instance of TofCalibrationHandler is not passed between them."""
         fit_parameters = fit["par"]
-
-        old_mz_axis = get_sum_signal(self.filename).mz.values
-        new_mz_axis = old_mz_axis * fit_parameters["calibration_factor"]
-        new_mz_range = new_mz_axis[0], new_mz_axis[-1]
+        factor = fit_parameters["calibration_factor"]
 
         runtime.logger.info(f"Calibrating file: {self.filename}")
-        update_props(self.filename, {"range": new_mz_range, "mz_calibration": fit})
-        sample_file_type = get_sample_file_type(self.filename)
-        if sample_file_type == "orbi_zarr":
-            update_zarr_array_coord(self.filename, "signal", "mz", new_mz_axis)
-        update_zarr_array_coord(self.filename, "sum_signal", "mz", new_mz_axis)
 
+        # Update m/z axis for all sum signals
+        sample_data_path = m_name.parse_path_from_item_filename(self.filename)
+        sample_file_vars = m_io.get_file_data_vars(sample_data_path)
+        for sum_signal_var in sample_file_vars:
+            if sum_signal_var.startswith("sum_signal"):
+                new_mz_axis = (
+                    m_io.load_coord(self.filename, sum_signal_var, "mz") * factor
+                )
+                m_io.update_zarr_array_coord(
+                    self.filename, sum_signal_var, "mz", new_mz_axis
+                )
+
+        # Update sample file properties
+        full_sum_signal_mz = m_io.load_coord(self.filename, "sum_signal", "mz")
+        new_mz_range = full_sum_signal_mz[0], full_sum_signal_mz[-1]
+        m_io.update_props(self.filename, {"range": new_mz_range, "mz_calibration": fit})
+        sample_file_type = m_name.get_sample_file_type(self.filename)
+
+        # Update m/z axis for signal and peak arrays if they exist
+        if sample_file_type == "orbi_zarr":
+            new_signal_mz = m_io.load_array(self.filename, "signal").mz.values * factor
+            m_io.update_zarr_array_coord(self.filename, "signal", "mz", new_signal_mz)
         try:
-            old_peak_mz = load_coord(self.filename, "peak_areas", "mz")
-            new_peak_mz = old_peak_mz * fit_parameters["calibration_factor"]
-            update_zarr_array_coord(self.filename, "peak_areas", "mz", new_peak_mz)
-            update_zarr_array_coord(self.filename, "peak_heights", "mz", new_peak_mz)
+            new_peak_mz = m_io.load_coord(self.filename, "peak_areas", "mz") * factor
+            m_io.update_zarr_array_coord(self.filename, "peak_areas", "mz", new_peak_mz)
+            m_io.update_zarr_array_coord(
+                self.filename, "peak_heights", "mz", new_peak_mz
+            )
         except PathNotFoundError:
             runtime.logger.warning(
                 f"Peak_areas/heights not found in {self.filename}, "
@@ -316,7 +341,7 @@ class OrbiCalibrationHandler(BaseCalibrationHandler):
 def get_calibration_handler(
     filename: str, calibration_params: CalibrationFitParams, notifications: object
 ) -> BaseCalibrationHandler:
-    instrument_type = get_instrument_type(filename)
+    instrument_type = m_name.get_instrument_type(filename)
     match instrument_type:
         case "tof":
             return TofCalibrationHandler(filename, calibration_params, notifications)
