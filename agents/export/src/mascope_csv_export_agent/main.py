@@ -18,7 +18,6 @@ import pandas as pd
 
 from datetime import datetime, timezone
 from logging.handlers import RotatingFileHandler
-from typing import Dict, List
 
 import mascope_sdk
 
@@ -65,7 +64,7 @@ class DataMonitor:
         # Validate configuration
         self.validate_config()
 
-    def load_config(self) -> Dict:
+    def load_config(self) -> dict:
         """Load configuration from file or create default."""
         try:
             if os.path.exists(self.config_file):
@@ -89,7 +88,7 @@ class DataMonitor:
             print(f"Error loading config: {e}")
             return DEFAULT_CONFIG
 
-    def load_state(self) -> Dict:
+    def load_state(self) -> dict:
         """Load state from file or create default."""
         default_state = {
             "last_check_timestamp": None,
@@ -154,7 +153,7 @@ class DataMonitor:
 
         self.logger.info(f"Output directory: {output_dir}")
 
-    def get_modified_batches(self) -> List[Dict]:
+    def get_modified_batches(self) -> list[dict]:
         """Get all sample batches that have been modified since last check."""
         try:
             batches = get_sample_batches(
@@ -224,7 +223,7 @@ class DataMonitor:
             self.logger.error(f"Error getting modified batches: {e}")
             return []
 
-    def get_new_samples(self, batch_id: str) -> List[Dict]:
+    def get_new_samples(self, batch_id: str) -> list[dict]:
         """Get new samples from batch created since last check using timestamp comparison."""
         try:
             samples = get_samples(
@@ -289,7 +288,7 @@ class DataMonitor:
             self.logger.error(f"Error getting new samples: {e}")
             return []
 
-    def process_sample(self, sample: Dict) -> tuple[Dict, Dict]:
+    def process_sample(self, sample: dict) -> tuple[dict, dict]:
         """Process a single sample with compound matching.
 
         :param sample: The sample to process.
@@ -348,7 +347,7 @@ class DataMonitor:
         self.logger.info(f"Finished matching for sample {sample_name}")
         return sample, results
 
-    def save_results(self, results: list[tuple[dict, list]]) -> bool:
+    def save_results(self, results: list[tuple[dict, dict]]) -> bool:
         """Save match results to a single CSV file per day with columns for each compound."""
         self.logger.debug(f"Saving results for {len(results)} samples")
         try:
@@ -403,7 +402,7 @@ class DataMonitor:
             self.logger.error(f"Error saving results: {e}\n{traceback.format_exc()}")
             return False
 
-    def update_state(self, last_check_timestamp: str, checked_batch_ids: List[str]):
+    def update_state(self, last_check_timestamp: str, checked_batch_ids: list[str]):
         """Update the state with checked batches."""
 
         # Update last check timestamp
