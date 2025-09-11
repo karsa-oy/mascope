@@ -156,6 +156,10 @@ class SampleBatchRead(SampleBatchBase):
     sample_batch_id: str = Field(
         ..., description="Unique identifier for the sample batch"
     )
+    status: str = Field(
+        ...,
+        description="Processing status of the sample batch (ready, processing, rematch)",
+    )
     locked: int = Field(
         ..., description="Lock status of the sample batch (0=unlocked, 1=locked)"
     )
@@ -189,6 +193,29 @@ class SampleBatchUpdate(SampleBatchBaseValidator, BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class SampleBatchUpdateStatusBody(BaseModel):
+    """
+    Model for updating sample batch statuses in bulk.
+
+    Allows updating multiple sample batches to the same status
+    """
+
+    sample_batch_ids: list[str] = Field(
+        ..., description="List of sample batch IDs to update", min_length=1
+    )
+    status: str = Field(..., description="New status to set for all specified batches")
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, status: str) -> str:
+        """Validate that status is one of the allowed values."""
+        if status not in sample_batch_config.SAMPLE_BATCH_STATUSES:
+            raise ValueError(
+                f"Invalid batch status '{status}'. Must be one of: {', '.join(sample_batch_config.SAMPLE_BATCH_STATUSES)}"
+            )
+        return status
+
+
 class GetSampleBatchesQueryParams(QueryParamsModel):
     workspace_id: str | None = Field(
         None,
@@ -200,6 +227,10 @@ class GetSampleBatchesQueryParams(QueryParamsModel):
     sample_batch_type: list[str] | None = Field(
         default=None,
         description="Filter by sample batch types (ACQUISITION, ANALYSIS). Can specify multiple types.",
+    )
+    status: list[str] | None = Field(
+        default=None,
+        description="Filter by processing status (ready, processing, rematch). Can specify multiple statuses.",
     )
     polarity: list[str] | None = Field(
         default=None,
@@ -229,6 +260,18 @@ class GetSampleBatchesQueryParams(QueryParamsModel):
                         f"Invalid sample batch type '{sample_batch_type}'. Must be one of: {', '.join(sample_batch_config.SAMPLE_BATCH_TYPES)}"
                     )
         return sample_batch_types
+
+    @field_validator("status")
+    @classmethod
+    def validate_status_list(cls, statuses: list[str] | None) -> list[str] | None:
+        """Validate sample batch statuses."""
+        if statuses:
+            for status in statuses:
+                if status not in sample_batch_config.SAMPLE_BATCH_STATUSES:
+                    raise ValueError(
+                        f"Invalid sample batch status '{status}'. Must be one of: {', '.join(sample_batch_config.SAMPLE_BATCH_STATUSES)}"
+                    )
+        return statuses
 
     @field_validator("polarity")
     @classmethod

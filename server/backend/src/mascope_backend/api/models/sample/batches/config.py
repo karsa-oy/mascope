@@ -16,9 +16,11 @@ class SampleBatchConfig(BaseModel):
     """
 
     SAMPLE_BATCH_TYPES: list = ["ACQUISITION", "ANALYSIS"]
+    SAMPLE_BATCH_STATUSES: list = ["ready", "processing", "rematch"]
 
     # Default values
     DEFAULT_SAMPLE_BATCH_TYPE: str = "ANALYSIS"
+    DEFAULT_SAMPLE_BATCH_STATUS: str = "ready"
     DEFAULT_LOCKED_STATUS: int = 0
 
     # Polarity constraints by batch type

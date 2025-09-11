@@ -217,6 +217,11 @@ class SampleBatch(Base):
         nullable=False,
         server_default=text(f"{sample_batch_config.DEFAULT_SAMPLE_BATCH_TYPE}"),
     )
+    status: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        server_default=text(f"{sample_batch_config.DEFAULT_SAMPLE_BATCH_STATUS}"),
+    )
     locked: Mapped[int] = mapped_column(
         Integer,
         nullable=False,

@@ -16,6 +16,9 @@ from mascope_backend.api.controllers.sample.batches.sample_batches_controller im
     copy_sample_batch,
     sample_batch_export_peaks,
 )
+from mascope_backend.api.controllers.sample.batches.status.service import (
+    update_sample_batch_status,
+)
 from mascope_backend.api.models.sample.batches.sample_batch_pydantic_model import (
     SampleBatchCreate,
     SampleBatchUpdate,
@@ -23,6 +26,7 @@ from mascope_backend.api.models.sample.batches.sample_batch_pydantic_model impor
     GetSampleBatchTargetsQueryParams,
     SampleBatchImportSamplesBody,
     SampleBatchCopyBody,
+    SampleBatchUpdateStatusBody,
 )
 
 sample_batches_router = APIRouter(prefix="/api/sample/batches", tags=["Sample Batches"])
@@ -101,6 +105,32 @@ async def create_sample_batch_route(
     :rtype: dict
     """
     return await create_sample_batch(sample_batch=body, independent_transaction=True)
+
+
+@sample_batches_router.patch("/status")
+@api_route()
+async def update_sample_batch_status_route(
+    body: SampleBatchUpdateStatusBody,
+    user=Depends(editor_user),
+):
+    """
+    Update the status of multiple sample batches.
+
+    Only batches with different current status
+    are updated.
+
+    :param body: Request body containing batch IDs and target status
+    :type body: SampleBatchUpdateStatusBody
+    :param user: The current authenticated user with editor permissions
+    :type user: User
+    :return: Update results with count of affected batches and details
+    :rtype: dict
+    """
+    return await update_sample_batch_status(
+        sample_batch_ids=body.sample_batch_ids,
+        status=body.status,
+        independent_transaction=True,
+    )
 
 
 @sample_batches_router.patch("/{sample_batch_id}")

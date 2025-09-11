@@ -62,6 +62,9 @@ from mascope_backend.api.controllers.sample.lib.fetch_affected_sample_data impor
     fetch_affected_sample_data,
 )
 
+from mascope_backend.api.controllers.sample.batches.status.service import (
+    update_sample_batch_status,
+)
 from mascope_backend.api.controllers.ionization_mechanisms.lib.validation import (
     validate_ionization_mechanisms_polarity,
 )
@@ -102,6 +105,7 @@ async def get_sample_batches(
     workspace_id: str | None = None,
     sample_batch_name: str | None = None,
     sample_batch_type: list[str] | None = None,
+    status: list[str] | None = None,
     polarity: list[str] | None = None,
     sort: str = "sample_batch_utc_created",
     order: str = "asc",
@@ -151,6 +155,9 @@ async def get_sample_batches(
 
         if sample_batch_type:
             stmt = stmt.filter(SampleBatch.sample_batch_type.in_(sample_batch_type))
+
+        if status:
+            stmt = stmt.filter(SampleBatch.status.in_(status))
 
         if polarity:
             stmt = stmt.filter(SampleBatch.polarity.in_(polarity))
@@ -288,7 +295,7 @@ async def get_batch_targets(sample_batch_id: str, deduplicate: bool = False) -> 
 @api_controller(
     success_reload_events=[
         ("workspace_reload", "workspace_id"),
-    ],  # TODO_invalidation
+    ],  # TODO_reload fix when the reload is working properly
 )
 async def create_sample_batch(
     sample_batch: SampleBatchCreate,
