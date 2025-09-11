@@ -1,14 +1,7 @@
 from typing import List
 from pydantic import BaseModel, Field, model_validator
 from mascope_backend.api.models.base_pydantic_model import QueryParamsModel
-from mascope_backend.api.new.match.params import MZ_ERROR_TOLERANCE, TIC_THRESHOLD
-
-
-# TODO_configuration default calibration parameters
-DEFAULT_MATCH_SCORE_MIN = 0.0
-DEFAULT_REFINE_WINDOW = 100
-DEFAULT_PEAK_INTENSITY_MIN = 1000.0
-DEFAULT_ISOTOPE_ABUNDANCE_MIN = 0.1
+from mascope_backend.api.models.calibration.config import calibration_config
 
 
 class GetMzCalibrationQueryParams(QueryParamsModel):
@@ -38,23 +31,27 @@ class GetMzCalibrationQueryParams(QueryParamsModel):
 
 class MzCalibrationParams(BaseModel):
     match_score_min: float = Field(
-        DEFAULT_MATCH_SCORE_MIN, description="Minimum match score"
+        calibration_config.DEFAULT_MATCH_SCORE_MIN, description="Minimum match score"
     )
     refine_window: int = Field(
-        DEFAULT_REFINE_WINDOW, description="Refine window parameter"
+        calibration_config.DEFAULT_REFINE_WINDOW, description="Refine window parameter"
     )
     peak_intensity_min: float = Field(
-        DEFAULT_PEAK_INTENSITY_MIN, description="Minimum peak intensity"
+        calibration_config.DEFAULT_PEAK_INTENSITY_MIN,
+        description="Minimum peak intensity",
     )
     isotope_abundance_min: float = Field(
-        DEFAULT_ISOTOPE_ABUNDANCE_MIN, description="Minimum isotope abundance"
+        calibration_config.DEFAULT_ISOTOPE_ABUNDANCE_MIN,
+        description="Minimum isotope abundance",
     )
 
 
 class CalibrationFitParams(MzCalibrationParams):
-    tic_threshold: float = Field(TIC_THRESHOLD, description="TIC threshold")
+    tic_threshold: float = Field(
+        calibration_config.TIC_THRESHOLD, description="TIC threshold"
+    )
     mz_error_tolerance: float = Field(
-        MZ_ERROR_TOLERANCE, description="m/z error tolerance"
+        calibration_config.MZ_ERROR_TOLERANCE, description="m/z error tolerance"
     )
     calibration_collection_id: str | None = Field(
         None, description="Calibration collection ID"

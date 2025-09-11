@@ -6,12 +6,9 @@ from mascope_match.params import (
     DEFAULT_POSSIBLE_MATCH_THRESHOLD,
 )
 from mascope_backend.api.controllers.match.lib.match_util import similarity_factor
-
+from mascope_backend.api.models.target.collections.config import (
     target_collection_config,
 )
-
-# TODO_configuration list of alarming collection types
-APP_ALARMING_COLLECTION_TYPES = ["TARGETS"]
 
 
 def aggregate_params(df: pd.DataFrame) -> pd.Series:
@@ -93,8 +90,7 @@ async def set_alarm_mode(dataframe: pd.DataFrame) -> pd.DataFrame:
     :return: DataFrame with alarm_mode field set.
     :rtype: pd.DataFrame
     """
-    # TODO_configuration list of alarming collection types
-    alarms_list = APP_ALARMING_COLLECTION_TYPES
+    alarms_list = target_collection_config.APP_ALARMING_COLLECTION_TYPES
     # Set alarm_mode based on whether the target_collection_type is in the alarms_list
     dataframe["alarm_mode"] = dataframe["target_collection_type"].apply(
         lambda x: True if x in alarms_list else False

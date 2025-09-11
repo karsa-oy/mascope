@@ -13,6 +13,9 @@ class TargetCollectionConfig(BaseModel):
     # Collection types
     TARGET_COLLECTION_TYPES: list = ["TARGETS", "DIAGNOSTICS", "CALIBRANTS"]
 
+    # Collection types that considered alarming for match results
+    APP_ALARMING_COLLECTION_TYPES = ["TARGETS"]
+
     # Default collection type
     DEFAULT_TARGET_COLLECTION_TYPE: str = "TARGETS"
 
