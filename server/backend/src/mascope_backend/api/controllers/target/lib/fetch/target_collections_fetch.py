@@ -17,47 +17,33 @@ from mascope_backend.api.models.sample.batches.config import sample_batch_config
 from mascope_backend.runtime import runtime
 
 
-async def fetch_target_collection(
-    target_collection_id: str, session=None
-) -> TargetCollection:
+async def fetch_target_collection(target_collection_id: str) -> TargetCollection:
     """
     Retrieves a target collection from the database by its ID, including its associated sample batches
-    and target compounds. This function is used to ensure the correct retrieval of a target collection
-    along with its relationships for operations like creation, update, and deletion.
+    and target compounds.
 
     :param target_collection_id: The ID of the target collection to fetch.
     :type target_collection_id: str
-    :param session: An optional existing session to use for the query.
-    :type session: sqlalchemy.ext.asyncio.AsyncSession, optional
     :return: The target collection with its associated sample batches and target compounds.
     :rtype: TargetCollection
     :raises NotFoundException: If the target collection with the specified ID is not found.
     """
-    close_session = False
-    if session is None:
-        session = async_session()
-        close_session = True
+    async with async_session() as session:
+        if not (
+            collection := await session.get(
+                TargetCollection,
+                target_collection_id,
+                options=[
+                    joinedload(TargetCollection.sample_batch),
+                    joinedload(TargetCollection.target_compound),
+                ],
+            )
+        ):
+            raise NotFoundException(
+                f"Target collection with ID '{target_collection_id}' not found"
+            )
 
-    stmt = (
-        select(TargetCollection)
-        .options(
-            joinedload(TargetCollection.sample_batch),
-            joinedload(TargetCollection.target_compound),
-        )
-        .where(TargetCollection.target_collection_id == target_collection_id)
-    )
-    result = await session.execute(stmt)
-    target_collection = result.unique().scalar_one_or_none()
-
-    if close_session:
-        await session.close()
-
-    if not target_collection:
-        raise NotFoundException(
-            f"Target collection with ID '{target_collection_id}' not found"
-        )
-
-    return target_collection
+    return collection
 
 
 async def validate_sample_batches_for_collection(
