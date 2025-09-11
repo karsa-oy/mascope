@@ -474,15 +474,17 @@ class DataMonitor:
                 batch_results.append((sample, sample_results))
                 batch_successful_count += 1
             # Save results
-            self.save_results(batch_results)
+            saved = self.save_results(batch_results)
+            if saved:
+                self.update_batch_state(check_time, batch_id, save=True)
+                total_successful_count += batch_successful_count
+                checked_batch_ids.append(batch_id)
+                self.logger.info(
+                    f"Batch {batch_name}: processed {batch_successful_count}/{len(new_samples)} samples"
+                )
+            else:
+                self.logger.error(f"Failed to save results for batch {batch_name}")
 
-            self.update_batch_state(check_time, batch_id, save=True)
-            total_successful_count += batch_successful_count
-            checked_batch_ids.append(batch_id)
-
-            self.logger.info(
-                f"Batch {batch_name}: processed {batch_successful_count}/{len(new_samples)} samples"
-            )
             if batch_successful_count < len(new_samples):
                 self.logger.warning(
                     f"Some samples in batch {batch_name} failed to process"
