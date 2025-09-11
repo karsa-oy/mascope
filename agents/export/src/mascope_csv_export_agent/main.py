@@ -365,6 +365,7 @@ class DataMonitor:
             else:
                 df = pd.DataFrame()
 
+            new_rows = []
             for sample, result_row in results:
                 # Prepare row data
                 sample_datetime_utc = sample["datetime_utc"]
@@ -384,9 +385,9 @@ class DataMonitor:
                         "filename",
                     ]:
                         df[formula] = ""
-
-                # Append new row
-                df = pd.concat([df, pd.DataFrame([row_data])], ignore_index=True)
+                new_rows.append(row_data)
+            # Concatenate new data into existing dataframe
+            df = pd.concat([df, pd.DataFrame(new_rows)], ignore_index=True)
             # Sort columns
             df = df[
                 ["datetime_utc", "filename"]
