@@ -28,6 +28,10 @@ defineProps({
   pt: {
     type: Object,
     required: false
+  },
+  batchStatus: {
+    type: Object,
+    required: false
   }
 })
 </script>
@@ -45,17 +49,54 @@ defineProps({
   >
     <template #header>
       <div class="label">
-        <span :class="icon" />{{ label }}
         <Button
           v-if="clear"
-          v-tooltip.right="'Clear filters'"
-          icon="pi pi-filter-slash"
+          v-tooltip.right="'Back to sample batches'"
+          icon="pi ph ph-caret-left"
           @click="clear()"
           text
           severity="secondary"
           size="small"
-          class="filter-button"
+          class="back-button"
         />
+        <span :class="icon" />{{ label }}
+        <!-- Batch status icon -->
+        <div v-if="batchStatus" class="status-button">
+          <Button
+            v-if="batchStatus.status === 'rematch'"
+            v-tooltip.right="
+              'Sample batch has been modified, matches may be out of date. Click to refresh this batch matches'
+            "
+            icon="ph ph-arrows-clockwise"
+            text
+            severity="secondary"
+            size="large"
+            class="status-button"
+            @click="batchStatus.onRematch()"
+          />
+          <Button
+            v-else-if="batchStatus.status === 'ready'"
+            v-tooltip.right="'Sample batch matches are up to date'"
+            icon="ph ph-check-circle"
+            text
+            size="large"
+            class="status-button"
+            disabled
+          />
+          <div
+            v-else-if="batchStatus.status === 'processing'"
+            v-tooltip.right="'Sample batch is processing, computing matches'"
+            style="
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              width: 28px;
+              height: 28px;
+            "
+          >
+            <ProgressSpinner style="width: 16px; height: 16px" strokeWidth="3" />
+          </div>
+        </div>
       </div>
     </template>
     <template #icons>
@@ -80,11 +121,17 @@ defineProps({
   height: 25.15px;
 }
 
-.filter-button {
+.status-button {
+  opacity: 0.8;
+  margin-left: -0.2rem;
+}
+
+.back-button {
   opacity: 0.4;
 }
 
-.p-panel-header:hover .filter-button {
+.status-button:hover,
+.back-button:hover {
   opacity: 1;
 }
 </style>

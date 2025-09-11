@@ -147,7 +147,7 @@ const confirmation = async () => {
     confirm.require({
       icon: 'pi pi-exclamation-triangle',
       header: `Add compound to ${count} batches`,
-      message: `Are you sure you want to add compound ${input.target_compound_formula.trim()} to a collection used in ${count} batches? Rematching may take a while.`,
+      message: `Are you sure you want to add compound ${input.target_compound_formula.trim()} to a collection used in ${count} batches?`,
       accept: addCompound,
       acceptProps: {
         icon: 'pi pi-plus',

@@ -5,7 +5,6 @@ import { useWindowSize } from '@vueuse/core'
 
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
-import ContextMenu from 'primevue/contextmenu'
 import { useConfirm } from 'primevue/useconfirm'
 
 import { BaseTabbedPanel, BaseMatchTag, BaseCopyableField } from '@/lib/base'
@@ -30,6 +29,15 @@ const samples = computed(
     app.data.sample.list?.filter((sample) => sample.sample_batch_id == app.data.batch.focusedId) ??
     []
 )
+
+const batchStatus = computed(() => {
+  if (!batch.value) return null
+
+  return {
+    status: batch.value.status,
+    onRematch: () => app.data.batch.rematch({ sample_batch_id: batch.value.sample_batch_id })
+  }
+})
 
 const formatter = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 2,
@@ -73,6 +81,7 @@ const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top)
     :clear="app.data.batch.unfocus"
     :contextMenu="contextMenu"
     :loading="app.data.sample.loading"
+    :batchStatus="batchStatus"
     :pt="
       app.ui.help.right(`
         <h1>Sample Browser</h1>
