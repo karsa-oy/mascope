@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watchEffect, computed } from 'vue'
+import { ref, watchEffect } from 'vue'
 
 import Button from 'primevue/button'
 import Drawer from 'primevue/drawer'
@@ -19,7 +19,6 @@ import UserSettingsPane from './UserSettingsPane.vue'
 import NotificationPane from './NotificationPane.vue'
 import NotificationOverlay from './NotificationOverlay.vue'
 
-import { api } from '@/api'
 import { useApp } from '@/stores'
 
 const app = useApp()
@@ -67,7 +66,7 @@ watchEffect(() => {
       icon="pi ph ph-folder"
       :label="app.data.workspace.focused?.workspace_name"
       v-tooltip.bottom="
-        `${app.data.workspace.focused?.workspace_description}
+        `${app.data.workspace.focused?.workspace_description ?? 'No description'}
                          (right click for options)`
       "
       severity="secondary"
