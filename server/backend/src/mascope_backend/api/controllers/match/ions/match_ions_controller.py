@@ -1,12 +1,10 @@
 from datetime import datetime, timezone
-from typing import List, Optional
 from collections import defaultdict
 import pandas as pd
 from sqlalchemy import (
     select,
     delete,
     func,
-    and_,
 )
 
 from mascope_file.name import resolve_instrument_type
@@ -25,9 +23,7 @@ from mascope_backend.db.models import (
 )
 from mascope_backend.api.lib.api_features import api_controller
 from mascope_backend.api.lib.exceptions.api_exceptions import (
-    DuplicateException,
     NotFoundException,
-    ApiException,
 )
 from mascope_backend.api.controllers.match.lib.match_util import deduplicate_match_df
 from mascope_backend.api.controllers.sample.lib.sample_items_fetch import (
@@ -43,18 +39,18 @@ from mascope_backend.runtime import runtime
 
 @api_controller()
 async def get_match_ions(
-    sample_item_id: Optional[str] = None,
-    sample_batch_id: Optional[str] = None,
-    target_ion_id: Optional[str] = None,
-    ionization_mechanism_id: Optional[str] = None,
-    match_category_min: Optional[int] = None,
+    sample_item_id: str | None = None,
+    sample_batch_id: str | None = None,
+    target_ion_id: str | None = None,
+    ionization_mechanism_id: str | None = None,
+    match_category_min: int | None = None,
     deduplicate: bool = False,
     show_target_collection: bool = False,
     show_target_compound: bool = False,
     show_target_ion: bool = False,
     show_ionization_mechanism: bool = False,
-    sort: Optional[str] = None,
-    order: Optional[str] = None,
+    sort: str | None = None,
+    order: str | None = None,
     page: int = 0,
     limit: int = 10000,
 ) -> dict:
@@ -81,15 +77,15 @@ async def get_match_ions(
     14. If deduplication is requested and `show_target_collection` is True, deduplicate the ions.
 
     :param sample_item_id: Filter matches by the sample item ID, defaults to None.
-    :type sample_item_id: Optional[str], optional
+    :type sample_item_id: str | None, optional
     :param sample_batch_id: Filter matches by the sample batch ID, defaults to None.
-    :type sample_batch_id: Optional[str], optional
+    :type sample_batch_id: str | None, optional
     :param target_ion_id: Filter matches by the target ion ID, defaults to None.
-    :type target_ion_id: Optional[str], optional
+    :type target_ion_id: str | None, optional
     :param ionization_mechanism_id: Filter matches by the ionization mechanism ID, defaults to None.
-    :type ionization_mechanism_id: Optional[str], optional
+    :type ionization_mechanism_id: str | None, optional
     :param match_category_min: Filter by match_category to include specified category and higher (e.g., 1 includes categories 1 and higher), defaults to None.
-    :type match_category_min:int, optional
+    :type match_category_min: int | None, optional
     :param deduplicate: Flag to indicate whether ion deduplication should be applied when `show_target_collection` is True, defaults to False.
     :type deduplicate: bool
     :param show_target_collection: Whether to include target collection details, defaults to False.
@@ -101,9 +97,9 @@ async def get_match_ions(
     :param show_ionization_mechanism: Include ionization mechanism data in the results, defaults to False.
     :type show_ionization_mechanism: bool
     :param sort: Column name to sort by, defaults to None.
-    :type sort: Optional[str], optional
+    :type sort: str | None, optional
     :param order: Order of sorting, 'asc' for ascending or 'desc' for descending, defaults to None.
-    :type order: Optional[str], optional
+    :type order: str | None, optional
     :param page: Page number for pagination, starts from 0, defaults to 0.
     :type page: int, optional
     :param limit: Maximum number of results per page, defaults to 10000.
@@ -311,96 +307,93 @@ async def get_match_ion(match_ion_id: str) -> dict:
 
 @api_controller()
 async def create_match_ions(
-    match_ions: List[MatchIonBase],
+    match_ions: list[MatchIonBase],
     independent_transaction: bool = False,
-):
+) -> dict:
     """
-    Creates match ions for a given sample item based on the provided list of aggregated match ion data.
+    Creates match ions for a given sample item based on the provided list of
+    aggregated match ion data.
+    Skips creation of existing records, which prevents duplication and
+    allows safe re-calling after orphaned match removal operations.
 
-    Steps:
-    1. Group match ions by sample item ID.
-    2. For each group, check for existing match ions to avoid duplication.
-    3. Insert new match ions into the database.
-    4. Commit the transaction and refresh the newly created match ions.
-    5. Handle and report any duplication errors, raising an exception if no ions were successfully created.
-
-    :param match_ions: List of match ion data for creating matches.
-    :type match_ions: List[MatchIonBase]
-    :param independent_transaction: Indicates if the operation should be independent of any ongoing transactions, defaults to False.
-    :type independent_transaction: bool, optional
-    :return: The created match ions data.
+    :param match_ions: List of match ion data for creating matches
+    :type match_ions: list[MatchIonBase]
+    :param independent_transaction: Indicates if operation should be independent
+    :type independent_transaction: bool
+    :return: Creation results with counts of new vs existing records
     :rtype: dict
-    :raises ApiException: If no match ions could be created due to DuplicateException errors.
     """
+    if not match_ions:
+        return {"message": "No match ions provided", "data": []}
+
     # Step 1: Group match ions by sample item ID.
     grouped_match_ions = defaultdict(list)
     for match_ion in match_ions:
         grouped_match_ions[match_ion.sample_item_id].append(match_ion)
 
     new_match_ions = []
-    errors = defaultdict(list)
+    existing_count = 0
+
     async with async_session() as session:
-        for sample_item_id, match_ions in grouped_match_ions.items():
-            for match_ion in match_ions:
-                try:
-                    # Step 2: Check for existing match ion to avoid duplication.
-                    stmt = select(MatchIon).where(
-                        and_(
+        for sample_item_id, m_ions in grouped_match_ions.items():
+            # Step 2: Check for existing match ions to avoid duplication.
+            target_ion_ids = [mi.target_ion_id for mi in m_ions]
+            existing_ion_ids = set(
+                (
+                    await session.execute(
+                        select(MatchIon.target_ion_id).where(
                             MatchIon.sample_item_id == sample_item_id,
-                            MatchIon.target_ion_id == match_ion.target_ion_id,
+                            MatchIon.target_ion_id.in_(target_ion_ids),
                         )
                     )
-                    existing_match_ion = (
-                        (await session.execute(stmt)).scalars().one_or_none()
-                    )
-                    if existing_match_ion:
-                        raise DuplicateException(
-                            f"Match ion already exist for the given sample item '{sample_item_id}' and target ion {match_ion.target_ion_id}."
-                        )
-                    # Step 3: Insert new match ions
-                    new_match_ion = MatchIon(
-                        match_ion_id=gen_id(32),
-                        **match_ion.model_dump(),
-                        match_ion_utc_created=datetime.now(timezone.utc),
-                    )
-                    session.add(new_match_ion)
-                    new_match_ions.append(new_match_ion)
-                except DuplicateException as e:
-                    errors[sample_item_id].append(
-                        {"target_ion_id": match_ion.target_ion_id, "error": str(e)}
-                    )
-                    continue  # Continue with next ion even if current one fails
+                ).scalars()
+            )
+
+            if existing_ion_ids:
+                existing_count += len(existing_ion_ids)
+                runtime.logger.trace(
+                    f"Match ions already exist for sample '{sample_item_id}' "
+                    f"and {len(existing_ion_ids)} target ions - skipping"
+                )
+
+            # Step 3: Create new match ions for non-existing combinations
+            new_ions = [mi for mi in m_ions if mi.target_ion_id not in existing_ion_ids]
+            for match_ion in new_ions:
+                new_match_ion = MatchIon(
+                    match_ion_id=gen_id(32),
+                    **match_ion.model_dump(),
+                    match_ion_utc_created=datetime.now(timezone.utc),
+                )
+                session.add(new_match_ion)
+                new_match_ions.append(new_match_ion)
 
         # Step 4: Commit the transaction and refresh the newly created match ions.
         if new_match_ions:
-            await session.commit()  # Commit all successfully added to session ions
-            for match_ion in new_match_ions:
-                await session.refresh(match_ion)
+            await session.commit()
+            for ion in new_match_ions:
+                await session.refresh(ion)
 
-    # Step 5: Handle and report any duplication errors, raising an exception if no ions were successfully created.
-    result = {"message": ""}
-    if new_match_ions:
-        result[
-            "message"
-        ] += f"{len(new_match_ions)} match ion{'s' if len(new_match_ions) != 1 else ''} created successfully."
-        result["data"] = [ion.to_dict() for ion in new_match_ions]
+    # Step 5: Generate result message
+    total_requested = len(match_ions)
+    new_count = len(new_match_ions)
 
-    if errors:
-        error_count = sum(len(lst) for lst in errors.values())
-        result[
-            "message"
-        ] += f" Failed to create match ions for {error_count} sample{'s' if error_count != 1 else ''}."
-        result["errors"] = dict(errors)
+    if new_count > 0 and existing_count > 0:
+        status = "partial"
+        message = f"Created {new_count}/{total_requested} new match ions, {existing_count} already existed"
+    elif new_count > 0:
+        status = "success"
+        message = f"Created {new_count}/{total_requested} match ion{'s' if new_count != 1 else ''}"
+    else:
+        status = "skipped"
+        message = f"All {existing_count} match ions already existed"
 
-    runtime.logger.info(result["message"])
-    if not new_match_ions and errors:
-        raise ApiException(
-            f"Failed to create match ions due to duplicate issues for {error_count} samples.",
-            {"errors": dict(errors)},
-            409,
-        )
+    runtime.logger.info(message)
 
-    return result
+    return {
+        "status": status,
+        "message": message,
+        "data": [match_ion.to_dict() for match_ion in new_match_ions],
+    }
 
 
 @api_controller()

@@ -1,5 +1,4 @@
 from datetime import datetime, timezone
-from typing import List, Optional
 from sqlalchemy import asc, desc, func, select, delete, and_
 from mascope_backend.db import async_session
 from mascope_backend.db.models import (
@@ -25,12 +24,12 @@ from mascope_backend.runtime import runtime
 
 @api_controller()
 async def get_match_isotopes(
-    sample_item_id: Optional[str] = None,
-    sample_batch_id: Optional[str] = None,
-    target_isotope_id: Optional[str] = None,
+    sample_item_id: str | None = None,
+    sample_batch_id: str | None = None,
+    target_isotope_id: str | None = None,
     show_target_isotope: bool = False,
-    sort: str = None,
-    order: str = None,
+    sort: str | None = None,
+    order: str | None = None,
     page: int = 0,
     limit: int = 1000000,
 ) -> dict:
@@ -48,11 +47,11 @@ async def get_match_isotopes(
     7. Format the fetched data into a list of dictionaries for the response.
 
     :param sample_item_id: Filter by sample item ID, defaults to None.
-    :type sample_item_id: Optional[str], optional
+    :type sample_item_id: str | None, optional
     :param sample_batch_id: Filter by sample batch ID, defaults to None.
-    :type sample_batch_id: Optional[str], optional
+    :type sample_batch_id: str | None, optional
     :param target_isotope_id: Filter by target isotope ID, defaults to None.
-    :type target_isotope_id: Optional[str], optional
+    :type target_isotope_id: str | None, optional
     :param show_target_isotope: Include additional data about the target isotopes, defaults to False.
     :type show_target_isotope: bool, optional
     :param sort: Column to sort by, defaults to None.
@@ -163,9 +162,9 @@ async def get_match_isotope(match_isotope_id: str) -> dict:
 
 @api_controller()
 async def delete_match_isotopes(
-    sample_item_id: Optional[str] = None,
-    sample_batch_id: Optional[str] = None,
-    target_isotope_ids: Optional[List[str]] = None,
+    sample_item_id: str | None = None,
+    sample_batch_id: str | None = None,
+    target_isotope_ids: list[str] | None = None,
 ) -> dict:
     """
     Deletes match isotopes for specified sample items, optionally filtered by target isotope IDs.
@@ -180,11 +179,11 @@ async def delete_match_isotopes(
     4. Commit the transaction and report the number of deleted records.
 
     :param sample_item_id: ID of the single sample item for which match isotopes are to be deleted, optional.
-    :type sample_item_id:  Optional[str]
+    :type sample_item_id: str | None
     :param sample_batch_id: ID of the sample batch from which sample items are derived for deletion, optional.
-    :type sample_batch_id:  Optional[str]
+    :type sample_batch_id: str | None
     :param target_isotope_ids: Optional list of target isotope IDs to further filter the match isotopes to be deleted.
-    :type target_isotope_ids: Optional[List[str]]
+    :type target_isotope_ids: list[str] | None
     :return: A message indicating the outcome of the deletion process including the count of deleted records.
     :rtype: dict
     """
@@ -212,9 +211,9 @@ async def delete_match_isotopes(
 
 @api_controller()
 async def create_match_isotopes(
-    match_isotopes: List[MatchIsotopeBase],
+    match_isotopes: list[MatchIsotopeBase],
     independent_transaction: bool = False,
-):
+) -> dict:
     """
     Creates match isotopes for a given sample item based on the provided list of match isotope data.
 
@@ -224,7 +223,7 @@ async def create_match_isotopes(
     3. Refresh and return the created match isotopes.
 
     :param match_isotopes: List of match isotope data for creating matches.
-    :type match_isotopes: List[MatchIsotopeBase]
+    :type match_isotopes: list[MatchIsotopeBase]
     :param independent_transaction: Indicates if the operation should be independent of any ongoing transactions, defaults to False.
     :type independent_transaction: bool, optional
     :return: The created match isotopes data.

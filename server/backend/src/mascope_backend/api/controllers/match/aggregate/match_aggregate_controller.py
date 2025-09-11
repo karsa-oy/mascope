@@ -25,7 +25,6 @@ from mascope_backend.api.lib.api_features import (
     api_controller,
 )
 from mascope_backend.api.lib.exceptions.api_exceptions import (
-    ApiException,
     NotFoundException,
 )
 from mascope_backend.api.controllers.match.lib.match_aggregate import (
@@ -41,6 +40,9 @@ from mascope_backend.api.controllers.sample.lib.sample_items_fetch import (
     fetch_sample_item_ids,
 )
 from mascope_backend.api.controllers.samples.lib.samples_fetch import fetch_sample
+from mascope_backend.api.controllers.sample.lib.sample_batches_fetch import (
+    fetch_sample_batch,
+)
 from mascope_backend.api.controllers.match.ions.match_ions_controller import (
     create_match_ions,
 )
@@ -420,7 +422,6 @@ async def aggregate_and_create_matches(
         return {
             "message": str(e),
         }
-    result_dict = {}
     # Aggregate the match data
     aggregated_result = await aggregate_matches(
         sample_batch_id=sample_batch_id,
@@ -436,77 +437,88 @@ async def aggregate_and_create_matches(
         }
 
     match_data = aggregated_result.get("data", {})
-    message_logs = []
-    errors = []
 
+    # Build operations list
     create_operations = []
-    descriptions = []
-    if match_ions:
+    if match_ions and match_data.get("match_ions"):
         create_operations.append(
-            (create_match_ions, match_data.get("match_ions", []), MatchIonBase)
+            (
+                create_match_ions,
+                match_data.get("match_ions", []),
+                MatchIonBase,
+                "match_ions",
+            )
         )
-        descriptions.append("match_ions")
-    if match_compounds:
+    if match_compounds and match_data.get("match_compounds"):
         create_operations.append(
             (
                 create_match_compounds,
                 match_data.get("match_compounds", []),
                 MatchCompoundBase,
+                "match_compounds",
             )
         )
-        descriptions.append("match_compounds")
-    if match_collections:
+    if match_collections and match_data.get("match_collections"):
         create_operations.append(
             (
                 create_match_collections,
                 match_data.get("match_collections", []),
                 MatchCollectionBase,
+                "match_collections",
             )
         )
-        descriptions.append("match_collections")
-    if match_samples:
+    if match_samples and match_data.get("match_samples"):
         create_operations.append(
-            (create_match_samples, match_data.get("match_samples", []), MatchSampleBase)
-        )
-        descriptions.append("match_samples")
-
-    runtime.logger.info(f"Creating {', '.join(descriptions)} for {sample_ref}.")
-    # Process each type of match data if available
-    for create_func, raw_data, model_cls in create_operations:
-        if raw_data:  # Check if there is data to process
-            # Convert each data item to the corresponding Pydantic model
-            model_data = [model_cls(**item) for item in raw_data]
-            try:
-                # Execute the create operation
-                result = await create_func(model_data)
-                message_logs.append(f"{create_func.__name__}: {result['message']}")
-                if result.get("errors"):
-                    errors.append(f"{create_func.__name__}: {result['errors']}")
-            except ApiException as e:
-                errors.append(f"{create_func.__name__}: {e.tech_message}")
-                continue
-        else:
-            message_logs.append(f"{create_func.__name__}: No match data found.")
-
-    success_message = f"Successfully saved match {len(message_logs)} aggregate{'s' if len(message_logs) != 1 else ''} for {sample_ref}."
-    fail_message = f"Failed to save match {len(errors)} aggregate{'s' if len(errors) != 1 else ''} for {sample_ref}."
-    if errors:
-        message = f"{success_message} {fail_message}"
-        if not message_logs:
-            raise ApiException(
-                fail_message,
-                {
-                    "errors": errors,
-                },
-                409,
+            (
+                create_match_samples,
+                match_data.get("match_samples", []),
+                MatchSampleBase,
+                "match_samples",
             )
-    else:
-        message = success_message
+        )
 
-    result_dict["message"] = message
-    result_dict["message_logs"] = message_logs if message_logs else None
-    result_dict["errors"] = errors if errors else None
-    return result_dict
+    if not create_operations:
+        message = f"No match data types selected for creation for {sample_ref}"
+        runtime.logger.info(message)
+        return {"message": message}
+
+    # Execute operations
+    statuses = []
+    messages = []
+    sample_item_ids = set()
+    runtime.logger.info(f"Creating match aggregates for {sample_ref}")
+
+    for create_func, raw_data, model_cls, level_name in create_operations:
+        # Convert each data item to the corresponding Pydantic model
+        model_data = [model_cls(**item) for item in raw_data]
+        result = await create_func(model_data)
+        statuses.append(result.get("status"))
+        messages.append(f"{level_name}: {result['message']}")
+
+        # Collect sample_item_ids from created records
+        for record in result.get("data", []):
+            sample_item_ids.add(record.get("sample_item_id"))
+
+    # Determine overall status
+    statuses_set = set(statuses)
+    if "partial" in statuses_set or len(statuses_set) > 1:
+        status = "partial"
+    elif statuses_set == {"success"}:
+        status = "success"
+    else:  # all skipped
+        status = "skipped"
+
+    message = (
+        f"Aggregate and create matches completed ({status}) for {sample_ref}: "
+        + "; ".join(messages)
+    )
+    runtime.logger.info(message)
+
+    return {
+        "status": status,
+        "message": message,
+        "data": {"affected_sample_item_ids": list(sample_item_ids)},
+    }
 
 
 @api_controller()
@@ -541,9 +553,15 @@ async def aggregate_and_recreate_matches(
     :return: A dictionary with a message and log of aggregate_and_create_matches actions.
     """
     # Step 1: Remove existing matches based on flags
+    sample = None
+    sample_batch = None
+    if sample_item_id:
+        sample = await fetch_sample(sample_item_id)
+    if sample_batch_id:
+        sample_batch = await fetch_sample_batch(sample_batch_id)
     await remove_matches(
-        sample_item_id=sample_item_id,
-        sample_batch_id=sample_batch_id,
+        sample=sample,
+        sample_batch=sample_batch,
         match_isotopes=False,
         match_ions=match_ions,
         match_compounds=match_compounds,

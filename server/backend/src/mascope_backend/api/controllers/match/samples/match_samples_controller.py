@@ -1,5 +1,4 @@
 from datetime import datetime, timezone
-from typing import List, Optional
 from collections import defaultdict
 from sqlalchemy import (
     select,
@@ -11,9 +10,7 @@ from mascope_backend.db.id import gen_id
 from mascope_backend.db.models import MatchSample, SampleItem
 from mascope_backend.api.lib.api_features import api_controller
 from mascope_backend.api.lib.exceptions.api_exceptions import (
-    DuplicateException,
     NotFoundException,
-    ApiException,
 )
 from mascope_backend.api.controllers.sample.lib.sample_items_fetch import (
     fetch_sample_item_ids,
@@ -28,11 +25,11 @@ from mascope_backend.runtime import runtime
 
 @api_controller()
 async def get_match_samples(
-    sample_item_id: Optional[str] = None,
-    sample_batch_id: Optional[str] = None,
-    match_category_min: Optional[int] = None,
-    sort: Optional[str] = None,
-    order: Optional[str] = None,
+    sample_item_id: str | None = None,
+    sample_batch_id: str | None = None,
+    match_category_min: int | None = None,
+    sort: str | None = None,
+    order: str | None = None,
     page: int = 0,
     limit: int = 10000,
 ) -> dict:
@@ -49,15 +46,15 @@ async def get_match_samples(
     6. Format the fetched match samples into a list of dictionaries for response.
 
     :param sample_item_id: Filter match samples by sample item ID, defaults to None.
-    :type sample_item_id: Optional[str], optional
+    :type sample_item_id: str | None, optional
     :param sample_batch_id: Filter match samples by sample batch ID, defaults to None.
-    :type sample_batch_id: Optional[str], optional
+    :type sample_batch_id: str | None, optional
     :param match_category_min: Filter by match_category to include specified category and higher (e.g., 1 includes categories 1 and higher), defaults to None.
-    :type match_category_min:int, optional
+    :type match_category_min: int | None, optional
     :param sort: Column to sort the results by, defaults to None.
-    :type sort: Optional[str], optional
+    :type sort: str | None, optional
     :param order: Sort order, either 'asc' or 'desc', defaults to None.
-    :type order: Optional[str], optional
+    :type order: str | None, optional
     :param page: Page number for pagination, defaults to 0.
     :type page: int, optional
     :param limit: Number of items per page, defaults to 10000.
@@ -138,97 +135,124 @@ async def get_match_sample(match_sample_id: str) -> dict:
 
 @api_controller()
 async def create_match_samples(
-    match_samples: List[MatchSampleBase],
+    match_samples: list[MatchSampleBase],
     independent_transaction: bool = False,
-):
+) -> dict:
     """
-    Creates match samples for a given sample item based on the provided list of aggregated match sample data.
+    Creates or updates match samples for a given sample based on the provided list of
+    aggregated match sample data.
+    Updates existing records if data differs, skips if identical, creates if new.
 
-    Steps:
-    1. Group match samples by sample item ID.
-    2. For each group, check for existing match samples to avoid duplication.
-    3. Insert new match samples into the database.
-    4. Commit the transaction and refresh the newly created match samples.
-    5. Handle and report any duplication errors, raising an exception if no samples were successfully created.
-
-    :param match_samples: List of match sample data for creating matches.
+    :param match_samples: List of match sample data for creating matches
     :type match_samples: List[MatchSampleBase]
-    :param independent_transaction: Indicates if the operation should be independent of any ongoing transactions, defaults to False.
-    :type independent_transaction: bool, optional
-    :return: The created match samples data.
+    :param independent_transaction: Indicates if operation should be independent
+    :type independent_transaction: bool
+    :return: Creation results with counts of new vs existing records
     :rtype: dict
-    :raises ApiException: If no match samples could be created due to DuplicateException errors.
     """
+    if not match_samples:
+        return {"message": "No match samples provided", "data": []}
+
     # Step 1: Group match samples by sample item ID.
     grouped_match_samples = defaultdict(list)
     for match_sample in match_samples:
         grouped_match_samples[match_sample.sample_item_id].append(match_sample)
 
     new_match_samples = []
-    errors = []
+    updated_count = 0
+    unchanged_count = 0
+
     async with async_session() as session:
-        for sample_item_id, match_samples in grouped_match_samples.items():
-            try:
-                # Step 2: Check for existing match samples to avoid duplication.
-                stmt = select(MatchSample).where(
-                    MatchSample.sample_item_id == sample_item_id,
+        for sample_item_id, m_samples in grouped_match_samples.items():
+            provided_match_sample = m_samples[0]
+            # Step 2: Check for existing match sample
+            existing_sample = (
+                (
+                    await session.execute(
+                        select(MatchSample).where(
+                            MatchSample.sample_item_id == sample_item_id
+                        )
+                    )
                 )
-                existing_match_samples = (await session.execute(stmt)).scalars().all()
-                if existing_match_samples:
-                    raise DuplicateException(
-                        f"Match samples already exist for the given sample item '{sample_item_id}'."
+                .scalars()
+                .one_or_none()
+            )
+
+            if existing_sample:
+                # Step 3: Compare data and update if different
+                needs_update = (
+                    existing_sample.match_score != provided_match_sample.match_score
+                    or existing_sample.match_category
+                    != provided_match_sample.match_category
+                    or existing_sample.sample_peak_intensity_sum
+                    != provided_match_sample.sample_peak_intensity_sum
+                )
+                if needs_update:
+                    existing_sample.match_score = provided_match_sample.match_score
+                    existing_sample.match_category = (
+                        provided_match_sample.match_category
                     )
-
-                # Step 3: Insert new match samples
-                for match_sample in match_samples:
-                    new_match_sample = MatchSample(
-                        match_sample_id=gen_id(32),
-                        **match_sample.model_dump(),
-                        match_sample_utc_created=datetime.now(timezone.utc),
+                    existing_sample.sample_peak_intensity_sum = (
+                        provided_match_sample.sample_peak_intensity_sum
                     )
-                    session.add(new_match_sample)
-                    new_match_samples.append(new_match_sample)
-            except DuplicateException as e:
-                errors.append({"sample_item_id": sample_item_id, "error": str(e)})
+                    existing_sample.match_sample_utc_modified = datetime.now(
+                        timezone.utc
+                    )
+                    updated_count += 1
+                    new_match_samples.append(existing_sample)
+                    runtime.logger.trace(
+                        f"Updated match sample for sample '{sample_item_id}'"
+                    )
+                else:
+                    unchanged_count += 1
+                    runtime.logger.trace(
+                        f"Match sample unchanged for sample '{sample_item_id}'"
+                    )
+            else:
+                # Step 4: Create new match sample
+                new_match_sample = MatchSample(
+                    match_sample_id=gen_id(32),
+                    **provided_match_sample.model_dump(),
+                    match_sample_utc_created=datetime.now(timezone.utc),
+                )
+                session.add(new_match_sample)
+                new_match_samples.append(new_match_sample)
 
-        # Step 4: Commit the transaction and refresh the newly created match samples.
-        await session.commit()
-        for match_sample in new_match_samples:
-            await session.refresh(match_sample)
+        # Step 5: Commit the transaction and refresh the newly created match samples.
+        if new_match_samples:
+            await session.commit()
+            for sample in new_match_samples:
+                await session.refresh(sample)
 
-    # Step 5: Handle and report any duplication errors, raising an exception if no samples were successfully created.
-    result = {}
-    message = ""
-    if new_match_samples:
-        message = f"{len(new_match_samples)} match sample{'s' if len(new_match_samples) != 1 else ''} created successfully. "
-        result["message"] = message
-        result["data"] = [sample.to_dict() for sample in new_match_samples]
-    if errors:
-        message = (
-            message
-            + f"Failed to create match samples for {len(errors)} sample{'s' if len(errors) != 1 else ''}."
-        )
-        result["message"] = message
-        result["errors"] = errors
+    # Step 6: Generate result message
+    total_requested = len(match_samples)
+    created_count = len(new_match_samples) - updated_count
 
-    if errors and not new_match_samples:
-        user_message = f"Failed to create match samples for {len(errors)} sample{'s' if len(errors) != 1 else ''}."
+    if created_count > 0 and (updated_count > 0 or unchanged_count > 0):
+        status = "partial"
+        message = f"Processed {total_requested} match samples: {created_count} created, {updated_count} updated, {unchanged_count} unchanged"
+    elif created_count > 0 or updated_count > 0:
+        status = "success"
+        action = "created" if created_count > 0 else "updated"
+        count = created_count if created_count > 0 else updated_count
+        message = f"{action.title()} {count}/{total_requested} match sample{'s' if count != 1 else ''}"
+    else:
+        status = "skipped"
+        message = f"All {unchanged_count} match samples unchanged"
 
-        raise ApiException(
-            user_message,
-            {
-                "errors": errors,
-            },
-            409,
-        )
     runtime.logger.info(message)
-    return result
+
+    return {
+        "status": status,
+        "message": message,
+        "data": [match_sample.to_dict() for match_sample in new_match_samples],
+    }
 
 
 @api_controller()
 async def delete_match_samples(
-    sample_item_id: Optional[str] = None,
-    sample_batch_id: Optional[str] = None,
+    sample_item_id: str | None = None,
+    sample_batch_id: str | None = None,
 ):
     """
     Deletes match samples for specified sample items.

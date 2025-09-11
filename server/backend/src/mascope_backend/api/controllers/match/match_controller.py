@@ -33,12 +33,8 @@ from mascope_backend.api.controllers.match.lib.match_compute import (
     compute_and_create_sample_match_isotope_data,
 )
 from mascope_backend.api.controllers.match.lib.match_remove import remove_matches
-from mascope_backend.api.controllers.target.lib.filter.target_isotopes_filter import (
-    filter_existing_sample_match_isotope_data,
-)
 from mascope_backend.api.controllers.target.lib.fetch.target_isotopes_fetch import (
-    fetch_batch_target_isotopes_for_match_compute,
-    filter_target_isotopes_by_polarity,
+    fetch_sample_unmatched_target_isotopes,
 )
 from mascope_backend.api.controllers.match.aggregate.match_aggregate_controller import (
     aggregate_and_create_matches,
@@ -56,7 +52,6 @@ from mascope_backend.api.controllers.samples.samples_controller import (
 from mascope_backend.api.controllers.samples.lib.samples_fetch import fetch_sample
 from mascope_backend.api.models.match.match_pydantic_model import (
     RematchBatchesBody,
-    MatchComputeSample,
 )
 from mascope_backend.socket.notifications import (
     UserNotification,
@@ -331,166 +326,120 @@ async def match_remove_sample(
 @api_controller_background_task(
     success_notification_rooms=["sample_item_id", "instrument"],
     success_reload=[("sample_batch_reload", "sample_batch_id")],
-    error_notification_rooms=["sid"],
-    error_reload=[("sample_batch_reload", "sid")],
+    error_notification_rooms=["sample_item_id", "instrument"],
+    error_reload=[("sample_batch_reload", "sample_batch_id")],
 )
 async def match_compute_sample(
     sample_item_id: str,
-    added_target_compound_ids: list[str] | None = None,
-    added_ionization_mechanism_ids: list[str] | None = None,
     independent_transaction: bool = False,
-    sid: str = None,
-    process_id=None,
-    parent_id=None,
+    sid: str | None = None,
+    process_id: str | None = None,
+    parent_id: str | None = None,
 ) -> dict:
     """
-    Computes new matches for a specific sample item, taking into account any added target compounds or ionization mechanisms.
+    Computes new matches for a specific sample by identifying missing target isotope matches.
+    - Automatically determines which target isotopes need computation
+    - Handles m/z calibration verification and polarity filtering
+    - Aggregates higher-level matches based on computed isotopes
 
-    This function handles the entire match computation process for a given sample item. It includes:
-    - Fetching target isotopes relevant for match computation, either specific to added compounds/ionization mechanisms or for all targets associated with the sample's batch.
-    - Filter target isotopes by sample polarity
-    - Filtering out existing matches to avoid redundant computations.
-    - Performing the actual match computation at the isotope level.
-    - Aggregating and creating higher-level matches, such as ions, compounds, collections, and sample matches, based on the computed match isotopes.
-
-    Typically, this function is called for completely new samples or after matches have been removed using `match_remove_sample`, ensuring that no aggregated match data exists.
-    This allows the use of `aggregate_and_create_matches` without the need for `aggregate_and_recreate_matches`.
-
-
-    Steps:
-    1. Gather necessary sample information, including verification status of m/z calibration.
-    2. Fetch the target isotopes required for match computation using the helper function `fetch_batch_target_isotopes_for_match_compute`.
-    3. Filter out isotopes that already have matches, ensuring only new matches are computed.
-    4. Perform the match computation for isotopes, checking that all necessary preconditions are met (e.g., m/z calibration).
-    5. Aggregate and save higher-level matches (ions, compounds, collections, samples) based on the computed isotope matches.
-    6. Return the computed match data and a status message.
-
-    :param sample_item_id: ID of the sample item for which matches are to be computed.
+    :param sample_item_id: Sample item identifier for match computation
     :type sample_item_id: str
-    :param added_target_compound_ids: List of added target compound IDs to be considered for match computation, defaults to None
-    :type added_target_compound_ids: list[str] | None, optional
-    :param added_ionization_mechanism_ids: List of added ionization mechanism IDs to be considered for match computation, defaults to None
-    :type added_ionization_mechanism_ids: list[str] | None, optional
-    :param independent_transaction: Flag indicating whether the sample match computing is an independent transaction, which affects event emission, defaults to False
+    :param independent_transaction: Controls event emission behavior, defaults to False
     :type independent_transaction: bool, optional
-    :param sid: Session ID, used for targeting specific clients when emitting events, defaults to None
+    :param sid: Session identifier for client notifications, defaults to None
     :type sid: str, optional
-    :raises ApiException: Raised when no new target isotopes are available for match computation or if other critical preconditions are not met.
-    :return: A dictionary containing the rematched sample object and a status message.
+    :param process_id: Process identifier for progress tracking
+    :type process_id: str, optional
+    :param parent_id: Parent process identifier
+    :type parent_id: str, optional
+    :raises ApiException: When sample not found, calibration issues, or no new targets available
+    :return: A dictionary with status message.
     :rtype: dict
     """
     # Step 1: Gather sample information
-    sample_data = await get_sample(sample_item_id)
-    sample = sample_data.get("data")
-    sample_item_name = sample["sample_item_name"]
-    sample_batch_id = sample["sample_batch_id"]
-    filename = sample["filename"]
-    instrument = sample["instrument"]
-    sample_polarity = sample["polarity"]
+    sample = await fetch_sample(sample_item_id)
 
-    # Check if 'verified' exists in mz_calibration. If not, provide a default value of False
+    # Step 2: Check if m/z calibration is verified for the sample
+    # TODO_calibration split on orbi/tof?
     verified = (
-        sample["mz_calibration"].get("verified", False)
-        if sample["mz_calibration"] is not None
+        sample.mz_calibration.get("verified", False)
+        if sample.mz_calibration is not None
         else True
     )
+    if not verified:
+        warning_message = f"m/z calibration is not verified for sample file: {sample.filename}. Please try to calibrate the file."
+        raise_api_warning(warning_message, {"sample_item_id": sample_item_id})
 
     runtime.logger.info(
-        f"...Computing match isotopes for sample {sample_item_name}: {sample_item_id} ..."
+        f"...Computing match isotopes for sample {sample.sample_item_name}: {sample_item_id} ..."
     )
 
-    # Step 2: Fetch target isotopes for match computation
-    #   If compounds/ion_mechanisms were added get isotopes with specific filters.
-    #   If no compounds/ion_mechanisms were added get all target isotopes for the sample's batch.
-    batch_target_isotopes_df = await fetch_batch_target_isotopes_for_match_compute(
-        sample_batch_id=sample_batch_id,
-        added_target_compound_ids=added_target_compound_ids,
-        added_ionization_mechanism_ids=added_ionization_mechanism_ids,
-    )
-    # Skip computation if no target isotopes associated with the batch
-    if batch_target_isotopes_df.empty:
-        warning_message = f"There are no targets associated with the sample batch '{sample_batch_id}'."
-        raise_api_warning(warning_message, {"sample_batch_id": sample_batch_id})
-
-    # Filter target isotopes by sample polarity
-    polarity_filtered_isotopes_df = filter_target_isotopes_by_polarity(
-        batch_target_isotopes_df, sample_polarity
+    # Step 3: Fetch target isotopes needing computation, applies all filters centrally on db lvl
+    match_params = await default_match_params(sample_item_id)
+    target_isotopes_df = await fetch_sample_unmatched_target_isotopes(
+        sample, match_params
     )
 
-    # Skip computation if no target isotopes associated with the sample
-    if polarity_filtered_isotopes_df.empty or polarity_filtered_isotopes_df is None:
-        warning_message = (
-            f"There is no targets associated with the sample '{sample_item_name}'."
+    # Step 4: Compute match_isotopes for the sample
+    computed_match_isotopes_count = 0
+    if target_isotopes_df is not None and not target_isotopes_df.empty:
+        progress_notification = UserNotification(
+            process_id=process_id,
+            parent_id=parent_id,
+            type="match_compute_sample",
+            status="pending",
+            message=f"Computing match isotopes for sample '{sample.sample_item_name}'.",
+            # NOTE: Set the internal metadata for the pending user_notifications like
+            # room_ids and sid of the user.
+            # The _instrument_room is provided separately to skip the check if the user
+            # has moved from the room (by not providing sid to emit_user_notification).
+            # Internal metadata will be cleaned up the from data in send_progress_user_notification.
+            data={
+                "sample_item_id": sample_item_id,
+                "_room_ids": [sample_item_id],
+                "_instrument_room": sample.instrument,
+                "_sid": sid,
+            },
         )
-        raise_api_warning(warning_message, {"sample_item_id": sample_item_id})
+        match_data = await compute_and_create_sample_match_isotope_data(
+            sample, target_isotopes_df, progress_notification
+        )
+        computed_match_isotopes_count = len(match_data["match_isotopes"])
 
-    # Step 3: Filter out existing matches to avoid redundant computations
-    filtered_target_isotopes_df = await filter_existing_sample_match_isotope_data(
-        polarity_filtered_isotopes_df, sample_item_id
+    # Step 5: Aggregate higher-level matches and update timestamps
+    match_aggregate_result = await aggregate_and_create_matches(
+        sample_item_id=sample_item_id
     )
+    match_aggregate_status = match_aggregate_result.get("status")
 
-    # Skip computation if no new target isotopes are found for this sample item
-    if filtered_target_isotopes_df.empty or filtered_target_isotopes_df is None:
-        warning_message = f"No new target isotopes to compute match isotopes for the sample '{sample_item_name}'."
-        raise_api_warning(warning_message, {"sample_item_id": sample_item_id})
+    if match_aggregate_status in ("success", "partial"):
+        runtime.logger.debug(
+            f"Aggregated new higher-level matches for sample '{sample.sample_item_name}'."
+        )
+        await update_sample_modified_timestamps(sample_item_ids=[sample_item_id])
 
-    # Check if m/z calibration is verified for the sample
-    if not verified:
-        warning_message = f"m/z calibration is not verified for sample file: {filename}. Please try to calibrate the file."
-        raise_api_warning(warning_message, {"sample_item_id": sample_item_id})
-
-    # Step 4: Compute match_isotopes for the sample if passed all checks,
-    # Prepare data for match computation
-    sample_pydantic = MatchComputeSample(
-        sample_item_id=sample_item_id,
-        sample_item_name=sample_item_name,
-        sample_batch_id=sample_batch_id,
-        filename=filename,
-        instrument=instrument,
-        polarity=sample_polarity,
-    )
-
-    # Prepare progress user notification.
-    notification = UserNotification(
-        process_id=process_id,
-        parent_id=parent_id,
-        type="match_compute_sample",
-        status="pending",
-        message=f"Computing match isotopes for sample '{sample_item_name}'.",
-        # NOTE: Set the internal metadata for the pending user_notifications like
-        # room_ids and sid of the user.
-        # The _instrument_room is provided separately to skip the check if the user
-        # has moved from the room (by not providing sid to emit_user_notification).
-        # Internal metadata will be cleaned up the from data in send_progress_user_notification.
-        data={
-            "sample_item_id": sample_item_id,
-            "_room_ids": [sample_item_id],
-            "_instrument_room": instrument,
-            "_sid": sid,
-        },
-    )
-
-    # Compute match data
-    match_data = await compute_and_create_sample_match_isotope_data(
-        sample_pydantic, filtered_target_isotopes_df, notification
-    )
-
-    # Step 5: Aggregate and save match_ions, match_compounds, match_collections and match_samples
-
-    # Aggregate and save higher-level matches if isotope-level matches were computed and saved
-    if not match_data["match_isotopes"].empty:
-        await aggregate_and_create_matches(sample_item_id=sample_item_id)
-        message = f"Match isotopes computed for sample '{sample_item_name}'."
+    # Determine status based on outcomes
+    message = f"Finished computing matches ({match_aggregate_status}) for sample '{sample.sample_item_name}'."
+    if computed_match_isotopes_count > 0:
+        compute_status = "success"
+        message += f" Computed {computed_match_isotopes_count} new match isotope{'s' if computed_match_isotopes_count != 1 else ''}."
     else:
-        message = f"No matches found for sample '{sample_item_name}'."
+        compute_status = "skipped"
+        message += (
+            f" No new match isotopes found for sample '{sample.sample_item_name}'."
+        )
 
-    await update_sample_modified_timestamps(sample_item_ids=[sample_item_id])
+    if match_aggregate_status in ("success", "partial"):
+        compute_status = "success"
+    else:
+        # Nothing computed, nothing aggregated
+        compute_status = "skipped"
+    message += f" (status: {compute_status})"
+    runtime.logger.debug(message)
 
     # Step 6: Return sample with computed match data and status message
-    sample_data = await get_sample(sample_item_id)
-    sample = sample_data.get("data")
     return {
-        "data": sample,
+        "status": compute_status,
         "message": message,
         "_notification_data": {"sample_item_id": sample_item_id},
     }
@@ -504,26 +453,16 @@ async def match_compute_sample(
 )
 async def match_compute_samples(
     sample_item_ids: list[str],
-    added_target_compound_ids: list[str] | None = None,
-    added_ionization_mechanism_ids: list[str] | None = None,
     independent_transaction: bool = False,
-    sid: str = None,
-    process_id=None,
-    parent_id=None,
+    sid: str | None = None,
+    process_id: str | None = None,
+    parent_id: str | None = None,
 ) -> dict:
     """
-    Computes new matches for a specific sample items, taking into account any added target compounds or ionization mechanisms.
-    A thin wrapper around the `match_compute_sample` controller.
-
-    This function handles the entire match computation process for a given sample items. It includes:
-    - Fetching target isotopes relevant for match computation, either specific to added compounds/ionization mechanisms or for all targets associated with the sample's batch.
-    - Filtering out existing matches to avoid redundant computations.
-    - Performing the actual match computation at the isotope level.
-    - Aggregating and creating higher-level matches, such as ions, compounds, collections, and sample matches, based on the computed match isotopes.
-
-    Typically, this function is called for completely new samples or after matches have been removed using `match_remove_sample`, ensuring that no aggregated match data exists.
-    This allows the use of `aggregate_and_create_matches` without the need for `aggregate_and_recreate_matches`.
-
+    Computes new matches for multiple samples by processing each individually.
+    - Thin wrapper around match_compute_sample for processing sample lists
+    - Uses simplified automatic target detection per sample
+    - Provides basic progress tracking and error collection
 
     Steps:
     1. Compute match samples
@@ -531,10 +470,6 @@ async def match_compute_samples(
 
     :param sample_item_ids: ID of the sample item for which matches are to be computed.
     :type sample_item_ids: str
-    :param added_target_compound_ids: List of added target compound IDs to be considered for match computation, defaults to None
-    :type added_target_compound_ids: list[str] | None, optional
-    :param added_ionization_mechanism_ids: List of added ionization mechanism IDs to be considered for match computation, defaults to None
-    :type added_ionization_mechanism_ids: list[str] | None, optional
     :param independent_transaction: Flag indicating whether the sample match computing is an independent transaction, which affects event emission, defaults to False
     :type independent_transaction: bool, optional
     :param sid: Session ID, used for targeting specific clients when emitting events, defaults to None
@@ -547,8 +482,6 @@ async def match_compute_samples(
     for sample_item_id in sample_item_ids:
         await match_compute_sample(
             sample_item_id=sample_item_id,
-            added_target_compound_ids=added_target_compound_ids,
-            added_ionization_mechanism_ids=added_ionization_mechanism_ids,
             independent_transaction=False,
             sid=sid,
             process_id=gen_id(8),
@@ -1037,227 +970,176 @@ async def match_remove_batch(
 @api_controller_background_task(
     success_notification_rooms=["sample_batch_id"],
     success_reload=[("sample_batch_reload", "sample_batch_id")],
-    error_notification_rooms=[
-        "sample_batch_id"
-    ],  # NOTE: send to sample_batch_id for warning notifications
+    error_notification_rooms=["sample_batch_id"],
     error_reload=[("sample_batch_reload", "sample_batch_id")],
 )
 async def match_compute_batch(
     sample_batch_id: str,
-    added_target_compound_ids: list[str] | None = None,
-    added_ionization_mechanism_ids: list[str] | None = None,
     independent_transaction: bool = False,
-    notification: UserNotification = None,
-    sid: str = None,
-    process_id=None,
-    parent_id=None,
+    sid: str | None = None,
+    process_id: str | None = None,
+    parent_id: str | None = None,
 ) -> dict:
     """
-    Computes new matches for all samples within a given batch, taking into account any added target compounds or ionization mechanisms.
-
-    This function orchestrates the complete match computation process for each sample in a specified batch. It performs the following key steps:
-    - Fetching target isotopes relevant for match computation, either specific to added compounds/ionization mechanisms or for all targets associated with the sample's batch.
-    - Filter target isotopes by sample polarity
-    - Filtering out existing matches to avoid redundant computations.
-    - Computing matches at the isotope level after ensuring that all necessary preconditions (e.g., verified m/z calibration) are met.
-    - Aggregating higher-level matches such as match_ion, match_compound, match_collection, and match_sample based on the computed match_isotope.
-
-    Typically, this function is invoked for processing after existing matches have been removed (e.g., using a rematch process), ensuring the batch's state is ready for new match aggregation.
-
-    Steps:
-    1. Retrieve all samples associated with the given sample batch.
-    2. Fetch target isotopes required for match computation using the helper function `fetch_batch_target_isotopes_for_match_compute`.
-    3. Filter out isotopes that already have matches to focus on new match computations.
-    4. Process each sample in the batch:
-       - Gather sample-specific information.
-       - Ensure m/z calibration is verified.
-       - Compute matches for isotopes.
-    5. Aggregate and save higher-level matches (ions, compounds, collections, samples) for the entire batch based on the computed isotope matches.
-    6. If any sample fails to compute matches, raise a warning with details on the failed samples.
-    7. Return the computed match data for the batch along with a success message.
+    Computes new matches for all samples within a batch, processing each sample:
+    - Filters which target isotopes need computation
+    - Aggregates higher-level matches based on computed isotopes
 
     :param sample_batch_id: The identifier of the sample batch for which match computation is to be performed.
     :type sample_batch_id: str
-    :param added_target_compound_ids: A list of identifiers for target compounds that have been added to the batch, limiting the scope of match computation.
-    :type added_target_compound_ids: list[str] | None, optional
-    :param added_ionization_mechanism_ids: A list of identifiers for ionization mechanisms that have been added to the batch, limiting the scope of match computation.
-    :type added_ionization_mechanism_ids: list[str] | None, optional
-    :param independent_transaction: Indicates whether the match computation operation should be treated as a standalone process, which affects event emission and UI updates.
-    :type independent_transaction: bool, optional
-    :raises ApiException: Raised in cases where match computation cannot proceed due to issues such as unverified m/z calibration or the absence of new target isotopes to compute matches for.
-    :return: A dictionary containing the sample batch data and a success message.
+    :param independent_transaction: Controls event emission behavior
+    :type independent_transaction: bool
+    :param sid: Session identifier for client notifications
+    :param process_id: Process identifier for progress tracking
+    :param parent_id: Parent process identifier
+    :raises NotFoundException: When batch not found
+    :raises ApiException: When batch has no samples or critical failures occur
+    :return: Batch data with computation results and status message
     :rtype: dict
     """
-    # Step 1: Retrieve all samples associated with the specified sample batch.
+    # Step 1: Retrieve sample batch and all associated samples.
+    sample_batch = await fetch_sample_batch(sample_batch_id)
+
     async with async_session() as session:
-        # Fetch samples
-        result = await session.execute(
-            select(Sample).where(Sample.sample_batch_id == sample_batch_id)
+        samples = (
+            (
+                await session.execute(
+                    select(Sample).where(Sample.sample_batch_id == sample_batch_id)
+                )
+            )
+            .scalars()
+            .all()
         )
 
-        samples = result.scalars().all()
-
-    # Step 2: Retrieve batch data and ionization mechanisms from the batch.
-    async with async_session() as session:
-        sample_batch = await session.get(SampleBatch, sample_batch_id)
-    if not sample_batch:
-        raise NotFoundException(f"Sample batch with ID '{sample_batch_id}' not found")
     sample_batch_name = sample_batch.sample_batch_name
+    total_samples_count = len(samples)
+
+    if total_samples_count == 0:
+        message = f"Sample batch '{sample_batch.sample_batch_name}' has no samples"
+        runtime.logger.debug(message)
+        return {
+            "status": "skipped",
+            "message": message,
+            "data": {
+                "computed_samples_count": 0,
+                "failed_samples_count": 0,
+                "skipped_samples_count": 0,
+                "total_samples_count": total_samples_count,
+            },
+            "_notification_data": {"sample_batch_id": sample_batch_id},
+        }
 
     runtime.logger.info(
-        f"...Computing match isotopes for sample batch '{sample_batch_name}' with ID '{sample_batch_id}' ..."
+        f"Computing matches for sample batch '{sample_batch_name}' ({total_samples_count} samples)"
     )
 
-    # Step 3: Identify target isotopes for computation.
-    #   If compounds/ion_mechanisms were added get isotopes with specific filters.
-    #   If no compounds/ion_mechanisms were added get all target isotopes for the sample's batch.
-    batch_target_isotopes_df = await fetch_batch_target_isotopes_for_match_compute(
-        sample_batch_id=sample_batch_id,
-        added_target_compound_ids=added_target_compound_ids,
-        added_ionization_mechanism_ids=added_ionization_mechanism_ids,
-    )
-
-    # Skip computation if no target isotopes associated with the batch
-    if batch_target_isotopes_df.empty:
-        warning_message = f"There are no targets associated with the sample batch '{sample_batch_name}'."
-        raise_api_warning(warning_message, {"sample_batch_id": sample_batch_id})
-
-    # Step 4: Process each sample item for match computation
-    samples_compute_failed = []
-    samples_with_matches = []
-    total_samples = len(samples)
+    # Step 2: Process each sample for match computation
+    computed_samples = []
+    failed_samples = []
+    skipped_samples = []
     for item_index, sample in enumerate(samples):
-        # Prepare data for match computation
-        sample_pydantic = MatchComputeSample(
-            sample_item_id=sample.sample_item_id,
-            sample_item_name=sample.sample_item_name,
-            sample_batch_id=sample.sample_batch_id,
-            filename=sample.filename,
-            instrument=sample.instrument,
-            polarity=sample.polarity,
-        )
-
-        # Prepare progress user notification.
-        notification = UserNotification(
-            process_id=process_id,
-            parent_id=parent_id,
-            type="match_compute_batch",
-            status="pending",
-            message=f"Computing match isotopes for sample batch '{sample_batch_name}'.",
-            # NOTE: Set the internal metadata for the pending user_notifications like
-            # room_ids and sid of the user.
-            # Internal metadata will be cleaned up the from data in send_progress_user_notification.
-            data={
-                "sample_batch_id": sample_batch_id,
-                "_room_ids": [sample_batch_id],
-                "_sid": sid,
-                "_total_samples": total_samples,
-                "_item_index": item_index,
-            },
-        )
-
         try:
             runtime.logger.info(
-                f"...Computing match isotopes for sample '{sample.sample_item_name}' with ID {sample.sample_item_id} ..."
+                f"Computing match isotopes for sample {item_index + 1}/{total_samples_count}: '{sample.sample_item_name}'"
             )
-            # Gather sample information
-            # Check if 'verified' exists in mz_calibration. If not, provide a default value of False
-            verified = (
-                sample.mz_calibration.get("verified", False)
-                if sample.mz_calibration is not None
-                else True
+            # Check if m/z calibration (if exists) is verified for the sample
+            if sample.mz_calibration and not sample.mz_calibration.get(
+                "verified", False
+            ):
+                skipped_samples.append(sample.sample_item_id)
+                runtime.logger.debug(
+                    f"Skipped uncalibrated sample '{sample.sample_item_name}': "
+                    f"m/z calibration not verified for sample file: {sample.filename}."
+                )
+                continue
+
+            # Fetch unmatched target isotopes for the sample
+            match_params = await default_match_params(sample.sample_item_id)
+            target_isotopes_df = await fetch_sample_unmatched_target_isotopes(
+                sample, match_params
             )
-
-            # Check if m/z calibration is verified for the sample
-            if not verified:
-                warning_message = f"m/z calibration is not verified for sample file: {sample.filename}. Please try to calibrate the file."
-                raise_api_warning(
-                    warning_message, {"sample_item_id": sample.sample_item_id}
+            if target_isotopes_df is None or target_isotopes_df.empty:
+                skipped_samples.append(sample.sample_item_id)
+                runtime.logger.info(
+                    f"No new target isotopes to compute match isotopes for the sample '{sample.sample_item_name}'."
                 )
+                continue  # Nothing to compute for this sample
 
-            # Filter batch target isotopes by sample polarity
-            polarity_filtered_isotopes_df = filter_target_isotopes_by_polarity(
-                batch_target_isotopes_df, sample.polarity
+            # Step 3: Compute match_isotopes if the sample has passed all checks.
+            progress_notification = UserNotification(
+                process_id=process_id,
+                parent_id=parent_id,
+                type="match_compute_batch",
+                status="pending",
+                message=f"Processing sample {item_index + 1}/{total_samples_count} in sample batch '{sample_batch_name}'",
+                # NOTE: Set the internal metadata for the pending user_notifications like
+                # room_ids and sid of the user.
+                # Internal metadata will be cleaned up the from data in send_progress_user_notification.
+                data={
+                    "sample_batch_id": sample_batch_id,
+                    "_room_ids": [sample_batch_id],
+                    "_sid": sid,
+                    "_total_samples": total_samples_count,
+                    "_item_index": item_index,
+                },
             )
-
-            # Skip computation if no polarity-compatible target isotopes found
-            if polarity_filtered_isotopes_df.empty:
-                warning_message = (
-                    f"No polarity-compatible target isotopes found for sample '{sample.sample_item_name}' "
-                    f"(polarity: {sample.polarity})."
-                )
-                raise_api_warning(
-                    warning_message, {"sample_item_id": sample.sample_item_id}
-                )
-
-            # Filter existing matches for the target isotopes
-            filtered_target_isotopes_df = (
-                await filter_existing_sample_match_isotope_data(
-                    polarity_filtered_isotopes_df, sample.sample_item_id
-                )
-            )
-
-            # Skip computation if no new target isotopes are found for this sample item
-            if filtered_target_isotopes_df.empty:
-                warning_message = f"No new target isotopes to compute match isotopes for sample '{sample.sample_item_name}'."
-                raise_api_warning(
-                    warning_message, {"sample_item_id": sample.sample_item_id}
-                )
-
-            # Step 5: Compute and save match_isotopes for the sample items that passed all checks,
-            # where new target isotopes are identified, m/z calibration is verified.
             match_data = await compute_and_create_sample_match_isotope_data(
-                sample_pydantic, filtered_target_isotopes_df, notification
+                sample, target_isotopes_df, progress_notification
             )
-
-            # Track samples that had matches for reporting
+            # Track samples with matches
             if not match_data["match_isotopes"].empty:
-                samples_with_matches.append(sample.sample_item_name)
+                computed_samples.append(sample.sample_item_id)
+
         except ApiException as e:
-            # If an exception occurs during sample match computation, log the error and add the sample to the failed list
             runtime.logger.info(
-                f"Processing sample '{sample.sample_item_name}' failed: {e}"
+                f"Computing match isotopes for sample '{sample.sample_item_name}' failed: {e}"
             )
-            samples_compute_failed.append(
-                {
-                    "sample_item": {
-                        "sample_item_id": sample_pydantic.sample_item_id,
-                        "sample_item_name": sample_pydantic.sample_item_name,
-                        "filename": sample_pydantic.filename,
-                    },
-                    "warning_message": e.user_message,
-                }
-            )
-    # Step 6: Aggregate and save match_ions, match_compounds, match_collections and match_samples
-    # for the sample batch based on  computed and saved match_isotopes
-    await aggregate_and_create_matches(sample_batch_id=sample_batch_id)
+            failed_samples.append(sample.sample_item_id)
 
-    await update_sample_modified_timestamps(sample_batch_ids=[sample_batch_id])
-
-    # Step 7: If there are any failed samples, raise warning with the list of failed samples included in the error message
-    if samples_compute_failed:
-        user_message = f"Failed to compute match isotopes for {len(samples_compute_failed)} sample{'s' if len(samples_compute_failed) != 1 else ''} in sample batch '{sample_batch_name}'."
-        raise_api_warning(
-            user_message,
-            {
-                "sample_batch_id": sample_batch_id,
-                "samples_compute_failed": samples_compute_failed,
-            },
+    # Step 4: Aggregate higher-level matches and update timestamps
+    match_aggregate_result = await aggregate_and_create_matches(
+        sample_batch_id=sample_batch_id
+    )
+    match_aggregate_status = match_aggregate_result.get("status")
+    if match_aggregate_status in ("success", "partial"):
+        runtime.logger.debug(
+            f"Aggregated new higher-level matches for sample batch '{sample_batch_name}'."
+        )
+        await update_sample_modified_timestamps(
+            sample_item_ids=match_aggregate_result.get("affected_sample_item_ids", [])
         )
 
-    # Step 8: Return sample batch data and message
-    message = f"Match isotopes computed for sample batch '{sample_batch_name}'."
-    if samples_with_matches:
-        match_count = len(samples_with_matches)
-        match_message = (
-            f" Matches found in {match_count} sample{'s' if match_count != 1 else ''}."
-        )
-        message += match_message
+    # Step 5: Determine status based on outcomes
+    computed_samples_count = len(computed_samples)
+    failed_samples_count = len(failed_samples)
+    skipped_samples_count = len(skipped_samples)
+
+    if failed_samples_count > 0 and computed_samples_count == 0:
+        status = "failed"  # Only failures, no successes
+    elif failed_samples_count > 0 and computed_samples_count > 0:
+        status = "partial"  # Mixed results
+    elif skipped_samples_count > 0:
+        status = "skipped"
     else:
-        message += " No matches were found in any samples."
+        status = "success"
+
+    message = (
+        f"Finished computing matches ({status}) for sample batch '{sample_batch.sample_batch_name}'. "
+        f"{computed_samples_count} sample{'s' if computed_samples_count != 1 else ''} processed successfully, "
+        f"{failed_samples_count} failed, "
+        f"{skipped_samples_count} skipped due to missing calibration or no new targets."
+    )
+    runtime.logger.debug(message)
+
     return {
-        "data": sample_batch.to_dict(),
+        "status": status,
         "message": message,
+        "data": {
+            "computed_samples_count": computed_samples_count,
+            "failed_samples_count": failed_samples_count,
+            "skipped_samples_count": skipped_samples_count,
+            "total_samples_count": total_samples_count,
+        },
         "_notification_data": {"sample_batch_id": sample_batch_id},
     }
 

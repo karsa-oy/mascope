@@ -2,14 +2,6 @@ from typing import Optional, List
 from pydantic import BaseModel, Field, model_validator
 
 
-class MatchComputeSample(BaseModel):
-    sample_item_id: str = Field(..., description="ID of the sample item")
-    sample_item_name: str = Field(..., description="ID of the sample item")
-    sample_batch_id: str = Field(..., description="ID of the sample batch")
-    filename: str = Field(..., description="Filename of the sample item")
-    instrument: str = Field(..., description="Instrument of the sample item")
-    polarity: str = Field(..., description="Polarity of the sample item")
-
 
 class RematchBody(BaseModel):
     added_target_compound_ids: Optional[List[str]] = Field(

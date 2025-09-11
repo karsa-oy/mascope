@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends
 from mascope_backend.api.lib.api_features import api_route
-from mascope_backend.api.lib.exceptions.api_exceptions import ApiException
 from mascope_backend.api.controllers.match.aggregate.match_aggregate_controller import (
     aggregate_match_isotope_filtered_data,
     aggregate_matches,
@@ -219,20 +218,9 @@ async def aggregate_and_create_sample_matches_route(
         match_params=body.match_params,
     )
 
-    errors = result.get("errors", [])
-    message = result.get("message", "")
-    if errors:
-        raise ApiException(
-            message,
-            {
-                "errors": errors,
-            },
-            409,
-        )
-
     return {
-        "message": message,
-        "message_logs": result.get("message_logs", []),
+        "status": result.get("status"),
+        "message": result.get("message", ""),
     }
 
 

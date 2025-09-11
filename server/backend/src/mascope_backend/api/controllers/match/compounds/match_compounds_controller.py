@@ -1,12 +1,10 @@
-from datetime import datetime, timezone
-from typing import List, Optional
-import pandas as pd
 from collections import defaultdict
+from datetime import datetime, timezone
+import pandas as pd
 from sqlalchemy import (
     select,
     delete,
     func,
-    and_,
 )
 
 from mascope_file.name import resolve_instrument_type
@@ -23,9 +21,7 @@ from mascope_backend.db.models import (
 )
 from mascope_backend.api.lib.api_features import api_controller
 from mascope_backend.api.lib.exceptions.api_exceptions import (
-    DuplicateException,
     NotFoundException,
-    ApiException,
 )
 from mascope_backend.api.controllers.match.lib.match_util import deduplicate_match_df
 from mascope_backend.api.controllers.sample.lib.sample_items_fetch import (
@@ -41,15 +37,15 @@ from mascope_backend.runtime import runtime
 
 @api_controller()
 async def get_match_compounds(
-    sample_item_id: Optional[str] = None,
-    sample_batch_id: Optional[str] = None,
-    target_compound_id: Optional[str] = None,
-    match_category_min: Optional[int] = None,
+    sample_item_id: str | None = None,
+    sample_batch_id: str | None = None,
+    target_compound_id: str | None = None,
+    match_category_min: int | None = None,
     deduplicate: bool = False,
     show_target_collection: bool = False,
     show_target_compound: bool = False,
-    sort: Optional[str] = None,
-    order: Optional[str] = None,
+    sort: str | None = None,
+    order: str | None = None,
     page: int = 0,
     limit: int = 10000,
 ) -> dict:
@@ -68,13 +64,13 @@ async def get_match_compounds(
     8. If deduplication is requested and `show_target_collection` is True, deduplicate the compounds.
 
     :param sample_item_id: Filter matches by the associated sample item's ID, defaults to None.
-    :type sample_item_id: Optional[str], optional
+    :type sample_item_id: str | None, optional
     :param sample_batch_id: Filter matches by the associated sample batch's ID, defaults to None.
-    :type sample_batch_id: Optional[str], optional
+    :type sample_batch_id: str | None, optional
     :param target_compound_id: Filter matches by the associated target compound's ID, defaults to None.
-    :type target_compound_id: Optional[str], optional
+    :type target_compound_id: str | None, optional
     :param match_category_min: Filter by match_category to include specified category and higher (e.g., 1 includes categories 1 and higher), defaults to None.
-    :type match_category_min:int, optional
+    :type match_category_min: int | None, optional
     :param deduplicate: Flag to indicate whether compound deduplication should be applied when show_target_collection is True, defaults to False.
     :type deduplicate: bool
     :param show_target_collection: Include additional data about the target collections, defaults to False.
@@ -82,9 +78,9 @@ async def get_match_compounds(
     :param show_target_compound: Include additional data about the target compounds, defaults to False.
     :type show_target_compound: bool, optional
     :param sort: Column name to sort by, defaults to None.
-    :type sort: Optional[str], optional
+    :type sort: str | None, optional
     :param order: Order of sorting, 'asc' for ascending or 'desc' for descending, defaults to None.
-    :type order: Optional[str], optional
+    :type order: str | None, optional
     :param page: Page number for pagination, starts from 0, defaults to 0.
     :type page: int, optional
     :param limit: Maximum number of results per page, defaults to 10000.
@@ -249,100 +245,121 @@ async def get_match_compound(match_compound_id: str) -> dict:
 
 @api_controller()
 async def create_match_compounds(
-    match_compounds: List[MatchCompoundBase],
+    match_compounds: list[MatchCompoundBase],
     independent_transaction: bool = False,
-):
+) -> dict:
     """
-    Creates match compounds for a given sample item based on the provided list of aggregated match compound data.
+    Creates match compounds for a given samples based on the provided list of
+    aggregated match compound data.
+    Updates existing records if data differs, skips if identical, creates if new.
 
-    Steps:
-    1. Group match compounds by sample item ID.
-    2. For each group, check for existing match compounds to avoid duplication.
-    3. Insert new match compounds into the database.
-    4. Commit the transaction and refresh the newly created match compounds.
-    5. Handle and report any duplication errors, raising an exception if no compounds were successfully created.
-
-    :param match_compounds: List of match compound data for creating matches.
-    :type match_compounds: List[MatchCompoundBase]
-    :param independent_transaction: Indicates if the operation should be independent of any ongoing transactions, defaults to False.
-    :type independent_transaction: bool, optional
-    :return: The created match compounds data.
+    :param match_compounds: List of match compound data for creating matches
+    :type match_compounds: list[MatchCompoundBase]
+    :param independent_transaction: Indicates if operation should be independent
+    :type independent_transaction: bool
+    :return: Creation results with counts of new vs existing records
     :rtype: dict
-    :raises ApiException: If no match compounds could be created due to DuplicateException errors.
     """
+    if not match_compounds:
+        return {"message": "No match compounds provided", "data": []}
+
     # Step 1: Group match compounds by sample item ID.
     grouped_match_compounds = defaultdict(list)
     for match_compound in match_compounds:
         grouped_match_compounds[match_compound.sample_item_id].append(match_compound)
 
-    new_match_compounds = []
-    errors = []
+    processed_compounds = []
+    updated_count = 0
+    unchanged_count = 0
+
     async with async_session() as session:
-        for sample_item_id, match_compounds in grouped_match_compounds.items():
-            try:
-                # Step 2: Check for existing match compounds to avoid duplication.
-                target_compound_ids = [
-                    match_compound.target_compound_id
-                    for match_compound in match_compounds
-                ]
-
-                stmt = select(MatchCompound).where(
-                    and_(
-                        MatchCompound.sample_item_id == sample_item_id,
-                        MatchCompound.target_compound_id.in_(target_compound_ids),
+        for sample_item_id, m_compounds in grouped_match_compounds.items():
+            # Step 2: Get existing match compounds for this sample
+            target_compound_ids = [mc.target_compound_id for mc in m_compounds]
+            existing_compounds = {
+                row.target_compound_id: row
+                for row in (
+                    await session.execute(
+                        select(MatchCompound).where(
+                            MatchCompound.sample_item_id == sample_item_id,
+                            MatchCompound.target_compound_id.in_(target_compound_ids),
+                        )
                     )
-                )
-                existing_match_compounds = (await session.execute(stmt)).scalars().all()
-                if existing_match_compounds:
-                    raise DuplicateException(
-                        f"Match compounds already exist for the given sample item '{sample_item_id}' and target compounds."
+                ).scalars()
+            }
+
+            for new_compound in m_compounds:
+                existing = existing_compounds.get(new_compound.target_compound_id)
+
+                if existing:
+                    # Step 3: Compare and update if different
+                    needs_update = (
+                        existing.match_score != new_compound.match_score
+                        or existing.match_category != new_compound.match_category
+                        or existing.sample_peak_intensity_sum
+                        != new_compound.sample_peak_intensity_sum
                     )
 
-                # Step 3: Insert new match compounds
-                for match_compound in match_compounds:
+                    if needs_update:
+                        existing.match_score = new_compound.match_score
+                        existing.match_category = new_compound.match_category
+                        existing.sample_peak_intensity_sum = (
+                            new_compound.sample_peak_intensity_sum
+                        )
+                        existing.match_compound_utc_modified = datetime.now(
+                            timezone.utc
+                        )
+                        updated_count += 1
+                        processed_compounds.append(existing)
+                        runtime.logger.trace(
+                            f"Updated match compound for sample '{sample_item_id}' "
+                            f"and compound '{new_compound.target_compound_id}'"
+                        )
+                    else:
+                        unchanged_count += 1
+                        runtime.logger.trace(
+                            f"Match compound unchanged for sample '{sample_item_id}' "
+                            f"and compound '{new_compound.target_compound_id}'"
+                        )
+                else:
+                    # Step 4: Create new match compound
                     new_match_compound = MatchCompound(
                         match_compound_id=gen_id(32),
-                        **match_compound.model_dump(),
+                        **new_compound.model_dump(),
                         match_compound_utc_created=datetime.now(timezone.utc),
                     )
                     session.add(new_match_compound)
-                    new_match_compounds.append(new_match_compound)
-            except DuplicateException as e:
-                errors.append({"sample_item_id": sample_item_id, "error": str(e)})
+                    processed_compounds.append(new_match_compound)
 
-        # Step 4: Commit the transaction and refresh the newly created match compounds.
-        await session.commit()
-        for match_compound in new_match_compounds:
-            await session.refresh(match_compound)
+        # Step 5: Commit transaction and refresh
+        if processed_compounds:
+            await session.commit()
+            for compound in processed_compounds:
+                await session.refresh(compound)
 
-    # Step 5: Handle and report any duplication errors, raising an exception if no compounds were successfully created.
-    result = {}
-    message = ""
-    if new_match_compounds:
-        message = f"{len(new_match_compounds)} match compound{'s' if len(new_match_compounds) != 1 else ''} created successfully. "
-        result["message"] = message
-        result["data"] = [compound.to_dict() for compound in new_match_compounds]
-    if errors:
-        message = (
-            message
-            + f"Failed to create match compounds for {len(errors)} sample{'s' if len(errors) != 1 else ''}."
-        )
-        result["message"] = message
-        result["errors"] = errors
+    # Step 6: Generate result message
+    total_requested = len(match_compounds)
+    created_count = len(processed_compounds) - updated_count
 
-    if errors and not new_match_compounds:
-        user_message = f"Failed to create match compounds for {len(errors)} sample{'s' if len(errors) != 1 else ''}."
-
-        raise ApiException(
-            user_message,
-            {
-                "errors": errors,
-            },
-            409,
-        )
+    if created_count > 0 and (updated_count > 0 or unchanged_count > 0):
+        status = "partial"
+        message = f"Processed {total_requested} match compounds: {created_count} created, {updated_count} updated, {unchanged_count} unchanged"
+    elif created_count > 0 or updated_count > 0:
+        status = "success"
+        action = "created" if created_count > 0 else "updated"
+        count = created_count if created_count > 0 else updated_count
+        message = f"{action.title()} {count}/{total_requested} match compound{'s' if count != 1 else ''}"
+    else:
+        status = "skipped"
+        message = f"All {unchanged_count} match compounds unchanged"
 
     runtime.logger.info(message)
-    return result
+
+    return {
+        "status": status,
+        "message": message,
+        "data": [compound.to_dict() for compound in processed_compounds],
+    }
 
 
 @api_controller()
