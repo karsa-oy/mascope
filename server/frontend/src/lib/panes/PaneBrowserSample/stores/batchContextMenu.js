@@ -194,9 +194,21 @@ export const useBatchContextMenu = defineStore('browser.sample.batchCtxMenu', ()
           visible: row.value !== null
         },
         {
-          label: 'Rematch',
-          icon: 'pi ph ph-binoculars',
+          label: `Refresh`,
+          icon: 'pi ph ph-arrow-counter-clockwise',
           command: () => app.data.batch.rematch(row.value),
+          visible: row.value !== null
+        },
+        {
+          label: `Rematch`,
+          icon: 'pi ph ph-list-magnifying-glass',
+          command: async () => {
+            await app.data.batch.rematch({
+              sample_batch_id: row.value.sample_batch_id,
+              full_remove: true,
+              force: true
+            })
+          },
           visible: row.value !== null
         }
       ]

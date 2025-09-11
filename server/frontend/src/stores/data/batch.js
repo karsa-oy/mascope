@@ -97,13 +97,24 @@ export const useBatch = defineModule({
       }
     )
   },
-  rematch: ({ sample_batch_id }) =>
+  rematch: async ({ sample_batch_id, full_remove = false, force = false }) =>
     api.http.post(
       `/match/rematch/batch/${sample_batch_id}`,
       {},
       {
+        params: { full_remove, force },
         use: 'process',
         type: 'rematch_batch'
+      }
+    ),
+  rematchBatches: async ({ sample_batch_ids }) =>
+    api.http.post(
+      `/match/rematch/batches`,
+      { sample_batch_ids },
+      {},
+      {
+        use: 'process',
+        type: 'rematch_batches'
       }
     ),
   exportPeaks: async ({ sample_batch_id }) =>

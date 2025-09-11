@@ -93,22 +93,12 @@ export const useSample = defineModule({
       }
     )
   },
-  match: ({ sample_item_id }) =>
-    api.http.post(
-      `/match/compute/sample/${sampleId}`,
-      {
-        sampleId: sample_item_id
-      },
-      {
-        use: 'process',
-        type: 'compute_match_sample'
-      }
-    ),
-  rematch: async ({ sample_item_id }) =>
+  rematch: async ({ sample_item_id, full_remove = false }) =>
     api.http.post(
       `/match/rematch/sample/${sample_item_id}`,
       {},
       {
+        params: { full_remove },
         use: 'process',
         type: 'rematch_sample'
       }

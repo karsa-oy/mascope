@@ -208,7 +208,7 @@ export const useSampleContextMenu = defineStore('browser.sample.sampleCtxMenu', 
       },
       {
         label: 'Process',
-        icon: 'pi ph ph-hourglass-medium',
+        icon: 'pi ph ph-arrow-counter-clockwise',
         visible: !multiselecting && sampleContext.value,
         items: [
           {
@@ -220,10 +220,21 @@ export const useSampleContextMenu = defineStore('browser.sample.sampleCtxMenu', 
             visible: !multiselecting
           },
           {
-            label: `Rematch`,
-            icon: 'pi ph ph-binoculars',
+            label: `Refresh`,
+            icon: 'pi ph ph-arrow-counter-clockwise',
             command: async () => {
               await app.data.sample.rematch(row.value)
+            },
+            visible: !multiselecting
+          },
+          {
+            label: `Rematch`,
+            icon: 'pi ph ph-list-magnifying-glass',
+            command: async () => {
+              await app.data.sample.rematch({
+                sample_item_id: row.value.sample_item_id,
+                full_remove: true
+              })
             },
             visible: !multiselecting
           },
