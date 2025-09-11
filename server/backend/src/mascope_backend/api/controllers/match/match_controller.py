@@ -6,14 +6,12 @@ This module contains all the functionalities and endpoints related to
 the matching/rematching processes and related operations.
 """
 
-import asyncio
 from sqlalchemy import select, delete
 from mascope_backend.db import async_session
 from mascope_backend.db.id import gen_id
 from mascope_backend.db.wal.engine import wal_checkpoint
 from mascope_backend.db.models import (
     Sample,
-    SampleBatch,
     MatchIsotope,
     MatchIon,
     MatchCompound,
@@ -26,7 +24,6 @@ from mascope_backend.api.lib.api_features import (
 )
 from mascope_backend.api.lib.exceptions.api_exceptions import (
     ApiException,
-    NotFoundException,
     raise_api_warning,
 )
 from mascope_backend.api.controllers.match.lib.match_compute import (
@@ -45,14 +42,17 @@ from mascope_backend.api.controllers.sample.lib.fetch_affected_sample_data impor
 from mascope_backend.api.controllers.sample.lib.sample_modified_timestamps_manager import (
     update_sample_modified_timestamps,
 )
+from mascope_backend.api.controllers.sample.batches.status.service import (
+    update_sample_batch_status,
+)
 from mascope_backend.api.controllers.samples.samples_controller import (
     get_samples,
-    get_sample,
 )
 from mascope_backend.api.controllers.samples.lib.samples_fetch import fetch_sample
-from mascope_backend.api.models.match.match_pydantic_model import (
-    RematchBatchesBody,
+from mascope_backend.api.controllers.sample.lib.sample_batches_fetch import (
+    fetch_sample_batch,
 )
+from mascope_backend.api.new.match.params import default_match_params
 from mascope_backend.socket.notifications import (
     UserNotification,
     send_progress_user_notification,
@@ -71,111 +71,98 @@ from mascope_backend.runtime import runtime
     success_notification_rooms=["sid"],
     success_reload=[("sample_batch_reload", "sample_batch_id")],
     error_notification_rooms=["sid"],
+    error_reload=[("sample_batch_reload", "sample_batch_id")],
 )
 async def rematch_sample(
     sample_item_id: str,
-    added_target_compound_ids: list[str] | None = None,
-    added_ionization_mechanism_ids: list[str] | None = None,
-    removed_target_compound_ids: list[str] | None = None,
-    removed_ionization_mechanism_ids: list[str] | None = None,
+    full_remove: bool = False,
     independent_transaction: bool = False,
-    sid: str = None,
-    process_id=None,
-    parent_id=None,
+    sid: str | None = None,
+    process_id: str | None = None,
+    parent_id: str | None = None,
 ) -> dict:
     """
-    Performs a rematch of sample by removing and/or computing matches based on the specified parameters.
+    Performs a complete rematch of a sample by removing orphaned/all matches and recomputing.
 
-    This function handles the rematch process of a sample by first removing matches associated with removed
-    target compounds or ionization mechanisms and then adding matches for added compounds or mechanisms.
-    If no parameters are provided, it performs a complete rematch by removing all existing sample matches and recomputing them.
-
-    Steps:
-    1. Remove existing matches associated with removed parameters, if specified.
-    2. Compute new matches for added parameters, if specified.
-    3. In the absence of specified parameters for addition or removal, perform a full rematch by removing all matches and recomputing them for all targets of the sample.
-    4. Return the rematched sample.
-    5. Emit a finished and reload events to update the system with the changes, if the operation is flagged as an independent transaction.
-        The event emission for 'user_notification' and 'sample_batch_reload' is handled by the api_controller_background_task decorator based on operation success or failure
-
-    :param sample_item_id: ID of the sample item for which the rematch is to be performed.
+    :param sample_item_id: ID of the sample item for rematching
     :type sample_item_id: str
-    :param added_target_compound_ids: List of target compound IDs for which matches need to be computed, defaults to None
-    :type added_target_compound_ids: list[str] | None, optional
-    :param added_ionization_mechanism_ids: List of ionization mechanism IDs for which matches need to be computed, defaults to None
-    :type added_ionization_mechanism_ids: list[str] | None, optional
-    :param removed_target_compound_ids: List of target compound IDs for which matches are to be removed, defaults to None
-    :type removed_target_compound_ids: list[str] | None, optional
-    :param removed_ionization_mechanism_ids: List of ionization mechanism IDs for which matches are to be removed, defaults to None
-    :type removed_ionization_mechanism_ids: list[str] | None, optional
-    :param independent_transaction: Flag indicating whether the ramtching is an independent transaction, which affects event emission, defaults to False
-    :type independent_transaction: bool, optional
-    :param sid: Session ID, used for targeting specific clients when emitting events, defaults to None
-    :type sid: str, optional
-    :return: The dict with rematched Sample object.
-    rtype: dict
-
-    Notes:
-        - If `removed_*` parameters are provided, the function removes matches related to these parameters.
-        - If `added_*` parameters are provided, the function computes new matches related to these parameters.
-        - If no `added_*` or `removed_*` parameters are provided, the function removes all existing matches and computes new matches for all targets.
+    :param full_remove: If True, removes all existing matches before recomputing, defaults to False
+    :type full_remove: bool
+    :param independent_transaction: Flag for transaction handling
+    :param sid: Session ID for notifications
+    :param process_id: Process identifier
+    :param parent_id: Parent process identifier
     """
-    runtime.logger.info(f"...Rematching sample: {sample_item_id} ...")
-    # Step 1: Remove existing matches based on provided removed parameters
-    if removed_target_compound_ids or removed_ionization_mechanism_ids:
-        await match_remove_sample(
-            sample_item_id=sample_item_id,
-            removed_target_compound_ids=removed_target_compound_ids,
-            removed_ionization_mechanism_ids=removed_ionization_mechanism_ids,
-            independent_transaction=False,
-            sid=sid,
-            process_id=gen_id(8),
-            parent_id=process_id,
-        )
+    sample = await fetch_sample(sample_item_id)
+    operation_type = "Full" if full_remove else "Partial"
+    runtime.logger.info(
+        f"{operation_type} rematching sample '{sample.sample_item_name}'"
+    )
 
-    # Step 2: Compute new matches based on provided added parameters
-    if added_target_compound_ids or added_ionization_mechanism_ids:
-        compute_result = await match_compute_sample(
-            sample_item_id=sample_item_id,
-            added_target_compound_ids=added_target_compound_ids,
-            added_ionization_mechanism_ids=added_ionization_mechanism_ids,
-            independent_transaction=False,
-            sid=sid,
-            process_id=gen_id(8),
-            parent_id=process_id,
-        )
-    # Step 3: Perform a complete rematch if no specific targets are provided
-    elif not removed_target_compound_ids and not removed_ionization_mechanism_ids:
-        await match_remove_sample(
-            sample_item_id=sample_item_id,
-            independent_transaction=False,
-            sid=sid,
-            process_id=gen_id(8),
-            parent_id=process_id,
-        )  # Remove all existing matches
-        compute_result = await match_compute_sample(
-            sample_item_id=sample_item_id,
-            independent_transaction=False,
-            sid=sid,
-            process_id=gen_id(8),
-            parent_id=process_id,
-        )  # Compute matches for all targets
+    # Step 1: Remove matches (partial or full)
+    remove_result = await match_remove_sample(
+        sample_item_id=sample_item_id,
+        full_remove=full_remove,
+        independent_transaction=False,
+        sid=sid,
+        process_id=gen_id(8),
+        parent_id=process_id,
+    )
 
-    # Step 4: Return rematched sample and message
-    sample_data = await get_sample(sample_item_id)
-    sample = sample_data.get("data")
-    sample_item_name = sample["sample_item_name"]
+    # Step 2: Compute new matches
+    compute_result = await match_compute_sample(
+        sample_item_id=sample_item_id,
+        independent_transaction=False,
+        sid=sid,
+        process_id=gen_id(8),
+        parent_id=process_id,
+    )
 
-    # Include match status info in the message if available
-    match_compute_info = compute_result.get("message", "") if compute_result else ""
-    message = f"Sample '{sample_item_name}' was rematched."
-    if match_compute_info:
-        message = f"{message} {match_compute_info}"
+    # Step 3: Determine final status and message
+    remove_status = remove_result["status"]
+    compute_status = compute_result["status"]
+    removed_count = remove_result.get("data", {}).get("removed_match_isotopes_count", 0)
+    removed = f"all {removed_count}" if full_remove else f"{removed_count} orphaned"
+    remove_summary = f"{removed if removed_count else 'no'} match isotopes removed"
+
+    match (remove_status, compute_status):
+        case ("skipped", "skipped"):
+            # No orphaned matches to remove, no new matches to compute
+            rematch_status = "skipped"
+            message = (
+                f"Sample '{sample.sample_item_name}' rematch skipped: no changes needed"
+            )
+
+        case ("skipped", "success") | ("success", "skipped") | ("success", "success"):
+            # Either operation succeeded, or both succeeded
+            rematch_status = "success"
+            operation_type = "fully" if full_remove else "partially"
+            message = f"Sample '{sample.sample_item_name}' is {operation_type} rematched successfully: {remove_summary}"
+            if compute_status == "success":
+                message += ", new matches computed"
+
+        case ("skipped", "failed") | ("success", "failed"):
+            # Computation failed but removal may have worked
+            rematch_status = "failed"
+            message = f"Sample '{sample.sample_item_name}' rematch failed: {remove_summary}, but match computation failed"
+
+        case _:
+            # Unexpected status combination - fallback to safe handling
+            rematch_status = "failed"
+            message = f"Sample '{sample.sample_item_name}' rematch failed with unexpected error"
+            runtime.logger.error(
+                f"Unexpected rematch_sample status combination: remove={remove_status}, compute={compute_status}"
+            )
+    runtime.logger.info(f"{message}. Operation status: {rematch_status}")
 
     return {
-        "data": sample,
+        "status": rematch_status,
         "message": message,
+        "data": {
+            "removed_match_isotopes_count": removed_count,
+        },
         "_notification_data": {
+            "sample_batch_id": sample.sample_batch_id,
             "sample_item_id": sample_item_id,
         },
     }
@@ -189,10 +176,7 @@ async def rematch_sample(
 )
 async def rematch_samples(
     sample_item_ids: list[str],
-    added_target_compound_ids: list[str] | None = None,
-    added_ionization_mechanism_ids: list[str] | None = None,
-    removed_target_compound_ids: list[str] | None = None,
-    removed_ionization_mechanism_ids: list[str] | None = None,
+    full_remove: bool = False,
     independent_transaction: bool = False,
     sid: str = None,
     process_id=None,
@@ -213,14 +197,8 @@ async def rematch_samples(
 
     :param sample_item_ids: IDs of the sample items for which the rematch is to be performed.
     :type sample_item_ids: list[str]
-    :param added_target_compound_ids: List of target compound IDs for which matches need to be computed, defaults to None
-    :type added_target_compound_ids: list[str] | None, optional
-    :param added_ionization_mechanism_ids: List of ionization mechanism IDs for which matches need to be computed, defaults to None
-    :type added_ionization_mechanism_ids: list[str] | None, optional
-    :param removed_target_compound_ids: List of target compound IDs for which matches are to be removed, defaults to None
-    :type removed_target_compound_ids: list[str] | None, optional
-    :param removed_ionization_mechanism_ids: List of ionization mechanism IDs for which matches are to be removed, defaults to None
-    :type removed_ionization_mechanism_ids: list[str] | None, optional
+    :param full_remove: If True, removes all existing matches before recomputing, defaults to False
+    :type full_remove: bool
     :param independent_transaction: Flag indicating whether the ramtching is an independent transaction, which affects event emission, defaults to False
     :type independent_transaction: bool, optional
     :param sid: Session ID, used for targeting specific clients when emitting events, defaults to None
@@ -237,10 +215,7 @@ async def rematch_samples(
     for sample_item_id in sample_item_ids:
         await rematch_sample(
             sample_item_id=sample_item_id,
-            added_target_compound_ids=added_target_compound_ids,
-            added_ionization_mechanism_ids=added_ionization_mechanism_ids,
-            removed_target_compound_ids=removed_target_compound_ids,
-            removed_ionization_mechanism_ids=removed_ionization_mechanism_ids,
+            full_remove=full_remove,
             independent_transaction=False,
             sid=sid,
             process_id=gen_id(8),
@@ -509,76 +484,91 @@ async def match_compute_samples(
 
 @api_controller_background_task(
     success_notification_rooms=["sid"],
+    success_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
     error_notification_rooms=["sid"],
+    error_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
 )
 async def rematch_batches(
-    rematch_batches_body: RematchBatchesBody,
-    independent_transaction: bool,
-    sid: str,
-    process_id=None,
-    parent_id=None,
+    sample_batch_ids: list[str],
+    full_remove: bool = False,
+    force: bool = False,
+    independent_transaction: bool = False,
+    sid: str | None = None,
+    process_id: str | None = None,
+    parent_id: str | None = None,
 ) -> dict:
     """
-    Performs a rematch operation on multiple sample batches based on the provided for each batch batch-specific
-    removed- or added- parameters in target compounds or ionization mechanisms.
+    Performs rematch operation on multiple sample batches with status tracking.
 
-    This function iterates over each sample batch, creating separate rematch_batch task with
-    removed- or added- parameters in target compounds or ionization mechanisms for each batch.
-    It also aggregates any failures across batches for reporting purposes.
+    Result categorization:
+    - successful_batches: Batches that completed successfully (status: "success")
+    - failed_batches: Batches that encountered critical failures (status: "failed")
+    - partial_batches: Batches with mixed results (status: "partial")
+    - skipped_batches: Batches with no changes needed (status: "skipped")
 
-    Steps:
-    1. Gather initial data for each sample batch, including the number of items per batch and workspace IDs.
-    2. Notify client who triggered rematch_batches that batches processing has started.
-    3. Process each sample batch sequentially, continuing even if individual batches fail.
-    4. Aggregate results including: successful batches, failed samples, and critical errors.
-    5. Return status message along with notification data.
-
-    :param rematch_batches_body: A list of sample batch identifiers along with optional removed/added entities
-    :type rematch_batches_body: RematchBatchesBody
-    :param independent_transaction: Flag to indicate if the operation should be treated as an independent transaction
+    :param sample_batch_ids: A list of sample batch IDs to be rematched.
+    :type sample_batch_ids: list[str]
+    :param full_remove: If True, removes all matches; if False, removes only orphaned matches
+    :type full_remove: bool
+    :param force: If True, bypasses batch status checks and forces rematch regardless of current status
+    :type force: bool
+    :param independent_transaction: Flag for transaction handling
     :type independent_transaction: bool
-    :param sid: Session ID, used for emitting notifications to specific clients
-    :type sid: str
-    :return: A status message indicating the outcome of the batch rematch operation, including any failed match computations for samples.
+    :param sid: Session identifier for client notifications
+    :type sid: str | None
+    :param process_id: Process identifier for progress tracking
+    :type process_id: str | None
+    :param parent_id: Parent process identifier
+    :type parent_id: str | None
+    :raises NotFoundException: When batch not found
+    :raises ApiException: When batch is already processing or rematch fails
+    :return: Rematch results with batch categorization and aggregate statistics
     :rtype: dict
     """
-    # Initialize variables for tracking overall progress
-    total_batches = len(rematch_batches_body.sample_batches)
-    total_number_of_items = 0
-    items_per_batch = []
+    total_batches_count = len(sample_batch_ids)
+    runtime.logger.info(
+        f"Starting {'full' if full_remove else 'partial'} rematch for {total_batches_count} batches"
+    )
+    # Step 1: Collect processing statistics
+    batch_collections = {
+        "success_batches": [],
+        "skipped_batches": [],
+        "partial_batches": [],
+        "failed_batches": [],
+        "locked_batches": [],
+    }
 
-    # Results tracking
-    samples_compute_failed_all = []  # to collect failed samples from all batches
-    rematched_sample_batch_ids = []  # Collect batch IDs that were rematched
-    failed_batches = []  # Track batches that failed to rematch
+    processed_samples = {
+        "removed_match_isotopes_count": 0,
+        "computed_samples_count": 0,
+        "failed_samples_count": 0,
+        "skipped_samples_count": 0,
+        "total_samples_count": 0,
+    }
 
-    # Step 1: Collect total items and individual batch items count
-    for sample_batch in rematch_batches_body.sample_batches:
-        sample_items_info = await get_samples(
-            sample_batch_id=sample_batch.sample_batch_id
-        )
-        total_number_of_items += sample_items_info["results"]
-        items_per_batch.append(sample_items_info["results"])
+    total_samples_count = 0
+    samples_per_batch = []
+    for sample_batch_id in sample_batch_ids:
+        sample_items_info = await get_samples(sample_batch_id=sample_batch_id)
+        batch_samples = sample_items_info["results"]
+        total_samples_count += batch_samples
+        samples_per_batch.append(batch_samples)
 
-    # Calculate batch weights based on the number of items per batch
+    processed_samples["total_samples_count"] = total_samples_count
     batch_weights = [
-        items / total_number_of_items if total_number_of_items else 0
-        for items in items_per_batch
+        samples / total_samples_count if total_samples_count else 0
+        for samples in samples_per_batch
     ]
 
     # Step 2: Process each batch
-    for batch_index, (sample_batch, batch_weight) in enumerate(
-        zip(rematch_batches_body.sample_batches, batch_weights), start=1
+    for batch_index, (sample_batch_id, batch_weight) in enumerate(
+        zip(sample_batch_ids, batch_weights), start=1
     ):
-        sample_batch_id = sample_batch.sample_batch_id
-        added_target_compound_ids = sample_batch.added_target_compound_ids
-        removed_target_compound_ids = sample_batch.removed_target_compound_ids
-
         notification = UserNotification(
             process_id=process_id,
             type="rematch_batches",
             status="pending",
-            message=f"Rematching sample batch {batch_index}/{total_batches}.",
+            message=f"Rematching sample batch {batch_index}/{total_batches_count}.",
             # NOTE: Set the internal metadata for the pending user_notifications like
             # room_ids and sid of the user.
             # Internal metadata will be cleaned up the from data in send_progress_user_notification.
@@ -592,109 +582,118 @@ async def rematch_batches(
         )
         await send_progress_user_notification(notification, 0.2)
 
-        # Create rematching task for the current batch
-        task = asyncio.create_task(
-            rematch_batch(
+        try:
+            runtime.logger.debug(
+                f"Processing batch {batch_index}/{total_batches_count}: {sample_batch_id}"
+            )
+            batch_result = await rematch_batch(
                 sample_batch_id=sample_batch_id,
-                added_target_compound_ids=added_target_compound_ids,
-                removed_target_compound_ids=removed_target_compound_ids,
+                full_remove=full_remove,
+                force=force,
                 independent_transaction=False,
                 sid=sid,
                 process_id=gen_id(8),
                 parent_id=process_id,
             )
-        )
 
-        # Perform the rematch operation for the current batch
-        try:
-            task_result = await task
-            if task_result is None:
-                error_msg = f"There were problems during rematching batch {sample_batch_id}, check the logs above."
-                runtime.logger.warning(error_msg)
-                failed_batches.append({"batch_id": sample_batch_id, "error": error_msg})
-                continue  # Skip to the next batch
-            batch_id = task_result.get("_notification_data", {}).get(
-                "sample_batch_id", None
+            # Aggregate sample metrics
+            batch_data = batch_result.get("data", {})
+            for key in processed_samples:
+                if key != "total_samples_count":  # Skip total as it's pre-calculated
+                    processed_samples[key] += batch_data.get(key, 0)
+
+            # Categorize batch rematch result
+            batch_collections[f"{batch_result["status"]}_batches"].append(
+                sample_batch_id
             )
-            if batch_id:
-                rematched_sample_batch_ids.append(batch_id)
-        except ApiException as e:
-            # If the task fails, log the error and continue with the next batch
-            if e.status_code == 200:  # Warning ApiException with 2-- code
-                # Collect warning-level failured samples and continue processing next batches
-                samples_compute_failed_all.extend(
-                    e.tech_message.get("samples_compute_failed", [])
-                )
-                batch_id = e.tech_message.get("sample_batch_id", None)
-                if batch_id:
-                    rematched_sample_batch_ids.append(batch_id)
-            else:
-                # Log critical error but continue with next batch
-                error_msg = (
-                    f"Critical error in batch {sample_batch_id}: {e.user_message}"
-                )
-                runtime.logger.error(error_msg)
 
-                failed_batches.append(
-                    {"batch_id": sample_batch_id, "error": e.user_message}
-                )
         except Exception as e:
-            # Handle unexpected errors
-            error_msg = (
-                f"Unexpected error during rematching batch {sample_batch_id}: {str(e)}"
+            batch_collections["failed_batches"].append(sample_batch_id)
+            runtime.logger.error(
+                f"Unexpected error rematching batch {sample_batch_id}: {str(e)}"
             )
-            runtime.logger.error(error_msg)
-            failed_batches.append({"batch_id": sample_batch_id, "error": str(e)})
 
         # Update proress user notification
         notification.message = (
-            f"Finished rematching sample batch {batch_index}/{total_batches}."
+            f"Finished rematching sample batch {batch_index}/{total_batches_count}."
         )
         await send_progress_user_notification(notification, 0.8)
 
-    # Step 3: Log summary results
-    if failed_batches:
-        runtime.logger.warning(
-            f"There were problems with rematching {len(failed_batches)} sample batches. "
-            f"Check the logs above and try manually rematching after addressing the issues."
-        )
-
-    if samples_compute_failed_all:
-        runtime.logger.warning(
-            f"Failed to compute matches for {len(samples_compute_failed_all)} samples across {len(rematched_sample_batch_ids)} batches"
-        )
-
-    runtime.logger.info(
-        f"Summary: {len(rematched_sample_batch_ids)}/{total_batches} sample batches successfully rematched"
+    # Calculate summary metrics
+    processed_batches_count = (
+        len(batch_collections["success_batches"])
+        + len(batch_collections["skipped_batches"])
+        + len(batch_collections["partial_batches"])
+    )
+    problematic_batches_count = len(batch_collections["failed_batches"]) + len(
+        batch_collections["locked_batches"]
     )
 
-    # Step 4: Raise appropriate exception based on issues
-    if failed_batches or samples_compute_failed_all:
-        if failed_batches:
-            plural_batch = "es" if total_batches != 1 else ""
-            failed_count = len(failed_batches)
-            user_message = f"Error during rematching {total_batches} sample batch{plural_batch}: {failed_count} batch{plural_batch if failed_count > 1 else ''} failed with critical errors."
-            status_code = 500  # Internal server error for critical issues
-        else:
-            plural_batch = "es" if total_batches != 1 else ""
-            plural_sample = "s" if len(samples_compute_failed_all) != 1 else ""
-            user_message = f"Warning during rematching {total_batches} sample batch{plural_batch}: failed to compute matches for {len(samples_compute_failed_all)} sample{plural_sample}."
-            status_code = 200  # Warning status code
+    message_parts = []
+    for status in ["success", "skipped", "partial", "locked", "failed"]:
+        count = len(batch_collections[f"{status}_batches"])
+        if count > 0:
+            message_parts.append(f"{count} {status}")
 
-        raise ApiException(
-            user_message,
-            {
-                "sample_batch_ids": rematched_sample_batch_ids,
-                "samples_compute_failed": samples_compute_failed_all,
-                "failed_batches": failed_batches,
+    message = f"Rematch of sample batches completed: {processed_batches_count}/{total_batches_count} batches processed ({', '.join(message_parts)})"
+
+    # Add sample processing statistics if operations occurred
+    if (
+        processed_samples["computed_samples_count"] > 0
+        or processed_samples["removed_match_isotopes_count"] > 0
+    ):
+        stats_parts = []
+        if processed_samples["removed_match_isotopes_count"] > 0:
+            stats_parts.append(
+                f"{processed_samples['removed_match_isotopes_count']} match isotopes removed"
+            )
+        if processed_samples["computed_samples_count"] > 0:
+            stats_parts.append(
+                f"{processed_samples['computed_samples_count']} samples computed"
+            )
+        if processed_samples["failed_samples_count"] > 0:
+            stats_parts.append(
+                f"{processed_samples['failed_samples_count']} sample failures"
+            )
+        if processed_samples["skipped_samples_count"] > 0:
+            stats_parts.append(
+                f"{processed_samples['skipped_samples_count']} samples skipped"
+            )
+
+        message += f". Sample rematch processing: {', '.join(stats_parts)}"
+
+    runtime.logger.info(message)
+
+    # Error handling based on results
+    response_data = {
+        "data": {
+            "processed_batches": {
+                "total_batches_count": total_batches_count,
+                "success_batches_count": len(batch_collections["success_batches"]),
+                "skipped_batches_count": len(batch_collections["skipped_batches"]),
+                "partial_batches_count": len(batch_collections["partial_batches"]),
+                "failed_batches_count": len(batch_collections["failed_batches"]),
+                "locked_batches_count": len(batch_collections["locked_batches"]),
+                **batch_collections,
             },
-            status_code,
+            "processed_samples": processed_samples,
+        },
+        "_notification_data": {"affected_sample_batch_ids": sample_batch_ids},
+    }
+    if processed_batches_count == 0:
+        # Only failed/blocked batches - critical error
+        raise ApiException(
+            f"All {total_batches_count} batches failed to process",
+            response_data,
+            500,
         )
+    elif problematic_batches_count > 0:
+        # Mixed results - warning
+        raise_api_warning(message, response_data)
 
-    # Step 5: Return sample batch data and message
     return {
-        "message": f"{total_batches} sample batch{'es' if total_batches != 1 else ''} rematched.",
-        "_notification_data": {"sample_batch_ids": rematched_sample_batch_ids},
+        "message": message,
+        **response_data,
     }
 
 
@@ -706,200 +705,249 @@ async def rematch_batches(
 )
 async def rematch_batch(
     sample_batch_id: str,
-    added_target_compound_ids: list[str] | None = None,
-    added_ionization_mechanism_ids: list[str] | None = None,
-    removed_target_compound_ids: list[str] | None = None,
-    removed_ionization_mechanism_ids: list[str] | None = None,
+    full_remove: bool = False,
+    force: bool = False,
     independent_transaction: bool = False,
-    notification: UserNotification = None,
-    sid: str = None,
-    process_id=None,
-    parent_id=None,
-):
+    sid: str | None = None,
+    process_id: str | None = None,
+    parent_id: str | None = None,
+) -> dict:
     """
-    Performs a rematch of sample batch by removing and/or computing matches based on the specified parameters.
-    This operation can be conducted as part of a larger rematch_batches operation or as an independent transaction.
+    Performs rematch operation on sample batch by removing and recomputing matches.
+    - Sets batch status to processing during operation
+    - Removes orphaned/all matches based on full_remove parameter
+    - Computes missing matches
+    - Updates batch status to ready on success or rematch on failure
 
-    This function handles the rematch process of a sample batch by first removing matches associated with removed
-    target compounds or ionization mechanisms and then adding matches for added compounds or mechanisms.
-    If no parameters are provided, it performs a complete rematch by removing all existing sample matches and recomputing them.
+    Orchestrates the complete rematch workflow:
+    - Sets batch status to processing during operation
+    - Removes existing matches (orphaned or all based on full_remove flag)
+    - Computes missing matches for all batch samples
+    - Determines final status based on both operations
+    - Updates sample batch status appropriately based on outcome
 
-    Steps:
-    1. Notify batch clients that batch processing has started.
-    2. Remove existing matches associated with removed parameters, if specified.
-    3. Compute new matches for added parameters, if specified.
-    4. In the absence of specified parameters for addition or removal, perform a full rematch by removing all matches and recomputing them for all targets of the batch.
-    5. Emit a reload event for the batch users to update the system with the changes, if the operation is flagged as an independent transaction.
-    6. Notify batch clients that  batch rematching has finished, including information about any failures
-    7. If there are any failed samples, return them as part of the function's result to be processed in rematch_batches endpoint
+    Operation status logic:
+    - skipped: No changes made to batch (no orphans to remove, no new matches to compute)
+    - success: Operations completed successfully (match data was modified)
+    - partial: Mixed results (some operations succeeded, some failed)
+    - failed: Critical failures occurred during processing
 
-    :param sample_batch_id: ID of the sample batch for which the rematch is to be performed.
+    :param sample_batch_id: ID of the sample batch for rematching
     :type sample_batch_id: str
-    :param added_target_compound_ids: List of target compound IDs for which matches need to be computed, defaults to None
-    :type added_target_compound_ids: list[str] | None, optional
-    :param added_ionization_mechanism_ids: List of ionization mechanism IDs for which matches need to be computed, defaults to None
-    :type added_ionization_mechanism_ids: list[str] | None, optional
-    :param removed_target_compound_ids: List of target compound IDs for which matches are to be removed, defaults to None
-    :type removed_target_compound_ids: list[str] | None, optional
-    :param removed_ionization_mechanism_ids: List of ionization mechanism IDs for which matches are to be removed, defaults to None
-    :type removed_ionization_mechanism_ids: list[str] | None, optional
-
-    Notes:
-        - If `removed_*` parameters are provided, the function removes matches related to these parameters.
-        - If `added_*` parameters are provided, the function computes new matches related to these parameters.
-        - If no `added_*` or `removed_*` parameters are provided, the function removes all existing matches and computes new matches for all targets.
-
-    :param sample_batch_id: _description_
-    :type sample_batch_id: str
-    :param added_target_compound_ids: _description_, defaults to None
-    :type added_target_compound_ids: list[str] | None, optional
-    :param added_ionization_mechanism_ids: _description_, defaults to None
-    :type added_ionization_mechanism_ids: list[str] | None, optional
-    :param removed_target_compound_ids: _description_, defaults to None
-    :type removed_target_compound_ids: list[str] | None, optional
-    :param removed_ionization_mechanism_ids: _description_, defaults to None
-    :type removed_ionization_mechanism_ids: list[str] | None, optional
-    :param independent_transaction: _description_, defaults to False
-    :type independent_transaction: bool, optional
-    :param notification: _description_, defaults to None
-    :type notification: UserNotification, optional
-    :param sid: _description_, defaults to None
-    :type sid: str, optional
-    :param process_id: _description_, defaults to None
-    :type process_id: _type_, optional
-    :param parent_id: _description_, defaults to None
-    :type parent_id: _type_, optional
-    :raises NotFoundException: _description_
-    :return: _description_
-    :rtype: _type_
+    :param full_remove: If True, removes all matches; if False, removes only orphaned matches
+    :type full_remove: bool
+    :param force: If True, bypasses status checks and forces rematch regardless of current status
+    :type force: bool
+    :param independent_transaction: Flag for transaction handling
+    :type independent_transaction: bool
+    :param sid: Session identifier for client notifications
+    :type sid: str | None
+    :param process_id: Process identifier for progress tracking
+    :type process_id: str | None
+    :param parent_id: Parent process identifier
+    :type parent_id: str | None
+    :raises NotFoundException: When batch not found
+    :raises ApiException: When batch is already processing or rematch fails
+    :return: Batch data with rematch results, status, and aggregated statistics
+    :rtype: dict
     """
-    # Step 1: Retrieve batch data.
-    async with async_session() as session:
-        sample_batch = await session.get(SampleBatch, sample_batch_id)
-        if not sample_batch:
-            raise NotFoundException(
-                f"Sample batch with ID '{sample_batch_id}' not found"
-            )
+    # Step 1: Retrieve and handle current batch status
+    sample_batch = await fetch_sample_batch(sample_batch_id)
+
     sample_batch_name = sample_batch.sample_batch_name
+    batch_status = sample_batch.status
+    operation_type = "Full" if full_remove else "Partial"
     runtime.logger.info(
-        f"...Rematching sample batch '{sample_batch_name}' with ID '{sample_batch_id}' ..."
-    )
-    # Prepare progress user notification.
-    notification = UserNotification(
-        process_id=process_id,
-        parent_id=parent_id,
-        type="rematch_batch",
-        status="pending",
-        message=f"Rematching sample batch '{sample_batch_name}'.",
-        # NOTE: Set the internal metadata for the pending user_notifications like
-        # room_ids and sid of the user.
-        # Internal metadata will be cleaned up the from data in send_progress_user_notification.
-        data={
-            "sample_batch_id": sample_batch_id,
-            "_room_ids": [sample_batch_id],
-            "_sid": sid,
-        },
+        f"{operation_type} rematching for batch '{sample_batch_name}' (current status: {batch_status})"
     )
 
-    await send_progress_user_notification(notification)
-
-    # Step 2: Remove existing matches based on provided removed parameters
-    compute_result = ""
-    if (removed_target_compound_ids and len(removed_target_compound_ids) > 0) or (
-        removed_ionization_mechanism_ids and len(removed_ionization_mechanism_ids) > 0
-    ):
-        await match_remove_batch(
-            sample_batch_id=sample_batch_id,
-            removed_target_compound_ids=removed_target_compound_ids,
-            removed_ionization_mechanism_ids=removed_ionization_mechanism_ids,
-            independent_transaction=False,
-            sid=sid,
-            process_id=gen_id(8),
-            parent_id=process_id,
-        )
-        if not (
-            added_target_compound_ids and len(added_target_compound_ids) > 0
-        ) and not (
-            added_ionization_mechanism_ids and len(added_ionization_mechanism_ids) > 0
-        ):
-            # matches have been removed using `match_remove_batch`=>`remove_matches`, ensuring that no aggregated match data exists.
-            # This allows the use of `aggregate_and_create_matches` without the need for `aggregate_and_recreate_matches`
-            # to aggregate and save match_compounds, match_collections and match_samples
-            await aggregate_and_create_matches(
-                sample_batch_id=sample_batch_id,
-                match_ions=False,
+    # Check batch status unless forced
+    if not force and batch_status != "rematch":
+        async with async_session() as session:
+            skipped_samples_count = len(
+                (
+                    (
+                        await session.execute(
+                            select(Sample).where(
+                                Sample.sample_batch_id == sample_batch_id
+                            )
+                        )
+                    )
+                    .scalars()
+                    .all()
+                )
             )
-
-    # Step 3: Compute new matches based on provided added parameters
-    if (added_target_compound_ids and len(added_target_compound_ids) > 0) or (
-        added_ionization_mechanism_ids and len(added_ionization_mechanism_ids) > 0
-    ):
-        # if added_target_compound_ids or added_ionization_mechanism_ids:
-        if not (
-            removed_target_compound_ids and len(removed_target_compound_ids) > 0
-        ) and not (
-            removed_ionization_mechanism_ids
-            and len(removed_ionization_mechanism_ids) > 0
-        ):
-            # Remove match_collections and match_samples to overwrite the aggregates
-            await remove_matches(
-                sample_batch_id=sample_batch_id,
-                match_isotopes=False,
-                match_ions=False,
+        response_data = {
+            "data": {
+                "removed_match_isotopes_count": 0,
+                "computed_samples_count": 0,
+                "failed_samples_count": 0,
+                "skipped_samples_count": skipped_samples_count,
+            },
+            "_notification_data": {"sample_batch_id": sample_batch_id},
+        }
+        if batch_status == "processing":
+            message = (
+                f"Sample batch '{sample_batch_name}' is currently being processed by other operations - rematch is locked."
+                "Please wait for completion and try again later"
             )
-        compute_result = await match_compute_batch(
+            runtime.logger.warning(message)
+            return {
+                "status": "locked",
+                "message": message,
+                **response_data,
+            }
+        message = f"Sample batch '{sample_batch_name}' status is '{batch_status}' - rematch skipped."
+        runtime.logger.info(
+            f"{message} Use force=True to override the status check and force rematch."
+        )
+        return {
+            "status": "skipped",
+            "message": message,
+            **response_data,
+        }
+
+    await update_sample_batch_status(
+        sample_batch_ids=[sample_batch_id],
+        status="processing",
+        independent_transaction=True,  # reload UI status icons
+    )
+
+    try:
+        # Step 2: Send initial progress notification
+        progress_notification = UserNotification(
+            process_id=process_id,
+            parent_id=parent_id,
+            type="rematch_batch",
+            status="pending",
+            message=f"{operation_type} for batch '{sample_batch_name}'",
+            data={
+                "sample_batch_id": sample_batch_id,
+                "_room_ids": [sample_batch_id],
+                "_sid": sid,
+            },
+        )
+        await send_progress_user_notification(progress_notification)
+
+        # Step 3: Remove existing matches (partially or fully)
+        remove_result = await match_remove_batch(
             sample_batch_id=sample_batch_id,
-            added_target_compound_ids=added_target_compound_ids,
-            added_ionization_mechanism_ids=added_ionization_mechanism_ids,
+            full_remove=full_remove,  # conditionally remove all existing matches
             independent_transaction=False,
             sid=sid,
             process_id=gen_id(8),
             parent_id=process_id,
         )
 
-    # Step 5: Perform a complete rematch if no specific targets are provided
-    if (
-        not (removed_target_compound_ids and len(removed_target_compound_ids) > 0)
-        and not (
-            removed_ionization_mechanism_ids
-            and len(removed_ionization_mechanism_ids) > 0
-        )
-        and not (added_target_compound_ids and len(added_target_compound_ids) > 0)
-        and not (
-            added_ionization_mechanism_ids and len(added_ionization_mechanism_ids) > 0
-        )
-    ):
-        await match_remove_batch(
-            sample_batch_id=sample_batch_id,
-            independent_transaction=False,
-            sid=sid,
-            process_id=gen_id(8),
-            parent_id=process_id,
-        )  # Remove all existing matches
+        # Step 4: Compute new matches
         compute_result = await match_compute_batch(
             sample_batch_id=sample_batch_id,
             independent_transaction=False,
             sid=sid,
             process_id=gen_id(8),
             parent_id=process_id,
-        )  # Compute matches for all targets
+        )
 
-    # Step 6: Perform WAL checkpoint
-    await wal_checkpoint()
+        # Step 5: Determine final status and message
+        remove_status = remove_result["status"]
+        compute_status = compute_result["status"]
+        removed_count = remove_result.get("data", {}).get(
+            "removed_match_isotopes_count", 0
+        )
+        compute_data = compute_result.get("data", {})
+        computed_count = compute_data.get("computed_samples_count", 0)
+        failed_count = compute_data.get("failed_samples_count", 0)
+        skipped_count = compute_data.get("skipped_samples_count", 0)
+        total_samples = compute_data.get("total_samples_count", 0)
 
-    # Step 7: Return sample batch data and message
+        removed = f"all {removed_count}" if full_remove else f"{removed_count} orphaned"
+        remove_summary = f"{removed if removed_count else "no"} match isotopes removed"
+        compute_summary = f"{computed_count}/{total_samples} samples computed missing matches successfully"
+        failed_summary = (
+            f"match computation failed for {failed_count}/{total_samples} samples"
+        )
+        skipped_summary = f"{skipped_count}/{total_samples} samples skipped match computation due to missing calibration or no new target associations"
+        match (remove_status, compute_status):
+            case ("skipped", "skipped"):
+                if total_samples == 0:
+                    rematch_status = "skipped"
+                    result_batch_status = "ready"
+                    message = f"Sample batch '{sample_batch_name}' has no samples - nothing to rematch."
+                else:
+                    # No orphaned matches to remove, no new matches to compute
+                    rematch_status = "skipped"
+                    result_batch_status = "ready"  # nothing to rematch
+                    message = f"Sample batch '{sample_batch_name}' has skipped rematching: {skipped_summary}."
+            case (
+                ("skipped", "success") | ("success", "skipped") | ("success", "success")
+            ):
+                # Either operation succeeded without failures, or both succeeded
+                rematch_status = "success"
+                result_batch_status = "ready"
+                message = f"Sample batch '{sample_batch_name}' rematched successfully: {remove_summary}"
+                if compute_status == "success" and skipped_count == 0:
+                    message += f", {compute_summary}."
+                elif compute_status == "success" and skipped_count > 0:
+                    message += f", {compute_summary}, but {skipped_summary}."
+                else:
+                    message += f"{skipped_summary}."
 
-    # Include match status info in the message if available
-    message = (
-        compute_result.get("message", "")
-        if compute_result
-        else f"Sample batch '{sample_batch_name}' was rematched."
-    )
-    return {
-        "data": sample_batch.to_dict(),
-        "message": message,
-        "_notification_data": {"sample_batch_id": sample_batch_id},
-    }
+            case ("skipped", "partial") | ("success", "partial"):
+                # Computation had mixed results (some succeeded, some failed)
+                rematch_status = "partial"  # some operations failed, may need retry
+                result_batch_status = "rematch"
+                message = f"Sample batch '{sample_batch_name}' partially rematched:  {remove_summary}, {compute_summary}, {failed_summary}."
+
+            case ("skipped", "failed") | ("success", "failed"):
+                # Computation completely failed
+                rematch_status = "failed"
+                result_batch_status = "rematch"  # operation failed, needs retry
+                message = f"Sample batch '{sample_batch_name}' rematch failed: {remove_summary}, but {failed_summary}."
+            case _:
+                # Unexpected status combination - fallback to safe handling
+                rematch_status = "failed"
+                result_batch_status = "rematch"  # operation failed, needs retry
+                message = f"Sample batch '{sample_batch_name}' rematch failed with unexpected error."
+                runtime.logger.error(
+                    f"Unexpected rematch_batch status combination: remove={remove_status}, compute={compute_status}"
+                )
+
+        # Update batch status and WAL checkpoint
+        await update_sample_batch_status(
+            sample_batch_ids=[sample_batch_id],
+            status=result_batch_status,
+            independent_transaction=True,  # reload UI status icons
+        )
+        await wal_checkpoint()
+
+        # Step 6: Log final outcome and return structured response
+        runtime.logger.info(
+            f"{message} rematch status: {rematch_status}, batch status - {result_batch_status}."
+        )
+
+        return {
+            "status": rematch_status,
+            "message": message,
+            "data": {
+                "removed_match_isotopes_count": removed_count,
+                "computed_samples_count": computed_count,
+                "failed_samples_count": failed_count,
+                "skipped_samples_count": skipped_count,
+            },
+            "_notification_data": {"sample_batch_id": sample_batch_id},
+        }
+
+    except ApiException as e:
+        # Step 7: Revert status on failure to allow retry rematching
+        await update_sample_batch_status(
+            sample_batch_ids=[sample_batch_id],
+            status="rematch",
+            independent_transaction=True,  # reload UI status icons
+        )
+        runtime.logger.error(
+            f"Rematch failed for batch '{sample_batch_name}': {e.user_message}"
+        )
+        raise
 
 
 @api_controller_background_task(

@@ -871,8 +871,8 @@ async def import_sample_items(
         runtime.logger.info(other_affected_batches_message)
         notification.message += other_affected_batches_message
 
-    # Step 6: Rematch all imported samples
-    await rematch_samples(
+    # Step 6: Compute matches for all imported samples
+    await match_compute_samples(
         sample_item_ids=created_sample_item_ids,
         independent_transaction=False,
         sid=sid,

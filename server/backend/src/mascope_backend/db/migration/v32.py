@@ -30,7 +30,6 @@ from mascope_backend.db.models import (
 from mascope_backend.api.controllers.match.match_controller import rematch_batches
 from mascope_backend.api.models.match.match_pydantic_model import (
     RematchBatchesBody,
-    RematchBatchBody,
 )
 from mascope_backend.runtime import runtime
 
@@ -160,11 +159,8 @@ async def run():
 
         # 7. Database changes completed. Rematch affected sample batches
         if batch_ids:
-            rematch_batch_bodies = [
-                RematchBatchBody(sample_batch_id=bid) for bid in batch_ids
-            ]
             rematch_batches_body = RematchBatchesBody(
-                sample_batches=rematch_batch_bodies
+                sample_batch_ids=[bid for bid in batch_ids]
             )
             try:
                 await rematch_batches(

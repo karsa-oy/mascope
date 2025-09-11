@@ -40,8 +40,6 @@ from mascope_backend.api.models.target.collections.target_collection_pydantic_mo
     TargetCollectionUpdate,
 )
 from mascope_backend.api.models.match.match_pydantic_model import (
-    RematchBatchesBody,
-)
 
 
 @api_controller()
