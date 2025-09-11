@@ -14,6 +14,8 @@ import time
 import logging
 import traceback
 
+import pandas as pd
+
 from datetime import datetime, timezone
 from logging.handlers import RotatingFileHandler
 from typing import Dict, List
@@ -287,14 +289,19 @@ class DataMonitor:
             self.logger.error(f"Error getting new samples: {e}")
             return []
 
-    def process_sample(self, sample: Dict) -> bool:
-        """Process a single sample with compound matching."""
+    def process_sample(self, sample: Dict) -> tuple[Dict, Dict]:
+        """Process a single sample with compound matching.
+
+        :param sample: The sample to process.
+        :return: A tuple containing the processed sample and the matching results.
+            Results is a dictionary with keys "formula" and values "intensity".
+        """
         sample_id = sample["sample_item_id"]
         sample_name = sample["sample_item_name"]
 
         self.logger.info(f"Processing sample: {sample_name} (ID: {sample_id})")
 
-        results = []
+        results = {}
 
         formulae = self.config["target_compounds"]
         try:
@@ -308,22 +315,25 @@ class DataMonitor:
                 sample_item_id=sample_id,
                 target_compound_formulas=formulae,
                 match_params=self.config["match_params"],
-                service_name="export-agent",
             )
+            if match_data is None:
+                raise RuntimeError(f"Failed to get matches for sample {sample_id}")
+
             if len(match_data) > 0:
                 for compound in match_data:
                     match_ions = compound.get("children", [])
-                    results.extend(
-                        [
-                            {
-                                "formula": match_ion["target_ion_formula"],
-                                "intensity": match_ion["sample_peak_intensity_sum"],
-                            }
-                            for match_ion in match_ions
-                            if match_ion["match_score"]
+                    for match_ion in match_ions:
+                        if (
+                            match_ion["match_score"]
                             >= self.config["match_params"]["match_score_threshold"]
-                        ]
-                    )
+                        ):
+                            results.update(
+                                {
+                                    match_ion["target_ion_formula"]: match_ion[
+                                        "sample_peak_intensity_sum"
+                                    ]
+                                }
+                            )
                 self.logger.info(
                     f"Found matches for {len(results)} ions in sample {sample_name}"
                 )
@@ -335,22 +345,13 @@ class DataMonitor:
                 f"Error in matching sample {sample_id}: {e}\n{traceback.format_exc()}"
             )
 
-        # Save results to file
-        if results:
-            return self.save_results(sample, results)
-        else:
-            self.logger.info(f"No matches found for sample {sample_name}")
-            return True
+        self.logger.info(f"Finished matching for sample {sample_name}")
+        return sample, results
 
-    def save_results(self, sample: Dict, results: List[Dict]) -> bool:
+    def save_results(self, results: list[tuple[dict, list]]) -> bool:
         """Save match results to a single CSV file per day with columns for each compound."""
-        self.logger.debug(
-            f"Saving results for sample {sample['sample_item_id']}: results={results}"
-        )
+        self.logger.debug(f"Saving results for {len(results)} samples")
         try:
-            sample_datetime_utc = sample["datetime_utc"]
-            sample_filename = sample["filename"]
-
             # Create output directory if it doesn't exist
             os.makedirs(self.config["output_directory"], exist_ok=True)
 
@@ -359,94 +360,41 @@ class DataMonitor:
             filename = f"{today}.csv"
             filepath = os.path.join(self.config["output_directory"], filename)
 
-            # Extract formulas and intensities from results
-            formula_intensities = {}
-            for result in results:
-                formula = result.get("formula")
-                intensity = result.get("intensity", "")
-                if formula:
-                    formula_intensities[formula] = intensity
+            # Load or create DataFrame
+            if os.path.isfile(filepath):
+                df = pd.read_csv(filepath)
+            else:
+                df = pd.DataFrame()
 
-            # Check if file already exists
-            file_exists = os.path.isfile(filepath)
-            existing_formulas = set()
+            for sample, result_row in results:
+                # Prepare row data
+                sample_datetime_utc = sample["datetime_utc"]
+                sample_filename = sample["filename"]
+                row_data = {
+                    "datetime_utc": sample_datetime_utc,
+                    "filename": sample_filename,
+                }
+                for formula, intensity in result_row.items():
+                    if formula:
+                        row_data[formula] = intensity
 
-            if file_exists:
-                # Read existing headers to check if we need to update the file structure
-                with open(filepath, "r", encoding="utf-8") as f:
-                    header_line = f.readline().strip()
-                    headers = header_line.split(",")
-                    # Skip datetime and filename columns
-                    existing_formulas = set(headers[2:])
+                # Add missing columns if needed
+                for formula in row_data.keys():
+                    if formula not in df.columns and formula not in [
+                        "datetime_utc",
+                        "filename",
+                    ]:
+                        df[formula] = ""
 
-            # Check if any new formulas exist in the results
-            new_formulas = set(formula_intensities.keys()) - existing_formulas
-
-            # If there are new formulas, we need to create a new file with updated headers
-            if new_formulas and file_exists:
-                self.logger.info(
-                    f"Found new compounds: {new_formulas}. Creating updated CSV file."
-                )
-
-                # Read all existing data
-                with open(filepath, "r", encoding="utf-8") as f:
-                    existing_data = f.readlines()
-
-                # Create a new file with updated headers
-                temp_filepath = f"{filepath}.temp"
-                with open(temp_filepath, "w", encoding="utf-8", newline="") as f:
-                    # Combine existing headers with new formulas
-                    all_formulas = sorted(list(existing_formulas.union(new_formulas)))
-                    new_header = (
-                        "datetime_utc,filename," + ",".join(all_formulas) + "\n"
-                    )
-                    f.write(new_header)
-
-                    # Write existing data with placeholders for new columns
-                    for i, line in enumerate(existing_data):
-                        if i == 0:  # Skip header line
-                            continue
-
-                        parts = line.strip().split(",")
-                        line_datetime = parts[0]
-                        line_filename = parts[1]
-
-                        # Create a dictionary mapping formula to value
-                        # Adjust index to account for datetime and filename columns
-                        line_values = {
-                            headers[j]: parts[j] for j in range(2, len(parts))
-                        }
-
-                        # Create updated line with placeholders for new formulas
-                        new_line = [line_datetime, line_filename]
-                        for formula in all_formulas:
-                            new_line.append(line_values.get(formula, ""))
-
-                        f.write(",".join(new_line) + "\n")
-
-                # Replace the old file with the updated one
-                os.replace(temp_filepath, filepath)
-
-                # Update existing_formulas for the next step
-                existing_formulas = set(all_formulas)
-
-            # Append data to the file
-            with open(
-                filepath, "a" if file_exists else "w", encoding="utf-8", newline=""
-            ) as f:
-                # Write header if creating a new file
-                if not file_exists:
-                    all_formulas = sorted(list(formula_intensities.keys()))
-                    header = "datetime_utc,filename," + ",".join(all_formulas) + "\n"
-                    f.write(header)
-                    existing_formulas = set(all_formulas)
-
-                # Prepare the data row
-                data_row = [sample_datetime_utc, sample_filename]
-                for formula in sorted(list(existing_formulas)):
-                    data_row.append(str(formula_intensities.get(formula, "")))
-
-                f.write(",".join(data_row) + "\n")
+                # Append new row
+                df = pd.concat([df, pd.DataFrame([row_data])], ignore_index=True)
+            # Sort columns
+            df = df[
+                ["datetime_utc", "filename"]
+                + [col for col in df.columns if col not in ["datetime_utc", "filename"]]
+            ]
+            # Save back to CSV
+            df.to_csv(filepath, index=False)
 
             self.logger.info(f"Results saved to: {filepath}")
             return True
@@ -462,22 +410,23 @@ class DataMonitor:
         self.state["last_check_timestamp"] = last_check_timestamp
 
         # Update batch check times
+        for batch_id in checked_batch_ids:
+            self.update_batch_state(last_check_timestamp, batch_id, save=False)
+
+        self.save_state()
+
+    def update_batch_state(
+        self, last_check_timestamp: str, batch_id: str, save: bool = True
+    ) -> None:
+        """Update the state for a specific batch."""
+
         if "last_batch_check_times" not in self.state:
             self.state["last_batch_check_times"] = {}
 
-        for batch_id in checked_batch_ids:
-            self.state["last_batch_check_times"][batch_id] = last_check_timestamp
+        self.state["last_batch_check_times"][batch_id] = last_check_timestamp
 
-        # Clean up old batch check times (keep last 100 to prevent unlimited growth)
-        batch_check_times = self.state["last_batch_check_times"]
-        if len(batch_check_times) > 100:
-            # Sort by timestamp and keep the most recent 100
-            sorted_batches = sorted(
-                batch_check_times.items(), key=lambda x: x[1], reverse=True
-            )
-            self.state["last_batch_check_times"] = dict(sorted_batches[:100])
-
-        self.save_state()
+        if save:
+            self.save_state()
 
     def run_single_check(self):
         """Run a single data check cycle."""
@@ -516,25 +465,32 @@ class DataMonitor:
 
             # Process each new sample in this batch
             batch_successful_count = 0
+            batch_results = []
+            for i, sample in enumerate(new_samples):
+                self.logger.info(
+                    f"Processing sample {i + 1}/{len(new_samples)} in batch {batch_name}"
+                )
+                sample, sample_results = self.process_sample(sample)
+                batch_results.append((sample, sample_results))
+                batch_successful_count += 1
+            # Save results
+            self.save_results(batch_results)
 
-            for sample in new_samples:
-                sample_id = sample.get("sample_item_id")
-
-                if self.process_sample(sample):
-                    batch_successful_count += 1
-                else:
-                    self.logger.error(f"Failed to process sample {sample_id}")
-
+            self.update_batch_state(check_time, batch_id, save=True)
             total_successful_count += batch_successful_count
             checked_batch_ids.append(batch_id)
 
             self.logger.info(
                 f"Batch {batch_name}: processed {batch_successful_count}/{len(new_samples)} samples"
             )
+            if batch_successful_count < len(new_samples):
+                self.logger.warning(
+                    f"Some samples in batch {batch_name} failed to process"
+                )
 
-        # Update state with checked batches
+        # Update global state
         if checked_batch_ids:
-            self.update_state(check_time, checked_batch_ids)
+            self.update_state(check_time, [])
             self.logger.info(
                 f"Total: processed {total_successful_count}/{total_new_samples} samples "
                 f"from {len(modified_batches)} batches"
