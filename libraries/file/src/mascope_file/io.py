@@ -39,7 +39,7 @@ def get_file_data_vars(filepath):
     file_dirs = next(os.walk(filepath))[1]
     zarrs = []
     for var in fnmatch.filter(file_dirs, "*.zarr"):
-        zarrs.append(var.strip(".zarr"))
+        zarrs.append(var.removesuffix(".zarr"))
     return zarrs
 
 
@@ -144,7 +144,7 @@ def load_file(base_filename, vars=None, prev_dataset=None):
     if vars is None:
         # Get all saved variable names
         zarrs = get_file_data_vars(filepath)
-        vars = [zarr.strip(".zarr") for zarr in zarrs]
+        vars = [zarr.removesuffix(".zarr") for zarr in zarrs]
     if "signal" in vars:
         runtime.logger.error(
             "Loading signal with load_file is depricated. Use load_signal instead."
