@@ -1,4 +1,5 @@
 # pylint: disable=line-too-long
+# pylint: disable=not-callable
 """
 Match Controller
 
@@ -6,7 +7,7 @@ This module contains all the functionalities and endpoints related to
 the matching/rematching processes and related operations.
 """
 
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, func
 from mascope_backend.db import async_session
 from mascope_backend.db.id import gen_id
 from mascope_backend.db.wal.engine import wal_checkpoint
@@ -714,17 +715,10 @@ async def rematch_batch(
 ) -> dict:
     """
     Performs rematch operation on sample batch by removing and recomputing matches.
-    - Sets batch status to processing during operation
+    - Sets batch status to processing during operation, which locks concurrent rematching
     - Removes orphaned/all matches based on full_remove parameter
     - Computes missing matches
     - Updates batch status to ready on success or rematch on failure
-
-    Orchestrates the complete rematch workflow:
-    - Sets batch status to processing during operation
-    - Removes existing matches (orphaned or all based on full_remove flag)
-    - Computes missing matches for all batch samples
-    - Determines final status based on both operations
-    - Updates sample batch status appropriately based on outcome
 
     Operation status logic:
     - skipped: No changes made to batch (no orphans to remove, no new matches to compute)
@@ -761,21 +755,11 @@ async def rematch_batch(
         f"{operation_type} rematching for batch '{sample_batch_name}' (current status: {batch_status})"
     )
 
-    # Check batch status unless forced
-    if not force and batch_status != "rematch":
+    # Check batch status - processing is never bypassable
+    if not force and batch_status != "rematch" or batch_status == "processing":
         async with async_session() as session:
-            skipped_samples_count = len(
-                (
-                    (
-                        await session.execute(
-                            select(Sample).where(
-                                Sample.sample_batch_id == sample_batch_id
-                            )
-                        )
-                    )
-                    .scalars()
-                    .all()
-                )
+            skipped_samples_count = await session.scalar(
+                select(func.count()).where(Sample.sample_batch_id == sample_batch_id)
             )
         response_data = {
             "data": {
@@ -786,26 +770,23 @@ async def rematch_batch(
             },
             "_notification_data": {"sample_batch_id": sample_batch_id},
         }
+
         if batch_status == "processing":
-            message = (
-                f"Sample batch '{sample_batch_name}' is currently being processed by other operations - rematch is locked."
-                "Please wait for completion and try again later"
+            status, message = (
+                "locked",
+                f"Sample batch '{sample_batch_name}' is currently being processed - rematch is locked.",
             )
             runtime.logger.warning(message)
-            return {
-                "status": "locked",
-                "message": message,
-                **response_data,
-            }
-        message = f"Sample batch '{sample_batch_name}' status is '{batch_status}' - rematch skipped."
-        runtime.logger.info(
-            f"{message} Use force=True to override the status check and force rematch."
-        )
-        return {
-            "status": "skipped",
-            "message": message,
-            **response_data,
-        }
+        else:  # ready status without force
+            status, message = (
+                "skipped",
+                f"Sample batch '{sample_batch_name}' status is '{batch_status}' - rematch skipped.",
+            )
+            runtime.logger.info(
+                f"{message} Use force=True to override the status check."
+            )
+
+        return {"status": status, "message": message, **response_data}
 
     await update_sample_batch_status(
         sample_batch_ids=[sample_batch_id],

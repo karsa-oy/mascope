@@ -1,6 +1,8 @@
+# pylint: disable=line-too-long
 from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from fastapi.params import Query
 from mascope_backend.db.id import gen_id
+from mascope_backend.api.lib.exceptions.api_exceptions import ApiException
 from mascope_backend.api.new.auth.dependencies import editor_user, admin_user
 from mascope_backend.api.lib.api_features import api_route
 
@@ -83,12 +85,27 @@ async def rematch_batch_route(
     Rematch a specific sample batch by removing orphaned/all matches and recomputing them
     for all samples in the batch
 
-    - Performs partial rematching by removing only orphaned matches.
-    Use full_remove=true for complete reset and rematch.
-    - Rematches only batch with status "rematch", use force=true to bypass status checks and forces rematch regardless of current status
+    - Processing batches cannot be rematched
+    - Ready batches require force=true to rematch
     """
     # Verify the existance of sample batch
     sample_batch = await fetch_sample_batch(sample_batch_id)
+
+    # Early status check - processing is never bypassable
+    msg = f"Sample batch '{sample_batch.sample_batch_name}' is "
+    notification_data = {"sample_batch_id": sample_batch_id}
+    match sample_batch.status:
+        case "processing":
+            msg += (
+                "currently processing. Please wait for completion and try again later."
+            )
+            raise ApiException(msg, notification_data, 409)
+        case "ready" if not force:
+            msg += "already matched - please use 'rematch' option if you want to recompute matches"
+            raise ApiException(msg, notification_data, 409)
+        case _:
+            # "rematch" status or force=True with "ready" - proceed
+            pass
 
     # Get data for notifications
     sid = request.headers.get("X-SID")
