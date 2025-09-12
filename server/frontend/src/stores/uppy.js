@@ -52,16 +52,15 @@ export const useUppy = defineStore('app.uppy', () => {
     // settings
     retryDelays: [0, 3000, 5000, 10000, 20000],
     chunkSize: 1e8, // 100MB
-    // auth
-    headers: {
-      'X-SID': api.socket.id
-    },
     withCredentials: true,
     removeFingerprintOnSuccess: true,
     onShouldRetry: (err, retryAttempt, options) => {
       console.log('Error', err)
       console.log('Request', err.originalRequest)
       console.log('Response', err.originalResponse)
+    },
+    onBeforeRequest: (req) => {
+      req.setHeader('X-SID', api.socket.id)
     }
   })
   // Register event handlers to track upload progress
