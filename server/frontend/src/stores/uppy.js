@@ -70,6 +70,7 @@ export const useUppy = defineStore('app.uppy', () => {
     process_id = genId(8)
   })
   uppy.on('progress', (progress) => {
+    if (progress === 100) return
     ui.notification.push({
       type: 'sample_file_upload',
       process_id,
