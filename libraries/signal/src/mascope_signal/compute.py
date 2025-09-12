@@ -16,19 +16,6 @@ import mascope_tofwerk.tofwerk as m_tofwerk
 from mascope_signal.runtime import runtime
 
 
-def _get_sum_signal_hash_name(t_min, t_max, polarity):
-    """Generate a unique hash name for sum signal based on parameters"""
-    is_full_sum_signal = t_min is None and t_max is None and polarity is None
-    if is_full_sum_signal:
-        cached_name = "sum_signal"
-    else:
-        key_str = json.dumps([t_min, t_max, polarity])
-        hash_addition = hashlib.sha1(key_str.encode()).hexdigest()[:12]
-        cached_name = f"sum_signal_{hash_addition}"
-
-    return cached_name
-
-
 def get_scan_timestamps(
     base_filename: str,
     t_min: float | None = None,
@@ -178,6 +165,13 @@ def get_sum_signal(
             )
             averaging_factor = time_data_points
 
+    if cached_name != "sum_signal":
+        # Check if calibration factor is available in the sample file properties
+        props = m_io.read_props(base_filename)
+        calibration = props["mz_calibration"]
+        factor = calibration.get("calibration_factor", 1.0) if calibration else 1.0
+        sum_signal = sum_signal.assign_coords(mz=sum_signal.mz.values * factor)
+
     # Save the computed sum signal to the sample file for future use
     filename_sum_signal = m_name.filename_to_zarr_path(base_filename, cached_name)
     runtime.logger.warning(f"Saving computed sum signal to {filename_sum_signal}")
@@ -195,6 +189,19 @@ def get_sum_signal(
         return sum_signal / averaging_factor
 
     return sum_signal
+
+
+def _get_sum_signal_hash_name(t_min, t_max, polarity):
+    """Generate a unique hash name for sum signal based on parameters"""
+    is_full_sum_signal = t_min is None and t_max is None and polarity is None
+    if is_full_sum_signal:
+        cached_name = "sum_signal"
+    else:
+        key_str = json.dumps([t_min, t_max, polarity])
+        hash_addition = hashlib.sha1(key_str.encode()).hexdigest()[:12]
+        cached_name = f"sum_signal_{hash_addition}"
+
+    return cached_name
 
 
 def _get_cached_sum_signal(base_filename, cached_name, average):
@@ -247,22 +254,30 @@ def load_signal(
         match sample_type:
             case "orbi_raw":
                 datafile_path = os.path.join(sample_path, "data.raw")
-                return m_thermo.get_signal(
+                signal = m_thermo.get_signal(
                     datafile_path, t_min, t_max, mz_min, mz_max, polarity
                 )
+                # Handle m/z axis calibration
+                props = m_io.read_props(base_filename)
+                calibration = props["mz_calibration"]
+                factor = (
+                    calibration.get("calibration_factor", 1.0) if calibration else 1.0
+                )
+                if factor != 1.0:
+                    signal = signal.assign_coords(mz=signal.mz.values * factor)
+                return signal
             case "tof_h5":
                 datafile_path = os.path.join(sample_path, "data.h5")
-                signal = m_tofwerk.get_signal(
-                    datafile_path, t_min, t_max, mz_min, mz_max
-                )
-                # Check if m/z axis calibration was applied to sample file
-                # by comparing m/z in sum signal and in h5 file
+                signal = m_tofwerk.get_signal(datafile_path, t_min, t_max)
+
+                # Handle m/z axis calibration, sum_signal m/z values are calibrated
                 sum_signal_mz = get_sum_signal(base_filename).mz.values
-                if np.array_equal(signal.mz.values, sum_signal_mz):
-                    # m/z axis match, no calibration was previously applied
-                    return signal
-                # M/z in sum signal and in h5 file do not match, replace m/z in signal
-                return signal.assign_coords(mz=sum_signal_mz)
+                mzs_are_equal = np.array_equal(signal.mz.values, sum_signal_mz)
+                if not mzs_are_equal:
+                    signal = signal.assign_coords(mz=sum_signal_mz)
+
+                signal = signal.sel(mz=slice(mz_min, mz_max))
+                return signal
             case "tof_zarr" | "orbi_zarr":
                 signal_ds = m_io.load_array(base_filename, "signal")
                 signal_ds = signal_ds.chunk(dict(mz=-1, time=-1))
