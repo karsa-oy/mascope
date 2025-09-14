@@ -708,17 +708,25 @@ The frontend folder structure is as follows:
 ```
 public/       static files
 scripts/      utility scripts
-  build/        legacy build script
   palette.js    generates the Karsa palette
 src/          source code
   api/          api client code
   lib/          shared library
-  routes/        pages and navigation
-  stores/        global app state
-  ...         global vue app configs
+    base/         shared components
+    charts/       plotly charts (with own stores)
+    dialogs/      interactive modals
+    help/         help system components
+    panes/        larger panels and tabs
+    toolbars/     various menu bars
+  routes/         pages and navigation
+  stores/         global app state
+    data/         data stores w/ mutating APIs
+    ui/           ui stores w/ read-only APIs
+  ...           global vue app configs
 tests/        playwright tests
   fixtures/     reusable test patterns
   ...
+.vscode/      VS Code workspace settings
 index.html    static template w/ font imports
 package.json  npm package w/ dependencies
 ...           other tooling configs
@@ -930,143 +938,146 @@ app.ui.darkmode.active;
 app.ui.split.left;
 ```
 
-#### Standard data modules
+#### Frontend Store Data Library
 
-The so-called _standard data module_ abstraction can be found in `src/stores/data/lib/module.js`. It is used to implement several key data modules, including `workspace`, `batch`, `sample`, `target` and `mechanism`.
+Our frontend data layer is built around composable functions that provide reactive data loading, selection management, and analytics querying. The core composables are located in `src/stores/data/lib/` and can be composed together in Pinia stores to create sophisticated data modules.
 
-The core idea of these modules is to define a _hierarchical data loading and selection model_. Modules are linked via parent-child relations, and selecting a parent will load the appropriate child data. For example, the `workspace` module is the parent of the `batch` store; if you select a different workspace, the batch data of that workspace needs to be loaded, while the old data needs to be unloaded.
+**_Core Composables_**
 
-**_Using data modules_**
+The data library provides two main composables:
 
-As an example of the most common API options, lets use the `batch` module as an example for the rest of this section; the other modules share the same API, so you can use the same methods.
+- **`useData`**: Handles reactive data loading with parent-child relationships, selection management, caching, and automatic reloading
+- **`useFilter`**: Provides cross-dimensional filtering for analytics queries
 
-A key concept in our data modules is `focus`. This is an API is designed for _single selection_: there is always at most 1 row focused. The API offers a two-way `v-model` binding to enable you to easily sync component and store state:
+A third composable, `useSelection`, exists internally to handle selection state but is not intended for standalone use.
 
-```html
-<select
-  v-model="app.data.batch.focused"
-  :options="app.data.batch.list"
-  dataKey="sample_batch_id"
-  optionLabel="sample_batch_name"
-/>
+**_Using useData_**
 
-<span>{{app.data.batch.focused.sample_batch_name}}</span>
-<span v-if="app.data.batch.focused">
-  <!-- we also offer a `focusedId` helper: -->
-  {{app.data.batch.focused.sample_batch_id == app.data.batch.focusedId }}
-  <!-- i.e. this is always true if something is focused -->
-</span>
-```
-
-You can also impertively apply, remove and check focus by calling the `focus`, `unfocus` and `active` methods:
+The `useData` composable creates reactive data collections with hierarchical loading:
 
 ```js
-app.data.batch.focus(someBatch); // often you would focus using a batch record
-app.data.batch.isFocused(someBatch); // true
-app.data.batch.focus({ sample_batch_id }); // but only the id is actually needed
-app.data.batch.unfocus(); // unfocusing requires no arguments
-```
+import { useData } from '@/stores/data/lib'
 
-The implementation has a currently unutilized feature to enable multiselection. This was implemented for future use. Since it shouldn't really be used at the moment, it will not be documented yet.
-
-**_Data module operatons_**
-
-In addition to selection, the data modules expose API methods as a convenience. These are _not_ standardized, although most modules include common operations like `create`, `update` and `delete`.
-
-> [!CAUTION]
-> While calling API operations like create or delete will automatically update the frontend state, the operations do _not_ await this synchronization. In other words, awaiting `app.data.batch.create` doesn't guarantee the presence of a new record in `app.data.batch.list`. You must use Vue watchers to "await" the updated data and perform actions with it.
-
-**_Implementing data modules_**
-
-For creating new data modules, you import the `defineModule` constructor and create a new store hook, similar to how Pinia stores are normally made. A variety of options are available to configure the module:
-
-```js
-import { defineModule } from "./lib/module";
-import { useWorkspace } from "./workspace";
-import { api } from "@/api";
-import { useMzFit } from "@/lib/mzFit";
-
-export const useBatch = defineModule({
-  // Name maps to `app.data.batch` store      [required]
-  name: "batch",
-  // Unique row id enables data replacement   [required]
-  key: "sample_batch_id",
-  load: {
-    // Load function fetching the data
-    // from the backend. If the module
-    // has a parent, the arg is its key;
-    // otherwise no arg is provided. The
-    // function should return the data.         [required]
-    method: ({ workspace_id }) =>
-      api.http.get(`/sample/batches`, {
-        params: { workspace_id },
-        use: "read",
-        type: "load_batches",
-      }),
-    // Define the parent by passing its hook
-    parent: useWorkspace,
-  // Define events that trigger reload
-  // other then parent selection change
-    events: ["sample_batch_reload"],
+const data = useData(
+  'batch', // name
+  ({ workspace_id }) => api.http.get(`/sample/batches`, { params: { workspace_id } }), // method
+  {
+    deps: () => ({ workspace_id: useWorkspace().focusedId }), // dependencies
+    parent: useWorkspace, // parent store
+    events: ['sample_batch_reload'], // socket events
+    selection: true // enable selection
   }
-  // Subscribe to socket io rooms by key
-  // in this case, selecting a row will
-  // create a sub for its sample_batch_id
-  subscribe: true,
-  // We can also (optionally) define
-  // standard CRUD operations
-  read: (sample_batch_id) =>
-    api.http.get(`/sample/batches/${sample_batch_id}`, {
-      use: "read",
-      type: "read_batch",
-    }),
-  create: (batch) =>
-    api.http.post(`/sample/batches/`, batch, {
-      use: "create",
-      type: "create_batch",
-    }),
-  update: (batch) =>
-    api.http.patch(`/sample/batches/${batch.sample_batch_id}`, batch, {
-      use: "update",
-      type: "update_batch",
-    }),
-  delete: ({ sample_batch_id }) =>
-    api.http.delete(`/sample/batches/${sample_batch_id}`, {
-      use: "process",
-      type: "delete_batch",
-    }),
-  // And we can even define arbitrary custom
-  // operations, which are passed through to
-  // the store unchanged, e.g:
-  importSamples: async ({ batch, sample_items }) => {
-    const mzFit = useMzFit();
-    return await api.http.post(
-      `/sample/batches/${batch.sample_batch_id}/import`,
-      {
-        sample_items,
-        mz_calibration_params: mzFit.mzCalibrationParams,
-      },
-      {
-        use: "process",
-        type: "import_samples",
-      }
-    );
-  },
-  // etc.
-});
+)
 ```
 
-Two additional options are available but not listed:
+The composable returns:
+- `list`: Reactive array of records
+- `pending`: Loading state
+- `filtered`: Filtered records based on selection
+- `hash`: Unique identifier for cache invalidation
 
-- `unfocusBefore` allows you define an array of operations before which the module should be unfocused; for example, the `sample` module is unfocused before the `delete` operation to prevent certain bugs.
-- `multiselect` allows enabling multiselection in the module, e.g. as with `sample` module
+When selection is enabled, additional properties are returned for selection management:
 
-When implementing new modules, we need to remember to the add the hook into the `useData` hook in `stores/data/index.js`. This will then include it under the
-`app.data` namespace in the `useApp` hook.
+**Selection Options:**
 
-**_Semistandard: the Match modules_**
+Selection can be enabled by passing a `selection` option to `useData`:
 
-The match collection, compound, ion and isotope modules are implemented in a _semistandard_ way. They leverage the `defineModule` abstraction, but do so in a slightly hacky way. This was deemed the lesser of all evils. For more information, read the comments in the file: `frontend/stores/data/match.js`.
+```js
+const data = useData('sample', method, {
+  selection: {
+    mode: 'multiple', // 'single', 'binary', or 'multiple'  
+    persist: true, // localStorage persistence
+    subscribe: ({ sample_file_id }) => sample_file_id // socket room subscription
+  }
+})
+```
+
+Selection modes:
+- `single`: Always maintains exactly one focused item
+- `binary`: 0 or 1 focused item (default when `selection: true`)
+- `multiple`: Multi-selection with focus on primary item
+
+**Selection API:**
+
+When selection is enabled, the following properties and methods are available:
+
+```js
+// Focus API (single selection)
+data.focus(record)
+data.unfocus()
+data.focused // current focused record
+data.focusedId // focused record's ID
+
+// Selection API (multi-selection)  
+data.select(record1, record2)
+data.unselect(record)
+data.selected // array of selected records
+data.selectedIds // array of selected IDs
+```
+
+**_Using useFilter for Analytics_**
+
+Analytics queries use the filter store to perform cross-dimensional filtering:
+
+```js
+import { useFilter } from '@/stores/data'
+
+const data = useData(
+  'sample',
+  (params) => api.http.post(`/analytics/sample`, params), // analytics endpoint
+  {
+    deps: () => ({
+      sample_batch_id: useBatch().focusedId,
+      ...useFilter().get('sample') // cross-dimensional filters
+    })
+  }
+)
+```
+
+The `useFilter().get(dimension)` method returns filter parameters for all other dimensions, enabling complex multi-dimensional queries while maintaining reactive updates when filters change.
+
+**_Implementing Data Stores_**
+
+A typical data store combines these composables:
+
+```js
+import { defineStore } from 'pinia'
+import { useData } from '@/stores/data/lib'
+import { useFilter } from '@/stores/data'
+
+export const useSample = defineStore('app.data.sample', () => {
+  const data = useData(
+    'sample',
+    (params) => api.http.post(`/analytics/sample`, params, {
+      use: 'read',
+      type: 'load_samples'
+    }),
+    {
+      deps: () => ({
+        sample_batch_id: useBatch().focusedId,
+        ...useFilter().get('sample')
+      }),
+      parent: useBatch,
+      selection: {
+        mode: 'multiple',
+        subscribe: ({ sample_file_id }) => sample_file_id
+      },
+      key: 'sample_item_id'
+    }
+  )
+
+  return {
+    ...data,
+    // Custom operations
+    create: (sample) => api.http.post(`/sample/items`, sample, {
+      use: 'create',
+      type: 'create_sample'
+    })
+  }
+})
+```
+
+This pattern provides automatic data loading, selection management, analytics filtering, and socket subscriptions while maintaining clean separation of concerns.
 
 ### Frontend User Help
 
