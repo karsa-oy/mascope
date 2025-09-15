@@ -14,6 +14,7 @@ import mascope_file.io as m_io
 import mascope_signal.compute as m_compute
 
 from mascope_match import compute_match_isotopes
+from mascope_match.params import TofMatchParams, OrbiMatchParams
 from mascope_backend.api.lib.api_features import (
     api_controller,
 )
@@ -26,7 +27,6 @@ from mascope_backend.api.controllers.target.isotopes.target_isotopes_controller 
 from mascope_backend.api.controllers.target.associations.target_compound_in_target_collection_controller import (
     get_target_compound_in_target_collection,
 )
-from mascope_match.params import TofMatchParams, OrbiMatchParams
 from mascope_backend.socket.notifications import (
     send_progress_user_notification,
 )

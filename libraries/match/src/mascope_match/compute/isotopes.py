@@ -10,7 +10,7 @@ from mascope_signal.peak import get_peak_detector
 from mascope_chem.mz import match_mz
 from mascope_match.runtime import runtime
 
-from mascope_match.params import unmatched_isotope_params
+from mascope_match.params import unmatched_isotope_params, BaseMatchParams
 from mascope_match.id import generate_id
 
 

@@ -42,6 +42,10 @@ export const useSampleContextMenu = defineStore('browser.sample.sampleCtxMenu', 
 
   // actions
   async function onClick(event) {
+    // Don't open context menu if currently focused batch is processing
+    if (app.data.batch.focused?.status === 'processing') {
+      return
+    }
     await clipboard.read()
     row.value = event?.data ?? null
     if (!row.value) {
