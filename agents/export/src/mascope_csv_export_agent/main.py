@@ -322,17 +322,13 @@ class DataMonitor:
                 for compound in match_data:
                     match_ions = compound.get("children", [])
                     for match_ion in match_ions:
-                        if (
-                            match_ion["match_score"]
+                        intensity = (
+                            match_ion["sample_peak_intensity_sum"]
+                            if match_ion["match_score"]
                             >= self.config["match_params"]["match_score_threshold"]
-                        ):
-                            results.update(
-                                {
-                                    match_ion["target_ion_formula"]: match_ion[
-                                        "sample_peak_intensity_sum"
-                                    ]
-                                }
-                            )
+                            else 0.0
+                        )
+                        results.update({match_ion["target_ion_formula"]: intensity})
                 self.logger.info(
                     f"Found matches for {len(results)} ions in sample {sample_name}"
                 )
