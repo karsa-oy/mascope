@@ -201,7 +201,7 @@ export const useBatchContextMenu = defineStore('browser.sample.batchCtxMenu', ()
           visible: row.value !== null
         },
         {
-          label: `Refresh`,
+          label: `Refresh matches`,
           icon: 'pi ph ph-arrow-counter-clockwise',
           command: () => app.data.batch.rematch(row.value),
           visible: row.value !== null

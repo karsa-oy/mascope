@@ -224,7 +224,7 @@ export const useSampleContextMenu = defineStore('browser.sample.sampleCtxMenu', 
             visible: !multiselecting
           },
           {
-            label: `Refresh`,
+            label: `Refresh matches`,
             icon: 'pi ph ph-arrow-counter-clockwise',
             command: async () => {
               await app.data.sample.rematch(row.value)

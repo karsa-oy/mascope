@@ -5,20 +5,19 @@ export const useBatchStatus = defineStore('browser.sample.batchStatus', () => {
     rematch: {
       type: 'button',
       icon: 'ph ph-arrows-clockwise',
-      tooltip:
-        'Sample batch has been modified, matches may be out of date. Click to refresh this batch matches',
+      tooltip: 'Batch has been modified, matches may be out of date. Click to refresh matches',
       severity: 'secondary'
     },
     ready: {
       type: 'button',
       icon: 'ph ph-check-circle',
-      tooltip: 'Sample batch matches are up to date',
+      tooltip: 'Batch is up to date',
       severity: 'primary',
       disabled: true
     },
     processing: {
       type: 'spinner',
-      tooltip: 'Sample batch is processing, computing matches'
+      tooltip: 'Computing matches for the batch'
     }
   }
 

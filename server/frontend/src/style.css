@@ -41,8 +41,12 @@
     opacity: 0.75;
   }
 
-  .p-contextmenu-item-link>.pi {
+  .p-contextmenu-item-link > .pi {
     margin-right: 0.3rem;
+  }
+
+  .p-contextmenu-item-content {
+    min-width: 150px;
   }
 
   .hiddenlabel .p-button-label,
@@ -97,7 +101,7 @@
     margin: 0;
   }
 
-  .p-dialog menu>* {
+  .p-dialog menu > * {
     margin: 0;
   }
 
@@ -147,7 +151,7 @@
     font-size: small;
   }
 
-  .browser .p-datatable-row-expansion>td {
+  .browser .p-datatable-row-expansion > td {
     padding: 0 !important;
     padding-left: 1.5rem !important;
   }
@@ -181,7 +185,6 @@
       }
     }
   }
-
 
   .browser .spinner .p-progressspinner::before {
     height: 15px;
@@ -241,11 +244,11 @@
     }
   }
 
-  .field> :deep(span) {
+  .field > :deep(span) {
     margin: 1rem 0 0.5rem 0;
   }
 
-  .field>small {
+  .field > small {
     margin-left: 0.3rem;
     max-width: 190px;
   }
@@ -264,7 +267,6 @@
     display: none !important;
   }
 }
-
 
 /* Customize Uppy Dashboard */
 .uppy-Dashboard {

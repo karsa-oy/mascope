@@ -53,7 +53,7 @@ defineProps({
       <div class="label">
         <Button
           v-if="clear"
-          v-tooltip.right="'Back to sample batches'"
+          v-tooltip.right="'Back to workspace'"
           icon="pi ph ph-caret-left"
           @click="clear()"
           text
