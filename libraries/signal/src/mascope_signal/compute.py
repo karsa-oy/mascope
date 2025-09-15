@@ -169,8 +169,16 @@ def get_sum_signal(
         # Check if calibration factor is available in the sample file properties
         props = m_io.read_props(base_filename)
         calibration = props["mz_calibration"]
-        factor = calibration.get("calibration_factor", 1.0) if calibration else 1.0
-        sum_signal = sum_signal.assign_coords(mz=sum_signal.mz.values * factor)
+        match sample_type:
+            case "orbi_raw" | "orbi_zarr":
+                factor = (
+                    calibration.get("calibration_factor", 1.0) if calibration else 1.0
+                )
+                sum_signal = sum_signal.assign_coords(mz=sum_signal.mz.values * factor)
+            case "tof_h5" | "tof_zarr":
+                if calibration:
+                    full_sum_signal = get_sum_signal(base_filename)
+                    sum_signal = sum_signal.assign_coords(mz=full_sum_signal.mz.values)
 
     # Save the computed sum signal to the sample file for future use
     filename_sum_signal = m_name.filename_to_zarr_path(base_filename, cached_name)
