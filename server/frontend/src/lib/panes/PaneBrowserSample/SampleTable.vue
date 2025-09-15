@@ -15,7 +15,7 @@ import { useApp } from '@/stores'
 
 import SampleTableCustomizer from './SampleTableCustomizer.vue'
 import SampleContextMenu from './SampleContextMenu.vue'
-import { useSampleContextMenu, useCustomizerPopover } from './stores'
+import { useSampleContextMenu, useCustomizerPopover, useBatchStatus } from './stores'
 
 const confirm = useConfirm()
 const app = useApp()
@@ -33,8 +33,10 @@ const samples = computed(
 const batchStatus = computed(() => {
   if (!batch.value) return null
 
+  const batchStatusStore = useBatchStatus()
   return {
     status: batch.value.status,
+    config: batchStatusStore.config,
     onRematch: () => app.data.batch.rematch({ sample_batch_id: batch.value.sample_batch_id })
   }
 })
@@ -81,7 +83,7 @@ const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top)
     :clear="app.data.batch.unfocus"
     :contextMenu="contextMenu"
     :loading="app.data.sample.loading"
-    :batchStatus="batchStatus"
+    :status="batchStatus"
     :pt="
       app.ui.help.right(`
         <h1>Sample Browser</h1>

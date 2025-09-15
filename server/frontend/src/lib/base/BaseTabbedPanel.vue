@@ -3,6 +3,8 @@ import Panel from 'primevue/panel'
 import Button from 'primevue/button'
 import ProgressSpinner from 'primevue/progressspinner'
 
+import { BaseStatusIcon } from '@/lib/base'
+
 defineProps({
   label: {
     type: String,
@@ -29,7 +31,7 @@ defineProps({
     type: Object,
     required: false
   },
-  batchStatus: {
+  status: {
     type: Object,
     required: false
   }
@@ -60,43 +62,12 @@ defineProps({
           class="back-button"
         />
         <span :class="icon" />{{ label }}
-        <!-- Batch status icon -->
-        <div v-if="batchStatus" class="status-button">
-          <Button
-            v-if="batchStatus.status === 'rematch'"
-            v-tooltip.right="
-              'Sample batch has been modified, matches may be out of date. Click to refresh this batch matches'
-            "
-            icon="ph ph-arrows-clockwise"
-            text
-            severity="secondary"
-            size="large"
-            class="status-button"
-            @click="batchStatus.onRematch()"
-          />
-          <Button
-            v-else-if="batchStatus.status === 'ready'"
-            v-tooltip.right="'Sample batch matches are up to date'"
-            icon="ph ph-check-circle"
-            text
-            size="large"
-            class="status-button"
-            disabled
-          />
-          <div
-            v-else-if="batchStatus.status === 'processing'"
-            v-tooltip.right="'Sample batch is processing, computing matches'"
-            style="
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              width: 28px;
-              height: 28px;
-            "
-          >
-            <ProgressSpinner style="width: 16px; height: 16px" strokeWidth="3" />
-          </div>
-        </div>
+        <BaseStatusIcon
+          v-if="status"
+          :status="status.status"
+          :config="status.config"
+          :onAction="status.onRematch"
+        />
       </div>
     </template>
     <template #icons>
