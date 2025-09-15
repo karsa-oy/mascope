@@ -307,33 +307,7 @@ export const defineModule = ({
       }
 
       // refocus
-      let newFocused = refocus(oldFocusedId)
-      // Reload the focused record with latest server data+
-      if (newFocused && read) {
-        try {
-          debug(`⚠️ reloading focused record ${newFocused[key]} from api`)
-
-          const freshRecord = await read(newFocused[key])
-
-          // Update the record in the list with fresh data
-          const index = records.value.findIndex((r) => r[key] === newFocused[key])
-          if (index >= 0) {
-            records.value[index] = freshRecord
-            debug(`updated record in list at index ${index}`)
-          }
-
-          // Update focused reference if in singleselect mode
-          if (singleselect) {
-            focused.value = freshRecord
-          }
-
-          // Use the fresh record for child propagation
-          newFocused = freshRecord
-        } catch (error) {
-          warn(`failed to refresh focused record after reload:`, error)
-        }
-      }
-
+      const newFocused = refocus(oldFocusedId)
       // propegate to children
       if (children.value.length > 0) {
         await Promise.all(children.value.map(({ sync }) => sync({ name, focused: newFocused })))
@@ -341,6 +315,40 @@ export const defineModule = ({
       }
       hash.value = genId(8) // differentiate loads with a hash
       loading.value = false
+    }
+
+    const refreshFocused = async () => {
+      if (!focused.value || !read) return null
+
+      try {
+        debug(`⚠️ refreshing ${name} focused record ${focused.value[key]} from api`)
+        const freshRecord = await read(focused.value[key])
+
+        // Update the record in the list
+        const index = records.value.findIndex((r) => r[key] === focused.value[key])
+        if (index >= 0) {
+          records.value[index] = freshRecord
+        }
+
+        // Update focused reference if in singleselect mode
+        if (singleselect) {
+          focused.value = freshRecord
+        }
+
+        // Propagate refresh to children
+        if (children.value.length > 0) {
+          await Promise.all(
+            children.value.map(({ refreshFocused }) =>
+              refreshFocused ? refreshFocused() : Promise.resolve()
+            )
+          )
+        }
+
+        return freshRecord
+      } catch (error) {
+        warn(`failed to refresh focused record:`, error)
+        return null
+      }
     }
 
     // load on init
@@ -356,7 +364,7 @@ export const defineModule = ({
 
     if (parent) {
       // child modules init with parent
-      parent.register({ sync })
+      parent.register({ sync, refreshFocused })
     }
 
     // reload children on refocus
@@ -395,6 +403,7 @@ export const defineModule = ({
     load.events.forEach((event) => {
       api.socket.on(event, async () => {
         await reloadHandler(event)
+        await refreshFocused()
         load.hook()
       })
     })
