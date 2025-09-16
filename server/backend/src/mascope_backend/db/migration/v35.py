@@ -39,7 +39,9 @@ async def run():
 
     # Get the TOF sample files
     async with async_session() as session:
-        stmt = select(SampleFile).where(SampleFile.instrument.ilike("%tof%"))
+        stmt = select(SampleFile).where(
+            SampleFile.instrument.ilike("%tof%") | SampleFile.instrument.ilike("%api%")
+        )
         result = await session.execute(stmt)
         sample_files = result.scalars().all()
 
