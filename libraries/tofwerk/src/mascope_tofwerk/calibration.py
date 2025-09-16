@@ -42,7 +42,7 @@ def mz_calibrate(peak_tof, peak_mz, exact_mz):
     if ret != 4:
         raise Exception(f"TwMassCalibrate failed with code: {ret}")
 
-    mass_calibration_result = {
+    mz_calibration_result = {
         "mode": calibration_mode,
         "par": list(calibration_parameters),
     }
@@ -60,7 +60,7 @@ def mz_calibrate(peak_tof, peak_mz, exact_mz):
         "post_dmz": delta_mass_after_calibration,
     }
 
-    return mass_calibration_result, stats
+    return mz_calibration_result, stats
 
 
 def tof_to_mass(tof: np.ndarray, mode: int, par: list) -> float | np.ndarray:

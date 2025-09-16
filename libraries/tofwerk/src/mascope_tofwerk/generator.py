@@ -110,7 +110,7 @@ class H5Processor(Thread):
             )  # [s]->[ns]
 
     @property
-    def mass_calibration(self) -> dict | None:
+    def mz_calibration(self) -> dict | None:
         """Mass calibration properties
 
         :return: Mass calibration properties
@@ -415,7 +415,7 @@ class H5Processor(Thread):
                         "range": self.mz_range,
                         "single_ion_signal": self.single_ion_signal,
                         "sample_interval": self.sample_interval,
-                        "mass_calibration": self.mass_calibration,
+                        "mz_calibration": self.mz_calibration,
                         "utc_offset": utc_offset,
                         "polarity": self.polarity,
                         # Not applicable for TOF
