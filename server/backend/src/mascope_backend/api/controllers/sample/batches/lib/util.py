@@ -29,19 +29,36 @@ def detect_update_batch_changes(existing_batch, sample_batch_update) -> dict[str
     current_collections = {
         tc.target_collection_id for tc in existing_batch.target_collection
     }
-    current_calibration = set(
+    current_calibration_collection = existing_batch.build_params.get(
+        "calibration_collection"
+    )
+    current_calibration_ion_mechanisms = set(
         existing_batch.build_params.get("calibration_ion_mechanisms", [])
     )
 
     # Extract proposed new state using dot notation
     new_ion_mechanisms = set(sample_batch_update.build_params.ion_mechanisms)
     new_collections = set(sample_batch_update.target_collection_ids)
-    new_calibration = set(sample_batch_update.build_params.calibration_ion_mechanisms)
+    new_calibration_collection = sample_batch_update.build_params.calibration_collection
+    new_calibration_ion_mechanisms = set(
+        sample_batch_update.build_params.calibration_ion_mechanisms or []
+    )
 
     # Calculate collection changes
     collections_to_add = new_collections - current_collections
     collections_to_remove = current_collections - new_collections
     collections_changed = len(collections_to_add) > 0 or len(collections_to_remove) > 0
+
+    # Calculate calibration changes
+    calibration_collection_changed = (
+        current_calibration_collection != new_calibration_collection
+    )
+    calibration_ion_mechanisms_changed = (
+        current_calibration_ion_mechanisms != new_calibration_ion_mechanisms
+    )
+    calibration_changed = (
+        calibration_collection_changed or calibration_ion_mechanisms_changed
+    )
 
     # Basic field changes
     name_changed = (
@@ -57,7 +74,9 @@ def detect_update_batch_changes(existing_batch, sample_batch_update) -> dict[str
     runtime.logger.debug(
         "Detected sample batch changes: "
         f"ion_mechanisms_changed: {current_ion_mechanisms != new_ion_mechanisms}, "
-        f"calibration_changed: {current_calibration != new_calibration}, "
+        f"calibration_collection_changed: {calibration_collection_changed}, "
+        f"calibration_ion_mechanisms_changed: {calibration_ion_mechanisms_changed}, "
+        f"calibration_changed: {calibration_changed}, "
         f"collections_changed: {collections_changed}, "
         f"collections_to_add: {list(collections_to_add)}, "
         f"collections_to_remove: {list(collections_to_remove)}, "
@@ -67,7 +86,9 @@ def detect_update_batch_changes(existing_batch, sample_batch_update) -> dict[str
 
     return {
         "ion_mechanisms": current_ion_mechanisms != new_ion_mechanisms,
-        "calibration": current_calibration != new_calibration,
+        "calibration_collection": calibration_collection_changed,
+        "calibration_ion_mechanisms": calibration_ion_mechanisms_changed,
+        "calibration": calibration_changed,  # Combined calibration flag
         "collections": collections_changed,
         "collections_to_add": collections_to_add,
         "collections_to_remove": collections_to_remove,

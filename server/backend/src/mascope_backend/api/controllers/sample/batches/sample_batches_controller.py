@@ -401,7 +401,7 @@ async def update_sample_batch(
 ) -> dict:
     """
     Updates the specified sample batch with new information and associations.
-    Changes to ion mechanisms or target collections set batch status to "rematch"
+    Changes to ion mechanisms, calibration parameters, or target collections set batch status to "rematch"
 
     Steps:
     1. Fetch existing batch data and validate existence
@@ -494,7 +494,9 @@ async def update_sample_batch(
         await session.refresh(batch)
 
     # Step 5: Set rematch status when recomputation needed
-    needs_rematch = changes["ion_mechanisms"] or changes["collections"]
+    needs_rematch = (
+        changes["ion_mechanisms"] or changes["collections"] or changes["calibration"]
+    )
     if needs_rematch:
         await update_sample_batch_status(
             sample_batch_ids=[sample_batch_id],
