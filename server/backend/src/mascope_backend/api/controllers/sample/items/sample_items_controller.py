@@ -835,7 +835,7 @@ async def sample_item_export_peaks(
         await send_progress_user_notification(notification, 0.1)
 
         peak_detector = get_peak_detector(filename, instrument_functions)
-        sample_file = await peak_detector.detect_peaks(if_exists="append")
+        sample_file = await peak_detector.detect_peaks()
 
         if instrument_type == "orbi":
             peak_data_type = "peak_heights"

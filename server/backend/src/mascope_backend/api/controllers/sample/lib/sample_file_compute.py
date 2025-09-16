@@ -25,5 +25,5 @@ async def compute_peaks(
 
     # Step 2: Detect peaks in the sample file.
     peak_detector = get_peak_detector(filename, instrument_functions)
-    sample_file = await peak_detector.detect_peaks(if_exists=if_exists)
+    sample_file = await peak_detector.detect_peaks()
     return sample_file

@@ -161,12 +161,9 @@ async def detect_and_load_peaks(
     :return: DataArray containing detected peaks with their m/z, intensity, and time information.
     :rtype: xarray.DataArray
     """
-    # Get list of nominal m/z values
-    u_list = list(np.unique(np.round(target_mzs)))
-
     # Detect peaks in the sample file
-    peak_detector = get_peak_detector(filename, instrument_functions, u_list)
-    await peak_detector.detect_peaks(if_exists="append")
+    peak_detector = get_peak_detector(filename, instrument_functions)
+    await peak_detector.detect_peaks()
 
     runtime.logger.debug("Start matching")
 
