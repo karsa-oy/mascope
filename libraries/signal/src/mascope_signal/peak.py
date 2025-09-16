@@ -92,7 +92,7 @@ class BasePeakDetector(ABC):
         peak_mzs: np.ndarray,
         peak_areas: np.ndarray,
         peak_heights: np.ndarray,
-    ) -> tuple:
+    ) -> xarray.Dataset:
         """Helper function to calculate peak profiles in detect_peaks"""
         # Get the tof values corresponding to the peak mzs
         mz_axis = self._sum_signal.mz.values
@@ -144,7 +144,14 @@ class BasePeakDetector(ABC):
         peak_profiles_area = peak_profiles_norm * peak_areas.reshape(-1, 1)
         peak_profiles_height = peak_profiles_norm * peak_heights.reshape(-1, 1)
 
-        return peak_profiles_area, peak_profiles_height
+        peak_profiles_ds = xarray.Dataset(
+            {
+                "peak_areas": peak_profiles_area,
+                "peak_heights": peak_profiles_height,
+            }
+        )
+
+        return peak_profiles_ds
 
     def _finalize(self, peak_mzs, peak_areas, peak_heights):
         """Helper function to finalize peak detection by:
@@ -158,7 +165,7 @@ class BasePeakDetector(ABC):
         )
 
         runtime.logger.debug("Computing peak profiles...")
-        peak_profiles_area, peak_profiles_height = self._calculate_peak_profiles(
+        peak_profiles = self._calculate_peak_profiles(
             peak_mzs, peak_areas, peak_heights
         )
 
@@ -174,8 +181,7 @@ class BasePeakDetector(ABC):
         runtime.logger.info(f"Writing peaks to file {self._filename}")
 
         m_io.write_peaks(
-            peak_profiles_area,
-            peak_profiles_height,
+            peak_profiles,
             self._filename,
             overwrite=True,
         )
@@ -183,7 +189,7 @@ class BasePeakDetector(ABC):
         runtime.logger.info("Complete")
         sample_file_data = m_io.load_file(
             self._filename,
-            vars=["peak_areas", "peak_heights"],
+            vars=["peak_profiles"],
         )
         return sample_file_data
 

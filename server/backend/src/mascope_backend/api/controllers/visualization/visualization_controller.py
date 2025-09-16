@@ -193,7 +193,7 @@ def _load_peaks_and_averaged_signal(sample, target_isotopes):
     mz_min = min(w[0] for w in mz_windows)
     mz_max = max(w[1] for w in mz_windows)
     peak_data = (
-        load_file(sample.filename, vars=["peak_areas", "peak_heights"])
+        load_file(sample.filename, vars=["peak_profiles"])
         .sel(mz=slice(mz_min, mz_max))
         .compute()
     )

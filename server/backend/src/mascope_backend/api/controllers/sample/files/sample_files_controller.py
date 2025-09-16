@@ -926,15 +926,9 @@ async def get_sample_file_peaks(
     sample_file_data = await get_sample_file(sample_file_id)
     filename = sample_file_data.get("data").get("filename")
 
-    # Step 2: Load the appropriate peak data based on the query params
-    vars_to_load = []
-    if areas:
-        vars_to_load.append("peak_areas")
-    if heights:
-        vars_to_load.append("peak_heights")
-
+    # Step 2: Load peak data
     try:
-        sample_file_data = load_file(filename, vars=vars_to_load)
+        sample_file_data = load_file(filename, vars=["peak_profiles"])
     except FileNotFoundError as e:
         raise NotFoundException(
             f"Sample file with name '{filename}' was not found or has not been processed"
@@ -1095,7 +1089,7 @@ async def get_sample_file_peak_timeseries(
     filename = sample_file_data.get("data").get("filename")
     # Step 2: Load the sample file
     try:
-        sample_file = load_file(filename, vars=["peak_heights"])
+        sample_file = load_file(filename, vars=["peak_profiles"])
         peaks = get_peaks(sample_file, "height")
     except FileNotFoundError:
         raise NotFoundException(f"Sample file with name '{filename}' not found")

@@ -295,17 +295,14 @@ def update_zarr_array_coord(base_filename, var, dim, coord):
 
 
 def write_peaks(
-    peak_areas: xr.DataArray,
-    peak_heights: xr.DataArray,
+    peak_profiles: xr.Dataset,
     filename: str,
     overwrite: bool = False,
 ) -> None:
     """Write fitted peak areas and peak heights to zarr files
 
-    :param peak_areas: Data array with peak areas
-    :type peak_areas: xr.DataArray
-    :param peak_heights: Data array with peak heights
-    :type peak_heights: xr.DataArray
+    :param peak_profiles: Dataset containing peak areas and peak heights
+    :type peak_profiles: xr.Dataset
     :param filename: Sample file name
     :type filename: str
     :param overwrite: Flag to overwrite peaks if they already exist, defaults to False
@@ -314,29 +311,21 @@ def write_peaks(
     :return: None
     """
     # Get paths to peak_areas and peak_heights zarr files
-    filename_peak_areas = filename_to_zarr_path(filename, "peak_areas")
-    filename_peak_heights = filename_to_zarr_path(filename, "peak_heights")
+    peak_profiles_path = filename_to_zarr_path(filename, "peak_profiles")
 
-    if os.path.exists(filename_peak_areas) or os.path.exists(filename_peak_heights):
+    if os.path.exists(peak_profiles_path):
         if overwrite:
-            rmtree(filename_peak_areas)
-            rmtree(filename_peak_heights)
+            rmtree(peak_profiles_path)
         else:
-            raise FileExistsError(
-                f"Peak areas or peak heights already exist for {filename}"
-            )
-
-    peak_areas.name = "peak_areas"
-    peak_heights.name = "peak_heights"
+            raise FileExistsError(f"Peak profiles already exist for {filename}")
 
     try:
-        peak_areas.to_zarr(filename_peak_areas, align_chunks=True)
-        peak_heights.to_zarr(filename_peak_heights, align_chunks=True)
+        peak_profiles.to_zarr(peak_profiles_path, mode="w")
     except FileNotFoundError as e:
         if ".partial" in str(e):
             # peak_heights in Exception because it's longer than peak_areas and sum_signal
             raise Exception(
-                f"The path is probably too long: {filename_peak_heights}"
+                f"The path is probably too long: {peak_profiles_path}"
             ) from e
         else:
             raise
