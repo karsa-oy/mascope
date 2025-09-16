@@ -2,7 +2,10 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 from mascope_backend.api.new.auth.dependencies import editor_user, guest_user
 from mascope_backend.db.id import gen_id
 from mascope_backend.api.lib.api_features import api_route
-from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
+from mascope_backend.api.lib.exceptions.api_exceptions import (
+    NotFoundException,
+    ApiException,
+)
 
 from mascope_backend.api.controllers.sample.items.sample_items_controller import (
     get_sample_item,
@@ -10,8 +13,8 @@ from mascope_backend.api.controllers.sample.items.sample_items_controller import
 from mascope_backend.api.controllers.sample.files.sample_files_controller import (
     get_sample_files,
 )
-from mascope_backend.api.controllers.sample.batches.sample_batches_controller import (
-    get_sample_batch,
+from mascope_backend.api.controllers.sample.lib.sample_batches_fetch import (
+    fetch_sample_batch,
 )
 
 from mascope_backend.api.controllers.calibration.calibration_controller import (
@@ -208,7 +211,10 @@ async def calibration_mz_calibrate_batch_route(
     background_tasks: BackgroundTasks,
     user=Depends(editor_user),
 ):
-    """m/z calibrate all samples in a batch.
+    """
+    m/z calibrate all samples in a batch.
+    - Processing batches cannot be calibrated
+    - Sets batch status to "processing" during calibration and "rematch" after completion
 
     :param request: The request object.
     :type request: Request
@@ -223,10 +229,13 @@ async def calibration_mz_calibrate_batch_route(
     :return: Message confirming start of batch calibration.
     :rtype: dict
     """
-    # Verify the existance of sample batch
-    sample_batch_result = await get_sample_batch(sample_batch_id)
-    sample_batch = sample_batch_result.get("data")
-    sample_batch_name = sample_batch["sample_batch_name"]
+    # Verify the existance of sample batch and check status
+    sample_batch = await fetch_sample_batch(sample_batch_id)
+
+    if sample_batch.status == "processing":
+        msg = f"Sample batch '{sample_batch.sample_batch_name}' is currently processing. Please wait for completion and try again later."
+        notification_data = {"sample_batch_id": sample_batch_id}
+        raise ApiException(msg, notification_data, 409)
 
     # Get data for notifications
     sid = request.headers.get("X-SID")
@@ -241,6 +250,6 @@ async def calibration_mz_calibrate_batch_route(
         process_id=process_id,
     )
     return {
-        "message": f"Started to m/z calibrate sample batch '{sample_batch_name}', please wait.",
+        "message": f"Started to m/z calibrate sample batch '{sample_batch.sample_batch_name}', please wait.",
         "process_id": process_id,
     }

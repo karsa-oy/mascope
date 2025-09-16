@@ -34,6 +34,12 @@ from mascope_backend.api.controllers.sample.items.sample_items_controller import
 from mascope_backend.api.controllers.sample.lib.fetch_affected_sample_data import (
     fetch_affected_sample_data,
 )
+from mascope_backend.api.controllers.sample.lib.sample_batches_fetch import (
+    fetch_sample_batch,
+)
+from mascope_backend.api.controllers.sample.batches.status.service import (
+    update_sample_batch_status,
+)
 from mascope_backend.api.models.sample.files.sample_file_pydantic_model import (
     SampleFileUpdate,
 )
@@ -141,18 +147,13 @@ async def calibration_mz_fit(
         if not sample:
             raise NotFoundException(f"Sample item with ID '{sample_item_id}' not found")
 
-        sample_batch = await session.get(SampleBatch, sample.sample_batch_id)
-        if not sample_batch:
-            raise NotFoundException(
-                f"Sample batch with ID '{sample.sample_batch_id}' not found"
-            )
-
+    sample_batch = await fetch_sample_batch(sample.sample_batch_id)
     build_params = sample_batch.build_params
 
     # Check if calibration collection is present
     if not build_params.get("calibration_collection"):
         raise NotFoundException(
-            f"Calibration collection not found in build parameters for sample batch '{sample_batch.sample_batch_id}'"
+            f"Calibration collection not found in build parameters for sample batch '{sample_batch.sample_batch_name}'"
         )
 
     # Step 2: Fetch affected samples data
@@ -253,6 +254,9 @@ async def calibration_mz_apply(
 ):
     """
     Apply m/z calibration to a sample file.
+    - Sets batch status to "processing" for all affected batches during operation.
+    - Removes existing matches for all affected samples since calibration invalidates them.
+    - Batch status sets to "rematch" for all affected batches because of removed matches.
 
     :param fit: Fit dictionary.
     :param filename: Name of the sample file.
@@ -266,6 +270,16 @@ async def calibration_mz_apply(
         affected_sample_batches,
     ) = await fetch_affected_sample_data(filenames=[filename], include_objects=True)
     total_samples = len(affected_sample_item_ids)
+
+    # Set ALL affected batches to "processing", already "processing" batches will not change the status
+    await update_sample_batch_status(
+        sample_batch_ids=affected_sample_batch_ids,
+        status="processing",
+        independent_transaction=True,
+    )
+    runtime.logger.info(
+        f"Set {len(affected_sample_batch_ids)} batch(es) to 'processing' for calibration apply"
+    )
 
     # Step 2: Prepare progress user notification.
     notification = UserNotification(
@@ -346,16 +360,29 @@ async def calibration_mz_apply(
                 sample_item_id=sample_item.sample_item_id,
                 full_remove=True,
                 independent_transaction=False,
+                sid=sid,
                 process_id=gen_id(8),
                 parent_id=process_id,
             )
+    # Step 6: Set ALL affected batches to "rematch" since calibration removes matches, already "rematch" batches will not change the status
+    if affected_sample_batch_ids:
+        await update_sample_batch_status(
+            sample_batch_ids=affected_sample_batch_ids,
+            status="rematch",
+            independent_transaction=True,  # reload UI status icons
+        )
+        runtime.logger.info(
+            f"Set {len(affected_sample_batch_ids)} batch(es) to 'rematch' after applying m/z calibration."
+        )
 
-    # Step 6: Return m/z fit result data and message
+    # Step 7: Return m/z fit result data and message
+    message = f"Applied m/z fit for sample file '{filename}', {total_samples} sample item{'s' if total_samples != 1 else ''} affected."
+    runtime.logger.info(message)
     return {
         "data": {
             "fit": fit,
         },
-        "message": f"Applied m/z fit for sample file '{filename}', {total_samples} sample item{'s' if total_samples != 1 else ''} affected.",
+        "message": message,
         "_notification_data": {
             "affected_sample_item_ids": affected_sample_item_ids,
             "affected_sample_batch_ids": affected_sample_batch_ids,
@@ -618,21 +645,21 @@ async def calibration_mz_calibrate_batch(
     sample_batch_id: str,
     mz_calibration_params: MzCalibrationParams,
     independent_transaction: bool = False,
-    sid: str = None,
-    process_id=None,
-    parent_id=None,
+    sid: str | None = None,
+    process_id: str | None = None,
+    parent_id: str | None = None,
 ) -> list:
     """
     Performs m/z calibration on all samples within a given batch using specified calibration parameters.
-    It notifies about the calibration progress and completion via Socket.IO. In case of failure, an error message is emitted.
+    Sets batch status to "processing" during operation to prevent concurrent operation.
+    Batch status sets to "rematch" for all affected batches since calibration removes existing matches (calibration_mz_apply).
 
     Steps:
-    1. Emit an event to notify the start of calibration.
-    2. Retrieve all samples associated with the specified sample batch.
-    3. Iterate over each sample, perform calibration, and accumulate results.
-    4. Emit an event to notify the completion of calibration along with the results.
-    5. Emit a reload event for the sample batch if this is an independent transaction.
-    6. In case of an exception, emit an event indicating calibration failure.
+    1. Retrieve batch and validate status for concurrent operation prevention
+    2. Retrieve all samples associated with the specified sample batch
+    3. Set batch status to "processing" to lock concurrent operations
+    4. Perform calibration on all samples via child operation
+    5. Return calibration results
 
     :param sample_batch_id: The ID of the sample batch to be calibrated.
     :type sample_batch_id: str
@@ -640,19 +667,34 @@ async def calibration_mz_calibrate_batch(
     :type mz_calibration_params: MzCalibrationParams
     :param independent_transaction: Flag indicating if the operation is an independent transaction, default to False.
     :type independent_transaction: bool
+    :param sid: Session identifier for client notifications
+    :type sid: str | None
+    :param process_id: Process identifier for progress tracking
+    :type process_id: str | None
+    :param parent_id: Parent process identifier
+    :type parent_id: str | None
     :raises NotFoundException: Raised if the sample batch or any samples within it are not found.
     :raises ApiException: Raised for any exceptions that occur during the calibration process.
-    :return: A list of calibration results for each sample in the batch.
-    :rtype: list
+    :return: Calibration results with batch information and notification data
+    :rtype: dict
     """
-    # Step 1: Fetch sample batch data
-    async with async_session() as session:
-        sample_batch = await session.get(SampleBatch, sample_batch_id)
-    if not sample_batch:
-        raise NotFoundException(f"Sample batch with ID '{sample_batch_id}' not found")
+    # Step 1: Retrieve batch and check if it's already processing
+    sample_batch = await fetch_sample_batch(sample_batch_id)
     sample_batch_name = sample_batch.sample_batch_name
+
+    if sample_batch.status == "processing":
+        message = f"Sample batch '{sample_batch_name}' is currently being processed - calibration is locked."
+        runtime.logger.warning(message)
+        return {
+            "status": "locked",
+            "message": message,
+            "_notification_data": {"affected_sample_batch_ids": [sample_batch_id]},
+        }
+
+    runtime.logger.info(f"Starting m/z calibration for batch '{sample_batch_name}'")
+
+    # Step 2: Fetch samples in the batch
     async with async_session() as session:
-        # Fetch samples
         result = await session.execute(
             select(Sample).where(Sample.sample_batch_id == sample_batch_id)
         )
@@ -661,6 +703,14 @@ async def calibration_mz_calibrate_batch(
     if not samples:
         raise NotFoundException(f"Sample batch '{sample_batch_name}' has no samples")
 
+    # Step 3: Set current batch status to processing to prevent concurrent operations
+    await update_sample_batch_status(
+        sample_batch_ids=[sample_batch_id],
+        status="processing",
+        independent_transaction=True,  # reload UI status icons
+    )
+
+    # Step 4: Perform calibration on all samples
     calibration_result = await calibration_mz_calibrate_samples(
         sample_item_ids=[sample.sample_item_id for sample in samples],
         mz_calibration_params=mz_calibration_params,
@@ -669,14 +719,22 @@ async def calibration_mz_calibrate_batch(
         process_id=gen_id(8),
         parent_id=process_id,
     )
-    # Get affected batch IDs from child operation
+
+    # Step 5: Extract notification data from child operation and prepare response
     notification_data = calibration_result.get("_notification_data", {})
     affected_sample_batch_ids = notification_data.get("affected_sample_batch_ids", [])
     affected_sample_item_ids = notification_data.get("affected_sample_item_ids", [])
 
-    # Step 5: Return rematched batch and message
+    message = (
+        f"Sample batch '{sample_batch_name}' m/z calibrated successfully. "
+        f"{len(affected_sample_batch_ids)} sample batch{'es were' if len(affected_sample_batch_ids) > 1 else ' was'} affected."
+    )
+
+    runtime.logger.info(f"{message} Batch status updated to 'rematch'.")
+
     return {
-        "message": f"Sample batch '{sample_batch.sample_batch_name}' m/z calibrated. {len(affected_sample_batch_ids)} sample batch{'es were' if len(affected_sample_batch_ids) > 1 else 'was'} affected.",
+        "status": "success",
+        "message": message,
         "_notification_data": {
             "affected_sample_batch_ids": affected_sample_batch_ids,
             "affected_sample_item_ids": affected_sample_item_ids,

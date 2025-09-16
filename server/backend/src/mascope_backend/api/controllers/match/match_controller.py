@@ -238,8 +238,8 @@ async def rematch_samples(
 
 
 @api_controller_background_task(
-    success_notification_rooms=["sample_batch_id"],
-    success_reload=[("sample_batch_reload", "sample_batch_id")],
+    success_notification_rooms=["sid"],
+    success_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
     error_notification_rooms=["sid"],
 )
 async def match_remove_sample(
@@ -295,7 +295,7 @@ async def match_remove_sample(
         "data": {
             "removed_match_isotopes_count": removed_match_isotopes_count,
         },
-        "_notification_data": {"sample_item_id": sample_item_id},
+        "_notification_data": {"affected_sample_batch_ids": [sample.sample_batch_id]},
     }
 
 
