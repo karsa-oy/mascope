@@ -94,7 +94,11 @@ def get_sum_signal(
 
     cached_name = _get_sum_signal_hash_name(t_min, t_max, polarity)
     try:
-        sum_signal = _get_cached_sum_signal(base_filename, cached_name, average)
+        sum_signal = _get_cached_sum_signal(base_filename, cached_name)
+        if average:
+            time_coord = get_scan_timestamps(base_filename, t_min, t_max, polarity)
+            averaging_factor = time_coord.size
+            return sum_signal / averaging_factor
         return sum_signal
     except FileNotFoundError:
         # case where file doesn't exist in filestore
@@ -214,14 +218,10 @@ def _get_sum_signal_hash_name(t_min, t_max, polarity):
     return cached_name
 
 
-def _get_cached_sum_signal(base_filename, cached_name, average):
+def _get_cached_sum_signal(base_filename, cached_name):
     """Helper function to load cached sum signal from the sample file if it exists"""
     sample_file = m_io.load_file(base_filename, vars=[cached_name])
     sum_signal = sample_file.sum_signal
-    if average:
-        time_coord = get_scan_timestamps(base_filename)
-        averaging_factor = time_coord.size
-        return sum_signal / averaging_factor
     return sum_signal
 
 
