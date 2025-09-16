@@ -12,26 +12,11 @@ from mascope_match.params import (
     ORBI_FITTING_THRESHOLD,
     TOF_FITTING_THRESHOLD,
 )
-from mascope_file.name import (
-    get_sample_file_type,
-)
-from mascope_file.io import (
-    load_file,
-    read_props,
-    write_peaks,
-)
+import mascope_file.name as m_name
+import mascope_file.io as m_io
+import mascope_signal.compute as m_compute
+import mascope_signal.fitting as m_fitting
 
-from mascope_signal.compute import (
-    get_sum_signal,
-    get_peak_profiles,
-    get_scan_timestamps,
-    get_orbi_centroids,
-)
-from mascope_signal.fitting import (
-    fit_n_peaks,
-    calculate_peak_area,
-    SIGMA_MULTIPLIER,
-)
 from mascope_signal.runtime import runtime
 
 # Restrict large chunks for dask
@@ -57,8 +42,8 @@ class BasePeakDetector(ABC):
         self._filename = filename
         self._peak_shape, self._resolution_function = instrument_functions
 
-        self._sample_file_props = read_props(self._filename)
-        self._sum_signal = get_sum_signal(self._filename)
+        self._sample_file_props = m_io.read_props(self._filename)
+        self._sum_signal = m_compute.get_sum_signal(self._filename)
 
     @property
     def u_list(self):
@@ -114,9 +99,9 @@ class BasePeakDetector(ABC):
         # Interpolate the index (tof) for each peak m/z
         unique_tofs = np.interp(peak_mzs, mz_axis, np.arange(len(mz_axis)))
 
-        peak_profiles = get_peak_profiles(self._filename, peak_mzs).assign_coords(
-            tof=("mz", unique_tofs)
-        )
+        peak_profiles = m_compute.get_peak_profiles(
+            self._filename, peak_mzs
+        ).assign_coords(tof=("mz", unique_tofs))
 
         # Check if peak_profiles is empty along "time" or "mz"
         if (
@@ -188,7 +173,7 @@ class BasePeakDetector(ABC):
 
         runtime.logger.info(f"Writing peaks to file {self._filename}")
 
-        write_peaks(
+        m_io.write_peaks(
             peak_profiles_area,
             peak_profiles_height,
             self._filename,
@@ -196,7 +181,7 @@ class BasePeakDetector(ABC):
         )
 
         runtime.logger.info("Complete")
-        sample_file_data = load_file(
+        sample_file_data = m_io.load_file(
             self._filename,
             vars=["peak_areas", "peak_heights"],
         )
@@ -239,8 +224,8 @@ class OrbiPeakDetector(BasePeakDetector):
 
         runtime.logger.debug("Reading centroids from the Thermo file...")
         # Get CALIBRATED centroids
-        peak_mzs, peak_heights, resolutions, signal_to_noise = get_orbi_centroids(
-            self._filename, self.u_list
+        peak_mzs, peak_heights, resolutions, signal_to_noise = (
+            m_compute.get_orbi_centroids(self._filename, self.u_list)
         )
 
         runtime.logger.debug("Filter centroids by height and resolution...")
@@ -252,7 +237,7 @@ class OrbiPeakDetector(BasePeakDetector):
         mz_arr = self._sum_signal.mz.values
 
         # Precompute all mz ranges for peak area calculation
-        sigmas = peak_mzs / resolutions / SIGMA_MULTIPLIER
+        sigmas = peak_mzs / resolutions / m_fitting.SIGMA_MULTIPLIER
         mz_mins = peak_mzs - 3 * sigmas
         mz_maxs = peak_mzs + 3 * sigmas
         left_indices = np.searchsorted(mz_arr, mz_mins, side="left")
@@ -260,7 +245,7 @@ class OrbiPeakDetector(BasePeakDetector):
 
         peak_areas = np.array(
             [
-                calculate_peak_area(
+                m_fitting.calculate_peak_area(
                     mz_arr[left_indices[i] : right_indices[i]],
                     self._peak_shape,
                     (peak_mzs[i], peak_heights[i], resolutions[i]),
@@ -359,7 +344,7 @@ class TofPeakDetector(BasePeakDetector):
         futures = [
             loop.run_in_executor(
                 EXECUTOR,
-                fit_n_peaks,
+                m_fitting.fit_n_peaks,
                 mz_chunk,
                 spec_chunk,
                 self._peak_shape,
@@ -449,7 +434,7 @@ class OrbiZarrPeakDetector(TofPeakDetector):
             return []
 
         # Remove tiny noise from the sum spectrum
-        threshold = n_scans = get_scan_timestamps(self._filename).size
+        threshold = n_scans = m_compute.get_scan_timestamps(self._filename).size
         sum_spec[sum_spec < threshold] = 0
         # Get non-zero indices
         non_zero_indices = np.flatnonzero(sum_spec)
@@ -502,7 +487,7 @@ def get_peak_detector(
     :return: An instance of the appropriate peak detector.
     :rtype: BasePeakDetector
     """
-    sample_file_type = get_sample_file_type(filename)
+    sample_file_type = m_name.get_sample_file_type(filename)
     match sample_file_type:
         case "orbi_raw":
             return OrbiPeakDetector(filename, instrument_functions)
@@ -593,7 +578,7 @@ def get_peaks(sample_file: xarray.Dataset, intensity_mode="area"):
         peaks = sample_file.peak_heights
     else:
         raise ValueError("intensity_mode must be either 'height' or 'area'")
-    sample_file_type = get_sample_file_type(sample_file.props["filename"])
+    sample_file_type = m_name.get_sample_file_type(sample_file.props["filename"])
     if sample_file_type == "tof_zarr" or sample_file_type == "orbi_zarr":
         peaks = peaks.dropna(dim="mz", how="all")
     return peaks
