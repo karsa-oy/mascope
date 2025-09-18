@@ -13,7 +13,7 @@ from sqlalchemy import (
 )
 
 from mascope_file.name import get_instrument_type
-
+import mascope_file.io as m_io
 import mascope_signal.compute as m_compute
 from mascope_signal.peak import get_peak_detector
 
@@ -835,12 +835,15 @@ async def sample_item_export_peaks(
         await send_progress_user_notification(notification, 0.1)
 
         peak_detector = get_peak_detector(filename, instrument_functions)
-        sample_file = await peak_detector.detect_peaks()
+        await peak_detector.detect_peaks()
+        peak_detector.write_peaks_to_zarr()
 
         if instrument_type == "orbi":
             peak_data_type = "peak_heights"
         if instrument_type == "tof":
             peak_data_type = "peak_areas"
+
+        sample_file = m_io.load_file(filename, vars=["peak_profiles"])
         sample_peak_data = sample_file[peak_data_type].dropna(dim="mz", how="all")
 
         await send_progress_user_notification(notification, 0.8)

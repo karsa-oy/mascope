@@ -178,13 +178,6 @@ class GetSampleFilePeaksQueryParams(QueryParamsModel):
         return values
 
 
-class ComputeSampleFilePeaksQueryParams(QueryParamsModel):
-    if_exists: Literal["append", "replace"] = Field(
-        "append",
-        description="Whether to append to or replace any existing peaks in the sample file.",
-    )
-
-
 class GetSampleFilePeakTimeseriesBody(BaseModel):
     peak_mz: float
     peak_mz_tolerance_ppm: Optional[float] = 1

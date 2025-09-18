@@ -14,6 +14,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import joinedload
 
 from mascope_file.name import get_instrument_type
+from mascope_file import io as m_io
 from mascope_signal.peak import get_peak_detector, get_peaks
 from mascope_backend.db import async_session
 from mascope_backend.db.id import gen_id
@@ -925,7 +926,8 @@ async def sample_batch_export_peaks(
             await send_progress_user_notification(notification, 0.1)
 
             peak_detector = get_peak_detector(filename, instrument_functions)
-            sample_file = await peak_detector.detect_peaks()
+            await peak_detector.detect_peaks()
+            peak_detector.write_peaks_to_zarr()
 
             # Assign peak abundance units
             instrument_type = get_instrument_type(filename)
@@ -936,6 +938,7 @@ async def sample_batch_export_peaks(
 
             await send_progress_user_notification(notification, 0.9)
 
+            sample_file = m_io.load_file(filename, vars=["peak_profiles"])
             peak_data_item = get_peaks(sample_file, unit).sum(dim="time").compute()
 
             await send_progress_user_notification(notification, 1)

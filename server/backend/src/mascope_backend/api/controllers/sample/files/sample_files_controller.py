@@ -1001,7 +1001,6 @@ async def get_sample_file_peaks(
 )
 async def compute_sample_file_peaks(
     sample_file_id: str,
-    if_exists: Literal["append", "replace"] = "append",
     independent_transaction: bool = False,
     sid: str = None,
     process_id: str | None = None,
@@ -1034,9 +1033,10 @@ async def compute_sample_file_peaks(
     filename = sample_file_data.get("data").get("filename")
 
     # Step 2: Load instrument functions and determine instrument type.
-    sample_file = await compute_peaks(filename, if_exists)
+    await compute_peaks(filename)
 
     # Return completion message and peak details.
+    sample_file = load_file(filename, vars=["peak_profiles"])
     message = f"Detected {sample_file.peak_heights.mz.size} peaks for file '{filename}'"
     runtime.logger.info(message)
 

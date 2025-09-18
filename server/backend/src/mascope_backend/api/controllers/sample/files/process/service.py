@@ -174,7 +174,6 @@ async def auto_process_sample_file(
     # --- Compute peak data for the sample file --- #
     await compute_sample_file_peaks(
         sample_file_id=sample_file_id,
-        if_exists="append",
         independent_transaction=False,
         sid=sid,
         process_id=gen_id(8),

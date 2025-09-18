@@ -5,6 +5,7 @@ import math
 from concurrent.futures import ProcessPoolExecutor
 from typing import Literal
 import numpy as np
+import pandas as pd
 from scipy.signal._peak_finding_utils import _select_by_peak_distance
 import xarray
 import dask
@@ -16,6 +17,7 @@ import mascope_file.name as m_name
 import mascope_file.io as m_io
 import mascope_signal.compute as m_compute
 import mascope_signal.fitting as m_fitting
+from mascope_tools.alignment.utils import flag_satellite_peaks
 
 from mascope_signal.runtime import runtime
 
@@ -29,6 +31,7 @@ EXECUTOR = ProcessPoolExecutor(max_workers=max_workers)
 
 # Define the delta m/z around unit masses for peak detection
 DMZ = 0.5
+SIGNAL_TO_NOISE_THRESHOLD = 3
 
 
 class PeakDetectionError(Exception):
@@ -45,6 +48,8 @@ class BasePeakDetector(ABC):
         self._sample_file_props = m_io.read_props(self._filename)
         self._sum_signal = m_compute.get_sum_signal(self._filename)
 
+        self.peak_profiles = None
+
     @property
     def u_list(self):
         """List of unique integer m/z values in the summed spectrum"""
@@ -52,50 +57,11 @@ class BasePeakDetector(ABC):
         u_list = np.unique(mz_values.astype(int))
         return u_list
 
-    def _sort_and_filter_peaks(
-        self,
-        peak_mzs: np.ndarray,
-        peak_areas: np.ndarray,
-        peak_heights: np.ndarray,
-    ) -> tuple:
-        """Helper function to sort and filter fitted peak data"""
-        # Sort fitted peaks by m/z
-        sorted_peak_ind = np.argsort(peak_mzs)
-        peak_mzs = peak_mzs[sorted_peak_ind]
-        peak_areas = peak_areas[sorted_peak_ind]
-        peak_heights = peak_heights[sorted_peak_ind]
-
-        # lmfit returns peaks with negative or zero heights, which are not valid
-        # filter out zero height peaks to prevent division by zero in peak profiles
-        peak_mz_coord = self._sum_signal.mz.sel(
-            mz=peak_mzs,
-            method="nearest",
-        )
-        valid_indices = (
-            self._sum_signal.sel(mz=peak_mz_coord, method="nearest").values > 0
-        )
-        peak_mz_coord = peak_mz_coord[valid_indices]
-        peak_mzs = peak_mzs[valid_indices]
-        peak_areas = peak_areas[valid_indices]
-        peak_heights = peak_heights[valid_indices]
-
-        # Remove duplicate peaks if any
-        _, unique_peak_index = np.unique(peak_mz_coord, return_index=True)
-        peak_mzs = peak_mzs[unique_peak_index]
-        peak_areas = peak_areas[unique_peak_index]
-        peak_heights = peak_heights[unique_peak_index]
-
-        return peak_mzs, peak_areas, peak_heights
-
-    def _calculate_peak_profiles(
-        self,
-        peak_mzs: np.ndarray,
-        peak_areas: np.ndarray,
-        peak_heights: np.ndarray,
-    ) -> xarray.Dataset:
+    def _calculate_peak_profiles(self, peaks: xarray.Dataset) -> xarray.Dataset:
         """Helper function to calculate peak profiles in detect_peaks"""
         # Get the tof values corresponding to the peak mzs
         mz_axis = self._sum_signal.mz.values
+        peak_mzs = peaks.mz.values
         # Interpolate the index (tof) for each peak m/z
         unique_tofs = np.interp(peak_mzs, mz_axis, np.arange(len(mz_axis)))
 
@@ -103,101 +69,54 @@ class BasePeakDetector(ABC):
             self._filename, peak_mzs
         ).assign_coords(tof=("mz", unique_tofs))
 
-        # Check if peak_profiles is empty along "time" or "mz"
-        if (
-            peak_profiles.sizes.get("time", 0) == 0
-            or peak_profiles.sizes.get("mz", 0) == 0
-        ):
-            # No data to process, return empty arrays with correct shapes
-            peak_profiles_area = peak_profiles.copy(
-                data=np.zeros_like(peak_profiles.values)
-            )
-            peak_profiles_height = peak_profiles.copy(
-                data=np.zeros_like(peak_profiles.values)
-            )
-            return peak_profiles_area, peak_profiles_height
-
-        # NOTE: Instead of filtering out peaks with non-consecutive scans
-        # we now remove peaks that have signal in only one scan for a given mz value (see issue #1043).
-        def has_more_than_one_positive(arr):
-            # arr is a 1D numpy array for a single mz value along time
-            return np.sum(arr > 0) > 1
-
-        # Apply along mz axis (i.e., for each mz, check along time)
-        has_more_than_one_positive_mask = peak_profiles.reduce(
-            lambda x, axis: np.apply_along_axis(has_more_than_one_positive, axis, x),
-            dim="time",
-        ).values
-
-        # Filter out mz values that do not have consecutive positive values
-        peak_profiles = peak_profiles.isel(mz=has_more_than_one_positive_mask)
-
-        peak_areas = peak_areas[has_more_than_one_positive_mask]
-        peak_heights = peak_heights[has_more_than_one_positive_mask]
-
         # Normalize peak profile intensities to 1
         peak_profiles_norm = peak_profiles / peak_profiles.sum(dim="time")
         peak_profiles_norm = peak_profiles_norm.fillna(0)
 
         # Restore peak profiles intensities using peak areas and heights of the fitted peaks,
         # that are, presumably, the correct integral of the peak profiles
-        peak_profiles_area = peak_profiles_norm * peak_areas.reshape(-1, 1)
-        peak_profiles_height = peak_profiles_norm * peak_heights.reshape(-1, 1)
+        peak_profiles_area = peak_profiles_norm * peaks.sum_peak_areas
+        peak_profiles_height = peak_profiles_norm * peaks.sum_peak_heights
 
-        peak_profiles_ds = xarray.Dataset(
+        peak_profiles = xarray.Dataset(
             {
                 "peak_areas": peak_profiles_area,
                 "peak_heights": peak_profiles_height,
             }
         )
 
-        return peak_profiles_ds
+        # Merge peak profiles with peaks dataset
+        peak_profiles = xarray.merge([peak_profiles, peaks])
 
-    def _finalize(self, peak_mzs, peak_areas, peak_heights):
-        """Helper function to finalize peak detection by:
-        - sorting
-        - filtering
-        - calculating profiles
-        - writing to file
-        """
-        peak_mzs, peak_areas, peak_heights = self._sort_and_filter_peaks(
-            peak_mzs, peak_areas, peak_heights
-        )
+        self.peak_profiles = peak_profiles
 
-        runtime.logger.debug("Computing peak profiles...")
-        peak_profiles = self._calculate_peak_profiles(
-            peak_mzs, peak_areas, peak_heights
-        )
+    def write_peaks_to_zarr(self, overwrite=True):
+        if self.peak_profiles is None:
+            raise PeakDetectionError("No peak profiles to write to zarr.")
 
-        if self.calibration_factor != 1.0:
-            # Apply calibration factor
-            peak_profiles_area = peak_profiles_area.assign_coords(
-                mz=peak_profiles_area.mz.values * self.calibration_factor
-            )
-            peak_profiles_height = peak_profiles_height.assign_coords(
-                mz=peak_profiles_height.mz.values * self.calibration_factor
-            )
-
-        runtime.logger.info(f"Writing peaks to file {self._filename}")
-
+        runtime.logger.info("Writing peak profiles to the sample file...")
         m_io.write_peaks(
-            peak_profiles,
+            self.peak_profiles,
             self._filename,
-            overwrite=True,
+            overwrite=overwrite,
         )
-
-        runtime.logger.info("Complete")
-        sample_file_data = m_io.load_file(
-            self._filename,
-            vars=["peak_profiles"],
-        )
-        return sample_file_data
+        runtime.logger.info("Writing peak profiles completed.")
 
     @abstractmethod
     async def detect_peaks(
         self, if_exists: Literal["fail", "append", "replace"] = "fail"
     ):
         raise NotImplementedError("Subclasses must implement detect_peaks method")
+
+    @abstractmethod
+    def _flag_weak_peaks(self):
+        raise NotImplementedError("Subclasses must implement _flag_weak_peaks method")
+
+    @abstractmethod
+    def _flag_satellite_peaks(self):
+        raise NotImplementedError(
+            "Subclasses must implement _flag_satellite_peaks method"
+        )
 
 
 class OrbiPeakDetector(BasePeakDetector):
@@ -233,19 +152,15 @@ class OrbiPeakDetector(BasePeakDetector):
         peak_mzs, peak_heights, resolutions, signal_to_noise = (
             m_compute.get_orbi_centroids(self._filename, self.u_list)
         )
-
-        runtime.logger.debug("Filter centroids by height and resolution...")
-        peak_mzs, peak_heights, resolutions = self._filter_centroids(
-            peak_mzs, peak_heights, resolutions, signal_to_noise
+        runtime.logger.debug(
+            f"{len(peak_mzs)} centroids were found, computing peak areas..."
         )
-
-        runtime.logger.debug("Computing peak areas...")
-        mz_arr = self._sum_signal.mz.values
 
         # Precompute all mz ranges for peak area calculation
         sigmas = peak_mzs / resolutions / m_fitting.SIGMA_MULTIPLIER
         mz_mins = peak_mzs - 3 * sigmas
         mz_maxs = peak_mzs + 3 * sigmas
+        mz_arr = self._sum_signal.mz.values
         left_indices = np.searchsorted(mz_arr, mz_mins, side="left")
         right_indices = np.searchsorted(mz_arr, mz_maxs, side="right")
 
@@ -261,71 +176,45 @@ class OrbiPeakDetector(BasePeakDetector):
             ]
         )
 
-        sample_file_data = self._finalize(peak_mzs, peak_areas, peak_heights)
-        return sample_file_data
-
-    def _filter_centroids(
-        self,
-        peak_mzs: np.ndarray,
-        peak_heights: np.ndarray,
-        resolutions: np.ndarray,
-        signal_to_noise: np.ndarray,
-        signal_to_noise_threshold: int = 3,
-    ) -> tuple:
-        """Filter centroids less than 1 count and with the S/N ratio less than signal_to_noise_threshold.
-
-        # NOTE: Filtering by resolution and height was removed, see issue #1043
-        """
-        runtime.logger.debug(f"Found {len(peak_mzs)} peaks")
-
-        # Filter out peaks with signal to noise ratio less than signal_to_noise_threshold
-        sn_mask = signal_to_noise >= signal_to_noise_threshold
-        peak_mzs = peak_mzs[sn_mask]
-        peak_heights = peak_heights[sn_mask]
-        resolutions = resolutions[sn_mask]
-
-        runtime.logger.debug(
-            f"{len(peak_mzs)} peaks left after filtering by signal to noise ratio >= {signal_to_noise_threshold}"
-        )
-
-        if peak_mzs.size == 0:
-            runtime.logger.info("No new valid peaks found after filtering by height.")
-            return peak_mzs, peak_heights, resolutions
-
-        return peak_mzs, peak_heights, resolutions
-
-    def _finalize(self, all_peak_mzs, all_peak_areas, all_peak_heights, if_exists):
-        """Helper function to finalize peak detection by:
-        - sorting
-        - filtering
-        - calculating profiles
-        - writing to file
-        """
-        peak_mzs, peak_areas, peak_heights = self._sort_and_filter_peaks(
-            all_peak_mzs, all_peak_areas, all_peak_heights
-        )
+        peaks = xarray.Dataset(
+            {
+                "sum_peak_areas": (("mz"), peak_areas),
+                "sum_peak_heights": (("mz"), peak_heights),
+                "signal_to_noise": (("mz"), signal_to_noise),
+            }
+        ).assign_coords(mz=("mz", peak_mzs))
+        peaks = peaks.sortby("mz")
 
         runtime.logger.debug("Computing peak profiles...")
-        peak_profiles_area, peak_profiles_height = self._calculate_peak_profiles(
-            peak_mzs, peak_areas, peak_heights
+        self._calculate_peak_profiles(peaks)
+        self._flag_weak_peaks()
+        self._flag_satellite_peaks()
+
+    def _flag_weak_peaks(self):
+        """Flag weak peaks based on signal-to-noise ratio and peak profile characteristics."""
+
+        def has_only_one_positive(arr):
+            return np.sum(arr > 0) <= 1
+
+        low_snr = self.peak_profiles.signal_to_noise.values < SIGNAL_TO_NOISE_THRESHOLD
+        only_one_positive = np.apply_along_axis(
+            has_only_one_positive, 1, self.peak_profiles.peak_heights.values
         )
 
-        runtime.logger.info(f"Writing peaks to file {self._filename}")
+        is_weak = low_snr | only_one_positive
+        self.peak_profiles = self.peak_profiles.assign({"is_weak": (("mz"), is_weak)})
 
-        overwrite_peak_dataset = if_exists in {"append", "replace"}
-        write_peaks(
-            peak_profiles_area,
-            peak_profiles_height,
-            self._filename,
-            overwrite_peak_dataset,
+    def _flag_satellite_peaks(self):
+        peaks_df = pd.DataFrame(
+            {
+                "mz": self.peak_profiles.mz.values,
+                "intensity": self.peak_profiles.sum_peak_heights.values,
+            }
         )
-
-        runtime.logger.info("Complete")
-        sample_file_data = load_file(
-            self._filename,
-            vars=["peak_areas", "peak_heights"],
+        peaks_df = flag_satellite_peaks(peaks_df)
+        self.peak_profiles = self.peak_profiles.assign(
+            {"is_satellite": (("mz"), peaks_df["is_satellite_peak"].values)}
         )
-        return sample_file_data
 
 
 class TofPeakDetector(BasePeakDetector):
@@ -396,8 +285,21 @@ class TofPeakDetector(BasePeakDetector):
         peak_areas = np.array(peak_areas)
         peak_heights = np.array(peak_heights)
 
-        sample_file_data = self._finalize(peak_mzs, peak_areas, peak_heights)
-        return sample_file_data
+        # TODO: figure out how to calculate SNR for TOF
+        peaks = xarray.Dataset(
+            {
+                "sum_peak_areas": (("mz"), peak_areas),
+                "sum_peak_heights": (("mz"), peak_heights),
+            }
+        ).assign_coords(mz=("mz", peak_mzs))
+        peaks = peaks.sortby("mz")
+
+        # TODO: filter out non-positive peaks
+
+        runtime.logger.debug("Computing peak profiles...")
+        self._calculate_peak_profiles(peaks)
+        self._flag_weak_peaks()
+        self._flag_satellite_peaks()
 
     @property
     def peak_fitting_threshold(self):
@@ -416,6 +318,22 @@ class TofPeakDetector(BasePeakDetector):
             for u in self.u_list
         ]
         return specs_to_fit
+
+    def _flag_weak_peaks(self):
+        """Flag weak peaks based on peak profile characteristics."""
+
+        def has_only_one_positive(arr):
+            return np.sum(arr > 0) > 1
+
+        is_weak = ~self.peak_profiles.peak_heights.apply(has_only_one_positive)
+        self.peak_profiles = self.peak_profiles.assign({"is_weak": (("mz"), is_weak)})
+
+    def _flag_satellite_peaks(self):
+        # TOF data does not have satellite peaks
+        is_satellite = np.zeros(len(self.peak_profiles.mz), dtype=bool)
+        self.peak_profiles = self.peak_profiles.assign(
+            {"is_satellite": (("mz"), is_satellite)}
+        )
 
 
 class OrbiZarrPeakDetector(TofPeakDetector):
@@ -473,6 +391,18 @@ class OrbiZarrPeakDetector(TofPeakDetector):
     @property
     def peak_fitting_threshold(self):
         return ORBI_FITTING_THRESHOLD
+
+    def _flag_satellite_peaks(self):
+        peaks_df = pd.DataFrame(
+            {
+                "mz": self.peak_profiles.mz.values,
+                "intensity": self.peak_profiles.sum_peak_heights.values,
+            }
+        )
+        peaks_df = flag_satellite_peaks(peaks_df)
+        self.peak_profiles = self.peak_profiles.assign(
+            {"is_satellite": (("mz"), peaks_df["is_satellite"].values)}
+        )
 
 
 class TofZarrPeakDetector(TofPeakDetector):

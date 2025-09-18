@@ -63,10 +63,7 @@ async def refit_peaks():
             )
         )
         try:
-            await compute_peaks(
-                sample_file.filename,
-                if_exists="replace",
-            )
+            await compute_peaks(sample_file.filename)
         except FileNotFoundError:
             runtime.logger.error(
                 f"Error computing peaks for sample file {sample_file.filename}. File not found."
