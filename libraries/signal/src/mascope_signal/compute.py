@@ -171,10 +171,12 @@ def get_sum_signal(
         calibration = props["mz_calibration"]
         match sample_type:
             case "orbi_raw" | "orbi_zarr":
-                factor = (
-                    calibration.get("calibration_factor", 1.0) if calibration else 1.0
-                )
-                sum_signal = sum_signal.assign_coords(mz=sum_signal.mz.values * factor)
+                if calibration:
+                    fit_parameters = calibration["par"]
+                    factor = fit_parameters["calibration_factor"]
+                    sum_signal = sum_signal.assign_coords(
+                        mz=sum_signal.mz.values * factor
+                    )
             case "tof_h5" | "tof_zarr":
                 if calibration:
                     full_sum_signal = get_sum_signal(base_filename)
@@ -268,10 +270,9 @@ def load_signal(
                 # Handle m/z axis calibration
                 props = m_io.read_props(base_filename)
                 calibration = props["mz_calibration"]
-                factor = (
-                    calibration.get("calibration_factor", 1.0) if calibration else 1.0
-                )
-                if factor != 1.0:
+                if calibration:
+                    fit_parameters = calibration["par"]
+                    factor = fit_parameters["calibration_factor"]
                     signal = signal.assign_coords(mz=signal.mz.values * factor)
                 return signal
             case "tof_h5":

@@ -18,8 +18,14 @@ from mascope_file.name import parse_path_from_item_filename
 # Actions
 
 
-async def delete_sum_signal():
-    """Delete "sum_signal" from all sample files in the database."""
+async def delete_sum_signal(cached_only=False):
+    """Delete "sum_signal" from all sample files in the database.
+    if cached_only=False, delete both cached and full sum signals.
+    cached_only=True will only delete cached sum signals.
+
+    cached sum signals are those with names like "sum_signal_a1b2c3d4.zarr"
+    full sum signals are those with names like "sum_signal.zarr"
+    """
     # Get all sample files
     sample_files = await fetch_sample_files()
 
@@ -32,7 +38,13 @@ async def delete_sum_signal():
             )
         )
         sample_data_path = parse_path_from_item_filename(sample_file.filename)
-        sum_signal_dirs = glob.glob(os.path.join(sample_data_path, "sum_signal*"))
+        pattern = "sum_signal_*" if cached_only else "sum_signal*"
+        sum_signal_dirs = glob.glob(
+            os.path.join(
+                sample_data_path,
+                pattern,
+            )
+        )
         for zarr_dir in sum_signal_dirs:
             rmtree(zarr_dir)
 
