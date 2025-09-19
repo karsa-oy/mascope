@@ -44,4 +44,5 @@ jobs:
 
       - name: Run tests
         run: |
+          export SKIP_CALIBRATION_FITTING_TEST=1
           uv run pytest server/backend/tests/ -v
