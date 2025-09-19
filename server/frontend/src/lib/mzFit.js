@@ -21,6 +21,8 @@ export const useMzFit = ({ unmount } = { unmount: false }) => {
   const current = ref(null)
   const error = ref(null)
   const stats = ref(null)
+  const affectedBatches = ref([])
+  const affectedSamples = ref([])
   const mzCalibrationParams = reactive({ ...DEFAULT_MZ_CALIBRATION_PARAMS })
 
   async function load(sample) {
@@ -41,6 +43,8 @@ export const useMzFit = ({ unmount } = { unmount: false }) => {
     current.value = null
     error.value = null
     stats.value = null
+    affectedBatches.value = []
+    affectedSamples.value = []
   }
 
   async function compute(sample) {
@@ -71,18 +75,24 @@ export const useMzFit = ({ unmount } = { unmount: false }) => {
     if (payload?.status === 'success') {
       current.value = payload?.data?.fit
       stats.value = payload?.data?.stats
+      affectedBatches.value = payload?.data?.affected_sample_batch_ids ?? []
+      affectedSamples.value = payload?.data?.affected_sample_item_ids ?? []
     }
     if (payload?.status === 'error') {
       error.value = payload?.message
       // Critical errors prevent further steps
       stats.value = null
       current.value = null
+      affectedBatches.value = []
+      affectedSamples.value = []
     }
     if (payload?.status === 'warning') {
       error.value = payload?.message
       // Allow further steps if stats are available
       current.value = payload?.error?.detail?.data?.fit
       stats.value = payload?.error?.detail?.data?.stats
+      affectedBatches.value = payload?.error?.detail?.data?.affected_sample_batch_ids ?? []
+      affectedSamples.value = payload?.error?.detail?.data?.affected_sample_item_ids ?? []
     }
   })
   if (unmount) {
@@ -95,6 +105,8 @@ export const useMzFit = ({ unmount } = { unmount: false }) => {
     current,
     error,
     stats,
+    affectedBatches,
+    affectedSamples,
     mzCalibrationParams,
     // actions
     load,

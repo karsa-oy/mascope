@@ -11,6 +11,7 @@ import Column from 'primevue/column'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import Listbox from 'primevue/listbox'
+import { useConfirm } from 'primevue/useconfirm'
 
 import { computed, watch, reactive, ref, watchEffect } from 'vue'
 
@@ -20,6 +21,7 @@ import { useMzFit } from '@/lib/mzFit'
 import { PaneSettingsCalibration } from '@/lib/panes'
 
 const mzFit = useMzFit({ unmount: true })
+const confirm = useConfirm()
 
 const app = useApp()
 
@@ -62,6 +64,24 @@ const title = computed(() =>
     : `Calibrate sample "${original.value?.sample_item_name}"`
 )
 
+const confirmMessage = computed(() => {
+  if (batch.value) {
+    return `Applying calibration will remove matches for all associated samples in this and other batches. 
+    This action cannot be undone. Are you sure you want to proceed?`
+  }
+
+  const batchCount = mzFit.affectedBatches?.length || 0
+  const sampleCount = mzFit.affectedSamples?.length || 0
+
+  if (batchCount > 0 || sampleCount > 0) {
+    return `Applying calibration to this file will remove matches for ${sampleCount} associated 
+    sample${sampleCount !== 1 ? 's' : ''} across ${batchCount} batch${batchCount !== 1 ? 'es' : ''}. 
+    This action cannot be undone. Are you sure you want to proceed?`
+  }
+
+  return 'Applying calibration will affect other samples and remove existing matches. This action cannot be undone. Are you sure you want to proceed?'
+})
+
 // component initialization logic
 watch(visible, init)
 function init(active) {
@@ -93,6 +113,36 @@ async function refit() {
     await mzFit.compute(sample)
   }
   state.previous = { ...mzFit.mzCalibrationParams }
+}
+
+async function save() {
+  confirm.require({
+    icon: 'pi pi-exclamation-triangle',
+    header: 'Confirm calibration',
+    message: confirmMessage.value,
+    accept: async () => {
+      if (batch.value) {
+        await api.http.post(
+          `/calibration/mz_calibrate/batch/${original.value.sample_batch_id}`,
+          mzFit.mzCalibrationParams,
+          {
+            use: 'process',
+            type: 'recalibrate_batch'
+          }
+        )
+      } else {
+        await mzFit.apply(original.value)
+      }
+      visible.value = false
+    },
+    acceptProps: {
+      label: 'Apply Calibration'
+    },
+    rejectProps: {
+      label: 'Cancel',
+      severity: 'secondary'
+    }
+  })
 }
 
 const calibration = computed(() => ({
@@ -204,23 +254,7 @@ const formatter = new Intl.NumberFormat('en-US', {
       <Button
         label="Save"
         :disabled="!mzFit.current || !mzFit.stats || mzFit.status === 'error'"
-        @click="
-          async () => {
-            if (batch) {
-              await api.http.post(
-                `/calibration/mz_calibrate/batch/${original.sample_batch_id}`,
-                mzFit.mzCalibrationParams,
-                {
-                  use: 'process',
-                  type: 'recalibrate_batch'
-                }
-              )
-            } else {
-              await mzFit.apply(original)
-            }
-            visible = false
-          }
-        "
+        @click="save"
       />
     </menu>
   </Dialog>

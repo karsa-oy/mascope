@@ -12,6 +12,7 @@ import Tab from 'primevue/tab'
 import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 import TextArea from 'primevue/textarea'
+import { useConfirm } from 'primevue/useconfirm'
 
 import { api } from '@/api'
 
@@ -26,6 +27,7 @@ import PaneSelectTargets from './PaneSelectTargets.vue'
 import PaneSelectMechanisms from './PaneSelectMechanisms.vue'
 
 const app = useApp()
+const confirm = useConfirm()
 
 const props = defineProps({
   batch: {
@@ -170,6 +172,17 @@ const showCalibrantsTab = computed(() => {
   return true // Default fallback
 })
 
+const calibrationChanged = computed(
+  () =>
+    ready.value &&
+    (!equals(selected.calibrants, initial.calibrants, 'target_collection_id') ||
+      !equals(
+        selected.mechanisms.calibration,
+        initial.mechanisms.calibration,
+        'ionization_mechanism_id'
+      ))
+)
+
 // initialization
 watch(action, init)
 async function init(value) {
@@ -242,7 +255,7 @@ async function execute() {
     case 'update':
     case 'update_targets': {
       await app.data.batch.update(updated.value)
-      if (!equals(selected.calibrants, initial.calibrants, 'target_collection_id')) {
+      if (calibrationChanged.value) {
         const mzFit = useMzFit({ unmount: true })
         await api.http.post(
           `/calibration/mz_calibrate/batch/${original.value.sample_batch_id}`,
@@ -255,6 +268,25 @@ async function execute() {
       }
       break
     }
+  }
+}
+async function save() {
+  if (calibrationChanged.value && ['update', 'update_targets'].includes(action.value)) {
+    confirm.require({
+      icon: 'pi pi-exclamation-triangle',
+      header: 'Confirm calibration',
+      message: `Updating calibration settings will remove matches for all associated samples in this and other batches. This action cannot be undone. Are you sure you want to proceed?`,
+      accept: execute,
+      acceptProps: {
+        label: 'Continue'
+      },
+      rejectProps: {
+        label: 'Cancel',
+        severity: 'secondary'
+      }
+    })
+  } else {
+    await execute()
   }
 }
 </script>
@@ -326,7 +358,7 @@ async function execute() {
 
     <menu>
       <Button label="Cancel" @click="action = null" icon="pi pi-times" severity="secondary" />
-      <Button label="Save" @click="execute" icon="pi pi-save" :disabled="invalid" />
+      <Button label="Save" @click="save" icon="pi pi-save" :disabled="invalid" />
     </menu>
   </Dialog>
 </template>
