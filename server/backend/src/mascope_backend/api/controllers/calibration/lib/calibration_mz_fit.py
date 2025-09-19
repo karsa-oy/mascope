@@ -254,19 +254,27 @@ class OrbiCalibrationHandler(BaseCalibrationHandler):
         target_mzs = good_matches_df["mz"].to_numpy()
         observed_mzs = good_matches_df["sample_peak_mz"].to_numpy()
 
-        mz_ratios = target_mzs / observed_mzs
-        calibration_factor = np.median(mz_ratios)
-
+        old_factor_scaling = np.median(target_mzs / observed_mzs)
+        old_factor = self._get_old_factor()
+        calibration_factor = old_factor * old_factor_scaling
+        # Store all factors at the time of fitting for unit testing
         self.fit_result = {
             "mode": "one-point",
-            "par": {"calibration_factor": calibration_factor},
+            "par": {
+                "old_factor": old_factor,
+                "old_factor_scaling": old_factor_scaling,
+                "calibration_factor": calibration_factor,
+            },
         }
+
+        # Show stats relative to the original m/z values
+        original_observed_mzs = observed_mzs / old_factor
         self.stats = {
-            "mz": observed_mzs,
-            "new_mz": observed_mzs * calibration_factor,
-            "pre_dmz": 1e6 * (observed_mzs - target_mzs) / target_mzs,
+            "mz": original_observed_mzs,
+            "new_mz": original_observed_mzs * calibration_factor,
+            "pre_dmz": 1e6 * (original_observed_mzs - target_mzs) / target_mzs,
             "post_dmz": 1e6
-            * (observed_mzs * calibration_factor - target_mzs)
+            * (original_observed_mzs * calibration_factor - target_mzs)
             / target_mzs,
         }
 
@@ -295,37 +303,39 @@ class OrbiCalibrationHandler(BaseCalibrationHandler):
 
     async def apply(self, fit: dict):
         """Applies the m/z calibration fit to the sample file.
-        NOTE: fit is passed externally since fit() and apply() used in different controllers
-        and the instance of TofCalibrationHandler is not passed between them."""
+        M/z scales for existing signals and peaks are scaled based on a new calibration.
+        A new calibration factor is stored for new sum signals and
+        signals to be generated later.
+        """
         fit_parameters = fit["par"]
-        factor = fit_parameters["calibration_factor"]
+        old_factor_scaling = fit_parameters["old_factor_scaling"]
+        if self._is_calibration_already_applied(fit):
+            runtime.logger.info("Same calibration already applied; skipping.")
+            return m_io.load_coord(self.filename, "sum_signal", "mz")
 
         runtime.logger.info(f"Calibrating file: {self.filename}")
 
-        # Update m/z axis for all sum signals
+        # Update m/z axis for all existing sum signals
         sample_data_path = m_name.parse_path_from_item_filename(self.filename)
         sample_file_vars = m_io.get_file_data_vars(sample_data_path)
-        for sum_signal_var in sample_file_vars:
-            if sum_signal_var.startswith("sum_signal"):
+        for var in sample_file_vars:
+            if var.startswith("sum_signal"):
                 new_mz_axis = (
-                    m_io.load_coord(self.filename, sum_signal_var, "mz") * factor
+                    m_io.load_coord(self.filename, var, "mz") * old_factor_scaling
                 )
-                m_io.update_zarr_array_coord(
-                    self.filename, sum_signal_var, "mz", new_mz_axis
-                )
-
-        # Update sample file properties
-        full_sum_signal_mz = m_io.load_coord(self.filename, "sum_signal", "mz")
-        new_mz_range = full_sum_signal_mz[0], full_sum_signal_mz[-1]
-        m_io.update_props(self.filename, {"range": new_mz_range, "mz_calibration": fit})
-        sample_file_type = m_name.get_sample_file_type(self.filename)
+                m_io.update_zarr_array_coord(self.filename, var, "mz", new_mz_axis)
 
         # Update m/z axis for signal and peak arrays if they exist
+        sample_file_type = m_name.get_sample_file_type(self.filename)
         if sample_file_type == "orbi_zarr":
-            new_signal_mz = m_io.load_array(self.filename, "signal").mz.values * factor
+            new_signal_mz = (
+                m_io.load_array(self.filename, "signal").mz.values * old_factor_scaling
+            )
             m_io.update_zarr_array_coord(self.filename, "signal", "mz", new_signal_mz)
         try:
-            new_peak_mz = m_io.load_coord(self.filename, "peak_areas", "mz") * factor
+            new_peak_mz = (
+                m_io.load_coord(self.filename, "peak_areas", "mz") * old_factor_scaling
+            )
             m_io.update_zarr_array_coord(self.filename, "peak_areas", "mz", new_peak_mz)
             m_io.update_zarr_array_coord(
                 self.filename, "peak_heights", "mz", new_peak_mz
@@ -335,7 +345,38 @@ class OrbiCalibrationHandler(BaseCalibrationHandler):
                 f"Peak_areas/heights not found in {self.filename}, "
                 "thus their m/z coordinates were not updated."
             )
-        return new_mz_axis
+
+        # Remove excessive items
+        fit["par"].pop("old_factor", None)
+        fit["par"].pop("old_factor_scaling", None)
+        # Update sample file properties
+        full_sum_signal_mz = m_io.load_coord(self.filename, "sum_signal", "mz")
+        new_mz_range = full_sum_signal_mz[0], full_sum_signal_mz[-1]
+        m_io.update_props(self.filename, {"range": new_mz_range, "mz_calibration": fit})
+
+        return full_sum_signal_mz
+
+    def _get_old_factor(self) -> float:
+        """Retrieve the old calibration factor from the file properties if exists."""
+        props = m_io.read_props(self.filename)
+        old_mz_calibration = props["mz_calibration"]
+        if old_mz_calibration is None:
+            old_factor = 1.0
+        else:
+            old_factor = old_mz_calibration["par"]["calibration_factor"]
+        return old_factor
+
+    def _is_calibration_already_applied(self, fit: dict) -> bool:
+        """Check if the calibration has already been applied."""
+        props = m_io.read_props(self.filename)
+        existing_calibration = props["mz_calibration"]
+        if (
+            existing_calibration
+            and existing_calibration["par"]["calibration_factor"]
+            == fit["par"]["calibration_factor"]
+        ):
+            return True
+        return False
 
 
 def get_calibration_handler(
