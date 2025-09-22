@@ -255,6 +255,15 @@ class BasePeakDetector(ABC):
             peak_mzs, peak_areas, peak_heights
         )
 
+        if self.calibration_factor != 1.0:
+            # Apply calibration factor
+            peak_profiles_area = peak_profiles_area.assign_coords(
+                mz=peak_profiles_area.mz.values * self.calibration_factor
+            )
+            peak_profiles_height = peak_profiles_height.assign_coords(
+                mz=peak_profiles_height.mz.values * self.calibration_factor
+            )
+
         runtime.logger.info(f"Writing peaks to file {self._filename}")
 
         overwrite_peak_dataset = if_exists in {"append", "replace"}
