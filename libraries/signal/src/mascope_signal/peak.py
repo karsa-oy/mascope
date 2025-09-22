@@ -275,6 +275,13 @@ class BasePeakDetector(ABC):
 
 
 class OrbiPeakDetector(BasePeakDetector):
+    @property
+    def calibration_factor(self):
+        calibration = self._sample_file_props["mz_calibration"]
+        if calibration is None:
+            return 1.0
+        return calibration["par"]["calibration_factor"]
+
     async def detect_peaks(
         self, if_exists: Literal["fail", "append", "replace"] = "fail", **kwargs
     ):
@@ -286,6 +293,10 @@ class OrbiPeakDetector(BasePeakDetector):
         :rtype: xarray.Dataset
         """
         old_peak_mzs, old_peak_areas, old_peak_heights = self._load_old_peaks(if_exists)
+        if old_peak_mzs != [] and self.calibration_factor != 1.0:
+            # Revert calibration for old peaks
+            old_peak_mzs = [mz / self.calibration_factor for mz in old_peak_mzs]
+
         self._update_u_list(if_exists, old_peak_mzs)
         no_peaks_to_fit = not self._validate_u_list()
         if no_peaks_to_fit:
@@ -372,6 +383,48 @@ class OrbiPeakDetector(BasePeakDetector):
             return peak_mzs, peak_heights, resolutions
 
         return peak_mzs, peak_heights, resolutions
+
+    def _finalize(self, all_peak_mzs, all_peak_areas, all_peak_heights, if_exists):
+        """Helper function to finalize peak detection by:
+        - sorting
+        - filtering
+        - calculating profiles
+        - writing to file
+        """
+        peak_mzs, peak_areas, peak_heights = self._sort_and_filter_peaks(
+            all_peak_mzs, all_peak_areas, all_peak_heights
+        )
+
+        runtime.logger.debug("Computing peak profiles...")
+        peak_profiles_area, peak_profiles_height = self._calculate_peak_profiles(
+            peak_mzs, peak_areas, peak_heights
+        )
+
+        if self.calibration_factor != 1.0:
+            # Apply calibration factor
+            peak_profiles_area = peak_profiles_area.assign_coords(
+                mz=peak_profiles_area.mz.values * self.calibration_factor
+            )
+            peak_profiles_height = peak_profiles_height.assign_coords(
+                mz=peak_profiles_height.mz.values * self.calibration_factor
+            )
+
+        runtime.logger.info(f"Writing peaks to file {self._filename}")
+
+        overwrite_peak_dataset = if_exists in {"append", "replace"}
+        write_peaks(
+            peak_profiles_area,
+            peak_profiles_height,
+            self._filename,
+            overwrite_peak_dataset,
+        )
+
+        runtime.logger.info("Complete")
+        sample_file_data = load_file(
+            self._filename,
+            vars=["peak_areas", "peak_heights"],
+        )
+        return sample_file_data
 
 
 class TofPeakDetector(BasePeakDetector):
