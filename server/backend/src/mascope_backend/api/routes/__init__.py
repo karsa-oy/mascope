@@ -9,6 +9,9 @@ from mascope_backend.api.new.users.owner.routes import owner_router
 from mascope_backend.api.new.roles.routes import roles_router
 from mascope_backend.api.new.params import params_router
 from mascope_backend.api.new.instruments import instruments_router
+from mascope_backend.api.new.ionization_mode.routes import (
+    ionization_mode_router,
+)
 from mascope_backend.api.new.temp.routes import temp_router
 from mascope_backend.api.new.instrument_configs.routes import (
     instrument_configs_router,
@@ -109,6 +112,7 @@ routers = [
     target_ions_router,
     target_isotopes_router,
     ionization_mechanisms_router,
+    ionization_mode_router,
     instruments_router,
     instrument_configs_router,
     instrument_configs_process_router,

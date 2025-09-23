@@ -1,0 +1,191 @@
+import pandas as pd
+
+from sqlalchemy import select, or_
+from mascope_backend.db import async_session
+from mascope_backend.db.models import (
+    IonizationMode,
+    SampleFile,
+    SampleItem,
+)
+
+from mascope_backend.runtime import runtime
+
+
+async def fetch_all_ionization_modes() -> list[IonizationMode]:
+    """Fetch all ionization modes from the database.
+
+    :return: A list of all ionization modes.
+    :rtype: list[IonizationMode]
+    """
+    async with async_session() as session:
+        result = await session.execute(select(IonizationMode))
+        ionization_modes = result.scalars().all()
+        return ionization_modes
+
+
+async def fetch_batch_ionization_mechanism_ids(sample_batch_id: str) -> list[str]:
+    """Fetch ionization mechanism IDs for a given sample batch.
+
+    :param sample_batch_id: The ID of the sample batch to fetch ionization mechanism IDs for.
+    :type sample_batch_id: str
+    :return: A list of ionization mechanism IDs associated with the sample batch.
+    :rtype: list[str]
+    """
+    async with async_session() as session:
+        # Get samples
+        result = await session.execute(
+            select(SampleItem).where(SampleItem.sample_batch_id == sample_batch_id)
+        )
+        batch_sample_items = result.scalars().all()
+        # Collect unique ionization mode ids in the batch samples
+        batch_ion_mode_ids = list(
+            set([item.ionization_mode_id for item in batch_sample_items])
+        )
+        # Get the ionization modes
+        result = await session.execute(
+            select(IonizationMode).where(
+                IonizationMode.ionization_mode_id.in_(batch_ion_mode_ids)
+            )
+        )
+        batch_ion_modes = result.scalars().all()
+        batch_ionization_mechanism_ids = list(
+            set(
+                ionization_mechanism_id
+                for ion_mode in batch_ion_modes
+                for ionization_mechanism_id in ion_mode.ionization_mechanism_ids
+            )
+        )
+        return batch_ionization_mechanism_ids
+
+
+async def fetch_sample_ionization_mechanism_ids(sample_item_id: str) -> list[str]:
+    """Fetch ionization mechanism IDs for a given sample item.
+
+    :param sample_item_id: The ID of the sample item to fetch ionization mechanism IDs for.
+    :type sample_item_id: str
+    :return: A list of ionization mechanism IDs associated with the sample item.
+    :rtype: list[str]
+    """
+    async with async_session() as session:
+        # Get samples
+        result = await session.execute(
+            select(SampleItem).where(SampleItem.sample_item_id == sample_item_id)
+        )
+        sample_item = result.scalars().one_or_none()
+        if not sample_item:
+            return []  # TODO: Should raise?
+
+        # Get the ionization mode
+        result = await session.execute(
+            select(IonizationMode).where(
+                IonizationMode.ionization_mode_id == sample_item.ionization_mode_id
+            )
+        )
+        sample_ion_mode = result.scalars().one_or_none()
+
+        return sample_ion_mode.ionization_mechanism_ids
+
+
+async def resolve_ionization_modes_by_peaks(
+    sample_file: SampleFile,
+) -> list[IonizationMode]:
+    """Resolve ionization modes based on peaks in the sample file.
+
+    :param sample_file: The sample file to resolve ionization modes for.
+    :type sample_file: SampleFile
+    :raises NotImplementedError: Not implemented yet.
+    :return: A list of resolved ionization modes.
+    :rtype: list[IonizationMode]
+    """
+
+    # Import here to avoid circular imports
+    from mascope_backend.api.controllers.target.isotopes.target_isotopes_controller import (
+        get_target_isotopes,
+    )
+
+    all_ionization_modes = await fetch_all_ionization_modes()
+    for ionization_mode in all_ionization_modes:
+        if ionization_mode.ionization_mode_polarity not in sample_file.polarity:
+            continue
+        calibration_collection_id = ionization_mode.calibration_collection_id
+        calibration_isotopes_response = await get_target_isotopes(
+            target_collection_id=calibration_collection_id
+        )
+        calibration_isotopes_df = pd.DataFrame(
+            calibration_isotopes_response.get("data", [])
+        )
+        # TODO: Match the calibration isotopes to the peaks in the sample file
+        raise NotImplementedError(
+            "Resolving ionization modes by peaks. Calibration isotopes matching not implemented yet",
+        )
+
+
+async def resolve_ionization_modes_by_tokens(
+    sample_file: SampleFile,
+) -> list[IonizationMode]:
+    """Resolve ionization modes based on tokens in the sample file.
+
+    :param sample_file: The sample file to resolve ionization modes for.
+    :type sample_file: SampleFile
+    :return: A list of resolved ionization modes.
+    :rtype: list[IonizationMode]
+    """
+    runtime.logger.debug(
+        f"Resolving ionization modes by tokens for {sample_file.filename}"
+    )
+    # Fetch all ionization modes
+    all_ionization_modes = await fetch_all_ionization_modes()
+    # Match ionization modes based on tokens in the filename
+    matched_ionization_modes = []
+    for ionization_mode in all_ionization_modes:
+        runtime.logger.debug(
+            f"Checking ionization mode with token: {ionization_mode.ionization_mode_token}"
+        )
+        if (
+            ionization_mode.ionization_mode_token
+            and ionization_mode.ionization_mode_polarity in sample_file.polarity
+            and ionization_mode.ionization_mode_token in sample_file.filename
+        ):
+            runtime.logger.debug(
+                f"Matched ionization mode token: {ionization_mode.ionization_mode_token} "
+                f"with filename: {sample_file.filename}"
+            )
+            matched_ionization_modes.append(ionization_mode)
+    return matched_ionization_modes
+
+
+async def token_is_unique(token: str) -> bool:
+    """Validate if an ionization mode token overlaps with an existing one.
+
+    Note: This checks for overlapping tokens, not exact matches. Also, it still
+    does not completely guarantee that a specific filename would only match one token.
+
+    :param token: The ionization mode token to validate.
+    :type token: str
+    :return: True if the token is unique, False otherwise.
+    :rtype: bool
+    """
+    async with async_session() as session:
+        # First check if any existing token contains the new token
+        result = await session.execute(
+            select(IonizationMode).where(
+                IonizationMode.ionization_mode_token.contains(token)
+            )
+        )
+        if result.scalars().first():
+            return False
+
+        # Then fetch all existing tokens and check if new token contains any of them
+        all_modes = await fetch_all_ionization_modes()
+
+        # Check if the new token contains any existing token
+        for mode in all_modes:
+            if not mode.ionization_mode_token:
+                continue
+            if mode.ionization_mode_token in token:
+                runtime.logger.debug(
+                    f"New token '{token}' contains existing token '{mode.ionization_mode_token}'"
+                )
+                return False
+
+        return True
