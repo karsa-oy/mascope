@@ -9,9 +9,7 @@ import { useUi } from '../ui'
 
 import { useWorkspace } from './workspace'
 import { useSample } from './sample'
-import { useTargetCollection } from './target'
 import { useMatchCollection } from './match'
-import { useMechanism } from './mechanism'
 import { useAcquisition } from './acquisition'
 
 export const useBatch = defineModule({
@@ -134,10 +132,8 @@ export const useBatch = defineModule({
    * @returns {Promise<void>} - This function does not return a value but triggers a file download.
    */
   exportCsv: async ({ sample_batch_id }) => {
-    const targetCollection = useTargetCollection()
     const workspace = useWorkspace()
     const matchCollection = useMatchCollection()
-    const mechanism = useMechanism()
 
     if (!sample_batch_id) {
       console.error('📄 [export] no sample batch ID provided.')
@@ -176,25 +172,7 @@ export const useBatch = defineModule({
               matchCollection.list?.map((row) => row.target_collection_name).join(', ') ?? 'none'
           },
           { field: '', value: '' },
-          { field: 'Parameters', value: '' },
-          {
-            field: 'Calibration collection',
-            value:
-              targetCollection.list.find(
-                (coll) => coll.target_collection_id === batch.build_params.calibration_collection
-              )?.target_collection_name ?? batch.build_params.calibration_collection
-          },
-          {
-            field: 'Ion mechanisms',
-            value: (batch.build_params.ion_mechanisms ?? [])
-              .map(
-                (id) =>
-                  mechanism.list.find((mechanism) => mechanism.ionization_mechanism_id === id)
-                    ?.ionization_mechanism
-              )
-              .filter(Boolean)
-              .join(', ')
-          }
+          { field: 'Parameters', value: '' }
         ],
         cols: [
           { field: 'field', label: 'Batch' },

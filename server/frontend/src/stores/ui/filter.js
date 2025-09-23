@@ -11,13 +11,9 @@ export const useFilter = defineStore('app.ui.filter', () => {
 
   // autoremoval of mechanism filters
   watch(
-    () => data.batch.focused?.build_params?.ionization_mechanisms ?? [],
-    (batchMechanisms) => {
-      const noMechanisms = batchMechanisms.length == 0
-      const filterMechanismNotInBatch = !(mechanism.value in batchMechanisms)
-      if (noMechanisms || filterMechanismNotInBatch) {
-        mechanism.value = null
-      }
+    () => data.batch.focused,
+    () => {
+      mechanism.value = null
     }
   )
 
