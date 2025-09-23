@@ -23,38 +23,6 @@ from mascope_backend.api.models.base_pydantic_model import QueryParamsModel
 from mascope_backend.api.models.sample.batches.config import sample_batch_config
 
 
-class BuildParams(BaseModel):
-    calibration_collection: str | None = Field(
-        None, description="ID of the calibration collection (optional for ACQUISITION)"
-    )
-    ion_mechanisms: list[str] = Field(
-        ..., description="List of ionisation mechanism IDs for matching"
-    )
-    calibration_ion_mechanisms: list[str] | None = Field(
-        [], description="List of ionisation mechanism IDs for calibration"
-    )
-
-    @field_validator("calibration_collection")
-    @classmethod
-    def check_calibration_collection_length(cls, v):
-        """Validate length if calibration_collection is provided"""
-        if v is not None:
-            # Convert empty strings to None
-            if isinstance(v, str) and v.strip() == "":
-                return None
-            # Validate length for non-empty values
-            if len(v) != 16:
-                raise ValueError("Only one calibration collection can be applied")
-        return v
-
-    @field_validator("ion_mechanisms")
-    @classmethod
-    def check_ion_mechanisms_non_empty(cls, v):
-        if len(v) == 0:
-            raise ValueError("At least one ionization mechanism must be provided")
-        return v
-
-
 class SampleBatchBaseValidator:
     """Base validation logic for sample batch shared fields."""
 
@@ -135,10 +103,6 @@ class SampleBatchBase(SampleBatchValidator, BaseModel):
         default=sample_batch_config.ANALYSIS_POLARITY,
         description="Polarity of the sample batch (+, -, or +-)",
     )
-    build_params: BuildParams = Field(
-        ..., description="Build parameters of the sample batch"
-    )
-
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -182,9 +146,6 @@ class SampleBatchUpdate(SampleBatchBaseValidator, BaseModel):
     sample_batch_name: str | None = Field(None, description="Name of the sample batch")
     sample_batch_description: str | None = Field(
         None, description="Description of the sample batch"
-    )
-    build_params: BuildParams = Field(
-        ..., description="Build parameters of the sample batch"
     )
     target_collection_ids: list[str] = Field(
         ..., description="IDs of target collections associated with the sample batch"

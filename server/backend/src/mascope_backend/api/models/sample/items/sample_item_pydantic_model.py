@@ -99,7 +99,7 @@ class SampleItemValidator(SampleItemBaseValidator, CommonValidators):
         return values
 
 
-class SampleItemBase(SampleItemValidator, BaseModel):
+class SampleItemBase(BaseModel):
     """Base model with common fields for sample items."""
 
     sample_batch_id: str = Field(..., description="ID of the associated sample batch")
@@ -114,18 +114,28 @@ class SampleItemBase(SampleItemValidator, BaseModel):
     )
     tic: float = Field(..., description="TIC of the sample item")
     polarity: str = Field(..., description="Polarity of the sample item")
+    ionization_mode_id: str = Field(
+        ..., description="ID of the ionization mode used for the sample item"
+    )
     t0: float = Field(..., description="Start time of the sample item")
     t1: float = Field(..., description="End time of the sample item")
 
     model_config = ConfigDict(from_attributes=True)
 
 
-class SampleItemCreate(SampleItemBase):
+class SampleItemCreate(SampleItemValidator, SampleItemBase):
     """Model for creating sample items with optional time and TIC values."""
 
     tic: float | None = Field(None, description="TIC of the sample item")
     t0: float | None = Field(None, description="Start time of the sample item")
     t1: float | None = Field(None, description="End time of the sample item")
+    ionization_mode_id: str | None = Field(
+        None,
+        description=(
+            "ID of the ionization mode used for the sample item. ",
+            "Optional for creation, as it will be inferred from the filename.",
+        ),
+    )
 
 
 class SampleItemRead(SampleItemBase):
@@ -138,6 +148,9 @@ class SampleItemRead(SampleItemBase):
         None,
         description="Polarity of the sample item, made optional for old samples without polarity",
     )
+    ionization_mode_id: str | None = Field(
+        None, description="ID of the ionization mode used for the sample item"
+    )
     locked: int = Field(
         ..., description="Lock status of the sample item (0=unlocked, 1=locked)"
     )
@@ -149,7 +162,7 @@ class SampleItemRead(SampleItemBase):
     )
 
 
-class SampleItemUpdate(SampleItemBase):
+class SampleItemUpdate(SampleItemValidator, SampleItemBase):
     """Model for updating sample items - excludes system-only sample item types."""
 
     @field_validator("sample_item_type")
