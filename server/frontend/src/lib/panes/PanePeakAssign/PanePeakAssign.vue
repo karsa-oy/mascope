@@ -120,9 +120,13 @@ watch(
 watchEffect(() => {
   // Only proceed if chemConfig is loaded
   if (!chemConfig.value) return
-
-  ionMechs.value = app.data.batch.focused.build_params.ion_mechanisms.map((id) =>
-    app.data.mechanism.list.find(({ ionization_mechanism_id }) => id === ionization_mechanism_id)
+  const ionMode = app.data.ionization.mode.list.find(
+    (im) => im.ionization_mode_id === app.data.sample.focused.ionization_mode_id
+  )
+  ionMechs.value = ionMode.ionization_mechanism_ids.map((id) =>
+    app.data.ionization.mechanism.list.find(
+      ({ ionization_mechanism_id }) => id === ionization_mechanism_id
+    )
   )
   params.mzPrecision = chemConfig.value.DEFAULT_MZ_PRECISION
   params.formulaRange = chemConfig.value.DEFAULT_FORMULA_RANGE
@@ -240,7 +244,7 @@ const expanded = ref({})
             id="ionmechs"
             v-model="ionMechs"
             dataKey="ionization_mechanism_id"
-            :options="app.data.mechanism.list"
+            :options="app.data.ionization.mechanism.list"
             optionLabel="ionization_mechanism"
             fluid
           />
