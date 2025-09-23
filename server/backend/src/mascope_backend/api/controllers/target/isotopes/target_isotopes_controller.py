@@ -15,6 +15,9 @@ from mascope_backend.db.models import (
 )
 from mascope_backend.api.lib.api_features import api_controller
 from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
+from mascope_backend.api.new.ionization_mode.util import (
+    fetch_batch_ionization_mechanism_ids,
+)
 
 
 async def get_target_isotopes(
@@ -157,9 +160,9 @@ async def get_target_isotopes(
                         f"Sample batch with id {sample_batch_id} not found"
                     )
 
-                batch_ionization_mechanism_ids = sample_batch.build_params[
-                    "ion_mechanisms"
-                ]
+                batch_ionization_mechanism_ids = (
+                    await fetch_batch_ionization_mechanism_ids(sample_batch_id)
+                )
                 # Since we have eager loaded the target_collection, we can fetch the m directly from sample_batch
                 target_collection_ids = [
                     tc.target_collection_id for tc in sample_batch.target_collection

@@ -1,3 +1,6 @@
+from mascope_backend.api.new.ionization_mode.util import (
+    fetch_sample_ionization_mechanism_ids,
+)
 import pandas as pd
 
 from sqlalchemy import (
@@ -16,6 +19,7 @@ from mascope_backend.db.models import (
     TargetCompound,
     TargetIon,
     IonizationMechanism,
+    IonizationMode,
     TargetIsotope,
     TargetCompoundInTargetCollection,
     TargetCollection,
@@ -104,10 +108,6 @@ async def aggregate_match_isotope_filtered_data(
                 f"Sample batch with ID '{sample_batch_id}' not found"
             )
 
-        # Step 2: Extract ion mechanisms from sample batch's build parameters
-        build_params = sample_batch.build_params
-        sample_batch_ion_mechanisms = build_params.get("ion_mechanisms", [])
-
         # Step 3: Construct and execute structured queries
         # a) Query for fetching basic samples information
         sample_query = select(
@@ -117,6 +117,7 @@ async def aggregate_match_isotope_filtered_data(
             Sample.sample_item_name,
             Sample.sample_item_type,
             Sample.polarity,
+            Sample.ionization_mode_id,
         ).where(Sample.sample_batch_id == sample_batch_id)
 
         # Apply sample_item_id filter if provided
@@ -134,9 +135,21 @@ async def aggregate_match_isotope_filtered_data(
             return samples_df
 
         sample_item_ids = samples_df["sample_item_id"].tolist()
-        # Extract unique polarities from samples for ionization mechanism filtering
-        # Note: polarity is required for new samples, nullable only for legacy compatibility
-        sample_polarities = samples_df["polarity"].unique().tolist()
+
+        # Get all ionization mechanism ids related to the samples in the batch
+        # TODO: Currently this does not take into account that samples may have different
+        # ionization modes, and thus different ionization mechanisms.
+        sample_ionization_mode_ids = samples_df["ionization_mode_id"].unique().tolist()
+        sample_ionization_mechanism_ids = []
+        result = await session.execute(
+            select(IonizationMode.ionization_mechanism_ids).where(
+                IonizationMode.ionization_mode_id.in_(sample_ionization_mode_ids)
+            )
+        )
+        ionization_mechanism_id_lists = result.scalars().all()
+        sample_ionization_mechanism_ids = list(
+            set(im_id for im_list in ionization_mechanism_id_lists for im_id in im_list)
+        )
 
         # b) Query to get relevant Target data
         target_query = (
@@ -184,14 +197,9 @@ async def aggregate_match_isotope_filtered_data(
                 == TargetIon.ionization_mechanism_id,
             )
             .where(
-                and_(
-                    IonizationMechanism.ionization_mechanism_id.in_(
-                        sample_batch_ion_mechanisms
-                    ),
-                    IonizationMechanism.ionization_mechanism_polarity.in_(
-                        sample_polarities
-                    ),
-                )
+                IonizationMechanism.ionization_mechanism_id.in_(
+                    sample_ionization_mechanism_ids
+                ),
             )
             .join(
                 TargetIsotope,

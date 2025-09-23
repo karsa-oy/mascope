@@ -18,10 +18,12 @@ from mascope_backend.db.models import (
     TargetCompoundInTargetCollection,
     TargetCollectionInSampleBatch,
     IonizationMechanism,
+    IonizationMode,
     MatchIsotope,
 )
-from mascope_backend.api.lib.exceptions.api_exceptions import (
-    NotFoundException,
+from mascope_backend.api.new.ionization_mode.util import (
+    fetch_batch_ionization_mechanism_ids,
+    fetch_sample_ionization_mechanism_ids,
 )
 from mascope_backend.runtime import runtime
 
@@ -64,24 +66,15 @@ async def fetch_sample_orphaned_match_data(sample: Sample) -> OrphanedMatchData:
     :rtype: OrphanedMatchData
     """
     async with async_session() as session:
-        # Get batch ionization mechanism IDs from build_params
-        if not (sample_batch := await session.get(SampleBatch, sample.sample_batch_id)):
-            raise NotFoundException(
-                f"Sample batch with ID '{sample.sample_batch_id}' not found"
-            )
-
-        batch_ion_mechanism_ids = sample_batch.build_params.get("ion_mechanisms", [])
+        sample_ion_mechanism_ids = await fetch_sample_ionization_mechanism_ids(
+            sample.sample_item_id
+        )
 
         # subquery for valid target isotopes
         valid_targets_subquery = (
             select(1)
             .select_from(TargetIsotope)
             .join(TargetIon)
-            .join(
-                IonizationMechanism,
-                IonizationMechanism.ionization_mechanism_id
-                == TargetIon.ionization_mechanism_id,
-            )
             .join(
                 TargetCompound,
                 TargetCompound.target_compound_id == TargetIon.target_compound_id,
@@ -99,8 +92,7 @@ async def fetch_sample_orphaned_match_data(sample: Sample) -> OrphanedMatchData:
             .where(
                 TargetIsotope.target_isotope_id == MatchIsotope.target_isotope_id,
                 TargetCollectionInSampleBatch.sample_batch_id == sample.sample_batch_id,
-                TargetIon.ionization_mechanism_id.in_(batch_ion_mechanism_ids),
-                IonizationMechanism.ionization_mechanism_polarity == sample.polarity,
+                TargetIon.ionization_mechanism_id.in_(sample_ion_mechanism_ids),
             )
         )
 
@@ -177,7 +169,9 @@ async def fetch_batch_orphaned_match_data(
     :rtype: OrphanedMatchData
     """
     async with async_session() as session:
-        batch_ion_mechanism_ids = sample_batch.build_params.get("ion_mechanisms", [])
+        batch_ion_mechanism_ids = await fetch_batch_ionization_mechanism_ids(
+            sample_batch.sample_batch_id
+        )
 
         # Valid targets subquery
         valid_targets_subquery = (
@@ -211,8 +205,9 @@ async def fetch_batch_orphaned_match_data(
                 TargetIsotope.target_isotope_id == MatchIsotope.target_isotope_id,
                 TargetCollectionInSampleBatch.sample_batch_id
                 == sample_batch.sample_batch_id,
-                TargetIon.ionization_mechanism_id.in_(batch_ion_mechanism_ids),
-                IonizationMechanism.ionization_mechanism_polarity == Sample.polarity,
+                TargetIon.ionization_mechanism_id.in_(
+                    batch_ion_mechanism_ids
+                ),  # TODO: As is, this will only work if all samples in the batch share the same ionization mechanisms
                 Sample.sample_item_id == MatchIsotope.sample_item_id,
             )
         )

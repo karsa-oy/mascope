@@ -40,6 +40,9 @@ from mascope_backend.api.controllers.target.lib.compute.target_ions_compute impo
     generate_target_ions_from_composition,
     generate_target_ions_from_mass,
 )
+from mascope_backend.api.new.ionization_mode.util import (
+    fetch_sample_ionization_mechanism_ids,
+)
 from mascope_match.params import BaseMatchParams
 
 
@@ -202,27 +205,19 @@ async def aggregate_sample_match_compound(
         # Step 1: Fetch sample related data and verify its existence
         sample = await fetch_sample(sample_item_id)
 
-        # Fetch sample batch data and verify its existence
-        sample_batch = await session.get(SampleBatch, sample.sample_batch_id)
-        if not sample_batch:
-            raise NotFoundException(
-                f"Sample batch with ID '{sample.sample_batch_id}' not found"
-            )
-
-        # Extract ion_mechanisms IDs from build_params
-        ion_mechanisms_ids = sample_batch.build_params.get("ion_mechanisms", [])
+        ion_mechanisms_ids = await fetch_sample_ionization_mechanism_ids(sample_item_id)
         if not ion_mechanisms_ids:
             raise ValueError(
-                f"There are no ion mechanisms for sample batch '{sample_batch.sample_batch_name}'."
+                f"There are no ion mechanisms for sample item '{sample.sample_item_name}'."
             )
 
         # Fetch the ionization mechanisms from the database using the extracted IDs
-        restult = await session.execute(
+        result = await session.execute(
             select(IonizationMechanism).filter(
                 IonizationMechanism.ionization_mechanism_id.in_(ion_mechanisms_ids)
             )
         )
-        ionization_mechanisms = restult.scalars().all()
+        ionization_mechanisms = result.scalars().all()
         if not ionization_mechanisms:
             raise NotFoundException(
                 f"Ionization mechanisms with IDs {ion_mechanisms_ids} not found"
@@ -356,20 +351,10 @@ async def aggregate_sample_match_compounds(
         # Step 1: Fetch sample related data and verify its existence
         sample = await fetch_sample(sample_item_id)
 
-        # Fetch sample batch data and verify its existence
-        sample_batch = await session.get(SampleBatch, sample.sample_batch_id)
-        if not sample_batch:
-            raise NotFoundException(
-                f"Sample batch with ID '{sample.sample_batch_id}' not found"
-            )
-
-        # Extract ion_mechanisms IDs from build_params
-        ion_mechanisms_ids = ion_mechanism_ids or sample_batch.build_params.get(
-            "ion_mechanisms", []
-        )
+        ion_mechanisms_ids = await fetch_sample_ionization_mechanism_ids(sample_item_id)
         if not ion_mechanisms_ids:
             raise ValueError(
-                f"No ion mechanisms were provided, and there are no ion mechanisms for sample batch '{sample_batch.sample_batch_name}'."
+                f"No ion mechanisms were provided, and there are no ion mechanisms for sample item '{sample.sample_item_name}'."
             )
 
         # Fetch the ionization mechanisms from the database using the extracted IDs
