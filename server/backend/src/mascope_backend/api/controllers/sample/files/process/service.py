@@ -36,20 +36,17 @@ from mascope_backend.api.controllers.match.match_controller import (
     match_compute_sample,
     rematch_samples,
 )
-from mascope_backend.api.controllers.target.collections.target_collections_controller import (
-    get_target_collections,
-)
-from mascope_backend.api.controllers.ionization_mechanisms.ionization_mechanisms_controller import (
-    get_ionization_mechanisms,
-)
 from mascope_backend.api.models.sample.items.sample_item_pydantic_model import (
     SampleItemCreate,
 )
 from mascope_backend.api.models.sample.batches.sample_batch_pydantic_model import (
     SampleBatchCreate,
-    BuildParams,
 )
 from mascope_backend.api.models.sample.batches.config import sample_batch_config
+from mascope_backend.api.new.ionization_mode.util import (
+    resolve_ionization_modes_by_peaks,
+    resolve_ionization_modes_by_tokens,
+)
 
 
 from mascope_backend.runtime import runtime
@@ -223,11 +220,39 @@ async def create_acquisition_batches_and_items(
     sample_items_to_create = []
     acquisition_sample_batches = []
 
-    for polarity in sample_file.polarity:
+    async def infer_sample_ionization_modes():
+        ionization_modes = []
+        # Resolve ionization modes based on tokens in filename
+        ionization_modes.extend(await resolve_ionization_modes_by_tokens(sample_file))
+        if len(ionization_modes) > len(sample_file.polarity):
+            # Found too many ionization modes, likely overlapping tokens
+            raise RuntimeError(
+                f"Found too many matching ionization modes for file {sample_file.filename}"
+            )
+        if len(ionization_modes) == len(sample_file.polarity):
+            # Found matching ionization modes for all polarities
+            return ionization_modes
+        else:
+            # Fallback to resolving by peaks if tokens were insufficient
+            ionization_modes.extend(
+                await resolve_ionization_modes_by_peaks(sample_file)
+            )
+        return ionization_modes
+
+    runtime.logger.debug(
+        f"Inferring ionization modes for sample file {sample_file.filename}"
+    )
+    inferred_ionization_modes = await infer_sample_ionization_modes()
+    runtime.logger.debug(
+        f"Inferred {len(inferred_ionization_modes)} ionization modes for sample file "
+        f"{sample_file.filename}: {[im.ionization_mode_name for im in inferred_ionization_modes]}"
+    )
+
+    for ionization_mode in inferred_ionization_modes:
         # Step 1: Generate daily ACQUISITION batch name for this polarity
-        polarity_name = sample_batch_config.get_acquisition_polarity_name(polarity)
+        ion_mode_name = ionization_mode.ionization_mode_name
         batch_name = (
-            f"{sample_file.datetime.strftime('%Y-%m-%d')} {polarity_name} acquisition"
+            f"{sample_file.datetime.strftime('%Y-%m-%d')} {ion_mode_name} acquisition"
         )
 
         # Step 2: Get or create daily ACQUISITION batch for this polarity
@@ -238,14 +263,13 @@ async def create_acquisition_batches_and_items(
                 await get_sample_batches(
                     workspace_id=workspace_id,
                     sample_batch_type=["ACQUISITION"],
-                    polarity=[polarity],
                     sample_batch_name=batch_name,
                 )
             ).get("data", [])
 
             if len(batch_data) > 1:
                 runtime.logger.error(
-                    f"Multiple ACQUISITION batches found for {batch_name} with polarity {polarity}, using first one."
+                    f"Multiple ACQUISITION batches found for {batch_name} with ionization mode {ion_mode_name}, using first one."
                 )
 
             if batch_data:
@@ -255,30 +279,21 @@ async def create_acquisition_batches_and_items(
                 )
             else:
                 # Create new ACQUISITION batch
-                # Get DIAGNOSTICS target collections for ACQUISITION batches
-                diagnostics_collections = await get_target_collections(
-                    target_collection_type=sample_batch_config.ACQUISITION_COLLECTION_TYPES,
-                )
-
-                target_collection_ids = [
-                    tc["target_collection_id"]
-                    for tc in diagnostics_collections.get("data", [])
-                ]
+                # Get DIAGNOSTICS and CALIBRATION target collections for ACQUISITION batches
+                target_collection_ids = []
+                if ionization_mode.diagnostic_collection_id:
+                    target_collection_ids.append(
+                        ionization_mode.diagnostic_collection_id
+                    )
+                if ionization_mode.calibration_collection_id:
+                    target_collection_ids.append(
+                        ionization_mode.calibration_collection_id
+                    )
 
                 if not target_collection_ids:
                     runtime.logger.warning(
                         f"No {', '.join(sample_batch_config.ACQUISITION_COLLECTION_TYPES)} target collections found for ACQUISITION batch"
                     )
-
-                # Get default ionization mechanism IDs for this polarity
-                default_ionization_mechanisms_ids = [
-                    mechanism["ionization_mechanism_id"]
-                    for mechanism in (
-                        await get_ionization_mechanisms(
-                            ionization_mechanism_polarity=polarity, is_default=True
-                        )
-                    ).get("data", [])
-                ]
 
                 # Create new ACQUISITION batch with defined build params
                 acquisition_sample_batch = (
@@ -288,12 +303,7 @@ async def create_acquisition_batches_and_items(
                             sample_batch_name=batch_name,
                             sample_batch_description=f"Auto-generated daily acquisition batch for {sample_file.instrument}",
                             sample_batch_type="ACQUISITION",
-                            polarity=polarity,
-                            build_params=BuildParams(
-                                calibration_collection=None,  # MVP: no calibration for ACQUISITION
-                                ion_mechanisms=default_ionization_mechanisms_ids,
-                                calibration_ion_mechanisms=[],
-                            ),
+                            polarity=ionization_mode.ionization_mode_polarity,
                             target_collection_ids=target_collection_ids,
                         ),
                         independent_transaction=True,
@@ -314,7 +324,8 @@ async def create_acquisition_batches_and_items(
                 sample_item_name=sample_file.datetime.strftime("%Y-%m-%d %H:%M:%S"),
                 sample_item_type="ACQUISITION",
                 sample_item_attributes={},
-                polarity=polarity,
+                polarity=ionization_mode.ionization_mode_polarity,
+                ionization_mode_id=ionization_mode.ionization_mode_id,
             )
         )
     # Step 3: Create ACQUISITION sample items

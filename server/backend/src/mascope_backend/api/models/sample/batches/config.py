@@ -34,7 +34,7 @@ class SampleBatchConfig(BaseModel):
     ACQUISITION_AUTO_LOCK: bool = True
 
     # Target collection constraints
-    ACQUISITION_COLLECTION_TYPES: list = ["DIAGNOSTICS"]
+    ACQUISITION_COLLECTION_TYPES: list = ["CALIBRANTS", "DIAGNOSTICS"]
     ANALYSIS_COLLECTION_TYPES: list = target_collection_config.TARGET_COLLECTION_TYPES
 
     @property
