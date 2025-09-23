@@ -51,6 +51,9 @@ from mascope_backend.api.controllers.target.isotopes.target_isotopes_controller 
 from mascope_backend.api.controllers.target.lib.fetch.target_collections_fetch import (
     validate_collections_for_batch,
 )
+from mascope_backend.api.controllers.sample.lib.sample_file_fetch import (
+    fetch_sample_file,
+)
 from mascope_backend.api.controllers.sample.lib.sample_items_fetch import (
     fetch_sample_item_ids,
 )
@@ -68,9 +71,6 @@ from mascope_backend.api.controllers.sample.batches.lib.util import (
 from mascope_backend.api.controllers.sample.batches.status.service import (
     update_sample_batch_status,
 )
-from mascope_backend.api.controllers.ionization_mechanisms.lib.validation import (
-    validate_ionization_mechanisms_polarity,
-)
 from mascope_backend.api.controllers.calibration.calibration_controller import (
     calibration_mz_calibrate_samples,
 )
@@ -82,6 +82,9 @@ from mascope_backend.api.new.instrument_configs.lib import (
 )
 from mascope_backend.api.new.instrument_configs.schemas import (
     SetInstrumentConfigBody,
+)
+from mascope_backend.api.new.ionization_mode.util import (
+    resolve_ionization_modes_by_tokens,
 )
 from mascope_backend.api.models.sample.batches.config import sample_batch_config
 from mascope_backend.api.models.sample.batches.sample_batch_pydantic_model import (
@@ -348,13 +351,6 @@ async def create_sample_batch(
             sample_batch_type=sample_batch.sample_batch_type,
         )
 
-        # Validate ionization mechanism polarity compatibility
-        await validate_ionization_mechanisms_polarity(
-            ionization_mechanism_ids=sample_batch.build_params.ion_mechanisms,
-            batch_polarity=sample_batch.polarity,
-            sample_batch_type=sample_batch.sample_batch_type,
-        )
-
         # Step 2: Construct new sample batch
         new_sample_batch = SampleBatch(
             sample_batch_id=gen_id(16),
@@ -439,14 +435,6 @@ async def update_sample_batch(
         changes = detect_update_batch_changes(batch, sample_batch_update)
 
         # Step 3: Validate new configurations when changes detected
-        if changes["ion_mechanisms"]:
-            # Validate ionization mechanism polarity compatibility for changed mechanisms
-            await validate_ionization_mechanisms_polarity(
-                ionization_mechanism_ids=sample_batch_update.build_params.ion_mechanisms,
-                batch_polarity=batch.polarity,
-                sample_batch_type=batch.sample_batch_type,
-            )
-
         if changes["collections"]:
             # Validate target collection type constraints
             await validate_collections_for_batch(
@@ -456,16 +444,13 @@ async def update_sample_batch(
 
         # Step 4: Update batch data
         basic_fields = sample_batch_update.model_dump(
-            exclude={"build_params", "target_collection_ids"}, exclude_unset=True
+            exclude={"target_collection_ids"}, exclude_unset=True
         )
         for field, value in basic_fields.items():
             if hasattr(batch, field):
                 setattr(batch, field, value)
 
         # Update complex fields only when changed
-        if changes["ion_mechanisms"] or changes["calibration"]:
-            batch.build_params = sample_batch_update.build_params.model_dump()
-
         if changes["collections"]:
             # Remove specific collections
             if changes["collections_to_remove"]:
@@ -494,9 +479,7 @@ async def update_sample_batch(
         await session.refresh(batch)
 
     # Step 5: Set rematch status when recomputation needed
-    needs_rematch = (
-        changes["ion_mechanisms"] or changes["collections"] or changes["calibration"]
-    )
+    needs_rematch = changes["collections"]
     if needs_rematch:
         await update_sample_batch_status(
             sample_batch_ids=[sample_batch_id],
@@ -513,7 +496,7 @@ async def update_sample_batch(
         reload_events.append(
             sio.emit("workspace_reload", room=batch.workspace_id, namespace="/")
         )
-    elif changes["description"] or changes["calibration"]:
+    elif changes["description"]:
         reload_events.append(
             sio.emit("sample_batch_reload", room=sample_batch_id, namespace="/")
         )
@@ -603,14 +586,15 @@ async def import_sample_items(
     Steps:
     1. Verify that all sample items are for the same instrument.
     2. Process instrument configs for the sample files.
-    3. Create provided sample items and save them to the database.
-    4. Optionally calibrate the batch using the provided calibration parameters,
+    3. Resolve ionization methods for the sample items to be created.
+    4. Create provided sample items and save them to the database.
+    5. Optionally calibrate the batch using the provided calibration parameters,
         based on the calibrate_batch flag and if the instrument is TOF.
-    5. Get all affected batch IDs
-    6. Rematch imported sample items.
-    7. Create separate independent task to recompute matches for other affected samples
-    8. In case of calibration failure, send a notification with information about failed samples.
-    9. Return the status message
+    6. Get all affected batch IDs
+    7. Rematch imported sample items.
+    8. Create separate independent task to recompute matches for other affected samples
+    9. In case of calibration failure, send a notification with information about failed samples.
+    10. Return the status message
 
     :param sample_batch_id: ID of the sample batch where sample items will be imported.
     :type sample_batch_id: str
@@ -667,6 +651,28 @@ async def import_sample_items(
         parent_id=process_id,
     )
 
+    # Step 3: Resolve ionization methods for the sample items to be created
+    for item in sample_items:
+        sample_file = await fetch_sample_file(item.filename)
+        ionization_modes = await resolve_ionization_modes_by_tokens(sample_file)
+        # Filter ionization modes by polarity
+        ionization_modes = [
+            im
+            for im in ionization_modes
+            if im.ionization_mode_polarity == item.polarity
+        ]
+        if not ionization_modes:
+            raise ValueError(
+                f"Could not resolve ionization mode for file '{item.filename}'. "
+                "No valid ionization mode token in the filename for the selected polarity."
+            )
+        if len(ionization_modes) > 1:
+            raise ValueError(
+                f"Could not resolve ionization mode for file '{item.filename}'. "
+                "Multiple ionization mode tokens matched the filename."
+            )
+        item.ionization_mode_id = ionization_modes[0].ionization_mode_id
+
     # Collect affected items from instrument config processing
     all_affected_sample_item_ids.update(
         instrument_config_result["_notification_data"].get(
@@ -676,7 +682,7 @@ async def import_sample_items(
 
     await send_progress_user_notification(notification, 0.15)
 
-    # Step 3: Create provided sample items and save to database
+    # Step 4: Create provided sample items and save to database
     created_sample_items_data = (
         await create_sample_items(
             sample_items=sample_items, independent_transaction=False
@@ -692,7 +698,7 @@ async def import_sample_items(
     notification.message = f"Created {len(sample_items)} sample{'s records' if len(sample_items) > 1 else 'record'}."
     await send_progress_user_notification(notification, 0.2)
 
-    # Step 4: Optionally calibrate batch if calibrate_batch flag is True and instrument is TOF
+    # Step 5: Optionally calibrate batch if calibrate_batch flag is True and instrument is TOF
     calibration_warning = None
     if calibrate_batch and instrument_type == "tof":
         samples_calibrate_failed = []
@@ -734,7 +740,7 @@ async def import_sample_items(
                 # This is a critical error, re-raise it
                 raise
 
-    # Step 5. Get all affected batch IDs
+    # Step 6. Get all affected batch IDs
     _, affected_sample_batch_ids, *_ = await fetch_affected_sample_data(
         sample_item_ids=list(all_affected_sample_item_ids)
     )
@@ -751,7 +757,7 @@ async def import_sample_items(
         runtime.logger.info(other_affected_batches_message)
         notification.message += other_affected_batches_message
 
-    # Step 6: Compute matches for all imported samples
+    # Step 7: Compute matches for all imported samples
     await match_compute_samples(
         sample_item_ids=created_sample_item_ids,
         independent_transaction=False,
@@ -763,7 +769,7 @@ async def import_sample_items(
     notification.message = f"Rematched {len(all_affected_sample_item_ids)} sample items affected by the import."
     await send_progress_user_notification(notification, 0.9)
 
-    # Step 7: Create separate independent task to recompute matches for other affected samples
+    # Step 8: Create separate independent task to recompute matches for other affected samples
     other_affected_sample_item_ids = [
         si_id
         for si_id in all_affected_sample_item_ids
@@ -783,7 +789,7 @@ async def import_sample_items(
             f"Started independent rematch task for {len(other_affected_sample_item_ids)} affected samples"
         )
 
-    # Step 8: Raise a warning if encountered during calibration
+    # Step 9: Raise a warning if encountered during calibration
     if calibration_warning is not None:
         raise_api_warning(
             calibration_warning,
@@ -795,7 +801,7 @@ async def import_sample_items(
             },
         )
 
-    # Step 9: Return the status message
+    # Step 10: Return the status message
     return {
         "message": f"{len(sample_items)} sample{'s' if len(sample_items) > 1 else ''} was imported to the sample batch '{sample_batch_name}'.",
         "_notification_data": {
@@ -891,7 +897,6 @@ async def copy_sample_batch(
             if original_sample_batch.sample_batch_type == "ACQUISITION"
             else original_sample_batch.polarity
         ),
-        build_params=original_sample_batch.build_params,
         target_collection_ids=target_collection_ids,
     )
 
