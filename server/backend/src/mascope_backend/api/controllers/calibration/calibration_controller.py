@@ -185,9 +185,6 @@ async def calibration_mz_fit(
 
     # Step 4: m/z fit the sample file
     calibration_mechs = ionization_mode.ionization_mechanism_ids
-    runtime.logger.debug(
-        f"Calibrating mz fit using {'calibration' if calibration_mechs else 'matching'} ionization mechanisms"
-    )
 
     calibration_parameters = CalibrationFitParams(
         calibration_collection_id=ionization_mode.calibration_collection_id,
