@@ -7,7 +7,7 @@ import Column from 'primevue/column'
 import ContextMenu from 'primevue/contextmenu'
 
 import { BaseTabbedPanel, BaseMatchTag, BaseCopyableField } from '@/lib/base'
-import { DialogTargetCollectionOp, DialogMechanismsOp } from '@/lib/dialogs'
+import { DialogTargetCollectionOp } from '@/lib/dialogs'
 import { num } from '@/lib/formatters'
 
 import { useApp } from '@/stores'
@@ -43,8 +43,7 @@ const context = reactive({
 const contextMenuRef = ref()
 
 const dialog = reactive({
-  collection: null,
-  mechanism: null
+  collection: null
 })
 
 const tableHeight = inject('target-table-height')
@@ -75,19 +74,6 @@ const icon = {
     "
   >
     <template #menu>
-      <Button
-        v-tooltip.top="'Edit mechanisms'"
-        label="Edit mechanisms"
-        class="hiddenlabel"
-        icon="pi pi-sliders-h"
-        text
-        size="small"
-        @click="
-          () => {
-            dialog.mechanism = true
-          }
-        "
-      />
       <Button
         v-tooltip.top="'Create collection'"
         label="Create collection"
@@ -150,7 +136,6 @@ const icon = {
     <ContextMenu ref="contextMenuRef" :model="context.menuItems" />
   </BaseTabbedPanel>
   <DialogTargetCollectionOp v-model:action="dialog.collection" :collection="context.record" />
-  <DialogMechanismsOp v-model:visible="dialog.mechanism" />
 </template>
 
 <style scoped>

@@ -19,7 +19,13 @@ import '@uppy/dashboard/css/style.min.css'
 import DropTarget from '@uppy/drop-target'
 import '@uppy/drop-target/css/style.min.css'
 
-import { DialogSampleOp, DialogBatchImport, DialogFileUpload } from '@/lib/dialogs'
+import {
+  DialogSampleOp,
+  DialogBatchImport,
+  DialogFileUpload,
+  DialogIonizationOp
+} from '@/lib/dialogs'
+import { InstrumentSelector } from '@/lib/toolbars'
 
 import { api } from '@/api'
 import { useApp } from '@/stores'
@@ -63,7 +69,8 @@ const props = defineProps({
 
 const dialog = reactive({
   sample: null,
-  batchImport: false
+  batchImport: false,
+  mechanism: null
 })
 
 const contextMenuRef = ref(null)
@@ -177,13 +184,23 @@ const derivedPolarity = computed(() => {
 <template>
   <div>
     <menu class="acquisition-menu">
-      <Button
-        icon="pi pi-filter-slash"
-        @click="clearFilters"
-        text
-        severity="secondary"
-        v-tooltip.left="'Clear filters and selection'"
-      />
+      <div class="row">
+        <AppFilterChips v-model:filtering="filtering" v-show="filtering" />
+        <Button
+          v-tooltip.top="'Edit ionizations'"
+          label="Edit ionizations"
+          class="hiddenlabel"
+          icon="pi pi-sliders-h"
+          text
+          size="small"
+          @click="
+            () => {
+              dialog.mechanism = true
+            }
+          "
+        />
+        <InstrumentSelector />
+      </div>
       <Select
         inputId="time"
         v-model="app.data.acquisition.time.mode"
@@ -222,38 +239,19 @@ const derivedPolarity = computed(() => {
       />
       <div style="flex-grow: 1; flex-shrink: 1" />
       <FloatLabel style="flex-grow: 1; max-width: 250px">
-        <label>Search</label>
         <IconField class="full">
           <InputIcon>
             <i class="pi pi-search" />
           </InputIcon>
-          <InputText v-model="search" placeholder="Search" style="width: 100%" />
+          <InputText v-model="search" placeholder="Search filenames" style="width: 100%" />
         </IconField>
       </FloatLabel>
-      <Button id="uppy-upload-trigger" label="Upload" icon="pi pi-file-arrow-up" @click="" />
       <Button
-        label="Process"
-        icon="pi pi-file-plus"
-        :disabled="
-          app.data.acquisition.selected?.length == 0 ||
-          !app.data.batch.focused ||
-          hasBothPolarities ||
-          onlyMixedPolaritySelected
-        "
-        :tooltip="
-          !app.data.batch.focused || app.data.acquisition.selected.length === 0
-            ? 'Select acquisitions and a batch in order to process sample files'
-            : ''
-        "
-        @click="
-          () => {
-            if (app.data.acquisition.focused) {
-              dialog.sample = 'create'
-            } else if (app.data.acquisition.multiselected) {
-              dialog.batchImport = true
-            }
-          }
-        "
+        icon="pi pi-filter-slash"
+        @click="clearFilters"
+        text
+        severity="secondary"
+        v-tooltip.left="'Clear filters and selection'"
       />
     </menu>
   </div>
@@ -330,6 +328,33 @@ const derivedPolarity = computed(() => {
         <i class="info-line">
           <span class="pi pi-file-arrow-up" /><span>Drag sample files here to upload them</span>
         </i>
+        <menu class="bottom-menu">
+          <Button id="uppy-upload-trigger" label="Upload" icon="pi pi-file-arrow-up" @click="" />
+          <Button
+            label="Process selected"
+            icon="pi pi-file-plus"
+            :disabled="
+              app.data.acquisition.selected?.length == 0 ||
+              !app.data.batch.focused ||
+              hasBothPolarities ||
+              onlyMixedPolaritySelected
+            "
+            :tooltip="
+              !app.data.batch.focused || app.data.acquisition.selected.length === 0
+                ? 'Select acquisitions and a batch in order to process sample files'
+                : ''
+            "
+            @click="
+              () => {
+                if (app.data.acquisition.focused) {
+                  dialog.sample = 'create'
+                } else if (app.data.acquisition.multiselected) {
+                  dialog.batchImport = true
+                }
+              }
+            "
+          />
+        </menu>
       </div>
     </UppyContextProvider>
 
@@ -356,6 +381,7 @@ const derivedPolarity = computed(() => {
         })
       "
     />
+    <DialogIonizationOp v-model:visible="dialog.mechanism" />
     <ContextMenu :model="contextMenuItems" ref="contextMenuRef" />
   </div>
 </template>
@@ -367,6 +393,15 @@ const derivedPolarity = computed(() => {
   height: fit-content;
   width: 100%;
   margin-bottom: 1rem;
+}
+
+.bottom-menu {
+  gap: 1rem;
+  align-items: baseline;
+  height: fit-content;
+  width: 100%;
+  margin-bottom: 1rem;
+  justify-content: flex-end;
 }
 
 menu {

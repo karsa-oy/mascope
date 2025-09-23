@@ -1,14 +1,12 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 
 import Toolbar from 'primevue/toolbar'
 
 import { useApp } from '@/stores'
 import { BaseKarsaLogo } from '@/lib/base'
-import { HelpButton } from '@/lib/help'
 
 import AppFilterChips from './AppFilterChips.vue'
-import InstrumentSelector from './InstrumentSelector.vue'
 
 import { SidebarMenu } from './SidebarMenu'
 
@@ -44,7 +42,6 @@ const filtering = ref(false)
     <template #end>
       <div class="row">
         <AppFilterChips v-model:filtering="filtering" v-show="filtering" />
-        <InstrumentSelector />
       </div>
     </template>
   </Toolbar>

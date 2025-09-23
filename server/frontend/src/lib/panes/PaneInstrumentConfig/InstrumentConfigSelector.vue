@@ -9,7 +9,7 @@ const instrumentConfig = defineModel()
 
 <template>
   <div class="input-group row" v-if="instrumentConfig.input?.ready">
-    <FloatLabel v-if="instrumentConfig.input.creating">
+    <FloatLabel v-if="instrumentConfig.input.creating" class="config-input">
       <InputText
         id="pending-instrument-config"
         v-model="instrumentConfig.input.new.method_file"
@@ -50,7 +50,7 @@ const instrumentConfig = defineModel()
       optionDisabled="disabled"
       dataKey="value"
       :allowEmpty="false"
-      style="width: 70px"
+      style="width: 70px; flex-shrink: 0"
     >
       <template #option="{ option }">
         <div
@@ -63,3 +63,37 @@ const instrumentConfig = defineModel()
     </SelectButton>
   </div>
 </template>
+
+<style scoped>
+.input-group.row {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.config-select,
+.config-input {
+  flex: 1;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.config-select :deep(.p-select),
+.config-input :deep(.p-inputtext) {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.config-select :deep(.p-select .p-select-label),
+.config-input :deep(.p-inputtext) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+</style>
