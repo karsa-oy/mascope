@@ -24,16 +24,16 @@ const calibrationMechanisms = defineModel('calibrationMechanisms')
 
 const filteredMechanisms = computed(() => {
   if (!props.batch?.polarity) {
-    return app.data.mechanism.list
+    return app.data.ionization.mechanism.list
   }
 
   // If polarity is "+-", show all mechanisms
   if (props.batch.polarity === ANALYSIS_POLARITY) {
-    return app.data.mechanism.list
+    return app.data.ionization.mechanism.list
   }
 
   // Otherwise filter by exact polarity match
-  return app.data.mechanism.list.filter(
+  return app.data.ionization.mechanism.list.filter(
     (mech) => mech.ionization_mechanism_polarity === props.batch.polarity
   )
 })

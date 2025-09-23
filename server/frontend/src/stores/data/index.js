@@ -1,6 +1,6 @@
 // standard
 import { useInstrument } from './instrument'
-import { useMechanism } from './mechanism'
+import { useIonizationMechanism, useIonizationMode } from './ionization'
 import { useTemplate } from './template'
 import { useWorkspace } from './workspace'
 import { useSample } from './sample'
@@ -26,8 +26,11 @@ import { useAcquisition } from './acquisition'
 export const useData = () => ({
   // standard
   workspace: useWorkspace(),
+  ionization: {
+    mechanism: useIonizationMechanism(),
+    mode: useIonizationMode()
+  },
   instrument: useInstrument(),
-  mechanism: useMechanism(),
   template: useTemplate(),
   batch: useBatch(),
   sample: useSample(),
