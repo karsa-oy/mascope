@@ -80,7 +80,8 @@ const input = reactive({
   filterId: null,
   instrument: null,
   type: null,
-  polarity: null
+  polarity: null,
+  ionization_mode_id: null
 })
 const initial = ref()
 const changedInput = computed(
@@ -119,7 +120,8 @@ async function init(active) {
     input.polarity = polarityOptions.value[0].value
   }
   input.filterId = original.value?.filter_id ?? null
-  input.type = original.value?.sample_item_type ?? null
+  input.type = original.value?.sample_item_type ?? 'ONLINE'
+  input.ionization_mode_id = original.value?.ionization_mode_id ?? null
 
   instrumentConfig.status = {}
   instrumentConfig.input = {}
@@ -174,6 +176,37 @@ const sampleTypeOptions = computed(() => {
   }
 })
 
+// Ionization mode options and fetching logic
+const ionizationModeOptions = ref([])
+
+// Fetch ionization modes for create mode when filename changes
+watchEffect(async () => {
+  if (action.value === 'create' && input.filename) {
+    try {
+      const response = await api.http.get(`/ionization_modes/by_filename/${input.filename}`)
+      ionizationModeOptions.value = response.data.data.map((mode) => ({
+        label: mode.ionization_mode_name,
+        value: mode.ionization_mode_id
+      }))
+      input.ionization_mode_id = ionizationModeOptions.value[0]?.value ?? null
+    } catch (error) {
+      ionizationModeOptions.value = []
+    }
+  } else if (action.value === 'update' && original.value?.ionization_mode_id) {
+    // For edit mode, show only the current ionization mode
+    ionizationModeOptions.value = [
+      {
+        label: app.data.ionization.mode.list.find(
+          (mode) => mode.ionization_mode_id === original.value.ionization_mode_id
+        )?.ionization_mode_name,
+        value: original.value.ionization_mode_id
+      }
+    ]
+  } else {
+    ionizationModeOptions.value = []
+  }
+})
+
 async function save() {
   visible.value = null
   emit('submit')
@@ -183,6 +216,7 @@ async function save() {
     sample_batch_id: app.data.batch.focused.sample_batch_id,
     filter_id: input.filterId,
     polarity: input.polarity,
+    ionization_mode_id: input.ionization_mode_id,
     sample_item_attributes: clone(
       input.fields
         .filter((field) => field.label != 'sample_item_name')
@@ -307,6 +341,7 @@ const polarityOptions = computed(() => {
                     v-model="input.filterId"
                     :options="filters"
                     :disabled="sampleTypesFilterIdNotAllowed.includes(input.type)"
+                    style="min-width: 200px"
                   />
                   <label for="item-filter-id">Filter ID</label>
                 </FloatLabel>
@@ -348,6 +383,19 @@ const polarityOptions = computed(() => {
                 <label for="item-filename"> Filename </label>
               </FloatLabel>
               <InstrumentConfigSelector v-model="instrumentConfig" />
+
+              <FloatLabel>
+                <Select
+                  inputId="ionization-mode"
+                  v-model="input.ionization_mode_id"
+                  :options="ionizationModeOptions"
+                  dataKey="value"
+                  optionValue="value"
+                  optionLabel="label"
+                  :disabled="action !== 'create'"
+                />
+                <label for="ionization-mode">Ionization Mode</label>
+              </FloatLabel>
             </div>
           </ScrollPanel>
         </TabPanel>
@@ -399,11 +447,12 @@ const polarityOptions = computed(() => {
   grid-template-columns: repeat(auto-fill, minmax(min(30ch, 100%), 1fr));
   grid-auto-rows: auto;
   align-items: baseline;
-  justify-items: start;
+  justify-items: stretch;
   justify-content: center;
   align-content: center;
   gap: 2rem;
 }
+
 .input-group {
   padding: 0;
   margin: 0;
@@ -411,14 +460,26 @@ const polarityOptions = computed(() => {
   display: flex;
   flex-flow: row nowrap;
   align-items: baseline;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
+
 .input-group :deep(*) {
   margin: 0;
 }
 
 :deep(.p-select),
 :deep(.p-inputtext) {
-  min-width: 250px;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Override the global min-width for grid items */
+.sample-field-grid > * {
+  min-width: 0;
+  max-width: 100%;
 }
 
 menu {
