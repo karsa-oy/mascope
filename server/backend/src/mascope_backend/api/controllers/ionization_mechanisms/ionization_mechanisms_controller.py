@@ -15,10 +15,12 @@ from mascope_backend.db import async_session
 from mascope_backend.db.id import gen_id
 from mascope_backend.db.models import (
     IonizationMechanism,
+    IonizationMode,
     TargetCompound,
     TargetIon,
     TargetIsotope,
     SampleBatch,
+    SampleItem,
 )
 from mascope_backend.api.lib.api_features import api_controller
 from mascope_backend.api.lib.exceptions.api_exceptions import (
@@ -145,29 +147,45 @@ async def get_ionization_mechanism(ionization_mechanism_id: str) -> dict:
                 f"Ionization mechanism with ID '{ionization_mechanism_id}' not found"
             )
 
-        # Step 3: Retrieve sample batches using the specified ionization mechanism
-        result = await session.execute(select(SampleBatch))
-        all_batches = result.scalars().all()
-        affected_sample_batches = []
-        for batch in all_batches:
-            build_params = batch.build_params
-            if (
-                "ion_mechanisms" in build_params
-                and ionization_mechanism_id in build_params["ion_mechanisms"]
-            ):
-                affected_sample_batches.append(
-                    {
-                        "sample_batch_id": batch.sample_batch_id,
-                        "sample_batch_name": batch.sample_batch_name,
-                    }
-                )
+        # Step 3: Retrieve ionization modes -> sample items -> sample batches
+        #         using the specified ionization mechanism
+        affected_ion_mode_ids = []
+        result = await session.execute(select(IonizationMode))
+        all_ion_modes = result.scalars().all()
+        for ion_mode in all_ion_modes:
+            if ionization_mechanism_id in ion_mode.ionization_mechanism_ids:
+                affected_ion_mode_ids.append(ion_mode.ionization_mode_id)
+
+        result = await session.execute(
+            select(SampleItem).where(
+                SampleItem.ionization_mode_id.in_(affected_ion_mode_ids)
+            )
+        )
+        affected_sample_items = result.scalars().all()
+
+        affected_sample_batch_ids = list(
+            set(item.sample_batch_id for item in affected_sample_items)
+        )
+        result = await session.execute(
+            select(SampleBatch).where(
+                SampleBatch.sample_batch_id.in_(affected_sample_batch_ids)
+            )
+        )
+        affected_sample_batches = result.scalars().all()
+        affected_sample_batch_info = [
+            {
+                "sample_batch_id": batch.sample_batch_id,
+                "sample_batch_name": batch.sample_batch_name,
+            }
+            for batch in affected_sample_batches
+        ]
 
         # Step 4: Return ionization mechanism details with sample batches
         ionization_mechanism_data = IonizationMechanismRead.model_validate(
             ionization_mechanism
         ).model_dump()
         ionization_mechanism_data["sample_batches_count"] = len(affected_sample_batches)
-        ionization_mechanism_data["sample_batches"] = affected_sample_batches
+        ionization_mechanism_data["sample_batches"] = affected_sample_batch_info
         return {
             "message": f"Ionization mechanism '{ionization_mechanism.ionization_mechanism}' retrieved successfully.",
             "data": ionization_mechanism_data,
