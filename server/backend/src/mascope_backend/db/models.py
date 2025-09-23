@@ -232,7 +232,6 @@ class SampleBatch(Base):
         nullable=False,
         server_default=text(f"'{sample_batch_config.ANALYSIS_POLARITY}'"),
     )
-    build_params: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     sample_batch_utc_created: Mapped[Optional[str]] = mapped_column(
         TIMESTAMP, nullable=True
     )
@@ -297,6 +296,14 @@ class SampleItem(Base):
     filter_id: Mapped[Optional[str]] = mapped_column(String(6), nullable=True)
     tic: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     polarity: Mapped[Optional[str]] = mapped_column(String(1), nullable=True)
+    ionization_mode_id: Mapped[str] = mapped_column(
+        String(16),
+        ForeignKey(
+            "ionization_mode.ionization_mode_id",
+            ondelete="SET NULL",
+        ),
+        nullable=True,
+    )
     t0: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     t1: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     sample_item_utc_created: Mapped[Optional[str]] = mapped_column(
@@ -558,6 +565,24 @@ class IonizationMechanism(Base):
         "TargetIon",
         back_populates="ionization_mechanism",
         cascade="all, delete, delete-orphan",
+    )
+
+
+class IonizationMode(Base):
+    __tablename__ = "ionization_mode"
+
+    ionization_mode_id: Mapped[str] = mapped_column(String(16), primary_key=True)
+    ionization_mode_name: Mapped[str] = mapped_column(String(256), nullable=False)
+    ionization_mode_token: Mapped[Optional[str]] = mapped_column(
+        String(256), unique=True, nullable=True
+    )
+    ionization_mode_polarity: Mapped[str] = mapped_column(String(1), nullable=False)
+    ionization_mechanism_ids: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    calibration_collection_id: Mapped[Optional[str]] = mapped_column(
+        String(256), nullable=True
+    )
+    diagnostic_collection_id: Mapped[Optional[str]] = mapped_column(
+        String(256), nullable=True
     )
 
 
@@ -826,6 +851,14 @@ class Sample(Base):
     length: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     tic: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     polarity: Mapped[Optional[str]] = mapped_column(String(1), nullable=True)
+    ionization_mode_id: Mapped[str] = mapped_column(
+        String(16),
+        ForeignKey(
+            "ionization_mode.ionization_mode_id",
+            ondelete="SET NULL",
+        ),
+        nullable=True,
+    )
     range: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     mz_calibration: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     datetime: Mapped[Optional[str]] = mapped_column(TIMESTAMP, nullable=True)

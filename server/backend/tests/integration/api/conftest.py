@@ -325,9 +325,5 @@ def sample_batch_create_data():
     return {
         "sample_batch_name": "New Test Sample Batch",
         "sample_batch_description": "Sample batch for testing",
-        "build_params": {
-            "calibration_collection": "1234567890123456",  # 16 chars required
-            "ion_mechanisms": ["APCI+"],  # At least one required
-        },
         "target_collection_ids": ["collection1", "collection2"],
     }

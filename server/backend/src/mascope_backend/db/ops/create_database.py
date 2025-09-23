@@ -66,6 +66,7 @@ async def create_database():
                 sample_file.length,
                 sample_item.tic,
                 sample_item.polarity,
+                sample_item.ionization_mode_id,
                 sample_file.range,
                 sample_file.mz_calibration,
                 sample_file.datetime,
