@@ -9,7 +9,7 @@ from mascope_signal.compute import get_sum_signal
 from sqlalchemy import select, func, and_
 from mascope_backend.db import async_session
 from mascope_backend.db.id import gen_id
-from mascope_backend.db.models import Sample, SampleBatch, SampleItem
+from mascope_backend.db.models import IonizationMode, Sample, SampleBatch, SampleItem
 from mascope_backend.api.lib.api_features import (
     api_controller,
     api_controller_background_task,
@@ -147,13 +147,16 @@ async def calibration_mz_fit(
         if not sample:
             raise NotFoundException(f"Sample item with ID '{sample_item_id}' not found")
 
-    sample_batch = await fetch_sample_batch(sample.sample_batch_id)
-    build_params = sample_batch.build_params
+        ionization_mode = await session.get(IonizationMode, sample.ionization_mode_id)
+        if not ionization_mode:
+            raise NotFoundException(
+                f"Ionization mode with ID '{sample.ionization_mode_id}' not found"
+            )
 
     # Check if calibration collection is present
-    if not build_params.get("calibration_collection"):
+    if not ionization_mode.calibration_collection_id:
         raise NotFoundException(
-            f"Calibration collection not found in build parameters for sample batch '{sample_batch.sample_batch_name}'"
+            f"Calibration collection not found for ionization mode '{ionization_mode.ionization_mode_id}'"
         )
 
     # Step 2: Fetch affected samples data
@@ -181,16 +184,14 @@ async def calibration_mz_fit(
     )
 
     # Step 4: m/z fit the sample file
-    calibration_mechs = build_params.get("calibration_ion_mechanisms")
-    matching_mechs = build_params["ion_mechanisms"]
-    mechanisms = calibration_mechs if calibration_mechs else matching_mechs
+    calibration_mechs = ionization_mode.ionization_mechanism_ids
     runtime.logger.debug(
         f"Calibrating mz fit using {'calibration' if calibration_mechs else 'matching'} ionization mechanisms"
     )
 
     calibration_parameters = CalibrationFitParams(
-        calibration_collection_id=build_params["calibration_collection"],
-        ionization_mechanism_ids=mechanisms,
+        calibration_collection_id=ionization_mode.calibration_collection_id,
+        ionization_mechanism_ids=calibration_mechs,
         **mz_calibration_params.model_dump(),
     )
     calibration_handler = get_calibration_handler(
