@@ -293,9 +293,15 @@ class OrbiPeakDetector(BasePeakDetector):
         :rtype: xarray.Dataset
         """
         old_peak_mzs, old_peak_areas, old_peak_heights = self._load_old_peaks(if_exists)
-        if old_peak_mzs != [] and self.calibration_factor != 1.0:
-            # Revert calibration for old peaks
-            old_peak_mzs = [mz / self.calibration_factor for mz in old_peak_mzs]
+
+        if self.calibration_factor != 1.0:
+            # Revert calibration for sum signal
+            self._sum_signal = self._sum_signal.assign_coords(
+                mz=self._sum_signal.mz / self.calibration_factor
+            )
+            if old_peak_mzs != []:
+                # Revert calibration for old peaks
+                old_peak_mzs = [mz / self.calibration_factor for mz in old_peak_mzs]
 
         self._update_u_list(if_exists, old_peak_mzs)
         no_peaks_to_fit = not self._validate_u_list()
