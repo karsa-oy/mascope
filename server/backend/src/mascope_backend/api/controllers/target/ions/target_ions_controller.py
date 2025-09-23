@@ -28,6 +28,9 @@ from mascope_backend.api.models.target.compounds.target_compound_pydantic_model 
 from mascope_backend.api.models.target.ions.target_ion_pydantic_model import (
     TargetIonUpdate,
 )
+from mascope_backend.api.new.ionization_mode.util import (
+    fetch_batch_ionization_mechanism_ids,
+)
 
 
 @api_controller()
@@ -134,7 +137,9 @@ async def get_target_ions(
                     )
 
                 # Extract ion mechanisms
-                ionization_mechanism_ids = sample_batch.build_params["ion_mechanisms"]
+                ionization_mechanism_ids = await fetch_batch_ionization_mechanism_ids(
+                    sample_batch_id
+                )
                 target_collection_ids = [
                     tc.target_collection_id for tc in sample_batch.target_collection
                 ]

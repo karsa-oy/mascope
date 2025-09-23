@@ -12,7 +12,6 @@ from mascope_file.name import get_instrument_type
 from mascope_backend.db import async_session
 from mascope_backend.db.models import (
     Sample,
-    SampleBatch,
     TargetIsotope,
     TargetIon,
     TargetCompound,
@@ -21,10 +20,11 @@ from mascope_backend.db.models import (
     IonizationMechanism,
     MatchIsotope,
 )
-from mascope_backend.api.lib.exceptions.api_exceptions import (
-    NotFoundException,
-)
+
 from mascope_backend.api.new.match.params import default_match_params
+from mascope_backend.api.new.ionization_mode.util import (
+    fetch_sample_ionization_mechanism_ids,
+)
 from mascope_backend.runtime import runtime
 
 
@@ -35,7 +35,7 @@ async def fetch_sample_unmatched_target_isotopes(
     """
     Fetches target isotopes that need match computation for a specific sample.
     - Gets isotopes associated with sample's batch target collections
-    - Filters by batch ionization mechanisms (from build_params)
+    - Filters by sample ionization mechanisms (from ionization mode)
     - Filters by sample polarity compatibility
     - Applies match parameter filtering based on sample instrument type
     - Excludes isotopes that already have matches for this sample in match_isotopes table
@@ -52,14 +52,8 @@ async def fetch_sample_unmatched_target_isotopes(
         match_params = await default_match_params(sample.sample_item_id)
 
     async with async_session() as session:
-        # Get batch ionization mechanism IDs from build_params
-        if not (sample_batch := await session.get(SampleBatch, sample.sample_batch_id)):
-            raise NotFoundException(
-                f"Sample batch with ID '{sample.sample_batch_id}' not found"
-            )
-
-        batch_ionization_mechanism_ids = sample_batch.build_params.get(
-            "ion_mechanisms", []
+        ionization_mechanism_ids = await fetch_sample_ionization_mechanism_ids(
+            sample.sample_item_id
         )
 
         # Determine resolution type based on instrument
@@ -111,8 +105,8 @@ async def fetch_sample_unmatched_target_isotopes(
                 TargetCollectionInSampleBatch.sample_batch_id
                 == sample.sample_batch_id,  # target collection association filtering
                 TargetIon.ionization_mechanism_id.in_(
-                    batch_ionization_mechanism_ids
-                ),  # batch ion_mechanisms filtering
+                    ionization_mechanism_ids
+                ),  # sample ionization mechanism filtering
                 IonizationMechanism.ionization_mechanism_polarity
                 == sample.polarity,  # sample polarity filtering
                 TargetIsotope.relative_abundance
