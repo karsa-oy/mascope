@@ -18,6 +18,7 @@ const FILE_UPLOAD_SIZE_LIMIT = 2.5 * 1024 * 1024 * 1024 // 2.5 GB
 function validateFile(file) {
   const validInstrument = validateInstrument(file)
   const validIonization = validateIonization(file)
+  return validInstrument && validIonization
 }
 
 function validateInstrument(file) {
