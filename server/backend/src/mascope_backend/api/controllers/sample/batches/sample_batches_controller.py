@@ -29,8 +29,6 @@ from mascope_backend.api.lib.api_features import (
 )
 from mascope_backend.api.lib.exceptions.api_exceptions import (
     NotFoundException,
-    ApiException,
-    raise_api_warning,
 )
 from mascope_backend.api.controllers.match.match_controller import (
     rematch_samples,
@@ -71,9 +69,6 @@ from mascope_backend.api.controllers.sample.batches.lib.util import (
 from mascope_backend.api.controllers.sample.batches.status.service import (
     update_sample_batch_status,
 )
-from mascope_backend.api.controllers.calibration.calibration_controller import (
-    calibration_mz_calibrate_samples,
-)
 from mascope_backend.api.new.instrument_configs.process.service import (
     process_instrument_config,
 )
@@ -94,9 +89,6 @@ from mascope_backend.api.models.sample.batches.sample_batch_pydantic_model impor
 )
 from mascope_backend.api.models.sample.items.sample_item_pydantic_model import (
     SampleItemCreate,
-)
-from mascope_backend.api.models.calibration.calibration_pydantic_model import (
-    MzCalibrationParams,
 )
 from mascope_backend.socket.notifications import (
     UserNotification,
@@ -573,40 +565,30 @@ async def delete_sample_batch(
 async def import_sample_items(
     sample_batch_id: str,
     sample_items: list[SampleItemCreate],
-    mz_calibration_params: MzCalibrationParams,
     instrument_config: SetInstrumentConfigBody,
-    calibrate_batch: bool = True,
     independent_transaction: bool = False,
     sid: str = None,
     process_id=None,
 ):
     """
-    Imports sample items to a specified batch by creating provided sample items,
-    optionally calibrating the batch, and computing matches.
+    Imports sample items to a specified batch by creating provided sample items and computing matches.
 
     Steps:
-    1. Verify that all sample items are for the same instrument.
-    2. Process instrument configs for the sample files.
-    3. Resolve ionization methods for the sample items to be created.
-    4. Create provided sample items and save them to the database.
-    5. Optionally calibrate the batch using the provided calibration parameters,
-        based on the calibrate_batch flag and if the instrument is TOF.
-    6. Get all affected batch IDs
-    7. Rematch imported sample items.
-    8. Create separate independent task to recompute matches for other affected samples
-    9. In case of calibration failure, send a notification with information about failed samples.
-    10. Return the status message
+    - Verify that all sample items are for the same instrument
+    - Process instrument configs for the sample files
+    - Resolve ionization methods for the sample items to be created
+    - Create provided sample items and save them to the database
+    - Get all affected batch IDs
+    - Rematch imported sample items
+    - Create separate independent task to recompute matches for other affected samples
+    - Return the status message
 
     :param sample_batch_id: ID of the sample batch where sample items will be imported.
     :type sample_batch_id: str
     :param sample_items: List of sample items to be created and imported.
     :type sample_items: List[SampleItemCreate]
-    :param mz_calibration_params: Calibration parameters for the batch. If not provided, default values are used.
-    :type mz_calibration_params: MzCalibrationParams
     :param instrument_config: Instrument config to use for the imported files.
     :type instrument_config: InstrumentConfigBody
-    :param calibrate_batch: A boolean flag to control whether the batch should undergo calibration, defaults to True
-    :type calibrate_batch: bool, optional
     :param independent_transaction: Flag to indicate if the operation should be treated as an independent transaction, defaults to False
     :type independent_transaction: bool, optional
     :param sid: Session ID, used for emitting notifications to specific clients, defaults to None.
@@ -615,16 +597,13 @@ async def import_sample_items(
     sample_batch_result = await get_sample_batch(sample_batch_id)
     sample_batch = sample_batch_result.get("data")
     sample_batch_name = sample_batch["sample_batch_name"]
-    # Init collector for affected sample items from all child operations
-    all_affected_sample_item_ids = set()
 
-    # Step 1: Verify that all sample items are for the same instrument
+    # --- Verify that all sample items are for the same instrument --- #
     instrument_types = {get_instrument_type(item.filename) for item in sample_items}
     if len(instrument_types) > 1:
         raise ValueError(
             "Importing samples from different instruments is not supported, please import samples for each instrument separately"
         )
-    instrument_type = instrument_types.pop()  # Extract the single instrument type
 
     notification = UserNotification(
         process_id=process_id,
@@ -642,7 +621,7 @@ async def import_sample_items(
     )
     await send_progress_user_notification(notification, 0.1)
 
-    # Step 2: Process instrument configs for the files
+    # --- Process instrument configs for the sample files --- #
     instrument_config_result = await process_instrument_config(
         filenames=[item.filename for item in sample_items],
         instrument_config=instrument_config,
@@ -652,7 +631,7 @@ async def import_sample_items(
         parent_id=process_id,
     )
 
-    # Step 3: Resolve ionization methods for the sample items to be created
+    # --- Resolve ionization methods for the sample items to be created --- #
     for item in sample_items:
         sample_file = await fetch_sample_file(item.filename)
         ionization_modes = await resolve_ionization_modes_by_tokens(sample_file)
@@ -675,7 +654,8 @@ async def import_sample_items(
         item.ionization_mode_id = ionization_modes[0].ionization_mode_id
 
     # Collect affected items from instrument config processing
-    all_affected_sample_item_ids.update(
+    affected_sample_item_ids = set()
+    affected_sample_item_ids.update(
         instrument_config_result["_notification_data"].get(
             "affected_sample_item_ids", []
         )
@@ -683,7 +663,7 @@ async def import_sample_items(
 
     await send_progress_user_notification(notification, 0.15)
 
-    # Step 4: Create provided sample items and save to database
+    # --- Create provided sample items and save them to the database --- #
     created_sample_items_data = (
         await create_sample_items(
             sample_items=sample_items, independent_transaction=False
@@ -694,56 +674,14 @@ async def import_sample_items(
     ]
 
     # Add created sample items to the rematch set
-    all_affected_sample_item_ids.update(created_sample_item_ids)
+    affected_sample_item_ids.update(created_sample_item_ids)
 
     notification.message = f"Created {len(sample_items)} sample{'s records' if len(sample_items) > 1 else 'record'}."
     await send_progress_user_notification(notification, 0.2)
 
-    # Step 5: Optionally calibrate batch if calibrate_batch flag is True and instrument is TOF
-    calibration_warning = None
-    if calibrate_batch and instrument_type == "tof":
-        samples_calibrate_failed = []
-        try:
-            calibration_result = await calibration_mz_calibrate_samples(
-                sample_item_ids=created_sample_item_ids,
-                mz_calibration_params=mz_calibration_params,
-                independent_transaction=False,
-                sid=sid,
-                process_id=gen_id(8),
-                parent_id=process_id,
-            )
-
-            # Collect calibration-affected sample items
-            all_affected_sample_item_ids.update(
-                calibration_result["_notification_data"].get(
-                    "affected_sample_item_ids", []
-                )
-            )
-
-            notification.message = f"Sample batch'{sample_batch_name}' m/z calibrated."
-            await send_progress_user_notification(notification, 0.6)
-        except ApiException as e:
-            if e.status_code == 200:
-                # Handle warning case: proceed to ramtch, the not-calibrated samples
-                # will be not matched since the calibration is not verified
-                samples_calibrate_failed = e.tech_message.get(
-                    "samples_calibrate_failed", []
-                )
-                calibration_warning = e.user_message
-
-                # Collect affected items from warning response
-                all_affected_sample_item_ids.update(
-                    e.tech_message.get("_notification_data", {}).get(
-                        "affected_sample_item_ids", []
-                    )
-                )
-            else:
-                # This is a critical error, re-raise it
-                raise
-
-    # Step 6. Get all affected batch IDs
+    # --- Get all affected batch IDs --- #
     _, affected_sample_batch_ids, *_ = await fetch_affected_sample_data(
-        sample_item_ids=list(all_affected_sample_item_ids)
+        sample_item_ids=list(affected_sample_item_ids)
     )
 
     # Check for spillover effects (affects on other batches)
@@ -758,7 +696,7 @@ async def import_sample_items(
         runtime.logger.info(other_affected_batches_message)
         notification.message += other_affected_batches_message
 
-    # Step 7: Compute matches for all imported samples
+    # --- Rematch imported sample items --- #
     await match_compute_samples(
         sample_item_ids=created_sample_item_ids,
         independent_transaction=False,
@@ -767,13 +705,13 @@ async def import_sample_items(
         parent_id=process_id,
     )
 
-    notification.message = f"Rematched {len(all_affected_sample_item_ids)} sample items affected by the import."
+    notification.message = f"Rematched {len(affected_sample_item_ids)} sample items affected by the import."
     await send_progress_user_notification(notification, 0.9)
 
-    # Step 8: Create separate independent task to recompute matches for other affected samples
+    # --- Create separate independent task to recompute matches for other affected samples --- #
     other_affected_sample_item_ids = [
         si_id
-        for si_id in all_affected_sample_item_ids
+        for si_id in affected_sample_item_ids
         if si_id not in created_sample_item_ids  # exclude the imported samples
     ]
     if other_affected_sample_item_ids:
@@ -790,23 +728,11 @@ async def import_sample_items(
             f"Started independent rematch task for {len(other_affected_sample_item_ids)} affected samples"
         )
 
-    # Step 9: Raise a warning if encountered during calibration
-    if calibration_warning is not None:
-        raise_api_warning(
-            calibration_warning,
-            {
-                "_notification_data": {
-                    "affected_sample_batch_ids": affected_sample_batch_ids,
-                },
-                "samples_calibrate_failed": samples_calibrate_failed,
-            },
-        )
-
-    # Step 10: Return the status message
+    # --- Return the status message --- #
     return {
         "message": f"{len(sample_items)} sample{'s' if len(sample_items) > 1 else ''} was imported to the sample batch '{sample_batch_name}'.",
         "_notification_data": {
-            "affected_sample_item_ids": list(all_affected_sample_item_ids),
+            "affected_sample_item_ids": list(affected_sample_item_ids),
             "affected_sample_batch_ids": affected_sample_batch_ids,
         },
     }

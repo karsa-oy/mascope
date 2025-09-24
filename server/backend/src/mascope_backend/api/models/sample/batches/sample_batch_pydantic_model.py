@@ -13,9 +13,6 @@ from mascope_file.name import get_instrument_type
 from mascope_backend.api.new.instrument_configs.schemas import (
     SetInstrumentConfigBody,
 )
-from mascope_backend.api.models.calibration.calibration_pydantic_model import (
-    MzCalibrationParams,
-)
 from mascope_backend.api.models.sample.items.sample_item_pydantic_model import (
     SampleItemCreate,
 )
@@ -258,14 +255,9 @@ class SampleBatchImportSamplesBody(BaseModel):
     sample_items: list[SampleItemCreate] = Field(
         ..., description="Sample items to be created and imported to the sample batch"
     )
-    mz_calibration_params: MzCalibrationParams = MzCalibrationParams()
     instrument_config: SetInstrumentConfigBody = Field(
         ...,
         description="Instrument config to use for imported sample files",
-    )
-    calibrate_batch: bool = Field(
-        default=True,
-        description="Flag to control whether the batch should be calibrated.",
     )
 
     @model_validator(mode="after")

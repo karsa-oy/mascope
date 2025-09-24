@@ -227,7 +227,7 @@ async def process_sample_item_route(
     background_tasks: BackgroundTasks,
     user=Depends(editor_user),
 ):
-    """Process a sample item, including creation, calibration, and matching.
+    """Process a sample item, including creation and matching.
 
     :param body: The data for processing the sample item.
     :param background_tasks: Background tasks for processing the item.
@@ -253,7 +253,6 @@ async def process_sample_item_route(
         process_sample_item,
         sample_item=body.sample_item,
         instrument_config=body.instrument_config,
-        mz_calibration_params=body.mz_calibration_params,
         independent_transaction=True,
         sid=sid,
         process_id=process_id,

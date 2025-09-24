@@ -1,17 +1,11 @@
 import asyncio
 
-from mascope_file.name import get_instrument_type
-
 from mascope_backend.db.id import gen_id
 from mascope_backend.api.lib.api_features import (
     api_controller_background_task,
 )
-from mascope_backend.api.lib.exceptions.api_exceptions import ApiException
 from mascope_backend.api.controllers.match.match_controller import match_compute_sample
 
-from mascope_backend.api.controllers.calibration.calibration_controller import (
-    calibration_mz_calibrate_sample,
-)
 from mascope_backend.api.controllers.samples.samples_controller import get_sample
 from mascope_backend.api.models.sample.items.sample_item_pydantic_model import (
     SampleItemCreate,
@@ -23,9 +17,6 @@ from mascope_backend.api.controllers.sample.lib.fetch_affected_sample_data impor
     fetch_affected_sample_data,
 )
 from mascope_backend.api.controllers.match.match_controller import rematch_samples
-from mascope_backend.api.models.calibration.calibration_pydantic_model import (
-    MzCalibrationParams,
-)
 from mascope_backend.socket.notifications import (
     UserNotification,
     send_progress_user_notification,
@@ -49,7 +40,6 @@ from mascope_backend.runtime import runtime
 async def process_sample_item(
     sample_item: SampleItemCreate,
     instrument_config: SetInstrumentConfigBody,
-    mz_calibration_params: MzCalibrationParams = MzCalibrationParams(),
     independent_transaction: bool = False,
     sid=None,
     process_id=None,
@@ -62,21 +52,17 @@ async def process_sample_item(
     NOTE that the sample_file record with the same filename should already exist in the database.
 
     Steps:
-    1. Process instrument functions for the sample file
-    2. Create a new sample item using the provided details.
-    3. Perform m/z calibration on the newly created sample item if instrument is TOF
-        using provided calibration parameters.
-    4. Compute matches for the processed sample
-    5. Create separate independent task to recompute matches for other affected samples
-    6. Gather all affected batch IDs for ui reload events
-    7. Fetch processed sample details including match data
+    - Process instrument functions for the sample file
+    - Create a new sample item
+    - Compute matches for the sample item
+    - Create separate independent task to recompute matches for other affected samples
+    - Gather all affected batch IDs for ui reload events
+    - Fetch processed sample details including match data
 
     :param sample_item: Details of the sample item to be created.
     :type sample_item: SampleItemCreate
     :param instrument_config: An instrument config to use for the processed item.
     :type instrument_config: SetIntrumentConfigBody
-    :param mz_calibration_params: Calibration parameters to use, defaults to a preconfigured set.
-    :type mz_calibration_params: MzCalibrationParams, optional
     :param independent_transaction: Indicates whether this operation should be treated as a standalone transaction.
     :type independent_transaction: bool, optional
     :param sid: Session ID for client-specific communications, defaults to None.
@@ -105,7 +91,7 @@ async def process_sample_item(
     )
     await send_progress_user_notification(notification, 0.1)
 
-    # Step 1: process instrument config
+    # --- Process instrument functions for the sample file --- #
     instrument_config_result = await process_instrument_config(
         filenames=[sample_item.filename],
         instrument_config=instrument_config,
@@ -121,7 +107,7 @@ async def process_sample_item(
         )
     )
 
-    # Step 2: create the sample item
+    # --- Create a new sample item --- #
     created_sample_item = (
         await create_sample_items(
             sample_items=[sample_item], independent_transaction=True
@@ -142,41 +128,7 @@ async def process_sample_item(
     }
     await send_progress_user_notification(notification, 0.2)
 
-    # Step 3: Calibrate the sample item if instrument is TOF
-    if get_instrument_type(created_sample_item["filename"]) == "tof":
-        try:
-            calibration_result = await calibration_mz_calibrate_sample(
-                sample_item_id=created_sample_item_id,
-                mz_calibration_params=mz_calibration_params,
-                independent_transaction=False,
-                sid=sid,
-                process_id=gen_id(8),
-                parent_id=process_id,
-            )
-            # Collect calibration-affected sample items
-            all_affected_sample_item_ids.update(
-                calibration_result["_notification_data"].get(
-                    "affected_sample_item_ids", []
-                )
-            )
-
-            notification.message = (
-                f"Sample '{sample_item.sample_item_name}' m/z calibrated."
-            )
-            await send_progress_user_notification(notification, 0.6)
-        except ApiException as e:
-            if e.status_code == 200:
-                # Handle warnings, collect affected items from warning response
-                all_affected_sample_item_ids.update(
-                    e.tech_message.get("_notification_data", {}).get(
-                        "affected_sample_item_ids", []
-                    )
-                )
-            else:
-                # This is a critical error, re-raise it
-                raise
-
-    # Step 4: Compute matches for processed sample
+    # --- Compute matches for the sample item --- #
     await match_compute_sample(
         sample_item_id=created_sample_item_id,
         independent_transaction=False,
@@ -190,7 +142,7 @@ async def process_sample_item(
     )
     await send_progress_user_notification(notification, 0.9)
 
-    # Step 5: Create separate independent task to recompute matches for other affected samples
+    # --- Create separate independent task to recompute matches for other affected samples --- #
     other_affected_sample_item_ids = [
         si_id
         for si_id in all_affected_sample_item_ids
@@ -210,12 +162,12 @@ async def process_sample_item(
             f"Started independent rematch task for {len(other_affected_sample_item_ids)} affected samples"
         )
 
-    # Step 6. Gather all affected batch IDs for ui reload events
+    # --- Gather all affected batch IDs for ui reload events --- #
     _, affected_sample_batch_ids, *_ = await fetch_affected_sample_data(
         sample_item_ids=list(all_affected_sample_item_ids)
     )
 
-    # Step 7: Fetch processed sample details including match data
+    # --- Fetch processed sample details including match data --- #
     sample = (
         await get_sample(
             sample_item_id=created_sample_item_id,

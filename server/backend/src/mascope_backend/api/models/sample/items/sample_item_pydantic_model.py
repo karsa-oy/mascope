@@ -9,9 +9,6 @@ from datetime import datetime
 import re
 from typing import Optional, Dict
 from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
-from mascope_backend.api.models.calibration.calibration_pydantic_model import (
-    MzCalibrationParams,
-)
 from mascope_backend.api.models.base_pydantic_model import (
     QueryParamsModel,
     CommonValidators,
@@ -287,4 +284,3 @@ class SampleItemProcessBody(BaseModel):
     instrument_config: SetInstrumentConfigBody = Field(
         ..., description="Instrument config to set for the sample item"
     )
-    mz_calibration_params: MzCalibrationParams = MzCalibrationParams()
