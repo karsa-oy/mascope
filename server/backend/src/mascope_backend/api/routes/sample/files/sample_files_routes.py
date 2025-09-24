@@ -298,6 +298,7 @@ async def process_sample_item_route(
         sample_file_id=sample_file_id,
         independent_transaction=True,
         sid=sid,
+        instrument=sample_file.instrument,
         process_id=process_id,
     )
 

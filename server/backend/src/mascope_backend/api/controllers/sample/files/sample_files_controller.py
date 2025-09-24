@@ -240,6 +240,7 @@ async def create_sample_file(
             sample_file_id=new_sample_file.sample_file_id,
             independent_transaction=True,
             sid=sid,
+            instrument=new_sample_file.instrument,
             process_id=process_id,
         )
 

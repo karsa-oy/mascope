@@ -53,15 +53,16 @@ from mascope_backend.runtime import runtime
 
 
 @api_controller_background_task(
-    success_notification_rooms=["sid"],
+    success_notification_rooms=["instrument"],
     success_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
-    error_notification_rooms=["sid"],
+    error_notification_rooms=["instrument"],
     error_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
 )
 async def auto_process_sample_file(
     sample_file_id: str,
     independent_transaction: bool = None,
     sid: str | None = None,
+    instrument: str | None = None,
     process_id: str | None = None,
 ) -> dict:
     """
@@ -86,6 +87,8 @@ async def auto_process_sample_file(
     :type independent_transaction: bool, optional
     :param sid: Session ID for notifications
     :type sid: str | None, optional
+    :param instrument: Instrument name for user notifications to its room
+    :type instrument: str | None, optional
     :param process_id: Process ID for tracking
     :type process_id: str | None, optional
     :return: Processing results with affected IDs
