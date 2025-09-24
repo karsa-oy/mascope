@@ -4,6 +4,7 @@ import { ref } from 'vue'
 import Uppy from '@uppy/core'
 import Tus from '@uppy/tus'
 
+import { useIonizationMode } from './data/ionization'
 import { useUi } from './ui'
 
 import { api } from '@/api'
@@ -15,6 +16,11 @@ const FILE_UPLOAD_EXTENSIONS = ['.h5', '.raw']
 const FILE_UPLOAD_SIZE_LIMIT = 2.5 * 1024 * 1024 * 1024 // 2.5 GB
 
 function validateFile(file) {
+  const validInstrument = validateInstrument(file)
+  const validIonization = validateIonization(file)
+}
+
+function validateInstrument(file) {
   // parse filename
   const prefix = file.name.split('_')[0]
   const prefixType = instrumentType(prefix)
@@ -27,6 +33,14 @@ function validateFile(file) {
   } else {
     return true
   }
+}
+
+function validateIonization(file) {
+  const ionization = useIonizationMode().list.some((i) =>
+    file.name.includes(i.ionization_mode_token)
+  )
+  if (!ionization) return false
+  return true
 }
 
 export const useUppy = defineStore('app.uppy', () => {

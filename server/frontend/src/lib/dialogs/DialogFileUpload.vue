@@ -1,5 +1,5 @@
 <script setup>
-import { reactive, computed, watch, nextTick } from 'vue'
+import { reactive, ref, computed, watch, nextTick } from 'vue'
 
 import Button from 'primevue/button'
 import Select from 'primevue/select'
@@ -28,11 +28,20 @@ const instrument = reactive({
   orbi: null
 })
 
+const ionizationToken = ref(null)
+
+const availableIonizationModes = computed(
+  () =>
+    app.data.ionization.mode.list
+      .map((i) => ({ name: i.ionization_mode_name, token: i.ionization_mode_token }))
+      .filter((mode) => mode.token) || []
+)
 // validate file sizes before upload
 const processed = computed(() => {
   const invalid = {
     tof: [],
-    orbi: []
+    orbi: [],
+    ionization: []
   }
   const valid = []
   props.files.forEach((file) => {
@@ -41,11 +50,20 @@ const processed = computed(() => {
     const prefixType = instrumentType(prefix)
     const ext = file.name.split('.').slice(-1)[0].toLowerCase()
     // check filename validity
+    let validInstrumentName = true
     if (ext == 'h5' && prefixType !== 'tof') {
       invalid.tof.push(file)
+      validInstrumentName = false
     } else if (ext == 'raw' && prefixType !== 'orbi') {
       invalid.orbi.push(file)
-    } else {
+      validInstrumentName = false
+    }
+    let validIonization = true
+    if (!availableIonizationModes.value.some((mode) => file.name.includes(mode.token))) {
+      invalid.ionization.push(file)
+      validIonization = false
+    }
+    if (validInstrumentName && validIonization) {
       valid.push(file)
     }
   })
@@ -53,7 +71,10 @@ const processed = computed(() => {
 })
 
 const count = computed(() => ({
-  invalid: processed.value.invalid.tof.length + processed.value.invalid.orbi.length,
+  invalid:
+    processed.value.invalid.tof.length +
+    processed.value.invalid.orbi.length +
+    processed.value.invalid.ionization.length,
   valid: processed.value.valid.length,
   total: props.files.length
 }))
@@ -70,12 +91,14 @@ const invalid = computed(() => {
     processed.value.invalid.tof.length > 0 && instrumentType(instrument.tof) !== 'tof'
   const invalidInstrumentName =
     !validInstrumentName(instrument.tof) || !validInstrumentName(instrument.orbi)
+  const invalidIonization = processed.value.invalid.ionization.length > 0 && !ionizationToken.value
   const noFiles =
     processed.value.invalid.tof.length +
       processed.value.invalid.orbi.length +
+      processed.value.invalid.ionization.length +
       processed.value.valid.length ==
     0
-  return invalidOrbi || invalidTof || invalidInstrumentName || noFiles
+  return invalidOrbi || invalidTof || invalidInstrumentName || invalidIonization || noFiles
 })
 
 // handle file selection
@@ -95,21 +118,78 @@ watch(
 
 // Manual upload for renamed files
 const upload = () => {
-  const renamedTofFiles = processed.value.invalid.tof.map((file) => {
-    return {
+  const allProcessedFiles = new Map() // Use Map to avoid duplicates
+
+  // Process TOF files with instrument name issues
+  processed.value.invalid.tof.forEach((file) => {
+    let newName = `${instrument.tof}_${file.name}`
+
+    // Check if this file also needs ionization token
+    const needsIonization = processed.value.invalid.ionization.some(
+      (ionFile) => ionFile.name === file.name
+    )
+    if (needsIonization && ionizationToken.value) {
+      // Insert ionization token after instrument name
+      const parts = newName.split('.')
+      const nameWithoutExt = parts.slice(0, -1).join('.')
+      const ext = parts.slice(-1)[0]
+      newName = `${nameWithoutExt}_${ionizationToken.value}.${ext}`
+    }
+
+    allProcessedFiles.set(file.name, {
       ...file,
-      name: `${instrument.tof}_${file.name}`
+      name: newName
+    })
+  })
+
+  // Process Orbi files with instrument name issues
+  processed.value.invalid.orbi.forEach((file) => {
+    let newName = `${instrument.orbi}_${file.name}`
+
+    // Check if this file also needs ionization token
+    const needsIonization = processed.value.invalid.ionization.some(
+      (ionFile) => ionFile.name === file.name
+    )
+    if (needsIonization && ionizationToken.value) {
+      // Insert ionization token after instrument name
+      const parts = newName.split('.')
+      const nameWithoutExt = parts.slice(0, -1).join('.')
+      const ext = parts.slice(-1)[0]
+      newName = `${nameWithoutExt}_${ionizationToken.value}.${ext}`
+    }
+
+    allProcessedFiles.set(file.name, {
+      ...file,
+      name: newName
+    })
+  })
+
+  // Process files that only have ionization issues (not already processed above)
+  processed.value.invalid.ionization.forEach((file) => {
+    // Skip if already processed as TOF or Orbi file
+    if (!allProcessedFiles.has(file.name) && ionizationToken.value) {
+      const parts = file.name.split('.')
+      const nameWithoutExt = parts.slice(0, -1).join('.')
+      const ext = parts.slice(-1)[0]
+      const newName = `${nameWithoutExt}_${ionizationToken.value}.${ext}`
+
+      allProcessedFiles.set(file.name, {
+        ...file,
+        name: newName
+      })
     }
   })
-  const renamedOrbiFiles = processed.value.invalid.orbi.map((file) => {
-    return {
-      ...file,
-      name: `${instrument.orbi}_${file.name}`
-    }
-  })
+
+  const renamedFiles = Array.from(allProcessedFiles.values())
+
   active.value = false
   app.uppy.clearInvalid()
-  emit('upload', [...renamedTofFiles, ...renamedOrbiFiles])
+  emit('upload', renamedFiles)
+}
+
+const cancel = () => {
+  active.value = false
+  app.uppy.clearInvalid()
 }
 </script>
 
@@ -215,9 +295,44 @@ const upload = () => {
         </Message>
       </div>
     </template>
+    <!-- MISSING IONIZATION -->
+    <template v-if="processed.invalid.ionization.length > 0">
+      <h3>Files missing ionization mode</h3>
+      <p>The following raw files do not have a valid ionization mode token:</p>
+      <ul>
+        <li v-for="file in processed.invalid.ionization" :key="file.name">
+          {{ file.name }}
+        </li>
+      </ul>
+      <p>
+        <i>
+          Each filename must include a valid ionization mode token in order to be processed
+          correctly. Currently available tokens are:
+          {{ availableIonizationModes.map((i) => i.token).join(', ') }}.
+        </i>
+      </p>
+      <p>
+        Please select one of the existing ionization modes below to apply to these files, if
+        applicable. Otherwise, create a new ionization mode with an appropriate token and upload
+        again.
+      </p>
+      <div class="center" style="width: 100%">
+        <FloatLabel>
+          <Select
+            inputId="file-ionization"
+            v-model="ionizationToken"
+            :options="availableIonizationModes"
+            optionLabel="name"
+            optionValue="token"
+            style="min-width: 200px"
+          />
+          <label for="file-ionization"> Ionization mode </label>
+        </FloatLabel>
+      </div>
+    </template>
     <!-- CONFIRM -->
     <menu style="justify-content: flex-end">
-      <Button label="Cancel" icon="pi pi-times" severity="secondary" @click="active = false" />
+      <Button label="Cancel" icon="pi pi-times" severity="secondary" @click="cancel" />
       <Button label="Save" icon="pi pi-save" :disabled="invalid" @click="upload" />
     </menu>
   </Dialog>
