@@ -224,17 +224,21 @@ async def create_acquisition_batches_and_items(
         ionization_modes = []
         # Resolve ionization modes based on tokens in filename
         ionization_modes.extend(await resolve_ionization_modes_by_tokens(sample_file))
-        if len(ionization_modes) > len(sample_file.polarity):
-            # Found too many ionization modes, likely overlapping tokens
-            raise RuntimeError(
-                f"Found too many matching ionization modes for file {sample_file.filename}"
-            )
         if len(ionization_modes) == len(sample_file.polarity):
-            # Found matching ionization modes for all polarities
+            # Found matching ionization modes for all polarities (1 or 2)
             return ionization_modes
+        elif len(ionization_modes) > len(sample_file.polarity):
+            # Found too many ionization modes, likely overlapping tokens
+            raise ValueError(
+                f"Found too many matching ionization modes for file {sample_file.filename}. "
+                "Configure tokens in ionization settings"
+            )
         else:
-            runtime.logger.debug(f"Did not find enough ionization modes by tokens")
-            # Fallback to resolving by peaks if tokens were insufficient
+            raise ValueError(
+                f"Not enough ionization mode tokens found for file {sample_file.filename}. "
+                "Configure tokens in ionization settings"
+            )
+            # TODO: Fallback to resolving by peaks if tokens were insufficient
             ionization_modes.extend(
                 await resolve_ionization_modes_by_peaks(sample_file)
             )
