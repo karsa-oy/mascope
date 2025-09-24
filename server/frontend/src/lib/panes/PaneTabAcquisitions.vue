@@ -185,7 +185,6 @@ const derivedPolarity = computed(() => {
   <div>
     <menu class="acquisition-menu">
       <div class="row">
-        <AppFilterChips v-model:filtering="filtering" v-show="filtering" />
         <Button
           v-tooltip.top="'Edit ionizations'"
           label="Edit ionizations"
