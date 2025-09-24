@@ -139,6 +139,10 @@ export function useRowsValidation({ imported }) {
     for (const item of imported.items) {
       key++
       let failures = []
+      // Validate ionization mode token in filename
+      if (!imported.availableIonizationModes.some((mode) => item.filename.includes(mode.token))) {
+        failures.push(`Ionization mode token not found in filename '${item.filename}'.`)
+      }
       // Validate sample type
       if (!sampleTypes.includes(item.sample_item_type)) {
         failures.push(

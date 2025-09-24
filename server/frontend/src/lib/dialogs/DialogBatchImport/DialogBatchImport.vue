@@ -18,12 +18,7 @@ import Dialog from 'primevue/dialog'
 import { useConfirm } from 'primevue/useconfirm'
 
 import { fromSpreadsheet } from '@/lib/table'
-import {
-  sampleTypes,
-  sampleTypesFilterIdRequired,
-  sampleTypesFilterIdOptional,
-  sampleTypesFilterIdNotAllowed
-} from '@/lib/constants'
+import { sampleTypesFilterIdOptional, sampleTypesFilterIdNotAllowed } from '@/lib/constants'
 import { PaneInstrumentConfig, InstrumentConfigSelector } from '@/lib/panes'
 import { useApp } from '@/stores'
 import { BaseClipboardContext } from '@/lib/base'
@@ -57,7 +52,8 @@ const imported = reactive({
   parsed: [],
   items: [],
   type: null,
-  filterId: null
+  filterId: null,
+  availableIonizationModes: []
 })
 const generated = reactive({
   filterId: null
@@ -94,6 +90,13 @@ watchEffect(() => {
 const allowedSampleTypes = computed(() => {
   return sampleTypesFilterIdOptional.concat(sampleTypesFilterIdNotAllowed).join(', ')
 })
+
+const availableIonizationModes = computed(
+  () =>
+    app.data.ionization.mode.list
+      .map((i) => ({ name: i.ionization_mode_name, token: i.ionization_mode_token }))
+      .filter((mode) => mode.token) || []
+)
 
 const title = computed(() => {
   const name = app.data.batch.focused?.sample_batch_name ?? 'selected'
@@ -141,6 +144,7 @@ function init(active) {
   imported.items = []
   imported.filterId = ''
   imported.type = null
+  imported.availableIonizationModes = availableIonizationModes.value
   instrumentConfig.status = {}
   instrumentConfig.input = {}
   instrumentConfig.payload = {}
