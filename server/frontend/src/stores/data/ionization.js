@@ -40,13 +40,13 @@ export const useIonizationMode = defineModule({
   key: 'ionization_mode_id',
   load: {
     method: () =>
-      api.http.get(`/ionization_modes`, {
+      api.http.get(`/ionization/modes`, {
         use: 'read',
         type: 'load_ionization_modes'
       }),
     events: ['ionization_mode_reload']
   },
-  read: (ionization_mode_id) => api.http.get(`/ionization_modes/${ionization_mode_id}`),
+  read: (ionization_mode_id) => api.http.get(`/ionization/modes/${ionization_mode_id}`),
   create: ({
     ionization_mode_name,
     ionization_mode_token,
@@ -56,7 +56,7 @@ export const useIonizationMode = defineModule({
     diagnostic_collection_id
   }) =>
     api.http.post(
-      `/ionization_modes`,
+      `/ionization/modes`,
       {
         ionization_mode_name,
         ionization_mode_token,
@@ -71,12 +71,12 @@ export const useIonizationMode = defineModule({
       }
     ),
   update: (ionization_mode) =>
-    api.http.patch(`/ionization_modes/${ionization_mode.ionization_mode_id}`, ionization_mode, {
+    api.http.patch(`/ionization/modes/${ionization_mode.ionization_mode_id}`, ionization_mode, {
       use: 'update',
       type: 'update_ionization_mode'
     }),
   delete: (ionization_mode_id) =>
-    api.http.delete(`/ionization_modes/${ionization_mode_id}`, {
+    api.http.delete(`/ionization/modes/${ionization_mode_id}`, {
       use: 'delete',
       type: 'delete_ionization_mode'
     })

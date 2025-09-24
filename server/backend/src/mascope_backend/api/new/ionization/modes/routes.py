@@ -7,12 +7,12 @@ from fastapi import APIRouter, Depends
 from mascope_backend.api.new.auth.dependencies import editor_user, guest_user
 from mascope_backend.api.lib.api_features import api_route
 
-from mascope_backend.api.new.ionization_mode.schema import (
+from mascope_backend.api.new.ionization.modes.schema import (
     IonizationModeCreate,
     IonizationModeUpdate,
     GetIonizationModesQueryParams,
 )
-from mascope_backend.api.new.ionization_mode.service import (
+from mascope_backend.api.new.ionization.modes.service import (
     create_ionization_mode,
     get_ionization_mode,
     get_ionization_modes,
@@ -24,7 +24,7 @@ from mascope_backend.db.models import User
 
 
 ionization_mode_router = APIRouter(
-    prefix="/api/ionization_modes", tags=["ionization modes"]
+    prefix="/api/ionization/modes", tags=["ionization modes"]
 )
 
 

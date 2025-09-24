@@ -8,7 +8,7 @@ from mascope_backend.api.controllers.sample.lib.sample_file_fetch import (
 )
 from mascope_backend.api.lib.api_features import api_controller
 from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
-from mascope_backend.api.new.ionization_mode.schema import (
+from mascope_backend.api.new.ionization.modes.schema import (
     IonizationModeCreate,
     IonizationModeUpdate,
 )
@@ -20,8 +20,6 @@ from .util import (
     token_is_unique,
 )
 
-from mascope_backend.runtime import runtime
-
 
 @api_controller()
 async def create_ionization_mode(
@@ -31,28 +29,24 @@ async def create_ionization_mode(
     Creates a new ionization mode with the provided details.
 
     Steps:
-    1. Generate a unique ID for the ionization mode.
-    2. Check for conflicting ionization mode tokens if provided.
-    3. Check for conflicting ionization mode names.
-    4. Construct a new IonizationMode object with the provided details.
-    5. Add the new ionization mode to the session and commit the changes to the database.
-    6. Refresh the instance and return the details of the created ionization mode.
+    1. Check for conflicting ionization mode tokens if provided.
+    2. Check for conflicting ionization mode names.
+    3. Construct a new IonizationMode object with the provided details.
+    4. Add the new ionization mode to the session and commit the changes to the database.
+    5. Refresh the instance and return the details of the created ionization mode.
 
     :param ionization_mode_data: The ionization mode data to create
     :return: A dictionary containing the created ionization mode data.
     """
     async with async_session() as session:
-        # Step 1: Generate unique ID
-        ionization_mode_id = gen_id(16)
-
-        # Step 2: Check for token conflicts if provided
+        # Step 1: Check for token conflicts if provided
         if ionization_mode_data.ionization_mode_token:
             if not await token_is_unique(ionization_mode_data.ionization_mode_token):
                 raise ValueError(
                     f"Ionization mode with similar token as '{ionization_mode_data.ionization_mode_token}' already exists"
                 )
 
-        # Step 3: Check for name conflicts
+        # Step 2: Check for name conflicts
         existing_name = await session.execute(
             select(IonizationMode).where(
                 IonizationMode.ionization_mode_name
@@ -64,17 +58,17 @@ async def create_ionization_mode(
                 f"Ionization mode with name '{ionization_mode_data.ionization_mode_name}' already exists"
             )
 
-        # Step 4: Create new ionization mode instance
+        # Step 3: Create new ionization mode instance
         new_ionization_mode = IonizationMode(
-            ionization_mode_id=ionization_mode_id,
+            ionization_mode_id=gen_id(16),
             **ionization_mode_data.model_dump(),
         )
 
-        # Step 5: Add to session and commit
+        # Step 4: Add to session and commit
         session.add(new_ionization_mode)
         await session.commit()
 
-        # Step 6: Refresh and return
+        # Step 5: Refresh and return
         await session.refresh(new_ionization_mode)
         await sio.emit("ionization_mode_reload")
         return {

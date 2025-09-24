@@ -21,7 +21,7 @@ from mascope_backend.db.models import (
     IonizationMode,
     MatchIsotope,
 )
-from mascope_backend.api.new.ionization_mode.util import (
+from mascope_backend.api.new.ionization.modes.util import (
     fetch_batch_ionization_mechanism_ids,
     fetch_sample_ionization_mechanism_ids,
 )

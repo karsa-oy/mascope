@@ -83,7 +83,7 @@ from mascope_backend.api.new.instrument_configs.lib import (
 from mascope_backend.api.new.instrument_configs.schemas import (
     SetInstrumentConfigBody,
 )
-from mascope_backend.api.new.ionization_mode.util import (
+from mascope_backend.api.new.ionization.modes.util import (
     resolve_ionization_modes_by_tokens,
 )
 from mascope_backend.api.models.sample.batches.config import sample_batch_config

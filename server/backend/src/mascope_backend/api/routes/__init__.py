@@ -9,7 +9,7 @@ from mascope_backend.api.new.users.owner.routes import owner_router
 from mascope_backend.api.new.roles.routes import roles_router
 from mascope_backend.api.new.params import params_router
 from mascope_backend.api.new.instruments import instruments_router
-from mascope_backend.api.new.ionization_mode.routes import (
+from mascope_backend.api.new.ionization.modes.routes import (
     ionization_mode_router,
 )
 from mascope_backend.api.new.temp.routes import temp_router

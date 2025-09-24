@@ -43,7 +43,7 @@ from mascope_backend.api.models.sample.batches.sample_batch_pydantic_model impor
     SampleBatchCreate,
 )
 from mascope_backend.api.models.sample.batches.config import sample_batch_config
-from mascope_backend.api.new.ionization_mode.util import (
+from mascope_backend.api.new.ionization.modes.util import (
     resolve_ionization_modes_by_peaks,
     resolve_ionization_modes_by_tokens,
 )
@@ -233,6 +233,7 @@ async def create_acquisition_batches_and_items(
             # Found matching ionization modes for all polarities
             return ionization_modes
         else:
+            runtime.logger.debug(f"Did not find enough ionization modes by tokens")
             # Fallback to resolving by peaks if tokens were insufficient
             ionization_modes.extend(
                 await resolve_ionization_modes_by_peaks(sample_file)

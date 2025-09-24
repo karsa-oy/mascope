@@ -1,4 +1,4 @@
-from mascope_backend.api.new.ionization_mode.util import (
+from mascope_backend.api.new.ionization.modes.util import (
     fetch_sample_ionization_mechanism_ids,
 )
 import pandas as pd

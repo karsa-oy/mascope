@@ -28,7 +28,7 @@ from mascope_backend.api.models.target.compounds.target_compound_pydantic_model 
 from mascope_backend.api.models.target.ions.target_ion_pydantic_model import (
     TargetIonUpdate,
 )
-from mascope_backend.api.new.ionization_mode.util import (
+from mascope_backend.api.new.ionization.modes.util import (
     fetch_batch_ionization_mechanism_ids,
 )
 

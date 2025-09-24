@@ -183,7 +183,7 @@ const ionizationModeOptions = ref([])
 watchEffect(async () => {
   if (action.value === 'create' && input.filename) {
     try {
-      const response = await api.http.get(`/ionization_modes/by_filename/${input.filename}`)
+      const response = await api.http.get(`/ionization/modes/by_filename/${input.filename}`)
       ionizationModeOptions.value = response.data.data.map((mode) => ({
         label: mode.ionization_mode_name,
         value: mode.ionization_mode_id

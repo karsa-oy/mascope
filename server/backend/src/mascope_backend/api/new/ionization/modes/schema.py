@@ -1,8 +1,4 @@
-"""
-Pydantic models for ionization mode API endpoints.
-"""
-
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 from mascope_backend.api.models.base_pydantic_model import QueryParamsModel
 
@@ -20,6 +16,19 @@ class IonizationModeBaseValidator:
     def validate_ionization_mechanism_ids(cls, value: list[str]):
         if not isinstance(value, list):
             raise ValueError("ionization_mechanism_ids must be a list")
+        if not all(isinstance(item, str) for item in value):
+            raise ValueError("All items in ionization_mechanism_ids must be strings")
+        if not len(value):
+            raise ValueError("ionization_mechanism_ids must contain at least one ID")
+        return value
+
+    @field_validator("ionization_mode_token")
+    @classmethod
+    def validate_token(cls, value: str | None):
+        """Strip trailing and leading whitespace and convert empty strings to None."""
+        value = value.strip() if value else value
+        if value == "":
+            return None
         return value
 
 
@@ -43,14 +52,16 @@ class IonizationModeBase(IonizationModeBaseValidator, BaseModel):
     )
     calibration_collection_id: str | None = Field(
         None,
-        max_length=256,
+        max_length=16,
         description="ID of the calibration collection to use for the scheme",
     )
     diagnostic_collection_id: str | None = Field(
         None,
-        max_length=256,
+        max_length=16,
         description="ID of the diagnostic collection to use for the scheme",
     )
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class IonizationModeCreate(IonizationModeBase):
@@ -62,10 +73,14 @@ class IonizationModeCreate(IonizationModeBase):
 class IonizationModeUpdate(IonizationModeBase):
     """Model for updating an existing ionization mode."""
 
-    pass
+    ionization_mode_id: str = Field(
+        ...,
+        max_length=16,
+        description="ID of the ionization mode to update",
+    )
 
 
 class GetIonizationModesQueryParams(QueryParamsModel):
-    ionization_mode_polarity: str | None = Field(
-        None, description="Filter by ionization mode polarity ('+' or '-')"
-    )
+    """Placeholder for future query parameters for getting ionization modes."""
+
+    pass

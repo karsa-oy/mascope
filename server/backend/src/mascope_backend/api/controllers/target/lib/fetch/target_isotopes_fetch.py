@@ -22,7 +22,7 @@ from mascope_backend.db.models import (
 )
 
 from mascope_backend.api.new.match.params import default_match_params
-from mascope_backend.api.new.ionization_mode.util import (
+from mascope_backend.api.new.ionization.modes.util import (
     fetch_sample_ionization_mechanism_ids,
 )
 from mascope_backend.runtime import runtime
