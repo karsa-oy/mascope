@@ -70,8 +70,8 @@ export const useIonizationMode = defineModule({
         type: 'create_ionization_mode'
       }
     ),
-  update: (ionization_mode) =>
-    api.http.patch(`/ionization/modes/${ionization_mode.ionization_mode_id}`, ionization_mode, {
+  update: (ionization_mode_id, ionization_mode_update) =>
+    api.http.patch(`/ionization/modes/${ionization_mode_id}`, ionization_mode_update, {
       use: 'update',
       type: 'update_ionization_mode'
     }),

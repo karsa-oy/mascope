@@ -1,6 +1,6 @@
 import pandas as pd
 
-from sqlalchemy import select, or_
+from sqlalchemy import and_, select
 from mascope_backend.db import async_session
 from mascope_backend.db.models import (
     IonizationMode,
@@ -154,7 +154,7 @@ async def resolve_ionization_modes_by_tokens(
     return matched_ionization_modes
 
 
-async def token_is_unique(token: str) -> bool:
+async def token_is_unique(token: str, ignore_id: str | None = None) -> bool:
     """Validate if an ionization mode token overlaps with an existing one.
 
     Note: This checks for overlapping tokens, not exact matches. Also, it still
@@ -162,6 +162,8 @@ async def token_is_unique(token: str) -> bool:
 
     :param token: The ionization mode token to validate.
     :type token: str
+    :param ignore_id: An optional ionization mode ID to ignore during the check (useful when updating).
+    :type ignore_id: str | None
     :return: True if the token is unique, False otherwise.
     :rtype: bool
     """
@@ -169,7 +171,10 @@ async def token_is_unique(token: str) -> bool:
         # First check if any existing token contains the new token
         result = await session.execute(
             select(IonizationMode).where(
-                IonizationMode.ionization_mode_token.contains(token)
+                and_(
+                    IonizationMode.ionization_mode_token.contains(token),
+                    IonizationMode.ionization_mode_id != ignore_id,
+                )
             )
         )
         if result.scalars().first():
@@ -180,7 +185,7 @@ async def token_is_unique(token: str) -> bool:
 
         # Check if the new token contains any existing token
         for mode in all_modes:
-            if not mode.ionization_mode_token:
+            if not mode.ionization_mode_token or mode.ionization_mode_id == ignore_id:
                 continue
             if mode.ionization_mode_token in token:
                 runtime.logger.debug(

@@ -22,6 +22,8 @@ class IonizationModeBaseValidator:
             raise ValueError("ionization_mechanism_ids must contain at least one ID")
         return value
 
+
+class IonizationModeTokenValidator:
     @field_validator("ionization_mode_token")
     @classmethod
     def validate_token(cls, value: str | None):
@@ -32,7 +34,9 @@ class IonizationModeBaseValidator:
         return value
 
 
-class IonizationModeBase(IonizationModeBaseValidator, BaseModel):
+class IonizationModeBase(
+    IonizationModeBaseValidator, IonizationModeTokenValidator, BaseModel
+):
     """Base model for ionization mode with common fields."""
 
     ionization_mode_name: str = Field(
@@ -70,13 +74,16 @@ class IonizationModeCreate(IonizationModeBase):
     pass
 
 
-class IonizationModeUpdate(IonizationModeBase):
+class IonizationModeUpdate(IonizationModeTokenValidator, BaseModel):
     """Model for updating an existing ionization mode."""
 
-    ionization_mode_id: str = Field(
-        ...,
-        max_length=16,
-        description="ID of the ionization mode to update",
+    ionization_mode_name: str = Field(
+        ..., max_length=256, description="Friendly, unique name of the ionization mode"
+    )
+    ionization_mode_token: str | None = Field(
+        None,
+        max_length=256,
+        description="Unique filename token for the ionization mode",
     )
 
 

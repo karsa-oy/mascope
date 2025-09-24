@@ -204,7 +204,7 @@ async def update_ionization_mode(
         # Step 2: Check for token conflicts if being updated
         new_token = update_data.get("ionization_mode_token")
         if new_token and new_token != ionization_mode.ionization_mode_token:
-            if not await token_is_unique(new_token):
+            if not await token_is_unique(new_token, ignore_id=ionization_mode_id):
                 raise ValueError(
                     f"Ionization mode with similar token as '{new_token}'"
                     " already exists"

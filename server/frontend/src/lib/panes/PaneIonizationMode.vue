@@ -70,33 +70,20 @@ const availableMechanisms = computed(() => {
   )
 })
 
-// Filter mechanisms by edited polarity
-const availableEditMechanisms = computed(() => {
-  if (!edited.value?.ionization_mode_polarity) {
-    return []
-  }
-  return app.data.ionization.mechanism.list.filter(
-    (m) => m.ionization_mechanism_polarity === edited.value.ionization_mode_polarity
-  )
-})
-
 // Mode operations
 const mode = {
   edit: (data) => {
     edited.value = {
       ionization_mode_id: data.ionization_mode_id,
       ionization_mode_name: data.ionization_mode_name,
-      ionization_mode_token: data.ionization_mode_token,
-      ionization_mode_polarity: data.ionization_mode_polarity,
-      ionization_mechanism_ids: data.ionization_mechanism_ids,
-      calibration_collection_id: data.calibration_collection_id,
-      diagnostic_collection_id: data.diagnostic_collection_id
+      ionization_mode_token: data.ionization_mode_token
     }
   },
   cancel: resetEdit,
   save: async () => {
     if (edited.value) {
-      await app.data.ionization.mode.update(edited.value)
+      const { ionization_mode_id, ...updateData } = edited.value
+      await app.data.ionization.mode.update(ionization_mode_id, updateData)
       resetEdit()
     }
   },
@@ -293,31 +280,13 @@ defineExpose({
 
       <Column header="Polarity" style="width: 120px">
         <template #body="{ data }">
-          <Select
-            v-if="editing(data)"
-            v-model="edited.ionization_mode_polarity"
-            :options="polarityOptions"
-            optionLabel="label"
-            optionValue="value"
-            style="width: 100%"
-          />
-          <span v-else>{{ data.ionization_mode_polarity }}</span>
+          {{ data.ionization_mode_polarity }}
         </template>
       </Column>
 
       <Column header="Mechanisms" style="min-width: 200px">
         <template #body="{ data }">
-          <MultiSelect
-            v-if="editing(data)"
-            v-model="edited.ionization_mechanism_ids"
-            :options="availableEditMechanisms"
-            :showToggleAll="false"
-            optionLabel="ionization_mechanism"
-            optionValue="ionization_mechanism_id"
-            style="width: 100%"
-            placeholder="Select mechanisms"
-          />
-          <div v-else style="display: flex; flex-wrap: wrap; gap: 0.25rem">
+          <div style="display: flex; flex-wrap: wrap; gap: 0.25rem">
             <span
               v-for="mechanismId in data.ionization_mechanism_ids"
               :key="mechanismId"
@@ -335,47 +304,25 @@ defineExpose({
 
       <Column header="Calibration Collection" style="min-width: 150px">
         <template #body="{ data }">
-          <Select
-            v-if="editing(data)"
-            v-model="edited.calibration_collection_id"
-            :options="calibrationCollections"
-            optionLabel="target_collection_name"
-            optionValue="target_collection_id"
-            style="width: 100%"
-            placeholder="Select collection"
-          />
-          <span v-else>
-            {{
-              data.calibration_collection_id
-                ? app.data.target.collection.list.find(
-                    (c) => c.target_collection_id === data.calibration_collection_id
-                  )?.target_collection_name || data.calibration_collection_id
-                : ''
-            }}
-          </span>
+          {{
+            data.calibration_collection_id
+              ? app.data.target.collection.list.find(
+                  (c) => c.target_collection_id === data.calibration_collection_id
+                )?.target_collection_name || data.calibration_collection_id
+              : ''
+          }}
         </template>
       </Column>
 
       <Column header="Diagnostic Collection" style="min-width: 150px">
         <template #body="{ data }">
-          <Select
-            v-if="editing(data)"
-            v-model="edited.diagnostic_collection_id"
-            :options="diagnosticCollections"
-            optionLabel="target_collection_name"
-            optionValue="target_collection_id"
-            style="width: 100%"
-            placeholder="Select collection"
-          />
-          <span v-else>
-            {{
-              data.diagnostic_collection_id
-                ? app.data.target.collection.list.find(
-                    (c) => c.target_collection_id === data.diagnostic_collection_id
-                  )?.target_collection_name || data.diagnostic_collection_id
-                : ''
-            }}
-          </span>
+          {{
+            data.diagnostic_collection_id
+              ? app.data.target.collection.list.find(
+                  (c) => c.target_collection_id === data.diagnostic_collection_id
+                )?.target_collection_name || data.diagnostic_collection_id
+              : ''
+          }}
         </template>
       </Column>
 
