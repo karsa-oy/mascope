@@ -113,7 +113,7 @@ const changed = computed(() =>
 const invalid = computed(() => {
   switch (action.value) {
     case 'create': {
-      return !selected.info.name || !(selected.mechanisms.matching?.length > 0)
+      return !selected.info.name
     }
     case 'update': {
       const infoValid = selected.info.name.length > 0
@@ -182,25 +182,6 @@ async function execute() {
     }
   }
 }
-async function save() {
-  if (calibrationChanged.value && ['update', 'update_targets'].includes(action.value)) {
-    confirm.require({
-      icon: 'pi pi-exclamation-triangle',
-      header: 'Confirm calibration',
-      message: `Updating calibration settings will remove matches for all associated samples in this and other batches. This action cannot be undone. Are you sure you want to proceed?`,
-      accept: execute,
-      acceptProps: {
-        label: 'Continue'
-      },
-      rejectProps: {
-        label: 'Cancel',
-        severity: 'secondary'
-      }
-    })
-  } else {
-    await execute()
-  }
-}
 </script>
 
 <template>
@@ -252,7 +233,7 @@ async function save() {
 
     <menu>
       <Button label="Cancel" @click="action = null" icon="pi pi-times" severity="secondary" />
-      <Button label="Save" @click="save" icon="pi pi-save" :disabled="invalid" />
+      <Button label="Save" @click="execute" icon="pi pi-save" :disabled="invalid" />
     </menu>
   </Dialog>
 </template>

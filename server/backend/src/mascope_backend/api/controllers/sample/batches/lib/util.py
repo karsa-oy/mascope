@@ -37,17 +37,6 @@ def detect_update_batch_changes(existing_batch, sample_batch_update) -> dict[str
     collections_to_remove = current_collections - new_collections
     collections_changed = len(collections_to_add) > 0 or len(collections_to_remove) > 0
 
-    # Calculate calibration changes
-    calibration_collection_changed = (
-        current_calibration_collection != new_calibration_collection
-    )
-    calibration_ion_mechanisms_changed = (
-        current_calibration_ion_mechanisms != new_calibration_ion_mechanisms
-    )
-    calibration_changed = (
-        calibration_collection_changed or calibration_ion_mechanisms_changed
-    )
-
     # Basic field changes
     name_changed = (
         sample_batch_update.sample_batch_name is not None
