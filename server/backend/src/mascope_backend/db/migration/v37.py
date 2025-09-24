@@ -65,7 +65,6 @@ async def collect_unique_build_params() -> tuple[list[dict[str, Any]], dict[str,
     batch_to_combinations = {}  # batch_id -> combination_keys
 
     for batch in sample_batches:
-        print(batch)
         batch_id = batch["sample_batch_id"]
         build_params = json.loads(batch["build_params"])
 

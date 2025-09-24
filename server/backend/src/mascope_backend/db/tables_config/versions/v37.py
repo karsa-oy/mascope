@@ -129,9 +129,9 @@ table_configs = {
                 ionization_mode_token VARCHAR(256),
                 ionization_mode_polarity VARCHAR(1) NOT NULL,
                 ionization_mechanism_ids JSON NOT NULL,
-                calibration_collection_id VARCHAR(16),
+                calibration_collection_id VARCHAR(16)
                     REFERENCES target_collection(target_collection_id) ON DELETE SET NULL,
-                diagnostic_collection_id VARCHAR(16),
+                diagnostic_collection_id VARCHAR(16)
                     REFERENCES target_collection(target_collection_id) ON DELETE SET NULL,
                 UNIQUE (ionization_mode_name),
                 UNIQUE (ionization_mode_token)
