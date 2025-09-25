@@ -31,7 +31,7 @@ async def get_match_isotopes(
     sort: str | None = None,
     order: str | None = None,
     page: int = 0,
-    limit: int = 1000000,
+    limit: int | None = None,
 ) -> dict:
     """
     Retrieves a paginated list of matched isotopes, optionally filtered by sample item ID, target isotope ID, and sorted by a specified column.
@@ -60,7 +60,7 @@ async def get_match_isotopes(
     :type order: str, optional
     :param page: Page number for pagination, defaults to 0.
     :type page: int, optional
-    :param limit: Number of items per page, defaults to a large number.
+    :param limit: Number of items per page, defaults to None (return all).
     :type limit: int, optional
     :return: A dictionary with the total count and a list of matched isotopes.
     :rtype: dict
@@ -105,7 +105,8 @@ async def get_match_isotopes(
         )
 
         # Step 6: Apply pagination
-        stmt = stmt.offset(page * limit).limit(limit)
+        if limit is not None:
+            stmt = stmt.offset(page * limit).limit(limit)
 
         # Step 7: Execute query
         result = await session.execute(stmt)
