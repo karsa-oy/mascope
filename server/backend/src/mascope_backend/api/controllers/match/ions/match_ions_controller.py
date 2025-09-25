@@ -52,7 +52,7 @@ async def get_match_ions(
     sort: str | None = None,
     order: str | None = None,
     page: int = 0,
-    limit: int = 10000,
+    limit: int | None = None,
 ) -> dict:
     """
     Retrieves a list of matched ions based on specified filtering criteria, supporting optional inclusion
@@ -102,7 +102,7 @@ async def get_match_ions(
     :type order: str | None, optional
     :param page: Page number for pagination, starts from 0, defaults to 0.
     :type page: int, optional
-    :param limit: Maximum number of results per page, defaults to 10000.
+    :param limit: Maximum number of results per page, defaults to None (return everything).
     :type limit: int, optional
     :return: A dictionary containing the total results count and a paginated list of match ions.
     :rtype: dict
@@ -223,7 +223,8 @@ async def get_match_ions(
         total = await session.scalar(count_stmt)
 
         # Step 12: Execute the paginated query
-        query = query.offset(page * limit).limit(limit)
+        if limit is not None:
+            query = query.offset(page * limit).limit(limit)
         result = await session.execute(query)
 
     # Step 13: Construct response data
