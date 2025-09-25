@@ -47,7 +47,7 @@ async def get_match_compounds(
     sort: str | None = None,
     order: str | None = None,
     page: int = 0,
-    limit: int = 10000,
+    limit: int | None = None,
 ) -> dict:
     """
     Retrieves a list of matched compounds based on filtering criteria. This function allows
@@ -83,7 +83,7 @@ async def get_match_compounds(
     :type order: str | None, optional
     :param page: Page number for pagination, starts from 0, defaults to 0.
     :type page: int, optional
-    :param limit: Maximum number of results per page, defaults to 10000.
+    :param limit: Maximum number of results per page, defaults to None (return all).
     :type limit: int, optional
     :return: A dictionary containing total results count and the paginated list of match compounds.
     :rtype: dict
@@ -165,7 +165,8 @@ async def get_match_compounds(
         total = await session.scalar(count_stmt)
 
         # Step 6: Execute the paginated query
-        query = query.offset(page * limit).limit(limit)
+        if limit is not None:
+            query = query.offset(page * limit).limit(limit)
         result = await session.execute(query)
 
     # Step 7: Construct response data
