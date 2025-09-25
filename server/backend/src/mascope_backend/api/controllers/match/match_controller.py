@@ -309,6 +309,7 @@ async def match_compute_sample(
     sample_item_id: str,
     independent_transaction: bool = False,
     sid: str | None = None,
+    instrument: str | None = None,
     process_id: str | None = None,
     parent_id: str | None = None,
 ) -> dict:
@@ -324,6 +325,8 @@ async def match_compute_sample(
     :type independent_transaction: bool, optional
     :param sid: Session identifier for client notifications, defaults to None
     :type sid: str, optional
+    :param instrument: Instrument name for user notifications to its room
+    :type instrument: str | None, optional
     :param process_id: Process identifier for progress tracking
     :type process_id: str, optional
     :param parent_id: Parent process identifier

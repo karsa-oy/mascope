@@ -157,6 +157,7 @@ async def auto_process_sample_file(
             sample_item_id=sample_item.get("sample_item_id"),
             independent_transaction=False,
             sid=sid,
+            instrument=instrument,
             process_id=gen_id(8),
             parent_id=process_id,
         )
