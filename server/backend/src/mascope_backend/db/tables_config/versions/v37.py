@@ -557,12 +557,18 @@ table_configs = {
             "sample_item_utc_modified": ("TIMESTAMP", 0, None, 0),
         },
         "fks": {
+            "ionization_mode_id": (
+                "ionization_mode",
+                "ionization_mode_id",
+                "NO ACTION",
+                "SET NULL",
+            ),
             "sample_batch_id": (
                 "sample_batch",
                 "sample_batch_id",
                 "NO ACTION",
                 "CASCADE",
-            )
+            ),
         },
         "create_sql": """
             CREATE TABLE sample_item (
@@ -577,7 +583,8 @@ table_configs = {
                 filter_id VARCHAR(6),
                 tic FLOAT,
                 polarity VARCHAR(1),
-                ionization_mode_id VARCHAR(16),
+                ionization_mode_id VARCHAR(16)
+                    REFERENCES ionization_mode(ionization_mode_id) ON DELETE SET NULL,
                 t0 FLOAT,
                 t1 FLOAT,
                 sample_item_utc_created TIMESTAMP,

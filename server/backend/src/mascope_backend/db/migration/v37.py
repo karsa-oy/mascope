@@ -1,18 +1,23 @@
+"""
+Migration script for v37: Ionization Mode System Implementation.
+
+This migration implements the ionization mode system by extracting and consolidating
+ionization parameters from sample_batch.build_params into a dedicated ionization_mode
+table with proper relationships and foreign key constraints.
+"""
+
 import asyncio
 import json
 import os
 import shutil
 from typing import Any
 
-from sqlalchemy import select, text, update
+from sqlalchemy import text, update
 
 from mascope_backend.db import async_session, configure_database_engine
 from mascope_backend.db.ops.backup import create_db_backup
-from mascope_backend.db.models import Base, IonizationMode, SampleBatch, SampleItem
+from mascope_backend.db.models import Base, IonizationMode, SampleItem
 from mascope_backend.db.id import gen_id
-from mascope_backend.api.controllers.ionization_mechanisms.ionization_mechanisms_controller import (
-    get_ionization_mechanism,
-)
 from mascope_backend.api.controllers.sample.items.sample_items_controller import (
     get_sample_items,
 )
@@ -132,6 +137,24 @@ async def collect_unique_build_params() -> tuple[list[dict[str, Any]], dict[str,
     return unique_combinations, batch_to_combinations
 
 
+async def create_ionization_mode_table() -> None:
+    """
+    Create the ionization_mode table using SQLAlchemy model.
+    """
+    runtime.logger.info("Creating ionization_mode table...")
+
+    async with async_session() as session:
+        connection = await session.connection()
+
+        # Create only the new ionization_mode table
+        # metadata.create_all() will skip existing tables
+        await connection.run_sync(Base.metadata.create_all)
+
+        await session.commit()
+
+    runtime.logger.info("Ionization_mode table created successfully")
+
+
 async def populate_ionization_modes(unique_modes: list[dict[str, Any]]) -> None:
     """
     Populate the ionization_mode table with unique modes.
@@ -154,13 +177,23 @@ async def update_sample_items_with_ionization_modes(
 ) -> None:
     """
     Update sample items with their corresponding ionization_mode_id.
+    This works with the original table structure before schema changes.
 
     :param batch_to_combination_mapping: Dictionary mapping batch_id to combination
+    :param combinations: Dictionary mapping combination keys to ionization mode data
     """
+
+    runtime.logger.info("Updating sample items with ionization_mode_id...")
+
+    # Add "ionization_mode_id" column to "sample_item" table
+    async with async_session() as session:
+        await session.execute(
+            text("ALTER TABLE sample_item ADD COLUMN ionization_mode_id VARCHAR(16)")
+        )
+        await session.commit()
 
     total_updated = 0
 
-    # for batch_id, ionization_mode_id in batch_to_mode_mapping.items():
     for batch_id, combination_keys in batch_to_combination_mapping.items():
         # Get all sample items for this batch
         sample_items_response = await get_sample_items(sample_batch_id=batch_id)
@@ -201,64 +234,84 @@ async def update_sample_items_with_ionization_modes(
     )
 
 
-async def run():
-    # Step 1: Create backup before migration
-    await create_db_backup()
+async def modify_sample_item_schema() -> None:
+    """
+    Recreate sample_item table with updated schema in backup-and-recreate pattern.
+    """
+    runtime.logger.info("Recreating sample_item table with updated schema...")
 
-    # Step 2: Setup new database version
-    old_version = 36
-    new_version = 37
-    old_db_path = os.path.join(runtime.config.database, f"mascope.v{old_version}.db")
-    new_db_path = os.path.join(runtime.config.database, f"mascope.v{new_version}.db")
-
-    # Copy database file to new version
-    shutil.copyfile(old_db_path, new_db_path)
-
-    # Collect unique build params and create ionization modes
-    await configure_database_engine(old_version)
-    runtime.logger.info("Collecting unique build parameters from sample batches...")
-    combinations, batch_to_combination_mapping = await collect_unique_build_params()
-
-    await configure_database_engine(new_version)
-
-    runtime.logger.info(
-        f"Starting v{new_version} migration: create ionization_mode table and populate it."
-    )
     async with async_session() as session:
-
-        # Create new table: "ionization_mode"
-        ## Acquire connection
-        connection = await session.connection()
-        ## metadata.create_all() skips existing tables and only creates missing tables.
-        await connection.run_sync(Base.metadata.create_all)
-
-        # Add "ionization_mode_id" column to "sample_item" table
+        # Step 1: Create backup table with all current data (including ionization_mode_id)
         await session.execute(
-            text("ALTER TABLE sample_item ADD COLUMN ionization_mode_id VARCHAR(16)")
+            text(
+                """
+                CREATE TABLE sample_item_backup AS
+                SELECT * FROM sample_item;
+                """
+            )
         )
 
-        # Commit the transaction
+        # Step 2: Drop original table
+        await session.execute(text("DROP TABLE sample_item;"))
+
+        # Step 3: Create new table with updated schema using SQLAlchemy model
+        connection = await session.connection()
+        await connection.run_sync(SampleItem.__table__.create)
+
+        # Step 4: Migrate all data back to the properly structured table
+        await session.execute(
+            text(
+                """
+                INSERT INTO sample_item (
+                    sample_item_id, sample_batch_id, filename, sample_item_name,
+                    sample_item_type, locked, sample_item_attributes,
+                    filter_id, tic, polarity, ionization_mode_id, t0, t1,
+                    sample_item_utc_created, sample_item_utc_modified
+                )
+                SELECT 
+                    sample_item_id, sample_batch_id, filename, sample_item_name,
+                    sample_item_type, locked, sample_item_attributes,
+                    filter_id, tic, polarity, ionization_mode_id, t0, t1,
+                    sample_item_utc_created, sample_item_utc_modified
+                FROM sample_item_backup;
+                """
+            )
+        )
+
+        # Step 5: Clean up backup table
+        await session.execute(text("DROP TABLE sample_item_backup;"))
+
         await session.commit()
 
-    # Step 4: Populate ionization_mode table
-    runtime.logger.info("Populating ionization_mode table...")
-    unique_modes = list(combinations.values())
-    await populate_ionization_modes(unique_modes)
-
-    # Step 5: Update sample items with ionization_mode_id
-    runtime.logger.info("Updating sample items with ionization_mode_id...")
-    await update_sample_items_with_ionization_modes(
-        batch_to_combination_mapping, combinations
+    runtime.logger.info(
+        "sample_item table recreated with updated schema including ionization_mode_id"
     )
 
+
+async def modify_sample_batch_schema() -> None:
+    """
+    Remove build_params column from sample_batch table.
+    """
+    runtime.logger.info("Removing build_params column from sample_batch table...")
+
     async with async_session() as session:
-        # Remove "build_params" column from "sample_batch" table
         await session.execute(text("ALTER TABLE sample_batch DROP COLUMN build_params"))
 
-        # Drop the existing sample_view if it exists
-        await session.execute(text("DROP VIEW IF EXISTS sample_view"))
 
-        # Create the updated sample_view with the new column
+async def update_sample_view() -> None:
+    """
+    Update the sample_view to reflect the new schema changes.
+
+    This view joins sample_item and sample_file tables and should include
+    the new ionization_mode_id field for sample data access.
+    """
+    runtime.logger.info("Updating sample_view with ionization_mode_id field...")
+
+    async with async_session() as session:
+        # Step 1: Drop existing view
+        await session.execute(text("DROP VIEW IF EXISTS sample_view;"))
+
+        # Step 2: Recreate view with updated columns
         await session.execute(
             text(
                 """
@@ -291,12 +344,59 @@ async def run():
                 FROM
                     sample_item
                 JOIN
-                    sample_file ON sample_item.filename = sample_file.filename
+                    sample_file ON sample_item.filename = sample_file.filename;
                 """
             )
         )
-        # Commit the transaction
+
         await session.commit()
+
+    runtime.logger.info(
+        "sample_view updated successfully with ionization_mode_id field"
+    )
+
+
+async def run():
+    # Step 1: Create backup before migration
+    await create_db_backup()
+
+    # Step 2: Setup new database version
+    old_version = 36
+    new_version = 37
+    old_db_path = os.path.join(runtime.config.database, f"mascope.v{old_version}.db")
+    new_db_path = os.path.join(runtime.config.database, f"mascope.v{new_version}.db")
+
+    # Copy database file to new version
+    shutil.copyfile(old_db_path, new_db_path)
+
+    # Step 3: Collect unique build params from old version
+    await configure_database_engine(old_version)
+    runtime.logger.info("Collecting unique build parameters from sample batches...")
+    combinations, batch_to_combination_mapping = await collect_unique_build_params()
+
+    # Step 4: Switch to new version and perform schema changes
+    runtime.logger.info(
+        f"Starting v{new_version} migration: create ionization_mode table and populate it."
+    )
+    await configure_database_engine(new_version)
+
+    # Step 5: Create and populate ionization_mode table
+    await create_ionization_mode_table()
+    runtime.logger.info("Populating ionization_mode table...")
+    unique_modes = list(combinations.values())
+    await populate_ionization_modes(unique_modes)
+
+    # Step 6: Update sample items with ionization_mode_id (original schema intact)
+    await update_sample_items_with_ionization_modes(
+        batch_to_combination_mapping, combinations
+    )
+
+    # Step 7: Apply schema changes with proper FK constraints
+    await modify_sample_item_schema()
+    await modify_sample_batch_schema()
+
+    # Step 8: Update database views
+    await update_sample_view()
 
     runtime.logger.info(f"Migration v{new_version} completed successfully!")
 

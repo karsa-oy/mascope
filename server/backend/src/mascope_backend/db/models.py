@@ -579,10 +579,10 @@ class IonizationMode(Base):
     ionization_mode_polarity: Mapped[str] = mapped_column(String(1), nullable=False)
     ionization_mechanism_ids: Mapped[list[str]] = mapped_column(JSON, nullable=False)
     calibration_collection_id: Mapped[Optional[str]] = mapped_column(
-        String(256), nullable=True
+        String(16), nullable=True
     )
     diagnostic_collection_id: Mapped[Optional[str]] = mapped_column(
-        String(256), nullable=True
+        String(16), nullable=True
     )
 
 
