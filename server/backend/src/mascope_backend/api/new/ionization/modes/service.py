@@ -83,7 +83,7 @@ async def get_ionization_mode(
     token: str | None = None,
 ) -> dict:
     """
-    Retrieves a single ionization mode either by ID or by token.
+    Retrieves a single ionization mode either by ID or by token. One of them must be provided, but not both.
 
     Steps:
     1. Validate input parameters to ensure that either an ID or token is provided, but not both.
@@ -97,14 +97,14 @@ async def get_ionization_mode(
     :return: The requested ionization mode's details.
     """
     async with async_session() as session:
-        # Step 1: Validate input parameters
+        # Validate input parameters
         if ionization_mode_id and token:
             raise ValueError("Provide either ionization_mode_id or token, not both.")
 
         if not ionization_mode_id and not token:
             raise ValueError("Provide either ionization_mode_id or token.")
 
-        # Step 2: Construct query based on parameters
+        # Construct query based on parameters
         if ionization_mode_id:
             stmt = select(IonizationMode).where(
                 IonizationMode.ionization_mode_id == ionization_mode_id
@@ -116,15 +116,15 @@ async def get_ionization_mode(
             )
             label = f"with token '{token}'"
 
-        # Step 3: Execute query
+        # Execute query
         result = await session.execute(stmt)
         ionization_mode = result.scalar_one_or_none()
 
-        # Step 4: Check existence
+        # Check existence
         if not ionization_mode:
             raise NotFoundException(f"ionization mode {label} not found")
 
-        # Step 5: Return details
+        # Return details
         return {
             "message": f"Ionization mode {ionization_mode.ionization_mode_name} retrieved successfully.",
             "data": ionization_mode.to_dict(),

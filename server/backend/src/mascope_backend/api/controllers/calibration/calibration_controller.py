@@ -141,7 +141,7 @@ async def calibration_mz_fit(
     :raises NotFoundException: If sample item, batch or calibration collection not found
     :raises ApiException: If m/z fitting fails
     """
-    # Step 1: Retrieve and validate sample and batch data
+    # Retrieve and validate sample and batch data
     async with async_session() as session:
         sample = await session.get(SampleItem, sample_item_id)
         if not sample:
@@ -159,14 +159,14 @@ async def calibration_mz_fit(
             f"Calibration collection not found for ionization mode '{ionization_mode.ionization_mode_id}'"
         )
 
-    # Step 2: Fetch affected samples data
+    # Fetch affected samples data
     (
         affected_sample_item_ids,
         affected_sample_batch_ids,
         *_,
     ) = await fetch_affected_sample_data(filenames=[sample.filename])
 
-    # Step 3: Prepare progress user notification.
+    # Prepare progress user notification.
     notification = UserNotification(
         process_id=process_id,
         parent_id=parent_id,
@@ -183,12 +183,10 @@ async def calibration_mz_fit(
         },
     )
 
-    # Step 4: m/z fit the sample file
-    calibration_mechs = ionization_mode.ionization_mechanism_ids
-
+    # m/z fit the sample file
     calibration_parameters = CalibrationFitParams(
         calibration_collection_id=ionization_mode.calibration_collection_id,
-        ionization_mechanism_ids=calibration_mechs,
+        ionization_mechanism_ids=ionization_mode.ionization_mechanism_ids,
         **mz_calibration_params.model_dump(),
     )
     calibration_handler = get_calibration_handler(
@@ -197,7 +195,7 @@ async def calibration_mz_fit(
     await calibration_handler.fit()
     calibration_data = calibration_handler.to_dict()
 
-    # Step 5: Handle errors and warnings
+    # Handle errors and warnings
     notification_data = {
         "affected_sample_item_ids": affected_sample_item_ids,
         "affected_sample_batch_ids": affected_sample_batch_ids,
@@ -225,7 +223,7 @@ async def calibration_mz_fit(
                 "_notification_data": notification_data,
             },
         )
-    # Step 6: Return m/z fit result data and message
+    # Return m/z fit result data and message
     return {
         "data": calibration_data,
         "message": f"Finished to m/z fit sample '{sample.sample_item_name}'.",
