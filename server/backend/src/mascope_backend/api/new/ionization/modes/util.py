@@ -73,7 +73,7 @@ async def fetch_sample_ionization_mechanism_ids(sample_item_id: str) -> list[str
         )
         sample_item = result.scalars().one_or_none()
         if not sample_item:
-            return []  # TODO: Should raise?
+            raise ValueError(f"Sample item with ID {sample_item_id} not found")
 
         # Get the ionization mode
         result = await session.execute(
