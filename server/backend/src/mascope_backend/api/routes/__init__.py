@@ -21,6 +21,7 @@ from mascope_backend.api.new.instrument_configs.process.routes import (
 )
 from mascope_backend.api.new.cheminfo.routes import cheminfo_router
 from mascope_backend.api.new.file.routes import file_router
+from mascope_backend.api.new.match.records.routes import match_records_router
 from mascope_backend.api.routes.attribute_templates.attribute_templates_routes import (
     attribute_templates_router,
 )
@@ -117,6 +118,7 @@ routers = [
     instrument_configs_router,
     instrument_configs_process_router,
     calibration_router,
+    match_records_router,
     match_targets_sample_router,
     match_targets_batch_router,
     match_router,
