@@ -4,7 +4,7 @@ import { ref } from 'vue'
 import Uppy from '@uppy/core'
 import Tus from '@uppy/tus'
 
-import { useIonizationMode } from './data/ionization'
+import { useIonizationMode } from './data/modules/ionization'
 import { useUi } from './ui'
 
 import { api } from '@/api'

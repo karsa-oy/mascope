@@ -1,0 +1,51 @@
+import { defineStore } from 'pinia'
+
+import { api } from '@/api'
+import { useData } from '@/lib/store'
+
+export const useIonizationMechanism = defineStore('app.data.ionization.mechanism', () => {
+  const name = 'ionization_mechanism'
+  const key = 'ionization_mechanism_id'
+
+  const data = useData(
+    name,
+    () =>
+      api.http.get(`/ionization_mechanisms`, {
+        use: 'read',
+        type: 'load_ionization_mechanisms'
+      }),
+    {
+      key,
+      events: ['ionization_mechanism_reload'],
+      selection: true
+    }
+  )
+
+  return {
+    ...data,
+    // api
+    read: (ionization_mechanism_id) =>
+      api.http.get(`/ionization_mechanisms/${ionization_mechanism_id}`, {
+        use: 'read',
+        type: 'read_ionization_mechanism'
+      }),
+    create: ({ ionization_mechanism_polarity, ionization_mechanism, reagent }) =>
+      api.http.post(
+        `/ionization_mechanisms`,
+        {
+          ionization_mechanism_polarity,
+          ionization_mechanism,
+          reagent
+        },
+        {
+          use: 'create',
+          type: 'create_ionization_mechanism'
+        }
+      ),
+    delete: (ionization_mechanism_id) =>
+      api.http.delete(`/ionization_mechanisms/${ionization_mechanism_id}`, {
+        use: 'delete',
+        type: 'delete_ionization_mechanism'
+      })
+  }
+})
