@@ -42,7 +42,7 @@ const props = defineProps({
     type: Object
   }
 })
-const original = computed(() => props.collection ?? app.data.target.collection.focused)
+const original = computed(() => props.collection ?? app.data.match.collection.focused)
 
 // dialog visibility reactivity
 const visible = ref(false)
@@ -501,9 +501,7 @@ async function init(mode) {
     info.name = original.value?.target_collection_name
     info.desc = original.value?.target_collection_description
     info.type = original.value?.target_collection_type
-    compounds.selected = app.data.match.compound.list.filter(
-      (comp) => comp.target_collection_id === original.value.target_collection_id
-    )
+    compounds.selected = app.data.target.collection.detailed?.target_compounds ?? []
   }
   switch (mode) {
     case 'create': {
@@ -518,12 +516,7 @@ async function init(mode) {
     case 'update_batches': {
       selected.tab = 'batches'
       selected.workspace = app.data.workspace.focused
-      batches.selected = (
-        await api.http.get(`/target/collections/${original.value.target_collection_id}`, {
-          use: 'read',
-          type: 'read_target_collection'
-        })
-      )?.sample_batches
+      batches.selected = app.data.target.collection.detailed?.sample_batches ?? []
       break
     }
     case 'delete': {

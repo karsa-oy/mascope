@@ -33,14 +33,8 @@ const input = reactive({
   cas_number: null
 })
 
-const targetCollection = computed(() => props.collection ?? app.data.match.collection.focused)
-
-const targetCompounds = computed(() =>
-  (targetCollection.value?.children ?? app.data.match.compound.list).filter(
-    // Filter compounds that belong to focused collection
-    (comp) => comp.target_collection_id === targetCollection.value.target_collection_id
-  )
-)
+const targetCollection = computed(() => app.data.target.collection.detailed ?? props.collection)
+const targetCompounds = computed(() => app.data.target.collection.detailed?.target_compounds ?? [])
 
 // Check for existing compound based on input
 const existingCompound = computed(() =>
@@ -71,7 +65,7 @@ const buttonConfig = computed(() => {
   }
   if (invalidFormula.value) {
     return {
-      label: 'Add compound',
+      label: `Add compound`,
       tooltip: 'Invalid chemical formula'
     }
   }
@@ -137,17 +131,12 @@ const addCompound = () => {
 }
 
 const confirmation = async () => {
-  let count = (
-    await api.http.get(`/target/collections/${targetCollection.value.target_collection_id}`, {
-      use: 'read',
-      type: 'read_target_collections'
-    })
-  )?.sample_batches.length
-  if (count > 1) {
+  const batchCount = app.data.target.collection.detailed?.sample_batches_count ?? 0
+  if (batchCount > 1) {
     confirm.require({
       icon: 'pi pi-exclamation-triangle',
-      header: `Add compound to ${count} batches`,
-      message: `Are you sure you want to add compound ${input.target_compound_formula.trim()} to a collection used in ${count} batches?`,
+      header: `Add compound to ${batchCount} batches`,
+      message: `Are you sure you want to add compound ${input.target_compound_formula.trim()} to a collection used in ${batchCount} batches?`,
       accept: addCompound,
       acceptProps: {
         icon: 'pi pi-plus',
@@ -186,7 +175,11 @@ const addButtonDisabled = computed(
         popover.toggle(event)
       }
     "
-    v-tooltip="plusButtonDisabled ? 'Open a target collection to add a compound' : 'Add compound'"
+    v-tooltip="
+      plusButtonDisabled
+        ? 'Open a target collection to add a compound'
+        : `Add compound to ${targetCollection.target_collection_name}`
+    "
     :disabled="plusButtonDisabled"
   />
   <Popover ref="popover">

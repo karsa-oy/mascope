@@ -46,7 +46,7 @@ const dialog = reactive({
   collection: null
 })
 
-const tableHeight = inject('target-table-height')
+const tableHeight = inject('match-table-height')
 
 const icon = {
   TARGETS: 'pi ph ph-target',
@@ -97,7 +97,10 @@ const icon = {
       contextMenu
       v-model:contextMenuSelection="context.record"
       @rowContextmenu="
-        (event) => {
+        async (event) => {
+          context.record = event.data
+          // Load detailed data for context menu operations without focusing
+          await app.data.target.collection.loadDetailed(event.data.target_collection_id)
           contextMenuRef.show(event.originalEvent)
         }
       "
