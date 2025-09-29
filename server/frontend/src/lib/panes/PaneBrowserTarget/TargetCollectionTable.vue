@@ -59,7 +59,7 @@ const icon = {
   <BaseTabbedPanel
     label="Target Collections"
     icon="pi ph ph-crosshair"
-    :loading="app.data.match.collection.loading"
+    :loading="app.data.match.collection.pending"
     :pt="
       app.ui.help.right(`
         <h1>Target Browser</h1>
@@ -90,7 +90,7 @@ const icon = {
     </template>
     <DataTable
       :value="app.data.match.collection.list"
-      dataKey="match_key"
+      dataKey="target_collection_id"
       v-model:selection="app.data.match.collection.focused"
       selectionMode="single"
       :metaKeySelection="false"
@@ -122,7 +122,7 @@ const icon = {
       </Column>
       <Column header="Collection" field="target_collection_name" sortable>
         <template #body="{ data }">
-          <div :id="data.match_key" class="row" style="justify-content: flex-start">
+          <div :id="data.target_collection_id" class="row" style="justify-content: flex-start">
             <span
               :class="icon[data.target_collection_type]"
               v-tooltip.top="data.target_collection_type.toLowerCase()"

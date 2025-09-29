@@ -1,7 +1,6 @@
 <script setup>
 import { computed, ref, reactive } from 'vue'
 
-import ScrollPanel from 'primevue/scrollpanel'
 import Splitter from 'primevue/splitter'
 import SplitterPanel from 'primevue/splitterpanel'
 
@@ -18,8 +17,8 @@ const { height } = useWindowSize()
 
 const app = useApp()
 
-const compound = computed(() =>
-  app.data.match.compound.list.find(
+const matchIon = computed(() =>
+  app.data.match.ion.list.find(
     ({ target_compound_id }) =>
       target_compound_id == app.data.match.visualized.ion?.target_compound_id
   )
@@ -63,7 +62,7 @@ const heights = computed(() => [
       match: ion <i>{{ app.data.match.visualized.ion?.target_ion_formula }}</i>
       for
       <i>{{ app.data.match.visualized.ion?.sample_item_name }}</i> with target
-      <i>{{ compound?.target_compound_formula }}</i>
+      <i>{{ matchIon?.target_compound_formula }}</i>
     </h1>
     <ToolbarMatchRating />
   </menu>
