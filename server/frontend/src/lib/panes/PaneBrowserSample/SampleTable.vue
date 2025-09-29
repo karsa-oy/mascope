@@ -82,7 +82,7 @@ const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top)
     icon="pi pi-tags"
     :clear="app.data.batch.unfocus"
     :contextMenu="contextMenu"
-    :loading="app.data.sample.loading"
+    :loading="app.data.sample.pending"
     :status="batchStatus"
     :pt="
       app.ui.help.right(`

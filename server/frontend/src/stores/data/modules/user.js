@@ -1,0 +1,102 @@
+import { defineStore } from 'pinia'
+
+import { api } from '@/api'
+import { useData } from '@/lib/store'
+
+import { useAuth } from '../../auth'
+
+// helper to execute route with a role if
+// superuser and do nothing otherwise:
+const sudo = (execute) => {
+  const auth = useAuth()
+  const role = auth.user.role_name
+  if (role == 'owner' || role == 'admin') {
+    return execute(role)
+  } else {
+    return null
+  }
+}
+
+export const useUser = defineStore('app.data.user', () => {
+  const name = 'user'
+
+  const data = useData(
+    name,
+    () =>
+      sudo(() =>
+        api.http.get(`/users`, {
+          use: 'read',
+          type: 'load_users'
+        })
+      ) ?? [],
+    {
+      events: ['user_reload_all']
+    }
+  )
+
+  return {
+    ...data,
+    // api
+    read: (id) =>
+      api.http.get(`/users/${id}`, {
+        use: 'read',
+        type: 'read_user'
+      }),
+    create: (user) =>
+      sudo((role) =>
+        api.http.post(`/users/${role}/register`, user, {
+          use: 'create',
+          type: 'register_user'
+        })
+      ),
+    update: ({ id, username, email, role_id }) => {
+      const auth = useAuth()
+      return id && id !== auth.user.id
+        ? sudo((role) =>
+            api.http.patch(
+              `/users/${role}/${id}`,
+              { username, email, role_id },
+              {
+                use: 'update',
+                type: 'update_user'
+              }
+            )
+          )
+        : api.http.patch(`/users/me`, { username }, { use: 'update', type: 'update_user' })
+    },
+    updateMeCreds: ({ currentPassword, newPassword, verifyNewPassword }) =>
+      api.http.patch(
+        `users/me/creds`,
+        {
+          current_password: currentPassword,
+          new_password: newPassword,
+          verify_new_password: verifyNewPassword
+        },
+        {
+          use: 'update',
+          type: 'update_password'
+        }
+      ),
+    delete: (user) =>
+      sudo((role) =>
+        api.http.delete(`/users/${role}/${user.id}`, {
+          use: 'delete',
+          type: 'delete_user'
+        })
+      ),
+    resetPassword: (user) =>
+      sudo((role) =>
+        api.http.get(`/users/${role}/${user.id}/reset-password`, {
+          use: 'read',
+          type: 'reset_password'
+        })
+      ),
+    deleteAccessTokens: (user) =>
+      sudo((role) =>
+        api.http.delete(`/users/${role}/${user.id}/access-tokens`, {
+          use: 'read',
+          type: 'delete_access_tokens'
+        })
+      )
+  }
+})

@@ -4,14 +4,9 @@ import { defineStore } from 'pinia'
 import { api } from '@/api'
 import { runtime } from '@/lib/runtime'
 
-import { useSample } from './sample'
 import { useInstrument } from './instrument'
 
-import { useUi } from '../ui'
-
 export const useAcquisition = defineStore('app.data.acquisition', () => {
-  const ui = useUi()
-  const sample = useSample()
   const instrument = useInstrument()
 
   const list = ref([])
@@ -54,7 +49,6 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
   watch(time, () => unfocus())
 
   const mzCalibration = ref(null)
-  const orbi = computed(() => instrument.focused.instrument.toLowerCase().includes('orbi'))
 
   // instrument
 

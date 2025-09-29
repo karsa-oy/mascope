@@ -1,29 +1,21 @@
-// standard
-import { useInstrument } from './instrument'
-import { useIonizationMechanism, useIonizationMode } from './ionization'
-import { useTemplate } from './template'
-import { useWorkspace } from './workspace'
-import { useSample } from './sample'
-import { useBatch } from './batch'
-import { useTargetCollection, useTargetCompound } from './target'
-import { usePeak } from './peak'
-import { useUser } from './user'
-
+import { useAcquisition } from './modules/acquisition'
+import { useBatch } from './modules/batch'
+import { useInstrument } from './modules/instrument'
+import { useIonizationMechanism, useIonizationMode } from './modules/ionization'
 import {
-  // semistandard
   useMatchCollection,
-  useMatchCompound,
   useMatchIon,
-  // nonstandard
   useMatchParams,
   useMatchVisualized
-} from './match'
-
-// nonstandard
-import { useAcquisition } from './acquisition'
+} from './modules/match'
+import { usePeak } from './modules/peak'
+import { useSample } from './modules/sample'
+import { useTargetCollection, useTargetCompound } from './modules/target'
+import { useTemplate } from './modules/template'
+import { useUser } from './modules/user'
+import { useWorkspace } from './modules/workspace'
 
 export const useData = () => ({
-  // standard
   workspace: useWorkspace(),
   ionization: {
     mechanism: useIonizationMechanism(),
@@ -39,14 +31,11 @@ export const useData = () => ({
     compound: useTargetCompound()
   },
   user: useUser(),
-  // semistandard
   match: {
-    collection: useMatchCollection(),
-    compound: useMatchCompound(),
-    ion: useMatchIon(),
     params: useMatchParams(),
+    collection: useMatchCollection(),
+    ion: useMatchIon(),
     visualized: useMatchVisualized()
   },
-  // nonstandard
   acquisition: useAcquisition()
 })
