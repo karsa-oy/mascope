@@ -7,17 +7,23 @@ processing instrument_config and matching the samples.
 
 import asyncio
 
+import mascope_file.name as m_name
+
 from mascope_backend.db import async_session, db_semaphore
 from mascope_backend.db.id import gen_id
 from mascope_backend.db.models import SampleFile
+
 from mascope_backend.api.lib.api_features import api_controller_background_task
 from mascope_backend.api.lib.exceptions.api_exceptions import (
     NotFoundException,
+    ApiException,
 )
+
 from mascope_backend.api.new.instrument_configs.service import resolve_instrument_config
 from mascope_backend.api.new.instrument_configs.process.service import (
     process_instrument_config,
 )
+
 from mascope_backend.api.controllers.workspace.acquisition.service import (
     get_acquisition_workspace,
 )
@@ -25,24 +31,32 @@ from mascope_backend.api.controllers.sample.batches.sample_batches_controller im
     get_sample_batches,
     create_sample_batch,
 )
-from mascope_backend.api.controllers.samples.samples_controller import get_sample
+from mascope_backend.api.controllers.sample.files.sample_files_controller import (
+    compute_sample_file_peaks,
+)
 from mascope_backend.api.controllers.sample.items.sample_items_controller import (
     create_sample_items,
 )
-from mascope_backend.api.controllers.sample.files.sample_files_controller import (
-    compute_sample_file_peaks,
+from mascope_backend.api.controllers.samples.samples_controller import get_sample
+from mascope_backend.api.controllers.calibration.calibration_controller import (
+    calibration_mz_calibrate_sample,
 )
 from mascope_backend.api.controllers.match.match_controller import (
     match_compute_sample,
     rematch_samples,
 )
-from mascope_backend.api.models.sample.items.sample_item_pydantic_model import (
-    SampleItemCreate,
-)
+
 from mascope_backend.api.models.sample.batches.sample_batch_pydantic_model import (
     SampleBatchCreate,
 )
 from mascope_backend.api.models.sample.batches.config import sample_batch_config
+from mascope_backend.api.models.sample.items.sample_item_pydantic_model import (
+    SampleItemCreate,
+)
+from mascope_backend.api.models.calibration.calibration_pydantic_model import (
+    OrbiCalibrationParams,
+    TofCalibrationParams,
+)
 from mascope_backend.api.new.ionization.modes.util import (
     resolve_ionization_modes_by_peaks,
     resolve_ionization_modes_by_tokens,
@@ -72,14 +86,14 @@ async def auto_process_sample_file(
     creating the all data hierarchy if needed.
 
     Steps:
-    1. Validate sample file existence
-    2. Handle instrument config assignment (existing or create new) and processing
-    3. Get ACQUISITION workspace for the instrument
-    4. Create ACQUISITION batches and sample items for each sample file polarity
-    5. Compute peak data for the sample file
-    6. Perform match computation for created sample items
-    7. Schedule rematch tasks for other affected samples
-    8. Return processing results with affected IDs or UI reloads
+    - Validate sample file existence
+    - Handle instrument config assignment (existing or create new) and processing
+    - Get ACQUISITION workspace for the instrument
+    - Create ACQUISITION batches and sample items for each sample file polarity
+    - Compute peak data for the sample file
+    - Perform calibration and match computation for created ACQUISITION samples
+    - Schedule rematch tasks for other affected samples
+    - Return processing results with affected IDs or UI reloads
 
     :param sample_file_id: ID of the uploaded sample file
     :type sample_file_id: str
@@ -96,12 +110,12 @@ async def auto_process_sample_file(
     # Initialize collector for affected sample items
     all_affected_sample_item_ids = set()
 
-    # Step 1: Get sample file details and validate existence
+    # --- Validate sample file existence --- #
     async with async_session() as session:
         if not (sample_file := await session.get(SampleFile, sample_file_id)):
             raise NotFoundException(f"Sample file with ID '{sample_file_id}' not found")
 
-    # Step 2: Handle instrument config assignment (existing or create new) and processing
+    # --- Handle instrument config assignment (existing or create new) and processing --- #
     instrument_config = await resolve_instrument_config(sample_file)
 
     process_instrument_config_result = await process_instrument_config(
@@ -119,7 +133,7 @@ async def auto_process_sample_file(
         )
     )
 
-    # Step 3: Get ACQUISITION workspace for the instrument
+    # --- Get ACQUISITION workspace for the instrument --- #
     acquisition_workspace = (
         await get_acquisition_workspace(sample_file.instrument)
     ).get("data")
@@ -151,10 +165,32 @@ async def auto_process_sample_file(
         parent_id=process_id,
     )
 
-    # Step 6: Perform match computation for created ACQUISITION samples
+    # --- Perform calibration and match computation for created ACQUISITION samples --- #
     for sample_item in acquisition_sample_items:
+        sample_item_id = sample_item["sample_item_id"]
+        mz_calibration_params = resolve_calibration_params(sample_item["filename"])
+        try:
+            mz_calibration_params
+            await calibration_mz_calibrate_sample(
+                sample_item_id=sample_item_id,
+                mz_calibration_params=mz_calibration_params,
+                independent_transaction=False,
+                sid=sid,
+                process_id=gen_id(8),
+                parent_id=process_id,
+            )
+        except NotFoundException as e:
+            runtime.logger.warning(
+                f"Skipping m/z calibration for sample item {sample_item['sample_item_name']}: {e}. "
+                "Calibration collection is not set for the ionization mode."
+            )
+        except ApiException as e:
+            runtime.logger.error(
+                f"Failed to calibrate m/z for sample item {sample_item["sample_item_name"]}: {e}"
+            )
+
         await match_compute_sample(
-            sample_item_id=sample_item.get("sample_item_id"),
+            sample_item_id=sample_item_id,
             independent_transaction=False,
             sid=sid,
             instrument=instrument,
@@ -201,6 +237,24 @@ async def auto_process_sample_file(
             "affected_sample_item_ids": list(all_affected_sample_item_ids),
         },
     }
+
+
+def resolve_calibration_params(filename: str):
+    """Resolve calibration parameters based on instrument type inferred from filename
+
+    :param filename: Sample file name
+    :type filename: str
+    :raises ValueError: Failed to detect instrument type
+    :return: Calibration parameters for the instrument type
+    :rtype: MzCalibrationParams
+    """
+    instrument_type = m_name.get_instrument_type(filename)
+    if instrument_type == "orbi":
+        return OrbiCalibrationParams()
+    elif instrument_type == "tof":
+        return TofCalibrationParams()
+    else:
+        raise ValueError(f"Failed to resolve calibration params for {filename}")
 
 
 async def create_acquisition_batches_and_items(

@@ -30,11 +30,9 @@ class GetMzCalibrationQueryParams(QueryParamsModel):
 
 
 class MzCalibrationParams(BaseModel):
+    refine_window: int = Field(..., description="Refine window parameter")
     match_score_min: float = Field(
         calibration_config.DEFAULT_MATCH_SCORE_MIN, description="Minimum match score"
-    )
-    refine_window: int = Field(
-        calibration_config.DEFAULT_REFINE_WINDOW, description="Refine window parameter"
     )
     peak_intensity_min: float = Field(
         calibration_config.DEFAULT_PEAK_INTENSITY_MIN,
@@ -43,6 +41,20 @@ class MzCalibrationParams(BaseModel):
     isotope_abundance_min: float = Field(
         calibration_config.DEFAULT_ISOTOPE_ABUNDANCE_MIN,
         description="Minimum isotope abundance",
+    )
+
+
+class OrbiCalibrationParams(MzCalibrationParams):
+    refine_window: int = Field(
+        calibration_config.ORBI_DEFAULT_REFINE_WINDOW,
+        description="Refine window parameter",
+    )
+
+
+class TofCalibrationParams(MzCalibrationParams):
+    refine_window: int = Field(
+        calibration_config.TOF_DEFAULT_REFINE_WINDOW,
+        description="Refine window parameter",
     )
 
 

@@ -9,7 +9,7 @@ from mascope_signal.compute import get_sum_signal
 from sqlalchemy import select, func, and_
 from mascope_backend.db import async_session
 from mascope_backend.db.id import gen_id
-from mascope_backend.db.models import IonizationMode, Sample, SampleBatch, SampleItem
+from mascope_backend.db.models import IonizationMode, Sample, SampleItem
 from mascope_backend.api.lib.api_features import (
     api_controller,
     api_controller_background_task,
