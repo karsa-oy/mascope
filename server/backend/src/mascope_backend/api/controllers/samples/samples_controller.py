@@ -1,18 +1,11 @@
 # pylint: disable=line-too-long
+from dataclasses import dataclass
 from datetime import datetime
 import asyncio
 from mascope_file.io import load_file
 import mascope_signal.compute as m_compute
 from mascope_signal.peak import get_peaks
-from sqlalchemy import (
-    asc,
-    desc,
-    and_,
-    select,
-    func,
-    cast,
-    Float,
-)
+from sqlalchemy import and_, select, func, cast, Float
 from mascope_backend.db import async_session
 from mascope_backend.db.models import (
     Sample,
@@ -22,8 +15,10 @@ from mascope_backend.db.models import (
 )
 from mascope_backend.api.lib.api_features import api_controller
 from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
+from mascope_backend.api.models.target.collections.config import (
+    target_collection_config,
+)
 from mascope_backend.runtime import runtime
-from dataclasses import dataclass
 
 
 @api_controller()
@@ -38,62 +33,44 @@ async def get_samples(
     datetime_max: datetime | None = None,
     polarity: list[str] | None = None,
     match_category_min: int | None = None,
-    sort: str = "datetime_utc",
-    order: str = "asc",
-    page: int = 0,
-    limit: int = 10000,
 ) -> dict:
     """
-    Retrieves samples (combined sample item and sample file info) based on filter criteria and pagination settings.
-    Additionally, it can include match information for the samples if available, along with the match unique target collection types
-    associated with the sample's matches.
+    Retrieves samples with nested match data and alarming status.
 
-    Steps:
-    1. Construct the base query with filters based on provided parameters.
-    2. Apply sorting and pagination to the query.
-    3. Execute the query and fetch results.
-    4. Add unique match target collection types (`match_collection_types`) to each sample's result if there are matches.
+    Includes match information if available, including alarming flag based
+    on target collection types.
 
-    :param sample_item_id: Filter by sample item ID.
-    :type sample_item_id: str, optional
-    :param sample_file_id: Filter by sample file ID.
-    :type sample_file_id: str, optional
-    :param sample_batch_id: Filter by sample batch ID; required for batch match info.
-    :type sample_batch_id: str, optional, required for batch match data
-    :param filename: Filter by filename.
-    :type filename: str, optional
-    :param instrument: Filter by instrument name.
-    :type instrument: str, optional
-    :param sample_item_type: Filter by sample item types, can specify multiple, defaults to None.
-    :type sample_item_type: list[str] | None, optional
-    :param datetime_min: Filter samples after this datetime of the sample file.
-    :type datetime_min: datetime, optional
-    :param datetime_max: Filter samples before this datetime of the sample file.
-    :type datetime_max: datetime, optional
-    :param polarity: Filter by ion polarity modes (+, -), can specify multiple, defaults to None.
-    :type polarity: list[str] | None, optional
-    :param match_category_min: Filter by match_category to include specified category and higher (e.g., 1 includes categories 1 and higher), defaults to None.
-    :type match_category_min:int, optional
-    :param sort: Column to sort the results by.
-    :type sort: str, optional
-    :param order: Sort order ('asc' or 'desc').
-    :type order: str, optional
-    :param page: Pagination page number.
-    :type page: int, optional
-    :param limit: Number of results per page.
-    :type limit: int, optional
-    :return: A dictionary containing the total number of results, the formatted sample data, and optionally match information.
+    :param sample_item_id: Filter by sample item ID, defaults to None
+    :type sample_item_id: str | None
+    :param sample_file_id: Filter by sample file ID, defaults to None
+    :type sample_file_id: str | None
+    :param sample_batch_id: Filter by sample batch ID, defaults to None
+    :type sample_batch_id: str | None
+    :param filename: Filter by filename, defaults to None
+    :type filename: str | None
+    :param instrument: Filter by instrument name, defaults to None
+    :type instrument: str | None
+    :param sample_item_type: Filter by sample item types, defaults to None
+    :type sample_item_type: list[str] | None
+    :param datetime_min: Filter samples after this datetime, defaults to None
+    :type datetime_min: datetime | None
+    :param datetime_max: Filter samples before this datetime, defaults to None
+    :type datetime_max: datetime | None
+    :param polarity: Filter by ion polarity modes, defaults to None
+    :type polarity: list[str] | None
+    :param match_category_min: Filter by minimum match category, defaults to None
+    :type match_category_min: int | None
+    :return: Dictionary with status, message, results count, and sample data with nested match information
     :rtype: dict
     """
     async with async_session() as session:
-        # Step 1: Construct base query with joins to include MatchSample, MatchCollection, and TargetCollection data
         stmt = (
             select(
                 Sample,
                 MatchSample,
-                func.group_concat(
-                    func.distinct(TargetCollection.target_collection_type)
-                ).label("match_collection_types"),
+                TargetCollection.target_collection_type.in_(
+                    target_collection_config.APP_ALARMING_COLLECTION_TYPES
+                ).label("alarming"),
             )
             .outerjoin(MatchSample, Sample.sample_item_id == MatchSample.sample_item_id)
             .outerjoin(
@@ -108,7 +85,6 @@ async def get_samples(
             .group_by(Sample.sample_item_id, MatchSample.sample_item_id)
         )
 
-        # Query filters
         if sample_item_id:
             stmt = stmt.filter(Sample.sample_item_id == sample_item_id)
 
@@ -143,36 +119,69 @@ async def get_samples(
         if match_category_min is not None:
             stmt = stmt.filter(MatchSample.match_category >= match_category_min)
 
-        # Step 2: Apply sorting and pagination
-        if sort:
-            order_function = desc if order == "desc" else asc
-            stmt = stmt.order_by(order_function(getattr(Sample, sort)))
+        result = await session.execute(stmt)
+        rows = result.all()
 
-        # Get total count
-        count_stmt = select(func.count()).select_from(  # pylint: disable=not-callable
-            stmt.subquery()
-        )
-        total = await session.scalar(count_stmt)
+        data = []
+        for row in rows:
+            sample_data = {
+                "sample_item_id": row.Sample.sample_item_id,
+                "sample_file_id": row.Sample.sample_file_id,
+                "instrument_function_id": row.Sample.instrument_function_id,
+                "sample_batch_id": row.Sample.sample_batch_id,
+                "sample_item_name": row.Sample.sample_item_name,
+                "filename": row.Sample.filename,
+                "instrument": row.Sample.instrument,
+                "sample_item_type": row.Sample.sample_item_type,
+                "locked": row.Sample.locked,
+                "method_file": row.Sample.method_file,
+                "t0": row.Sample.t0,
+                "t1": row.Sample.t1,
+                "sample_item_attributes": row.Sample.sample_item_attributes,
+                "filter_id": row.Sample.filter_id,
+                "length": row.Sample.length,
+                "tic": row.Sample.tic,
+                "polarity": row.Sample.polarity,
+                "range": row.Sample.range,
+                "mz_calibration": row.Sample.mz_calibration,
+                "datetime": row.Sample.datetime,
+                "datetime_utc": row.Sample.datetime_utc,
+                "sample_item_utc_created": row.Sample.sample_item_utc_created,
+                "sample_item_utc_modified": row.Sample.sample_item_utc_modified,
+            }
 
-        # Get paginated results
-        stmt = stmt.offset(page * limit).limit(limit)
+            if row.MatchSample:
+                match_data = {
+                    "match_sample_id": row.MatchSample.match_sample_id,
+                    "sample_item_id": row.MatchSample.sample_item_id,
+                    "match_score": row.MatchSample.match_score,
+                    "match_category": row.MatchSample.match_category,
+                    "sample_peak_intensity_sum": row.MatchSample.sample_peak_intensity_sum,
+                    "match_sample_utc_created": row.MatchSample.match_sample_utc_created,
+                    "match_sample_utc_modified": row.MatchSample.match_sample_utc_modified,
+                    "alarming": row.alarming,
+                }
+            else:
+                match_data = {
+                    "match_sample_id": None,
+                    "sample_item_id": row.Sample.sample_item_id,
+                    "match_score": None,
+                    "match_category": None,
+                    "sample_peak_intensity_sum": None,
+                    "match_sample_utc_created": None,
+                    "match_sample_utc_modified": None,
+                    "alarming": False,
+                }
 
-        # Step 3: Execute query and fetch results
-        results = await session.execute(stmt)
+            sample_data["match"] = match_data
+            data.append(sample_data)
 
-    # Construct the response data
-    data = []
-    for sample, match, match_collection_types in results.all():
-        sample_dict = {**sample.to_dict(), **(match.to_dict() if match else {})}
-        if match and match_collection_types:
-            sample_dict["match_collection_types"] = match_collection_types.split(",")
-        data.append(sample_dict)
-
-    return {
-        "message": "Samples retrieved successfully.",
-        "results": total,
-        "data": data,
-    }
+        return {
+            "status": "success",
+            "message": f"{len(data)} samples retrieved successfully",
+            "results": len(data),
+            "data": data,
+        }
 
 
 @api_controller()

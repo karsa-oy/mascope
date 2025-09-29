@@ -53,18 +53,6 @@ class GetSamplesQueryParams(GetSampleItemsQueryValidator, QueryParamsModel):
         None,
         description="Filter samples by match_category to include samples with specified match category and higher",
     )
-    sort: str | None = Field(
-        "datetime_utc",
-        description="Column name by which to sort the results. Default is 'datetime_utc'",
-    )
-    order: str | None = Field(
-        "asc",
-        description="Sorting order, either 'asc' for ascending or 'desc' for descending. Default is 'asc'",
-    )
-    page: int = Field(0, description="Page number for pagination. Default is 0")
-    limit: int = Field(
-        10000, description="Number of results per page. Default is 10000"
-    )
 
 
 class GetSamplePeaksQueryParams(CommonValidators, QueryParamsModel):
