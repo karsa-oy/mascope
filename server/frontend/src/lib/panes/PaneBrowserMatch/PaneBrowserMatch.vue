@@ -5,7 +5,7 @@ import { useWindowSize } from '@vueuse/core'
 
 import { useApp } from '@/stores'
 
-import TargetCollectionTable from './TargetCollectionTable.vue'
+import MatchCollectionTable from './MatchCollectionTable.vue'
 import MatchIonTable from './MatchIonTable.vue'
 
 const app = useApp()
@@ -95,5 +95,5 @@ provide('match-table-height', tableHeight)
 
 <template>
   <MatchIonTable v-if="app.data.match.collection.focused" />
-  <TargetCollectionTable v-else />
+  <MatchCollectionTable v-else />
 </template>

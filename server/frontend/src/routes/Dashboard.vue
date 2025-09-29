@@ -15,7 +15,7 @@ import { ToolbarAppFilters } from '@/lib/toolbars'
 import {
   PaneProgress,
   PaneBrowserSample,
-  PaneBrowserTarget,
+  PaneBrowserMatch,
   PaneTabMatch,
   PaneTabAcquisitions,
   PaneTabSpectrum
@@ -111,7 +111,7 @@ const tabs = computed(() => [
             <PaneBrowserSample />
           </SplitterPanel>
           <SplitterPanel :size="50">
-            <PaneBrowserTarget />
+            <PaneBrowserMatch />
           </SplitterPanel>
         </Splitter>
       </SplitterPanel>
