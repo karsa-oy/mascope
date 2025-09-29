@@ -8,6 +8,7 @@ from mascope_backend.api.controllers.calibration.lib.calibration_mz_fit import (
 from mascope_backend.api.models.calibration.calibration_pydantic_model import (
     CalibrationFitParams,
 )
+from mascope_backend.api.models.calibration.config import calibration_config
 from mascope_backend.api.new.ionization.modes.service import get_ionization_mode
 from mascope_backend.api.new.ionization.modes.util import (
     fetch_sample_ionization_mechanism_ids,
@@ -36,6 +37,7 @@ async def test_calibration_fitting():
         calibration_parameters = CalibrationFitParams(
             calibration_collection_id=calibration_collection_id,
             ionization_mechanism_ids=mechanisms,
+            refine_window=calibration_config.ORBI_DEFAULT_REFINE_WINDOW,
         )
         calibration_handler = get_calibration_handler(
             sample.filename, calibration_parameters, fake_notification

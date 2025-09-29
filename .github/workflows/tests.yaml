@@ -45,6 +45,6 @@ jobs:
       - name: Run tests
         env:
           SKIP_TOFWERK_DLL: 1 # skip Tofwerk DLL loading
+          SKIP_CALIBRATION_FITTING_TEST: 1
         run: |
-          export SKIP_CALIBRATION_FITTING_TEST=1
           uv run pytest server/backend/tests/ -v
