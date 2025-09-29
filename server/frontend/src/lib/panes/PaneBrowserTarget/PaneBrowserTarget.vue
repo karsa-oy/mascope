@@ -6,133 +6,94 @@ import { useWindowSize } from '@vueuse/core'
 import { useApp } from '@/stores'
 
 import TargetCollectionTable from './TargetCollectionTable.vue'
-import TargetCompoundTable from './TargetCompoundTable.vue'
-import TargetIonTable from './TargetIonTable.vue'
-import TargetIsotopeTable from './TargetIsotopeTable.vue'
+import MatchIonTable from './MatchIonTable.vue'
 
 const app = useApp()
 
-// trigger visualization on match focus
-watch(
-  () => app.data.match.ion.focused ?? app.data.match.compound.focused,
-  async (match) => {
-    const ionId =
-      match?.target_ion_id ??
-      app.data.match.ion.list?.find((ion) => ion.target_compound_id === match?.target_compound_id)
-        ?.target_ion_id
-    if (
-      ionId &&
-      app.data.sample.focused &&
-      app.data.match.visualized.ion?.target_ion_id !== ionId
-    ) {
-      await app.data.match.visualized.set({
-        sampleId: app.data.sample.focused.sample_item_id,
-        ionId,
-        collectionId: match?.target_collection_id,
-        // pass the ion specific filter params if available to the loadSampleIon function
-        params: app.data.match.ion.list.find((ion) => ion.target_ion_id === ionId)?.filter_params[
-          app.data.sample.focused.instrument
-        ]
-      })
-    }
-  }
-)
-
 /**
- * Utility function to allow scrolling to targets in the watchers below
- *
- * A lock prevents race conditions when focusing one level of the hierarchy
- * is propegated to other levels, ensuring only the initially focused level
- * is scrolled to.
+ * Utility function to allow scrolling to matches in the watchers below
+ * Lock prevents race conditions when focusing propagates through hierarchy,
+ * ensuring only the initially focused level is scrolled to.
  */
-let lock = false
-function scrollTo(target) {
-  // TODO - reimplement this
-  //if (!lock && target) {
-  //  lock = true
-  //  setTimeout(() => {
-  //    document
-  //      .getElementById(target.match_key)
-  //      ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  //    lock = false
-  //  }, 1000)
-  //}
+let scrollLock = false
+const scrollToMatch = (target) => {
+  if (!scrollLock && target) {
+    scrollLock = true
+    setTimeout(() => {
+      const element = document.getElementById(
+        `match-${target.target_collection_id || target.target_ion_id}`
+      )
+      element?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      scrollLock = false
+    }, 300)
+  }
 }
 
 /**
- * Watcher that monitors changes of the focused target collection.
- *
- * It unfocuses all child elements (compounds, ions, isotopes) and unsets the visualized Match when:
- *   1. A different collection is selected.
- *   2. The current collection is deselected.
- *
- * @param {Object|null} collection - The currently focused collection.
- * @param {Object|null} oldCollection - The previously focused collection.
+ * Watch collection focus changes
+ * Clear visualized matches when collection changes or is deselected
  */
 watch(
   () => app.data.match.collection.focused,
   (collection, oldCollection) => {
-    const changedCollection =
+    const collectionChanged =
       collection?.target_collection_id !== oldCollection?.target_collection_id
-    // conditionally unset match visualized
-    if (!collection || changedCollection) {
+
+    // Clear visualized match on collection change or deselection
+    if (!collection || collectionChanged) {
       app.data.match.visualized.clear()
     }
-    if (collection) {
-      scrollTo(collection)
-    }
-  }
-)
-watch(
-  () => app.data.match.compound.focused,
-  (compound) => {
-    if (compound) {
-      // focus parent if focused
-      app.data.match.collection.focus((coll) => coll.match_key == compound.parent_key)
-      // unfocus unrelated ions
-      if (app.data.match.ion.focused?.parent_key !== compound.match_key) {
-        app.data.match.ion.unfocus()
-      }
-      scrollTo(compound)
-    } else {
-      // unfocus child if unfocused
+
+    // Clear ion selection when collection changes (but not when first selecting)
+    if (collectionChanged && oldCollection) {
       app.data.match.ion.unfocus()
-      // and unset visualized match
-      app.data.match.visualized.clear()
+    }
+
+    if (collection) {
+      scrollToMatch(collection)
     }
   }
 )
+
+/**
+ * Watch ion focus changes
+ */
 watch(
   () => app.data.match.ion.focused,
   (ion) => {
     if (ion) {
-      // focus parent if focused
-      app.data.match.compound.focus((comp) => comp.match_key == ion.parent_key)
-      scrollTo(ion)
+      scrollToMatch(ion)
+    } else {
+      // Clear visualized match when ion is unfocused
+      app.data.match.visualized.clear()
     }
   }
 )
+
+/**
+ * Watch sample changes - re-scroll to current selection
+ */
 watch(
   () => app.data.sample.focused,
-  (sample) => {
-    scrollTo(
-      app.data.match.ion.focused ??
-        app.data.match.compound.focused ??
-        app.data.match.collection.focused
-    )
+  () => {
+    const currentSelection = app.data.match.ion.focused ?? app.data.match.collection.focused
+    if (currentSelection) {
+      scrollToMatch(currentSelection)
+    }
   }
 )
 
+// Calculate table height for virtual scrolling
 const { height } = useWindowSize()
-const padding = 100
-const tableHeight = computed(() => ((height.value - padding) * app.ui.split.bottom) / 100 - 50)
-
-provide('target-table-height', tableHeight)
+const PADDING = 100
+const BOTTOM_OFFSET = 50
+const tableHeight = computed(
+  () => ((height.value - PADDING) * app.ui.split.bottom) / 100 - BOTTOM_OFFSET
+)
+provide('match-table-height', tableHeight)
 </script>
 
 <template>
-  <TargetIsotopeTable v-if="app.data.match.ion.focused" />
-  <TargetIonTable v-else-if="app.data.match.compound.focused" />
-  <TargetCompoundTable v-else-if="app.data.match.collection.focused" />
+  <MatchIonTable v-if="app.data.match.collection.focused" />
   <TargetCollectionTable v-else />
 </template>
