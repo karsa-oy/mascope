@@ -106,6 +106,17 @@ def get_signal(
         signal_ref = h5_file["FullSpectra"]["TofData"]
         # Get m/z scale
         all_mzs = h5_file["FullSpectra"]["MassAxis"][:]
+
+        zero_mzs_inds = np.where(all_mzs == 0)[0]
+        if zero_mzs_inds.size > 1:
+            # Replace consecutive leading zeros with a small increasing sequence
+            # up to the first non-zero value
+            first_non_zero_index = zero_mzs_inds[-1] + 1
+            first_non_zero_value = all_mzs[first_non_zero_index]
+            all_mzs[: first_non_zero_index + 1] = np.linspace(
+                0, first_non_zero_value, first_non_zero_index + 1
+            )
+
         # Get time scale
         scan_time = h5_file["TimingData"]["BufTimes"][:].reshape(-1)
         last_non_zero_scan = np.where(scan_time != 0)[0][-1]
@@ -218,6 +229,17 @@ def compute_sum_signal(
         signal_ref = h5_file["FullSpectra"]["TofData"]
         # Get m/z scale
         all_mzs = h5_file["FullSpectra"]["MassAxis"][:]
+
+        zero_mzs_inds = np.where(all_mzs == 0)[0]
+        if zero_mzs_inds.size > 1:
+            # Replace consecutive leading zeros with a small increasing sequence
+            # up to the first non-zero value
+            first_non_zero_index = zero_mzs_inds[-1] + 1
+            first_non_zero_value = all_mzs[first_non_zero_index]
+            all_mzs[: first_non_zero_index + 1] = np.linspace(
+                0, first_non_zero_value, first_non_zero_index + 1
+            )
+
         # Get time scale
         scan_time = h5_file["TimingData"]["BufTimes"][:].reshape(-1)
         last_non_zero_scan = np.where(scan_time != 0)[0][-1]
