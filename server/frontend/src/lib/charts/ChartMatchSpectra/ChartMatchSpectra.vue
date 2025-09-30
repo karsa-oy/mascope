@@ -169,26 +169,26 @@ const layout = computed(() => {
         </BaseChartPlotly>
         <div class="float">
           <Tag
-            :value="`Peak ${scale.mode} intensity: ${num.peakIntensity.format(scale.mode == 'average' ? isotopeChart.sample_peak_intensity : isotopeChart.sample_peak_intensity * sampleLength)}`"
+            :value="`Peak ${scale.mode} intensity: ${num.peakIntensity.format(scale.mode == 'average' ? isotopeChart.match.sample_peak_intensity : isotopeChart.match.sample_peak_intensity * sampleLength)}`"
             :severity="
-              isotopeChart.sample_peak_intensity < app.data.match.params.ui.peak_min_intensity
+              isotopeChart.match.sample_peak_intensity < app.data.match.params.ui.peak_min_intensity
                 ? 'warn'
                 : 'info'
             "
           />
           <Tag
-            :value="`m/z error (ppm): ${num.mzError.format(isotopeChart.match_mz_error)}`"
+            :value="`m/z error (ppm): ${num.mzError.format(isotopeChart.match.match_mz_error)}`"
             :severity="
-              Math.abs(isotopeChart.match_mz_error) > app.data.match.params.ui.mz_tolerance
+              Math.abs(isotopeChart.match.match_mz_error) > app.data.match.params.ui.mz_tolerance
                 ? 'warn'
                 : 'info'
             "
           />
 
           <Tag
-            :value="`Abundance error: ${num.relativeAbundanceError.format(isotopeChart.match_abundance_error)}`"
+            :value="`Abundance error: ${num.relativeAbundanceError.format(isotopeChart.match.match_abundance_error)}`"
             :severity="
-              Math.abs(isotopeChart.match_abundance_error) >
+              Math.abs(isotopeChart.match.match_abundance_error) >
               app.data.match.params.ui.isotope_ratio_tolerance
                 ? 'warn'
                 : 'info'

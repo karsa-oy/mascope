@@ -24,6 +24,8 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
   // state
   const ion = ref(null)
   const isotopes = ref(null)
+
+  // Cache for tracking current visualization context
   const cache = reactive({
     sampleId: null,
     ionId: null,
@@ -74,9 +76,7 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
     await load({ sampleId, ionId, collectionId, init: true })
 
     // Update cache to reflect the new state
-    cache.sampleId = sampleId
-    cache.ionId = ionId
-    cache.collectionId = collectionId
+    Object.assign(cache, { sampleId, ionId, collectionId })
   }
 
   async function reload({ init } = { init: false }) {
@@ -88,24 +88,23 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
       return
     }
     ui.chart.clear()
-    // reset values
     ion.value = null
     isotopes.value = null
-    // clear cache
-    cache.sampleId = null
-    cache.ionId = null
-    cache.collectionId = null
+    Object.assign(cache, { sampleId: null, ionId: null, collectionId: null })
   }
 
   async function load({ sampleId, ionId, collectionId, init } = { init: true }) {
-    // load matches
-    const sample_item_id = sampleId ?? ion.value?.sample_item_id
+    // Resolve IDs from current state or cache
+    const sample_item_id =
+      sampleId ?? ion.value?.match?.sample_item_id ?? sample.focused?.sample_item_id
     const target_ion_id = ionId ?? ion.value?.target_ion_id
-    const target_collection_id = collectionId ?? ion.value?.target_collection_id
+    const target_collection_id = collectionId ?? matchCollection.focused.target_collection_id
     if (!sample_item_id || !target_ion_id || !target_collection_id) {
       return
     }
-    const sampleIon = await api.http.post(
+
+    // Fetch aggregated match data with nested match structure
+    const response = await api.http.post(
       `/match/aggregate/sample/${sample_item_id}/ion`,
       {
         target_ion_id,
@@ -117,33 +116,33 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
         type: 'load_matches'
       }
     )
-    if (!sampleIon) {
-      return
-    }
+    if (!response?.match_ions?.[0]) return
 
-    ion.value = sampleIon.match_ions[0]
-    isotopes.value = sampleIon.match_isotopes.map(({ match_score, match_category, ...rest }) => ({
-      ...rest,
-      match: {
-        match_score,
-        match_category
-      },
+    // Store ion with nested match structure intact
+    ion.value = response.match_ions[0]
+
+    // Process isotopes - preserve color, format mz
+    isotopes.value = response.match_isotopes.map((isotope) => ({
+      ...isotope,
+      // Preserve existing color if isotope was already loaded
       color:
-        isotopes.value?.find((existing) => existing.target_isotope_id === rest.target_isotope_id)
-          ?.color ?? null, // Preserve color if exists
-      mz: rest.mz.toFixed(4)
+        isotopes.value?.find((existing) => existing.target_isotope_id === isotope.target_isotope_id)
+          ?.color ?? null,
+      // Format mz to 4 decimal places
+      mz: isotope.mz.toFixed(4)
     }))
 
+    // Initialize params from backend on first load
     if (init) {
-      // use backend to init frontend params
       matchParams.set({ params: matchParams.db })
     }
 
     ui.chart.clear()
 
+    // Load visualization data
     await api.http.get(`/visualization/ion_focus`, {
       params: {
-        sample_item_id: sampleId ?? ion.value.sample_item_id,
+        sample_item_id: sampleId ?? ion.value.match.sample_item_id,
         target_ion_id: ionId ?? ion.value.target_ion_id,
         min_isotope_abundance: matchParams.ui.min_isotope_abundance,
         peak_min_intensity: matchParams.ui.peak_min_intensity,
@@ -154,16 +153,11 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
     })
   }
 
-  // clear when switching workspaces
+  // Clear visualization when workspace changes
   const workspace = useWorkspace()
-  watch(
-    () => workspace.focused,
-    () => {
-      clear()
-    }
-  )
+  watch(() => workspace.focused, clear)
 
-  // Watches for changes in the focused sample and updates the match visualization accordingly.
+  // Update visualization when sample/match.ion/match.collection focus changes
   watch(
     () => ({
       focusedSample: sample.focused,
@@ -172,35 +166,23 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
     }),
     async ({ focusedSample, focusedCollection, focusedIon }, old) => {
       const collectionChanged =
-        focusedCollection?.target_collection_id !== old.focusedCollection?.target_collection_id
-      // clear visualization if requirements are missing
+        focusedCollection?.target_collection_id !== old?.focusedCollection?.target_collection_id
+
+      // clear visualization if requirements are missing or collection changed
       if (!focusedSample || !focusedIon || !focusedCollection || collectionChanged) {
         clear()
         return
       }
 
       // do nothing if no collection is focused
-      let ionId = null
-      let sampleId = focusedSample.sample_item_id
-      let collectionId = focusedCollection.target_collection_id
-      if (!collectionId) {
-        return
-      }
+      const collectionId = focusedCollection.target_collection_id
+      if (!collectionId) return
 
-      if (ion.value) {
-        // use visualized ion if set
-        ionId = ion.value.target_ion_id
-        collectionId = ion.value.target_collection_id
-      } else if (focusedIon) {
-        // no ion visualized but ion focused
-        ionId = focusedIon.target_ion_id
-      }
+      const sampleId = focusedSample.sample_item_id
+      const ionId = focusedIon.target_ion_id
+
       // Set the focusedIon visualization with the new focusedSample ID, ion ID, collection ID, and filter params
-      await set({
-        sampleId,
-        ionId,
-        collectionId
-      })
+      await set({ sampleId, ionId, collectionId })
     }
   )
 

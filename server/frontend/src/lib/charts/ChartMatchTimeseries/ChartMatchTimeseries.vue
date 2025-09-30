@@ -78,7 +78,7 @@ const layout = computed(() => ({
       <Tag
         :value="
           num.isotopeSimilarity.format(
-            app.data.match.visualized.isotopes?.[0].match_isotope_similarity
+            app.data.match.visualized.isotopes?.[0].match.match_isotope_similarity
           )
         "
       />

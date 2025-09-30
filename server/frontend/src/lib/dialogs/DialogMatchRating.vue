@@ -42,12 +42,15 @@ const expandedIsotopes = ref()
 
 // computed
 const title = computed(() => {
-  const ionSumIntensity = peak.format(app.data.match.visualized.ion?.sample_peak_intensity_sum)
+  const ionSumIntensity = peak.format(
+    app.data.match.visualized.ion?.match?.sample_peak_intensity_sum
+  )
   return `${app.data.sample.focused?.sample_item_name}: ${app.data.match.visualized.ion?.target_ion_formula} | Intensity: ${ionSumIntensity}`
 })
 const checklistEnabled = computed(() => {
   const possibleMatch =
-    app.data.match.visualized.ion.match_score >= app.data.match.params.ui.possible_match_threshold
+    app.data.match.visualized.ion.match.match_score >=
+    app.data.match.params.ui.possible_match_threshold
   return (
     (props.rating === '0' && possibleMatch) ||
     props.rating === '1' ||
@@ -66,26 +69,27 @@ const invalid = computed(
 const isotopes = computed(() =>
   app.data.match.visualized.isotopes.map((isotope) => {
     let failures = []
-    if (Math.abs(isotope.match_mz_error) > app.data.match.params.ui.mz_tolerance) {
+    if (Math.abs(isotope.match.match_mz_error) > app.data.match.params.ui.mz_tolerance) {
       failures.push({
         filter: 'm/z tolerance',
-        message: `Isotope m/z error is ${isotope.match_mz_error.toFixed(3)}`,
+        message: `Isotope m/z error is ${isotope.match.match_mz_error.toFixed(3)}`,
         threshold: app.data.match.params.ui.mz_tolerance
       })
     }
     if (
-      Math.abs(isotope.match_abundance_error) > app.data.match.params.ui.isotope_ratio_tolerance
+      Math.abs(isotope.match.match_abundance_error) >
+      app.data.match.params.ui.isotope_ratio_tolerance
     ) {
       failures.push({
         filter: 'Isotope ratio tolerance',
-        message: `Match abundance error is ${isotope.match_abundance_error.toFixed(3)}`,
+        message: `Match abundance error is ${isotope.match.match_abundance_error.toFixed(3)}`,
         threshold: app.data.match.params.ui.isotope_ratio_tolerance
       })
     }
-    if (isotope.sample_peak_intensity < app.data.match.params.ui.peak_min_intensity) {
+    if (isotope.match.sample_peak_intensity < app.data.match.params.ui.peak_min_intensity) {
       failures.push({
         filter: 'Minimum peak intensity',
-        message: `Sample peak area is ${isotope.sample_peak_intensity.toFixed(3)}`,
+        message: `Sample peak area is ${isotope.match.sample_peak_intensity.toFixed(3)}`,
         threshold: app.data.match.params.ui.peak_min_intensity
       })
     }
@@ -240,14 +244,16 @@ const peak = new Intl.NumberFormat('en-US', {
               v-model:expandedRows="expandedIsotopes"
             >
               <Column expander style="width: 3ch" />
-              <Column field="match_score" sortable class="match-column">
+              <Column sortable sortField="match.match_score" class="match-column">
                 <template #header>
                   <span class="pi pi-verified" />
                 </template>
                 <template #body="{ data }">
                   <BaseMatchTag
-                    :row="data"
-                    :tooltip="`Total peak intensity: ${peak.format(data?.sample_peak_intensity_sum)} (cps)`"
+                    :match-score="data.match?.match_score"
+                    :match-category="data.match?.match_category"
+                    :alarming="data.match?.alarming"
+                    :tooltip="`Relative peak intensity: ${data.match.sample_peak_intensity_relative.toFixed(2)} (cps)`"
                   />
                 </template>
               </Column>

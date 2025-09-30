@@ -1,9 +1,8 @@
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 
 import { api } from '@/api'
 import { useAuth } from '@/stores/auth'
-
 import { useMatchVisualized } from './visualized'
 
 export const useMatchParams = defineStore('app.data.match.params', () => {
@@ -14,6 +13,7 @@ export const useMatchParams = defineStore('app.data.match.params', () => {
   const auth = useAuth()
 
   // TODO: make global params store
+  // Load default params on login
   auth.onLogin(() => {
     api.http
       .get('/params', {
@@ -24,7 +24,7 @@ export const useMatchParams = defineStore('app.data.match.params', () => {
       })
   })
 
-  // defaults
+  // Computed defaults for current instrument type
   const typeDefaults = computed(() =>
     defaults.value ? defaults.value[matchVisualized.instrumentType] : null
   )
@@ -38,7 +38,8 @@ export const useMatchParams = defineStore('app.data.match.params', () => {
 
   // frontend param state
   const ui = ref()
-  // backend param state
+
+  // Backend param state (what's stored in DB for this ion)
   const db = computed(
     () =>
       ({
@@ -46,6 +47,8 @@ export const useMatchParams = defineStore('app.data.match.params', () => {
         ...(matchVisualized.ion?.filter_params[matchVisualized.instrument] ?? {})
       }) ?? null
   )
+
+  // Check if UI params differ from DB params
   const changed = computed(() =>
     ui.value && db.value
       ? Object.keys(db.value).some((key) => db.value[key] !== ui.value[key])
@@ -77,7 +80,7 @@ export const useMatchParams = defineStore('app.data.match.params', () => {
       `/target/ions/${matchVisualized.ion?.target_ion_id}`,
       {
         match_params: {
-          [matchVisualized.ion?.instrument]: ui.value
+          [matchVisualized.instrument]: ui.value
         }
       },
       {
@@ -91,7 +94,7 @@ export const useMatchParams = defineStore('app.data.match.params', () => {
     await api.http.patch(
       `/target/ions/${matchVisualized.ion.target_ion_id}`,
       {
-        delete_instrument_params: matchVisualized.ion.instrument
+        delete_instrument_params: matchVisualized.instrument
       },
       {
         use: 'delete',
@@ -102,7 +105,11 @@ export const useMatchParams = defineStore('app.data.match.params', () => {
     await matchVisualized.reload({ init: true })
   }
 
-  // compute match category using UI param values
+  /**
+   * Compute match category using UI param threshold values
+   * @param {object} record - Record with match_score and match_category
+   * @returns {number} - Computed match category (0, 1, or 2)
+   */
   function uiCategory(record) {
     if (!ui.value) {
       return record?.match_category

@@ -25,8 +25,7 @@ const key = ref(0)
 
 const summary = computed(
   () =>
-    `${app.data.match.visualized.ion.target_ion_formula} match parameters
-  for ${app.data.match.visualized.ion.instrument} instrument`
+    `${app.data.match.visualized.ion.target_ion_formula} match parameters for ${app.data.match.visualized.instrument} instrument`
 )
 
 const items = computed(() => [
@@ -79,7 +78,7 @@ const items = computed(() => [
       confirm.require({
         icon: 'pi pi-exclamation-triangle',
         header: 'Deleting match parameters',
-        message: `Are you sure you want to delete ${summary.value}`,
+        message: `Are you sure you want to delete ${summary.value}?`,
         accept: () => {
           app.data.match.params.remove()
         },
@@ -97,7 +96,7 @@ const items = computed(() => [
     },
     disabled:
       app.data.match.visualized.ion?.filter_params &&
-      app.data.match.visualized.ion?.instrument in app.data.match.visualized.ion.filter_params
+      app.data.match.visualized.instrument in app.data.match.visualized.ion.filter_params
         ? false
         : true
   }

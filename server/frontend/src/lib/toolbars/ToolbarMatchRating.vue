@@ -40,7 +40,7 @@ async function submitRating(rating) {
  * @param {number} rating - The rating to be submitted
  */
 async function processRatingSubmission(rating) {
-  const matchScore = app.data.match.visualized.ion.match_score
+  const matchScore = app.data.match.visualized.ion.match.match_score
   const possibleMatch = matchScore >= app.data.match.params.ui.possible_match_threshold
 
   if (rating === 1 || (rating === 0 && possibleMatch) || (rating === 2 && !possibleMatch)) {

@@ -8,7 +8,7 @@ import { useWindowSize } from '@vueuse/core'
 
 import { BaseMatchTag } from '@/lib/base'
 import { ChartMatchSpectra, ChartMatchTimeseries } from '@/lib/charts'
-import { ToolbarMatchCharts, ToolbarMatchRating } from '@/lib/toolbars'
+import { ToolbarMatchRating } from '@/lib/toolbars'
 import { useApp } from '@/stores'
 
 import SidebarMatchParams from './SidebarMatchParams.vue'
@@ -17,26 +17,18 @@ const { height } = useWindowSize()
 
 const app = useApp()
 
-const matchIon = computed(() =>
-  app.data.match.ion.list.find(
-    ({ target_compound_id }) =>
-      target_compound_id == app.data.match.visualized.ion?.target_compound_id
-  )
-)
-
 const scale = ref({
   mode: 'average',
   max: null,
   log: false
 })
 
-// recompute match category with the UI's param state
-const uiScoredIon = computed(() => {
+// Compute UI-based match category for display
+const uiMatchCategory = computed(() => {
   const ion = app.data.match.visualized.ion
-  return {
-    ...ion,
-    match_category: app.data.match.params.uiCategory(ion)
-  }
+  if (!ion?.match) return
+
+  return app.data.match.params.uiCategory(ion.match)
 })
 
 const sidebarOpen = ref(false)
@@ -58,11 +50,14 @@ const heights = computed(() => [
       <SidebarMatchParams v-model:open="sidebarOpen" />
     </div>
     <h1>
-      <BaseMatchTag :row="uiScoredIon" :style="'font-size: large'" />
-      match: ion <i>{{ app.data.match.visualized.ion?.target_ion_formula }}</i>
-      for
-      <i>{{ app.data.match.visualized.ion?.sample_item_name }}</i> with target
-      <i>{{ matchIon?.target_compound_formula }}</i>
+      <BaseMatchTag
+        :matchScore="app.data.match.visualized.ion?.match?.match_score"
+        :matchCategory="uiMatchCategory"
+        :alarming="app.data.match.visualized.ion?.match?.alarming"
+        :style="'font-size: large'"
+      />
+      <i>{{ app.data.match.visualized.ion?.target_ion_formula }}</i> for compound
+      <i>{{ app.data.match.visualized.ion?.target_compound_formula }}</i>
     </h1>
     <ToolbarMatchRating />
   </menu>
