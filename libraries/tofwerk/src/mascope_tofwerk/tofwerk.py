@@ -8,6 +8,9 @@ import dask.array as da
 from mascope_tofwerk.runtime import runtime
 
 
+DEFAULT_NONSENSE_MZ = 10.0  # m/z values below this are considered nonsense
+
+
 @contextmanager
 def open_h5_file(datafile_path: str):
     """Context manager for safely opening and closing Tofwerk h5-files.
@@ -112,16 +115,6 @@ def get_signal(
         # Get m/z scale
         all_mzs = h5_file["FullSpectra"]["MassAxis"][:]
 
-        zero_mzs_inds = np.where(all_mzs == 0)[0]
-        if zero_mzs_inds.size > 1:
-            # Replace consecutive leading zeros with a small increasing sequence
-            # up to the first non-zero value
-            first_non_zero_index = zero_mzs_inds[-1] + 1
-            first_non_zero_value = all_mzs[first_non_zero_index]
-            all_mzs[: first_non_zero_index + 1] = np.linspace(
-                0, first_non_zero_value, first_non_zero_index + 1
-            )
-
         # Get time scale
         scan_time = h5_file["TimingData"]["BufTimes"][:].reshape(-1)
         last_non_zero_scan = np.where(scan_time != 0)[0][-1]
@@ -159,14 +152,16 @@ def get_signal(
             ]
             # Convert to dask array
             signal_dask = da.from_array(signal_array, chunks="auto")
-            # Init and return xarray Dataset with swapped dimensions
-            return xr.Dataset(
+            signal = xr.Dataset(
                 {"signal": (("mz", "time"), signal_dask.T)},
                 coords={
                     "mz": all_mzs[mz_start_ind : mz_end_ind + 1],
                     "time": scan_time,
                 },
             )
+            signal = signal.where(signal["mz"] >= DEFAULT_NONSENSE_MZ, drop=True)
+            # Init and return xarray Dataset with swapped dimensions
+            return signal
 
         if t_min is not None and t_max is not None and t_min > t_max:
             raise ValueError(f"Invalid time range: {t_min} > {t_max}")
@@ -200,14 +195,16 @@ def get_signal(
         signal_slice *= conversion_coefficient
 
         signal_dask = da.from_array(signal_slice, chunks="auto")
-        # Init and return xarray Dataset with swapped dimensions
-        return xr.Dataset(
+        signal = xr.Dataset(
             {"signal": (("mz", "time"), signal_dask.T)},
             coords={
                 "mz": all_mzs[mz_start_ind : mz_end_ind + 1],
                 "time": scan_time[t_start_ind : t_end_ind + 1],
             },
         )
+        signal = signal.where(signal["mz"] >= DEFAULT_NONSENSE_MZ, drop=True)
+
+        return signal
 
 
 def compute_sum_signal(
@@ -234,16 +231,6 @@ def compute_sum_signal(
         signal_ref = h5_file["FullSpectra"]["TofData"]
         # Get m/z scale
         all_mzs = h5_file["FullSpectra"]["MassAxis"][:]
-
-        zero_mzs_inds = np.where(all_mzs == 0)[0]
-        if zero_mzs_inds.size > 1:
-            # Replace consecutive leading zeros with a small increasing sequence
-            # up to the first non-zero value
-            first_non_zero_index = zero_mzs_inds[-1] + 1
-            first_non_zero_value = all_mzs[first_non_zero_index]
-            all_mzs[: first_non_zero_index + 1] = np.linspace(
-                0, first_non_zero_value, first_non_zero_index + 1
-            )
 
         # Get time scale
         scan_time = h5_file["TimingData"]["BufTimes"][:].reshape(-1)
@@ -287,7 +274,12 @@ def compute_sum_signal(
         sum_signal *= conversion_coefficient
 
         sum_signal_da = xr.DataArray(sum_signal, dims=["mz"], coords={"mz": all_mzs})
-        return sum_signal_da.rename("sum_signal"), averaging_factor
+        sum_signal_da.name = "sum_signal"
+        sum_signal_da = sum_signal_da.where(
+            sum_signal_da["mz"] >= DEFAULT_NONSENSE_MZ, drop=True
+        )
+
+        return sum_signal_da, averaging_factor
 
 
 def get_tic_per_scan(
