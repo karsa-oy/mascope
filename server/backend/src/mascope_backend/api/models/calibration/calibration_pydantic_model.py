@@ -1,4 +1,3 @@
-from typing import List
 from pydantic import BaseModel, Field, model_validator
 from mascope_backend.api.models.base_pydantic_model import QueryParamsModel
 from mascope_backend.api.models.calibration.config import calibration_config
@@ -59,17 +58,27 @@ class TofCalibrationParams(MzCalibrationParams):
 
 
 class CalibrationFitParams(MzCalibrationParams):
+    mz_error_tolerance: float = Field(..., description="m/z error tolerance")
     tic_threshold: float = Field(
         calibration_config.TIC_THRESHOLD, description="TIC threshold"
-    )
-    mz_error_tolerance: float = Field(
-        calibration_config.MZ_ERROR_TOLERANCE, description="m/z error tolerance"
     )
     calibration_collection_id: str | None = Field(
         None, description="Calibration collection ID"
     )
-    ionization_mechanism_ids: List[str | None] = Field(
+    ionization_mechanism_ids: list[str | None] = Field(
         None, description="Ionization mechanism IDs"
+    )
+
+
+class TofCalibrationFitParams(CalibrationFitParams):
+    mz_error_tolerance: float = Field(
+        calibration_config.TOF_MZ_ERROR_TOLERANCE, description="m/z error tolerance"
+    )
+
+
+class OrbiCalibrationFitParams(CalibrationFitParams):
+    mz_error_tolerance: float = Field(
+        calibration_config.ORBI_MZ_ERROR_TOLERANCE, description="m/z error tolerance"
     )
 
 

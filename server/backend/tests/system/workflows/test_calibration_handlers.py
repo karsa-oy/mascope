@@ -4,9 +4,7 @@ import pytest
 from mascope_backend.db import init_db
 from mascope_backend.api.controllers.calibration.lib.calibration_mz_fit import (
     get_calibration_handler,
-)
-from mascope_backend.api.models.calibration.calibration_pydantic_model import (
-    CalibrationFitParams,
+    calibration_fit_params_factory,
 )
 from mascope_backend.api.models.calibration.config import calibration_config
 from mascope_backend.api.new.ionization.modes.service import get_ionization_mode
@@ -34,7 +32,8 @@ async def test_calibration_fitting():
         ionization_mode_response = await get_ionization_mode(sample.ionization_mode_id)
         ionization_mode = ionization_mode_response["data"]
         calibration_collection_id = ionization_mode["calibration_collection_id"]
-        calibration_parameters = CalibrationFitParams(
+        calibration_parameters = calibration_fit_params_factory(
+            filename=sample.filename,
             calibration_collection_id=calibration_collection_id,
             ionization_mechanism_ids=mechanisms,
             refine_window=calibration_config.ORBI_DEFAULT_REFINE_WINDOW,

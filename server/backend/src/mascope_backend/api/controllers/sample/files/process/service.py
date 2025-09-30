@@ -170,7 +170,6 @@ async def auto_process_sample_file(
         sample_item_id = sample_item["sample_item_id"]
         mz_calibration_params = resolve_calibration_params(sample_item["filename"])
         try:
-            mz_calibration_params
             await calibration_mz_calibrate_sample(
                 sample_item_id=sample_item_id,
                 mz_calibration_params=mz_calibration_params,

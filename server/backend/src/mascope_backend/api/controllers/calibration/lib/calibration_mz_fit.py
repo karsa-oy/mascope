@@ -32,6 +32,8 @@ from mascope_backend.socket.notifications import (
 )
 from mascope_backend.api.models.calibration.calibration_pydantic_model import (
     CalibrationFitParams,
+    TofCalibrationFitParams,
+    OrbiCalibrationFitParams,
 )
 
 from mascope_backend.runtime import runtime
@@ -389,3 +391,14 @@ def get_calibration_handler(
             return OrbiCalibrationHandler(filename, calibration_params, notifications)
         case _:
             raise ValueError(f"Unsupported instrument type: {instrument_type}")
+
+
+def calibration_fit_params_factory(filename: str, **kwargs) -> CalibrationFitParams:
+    instrument_type = m_name.get_instrument_type(filename)
+    match instrument_type:
+        case "tof":
+            return TofCalibrationFitParams(**kwargs)
+        case "orbi":
+            return OrbiCalibrationFitParams(**kwargs)
+        case _:
+            raise ValueError(f"Unknown instrument type: {instrument_type}")
