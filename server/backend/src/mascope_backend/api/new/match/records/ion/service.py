@@ -23,6 +23,7 @@ from mascope_backend.api.controllers.sample.lib.sample_batches_fetch import (
 )
 from mascope_backend.api.new.ionization.modes.util import (
     fetch_batch_ionization_mechanism_ids,
+    fetch_sample_ionization_mechanism_ids,
 )
 from mascope_backend.api.models.target.collections.config import (
     target_collection_config,
@@ -94,9 +95,9 @@ async def _get_sample_match_ion_records(
     :rtype: list[dict]
     """
     async with async_session() as session:
-        # Extract ionization mechanism IDs from build params
-        batch_ionization_mechanism_ids = await fetch_batch_ionization_mechanism_ids(
-            sample.sample_batch_id
+        # Get sample ionization mechanism IDs
+        sample_ionization_mechanism_ids = await fetch_sample_ionization_mechanism_ids(
+            sample.sample_item_id
         )
 
         query = (
@@ -146,7 +147,7 @@ async def _get_sample_match_ion_records(
                     TargetCollectionInSampleBatch.sample_batch_id
                     == sample.sample_batch_id,
                     TargetIon.ionization_mechanism_id.in_(
-                        batch_ionization_mechanism_ids
+                        sample_ionization_mechanism_ids
                     ),
                 )
             )
