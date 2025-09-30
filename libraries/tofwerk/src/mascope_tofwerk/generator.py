@@ -132,17 +132,23 @@ class H5Processor(Thread):
 
     @property
     def polarity(self) -> str | None:
-        """Polarity options in the sample file
+        """Polarity option in the sample file.
 
-        :return: Polarity options
+        :return: '-' for negative, '+' for positive, or None if not found
         :rtype: str | None
         """
         if self.h5:
-            ion_mode = self.h5.attrs.get("IonMode", "").lower()
-            if ion_mode == b"negative":
-                return "-"
-            elif ion_mode == b"positive":
-                return "+"
+            ion_mode = self.h5.attrs.get("IonMode")
+            if ion_mode is not None:
+                ion_mode_str = (
+                    ion_mode.decode() if isinstance(ion_mode, bytes) else str(ion_mode)
+                )
+                ion_mode_str = ion_mode_str.strip().lower()
+                if ion_mode_str == "negative":
+                    return "-"
+                elif ion_mode_str == "positive":
+                    return "+"
+        return None
 
     def _finalize(self):
         """Finalize acquisition"""

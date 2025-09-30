@@ -39,13 +39,18 @@ def get_polarity_options(datafile_path: str) -> str:
     :rtype: str
     """
     with open_h5_file(datafile_path) as h5_file:
-        ion_mode = h5_file.attrs.get("IonMode", "").lower()
-        if ion_mode == b"negative":
-            return "-"
-        elif ion_mode == b"positive":
-            return "+"
-        else:
-            raise ValueError(f"Unexpected IonMode value: {ion_mode}")
+        ion_mode = h5_file.attrs.get("IonMode")
+        if ion_mode is not None:
+            ion_mode_str = (
+                ion_mode.decode() if isinstance(ion_mode, bytes) else str(ion_mode)
+            )
+            ion_mode_str = ion_mode_str.strip().lower()
+            if ion_mode_str == "negative":
+                return "-"
+            elif ion_mode_str == "positive":
+                return "+"
+            else:
+                raise ValueError(f"Unexpected IonMode value: {ion_mode_str}")
 
 
 def get_conversion_coefficient(h5_file) -> float:
