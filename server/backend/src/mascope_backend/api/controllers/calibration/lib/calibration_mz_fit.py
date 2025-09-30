@@ -209,7 +209,7 @@ class TofCalibrationHandler(BaseCalibrationHandler):
         sample_data_path = m_name.parse_path_from_item_filename(self.filename)
         sample_file_vars = m_io.get_file_data_vars(sample_data_path)
         for sum_signal_var in sample_file_vars:
-            if sum_signal_var.startswith("sum_signal_"):
+            if sum_signal_var.startswith("sum_signal"):
                 m_io.update_zarr_array_coord(
                     self.filename, sum_signal_var, "mz", new_mz_axis
                 )
