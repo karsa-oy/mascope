@@ -173,15 +173,16 @@ class TofCalibrationHandler(BaseCalibrationHandler):
                 mz_error_diff=abs(self.stats["post_dmz"]) - abs(self.stats["pre_dmz"]),
                 calibrant_to_tic=calibrant_to_tic,
             )
-            calibration_inaccurate = (
-                abs(calibration_df["calibration_mz_error"])
-                > self.params.mz_error_tolerance
-            ).any()
-            if calibration_inaccurate:
-                self.warning = "Calibration inaccurate"
             self.stats = calibration_df.to_dict("records")
             summary_row = self._get_summary_row(calibration_df)
             self.stats.append(summary_row)
+
+            calibration_inaccurate = (
+                abs(summary_row["calibration_mz_error"])
+                > self.params.mz_error_tolerance
+            )
+            if calibration_inaccurate:
+                self.warning = "Calibration inaccurate"
 
             await send_progress_user_notification(self.notification, 0.95)
         else:
@@ -290,15 +291,16 @@ class OrbiCalibrationHandler(BaseCalibrationHandler):
             mz_error_diff=abs(self.stats["post_dmz"]) - abs(self.stats["pre_dmz"]),
             calibrant_to_tic=calibrant_to_tic,
         )
-        calibration_inaccurate = (
-            abs(calibration_df["calibration_mz_error"]) > self.params.mz_error_tolerance
-        ).any()
-        if calibration_inaccurate:
-            self.warning = "Calibration inaccurate"
 
         self.stats = calibration_df.to_dict("records")
         summary_row = self._get_summary_row(calibration_df)
         self.stats.append(summary_row)
+
+        calibration_inaccurate = (
+            abs(summary_row["calibration_mz_error"]) > self.params.mz_error_tolerance
+        )
+        if calibration_inaccurate:
+            self.warning = "Calibration inaccurate"
 
         await send_progress_user_notification(self.notification, 0.95)
 
