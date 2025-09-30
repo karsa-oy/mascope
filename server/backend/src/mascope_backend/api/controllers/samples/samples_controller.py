@@ -125,42 +125,19 @@ async def get_samples(
         data = []
         for row in rows:
             sample_data = {
-                "sample_item_id": row.Sample.sample_item_id,
-                "sample_file_id": row.Sample.sample_file_id,
-                "instrument_function_id": row.Sample.instrument_function_id,
-                "sample_batch_id": row.Sample.sample_batch_id,
-                "sample_item_name": row.Sample.sample_item_name,
-                "filename": row.Sample.filename,
-                "instrument": row.Sample.instrument,
-                "sample_item_type": row.Sample.sample_item_type,
-                "locked": row.Sample.locked,
-                "method_file": row.Sample.method_file,
-                "t0": row.Sample.t0,
-                "t1": row.Sample.t1,
-                "sample_item_attributes": row.Sample.sample_item_attributes,
-                "filter_id": row.Sample.filter_id,
-                "length": row.Sample.length,
-                "tic": row.Sample.tic,
-                "polarity": row.Sample.polarity,
-                "range": row.Sample.range,
-                "mz_calibration": row.Sample.mz_calibration,
-                "datetime": row.Sample.datetime,
-                "datetime_utc": row.Sample.datetime_utc,
-                "sample_item_utc_created": row.Sample.sample_item_utc_created,
-                "sample_item_utc_modified": row.Sample.sample_item_utc_modified,
+                column.name: getattr(row.Sample, column.name)
+                for column in Sample.__table__.columns
             }
 
             if row.MatchSample:
                 match_data = {
-                    "match_sample_id": row.MatchSample.match_sample_id,
-                    "sample_item_id": row.MatchSample.sample_item_id,
-                    "match_score": row.MatchSample.match_score,
-                    "match_category": row.MatchSample.match_category,
-                    "sample_peak_intensity_sum": row.MatchSample.sample_peak_intensity_sum,
-                    "match_sample_utc_created": row.MatchSample.match_sample_utc_created,
-                    "match_sample_utc_modified": row.MatchSample.match_sample_utc_modified,
-                    "alarming": row.alarming,
+                    column.name: getattr(row.MatchSample, column.name)
+                    for column in MatchSample.__table__.columns
                 }
+                # Add alarming as extra field (not part of MatchSample model)
+                match_data["alarming"] = (
+                    row.alarming if row.alarming is not None else False
+                )
             else:
                 match_data = {
                     "match_sample_id": None,
