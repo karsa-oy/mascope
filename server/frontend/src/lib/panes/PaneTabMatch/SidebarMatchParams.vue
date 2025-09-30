@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, watchEffect, onMounted } from 'vue'
+import { ref, computed, watchEffect } from 'vue'
 
 import Button from 'primevue/button'
 import Drawer from 'primevue/drawer'
@@ -8,7 +8,6 @@ import Menu from 'primevue/menu'
 import { useConfirm } from 'primevue/useconfirm'
 
 import { BaseParamField } from '@/lib/base'
-import { api } from '@/api'
 import { useApp } from '@/stores'
 
 const confirm = useConfirm()
@@ -23,9 +22,6 @@ watchEffect(() => {
 })
 
 const key = ref(0)
-const refresh = () => {
-  key.value = Math.random()
-}
 
 const summary = computed(
   () =>
@@ -65,7 +61,6 @@ const items = computed(() => [
     icon: 'pi pi-undo',
     command: () => {
       app.data.match.params.revert()
-      refresh()
     },
     disabled: !app.data.match.params.changed
   },
@@ -74,7 +69,6 @@ const items = computed(() => [
     icon: 'pi pi-file-import',
     command: () => {
       app.data.match.params.reset()
-      refresh()
     },
     disabled: app.data.match.params.default
   },
@@ -88,7 +82,6 @@ const items = computed(() => [
         message: `Are you sure you want to delete ${summary.value}`,
         accept: () => {
           app.data.match.params.remove()
-          refresh()
         },
         acceptProps: {
           icon: 'pi pi-trash',
@@ -146,11 +139,7 @@ const matchRangeMiddle = computed(
     icon="pi pi-sliders-h"
     severity="secondary"
     text
-    @click="
-      (event) => {
-        drawer = true
-      }
-    "
+    @click="drawer = true"
   />
   <Drawer
     v-model:visible="drawer"
@@ -201,10 +190,10 @@ const matchRangeMiddle = computed(
       />
       <div class="col" style="gap: 0">
         <div class="row" :key="matchRangeMiddle">
+          <!-- NO @change handler - these are UI-only params -->
           <BaseParamField
             label="Possible match [%]"
             v-model:param="app.data.match.params.ui.possible_match_threshold"
-            @change="app.data.match.visualized.reload"
             :range="{
               min: 0,
               max: app.data.match.params.ui.probable_match_threshold,
@@ -217,7 +206,6 @@ const matchRangeMiddle = computed(
           <BaseParamField
             label="Probable match [%]"
             v-model:param="app.data.match.params.ui.probable_match_threshold"
-            @change="app.data.match.visualized.reload"
             :range="{
               min: app.data.match.params.ui.possible_match_threshold,
               max: 1,
