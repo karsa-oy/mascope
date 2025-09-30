@@ -32,6 +32,7 @@ const loading = ref(false)
 // --- API ---
 /**
  * Load isotope data for the specified ion
+ * Can be moved to store as (match.ion.detailed?) if needed elsewhere
  */
 const loadIsotopes = async () => {
   if (!props.ionId) return
@@ -88,13 +89,15 @@ onMounted(() => {
       :sortOrder="1"
     >
       <!-- Match Score Column -->
-      <Column field="match_score" sortable class="match-column">
+      <Column sortable sortField="match.match_score" class="match-column">
         <template #header>
           <span class="pi pi-verified" />
         </template>
         <template #body="{ data }">
           <BaseMatchTag
-            :row="data"
+            :match-score="data.match?.match_score"
+            :match-category="data.match?.match_category"
+            :alarming="data.match?.alarming"
             :tooltip="
               data.match?.sample_peak_intensity
                 ? `Peak intensity: ${num.peakIntensity.format(data.match.sample_peak_intensity)} (cps)`

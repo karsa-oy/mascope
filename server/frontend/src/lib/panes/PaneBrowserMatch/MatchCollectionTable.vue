@@ -112,14 +112,20 @@ const icon = {
       sortField="match_score"
       :sortOrder="-1"
     >
-      <Column field="match_score" sortable class="match-column">
+      <Column sortable sortField="match.match_score" class="match-column">
         <template #header>
           <span class="pi pi-verified" />
         </template>
         <template #body="{ data }">
           <BaseMatchTag
-            :row="data"
-            :tooltip="`Total peak intensity: ${num.peakIntensity.format(data?.sample_peak_intensity_sum)} (cps)`"
+            :match-score="data.match?.match_score"
+            :match-category="data.match?.match_category"
+            :alarming="data.match?.alarming"
+            :tooltip="
+              data.match?.sample_peak_intensity_sum
+                ? `Peak intensity: ${num.peakIntensity.format(data.match.sample_peak_intensity_sum)} (cps)`
+                : 'No peak intensity data'
+            "
           />
         </template>
       </Column>

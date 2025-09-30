@@ -205,7 +205,7 @@ watch(
       <Column v-if="showExpanders" expander style="width: 3rem" />
 
       <!-- Match Score Column -->
-      <Column field="match_score" sortable class="match-column" style="width: 6rem">
+      <Column sortable sortField="match.match_score" class="match-column">
         <template #header> <span class="pi pi-verified" /> </template>
         <template #body="{ data }">
           <BaseMatchTag
@@ -214,6 +214,16 @@ watch(
               data.match?.sample_peak_intensity_sum
                 ? `Peak intensity: ${num.peakIntensity.format(data.match.sample_peak_intensity_sum)} (cps)`
                 : 'No match data'
+            "
+          />
+          <BaseMatchTag
+            :match-score="data.match?.match_score"
+            :match-category="data.match?.match_category"
+            :alarming="data.match?.alarming"
+            :tooltip="
+              data.match?.sample_peak_intensity_sum
+                ? `Peak intensity: ${num.peakIntensity.format(data.match.sample_peak_intensity_sum)} (cps)`
+                : 'No peak intensity data'
             "
           />
         </template>

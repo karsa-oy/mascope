@@ -284,7 +284,12 @@ const expanded = ref({})
             <span class="pi pi-verified" v-tooltip="'Match score'" />
           </template>
           <template #body="{ data }">
-            <BaseMatchTag :row="data" nofade />
+            <BaseMatchTag
+              :match-score="data?.match_score"
+              :match-category="data?.match_category"
+              :alarming="data?.alarming"
+              nofade
+            />
           </template>
         </Column>
         <Column field="existing" sortable>
@@ -363,7 +368,12 @@ const expanded = ref({})
                 <span class="pi pi-verified" v-tooltip="'Match score'" />
               </template>
               <template #body="{ data }">
-                <BaseMatchTag :row="data" nofade />
+                <BaseMatchTag
+                  :match-score="data?.match_score"
+                  :match-category="data?.match_category"
+                  :alarming="data?.alarming"
+                  nofade
+                />
               </template>
             </Column>
           </DataTable>

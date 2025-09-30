@@ -4,9 +4,17 @@ import { computed } from 'vue'
 import Tag from 'primevue/tag'
 
 const props = defineProps({
-  row: {
-    type: Object,
-    required: true
+  matchScore: {
+    type: Number,
+    default: null
+  },
+  matchCategory: {
+    type: Number,
+    default: 0
+  },
+  alarming: {
+    type: Boolean,
+    default: false
   },
   tooltip: {
     type: String
@@ -33,13 +41,13 @@ const formatter = new Intl.NumberFormat('en-US', {
 })
 
 const score = computed(() => {
-  const notNull = (props.row?.match?.match_score ?? null) !== null
-  const notNaN = !isNaN(props.row?.match?.match_score)
-  return notNull && notNaN ? formatter.format(props.row.match?.match_score) : null
+  const notNull = props.matchScore !== null
+  const notNaN = !isNaN(props.matchScore)
+  return notNull && notNaN ? formatter.format(props.matchScore) : null
 })
 
 const severity = computed(() => {
-  switch (props.row.match.match_category) {
+  switch (props.matchCategory) {
     case 2:
       return 'danger'
     case 1:
@@ -48,8 +56,6 @@ const severity = computed(() => {
       return 'success'
   }
 })
-
-const zeroScored = computed(() => props.score == '00.00%')
 </script>
 
 <template>
@@ -59,7 +65,7 @@ const zeroScored = computed(() => props.score == '00.00%')
     v-tooltip.right="tooltip"
     :value="text ? `Match score: ${score}` : score"
     :severity="severity"
-    :class="nofade || row.match?.alarming || zeroScored ? '' : 'pale'"
+    :class="nofade || alarming ? '' : 'pale'"
     :style="style"
   />
 </template>
