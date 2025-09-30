@@ -65,18 +65,21 @@ const isotopeCharts = computed(() => {
         ? nextStart // use it as the end of isotope trace data
         : traces?.length // otherwise use all remaining data
     const isotopeTraces = traces.value?.slice(start, end)
-    // compute match category with UI match params
-    const match_category = app.data.match.params.uiCategory(isotope)
-    // return chart data
     return {
       // all match isotope fields
       ...isotope,
       // and our computed data
-      traces: isotopeTraces,
-      match_category
+      traces: isotopeTraces
     }
   })
 })
+
+// compute match category with UI match params
+const getIsotopeCategory = (isotope) => {
+  if (!isotope?.match) return 0
+  // This accesses app.data.match.params.ui inside the function,
+  return app.data.match.params.uiCategory(isotope.match)
+}
 
 // auto vs manual scale
 const rangeY = computed(
@@ -135,7 +138,11 @@ const layout = computed(() => {
         :class="sidebarOpen ? 'sidebarOpen' : ''"
       >
         <h3 :style="`color: ${isotopeChart.traces[0]?.line.color}; margin: 0`">
-          <BaseMatchTag :row="isotopeChart" />
+          <BaseMatchTag
+            :match-score="isotopeChart.match?.match_score"
+            :match-category="getIsotopeCategory(isotopeChart)"
+            :alarming="isotopeChart.match?.alarming"
+          />
           Isotope {{ num.mz.format(isotopeChart.mz) }}
         </h3>
         <!--
