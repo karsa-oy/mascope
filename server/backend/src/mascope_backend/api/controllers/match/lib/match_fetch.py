@@ -18,7 +18,6 @@ from mascope_backend.db.models import (
     TargetCompoundInTargetCollection,
     TargetCollectionInSampleBatch,
     IonizationMechanism,
-    IonizationMode,
     MatchIsotope,
 )
 from mascope_backend.api.new.ionization.modes.util import (

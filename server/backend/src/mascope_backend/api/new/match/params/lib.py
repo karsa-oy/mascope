@@ -31,7 +31,7 @@ def apply_match_params(
     :param match_isotope_df: DataFrame containing match isotope data.
     :type match_isotope_df: pd.DataFrame
     :param match_params: Optional; Pydantic model of filtering parameters.
-    :type match_params: MatchParams
+    :type match_params: BaseMatchParams
     :return: DataFrame with applied filters.
     :rtype: pd.DataFrame
     """

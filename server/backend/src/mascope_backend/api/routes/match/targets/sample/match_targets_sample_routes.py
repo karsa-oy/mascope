@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from mascope_backend.api.new.auth.dependencies import guest_user
 from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.controllers.match.targets.sample.match_targets_sample_controller import (
@@ -23,7 +23,7 @@ match_targets_sample_router = APIRouter(
 @api_route()
 async def get_match_sample_collections_route(
     sample_item_id: str,
-    query_params: SortingPaginationQueryParams = Depends(),
+    query_params: SortingPaginationQueryParams = Query(),
     user=Depends(guest_user),
 ):
     """Retrieve target collection matches for a specific sample item.

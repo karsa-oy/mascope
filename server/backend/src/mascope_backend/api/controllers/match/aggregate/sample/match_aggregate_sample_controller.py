@@ -1,13 +1,15 @@
+# pylint: disable=line-too-long
 import pandas as pd
 from sqlalchemy import (
     select,
 )
 from mascope_file.string import norm
 from mascope_match import compute_match_isotopes
+from mascope_match.params import BaseMatchParams
+
 from mascope_backend.db.id import gen_id
 from mascope_backend.db import async_session
 from mascope_backend.db.models import (
-    SampleBatch,
     TargetCompound,
     TargetIon,
     IonizationMechanism,
@@ -43,7 +45,9 @@ from mascope_backend.api.controllers.target.lib.compute.target_ions_compute impo
 from mascope_backend.api.new.ionization.modes.util import (
     fetch_sample_ionization_mechanism_ids,
 )
-from mascope_match.params import BaseMatchParams
+from mascope_backend.api.models.target.collections.config import (
+    target_collection_config,
+)
 
 
 @api_controller()
@@ -60,6 +64,7 @@ async def aggregate_sample_match_ion(
     Key Points:
     - Ion-specific `match_params` are required; stored or default parameters are NOT used for filtering.
     - The function directly processes the aggregated match isotope data without unnecessary intermediate steps.
+    - Response structure matches match records format with nested match data.
 
     Steps:
     1. Verify the existence of the specified sample item and target ion.
@@ -81,13 +86,13 @@ async def aggregate_sample_match_ion(
     :rtype: dict
     """
     async with async_session() as session:
-        # Step 1: Fetch sample and target ion to verify its existence
+        # Fetch sample and target ion to verify its existence
         sample = await fetch_sample(sample_item_id)
         ion = await session.get(TargetIon, target_ion_id)
         if not ion:
             raise NotFoundException(f"Target ion with ID '{target_ion_id}' not found")
 
-        # Step 2: Aggregate and filter match data at the isotope level using the provided filter parameters
+        # Aggregate and filter match data at the isotope level using the provided filter parameters
         aggregated_match_isotope_filtered_data_df = (
             await aggregate_match_isotope_filtered_data(
                 sample_item_id=sample.sample_item_id,
@@ -96,7 +101,7 @@ async def aggregate_sample_match_ion(
             )
         )
 
-        # Step 3: Check if the DataFrame is empty
+        # Check if the DataFrame is empty
         if aggregated_match_isotope_filtered_data_df.empty:
             return {
                 "matches": {
@@ -107,40 +112,99 @@ async def aggregate_sample_match_ion(
                 "match_isotopes": [],
             }
 
-        # Step 4: Filter and prepare match isotope data
-        # Filter match_isotopes_df  duplicates (if compound is present in 2 different collections) based on target_collection_id
+        # Filter match_isotopes_df duplicates (if compound is present in 2 different collections) by target_collection_id
         match_isotopes_df = aggregated_match_isotope_filtered_data_df[
             aggregated_match_isotope_filtered_data_df["target_collection_id"]
             == target_collection_id
-        ].drop(
-            columns=[
-                "sample_item_type",
-                "target_collection_name",
-                "target_collection_description",
-                "target_compound_name",
-                "target_compound_formula",
-                "target_ion_formula",
-                "filter_params",
-                "ionization_mechanism",
-            ]
-        )
+        ].copy()
 
-        # Step 5: Aggregate fields for match ions and filter duplicates based on target_collection_id
+        # Aggregate fields for match ions and filter duplicates by target_collection_id
         match_ions_data_df, _ = await aggregate_match_ions(
             aggregated_match_isotope_filtered_data_df, match_params
         )
         match_ions_df = match_ions_data_df[
             match_ions_data_df["target_collection_id"] == target_collection_id
-        ].drop(
-            columns=[
-                "target_collection_description",
-                "target_compound_name",
-                "target_compound_formula",
-                "sample_item_type",
-            ]
-        )
+        ].copy()
 
-        # Step 6: Prepare the final output
+        # Calculate alarming flag based on target_collection_type
+        match_ions_df["alarming"] = match_ions_df["target_collection_type"].isin(
+            target_collection_config.APP_ALARMING_COLLECTION_TYPES
+        )
+        match_isotopes_df["alarming"] = match_isotopes_df[
+            "target_collection_type"
+        ].isin(target_collection_config.APP_ALARMING_COLLECTION_TYPES)
+
+        # Transform match_ions to nested structure
+        match_ions_list = []
+        for _, row in match_ions_df.sort_values(
+            by=["match_category", "match_score"], ascending=[False, False]
+        ).iterrows():
+            ion_data = {
+                "target_compound_id": row["target_compound_id"],
+                "target_compound_name": row["target_compound_name"],
+                "target_compound_formula": row["target_compound_formula"],
+                "target_ion_id": row["target_ion_id"],
+                "target_ion_formula": row["target_ion_formula"],
+                "ionization_mechanism": row["ionization_mechanism"],
+                "filter_params": row.get("filter_params", {}),
+                "match": {
+                    "sample_item_id": row["sample_item_id"],
+                    "match_score": row["match_score"],
+                    "match_category": row["match_category"],
+                    "sample_peak_intensity_sum": row["sample_peak_intensity_sum"],
+                    "alarming": row["alarming"],
+                },
+            }
+
+            # Convert pandas NaN to None for JSON serialization
+            for key, value in ion_data.items():
+                if key != "match" and pd.isna(value):
+                    ion_data[key] = None
+            for key, value in ion_data["match"].items():
+                if pd.isna(value):
+                    ion_data["match"][key] = None
+
+            match_ions_list.append(ion_data)
+
+        # Transform match_isotopes to nested structure
+        match_isotopes_list = []
+        for _, row in match_isotopes_df.sort_values(by="mz", ascending=True).iterrows():
+            isotope_data = {
+                "target_compound_id": row["target_compound_id"],
+                "target_ion_id": row["target_ion_id"],
+                "target_isotope_id": row["target_isotope_id"],
+                "mz": row["mz"],
+                "relative_abundance": row["relative_abundance"],
+                "resolution": row["resolution"],
+                "match": {
+                    "sample_item_id": row["sample_item_id"],
+                    "sample_peak_id": None,  # Not available in aggregated data
+                    "sample_peak_mz": row["sample_peak_mz"],
+                    "sample_peak_intensity": row["sample_peak_intensity"],
+                    "sample_peak_intensity_relative": row[
+                        "sample_peak_intensity_relative"
+                    ],
+                    "sample_peak_tof": row["sample_peak_tof"],
+                    "match_abundance_error": row["match_abundance_error"],
+                    "match_mz_error": row["match_mz_error"],
+                    "match_isotope_similarity": row["match_isotope_similarity"],
+                    "match_score": row["match_score"],
+                    "match_category": row["match_category"],
+                    "alarming": row["alarming"],
+                },
+            }
+
+            # Convert pandas NaN to None for JSON serialization
+            for key, value in isotope_data.items():
+                if key != "match" and pd.isna(value):
+                    isotope_data[key] = None
+            for key, value in isotope_data["match"].items():
+                if pd.isna(value):
+                    isotope_data["match"][key] = None
+
+            match_isotopes_list.append(isotope_data)
+
+        # Prepare the final output
         if len(match_ions_df) and len(match_isotopes_df):
             message = "Match information retrieved successfully"
         else:
@@ -150,15 +214,11 @@ async def aggregate_sample_match_ion(
             "message": message,
             "data": {
                 "matches": {
-                    "match_ions": len(match_ions_df),
-                    "match_isotopes": len(match_isotopes_df),
+                    "match_ions": len(match_ions_list),
+                    "match_isotopes": len(match_isotopes_list),
                 },
-                "match_ions": match_ions_df.sort_values(
-                    by=["match_category", "match_score"], ascending=[False, False]
-                ).to_dict("records"),
-                "match_isotopes": match_isotopes_df.sort_values(
-                    by="mz", ascending=True
-                ).to_dict("records"),
+                "match_ions": match_ions_list,
+                "match_isotopes": match_isotopes_list,
             },
         }
 
