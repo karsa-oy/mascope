@@ -63,7 +63,8 @@ export const useChartData = defineStore('chart.batch.overview', () => {
    * Records are already filtered (match_category > 0) and contain all needed data
    */
   const traces = computed(() => {
-    if (!records.value.length || !samples.value.length) return []
+    // Guard: no samples = no chart
+    if (!samples.value.length) return []
 
     const xFieldName = xField.value?.field || 'index'
 
@@ -74,73 +75,75 @@ export const useChartData = defineStore('chart.batch.overview', () => {
         : (sample) => sample[xFieldName]
     )
 
-    // Group records by target_ion_id for trace building
-    const ionGroups = records.value.reduce((groups, record) => {
-      const ionId = record.target_ion_id
-      if (!groups[ionId]) groups[ionId] = []
-      groups[ionId].push(record)
-      return groups
-    }, {})
+    // Build ion traces (one per ion) only if collection focused (batch overview match records available)
+    const ionTraces = !records.value.length
+      ? []
+      : Object.entries(
+          // Group records by target_ion_id for trace building
+          records.value.reduce((groups, record) => {
+            const ionId = record.target_ion_id
+            if (!groups[ionId]) groups[ionId] = []
+            groups[ionId].push(record)
+            return groups
+          }, {})
+        ).map(([ionId, ionRecords], index) => {
+          // Create sample_item_id → intensity mapping for this ion
+          const intensityMap = ionRecords.reduce((map, record) => {
+            map[record.sample_item_id] = record.sample_peak_intensity_sum
+            return map
+          }, {})
 
-    // Build traces - one per ion
-    const ionTraces = Object.entries(ionGroups).map(([ionId, ionRecords], index) => {
-      // Create sample_item_id → intensity mapping for this ion
-      const intensityMap = ionRecords.reduce((map, record) => {
-        map[record.sample_item_id] = record.sample_peak_intensity_sum
-        return map
-      }, {})
+          // Y-axis - sample_peak_intensity_sum
+          // Build y-values aligned with samples (null where no match)
+          const yValues = samples.value.map((sample) => intensityMap[sample.sample_item_id] ?? null)
 
-      // Y-axis - sample_peak_intensity_sum
-      // Build y-values aligned with samples (null where no match)
-      const yValues = samples.value.map((sample) => intensityMap[sample.sample_item_id] ?? null)
+          // Get representative record for metadata (all records for same ion have same metadata)
+          const rep = ionRecords[0]
+          const maxMatchCategory = Math.max(...ionRecords.map((r) => r.match_category))
 
-      // Get representative record for metadata (all records for same ion have same metadata)
-      const rep = ionRecords[0]
-      const maxMatchCategory = Math.max(...ionRecords.map((r) => r.match_category))
+          // Build trace name from compound + ion formula
+          const compoundName = rep.target_compound_name?.trim()
+            ? rep.target_compound_name
+            : rep.target_compound_formula
+          const traceName = `${compoundName}: ${rep.target_ion_formula}`
 
-      // Build trace name from compound + ion formula
-      const compoundName = rep.target_compound_name?.trim()
-        ? rep.target_compound_name
-        : rep.target_compound_formula
-      const traceName = `${compoundName}: ${rep.target_ion_formula}`
+          return {
+            name: traceName,
+            x: xValues,
+            y: yValues,
+            mode: 'markers',
+            type: 'scatter',
+            marker: {
+              color: theme.value[index % theme.value.length],
+              size: 10,
+              symbol: maxMatchCategory === 2 ? 'square' : 'square-open'
+            },
+            // Click metadata for focusing
+            matchData: {
+              target_ion_id: rep.target_ion_id,
+              match_ion_id: rep.match_ion_id
+            },
+            // Hover tooltip data
+            customdata: samples.value.map((sample) => [sample.datetime, 'counts/s']),
+            text: samples.value.map((sample) => sample.sample_item_name),
+            hovertemplate: `
+              <i>Ion Match</i>
+              <b># %{x}</b>
+              <br>
+              <b>${traceName}</b>
+              ${rep.ionization_mechanism ? `<br>Mechanism: ${rep.ionization_mechanism}` : ''}
+              <br>
+              <b>%{text}</b>
+              <br>
+              Intensity: %{y:,.2e} %{customdata[1]}
+              <br>
+              %{customdata[0]}
+              <extra></extra>
+            ` // use "<extra></extra>" to get rid of extra block from the hoverbox
+          }
+        })
 
-      return {
-        name: traceName,
-        x: xValues,
-        y: yValues,
-        mode: 'markers',
-        type: 'scatter',
-        marker: {
-          color: theme.value[index % theme.value.length],
-          size: 10,
-          symbol: maxMatchCategory === 2 ? 'square' : 'square-open'
-        },
-        // Click metadata for focusing
-        matchData: {
-          target_ion_id: rep.target_ion_id,
-          match_ion_id: rep.match_ion_id
-        },
-        // Hover tooltip data
-        customdata: samples.value.map((sample) => [sample.datetime, 'counts/s']),
-        text: samples.value.map((sample) => sample.sample_item_name),
-        hovertemplate: `
-        <i>Ion Match</i>
-        <b># %{x}</b>
-        <br>
-        <b>${traceName}</b>
-        ${rep.ionization_mechanism ? `<br>Mechanism: ${rep.ionization_mechanism}` : ''}
-        <br>
-        <b>%{text}</b>
-        <br>
-        Intensity: %{y:,.2e} %{customdata[1]}
-        <br>
-        %{customdata[0]}
-        <extra></extra>
-      ` // use "<extra></extra>" to get rid of extra block from the hoverbox
-      }
-    })
-
-    // Add TIC trace (always last)
+    // Always add TIC trace
     ionTraces.push({
       // Make trace for TIC
       name: 'TIC',

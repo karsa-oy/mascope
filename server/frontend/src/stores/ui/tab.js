@@ -34,34 +34,26 @@ export const useTab = defineStore('app.ui.tab', () => {
       }
     }
   )
-  // Switch to 'batch' tab when collection focused, return to default when unfocused
+  // Switch to batch tab when samples loaded AND batch focused
+  // Leave batch tab when samples become empty
   watch(
-    () => data.match.collection.focused,
-    (focused, unfocused) => {
-      if (focused && data.batch.focused && data.sample.list.length > 0) {
-        // Collection focused + batch loaded + has samples → switch to batch tab
+    () => data.sample.list.length,
+    (length) => {
+      if (length > 0 && data.batch.focused) {
+        // Samples loaded + batch focused → enter batch tab
         active.value = 'batch'
-      } else if (!focused && unfocused && active.value === 'batch') {
-        // Collection unfocused → leave batch tab
-        active.value = DEFAULT_TAB
-      }
-    }
-  )
-  // Return to default tab when batch unfocused (if currently on batch tab)
-  watch(
-    () => data.batch.focused,
-    (focused) => {
-      if (!focused && active.value == 'batch') {
+      } else if (length === 0 && active.value === 'batch') {
+        // Samples empty → leave batch tab
         active.value = DEFAULT_TAB
       }
     }
   )
 
-  // Guard: switch away from batch tab if sample list becomes empty
+  // Return to default tab when batch unfocused (if currently on batch tab)
   watch(
-    () => data.sample.list.length,
-    (length) => {
-      if (length === 0 && active.value === 'batch') {
+    () => data.batch.focused,
+    (focused) => {
+      if (!focused && active.value === 'batch') {
         active.value = DEFAULT_TAB
       }
     }

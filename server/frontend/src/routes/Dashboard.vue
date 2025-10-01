@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 
 import Splitter from 'primevue/splitter'
 import SplitterPanel from 'primevue/splitterpanel'
@@ -9,7 +9,6 @@ import TabList from 'primevue/tablist'
 import Tab from 'primevue/tab'
 import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
-import Button from 'primevue/button'
 
 import { ToolbarAppFilters } from '@/lib/toolbars'
 import {
@@ -42,12 +41,13 @@ const tabs = computed(() => [
   {
     label: 'Batch',
     icon: 'pi pi-hashtag',
-    disabled: app.data.sample.list.length == 0,
+    disabled: !app.data.batch.focused || app.data.sample.list.length === 0,
     help: `
       <h1>Batch Overview Chart</h1>
 
-      <p>Visualize intensity of all samples in
-      a batch against various data points.</p>
+      <p>Visualize TIC and matched ion intensities 
+      across all samples in a batch. Select a target 
+      collection to view ion-specific traces.</p>
     `
   },
   {
@@ -136,7 +136,7 @@ const tabs = computed(() => [
                 <PaneTabAcquisitions :active="app.ui.tab.active == 'acquisitions'" />
               </TabPanel>
               <TabPanel value="batch">
-                <ChartBatchOverview v-if="app.data.batch.focused && app.ui.tab.active == 'batch'" />
+                <ChartBatchOverview v-if="app.ui.tab.active == 'batch'" />
               </TabPanel>
               <TabPanel value="spectrum" :pt="{ content: { style: { padding: 0 } } }">
                 <PaneTabSpectrum v-if="app.ui.tab.active == 'spectrum'" />
