@@ -6,12 +6,8 @@ import { useMzFit } from '@/lib/mzFit'
 import { toSpreadsheet } from '@/lib/table'
 import { useData } from '@/lib/store'
 
-import { useUi } from '../../ui'
-
 import { useWorkspace } from './workspace'
-import { useSample } from './sample'
 import { useMatchCollection } from './match'
-import { useAcquisition } from './acquisition'
 
 export const useBatch = defineStore('app.data.batch', () => {
   const name = 'batch'
@@ -31,27 +27,8 @@ export const useBatch = defineStore('app.data.batch', () => {
       deps: () => ({
         workspace_id: useWorkspace().focusedId
       }),
-      hook: () => {
-        const sample = useSample()
-        const ui = useUi()
-        if (sample.list.length == 0 && ui.tab.active == 'batch') {
-          ui.tab.default()
-        }
-      },
       selection: {
-        subscribe: true,
-        hook: () => {
-          const sample = useSample()
-          const ui = useUi()
-          const acquistion = useAcquisition()
-          if (sample.list.length > 0) {
-            if (acquistion.selected.length === 0) {
-              ui.tab.active = 'batch'
-            }
-          } else if (ui.tab.active == 'batch') {
-            ui.tab.default()
-          }
-        }
+        subscribe: true
       },
       read: (sample_batch_id) =>
         api.http.get(`/sample/batches/${sample_batch_id}`, {
