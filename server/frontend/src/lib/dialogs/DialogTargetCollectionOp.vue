@@ -37,23 +37,11 @@ const app = useApp()
 
 const action = defineModel('action')
 
-const props = defineProps({
-  collection: {
-    type: Object
-  }
-})
-const original = computed(() => props.collection ?? app.data.match.collection.focused)
+// Use detailed collection
+const original = computed(() => app.data.target.collection.detailed)
 
 // dialog visibility reactivity
 const visible = ref(false)
-watch(action, (value) => {
-  visible.value = !!value
-})
-watch(visible, (value) => {
-  if (!value) {
-    action.value = null
-  }
-})
 
 const info = reactive({
   id: null,
@@ -103,12 +91,6 @@ const columns = [
   { field: 'cas_number', label: 'CAS' },
   { field: 'status', label: 'Status' }
 ]
-
-const batchLabel = computed(() =>
-  batches.selected.length == 1
-    ? `"${batches.selected[0].sample_batch_name}" batch`
-    : `${batches.selected.length} batches`
-)
 
 const title = computed(() => {
   // Define the modal title based on the action
@@ -204,27 +186,6 @@ function restore(compound) {
   compounds.selected.push(compound)
 }
 
-watchEffect(() => {
-  if (selected.source == 'input') {
-    selected.search = ''
-  }
-})
-watchEffect(async () => {
-  // reload compounds
-  compounds.loaded =
-    selected.collection === 'all-compounds'
-      ? app.data.target.compound.list
-      : ((await app.data.target.collection.read(selected.collection))?.target_compounds ?? [])
-  // select all checkbox state
-  selected.all.targets =
-    compounds.loaded.length > 0
-      ? compounds.loaded.every((comp) =>
-          compounds.selected
-            .map(({ target_compound_id }) => target_compound_id)
-            .includes(comp.target_compound_id)
-        )
-      : false
-})
 function loadSpreadsheet({ rows }) {
   let prexisting = []
   rows.forEach((compound) => {
@@ -262,8 +223,6 @@ function loadSpreadsheet({ rows }) {
   key.targets += 1
 }
 
-watchEffect(() => loadBatches(selected.workspace, info.type))
-
 async function loadBatches(workspace, collectionType) {
   if (!workspace || !collectionType) {
     batches.loaded = []
@@ -279,13 +238,15 @@ async function loadBatches(workspace, collectionType) {
     use: 'read',
     type: 'load_batches'
   })
-  // reconcile with existing data
-  batches.loaded = latest.map(
-    (batch) =>
-      batches.loaded.find(({ sample_batch_id }) => sample_batch_id === batch.sample_batch_id) ??
-      batch
-  )
-  // select all checkbox state
+  batches.loaded = latest
+
+  // Re-select batches by ID to match fresh objects
+  if (batches.selected.length > 0) {
+    const selectedIds = batches.selected.map((b) => b.sample_batch_id)
+    batches.selected = batches.loaded.filter((b) => selectedIds.includes(b.sample_batch_id))
+  }
+
+  // Update select all checkbox state
   selected.all.batches =
     batches.loaded.length > 0
       ? batches.loaded.every((batch) =>
@@ -295,30 +256,6 @@ async function loadBatches(workspace, collectionType) {
         )
       : false
 }
-
-// watcher to reset batch selections when collection type changes
-watch(
-  () => info.type,
-  (newType, oldType) => {
-    if (oldType && newType !== oldType) {
-      // Reset workspace if it becomes invalid
-      if (selected.workspace) {
-        const allowedWorkspaceTypes = getAllowedWorkspaceTypes(newType)
-        if (!allowedWorkspaceTypes.includes(selected.workspace.workspace_type)) {
-          selected.workspace = null
-        }
-      }
-
-      // Reset batch selections if they become invalid
-      if (batches.selected.length > 0) {
-        const allowedBatchTypes = getAllowedBatchTypes(newType)
-        batches.selected = batches.selected.filter((batch) =>
-          allowedBatchTypes.includes(batch.sample_batch_type)
-        )
-      }
-    }
-  }
-)
 
 function execute() {
   const common = {
@@ -478,7 +415,6 @@ const addCompoundButtonDisabled = computed(
   () => !add.formula.trim() || invalidFormula.value || alreadyInSelection.value
 )
 
-watch(action, init)
 async function init(mode) {
   if (!mode) {
     return
@@ -501,7 +437,7 @@ async function init(mode) {
     info.name = original.value?.target_collection_name
     info.desc = original.value?.target_collection_description
     info.type = original.value?.target_collection_type
-    compounds.selected = app.data.target.collection.detailed?.target_compounds ?? []
+    compounds.selected = original.value?.target_compounds ?? []
   }
   switch (mode) {
     case 'create': {
@@ -510,13 +446,19 @@ async function init(mode) {
       info.desc = ''
       info.type = 'TARGETS'
       selected.workspace = app.data.workspace.focused
-      batches.selected = app.data.batch.focused ? [app.data.batch.focused] : []
       break
     }
     case 'update_batches': {
       selected.tab = 'batches'
       selected.workspace = app.data.workspace.focused
-      batches.selected = app.data.target.collection.detailed?.sample_batches ?? []
+      // Store IDs to select after loading
+      const selectedBatchIds = original.value?.sample_batches?.map((b) => b.sample_batch_id) ?? []
+
+      // Wait for batches to load
+      await loadBatches(selected.workspace, info.type)
+
+      // Now select from loaded batches
+      batches.selected = batches.loaded.filter((b) => selectedBatchIds.includes(b.sample_batch_id))
       break
     }
     case 'delete': {
@@ -559,6 +501,90 @@ const onEnter = (event) => {
 }
 onMounted(() => window.addEventListener('keydown', onEnter))
 onBeforeUnmount(() => window.removeEventListener('keydown', onEnter))
+
+// Initialize dialog when action changes
+watch(action, async (value) => {
+  visible.value = !!value
+  if (value) {
+    await init(value)
+  }
+})
+
+// Close dialog when visibility changes to false
+watch(visible, (value) => {
+  if (!value) {
+    action.value = null
+    // Clear state to get fresh data on next open
+    selected.workspace = null
+    selected.tab = 'compounds'
+    selected.collection = 'all-compounds'
+    selected.source = 'collection'
+    selected.search = ''
+    info.type = null
+    compounds.loaded = []
+    compounds.selected = []
+    compounds.initial = []
+    compounds.created = []
+    batches.loaded = []
+    batches.selected = []
+    batches.initial = []
+    add.name = ''
+    add.formula = ''
+    add.cas = ''
+  }
+})
+
+// Validate workspace and batch selections when collection type changes
+watch(
+  () => info.type,
+  (newType, oldType) => {
+    if (oldType && newType !== oldType) {
+      // Reset workspace if it becomes invalid for the new collection type
+      if (selected.workspace) {
+        const allowedWorkspaceTypes = getAllowedWorkspaceTypes(newType)
+        if (!allowedWorkspaceTypes.includes(selected.workspace.workspace_type)) {
+          selected.workspace = null
+        }
+      }
+
+      // Reset batch selections if they become invalid for the new collection type
+      if (batches.selected.length > 0) {
+        const allowedBatchTypes = getAllowedBatchTypes(newType)
+        batches.selected = batches.selected.filter((batch) =>
+          allowedBatchTypes.includes(batch.sample_batch_type)
+        )
+      }
+    }
+  }
+)
+
+// Load batches when workspace or collection type changes
+watchEffect(() => loadBatches(selected.workspace, info.type))
+
+// Auto-clear search when switching to manual input mode
+watchEffect(() => {
+  if (selected.source == 'input') {
+    selected.search = ''
+  }
+})
+
+// Load compounds from selected collection and update "select all" checkbox state
+watchEffect(async () => {
+  // reload compounds
+  compounds.loaded =
+    selected.collection === 'all-compounds'
+      ? app.data.target.compound.list
+      : ((await app.data.target.collection.read(selected.collection))?.target_compounds ?? [])
+  // select all checkbox state
+  selected.all.targets =
+    compounds.loaded.length > 0
+      ? compounds.loaded.every((comp) =>
+          compounds.selected
+            .map(({ target_compound_id }) => target_compound_id)
+            .includes(comp.target_compound_id)
+        )
+      : false
+})
 </script>
 
 <template>
