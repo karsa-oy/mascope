@@ -68,14 +68,14 @@ async def get_match_ion_records(
     if not data:
         return {
             "status": "success",
-            "message": f"No target ions found for {entity_type} '{entity_name}'",
+            "message": f"No match ions found for {entity_type} '{entity_name}'",
             "results": 0,
             "data": [],
         }
 
     return {
         "status": "success",
-        "message": f"Successfully retrieved target ion records for {entity_type} '{entity_name}'",
+        "message": f"Successfully retrieved match ion records for {entity_type} '{entity_name}'",
         "results": len(data),
         "data": data,
     }

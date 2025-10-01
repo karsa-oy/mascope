@@ -14,11 +14,13 @@ from mascope_backend.api.new.match.records import (
     get_match_collection_records,
     get_match_ion_records,
     get_match_isotope_records,
+    get_batch_overview_match_records,
 )
 from mascope_backend.api.new.match.records.schemas import (
     MatchRecordsQueryParams,
     MatchIonRecordsQueryParams,
     MatchIsotopeRecordsQueryParams,
+    MatchRecordsBatchOverviewQueryParams,
     MatchRecordsResponse,
 )
 
@@ -92,4 +94,30 @@ async def get_match_isotopes_records_route(
     :rtype: MatchRecordsResponse
     """
     result = await get_match_isotope_records(**query_params.model_dump())
+    return MatchRecordsResponse.model_validate(result)
+
+
+@match_records_router.get("/batch_overview", response_model=MatchRecordsResponse)
+@api_route()
+async def get_batch_overview_match_records_route(
+    query_params: MatchRecordsBatchOverviewQueryParams = Query(),
+    user: User = Depends(guest_user),
+) -> MatchRecordsResponse:
+    """
+    Retrieve batch overview records for chart visualization.
+
+    Returns flattened match records optimized for trace building.
+    Only includes valid matches (match_category > 0) for selected batch and collection.
+
+    Designed specifically for ChartBatchOverview component - minimal data,
+    pre-joined, ready for grouping by target_ion_id.
+
+    :param query_params: Query parameters including batch ID and target collection ID filter
+    :type query_params: MatchRecordsBatchOverviewQueryParams
+    :param user: Authenticated user with guest permissions
+    :type user: User
+    :return: Flattened batch overview records
+    :rtype: MatchRecordsResponse
+    """
+    result = await get_batch_overview_match_records(**query_params.model_dump())
     return MatchRecordsResponse.model_validate(result)

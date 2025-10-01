@@ -88,14 +88,14 @@ async def get_match_isotope_records(
     if not data:
         return {
             "status": "success",
-            "message": f"No target isotopes found for {entity_type} '{entity_name}'",
+            "message": f"No match isotopes found for {entity_type} '{entity_name}'",
             "results": 0,
             "data": [],
         }
 
     return {
         "status": "success",
-        "message": f"Successfully retrieved target isotope records for {entity_type} '{entity_name}'",
+        "message": f"Successfully retrieved match isotope records for {entity_type} '{entity_name}'",
         "results": len(data),
         "data": data,
     }
