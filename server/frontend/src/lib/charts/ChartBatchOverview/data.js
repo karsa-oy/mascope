@@ -66,6 +66,11 @@ export const useChartData = defineStore('chart.batch.overview', () => {
     // Guard: no samples = no chart
     if (!samples.value.length) return []
 
+    // Filter records by ionization mechanism (if filter active)
+    const filteredRecords = records.value.filter((record) =>
+      app.data.ionization.mechanism.filteredIds.includes(record.ionization_mechanism_id)
+    )
+
     const xFieldName = xField.value?.field || 'index'
 
     // Generate x-values based on selected xField
@@ -76,11 +81,11 @@ export const useChartData = defineStore('chart.batch.overview', () => {
     )
 
     // Build ion traces (one per ion) only if collection focused (batch overview match records available)
-    const ionTraces = !records.value.length
+    const ionTraces = !filteredRecords.length
       ? []
       : Object.entries(
           // Group records by target_ion_id for trace building
-          records.value.reduce((groups, record) => {
+          filteredRecords.reduce((groups, record) => {
             const ionId = record.target_ion_id
             if (!groups[ionId]) groups[ionId] = []
             groups[ionId].push(record)

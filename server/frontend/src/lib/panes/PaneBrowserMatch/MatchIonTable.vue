@@ -58,6 +58,17 @@ const breadcrumb = computed(() => {
   }
 })
 
+// --- Data & Computed ---
+const mechanismMap = computed(
+  () =>
+    new Map(
+      app.data.ionization.mechanism.list.map((m) => [
+        m.ionization_mechanism,
+        m.ionization_mechanism_id
+      ])
+    )
+)
+
 // --- State Management ---
 // expandable rows state - only one ion can be expanded at a time
 const expandedRows = ref({})
@@ -115,6 +126,17 @@ watch(
     expandedRows.value = {}
     expandedIonId.value = null
     ionContextMenu.clear()
+  }
+)
+
+// Watch mechanism focus and sync to dropdown filter
+watch(
+  () => app.data.ionization.mechanism.focused,
+  (focused) => {
+    if (!focused) {
+      // Clear dropdown when mechanism unfocused externally (chip, etc)
+      filters.value.ionization_mechanism.value = null
+    }
   }
 )
 </script>
@@ -258,36 +280,21 @@ watch(
       <!-- Ionization Mechanism Column -->
       <Column field="ionization_mechanism" header="Mechanism" sortable style="min-width: 10rem">
         <template #body="{ data }">
-          <BaseCopyableField :field="data.ionization_mechanism">
-            <Button
-              v-if="app.data.ionization.mechanism.focusedId !== data.ionization_mechanism_id"
-              v-tooltip.bottom="'Filter by mechanism'"
-              icon="pi pi-filter"
-              severity="secondary"
-              text
-              size="small"
-              @click.stop="
-                app.data.ionization.mechanism.focus({
-                  ionization_mechanism_id: data.ionization_mechanism_id
-                })
-              "
-            />
-            <Button
-              v-else
-              v-tooltip.bottom="'Clear mechanism filter'"
-              icon="pi pi-filter"
-              severity="info"
-              text
-              size="small"
-              class="active-filter"
-              @click.stop="app.data.ionization.mechanism.unfocus()"
-            />
-          </BaseCopyableField>
+          <BaseCopyableField :field="data.ionization_mechanism"> </BaseCopyableField>
         </template>
         <template #filter="{ filterModel, filterCallback }">
           <Select
             v-model="filterModel.value"
-            @change="filterCallback()"
+            @change="
+              (e) => {
+                filterCallback()
+                e.value
+                  ? app.data.ionization.mechanism.focus({
+                      ionization_mechanism_id: mechanismMap.get(e.value)
+                    })
+                  : app.data.ionization.mechanism.unfocus()
+              }
+            "
             :options="filterOptions.mechanisms"
             placeholder="Any mechanism"
             size="small"
@@ -312,12 +319,6 @@ watch(
 </template>
 
 <style scoped>
-.active-filter {
-  visibility: visible !important;
-  color: var(--p-button-text-info-color);
-  opacity: 0.7;
-}
-
 /* Disable hover effects on expansion content */
 :deep(.p-datatable-row-expansion) {
   background-color: var(--p-datatable-row-background) !important;

@@ -53,6 +53,7 @@ async def get_batch_overview_match_records(
             select(
                 Sample.sample_item_id,
                 TargetIon.target_ion_id,
+                TargetIon.ionization_mechanism_id,
                 TargetIon.target_ion_formula,
                 TargetCompound.target_compound_name,
                 TargetCompound.target_compound_formula,
@@ -111,10 +112,11 @@ async def get_batch_overview_match_records(
         # Build flat records optimized for frontend trace grouping
         data = [
             {
-                # Identifiers (for mapping and focusing)
+                # Identifiers (for mapping/focusing/filtering)
                 "sample_item_id": row.sample_item_id,
                 "target_ion_id": row.target_ion_id,
                 "match_ion_id": row.match_ion_id,
+                "ionization_mechanism_id": row.ionization_mechanism_id,
                 # Display data (for trace building)
                 "target_ion_formula": row.target_ion_formula,
                 "target_compound_name": row.target_compound_name,
