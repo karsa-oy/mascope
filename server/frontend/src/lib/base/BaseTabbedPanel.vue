@@ -1,11 +1,11 @@
 <script setup>
+import { ref, watch, onUnmounted } from 'vue'
 import Panel from 'primevue/panel'
 import Button from 'primevue/button'
 import ProgressSpinner from 'primevue/progressspinner'
 
 import { BaseStatusIcon } from '@/lib/base'
-
-defineProps({
+const props = defineProps({
   label: {
     type: String,
     required: true
@@ -34,6 +34,39 @@ defineProps({
   status: {
     type: Object,
     required: false
+  }
+})
+
+// Debounced loading state
+const showSpinner = ref(false)
+let loadingTimeout = null
+
+// Watch for loading prop changes and debounce the spinner
+watch(
+  () => props.loading,
+  (newLoading) => {
+    if (loadingTimeout) {
+      clearTimeout(loadingTimeout)
+      loadingTimeout = null
+    }
+
+    if (newLoading) {
+      // Show spinner after 300ms of loading
+      loadingTimeout = setTimeout(() => {
+        showSpinner.value = true
+      }, 300)
+    } else {
+      // Hide spinner immediately when loading stops
+      showSpinner.value = false
+    }
+  },
+  { immediate: true }
+)
+
+// Cleanup timeout on unmount
+onUnmounted(() => {
+  if (loadingTimeout) {
+    clearTimeout(loadingTimeout)
   }
 })
 </script>
@@ -73,10 +106,15 @@ defineProps({
     <template #icons>
       <slot name="menu"></slot>
     </template>
-    <slot v-if="!loading"></slot>
-    <div v-else class="spinner">
-      <div><ProgressSpinner strokeWidth="5px" />loading...</div>
+    <div v-if="showSpinner" class="spinner">
+      <div>
+        <ProgressSpinner strokeWidth="5px" />
+        <span>loading...</span>
+      </div>
     </div>
+    <template v-else>
+      <slot></slot>
+    </template>
   </Panel>
 </template>
 
