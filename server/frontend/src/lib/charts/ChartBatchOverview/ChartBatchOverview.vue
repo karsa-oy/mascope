@@ -3,7 +3,6 @@ import { ref, computed, watch, toRaw } from 'vue'
 
 import Select from 'primevue/select'
 import FloatLabel from 'primevue/floatlabel'
-import Chip from 'primevue/chip'
 
 import { useApp } from '@/stores'
 import { ToolbarIntensityScale } from '@/lib/toolbars'
@@ -33,8 +32,12 @@ const unit = computed(() =>
   scale.value.mode == 'average' ? '[cps]' : '[counts]'
 )
 
+/**
+ * Scale traces based on average/sum mode
+ */
 const traces = computed(() => {
-  // Scale trace y-values based on "sum / average" toggle
+  if (!data.traces.length) return []
+
   // Collect sample lengths into an object {[sample_item_id]: sample.length}
   const sampleLengths = app.data.sample.list.reduce(
     (o, sample) => ({ ...o, [sample.sample_item_id]: sample.length }),
@@ -66,11 +69,17 @@ const xAxis = computed(() => ({
 
 const dragmode = ref('zoom')
 
+const zoom = {
+  rangeX: null,
+  rangeY: null
+}
+
 const layout = computed(() => {
   const scaleRangeY =
     scale.value.max && scale.value.max > 0
       ? { range: [0, scale.value.max], autorange: false }
       : null
+
   const autorange = { range: null, autorange: true }
   const yRange = scaleRangeY
     ? { ...scaleRangeY, autorange: false }
@@ -78,6 +87,7 @@ const layout = computed(() => {
       ? { ...zoom.rangeY, autorange: false }
       : autorange
   const xRange = zoom.rangeX ? { ...zoom.rangeX, autorange: false } : autorange
+
   return {
     xaxis: {
       title: { text: data.xField?.label },
@@ -107,89 +117,65 @@ const layout = computed(() => {
   }
 })
 
-const zoom = {
-  rangeX: null,
-  rangeY: null
-}
-
+/**
+ * Handle click on chart point - focus sample and ion directly
+ */
 function onClick({ pointIndex, curveNumber }) {
   if (pointIndex == null || curveNumber == null) return
-  // Select sample corresponding to the clicked data point
+
+  // Focus sample corresponding to the clicked data point
   const sample = app.data.sample.list[pointIndex]
-
-  watch(
-    () => app.data.match.ion.list,
-    (list) => {
-      // Focus on the corresponding compound/ion using the trace index
-      const trace = data.traces[curveNumber]
-      // Guard for matchData availability
-      if (!trace.matchData) {
-        return
-      }
-      const { level, match_key } = trace.matchData
-      if (level && level === 'compound') {
-        app.data.match.compound.focus({ match_key })
-      } else if (level && level === 'ion') {
-        app.data.match.ion.focus({ match_key })
-      }
-    },
-    { once: true }
-  )
-
   if (sample) {
     app.data.sample.focus(sample)
   } else {
     app.data.sample.unfocus()
   }
+
+  // Focus on the corresponding ion using the trace index
+  const trace = data.traces[curveNumber]
+  if (!trace?.matchData) return
+
+  const { target_ion_id } = trace.matchData
+
+  // Focus in match.ion store by target_ion_id
+  if (target_ion_id) {
+    app.data.match.ion.focus({ target_ion_id })
+  }
 }
 
+/**
+ * Handle selection on chart - update sample selection
+ */
 function onSelect({ points }) {
   const samples = points.map((i) => app.data.sample.list[i])
   app.data.sample.selected = samples
 }
 
-// Update chart selection when sample selection changes
+/**
+ * Sync chart selection with sample selection
+ */
 watch(
   () => app.data.sample.selected,
   (selected) => {
+    if (!plot.value) return
+
     if (selected.length <= 0) {
       plot.value.resetSelection()
     } else {
       // Select samples in the chart
       const pointIndices = selected.map((sample) => app.data.sample.list.indexOf(sample))
-      plot.value.selectPoints(pointIndices)
+      plot.value?.selectPoints(pointIndices)
     }
   }
 )
-
-const anyFilters = computed(() => app.ui.filter.mechanism)
 </script>
 
 <template>
   <figure style="height: calc(100vh - 200px)">
-    <div
-      class="row"
-      :style="`
-        justify-content: flex-start;
-        width: calc(${app.ui.split.right}vw - 3rem);
-        position: fixed;
-        top: 10rem;
-        z-index: 100
-      `"
-    >
-      <span v-if="anyFilters" class="pi pi-filter" style="opacity: 0.5" />
-      <Chip
-        v-if="app.ui.filter.mechanism"
-        icon="pi pi-cog"
-        :label="app.ui.filter.mechanism.ionization_mechanism"
-        removable
-        @remove="app.ui.filter.mechanism = null"
-      />
-    </div>
     <BaseChartPlotly
       id="ChartSampleIntensity"
+      ref="plot"
       :title="chartTitle"
-      :ref="(el) => (plot = el)"
       :data="traces"
       :layout="layout"
       @click="onClick"
@@ -211,7 +197,7 @@ const anyFilters = computed(() => app.ui.filter.mechanism)
         <div style="height: 0.5rem" />
         <FloatLabel>
           <Select
-            v-model:modelValue="data.xField"
+            v-model="data.xField"
             :options="data.xFields"
             optionLabel="label"
             dataKey="field"
