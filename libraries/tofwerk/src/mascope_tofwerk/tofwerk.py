@@ -415,10 +415,17 @@ def get_peak_profiles(
         # Get signal HDF5 dataset reference
         signal_ref = h5_file["FullSpectra"]["TofData"]
 
+        # Get and calibrate m/z scale
+        all_mzs = h5_file["FullSpectra"]["MassAxis"][:]
+        proper_mz_indices = np.where(all_mzs >= DEFAULT_NONSENSE_MZ)[0]
+        all_mzs[proper_mz_indices] = np.interp(
+            all_mzs[proper_mz_indices], true_mz_axis, true_mz_axis
+        )
+
         # Find indices of m/z range
-        mz_start_ind = np.abs(true_mz_axis - mzs.min()).argmin() - 1
-        mz_end_ind = np.abs(true_mz_axis - mzs.max()).argmin() + 1
-        true_mz_slice = true_mz_axis[mz_start_ind : mz_end_ind + 1]
+        mz_start_ind = np.abs(all_mzs - mzs.min()).argmin() - 1
+        mz_end_ind = np.abs(all_mzs - mzs.max()).argmin() + 1
+        mz_slice = all_mzs[mz_start_ind : mz_end_ind + 1]
 
         # Initialize output array
         peak_profiles = np.zeros((len(mzs), len(scan_time)))
@@ -436,7 +443,7 @@ def get_peak_profiles(
 
             spec_segment *= conv_coeff
             peak_profiles[:, j] = np.interp(
-                mzs, true_mz_slice, spec_segment, left=0.0, right=0.0
+                mzs, mz_slice, spec_segment, left=0.0, right=0.0
             )
 
         # Convert to dask array
