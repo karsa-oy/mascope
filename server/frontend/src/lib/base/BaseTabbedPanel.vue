@@ -4,19 +4,25 @@ import Panel from 'primevue/panel'
 import Button from 'primevue/button'
 import ProgressSpinner from 'primevue/progressspinner'
 
-import { BaseStatusIcon } from '@/lib/base'
+import { BaseBreadcrumb, BaseStatusIcon } from '@/lib/base'
+
 const props = defineProps({
   label: {
     type: String,
-    required: true
+    required: false
   },
   icon: {
     type: String,
-    required: true
+    required: false
   },
   clear: {
     type: Function,
     required: false
+  },
+  backLabel: {
+    type: String,
+    required: false,
+    default: 'Back'
   },
   loading: {
     type: Boolean,
@@ -34,6 +40,13 @@ const props = defineProps({
   status: {
     type: Object,
     required: false
+  },
+  // Breadcrumb configuration: { items: [...] }
+  // Each item: { icon, label?, action?, tooltip?, contextMenu? }
+  breadcrumb: {
+    type: Object,
+    required: false,
+    default: null
   }
 })
 
@@ -83,10 +96,14 @@ onUnmounted(() => {
     :pt="pt"
   >
     <template #header>
-      <div class="label">
+      <!-- Breadcrumb navigation (when provided) -->
+      <BaseBreadcrumb v-if="breadcrumb" :items="breadcrumb.items" />
+
+      <!-- Traditional label (when no breadcrumb) -->
+      <div v-else-if="label" class="label">
         <Button
           v-if="clear"
-          v-tooltip.right="'Back to workspace'"
+          v-tooltip.right="backLabel"
           icon="pi ph ph-caret-left"
           @click="clear()"
           text
@@ -94,7 +111,8 @@ onUnmounted(() => {
           size="small"
           class="back-button"
         />
-        <span :class="icon" />{{ label }}
+        <span v-if="icon" :class="icon" />
+        {{ label }}
         <BaseStatusIcon
           v-if="status"
           :status="status.status"

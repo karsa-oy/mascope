@@ -1,33 +1,68 @@
 <script setup>
-import { ref, reactive, inject, computed, watch } from 'vue'
+import { ref, inject, computed, watch } from 'vue'
 
 import Button from 'primevue/button'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
-import ContextMenu from 'primevue/contextmenu'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import MultiSelect from 'primevue/multiselect'
 import { FilterMatchMode } from '@primevue/core/api'
-import { useConfirm } from 'primevue/useconfirm'
 
 import { BaseTabbedPanel, BaseMatchTag, BaseCopyableField } from '@/lib/base'
-import { PopoverTargetCompoundAdd, DialogTargetCompoundUpdate } from '@/lib/dialogs'
+import { PopoverTargetCompoundAdd } from '@/lib/dialogs'
 import MatchIsotopeTable from './MatchIsotopeTable.vue'
 import { num } from '@/lib/formatters'
+import { collectionTypeIcons } from '@/lib/constants'
 
 import { useApp } from '@/stores'
+import { useCollectionContextMenu, useIonContextMenu } from './stores'
+import MatchCollectionContextMenu from './MatchCollectionContextMenu.vue'
+import MatchIonContextMenu from './MatchIonContextMenu.vue'
 
-const confirm = useConfirm()
 const app = useApp()
+const collectionContextMenu = useCollectionContextMenu()
+const ionContextMenu = useIonContextMenu()
+
+// --- Breadcrumb Navigation ---
+const breadcrumb = computed(() => {
+  const collection = app.data.match.collection.focused
+  if (!collection) return null
+
+  return {
+    items: [
+      {
+        icon: 'pi ph ph-crosshair',
+        label: 'Target Collections',
+        action: () => app.data.match.collection.unfocus(),
+        tooltip: 'Back to target collections'
+        // No context menu on this level
+      },
+      {
+        icon: collectionTypeIcons[collection.target_collection_type] || 'pi ph ph-target',
+        label: `${collection.target_collection_name}`,
+        tooltip: collection.target_collection_description
+          ? `${collection.target_collection_description} (${collection.target_collection_type?.toLowerCase()})`
+          : collection.target_collection_type?.toLowerCase() || 'Collection targets',
+        contextMenu: {
+          items: collectionContextMenu.entries.value
+        },
+        contextMenuHandler: (event) => {
+          // Manually trigger collection context menu from breadcrumb
+          collectionContextMenu.selection = collection
+          collectionContextMenu.ref?.toggle(event)
+        }
+        // No action = current view
+      }
+    ]
+  }
+})
 
 // --- State Management ---
 // expandable rows state - only one ion can be expanded at a time
 const expandedRows = ref({})
 const expandedIonId = ref(null)
 const showExpanders = ref(true)
-const contextMenuRef = ref()
-const dialog = reactive({ compound: false })
 
 // --- Filtering ---
 // Filters configuration for each column
@@ -47,72 +82,6 @@ const filterOptions = computed(() => ({
     ...new Set(app.data.match.ion.list.map((ion) => ion.ionization_mechanism).filter(Boolean))
   ]
 }))
-
-// --- Context menu configuration for ion/compound management ---
-const contextRecord = ref(null) // Holds the match ion data for the context menu
-
-const compoundLabel = computed(
-  () =>
-    contextRecord.value?.target_compound_name ||
-    contextRecord.value?.target_compound_formula ||
-    'Unknown Compound'
-)
-
-const contextMenuItems = computed(() => {
-  if (!contextRecord.value) return []
-
-  const record = contextRecord.value
-  const collection = app.data.target.collection.detailed
-
-  return [
-    {
-      label: `Edit compound '${compoundLabel.value}'`,
-      icon: 'pi pi-pen-to-square',
-      command: () => {
-        dialog.compound = true
-      }
-    },
-    {
-      label: `Remove '${compoundLabel.value}' from '${collection.target_collection_name}'`,
-      icon: 'pi pi-minus',
-      command: () => removeCompoundFromCollection(record, collection),
-      disabled: !collection
-    }
-  ]
-})
-
-const removeCompoundFromCollection = (ionRecord, collection) => {
-  if (!collection || !ionRecord) return
-  const batchCount = collection?.sample_batches_count ?? 0
-
-  confirm.require({
-    icon: 'pi pi-exclamation-triangle',
-    header: `Remove target compound '${compoundLabel.value}'`,
-    message: `Are you sure you want to remove compound '${compoundLabel.value}' from target collection 
-    '${collection.target_collection_name}' used in ${batchCount} batches? This will require rematching the affected batches.`,
-    accept: () => {
-      const remainingCompoundIds = [
-        ...new Set(
-          app.data.match.ion.list
-            .filter(
-              (ion) =>
-                ion.target_collection_id === collection.target_collection_id &&
-                ion.target_compound_id !== ionRecord.target_compound_id
-            )
-            .map((ion) => ion.target_compound_id)
-        )
-      ]
-      app.data.target.collection.update({
-        target_collection_id: collection.target_collection_id,
-        target_collection_name: collection.target_collection_name,
-        target_collection_type: collection.target_collection_type,
-        target_compound_ids: remainingCompoundIds
-      })
-    },
-    acceptProps: { icon: 'pi pi-minus', label: 'Remove' },
-    rejectProps: { label: 'Cancel', severity: 'secondary' }
-  })
-}
 
 // --- Row Expansion for match isotopes level ---
 const onRowExpand = (event) => {
@@ -145,16 +114,14 @@ watch(
   () => {
     expandedRows.value = {}
     expandedIonId.value = null
-    contextRecord.value = null
+    ionContextMenu.clear()
   }
 )
 </script>
 
 <template>
   <BaseTabbedPanel
-    label="Target Ions"
-    icon="pi pi-bullseye"
-    :clear="app.data.match.collection.unfocus"
+    :breadcrumb="breadcrumb"
     :loading="app.data.match.ion.pending"
     :pt="
       app.ui.help.right(
@@ -186,8 +153,14 @@ watch(
       selectionMode="single"
       :metaKeySelection="false"
       contextMenu
-      v-model:contextMenuSelection="contextRecord"
-      @rowContextmenu="(event) => contextMenuRef.show(event.originalEvent)"
+      v-model:contextMenuSelection="ionContextMenu.selection"
+      @rowContextmenu="
+        async (event) => {
+          event.originalEvent.stopPropagation()
+          event.originalEvent.preventDefault()
+          await ionContextMenu.onClick(event)
+        }
+      "
       @rowExpand="onRowExpand"
       @rowCollapse="onRowCollapse"
       filterDisplay="row"
@@ -208,14 +181,6 @@ watch(
       <Column sortable sortField="match.match_score" class="match-column">
         <template #header> <span class="pi pi-verified" /> </template>
         <template #body="{ data }">
-          <BaseMatchTag
-            :row="data"
-            :tooltip="
-              data.match?.sample_peak_intensity_sum
-                ? `Peak intensity: ${num.peakIntensity.format(data.match.sample_peak_intensity_sum)} (cps)`
-                : 'No match data'
-            "
-          />
           <BaseMatchTag
             :match-score="data.match?.match_score"
             :match-category="data.match?.match_category"
@@ -340,11 +305,10 @@ watch(
         />
       </template>
     </DataTable>
-
-    <ContextMenu ref="contextMenuRef" :model="contextMenuItems" />
   </BaseTabbedPanel>
 
-  <DialogTargetCompoundUpdate v-model:visible="dialog.compound" :compound="contextRecord" />
+  <MatchCollectionContextMenu />
+  <MatchIonContextMenu />
 </template>
 
 <style scoped>

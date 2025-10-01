@@ -1,3 +1,4 @@
+export { default as BaseBreadcrumb } from './BaseBreadcrumb.vue'
 export { default as BaseClipboardContext } from './BaseClipboardContext.vue'
 export { default as BaseCopyableField } from './BaseCopyableField.vue'
 export { default as BaseEditableField } from './BaseEditableField.vue'

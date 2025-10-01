@@ -2,6 +2,12 @@ export const alarmsList = ['TARGETS']
 
 export const collectionTypes = ['TARGETS', 'DIAGNOSTICS', 'CALIBRANTS']
 
+export const collectionTypeIcons = {
+  TARGETS: 'pi ph ph-target',
+  DIAGNOSTICS: 'pi ph ph-stethoscope',
+  CALIBRANTS: 'pi ph ph-scales'
+}
+
 export const batchTypes = ['ACQUISITION', 'ANALYSIS']
 export const DEFAULT_SAMPLE_BATCH_TYPE = 'ANALYSIS' // TODO should read from api configs DEFAULT_SAMPLE_BATCH_TYPE?
 export const ACQUISITION_POLARITY = ['+', '-']

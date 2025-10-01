@@ -1,65 +1,42 @@
 <script setup>
-import { ref, reactive, inject } from 'vue'
+import { inject, computed, watch } from 'vue'
 
 import Button from 'primevue/button'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
-import ContextMenu from 'primevue/contextmenu'
 
 import { BaseTabbedPanel, BaseMatchTag, BaseCopyableField } from '@/lib/base'
-import { DialogTargetCollectionOp } from '@/lib/dialogs'
 import { num } from '@/lib/formatters'
+import { collectionTypeIcons } from '@/lib/constants'
 
 import { useApp } from '@/stores'
+import { useCollectionContextMenu } from './stores'
+import MatchCollectionContextMenu from './MatchCollectionContextMenu.vue'
 
 const app = useApp()
-
-const context = reactive({
-  record: null,
-  menuItems: [
-    {
-      label: 'Edit collection',
-      icon: 'pi pi-pen-to-square',
-      command: () => {
-        dialog.collection = 'update'
-      }
-    },
-    {
-      label: 'Edit batches',
-      icon: 'pi pi-pen-to-square',
-      command: () => {
-        dialog.collection = 'update_batches'
-      }
-    },
-    {
-      label: 'Delete collection',
-      icon: 'pi pi-trash',
-      command: () => {
-        dialog.collection = 'delete'
-      }
-    }
-  ]
-})
-const contextMenuRef = ref()
-
-const dialog = reactive({
-  collection: null
-})
+const contextMenu = useCollectionContextMenu()
 
 const tableHeight = inject('match-table-height')
 
-const icon = {
-  TARGETS: 'pi ph ph-target',
-  DIAGNOSTICS: 'pi ph ph-stethoscope',
-  CALIBRANTS: 'pi ph ph-scales'
-}
+// Breadcrumb configuration - simple single level
+const breadcrumb = computed(() => ({
+  items: [
+    {
+      icon: 'pi ph ph-crosshair',
+      label: 'Target Collections',
+      disabled: true,
+      tooltip: null
+      // No action - this is the current view
+    }
+  ]
+}))
 </script>
 
-<template v-if="collections">
+<template>
   <BaseTabbedPanel
-    label="Target Collections"
-    icon="pi ph ph-crosshair"
+    :breadcrumb="breadcrumb"
     :loading="app.data.match.collection.pending"
+    :contextMenu="contextMenu"
     :pt="
       app.ui.help.right(`
         <h1>Target Browser</h1>
@@ -81,11 +58,7 @@ const icon = {
         icon="pi pi-plus"
         text
         size="small"
-        @click="
-          () => {
-            dialog.collection = 'create'
-          }
-        "
+        @click="contextMenu.dialog.op = 'create'"
       />
     </template>
     <DataTable
@@ -95,13 +68,12 @@ const icon = {
       selectionMode="single"
       :metaKeySelection="false"
       contextMenu
-      v-model:contextMenuSelection="context.record"
+      v-model:contextMenuSelection="contextMenu.selection"
       @rowContextmenu="
         async (event) => {
-          context.record = event.data
-          // Load detailed data for context menu operations without focusing
-          await app.data.target.collection.loadDetailed(event.data.target_collection_id)
-          contextMenuRef.show(event.originalEvent)
+          event.originalEvent.stopPropagation()
+          event.originalEvent.preventDefault()
+          await contextMenu.onClick(event)
         }
       "
       resizableColumns
@@ -133,7 +105,7 @@ const icon = {
         <template #body="{ data }">
           <div :id="data.target_collection_id" class="row" style="justify-content: flex-start">
             <span
-              :class="icon[data.target_collection_type]"
+              :class="collectionTypeIcons[data.target_collection_type]"
               v-tooltip.top="data.target_collection_type.toLowerCase()"
               style="margin-right: 0.5rem"
             />
@@ -142,9 +114,8 @@ const icon = {
         </template>
       </Column>
     </DataTable>
-    <ContextMenu ref="contextMenuRef" :model="context.menuItems" />
   </BaseTabbedPanel>
-  <DialogTargetCollectionOp v-model:action="dialog.collection" :collection="context.record" />
+  <MatchCollectionContextMenu />
 </template>
 
 <style scoped>
