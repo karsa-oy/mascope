@@ -29,36 +29,97 @@ def rule_element_ratio(
     )
     non_carbon_element_ratio_range = params.get("non_carbon_element_ratio_range", {})
 
-    formulas = candidates.get_column("formula").to_list()
-    counts_list = [ParseFormula(f) for f in formulas]
-    counts = pl.DataFrame(counts_list)
-    if "C" in counts.columns:
-        has_carbon = counts.get_column("C") > 0
-    else:
-        has_carbon = pl.Series([False] * counts.height)
+    # Early return if no candidates
+    if candidates.is_empty():
+        return pl.Series([], dtype=pl.Boolean), log_messages
 
-    def apply_ratio_rules(ratio_range, mask_condition):
-        mask = pl.Series([True] * counts.height)
+    formulas = candidates.get_column("formula").to_list()
+
+    # Parse all formulas once and convert to a structured format
+    counts_list = [ParseFormula(f) for f in formulas]
+
+    # Get all unique elements across all formulas
+    all_elements = set()
+    for counts in counts_list:
+        all_elements.update(counts.keys())
+    all_elements = sorted(all_elements)
+
+    # Create a matrix where rows are formulas and columns are elements
+    n_formulas = len(counts_list)
+    n_elements = len(all_elements)
+    element_matrix = np.zeros((n_formulas, n_elements), dtype=np.int32)
+
+    # Fill the matrix
+    element_to_idx = {elem: idx for idx, elem in enumerate(all_elements)}
+    for i, counts in enumerate(counts_list):
+        for elem, count in counts.items():
+            element_matrix[i, element_to_idx[elem]] = count
+
+    # Determine which formulas have carbon
+    carbon_idx = element_to_idx.get("C")
+    has_carbon = carbon_idx is not None and element_matrix[:, carbon_idx] > 0
+
+    # Initialize mask - all True initially
+    final_mask = np.ones(n_formulas, dtype=bool)
+
+    def apply_ratio_rules_vectorized(ratio_range, apply_to_mask):
+        """Apply ratio rules using vectorized operations"""
+        if not ratio_range or not np.any(apply_to_mask):
+            return np.ones(n_formulas, dtype=bool)
+
+        rule_mask = np.ones(n_formulas, dtype=bool)
+
         for ratio, (min_val, max_val) in ratio_range.items():
             num, denom = ratio.split("/")
-            if num not in counts.columns or denom not in counts.columns:
+
+            # Get indices for numerator and denominator elements
+            num_idx = element_to_idx.get(num)
+            denom_idx = element_to_idx.get(denom)
+
+            if num_idx is None or denom_idx is None:
                 continue
-            numerator = counts[num]
-            denominator = counts[denom]
-            ratio_val = numerator / denominator
-            ratio_val = ratio_val.fill_nan(float("nan"))
-            rule_mask = (ratio_val >= min_val) & (ratio_val <= max_val)
-            mask = mask & (mask_condition | rule_mask)
-        return mask
 
-    # Apply carbon ratios where C > 0
-    mask_carbon = apply_ratio_rules(carbon_element_ratio_range, ~has_carbon)
-    # Apply non-carbon ratios where C == 0
-    mask_non_carbon = apply_ratio_rules(non_carbon_element_ratio_range, has_carbon)
-    # Combine both masks
-    element_ratio_mask = mask_carbon & mask_non_carbon
+            # Get counts for numerator and denominator
+            num_counts = element_matrix[:, num_idx]
+            denom_counts = element_matrix[:, denom_idx]
 
-    return element_ratio_mask, log_messages
+            # Only apply rule where both elements exist and denominator > 0
+            has_both_elements = (num_counts > 0) & (denom_counts > 0)
+            applicable_mask = apply_to_mask & has_both_elements
+
+            if not np.any(applicable_mask):
+                continue
+
+            # Calculate ratios only where applicable (avoid division by zero)
+            ratios = np.full(n_formulas, np.inf)
+            ratios[applicable_mask] = (
+                num_counts[applicable_mask] / denom_counts[applicable_mask]
+            )
+
+            # Check if ratios are within bounds
+            ratio_valid = (ratios >= min_val) & (ratios <= max_val)
+
+            # Update rule mask: pass if not applicable OR ratio is valid
+            rule_mask &= np.logical_not(applicable_mask) | ratio_valid
+
+        return rule_mask
+
+    # Apply carbon-specific ratios to formulas with carbon
+    if np.any(has_carbon) and carbon_element_ratio_range:
+        carbon_mask = apply_ratio_rules_vectorized(
+            carbon_element_ratio_range, has_carbon
+        )
+        final_mask &= carbon_mask
+
+    # Apply non-carbon ratios to formulas without carbon
+    no_carbon = np.logical_not(has_carbon)
+    if np.any(no_carbon) and non_carbon_element_ratio_range:
+        non_carbon_mask = apply_ratio_rules_vectorized(
+            non_carbon_element_ratio_range, no_carbon
+        )
+        final_mask &= non_carbon_mask
+
+    return pl.Series(final_mask), log_messages
 
 
 def rule_valence(candidates: pl.DataFrame, **kwargs) -> tuple[pl.Series, list[str]]:
