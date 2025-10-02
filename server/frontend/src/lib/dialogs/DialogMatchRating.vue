@@ -237,7 +237,7 @@ const peak = new Intl.NumberFormat('en-US', {
             <DataTable
               :value="isotopes"
               dataKey="target_isotope_id"
-              sortField="match_score"
+              sortField="match.match_score"
               :sortOrder="-1"
               scrollable
               scrollHeight="300px"

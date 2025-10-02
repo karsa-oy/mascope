@@ -112,10 +112,8 @@ export const useSample = defineStore('app.data.sample', () => {
     },
     match: ({ sample_item_id }) =>
       api.http.post(
-        `/match/compute/sample/${sampleId}`,
-        {
-          sampleId: sample_item_id
-        },
+        `/match/compute/sample/${sample_item_id}`,
+        {},
         {
           use: 'process',
           type: 'compute_match_sample'

@@ -255,7 +255,7 @@ const expanded = ref({})
         v-if="!loading && results.length > 0"
         :value="results"
         dataKey="target_compound_formula"
-        sortField="match_score"
+        sortField="match.match_score"
         :sortOrder="-1"
         scrollable
         :scrollHeight="`${height - 100}px`"

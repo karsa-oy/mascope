@@ -191,7 +191,7 @@ watch(
       scrollable
       :scrollHeight="`${tableHeight}px`"
       :virtualScrollerOptions="{ itemSize: 35.74 }"
-      sortField="match_score"
+      sortField="match.match_score"
       :sortOrder="-1"
     >
       <template #empty>No match ions found.</template>
