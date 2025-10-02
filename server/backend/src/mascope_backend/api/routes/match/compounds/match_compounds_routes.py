@@ -10,7 +10,7 @@ from mascope_backend.api.controllers.match.compounds.match_compounds_controller 
 from mascope_backend.api.models.match.compounds.match_compound_pydantic_model import (
     MatchCompoundBase,
     GetMatchCompoundsQueryParams,
-    DeleteMatchCompounsPayload,
+    DeleteMatchCompoundsPayload,
 )
 from mascope_backend.api.new.auth.dependencies import editor_user, guest_user
 
@@ -78,13 +78,13 @@ async def create_match_compounds_route(
 @match_compounds_router.delete("")
 @api_route()
 async def delete_match_compounds_route(
-    body: DeleteMatchCompounsPayload,
+    body: DeleteMatchCompoundsPayload,
     user=Depends(editor_user),
 ):
     """Delete specific match compounds based on sample item or batch.
 
     :param body: Data payload specifying sample item, batch, and compound IDs.
-    :type body: DeleteMatchCompounsPayload
+    :type body: DeleteMatchCompoundsPayload
     :param user: The current authenticated user with editor permissions.
     :type user: User
     :return: A dictionary confirming the deletion outcome.

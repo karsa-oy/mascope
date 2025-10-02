@@ -53,7 +53,7 @@ class GetMatchCompoundsQueryParams(QueryParamsModel):
     limit: int | None = Field(None, description="The number of results per page.")
 
 
-class DeleteMatchCompounsPayload(FilterSamplePayload):
+class DeleteMatchCompoundsPayload(FilterSamplePayload):
     target_compound_ids: Optional[List[str]] = Field(
         None,
         description="Optional list of target compound IDs to limit the match compounds being deleted.",
