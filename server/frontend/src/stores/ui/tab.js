@@ -18,7 +18,7 @@ export const useTab = defineStore('app.ui.tab', () => {
       if (visualized && active.value !== 'spectrum') {
         active.value = 'match'
       } else {
-        if (active.value == 'match') {
+        if (active.value === 'match') {
           active.value = data.batch.focused ? 'batch' : DEFAULT_TAB
         }
       }
@@ -29,7 +29,7 @@ export const useTab = defineStore('app.ui.tab', () => {
   watch(
     () => data.sample.focused,
     (sample) => {
-      if (!sample && active.value == 'spectrum') {
+      if (!sample && active.value === 'spectrum') {
         active.value = 'batch'
       }
     }

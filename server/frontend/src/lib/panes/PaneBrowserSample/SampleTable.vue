@@ -1,11 +1,10 @@
 <script setup>
-import { computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 
 import { useWindowSize } from '@vueuse/core'
 
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
-import { useConfirm } from 'primevue/useconfirm'
 
 import { BaseTabbedPanel, BaseMatchTag, BaseCopyableField } from '@/lib/base'
 import { DialogSampleOp, DialogCalibration } from '@/lib/dialogs'
@@ -17,8 +16,9 @@ import SampleTableCustomizer from './SampleTableCustomizer.vue'
 import SampleContextMenu from './SampleContextMenu.vue'
 import { useSampleContextMenu, useCustomizerPopover, useBatchStatus } from './stores'
 
-const confirm = useConfirm()
 const app = useApp()
+// Ref to access DataTable for programmatic scrolling
+const sampleTable = ref(null)
 
 const customizer = useCustomizerPopover()
 const contextMenu = useSampleContextMenu()
@@ -41,33 +41,84 @@ const batchStatus = computed(() => {
   }
 })
 
-const formatter = new Intl.NumberFormat('en-US', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2
-})
-
 /**
- * Utility function to allow scrolling to samples in the watchers below
- *
- * A lock prevents race conditions, especially if later other watchers are added.
+ * Scroll to sample in virtual scroller only if not already visible.
+ * Checks visibility within the DataTable's scroll container, not window.
  */
-let lock = false
-function scrollTo(sampleId) {
-  if (!lock && sampleId) {
-    lock = true
+let scrollLock = false
+async function scrollToSample(sampleId) {
+  if (!scrollLock && sampleId && sampleTable.value) {
+    scrollLock = true
+
+    await nextTick()
+
+    const scrollContainer = sampleTable.value.$el.querySelector('.p-virtualscroller')
+
+    if (!scrollContainer) {
+      scrollLock = false
+      return
+    }
+
+    // Check if element already exists and is visible in scroll container
+    const existingElement = document.getElementById(sampleId)
+    if (existingElement) {
+      const containerRect = scrollContainer.getBoundingClientRect()
+      const elementRect = existingElement.getBoundingClientRect()
+
+      // Check if element is within the scroll container's visible area
+      const isVisible =
+        elementRect.top >= containerRect.top && elementRect.bottom <= containerRect.bottom
+
+      if (isVisible) {
+        // Already visible in container, no scroll needed
+        scrollLock = false
+        return
+      }
+    }
+
+    const sampleIndex = samples.value.findIndex((s) => s.sample_item_id === sampleId)
+
+    if (sampleIndex === -1) {
+      scrollLock = false
+      return
+    }
+
+    const itemSize = 35.74
+    const scrollTop = sampleIndex * itemSize
+
+    // Scroll container to render the row
+    scrollContainer.scrollTop = scrollTop
+
+    // Wait for render, then scroll into view using nearest edge
     setTimeout(() => {
-      document.getElementById(sampleId)?.scrollIntoViewIfNeeded()
-      lock = false
-    }, 1000)
+      const element = document.getElementById(sampleId)
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+      }
+      scrollLock = false
+    }, 100)
   }
 }
 
 watch(
-  () => app.data.sample.focusedId,
-  (sampleId, oldSampleId) => {
-    if (sampleId !== oldSampleId) {
-      scrollTo(sampleId)
+  () => app.data.sample.selectedIds,
+  (newSelection) => {
+    if (!newSelection) return
+    let targetSampleId = null
+    if (newSelection.length === 1) {
+      targetSampleId = app.data.sample.focusedId
     }
+    if (newSelection.length > 1) {
+      const selectedIndices = app.data.sample.selectedIds
+        .map((id) => samples.value.findIndex((s) => s.sample_item_id === id))
+        .filter((idx) => idx !== -1)
+
+      if (selectedIndices.length > 0) {
+        const firstIndex = Math.min(...selectedIndices)
+        targetSampleId = samples.value[firstIndex].sample_item_id
+      }
+    }
+    scrollToSample(targetSampleId)
   }
 )
 
@@ -102,6 +153,7 @@ const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top)
       <SampleTableCustomizer />
     </template>
     <DataTable
+      ref="sampleTable"
       v-if="samples.length > 0 && app.data.batch.focused"
       :value="samples"
       dataKey="sample_item_id"
