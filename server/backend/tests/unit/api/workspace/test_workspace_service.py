@@ -248,7 +248,7 @@ async def test_create_workspace(
         )
 
     # Verify Socket.IO event was emitted
-    mock_sio_workspace.emit.assert_called_once_with("org_reload", namespace="/")
+    mock_sio_workspace.emit.assert_called_once_with("workspace_reload", namespace="/")
 
 
 @pytest.mark.asyncio
@@ -306,11 +306,8 @@ async def test_update_workspace(
         assert "workspace_utc_modified" in workspace_data
 
         # Verify Socket.IO events were emitted
-        assert mock_sio_workspace.emit.call_count == 2
-        mock_sio_workspace.emit.assert_any_call("org_reload", namespace="/")
-        mock_sio_workspace.emit.assert_any_call(
-            "workspace_reload", room=workspace_id, namespace="/"
-        )
+        assert mock_sio_workspace.emit.call_count == 1
+        mock_sio_workspace.emit.assert_any_call("workspace_reload", namespace="/")
 
         # Verify workspace was actually updated in the database
         async with async_session_factory() as session:
@@ -485,11 +482,8 @@ async def test_delete_workspace(
         assert f"Workspace '{workspace_name}' deleted successfully" in result["message"]
 
         # Verify Socket.IO events were emitted
-        assert mock_sio_workspace.emit.call_count == 2
-        mock_sio_workspace.emit.assert_any_call("org_reload", namespace="/")
-        mock_sio_workspace.emit.assert_any_call(
-            "workspace_reload", room=workspace_id, namespace="/"
-        )
+        assert mock_sio_workspace.emit.call_count == 1
+        mock_sio_workspace.emit.assert_any_call("workspace_reload", namespace="/")
 
         # Verify workspace was actually deleted from the database
         async with async_session_factory() as session:

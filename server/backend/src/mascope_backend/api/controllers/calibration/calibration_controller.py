@@ -236,9 +236,9 @@ async def calibration_mz_fit(
 
 @api_controller_background_task(
     success_notification_rooms=["sid"],
-    success_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
+    success_reload=[("match_reload", "affected_sample_batch_ids")],
     error_notification_rooms=["sid"],
-    error_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
+    error_reload=[("match_reload", "affected_sample_batch_ids")],
 )
 async def calibration_mz_apply(
     fit: dict,
@@ -389,9 +389,9 @@ async def calibration_mz_apply(
 
 @api_controller_background_task(
     success_notification_rooms=["sid"],
-    success_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
+    success_reload=[("match_reload", "affected_sample_batch_ids")],
     error_notification_rooms=["sid"],
-    error_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
+    error_reload=[("match_reload", "affected_sample_batch_ids")],
 )
 async def calibration_mz_calibrate_sample(
     sample_item_id: str,
@@ -501,9 +501,9 @@ async def calibration_mz_calibrate_sample(
 
 @api_controller_background_task(
     success_notification_rooms=["sid"],
-    success_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
+    success_reload=[("match_reload", "affected_sample_batch_ids")],
     error_notification_rooms=["sid"],
-    error_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
+    error_reload=[("match_reload", "affected_sample_batch_ids")],
 )
 async def calibration_mz_calibrate_samples(
     sample_item_ids: str,
@@ -633,9 +633,9 @@ async def calibration_mz_calibrate_samples(
 
 @api_controller_background_task(
     success_notification_rooms=["sid"],
-    success_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
+    success_reload=[("match_reload", "affected_sample_batch_ids")],
     error_notification_rooms=["sid"],
-    error_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
+    error_reload=[("match_reload", "affected_sample_batch_ids")],
 )
 async def calibration_mz_calibrate_batch(
     sample_batch_id: str,

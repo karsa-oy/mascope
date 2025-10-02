@@ -148,7 +148,7 @@ async def create_acquisition_workspaces() -> dict:
 
     # Step 6: Emit socket events to notify clients
     if created_workspaces:
-        await sio.emit("org_reload", namespace="/")
+        await sio.emit("workspace_reload", namespace="/")
 
     message = f"Created {len(created_workspaces)} acquisition workspaces for instruments: {', '.join(missing_instruments)}"
     runtime.logger.debug(message)

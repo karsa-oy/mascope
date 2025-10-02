@@ -28,6 +28,7 @@ export const useMatchBatchOverview = defineStore('app.data.match.batch_overview'
       }),
     {
       key,
+      events: ['match_reload'],
       deps: () => {
         const batchId = useBatch().focusedId
         const collectionId = useMatchCollection().focusedId

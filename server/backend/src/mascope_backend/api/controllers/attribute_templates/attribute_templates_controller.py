@@ -110,7 +110,7 @@ async def create_attribute_template(template_data: AttributeTemplateCreateBody):
     1. Convert template fields to a dictionary.
     2. Construct a new AttributeTemplate object and add it to the session.
     3. Commit the transaction and refresh the instance.
-    4. Emit an 'org_reload' event.
+    4. Emit an 'template_reload' event.
     5. Return the created attribute template data.
 
     :param template_data: Data for creating the attribute template.
@@ -137,7 +137,7 @@ async def create_attribute_template(template_data: AttributeTemplateCreateBody):
         await session.refresh(new_template)
 
     # Step 4: Emit the event to inform the clients about the new template
-    await sio.emit("org_reload", namespace="/")
+    await sio.emit("template_reload", namespace="/")
 
     # Step 5: Return created template
     return {
@@ -157,7 +157,7 @@ async def update_attribute_template(
     1. Fetch the existing attribute template from the database using the provided ID.
     2. Update the template's properties with the new data.
     3. Commit the changes to the database.
-    4. Emit an "org_reload" event to notify clients about the updated template.
+    4. Emit an "template_reload" event to notify clients about the updated template.
     5. Return the updated template as a dictionary.
 
     :param attribute_template_id: The ID of the attribute template to update.
@@ -184,8 +184,8 @@ async def update_attribute_template(
         # Step 3: Commit the changes to the database.
         await session.commit()
 
-    # Step 4: Emit an "org_reload" event to notify clients about the updated template.
-    await sio.emit("org_reload", namespace="/")
+    # Step 4: Emit an "template_reload" event to notify clients about the updated template.
+    await sio.emit("template_reload", namespace="/")
 
     # Step 5: Return the updated template as a dictionary.
     return {
@@ -202,7 +202,7 @@ async def delete_attribute_template(attribute_template_id: str):
     Steps:
     1. Fetch the attribute template from the database using the provided ID.
     2. Delete the fetched template from the session and commit the changes to the database.
-    3. Emit an "org_reload" event to notify clients about the deletion.
+    3. Emit an "template_reload" event to notify clients about the deletion.
 
     :param attribute_template_id: The ID of the attribute template to delete.
     :type attribute_template_id: str
@@ -221,8 +221,8 @@ async def delete_attribute_template(attribute_template_id: str):
         await session.delete(template)
         await session.commit()
 
-    # Step 3: Emit an "org_reload" event to notify clients about the deletion.
-    await sio.emit("org_reload", namespace="/")
+    # Step 3: Emit an "template_reload" event to notify clients about the deletion.
+    await sio.emit("template_reload", namespace="/")
 
     return {
         "message": f"Attribute template '{template.name}' deleted successfully.",

@@ -29,7 +29,7 @@ export const useSample = defineStore('app.data.sample', () => {
       }),
     {
       key,
-      events: ['sample_reload'],
+      events: ['sample_reload', 'match_reload'],
       deps: () => ({
         sample_batch_id: useBatch().focusedId
       }),

@@ -300,7 +300,7 @@ async def get_batch_targets(sample_batch_id: str, deduplicate: bool = False) -> 
 
 @api_controller(
     success_reload_events=[
-        ("workspace_reload", "workspace_id"),
+        ("sample_batch_reload", "workspace_id"),
     ],  # TODO_reload fix when the reload is working properly
 )
 async def create_sample_batch(
@@ -320,7 +320,6 @@ async def create_sample_batch(
     3. Associate the new sample batch with target collections if any are provided in the request.
     4. Commit the transaction to persist the new sample batch in the database.
     5. Return the details of the created sample batch as a dictionary.
-    6. If independent_transaction is True, emit a 'workspace_reload' event to workspace_id room.
 
     :param sample_batch: Data for creating the sample batch.
     :type sample_batch: SampleBatchCreate
@@ -491,14 +490,13 @@ async def update_sample_batch(
     # Step 6: Emit reload events based on change types
     reload_events = []
     if changes["collections"]:
-        reload_events.append(sio.emit("targets_all_reload", namespace="/"))
-    if changes["name"]:
         reload_events.append(
-            sio.emit("workspace_reload", room=batch.workspace_id, namespace="/")
+            sio.emit("collection_reload", room=sample_batch_id, namespace="/")
         )
-    elif changes["description"]:
+
+    if changes["name"] or changes["description"]:
         reload_events.append(
-            sio.emit("sample_batch_reload", room=sample_batch_id, namespace="/")
+            sio.emit("sample_batch_reload", room=batch.workspace_id, namespace="/")
         )
 
     if reload_events:  # TODO_reload remove when the reload is working properly
@@ -514,7 +512,7 @@ async def update_sample_batch(
 
 @api_controller_background_task(
     success_notification_rooms=["workspace_id"],
-    success_reload=[("workspace_reload", "workspace_id")],
+    success_reload=[("sample_batch_reload", "workspace_id")],
     error_notification_rooms=["workspace_id"],
 )
 async def delete_sample_batch(
@@ -530,7 +528,6 @@ async def delete_sample_batch(
     Steps:
     1. Fetch the sample batch by its ID from the database to verify its existence.
     2. If the sample batch exists, delete it from the session and commit the changes to the database.
-    3. If the operation is independent, emit 'delete_finished' and 'workspace_reload' events with the workspace ID.
 
     :param sample_batch_id: Unique identifier of the sample batch to delete.
     :type sample_batch_id: str
@@ -541,8 +538,6 @@ async def delete_sample_batch(
     :param sid: Session ID, used for targeting specific clients when emitting events.
     :type sid: str, optional
     :raises NotFoundException: If no sample batch is found with the provided ID.
-
-    Note: The event emission for 'delete_finished' and 'workspace_reload' is handled by the api_controller_background_task decorator based on operation success or failure.
     """
     async with async_session() as session:
         # Step 1: Fetch and verify sample batch existence
@@ -565,9 +560,9 @@ async def delete_sample_batch(
 
 @api_controller_background_task(
     success_notification_rooms=["sid"],
-    success_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
+    success_reload=[("match_reload", "affected_sample_batch_ids")],
     error_notification_rooms=["sid"],
-    error_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
+    error_reload=[("match_reload", "affected_sample_batch_ids")],
 )
 async def import_sample_items(
     sample_batch_id: str,
@@ -813,9 +808,9 @@ async def import_sample_items(
 
 @api_controller_background_task(
     success_notification_rooms=["workspace_id"],
-    success_reload=[("workspace_reload", "workspace_id")],
+    success_reload=[("sample_batch_reload", "workspace_id")],
     error_notification_rooms=["sid"],
-    error_reload=[("workspace_reload", "workspace_id")],
+    error_reload=[("sample_batch_reload", "workspace_id")],
 )
 async def copy_sample_batch(
     sample_batch_id: str,

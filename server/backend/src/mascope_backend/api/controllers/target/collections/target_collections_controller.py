@@ -200,10 +200,10 @@ async def get_target_collection(target_collection_id: str) -> dict:
 
 @api_controller(
     success_reload_events=[
-        ("sample_batch_reload", "affected_sample_batch_ids"),
+        ("collection_reload", "affected_sample_batch_ids"),
     ],
     error_reload_events=[
-        ("sample_batch_reload", "affected_sample_batch_ids"),
+        ("collection_reload", "affected_sample_batch_ids"),
     ],
 )
 async def create_target_collection(
@@ -323,8 +323,9 @@ async def create_target_collection(
         )
 
     # Step 7: Emit reload events
-    # TODO_reload - handle emitting without specific rooms (to all clients)
     await sio.emit("targets_all_reload", namespace="/")
+    for batch_id in sample_batch_ids:
+        await sio.emit("collection_reload", room=batch_id, namespace="/")
 
     # Fetch the created collection with associations for return
     created_collection = await fetch_target_collection(
@@ -469,8 +470,8 @@ async def update_target_collection(
         affected_sample_batch_ids.update(changes["batches_to_add"])
         affected_sample_batch_ids.update(changes["batches_to_remove"])
 
-    if changes["collection_type"]:
-        # For collection type changes, all batches (current + new) need rematch
+    if any([changes["collection_type"], changes["basic_fields"]]):
+        # For basic field changes, all batches (current + new) need rematch
         affected_sample_batch_ids.update(sample_batches_db)
         if changes["batches"]:
             affected_sample_batch_ids.update(target_collection_update.sample_batch_ids)
@@ -548,7 +549,6 @@ async def update_target_collection(
         await session.refresh(target_collection_db)
 
     # Step 7: Set rematch status for affected sample batches
-    # Update target associations
     # TODO_match If collection type changes, all affected batches need new match_collection, match_sample
     needs_rematch = (
         changes["compounds"] or changes["batches"] or changes["collection_type"]
@@ -559,7 +559,7 @@ async def update_target_collection(
         batch_status_result = await update_sample_batch_status(
             sample_batch_ids=list(affected_sample_batch_ids),
             status="rematch",
-            independent_transaction=True,  # TODO_reload fix when the reload is working properly
+            independent_transaction=True,  # batches reloads to show rematch status
         )
 
     # Step 8: Emit reload events based on change types
@@ -568,14 +568,19 @@ async def update_target_collection(
     if any([changes["compounds"], changes["batches"], changes["basic_fields"]]):
         reload_events.append(sio.emit("targets_all_reload", namespace="/"))
 
-    # Emit batch reloads for affected batches (they'll show rematch status)
-    if needs_rematch and affected_sample_batch_ids:
-        # TODO_reload, sample_batch_reload to parent workspace rooms? With batch_id data to refresh the exact record in list
+    if any([changes["batches"], changes["basic_fields"]]):
+        # Reload collection data for affected batches
         reload_events.extend(
             [
-                sio.emit("sample_batch_reload", room=batch_id, namespace="/")
+                sio.emit("collection_reload", room=batch_id, namespace="/")
                 for batch_id in affected_sample_batch_ids
             ]
+        )
+
+    if changes["compounds"]:
+        # Reload match ion table data in the target collection
+        reload_events.append(
+            sio.emit("ion_reload", room=target_collection_id, namespace="/")
         )
 
     if reload_events:
@@ -604,10 +609,10 @@ async def update_target_collection(
 
 @api_controller(
     success_reload_events=[
-        ("sample_batch_reload", "affected_sample_batch_ids"),
+        ("collection_reload", "affected_sample_batch_ids"),
     ],
     error_reload_events=[
-        ("sample_batch_reload", "affected_sample_batch_ids"),
+        ("collection_reload", "affected_sample_batch_ids"),
     ],
 )
 async def delete_target_collection(

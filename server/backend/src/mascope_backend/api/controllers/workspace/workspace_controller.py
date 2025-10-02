@@ -166,7 +166,7 @@ async def create_workspace(workspace: WorkspaceCreate) -> dict:
         await session.refresh(new_workspace)
 
         # Step 3: Emit event
-        await sio.emit("org_reload", namespace="/")
+        await sio.emit("workspace_reload", namespace="/")
 
     # Step 4: Return the new workspace details
     return {
@@ -228,8 +228,7 @@ async def update_workspace(workspace_id: str, workspace: WorkspaceUpdate) -> dic
         await session.refresh(existing_workspace)
 
     # Step 6: Emit socket.io events
-    await sio.emit("org_reload", namespace="/")
-    await sio.emit("workspace_reload", room=workspace_id, namespace="/")
+    await sio.emit("workspace_reload", namespace="/")
 
     return {
         "message": f"Workspace '{existing_workspace.workspace_name}' updated successfully.",
@@ -262,8 +261,7 @@ async def delete_workspace(workspace_id: str):
         await session.commit()
 
     # Step 3: Emit socket.io events
-    await sio.emit("org_reload", namespace="/")
-    await sio.emit("workspace_reload", room=workspace_id, namespace="/")
+    await sio.emit("workspace_reload", namespace="/")
 
     return {
         "message": f"Workspace '{workspace.workspace_name}' deleted successfully.",

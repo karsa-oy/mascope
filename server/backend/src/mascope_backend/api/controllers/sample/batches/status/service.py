@@ -19,10 +19,10 @@ from mascope_backend.runtime import runtime
 # TODO_reload - should emit affected batches ids to the workspace rooms
 @api_controller(
     success_reload_events=[
-        ("workspace_reload", "affected_workspace_ids"),
+        ("sample_batch_reload", "affected_workspace_ids"),
     ],
     error_reload_events=[
-        ("workspace_reload", "affected_workspace_ids"),
+        ("sample_batch_reload", "affected_workspace_ids"),
     ],
 )
 async def update_sample_batch_status(

@@ -42,9 +42,9 @@ from mascope_backend.runtime import runtime
 
 @api_controller_background_task(
     success_notification_rooms=["sid"],
-    success_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
+    success_reload=[("match_reload", "affected_sample_batch_ids")],
     error_notification_rooms=["sid"],
-    error_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
+    error_reload=[("match_reload", "affected_sample_batch_ids")],
 )
 async def process_sample_item(
     sample_item: SampleItemCreate,
@@ -122,9 +122,6 @@ async def process_sample_item(
     )
 
     # Step 2: create the sample item
-
-    # TODO_invalidation
-    # Set independent_transaction to true to trigger sample_batch_reload after creating the sample item record
     created_sample_item = (
         await create_sample_items(
             sample_items=[sample_item], independent_transaction=True

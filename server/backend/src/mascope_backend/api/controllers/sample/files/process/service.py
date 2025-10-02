@@ -54,9 +54,9 @@ from mascope_backend.runtime import runtime
 
 @api_controller_background_task(
     success_notification_rooms=["instrument"],
-    success_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
+    success_reload=[("match_reload", "affected_sample_batch_ids")],
     error_notification_rooms=["instrument"],
-    error_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
+    error_reload=[("match_reload", "affected_sample_batch_ids")],
 )
 async def auto_process_sample_file(
     sample_file_id: str,
@@ -124,7 +124,7 @@ async def auto_process_sample_file(
         await get_acquisition_workspace(sample_file.instrument)
     ).get("data")
 
-    # Step 4: Create ACQUISITION batches and sample items for each polarity
+    # Step 4: Create ACQUISITION batches and sample items for each ionization mode
     acquisition_sample_items, acquisition_sample_batches = (
         await create_acquisition_batches_and_items(
             sample_file=sample_file,
@@ -207,9 +207,9 @@ async def create_acquisition_batches_and_items(
     sample_file: SampleFile, workspace_id: str
 ) -> tuple[list[dict], list[dict]]:
     """
-    Create ACQUISITION batches and sample items for each polarity in sample file.
+    Create ACQUISITION batches and sample items for each ionization mode of sample file.
 
-    For each polarity in the sample file:
+    For each ionization mode in the sample file:
     1. Get or create daily ACQUISITION batch in provided acquisition workspace
     2. Create ACQUISITION sample item within the batch
     3. Configure batch with appropriate target collections and ionization mechanisms

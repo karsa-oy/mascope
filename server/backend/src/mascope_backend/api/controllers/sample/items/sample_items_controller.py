@@ -190,7 +190,7 @@ async def get_sample_item(sample_item_id: str) -> dict:
 
 @api_controller(
     success_reload_events=[
-        ("sample_batch_reload", "affected_sample_batch_ids"),
+        ("sample_reload", "affected_sample_batch_ids"),
     ],
 )
 async def create_sample_items(
@@ -402,7 +402,7 @@ async def update_sample_item(
     # Step 6: Directly reload batch if needed # TODO_invalidation
     elif changed_fields:
         await sio.emit(
-            "sample_batch_reload",
+            "sample_reload",
             room=existing_sample_item.sample_batch_id,
             namespace="/",
         )
@@ -415,7 +415,7 @@ async def update_sample_item(
 
 @api_controller(
     success_reload_events=[
-        ("sample_batch_reload", "affected_sample_batch_ids"),
+        ("sample_reload", "affected_sample_batch_ids"),
     ],  # TODO_invalidation
 )
 async def delete_sample_items(
@@ -477,9 +477,9 @@ async def delete_sample_items(
 
 @api_controller_background_task(
     success_notification_rooms=["sid"],
-    success_reload=[("sample_batch_reload", "sample_batch_id")],
+    success_reload=[("sample_reload", "sample_batch_id")],
     error_notification_rooms=["sid"],
-    error_reload=[("sample_batch_reload", "sample_batch_id")],
+    error_reload=[("sample_reload", "sample_batch_id")],
 )
 async def copy_sample_items(
     sample_item_ids: list[str],
@@ -640,7 +640,7 @@ async def copy_sample_items(
 
 @api_controller_background_task(
     success_notification_rooms=["sid"],
-    success_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
+    success_reload=[("sample_reload", "affected_sample_batch_ids")],
     error_notification_rooms=["sid"],
 )
 async def move_sample_items(
