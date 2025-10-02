@@ -5,7 +5,7 @@ import asyncio
 from mascope_file.io import load_file
 import mascope_signal.compute as m_compute
 from mascope_signal.peak import get_peaks
-from sqlalchemy import and_, select, func, cast, Float
+from sqlalchemy import and_, select, func, cast, Float, Integer
 from mascope_backend.db import async_session
 from mascope_backend.db.models import (
     Sample,
@@ -68,8 +68,11 @@ async def get_samples(
             select(
                 Sample,
                 MatchSample,
-                TargetCollection.target_collection_type.in_(
-                    target_collection_config.APP_ALARMING_COLLECTION_TYPES
+                # max to check if ANY collection is alarming (returns 1 if any is True, 0 otherwise)
+                func.max(
+                    TargetCollection.target_collection_type.in_(
+                        target_collection_config.APP_ALARMING_COLLECTION_TYPES
+                    ).cast(Integer)
                 ).label("alarming"),
             )
             .outerjoin(MatchSample, Sample.sample_item_id == MatchSample.sample_item_id)
@@ -136,7 +139,7 @@ async def get_samples(
                 }
                 # Add alarming as extra field (not part of MatchSample model)
                 match_data["alarming"] = (
-                    row.alarming if row.alarming is not None else False
+                    bool(row.alarming) if row.alarming is not None else False
                 )
             else:
                 match_data = {
