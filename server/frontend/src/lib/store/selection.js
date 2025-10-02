@@ -27,7 +27,7 @@ export const useSelection = (name, key, records, options = {}) => {
   const filterRefs = storeToRefs(filterStore)
   let filter = filterRefs[name]
 
-  // ff no filter exists in filter store, create local reactive ref
+  // if no filter exists in filter store, create local reactive ref (guard)
   if (!filter) {
     logger.warn(`Creating local selection state for '${name}' (not in filter store)`)
     filter = ref([])
