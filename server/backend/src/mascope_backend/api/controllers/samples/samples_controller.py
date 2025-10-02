@@ -166,9 +166,7 @@ async def get_sample(
     sample_item_id: str,
 ) -> dict:
     """
-    Retrieves detailed information for a specific sample, including optional match data and match collection types if available.
-
-    This function joins the sample with match data and includes the list of unique collection types associated with the sample's matches.
+    Retrieves detailed information for a specific sample with nested match data and alarming status.
 
     :param sample_item_id: Unique identifier for the sample.
     :type sample_item_id: str
@@ -176,21 +174,21 @@ async def get_sample(
     :rtype: dict
     :raises NotFoundException: If the sample with the specified item ID is not found.
     """
-    # Check sample item by ID
     async with async_session() as session:
-        sample = await session.get(Sample, sample_item_id)
-    if not sample:
-        raise NotFoundException(f"Sample with ID '{sample_item_id}' not found")
+        # Verify sample exists
+        if not (sample := await session.get(Sample, sample_item_id)):
+            raise NotFoundException(f"Sample with ID '{sample_item_id}' not found")
 
-    async with async_session() as session:
-        # Construct query with joins to include MatchSample, MatchCollection, and TargetCollection data
         stmt = (
             select(
                 Sample,
                 MatchSample,
-                func.group_concat(
-                    func.distinct(TargetCollection.target_collection_type)
-                ).label("match_collection_types"),
+                # max to check if ANY collection is alarming
+                func.max(
+                    TargetCollection.target_collection_type.in_(
+                        target_collection_config.APP_ALARMING_COLLECTION_TYPES
+                    ).cast(Integer)
+                ).label("alarming"),
             )
             .outerjoin(MatchSample, Sample.sample_item_id == MatchSample.sample_item_id)
             .outerjoin(
@@ -206,23 +204,40 @@ async def get_sample(
             .group_by(Sample.sample_item_id, MatchSample.sample_item_id)
         )
 
-        # Execute query and fetch results
         result = await session.execute(stmt)
-    sample, match_sample, match_collection_types = result.first()
 
-    # Construct the response data
-    sample_data = sample.to_dict() if sample else {}
-    match_sample_data = match_sample.to_dict() if match_sample else {}
+    row = result.first()
 
-    # Merge data, with match_sample data overlaying sample data where available
-    sample_data.update(match_sample_data)
+    sample_data = {
+        column.name: getattr(row.Sample, column.name)
+        for column in Sample.__table__.columns
+    }
+    if row.MatchSample:
+        match_data = {
+            column.name: getattr(row.MatchSample, column.name)
+            for column in MatchSample.__table__.columns
+        }
+        # Convert aggregated 1/0 to boolean
+        match_data["alarming"] = (
+            bool(row.alarming) if row.alarming is not None else False
+        )
+    else:
+        match_data = {
+            "match_sample_id": None,
+            "sample_item_id": row.Sample.sample_item_id,
+            "match_score": None,
+            "match_category": None,
+            "sample_peak_intensity_sum": None,
+            "match_sample_utc_created": None,
+            "match_sample_utc_modified": None,
+            "alarming": False,
+        }
 
-    # Include match_collection_types if there are any matches
-    if match_sample and match_collection_types:
-        sample_data["match_collection_types"] = match_collection_types.split(",")
+    sample_data["match"] = match_data
 
     return {
-        "message": f"Sample '{sample.sample_item_name}' retrieved successfully.",
+        "status": "success",
+        "message": f"Sample '{sample.sample_item_name}' retrieved successfully",
         "data": sample_data,
     }
 
