@@ -51,6 +51,19 @@ export const useMatchCollection = defineStore('app.data.match.collection', () =>
             targetCollection.unfocus()
           }
         }
+      },
+      read: (target_collection_id) => {
+        const sampleId = useSample().focusedId
+        const batchId = useBatch().focusedId
+
+        // Conditional loading: sample-level if sample selected, else batch-level
+        const params = sampleId ? { sample_item_id: sampleId } : { sample_batch_id: batchId }
+
+        return api.http.get(`/match/records/collection/${target_collection_id}`, {
+          params,
+          use: 'read',
+          type: 'read_match_collection'
+        })
       }
     }
   )

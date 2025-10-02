@@ -151,12 +151,27 @@ export const useData = (
   const reloadRecord = async () => {
     if (!selection?.focused?.value || !read) return
 
+    // Capture the ID before async operation to prevent race conditions
+    const recordId = selection.focused.value[key]
+
     try {
-      logger.debug(`reload focused record ${selection?.focused.value[key]}`)
-      const freshRecord = await read(selection.focused.value[key])
+      logger.debug(`reload focused record ${recordId}`)
+      const freshRecord = await read(recordId)
+
+      // Guard: Check if selection still focused on same record after async operation
+      if (!selection?.focused?.value || selection.focused.value[key] !== recordId) {
+        logger.debug(`record ${recordId} unfocused during reload - skipping update`)
+        return
+      }
+
+      // Guard: Check if read returned valid data
+      if (!freshRecord) {
+        logger.warn(`reload focused record ${recordId} returned null/undefined`)
+        return
+      }
 
       // Update the record in the list
-      const index = records.value.findIndex((r) => r[key] === selection.focused.value[key])
+      const index = records.value.findIndex((r) => r[key] === recordId)
       if (index >= 0) {
         records.value[index] = freshRecord
       }

@@ -72,3 +72,11 @@ class MatchRecordsResponse(BaseModel):
     message: str = Field(description="Response message")
     results: int = Field(description="Total number of results")
     data: list[dict] = Field(description="Match records data")
+
+
+class MatchRecordsSingleResponse(BaseModel):
+    """Response model for single match record"""
+
+    status: str = Field(description="Response status")
+    message: str = Field(description="Response message")
+    data: dict = Field(description="Single match record data")
