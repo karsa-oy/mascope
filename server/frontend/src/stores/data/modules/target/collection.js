@@ -60,6 +60,7 @@ export const useTargetCollection = defineStore('app.data.target.collection', () 
 
   return {
     ...data,
+    read,
     loadDetailed,
     // backend methods
     create: (collection) =>

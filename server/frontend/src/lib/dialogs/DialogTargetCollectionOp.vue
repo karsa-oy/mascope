@@ -43,24 +43,34 @@ const original = computed(() => app.data.target.collection.detailed)
 // dialog visibility reactivity
 const visible = ref(false)
 
+// Prevents watchers from interfering during initialization
+const initializing = ref(false)
+
+// Collection info
 const info = reactive({
   id: null,
   name: '',
   desc: '',
   type: 'TARGETS'
 })
+
+// Compounds state
 const compounds = reactive({
-  loaded: [],
-  selected: [],
-  initial: [],
-  created: [],
+  loaded: [], // Loaded from selected collection
+  selected: [], // Currently selected compounds
+  initial: [], // Initial selection snapshot for change tracking
+  created: [], // New compounds created in this dialog
   deleted: []
 })
+
+// Batches state - spans multiple workspaces
 const batches = reactive({
-  loaded: [],
-  selected: [],
-  initial: []
+  loaded: [], // Batches from current workspace only
+  selected: [], // Selected batches across ALL workspaces
+  initial: [] // Initial selection snapshot for change tracking
 })
+
+// UI selection state
 const selected = reactive({
   workspace: null,
   source: 'collection',
@@ -223,40 +233,6 @@ function loadSpreadsheet({ rows }) {
   key.targets += 1
 }
 
-async function loadBatches(workspace, collectionType) {
-  if (!workspace || !collectionType) {
-    batches.loaded = []
-    return
-  }
-  const allowedBatchTypes = getAllowedBatchTypes(collectionType)
-
-  const latest = await api.http.get(`/sample/batches`, {
-    params: {
-      workspace_id: workspace.workspace_id,
-      sample_batch_type: allowedBatchTypes
-    },
-    use: 'read',
-    type: 'load_batches'
-  })
-  batches.loaded = latest
-
-  // Re-select batches by ID to match fresh objects
-  if (batches.selected.length > 0) {
-    const selectedIds = batches.selected.map((b) => b.sample_batch_id)
-    batches.selected = batches.loaded.filter((b) => selectedIds.includes(b.sample_batch_id))
-  }
-
-  // Update select all checkbox state
-  selected.all.batches =
-    batches.loaded.length > 0
-      ? batches.loaded.every((batch) =>
-          batches.selected
-            .map(({ sample_batch_id }) => sample_batch_id)
-            .includes(batch.sample_batch_id)
-        )
-      : false
-}
-
 function execute() {
   const common = {
     target_collection_name: info.name,
@@ -415,10 +391,65 @@ const addCompoundButtonDisabled = computed(
   () => !add.formula.trim() || invalidFormula.value || alreadyInSelection.value
 )
 
+/**
+ * Computed property that filters global batch selection to current workspace.
+ * This allows batches.selected to track selections across all workspaces,
+ * while the DataTable only shows/modifies batches from the current workspace.
+ */
+const workspaceBatchSelection = computed({
+  get() {
+    if (!selected.workspace) return []
+    // Filter global selection to only show batches from current workspace
+    return batches.selected.filter(
+      (batch) => batch.workspace_id === selected.workspace.workspace_id
+    )
+  },
+  set(newSelection) {
+    if (!selected.workspace) return
+
+    // Remove batches from current workspace, keep batches from other workspaces
+    const otherWorkspaceBatches = batches.selected.filter(
+      (batch) => batch.workspace_id !== selected.workspace.workspace_id
+    )
+
+    // Combine with new selection from current workspace
+    batches.selected = [...otherWorkspaceBatches, ...newSelection]
+  }
+})
+
+/**
+ * Load batches for a specific workspace and collection type.
+ * Only loads batches for the given workspace - doesn't modify selection state.
+ */
+async function loadBatches(workspace, collectionType) {
+  if (!workspace || !collectionType) {
+    batches.loaded = []
+    return
+  }
+  const allowedBatchTypes = getAllowedBatchTypes(collectionType)
+
+  const latest = await api.http.get(`/sample/batches`, {
+    params: {
+      workspace_id: workspace.workspace_id,
+      sample_batch_type: allowedBatchTypes
+    },
+    use: 'read',
+    type: 'load_batches'
+  })
+  batches.loaded = latest
+}
+
+/**
+ * Initialize dialog state based on action mode.
+ * Sets initializing flag to prevent watchers from interfering.
+ */
 async function init(mode) {
   if (!mode) {
     return
   }
+  initializing.value = true
+
+  // Reset to defaults
   selected.tab = 'compounds'
   selected.collection = 'all-compounds'
   selected.source = 'collection'
@@ -432,6 +463,8 @@ async function init(mode) {
   add.cas = ''
   batches.loaded = []
   batches.selected = []
+
+  // Load collection data for update actions
   if (mode.startsWith('update')) {
     info.id = original.value?.target_collection_id
     info.name = original.value?.target_collection_name
@@ -439,6 +472,7 @@ async function init(mode) {
     info.type = original.value?.target_collection_type
     compounds.selected = original.value?.target_compounds ?? []
   }
+
   switch (mode) {
     case 'create': {
       info.id = ''
@@ -450,15 +484,24 @@ async function init(mode) {
     }
     case 'update_batches': {
       selected.tab = 'batches'
-      selected.workspace = app.data.workspace.focused
-      // Store IDs to select after loading
-      const selectedBatchIds = original.value?.sample_batches?.map((b) => b.sample_batch_id) ?? []
 
-      // Wait for batches to load
+      // Load all batches from the collection (across all workspaces)
+      // Clone to avoid mutating the original collection data
+      batches.selected = clone(original.value?.sample_batches ?? [])
+
+      // Set workspace for display
+      selected.workspace = app.data.workspace.focused
+
+      // Load batches for the current workspace
       await loadBatches(selected.workspace, info.type)
 
-      // Now select from loaded batches
-      batches.selected = batches.loaded.filter((b) => selectedBatchIds.includes(b.sample_batch_id))
+      // Update "select all" checkbox to reflect current workspace state
+      selected.all.batches =
+        batches.loaded.length > 0
+          ? batches.loaded.every((batch) =>
+              batches.selected.some((s) => s.sample_batch_id === batch.sample_batch_id)
+            )
+          : false
       break
     }
     case 'delete': {
@@ -467,8 +510,11 @@ async function init(mode) {
       deleteOrphans.value = true
     }
   }
+  // Take snapshots for change tracking
   compounds.initial = clone(compounds.selected)
   batches.initial = clone(batches.selected)
+
+  initializing.value = false
 }
 
 /**
@@ -514,7 +560,7 @@ watch(action, async (value) => {
 watch(visible, (value) => {
   if (!value) {
     action.value = null
-    // Clear state to get fresh data on next open
+    // Reset all state for fresh data on next open
     selected.workspace = null
     selected.tab = 'compounds'
     selected.collection = 'all-compounds'
@@ -534,12 +580,24 @@ watch(visible, (value) => {
   }
 })
 
-// Validate workspace and batch selections when collection type changes
+/**
+ * Handle collection type changes.
+ * Only active during create/update_batches modes.
+ * Resets workspace if it becomes incompatible with new type.
+ */
 watch(
   () => info.type,
   (newType, oldType) => {
+    // Skip during initialization to avoid clearing initial batch selections
+    if (initializing.value) return
+
     if (oldType && newType !== oldType) {
-      // Reset workspace if it becomes invalid for the new collection type
+      // Only handle for actions that can modify batches
+      if (!['create', 'update_batches'].includes(action.value)) {
+        return
+      }
+
+      // Reset workspace if it's incompatible with new collection type
       if (selected.workspace) {
         const allowedWorkspaceTypes = getAllowedWorkspaceTypes(newType)
         if (!allowedWorkspaceTypes.includes(selected.workspace.workspace_type)) {
@@ -547,19 +605,41 @@ watch(
         }
       }
 
-      // Reset batch selections if they become invalid for the new collection type
-      if (batches.selected.length > 0) {
-        const allowedBatchTypes = getAllowedBatchTypes(newType)
-        batches.selected = batches.selected.filter((batch) =>
-          allowedBatchTypes.includes(batch.sample_batch_type)
-        )
-      }
+      // Clear batch selections since different types may have different batch types
+      batches.selected = []
     }
   }
 )
 
-// Load batches when workspace or collection type changes
-watchEffect(() => loadBatches(selected.workspace, info.type))
+/**
+ * Load batches when workspace or collection type changes.
+ * Updates checkbox state to reflect current workspace selection.
+ */
+watch(
+  [() => selected.workspace, () => info.type],
+  async ([newWorkspace, newType], [oldWorkspace, oldType]) => {
+    // Skip during initialization - init handles the first load
+    if (initializing.value) return
+
+    // Skip if no workspace or type (invalid state)
+    if (!newWorkspace || !newType) {
+      batches.loaded = []
+      selected.all.batches = false
+      return
+    }
+
+    // Load batches for the new workspace
+    await loadBatches(newWorkspace, newType)
+
+    // Update "select all" checkbox based on what's selected in current workspace
+    selected.all.batches =
+      batches.loaded.length > 0
+        ? batches.loaded.every((batch) =>
+            batches.selected.some((s) => s.sample_batch_id === batch.sample_batch_id)
+          )
+        : false
+  }
+)
 
 // Auto-clear search when switching to manual input mode
 watchEffect(() => {
@@ -568,7 +648,10 @@ watchEffect(() => {
   }
 })
 
-// Load compounds from selected collection and update "select all" checkbox state
+/**
+ * Load compounds from selected collection and update checkbox state.
+ * Runs automatically when collection selection changes.
+ */
 watchEffect(async () => {
   // reload compounds
   compounds.loaded =
@@ -979,7 +1062,7 @@ watchEffect(async () => {
                 <DataTable
                   :key="key.batches"
                   dataKey="sample_batch_id"
-                  v-model:selection="batches.selected"
+                  v-model:selection="workspaceBatchSelection"
                   :value="batches.loaded"
                   scrollable
                   scrollHeight="350px"

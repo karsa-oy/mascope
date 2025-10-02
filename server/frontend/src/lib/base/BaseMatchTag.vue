@@ -42,7 +42,7 @@ const formatter = new Intl.NumberFormat('en-US', {
 
 const score = computed(() => {
   const notNull = props.matchScore !== null
-  const notNaN = !isNaN(props.matchScore)
+  const notNaN = !Number.isNaN(props.matchScore)
   return notNull && notNaN ? formatter.format(props.matchScore) : null
 })
 
