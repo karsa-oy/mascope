@@ -36,8 +36,8 @@ async def get_target_isotopes(
     show_ionization_mechanism: bool = False,
     sort: str | None = None,
     order: str | None = None,
-    page: int = 0,
-    limit: int = 1000000,
+    page: int | None = None,
+    limit: int | None = None,
 ) -> dict:
     """
     Retrieves a list of target isotopes based on various filters with optional related entity details.
@@ -85,13 +85,18 @@ async def get_target_isotopes(
     :type sort: str | None
     :param order: Sort order ('asc' for ascending, 'desc' for descending).
     :type order: str | None
-    :param page: Page number for pagination (0-based).
-    :type page: int
-    :param limit: Number of items per page (defaults to 1,000,000 for no effective limit).
-    :type limit: int
+    :param page: Page number for pagination, defaults to None (no pagination).
+    :type page: Optional[int], optional
+    :param limit: Number of items per page, defaults to None (no pagination).
+    :type limit: Optional[int], optional
     :return: Dictionary containing the total count and list of detailed isotopes matching the filters.
     :rtype: dict
     """
+    # Validate pagination parameters
+    if (page is None) != (limit is None):
+        raise ValueError(
+            "Both 'page' and 'limit' must be provided together or both omitted."
+        )
     async with async_session() as session:
         # Step 1: Construct the base query
         stmt = select(TargetIsotope).join(
@@ -210,8 +215,9 @@ async def get_target_isotopes(
             select(func.count()).select_from(stmt)  # pylint: disable=not-callable
         )
 
-        # Step 6:  Apply pagination
-        stmt = stmt.offset(page * limit).limit(limit)
+        # Step 6: Apply pagination
+        if page is not None and limit is not None:
+            stmt = stmt.offset(page * limit).limit(limit)
         result = await session.execute(stmt)
 
     # Step 7: Construct the response data

@@ -3,31 +3,41 @@ import numpy as np
 
 
 def sort_and_paginate_match_sample_df(
-    df: pd.DataFrame, order: str, page: int, limit: int
+    df: pd.DataFrame,
+    order: str,
+    page: int | None = None,
+    limit: int | None = None,
 ) -> pd.DataFrame:
     """
-    Sorts and paginates the DataFrame for match sample data. Used in endpoints match_sample_targets_controller
+    Sorts and optionally paginates the DataFrame for match sample data. Used in endpoints match_sample_targets_controller.
     Handles NaN values by treating them as -1 for sorting purposes and ensures JSON compatibility.
 
     Steps:
-    1. Replace NaN values in 'match_score' and 'match_category' with -1 for sorting purposes.
-    2. Convert 'match_category' to integer type.
-    3. Sort the DataFrame by 'target_collection_id', 'match_category', and 'match_score'.
-    4. Paginate the sorted DataFrame based on the 'page' and 'limit' parameters.
-    5. Replace -1 back to None for 'match_score' and 'match_category'.
-    6. Replace all other NaN and NaT values with None for JSON compatibility.
+    1. Validate pagination parameters: both 'page' and 'limit' must be provided together or both omitted.
+    2. Replace NaN values in 'match_score' and 'match_category' with -1 for sorting purposes.
+    3. Convert 'match_category' to integer type.
+    4. Sort the DataFrame by 'target_collection_id', 'match_category', and 'match_score'.
+    5. If pagination parameters are provided, paginate the sorted DataFrame based on the 'page' and 'limit' parameters.
+    6. Replace -1 back to None for 'match_score' and 'match_category'.
+    7. Replace all other NaN and NaT values with None for JSON compatibility.
 
-    :param df: DataFrame containing the match sample data to be sorted and paginated.
+    :param df: DataFrame containing the match sample data to be sorted and optionally paginated.
     :type df: pd.DataFrame
-    :param order: Sorting order ('asc' or 'desc').
+    :param order: Sorting order ('asc' or 'desc')
     :type order: str
-    :param page: Page number for pagination.
-    :type page: int
-    :param limit: Number of items per page.
-    :type limit: int
-    :return: Sorted and paginated DataFrame with JSON compatible values.
+    :param page: Page number for pagination, defaults to None (no pagination).
+    :type page: int | None, optional
+    :param limit: Number of items per page, defaults to None (no pagination).
+    :type limit: int | None, optional
+    :return: Sorted and optionally paginated DataFrame with JSON compatible values.
     :rtype: pd.DataFrame
     """
+    # Validate pagination parameters
+    if (page is None) != (limit is None):
+        raise ValueError(
+            "Both 'page' and 'limit' must be provided together or both omitted."
+        )
+
     # Replace match_score and match_category NaN for sorting and ensure match_category remains integer
     # The option_context is used to avoid FutureWarning in pandas 3, where silent downcasting is deprecated.
     with pd.option_context("future.no_silent_downcasting", True):
@@ -41,8 +51,9 @@ def sort_and_paginate_match_sample_df(
         ascending=sort_ascending,
     )
 
-    # Pagination logic
-    df = df.iloc[page * limit : (page + 1) * limit]
+    # Pagination logic (conditional)
+    if page is not None and limit is not None:
+        df = df.iloc[page * limit : (page + 1) * limit]
 
     # Replace -1 back to None for match_category and match_score if it was originally NaN
     df["match_score"] = df["match_score"].replace(-1, None)

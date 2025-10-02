@@ -13,8 +13,8 @@ class GetInstrumentConfigsQueryParams(QueryParamsModel):
     order: str | None = Field(
         None, description="Order of sorting, can be either 'asc' or 'desc'."
     )
-    page: int = Field(0, description="Page number for pagination.")
-    limit: int = Field(10000, description="Number of items per page.")
+    page: int | None = Field(None, description="Page number for pagination.")
+    limit: int | None = Field(None, description="Number of items per page.")
 
 
 class PeakShape(BaseModel):

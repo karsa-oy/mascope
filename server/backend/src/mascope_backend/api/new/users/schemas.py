@@ -266,8 +266,8 @@ class GetUsersQueryParams(QueryParamsModel):
         "desc",
         description="Sorting order: 'asc' for ascending or 'desc' for descending.",
     )
-    page: int = Field(0, description="Page number for pagination.")
-    limit: int = Field(10000, description="Number of results per page.")
+    page: int | None = Field(None, description="Page number for pagination.")
+    limit: int | None = Field(None, description="Number of results per page.")
 
     @model_validator(mode="after")
     @classmethod

@@ -23,8 +23,8 @@ async def get_match_ratings(
     rating: int = None,
     sort: str = None,
     order: str = None,
-    page: int = 0,
-    limit: int = 10000,
+    page: int | None = None,
+    limit: int | None = None,
     datetime_min: datetime = None,
     datetime_max: datetime = None,
 ) -> dict:
@@ -50,10 +50,10 @@ async def get_match_ratings(
     :type sort: str, optional
     :param order: Sorting order, defaults to None.
     :type order: str, optional
-    :param page: Page number for pagination, defaults to 0.
-    :type page: int, optional
-    :param limit: Number of items per page, defaults to 100.
-    :type limit: int, optional
+    :param page: Page number for pagination, defaults to None (no pagination).
+    :type page: int | None, optional
+    :param limit: Number of items per page, defaults to None (no pagination).
+    :type limit: int | None, optional
     :param datetime_min: Filter by minimum datetime, defaults to None.
     :type datetime_min: datetime, optional
     :param datetime_max: Filter by maximum datetime, defaults to None.
@@ -61,6 +61,11 @@ async def get_match_ratings(
     :return: Dictionary containing total count and list of match ratings.
     :rtype: dict
     """
+    # Validate pagination parameters
+    if (page is None) != (limit is None):
+        raise ValueError(
+            "Both 'page' and 'limit' must be provided together or both omitted."
+        )
     async with async_session() as session:
         # Step 1: Construct base query
         stmt = select(MatchRating)
@@ -89,7 +94,8 @@ async def get_match_ratings(
         total = await session.scalar(
             select(func.count()).select_from(stmt)  # pylint: disable=not-callable
         )
-        stmt = stmt.offset(page * limit).limit(limit)
+        if page is not None and limit is not None:
+            stmt = stmt.offset(page * limit).limit(limit)
 
         # Step 5: Execute query
         result = await session.execute(stmt)

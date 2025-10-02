@@ -59,8 +59,8 @@ async def get_sample_files(
     filename: str = None,
     sort: str = "datetime_utc",
     order: str = "asc",
-    page: int = 0,
-    limit: int = 10000,
+    page: int | None = None,
+    limit: int | None = None,
 ) -> dict:
     """
     Retrieves a paginated list of sample files, optionally filtered by date range, instrument, or filename, and sorted by a specified column.
@@ -85,10 +85,10 @@ async def get_sample_files(
     :type sort: str, optional
     :param order: Sorting order, "asc" for ascending or "desc" for descending, defaults to "asc".
     :type order: str, optional
-    :param page: Page number for pagination, defaults to 0.
-    :type page: int, optional
-    :param limit: Number of items per page, defaults to 10000.
-    :type limit: int, optional
+    :param page: Page number for pagination, defaults to None (no pagination).
+    :type page: int | None, optional
+    :param limit: Number of items per page, defaults to None (no pagination).
+    :type limit: int | None, optional
     :return: A dictionary containing the total count of filtered sample files and a list of sample file details.
     :rtype: dict
     """
@@ -117,7 +117,8 @@ async def get_sample_files(
         total = await session.scalar(
             select(func.count()).select_from(stmt)  # pylint: disable=not-callable
         )
-        stmt = stmt.offset(page * limit).limit(limit)
+        if page is not None and limit is not None:
+            stmt = stmt.offset(page * limit).limit(limit)
 
         # Step 5: Execute query and fetch results
         result = await session.execute(stmt)

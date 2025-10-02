@@ -142,8 +142,10 @@ class GetSampleFilesQueryParams(QueryParamsModel):
         "asc",
         description="Can either be 'asc' for ascending order or 'desc' for descending order.",
     )
-    page: int = Field(0, description="The page number for pagination, default 0")
-    limit: int = Field(10000, description="The number of results per page.")
+    page: int | None = Field(
+        None, description="The page number for pagination, default 0"
+    )
+    limit: int | None = Field(None, description="The number of results per page.")
 
 
 class GetRecentSampleFilesQueryParams(GetSampleFilesQueryParams):

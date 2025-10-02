@@ -52,11 +52,8 @@ class GetTargetIsotopesQueryParams(QueryParamsModel):
     )
     sort: str | None = Field(None, description="Field to sort by.")
     order: str | None = Field(None, description="Order of sorting ('asc' or 'desc').")
-    page: int = Field(0, description="Pagination page number.")
-    limit: int = Field(
-        1000000,
-        description="Number of items per page.",
-    )
+    page: int | None = Field(None, description="Pagination page number.")
+    limit: int | None = Field(None, description="Number of items per page.")
 
     @field_validator("resolution")
     @classmethod

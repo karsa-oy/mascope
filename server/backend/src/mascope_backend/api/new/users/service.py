@@ -31,8 +31,8 @@ from mascope_backend.api.new.roles.exceptions import InvalidRoleException
 async def get_users(
     role_name_min: Optional[str] = None,
     role_name_max: Optional[str] = None,
-    page: int = 0,
-    limit: int = 10000,
+    page: int | None = None,
+    limit: int | None = None,
     sort: str = "registered_at",
     order: str = "desc",
 ) -> dict:
@@ -43,10 +43,10 @@ async def get_users(
     :type role_name_min: Optional[str]
     :param role_name_max: Maximum role name for filtering (inclusive), defaults to None.
     :type role_name_max: Optional[str]
-    :param page: Page number for pagination, defaults to 0.
-    :type page: int
-    :param limit: Number of results per page, defaults to 100.
-    :type limit: int
+    :param page: Page number for pagination, defaults to None (no pagination).
+    :type page: int | None
+    :param limit: Number of results per page, defaults to None (no pagination).
+    :type limit: int | None
     :param sort: Column name to sort by, defaults to "registered_at".
     :type sort: str
     :param order: Sort order, either 'asc' or 'desc', defaults to "desc".
@@ -55,6 +55,11 @@ async def get_users(
     :return: A dictionary containing the user list and metadata.
     :rtype: dict
     """
+    # Validate pagination parameters
+    if (page is None) != (limit is None):
+        raise ValueError(
+            "Both 'page' and 'limit' must be provided together or both omitted."
+        )
     async with async_session() as session:
         # Step 1: Construct the base query with join to Role
         query = select(User, Role.role_name).join(Role, Role.role_id == User.role_id)
@@ -89,7 +94,8 @@ async def get_users(
         total = await session.scalar(count_query)
 
         # Step 4: Apply pagination and execute the query
-        query = query.offset(page * limit).limit(limit)
+        if page is not None and limit is not None:
+            query = query.offset(page * limit).limit(limit)
         result = await session.execute(query)
 
         # Step 5: Construct the response data

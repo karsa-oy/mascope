@@ -46,8 +46,8 @@ async def get_target_collections(
     target_collection_type: list[str] | None = None,
     sort: str = None,
     order: str = None,
-    page: int = 0,
-    limit: int = 10000,
+    page: int | None = None,
+    limit: int | None = None,
 ) -> dict:
     """
     Retrieves a paginated list of target collections, optionally sorted by a specified column in either ascending or descending order.
@@ -70,13 +70,18 @@ async def get_target_collections(
     :type sort: str, optional
     :param order: Sorting order ('asc' for ascending, 'desc' for descending), defaults to "asc"
     :type order: str, optional
-    :param page: Page number for pagination.
-    :type page: int, optional
-    :param limit: Number of items per page.
-    :type limit: int, optional
+    :param page: Page number for pagination, defaults to None (no pagination).
+    :type page: int | None, optional
+    :param limit: Number of items per page, defaults to None (no pagination).
+    :type limit: int | None, optional
     :return: A dictionary with the total count and a list of target collections.
     :rtype: dict
     """
+    # Validate pagination parameters
+    if (page is None) != (limit is None):
+        raise ValueError(
+            "Both 'page' and 'limit' must be provided together or both omitted."
+        )
     async with async_session() as session:
         stmt = select(TargetCollection)
 
@@ -110,11 +115,13 @@ async def get_target_collections(
         )
         total = await session.scalar(count_stmt)
 
-        # Step 5: Return the total count and the list of target collections
-        stmt = stmt.offset(page * limit).limit(limit)
+        # Step 4: Apply pagination
+        if page is not None and limit is not None:
+            stmt = stmt.offset(page * limit).limit(limit)
         result = await session.execute(stmt)
         target_collections = result.scalars().all()
 
+        # Step 5: Return the total count and the list of target collections
         return {
             "message": "Target collections retrieved successfully.",
             "results": total,

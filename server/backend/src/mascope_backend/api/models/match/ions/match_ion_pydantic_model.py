@@ -60,8 +60,8 @@ class GetMatchIonsQueryParams(QueryParamsModel):
         None,
         description="The sort order, either 'asc' for ascending or 'desc' for descending.",
     )
-    page: int = Field(0, description="The page number for pagination.")
-    limit: int = Field(10000, description="The number of results per page.")
+    page: int | None = Field(None, description="The page number for pagination.")
+    limit: int | None = Field(None, description="The number of results per page.")
 
 
 class DeleteMatchIonsPayload(FilterSamplePayload):

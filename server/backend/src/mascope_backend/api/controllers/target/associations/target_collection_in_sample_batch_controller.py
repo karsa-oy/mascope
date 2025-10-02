@@ -12,13 +12,18 @@ from mascope_backend.api.lib.api_features import api_controller
 
 @api_controller()
 async def get_target_collections_in_sample_batch(
-    sample_batch_id: str = None,
-    target_collection_id: str = None,
-    sort: str = None,
-    order: str = None,
-    page: int = 0,
-    limit: int = 100000,
+    sample_batch_id: str | None = None,
+    target_collection_id: str | None = None,
+    sort: str | None = None,
+    order: str | None = None,
+    page: int | None = None,
+    limit: int | None = None,
 ):
+    # Validate pagination parameters
+    if (page is None) != (limit is None):
+        raise ValueError(
+            "Both 'page' and 'limit' must be provided together or both omitted."
+        )
     async with async_session() as session:
         stmt = select(TargetCollectionInSampleBatch)
 
@@ -46,7 +51,8 @@ async def get_target_collections_in_sample_batch(
         total = await session.scalar(count_stmt)
 
         # Get paginated results
-        stmt = stmt.offset(page * limit).limit(limit)
+        if page is not None and limit is not None:
+            stmt = stmt.offset(page * limit).limit(limit)
         result = await session.execute(stmt)
         target_collections_in_sample_batch = result.scalars().all()
 

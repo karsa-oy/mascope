@@ -40,5 +40,5 @@ class GetTargetIonsQueryParams(QueryParamsModel):
     )
     sort: str | None = Field(None, description="Field to sort by.")
     order: str | None = Field(None, description="Order of sorting ('asc' or 'desc').")
-    page: int = Field(0, description="Pagination page.")
-    limit: int = Field(10000, description="Number of items per page.")
+    page: int | None = Field(None, description="Pagination page.")
+    limit: int | None = Field(None, description="Number of items per page.")

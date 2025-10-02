@@ -42,8 +42,8 @@ async def get_target_compounds(
     show_target_collection: bool = False,
     sort: str = None,
     order: str = None,
-    page: int = 0,
-    limit: int = 10000,
+    page: int | None = None,
+    limit: int | None = None,
 ) -> dict:
     """
     Retrieves a list of target compounds optionally filtered by name, formula, sample batch,
@@ -73,13 +73,18 @@ async def get_target_compounds(
     :type sort: str, optional
     :param order: Direction to sort the results ('asc' or 'desc'), defaults to None.
     :type order: str, optional
-    :param page: Page number for pagination, defaults to 0.
-    :type page: int, optional
-    :param limit: Number of items per page, defaults to 10000.
-    :type limit: int, optional
+    :param page: Page number for pagination, defaults to None (no pagination).
+    :type page: Optional[int], optional
+    :param limit: Number of items per page, defaults to None (no pagination).
+    :type limit: Optional[int], optional
     :return: A dictionary containing the total number of results, and a list of compounds.
     :rtype: dict
     """
+    # Validate pagination parameters
+    if (page is None) != (limit is None):
+        raise ValueError(
+            "Both 'page' and 'limit' must be provided together or both omitted."
+        )
     async with async_session() as session:
         # Step 1: Define the main query for target compounds
         stmt = select(TargetCompound)
@@ -145,7 +150,8 @@ async def get_target_compounds(
         total = await session.scalar(count_stmt)
 
         # Step 6: Apply pagination and execute
-        stmt = stmt.offset(page * limit).limit(limit)
+        if page is not None and limit is not None:
+            stmt = stmt.offset(page * limit).limit(limit)
         result = await session.execute(stmt)
 
     # Step 7: Construct the response data

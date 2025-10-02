@@ -70,8 +70,8 @@ def test_query_params_defaults():
     params = GetWorkspacesQueryParams()
     assert params.sort == "workspace_utc_created"
     assert params.order == "asc"
-    assert params.page == 0
-    assert params.limit == 10000
+    assert params.page is None
+    assert params.limit is None
 
 
 def test_query_params_custom():

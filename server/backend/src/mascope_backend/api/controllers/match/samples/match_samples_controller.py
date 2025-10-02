@@ -31,7 +31,7 @@ async def get_match_samples(
     sort: str | None = None,
     order: str | None = None,
     page: int = 0,
-    limit: int = 10000,
+    limit: int | None = None,
 ) -> dict:
     """
     Retrieves a list of match samples based on filter criteria, including sample item ID and batch ID.
@@ -57,8 +57,8 @@ async def get_match_samples(
     :type order: str | None, optional
     :param page: Page number for pagination, defaults to 0.
     :type page: int, optional
-    :param limit: Number of items per page, defaults to 10000.
-    :type limit: int, optional
+    :param limit: Number of items per page, defaults to None (return all).
+    :type limit: int | None, optional
     :return: A dictionary containing the total count and a list of match samples.
     :rtype: dict
     """
@@ -92,7 +92,8 @@ async def get_match_samples(
         total = await session.scalar(count_stmt)
 
         # Step 5: Apply pagination
-        query = query.offset(page * limit).limit(limit)
+        if limit is not None:
+            query = query.offset(page * limit).limit(limit)
 
         # Step 6: Execute the query
         result = await session.execute(query)

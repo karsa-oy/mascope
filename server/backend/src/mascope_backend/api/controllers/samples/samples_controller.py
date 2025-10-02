@@ -63,6 +63,11 @@ async def get_samples(
     :return: Dictionary with status, message, results count, and sample data with nested match information
     :rtype: dict
     """
+    # Validate pagination parameters
+    if (page is None) != (limit is None):
+        raise ValueError(
+            "Both 'page' and 'limit' must be provided together or both omitted."
+        )
     async with async_session() as session:
         stmt = (
             select(

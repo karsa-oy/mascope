@@ -242,9 +242,11 @@ class GetSampleItemsQueryParams(GetSampleItemsQueryValidator, QueryParamsModel):
         "asc",
         description="Sorting order, either 'asc' for ascending or 'desc' for descending. Default is 'asc'",
     )
-    page: int = Field(0, description="Page number for pagination. Default is 0")
-    limit: int = Field(
-        10000, description="Number of results per page. Default is 10000"
+    page: int | None = Field(
+        None, description="Page number for pagination. Default is None (return all)"
+    )
+    limit: int | None = Field(
+        None, description="Number of results per page. Default is None (return all)"
     )
 
 

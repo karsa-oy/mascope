@@ -44,8 +44,8 @@ async def get_ionization_mechanisms(
     is_default: bool | None = None,
     sort: str | None = None,
     order: str | None = None,
-    page: int = 0,
-    limit: int = 10000,
+    page: int | None = None,
+    limit: int | None = None,
 ) -> dict:
     """
     Retrieves a paginated list of ionization mechanisms, optionally filtered by polarity, mechanism, or reagent,
@@ -67,10 +67,15 @@ async def get_ionization_mechanisms(
     :type is_default: bool | None
     :param sort: Column to sort by, defaults to None.
     :param order: Sorting order, defaults to None.
-    :param page: Page number for pagination, defaults to 0.
-    :param limit: Number of items per page, defaults to 100.
+    :param page: Page number for pagination, defaults to None (no pagination).
+    :param limit: Number of items per page, defaults to None (no pagination).
     :return: A dictionary with the total count and a list of ionization mechanisms.
     """
+    # Validate pagination parameters
+    if (page is None) != (limit is None):
+        raise ValueError(
+            "Both 'page' and 'limit' must be provided together or both omitted."
+        )
     async with async_session() as session:
         stmt = select(IonizationMechanism)
 
@@ -103,7 +108,8 @@ async def get_ionization_mechanisms(
 
         # Step 4: Apply pagination
         total = await session.scalar(select(func.count()).select_from(stmt))
-        stmt = stmt.offset(page * limit).limit(limit)
+        if page is not None and limit is not None:
+            stmt = stmt.offset(page * limit).limit(limit)
         # Step 5: Execute the query
         result = await session.execute(stmt)
         ionization_mechanisms = result.scalars().all()

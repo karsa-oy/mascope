@@ -53,8 +53,8 @@ async def get_instrument_configs(
     datetime_utc: str | None = None,
     sort: str | None = None,
     order: str | None = None,
-    page: int = 0,
-    limit: int = 10000,
+    page: int | None = None,
+    limit: int | None = None,
 ) -> dict:
     """
     Retrieves a paginated list of instrument configs, optionally filtered by instrument and sorted by a specified column.
@@ -73,10 +73,15 @@ async def get_instrument_configs(
     :param datetime_utc: Filter by datetime utc
     :param sort: Column name to sort by.
     :param order: Sorting order ('asc' for ascending, 'desc' for descending).
-    :param page: Page number for pagination.
-    :param limit: Number of items per page.
+    :param page: Page number for pagination, defaults to None (no pagination).
+    :param limit: Number of items per page, defaults to None (no pagination).
     :return: A dictionary containing total results count and a list of instrument functions.
     """
+    # Validate pagination parameters
+    if (page is None) != (limit is None):
+        raise ValueError(
+            "Both 'page' and 'limit' must be provided together or both omitted."
+        )
     async with async_session() as session:
         # Step 1: construct query
         stmt = select(InstrumentConfig)
@@ -114,7 +119,8 @@ async def get_instrument_configs(
         total = await session.scalar(
             select(func.count()).select_from(stmt)  # pylint: disable=not-callable
         )
-        stmt = stmt.offset(page * limit).limit(limit)
+        if page is not None and limit is not None:
+            stmt = stmt.offset(page * limit).limit(limit)
 
         # Step 5: Execute the query
         result = await session.execute(stmt)

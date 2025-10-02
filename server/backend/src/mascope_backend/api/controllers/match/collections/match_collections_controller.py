@@ -31,19 +31,19 @@ async def get_match_collections(
     match_category_min: int | None = None,
     sort: str | None = None,
     order: str | None = None,
-    page: int = 0,
-    limit: int = 10000,
+    page: int | None = None,
+    limit: int | None = None,
 ) -> dict:
     """
     Retrieves a list of matched collections based on filter criteria.
-    Results can be sorted and paginated according to the provided parameters.
+    Results can be sorted and optionally paginated according to the provided parameters.
 
     Steps:
     1. Construct the base query to select from MatchCollection.
     2. Apply filters based on provided criteria such as sample item ID, batch ID, target collection ID, and match category.
     3. Apply sorting if specified.
     4. Count the total matched collections for pagination.
-    5. Apply pagination and execute the query to fetch results.
+    5. Apply pagination if specified and execute the query to fetch results.
     6. Convert the fetched match collections into a list of dictionaries for response.
 
     :param sample_item_id: Filter match collections by the ID of the sample item, defaults to None.
@@ -58,13 +58,18 @@ async def get_match_collections(
     :type sort: str | None, optional
     :param order: Sort order, either 'asc' for ascending or 'desc' for descending, defaults to None.
     :type order: str | None, optional
-    :param page: Page number for pagination, defaults to 0.
-    :type page: int, optional
-    :param limit: Number of items per page, defaults to 10000.
-    :type limit: int, optional
+    :param page: Page number for pagination, defaults to None (no pagination).
+    :type page: int | None, optional
+    :param limit: Number of items per page, defaults to None (no pagination).
+    :type limit: int | None, optional
     :return: A dictionary containing the total count and a list of matched collections.
     :rtype: dict
     """
+    # Validate pagination parameters
+    if (page is None) != (limit is None):
+        raise ValueError(
+            "Both 'page' and 'limit' must be provided together or both omitted."
+        )
     async with async_session() as session:
         # Step 1: Construct base query
         query = select(MatchCollection)
@@ -99,7 +104,8 @@ async def get_match_collections(
         total = await session.scalar(count_stmt)
 
         # Step 5: Apply pagination
-        query = query.offset(page * limit).limit(limit)
+        if page is not None and limit is not None:
+            query = query.offset(page * limit).limit(limit)
         # Step 6: Execute the query and fetch results
         result = await session.execute(query)
     data = [item.to_dict() for item in result.scalars().all()]

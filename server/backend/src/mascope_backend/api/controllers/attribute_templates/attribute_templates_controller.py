@@ -20,8 +20,8 @@ from mascope_backend.api.models.attribute_templates.attribute_template_pydantic_
 async def get_attribute_templates(
     sort: str = "name",
     order: str = "asc",
-    page: int = 0,
-    limit: int = 10000,
+    page: int | None = None,
+    limit: int | None = None,
 ):
     """
     Retrieves a paginated list of attribute templates, optionally sorted.
@@ -36,14 +36,19 @@ async def get_attribute_templates(
     :type sort: str
     :param order: Order of sorting ('asc' or 'desc').
     :type order: str
-    :param page: Page number for pagination.
-    :type page: int
-    :param limit: Number of results per page.
-    :type limit: int
+    :param page: Page number for pagination, defaults to None (no pagination).
+    :type page: int | None
+    :param limit: Number of results per page, defaults to None (no pagination).
+    :type limit: int | None
     :raises ApiException: For handling any exceptions that occur during the process.
     :return: Dictionary containing total count and paginated attribute templates.
     :rtype: dict
     """
+    # Validate pagination parameters
+    if (page is None) != (limit is None):
+        raise ValueError(
+            "Both 'page' and 'limit' must be provided together or both omitted."
+        )
     async with async_session() as session:
         # Step 1: Construct query
         stmt = select(AttributeTemplate)
@@ -57,7 +62,8 @@ async def get_attribute_templates(
         total = await session.scalar(select(func.count()).select_from(stmt))
 
         # Step 3: Fetch paginated results
-        stmt = stmt.offset(page * limit).limit(limit)
+        if page is not None and limit is not None:
+            stmt = stmt.offset(page * limit).limit(limit)
         result = await session.execute(stmt)
         attribute_templates = result.scalars().all()
 

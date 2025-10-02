@@ -177,8 +177,8 @@ class GetIonizationMechanismsQueryParams(QueryParamsModel):
         "asc",
         description="Order of sorting ('asc' for ascending, 'desc' for descending)",
     )
-    page: int = Field(0, description="Pagination page number")
-    limit: int = Field(10000, description="Number of items per page")
+    page: int | None = Field(None, description="Pagination page number")
+    limit: int | None = Field(None, description="Number of items per page")
 
     @field_validator("ionization_mechanism_polarity")
     @classmethod

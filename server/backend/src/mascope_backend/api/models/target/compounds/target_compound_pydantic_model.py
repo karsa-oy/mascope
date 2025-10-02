@@ -64,8 +64,8 @@ class GetTargetCompoundsQueryParams(QueryParamsModel):
         None,
         description="The sort order, either 'asc' for ascending or 'desc' for descending.",
     )
-    page: int = Field(0, description="The page number for pagination.")
-    limit: int = Field(10000, description="The number of results per page.")
+    page: int | None = Field(None, description="The page number for pagination.")
+    limit: int | None = Field(None, description="The number of results per page.")
 
 
 class GetTargetCompoundInTargetCollectionQueryParams(QueryParamsModel):
@@ -85,5 +85,7 @@ class GetTargetCompoundInTargetCollectionQueryParams(QueryParamsModel):
         None,
         description="Can either be asc for ascending order or desc for descending order.",
     )
-    page: int = Field(0, description="The page number for pagination, default 0")
-    limit: int = Field(10000, description="The number of results per page.")
+    page: int | None = Field(
+        None, description="The page number for pagination, default 0"
+    )
+    limit: int | None = Field(None, description="The number of results per page.")

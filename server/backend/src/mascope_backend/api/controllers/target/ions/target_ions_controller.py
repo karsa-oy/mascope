@@ -46,8 +46,8 @@ async def get_target_ions(
     target_ion_formula: str = None,
     sort: str = None,
     order: str = None,
-    page: int = 0,
-    limit: int = 10000,
+    page: int | None = None,
+    limit: int | None = None,
 ) -> dict:
     """
     Retrieves a paginated list of target ions based on various filtering criteria such as target compound,
@@ -66,9 +66,9 @@ async def get_target_ions(
     8. Format the fetched data into a list of dictionaries suitable for JSON serialization and return alongside total results count.
 
     :param target_compound_id: Filter by specific target compound ID, defaults to None.
-    :type target_compound_id: Optional[str]
+    :type target_compound_id: str | None
     :param ionization_mechanism_id: Filter by specific ionization mechanism ID, defaults to None.
-    :type ionization_mechanism_id: Optional[str]
+    :type ionization_mechanism_id: str | None
     :param sample_batch_id: Filter ions by the ID of the associated sample batch, defaults to None.
     :type sample_batch_id: Optional[str]
     :param target_collection_id: Filter ions by the ID of the target collection they belong to, defaults to None.
@@ -82,18 +82,23 @@ async def get_target_ions(
     :param ionization_mechanism_ids: List of ionization mechanism IDs for broader filtering, defaults to None.
     :type ionization_mechanism_ids: Optional[List[str]]
     :param target_ion_formula: Filter ions by their chemical formula, defaults to None.
-    :type target_ion_formula: Optional[str]
+    :type target_ion_formula: str | None
     :param sort: Field name to sort the results by, defaults to None.
-    :type sort: Optional[str]
+    :type sort: str | None
     :param order: Sorting order, either 'asc' or 'desc', defaults to None.
-    :type order: Optional[str]
-    :param page: Page number for pagination, defaults to 0.
-    :type page: int
-    :param limit: Number of items per page, defaults to 10000.
-    :type limit: int
+    :type order: str | None
+    :param page: Page number for pagination, defaults to None (no pagination).
+    :type page: int | None
+    :param limit: Number of items per page, defaults to None (no pagination).
+    :type limit: int | None
     :return: A dictionary containing the total number of results and a list of target ions.
     :rtype: dict
     """
+    # Validate pagination parameters
+    if (page is None) != (limit is None):
+        raise ValueError(
+            "Both 'page' and 'limit' must be provided together or both omitted."
+        )
     async with async_session() as session:
         # Step 1: Construct the base query
         stmt = select(TargetIon)
@@ -194,8 +199,9 @@ async def get_target_ions(
         total = await session.scalar(
             select(func.count()).select_from(stmt)  # pylint: disable=not-callable
         )
-        # Step 7: Execute the query with pagination.
-        stmt = stmt.offset(page * limit).limit(limit)
+        # Step 7: Apply pagination conditionally
+        if page is not None and limit is not None:
+            stmt = stmt.offset(page * limit).limit(limit)
         result = await session.execute(stmt)
 
     # Step 8: Construct the response data

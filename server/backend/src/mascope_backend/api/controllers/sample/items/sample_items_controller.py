@@ -80,8 +80,8 @@ async def get_sample_items(
     polarity: list[str] | None = None,
     sort: str = "sample_item_utc_created",
     order: str = "asc",
-    page: int = 0,
-    limit: int = 10000,
+    page: int | None = None,
+    limit: int | None = None,
 ) -> dict:
     """
     Retrieves a paginated list of sample items, optionally sorted by a specified column in either ascending or descending order.
@@ -90,14 +90,13 @@ async def get_sample_items(
     1. Construct a SQLAlchemy query to select all sample items.
     2. Apply filtering if specified by the parameters.
     3. Apply sorting if specified by the sort and order parameters.
-    3. Apply pagination based on the page and limit parameters.
-    4. Execute the query to fetch the results.
+    4. Apply pagination based on the provided page and limit parameters.
     5. Convert the results into a list of dictionaries for JSON serialization.
 
     :param sample_batch_id: The sample batch ID for which you want to fetch the sample items, defaults to None
-    :type sample_batch_id: str, optional
+    :type sample_batch_id: str | None, optional
     :param filename: The filename for which you want to fetch the sample items, defaults to None
-    :type filename: str, optional
+    :type filename: str | None, optional
     :param sample_item_type: Filter by sample item types, can specify multiple types, defaults to None
     :type sample_item_type: list[str] | None
     :param polarity: Filter by ion polarity mode of the sample item, '+' for positive or '-' for negative
@@ -106,13 +105,18 @@ async def get_sample_items(
     :type sort: str, optional
     :param order: Sorting order ('asc' for ascending, 'desc' for descending), defaults to "asc"
     :type order: str, optional
-    :param page: Page number for pagination.
-    :type page: int, optional
-    :param limit: Number of items per page.
-    :type limit: int, optional
+    :param page: Page number for pagination, defaults to None (no pagination).
+    :type page: int | None, optional
+    :param limit: Number of items per page, defaults to None (no pagination).
+    :type limit: int | None, optional
     :return: A dictionary with the total count and a list of sample items.
     :rtype: dict
     """
+    # Validate pagination parameters
+    if (page is None) != (limit is None):
+        raise ValueError(
+            "Both 'page' and 'limit' must be provided together or both omitted."
+        )
     async with async_session() as session:
         stmt = select(SampleItem)
 
@@ -143,7 +147,8 @@ async def get_sample_items(
         total = await session.scalar(count_stmt)
 
         # Step 4: Apply pagination
-        stmt = stmt.offset(page * limit).limit(limit)
+        if page is not None and limit is not None:
+            stmt = stmt.offset(page * limit).limit(limit)
         result = await session.execute(stmt)
         sample_items = result.scalars().all()
 

@@ -174,8 +174,8 @@ class GetWorkspacesQueryParams(WorkspaceBaseValidator, QueryParamsModel):
         "asc",
         description="Sorting order which can be asc for ascending or desc for descending.",
     )
-    page: int = Field(0, description="Page number for pagination.")
-    limit: int = Field(10000, description="Number of results per page.")
+    page: int | None = Field(None, description="Page number for pagination.")
+    limit: int | None = Field(None, description="Number of results per page.")
 
     @field_validator("workspace_type")
     @classmethod

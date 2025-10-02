@@ -27,8 +27,8 @@ async def get_workspaces(
     instrument: list[str] | None = None,
     sort: str = "workspace_utc_created",
     order: str = "asc",
-    page: int = 0,
-    limit: int = 10000,
+    page: int | None = None,
+    limit: int | None = None,
 ) -> dict:
     """
     Retrieves a paginated list of workspaces, optionally sorted by a specified column in either ascending or descending order.
@@ -50,13 +50,18 @@ async def get_workspaces(
     :type sort: str, optional
     :param order: Sorting order ('asc' for ascending, 'desc' for descending), defaults to "asc"
     :type order: str, optional
-    :param page: Page number for pagination.
-    :type page: int, optional
-    :param limit: Number of items per page.
-    :type limit: int, optional
+    :param page: Page number for pagination, defaults to None (no pagination).
+    :type page: int | None, optional
+    :param limit: Number of items per page, defaults to None (no pagination).
+    :type limit: int | None, optional
     :return: A dictionary with the total count and a list of workspaces.
     :rtype: dict
     """
+    # Validate pagination parameters
+    if (page is None) != (limit is None):
+        raise ValueError(
+            "Both 'page' and 'limit' must be provided together or both omitted."
+        )
     async with async_session() as session:
         stmt = select(Workspace)
 
@@ -82,7 +87,8 @@ async def get_workspaces(
         total = await session.scalar(count_stmt)
 
         # Step 4: Apply pagination
-        stmt = stmt.offset(page * limit).limit(limit)
+        if page is not None and limit is not None:
+            stmt = stmt.offset(page * limit).limit(limit)
 
         # Step 5: Execute the query
         result = await session.execute(stmt)
