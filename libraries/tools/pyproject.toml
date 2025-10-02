@@ -19,7 +19,7 @@ requires-python = ">=3.12"
 readme = "README.md"
 dependencies = [
     "isospecpy>=2.2.3",
-    "mascope-sdk>=2025.8.18",
+    "mascope-sdk>=2025.8.28",
     "numpy>=1.26",
     "scipy>=1.16.1",
     "pandas>=2.3.1",
