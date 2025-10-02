@@ -30,6 +30,7 @@ export const useMatchCollection = defineStore('app.data.match.collection', () =>
         return sampleId ? { sample_item_id: sampleId } : { sample_batch_id: batchId }
       },
       selection: {
+        subscribe: true,
         /**
          * Cross-store sync: focus target collection when match collection focused
          */

@@ -6,7 +6,9 @@ import Button from 'primevue/button'
 
 import { reactive, watchEffect } from 'vue'
 
-import { api } from '@/api'
+import { useApp } from '@/stores'
+
+const app = useApp()
 
 const props = defineProps({
   compound: {
@@ -70,10 +72,7 @@ watchEffect(() => {
           icon="pi pi-save"
           @click="
             () => {
-              api.http.patch(`/target/compounds`, [input], {
-                use: 'update',
-                type: 'update_target_compounds'
-              })
+              app.data.target.compound.update(input)
               visible = false
             }
           "

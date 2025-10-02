@@ -74,13 +74,14 @@ def detect_target_collection_changes(
     )
 
     runtime.logger.debug(
-        "Detected target collection changes:",
-        f"compounds_changed: {compounds_changed},"
-        f"compounds_to_add: {list(compounds_to_add)},"
-        f"compounds_to_remove: {list(compounds_to_remove)},"
-        f"batches_changed: {batches_changed},"
-        f"batches_to_add: {list(batches_to_add)},"
-        f"batches_to_remove: {list(batches_to_remove)},",
+        "Detected target collection changes:\n"
+        f"  basic_fields_changed: {basic_fields_changed}\n"
+        f"  compounds_changed: {compounds_changed}\n"
+        f"  compounds_to_add: {list(compounds_to_add)}\n"
+        f"  compounds_to_remove: {list(compounds_to_remove)}\n"
+        f"  batches_changed: {batches_changed}\n"
+        f"  batches_to_add: {list(batches_to_add)}\n"
+        f"  batches_to_remove: {list(batches_to_remove)}"
     )
 
     return {

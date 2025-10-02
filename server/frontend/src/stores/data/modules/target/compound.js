@@ -19,6 +19,12 @@ export const useTargetCompound = defineStore('app.data.target.compound', () => {
   )
 
   return {
-    ...data
+    ...data,
+    // backend methods
+    update: (compound) =>
+      api.http.patch(`/target/compounds/`, [compound], {
+        use: 'update',
+        type: 'update_target_compound'
+      })
   }
 })

@@ -4,8 +4,6 @@ import { computed, inject } from 'vue'
 import Chip from 'primevue/chip'
 
 import { useApp } from '@/stores'
-import { prettyTrim } from '@/lib/utils'
-import { num } from '@/lib/formatters'
 
 const app = useApp()
 

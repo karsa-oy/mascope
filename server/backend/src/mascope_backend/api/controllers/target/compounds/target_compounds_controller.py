@@ -1,6 +1,8 @@
-from typing import List, Optional
+import asyncio
+from typing import Optional
 from fastapi import HTTPException
 from sqlalchemy import asc, desc, func, select, or_, and_
+from sqlalchemy.ext.asyncio import AsyncSession
 from mascope_file.string import norm
 from mascope_backend.socket import sio
 from mascope_backend.db import async_session
@@ -14,7 +16,7 @@ from mascope_backend.db.models import (
 )
 from mascope_backend.api.lib.api_features import api_controller
 from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
-from mascope_backend.api.controllers.target.lib.fetch.target_fetch import (
+from mascope_backend.api.controllers.target.lib.fetch.target_compounds_fetch import (
     fetch_compound_collections_and_batches,
 )
 from mascope_backend.api.controllers.ionization_mechanisms.ionization_mechanisms_controller import (
@@ -198,9 +200,9 @@ async def get_target_compound(target_compound_id: str) -> dict:
 
 @api_controller()
 async def create_target_compound(
-    target_compounds: List[TargetCompoundBase],
-    independent_transaction=False,
-    session=None,
+    target_compounds: list[TargetCompoundBase],
+    independent_transaction: bool = False,
+    session: AsyncSession | None = None,
 ) -> dict:
     """Function to create a target compound record(s) and derived target ions and isotopes
 
@@ -224,11 +226,11 @@ async def create_target_compound(
     name+formula but different CAS number than an existing record, the existing record will be used and the inconsistency between CAS
     numbers is silently ignored.
 
-    :param target_compounds: List of target compounds to create
-    :type target_compounds: List[TargetCompoundBase]
+    :param target_compounds: list of target compounds to create
+    :type target_compounds: list[TargetCompoundBase]
     :param independent_transaction: Flag indicating whether the create target compound is an independent transaction, defaults to False
     :type independent_transaction: bool, optional
-    :param session: Database session, smust be gicen if not an independent transaction, defaults to None
+    :param session: Database session, must be given if not an independent transaction, defaults to None
     :type session: SQLAlchemy.AsyncSession, optional
     :raises RuntimeError: Database is malformed
     :return: Return created target compounds, skipped compounds (already existing) and message log
@@ -390,19 +392,38 @@ async def create_target_compound(
 
 
 @api_controller()
-async def update_target_compound(target_compounds: List[TargetCompoundUpdate]):
-    async with async_session() as session:
-        not_changed_target_compounds = []
-        not_updated_target_compounds = []
-        existing_target_compounds = []
-        updated_target_compounds = []
-        sample_batches_affected_reload = set()
-        sample_batches_affected_rematch = set()
-        message_log = {}
+async def update_target_compound(
+    target_compounds: list[TargetCompoundUpdate],
+) -> dict[str, list | dict]:
+    """
+    Updates multiple target compounds with validation and change tracking.
 
-        # for target_compound in target_compounds:
+    Handles formula changes by recreating compounds and re-associating them
+    with target collections. Emits appropriate reload events for affected
+    collections.
+
+    Steps:
+    - Validate each compound exists
+    - Check if changes were made
+    - For formula changes: delete old, create new, re-associate collections
+    - For other changes: update fields directly
+    - Track affected target collections
+    - Emit reload events to update UI
+
+    :param target_compounds: List of target compound updates to process
+    :type target_compounds: list[TargetCompoundUpdate]
+    :return: Dictionary containing categorized compounds and message logs
+    :rtype: dict[str, list | dict]
+    """
+    not_changed_target_compounds = []
+    not_updated_target_compounds = []
+    existing_target_compounds = []
+    updated_target_compounds = []
+    affected_target_collection_ids = set()
+    message_log = {}
+    async with async_session() as session:
         for i, target_compound in enumerate(target_compounds):
-            # Initialize messages list for this compound
+            # Initialize message log for this compound
             message_log[i + 1] = {"status_code": 0, "messages": []}
 
             # Check if target compound exists
@@ -421,9 +442,8 @@ async def update_target_compound(target_compounds: List[TargetCompoundUpdate]):
                 )
                 continue
 
-            # Check if target compound was edited
-            update_data = target_compound.dict(exclude_unset=True)
-
+            # Check if target compound was actually edited
+            update_data = target_compound.model_dump(exclude_unset=True)
             if all(
                 getattr(existing_compound, key, None) == value
                 for key, value in update_data.items()
@@ -435,7 +455,13 @@ async def update_target_compound(target_compounds: List[TargetCompoundUpdate]):
                 )
                 continue  # Skip this compound update, proceed to the next
 
-            # Check if the compound formula is updated
+            # Get affected target collections before any modifications
+            _, target_collections_ids = await fetch_compound_collections_and_batches(
+                target_compound.target_compound_id
+            )
+            affected_target_collection_ids.update(target_collections_ids)
+
+            # Handle formula changes (requires compound recreation)
             if (
                 target_compound.target_compound_formula
                 and existing_compound.target_compound_formula
@@ -467,14 +493,6 @@ async def update_target_compound(target_compounds: List[TargetCompoundUpdate]):
                     )
                     continue  # Skip this compound update, proceed to the next
 
-                # Get the sample batches affected by the formula changed compond
-                (
-                    sample_batches_ids,
-                    target_collections_ids,
-                ) = await fetch_compound_collections_and_batches(
-                    target_compound.target_compound_id
-                )
-
                 # If compound formula has changed, delete the compound and recreate it with new formula
                 await delete_target_compound(
                     target_compound_id=target_compound.target_compound_id,
@@ -488,41 +506,33 @@ async def update_target_compound(target_compounds: List[TargetCompoundUpdate]):
                     independent_transaction=False,
                     session=session,
                 )
+
+                # Process creation result
                 if (
                     "created_compounds" in new_compound_result
                     and len(new_compound_result["created_compounds"]) == 1
                 ):
                     new_compound = new_compound_result["created_compounds"][0]
-                    # Add batches to remath set
-                    sample_batches_affected_rematch.update(sample_batches_ids)
-
                     message_log[i + 1]["status_code"] = 201
                     message_log[i + 1]["messages"].append(
-                        "New target compound {} (target_compound_id: {} ) created".format(
-                            new_compound.target_compound_name,
-                            new_compound.target_compound_id,
-                        )
+                        f"New target compound '{new_compound.target_compound_name}' created "
+                        f"(ID: {new_compound.target_compound_id})"
                     )
                 elif (
                     "existing_compounds" in new_compound_result
                     and len(new_compound_result["existing_compounds"]) == 1
                 ):
                     new_compound = new_compound_result["existing_compounds"][0]
-                    # Add batches to remath set
-                    sample_batches_affected_rematch.update(sample_batches_ids)
-
                     message_log[i + 1]["status_code"] = 200
                     message_log[i + 1]["messages"].append(
-                        "Existing target compound {} with target_compound_id: {} used".format(
-                            new_compound.target_compound_name,
-                            new_compound.target_compound_id,
-                        )
+                        f"Existing target compound '{new_compound.target_compound_name}' used "
+                        f"(ID: {new_compound.target_compound_id})"
                     )
 
                 else:
                     raise HTTPException(
                         status_code=500,
-                        detail="Error in creating target compound",
+                        detail="Error creating target compound",
                     )
 
                 # Check if the compound already exists in target collections
@@ -555,43 +565,27 @@ async def update_target_compound(target_compounds: List[TargetCompoundUpdate]):
 
             else:
                 # If compound formula has not changed, just update the fields
-                update_data = target_compound.dict(exclude_unset=True)
                 for key, value in update_data.items():
                     setattr(existing_compound, key, value)
+
                 updated_target_compounds.append(existing_compound)
-
-                # Get all affected collection and sample batches to reload
-                sample_batches_ids, _ = await fetch_compound_collections_and_batches(
-                    target_compound.target_compound_id
-                )
-                sample_batches_affected_reload.update(sample_batches_ids)
-
                 message_log[i + 1]["status_code"] = 200
                 message_log[i + 1]["messages"].append(
-                    f"Compound {existing_compound.target_compound_name} updated."
+                    f"Compound '{existing_compound.target_compound_name}' updated"
                 )
 
         await session.commit()
 
-        # TODO Rematch the affected sample batches where compound formula was updated
+        # Step 5: Emit reload events for affected collections
+        reload_events = [
+            sio.emit("ion_reload", room=target_collection_id, namespace="/")
+            for target_collection_id in affected_target_collection_ids
+        ]
+        # Always emit global targets reload
+        reload_events.append(sio.emit("targets_all_reload", namespace="/"))
 
-        # Exclude rematched ids since they've been reloaded
-        sample_batches_affected_reload = (
-            sample_batches_affected_reload - sample_batches_affected_rematch
-        )
-
-        # Reload other affected sample batches
-        for sample_batch_id in sample_batches_affected_reload:
-            await sio.emit(
-                "sample_batch_reload",
-                room=sample_batch_id,
-                namespace="/",
-            )
-        # Emit global targets reload event to update ui
-        await sio.emit(
-            "targets_all_reload",
-            namespace="/",
-        )
+        if reload_events:
+            await asyncio.gather(*reload_events)
 
         return {
             "not_changed_compounds": not_changed_target_compounds,
@@ -603,16 +597,38 @@ async def update_target_compound(target_compounds: List[TargetCompoundUpdate]):
 
 
 @api_controller()
-# TODO_error_handling any exceptions would not be returned whdn called from the delete_target_collection, may use the api_controller_background_task
 async def delete_target_compound(
-    target_compound_id: str, independent_transaction=False, session=None
-):
-    sample_batches_to_reload = set()
+    target_compound_id: str,
+    independent_transaction: bool = False,
+    session: AsyncSession | None = None,
+) -> dict[str, str]:
+    """
+    Deletes a target compound and emits reload events for affected collections.
 
+    When a compound is deleted, all target collections that contained this
+    compound need to reload their ion data. The compound-collection associations
+    are automatically removed via cascade delete.
+
+    Steps:
+    - Fetch the target compound to verify existence
+    - Find all target collections containing this compound
+    - Delete the compound (cascade removes associations)
+    - Emit reload events to affected collections
+
+    :param target_compound_id: ID of the target compound to delete
+    :type target_compound_id: str
+    :param independent_transaction: Whether to manage transaction independently
+    :type independent_transaction: bool
+    :param session: Optional SQLAlchemy session for nested transactions
+    :type session: AsyncSession | None
+    :raises NotFoundException: When target compound is not found
+    :return: Success message with deleted compound name
+    :rtype: dict[str, str]
+    """
     if independent_transaction:
         session = async_session()
 
-    # Step 1: Fetch the target compound
+    # Fetch the target compound
     target_compound = await session.get(TargetCompound, target_compound_id)
     if not target_compound:
         raise NotFoundException(
@@ -625,32 +641,24 @@ async def delete_target_compound(
             TargetCompoundInTargetCollection.target_compound_id == target_compound_id
         )
     )
-    target_collections_with_compound = result.scalars().all()
+    affected_target_collection_ids = result.scalars().all()
 
-    # Fetch the sample batch ids from TargetCollectionInSampleBatch for these collections
-    result = await session.execute(
-        select(TargetCollectionInSampleBatch.sample_batch_id).filter(
-            TargetCollectionInSampleBatch.target_collection_id.in_(
-                target_collections_with_compound
-            )
-        )
-    )
-    affected_sample_batches = result.scalars().all()
-    sample_batches_to_reload.update(affected_sample_batches)
-
-    # Delete TargetCompound record
+    # Delete the compound (associations removed by cascade)
     await session.delete(target_compound)
 
     if independent_transaction:
         await session.commit()
-        # Reload affected sample batches
-        for sample_batch_id in sample_batches_to_reload:
-            await sio.emit(
-                "sample_batch_reload",
-                room=sample_batch_id,
-                namespace="/",
-            )
-        await sio.emit("targets_all_reload", namespace="/")
+
+        #  Emit reload events for affected collections
+        reload_events = [
+            sio.emit("ion_reload", room=collection_id, namespace="/")
+            for collection_id in affected_target_collection_ids
+        ]
+        # Always emit global targets reload
+        reload_events.append(sio.emit("targets_all_reload", namespace="/"))
+
+        if reload_events:
+            await asyncio.gather(*reload_events)
     else:
         await session.flush()
 

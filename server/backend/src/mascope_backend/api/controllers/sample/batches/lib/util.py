@@ -49,12 +49,12 @@ def detect_update_batch_changes(existing_batch, sample_batch_update) -> dict[str
     )
 
     runtime.logger.debug(
-        "Detected sample batch changes: "
-        f"collections_changed: {collections_changed}, "
-        f"collections_to_add: {list(collections_to_add)}, "
-        f"collections_to_remove: {list(collections_to_remove)}, "
-        f"name_changed: {name_changed}, "
-        f"description_changed: {description_changed}"
+        "Detected sample batch changes:\n"
+        f"  collections_changed: {collections_changed}\n"
+        f"  collections_to_add: {list(collections_to_add)}\n"
+        f"  collections_to_remove: {list(collections_to_remove)}\n"
+        f"  name_changed: {name_changed}\n"
+        f"  description_changed: {description_changed}"
     )
 
     return {
