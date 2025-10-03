@@ -1,8 +1,6 @@
 <script setup>
 import { ref, watch, watchEffect, computed } from 'vue'
 
-import Select from 'primevue/select'
-import ContextMenu from 'primevue/contextmenu'
 import Button from 'primevue/button'
 import Listbox from 'primevue/listbox'
 
@@ -15,7 +13,6 @@ const app = useApp()
 const sidebarMenu = useSidebarMenu()
 const open = computed(() => sidebarMenu.open && sidebarMenu.tab === 'workspaces')
 
-const menu = ref()
 const dialog = ref()
 
 watch(
@@ -65,9 +62,20 @@ const vHelpLayer = app.ui.help.directive(layer)
     </div>
     <section>
       <Listbox
-        v-model="app.data.workspace.focused"
+        :modelValue="app.data.workspace.focused"
+        @update:modelValue="
+          (value) => {
+            if (value) {
+              // Selecting a different workspace
+              app.data.workspace.focused = value
+            } else if (!value && sidebarMenu.open) {
+              // Tried to deselect (clicked same workspace) - close sidebar
+              sidebarMenu.open = false
+            }
+          }
+        "
         :options="app.data.workspace.list"
-        optionLabel="worksace_name"
+        optionLabel="workspace_name"
         listStyle="height: calc(100vh - 300px)"
         :pt="
           app.ui.help.bottom_start(`
