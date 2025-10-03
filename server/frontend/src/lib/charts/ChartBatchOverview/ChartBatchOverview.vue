@@ -1,8 +1,9 @@
 <script setup>
-import { ref, computed, watch, toRaw } from 'vue'
+import { ref, computed, watch, toRaw, onUnmounted } from 'vue'
 
 import Select from 'primevue/select'
 import FloatLabel from 'primevue/floatlabel'
+import ProgressSpinner from 'primevue/progressspinner'
 
 import { useApp } from '@/stores'
 import { ToolbarIntensityScale } from '@/lib/toolbars'
@@ -16,17 +17,39 @@ const data = useChartData()
 const scroller = useSampleScroller()
 
 const plot = ref({})
-
-const chartTitle = computed(() =>
-  app.data.batch.focused.sample_batch_name
-    ? `${app.data.batch.focused.sample_batch_name} <i>(${app.data.sample.list.length} samples)</i>`
-    : ''
-)
+const showSpinner = ref(false)
 
 const scale = ref({
   mode: 'average',
   max: null,
   log: true
+})
+
+const chartTitle = computed(() => {
+  const batchName = app.data.batch?.focused?.sample_batch_name || null
+  const sampleCount = app.data.sample?.list.length || 0
+
+  if (!batchName) return ''
+
+  const mainTitle = `${batchName} <i>(${sampleCount} samples)</i>`
+
+  if (!app.data.match.collection.focused) {
+    return `
+      ${mainTitle}
+      <br>
+      <span style="font-size: 0.85em; opacity: 0.6; font-weight: normal;">
+        Select a target collection to visualize matches
+      </span>
+    `
+  }
+
+  return `
+    ${mainTitle}
+    <br>
+    <span style="font-size: 0.85em; opacity: 0.7; font-weight: normal;">
+      target: '${app.data.match.collection.focused.target_collection_name}'
+    </span>
+  `
 })
 
 const unit = computed(() =>
@@ -174,11 +197,41 @@ watch(
     }
   }
 )
+
+let loadingTimeout = null
+watch(
+  () => app.data.match.batch_overview.pending,
+  (isLoading) => {
+    if (loadingTimeout) {
+      clearTimeout(loadingTimeout)
+      loadingTimeout = null
+    }
+
+    if (isLoading) {
+      loadingTimeout = setTimeout(() => {
+        showSpinner.value = true
+      }, 300)
+    } else {
+      showSpinner.value = false
+    }
+  },
+  { immediate: true }
+)
+
+onUnmounted(() => {
+  if (loadingTimeout) clearTimeout(loadingTimeout)
+})
 </script>
 
 <template>
   <figure style="height: calc(100vh - 200px)">
+    <div v-if="showSpinner" class="spinner">
+      <div>
+        <ProgressSpinner strokeWidth="5px" />
+      </div>
+    </div>
     <BaseChartPlotly
+      v-else
       id="ChartSampleIntensity"
       ref="plot"
       :title="chartTitle"
@@ -216,3 +269,12 @@ watch(
     </BaseChartPlotly>
   </figure>
 </template>
+
+<style scoped>
+.spinner :deep(.p-progressspinner) {
+  height: auto !important;
+  width: 50px !important;
+  height: 50px !important;
+  opacity: 0.8;
+}
+</style>
