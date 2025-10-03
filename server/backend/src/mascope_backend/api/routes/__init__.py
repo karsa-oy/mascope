@@ -52,9 +52,6 @@ from mascope_backend.api.routes.match.match_routes import match_router
 from mascope_backend.api.routes.match.samples.match_samples_routes import (
     match_samples_router,
 )
-from mascope_backend.api.routes.match.targets.sample.match_targets_sample_routes import (
-    match_targets_sample_router,
-)
 from mascope_backend.api.routes.match.targets.batch.match_targets_batch_routes import (
     match_targets_batch_router,
 )
@@ -119,7 +116,6 @@ routers = [
     instrument_configs_process_router,
     calibration_router,
     match_records_router,
-    match_targets_sample_router,
     match_targets_batch_router,
     match_router,
     match_aggregate_batch_router,
