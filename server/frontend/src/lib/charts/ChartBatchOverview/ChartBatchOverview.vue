@@ -8,10 +8,12 @@ import { useApp } from '@/stores'
 import { ToolbarIntensityScale } from '@/lib/toolbars'
 
 import BaseChartPlotly from '../BaseChartPlotly.vue'
+import { useSampleScroller } from '@/lib/panes/PaneBrowserSample/stores'
 import { useChartData } from './data'
 
 const app = useApp()
 const data = useChartData()
+const scroller = useSampleScroller()
 
 const plot = ref({})
 
@@ -127,6 +129,8 @@ function onClick({ pointIndex, curveNumber }) {
   const sample = app.data.sample.list[pointIndex]
   if (sample) {
     app.data.sample.focus(sample)
+    // Scroll to sample in table
+    scroller.scrollToSample(app.data.sample.focusedId)
   } else {
     app.data.sample.unfocus()
   }
@@ -149,6 +153,8 @@ function onClick({ pointIndex, curveNumber }) {
 function onSelect({ points }) {
   const samples = points.map((i) => app.data.sample.list[i])
   app.data.sample.selected = samples
+  // Scroll to first selected sample in table
+  scroller.scrollToSamples(app.data.sample.selectedIds)
 }
 
 /**

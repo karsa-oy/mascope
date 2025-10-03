@@ -1,6 +1,5 @@
 <script setup>
-import { ref, computed, watch, nextTick } from 'vue'
-
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { useWindowSize } from '@vueuse/core'
 
 import DataTable from 'primevue/datatable'
@@ -14,11 +13,16 @@ import { useApp } from '@/stores'
 
 import SampleTableCustomizer from './SampleTableCustomizer.vue'
 import SampleContextMenu from './SampleContextMenu.vue'
-import { useSampleContextMenu, useCustomizerPopover, useBatchStatus } from './stores'
+import {
+  useBatchStatus,
+  useCustomizerPopover,
+  useSampleContextMenu,
+  useSampleScroller
+} from './stores'
 
 const app = useApp()
-// Ref to access DataTable for programmatic scrolling
 const sampleTable = ref(null)
+const scroller = useSampleScroller()
 
 const customizer = useCustomizerPopover()
 const contextMenu = useSampleContextMenu()
@@ -41,86 +45,28 @@ const batchStatus = computed(() => {
   }
 })
 
-/**
- * Scroll to sample in virtual scroller only if not already visible.
- * Checks visibility within the DataTable's scroll container, not window.
- */
-let scrollLock = false
-async function scrollToSample(sampleId) {
-  if (!scrollLock && sampleId && sampleTable.value) {
-    scrollLock = true
-
-    await nextTick()
-
-    const scrollContainer = sampleTable.value.$el.querySelector('.p-virtualscroller')
-
-    if (!scrollContainer) {
-      scrollLock = false
-      return
-    }
-
-    // Check if element already exists and is visible in scroll container
-    const existingElement = document.getElementById(sampleId)
-    if (existingElement) {
-      const containerRect = scrollContainer.getBoundingClientRect()
-      const elementRect = existingElement.getBoundingClientRect()
-
-      // Check if element is within the scroll container's visible area
-      const isVisible =
-        elementRect.top >= containerRect.top && elementRect.bottom <= containerRect.bottom
-
-      if (isVisible) {
-        // Already visible in container, no scroll needed
-        scrollLock = false
-        return
-      }
-    }
-
-    const sampleIndex = samples.value.findIndex((s) => s.sample_item_id === sampleId)
-
-    if (sampleIndex === -1) {
-      scrollLock = false
-      return
-    }
-
-    const itemSize = 35.74
-    const scrollTop = sampleIndex * itemSize
-
-    // Scroll container to render the row
-    scrollContainer.scrollTop = scrollTop
-
-    // Wait for render, then scroll into view using nearest edge
-    setTimeout(() => {
-      const element = document.getElementById(sampleId)
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-      }
-      scrollLock = false
-    }, 100)
-  }
-}
-
+// Watch for table ref to become available and bind to scroller
 watch(
-  () => app.data.sample.selectedIds,
-  (newSelection) => {
-    if (!newSelection) return
-    let targetSampleId = null
-    if (newSelection.length === 1) {
-      targetSampleId = app.data.sample.focusedId
+  sampleTable,
+  (newTableRef) => {
+    if (newTableRef) {
+      scroller.bind(
+        newTableRef,
+        () => samples.value,
+        () => customizer.config
+      )
     }
-    if (newSelection.length > 1) {
-      const selectedIndices = app.data.sample.selectedIds
-        .map((id) => samples.value.findIndex((s) => s.sample_item_id === id))
-        .filter((idx) => idx !== -1)
-
-      if (selectedIndices.length > 0) {
-        const firstIndex = Math.min(...selectedIndices)
-        targetSampleId = samples.value[firstIndex].sample_item_id
-      }
-    }
-    scrollToSample(targetSampleId)
-  }
+  },
+  { immediate: true }
 )
+
+onBeforeUnmount(() => {
+  scroller.bind(
+    null,
+    () => [],
+    () => ({ sortField: null, sortOrder: 1 })
+  )
+})
 
 const { height } = useWindowSize()
 const padding = 100
