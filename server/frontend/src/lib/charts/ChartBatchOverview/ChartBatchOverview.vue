@@ -31,25 +31,12 @@ const chartTitle = computed(() => {
 
   if (!batchName) return ''
 
-  const mainTitle = `${batchName} <i>(${sampleCount} samples)</i>`
+  return `${batchName} <i>(${sampleCount} samples)</i>`
+})
 
-  if (!app.data.match.collection.focused) {
-    return `
-      ${mainTitle}
-      <br>
-      <span style="font-size: 0.85em; opacity: 0.6; font-weight: normal;">
-        Select a target collection to visualize matches
-      </span>
-    `
-  }
-
-  return `
-    ${mainTitle}
-    <br>
-    <span style="font-size: 0.85em; opacity: 0.7; font-weight: normal;">
-      target: '${app.data.match.collection.focused.target_collection_name}'
-    </span>
-  `
+const chartSubtitle = computed(() => {
+  if (!app.data.match.collection.focused) return 'Select a target collection to visualize matches'
+  return `Collection: ${app.data.match.collection.focused.target_collection_name}`
 })
 
 const unit = computed(() =>
@@ -235,6 +222,7 @@ onUnmounted(() => {
       id="ChartSampleIntensity"
       ref="plot"
       :title="chartTitle"
+      :subtitle="chartSubtitle"
       :data="traces"
       :layout="layout"
       @click="onClick"

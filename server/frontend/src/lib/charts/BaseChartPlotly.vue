@@ -23,6 +23,10 @@ const props = defineProps({
   title: {
     type: String
   },
+  subtitle: {
+    type: String,
+    required: false
+  },
   data: {
     type: Array
   },
@@ -93,7 +97,12 @@ const derived = computed(() => ({
       ...(!props.hideTitle
         ? {
             title: {
-              text: props.title
+              text: props.subtitle
+                ? `${props.title}<br><span style="font-size: 14px; font-weight: 400; opacity: 0.85;">${props.subtitle}</span>`
+                : props.title,
+              pad: {
+                b: 10
+              }
             }
           }
         : {
@@ -233,11 +242,11 @@ watchEffect(
         icon="pi pi-chart-bar"
       />
       <Popover ref="settings">
-        <slot name="settings"> </slot>
+        <slot name="settings" />
       </Popover>
     </div>
     <div class="bottomleft" v-if="slots.origin">
-      <slot name="origin"> </slot>
+      <slot name="origin" />
     </div>
   </div>
 </template>
