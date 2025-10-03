@@ -940,59 +940,96 @@ app.ui.split.left;
 
 #### Frontend Store Data Library
 
-Our frontend data layer is built around composable functions that provide reactive data loading, selection management, and analytics querying. The core composables are located in `src/stores/data/lib/` and can be composed together in Pinia stores to create sophisticated data modules.
+Our frontend data layer is built around composable functions that provide reactive data loading and selection management. The core composables are located in `src/stores/data/lib/` and can be composed together in Pinia stores to create data modules.
 
 **_Core Composables_**
 
 The data library provides two main composables:
 
-- **`useData`**: Handles reactive data loading with parent-child relationships, selection management, caching, and automatic reloading
-- **`useFilter`**: Provides cross-dimensional filtering for analytics queries
+- **`useData`**: Handles reactive data loading with dependency-based triggering, selection management, and automatic reloading
+- **`useSelection`**: Manages selection state (focus/select/unselect) with optional localStorage persistence and socket subscriptions
 
-A third composable, `useSelection`, exists internally to handle selection state but is not intended for standalone use.
+Additionally, a **`useFilter`** store exists to centralize selection state across stores. This allows stores to optionally use other stores' selected records as filter parameters. Currently unused - all data loading is handled via dependency management. Reserved for future advanced filtering scenarios where data needs to be filtered by selections from multiple other stores.
 
 **_Using useData_**
 
-The `useData` composable creates reactive data collections with hierarchical loading:
+The useData composable creates reactive data collections with dependency-based loading:
 
 ```js
-import { useData } from '@/stores/data/lib'
+import { useData } from "@/stores/data/lib";
 
 const data = useData(
-  'batch', // name
-  ({ workspace_id }) => api.http.get(`/sample/batches`, { params: { workspace_id } }), // method
+  "batch", // name
+  ({ workspace_id }) =>
+    api.http.get(`/sample/batches`, { params: { workspace_id } }), // main load method, populates list, params passed from deps
   {
-    deps: () => ({ workspace_id: useWorkspace().focusedId }), // dependencies
-    parent: useWorkspace, // parent store
-    events: ['sample_batch_reload'], // socket events
-    selection: true // enable selection
+    deps: () => ({ workspace_id: useWorkspace().focusedId }), // dependencies that trigger loading, become method params
+    events: ["sample_batch_reload"], // socket events that trigger reload
+    selection: true, // enable selection
+    key: "sample_batch_id", // primary key field
   }
-)
+);
 ```
 
+**Key Options:**
+
+- **`deps`**: Function returning parameters object. Store loads when any dependency value changes. Null values prevent loading until dependency becomes available.
+- **`events`**: Array of socket event names that trigger store reload
+- **`selection`**: Enable selection management (see below)
+- **`key`**: Primary key field name (defaults to `${name}_id`)
+- **`read`**: Optional function to fetch single record by ID for `reloadRecord()`
+- **`detailed`**: Optional ref to hold detailed record with associations
+
 The composable returns:
-- `list`: Reactive array of records
-- `pending`: Loading state
-- `filtered`: Filtered records based on selection
-- `hash`: Unique identifier for cache invalidation
 
-When selection is enabled, additional properties are returned for selection management:
+- `list`: Reactive array of all records
+- `pending`: Loading state boolean
+- `filtered`: Records filtered by selection (or full list if no selection)
+- `filteredIds`: Array of IDs from filtered records
+- `detailed`: Detailed record data (if `detailed` option provided)
+- Selection properties (if `selection` enabled - see below)
 
-**Selection Options:**
+**_Dependency-Based Loading_**
+
+All data loading is triggered by dependency changes. When `deps()` returns different values, the store automatically reloads:
+
+```js
+// Store reloads when workspace focus changes
+deps: () => ({
+  workspace_id: useWorkspace().focusedId,
+});
+
+// Store reloads when batch OR collection focus changes
+deps: () => ({
+  sample_batch_id: useBatch().focusedId,
+  target_collection_id: useMatchCollection().focusedId,
+});
+
+// Context-sensitive: prioritize sample-level, fallback to batch-level
+deps: () => {
+  const sampleId = useSample().focusedId;
+  const batchId = useBatch().focusedId;
+
+  return sampleId ? { sample_item_id: sampleId } : { sample_batch_id: batchId };
+};
+```
+
+**_Selection Management_**
 
 Selection can be enabled by passing a `selection` option to `useData`:
 
 ```js
 const data = useData('sample', method, {
   selection: {
-    mode: 'multiple', // 'single', 'binary', or 'multiple'  
-    persist: true, // localStorage persistence
-    subscribe: ({ sample_file_id }) => sample_file_id // socket room subscription
+    mode: 'multiple', *// 'single', 'multiple' or 'binary' (default)*
+    persist: true, *// localStorage persistence*
+    subscribe: ({ sample_file_id }) => sample_file_id *// socket room subscription*
   }
 })
 ```
 
 Selection modes:
+
 - `single`: Always maintains exactly one focused item
 - `binary`: 0 or 1 focused item (default when `selection: true`)
 - `multiple`: Multi-selection with focus on primary item
@@ -1003,81 +1040,195 @@ When selection is enabled, the following properties and methods are available:
 
 ```js
 // Focus API (single selection)
-data.focus(record)
-data.unfocus()
-data.focused // current focused record
-data.focusedId // focused record's ID
+data.focus(record);
+data.unfocus();
+data.focused; // current focused record
+data.focusedId; // focused record's ID
 
-// Selection API (multi-selection)  
-data.select(record1, record2)
-data.unselect(record)
-data.selected // array of selected records
-data.selectedIds // array of selected IDs
+// Selection API (multi-selection)
+data.select(record1, record2);
+data.unselect(record);
+data.selected; // array of selected records
+data.selectedIds; // array of selected IDs
 ```
 
-**_Using useFilter for Analytics_**
+**_Store-Specific Reload Events_**
 
-Analytics queries use the filter store to perform cross-dimensional filtering:
+Each store configures its own socket events for reloading. Events follow naming convention matching store names:
 
 ```js
-import { useFilter } from '@/stores/data'
-
-const data = useData(
-  'sample',
-  (params) => api.http.post(`/analytics/sample`, params), // analytics endpoint
-  {
-    deps: () => ({
-      sample_batch_id: useBatch().focusedId,
-      ...useFilter().get('sample') // cross-dimensional filters
-    })
-  }
-)
+events: ["sample_batch_reload"]; // Reloads batch store
+events: ["workspace_reload"]; // Reloads workspace store
+events: ["match_reload"]; // Can trigger multiple stores
 ```
 
-The `useFilter().get(dimension)` method returns filter parameters for all other dimensions, enabling complex multi-dimensional queries while maintaining reactive updates when filters change.
+When a reload event fires, the store:
+
+1. Reloads its `list` data
+2. Calls `reloadRecord()` to refresh `focused` and `detailed` records
+3. Executes optional `hook()` callback
+
+**_Detailed Record Loading_**
+
+For stores needing detailed data with associations (need api endpoint with details), provide `detailed` ref and `read` function.
+Separate load method can be specified, to be used in external calls:
+
+```js
+import { ref } from "vue";
+
+export const useTargetCollection = defineStore('app.data.target.collection', () => {
+  const detailed = ref(null)
+  const read = (target_collection_id) =>
+    api.http.get(`/target/collections/${target_collection_id}`, {
+      use: 'read',
+      type: 'read_target_collection_details'
+    })
+
+  const loadDetailed = async (target_collection_id) => {
+    if (!target_collection_id) return null
+    try {
+      detailed.value = await read(target_collection_id)
+      return detailed.value
+    } catch (error) {
+      console.warn(`🗃️ [data ${name}] failed to load detailed ${target_collection_id}: ${error}`)
+      detailed.value = null
+      return null
+    }
+  }
+
+  const data = useData(
+    'target_collection'
+    () =>
+      api.http.get(`/target/collections`, {
+        use: 'read',
+        type: 'load_target_collections'
+      }),
+    {
+      selection: {
+        /**
+         * Hook to automatically load detailed data when focused
+         * and clear when unfocused
+         */
+        hook: async ({ next, prev }) => {
+          if (next) {
+            await loadDetailed(next[key])
+          } else {
+            console.log(`🗃️ [data ${name}] unloading detailed ${prev[key]}`)
+            detailed.value = null
+          }
+        }
+      },
+      // pass to handle the reloadRecord for list/focused/detailed
+      read,
+      detailed // Ref to hold detailed data
+    }
+  )
+});
+```
+
+**_Cross-Store Coordination_**
+
+Stores coordinate via custom hooks watching selection changes:
+
+```js
+// When focused in match.collection store - auto-focus in target.collection store
+selection: {
+  hook: async ({ next, prev }) => {
+    if (next?.target_collection_id) {
+      const targetCollectionStore = useTargetCollection();
+      targetCollectionStore.focus(next.target_collection_id);
+    }
+  };
+}
+```
 
 **_Implementing Data Stores_**
 
 A typical data store combines these composables:
 
 ```js
-import { defineStore } from 'pinia'
-import { useData } from '@/stores/data/lib'
-import { useFilter } from '@/stores/data'
+import { defineStore } from "pinia";
+import { useData } from "@/stores/data/lib";
+import { ref } from "vue";
 
-export const useSample = defineStore('app.data.sample', () => {
+export const useWorkspace = defineStore("app.data.workspace", () => {
+  const detailed = ref(null);
+
   const data = useData(
-    'sample',
-    (params) => api.http.post(`/analytics/sample`, params, {
-      use: 'read',
-      type: 'load_samples'
-    }),
-    {
-      deps: () => ({
-        sample_batch_id: useBatch().focusedId,
-        ...useFilter().get('sample')
+    "workspace",
+    () =>
+      api.http.get("/workspaces", {
+        use: "read",
+        type: "load_workspaces",
       }),
-      parent: useBatch,
+    {
+      key: "workspace_id",
+      events: ["workspace_reload"],
       selection: {
-        mode: 'multiple',
-        subscribe: ({ sample_file_id }) => sample_file_id
+        mode: "single",
+        persist: true,
+        subscribe: true,
       },
-      key: 'sample_item_id'
+      read: (workspace_id) =>
+        api.http.get(`/workspaces/${workspace_id}`, {
+          use: "read",
+          type: "read_workspace",
+        }),
     }
-  )
+  );
 
   return {
     ...data,
-    // Custom operations
-    create: (sample) => api.http.post(`/sample/items`, sample, {
-      use: 'create',
-      type: 'create_sample'
-    })
-  }
-})
+    // Custom CRUD operations
+    create: (workspace) =>
+      api.http.post("/workspaces", workspace, {
+        use: "create",
+        type: "create_workspace",
+      }),
+    update: (workspace) =>
+      api.http.patch(`/workspaces/${workspace.workspace_id}`, workspace, {
+        use: "update",
+        type: "update_workspace",
+      }),
+    delete: (workspace) =>
+      api.http.delete(`/workspaces/${workspace.workspace_id}`, {
+        use: "delete",
+        type: "delete_workspace",
+      }),
+  };
+});
 ```
 
-This pattern provides automatic data loading, selection management, analytics filtering, and socket subscriptions while maintaining clean separation of concerns.
+This pattern provides automatic data loading via dependencies, selection management with optional persistence, store-specific reload events, and detailed record loading while maintaining clean separation of concerns.
+
+**_Filter Store_**
+
+A centralized filter store (`src/stores/data/filter.js`) holds selection state from all registered stores:
+
+```js
+*// Each store's selection automatically syncs to filter store*
+useFilter().sample  *// Contains selected sample records*
+useFilter().batch   *// Contains selected batch records*
+```
+
+Example of useFilter and the filter store usage to perform cross-dimensional filtering:
+
+```js
+import { useFilter } from "@/stores/data";
+
+const data = useData(
+  "sample",
+  (params) => api.http.post(`/sample`, params), // load endpoint
+  {
+    deps: () => ({
+      sample_batch_id: useBatch().focusedId,
+      ...useFilter().get("sample"), // cross-dimensional filters getter (need implementation)
+    }),
+  }
+);
+```
+
+Currently unused - selection state is managed locally in each store. Reserved for future scenarios where stores need to filter data based on selections from multiple other stores simultaneously.
 
 ### Frontend User Help
 
