@@ -275,13 +275,6 @@ class BasePeakDetector(ABC):
 
 
 class OrbiPeakDetector(BasePeakDetector):
-    @property
-    def calibration_factor(self):
-        calibration = self._sample_file_props["mz_calibration"]
-        if calibration is None:
-            return 1.0
-        return calibration["par"]["calibration_factor"]
-
     async def detect_peaks(
         self, if_exists: Literal["fail", "append", "replace"] = "fail", **kwargs
     ):
@@ -294,15 +287,6 @@ class OrbiPeakDetector(BasePeakDetector):
         """
         old_peak_mzs, old_peak_areas, old_peak_heights = self._load_old_peaks(if_exists)
 
-        if self.calibration_factor != 1.0:
-            # Revert calibration for sum signal
-            self._sum_signal = self._sum_signal.assign_coords(
-                mz=self._sum_signal.mz / self.calibration_factor
-            )
-            if old_peak_mzs != []:
-                # Revert calibration for old peaks
-                old_peak_mzs = [mz / self.calibration_factor for mz in old_peak_mzs]
-
         self._update_u_list(if_exists, old_peak_mzs)
         no_peaks_to_fit = not self._validate_u_list()
         if no_peaks_to_fit:
@@ -314,6 +298,7 @@ class OrbiPeakDetector(BasePeakDetector):
             return sample_file_data
 
         runtime.logger.debug("Reading centroids from the Thermo file...")
+        # Get CALIBRATED centroids
         new_peak_mzs, new_peak_heights, resolutions, signal_to_noise = (
             get_orbi_centroids(self._filename, self._u_list)
         )
@@ -405,15 +390,6 @@ class OrbiPeakDetector(BasePeakDetector):
         peak_profiles_area, peak_profiles_height = self._calculate_peak_profiles(
             peak_mzs, peak_areas, peak_heights
         )
-
-        if self.calibration_factor != 1.0:
-            # Apply calibration factor
-            peak_profiles_area = peak_profiles_area.assign_coords(
-                mz=peak_profiles_area.mz.values * self.calibration_factor
-            )
-            peak_profiles_height = peak_profiles_height.assign_coords(
-                mz=peak_profiles_height.mz.values * self.calibration_factor
-            )
 
         runtime.logger.info(f"Writing peaks to file {self._filename}")
 

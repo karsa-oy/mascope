@@ -433,16 +433,28 @@ def get_orbi_centroids(
     :param polarity: Polarity of scans to use ('+' or '-'), optional, defaults to None (all polarities).
     :type polarity: Literal['+', '-'], optional
     :return: Tuple of (masses, intensities, resolutions, signal-to-noise) for centroid peaks
-    matching the criteria, or (None, None, None, None) if raw file was not found.
+    matching the criteria.
     :rtype: tuple
     """
     sample_type = m_name.get_sample_file_type(base_filename)
-    if sample_type == "orbi_raw":
-        datafile_path = m_name.filename_to_datafile_path(base_filename)
-        return m_thermo.get_centroids(
-            datafile_path, u_list, t_min, t_max, polarity=polarity
-        )
-    return None, None, None, None
+
+    match sample_type:
+        case "orbi_raw":
+            datafile_path = m_name.filename_to_datafile_path(base_filename)
+            masses, intensities, resolutions, signal_to_noise = m_thermo.get_centroids(
+                datafile_path, u_list, t_min, t_max, polarity=polarity
+            )
+            props = m_io.read_props(base_filename)
+            calibration = props["mz_calibration"]
+            if calibration:
+                fit_parameters = calibration["par"]
+                factor = fit_parameters["calibration_factor"]
+                masses = masses * factor
+        case _:
+            raise NotImplementedError(
+                "Centroid extraction is only implemented for Orbitrap raw files."
+            )
+    return masses, intensities, resolutions, signal_to_noise
 
 
 def get_orbi_centroids_per_scan(
@@ -467,12 +479,25 @@ def get_orbi_centroids_per_scan(
     :rtype: list
     """
     sample_type = m_name.get_sample_file_type(base_filename)
-    if sample_type == "orbi_raw":
-        datafile_path = m_name.filename_to_datafile_path(base_filename)
-        return m_thermo.get_centroids_per_scan(
-            datafile_path, t_min, t_max, polarity=polarity
-        )
-    return []
+    match sample_type:
+        case "orbi_raw":
+            datafile_path = m_name.filename_to_datafile_path(base_filename)
+            centroids_per_scan = m_thermo.get_centroids_per_scan(
+                datafile_path, t_min, t_max, polarity=polarity
+            )
+            props = m_io.read_props(base_filename)
+            calibration = props["mz_calibration"]
+            if calibration:
+                fit_parameters = calibration["par"]
+                factor = fit_parameters["calibration_factor"]
+                for scan_centroids in centroids_per_scan:
+                    scan_centroids["masses"] = scan_centroids["masses"] * factor
+
+            return centroids_per_scan
+        case _:
+            raise NotImplementedError(
+                "Per-scan centroid extraction is only for Orbitrap raw files."
+            )
 
 
 def get_peak_profiles(
