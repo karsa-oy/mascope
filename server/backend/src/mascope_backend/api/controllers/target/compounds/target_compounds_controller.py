@@ -60,13 +60,13 @@ async def get_target_compounds(
     7. Format the fetched data into a list of dictionaries for the response.
 
     :param target_compound_name: Filter compounds by their name, defaults to None.
-    :type target_compound_name: Optional[str], optional
+    :type target_compound_name: str | None, optional
     :param target_compound_formula: Filter compounds by their chemical formula, defaults to None.
-    :type target_compound_formula: Optional[str], optional
+    :type target_compound_formula: str | None, optional
     :param sample_batch_id: Filter compounds associated with a specific sample batch ID, defaults to None.
-    :type sample_batch_id: Optional[str], optional
+    :type sample_batch_id: str | None, optional
     :param target_collection_id: Filter compounds associated with a specific target collection ID, defaults to None.
-    :type target_collection_id: Optional[str], optional
+    :type target_collection_id: str | None, optional
     :param show_target_collection: Include target collection data in the response, defaults to False.
     :type show_target_collection: bool, optional
     :param sort: Column name to sort by, defaults to None.
@@ -74,9 +74,9 @@ async def get_target_compounds(
     :param order: Direction to sort the results ('asc' or 'desc'), defaults to None.
     :type order: str, optional
     :param page: Page number for pagination, defaults to None (no pagination).
-    :type page: Optional[int], optional
+    :type page: int | None, optional
     :param limit: Number of items per page, defaults to None (no pagination).
-    :type limit: Optional[int], optional
+    :type limit: int | None, optional
     :return: A dictionary containing the total number of results, and a list of compounds.
     :rtype: dict
     """

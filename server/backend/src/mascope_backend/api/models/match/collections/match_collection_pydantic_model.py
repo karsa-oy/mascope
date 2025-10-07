@@ -39,8 +39,14 @@ class GetMatchCollectionsQueryParams(QueryParamsModel):
         None,
         description="The sort order, either 'asc' for ascending or 'desc' for descending.",
     )
-    page: int | None = Field(None, description="The page number for pagination.")
-    limit: int | None = Field(None, description="The number of results per page.")
+    page: int | None = Field(
+        None,
+        description="The page number for pagination, optional. None for no pagination.",
+    )
+    limit: int | None = Field(
+        None,
+        description="The number of results per page, optional. None for no pagination.",
+    )
 
 
 class DeleteMatchCollectionsPayload(FilterSamplePayload):

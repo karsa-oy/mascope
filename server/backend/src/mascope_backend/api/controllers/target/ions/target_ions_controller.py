@@ -55,15 +55,15 @@ async def get_target_ions(
     target collection information and can be ordered and sorted according to specified parameters.
 
     Steps:
-    1. Construct the base query for fetching target ions.
-    2. Apply filters based on target compound ID, ionization mechanism ID, compound list, and ionization mechanism list.
-    3. If additional context such as sample batch or target collection details are requested, enhance the query to join
+    - Construct the base query for fetching target ions.
+    - Apply filters based on target compound ID, ionization mechanism ID, compound list, and ionization mechanism list.
+    - If additional context such as sample batch or target collection details are requested, enhance the query to join
        with related tables and filter further based on these details.
-    4,5. If 'show_target_collection' or 'show_ionization_mechanism' is true, join with the respective tables to include
+    - If 'show_target_collection' or 'show_ionization_mechanism' is true, join with the respective tables to include
        these details in the results.
-    6. Apply ordering and sorting to the query.
-    7. Execute the query with pagination.
-    8. Format the fetched data into a list of dictionaries suitable for JSON serialization and return alongside total results count.
+    - Apply ordering and sorting to the query.
+    - Execute the query with pagination.
+    - Format the fetched data into a list of dictionaries suitable for JSON serialization and return alongside total results count.
 
     :param target_compound_id: Filter by specific target compound ID, defaults to None.
     :type target_compound_id: str | None
@@ -100,10 +100,10 @@ async def get_target_ions(
             "Both 'page' and 'limit' must be provided together or both omitted."
         )
     async with async_session() as session:
-        # Step 1: Construct the base query
+        # Construct the base query
         stmt = select(TargetIon)
 
-        # Step 2: Apply basic filters
+        # Apply basic filters
         if target_compound_id:
             stmt = stmt.filter(TargetIon.target_compound_id == target_compound_id)
         if ionization_mechanism_id:
@@ -119,7 +119,7 @@ async def get_target_ions(
         if target_ion_formula:
             stmt = stmt.filter(TargetIon.target_ion_formula == target_ion_formula)
 
-        # Step 3: Adjust the query based non-basic filters
+        # Adjust the query based non-basic filters
         if sample_batch_id or target_collection_id or show_target_collection:
             stmt = stmt.join(
                 TargetCompoundInTargetCollection,
@@ -164,7 +164,7 @@ async def get_target_ions(
                     == target_collection_id
                 )
 
-            # Step 4: Include target collection details if requested
+            # Include target collection details if requested
             if show_target_collection:
                 stmt = stmt.join(
                     TargetCollection,
@@ -177,7 +177,7 @@ async def get_target_ions(
                     TargetCollection.target_collection_type,
                 )
 
-        # Step 5: Join IonizationMechanism if show_ionization_mechanism is True
+        # Join IonizationMechanism if show_ionization_mechanism is True
         if show_ionization_mechanism:
             stmt = stmt.join(
                 IonizationMechanism,
@@ -188,7 +188,7 @@ async def get_target_ions(
                 IonizationMechanism.ionization_mechanism,
             )
 
-        # Step 6: Apply sorting
+        # Apply sorting
         if sort:
             if order == "desc":
                 stmt = stmt.order_by(desc(getattr(TargetIon, sort)))
@@ -199,12 +199,12 @@ async def get_target_ions(
         total = await session.scalar(
             select(func.count()).select_from(stmt)  # pylint: disable=not-callable
         )
-        # Step 7: Apply pagination conditionally
+        # Apply pagination conditionally
         if page is not None and limit is not None:
             stmt = stmt.offset(page * limit).limit(limit)
         result = await session.execute(stmt)
 
-    # Step 8: Construct the response data
+    # Construct the response data
     data = []
     for row in result.all():
         # When show_target_collection is true, include target_collection_id

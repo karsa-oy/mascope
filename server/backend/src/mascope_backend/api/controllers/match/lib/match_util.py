@@ -13,13 +13,13 @@ def sort_and_paginate_match_sample_df(
     Handles NaN values by treating them as -1 for sorting purposes and ensures JSON compatibility.
 
     Steps:
-    1. Validate pagination parameters: both 'page' and 'limit' must be provided together or both omitted.
-    2. Replace NaN values in 'match_score' and 'match_category' with -1 for sorting purposes.
-    3. Convert 'match_category' to integer type.
-    4. Sort the DataFrame by 'target_collection_id', 'match_category', and 'match_score'.
-    5. If pagination parameters are provided, paginate the sorted DataFrame based on the 'page' and 'limit' parameters.
-    6. Replace -1 back to None for 'match_score' and 'match_category'.
-    7. Replace all other NaN and NaT values with None for JSON compatibility.
+    - Validate pagination parameters: both 'page' and 'limit' must be provided together or both omitted.
+    - Replace NaN values in 'match_score' and 'match_category' with -1 for sorting purposes.
+    - Convert 'match_category' to integer type.
+    - Sort the DataFrame by 'target_collection_id', 'match_category', and 'match_score'.
+    - If pagination parameters are provided, paginate the sorted DataFrame based on the 'page' and 'limit' parameters.
+    - Replace -1 back to None for 'match_score' and 'match_category'.
+    - Replace all other NaN and NaT values with None for JSON compatibility.
 
     :param df: DataFrame containing the match sample data to be sorted and optionally paginated.
     :type df: pd.DataFrame

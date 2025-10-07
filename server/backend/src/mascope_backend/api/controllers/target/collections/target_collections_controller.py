@@ -53,12 +53,12 @@ async def get_target_collections(
     Retrieves a paginated list of target collections, optionally sorted by a specified column in either ascending or descending order.
 
     Steps:
-    1. Construct a SQLAlchemy query to select all target collections.
-    2. Apply filtering if specified by the parameters.
-    3. Apply sorting if specified by the sort and order parameters.
-    3. Apply pagination based on the page and limit parameters.
-    4. Execute the query to fetch the results.
-    5. Convert the results into a list of dictionaries for JSON serialization.
+    - Construct a SQLAlchemy query to select all target collections.
+    - Apply filtering if specified by the parameters.
+    - Apply sorting if specified by the sort and order parameters.
+    - Apply pagination based on the page and limit parameters.
+    - Execute the query to fetch the results.
+    - Convert the results into a list of dictionaries for JSON serialization.
 
     :param target_collection_name: The name of the target collection for which you want to fetch the target collections, defaults to None
     :type target_collection_name: str | None, optional
@@ -85,7 +85,7 @@ async def get_target_collections(
     async with async_session() as session:
         stmt = select(TargetCollection)
 
-        # Step 1: Apply filters if specified
+        # Apply filters if specified
         if target_collection_name:
             stmt = stmt.where(
                 TargetCollection.target_collection_name == target_collection_name
@@ -102,26 +102,25 @@ async def get_target_collections(
             stmt = stmt.where(
                 TargetCollection.target_collection_type.in_(target_collection_type)
             )
-        # Step 2: Apply sorting if specified
+        # Apply sorting if specified
         if sort:
             if order == "desc":
                 stmt = stmt.order_by(desc(getattr(TargetCollection, sort)))
             else:
                 stmt = stmt.order_by(asc(getattr(TargetCollection, sort)))
 
-        # Step 3: Get total count for pagination
+        # Get total count for pagination
         count_stmt = select(func.count()).select_from(  # pylint: disable=not-callable
             stmt
         )
         total = await session.scalar(count_stmt)
 
-        # Step 4: Apply pagination
+        # Apply pagination
         if page is not None and limit is not None:
             stmt = stmt.offset(page * limit).limit(limit)
         result = await session.execute(stmt)
         target_collections = result.scalars().all()
 
-        # Step 5: Return the total count and the list of target collections
         return {
             "message": "Target collections retrieved successfully.",
             "results": total,
