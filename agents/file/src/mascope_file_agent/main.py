@@ -47,7 +47,9 @@ DEFAULT_CONFIG = textwrap.dedent(
     """
 )
 
-FILE_UPLOAD_SIZE_LIMIT = 2.5 * 1024**3  # 2.5 GB
+# TODO: Use TUS protocol for large file uploads, see issue #1131
+# https://github.com/karsa-oy/mascope/issues/1131
+FILE_UPLOAD_SIZE_LIMIT = 100 * 1024**2  # 100 MB
 HOST = None
 PORT = None
 URL = None
@@ -105,10 +107,8 @@ def upload_sample_file(filepath: str) -> None:
     file_size = os.stat(filepath).st_size
     if file_size > FILE_UPLOAD_SIZE_LIMIT:
         raise ValueError(
-            (
-                f"File size ({round(file_size / (1024**3), 1)} GB) exceeds the maximum",
-                f"allowed size ({FILE_UPLOAD_SIZE_LIMIT / (1024**3)} GB)",
-            )
+            f"File size ({round(file_size / (1024**2), 1)} MB) exceeds the maximum "
+            f"allowed size ({FILE_UPLOAD_SIZE_LIMIT / (1024**2)} MB)"
         )
 
     # Make file upload request
