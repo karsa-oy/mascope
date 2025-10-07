@@ -143,7 +143,16 @@ async def validation_exception_handler(
     :return: A structured HTTP response indicating the validation errors.
     :rtype: JSONResponse
     """
-    context_message = "Validation error"
+    try:
+        body = await request.json()
+    except Exception:
+        body = None
+
+    context_message = (
+        f"Validation error on route {request.method} {request.url.path} "
+        f"with body={body!r}"
+    )
+    runtime.logger.error(f"Validation error on {request.method} {request.url.path}")
     return handle_exception(exc, context_message, response_type="http")
 
 
@@ -184,7 +193,7 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
     elif exc.status_code == status.HTTP_400_BAD_REQUEST:
         context_message = "Bad request"
     else:
-        context_message = "An HTTP error occurred"
+        context_message = f"HTTPException on {request.method} {request.url.path} | detail={exc.detail}"
     return handle_exception(exc, context_message, response_type="http")
 
 
@@ -201,7 +210,7 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
     :return: An appropriate HTTP response based on the exception, ensuring that the application responds gracefully to unexpected errors.
     :rtype: JSONResponse
     """
-    context_message = "An error occurred"
+    context_message = f"Unhandled exception on {request.method} {request.url.path}"
     # Handle the exception and get the response
     return handle_exception(exc, context_message, response_type="http")
 
