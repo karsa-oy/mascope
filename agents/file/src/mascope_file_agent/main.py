@@ -4,6 +4,7 @@ import shutil
 import sys
 import textwrap
 
+from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import Event, Queue
 from queue import Empty
 from threading import Thread
@@ -56,6 +57,8 @@ URL = None
 SHUTDOWN_EVENT = Event()
 
 runtime = None  # pylint: disable=invalid-name
+
+executor = ThreadPoolExecutor(max_workers=3)
 
 
 def process_file_upload(filepath: str, max_retries: int = 10) -> None:
@@ -344,11 +347,8 @@ class FileUploader:
                         self.jobs.put(fname)
                         runtime.logger.debug(f"Put {fname} back to queue")
                         continue
-                    # Spawn a thread for file upload
-                    upload_thread = Thread(
-                        target=process_file_upload, args=(fname,), daemon=True
-                    )
-                    upload_thread.start()
+                    # Submit file upload task for the thread pool executor
+                    executor.submit(process_file_upload, fname)
                 except Empty:
                     continue
 
@@ -390,6 +390,7 @@ def run() -> None:
     uploader = FileUploader(runtime.config.source, runtime.config.mask)
     uploader.watcher.run_as_daemon()
     uploader.run_until_complete()
+    executor.shutdown(wait=True)
 
 
 if __name__ == "__main__":
