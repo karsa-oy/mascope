@@ -374,10 +374,11 @@ def run() -> None:
 
     PORT = runtime.meta.api_port
     HOST = runtime.config.host
-    if HOST and PORT:
-        URL = f"http://{HOST}:{PORT}"
-    elif HOST:
-        URL = f"http://{HOST}"
+    match runtime.mode:
+        case "dev":
+            URL = f"http://{HOST}:{PORT}"
+        case "prod":
+            URL = f"https://{HOST}"
     if not URL:
         runtime.logger.error(
             "Mascope host not defined, please check configuration. Exiting..."
