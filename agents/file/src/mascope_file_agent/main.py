@@ -303,7 +303,7 @@ class FileUploader:
                 os.rename(fname, fname)
                 break
             except PermissionError:
-                runtime.logger.info(f"File {fname} is not ready")
+                runtime.logger.debug(f"File {fname} is not ready")
                 time.sleep(1)
         self.jobs.put(fname)
 
