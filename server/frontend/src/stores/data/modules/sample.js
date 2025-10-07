@@ -2,7 +2,6 @@ import { defineStore } from 'pinia'
 
 import { api } from '@/api'
 
-import { useMzFit } from '@/lib/mzFit'
 import { genId } from '@/lib/utils'
 import { useData } from '@/lib/store'
 
@@ -96,12 +95,10 @@ export const useSample = defineStore('app.data.sample', () => {
         }
       ),
     process: async ({ sample, instrument_config }) => {
-      const mzFit = useMzFit()
       return await api.http.post(
         `/sample/items/process`,
         {
           sample_item: sample,
-          mz_calibration_params: mzFit.mzCalibrationParams,
           instrument_config
         },
         {
