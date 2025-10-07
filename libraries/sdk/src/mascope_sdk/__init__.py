@@ -187,7 +187,7 @@ def api_post_file(
                 files=[("files", file)],
                 headers=headers,
                 verify=False,
-                timeout=30,
+                timeout=60,
             )
         resp.raise_for_status()  # Raise HTTPError for bad responses
         message = json.loads(resp.content).get("message", None)
