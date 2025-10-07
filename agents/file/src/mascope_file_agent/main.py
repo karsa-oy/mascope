@@ -56,21 +56,35 @@ SHUTDOWN_EVENT = Event()
 runtime = None  # pylint: disable=invalid-name
 
 
-def process_file_upload(filepath: str) -> None:
+def process_file_upload(filepath: str, max_retries: int = 10) -> None:
     """Process file upload
 
     :param filepath: Full path to the file to be uploaded
     :type filepath: str
     """
-    try:
-        upload_sample_file(filepath)
-    except Exception as e:  # pylint: disable=broad-except
-        runtime.logger.error(f"Exception {e.__class__.__name__}({str(e)})")
-        # Move failed file into a separate directory
-        failed_dir = mkdir(runtime.config.source, "failed_uploads")
-        failed_filepath = os.path.join(failed_dir, os.path.basename(filepath))
-        shutil.copyfile(filepath, failed_filepath)
-        runtime.logger.debug(f"Copied failed file to {failed_filepath}")
+    for attempt in range(1, max_retries + 1):
+        try:
+            upload_sample_file(filepath)
+            return
+        except ValueError as ve:
+            runtime.logger.error(f"File upload failed: {str(ve)}")
+            break  # do not retry on validation errors
+        except Exception as e:  # pylint: disable=broad-except
+            runtime.logger.warning(
+                f"Upload attempt {attempt}/{max_retries} for file "
+                f"{os.path.basename(filepath)} failed: {e.__class__.__name__}({str(e)})"
+            )
+            runtime.logger.info("Retrying upload in 30 seconds...")
+            time.sleep(30)
+    # Max retries exceeded, give up
+    runtime.logger.error(
+        f"File upload failed for file {os.path.basename(filepath)} after {attempt} attempts"
+    )
+    # Move failed file into a separate directory
+    failed_dir = mkdir(runtime.config.source, "failed_uploads")
+    failed_filepath = os.path.join(failed_dir, os.path.basename(filepath))
+    shutil.copyfile(filepath, failed_filepath)
+    runtime.logger.debug(f"Copied failed file to {failed_filepath}")
 
 
 def upload_sample_file(filepath: str) -> None:
