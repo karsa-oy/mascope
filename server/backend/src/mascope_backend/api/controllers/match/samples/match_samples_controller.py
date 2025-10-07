@@ -30,7 +30,7 @@ async def get_match_samples(
     match_category_min: int | None = None,
     sort: str | None = None,
     order: str | None = None,
-    page: int = 0,
+    page: int | None = None,
     limit: int | None = None,
 ) -> dict:
     """
@@ -38,12 +38,12 @@ async def get_match_samples(
     Results can be sorted and paginated according to the provided parameters.
 
     Steps:
-    1. Construct a query to fetch match samples.
-    2. Apply filtering based on sample item ID, sample batch ID, and match category if specified.
-    3. Apply sorting if specified.
-    4. Count the total matching samples for pagination.
-    5. Apply pagination and execute the query.
-    6. Format the fetched match samples into a list of dictionaries for response.
+    - Construct a query to fetch match samples.
+    - Apply filtering based on sample item ID, sample batch ID, and match category if specified.
+    - Apply sorting if specified.
+    - Count the total matching samples for pagination.
+    - Apply pagination and execute the query.
+    - Format the fetched match samples into a list of dictionaries for response.
 
     :param sample_item_id: Filter match samples by sample item ID, defaults to None.
     :type sample_item_id: str | None, optional
@@ -55,18 +55,23 @@ async def get_match_samples(
     :type sort: str | None, optional
     :param order: Sort order, either 'asc' or 'desc', defaults to None.
     :type order: str | None, optional
-    :param page: Page number for pagination, defaults to 0.
-    :type page: int, optional
+    :param page: Page number for pagination, defaults to None.
+    :type page: int | None, optional
     :param limit: Number of items per page, defaults to None (return all).
     :type limit: int | None, optional
     :return: A dictionary containing the total count and a list of match samples.
     :rtype: dict
     """
+    # Validate pagination parameters
+    if (page is None) != (limit is None):
+        raise ValueError(
+            "Both 'page' and 'limit' must be provided together or both omitted."
+        )
     async with async_session() as session:
-        # Step 1: Construct base query
+        # Construct base query
         query = select(MatchSample)
 
-        # Step 2: Apply filters
+        # Apply filters
         if sample_item_id:
             query = query.filter(MatchSample.sample_item_id == sample_item_id)
         if match_category_min is not None:
@@ -76,7 +81,7 @@ async def get_match_samples(
                 SampleItem, SampleItem.sample_item_id == MatchSample.sample_item_id
             ).filter(SampleItem.sample_batch_id == sample_batch_id)
 
-        # Step 3: Apply sorting
+        # Apply sorting
         if sort:
             sort_expression = getattr(MatchSample, sort, None)
             if sort_expression:
@@ -85,17 +90,17 @@ async def get_match_samples(
                 else:
                     query = query.order_by(sort_expression.asc())
 
-        # Step 4: Count total matching samples
+        # Count total matching samples
         count_stmt = select(func.count()).select_from(  # pylint: disable=not-callable
             query.subquery()
         )
         total = await session.scalar(count_stmt)
 
-        # Step 5: Apply pagination
-        if limit is not None:
+        # Apply pagination
+        if page is not None and limit is not None:
             query = query.offset(page * limit).limit(limit)
 
-        # Step 6: Execute the query
+        # Execute the query
         result = await session.execute(query)
     data = [item.to_dict() for item in result.scalars().all()]
 
