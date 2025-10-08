@@ -7,11 +7,12 @@ from mascope_file.io import load_array
 from mascope_file.name import get_instrument_type, get_sample_file_type
 from mascope_signal.compute import get_scan_timestamps
 from mascope_signal.peak import get_peak_detector
-from mascope_chem.mz import match_mz
 from mascope_match.runtime import runtime
 
 from mascope_match.params import unmatched_isotope_params, BaseMatchParams
 from mascope_match.id import generate_id
+
+MATCH_WINDOW_AMU = 0.5  # Da
 
 
 async def compute_match_isotopes(
@@ -221,39 +222,27 @@ def match(row, parsed_peaks):
                 sample_peak_tof, and sample_peak_intensity.
     :rtype: pd.Series
     """
-    # Extract parsed peak data for ease of use
-    peak_intensities = parsed_peaks["peak_intensities"]
-    peak_mzs = parsed_peaks["peak_mzs"]
+    peak_mzs = np.asarray(parsed_peaks["peak_mzs"])
+    peak_sorting = np.asarray(parsed_peaks["peak_sorting"])
     peak_tofs = parsed_peaks["peak_tofs"]
-    peak_sorting = parsed_peaks["peak_sorting"]
+    peak_intensities = parsed_peaks["peak_intensities"]
 
-    # Get all peaks within unit mass window
-    mz_tolerance = 0.5
-    target_mz = row.mz
-    match_indices, _ = match_mz(
-        target_mz, peak_mzs[peak_sorting], tolerance=mz_tolerance
-    )
+    sorted_peak_mzs = peak_mzs[peak_sorting]
+    mz_diffs = np.abs(sorted_peak_mzs - row.mz)
+    mz_diffs_within_window = mz_diffs[mz_diffs <= MATCH_WINDOW_AMU]
 
-    # Find closest match
-    for match_index in match_indices:
-        # Get match peak
-        peak_index = peak_sorting[match_index]
-        peak_mz = peak_mzs[peak_index]
-        peak_intensity = peak_intensities[peak_index]
+    no_peaks_within_window = mz_diffs_within_window.size == 0
+    if no_peaks_within_window:
+        return row
 
-        # Check if better than current match
-        best_match = row.sample_peak_id
-        if not np.isnan(best_match):
-            prev_mz_err = abs(row.sample_peak_mz - target_mz)
-            new_mz_err = abs(peak_mz - target_mz)
-            if new_mz_err > prev_mz_err:
-                continue
+    closest_mz_index = np.argmin(mz_diffs_within_window)
+    match_index = np.where(mz_diffs == mz_diffs_within_window[closest_mz_index])[0][0]
 
-        # Save match
-        row["sample_peak_id"] = peak_index
-        row["sample_peak_mz"] = peak_mz
-        row["sample_peak_tof"] = peak_tofs[int(peak_index)]
-        row["sample_peak_intensity"] = peak_intensity
+    row["sample_peak_id"] = int(match_index)
+    row["sample_peak_mz"] = float(peak_mzs[match_index])
+    row["sample_peak_tof"] = peak_tofs[match_index]
+    row["sample_peak_intensity"] = peak_intensities[match_index]
+
     return row
 
 
