@@ -85,6 +85,22 @@ class IonizationModeUpdate(IonizationModeTokenValidator, BaseModel):
         max_length=256,
         description="Unique filename token for the ionization mode",
     )
+    calibration_collection_id: str | None = Field(
+        None,
+        max_length=16,
+        description=(
+            "ID of the calibration collection to use for the scheme. "
+            "When updating, only allowed if calibration collection is not yet defined."
+        ),
+    )
+    diagnostic_collection_id: str | None = Field(
+        None,
+        max_length=16,
+        description=(
+            "ID of the diagnostic collection to use for the scheme. "
+            "When updating, only allowed if diagnostic collection is not yet defined."
+        ),
+    )
 
 
 class GetIonizationModesQueryParams(QueryParamsModel):

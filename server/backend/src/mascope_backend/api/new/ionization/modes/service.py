@@ -178,18 +178,19 @@ async def update_ionization_mode(
     Updates an existing ionization mode.
 
     Steps:
-    1. Fetch the ionization mode by its ID from the database.
-    2. Check for token conflicts if token is being updated.
-    3. Check affected acquisition batches
-    4. Update the fields that were provided in the request.
-    5. Commit the changes and return the updated ionization mode.
+    - Fetch the ionization mode by its ID from the database.
+    - Check for token conflicts if token is being updated.
+    - Validate calibration and diagnostic collection updates (only adding is allowed).
+    - Check for name conflicts with existing acquisition batches
+    - Update the fields that were provided in the request.
+    - Commit the changes and return the updated ionization mode.
 
     :param ionization_mode_id: The ID of the ionization mode to update.
     :param ionization_mode_data: The data to update.
     :return: A dictionary containing the updated ionization mode data.
     """
     async with async_session() as session:
-        # Step 1: Get the existing ionization mode
+        # Get the existing ionization mode
         stmt = select(IonizationMode).where(
             IonizationMode.ionization_mode_id == ionization_mode_id
         )
@@ -201,7 +202,7 @@ async def update_ionization_mode(
                 f"Ionization mode with ID {ionization_mode_id} not found"
             )
         update_data = ionization_mode_data.model_dump(exclude_unset=True)
-        # Step 2: Check for token conflicts if being updated
+        # Check for token conflicts if being updated
         new_token = update_data.get("ionization_mode_token")
         if new_token and new_token != ionization_mode.ionization_mode_token:
             if not await token_is_unique(new_token, ignore_id=ionization_mode_id):
@@ -210,8 +211,35 @@ async def update_ionization_mode(
                     " already exists"
                 )
 
-        # Step 3: Check affected acquisition batches. If there are acquisition batches for this
-        #         ionization mode, only allow updating the token (to release it)
+        # Check for calibration and diagnostic collection updates
+        # Only allow adding if not yet defined, don't allow removal or changing
+        if (
+            "calibration_collection_id" in update_data
+            and update_data["calibration_collection_id"] is not None
+            and ionization_mode.calibration_collection_id
+            and update_data["calibration_collection_id"]
+            != ionization_mode.calibration_collection_id
+        ):
+            raise ValueError(
+                "Cannot update calibration collection, as it is already defined"
+            )
+        if update_data.get("calibration_collection_id") is None:
+            update_data.pop("calibration_collection_id", None)
+        if (
+            "diagnostic_collection_id" in update_data
+            and update_data["diagnostic_collection_id"] is not None
+            and ionization_mode.diagnostic_collection_id
+            and update_data["diagnostic_collection_id"]
+            != ionization_mode.diagnostic_collection_id
+        ):
+            raise ValueError(
+                "Cannot update diagnostic collection, as it is already defined"
+            )
+        if update_data.get("diagnostic_collection_id") is None:
+            update_data.pop("diagnostic_collection_id", None)
+
+        # Check affected acquisition batches. If there are acquisition batches for this
+        # ionization mode, only allow updating the token (to release it)
         affected_batches = await session.execute(
             select(SampleBatch).where(
                 and_(
@@ -238,15 +266,15 @@ async def update_ionization_mode(
                         # Other fields cannot be changed if the mode is used in acquisition batches
                         if getattr(ionization_mode, key) != value:
                             raise ValueError(
-                                f"Cannot update ionization mode '{ionization_mode.ionization_mode_name}', as the name "
-                                f"is reserved in one or more acquisition batches. Only the token can be updated"
+                                f"Cannot update ionization mode '{ionization_mode.ionization_mode_name}' name, "
+                                f"as it is in use for one or more acquisition batches."
                             )
 
-        # Step 4: Update the fields that were provided
+        # Update the fields that were provided
         for field, value in update_data.items():
             setattr(ionization_mode, field, value)
 
-        # Step 5: Commit and return
+        # Commit and return
         await session.commit()
         await session.refresh(ionization_mode)
         await sio.emit("ionization_mode_reload")

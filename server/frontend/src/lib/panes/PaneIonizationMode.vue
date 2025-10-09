@@ -76,7 +76,9 @@ const mode = {
     edited.value = {
       ionization_mode_id: data.ionization_mode_id,
       ionization_mode_name: data.ionization_mode_name,
-      ionization_mode_token: data.ionization_mode_token
+      ionization_mode_token: data.ionization_mode_token,
+      calibration_collection_id: data.calibration_collection_id,
+      diagnostic_collection_id: data.diagnostic_collection_id
     }
   },
   cancel: resetEdit,
@@ -304,25 +306,57 @@ defineExpose({
 
       <Column header="Calibration Collection" style="min-width: 150px">
         <template #body="{ data }">
-          {{
-            data.calibration_collection_id
-              ? app.data.target.collection.list.find(
-                  (c) => c.target_collection_id === data.calibration_collection_id
-                )?.target_collection_name || data.calibration_collection_id
-              : ''
-          }}
+          <Select
+            v-if="editing(data) && data.calibration_collection_id === null"
+            v-model="edited.calibration_collection_id"
+            :options="calibrationCollections"
+            optionLabel="target_collection_name"
+            optionValue="target_collection_id"
+            id="edit-calibration"
+            style="width: 100%"
+            v-tooltip="{
+              value:
+                'Select a target collection for this ionization mode to use for mass calibration',
+              showDelay: 1000
+            }"
+          />
+          <span v-else>
+            {{
+              data.calibration_collection_id
+                ? app.data.target.collection.list.find(
+                    (c) => c.target_collection_id === data.calibration_collection_id
+                  )?.target_collection_name || data.calibration_collection_id
+                : ''
+            }}
+          </span>
         </template>
       </Column>
 
       <Column header="Diagnostic Collection" style="min-width: 150px">
         <template #body="{ data }">
-          {{
-            data.diagnostic_collection_id
-              ? app.data.target.collection.list.find(
-                  (c) => c.target_collection_id === data.diagnostic_collection_id
-                )?.target_collection_name || data.diagnostic_collection_id
-              : ''
-          }}
+          <Select
+            v-if="editing(data) && data.diagnostic_collection_id === null"
+            v-model="edited.diagnostic_collection_id"
+            :options="diagnosticCollections"
+            optionLabel="target_collection_name"
+            optionValue="target_collection_id"
+            id="edit-diagnostic"
+            style="width: 100%"
+            v-tooltip="{
+              value:
+                'Select a target collection for this ionization mode to use for quality control',
+              showDelay: 1000
+            }"
+          />
+          <span v-else>
+            {{
+              data.diagnostic_collection_id
+                ? app.data.target.collection.list.find(
+                    (c) => c.target_collection_id === data.diagnostic_collection_id
+                  )?.target_collection_name || data.diagnostic_collection_id
+                : ''
+            }}
+          </span>
         </template>
       </Column>
 
