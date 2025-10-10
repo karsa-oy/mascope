@@ -204,9 +204,10 @@ async def create_sample_file(
         )
 
     async with async_session() as session:
-        initial_instruments = [
-            i["instrument"] for i in (await get_instruments())["data"]
-        ]
+        # Step 1: Get instruments
+        instruments_response = await get_instruments()
+        instruments = instruments_response["data"]
+        initial_instruments = [i["instrument"] for i in instruments]
 
         # Step 2: Construct new sample file
         new_sample_file = SampleFile(
