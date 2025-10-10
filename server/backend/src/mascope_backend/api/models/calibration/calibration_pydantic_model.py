@@ -30,6 +30,7 @@ class GetMzCalibrationQueryParams(QueryParamsModel):
 
 class MzCalibrationParams(BaseModel):
     refine_window: int = Field(..., description="Refine window parameter")
+    mz_error_tolerance: float | None = Field(None, description="m/z error tolerance")
     match_score_min: float = Field(
         calibration_config.DEFAULT_MATCH_SCORE_MIN, description="Minimum match score"
     )
@@ -44,6 +45,9 @@ class MzCalibrationParams(BaseModel):
 
 
 class OrbiCalibrationParams(MzCalibrationParams):
+    mz_error_tolerance: float = Field(
+        calibration_config.ORBI_MZ_ERROR_TOLERANCE, description="m/z error tolerance"
+    )
     refine_window: int = Field(
         calibration_config.ORBI_DEFAULT_REFINE_WINDOW,
         description="Refine window parameter",
@@ -51,6 +55,9 @@ class OrbiCalibrationParams(MzCalibrationParams):
 
 
 class TofCalibrationParams(MzCalibrationParams):
+    mz_error_tolerance: float = Field(
+        calibration_config.TOF_MZ_ERROR_TOLERANCE, description="m/z error tolerance"
+    )
     refine_window: int = Field(
         calibration_config.TOF_DEFAULT_REFINE_WINDOW,
         description="Refine window parameter",
@@ -58,7 +65,6 @@ class TofCalibrationParams(MzCalibrationParams):
 
 
 class CalibrationFitParams(MzCalibrationParams):
-    mz_error_tolerance: float = Field(..., description="m/z error tolerance")
     tic_threshold: float = Field(
         calibration_config.TIC_THRESHOLD, description="TIC threshold"
     )
@@ -67,18 +73,6 @@ class CalibrationFitParams(MzCalibrationParams):
     )
     ionization_mechanism_ids: list[str | None] = Field(
         None, description="Ionization mechanism IDs"
-    )
-
-
-class TofCalibrationFitParams(CalibrationFitParams):
-    mz_error_tolerance: float = Field(
-        calibration_config.TOF_MZ_ERROR_TOLERANCE, description="m/z error tolerance"
-    )
-
-
-class OrbiCalibrationFitParams(CalibrationFitParams):
-    mz_error_tolerance: float = Field(
-        calibration_config.ORBI_MZ_ERROR_TOLERANCE, description="m/z error tolerance"
     )
 
 

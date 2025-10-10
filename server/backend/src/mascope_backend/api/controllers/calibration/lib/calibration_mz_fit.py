@@ -8,13 +8,16 @@ from zarr.errors import PathNotFoundError
 
 from mascope_tofwerk.calibration import mz_calibrate, tof_to_mass
 
-
 import mascope_file.name as m_name
 import mascope_file.io as m_io
 import mascope_signal.compute as m_compute
 
-from mascope_match import compute_match_isotopes
-from mascope_match.params import TofMatchParams, OrbiMatchParams
+from mascope_match.compute.isotopes import (
+    detect_and_load_peaks,
+    parse_and_filter_peaks,
+    calculate_match_stats,
+)
+from mascope_match.params import TofMatchParams, OrbiMatchParams, BaseMatchParams
 from mascope_backend.api.lib.api_features import (
     api_controller,
 )
@@ -32,8 +35,9 @@ from mascope_backend.socket.notifications import (
 )
 from mascope_backend.api.models.calibration.calibration_pydantic_model import (
     CalibrationFitParams,
-    TofCalibrationFitParams,
-    OrbiCalibrationFitParams,
+    OrbiCalibrationParams,
+    TofCalibrationParams,
+    MzCalibrationParams,
 )
 
 from mascope_backend.runtime import runtime
@@ -55,7 +59,7 @@ class BaseCalibrationHandler:
         self.warning = None
 
     async def _match_calibration_compounds(
-        self, match_params
+        self, match_params: BaseMatchParams
     ) -> tuple[pd.DataFrame, pd.DataFrame]:
         """Match calibration compounds in the sample file."""
         target_compounds_result = await get_target_compound_in_target_collection(
@@ -72,23 +76,89 @@ class BaseCalibrationHandler:
         target_isotopes_df = pd.DataFrame(target_isotopes_result["data"])
 
         instrument_functions = await read_instrument_functions(self.filename)
+        instrument_type = m_name.get_instrument_type(self.filename)
 
-        match_isotope_df = await compute_match_isotopes(
+        peaks = await detect_and_load_peaks(
             filename=self.filename,
-            target_isotopes_df=target_isotopes_df,
-            match_params=match_params,
+            instrument_type=instrument_type,
             instrument_functions=instrument_functions,
+            target_mzs=target_isotopes_df.mz,
+        )
+        parsed_peaks = parse_and_filter_peaks(peaks)
+
+        match_df = target_isotopes_df.copy().assign(
+            sample_peak_id=np.nan,
+            sample_peak_mz=np.nan,
+            sample_peak_intensity=np.nan,
+            sample_peak_intensity_relative=np.nan,
+            match_abundance_error=np.nan,
+            match_isotope_similarity=np.nan,
+            match_mz_error=np.nan,
+            match_score=np.nan,
+            sample_peak_tof=np.nan,
         )
 
-        good_matches_df = match_isotope_df[
-            (match_isotope_df.relative_abundance >= self.params.isotope_abundance_min)
-            & (match_isotope_df.sample_peak_intensity >= self.params.peak_intensity_min)
-            & (abs(match_isotope_df.match_mz_error) <= self.params.refine_window)
-            & (match_isotope_df.match_score >= self.params.match_score_min)
-            & (match_isotope_df.sample_peak_id != -1)
+        match_df = match_df.apply(
+            self._match_max_in_range,
+            args=(
+                parsed_peaks,
+                match_params,
+            ),
+            axis=1,
+        ).reset_index(drop=True)
+
+        matched_mask = ~match_df["sample_peak_mz"].isna()
+        if matched_mask.any():
+            match_df = match_df[matched_mask]
+            match_df = calculate_match_stats(match_df, peaks)
+
+        # Fill np.nan with serializable defaults for unmatched isotopes
+        match_df = match_df.fillna(
+            {
+                "sample_peak_id": -1,
+                "sample_peak_intensity": 0.0,
+                "sample_peak_intensity_relative": 0.0,
+                "match_abundance_error": 1.0,
+                "match_isotope_similarity": 0.0,
+                "match_mz_error": self.params.refine_window + 1,
+                "match_score": 0.0,
+                "sample_peak_tof": -1.0,
+            }
+        )
+
+        good_matches_df = match_df[
+            (match_df.relative_abundance >= self.params.isotope_abundance_min)
+            & (match_df.sample_peak_intensity >= self.params.peak_intensity_min)
+            & (abs(match_df.match_mz_error) <= self.params.refine_window)
+            & (match_df.match_score >= self.params.match_score_min)
         ]
 
-        return match_isotope_df, good_matches_df
+        return match_df, good_matches_df
+
+    def _match_max_in_range(
+        self, isotope_row: pd.Series, parsed_peaks: dict, match_params: BaseMatchParams
+    ):
+        """Match the isotope to the peak with the highest intensity within the m/z tolerance range."""
+        target_mz = isotope_row["mz"]
+        mz_tolerance = match_params.mz_tolerance * 1e-6 * target_mz
+        mz_min = target_mz - mz_tolerance
+        mz_max = target_mz + mz_tolerance
+
+        parsed_peaks = pd.DataFrame(parsed_peaks)
+        parsed_peaks.sort_values("peak_mzs", inplace=True)
+        peaks_in_range = parsed_peaks[parsed_peaks.peak_mzs.between(mz_min, mz_max)]
+
+        if len(peaks_in_range) > 0:
+            max_peak_idx = peaks_in_range.peak_intensities.idxmax()
+            isotope_row["sample_peak_mz"] = peaks_in_range.at[max_peak_idx, "peak_mzs"]
+            isotope_row["sample_peak_tof"] = peaks_in_range.at[
+                max_peak_idx, "peak_tofs"
+            ]
+            isotope_row["sample_peak_intensity"] = peaks_in_range.at[
+                max_peak_idx, "peak_intensities"
+            ]
+
+        return isotope_row
 
     def _get_summary_row(self, calibration_df):
         return {
@@ -125,10 +195,13 @@ class TofCalibrationHandler(BaseCalibrationHandler):
     async def fit(self):
         """Fit the m/z calibration for a TOF instrument."""
         match_params = TofMatchParams(
-            mz_tolerance=self.params.mz_error_tolerance,
             peak_min_intensity=self.params.peak_intensity_min,
         )
         match_params.min_isotope_abundance = self.params.isotope_abundance_min
+        if self.params.mz_error_tolerance:
+            match_params.mz_tolerance = self.params.mz_error_tolerance
+        else:
+            self.params.mz_error_tolerance = match_params.mz_tolerance
 
         await send_progress_user_notification(self.notification, 0.25)
 
@@ -157,16 +230,19 @@ class TofCalibrationHandler(BaseCalibrationHandler):
 
         await send_progress_user_notification(self.notification, 0.75)
 
-        if (
-            n_relevant_isotopes >= 3
-            and len(good_matches_df) >= 3
-            and (n_relevant_isotopes - len(good_matches_df) <= 2)
-        ):
+        if n_relevant_isotopes >= 3 and len(good_matches_df) >= 3:
             self.fit_result, self.stats = mz_calibrate(
                 good_matches_df["sample_peak_tof"],
                 good_matches_df["sample_peak_mz"],
                 good_matches_df["mz"],
             )
+            zero_coefficient = any([coef == 0 for coef in self.fit_result["par"]])
+            if zero_coefficient:
+                self.fit_result = None
+                self.stats = good_matches_df.to_dict("records")
+                self.error = "Calibration failed"
+                return
+
             calibration_df = good_matches_df.copy().assign(
                 calibration_mz=self.stats["new_mz"],
                 calibration_mz_error=self.stats["post_dmz"],
@@ -237,10 +313,13 @@ class OrbiCalibrationHandler(BaseCalibrationHandler):
     async def fit(self):
         """Fit the m/z calibration for an Orbitrap instrument."""
         match_params = OrbiMatchParams(
-            mz_tolerance=self.params.mz_error_tolerance,
             peak_min_intensity=self.params.peak_intensity_min,
         )
         match_params.min_isotope_abundance = self.params.isotope_abundance_min
+        if self.params.mz_error_tolerance:
+            match_params.mz_tolerance = self.params.mz_error_tolerance
+        else:
+            self.params.mz_error_tolerance = match_params.mz_tolerance
 
         await send_progress_user_notification(self.notification, 0.25)
 
@@ -395,12 +474,12 @@ def get_calibration_handler(
             raise ValueError(f"Unsupported instrument type: {instrument_type}")
 
 
-def calibration_fit_params_factory(filename: str, **kwargs) -> CalibrationFitParams:
+def calibration_params_factory(filename: str, **kwargs) -> MzCalibrationParams:
     instrument_type = m_name.get_instrument_type(filename)
     match instrument_type:
         case "tof":
-            return TofCalibrationFitParams(**kwargs)
+            return TofCalibrationParams(**kwargs)
         case "orbi":
-            return OrbiCalibrationFitParams(**kwargs)
+            return OrbiCalibrationParams(**kwargs)
         case _:
             raise ValueError(f"Unknown instrument type: {instrument_type}")

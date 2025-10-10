@@ -22,7 +22,7 @@ from mascope_backend.api.lib.exceptions.api_exceptions import (
 
 from mascope_backend.api.controllers.calibration.lib.calibration_mz_fit import (
     get_calibration_handler,
-    calibration_fit_params_factory,
+    calibration_params_factory,
 )
 from mascope_backend.api.controllers.match.match_controller import match_remove_sample
 from mascope_backend.api.controllers.sample.files.sample_files_controller import (
@@ -46,6 +46,7 @@ from mascope_backend.api.models.sample.files.sample_file_pydantic_model import (
 )
 from mascope_backend.api.models.calibration.calibration_pydantic_model import (
     MzCalibrationParams,
+    CalibrationFitParams,
 )
 from mascope_backend.socket.notifications import (
     UserNotification,
@@ -184,7 +185,13 @@ async def calibration_mz_fit(
     )
 
     # m/z fit the sample file
-    calibration_parameters = calibration_fit_params_factory(
+    default_calibration_params = calibration_params_factory(filename=sample.filename)
+    if mz_calibration_params.mz_error_tolerance is None:
+        # m/z tolerance was not passed, use default value
+        mz_calibration_params.mz_error_tolerance = (
+            default_calibration_params.mz_error_tolerance
+        )
+    calibration_parameters = CalibrationFitParams(
         filename=sample.filename,
         calibration_collection_id=ionization_mode.calibration_collection_id,
         ionization_mechanism_ids=ionization_mode.ionization_mechanism_ids,

@@ -7,8 +7,6 @@ processing instrument_config and matching the samples.
 
 import asyncio
 
-import mascope_file.name as m_name
-
 from mascope_backend.db import async_session, db_semaphore
 from mascope_backend.db.id import gen_id
 from mascope_backend.db.models import SampleFile
@@ -41,6 +39,9 @@ from mascope_backend.api.controllers.samples.samples_controller import get_sampl
 from mascope_backend.api.controllers.calibration.calibration_controller import (
     calibration_mz_calibrate_sample,
 )
+from mascope_backend.api.controllers.calibration.lib.calibration_mz_fit import (
+    calibration_params_factory,
+)
 from mascope_backend.api.controllers.match.match_controller import (
     match_compute_sample,
     rematch_samples,
@@ -53,10 +54,6 @@ from mascope_backend.api.models.sample.batches.config import sample_batch_config
 from mascope_backend.api.models.sample.items.sample_item_pydantic_model import (
     SampleItemCreate,
 )
-from mascope_backend.api.models.calibration.calibration_pydantic_model import (
-    OrbiCalibrationParams,
-    TofCalibrationParams,
-)
 from mascope_backend.api.new.ionization.modes.util import (
     resolve_ionization_modes_by_peaks,
     resolve_ionization_modes_by_tokens,
@@ -64,6 +61,10 @@ from mascope_backend.api.new.ionization.modes.util import (
 
 
 from mascope_backend.runtime import runtime
+
+# Number of calibration fitting attempts before giving up
+# Chosen so that final m/z error tolerance for TOF would be around 1000 ppm
+CALIBRATION_ITERATIONS = 7
 
 
 @api_controller_background_task(
@@ -138,7 +139,7 @@ async def auto_process_sample_file(
         await get_acquisition_workspace(sample_file.instrument)
     ).get("data")
 
-    # Step 4: Create ACQUISITION batches and sample items for each ionization mode
+    # --- Create ACQUISITION batches and sample items for each sample file polarity --- #
     acquisition_sample_items, acquisition_sample_batches = (
         await create_acquisition_batches_and_items(
             sample_file=sample_file,
@@ -155,7 +156,7 @@ async def auto_process_sample_file(
     for sample_item in acquisition_sample_items:
         all_affected_sample_item_ids.add(sample_item["sample_item_id"])
 
-    # Step 5: Compute peak data for the sample file
+    # --- Compute peak data for the sample file --- #
     await compute_sample_file_peaks(
         sample_file_id=sample_file_id,
         if_exists="append",
@@ -168,25 +169,46 @@ async def auto_process_sample_file(
     # --- Perform calibration and match computation for created ACQUISITION samples --- #
     for sample_item in acquisition_sample_items:
         sample_item_id = sample_item["sample_item_id"]
-        mz_calibration_params = resolve_calibration_params(sample_item["filename"])
-        try:
-            await calibration_mz_calibrate_sample(
-                sample_item_id=sample_item_id,
-                mz_calibration_params=mz_calibration_params,
-                independent_transaction=False,
-                sid=sid,
-                process_id=gen_id(8),
-                parent_id=process_id,
-            )
-        except NotFoundException as e:
-            runtime.logger.warning(
-                f"Skipping m/z calibration for sample item {sample_item['sample_item_name']}: {e}. "
-                "Calibration collection is not set for the ionization mode."
-            )
-        except ApiException as e:
-            runtime.logger.error(
-                f"Failed to calibrate m/z for sample item {sample_item["sample_item_name"]}: {e}"
-            )
+        mz_calibration_params = calibration_params_factory(sample_item["filename"])
+        for i in range(1, CALIBRATION_ITERATIONS + 1):
+            try:
+                await calibration_mz_calibrate_sample(
+                    sample_item_id=sample_item_id,
+                    mz_calibration_params=mz_calibration_params,
+                    independent_transaction=False,
+                    sid=sid,
+                    process_id=gen_id(8),
+                    parent_id=process_id,
+                )
+                break
+            except NotFoundException as e:
+                runtime.logger.warning(
+                    f"Skipping m/z calibration for sample item {sample_item['sample_item_name']}: {e}. "
+                    "Calibration collection is not set for the ionization mode."
+                )
+                break
+            except ApiException as e:
+                if i == CALIBRATION_ITERATIONS:
+                    runtime.logger.error(
+                        f"Failed to calibrate m/z with m/z tolerance {mz_calibration_params.mz_error_tolerance} "
+                        f"for sample item {sample_item["sample_item_name"]}: {e}"
+                    )
+                else:
+                    old_mz_error_tolerance = mz_calibration_params.mz_error_tolerance
+                    # Double the m/z error tolerance, check refinement window limits, then retry
+                    mz_calibration_params.mz_error_tolerance *= 2
+                    if (
+                        mz_calibration_params.refine_window
+                        <= mz_calibration_params.mz_error_tolerance
+                    ):
+                        mz_calibration_params.refine_window = (
+                            mz_calibration_params.mz_error_tolerance + 1
+                        )
+                    runtime.logger.warning(
+                        f"Not enouph calibration peaks with m/z error tolerance {old_mz_error_tolerance}, "
+                        f"retrying m/z calibration for sample item {sample_item['sample_item_name']} with "
+                        f"mz_error_tolerance={mz_calibration_params.mz_error_tolerance}."
+                    )
 
         await match_compute_sample(
             sample_item_id=sample_item_id,
@@ -197,7 +219,7 @@ async def auto_process_sample_file(
             parent_id=process_id,
         )
 
-    # Step 7: Create separate independent task to recompute matches for other affected samples
+    # --- Schedule rematch tasks for other affected samples --- #
     acquisition_sample_item_ids = [
         item["sample_item_id"] for item in acquisition_sample_items
     ]
@@ -220,7 +242,7 @@ async def auto_process_sample_file(
             f"Started independent rematch task for {len(other_affected_sample_item_ids)} affected samples"
         )
 
-    # Step 8: Prepare response with processing results
+    # --- Return processing results with affected IDs or UI reloads --- #
     processed_samples = []
     for sample_item in acquisition_sample_items:
         sample_result = await get_sample(
@@ -236,24 +258,6 @@ async def auto_process_sample_file(
             "affected_sample_item_ids": list(all_affected_sample_item_ids),
         },
     }
-
-
-def resolve_calibration_params(filename: str):
-    """Resolve calibration parameters based on instrument type inferred from filename
-
-    :param filename: Sample file name
-    :type filename: str
-    :raises ValueError: Failed to detect instrument type
-    :return: Calibration parameters for the instrument type
-    :rtype: MzCalibrationParams
-    """
-    instrument_type = m_name.get_instrument_type(filename)
-    if instrument_type == "orbi":
-        return OrbiCalibrationParams()
-    elif instrument_type == "tof":
-        return TofCalibrationParams()
-    else:
-        raise ValueError(f"Failed to resolve calibration params for {filename}")
 
 
 async def create_acquisition_batches_and_items(
