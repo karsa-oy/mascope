@@ -72,7 +72,15 @@ async def get_enabled_backends(request: Request) -> list[AuthenticationBackend]:
 
     # Access token-based authentication(mascope_sdk Jupyter lib, file_converter service, tof-agent)
     if auth_header and not cookie_auth:
-        token = auth_header.split(" ")[1]
+        try:
+            token = auth_header.split(" ")[1]
+        except IndexError as e:
+            runtime.logger.error("Malformed Authorization header. Token missing.")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Unauthorized: Missing access token",
+            ) from e
+
         token_service_name = await get_token_service(token)
 
         if token_service_name != request_service_name:
