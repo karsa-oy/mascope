@@ -77,7 +77,7 @@ def process_file_upload(filepath: str, max_retries: int = 10) -> None:
         except Exception as e:  # pylint: disable=broad-except
             runtime.logger.warning(
                 f"Upload attempt {attempt}/{max_retries} for file "
-                f"{os.path.basename(filepath)} failed: {e.__class__.__name__}({str(e)})"
+                f"{os.path.basename(filepath)} failed: {e.__class__.__name__}({e})"
             )
             runtime.logger.info("Retrying upload in 30 seconds...")
             time.sleep(30)
@@ -208,7 +208,7 @@ class FileSystemWatcher:
             try:
                 self.client.on_filesystem_object_created(event.src_path)
             except Exception as e:  # pylint: disable=broad-except
-                runtime.logger.error(f"Exception {e.__class__.__name__}({str(e)})")
+                runtime.logger.error(f"Exception {e.__class__.__name__}({e})")
 
         def on_moved(self, event: watchdog.events.FileSystemEvent) -> None:
             """File moved
@@ -219,7 +219,7 @@ class FileSystemWatcher:
             try:
                 self.client.on_filesystem_object_created(event.dest_path)
             except Exception as e:  # pylint: disable=broad-except
-                runtime.logger.error(f"Exception {e.__class__.__name__}({str(e)})")
+                runtime.logger.error(f"Exception {e.__class__.__name__}({e})")
 
     def __init__(self, client, path: str, mask: str, recursive=False):
         self.client = client
@@ -261,7 +261,7 @@ class FileSystemWatcher:
             except KeyboardInterrupt:
                 self.client.shutdown_event.set()
             except Exception as e:  # pylint: disable=broad-except
-                runtime.logger.error(f"Exception {e.__class__.__name__}({str(e)})")
+                runtime.logger.error(f"Exception {e.__class__.__name__}({e})")
         self.stop()
 
     def run_as_daemon(self):
@@ -355,7 +355,7 @@ class FileUploader:
         except KeyboardInterrupt:
             runtime.logger.info("Shutdown requested by user.")
         except Exception as e:  # pylint: disable=broad-except
-            runtime.logger.error(f"{e.__class__.__name__}({str(e)})")
+            runtime.logger.error(f"{e.__class__.__name__}({e})")
         finally:
             self.shutdown_event.set()
 
