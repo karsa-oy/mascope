@@ -1,6 +1,5 @@
 import numpy as np
-from scipy.optimize import fsolve
-from mascope_tofwerk.lib.TwTool import TwMassCalibrate
+from scipy.optimize import fsolve, least_squares
 
 
 def mz_calibrate(peak_tof, peak_mz, exact_mz):
@@ -13,48 +12,52 @@ def mz_calibrate(peak_tof, peak_mz, exact_mz):
     :type peak_mz: array-like
     :param exact_mz: Array of exact m/z values for calibration peaks.
     :type exact_mz: array-like
-    :raises Exception: If TwMassCalibrate fails.
+    :raise ValueError: If fewer than two calibration points are provided.
+    :raise ValueError: If the calibration optimization fails.
     :return: Tuple containing the mass calibration parameters and calibration statistics.
     :rtype: tuple(dict, dict)
     """
-    calibration_mode = 0
-    nbr_points = len(peak_tof)
-    mass = np.array(exact_mz, dtype=np.double)
-    tofs = np.array(peak_tof, dtype=np.double)
-    peak_mz = np.array(peak_mz)
-    weight = np.ones((nbr_points,))  # TODO: Set weights?
-    nbr_params = np.array([2], dtype=int)
-    calibration_parameters = np.zeros((nbr_params[0],), dtype=np.double)
-    legacy_a = legacy_b = np.array([None], dtype=np.double)
+    peak_tof = np.asarray(peak_tof, dtype=np.float64)
+    peak_mz = np.asarray(peak_mz, dtype=np.float64)
+    exact_mz = np.asarray(exact_mz, dtype=np.float64)
 
-    ret = TwMassCalibrate(
-        calibration_mode,
-        nbr_points,
-        mass,
-        tofs,
-        weight,
-        nbr_params,
-        calibration_parameters,
-        legacy_a,
-        legacy_b,
+    if peak_tof.shape[0] < 2:
+        raise ValueError("At least two calibration points are required for mode 0.")
+
+    def residuals(par: np.ndarray, m: np.ndarray, tof: np.ndarray) -> np.ndarray:
+        return par[0] * np.sqrt(m) + par[1] - tof
+
+    # Initial guess: linear fit between sqrt(m) and tof
+    X = np.vstack([np.sqrt(exact_mz), np.ones_like(exact_mz)]).T
+    p_init, _, _, _ = np.linalg.lstsq(X, peak_tof, rcond=None)
+
+    result = least_squares(
+        residuals,
+        x0=p_init,
+        args=(exact_mz, peak_tof),
+        method="trf",
+        loss="linear",
+        max_nfev=1000,
     )
 
-    if ret != 4:
-        raise Exception(f"TwMassCalibrate failed with code: {ret}")
+    if not result.success:
+        raise ValueError(f"Calibration failed: {result.message}")
+
+    calibration_parameters = result.x
 
     mz_calibration_result = {
-        "mode": calibration_mode,
-        "par": list(calibration_parameters),
+        "mode": 0,
+        "par": calibration_parameters.tolist(),
     }
 
-    new_peak_mz = np.array(
-        [tof_to_mass(tof, calibration_mode, calibration_parameters) for tof in tofs]
-    )
-    delta_mass_before_calibration = (peak_mz - mass) / mass * 1e6
-    delta_mass_after_calibration = (new_peak_mz - mass) / mass * 1e6
+    # Calculate new m/z for each TOF using the calibration
+    new_peak_mz = tof_to_mass(peak_tof, mode=0, par=calibration_parameters)
+
+    delta_mass_before_calibration = (peak_mz - exact_mz) / exact_mz * 1e6
+    delta_mass_after_calibration = (new_peak_mz - exact_mz) / exact_mz * 1e6
 
     stats = {
-        "mz": mass,
+        "mz": exact_mz,
         "new_mz": new_peak_mz,
         "pre_dmz": delta_mass_before_calibration,
         "post_dmz": delta_mass_after_calibration,
