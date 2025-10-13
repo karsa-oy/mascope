@@ -1,9 +1,9 @@
 import os
-import pickle
 import mascope_sdk as msdk
 import numpy as np
 import pandas as pd
 from .calibration import CentroidedSpectrum, Spectra
+from .caching import CacheManager
 
 
 def _is_notebook():
@@ -27,41 +27,8 @@ CACHE_FOLDER = os.path.abspath(os.path.join(os.getcwd(), "cached_spectra"))
 DOWNLOAD_CHUNK_SIZE = 1
 
 
-def _cache_path(sample_item_id: str) -> str:
-    return os.path.join(CACHE_FOLDER, str(sample_item_id))
-
-
 def create_cache_folder():
     os.makedirs(CACHE_FOLDER, exist_ok=True)
-
-
-def _save_cache(
-    sample_item_id: str, spec_list: list[CentroidedSpectrum], timestamps: np.ndarray
-) -> None:
-    """Saves centroided spectra and timestamps to a cache file."""
-    path = _cache_path(sample_item_id)
-    tmp_path = path + ".__tmp__"
-    with open(tmp_path, "wb") as f:
-        pickle.dump(
-            {
-                "spectra": spec_list,
-                "timestamps": np.asarray(timestamps, dtype=float),
-            },
-            f,
-            protocol=pickle.HIGHEST_PROTOCOL,
-        )
-    os.replace(tmp_path, path)
-
-
-def _load_cache(sample_item_id: str):
-    """Loads cached centroided spectra and timestamps for a given sample_item_id."""
-    path = _cache_path(sample_item_id)
-    try:
-        with open(path, "rb") as f:
-            payload = pickle.load(f)
-        return payload["spectra"], np.asarray(payload["timestamps"], dtype=float)
-    except Exception:
-        return None
 
 
 def ppm_to_da(mz0: float, ppm: float) -> float:
@@ -89,10 +56,10 @@ def collect_spectra(
     :rtype: Spectra
     """
     create_cache_folder()
+    cache = CacheManager(CACHE_FOLDER)
     samples = samples.copy()
     samples["datetime"] = pd.to_datetime(samples["datetime"])
     samples = samples.sort_values("datetime").reset_index(drop=True)
-    cached_sample_item_ids = set(os.listdir(CACHE_FOLDER))
 
     time_since_first_sample_s = (
         (samples.datetime - samples.datetime[0]).dt.total_seconds().values
@@ -104,15 +71,15 @@ def collect_spectra(
         to_fetch = sample_item_ids
         to_load = []
     else:
-        to_fetch = [sid for sid in sample_item_ids if sid not in cached_sample_item_ids]
-        to_load = [sid for sid in sample_item_ids if sid in cached_sample_item_ids]
+        to_fetch = [sid for sid in sample_item_ids if not cache.exists(sid)]
+        to_load = [sid for sid in sample_item_ids if cache.exists(sid)]
 
     # Collect all data (per sample_item_id) into a dict
-    per_sample_data = {}
+    per_sample_data: dict[str, tuple[list[CentroidedSpectrum], np.ndarray]] = {}
 
     # Load from cache
     for sid in tqdm(to_load, desc="Loading centroided spectra from cache"):
-        loaded = _load_cache(sid)
+        loaded = cache.load(sid)
         if loaded is None:
             # Corrupted/missing file -> re-fetch this one
             to_fetch.append(sid)
@@ -155,11 +122,11 @@ def collect_spectra(
                 ]
                 timestamps = np.asarray(centroids["timestamp"], dtype=float)
                 # Save/refresh cache
-                _save_cache(sample_item_id, spec_list, timestamps)
+                cache.save(sample_item_id, (spec_list, timestamps))
                 per_sample_data[sample_item_id] = (spec_list, timestamps)
     # Gather outputs in the exact input order with correct time offsets
-    spectra = []
-    batch_scan_timestamps = []
+    spectra: list[CentroidedSpectrum] = []
+    batch_scan_timestamps: list[float] = []
     for row_idx, sample_item_id in enumerate(sample_item_ids):
         spec_list, timestamps = per_sample_data[sample_item_id]
         spectra.extend(spec_list)
@@ -173,12 +140,11 @@ def average_sample_item_spectra(
     access_token: str,
     sample_item_ids: list[str],
     calibration_factors: list | None = None,
-    method="mean",
+    method: str = "mean",
+    update_cached: bool = False,
 ) -> dict[str, np.ndarray]:
-    """Calculate the averaged spectrum from the spectra of multiple sample items.
-    This function retrieves the spectra for each sample item ID, calibrates their m/z values if
-    calibration factors are provided, interpolates them onto a common m/z grid,
-    and then averages the intensities at each m/z value.
+    """
+    Calculate the averaged spectrum from the spectra of multiple sample items.
 
     :param mascope_url: URL of the Mascope server.
     :type mascope_url: str
@@ -189,51 +155,111 @@ def average_sample_item_spectra(
     :param calibration_factors: List of m/z calibration factors for each sample item ID, defaults to None
     :param method: Averaging method, defaults to "mean"
     :type method: str, optional
+    :param update_cached: If True, will update the cache with new averaged spectra, defaults to False.
+    :type update_cached: bool, optional
     :raises ValueError: If the method is not 'mean' or 'median'.
     :return: A dictionary with 'mz' and 'intensity' keys, where 'mz' is the common m/z grid and 'intensity' is the averaged intensity at each m/z.
     :rtype: dict
     """
+    create_cache_folder()
+    cache = CacheManager(CACHE_FOLDER)
+
     if calibration_factors is not None:
         calibration_factors = np.asarray(calibration_factors, dtype=float)
     else:
         calibration_factors = np.ones(len(sample_item_ids), dtype=float)
 
-    averaged_specs = []
-    num_chunks = (len(sample_item_ids) + DOWNLOAD_CHUNK_SIZE - 1) // DOWNLOAD_CHUNK_SIZE
+    avg_cache_key = {
+        "type": "averaged_spectrum",
+        "sample_item_ids": tuple(sample_item_ids),
+        "calibration_factors": tuple(calibration_factors.tolist()),
+        "method": method,
+    }
 
-    for chunk_idx in tqdm(range(num_chunks), desc="Processing sample_item_ids"):
-        chunk = sample_item_ids[
-            chunk_idx * DOWNLOAD_CHUNK_SIZE : (chunk_idx + 1) * DOWNLOAD_CHUNK_SIZE
-        ]
-        chunk_averaged_specs = msdk.get_samples_spectra(
-            mascope_url=mascope_url,
-            access_token=access_token,
-            sample_item_ids=chunk,
+    if not update_cached:
+        cached_result = cache.load(avg_cache_key)
+        if cached_result is not None:
+            return cached_result
+
+    per_sample_avg_keys = [
+        (
+            "averaged_spectrum_per_sample",
+            sample_item_id,
+            float(calibration_factors[i]),
+            method,
         )
-        if not chunk_averaged_specs:
-            raise ValueError(
-                f"No spectra found for sample_item_ids: {chunk}. "
-                "Check if Mascope server is running and has spectrum data."
+        for i, sample_item_id in enumerate(sample_item_ids)
+    ]
+
+    averaged_specs: list[dict[str, np.ndarray] | None] = [None] * len(sample_item_ids)
+    loaded_mask = np.zeros(len(sample_item_ids), dtype=bool)
+
+    # Load from cache with tqdm
+    for i, key in enumerate(
+        tqdm(per_sample_avg_keys, desc="Loading averaged spectra from cache")
+    ):
+        if not update_cached:
+            cached = cache.load(key)
+            if cached is not None:
+                averaged_specs[i] = cached
+                loaded_mask[i] = True
+
+    # Fetch and cache missing spectra chunk-wise
+    to_fetch_indices = (
+        np.where(~loaded_mask)[0]
+        if not update_cached
+        else np.arange(len(sample_item_ids))
+    )
+    if len(to_fetch_indices) > 0:
+        for chunk_start in tqdm(
+            range(0, len(to_fetch_indices), DOWNLOAD_CHUNK_SIZE),
+            desc="Fetching averaged spectra",
+        ):
+            chunk_indices = to_fetch_indices[
+                chunk_start : chunk_start + DOWNLOAD_CHUNK_SIZE
+            ]
+            chunk_sample_ids = [sample_item_ids[i] for i in chunk_indices]
+            chunk_cal_factors = [float(calibration_factors[i]) for i in chunk_indices]
+            chunk_keys = [per_sample_avg_keys[i] for i in chunk_indices]
+
+            chunk_averaged_specs = msdk.get_samples_spectra(
+                mascope_url=mascope_url,
+                access_token=access_token,
+                sample_item_ids=chunk_sample_ids,
             )
-        averaged_specs.extend(chunk_averaged_specs)
+            if not chunk_averaged_specs or len(chunk_averaged_specs) != len(
+                chunk_sample_ids
+            ):
+                raise ValueError(
+                    f"No spectra found for sample_item_ids: {chunk_sample_ids}. "
+                    "Check if Mascope server is running and has spectrum data."
+                )
 
-    # Apply calibration to m/z values
-    for i, cal in enumerate(calibration_factors):
-        mz_arr = np.asarray(averaged_specs[i]["mz"], dtype=float)
-        averaged_specs[i]["mz"] = mz_arr * cal
+            for spec, cal, key, arr_idx in zip(
+                chunk_averaged_specs, chunk_cal_factors, chunk_keys, chunk_indices
+            ):
+                mz_arr = np.asarray(spec["mz"], dtype=float) * cal
+                spec["mz"] = mz_arr
+                cache.save(key, spec)
+                averaged_specs[arr_idx] = spec
 
-    # 1. Get all unique m/z values across all spectra
+    # All spectra are now in averaged_specs in the correct order
+    if any(spec is None for spec in averaged_specs):
+        missing = [i for i, spec in enumerate(averaged_specs) if spec is None]
+        raise RuntimeError(
+            f"Failed to load or fetch averaged spectra for indices: {missing}"
+        )
+
     union_mz = np.unique(np.concatenate([spec["mz"] for spec in averaged_specs]))
     union_mz = np.sort(union_mz)
 
-    # 2. Interpolate each spectrum's intensity onto the union m/z grid
-    interpolated_spectra = []
-    for spec in averaged_specs:
-        interp = np.interp(union_mz, spec["mz"], spec["intensity"], left=0, right=0)
-        interpolated_spectra.append(interp)
-    interpolated_spectra = np.vstack(interpolated_spectra)
+    interpolated_spectra = np.vstack(
+        [
+            np.interp(union_mz, spec["mz"], spec["intensity"], left=0, right=0)
+            for spec in averaged_specs
+        ]
+    )
 
-    # 3. Average intensities at each m/z
     if method == "mean":
         avg_intensity = np.mean(interpolated_spectra, axis=0)
     elif method == "median":
@@ -241,7 +267,9 @@ def average_sample_item_spectra(
     else:
         raise ValueError("method must be 'mean' or 'median'")
 
-    return {"mz": union_mz, "intensity": avg_intensity}
+    result = {"mz": union_mz, "intensity": avg_intensity}
+    cache.save(avg_cache_key, result)
+    return result
 
 
 def filter_centroids(
