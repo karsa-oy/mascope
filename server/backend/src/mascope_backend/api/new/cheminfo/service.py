@@ -34,11 +34,11 @@ async def retrieve_cheminfo_by_mz(
     Query the ChemInfo database by mz and other optional parameters.
 
     Steps:
-    1. Fetch ionization mechanisms from database
-    2. Prepare request parameters and convert ionization mechanisms to ChemInfo format
-    3. Make HTTP request to ChemInfo API
-    4. Process and format the results
-    5. Apply pagination and sorting
+    - Fetch ionization mechanisms from database
+    - Prepare request parameters and convert ionization mechanisms to ChemInfo format
+    - Make HTTP request to ChemInfo API
+    - Process and format the results
+    - Apply sorting
 
     :param mz: The m/z value to search for
     :type mz: float
@@ -60,7 +60,7 @@ async def retrieve_cheminfo_by_mz(
         - target_isotope_mz_error_ppm
     :rtype: dict
     """
-    # Step 1: Fetch ionization mechanisms from database
+    # Fetch ionization mechanisms from database
     async with async_session() as session:
         result = await session.execute(
             select(IonizationMechanism).filter(
@@ -78,7 +78,7 @@ async def retrieve_cheminfo_by_mz(
                 f"No ionization mechanisms found with the provided IDs: {ionization_mechanism_ids}"
             )
 
-    # Step 2: Prepare request parameters and convert ionization mechanisms to ChemInfo format
+    # Prepare request parameters and convert ionization mechanisms to ChemInfo format
 
     params = {
         "mass": mz,
@@ -89,7 +89,7 @@ async def retrieve_cheminfo_by_mz(
         "ranges": formula_ranges,
         "allowNeutral": "false",
     }
-    # Step 3: Make API request to ChemInfo
+    # Make API request to ChemInfo
     async with httpx.AsyncClient() as client:
         resp = await client.get(
             f"{cheminfo_config.BASE_URL}/v1/mfFromMonoisotopicMass",
@@ -99,7 +99,7 @@ async def retrieve_cheminfo_by_mz(
         resp.raise_for_status()  # Raise exception for 4XX/5XX responses
         data = resp.json()
 
-    # Step 4: Process and format the results
+    # Process and format the results
     results = []
     for raw in data.get("result", []):
         # Process each compound result from ChemInfo
@@ -121,7 +121,7 @@ async def retrieve_cheminfo_by_mz(
             # Skip malformed results rather than failing the entire request
             continue
 
-    # Step 5: Apply pagination and sorting
+    # Apply sorting
     total_results = len(results)
 
     # Apply sorting if requested
@@ -162,9 +162,9 @@ async def match_cheminfo_by_mz(
     match data for specified sample.
 
     Steps:
-    1. Query ChemInfo for compounds matching the m/z value
-    2. Match these compounds against a specified sample
-    3. Combine and format the results
+    - Query ChemInfo for compounds matching the m/z value
+    - Match these compounds against a specified sample
+    - Combine and format the results
 
     Match ion aggregation level is used to represent the match score of each formula result.
     Match isotopes are included in the result data for more detailed information.
@@ -201,7 +201,7 @@ async def match_cheminfo_by_mz(
         - target_isotope_mz_error_ppm
     :rtype: dict
     """
-    # Step 1: Get ChemInfo data
+    # Get ChemInfo data
     runtime.logger.info(f"Starting ChemInfo query for m/z {mz}")
     cheminfo_result = await retrieve_cheminfo_by_mz(
         mz=mz,
@@ -229,7 +229,7 @@ async def match_cheminfo_by_mz(
             },
         }
 
-    # Step 2: Get matches against the sample
+    # Get matches against the sample
     runtime.logger.info(
         f"Matching {cheminfo_results} compounds against sample {sample_item_id}"
     )
@@ -245,6 +245,9 @@ async def match_cheminfo_by_mz(
         formula_norm = re.sub(r"\[\d+([A-Za-z]+)\]", r"\1", formula)
         return formula_norm
 
+    # Compute matches for the ChemInfo results
+    ## Matches are computed for all ionization mechanisms for each returned formula
+    ## and later filtered to keep only the one matching the original ChemInfo result
     matches_result = await aggregate_sample_match_compounds(
         sample_item_id=sample_item_id,
         target_compound_formulas=[
@@ -256,7 +259,7 @@ async def match_cheminfo_by_mz(
 
     matches = matches_result.get("data", [])
 
-    # Step 3: Combine results data with cheminfo data
+    # Combine results data with cheminfo data
     data = []
     for info in cheminfo_data:
         # Find match data for the current ChemInfo result
@@ -316,7 +319,7 @@ async def match_cheminfo_by_mz(
                 data.append(matched_info)
                 break
 
-    # Step 4: Return formatted response with notification data
+    # Return formatted response with notification data
     result_data = {
         "results": len(data),
         "total": cheminfo_total,
