@@ -17,7 +17,7 @@ class ChemInfoConfig(BaseModel):
     REQUEST_TIMEOUT: float = 10.0
 
     # Default precision for m/z matching in ppm
-    DEFAULT_MZ_PRECISION: float = 30.0
+    DEFAULT_MZ_PRECISION: float = 10.0
 
     # Default formula range for queries
     DEFAULT_FORMULA_RANGE: str = "C0-100 H0-100 O0-100 N0-100"
