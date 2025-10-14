@@ -411,8 +411,12 @@ async def aggregate_sample_match_compounds(
         # Step 1: Fetch sample related data and verify its existence
         sample = await fetch_sample(sample_item_id)
 
-        ion_mechanisms_ids = await fetch_sample_ionization_mechanism_ids(sample_item_id)
-        if not ion_mechanisms_ids:
+        if not ion_mechanism_ids:
+            ion_mechanism_ids = await fetch_sample_ionization_mechanism_ids(
+                sample_item_id
+            )
+
+        if not ion_mechanism_ids:
             raise ValueError(
                 f"No ion mechanisms were provided, and there are no ion mechanisms for sample item '{sample.sample_item_name}'."
             )
@@ -420,13 +424,13 @@ async def aggregate_sample_match_compounds(
         # Fetch the ionization mechanisms from the database using the extracted IDs
         result = await session.execute(
             select(IonizationMechanism).filter(
-                IonizationMechanism.ionization_mechanism_id.in_(ion_mechanisms_ids)
+                IonizationMechanism.ionization_mechanism_id.in_(ion_mechanism_ids)
             )
         )
         ionization_mechanisms = result.scalars().all()
         if not ionization_mechanisms:
             raise NotFoundException(
-                f"Ionization mechanisms with IDs {ion_mechanisms_ids} not found"
+                f"Ionization mechanisms with IDs {ion_mechanism_ids} not found"
             )
 
         target_compounds = []
