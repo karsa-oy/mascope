@@ -148,13 +148,17 @@ export const useChartData = defineStore('chart.sample.spectrum', () => {
             type: 'scatter' + gl,
             x: [...Array(3).keys()].map(() => preview.peak.mz), // *
             y: [...Array(3).keys()].map(
-              (index) => mzRangeMax.value(preview.peak.mz, 0.05) * (index / 2)
+              (index) =>
+                (preview.peak.relative_abundance / preview.peak.abundance_reference) *
+                preview.peak.intensity_reference *
+                (index / 2)
             ),
             hovertemplate: ['<i>Peak</i>', 'mz: <b>%{x:.4f}</b>'].join('<br>') + '<extra></extra>'
           }
         ]
       : []
   )
+
   const traces = computed(() => [...mainTraces.value, ...focusTrace.value, ...previewTrace.value])
 
   // unload data and switch tab if necessary
