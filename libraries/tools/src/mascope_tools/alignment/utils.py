@@ -25,6 +25,7 @@ else:
 CACHE_FOLDER = os.path.abspath(os.path.join(os.getcwd(), "cached_spectra"))
 # TODO increase chunk size after resolving the issue with blocked server
 DOWNLOAD_CHUNK_SIZE = 1
+MAX_RETRIES = 5 # Number of retries for fetching data from server
 
 
 def create_cache_folder():
@@ -93,16 +94,19 @@ def collect_spectra(
             chunk = to_fetch[
                 chunk_idx * DOWNLOAD_CHUNK_SIZE : (chunk_idx + 1) * DOWNLOAD_CHUNK_SIZE
             ]
-            centroided_map = msdk.get_sample_centroids_per_scan(
-                mascope_url=mascope_url,
-                access_token=access_token,
-                sample_item_ids=chunk,
-            )
-            if not centroided_map:
-                raise ValueError(
-                    f"No centroided data found for sample_item_ids: {chunk}. "
-                    "Check if Mascope server is running and has centroided data."
+            for attempt in range(1, MAX_RETRIES + 1):
+                centroided_map = msdk.get_sample_centroids_per_scan(
+                    mascope_url=mascope_url,
+                    access_token=access_token,
+                    sample_item_ids=chunk,
                 )
+                if centroided_map:
+                    break
+                if attempt == MAX_RETRIES:
+                    raise ValueError(
+                        f"No centroided data found for sample_item_ids: {chunk} after {MAX_RETRIES} attempts. "
+                        "Check if Mascope server is running and has centroided data."
+                    )
             for sample_item_id, centroids in centroided_map.items():
                 # Build CentroidedSpectrum list per scan
                 spec_list = [
@@ -222,18 +226,21 @@ def average_sample_item_spectra(
             chunk_cal_factors = [float(calibration_factors[i]) for i in chunk_indices]
             chunk_keys = [per_sample_avg_keys[i] for i in chunk_indices]
 
-            chunk_averaged_specs = msdk.get_samples_spectra(
-                mascope_url=mascope_url,
-                access_token=access_token,
-                sample_item_ids=chunk_sample_ids,
-            )
-            if not chunk_averaged_specs or len(chunk_averaged_specs) != len(
-                chunk_sample_ids
-            ):
-                raise ValueError(
-                    f"No spectra found for sample_item_ids: {chunk_sample_ids}. "
-                    "Check if Mascope server is running and has spectrum data."
+            for attempt in range(1, MAX_RETRIES + 1):
+                chunk_averaged_specs = msdk.get_samples_spectra(
+                    mascope_url=mascope_url,
+                    access_token=access_token,
+                    sample_item_ids=chunk_sample_ids,
                 )
+                if chunk_averaged_specs and len(chunk_averaged_specs) == len(
+                    chunk_sample_ids
+                ):
+                    break
+                if attempt == MAX_RETRIES:
+                    raise ValueError(
+                        f"No spectra found for sample_item_ids: {chunk_sample_ids} after {MAX_RETRIES} attempts. "
+                        "Check if Mascope server is running and has spectrum data."
+                    )
 
             for spec, cal, key, arr_idx in zip(
                 chunk_averaged_specs, chunk_cal_factors, chunk_keys, chunk_indices
