@@ -69,9 +69,17 @@ class BaseCalibrationHandler:
             item["target_compound_id"] for item in target_compounds_result["data"]
         ]
 
+        instrument_type = m_name.get_instrument_type(self.filename)
+        match instrument_type:
+            case "tof":
+                isotope_resolution = "LOW"
+            case "orbi":
+                isotope_resolution = "HIGH"
+
         target_isotopes_result = await get_target_isotopes(
             target_compound_ids=target_compound_ids,
             ionization_mechanism_ids=self.params.ionization_mechanism_ids,
+            resolution=isotope_resolution,
         )
         target_isotopes_df = pd.DataFrame(target_isotopes_result["data"])
 
@@ -124,6 +132,12 @@ class BaseCalibrationHandler:
                 "match_score": 0.0,
                 "sample_peak_tof": -1.0,
             }
+        )
+        # Matches contain duplicates for every ionization mechanism, we drop them
+        match_df = (
+            match_df.sort_values(by=["sample_peak_mz", "target_ion_id"])
+            .drop_duplicates(subset="sample_peak_mz", keep="first")
+            .reset_index(drop=True)
         )
 
         good_matches_df = match_df[
@@ -253,10 +267,12 @@ class TofCalibrationHandler(BaseCalibrationHandler):
             summary_row = self._get_summary_row(calibration_df)
             self.stats.append(summary_row)
 
-            calibration_inaccurate = (
+            isotopes_from_single_ion = len(good_matches_df.target_ion_id.unique()) == 1
+            mz_err_too_high = (
                 abs(summary_row["calibration_mz_error"])
                 > self.params.mz_error_tolerance
             )
+            calibration_inaccurate = mz_err_too_high or isotopes_from_single_ion
             if calibration_inaccurate:
                 self.warning = "Calibration inaccurate"
 
