@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, computed, watch, watchEffect, onUnmounted } from 'vue'
+import { ref, reactive, computed, watch, watchEffect, onMounted, onUnmounted } from 'vue'
 import { watchDebounced } from '@vueuse/core'
 
 import Panel from 'primevue/panel'
@@ -46,25 +46,26 @@ const totalMatches = ref(0)
 const displayedMatches = ref(0)
 const loading = ref(false)
 
-// Load  configuration from api on component creation
-api.http
-  .get('/params', {
-    type: 'read_params'
-  })
-  .then(({ data }) => {
-    // Store the cheminfo config
-    chemConfig.value = data?.data?.params?.cheminfo_config
-    // Initialize parameters with values from API response
-    if (chemConfig.value) {
-      params.mzPrecision = chemConfig.value.DEFAULT_MZ_PRECISION
-      params.formulaRange = chemConfig.value.DEFAULT_FORMULA_RANGE
-      params.limit = chemConfig.value.DEFAULT_RESULT_LIMIT
-      formulaRangeModel.value = chemConfig.value.DEFAULT_FORMULA_RANGE
-    }
-  })
-  .catch((err) => {
-    console.error('Error fetching params:', err)
-  })
+onMounted(() => {
+  // Load configuration from api on component creation
+  api.http
+    .get('/params', {
+      type: 'read_params'
+    })
+    .then(({ data }) => {
+      // Store the cheminfo config
+      chemConfig.value = data?.data?.params?.cheminfo_config
+      // Initialize parameters with values from API response
+      if (chemConfig.value) {
+        params.mzPrecision = chemConfig.value.DEFAULT_MZ_PRECISION
+        params.formulaRange = chemConfig.value.DEFAULT_FORMULA_RANGE
+        formulaRangeModel.value = chemConfig.value.DEFAULT_FORMULA_RANGE
+      }
+    })
+    .catch((err) => {
+      console.error('Error fetching params:', err)
+    })
+})
 
 const updateFormulaRange = () => {
   params.formulaRange = formulaRangeModel.value
@@ -127,9 +128,6 @@ watchEffect(() => {
       ({ ionization_mechanism_id }) => id === ionization_mechanism_id
     )
   )
-  params.mzPrecision = chemConfig.value.DEFAULT_MZ_PRECISION
-  params.formulaRange = chemConfig.value.DEFAULT_FORMULA_RANGE
-  formulaRangeModel.value = chemConfig.value.DEFAULT_FORMULA_RANGE
 })
 
 // Debounced API request that triggers when any dependency changes (single computed object `deps`)
