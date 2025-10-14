@@ -17,14 +17,6 @@ class CheminfoQueryBody(BaseModel):
     ionization_mechanism_ids: list[str] = Field(
         ..., description="The ionization mechanism IDs to query against"
     )
-    page: int = Field(
-        cheminfo_config.DEFAULT_PAGE,
-        description="The page number for pagination",
-    )
-    limit: int = Field(
-        cheminfo_config.DEFAULT_RESULT_LIMIT,
-        description="Maximum number of results to return per page",
-    )
     sort: None | str = Field(
         None,
         description="The field to sort results by, should be one of the fields in the result data structure",

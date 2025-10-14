@@ -68,8 +68,6 @@ async def match_cheminfo_mz_route(
         formula_ranges=body.formula_ranges,
         ionization_mechanism_ids=body.ionization_mechanism_ids,
         match_params=body.match_params,
-        limit=body.limit,
-        page=body.page,
         sort=body.sort,
         order=body.order,
         independent_transaction=True,

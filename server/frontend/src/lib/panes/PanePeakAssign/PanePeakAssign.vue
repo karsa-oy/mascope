@@ -38,8 +38,7 @@ const chemConfig = ref(null)
 const ionMechs = ref([])
 const params = reactive({
   mzPrecision: null,
-  formulaRange: null,
-  limit: null
+  formulaRange: null
 })
 const formulaRangeModel = ref('')
 const results = ref([])
@@ -144,7 +143,6 @@ watchDebounced(
       sampleId: app.data.sample.focusedId,
       mzPrecision: params.mzPrecision,
       formulaRange: params.formulaRange,
-      limit: params.limit,
       ionMechanismIds: ionMechs.value.map((m) => m.ionization_mechanism_id).join(',')
     }
   },
@@ -174,7 +172,6 @@ watchDebounced(
         ),
         mz_precision: deps.mzPrecision,
         formula_ranges: deps.formulaRange,
-        limit: deps.limit,
         match_params: app.data.match.params.typeDefaults
       },
       {
@@ -225,10 +222,6 @@ const expanded = ref({})
           <InputNumber v-model="params.mzPrecision" id="mzPrecision" />
           <label for="mzPrecision">m/z precision</label>
         </FloatLabel>
-        <FloatLabel style="flex-shrink: 1">
-          <InputNumber v-model="params.limit" id="limit" />
-          <label for="limit">results limit</label>
-        </FloatLabel>
         <FloatLabel style="flex-grow: 1">
           <InputText
             v-model="formulaRangeModel"
@@ -239,7 +232,7 @@ const expanded = ref({})
           />
           <label for="formulaRange">formula range</label>
         </FloatLabel>
-        <FloatLabel style="min-width: 100px">
+        <FloatLabel style="min-width: 100px; max-width: 200px">
           <MultiSelect
             id="ionmechs"
             v-model="ionMechs"

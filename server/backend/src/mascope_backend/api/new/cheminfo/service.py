@@ -27,8 +27,6 @@ async def retrieve_cheminfo_by_mz(
     ionization_mechanism_ids: list[str],
     mz_precision: float = cheminfo_config.DEFAULT_MZ_PRECISION,
     formula_ranges: str = cheminfo_config.DEFAULT_FORMULA_RANGE,
-    limit: int = cheminfo_config.DEFAULT_RESULT_LIMIT,
-    page: int = cheminfo_config.DEFAULT_PAGE,
     sort: None | str = None,
     order: None | str = None,
 ) -> dict:
@@ -50,10 +48,6 @@ async def retrieve_cheminfo_by_mz(
     :type formula_ranges: str
     :param ionization_mechanism_ids: List of ionization mechanism IDs to query against
     :type ionization_mechanism_ids: None | list[str]
-    :param limit: Maximum number of results to return
-    :type limit: int
-    :param page: Page number for pagination
-    :type page: int
     :param sort: Field to sort results by
     :type sort: None | str
     :param order: Sort order ('asc' or 'desc')
@@ -86,11 +80,8 @@ async def retrieve_cheminfo_by_mz(
 
     # Step 2: Prepare request parameters and convert ionization mechanisms to ChemInfo format
 
-    # NOTE: Don't pass the limit to get all total results, limit is used for results pagination
-    # Cheminfo mfFromMonoisotopicMass limi default value : 1000
     params = {
         "mass": mz,
-        # "limit": limit,
         "ionizations": (
             ",".join([to_cheminfo_ionization_format(i) for i in ionization_mechanisms])
         ),
@@ -133,23 +124,18 @@ async def retrieve_cheminfo_by_mz(
     # Step 5: Apply pagination and sorting
     total_results = len(results)
 
-    # Apply pagination
-    start_idx = page * limit
-    end_idx = start_idx + limit
-    paginated_results = results[start_idx:end_idx]
-
     # Apply sorting if requested
-    if sort and all(sort in item for item in paginated_results):
+    sorted_results = results
+    if sort and all(sort in item for item in results):
         reverse = order.lower() == "desc"
-        paginated_results.sort(key=lambda x: x.get(sort, 0), reverse=reverse)
+        sorted_results.sort(key=lambda x: x.get(sort, 0), reverse=reverse)
 
     # Return formatted response
     return {
-        "message": f"Retrieved {len(paginated_results)} m/z query results from ChemInfo",
-        "results": len(paginated_results),
+        "message": f"Retrieved {len(sorted_results)} m/z query results from ChemInfo",
+        "results": len(sorted_results),
         "total": total_results,
-        "page": page,
-        "data": paginated_results,
+        "data": sorted_results,
     }
 
 
@@ -164,8 +150,6 @@ async def match_cheminfo_by_mz(
     formula_ranges: str | None = "C0-100 H0-100 O0-100 N0-100",
     ionization_mechanism_ids: list[str] | None = None,
     match_params: BaseMatchParams | None = None,
-    limit: int = 20,
-    page: int = 0,
     sort: None | str = None,
     order: None | str = "asc",
     independent_transaction: bool = False,
@@ -197,10 +181,6 @@ async def match_cheminfo_by_mz(
     :type ionization_mechanism_ids: None | list[str]
     :param match_params: Parameters for customizing the matching algorithm
     :type match_params: None | BaseMatchParams
-    :param limit: Maximum number of results to return
-    :type limit: int
-    :param page: Page number for pagination
-    :type page: int
     :param sort: Field to sort results by
     :type sort: None | str
     :param order: Sort order ('asc' or 'desc')
@@ -228,8 +208,6 @@ async def match_cheminfo_by_mz(
         ionization_mechanism_ids=ionization_mechanism_ids,
         mz_precision=mz_precision,
         formula_ranges=formula_ranges,
-        limit=limit,
-        page=page,
         sort=sort,
         order=order,
     )
