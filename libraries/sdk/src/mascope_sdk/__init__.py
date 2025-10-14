@@ -52,7 +52,7 @@ def api_get(url: str, path: str, access_token: str, params: dict = None):
         resp.raise_for_status()  # Raise HTTPError for bad responses
         message = json.loads(resp.content).get("message", None)
         if message is not None:
-            logger.info(message)
+            logger.debug(message)
     except HTTPError as http_err:
         if resp.status_code == 401 or resp.status_code == 403:
             response = json.loads(resp.content)
@@ -116,7 +116,7 @@ def api_post(url: str, path: str, access_token: str, data: dict):
         resp.raise_for_status()  # Raise HTTPError for bad responses
         message = json.loads(resp.content).get("message", None)
         if message is not None:
-            logger.info(message)
+            logger.debug(message)
     except HTTPError as http_err:
         if resp.status_code == 401 or resp.status_code == 403:
             response = json.loads(resp.content)
@@ -192,7 +192,7 @@ def api_post_file(
         resp.raise_for_status()  # Raise HTTPError for bad responses
         message = json.loads(resp.content).get("message", None)
         if message is not None:
-            logger.info(message)
+            logger.debug(message)
     except HTTPError as http_err:
         if resp.status_code == 401 or resp.status_code == 403:
             response = json.loads(resp.content)
