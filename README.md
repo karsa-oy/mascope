@@ -1481,8 +1481,6 @@ To publish the package in the _real_ [Python Package Index (PyPI)](https://pypi.
    uv publish --token <MY_TOKEN>                        # Publish from root where dist/ exists
    ```
 
-4. Reset the version in `libraries/sdk/pyproject.toml` back to `0.0.0` after successful release.
-
 ---
 
 ## 🚚 Deploying
