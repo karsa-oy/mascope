@@ -200,7 +200,9 @@ def average_sample_item_spectra(
 
     # Load from cache with tqdm
     for i, key in enumerate(
-        tqdm(per_sample_avg_keys, desc="Loading averaged spectra from cache")
+        tqdm(
+            per_sample_avg_keys, desc="Check if some of averaged spectra are cached..."
+        )
     ):
         if not update_cached:
             cached = cache.load(key)
@@ -217,7 +219,7 @@ def average_sample_item_spectra(
     if len(to_fetch_indices) > 0:
         for chunk_start in tqdm(
             range(0, len(to_fetch_indices), DOWNLOAD_CHUNK_SIZE),
-            desc="Fetching averaged spectra",
+            desc="Fetching missing averaged spectra from server",
         ):
             chunk_indices = to_fetch_indices[
                 chunk_start : chunk_start + DOWNLOAD_CHUNK_SIZE
