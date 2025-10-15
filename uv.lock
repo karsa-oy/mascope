@@ -1631,7 +1631,7 @@ requires-dist = [
 
 [[package]]
 name = "mascope-sdk"
-version = "0.0.0"
+version = "2025.10.14"
 source = { editable = "libraries/sdk" }
 dependencies = [
     { name = "loguru" },
@@ -1721,7 +1721,7 @@ requires-dist = [
 
 [[package]]
 name = "mascope-tools"
-version = "0.0.0"
+version = "2025.10.14"
 source = { editable = "libraries/tools" }
 dependencies = [
     { name = "isospecpy" },
