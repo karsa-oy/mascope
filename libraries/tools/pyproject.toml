@@ -1,6 +1,6 @@
 [project]
 name = "mascope_tools"
-version = "2025.10.15"
+version = "2025.10.16"
 description = "Mascope's public library, containing tools for spectra postprocessing."
 classifiers = [
     "Topic :: Scientific/Engineering :: Atmospheric Science",
