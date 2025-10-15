@@ -185,13 +185,6 @@ watchDebounced(
   }
 )
 
-const columns = [
-  { field: 'target_compound_formula', label: 'Formula' },
-  { field: 'ionization_mechanism', label: 'Ion. Mechanism' },
-  { field: 'target_isotope_mz', label: 'Isotope m/z' },
-  { field: 'target_isotope_mz_error_ppm', label: 'm/z error (ppm)' }
-]
-
 const expanded = ref({})
 </script>
 
@@ -255,6 +248,7 @@ const expanded = ref({})
       >
         <Column expander />
         <Column field="target_compound_formula" header="Formula" sortable />
+        <Column field="cheminfo.target_compound_unsaturation" header="DBE" sortable />
         <Column field="cheminfo.target_isotope_mz" header="Isotope m/z" sortable>
           <template #body="{ data }">
             {{ num.mz.format(data.cheminfo.target_isotope_mz) }}
