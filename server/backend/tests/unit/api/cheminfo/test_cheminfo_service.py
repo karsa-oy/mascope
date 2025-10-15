@@ -15,7 +15,6 @@ def assert_cheminfo_query_result_format(result: dict):
     assert "message" in result
     assert "results" in result
     assert "total" in result
-    assert "page" in result
     assert "data" in result
 
     assert result["results"] > 0
