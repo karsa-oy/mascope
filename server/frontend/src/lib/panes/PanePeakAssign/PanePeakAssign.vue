@@ -217,7 +217,7 @@ const expanded = ref({})
     <div class="col" style="gap: 1rem; align-items: stretch; max-width: 900px">
       <menu class="topbar">
         <FloatLabel style="flex-shrink: 1">
-          <InputNumber v-model="params.mzPrecision" id="mzPrecision" />
+          <InputNumber v-model="params.mzPrecision" id="mzPrecision" :max="100" />
           <label for="mzPrecision">m/z precision</label>
         </FloatLabel>
         <FloatLabel style="flex-grow: 1">
