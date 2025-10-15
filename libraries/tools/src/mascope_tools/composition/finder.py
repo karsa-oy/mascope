@@ -516,30 +516,29 @@ def replace_atom_with_isotope(ion: str, isotope_label: str) -> str:
     """
     if not isinstance(isotope_label, str) or isotope_label in {"M0", "---", ""}:
         return ion
-    isotope_label = f"[{isotope_label}]"
-
-    element_match = re.search(r"\[\d*([A-Z][a-z]*)\]", isotope_label)
-    if not element_match:
-        raise ValueError("Invalid isotope format. Expected format like '[13C]'.")
-    isotope_element = element_match.group(1)
+    isotope_labels = [f"[{iso_label}]" for iso_label in isotope_label.split("+")]
 
     # Separate the charge at the end of the formula, if any
-    charge = ion[-1] if ion[-1] in "+-" else ""
-    ion = ion[:-1] if charge else ion
+    ion_charge = ion[-1] if ion[-1] in "+-" else ""
+    ion_formula = ion[:-1] if ion_charge else ion
+    element_counts = ParseFormula(ion_formula)
 
-    element_counts = ParseFormula(ion)
+    for iso in isotope_labels:
+        element_match = re.search(r"\[\d*([A-Z][a-z]*)\]", iso)
+        if not element_match:
+            return f"[]{ion}"  # Invalid isotope label format
 
-    # 4. Check if the isotope's element exists in the formula
-    if isotope_element not in element_counts:
-        raise ValueError(
-            f"Element '{isotope_element}' not found in the formula '{ion}'."
-        )
+        isotope_element = element_match.group(1)
 
-    # Decrement the count of the target element
-    element_counts[isotope_element] -= 1
+        # Check if the isotope's element exists in the formula
+        if isotope_element not in element_counts:
+            return f"[]{ion}"  # Isotope element not found in the formula
+
+        # Decrement the count of the target element
+        element_counts[isotope_element] -= 1
 
     # Rebuild the formula string
-    new_formula_parts = [isotope_label]
+    new_formula_parts = [f"[{isotope_label}]"]
     for element in element_counts.keys():
         count = element_counts[element]
         if count == 0:
@@ -550,7 +549,7 @@ def replace_atom_with_isotope(ion: str, isotope_label: str) -> str:
             new_formula_parts.append(f"{element}{count}")
 
     # Append the charge and join everything into the final string
-    return "".join(new_formula_parts) + charge
+    return "".join(new_formula_parts) + ion_charge
 
 
 def update_ion_with_isotope_label(matches: pd.DataFrame) -> pd.DataFrame:
