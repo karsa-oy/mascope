@@ -473,18 +473,19 @@ def _formula_sort_key(formula: str) -> tuple[int, int, str]:
         3: All other C-containing
         4: Non-carbon containing
     """
-    if formula == "---":
-        return (5, 0, formula)
-    atoms = set(ParseFormula(formula).keys())
-    if "C" not in atoms:
-        return (4, len(atoms), formula)
-    if atoms <= {"C", "H"}:
-        return (0, len(atoms), formula)
-    if atoms <= {"C", "H", "O"}:
-        return (1, len(atoms), formula)
-    if atoms <= {"C", "H", "O", "N"}:
-        return (2, len(atoms), formula)
-    return (3, len(atoms), formula)
+    try:
+        atoms = set(ParseFormula(formula).keys())
+        if "C" not in atoms:
+            return (4, len(atoms), formula)
+        if atoms <= {"C", "H"}:
+            return (0, len(atoms), formula)
+        if atoms <= {"C", "H", "O"}:
+            return (1, len(atoms), formula)
+        if atoms <= {"C", "H", "O", "N"}:
+            return (2, len(atoms), formula)
+        return (3, len(atoms), formula)
+    except Exception:
+        return (5, 0, formula)  # Place invalid formulas at the end
 
 
 def sort_matches_by_formula(matches: pd.DataFrame) -> pd.DataFrame:
