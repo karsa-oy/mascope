@@ -1,10 +1,12 @@
 """Based on https://github.com/cheminfo/chemcalc"""
 
+import re
 import warnings
 from typing import Any
 import pandas as pd
 import polars as pl
 import numpy as np
+from IsoSpecPy import ParseFormula
 from mascope_tools.composition.heuristic_filter import (
     apply_heuristic_rules,
     match_isotopic_pattern,
@@ -125,9 +127,17 @@ def assign_compositions(
         )
 
     matches = pd.DataFrame(results_per_peak)
+    # --- Format results --- #
     matches = matches.sort_values(by=["mz", "mz_error_ppm"])
     # Drop duplicate m/z entries, keeping the one with the lowest mz_error_ppm
     matches = matches.drop_duplicates(subset=["mz"], keep="first")
+    matches = sort_matches_by_formula(matches)
+    # Add isotope label to ion string
+    matches = update_ion_with_isotope_label(matches)
+    # Show mz, formula, ion, isotope_label and then all other columns
+    first_columns = ["mz", "formula", "ion", "isotope_label", "ionization_mechanism"]
+    cols = first_columns + [col for col in matches.columns if col not in first_columns]
+    matches = matches[cols].reset_index(drop=True)
 
     return matches, mass_log_messages
 
@@ -451,3 +461,106 @@ def get_unsaturation(atoms: list[Atom], counts: list[int]) -> float:
             )
         unsaturation_value += coefficient * counts[i]
     return (unsaturation_value + 2) / 2.0
+
+
+def _formula_sort_key(formula: str) -> tuple[int, int, str]:
+    """
+    Generate a sorting key for a chemical formula based on atomic composition.
+    Priority:
+        0: Only C and H
+        1: Only C, H, and O
+        2: Only C, H, O, and N
+        3: All other C-containing
+        4: Non-carbon containing
+    """
+    if formula == "---":
+        return (5, 0, formula)
+    atoms = set(ParseFormula(formula).keys())
+    if "C" not in atoms:
+        return (4, len(atoms), formula)
+    if atoms <= {"C", "H"}:
+        return (0, len(atoms), formula)
+    if atoms <= {"C", "H", "O"}:
+        return (1, len(atoms), formula)
+    if atoms <= {"C", "H", "O", "N"}:
+        return (2, len(atoms), formula)
+    return (3, len(atoms), formula)
+
+
+def sort_matches_by_formula(matches: pd.DataFrame) -> pd.DataFrame:
+    """Sort a DataFrame of chemical formulae by atomic composition:
+    1. C,H only
+    2. C,H,O only
+    3. C,H,O,N only
+    4. Other C-containing
+    5. Non-carbon containing
+    Within each group, sort by number of atoms, then lexicographically.
+
+    :param matches: Dataframe with matched peaks
+    :type matches: pd.DataFrame
+    :return: Sorted matches
+    :rtype: pd.DataFrame
+    """
+    sort_keys = matches["formula"].apply(_formula_sort_key)
+    return (
+        matches.assign(_sort_key=sort_keys)
+        .sort_values("_sort_key")
+        .drop("_sort_key", axis=1)
+        .reset_index(drop=True)
+    )
+
+
+def replace_atom_with_isotope(ion: str, isotope_label: str) -> str:
+    """
+    Replaces one atom of an element in a chemical formula with a specified isotope.
+    """
+    if not isinstance(isotope_label, str) or isotope_label in {"M0", "---", ""}:
+        return ion
+    isotope_label = f"[{isotope_label}]"
+
+    element_match = re.search(r"\[\d*([A-Z][a-z]*)\]", isotope_label)
+    if not element_match:
+        raise ValueError("Invalid isotope format. Expected format like '[13C]'.")
+    isotope_element = element_match.group(1)
+
+    # Separate the charge at the end of the formula, if any
+    charge = ion[-1] if ion[-1] in "+-" else ""
+    ion = ion[:-1] if charge else ion
+
+    element_counts = ParseFormula(ion)
+
+    # 4. Check if the isotope's element exists in the formula
+    if isotope_element not in element_counts:
+        raise ValueError(
+            f"Element '{isotope_element}' not found in the formula '{ion}'."
+        )
+
+    # Decrement the count of the target element
+    element_counts[isotope_element] -= 1
+
+    # Rebuild the formula string
+    new_formula_parts = [isotope_label]
+    for element in element_counts.keys():
+        count = element_counts[element]
+        if count == 0:
+            continue  # Skip elements with a count of zero
+        elif count == 1:
+            new_formula_parts.append(element)
+        else:
+            new_formula_parts.append(f"{element}{count}")
+
+    # Append the charge and join everything into the final string
+    return "".join(new_formula_parts) + charge
+
+
+def update_ion_with_isotope_label(matches: pd.DataFrame) -> pd.DataFrame:
+    """
+    Update the 'ion' column in the matches DataFrame to prepend the isotope label
+    (if present and not 'M0' or '---') before the first element symbol.
+    """
+    matches = matches.copy()
+    matches["ion"] = [
+        replace_atom_with_isotope(ion, isotope_label)
+        for ion, isotope_label in zip(matches["ion"], matches["isotope_label"])
+    ]
+    return matches
