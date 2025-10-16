@@ -539,7 +539,7 @@ def replace_atom_with_isotope(ion: str, isotope_label: str) -> str:
         element_counts[isotope_element] -= 1
 
     # Rebuild the formula string
-    new_formula_parts = [f"[{isotope_label}]"]
+    new_formula_parts = isotope_labels
     for element in element_counts.keys():
         count = element_counts[element]
         if count == 0:
