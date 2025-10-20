@@ -143,7 +143,7 @@ def average_sample_item_spectra(
     mascope_url: str,
     access_token: str,
     sample_item_ids: list[str],
-    calibration_factors: list | None = None,
+    calibration_factors: list[float] | None = None,
     method: str = "mean",
     update_cached: bool = False,
 ) -> dict[str, np.ndarray]:
@@ -198,7 +198,6 @@ def average_sample_item_spectra(
     averaged_specs: list[dict[str, np.ndarray] | None] = [None] * len(sample_item_ids)
     loaded_mask = np.zeros(len(sample_item_ids), dtype=bool)
 
-    # Load from cache with tqdm
     for i, key in enumerate(
         tqdm(
             per_sample_avg_keys, desc="Check if some of averaged spectra are cached..."
@@ -210,7 +209,6 @@ def average_sample_item_spectra(
                 averaged_specs[i] = cached
                 loaded_mask[i] = True
 
-    # Fetch and cache missing spectra chunk-wise
     to_fetch_indices = (
         np.where(~loaded_mask)[0]
         if not update_cached
@@ -252,7 +250,6 @@ def average_sample_item_spectra(
                 cache.save(key, spec)
                 averaged_specs[arr_idx] = spec
 
-    # All spectra are now in averaged_specs in the correct order
     if any(spec is None for spec in averaged_specs):
         missing = [i for i, spec in enumerate(averaged_specs) if spec is None]
         raise RuntimeError(
@@ -262,16 +259,21 @@ def average_sample_item_spectra(
     union_mz = np.unique(np.concatenate([spec["mz"] for spec in averaged_specs]))
     union_mz = np.sort(union_mz)
 
-    interpolated_spectra = np.vstack(
-        [
-            np.interp(union_mz, spec["mz"], spec["intensity"], left=0, right=0)
-            for spec in averaged_specs
-        ]
-    )
-
+    n = len(averaged_specs)
     if method == "mean":
-        avg_intensity = np.mean(interpolated_spectra, axis=0)
+        sum_intensity = np.zeros_like(union_mz)
+        for spec in averaged_specs:
+            sum_intensity += np.interp(
+                union_mz, spec["mz"], spec["intensity"], left=0, right=0
+            )
+        avg_intensity = sum_intensity / n
     elif method == "median":
+        # For median, chunking is not possible; fallback to stacking for correctness
+        interpolated_spectra = np.empty((n, union_mz.size), dtype=float)
+        for i, spec in enumerate(averaged_specs):
+            interpolated_spectra[i] = np.interp(
+                union_mz, spec["mz"], spec["intensity"], left=0, right=0
+            )
         avg_intensity = np.median(interpolated_spectra, axis=0)
     else:
         raise ValueError("method must be 'mean' or 'median'")
