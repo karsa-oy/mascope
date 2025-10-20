@@ -314,7 +314,11 @@ const expanded = ref({})
                 // Store the abundance and intensity of the main isotope with each record
                 // to allow scaling peak trace heights in the preview
                 const mainIsotopeAbundance = data.children[maxIdx]?.relative_abundance
-                const mainIsotopeIntensity = data.children[maxIdx]?.sample_peak_intensity
+                // Find the height of the main isotope peak from peak store
+                const mainIsotopeIntensity =
+                  app.data.peak.list.find(
+                    (peak) => peak.mz === data.children[maxIdx]?.sample_peak_mz
+                  )?.height || 0
                 return data.children.map((record) => ({
                   ...record,
                   close:
