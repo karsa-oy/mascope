@@ -292,12 +292,19 @@ async def create_sample_items(
         await session.commit()
 
     # Step 4: Fetch created sample items for response and affected sample batches
-    _, affected_sample_batch_ids, created_sample_items, _ = (
+    created_item_ids = [si["sample_item_id"] for si in sample_items_data]
+
+    _, affected_sample_batch_ids, fetched_samples_list, _ = (
         await fetch_affected_sample_data(
-            sample_item_ids=[si["sample_item_id"] for si in sample_items_data],
+            sample_item_ids=created_item_ids,
             include_objects=True,
         )
     )
+
+    # Preserve insertion order
+    samples_by_id = {s.sample_item_id: s for s in fetched_samples_list}
+    created_sample_items = [samples_by_id[item_id] for item_id in created_item_ids]
+
     # Step 5: Update modified timestamps for affected batches
     await update_sample_batches_modified_timestamp(
         sample_batch_ids=affected_sample_batch_ids
@@ -501,14 +508,6 @@ async def copy_sample_items(
     - Sets target batch to "rematch" status if copied samples need new match computation
     - May be a part of the copy sample batch operation or independent.
 
-
-    Steps:
-    1. Validate target batch and source sample items
-    2. Create new sample items in target batch
-    3. Copy match data if conditions are met
-    4. Set target batch to rematch status if needed
-    5. Return results
-
     :param sample_item_ids: ID of the original sample items to be copied.
     :type sample_item_ids: list[str]
     :param sample_batch_id: ID of the sample batch where the new items will be placed.
@@ -528,70 +527,98 @@ async def copy_sample_items(
     :return: Copy results with created sample data
     :rtype: dict
     """
-    # Step 1: Fetch and validate the original sample items
+    # Validate unique IDs
     if len(set(sample_item_ids)) < len(sample_item_ids):
         raise ValueError("sample_item_ids to be copied must be unique")
 
+    # Fetch and validate source samples
     async with async_session() as session:
         result = await session.execute(
             select(SampleItem).where(SampleItem.sample_item_id.in_(sample_item_ids))
         )
-        original_sample_items = result.scalars().all()
+        source_samples = result.scalars().all()
 
-        if missing_ids := set(sample_item_ids) - {
-            si.sample_item_id for si in original_sample_items
-        }:
+        missing_ids = set(sample_item_ids) - {s.sample_item_id for s in source_samples}
+        if missing_ids:
             raise NotFoundException(f"Sample items not found: {list(missing_ids)}")
 
-    # Step 2: Validate the batch into which the sample is being copied.
-    sample_batch = await fetch_sample_batch(sample_batch_id)
+    # Validate target batch
+    target_batch = await fetch_sample_batch(sample_batch_id)
 
-    # Step 3: Prepare SampleItemCreate objects with copy transformations
+    # Prepare sample items for creation
     sample_items_to_create = []
-    for original in original_sample_items:
+    for source_sample in source_samples:
         sample_item_create = SampleItemCreate(
-            **SampleItemBase.model_validate(original).model_dump(
-                exclude={"sample_batch_id", "sample_item_name", "sample_item_type"}
+            **SampleItemBase.model_validate(source_sample).model_dump(
+                exclude={
+                    "sample_item_id",
+                    "sample_batch_id",
+                    "sample_item_name",
+                    "sample_item_type",
+                }
             ),
             sample_batch_id=sample_batch_id,
             sample_item_name=(
-                generate_copy_name(original.sample_item_name)
-                if original.sample_batch_id == sample_batch_id
-                else original.sample_item_name
+                generate_copy_name(source_sample.sample_item_name)
+                if source_sample.sample_batch_id == sample_batch_id
+                else source_sample.sample_item_name
             ),
             sample_item_type=(
                 "UNKNOWN"
-                if original.sample_item_type == "ACQUISITION"
-                else original.sample_item_type
+                if source_sample.sample_item_type == "ACQUISITION"
+                else source_sample.sample_item_type
             ),
         )
 
         sample_items_to_create.append(sample_item_create)
 
-    # Step 4: Bulk create sample items
-    created_items_data = (
+    # Bulk create new sample items
+    created_samples = (
         await create_sample_items(
             sample_items=sample_items_to_create,
             independent_transaction=False,
         )
     ).get("data", [])
 
-    # Step 4: Prepare match operations using zip for cleaner iteration
-    sample_match_copies = []
-    needs_rematch = False
+    # Sanity check
+    if len(created_samples) != len(sample_item_ids):
+        raise ValueError(
+            f"Created item count mismatch: expected {len(sample_item_ids)}, "
+            f"got {len(created_samples)}"
+        )
 
-    for original, created_item in zip(original_sample_items, created_items_data):
-        new_item_id = created_item["sample_item_id"]
+    # Prepare match operations using zip
+    match_copy_commands = []
+    requires_rematch = False
 
-        if original.sample_batch_id == sample_batch_id or always_copy_matches:
-            sample_match_copies.append(
-                CopyMatches(original.sample_item_id, new_item_id)
+    for source_sample, created_sample in zip(source_samples, created_samples):
+        new_sample_item_id = created_sample["sample_item_id"]
+
+        # Verify correspondence between source and created sample
+        if (
+            source_sample.filename != created_sample["filename"]
+            or source_sample.polarity != created_sample["polarity"]
+        ):
+            runtime.logger.error(
+                f"Sample item correspondence mismatch detected: "
+                f"source {source_sample.sample_item_id} "
+                f"(filename='{source_sample.filename}', polarity='{source_sample.polarity}') "
+                f"does not match created {new_sample_item_id} "
+                f"(filename='{created_sample['filename']}', polarity='{created_sample['polarity']}'). "
+                f"Skipping match data copy for this sample."
+            )
+            requires_rematch = True
+            continue
+
+        if source_sample.sample_batch_id == sample_batch_id or always_copy_matches:
+            match_copy_commands.append(
+                CopyMatches(source_sample.sample_item_id, new_sample_item_id)
             )
         else:
-            needs_rematch = True
+            requires_rematch = True
 
-    # Step 5: Copy match records if necessary
-    if sample_match_copies:
+    # Copy match data if needed
+    if match_copy_commands:
         notification = UserNotification(
             process_id=process_id,
             parent_id=parent_id,
@@ -599,19 +626,19 @@ async def copy_sample_items(
             status="pending",
             message=f"Copying match records for {len(sample_item_ids)} samples.",
             data={
-                "sample_match_copies": [copy._asdict() for copy in sample_match_copies],
+                "sample_match_copies": [cmd._asdict() for cmd in match_copy_commands],
                 "sample_batch_id": sample_batch_id,
                 "_room_ids": [sid],
                 "_sid": sid,
             },
         )
         await copy_sample_items_match_data(
-            sample_match_copies,
+            match_copy_commands,
             notification,
         )
 
     # Step 6: Set rematch status if samples need recomputation
-    if needs_rematch:
+    if requires_rematch:
         await update_sample_batch_status(
             sample_batch_ids=[sample_batch_id],
             status="rematch",
@@ -620,24 +647,24 @@ async def copy_sample_items(
 
     # Step 7: Return the copied sample and message
     message = (
-        f"Copied {len(created_items_data)} samples successfully "
-        f"to batch '{sample_batch.sample_batch_name}'."
+        f"Copied {len(created_samples)} samples successfully "
+        f"to batch '{target_batch.sample_batch_name}'."
     )
 
-    if sample_match_copies:
+    if match_copy_commands:
         message += " Match data was copied."
 
-    if needs_rematch:
+    if requires_rematch:
         message += " This batch may have different targets, please refresh the matches."
 
     return {
         "status": "success",
-        "results": len(created_items_data),
+        "results": len(created_samples),
         "message": message,
-        "data": created_items_data,
+        "data": created_samples,
         "_notification_data": {
             "affected_sample_item_ids": [
-                si["sample_item_id"] for si in created_items_data
+                si["sample_item_id"] for si in created_samples
             ],
         },
     }
