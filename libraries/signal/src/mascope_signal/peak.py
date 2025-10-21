@@ -38,7 +38,12 @@ from mascope_signal.runtime import runtime
 # Restrict large chunks for dask
 dask.config.set(**{"array.slicing.split_large_chunks": True})
 
+# Set up a global ProcessPoolExecutor
+cpu_cores = os.cpu_count()
+max_workers = max(1, cpu_cores // 2)
+EXECUTOR = ProcessPoolExecutor(max_workers=max_workers)
 
+# Define the delta m/z around unit masses for peak detection
 DMZ = 0.5
 
 
@@ -438,15 +443,12 @@ class TofPeakDetector(BasePeakDetector):
         self._sample_interval = self._sample_file_props.get("sample_interval", 0.25)
         specs_to_fit = self._segment_spectrum_for_fitting()
 
-        cpu_cores = os.cpu_count()
-        max_workers = max(1, cpu_cores // 2)
-        executor = ProcessPoolExecutor(max_workers=max_workers)
         loop = asyncio.get_event_loop()
 
         # Fill in asynchronous operations
         futures = [
             loop.run_in_executor(
-                executor,
+                EXECUTOR,
                 fit_n_peaks,
                 mz_to_fit,
                 spec_to_fit,
@@ -478,8 +480,6 @@ class TofPeakDetector(BasePeakDetector):
         # Log unique warnings
         for warning in fit_warnings:
             runtime.logger.debug(f"Peak detection warning: {warning}")
-
-        executor.shutdown()
 
         if len(new_peaks) > 0:
             new_peak_mzs, new_peak_heights, new_peak_areas = zip(
