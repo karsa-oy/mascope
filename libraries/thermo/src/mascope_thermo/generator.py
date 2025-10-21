@@ -305,6 +305,11 @@ class RawProcessor(Thread):
         except Exception as e:
             error_msg = f"Failed to create database record: {e}"
             self.log.error(error_msg)
+            # Delete filestore directory on failure
+            filename = sample_file_props["filename"]
+            data_path = parse_path_from_item_filename(filename)
+            if os.path.exists(data_path):
+                shutil.rmtree(data_path)
             raise RuntimeError(error_msg) from e
 
     def _process_raw_file(self, sample_file_props: dict, raw_file_path: str) -> None:

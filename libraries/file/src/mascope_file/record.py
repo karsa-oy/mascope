@@ -68,7 +68,7 @@ def create_sample_file_db_record(data: dict, access_token: str) -> None:
             f"{url}/api/sample/files",
             headers=headers,
             json=sample_file_db_record,
-            timeout=30,
+            timeout=180,
         )
 
         if response.status_code != 201:
