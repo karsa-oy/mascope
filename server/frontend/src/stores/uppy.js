@@ -66,7 +66,7 @@ export const useUppy = defineStore('app.uppy', () => {
     endpoint: `${runtime.api_path}/api/sample/files/upload/tus`,
     // settings
     retryDelays: [0, 3000, 5000, 10000, 20000],
-    chunkSize: 50 * 1024 * 1024, // 50 MiB, recommended by Cloudflare
+    chunkSize: 5 * 1024 * 1024, // 5 MiB, small chunks seem the most reliable
     withCredentials: true,
     removeFingerprintOnSuccess: true,
     onShouldRetry: (err, retryAttempt, options) => {
