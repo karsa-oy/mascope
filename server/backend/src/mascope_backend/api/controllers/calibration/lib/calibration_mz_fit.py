@@ -175,11 +175,15 @@ class BaseCalibrationHandler:
         return isotope_row
 
     def _get_summary_row(self, calibration_df):
+        match_mz_error = abs(calibration_df["match_mz_error"]).mean()
+        calibration_mz_error = abs(calibration_df["calibration_mz_error"]).mean()
+        mz_error_diff = abs(match_mz_error - calibration_mz_error)
+        calibrant_to_tic = sum(calibration_df["calibrant_to_tic"])
         return {
-            "match_mz_error": abs(calibration_df["match_mz_error"]).mean(),
-            "calibration_mz_error": abs(calibration_df["calibration_mz_error"]).mean(),
-            "mz_error_diff": sum(calibration_df["mz_error_diff"]),
-            "calibrant_to_tic": sum(calibration_df["calibrant_to_tic"]),
+            "match_mz_error": match_mz_error,
+            "calibration_mz_error": calibration_mz_error,
+            "mz_error_diff": mz_error_diff,
+            "calibrant_to_tic": calibrant_to_tic,
         }
 
     async def fit(self):
