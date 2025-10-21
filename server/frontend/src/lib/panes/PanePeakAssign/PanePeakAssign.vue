@@ -270,7 +270,11 @@ const expanded = ref({})
       >
         <Column expander />
         <Column field="target_compound_formula" header="Formula" sortable />
-        <Column field="cheminfo.target_compound_unsaturation" header="DBE" sortable />
+        <Column field="cheminfo.target_compound_unsaturation" sortable>
+          <template #header>
+            <span v-tooltip="{ value: 'Degree of unsaturation', showDelay: 500 }"><b>DBE</b></span>
+          </template>
+        </Column>
         <Column field="cheminfo.target_isotope_mz" header="Isotope m/z" sortable>
           <template #body="{ data }">
             {{ num.mz.format(data.cheminfo.target_isotope_mz) }}
@@ -288,7 +292,7 @@ const expanded = ref({})
         </Column>
         <Column field="match_score" sortable>
           <template #header>
-            <span class="pi pi-verified" v-tooltip="'Match score'" />
+            <span class="pi pi-verified" v-tooltip="{ value: 'Match score', showDelay: 500 }" />
           </template>
           <template #body="{ data }">
             <BaseMatchTag
@@ -301,7 +305,10 @@ const expanded = ref({})
         </Column>
         <Column field="existing" sortable>
           <template #header>
-            <span class="pi pi-info-circle" v-tooltip.left="'Compound info'" />
+            <span
+              class="pi pi-info-circle"
+              v-tooltip.left="{ value: 'Compound info', showDelay: 500 }"
+            />
           </template>
           <template #body="{ data }">
             <span
