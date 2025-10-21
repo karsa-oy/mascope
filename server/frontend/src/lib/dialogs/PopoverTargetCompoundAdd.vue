@@ -178,7 +178,7 @@ const addButtonDisabled = computed(
     v-tooltip="
       plusButtonDisabled
         ? 'Open a target collection to add a compound'
-        : `Add compound to ${targetCollection.target_collection_name}`
+        : `Add compound to ${targetCollection?.target_collection_name ?? 'selected collection'}`
     "
     :disabled="plusButtonDisabled"
   />
