@@ -17,7 +17,10 @@ from mascope_backend.api.lib.exceptions.api_exceptions import (
     ApiException,
 )
 
-from mascope_backend.api.new.instrument_configs.service import resolve_instrument_config
+from mascope_backend.api.new.instrument_configs.schemas import (
+    CreateInstrumentConfigBody,
+    SetInstrumentConfigBody,
+)
 from mascope_backend.api.new.instrument_configs.process.service import (
     process_instrument_config,
 )
@@ -88,7 +91,7 @@ async def auto_process_sample_file(
 
     Steps:
     - Validate sample file existence
-    - Handle instrument config assignment (existing or create new) and processing
+    - Create a new instrument config and process
     - Get ACQUISITION workspace for the instrument
     - Create ACQUISITION batches and sample items for each sample file polarity
     - Compute peak data for the sample file
@@ -116,8 +119,20 @@ async def auto_process_sample_file(
         if not (sample_file := await session.get(SampleFile, sample_file_id)):
             raise NotFoundException(f"Sample file with ID '{sample_file_id}' not found")
 
-    # --- Handle instrument config assignment (existing or create new) and processing --- #
-    instrument_config = await resolve_instrument_config(sample_file)
+    # --- Create a new instrument config and process --- #
+    method_file_exists = sample_file.method_file and sample_file.method_file.strip()
+    if method_file_exists:
+        method_file = sample_file.method_file
+    else:
+        # Fallback to auto-generated method file name
+        timestamp = sample_file.datetime.strftime("%Y-%m-%d %H:%M:%S")
+        method_file = f"{timestamp} Acquisition {sample_file.instrument}"
+
+    instrument_config = SetInstrumentConfigBody(
+        new_record=CreateInstrumentConfigBody(
+            method_file=method_file,
+        )
+    )
 
     process_instrument_config_result = await process_instrument_config(
         filenames=[sample_file.filename],
