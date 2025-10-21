@@ -185,6 +185,28 @@ watchDebounced(
   }
 )
 
+function getIsotopeRows(data) {
+  // Find the isotope with the highest relative abundance to use as reference
+  const maxIdx = data.children.reduce(
+    (maxI, r, i, arr) =>
+      (r.relative_abundance ?? 0) > (arr[maxI].relative_abundance ?? 0) ? i : maxI,
+    0
+  )
+  // Store the abundance and intensity of the main isotope with each record
+  // to allow scaling peak trace heights in the preview
+  const mainIsotopeAbundance = data.children[maxIdx]?.relative_abundance
+  // Find the height of the main isotope peak from peak store
+  const mainIsotopeIntensity =
+    app.data.peak.list.find((peak) => peak.mz === data.children[maxIdx]?.sample_peak_mz)?.height ||
+    0
+  return data.children.map((record) => ({
+    ...record,
+    close: (Math.abs(record.mz - app.data.peak.focused?.mz) * 1e6) / record.mz < params.mzPrecision,
+    abundance_reference: mainIsotopeAbundance,
+    intensity_reference: mainIsotopeIntensity
+  }))
+}
+
 const expanded = ref({})
 </script>
 
@@ -303,32 +325,7 @@ const expanded = ref({})
         </Column>
         <template #expansion="{ data }">
           <DataTable
-            :value="
-              (() => {
-                // Find the isotope with the highest relative abundance to use as reference
-                const maxIdx = data.children.reduce(
-                  (maxI, r, i, arr) =>
-                    (r.relative_abundance ?? 0) > (arr[maxI].relative_abundance ?? 0) ? i : maxI,
-                  0
-                )
-                // Store the abundance and intensity of the main isotope with each record
-                // to allow scaling peak trace heights in the preview
-                const mainIsotopeAbundance = data.children[maxIdx]?.relative_abundance
-                // Find the height of the main isotope peak from peak store
-                const mainIsotopeIntensity =
-                  app.data.peak.list.find(
-                    (peak) => peak.mz === data.children[maxIdx]?.sample_peak_mz
-                  )?.height || 0
-                return data.children.map((record) => ({
-                  ...record,
-                  close:
-                    (Math.abs(record.mz - app.data.peak.focused?.mz) * 1e6) / record.mz <
-                    params.mzPrecision,
-                  abundance_reference: mainIsotopeAbundance,
-                  intensity_reference: mainIsotopeIntensity
-                }))
-              })()
-            "
+            :value="getIsotopeRows(data)"
             dataKey="mz"
             selectionMode="single"
             v-model:selection="preview.peak"
