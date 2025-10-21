@@ -386,19 +386,22 @@ async def fit_resolution_function(
     p_mzs = np.array(p_mzs)
     p_fwhms = np.array(p_fwhms)
 
-    # Fit FWHM vs m/z pairs
-    p_fwhms_fit = fit_fwhm(instrument_type, p_mzs, p_fwhms)
-
-    residuals = p_fwhms - p_fwhms_fit
-    std_dev = np.std(residuals)
     if instrument_type == "tof":
-        is_outlier = (residuals > 0) | (residuals < -ndev * std_dev)
+        # log-space filtering
+        log_f = np.log(p_fwhms)
+        log_f_med = np.median(log_f)
+        lof_f_mad = np.median(np.abs(log_f - log_f_med)) or 1e-9
+        is_outlier = np.abs(log_f - log_f_med) >= 4 * lof_f_mad
     else:
+        # Fit FWHM vs m/z pairs
+        p_fwhms_fit = fit_fwhm(instrument_type, p_mzs, p_fwhms)
+        residuals = p_fwhms - p_fwhms_fit
+        std_dev = np.std(residuals)
         is_outlier = (residuals > ndev * std_dev) | (residuals < -ndev * std_dev)
 
     # Remove outliers
-    p_fwhms_filt = np.array(p_fwhms)[~is_outlier]
-    mass = np.array(p_mzs)[~is_outlier]
+    p_fwhms_filt = p_fwhms[~is_outlier]
+    mass = p_mzs[~is_outlier]
 
     resolution = mass / p_fwhms_filt
 
@@ -408,29 +411,39 @@ async def fit_resolution_function(
     # Fit resolution function based on the instrument type
     try:
         if instrument_type == "tof":
-            # TOF initial guesses
-            a_init = 1 / np.mean(resolution)
-            b_init = 1e2 * a_init
-            bounds = ([0, 0], [1, np.inf])
-
-            fit_res = curve_fit(
-                rational_polynome,
-                mass,
-                resolution,
-                p0=(a_init, b_init),
-                bounds=bounds,
-            )
-            a, b = fit_res[0]
+            meta = _fit_tof_rational(mass, p_fwhms_filt)
+            a = meta["a"]
+            b = meta["b"]
             resolution_function = partial(r_tof, a=a, b=b)
+            stats.update(
+                {
+                    "model": "rational_polynome",
+                    "coefficients": [a, b],
+                    "method": meta["method"],
+                    "dynamic_range": meta["dynamic_range"],
+                    "n_points": meta["n_points"],
+                }
+            )
             runtime.logger.info(
-                f"TOF resolution function coefficients: a={a:.2e}, b={b:.2e}"
+                f"TOF resolution a={a:.3e} b={b:.3e} "
+                f"dyn_range={meta['dynamic_range'] if meta['dynamic_range'] is not None else 'NA'} "
+                f"points={meta['n_points']} method={meta['method']}"
             )
 
         else:
             fit_res = curve_fit(inverse_sqrt, mass, resolution)
             a = fit_res[0][0]
             resolution_function = partial(r_orbi, a=a)
-            runtime.logger.info(f"Orbi resolution function coefficients: a={a:.2e}")
+            stats.update(
+                {
+                    "model": "inverse_sqrt",
+                    "coefficients": [a],
+                    "method": "nonlinear",
+                    "dynamic_range": None,
+                    "n_points": int(mass.size),
+                }
+            )
+            runtime.logger.info(f"Orbi resolution a={a:.3e} points={mass.size}")
 
     except ValueError as e:
         runtime.logger.error(f"Resolution function fitting failed: {e}")
@@ -463,6 +476,135 @@ def fit_fwhm(
         coefs = np.polyfit(p_mzs, p_fwhms, 2)
         p_fwhms_fit = polynome(p_mzs, *coefs)
     return p_fwhms_fit
+
+
+def _huber_weights(residuals: np.ndarray, c: float = 1.345) -> np.ndarray:
+    s = 1.4826 * np.median(np.abs(residuals - np.median(residuals)))
+    if s <= 0:
+        return np.ones_like(residuals)
+    r = residuals / (c * s)
+    w = np.ones_like(residuals)
+    mask = np.abs(r) > 1
+    w[mask] = 1 / np.abs(r[mask])
+    return w
+
+
+def _weighted_linear_fit(
+    mass: np.ndarray, fwhm: np.ndarray, max_iter: int = 10
+) -> tuple[float, float]:
+    """Linear fit of FWHM vs m/z with Huber weights"""
+    # Solve fwhm ~ alpha*mz + beta with iterative Huber weighting
+    X = np.vstack([mass, np.ones_like(mass)]).T
+    alpha, beta = np.polyfit(mass, fwhm, 1)  # init
+    for _ in range(max_iter):
+        pred = alpha * mass + beta
+        w = _huber_weights(fwhm - pred)
+        # Weighted least squares: solve (W^(1/2) X) coeffs = W^(1/2) y
+        WX = X * np.sqrt(w[:, None])
+        Wy = fwhm * np.sqrt(w)
+        try:
+            coeffs, *_ = np.linalg.lstsq(WX, Wy, rcond=None)
+        except Exception:
+            break
+        alpha_new, beta_new = coeffs
+        if np.allclose([alpha, beta], [alpha_new, beta_new], rtol=1e-4, atol=1e-6):
+            alpha, beta = alpha_new, beta_new
+            break
+        alpha, beta = alpha_new, beta_new
+    return alpha, beta
+
+
+def _rational_dynamic_range(mass: np.ndarray, a: float, b: float) -> float:
+    vals = rational_polynome(mass, a, b)
+    return (np.max(vals) - np.min(vals)) / (np.mean(vals) + 1e-12)
+
+
+def _adjust_coefficients(
+    mass: np.ndarray, a: float, b: float, target_dr: float = 0.05
+) -> tuple[float, float]:
+    """Adjust rational polynome coefficients to ensure reasonable dynamic range"""
+    # Enforce positivity
+    a = max(a, 1e-12)
+    b = max(b, 1e-12)
+    med_mz = np.median(mass)
+    # Ensure intercept contributes early curvature
+    min_b = 0.05 * a * med_mz
+    if b < min_b:
+        b = min_b
+    # Increase curvature if dynamic range too low
+    dr = _rational_dynamic_range(mass, a, b)
+    if dr < target_dr:
+        # Boost b to push out of premature plateau
+        scale = target_dr / (dr + 1e-12)
+        b *= min(scale, 10.0)
+    return a, b
+
+
+def _fit_tof_rational(mass: np.ndarray, fwhm: np.ndarray) -> dict:
+    """Fit TOF resolution function with rational polynome"""
+    if mass.size < 5:
+        # Fallback: approximate plateau from median resolution
+        if mass.size == 0:
+            a = 1e-5
+            b = 1.0
+        else:
+            resolution = mass / fwhm
+            plateau = np.median(resolution)
+            a = 1 / max(plateau, 1e-9)
+            # Intercept so that resolution at min(mass) reduced by ~10%
+            b = 0.1 * a * np.min(mass)
+        return {
+            "a": float(a),
+            "b": float(b),
+            "method": "fallback_small_sample",
+            "n_points": int(mass.size),
+            "dynamic_range": None,
+        }
+
+    # Linear fit of FWHM
+    alpha, beta = _weighted_linear_fit(mass, fwhm)
+    alpha = max(alpha, 1e-12)
+    beta = max(beta, 1e-12)
+
+    # Initial rational params
+    a0, b0 = alpha, beta
+    a0, b0 = _adjust_coefficients(mass, a0, b0)
+
+    # Refine with curve_fit
+    resolution = mass / fwhm
+    try:
+        popt, _ = curve_fit(
+            rational_polynome,
+            mass,
+            resolution,
+            p0=(a0, b0),
+            bounds=([1e-12, 1e-12], [1.0, np.inf]),
+            maxfev=20_000,
+        )
+        a_fit, b_fit = popt
+    except Exception:
+        a_fit, b_fit = a0, b0
+        refine_status = "nonlinear_failed"
+    else:
+        refine_status = "nonlinear_success"
+
+    # Sanity adjustments
+    a_final, b_final = _adjust_coefficients(mass, a_fit, b_fit)
+    dr = _rational_dynamic_range(mass, a_final, b_final)
+
+    # If after adjustment still near-flat but raw data vary more, inflate b
+    raw_dr = (np.max(resolution) - np.min(resolution)) / (np.mean(resolution) + 1e-12)
+    if dr < 0.02 and raw_dr > 0.05:
+        b_final = max(b_final, 0.2 * a_final * np.median(mass))
+        dr = _rational_dynamic_range(mass, a_final, b_final)
+
+    return {
+        "a": float(a_final),
+        "b": float(b_final),
+        "method": f"linear+{refine_status}",
+        "n_points": int(mass.size),
+        "dynamic_range": float(dr),
+    }
 
 
 def r_tof(mz: float | np.ndarray, a: float, b: float):
