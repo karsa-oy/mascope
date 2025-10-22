@@ -21,6 +21,9 @@ from mascope_backend.api.lib.exceptions.api_exceptions import handle_exception
 from mascope_backend.api.controllers.workspace.acquisition.service import (
     create_acquisition_workspaces,
 )
+from mascope_backend.db.ops.batch.reset_processing_status import (
+    reset_stuck_processing_batches,
+)
 
 from mascope_backend.runtime import runtime
 
@@ -36,6 +39,10 @@ async def lifespan(app: FastAPI):
     # Initialize database
     runtime.logger.info("Fast App startup: initializing database")
     await init_db()
+
+    # Reset stuck processing batches
+    runtime.logger.info("Fast App startup: resetting stuck processing batches")
+    await reset_stuck_processing_batches()
 
     # Reset temp directory
     runtime.logger.info("Fast App startup: initializing temp directory")
