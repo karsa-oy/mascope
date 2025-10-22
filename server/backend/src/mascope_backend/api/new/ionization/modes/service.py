@@ -266,7 +266,7 @@ async def update_ionization_mode(
                         # Other fields cannot be changed if the mode is used in acquisition batches
                         if getattr(ionization_mode, key) != value:
                             raise ValueError(
-                                f"Cannot update ionization mode '{ionization_mode.ionization_mode_name}' name, "
+                                f"Cannot update ionization mode '{ionization_mode.ionization_mode_name}', "
                                 f"as it is in use for one or more acquisition batches."
                             )
 
