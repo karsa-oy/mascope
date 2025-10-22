@@ -457,6 +457,8 @@ class DataMonitor:
             if not new_samples:
                 self.logger.info(f"No new samples in batch {batch_name}")
                 checked_batch_ids.append(batch_id)
+                # Update batch last check time
+                self.update_batch_state(check_time, batch_id, save=True)
                 continue
 
             # Process each new sample in this batch
