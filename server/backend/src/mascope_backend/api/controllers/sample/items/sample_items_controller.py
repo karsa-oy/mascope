@@ -551,7 +551,6 @@ async def copy_sample_items(
         sample_item_create = SampleItemCreate(
             **SampleItemBase.model_validate(source_sample).model_dump(
                 exclude={
-                    "sample_item_id",
                     "sample_batch_id",
                     "sample_item_name",
                     "sample_item_type",
