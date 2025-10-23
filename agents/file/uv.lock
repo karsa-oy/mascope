@@ -170,7 +170,7 @@ requires-dist = [
 
 [[package]]
 name = "mascope-sdk"
-version = "0.0.0"
+version = "2025.10.14"
 source = { editable = "../../libraries/sdk" }
 dependencies = [
     { name = "loguru" },
