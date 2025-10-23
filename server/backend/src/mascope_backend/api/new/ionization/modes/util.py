@@ -138,9 +138,8 @@ async def resolve_ionization_modes_by_tokens(
     # Match ionization modes based on tokens in the filename
     matched_ionization_modes = []
     for ionization_mode in all_ionization_modes:
-        runtime.logger.debug(
-            f"Checking ionization mode with token: {ionization_mode.ionization_mode_token}"
-        )
+        if not ionization_mode.ionization_mode_token:
+            continue
         if (
             ionization_mode.ionization_mode_token
             and ionization_mode.ionization_mode_polarity in sample_file.polarity

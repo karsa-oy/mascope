@@ -72,7 +72,7 @@ def process_file_upload(filepath: str, max_retries: int = 10) -> None:
             upload_sample_file(filepath)
             return
         except ValueError as ve:
-            runtime.logger.error(f"File upload failed: {str(ve)}")
+            runtime.logger.error(f"File upload failed: {ve}")
             break  # do not retry on validation errors
         except Exception as e:  # pylint: disable=broad-except
             runtime.logger.warning(
