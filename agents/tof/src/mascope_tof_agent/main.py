@@ -5,6 +5,7 @@ import sys
 import time
 import textwrap
 
+from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import Event
 from queue import Empty
 import socketio
@@ -62,6 +63,7 @@ SHUTDOWN_EVENT = Event()
 
 runtime = None  # pylint: disable=invalid-name
 sio = socketio.AsyncClient(logger=False, ssl_verify=False)
+executor = ThreadPoolExecutor(max_workers=3)
 
 
 def process_file_upload(filepath: str, max_retries: int = 10) -> None:
@@ -223,11 +225,8 @@ async def streamer_processor(streamer) -> None:
                 # File finished
                 runtime.logger.info(f"Acquisition of file {filename} finished")
                 raw_filename = data["source_filepath"]
-                # Spawn a thread for upload to not block processing of subsequent acquisitions
-                upload_thread = threading.Thread(
-                    target=process_file_upload, args=(raw_filename,), daemon=True
-                )
-                upload_thread.start()
+                # Submit file upload task for the thread pool executor
+                executor.submit(process_file_upload, raw_filename)
                 if sio.connected:
                     await sio.emit(
                         "instrument_acquisition_finished",
@@ -352,6 +351,7 @@ def run() -> None:
     finally:
         runtime.logger.info("Shutting down...")
         SHUTDOWN_EVENT.set()
+        executor.shutdown(wait=True)
 
 
 if __name__ == "__main__":
