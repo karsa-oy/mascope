@@ -80,6 +80,7 @@ class TofDaqStreamer(Thread):
         # Acquisition state
         self._prev_rec_running = False
         self._prev_daq_active = False
+        self._prev_daq_run = -1
         self._my_bufs_processed = None
         self._buf_time = np.zeros((1,), dtype=np.float64)
         self._base_filename = None
@@ -163,6 +164,10 @@ class TofDaqStreamer(Thread):
         ret = TwWaitForNewData(1000, self.desc, self.ptr, True)
         if ret == 4:
             runtime.logger.debug("Received new data")
+            if self._prev_daq_run != self.desc.iRun:
+                # Next "run" of the acquisition started since last iteration
+                self.on_daq_ended()
+                self._prev_daq_run = self.desc.iRun
             if self._my_bufs_processed is None:
                 # Daq active first time
                 self.on_first_daq_active()
@@ -175,6 +180,7 @@ class TofDaqStreamer(Thread):
                         "i": self._my_bufs_processed,
                     }
                 )
+                self._prev_daq_run = self.desc.iRun
         elif ret == 8:
             # No new data within timeout
             runtime.logger.debug("Timeout while waiting for new data")
@@ -198,6 +204,7 @@ class TofDaqStreamer(Thread):
         # Clear active flag
         self.active.clear()
         # Reset self
+        self._prev_daq_run = -1
         self._my_bufs_processed = None
         self._base_filename = None
         self._filepath = None
