@@ -48,7 +48,9 @@ async def owner_register_user_route(
         raise InvalidUsernameException()
 
     # Step 2: Create new user
-    return await register_user(user_create=user_create, user_manager=user_manager)
+    return await register_user(
+        user_create=user_create, user_manager=user_manager, safe=False
+    )
 
 
 @owner_router.patch("/{user_id}")

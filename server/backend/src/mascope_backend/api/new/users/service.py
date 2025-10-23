@@ -178,13 +178,18 @@ async def register_user(
     :return: The registered user's details.
     :rtype: dict
     """
-    # Step 1: Check if the username already exists
+    # --- Check if the username already exists ---
     await check_username_exists(user_create.username)
 
-    # Step 2: Create the user
+    # --- Sync is_superuser with role_id (owner role requires superuser) ---
+    user_create.is_superuser = (
+        user_create.role_id == auth_settings.ROLE_ACCESS_LEVELS.get("owner")
+    )
+
+    # --- Create the user ---
     created_user = await user_manager.create(user_create=user_create, safe=safe)
 
-    # Step 3: Validate and return the registered user's details
+    # --- Validate and return the registered user's details ---
     user = (await get_user(user_id=created_user.id))["data"]
     return {
         "message": f"User '{user.username}' registered successfully.",
@@ -213,10 +218,10 @@ async def update_user(
     :raises LastOwnerDowngradeException: If attempting to downgrade the last owner
     :return: The updated user details.
     """
-    # Step 1: Retrieve the user
+    # --- Retrieve the user ---
     user = await user_manager.get(user_id)
 
-    # Step 2: Check owner role downgrade only for full UserUpdate schema
+    # --- Check owner role downgrade only for full UserUpdate schema ---
     if (
         isinstance(user_update, UserUpdate)
         and hasattr(user_update, "role_id")
@@ -224,7 +229,12 @@ async def update_user(
     ):
         await check_owner_role_change(user_id, user_update.role_id)
 
-    # Step 3: Check username new username already exists if it's being updated
+        # --- Sync is_superuser with role_id (owner role requires superuser) ---
+        user_update.is_superuser = (
+            user_update.role_id == auth_settings.ROLE_ACCESS_LEVELS.get("owner")
+        )
+
+    # --- Check username new username already exists if it's being updated ---
     if (
         hasattr(user_update, "username")
         and user_update.username
@@ -232,10 +242,10 @@ async def update_user(
     ):
         await check_username_exists(user_update.username)
 
-    # Step 4: Update the user
+    # --- Update the user ---
     await user_manager.update(user_update, user)
 
-    # Step 5: Validate and return the updated user
+    # --- Validate and return the updated user details ---
     user = (await get_user(user_id=user_id))["data"]
     message = f"User '{user.username}' updated successfully."
     if user_update.password is not None:
