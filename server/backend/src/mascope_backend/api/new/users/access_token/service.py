@@ -13,29 +13,37 @@ from mascope_backend.runtime import runtime
 
 
 @api_controller()
-async def delete_user_access_tokens(user_id: int) -> dict:
+async def delete_user_access_tokens(
+    user_id: int, service_name: str | None = None
+) -> dict:
     """
-    Deletes all access tokens associated with the specified user (by user_id).
-
-    This function directly removes all access tokens linked to the user from the database.
-    Used for admin managing of other users.
+    Deletes access tokens for the specified user.
 
     :param user_id: The ID of the user whose tokens should be deleted.
-    :return: A success message or a notification if no tokens were found.
+    :param service_name: Optional service name to delete only specific tokens.
+                        If None, deletes all tokens for the user.
+    :return: A success message with count of deleted tokens.
     """
-    # Step 1: Fetch the user details
     async with async_session() as session:
         user = await session.get(User, user_id)
 
-    # Step 2: Remove all access tokens for the user
-    async with async_session() as session:
         delete_query = delete(AccessToken).where(AccessToken.user_id == user_id)
+
+        # Filter by service if specified
+        if service_name:
+            delete_query = delete_query.where(AccessToken.service_name == service_name)
+
         result = await session.execute(delete_query)
         await session.commit()
 
         if result.rowcount == 0:
-            message = f"No access tokens found for user `{user.username}`."
+            service_msg = f"for service '{service_name}'" if service_name else ""
+            message = (
+                f"No access tokens {service_msg} found for user `{user.username}`."
+            )
+        else:
+            service_msg = f"'{service_name}' " if service_name else ""
+            message = f"Deleted {result.rowcount} {service_msg}access token(s) for user `{user.username}`."
 
-    message = f"All access tokens for user `{user.username}` have been deleted."
-    runtime.logger.info(message)
-    return {"message": message}
+        runtime.logger.info(message)
+        return {"message": message}

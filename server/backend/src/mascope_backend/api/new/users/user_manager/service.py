@@ -15,7 +15,7 @@ from mascope_backend.db.models import User
 from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
 from mascope_backend.api.new.auth.config import auth_settings
 from mascope_backend.api.new.users import exceptions
-from mascope_backend.api.new.users.schemas import UserCreate
+from mascope_backend.api.new.users.schemas import UserCreate, UserUpdate
 from mascope_backend.api.new.auth.access_token.service import regenerate_access_token
 from mascope_backend.api.new.users.access_token.service import delete_user_access_tokens
 from mascope_backend.socket import event_emitter
@@ -107,6 +107,52 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
 
         return created_user
 
+    async def update(
+        self,
+        user_update: UserUpdate,
+        user: models.UP,
+        safe: bool = False,
+        request: Optional[Request] = None,
+    ) -> models.UP:
+        """
+        Update a user in database and manage file-converter token on role change.
+
+        :param user_update: The UserUpdate model containing
+        the changes to apply to the user.
+        :param user: The current user to update.
+        :param safe: If True, sensitive values like is_superuser or is_verified
+        will be ignored during the update, defaults to False
+        :param request: Optional FastAPI request that
+        triggered the operation, defaults to None.
+        :return: The updated user.
+        """
+        old_role_id = user.role_id
+        # Call parent update (this triggers on_after_update)
+        updated_user = await super().update(user_update, user, safe, request)
+
+        # Handle file-converter token on role change
+        if user_update.role_id is not None and old_role_id != updated_user.role_id:
+            editor_level = auth_settings.ROLE_ACCESS_LEVELS.get("editor")
+            promoted_to_editor = old_role_id < editor_level <= updated_user.role_id
+            demoted_to_guest = old_role_id >= editor_level > updated_user.role_id
+
+            if promoted_to_editor:
+                await regenerate_access_token(
+                    user=updated_user, service_name="file-converter"
+                )
+                runtime.logger.info(
+                    f"Generated file-converter token for {updated_user.username}"
+                )
+            elif demoted_to_guest:
+                await delete_user_access_tokens(
+                    user_id=updated_user.id, service_name="file-converter"
+                )
+                runtime.logger.info(
+                    f"Removed file-converter token for {updated_user.username}"
+                )
+
+        return updated_user
+
     async def on_after_register(self, user: User, request: Optional[Request] = None):
         runtime.logger.info(f"User {user.username} was registered.")
         await event_emitter.emit("user.reload", user)
@@ -167,7 +213,7 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
             runtime.logger.error(
                 f"Unexpected error during socket authentication after login: {str(e)}"
             )
-        return  # pragma: no cover
+        return
 
     async def on_after_update(
         self,
@@ -184,12 +230,14 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
         triggered the operation, defaults to None.
         """
         runtime.logger.info(f"User `{user.username}` updated.")
-        # Logout user if their password is updated? Revoke tokens logic?
+
+        # Revoke access tokens if password changed
         if "password" in update_dict:
             runtime.logger.info(f"User `{user.username}` password was changed.")
             await delete_user_access_tokens(user_id=user.id)
+
         await event_emitter.emit("user.reload", user)
-        return  # pragma: no cover
+        return
 
     async def on_after_delete(
         self,
