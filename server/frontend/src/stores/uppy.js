@@ -95,43 +95,46 @@ export const useUppy = defineStore('app.uppy', () => {
     })
   })
 
-  uppy.on('error', (error) => {
-    ui.notification.push({
-      type: 'sample_file_upload',
-      process_id,
-      status: 'error',
-      message: 'Sample file upload(s) failed'
-    })
-    console.error(error.stack)
-  })
-
   uppy.on('complete', (result) => {
-    if (result.successful.length === 1) {
+    // Handle successful uploads
+    if (result.successful.length > 0) {
+      const message =
+        result.successful.length === 1
+          ? `Uploaded ${result.successful[0].name} successfully!`
+          : `Uploaded ${result.successful.length} sample files successfully!`
+
       ui.notification.push({
         type: 'sample_file_upload',
         process_id,
         status: 'success',
-        message: `Uploaded ${result.successful[0].name} successfully!`,
-        progress: 100
-      })
-    } else if (result.successful.length > 1) {
-      ui.notification.push({
-        type: 'sample_file_upload',
-        process_id,
-        status: 'success',
-        message: `Uploaded ${result.successful.length} sample files successfully!`,
+        message,
         progress: 100
       })
     }
-    result.failed.forEach(({ name, error }) => {
-      ui.notification.push({
-        type: 'sample_file_upload',
-        process_id,
-        status: 'error',
-        message: `Failed to upload file ${name}: ${error}`
+
+    // Handle failed uploads
+    if (result.failed.length > 0) {
+      result.failed.forEach((file) => {
+        // Extract api error message from TUS error string
+        const errorMessage = (() => {
+          try {
+            const jsonStr = file.error?.split('response text: ')[1]?.split(', request id:')[0]
+            return jsonStr ? JSON.parse(jsonStr).error : 'Upload failed'
+          } catch {
+            return 'Upload failed'
+          }
+        })()
+
+        ui.notification.push({
+          type: 'sample_file_upload',
+          process_id,
+          status: 'error',
+          message: `${file.name}: ${errorMessage}`
+        })
+
+        console.error(`Upload failed for ${file.name}:`, file.error)
       })
-      console.error(`Sample file upload failed:`, error)
-    })
+    }
   })
   // End event handlers
 

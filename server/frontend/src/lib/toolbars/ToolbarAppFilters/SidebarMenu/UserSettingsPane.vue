@@ -24,7 +24,7 @@ const dialog = reactive({
   password: false
 })
 
-// API Token Management
+// TODO_config API Token Management
 const SERVICE_CONFIGS = [
   {
     id: 'mascope_sdk', // used for both internal reference in selectedTokenType and API requests for packages
