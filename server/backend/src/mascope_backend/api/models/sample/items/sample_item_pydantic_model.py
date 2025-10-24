@@ -129,8 +129,8 @@ class SampleItemCreate(SampleItemValidator, SampleItemBase):
     ionization_mode_id: str | None = Field(
         None,
         description=(
-            "ID of the ionization mode used for the sample item. ",
-            "Optional for creation, as it will be inferred from the filename.",
+            "ID of the ionization mode used for the sample item."
+            "Optional for creation, as it will be inferred from the filename."
         ),
     )
 
