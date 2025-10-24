@@ -8,6 +8,7 @@ from sqlalchemy import delete
 from mascope_backend.db import async_session
 from mascope_backend.db.models import AccessToken, User
 from mascope_backend.api.lib.api_features import api_controller
+from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
 
 from mascope_backend.runtime import runtime
 
@@ -26,6 +27,8 @@ async def delete_user_access_tokens(
     """
     async with async_session() as session:
         user = await session.get(User, user_id)
+        if not user:
+            raise NotFoundException(f"User with ID '{user_id}' not found")
 
         delete_query = delete(AccessToken).where(AccessToken.user_id == user_id)
 
