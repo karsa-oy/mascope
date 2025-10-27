@@ -5,7 +5,7 @@ import asyncio
 from mascope_file.io import load_file
 import mascope_signal.compute as m_compute
 from mascope_signal.peak import get_peaks
-from sqlalchemy import and_, select, func, cast, Float, Integer
+from sqlalchemy import and_, select, func, cast, Float, Integer, desc, asc
 from mascope_backend.db import async_session
 from mascope_backend.db.models import (
     Sample,
@@ -33,6 +33,8 @@ async def get_samples(
     datetime_max: datetime | None = None,
     polarity: list[str] | None = None,
     match_category_min: int | None = None,
+    sort: str = "datetime_utc",
+    order: str = "asc",
 ) -> dict:
     """
     Retrieves samples with nested match data and alarming status.
@@ -60,6 +62,10 @@ async def get_samples(
     :type polarity: list[str] | None
     :param match_category_min: Filter by minimum match category, defaults to None
     :type match_category_min: int | None
+    :param sort: Column name to sort results by, defaults to "datetime_utc"
+    :type sort: str
+    :param order: Sorting order ("asc" or "desc"), defaults to "asc"
+    :type order: str
     :return: Dictionary with status, message, results count, and sample data with nested match information
     :rtype: dict
     """
@@ -121,6 +127,12 @@ async def get_samples(
 
         if match_category_min is not None:
             stmt = stmt.filter(MatchSample.match_category >= match_category_min)
+
+        # Apply sorting
+        if order == "desc":
+            stmt = stmt.order_by(desc(getattr(Sample, sort)))
+        else:
+            stmt = stmt.order_by(asc(getattr(Sample, sort)))
 
         result = await session.execute(stmt)
         rows = result.all()

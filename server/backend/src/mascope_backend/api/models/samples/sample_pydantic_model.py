@@ -53,6 +53,14 @@ class GetSamplesQueryParams(GetSampleItemsQueryValidator, QueryParamsModel):
         None,
         description="Filter samples by match_category to include samples with specified match category and higher",
     )
+    sort: str = Field(
+        "datetime_utc",
+        description="Column name by which you want to sort the results. Should be one of the Sample table columns (e.g., datetime_utc, filename, sample_item_type).",
+    )
+    order: str = Field(
+        "asc",
+        description="Sorting order which can be 'asc' for ascending or 'desc' for descending.",
+    )
 
 
 class GetSamplePeaksQueryParams(CommonValidators, QueryParamsModel):

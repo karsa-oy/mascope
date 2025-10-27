@@ -44,7 +44,8 @@ tags = ['lab', 'orbi', 'tof', 'file', 'all']
 log_path = './logs'
 color = "magenta"
 # settings
-# acquisition_filter = { min = '2020-01-01T00:00' }
+acquisition_filter = { min = '2020-01-01T00:00' }
+sample_table_defaults = { columns = ["sample_item_name", "index"], sort_field = "index", sort_order = -1 }
 # scripts
 run = "cd ./server/frontend && npm install && npm run dev"
 

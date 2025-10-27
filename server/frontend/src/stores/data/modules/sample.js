@@ -20,8 +20,7 @@ export const useSample = defineStore('app.data.sample', () => {
     (params) =>
       api.http.get(`/samples`, {
         params: {
-          sample_batch_id: params.sample_batch_id,
-          sort: 'datetime_utc'
+          sample_batch_id: params.sample_batch_id
         },
         use: 'read',
         type: 'load_samples'
