@@ -91,7 +91,7 @@ export default {
 
     // Handle owner registration check
     if (type === 'first_owner_status') {
-      return status === 200 ? { status } : null
+      return data
     }
 
     // Handle identify_user responses

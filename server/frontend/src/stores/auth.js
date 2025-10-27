@@ -5,11 +5,10 @@ import { api } from '@/api'
 
 export const useAuth = defineStore('app.auth', () => {
   const user = ref(null)
-  const requiresOwner = ref(false)
+  const requiresOwner = ref(null)
 
   // Initial auth checks
   onMounted(async () => {
-    await checkFirstOwner()
     await identify()
   })
 
@@ -31,7 +30,7 @@ export const useAuth = defineStore('app.auth', () => {
       type: 'user_sign_in',
       use: 'auth'
     })
-    identify()
+    await identify()
   }
   const logout = async () => {
     await api.http.post(
@@ -42,20 +41,15 @@ export const useAuth = defineStore('app.auth', () => {
         use: 'auth'
       }
     )
-    identify()
+    await identify()
   }
   // First owner management
   const checkFirstOwner = async () => {
-    try {
-      const response = await api.http.get('/users/first-owner/status', {
-        type: 'first_owner_status',
-        use: 'auth',
-        validateStatus: (status) => status < 500
-      })
-      requiresOwner.value = response.status === 200
-    } catch (error) {
-      requiresOwner.value = false
-    }
+    const response = await api.http.get('/users/first-owner/status', {
+      type: 'first_owner_status',
+      use: 'auth'
+    })
+    requiresOwner.value = response?.status === 'available'
   }
 
   const signupFirstOwner = async ({ email, username, password, serverSecret }) => {
@@ -67,27 +61,35 @@ export const useAuth = defineStore('app.auth', () => {
         use: 'create'
       }
     )
-    checkFirstOwner()
+    await checkFirstOwner()
   }
-  // hooks
-
+  // Hooks
   const handlers = ref([])
 
   function onLogin(callback) {
     handlers.value.push({ callback })
   }
 
+  // Watch user changes for side effects
   watch(
     () => user.value,
-    (newUser, oldUser) => {
+    async (newUser, oldUser) => {
+      // Trigger login callbacks when user logs in
       if (newUser && oldUser !== newUser) {
         handlers.value.forEach(({ callback }) => callback())
       }
+
+      // Socket subscriptions
       if (oldUser) {
         api.socket.emit('unsubscribe', `user-${oldUser.id}`)
       }
       if (newUser) {
         api.socket.emit('subscribe', `user-${newUser.id}`)
+      }
+
+      // Check first owner status only when no authenticated user found
+      if (newUser === false && requiresOwner.value === null) {
+        await checkFirstOwner()
       }
     }
   )

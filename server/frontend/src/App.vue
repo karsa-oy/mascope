@@ -50,10 +50,14 @@ app.ui.notification
 </script>
 
 <template>
-  <!-- App Routes -->
+  <!-- App Routes - Authenticated user -->
   <RouterView v-if="app.auth.user" />
-  <!-- Login / Owner Setup Screen  -->
-  <div v-else-if="app.auth.user == false" class="center" style="min-height: 80vh">
+  <!-- Login / Owner Setup Screen - No authenticated user  -->
+  <div
+    v-else-if="app.auth.user == false && app.auth.requiresOwner !== null"
+    class="center"
+    style="min-height: 80vh"
+  >
     <Panel style="width: 500px">
       <BaseKarsaLogo />
       <div style="margin-top: 2rem" />
@@ -61,6 +65,8 @@ app.ui.notification
       <PaneLogin v-else />
     </Panel>
   </div>
+
+  <!-- Loading - Checking authentication and registration status -->
   <div v-else class="col" style="min-height: 80vh; justify-content: center">
     <BaseKarsaLogo />
     <ProgressSpinner />
