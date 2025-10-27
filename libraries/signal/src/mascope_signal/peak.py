@@ -262,7 +262,11 @@ class TofPeakDetector(BasePeakDetector):
         peak_heights = np.array(peak_heights)
         peak_areas = np.array(peak_areas)
 
-        # TODO: figure out how to calculate SNR for TOF
+        positive_mask = (peak_heights > 0) & (peak_areas > 0)
+        peak_mzs = peak_mzs[positive_mask]
+        peak_heights = peak_heights[positive_mask]
+        peak_areas = peak_areas[positive_mask]
+
         peaks = xarray.Dataset(
             {
                 "sum_peak_areas": (("mz"), peak_areas),
@@ -270,8 +274,6 @@ class TofPeakDetector(BasePeakDetector):
             }
         ).assign_coords(mz=("mz", peak_mzs))
         peaks = peaks.sortby("mz")
-
-        # TODO: filter out non-positive peaks
 
         runtime.logger.debug("Computing peak profiles...")
         self._calculate_peak_profiles(peaks)
@@ -302,7 +304,11 @@ class TofPeakDetector(BasePeakDetector):
         def has_only_one_positive(arr):
             return np.sum(arr > 0) > 1
 
-        is_weak = ~self.peak_profiles.peak_heights.apply(has_only_one_positive)
+        only_one_positive = np.apply_along_axis(
+            has_only_one_positive, 1, self.peak_profiles.peak_heights.values
+        )
+
+        is_weak = only_one_positive
         self.peak_profiles = self.peak_profiles.assign({"is_weak": (("mz"), is_weak)})
 
     def _flag_satellite_peaks(self):
