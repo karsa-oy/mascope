@@ -69,6 +69,7 @@ export const useUppy = defineStore('app.uppy', () => {
     chunkSize: 5 * 1024 * 1024, // 5 MiB, small chunks seem the most reliable
     withCredentials: true,
     removeFingerprintOnSuccess: true,
+    limit: 1, // Upload files sequentially, one by one
     onShouldRetry: (err, retryAttempt, options) => {
       console.log('Error', err)
       console.log('Request', err.originalRequest)
