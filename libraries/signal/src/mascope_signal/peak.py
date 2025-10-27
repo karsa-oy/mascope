@@ -126,27 +126,6 @@ class OrbiPeakDetector(BasePeakDetector):
         :return: Sample file data with updated peak information
         :rtype: xarray.Dataset
         """
-        old_peak_mzs, old_peak_areas, old_peak_heights = self._load_old_peaks(if_exists)
-
-        if self.calibration_factor != 1.0:
-            # Revert calibration for sum signal
-            self._sum_signal = self._sum_signal.assign_coords(
-                mz=self._sum_signal.mz / self.calibration_factor
-            )
-            if old_peak_mzs != []:
-                # Revert calibration for old peaks
-                old_peak_mzs = [mz / self.calibration_factor for mz in old_peak_mzs]
-
-        self._update_u_list(if_exists, old_peak_mzs)
-        no_peaks_to_fit = not self._validate_u_list()
-        if no_peaks_to_fit:
-            # Nothing to fit, return existing data
-            sample_file_data = load_file(
-                self._filename,
-                vars=["peak_areas", "peak_heights"],
-            )
-            return sample_file_data
-
         runtime.logger.debug("Reading centroids from the Thermo file...")
         # Get CALIBRATED centroids
         peak_mzs, peak_heights, resolutions, signal_to_noise = (
@@ -271,19 +250,17 @@ class TofPeakDetector(BasePeakDetector):
         for warning in fit_warnings:
             runtime.logger.debug(f"Peak detection warning: {warning}")
 
-        executor.shutdown()
-
-        if len(new_peaks) > 0:
-            new_peak_mzs, new_peak_heights, new_peak_areas = zip(
-                *[(p[0], p[1], p[3]) for p in new_peaks]
+        if len(peaks) > 0:
+            peak_mzs, peak_heights, peak_areas = zip(
+                *[(p[0], p[1], p[3]) for p in peaks]
             )
         else:
             # Nothing was fitted
             peak_mzs, peak_heights, peak_areas = [], [], []
 
         peak_mzs = np.array(peak_mzs)
-        peak_areas = np.array(peak_areas)
         peak_heights = np.array(peak_heights)
+        peak_areas = np.array(peak_areas)
 
         # TODO: figure out how to calculate SNR for TOF
         peaks = xarray.Dataset(
