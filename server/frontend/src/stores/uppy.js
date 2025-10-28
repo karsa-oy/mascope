@@ -70,10 +70,14 @@ export const useUppy = defineStore('app.uppy', () => {
     withCredentials: true,
     removeFingerprintOnSuccess: true,
     limit: 1, // Upload files sequentially, one by one
-    onShouldRetry: (err, retryAttempt, options) => {
-      console.log('Error', err)
-      console.log('Request', err.originalRequest)
-      console.log('Response', err.originalResponse)
+    onShouldRetry: (err, retryAttempt, options, next) => {
+      console.log('[uppy] Upload error:', err)
+      const status = err?.originalResponse?.getStatus()
+      if (status === undefined || status === 0 || (status >= 500 && status < 600)) {
+        // Proceed to retry unless the error is client-side
+        return true
+      }
+      return next(err)
     },
     onBeforeRequest: (req) => {
       req.setHeader('X-SID', api.socket.id)
