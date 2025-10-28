@@ -1,6 +1,4 @@
 from functools import partial
-import asyncio
-from argparse import ArgumentParser
 import numpy as np
 from scipy.signal import find_peaks
 from scipy.stats import linregress
@@ -10,7 +8,6 @@ from lmfit.models import SplineModel, SkewedGaussianModel
 from lmfit.model import ModelResult
 
 from mascope_file.name import get_instrument_type
-from mascope_file.io import load_array
 from mascope_signal.compute import get_sum_signal
 
 from mascope_signal.runtime import runtime
@@ -661,116 +658,3 @@ def inverse_sqrt(x, a):
     """Calculates the output of the inverse square root
     for given values of x and a"""
     return a / np.sqrt(x)
-
-
-if __name__ == "__main__":
-    import dash
-    from dash import dcc, html
-    from dash.dependencies import Input, Output
-    from mascope_signal.peak import detect_peaks
-    from mascope_signal.inst_func_viz import vizualize, update_chosen_peak
-
-    # Parse arguments
-    parser = ArgumentParser()
-    parser.add_argument(
-        "-f", "--filename", dest="filename", help="Sample file name", required=True
-    )
-    parser.add_argument("-d", "--dmz", dest="dmz", help="Peak window size", default=0.5)
-    parser.add_argument(
-        "-r", "--r-squared", dest="r_sq_thres", help="R-squared threshold", default=0.96
-    )
-    args = parser.parse_args()
-
-    # Calculate instrument functions
-    try:
-        instrument_type = get_instrument_type(args.filename)
-
-        # Extract averaged spectrum and mz values
-        sum_signal = get_sum_signal(args.filename)
-        spec = sum_signal.values
-        mz = sum_signal.mz.values
-
-        # Get x-domain, normalized peak shapes and associated peak positions and FWHMs
-        p_x, p_ys, p_mzs, p_fwhms = asyncio.run(
-            process_peak_shapes(mz, spec, instrument_type, args.dmz, args.r_sq_thres)
-        )
-        p_mzs = np.array(p_mzs)
-        p_fwhms = np.array(p_fwhms)
-
-        # Get fitted FWHM vs m/z pairs
-        p_fwhms_fit = fit_fwhm(instrument_type, p_mzs, p_fwhms)
-
-        # Number of std to filter out outliers in FWHM fit
-        ndev = 1
-
-        ps, _ = calculate_peakshape(p_x, p_ys)
-        res_fun, _ = asyncio.run(
-            fit_resolution_function(instrument_type, p_mzs, p_fwhms, ndev)
-        )
-
-        # Fit peaks
-        sample_file_data = asyncio.run(
-            detect_peaks(
-                args.filename,
-                (ps, res_fun),
-                0.9,
-                u_list=p_mzs,
-                if_exists="replace",
-                dmz=args.dmz,
-                instrument_type=instrument_type,
-            )
-        )
-        sum_signal = get_sum_signal(args.filename)
-
-        # Get fitted peak positions and heights
-        fit_heis = (
-            load_array(args.filename, "peak_heights")
-            .dropna(dim="mz")
-            .sum(dim="time")["peak_heights"]
-        )
-        fit_poss = fit_heis.mz.values
-        fit_heis = fit_heis.values
-
-        # Initialize the Dash app
-        app = dash.Dash(__name__)
-
-        # Get plotly figure
-        fig = vizualize(p_mzs, p_fwhms, p_fwhms_fit, ndev, res_fun)
-
-        # Define the layout of the Dash app
-        app.layout = html.Div(
-            [
-                dcc.Graph(id="interactive-plot", figure=fig),
-                html.Div(id="output"),
-            ]
-        )
-
-        # Data to pass to callback
-        data = {
-            "fig": fig,
-            "sum_signal": sum_signal,
-            "fit_poss": fit_poss,
-            "fit_heis": fit_heis,
-            "res_fun": res_fun,
-            "ps": ps,
-        }
-
-        # Define the callback to handle click events
-        @app.callback(
-            [Output("interactive-plot", "figure"), Output("output", "children")],
-            [Input("interactive-plot", "clickData")],
-        )
-        def display_click_data(click_data):
-            """Handles click event"""
-            if click_data:
-                points = click_data["points"][0]
-                updated_fig = update_chosen_peak(points, **data)
-                return updated_fig, f"Chosen mz = {points['x']:.2f}"
-            return dash.no_update, "Click on a m/z data point in the plot"
-
-        # Run Dash app
-        app.run_server()
-
-    except ValueError as err:
-        runtime.logger.error("Check the filename")
-        raise ValueError from err
