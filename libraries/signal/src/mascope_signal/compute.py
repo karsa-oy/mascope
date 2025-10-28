@@ -526,9 +526,24 @@ def get_peak_profiles(
     match sample_type:
         case "orbi_raw":
             datafile_path = m_name.filename_to_datafile_path(base_filename)
-            return m_thermo.get_peak_profiles(
-                datafile_path, mzs, t_min, t_max, polarity
+
+            # Orbitrap raw files store raw data, mzs need to be uncalibrated
+            # before extracting peak profiles
+            props = m_io.read_props(base_filename)
+            calibration = props["mz_calibration"]
+            factor = 1.0
+            if calibration:
+                fit_parameters = calibration["par"]
+                factor = fit_parameters["calibration_factor"]
+            uncalibrated_mzs = np.array(mzs) / factor
+            peak_profiles = m_thermo.get_peak_profiles(
+                datafile_path, uncalibrated_mzs, t_min, t_max, polarity
             )
+            # Calibrate m/z coordinate
+            peak_profiles = peak_profiles.assign_coords(
+                mz=peak_profiles.mz.values * factor
+            )
+            return peak_profiles
         case "tof_h5":
             # Get calibrated m/z values
             sum_signal_mz = get_sum_signal(base_filename).mz.values
