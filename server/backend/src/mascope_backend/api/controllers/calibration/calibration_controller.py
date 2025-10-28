@@ -275,14 +275,20 @@ async def calibration_mz_apply(
     ) = await fetch_affected_sample_data(filenames=[filename], include_objects=True)
     total_samples = len(affected_sample_item_ids)
 
-    # Set ALL affected batches to "processing", already "processing" batches will not change the status
+    # Set non-ACQUISITION batches to "processing", already "processing" batches will not change the status
     await update_sample_batch_status(
-        sample_batch_ids=affected_sample_batch_ids,
+        sample_batch_ids=[
+            batch.sample_batch_id
+            for batch in affected_sample_batches
+            if batch.sample_batch_type != "ACQUISITION"
+        ],
         status="processing",
         independent_transaction=True,
     )
+
     runtime.logger.info(
-        f"Set {len(affected_sample_batch_ids)} batch(es) to 'processing' for calibration apply"
+        f"Set {sum(1 for b in affected_sample_batches if b.sample_batch_type != 'ACQUISITION')} "
+        f"non-ACQUISITION batch(es) to 'processing' for calibration apply"
     )
 
     # Step 2: Prepare progress user notification.
@@ -368,16 +374,21 @@ async def calibration_mz_apply(
                 process_id=gen_id(8),
                 parent_id=process_id,
             )
-    # Step 6: Set ALL affected batches to "rematch" since calibration removes matches, already "rematch" batches will not change the status
-    if affected_sample_batch_ids:
-        await update_sample_batch_status(
-            sample_batch_ids=affected_sample_batch_ids,
-            status="rematch",
-            independent_transaction=True,  # reload UI status icons
-        )
-        runtime.logger.info(
-            f"Set {len(affected_sample_batch_ids)} batch(es) to 'rematch' after applying m/z calibration."
-        )
+    # Step 6: Set non-ACQUISITION batches to "rematch" , since calibration removes matches
+    # ACQUISITION batches being matched for the first time
+    await update_sample_batch_status(
+        sample_batch_ids=[
+            batch.sample_batch_id
+            for batch in affected_sample_batches
+            if batch.sample_batch_type != "ACQUISITION"
+        ],
+        status="rematch",
+        independent_transaction=True,  # reload UI status icons
+    )
+    runtime.logger.info(
+        f"Set {sum(1 for b in affected_sample_batches if b.sample_batch_type != 'ACQUISITION')} "
+        f"non-ACQUISITION batch(es) to 'rematch' after applying m/z calibration"
+    )
 
     # Step 7: Return m/z fit result data and message
     message = f"Applied m/z fit for sample file '{filename}', {total_samples} sample item{'s' if total_samples != 1 else ''} affected."
