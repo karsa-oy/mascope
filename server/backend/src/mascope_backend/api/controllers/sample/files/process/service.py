@@ -9,7 +9,7 @@ import asyncio
 
 from mascope_backend.db import async_session, db_semaphore
 from mascope_backend.db.id import gen_id
-from mascope_backend.db.models import SampleFile
+from mascope_backend.db.models import SampleFile, IonizationMode
 
 from mascope_backend.api.lib.api_features import api_controller_background_task
 from mascope_backend.api.lib.exceptions.api_exceptions import (
@@ -93,7 +93,7 @@ async def auto_process_sample_file(
     - Validate sample file existence
     - Create a new instrument config and process
     - Get ACQUISITION workspace for the instrument
-    - Create ACQUISITION batches and sample items for each sample file polarity
+    - Create ACQUISITION batches and sample items for each sample file ionization mode
     - Compute peak data for the sample file
     - Perform calibration and match computation for created ACQUISITION samples
     - Schedule rematch tasks for other affected samples
@@ -154,7 +154,7 @@ async def auto_process_sample_file(
         await get_acquisition_workspace(sample_file.instrument)
     ).get("data")
 
-    # --- Create ACQUISITION batches and sample items for each sample file polarity --- #
+    # --- Create ACQUISITION batches and sample items for each sample file ionization mode --- #
     acquisition_sample_items, acquisition_sample_batches = (
         await create_acquisition_batches_and_items(
             sample_file=sample_file,
@@ -184,46 +184,60 @@ async def auto_process_sample_file(
     # --- Perform calibration and match computation for created ACQUISITION samples --- #
     for sample_item in acquisition_sample_items:
         sample_item_id = sample_item["sample_item_id"]
-        mz_calibration_params = calibration_params_factory(sample_item["filename"])
-        for i in range(1, CALIBRATION_ITERATIONS + 1):
-            try:
-                await calibration_mz_calibrate_sample(
-                    sample_item_id=sample_item_id,
-                    mz_calibration_params=mz_calibration_params,
-                    independent_transaction=False,
-                    sid=sid,
-                    process_id=gen_id(8),
-                    parent_id=process_id,
+
+        # Validate ionization mode exists
+        async with async_session() as session:
+            if not (
+                ionization_mode := await session.get(
+                    IonizationMode, sample_item["ionization_mode_id"]
                 )
-                break
-            except NotFoundException as e:
-                runtime.logger.warning(
-                    f"Skipping m/z calibration for sample item {sample_item['sample_item_name']}: {e}. "
-                    "Calibration collection is not set for the ionization mode."
+            ):
+                raise NotFoundException(
+                    f"Ionization mode with ID '{sample_item['ionization_mode_id']}' not found"
                 )
-                break
-            except ApiException as e:
-                if i == CALIBRATION_ITERATIONS:
-                    runtime.logger.error(
-                        f"Failed to calibrate m/z with m/z tolerance {mz_calibration_params.mz_error_tolerance} "
-                        f"for sample item {sample_item["sample_item_name"]}: {e}"
+
+        # Check if calibration collection is configured for this sample's ionization mode
+        if ionization_mode.calibration_collection_id:
+            # Calibration with retry logic
+            mz_calibration_params = calibration_params_factory(sample_item["filename"])
+            for i in range(1, CALIBRATION_ITERATIONS + 1):
+                try:
+                    await calibration_mz_calibrate_sample(
+                        sample_item_id=sample_item_id,
+                        mz_calibration_params=mz_calibration_params,
+                        independent_transaction=False,
+                        sid=sid,
+                        process_id=gen_id(8),
+                        parent_id=process_id,
                     )
-                else:
-                    old_mz_error_tolerance = mz_calibration_params.mz_error_tolerance
-                    # Double the m/z error tolerance, check refinement window limits, then retry
-                    mz_calibration_params.mz_error_tolerance *= 2
-                    if (
-                        mz_calibration_params.refine_window
-                        <= mz_calibration_params.mz_error_tolerance
-                    ):
-                        mz_calibration_params.refine_window = (
-                            mz_calibration_params.mz_error_tolerance + 1
+                    break
+                except ApiException as e:
+                    if i == CALIBRATION_ITERATIONS:
+                        runtime.logger.error(
+                            f"Failed to calibrate m/z with m/z tolerance {mz_calibration_params.mz_error_tolerance} "
+                            f"for sample item {sample_item["sample_item_name"]}: {e}"
                         )
-                    runtime.logger.warning(
-                        f"Not enouph calibration peaks with m/z error tolerance {old_mz_error_tolerance}, "
-                        f"retrying m/z calibration for sample item {sample_item['sample_item_name']} with "
-                        f"mz_error_tolerance={mz_calibration_params.mz_error_tolerance}."
-                    )
+                    else:
+                        # Double the m/z error tolerance, check refinement window limits, then retry
+                        old_tolerance = mz_calibration_params.mz_error_tolerance
+                        mz_calibration_params.mz_error_tolerance *= 2
+                        if (
+                            mz_calibration_params.refine_window
+                            <= mz_calibration_params.mz_error_tolerance
+                        ):
+                            mz_calibration_params.refine_window = (
+                                mz_calibration_params.mz_error_tolerance + 1
+                            )
+                        runtime.logger.warning(
+                            f"Not enough calibration peaks with m/z error tolerance {old_tolerance}, "
+                            f"retrying m/z calibration for sample {sample_item['sample_item_name']} with "
+                            f"mz_error_tolerance={mz_calibration_params.mz_error_tolerance}."
+                        )
+        else:
+            runtime.logger.warning(
+                f"Skipping m/z calibration for sample '{sample_item['sample_item_name']}': "
+                f"Calibration collection is not set for the ionization mode '{ionization_mode.ionization_mode_name}'."
+            )
 
         await match_compute_sample(
             sample_item_id=sample_item_id,
@@ -330,13 +344,13 @@ async def create_acquisition_batches_and_items(
     )
 
     for ionization_mode in inferred_ionization_modes:
-        # Step 1: Generate daily ACQUISITION batch name for this polarity
+        # Step 1: Generate daily ACQUISITION batch name for this ionization mode
         ion_mode_name = ionization_mode.ionization_mode_name
         batch_name = (
             f"{sample_file.datetime.strftime('%Y-%m-%d')} {ion_mode_name} acquisition"
         )
 
-        # Step 2: Get or create daily ACQUISITION batch for this polarity
+        # Step 2: Get or create daily ACQUISITION batch for this ionization mode
         # Wrapped the entire get-or-create logic in semaphore to prevent race conditions
         async with db_semaphore:
             # Check if batch already exists
@@ -397,7 +411,7 @@ async def create_acquisition_batches_and_items(
 
         acquisition_sample_batches.append(acquisition_sample_batch)
 
-        # Prepare ACQUISITION sample item for this polarity
+        # Prepare ACQUISITION sample item for this ionization mode
         sample_items_to_create.append(
             SampleItemCreate(
                 sample_batch_id=acquisition_sample_batch["sample_batch_id"],
