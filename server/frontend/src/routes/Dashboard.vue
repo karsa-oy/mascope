@@ -95,7 +95,7 @@ const tabs = computed(() => [
         }
       "
     >
-      <SplitterPanel :size="20">
+      <SplitterPanel :size="app.ui.split.left">
         <Splitter
           layout="vertical"
           stateStorage="local"
@@ -107,15 +107,15 @@ const tabs = computed(() => [
             }
           "
         >
-          <SplitterPanel :size="50">
+          <SplitterPanel :size="app.ui.split.top">
             <PaneBrowserSample />
           </SplitterPanel>
-          <SplitterPanel :size="50">
+          <SplitterPanel :size="app.ui.split.bottom">
             <PaneBrowserMatch />
           </SplitterPanel>
         </Splitter>
       </SplitterPanel>
-      <SplitterPanel :size="80">
+      <SplitterPanel :size="app.ui.split.right">
         <Panel id="charts">
           <Tabs v-model:value="app.ui.tab.active">
             <TabList>
