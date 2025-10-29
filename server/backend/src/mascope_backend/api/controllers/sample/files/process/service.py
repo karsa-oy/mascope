@@ -1,3 +1,4 @@
+# pylint: disable=line-too-long
 """
 Controller for sample files auto-processing pipeline.
 
@@ -162,14 +163,13 @@ async def auto_process_sample_file(
         )
     )
 
-    # Extract batch IDs for notifications
+    # Extract batch and sample IDs for notifications
     affected_sample_batch_ids = [
         batch.get("sample_batch_id") for batch in acquisition_sample_batches
     ]
-
-    # Add newly created items to affected items collection
-    for sample_item in acquisition_sample_items:
-        all_affected_sample_item_ids.add(sample_item["sample_item_id"])
+    all_affected_sample_item_ids.update(
+        sample["sample_item_id"] for sample in acquisition_sample_items
+    )
 
     # --- Compute peak data for the sample file --- #
     await compute_sample_file_peaks(
@@ -185,19 +185,14 @@ async def auto_process_sample_file(
     for sample_item in acquisition_sample_items:
         sample_item_id = sample_item["sample_item_id"]
 
-        # Validate ionization mode exists
+        # Get ionization mode to check calibration collection
         async with async_session() as session:
-            if not (
-                ionization_mode := await session.get(
-                    IonizationMode, sample_item["ionization_mode_id"]
-                )
-            ):
-                raise NotFoundException(
-                    f"Ionization mode with ID '{sample_item['ionization_mode_id']}' not found"
-                )
+            ionization_mode = await session.get(
+                IonizationMode, sample_item["ionization_mode_id"]
+            )
 
-        # Check if calibration collection is configured for this sample's ionization mode
-        if ionization_mode.calibration_collection_id:
+        # Perform calibration if calibration collection configured for this ionization mode
+        if ionization_mode and ionization_mode.calibration_collection_id:
             # Calibration with retry logic
             mz_calibration_params = calibration_params_factory(sample_item["filename"])
             for i in range(1, CALIBRATION_ITERATIONS + 1):
@@ -249,14 +244,14 @@ async def auto_process_sample_file(
         )
 
     # --- Schedule rematch tasks for other affected samples --- #
-    acquisition_sample_item_ids = [
-        item["sample_item_id"] for item in acquisition_sample_items
-    ]
-    other_affected_sample_item_ids = [
-        si_id
-        for si_id in all_affected_sample_item_ids
-        if si_id not in acquisition_sample_item_ids  # exclude the processed sample
-    ]
+    acquisition_sample_item_ids = {
+        sample["sample_item_id"] for sample in acquisition_sample_items
+    }
+    # exclude the processed sample
+    other_affected_sample_item_ids = (
+        all_affected_sample_item_ids - acquisition_sample_item_ids
+    )
+
     if other_affected_sample_item_ids:
         asyncio.create_task(
             rematch_samples(
@@ -271,13 +266,11 @@ async def auto_process_sample_file(
             f"Started independent rematch task for {len(other_affected_sample_item_ids)} affected samples"
         )
 
-    # --- Return processing results with affected IDs or UI reloads --- #
-    processed_samples = []
-    for sample_item in acquisition_sample_items:
-        sample_result = await get_sample(
-            sample_item_id=sample_item.get("sample_item_id")
-        )
-        processed_samples.append(sample_result["data"])
+    # --- Return processing results with affected IDs for UI reloads --- #
+    processed_samples = [
+        (await get_sample(sample_item_id=item["sample_item_id"]))["data"]
+        for item in acquisition_sample_items
+    ]
 
     return {
         "message": f"Auto-processing complete for {sample_file.filename}, processed {len(processed_samples)} samples.",
@@ -296,9 +289,9 @@ async def create_acquisition_batches_and_items(
     Create ACQUISITION batches and sample items for each ionization mode of sample file.
 
     For each ionization mode in the sample file:
-    1. Get or create daily ACQUISITION batch in provided acquisition workspace
-    2. Create ACQUISITION sample item within the batch
-    3. Configure batch with appropriate target collections and ionization mechanisms
+    - Get or create daily ACQUISITION batch in provided acquisition workspace
+    - Create ACQUISITION sample item within the batch
+    - Configure batch with appropriate target collections and ionization mechanisms
 
     :param sample_file: Sample file record containing polarities and metadata
     :type sample_file: SampleFile
