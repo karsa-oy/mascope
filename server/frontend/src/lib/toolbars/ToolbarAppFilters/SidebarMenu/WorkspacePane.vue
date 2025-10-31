@@ -39,12 +39,12 @@ const vHelpLayer = app.ui.help.directive(layer)
     v-help-layer.right="
       `
       <b>Workspaces</b>
-      
       <p>
         Select and manage workspaces. Workspaces are like folders
-        that contain sample batches and their corresponding ion
-        mechanism and target configuration.
-      </p>`
+        containing batches. Click on a workspace to open it and see its batches.
+      </p>
+      <p>Click on the Create-button to create a new workspace</p>
+      `
     "
   >
     <div class="row" style="align-items: center">

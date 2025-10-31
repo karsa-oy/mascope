@@ -147,9 +147,17 @@ watch(
     :loading="app.data.match.ion.pending"
     :pt="
       app.ui.help.right(
-        `<h1>Match Browser</h1>
-        <p>Shows match ions with compound data for the selected collection. Use column filters to search and narrow results.</p>
-        <p>Right click on any ion to manage its parent compound. Click the expand icon to view isotope data for that ion.</p>`
+        `<h1>Target Browser: Ions</h1>
+        <p>
+        Shows target ions of the selected collection. Use column filters to search and filter results.
+        </p>
+        <p>
+        If a sample is selected, shows match scores for each ion based on the sample data. Click on an ion
+        to visualize the match in Match View.
+        </p>
+        <p>
+        Right click on any ion to manage its parent compound. Click the expand icon to view isotope data for that ion.
+        </p>`
       )
     "
   >

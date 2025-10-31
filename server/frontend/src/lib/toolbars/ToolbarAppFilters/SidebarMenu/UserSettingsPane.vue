@@ -118,7 +118,14 @@ const vHelpLayer = app.ui.help.directive(layer)
 
 <template>
   <h2>Settings</h2>
-  <section v-help-layer.right="'Manage your sign-in details and session'">
+  <section
+    v-help-layer.right="
+      `
+    <b>Account Settings</b>
+    <p>View your sign-in details, user role, and change your password.</p>
+  `
+    "
+  >
     <h3>Account</h3>
     <BaseEditableField
       :field="app.auth.user.username"
@@ -136,7 +143,14 @@ const vHelpLayer = app.ui.help.directive(layer)
       icon="pi ph ph-lock-key"
     />
   </section>
-  <section v-help-layer.right="'Pick the theme for Mascope'">
+  <section
+    v-help-layer.right="
+      `
+    <b>Theme</b>
+    <p>Select between light and dark mode for the Mascope interface.</p>
+  `
+    "
+  >
     <h3>Theme</h3>
     <div class="row" style="width: fit-content">
       <span>Light</span>
@@ -148,7 +162,14 @@ const vHelpLayer = app.ui.help.directive(layer)
   </section>
   <section
     v-help-layer.right="
-      'API tokens are used for Jupyter notebooks and other development tools. Tokens can only be viewed once for security reasons.'
+      `
+      <b>API Access Tokens</b>
+      <p>
+        API tokens are used for authentication when accessing Mascope programmatically,
+        e.g., from Jupyter Notebooks or other external tools. Here you can generate tokens
+        for specific services.
+      </p>
+    `
     "
   >
     <h3>API Access Tokens</h3>
@@ -180,7 +201,15 @@ const vHelpLayer = app.ui.help.directive(layer)
       </div>
     </div>
   </section>
-  <section v-if="app.auth.user.role_id >= 300" v-help-layer.right="'Add, remove and modify users'">
+  <section
+    v-if="app.auth.user.role_id >= 300"
+    v-help-layer.right="
+      `
+  <b>Admin Settings</b>
+  <p>Add, remove and modify users</p>
+  `
+    "
+  >
     <h3>Admin</h3>
     <Button icon="pi pi-users" @click="() => (dialog.users = true)" label="Manage users" />
   </section>

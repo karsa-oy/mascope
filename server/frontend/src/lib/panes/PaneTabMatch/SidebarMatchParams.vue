@@ -15,11 +15,19 @@ const app = useApp()
 
 const drawer = ref(false)
 const isSaving = ref(false)
+const layer = 'sidebar_match_params' // Help-mode layer for drawer
 
 const open = defineModel('open')
 watchEffect(() => {
   open.value = drawer.value
+  // Set help mode layer when sidebar is opened
+  if (drawer.value) {
+    app.ui.help.set(layer)
+  } else {
+    app.ui.help.set(null)
+  }
 })
+const vHelpLayer = app.ui.help.directive(layer)
 
 const key = ref(0)
 
@@ -147,8 +155,37 @@ const matchRangeMiddle = computed(
     :style="`width: ${app.ui.split.left}vw;`"
     :modal="false"
   >
-    <Menu :model="items" style="border: none" />
-    <section>
+    <Menu
+      :model="items"
+      style="border: none"
+      :pt="
+        app.ui.help.right(
+          `
+          <h1>Match Parameters: Manage</h1>
+          <p>
+            Save the current match parameters for the selected ion and instrument.
+            These parameters will be used for matching in future sessions.
+          </p>
+        `,
+          { layer }
+        )
+      "
+    />
+    <section
+      v-help-layer.right="
+        `
+          <h1>Match Parameters: Isotope settings</h1>
+          <p>
+            Configure the parameters used for isotope matching.
+            <ul>
+              <li>m/z tolerance:</li> The maximum allowed mass error (in ppm) when matching isotopes.
+              <li>Min. isotope abundance:</li> The minimum relative abundance of isotopes to consider when matching.
+              <li>Isotope ratio tolerance:</li> The maximum allowed deviation in expected isotope ratios.
+            </ul>
+          </p>
+        `
+      "
+    >
       <h3>Isotope settings</h3>
       <BaseParamField
         label="m/z tolerance [ppm]"
@@ -177,7 +214,16 @@ const matchRangeMiddle = computed(
         :key="key"
       />
     </section>
-    <section>
+    <section
+      v-help-layer.right="
+        `
+          <h1>Match Parameters: Peak settings</h1>
+          <p>
+            Configure peak filtering parameters used when matching.
+          </p>
+        `
+      "
+    >
       <h3>Peak settings</h3>
       <BaseParamField
         label="Min. peak intensity"
@@ -187,6 +233,18 @@ const matchRangeMiddle = computed(
         small
         :key="key"
       />
+    </section>
+    <section
+      v-help-layer.right="
+        `
+          <h1>Match Parameters: Match score thresholds</h1>
+          <p>
+            Configure the match score thresholds for match categorization.
+          </p>
+        `
+      "
+    >
+      <h3>Match score thresholds</h3>
       <div class="col" style="gap: 0">
         <div class="row" :key="matchRangeMiddle">
           <!-- NO @change handler - these are UI-only params -->

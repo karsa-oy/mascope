@@ -27,14 +27,15 @@ const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top)
     :contextMenu="contextMenu"
     :pt="
       app.ui.help.right(`
-        <h1>Sample Browser</h1>
+        <h1>Sample Browser: Batches</h1>
 
-        <p>Shows the samples in your workspace,
-        providing features to organize them into
-        batches.</p>
+        <p>Shows all batches in the currently selected workspace 
+        (${app.data.workspace.focused.workspace_name}).
+        </p>
 
-        <p>Right click batches and samples to
-        perform actions.</p>
+        <p>Click on a batch to open it and see the samples within.</p>
+
+        <p>Right click on a batch to perform actions.</p>
       `)
     "
   >

@@ -41,8 +41,11 @@ const vHelpLayer = app.ui.help.directive(layer)
     v-help-layer.right="
       `
       <b>Notifications</b>
-      
-      <p>View recent success,error, and warning notifications.</p>`
+      <p>
+        Notifications are shown as toasts in the bottom right corner in real time.
+        Here you can view a log of past notifications.
+      </p>
+      `
     "
     style="min-height: calc(100vh - 300px)"
   >

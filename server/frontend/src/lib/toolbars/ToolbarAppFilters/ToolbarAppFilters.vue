@@ -20,14 +20,14 @@ const filtering = ref(false)
     class="filters"
     :pt="
       app.ui.help.bottom(`
-        <h1>Main Toolbar</h1>
-
-        <p>Provides controls for global Mascope settings.
-        Hover on individual controls for more information.</p>
-
-        <p>Your currently installed version of Mascope is visible
-        under the logo. This may be requested from you when
-        getting support from Karsa.</p>
+        <h1>Topbar</h1>
+        <p>
+          On the left, there is workspace navigation and home menu with settings
+          and notification log.
+        </p>
+        <p>
+          On the right, there are filter chips reflecting the current data selection.
+        </p>
       `)
     "
   >

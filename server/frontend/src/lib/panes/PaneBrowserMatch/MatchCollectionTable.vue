@@ -39,14 +39,25 @@ const breadcrumb = computed(() => ({
     :contextMenu="contextMenu"
     :pt="
       app.ui.help.right(`
-        <h1>Target Browser</h1>
+        <h1>Target Browser: Collections</h1>
 
-        <p>Shows the targets and matches associated
+        <p>Shows the target collections associated
         with the currently selected batch, and provides
         features for managing them.</p>
 
-        <p>Right click on collections and compounds to
-        perform actions.</p>
+        <p>
+        Click on a collection to view its targets.
+        </p>
+
+        <p>
+        Right click on collections to edit them or add
+        them to other batches.
+        </p>
+
+        <p>
+        Click on the <span class='pi pi-plus'></span> button (top right)
+        to create a new target collection.
+        </p>
       `)
     "
   >

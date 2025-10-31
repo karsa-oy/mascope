@@ -22,8 +22,7 @@ const app = useApp()
       app.ui.help.bottom_end(`
           <h1>Instrument Selector</h1>
 
-          <p>Select which instrument to use. Influences the
-          acquisitions tab.</p>
+          <p>Select an instrument to list acquisitions for.</p>
     `)
     "
   >

@@ -78,20 +78,19 @@ const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top)
     label="Samples"
     icon="pi pi-tags"
     :clear="app.data.batch.unfocus"
-    :back-label="'Back to workspaces'"
+    :back-label="'Back to batches'"
     :contextMenu="contextMenu"
     :loading="app.data.sample.pending"
     :status="batchStatus"
     :pt="
       app.ui.help.right(`
-        <h1>Sample Browser</h1>
+        <h1>Sample Browser: Samples</h1>
 
-        <p>Shows the samples in your workspace,
-        providing features to organize them into
-        batches.</p>
+        <p>Shows all samples in the currently opened batch (${app.data.batch.focused.sample_batch_name}).</p>
 
-        <p>Right click batches and samples to
-        perform actions.</p>
+        <p>Click on a sample to select it. Hold Shift or Ctrl to select multiple samples.</p>
+
+        <p>Right click on selected sample(s) to perform actions such as copy, cut and delete.</p>
       `)
     "
   >

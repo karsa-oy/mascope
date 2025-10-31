@@ -88,6 +88,10 @@ watchEffect(() => {
       <Button
         icon="pi pi-tags"
         :label="app.data.batch.focused.sample_batch_name"
+        v-tooltip.bottom="
+          `${app.data.batch.focused?.sample_batch_description ?? 'No description'}
+                          (right click for options)`
+        "
         severity="secondary"
         text
         @click="

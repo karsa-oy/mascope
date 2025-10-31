@@ -21,7 +21,20 @@ const props = defineProps({
 </script>
 
 <template>
-  <Panel class="browser" style="border: none; width: 400px" v-if="app.data.peak.list.length > 0">
+  <Panel
+    class="browser"
+    style="border: none; width: 400px"
+    v-if="app.data.peak.list.length > 0"
+    :pt="
+      app.ui.help.top(`
+        <h1>Peak Browser</h1>
+
+        <p>
+        List of detected peaks in the currently selected sample. Click on a peak to assign a composition.
+        </p>
+      `)
+    "
+  >
     <template #header>
       <TabMenu :model="[{ label: 'Peaks', icon: 'pi ph ph-crosshair' }]" style="overflow: hidden" />
     </template>

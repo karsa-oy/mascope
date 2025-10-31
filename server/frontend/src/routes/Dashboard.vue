@@ -31,11 +31,13 @@ const tabs = computed(() => [
     label: 'Acquisitions',
     icon: 'pi pi-hourglass',
     help: `
-      <h1>Acquisition Table</h1>
-
-      <p>View incoming measurements and import them
-      into batches. Import files from your computer
-      into Mascope.</p>
+      <h1>Acquisitions</h1>
+      <p>
+        View data files uploaded to the Mascope server, and import files from your computer.
+      </p>
+      <p>
+        Process files retrospectively into samples and batches.
+      </p>
     `
   },
   {
@@ -43,22 +45,35 @@ const tabs = computed(() => [
     icon: 'pi pi-hashtag',
     disabled: !app.data.batch.focused || app.data.sample.list.length === 0,
     help: `
-      <h1>Batch Overview Chart</h1>
+      <h1>Batch View</h1>
 
-      <p>Visualize TIC and matched ion intensities 
-      across all samples in a batch. Select a target 
-      collection to view ion-specific traces.</p>
+      <p>
+        Visualize the currently selected batch. Select a target 
+        collection to view the matches found in each sample in the batch.
+      </p>
+
+      <p>
+        Drag with mouse to zoom in, or pick the Select-tool to select samples by
+        dragging instead. Chart tools are available at top-right. Double click to reset zoom.
+      </p>  
+
+      <p>Click on a data point to visualize the corresponding Match.</p>
+
+      <p>
+        Chart settings (top-left) allow you to select the x-axis dimension, y-axis scaling etc.
+      </p>
     `
   },
   {
-    label: 'Spectrum',
+    label: 'Sample',
     icon: 'pi pi-chart-bar',
     disabled: !app.data.sample.focused,
     help: `
-      <h1>Sample Spectrum Chart</h1>
+      <h1>Sample View</h1>
 
-      <p>Visualize the selected sample's signal
-      in detail.</p>
+      <p>Visualize the selected sample's spectrum and peaks.</p>
+
+      <p>Assign elemental composition to detected peaks and add them to a target collection.</p>
     `
   },
   {
@@ -66,11 +81,16 @@ const tabs = computed(() => [
     icon: 'pi pi-wave-pulse',
     disabled: !app.data.match.visualized.ion,
     help: `
-      <h1>Match Overview</h1>
-
-      <p>Visualize match isotope peaks for a
-      selected ion as well as their timeseries.
-      Adjust match parameters to fine-tune matches.</p>
+      <h1>Match View</h1>
+      <p>
+        Visualize the currently selected ion match for the selected sample.
+        Displays the spectrum for each matched isotope as well as the timeseries
+        of matched peaks.
+      </p>
+      <p>
+        Shows match metrics (intensity, m/z error, isotope abundance error) while hovering over the chart.
+        You may tweak matching parameters in the settings panel (top-left) to fine-tune matching.
+      </p>
     `
   }
 ])

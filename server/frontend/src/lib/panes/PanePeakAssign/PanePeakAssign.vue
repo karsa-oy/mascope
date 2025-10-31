@@ -214,7 +214,22 @@ const expanded = ref({})
   <Panel
     class="browser"
     style="border: none; flex-grow: 1; max-width: 900px"
-    :pt="{ content: { style: { padding: 0 } } }"
+    :pt="
+      ({ content: { style: { padding: 0 } } },
+      app.ui.help.top(`
+        <h1>Peak Assignment</h1>
+
+        <p>
+        Assign a composition to the currently selected peak based on the m/z value,
+        ionization mechanisms and allowed ranges of atom counts.
+        </p>
+
+        <p>
+        Select peaks by clicking rows in the peak browser to the left, or by clicking
+        the vertical grey peak lines in the spectrum chart.
+        </p>
+      `))
+    "
   >
     <template #header>
       <TabMenu
