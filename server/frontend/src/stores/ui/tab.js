@@ -10,12 +10,12 @@ export const useTab = defineStore('app.ui.tab', () => {
 
   const data = useData()
 
-  // Switch to 'match' tab when visualized ion focused (unless on spectrum tab)
+  // Switch to 'match' tab when visualized ion focused (unless on sample tab)
   // When visualized ion unfocused, return to 'batch' if batch exists, else default
   watch(
     () => data.match.visualized.ion,
     (visualized) => {
-      if (visualized && active.value !== 'spectrum') {
+      if (visualized && active.value !== 'sample') {
         active.value = 'match'
       } else {
         if (active.value === 'match') {
@@ -25,11 +25,11 @@ export const useTab = defineStore('app.ui.tab', () => {
     }
   )
 
-  // Return to 'batch' tab when sample unfocused (if currently on spectrum tab)
+  // Return to 'batch' tab when sample unfocused (if currently on sample tab)
   watch(
     () => data.sample.focused,
     (sample) => {
-      if (!sample && active.value === 'spectrum') {
+      if (!sample && active.value === 'sample') {
         active.value = 'batch'
       }
     }

@@ -115,7 +115,7 @@ const config = {
 <template>
   <BaseChartPlotly
     id="ChartSampleSpectrum"
-    title="Spectrum"
+    title="Sum spectrum"
     :data="traces"
     :layout="layout"
     :config="config"

@@ -17,7 +17,7 @@ import {
   PaneBrowserMatch,
   PaneTabMatch,
   PaneTabAcquisitions,
-  PaneTabSpectrum
+  PaneTabSample
 } from '@/lib/panes'
 import { ChartBatchOverview } from '@/lib/charts'
 import { HelpButton, HelpPopover } from '@/lib/help'
@@ -158,8 +158,8 @@ const tabs = computed(() => [
               <TabPanel value="batch">
                 <ChartBatchOverview v-if="app.ui.tab.active == 'batch'" />
               </TabPanel>
-              <TabPanel value="spectrum" :pt="{ content: { style: { padding: 0 } } }">
-                <PaneTabSpectrum v-if="app.ui.tab.active == 'spectrum'" />
+              <TabPanel value="sample" :pt="{ content: { style: { padding: 0 } } }">
+                <PaneTabSample v-if="app.ui.tab.active == 'sample'" />
               </TabPanel>
               <TabPanel value="match" :pt="{ content: { style: { padding: 0 } } }">
                 <PaneTabMatch />

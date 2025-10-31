@@ -17,7 +17,7 @@ const app = useApp()
 
 const padding = 180
 
-const storedState = localStorage.getItem('spectrum-tab-split')
+const storedState = localStorage.getItem('sample-tab-split')
 const [initTop, initBottom] = JSON.parse(storedState ?? '[50, 50]')
 
 const topSplit = ref(initTop)
@@ -30,7 +30,7 @@ const bottomHeight = computed(() => ((height.value - padding) * bottomSplit.valu
   <Splitter
     layout="vertical"
     stateStorage="local"
-    stateKey="spectrum-tab-split"
+    stateKey="sample-tab-split"
     :style="`height: calc(100vh - ${padding}px); width: 100%`"
     @resizeend="
       ({ sizes }) => {

@@ -22,9 +22,7 @@ export const useChartData = defineStore('chart.sample.spectrum', () => {
     }
   })
 
-  const shouldLoad = computed(
-    () => app.ui.tab.active === 'spectrum' && app.data.peak.list.length > 0
-  )
+  const shouldLoad = computed(() => app.ui.tab.active === 'sample' && app.data.peak.list.length > 0)
 
   // load triggering
   watchEffect(() => {
@@ -164,7 +162,7 @@ export const useChartData = defineStore('chart.sample.spectrum', () => {
   // unload data and switch tab if necessary
   function unload() {
     mainTraces.value = []
-    const tabOpen = app.ui.tab.active === 'spectrum'
+    const tabOpen = app.ui.tab.active === 'sample'
     if (tabOpen) {
       app.ui.tab.default()
     }
