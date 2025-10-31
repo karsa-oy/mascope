@@ -347,11 +347,6 @@ async def get_sample_peaks(
     response_data = {}
 
     if areas:
-        if "peak_areas" not in sample_file_data:
-            raise NotFoundException(
-                f"No peak areas found in sample file '{sample.filename}', file may not have been processed"
-            )
-
         peak_areas = get_peaks(sample_file_data, "area")
 
         # Filter by polarity-specific scan timestamps
@@ -369,10 +364,6 @@ async def get_sample_peaks(
         response_data["area"] = peak_areas.values.tolist()
 
     if heights:
-        if "peak_heights" not in sample_file_data:
-            raise NotFoundException(
-                f"No peak heights found in sample file '{sample.filename}', file may not have been processed"
-            )
         peak_heights = get_peaks(sample_file_data, "height")
 
         # Filter by polarity-specific scan timestamps

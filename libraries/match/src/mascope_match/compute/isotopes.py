@@ -3,10 +3,9 @@ import numpy as np
 import pandas as pd
 from scipy.spatial.distance import pdist
 
-from mascope_file.io import load_array
+import mascope_file.io as m_io
+import mascope_signal.compute as m_compute
 from mascope_file.name import get_instrument_type, get_sample_file_type
-from mascope_signal.compute import get_scan_timestamps
-from mascope_signal.peak import get_peak_detector
 from mascope_match.runtime import runtime
 
 from mascope_match.params import unmatched_isotope_params, BaseMatchParams
@@ -61,6 +60,7 @@ async def compute_match_isotopes(
       and legacy filtering (when match_params provided for backwards compatibility).
       TODO remove match_params and target isotopes filtering form here? keep only actual computing
     """
+    runtime.logger.debug("Start matching...")
     try:
         # Step 1: Initialize parameters and load data
         instrument_type = get_instrument_type(filename)
@@ -68,9 +68,9 @@ async def compute_match_isotopes(
         # Step 2: Apply filtering only if match_params provided (backwards compatibility)
         if match_params is not None:
             # Filter isotopes below threshold and with incorrect resolution
-            resolution_type = (
+            resolution_type = (  # noqa: F841
                 "LOW" if instrument_type == "tof" else "HIGH"
-            )  # noqa: F841
+            )
             query = "relative_abundance >= @match_params.min_isotope_abundance and resolution == @resolution_type"
             target_isotopes_df = target_isotopes_df.query(query).reset_index(drop=True)
         else:
@@ -81,10 +81,9 @@ async def compute_match_isotopes(
             return pd.DataFrame()
 
         # Step 3: Detect peaks in the sample file
-        peaks = await detect_and_load_peaks(
+        peaks = load_peaks(
             filename=filename,
             instrument_type=instrument_type,
-            instrument_functions=instrument_functions,
             target_mzs=target_isotopes_df.mz,
             polarity=polarity,
         )
@@ -139,21 +138,19 @@ async def compute_match_isotopes(
 # --- Helper Functions ---
 
 
-async def detect_and_load_peaks(
+def load_peaks(
     filename: str,
     instrument_type: str,
-    instrument_functions: tuple,
     target_mzs: pd.Series,
     polarity: Literal["+", "-"] | None = None,
 ):
-    """Detect peaks in the sample file and load them into a DataArray.
+    """Loads target_mzs peak profiles of required polarity from the sample file.
+    Loads peak_heights for Orbitrap files and peak_areas for TOF files.
 
     :param filename: Path to the sample file to be analyzed for matches.
     :type filename: str
     :param instrument_type: Type of the instrument used for the sample file, e.g., "orbi" or "tof".
     :type instrument_type: str
-    :param instrument_functions: Tuple containing peak shape and a resolution function.
-    :type instrument_functions: tuple
     :param target_mzs: Series of target m/z values to be matched against the sample peaks.
     :type target_mzs: pd.Series
     :param polarity: Polarity of the sample, either "+", "-", or "+-". Defaults to None.
@@ -161,18 +158,21 @@ async def detect_and_load_peaks(
     :return: DataArray containing detected peaks with their m/z, intensity, and time information.
     :rtype: xarray.DataArray
     """
-    # Detect peaks in the sample file
-    peak_detector = get_peak_detector(filename, instrument_functions)
-    await peak_detector.detect_peaks()
-    peak_detector.write_peaks_to_zarr()
+    target_mzs = np.array(target_mzs)
+    closest_mzs = (
+        m_io.load_file(filename, vars=["peak_profiles"])
+        .sel(mz=target_mzs, method="nearest")
+        .mz.values
+    )
+    # Remove duplicates, as multiple target_mzs can map to the same closest_mz
+    closest_mzs = np.unique(closest_mzs)
 
-    runtime.logger.debug("Start matching")
-
+    peak_data = m_compute.load_peak_profiles(filename, closest_mzs)
     match instrument_type:
         case "orbi":
-            peaks = load_array(filename, "peak_heights").peak_heights
+            peaks = peak_data.peak_heights
         case "tof":
-            peaks = load_array(filename, "peak_areas").peak_areas
+            peaks = peak_data.peak_areas
 
     sample_file_type = get_sample_file_type(filename)
     if sample_file_type in ["orbi_zarr", "tof_zarr"]:
@@ -180,7 +180,7 @@ async def detect_and_load_peaks(
 
     if polarity:
         # Filter peaks based on polarity
-        time_scan = get_scan_timestamps(filename, polarity=polarity)
+        time_scan = m_compute.get_scan_timestamps(filename, polarity=polarity)
         peaks = peaks.sel(time=time_scan, method="nearest")
 
     return peaks

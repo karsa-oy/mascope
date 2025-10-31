@@ -13,7 +13,7 @@ import mascope_file.io as m_io
 import mascope_signal.compute as m_compute
 
 from mascope_match.compute.isotopes import (
-    detect_and_load_peaks,
+    load_peaks,
     parse_and_filter_peaks,
     calculate_match_stats,
 )
@@ -83,13 +83,10 @@ class BaseCalibrationHandler:
         )
         target_isotopes_df = pd.DataFrame(target_isotopes_result["data"])
 
-        instrument_functions = await read_instrument_functions(self.filename)
         instrument_type = m_name.get_instrument_type(self.filename)
-
-        peaks = await detect_and_load_peaks(
+        peaks = load_peaks(
             filename=self.filename,
             instrument_type=instrument_type,
-            instrument_functions=instrument_functions,
             target_mzs=target_isotopes_df.mz,
         )
         parsed_peaks = parse_and_filter_peaks(peaks)
@@ -314,15 +311,14 @@ class TofCalibrationHandler(BaseCalibrationHandler):
                 )
 
         try:
-            peak_tofs = m_io.load_coord(self.filename, "peak_areas", "tof")
+            peak_tofs = m_io.load_coord(self.filename, "peak_profiles", "tof")
             new_peak_mz = tof_to_mass(peak_tofs, fit_mode, fit_parameters)
-            m_io.update_zarr_array_coord(self.filename, "peak_areas", "mz", new_peak_mz)
             m_io.update_zarr_array_coord(
-                self.filename, "peak_heights", "mz", new_peak_mz
+                self.filename, "peak_profiles", "mz", new_peak_mz
             )
         except PathNotFoundError:
             runtime.logger.warning(
-                f"Peak_areas/heights not found in {self.filename}, "
+                f"peak_profiles not found in {self.filename}, "
                 "thus their m/z coordinates were not updated."
             )
         return new_mz_axis
@@ -436,12 +432,9 @@ class OrbiCalibrationHandler(BaseCalibrationHandler):
             m_io.update_zarr_array_coord(self.filename, "signal", "mz", new_signal_mz)
         try:
             new_peak_mz = (
-                m_io.load_coord(self.filename, "peak_areas", "mz") * old_factor_scaling
+                m_io.load_coord(self.filename, "peak_profiles", "mz") * old_factor_scaling
             )
-            m_io.update_zarr_array_coord(self.filename, "peak_areas", "mz", new_peak_mz)
-            m_io.update_zarr_array_coord(
-                self.filename, "peak_heights", "mz", new_peak_mz
-            )
+            m_io.update_zarr_array_coord(self.filename, "peak_profiles", "mz", new_peak_mz)
         except PathNotFoundError:
             runtime.logger.warning(
                 f"Peak_areas/heights not found in {self.filename}, "

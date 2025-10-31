@@ -500,6 +500,75 @@ def get_orbi_centroids_per_scan(
             )
 
 
+def load_peak_profiles(
+    base_filename: str,
+    mzs: Iterable[float],
+) -> xr.Dataset:
+    """Loads peak profiles from the sample file.
+    Computes missing peak profiles if needed.
+
+    :param base_filename: Sample file filename
+    :type base_filename: str
+    :param mzs: List of target m/z values
+    :type mzs: Iterable[float]
+    :return: The peak profiles dataset
+    :rtype: xr.Dataset
+    """
+    # --- Load existing peak profiles from the sample file ---
+    peak_profiles = m_io.load_file(base_filename, vars=["peak_profiles"]).sel(
+        mz=mzs, method="nearest"
+    )
+    print(
+        f"Loaded peak profiles for m/z values: {peak_profiles.mz.values} from {base_filename}"
+    )
+    to_compute_mask = np.invert(peak_profiles.is_profile_computed.values)
+    if not np.any(to_compute_mask):
+        runtime.logger.debug(
+            f"All peak profiles are cached in {base_filename}, loading from file."
+        )
+        return peak_profiles
+
+    # --- Compute missing peak profiles ---
+    mz_coords = peak_profiles.mz.values
+    mzs_to_compute = mz_coords[to_compute_mask]
+    new_peak_profiles = get_peak_profiles(base_filename, mzs_to_compute)
+
+    sum_peak_heights = peak_profiles.sum_peak_heights.sel(mz=mzs_to_compute).values
+    sum_peak_areas = peak_profiles.sum_peak_areas.sel(mz=mzs_to_compute).values
+
+    # Normalize peak profile intensities to 1
+    new_peak_profiles_norm = new_peak_profiles / new_peak_profiles.sum(dim="time")
+    new_peak_profiles_norm = new_peak_profiles_norm.values
+
+    # Restore peak profiles intensities using fitted peak areas and heights
+    new_peak_profiles_area = new_peak_profiles_norm * sum_peak_areas[:, np.newaxis]
+    new_peak_profiles_height = new_peak_profiles_norm * sum_peak_heights[:, np.newaxis]
+
+    # Insert/merge computed profiles into the cached peak_profiles dataset
+    try:
+        # Assign peak_areas and peak_heights for the computed mzs
+        peak_profiles["peak_areas"].loc[dict(mz=mzs_to_compute)] = (
+            new_peak_profiles_area
+        )
+        peak_profiles["peak_heights"].loc[dict(mz=mzs_to_compute)] = (
+            new_peak_profiles_height
+        )
+        # Mark profiles as computed
+        peak_profiles["is_profile_computed"].loc[dict(mz=mzs_to_compute)] = True
+
+    except Exception as e:
+        runtime.logger.error(f"Failed to merge computed peak profiles: {e}")
+        raise
+
+    runtime.logger.debug(f"peak heights {peak_profiles.peak_heights.values}")
+    runtime.logger.debug(f"peak areas {peak_profiles.peak_areas.values}")
+
+    # --- Store new peak profiles in the sample file ---
+    m_io.write_peaks(peak_profiles, base_filename)
+
+    return peak_profiles
+
+
 def get_peak_profiles(
     base_filename: str,
     mzs: Iterable[float],
@@ -507,7 +576,7 @@ def get_peak_profiles(
     t_max: float | None = None,
     polarity: Literal["+", "-"] | None = None,
 ) -> xr.DataArray:
-    """Get peak profiles for given m/z values in the time range [t_min, t_max]
+    """Get peak profiles for given peak m/z values in the time range [t_min, t_max]
 
     :param datafile_path: Path to the data file
     :type datafile_path: str
@@ -540,10 +609,7 @@ def get_peak_profiles(
                 datafile_path, uncalibrated_mzs, t_min, t_max, polarity
             )
             # Calibrate m/z coordinate
-            peak_profiles = peak_profiles.assign_coords(
-                mz=peak_profiles.mz.values * factor
-            )
-            return peak_profiles
+            return peak_profiles.assign_coords(mz=peak_profiles.mz.values * factor)
         case "tof_h5":
             # Get calibrated m/z values
             sum_signal_mz = get_sum_signal(base_filename).mz.values

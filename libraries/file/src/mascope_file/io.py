@@ -310,25 +310,63 @@ def write_peaks(
     :raises FileExistsError: Peak areas or peak heights already exist for the sample file
     :return: None
     """
-    # Get paths to peak_areas and peak_heights zarr files
     peak_profiles_path = filename_to_zarr_path(filename, "peak_profiles")
 
-    if os.path.exists(peak_profiles_path):
-        if overwrite:
-            rmtree(peak_profiles_path)
-        else:
-            raise FileExistsError(f"Peak profiles already exist for {filename}")
-
-    try:
+    def _full_overwrite():
+        """Full-write helper"""
+        runtime.logger.debug(f"Full overwrite of peak_profiles at {peak_profiles_path}")
+        if os.path.exists(peak_profiles_path):
+            try:
+                rmtree(peak_profiles_path)
+            except Exception as e:
+                runtime.logger.error(f"Failed to remove existing peak_profiles: {e}")
+                raise
         peak_profiles.to_zarr(peak_profiles_path, mode="w")
-    except FileNotFoundError as e:
-        if ".partial" in str(e):
-            # peak_heights in Exception because it's longer than peak_areas and sum_signal
-            raise Exception(
-                f"The path is probably too long: {peak_profiles_path}"
-            ) from e
+
+    file_not_processed = not os.path.exists(peak_profiles_path)
+    if overwrite or file_not_processed:
+        try:
+            _full_overwrite()
+            return
+        except FileNotFoundError as e:
+            if ".partial" in str(e):
+                raise Exception(
+                    f"The path is probably too long: {peak_profiles_path}"
+                ) from e
+            else:
+                raise
+
+    # -- Partial update --
+    runtime.logger.debug(f"Partial update of peak_profiles at {peak_profiles_path}")
+    try:
+        ds_full = xr.open_zarr(peak_profiles_path)
+        # Determine mz coordinate in the store
+        if "mz" in ds_full.coords:
+            mz_coords = ds_full.coords["mz"].values
+        elif "coords" in ds_full and "mz" in ds_full["coords"]:
+            mz_coords = ds_full["coords"]["mz"].values
         else:
-            raise
+            raise KeyError(
+                "mz coordinate not found in zarr store; cannot perform partial update"
+            )
+
+        # Find the integer indices for the mz slice to update
+        mz_update = peak_profiles.coords["mz"].values
+        indexer = ds_full.get_index("mz").get_indexer(mz_update, method="nearest")
+        start_index = indexer[0]
+        end_index = indexer[-1] + 1  # +1 for exclusive end
+
+        region = {"mz": slice(start_index, end_index), "time": slice(None)}
+
+        # Slice the input dataset to match the region shape
+        ds_slice = peak_profiles.sel(
+            mz=slice(mz_coords[start_index], mz_coords[end_index - 1])
+        ).copy(deep=True)
+
+        # Write the modified slice back to the store
+        ds_slice.to_zarr(peak_profiles_path, mode="r+", region=region)
+    except Exception as e:
+        runtime.logger.error(f"Failed to update peak_profiles: {e}.")
 
 
 def delete_peaks(base_filename: str):

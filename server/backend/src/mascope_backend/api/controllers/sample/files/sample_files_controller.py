@@ -939,10 +939,6 @@ async def get_sample_file_peaks(
 
     # Step 4: Extract and format the data
     if areas:
-        if "peak_areas" not in sample_file_data:
-            raise NotFoundException(
-                f"No peak areas found in sample file '{filename}', file may not have been processed"
-            )
         peak_areas = get_peaks(sample_file_data, "area")
         peak_areas = (
             peak_areas.mean(dim="time") if average else peak_areas.sum(dim="time")
@@ -951,10 +947,6 @@ async def get_sample_file_peaks(
         response_data["area"] = peak_areas.values.tolist()
 
     if heights:
-        if "peak_heights" not in sample_file_data:
-            raise NotFoundException(
-                f"No peak heights found in sample file '{filename}', file may not have been processed"
-            )
         peak_heights = get_peaks(sample_file_data, "height")
         peak_heights = (
             peak_heights.mean(dim="time") if average else peak_heights.sum(dim="time")
@@ -1037,7 +1029,7 @@ async def compute_sample_file_peaks(
 
     # Return completion message and peak details.
     sample_file = load_file(filename, vars=["peak_profiles"])
-    message = f"Detected {sample_file.peak_heights.mz.size} peaks for file '{filename}'"
+    message = f"Detected {sample_file.mz.size} peaks for file '{filename}'"
     runtime.logger.info(message)
 
     await sio.emit("peak_reload", room=sample_file_id, namespace="/")

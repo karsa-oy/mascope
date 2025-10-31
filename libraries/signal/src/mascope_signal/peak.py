@@ -9,6 +9,7 @@ import pandas as pd
 from scipy.signal._peak_finding_utils import _select_by_peak_distance
 import xarray
 import dask
+import dask.array as da
 from mascope_match.params import (
     ORBI_FITTING_THRESHOLD,
     TOF_FITTING_THRESHOLD,
@@ -57,38 +58,38 @@ class BasePeakDetector(ABC):
         u_list = np.unique(mz_values.astype(int))
         return u_list
 
-    def _calculate_peak_profiles(self, peaks: xarray.Dataset) -> xarray.Dataset:
-        """Helper function to calculate peak profiles in detect_peaks"""
+    def _allocate_peak_profiles(self, peaks: xarray.Dataset) -> xarray.Dataset:
+        """Allocate peak profiles dataset structure."""
         # Get the tof values corresponding to the peak mzs
         mz_axis = self._sum_signal.mz.values
         peak_mzs = peaks.mz.values
         # Interpolate the index (tof) for each peak m/z
         unique_tofs = np.interp(peak_mzs, mz_axis, np.arange(len(mz_axis)))
 
-        peak_profiles = m_compute.get_peak_profiles(
-            self._filename, peak_mzs
-        ).assign_coords(tof=("mz", unique_tofs))
+        time_coord = m_compute.get_scan_timestamps(self._filename)
+        data_coords = {
+            "mz": peaks.mz,
+            "time": time_coord,
+            "tof": (("mz"), unique_tofs),
+        }
 
-        # Normalize peak profile intensities to 1
-        peak_profiles_norm = peak_profiles / peak_profiles.sum(dim="time")
-        peak_profiles_norm = peak_profiles_norm.fillna(0)
-
-        # Restore peak profiles intensities using peak areas and heights of the fitted peaks,
-        # that are, presumably, the correct integral of the peak profiles
-        peak_profiles_area = peak_profiles_norm * peaks.sum_peak_areas
-        peak_profiles_height = peak_profiles_norm * peaks.sum_peak_heights
+        # Allocate dask arrays for peak areas and heights with NaN initialization
+        # to save memory
+        data_shape = (peaks.mz.size, time_coord.size)
+        peak_areas = da.full(data_shape, np.nan, dtype=np.float64)
+        peak_heights = da.full(data_shape, np.nan, dtype=np.float64)
+        peak_profile_computed = da.full(peaks.mz.size, False, dtype=bool)
+        data_vars = {
+            "peak_areas": (("mz", "time"), peak_areas),
+            "peak_heights": (("mz", "time"), peak_heights),
+            "is_profile_computed": (("mz"), peak_profile_computed),
+        }
 
         peak_profiles = xarray.Dataset(
-            {
-                "peak_areas": peak_profiles_area,
-                "peak_heights": peak_profiles_height,
-            }
+            data_vars=data_vars,
+            coords=data_coords,
         )
-
-        # Merge peak profiles with peaks dataset
-        peak_profiles = xarray.merge([peak_profiles, peaks])
-
-        self.peak_profiles = peak_profiles
+        self.peak_profiles = xarray.merge([peak_profiles, peaks])
 
     def write_peaks_to_zarr(self, overwrite=True):
         if self.peak_profiles is None:
@@ -128,14 +129,23 @@ class OrbiPeakDetector(BasePeakDetector):
         """
         runtime.logger.debug("Reading centroids from the Thermo file...")
         # Get CALIBRATED centroids
+        peaks_pos = self._extract_peaks_for_polarity("+")
+        peaks_neg = self._extract_peaks_for_polarity("-")
+
+        datasets = [ds for ds in [peaks_pos, peaks_neg] if ds is not None]
+        peaks = xarray.concat(datasets, dim="mz").sortby("mz")
+
+        runtime.logger.debug("Computing peak profiles...")
+        self._allocate_peak_profiles(peaks)
+        self._flag_weak_peaks()
+        self._flag_satellite_peaks()
+
+    def _extract_peaks_for_polarity(self, polarity: str) -> xarray.Dataset:
+        """A workaround to extract peaks for a given polarity from Thermo Orbitrap files."""
         peak_mzs, peak_heights, resolutions, signal_to_noise = (
-            m_compute.get_orbi_centroids(self._filename, self.u_list)
-        )
-        runtime.logger.debug(
-            f"{len(peak_mzs)} centroids were found, computing peak areas..."
+            m_compute.get_orbi_centroids(self._filename, self.u_list, polarity=polarity)
         )
 
-        # Precompute all mz ranges for peak area calculation
         sigmas = peak_mzs / resolutions / m_fitting.SIGMA_MULTIPLIER
         mz_mins = peak_mzs - 3 * sigmas
         mz_maxs = peak_mzs + 3 * sigmas
@@ -155,32 +165,19 @@ class OrbiPeakDetector(BasePeakDetector):
             ]
         )
 
-        peaks = xarray.Dataset(
+        return xarray.Dataset(
             {
                 "sum_peak_areas": (("mz"), peak_areas),
                 "sum_peak_heights": (("mz"), peak_heights),
                 "signal_to_noise": (("mz"), signal_to_noise),
+                "polarity": (("mz"), np.full(peak_mzs.shape, polarity)),
             }
         ).assign_coords(mz=("mz", peak_mzs))
-        peaks = peaks.sortby("mz")
-
-        runtime.logger.debug("Computing peak profiles...")
-        self._calculate_peak_profiles(peaks)
-        self._flag_weak_peaks()
-        self._flag_satellite_peaks()
 
     def _flag_weak_peaks(self):
-        """Flag weak peaks based on signal-to-noise ratio and peak profile characteristics."""
-
-        def has_only_one_positive(arr):
-            return np.sum(arr > 0) <= 1
-
+        """Flag weak peaks based on signal-to-noise ratio."""
         low_snr = self.peak_profiles.signal_to_noise.values < SIGNAL_TO_NOISE_THRESHOLD
-        only_one_positive = np.apply_along_axis(
-            has_only_one_positive, 1, self.peak_profiles.peak_heights.values
-        )
-
-        is_weak = low_snr | only_one_positive
+        is_weak = low_snr
         self.peak_profiles = self.peak_profiles.assign({"is_weak": (("mz"), is_weak)})
 
     def _flag_satellite_peaks(self):
@@ -266,17 +263,20 @@ class TofPeakDetector(BasePeakDetector):
         peak_mzs = peak_mzs[positive_mask]
         peak_heights = peak_heights[positive_mask]
         peak_areas = peak_areas[positive_mask]
-
+        polarity = m_compute.get_polarity_options(self._filename)
+        signal_to_noise = self._compute_snr(peak_mzs, peak_heights)
         peaks = xarray.Dataset(
             {
                 "sum_peak_areas": (("mz"), peak_areas),
                 "sum_peak_heights": (("mz"), peak_heights),
+                "signal_to_noise": (("mz"), signal_to_noise),
+                "polarity": (("mz"), np.full(peak_mzs.shape, polarity)),
             }
         ).assign_coords(mz=("mz", peak_mzs))
         peaks = peaks.sortby("mz")
 
         runtime.logger.debug("Computing peak profiles...")
-        self._calculate_peak_profiles(peaks)
+        self._allocate_peak_profiles(peaks)
         self._flag_weak_peaks()
         self._flag_satellite_peaks()
 
@@ -298,22 +298,56 @@ class TofPeakDetector(BasePeakDetector):
         ]
         return specs_to_fit
 
+    def _compute_snr(
+        self,
+        peak_mzs: np.ndarray,
+        peak_heights: np.ndarray,
+    ) -> np.ndarray:
+        """Compute signal-to-noise ratio for given peaks
+
+        :param peak_mzs: Fitted peak m/z values
+        :type peak_mzs: np.ndarray
+        :param peak_heights: Fitted peak heights
+        :type peak_heights: np.ndarray
+        :return: Signal-to-noise ratio array
+        :rtype: np.ndarray
+        """
+        mz_axis = self._sum_signal.mz.values
+        signal = self._sum_signal.values
+        snr = np.empty(len(peak_mzs), dtype=np.float64)
+
+        # Compute exclusion zone from the resolution function
+        resolutions = self._resolution_function(peak_mzs)
+        exclusion = peak_mzs / resolutions
+
+        # Compute baseline window as 10 times the exclusion zone
+        window = 10 * exclusion
+
+        # Vectorized baseline window calculation
+        left_min = peak_mzs - window
+        left_max = peak_mzs - exclusion
+        right_min = peak_mzs + exclusion
+        right_max = peak_mzs + window
+
+        # For each peak, select baseline regions and compute noise std
+        for i in range(len(peak_mzs)):
+            left_mask = (mz_axis >= left_min[i]) & (mz_axis <= left_max[i])
+            right_mask = (mz_axis >= right_min[i]) & (mz_axis <= right_max[i])
+            baseline = signal[left_mask | right_mask]
+            # Use robust estimator if baseline is non-Gaussian
+            noise_std = np.std(baseline) if baseline.size > 0 else np.nan
+            snr[i] = peak_heights[i] / noise_std if noise_std > 0 else np.nan
+
+        return snr
+
     def _flag_weak_peaks(self):
-        """Flag weak peaks based on peak profile characteristics."""
-
-        def has_only_one_positive(arr):
-            return np.sum(arr > 0) > 1
-
-        only_one_positive = np.apply_along_axis(
-            has_only_one_positive, 1, self.peak_profiles.peak_heights.values
-        )
-
-        is_weak = only_one_positive
+        """Flag weak peaks. Currently no weak peak criteria for TOF data."""
+        is_weak = np.full(len(self.peak_profiles.mz), False, dtype=bool)
         self.peak_profiles = self.peak_profiles.assign({"is_weak": (("mz"), is_weak)})
 
     def _flag_satellite_peaks(self):
-        # TOF data does not have satellite peaks
-        is_satellite = np.zeros(len(self.peak_profiles.mz), dtype=bool)
+        """Flag satellite peaks. Currently no satellite peak criteria for TOF data."""
+        is_satellite = np.full(len(self.peak_profiles.mz), False, dtype=bool)
         self.peak_profiles = self.peak_profiles.assign(
             {"is_satellite": (("mz"), is_satellite)}
         )
@@ -341,7 +375,9 @@ class OrbiZarrPeakDetector(TofPeakDetector):
             return []
 
         # Remove tiny noise from the sum spectrum
-        threshold = n_scans = m_compute.get_scan_timestamps(self._filename).size
+        threshold = n_scans = m_compute.get_scan_timestamps(  # noqa: F841
+            self._filename
+        ).size
         sum_spec[sum_spec < threshold] = 0
         # Get non-zero indices
         non_zero_indices = np.flatnonzero(sum_spec)

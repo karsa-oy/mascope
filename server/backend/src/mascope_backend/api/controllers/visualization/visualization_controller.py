@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from sqlalchemy import select
 from colorcet import glasbey_hv as colormap
 
-from mascope_file.io import load_file
+from mascope_file.io import load_file, read_props
 from mascope_file.name import get_instrument_type
 
 import mascope_signal.compute as m_compute
@@ -189,14 +189,23 @@ def _load_peaks_and_averaged_signal(sample, target_isotopes):
     :rtype: tuple
     """
     runtime.logger.info(f"Loading file: {sample.filename}")
-    mz_windows = [(iso.mz - DMZ, iso.mz + DMZ) for iso in target_isotopes]
-    mz_min = min(w[0] for w in mz_windows)
-    mz_max = max(w[1] for w in mz_windows)
-    peak_data = (
+    mz_vals = np.array([iso.mz for iso in target_isotopes])
+    mz_min = np.min(mz_vals) - DMZ
+    mz_max = np.max(mz_vals) + DMZ
+    peak_mzs = (
         load_file(sample.filename, vars=["peak_profiles"])
         .sel(mz=slice(mz_min, mz_max))
-        .compute()
+        .mz.values
     )
+    peak_data = m_compute.load_peak_profiles(sample.filename, peak_mzs)
+
+    runtime.logger.debug(f"Peak mzs: {peak_mzs}")
+    runtime.logger.debug(f"Peak profiles: {peak_data.peak_heights.values}")
+
+    # Attach sample file metadata to peak_data
+    props = read_props(sample.filename)
+    peak_data.attrs.update({"props": props})
+
     averaged_signal = (
         m_compute.get_sum_signal(
             sample.filename,
@@ -269,12 +278,15 @@ async def _process_isotope(
 
     isotope_slice = ctx.peak_data.sel(mz=slice(*mz_range))
     peak_profiles = get_peaks(isotope_slice, ctx.instrument_property.peak_data_type)
-    peaks = isotope_slice.peak_heights.sel(time=ctx.time_scan, method="nearest").mean(
-        dim="time"
+    mean_peak_heights = isotope_slice.peak_heights.sel(
+        time=ctx.time_scan, method="nearest"
+    ).mean(dim="time")
+    mean_peak_heights = filter_peaks(
+        mean_peak_heights, intensity=ctx.peak_min_intensity
     )
-    peaks = filter_peaks(peaks, intensity=ctx.peak_min_intensity)
 
     if isotope_averaged_spec.size == 0:
+        # No spectrum in the given mz range
         averaged_spec_mz = np.array(list(mz_range), dtype=np.float32)
         averaged_spec_y = np.array([0, 0], dtype=np.float32)
         isotope_expected_height = 0
@@ -282,13 +294,16 @@ async def _process_isotope(
         averaged_spec_mz = isotope_averaged_spec.mz.values.astype(np.float32)
         averaged_spec_y = isotope_averaged_spec.values.astype(np.float32)
         if ctx.index == 0:
+            # Main isotope: determine main isotope height
             try:
-                peak = peaks.sel(mz=ctx.isotope.mz, method="nearest")
+                peak = mean_peak_heights.sel(mz=ctx.isotope.mz, method="nearest")
                 peak_height = peak.item()
             except KeyError:
                 # Fall-back if no peak is found
                 peak_height = np.max(averaged_spec_y)
             isotope_result.main_isotope_height = peak_height
+
+        # Calculate expected height based on relative abundance
         isotope_expected_height = isotope_result.main_isotope_height * (
             ctx.isotope.relative_abundance / ctx.relative_abundances[0]
         )
@@ -312,7 +327,7 @@ async def _process_isotope(
         }
     )
 
-    for peak in peaks:
+    for peak in mean_peak_heights:
         peak_result = await _process_peak(
             peak, ctx, peak_profiles, isotope_result.sum_timeseries
         )
