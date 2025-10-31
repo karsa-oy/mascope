@@ -2,6 +2,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 import asyncio
+import numpy as np
 from mascope_file.io import load_file
 import mascope_signal.compute as m_compute
 from mascope_signal.peak import get_peaks
@@ -269,22 +270,20 @@ async def get_sample_peaks(
     mz_max: float | None = None,
 ) -> dict:
     """
-    Retrieve peak data from a sample.
-    Retrieve peak data from a sample with automatic sample's polarity filtering and optional time and m/z range filtering.
+    Retrieve peak data from a sample with automatic sample's polarity filtering.
 
     This controller extracts peak areas and/or heights for a sample, automatically filtered
-    by the sample's polarity. It supports optional time range filtering within the sample's
-    acquisition window (t0/t1) and m/z range filtering
+    by the sample's polarity. It supports optional m/z range filtering.
+    The filtering by time is not supported for now and raises an error if provided.
 
     Steps:
-    1. Get sample data and extract polarity/time metadata
-    2. Validate and set effective time limits with auto-correction
-    3. Get polarity-filtered scan timestamps for the specified time range
-    4. Load peak data from the sample file
-    5. Apply time filtering using polarity-specific timestamps
-    6. Apply m/z range filtering if specified
-    7. Aggregate peak data across the filtered time dimension
-    8. Return formatted peak data
+    - Get sample data
+    - Load sample file peak data and get polarity filter
+    - Apply filtering
+    - Extract and format the data
+    - Format the response for the case where no peaks were detected
+    - Remove empty fields from the response
+    - Return success response
 
     :param sample_item_id: Unique identifier for the sample
     :type sample_item_id: str
@@ -308,34 +307,18 @@ async def get_sample_peaks(
     :rtype: dict
     """
 
-    # Step 1: Get sample data and extract required fields
+    # --- Get sample data ---
     sample = await _load_sample_data(sample_item_id)
 
-    # Step 2: Validate and set effective time limits with auto-correction
-    t_min_eff, t_max_eff, time_adjustment_info = _validate_time_range(
-        t_min, t_max, sample.t0, sample.t1
-    )
+    if (t_min is not None and t_min > sample.t0) or (
+        t_max is not None and t_max < sample.t1
+    ):
+        raise NotImplementedError(
+            "Time range filtering is not supported for peak data extraction. "
+            "Please omit t_min and t_max parameters."
+        )
 
-    # Step 3: Get filtered scan timestamps using sample's polarity and time range
-    time_array = m_compute.get_scan_timestamps(
-        base_filename=sample.filename,
-        t_min=t_min_eff,
-        t_max=t_max_eff,
-        polarity=sample.polarity,
-    )
-
-    if len(time_array) == 0:
-        return {
-            "message": f"No scans found for sample '{sample.sample_item_name}' with polarity '{sample.polarity}' in time range [{t_min_eff:.2f}s, {t_max_eff:.2f}s].",
-            "results": 0,
-            "data": {
-                "mz": [],
-                "area": [] if areas else None,
-                "height": [] if heights else None,
-            },
-        }
-
-    # Step 4: Load sample file peak data
+    # --- Load sample file peak data and get polarity filter ---
     try:
         sample_file_data = load_file(sample.filename, vars=["peak_profiles"])
     except FileNotFoundError as e:
@@ -343,47 +326,34 @@ async def get_sample_peaks(
             f"Sample file with name '{sample.filename}' was not found or has not been processed"
         ) from e
 
-    # Step 5: Extract and format the data with polarity filtering
-    response_data = {}
+    # --- Apply filtering ---
+    polarity_mask = np.where(sample_file_data.polarity.values == sample.polarity)[0]
+    sample_file_data = sample_file_data.isel(mz=polarity_mask)
+    if mz_min is not None and mz_max is not None:
+        sample_file_data = sample_file_data.sel(mz=slice(mz_min, mz_max))
 
+    if average:
+        timestamps = m_compute.get_scan_timestamps(
+            sample.filename, polarity=sample.polarity
+        )
+        average_factor = len(timestamps) if len(timestamps) > 0 else 1
+    else:
+        average_factor = 1
+
+    # --- Extract and format the data ---
+    response_data = {
+        "mz": sample_file_data.mz.values,
+    }
     if areas:
-        peak_areas = get_peaks(sample_file_data, "area")
-
-        # Filter by polarity-specific scan timestamps
-        peak_areas = peak_areas.sel(time=time_array, method="nearest")
-
-        # Step 6: Apply m/z range filtering if specified
-        if mz_min is not None and mz_max is not None:
-            peak_areas = peak_areas.sel(mz=slice(mz_min, mz_max))
-
-        # Step 7: Aggregate over filtered time dimension
-        peak_areas = (
-            peak_areas.mean(dim="time") if average else peak_areas.sum(dim="time")
-        )
-        response_data["mz"] = peak_areas.mz.values.tolist()
-        response_data["area"] = peak_areas.values.tolist()
-
+        response_data["area"] = sample_file_data.sum_peak_areas.values / average_factor
     if heights:
-        peak_heights = get_peaks(sample_file_data, "height")
-
-        # Filter by polarity-specific scan timestamps
-        peak_heights = peak_heights.sel(time=time_array, method="nearest")
-
-        # Step 6: Apply m/z range filtering if specified
-        if mz_min is not None and mz_max is not None:
-            peak_heights = peak_heights.sel(mz=slice(mz_min, mz_max))
-
-        # Step 7: Aggregate over filtered time dimension
-        peak_heights = (
-            peak_heights.mean(dim="time") if average else peak_heights.sum(dim="time")
+        response_data["height"] = (
+            sample_file_data.sum_peak_heights.values / average_factor
         )
 
-        # If 'mz' was not populated from areas, populate it from heights
-        if "mz" not in response_data:
-            response_data["mz"] = peak_heights.mz.values.tolist()
-        response_data["height"] = peak_heights.values.tolist()
+    response_data = {key: value.tolist() for key, value in response_data.items()}
 
-    # Step 8: Format the response for the case where no peaks were detected
+    # --- Format the response for the case where no peaks were detected ---
     if not response_data.get("mz", []):
         message = (
             f"No peaks found in sample '{sample.sample_item_name}' with polarity '{sample.polarity}'. "
@@ -399,18 +369,14 @@ async def get_sample_peaks(
             },
         }
 
-    # Step 7: Remove empty fields from the response
+    # --- Remove empty fields from the response ---
     if not areas:
         response_data.pop("area", None)
     if not heights:
         response_data.pop("height", None)
 
-    # Step 8: Return success response
+    # --- Return success response ---
     message = f"Successfully loaded {len(response_data['mz'])} peaks from sample '{sample.sample_item_name}' with polarity '{sample.polarity}'"
-
-    if time_adjustment_info:
-        message += time_adjustment_info
-
     return {
         "message": message,
         "results": len(response_data["mz"]),
