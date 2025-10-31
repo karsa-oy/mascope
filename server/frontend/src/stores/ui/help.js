@@ -71,8 +71,13 @@ export const useHelp = defineStore('app.ui.help', () => {
   })
 
   const buffer = computed(() => {
-    // filter the current layer
-    const active = cards.value.filter((card) => card.layer == (layer.value ?? 'default'))
+    // Only consider cards whose element is still in the DOM
+    const active = cards.value.filter(
+      (card) =>
+        card.layer == (layer.value ?? 'default') &&
+        card.element &&
+        document.body.contains(card.element)
+    )
     // filter to select cards containing the mouse
     const hovered = active.filter(({ isOutside }) => !isOutside)
     // select the lowest element in the containment hierarchy
