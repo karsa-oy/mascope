@@ -518,8 +518,8 @@ def load_peak_profiles(
     peak_profiles = m_io.load_file(base_filename, vars=["peak_profiles"]).sel(
         mz=mzs, method="nearest"
     )
-    print(
-        f"Loaded peak profiles for m/z values: {peak_profiles.mz.values} from {base_filename}"
+    runtime.logger.debug(
+        f"Loading peak profiles for m/z values: {peak_profiles.mz.values} from {base_filename}"
     )
     to_compute_mask = np.invert(peak_profiles.is_profile_computed.values)
     if not np.any(to_compute_mask):
@@ -559,9 +559,6 @@ def load_peak_profiles(
     except Exception as e:
         runtime.logger.error(f"Failed to merge computed peak profiles: {e}")
         raise
-
-    runtime.logger.debug(f"peak heights {peak_profiles.peak_heights.values}")
-    runtime.logger.debug(f"peak areas {peak_profiles.peak_areas.values}")
 
     # --- Store new peak profiles in the sample file ---
     m_io.write_peaks(peak_profiles, base_filename)
