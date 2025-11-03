@@ -340,6 +340,7 @@ def write_peaks(
     runtime.logger.debug(f"Partial update of peak_profiles at {peak_profiles_path}")
     try:
         ds_full = xr.open_zarr(peak_profiles_path)
+
         # Determine mz coordinate in the store
         if "mz" in ds_full.coords:
             mz_coords = ds_full.coords["mz"].values
@@ -352,19 +353,49 @@ def write_peaks(
 
         # Find the integer indices for the mz slice to update
         mz_update = peak_profiles.coords["mz"].values
-        indexer = ds_full.get_index("mz").get_indexer(mz_update, method="nearest")
+
+        try:
+            indexer = ds_full.get_index("mz").get_indexer(mz_update)
+        except KeyError as ke:
+            runtime.logger.error(
+                "Failed to find exact 'mz' coordinates from input "
+                f"in peak profiles. Cannot perform partial update. {ke}"
+            )
+
+        # Check if indices are contiguous
+        if not np.all(np.diff(indexer) == 1):
+            raise ValueError(
+                "Cannot perform partial update: The 'mz' coordinates "
+                "of the new data are not a contiguous slice of the "
+                "existing 'mz' coordinates."
+            )
+
         start_index = indexer[0]
         end_index = indexer[-1] + 1  # +1 for exclusive end
 
         region = {"mz": slice(start_index, end_index), "time": slice(None)}
+        runtime.logger.debug(f"Calculated target region: {region}")
 
-        # Slice the input dataset to match the region shape
-        ds_slice = peak_profiles.sel(
-            mz=slice(mz_coords[start_index], mz_coords[end_index - 1])
-        ).copy(deep=True)
+        # The data slice to write is smaller than a zarr chunk
+        # To avoid Dask vs. Zarr chunk alignment errors,
+        # we compute the slice into memory before writing.
+        runtime.logger.debug("Computing data slice into memory before writing...")
+        try:
+            ds_to_write = peak_profiles.compute()
+        except Exception as compute_err:
+            runtime.logger.error(
+                f"Failed to compute data slice into memory: {compute_err}"
+            )
 
-        # Write the modified slice back to the store
-        ds_slice.to_zarr(peak_profiles_path, mode="r+", region=region)
+        runtime.logger.debug(f"Data computed. Writing to region {region}...")
+
+        # Write the in-memory (NumPy-backed) dataset to the Zarr region
+        ds_to_write.to_zarr(peak_profiles_path, mode="r+", region=region)
+
+        runtime.logger.debug(
+            f"Successfully updated region {region} in {peak_profiles_path}"
+        )
+
     except Exception as e:
         runtime.logger.error(f"Failed to update peak_profiles: {e}.")
 
