@@ -178,9 +178,9 @@ const matchRangeMiddle = computed(
           <p>
             Configure the parameters used for isotope matching.
             <ul>
-              <li>m/z tolerance:</li> The maximum allowed mass error (in ppm) when matching isotopes.
-              <li>Min. isotope abundance:</li> The minimum relative abundance of isotopes to consider when matching.
-              <li>Isotope ratio tolerance:</li> The maximum allowed deviation in expected isotope ratios.
+              <li><strong>m/z tolerance:</strong> The maximum allowed mass error (in ppm) when matching isotopes.</li>
+              <li><strong>Min. isotope abundance:</strong> The minimum relative abundance of isotopes to consider when matching.</li>
+              <li><strong>Isotope ratio tolerance:</strong> The maximum allowed deviation in expected isotope ratios.</li>
             </ul>
           </p>
         `

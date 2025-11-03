@@ -43,7 +43,7 @@ const vHelpLayer = app.ui.help.directive(layer)
         Select and manage workspaces. Workspaces are like folders
         containing batches. Click on a workspace to open it and see its batches.
       </p>
-      <p>Click on the Create-button to create a new workspace</p>
+      <p>Click on the Create button to create a new workspace</p>
       `
     "
   >
