@@ -319,10 +319,11 @@ def write_peaks(
             try:
                 rmtree(peak_profiles_path)
             except Exception as e:
-                runtime.logger.error(f"Failed to remove existing peak_profiles: {e}")
+                runtime.logger.error(f"Failed to remove existing peak_profiles")
                 raise
         peak_profiles.to_zarr(peak_profiles_path, mode="w")
 
+    # --- Full overwrite ---
     file_not_processed = not os.path.exists(peak_profiles_path)
     if overwrite or file_not_processed:
         try:
@@ -337,67 +338,49 @@ def write_peaks(
                 raise
 
     # -- Partial update --
-    runtime.logger.debug(f"Partial update of peak_profiles at {peak_profiles_path}")
+    runtime.logger.debug(f"Writing new profiles into {peak_profiles_path}...")
+
+    all_peak_profiles = xr.open_zarr(peak_profiles_path)
     try:
-        ds_full = xr.open_zarr(peak_profiles_path)
-
-        # Determine mz coordinate in the store
-        if "mz" in ds_full.coords:
-            mz_coords = ds_full.coords["mz"].values
-        elif "coords" in ds_full and "mz" in ds_full["coords"]:
-            mz_coords = ds_full["coords"]["mz"].values
-        else:
-            raise KeyError(
-                "mz coordinate not found in zarr store; cannot perform partial update"
-            )
-
-        # Find the integer indices for the mz slice to update
+        # Find the integer indices for the (mz, time) region to update
         mz_update = peak_profiles.coords["mz"].values
-
-        try:
-            indexer = ds_full.get_index("mz").get_indexer(mz_update)
-        except KeyError as ke:
-            runtime.logger.error(
-                "Failed to find exact 'mz' coordinates from input "
-                f"in peak profiles. Cannot perform partial update. {ke}"
-            )
-
-        # Check if indices are contiguous
-        if not np.all(np.diff(indexer) == 1):
-            raise ValueError(
-                "Cannot perform partial update: The 'mz' coordinates "
-                "of the new data are not a contiguous slice of the "
-                "existing 'mz' coordinates."
-            )
-
-        start_index = indexer[0]
-        end_index = indexer[-1] + 1  # +1 for exclusive end
-
-        region = {"mz": slice(start_index, end_index), "time": slice(None)}
-        runtime.logger.debug(f"Calculated target region: {region}")
-
-        # The data slice to write is smaller than a zarr chunk
-        # To avoid Dask vs. Zarr chunk alignment errors,
-        # we compute the slice into memory before writing.
-        runtime.logger.debug("Computing data slice into memory before writing...")
-        try:
-            ds_to_write = peak_profiles.compute()
-        except Exception as compute_err:
-            runtime.logger.error(
-                f"Failed to compute data slice into memory: {compute_err}"
-            )
-
-        runtime.logger.debug(f"Data computed. Writing to region {region}...")
-
-        # Write the in-memory (NumPy-backed) dataset to the Zarr region
-        ds_to_write.to_zarr(peak_profiles_path, mode="r+", region=region)
-
-        runtime.logger.debug(
-            f"Successfully updated region {region} in {peak_profiles_path}"
+        indexer = all_peak_profiles.get_index("mz").get_indexer(mz_update)
+    except KeyError:
+        runtime.logger.error(
+            "Failed to find exact 'mz' coordinates from input "
+            "in peak profiles. Cannot write new pea profiles into zarr."
         )
+        raise
 
-    except Exception as e:
-        runtime.logger.error(f"Failed to update peak_profiles: {e}.")
+    # Group contiguous indices in indexer for efficient region writing
+    breaks = np.diff(indexer) != 1
+    group_starts = np.insert(np.where(breaks)[0] + 1, 0, 0)
+    group_ends = np.append(np.where(breaks)[0], indexer.size - 1)
+    contiguous_regions = [
+        (indexer[start], indexer[end]) for start, end in zip(group_starts, group_ends)
+    ]
+
+    for start_idx, end_idx in contiguous_regions:
+        try:
+            region = {"mz": slice(start_idx, end_idx + 1), "time": slice(None)}
+            region_mask = (indexer >= start_idx) & (indexer <= end_idx)
+            update_indices = np.where(region_mask)[0]
+            contiguous_mz_data = peak_profiles.isel(mz=update_indices)
+            # Safe chunks disabled because the chunking is known to be compatible
+            # otherwise region writing fails because of chunk mis-alignment
+            contiguous_mz_data.to_zarr(
+                peak_profiles_path, mode="r+", region=region, safe_chunks=False
+            )
+        except Exception:
+            runtime.logger.error(
+                "Failed to write peak profiles for "
+                f"mz values {mz_update[start_idx]} to {mz_update[end_idx]}."
+            )
+            raise
+
+    runtime.logger.debug(
+        f"Successfully saved peak profiles for {mz_update} mz values at {peak_profiles_path}"
+    )
 
 
 def delete_peaks(base_filename: str):
