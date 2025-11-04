@@ -129,8 +129,16 @@ class OrbiPeakDetector(BasePeakDetector):
         """
         runtime.logger.debug("Reading centroids from the Thermo file...")
         # Get CALIBRATED centroids
-        peaks_pos = self._extract_peaks_for_polarity("+")
-        peaks_neg = self._extract_peaks_for_polarity("-")
+        try:
+            peaks_pos = self._extract_peaks_for_polarity("+")
+        except Exception as e:
+            runtime.logger.debug("No positive polarity data found.")
+            peaks_pos = None
+        try:
+            peaks_neg = self._extract_peaks_for_polarity("-")
+        except Exception as e:
+            runtime.logger.debug("No negative polarity data found.")
+            peaks_neg = None
 
         datasets = [ds for ds in [peaks_pos, peaks_neg] if ds is not None]
         peaks = xarray.concat(datasets, dim="mz").sortby("mz")
