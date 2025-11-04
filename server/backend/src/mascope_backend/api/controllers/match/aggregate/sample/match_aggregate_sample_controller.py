@@ -24,9 +24,6 @@ from mascope_backend.api.new.match.params import (
     apply_match_params,
     default_match_params,
 )
-from mascope_backend.api.new.instrument_configs.lib import (
-    read_instrument_functions,
-)
 from mascope_backend.api.controllers.match.lib.match_aggregate import (
     aggregate_match_ions,
     aggregate_match_ions_light,
@@ -316,14 +313,9 @@ async def aggregate_sample_match_compound(
         target_isotopes_df = pd.DataFrame(ion_creation_result["created_isotopes"])
 
         # Step 4: Compute matches for the isotopes in the sample file.
-
-        # Get instrument functions for filename
-        instrument_functions = await read_instrument_functions(sample.filename)
-
         match_isotope_df = await compute_match_isotopes(
             filename=sample.filename,
             target_isotopes_df=target_isotopes_df,
-            instrument_functions=instrument_functions,
             match_params=match_params,
             polarity=sample.polarity,
         )
@@ -491,14 +483,9 @@ async def aggregate_sample_match_compounds(
     results = []
     if len(target_isotopes_df) > 0:
         # Step 4: Compute matches for the isotopes in the sample file.
-
-        # Get instrument functions for filename
-        instrument_functions = await read_instrument_functions(sample.filename)
-
         match_isotope_df = await compute_match_isotopes(
             filename=sample.filename,
             target_isotopes_df=target_isotopes_df,
-            instrument_functions=instrument_functions,
             match_params=match_params,
             polarity=sample.polarity,
         )

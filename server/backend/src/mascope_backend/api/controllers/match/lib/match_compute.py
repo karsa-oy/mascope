@@ -13,9 +13,6 @@ from mascope_backend.api.controllers.match.isotopes.match_isotopes_controller im
 from mascope_backend.api.models.match.isotopes.match_isotopes_pydantic_model import (
     MatchIsotopeBase,
 )
-from mascope_backend.api.new.instrument_configs.lib import (
-    read_instrument_functions,
-)
 from mascope_backend.socket.notifications import (
     UserNotification,
     send_progress_user_notification,
@@ -34,12 +31,6 @@ async def compute_and_create_sample_match_isotope_data(
 
     It updates the computation progress if progress properties are provided. Match isotopes are then saved to the database.
 
-    Steps:
-    1. Unpack sample parameters including sample item ID and filename.
-    2. Compute match isotopes for the sample using the provided target isotopes.
-    3. Save computed match isotopes to the database, ensuring no duplication.
-    4. Update computation progress at each significant step if progress tracking is enabled.
-
     :param sample: Sample model object
     :type sample: Sample
     :param target_isotopes_df: A DataFrame containing target isotope information for match computation.
@@ -49,20 +40,16 @@ async def compute_and_create_sample_match_isotope_data(
     :return: Dictionary containing match_isotopes DataFrames
     :rtype: dict[str, pd.DataFrame]
     """
-    # Step 1: Get instrument functions for filename
-    instrument_functions = await read_instrument_functions(sample.filename)
-
     #  Sent progress user notification if notification is provided
     if notification:
         await send_progress_user_notification(notification, 0.33)
 
-    # Step 2: Compute match isotopes for the given sample and target isotopes.
+    # Compute match isotopes for the given sample and target isotopes
     runtime.logger.info(f"Computing match isotopes for file: {sample.filename}")
 
     match_isotope_df = await compute_match_isotopes(
         filename=sample.filename,
         target_isotopes_df=target_isotopes_df,
-        instrument_functions=instrument_functions,
         polarity=sample.polarity,
     )
     if match_isotope_df.empty:

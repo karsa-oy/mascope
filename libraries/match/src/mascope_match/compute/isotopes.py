@@ -17,7 +17,6 @@ MATCH_WINDOW_AMU = 0.5  # Da
 async def compute_match_isotopes(
     filename: str,
     target_isotopes_df: pd.DataFrame,
-    instrument_functions: tuple[dict, callable],
     match_params: BaseMatchParams | None = None,
     polarity: Literal["+", "-"] | None = None,
 ) -> pd.DataFrame:
