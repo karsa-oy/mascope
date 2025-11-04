@@ -188,23 +188,21 @@ def _load_peaks_and_averaged_signal(sample, target_isotopes):
     :return: Tuple of (peak_data, averaged_signal) for the specified m/z window.
     :rtype: tuple
     """
-    runtime.logger.info(f"Loading file: {sample.filename}")
-    mz_vals = np.array([iso.mz for iso in target_isotopes])
-    mz_min = np.min(mz_vals) - DMZ
-    mz_max = np.max(mz_vals) + DMZ
-    peak_mzs = (
-        load_file(sample.filename, vars=["peak_profiles"])
-        .sel(mz=slice(mz_min, mz_max))
-        .mz.values
-    )
-    peak_data = m_compute.load_peak_profiles(sample.filename, peak_mzs)
+    peak_data = load_file(sample.filename, vars=["peak_profiles"])
+    all_mzs = peak_data.mz.values
 
-    runtime.logger.debug(f"Peak mzs: {peak_mzs}")
-    runtime.logger.debug(f"Peak profiles: {peak_data.peak_heights.values}")
+    target_mzs = np.array([iso.mz for iso in target_isotopes])
+    closest_mzs = peak_data.sel(mz=target_mzs, method="nearest").mz.values
+    closest_mzs = np.unique(closest_mzs)
+
+    mz_mask = np.any(np.abs(all_mzs[:, None] - closest_mzs[None, :]) <= DMZ, axis=1)
+    mz_to_extract = all_mzs[mz_mask]
+
+    peak_profiles = m_compute.load_peak_profiles(sample.filename, mz_to_extract)
 
     # Attach sample file metadata to peak_data
     props = read_props(sample.filename)
-    peak_data.attrs.update({"props": props})
+    peak_profiles.attrs.update({"props": props})
 
     averaged_signal = (
         m_compute.get_sum_signal(
@@ -214,10 +212,10 @@ def _load_peaks_and_averaged_signal(sample, target_isotopes):
             polarity=sample.polarity,
             average=True,
         )
-        .sel(mz=slice(mz_min, mz_max))
+        .sel(mz=slice(np.min(mz_to_extract) - DMZ, np.max(mz_to_extract) + DMZ))
         .compute()
     )
-    return peak_data, averaged_signal
+    return peak_profiles, averaged_signal
 
 
 async def _fetch_target_isotopes(

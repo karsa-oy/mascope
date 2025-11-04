@@ -28,23 +28,20 @@ async def compute_match_isotopes(
     default values are assigned with a match score of 0.
 
     Steps:
-    1. Initialize parameters and load data from the sample file.
-    2. Detect peaks in the sample file for potential matches.
-    3. Create initial dataframe with placeholders for all target isotopes.
-    4. Perform matching between target isotopes and sample peaks.
-    5. Calculate match statistics for isotopes with actual matches.
-    6. Assign default values for isotopes without matching peaks.
-    7. Return a DataFrame containing match details for all target isotopes.
+    - Apply filtering only if match_params provided (backwards compatibility)
+    - Load sample peaks
+    - Initialize match DataFrame with placeholders for all target isotopes
+    - Extract peak data and perform matching
+    - Calculate match stats and assign defaults for unmatched isotopes
+    - Return a DataFrame containing match details for all target isotopes
 
     :param filename: Path to the sample file to be analyzed for matches.
     :type filename: str
     :param target_isotopes_df: DataFrame containing target isotopes with their m/z values and other properties.
     :type target_isotopes_df: pd.DataFrame
-    :param instrument_functions: Tuple containing peak shape details and a resolution function R.
-    :type instrument_functions: tuple[dict, callable]
     :param match_params: Match parameters containing settings for the matching process, default to None
     :type match_params: BaseMatchParams | None
-    :param polarity: Polarity of the sample, either "+", "-", or "+-".
+    :param polarity: Polarity of the sample, either "+" or "-".
     :type polarity: Literal["+", "-"], optional
     :return: DataFrame with match details for all target isotopes, including those without matches
     :rtype: pd.DataFrame
@@ -61,10 +58,8 @@ async def compute_match_isotopes(
     """
     runtime.logger.debug("Start matching...")
     try:
-        # Step 1: Initialize parameters and load data
+        # --- Apply filtering only if match_params provided (backwards compatibility) ---
         instrument_type = get_instrument_type(filename)
-
-        # Step 2: Apply filtering only if match_params provided (backwards compatibility)
         if match_params is not None:
             # Filter isotopes below threshold and with incorrect resolution
             resolution_type = (  # noqa: F841
@@ -79,7 +74,7 @@ async def compute_match_isotopes(
             runtime.logger.debug("No target isotopes to process")
             return pd.DataFrame()
 
-        # Step 3: Detect peaks in the sample file
+        # --- Load sample peaks ---
         peaks = load_peaks(
             filename=filename,
             instrument_type=instrument_type,
@@ -87,7 +82,7 @@ async def compute_match_isotopes(
             polarity=polarity,
         )
 
-        # Step 4: Create initial dataframe with default values
+        # --- Initialize match DataFrame with placeholders for all target isotopes ---
         match_isotope_df = target_isotopes_df.copy().assign(
             match_isotope_id=[
                 generate_id(length=32) for _ in range(len(target_isotopes_df))
@@ -103,16 +98,14 @@ async def compute_match_isotopes(
             sample_peak_tof=np.nan,
         )
 
-        # Step 5: Extract peak data and perform matching
+        # --- Extract peak data and perform matching ---
         runtime.logger.debug("Parse peak data")
-
         parsed_peaks = parse_and_filter_peaks(peaks)
-
         match_isotope_df = match_isotope_df.apply(
             match, args=(parsed_peaks,), axis=1
         ).reset_index()
 
-        # Step 6: Calculate match stats and assign defaults
+        # --- Calculate match stats and assign defaults for unmatched isotopes ---
         # Create a mask for matched isotopes (those with actual peak data)
         matched_mask = ~match_isotope_df["sample_peak_mz"].isna()
 
@@ -127,14 +120,12 @@ async def compute_match_isotopes(
                 match_isotope_df, unmatched_mask
             )
 
+        # --- Return a DataFrame containing match details for all target isotopes ---
         return match_isotope_df
     except Exception as e:
         error_message = f"Computing matches failed: {e}"
         runtime.logger.error(error_message)
         raise ValueError(error_message) from e
-
-
-# --- Helper Functions ---
 
 
 def load_peaks(
@@ -157,21 +148,29 @@ def load_peaks(
     :return: DataArray containing detected peaks with their m/z, intensity, and time information.
     :rtype: xarray.DataArray
     """
-    target_mzs = np.array(target_mzs)
-    closest_mzs = (
-        m_io.load_file(filename, vars=["peak_profiles"])
-        .sel(mz=target_mzs, method="nearest")
-        .mz.values
-    )
-    # Remove duplicates, as multiple target_mzs can map to the same closest_mz
+    target_mzs = np.asarray(target_mzs)
+    peak_data = m_io.load_file(filename, vars=["peak_profiles"])
+    # Select unique closest m/z values from the peak data
+    closest_mzs = peak_data.sel(mz=target_mzs, method="nearest").mz.values
     closest_mzs = np.unique(closest_mzs)
 
-    peak_data = m_compute.load_peak_profiles(filename, closest_mzs)
+    # Compute all peak profiles within MATCH_WINDOW_AMU of target m/z values
+    # to not compute them later in Match tab visualization
+    all_mzs = peak_data.mz.values
+    mz_mask = np.any(
+        np.abs(all_mzs[:, None] - closest_mzs[None, :]) <= MATCH_WINDOW_AMU, axis=1
+    )
+    mz_to_compute = all_mzs[mz_mask]
+
+    peak_profiles = m_compute.load_peak_profiles(filename, mz_to_compute)
+    # Narrow down to closest m/z values only after computing peak profiles
+    peak_profiles = peak_profiles.sel(mz=closest_mzs)
+
     match instrument_type:
         case "orbi":
-            peaks = peak_data.peak_heights
+            peaks = peak_profiles.peak_heights
         case "tof":
-            peaks = peak_data.peak_areas
+            peaks = peak_profiles.peak_areas
 
     sample_file_type = get_sample_file_type(filename)
     if sample_file_type in ["orbi_zarr", "tof_zarr"]:
