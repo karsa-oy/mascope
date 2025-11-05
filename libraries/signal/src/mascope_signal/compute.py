@@ -410,7 +410,7 @@ def get_tic_per_scan(
 
 def get_orbi_centroids(
     base_filename: str,
-    u_list: Iterable[float],
+    u_list: Iterable[float] | None = None,
     t_min: float | None = None,
     t_max: float | None = None,
     polarity: Literal["+", "-"] | None = None,
@@ -424,7 +424,7 @@ def get_orbi_centroids(
 
     :param base_filename: Sample file name (base, not full path).
     :type base_filename: str
-    :param u_list: Iterable of m/z values to select centroid peaks near (within ±0.5).
+    :param u_list: Iterable of m/z values to select centroid peaks near (within ±0.5), defaults to None.
     :type u_list: Iterable[float]
     :param t_min: Minimum time [s] for scan selection, optional, defaults to None (start of run).
     :type t_min: float | None, optional
@@ -450,6 +450,15 @@ def get_orbi_centroids(
                 fit_parameters = calibration["par"]
                 factor = fit_parameters["calibration_factor"]
                 masses = masses * factor
+            if u_list:
+                # Create a mask for the masses that are within 0.5 of any value in u_list
+                mz_mask = np.zeros_like(masses, dtype=bool)
+                for mz in u_list:
+                    mz_mask |= (masses >= mz - 0.5) & (masses <= mz + 0.5)
+                masses = masses[mz_mask]
+                intensities = intensities[mz_mask]
+                resolutions = resolutions[mz_mask]
+                signal_to_noise = signal_to_noise[mz_mask]
         case _:
             raise NotImplementedError(
                 "Centroid extraction is only implemented for Orbitrap raw files."

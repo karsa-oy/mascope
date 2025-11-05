@@ -151,7 +151,7 @@ class OrbiPeakDetector(BasePeakDetector):
     def _extract_peaks_for_polarity(self, polarity: str) -> xarray.Dataset:
         """A workaround to extract peaks for a given polarity from Thermo Orbitrap files."""
         peak_mzs, peak_heights, resolutions, signal_to_noise = (
-            m_compute.get_orbi_centroids(self._filename, self.u_list, polarity=polarity)
+            m_compute.get_orbi_centroids(self._filename, polarity=polarity)
         )
 
         sigmas = peak_mzs / resolutions / m_fitting.SIGMA_MULTIPLIER

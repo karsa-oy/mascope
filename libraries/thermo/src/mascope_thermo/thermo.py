@@ -491,7 +491,6 @@ def get_peak_profiles(
 
 def get_centroids(
     datafile_path: str,
-    u_list: Iterable[float],
     t_min: float | None = None,
     t_max: float | None = None,
     average: bool = False,
@@ -507,8 +506,6 @@ def get_centroids(
 
     :param datafile_path: Path to the Thermo Fisher raw file (.raw) containing the data.
     :type datafile_path: str
-    :param u_list: Iterable of m/z values to select centroid peaks near (within ±0.5).
-    :type u_list: Iterable[float]
     :param t_min: Minimum time [s] for scan selection, optional, defaults to None (start of run).
     :type t_min: float | None, optional
     :param t_max: Maximum time [s] for scan selection, optional, defaults to None (end of run).
@@ -565,15 +562,6 @@ def get_centroids(
         if not average:
             # Multiply by number of averaged scans
             intensities *= average_scan.ScansCombined
-
-        # Create a mask for the masses that are within 0.5 of any value in u_list
-        mz_mask = np.zeros_like(masses, dtype=bool)
-        for mz in u_list:
-            mz_mask |= (masses >= mz - 0.5) & (masses <= mz + 0.5)
-        masses = masses[mz_mask]
-        intensities = intensities[mz_mask]
-        resolutions = resolutions[mz_mask]
-        signal_to_noise = signal_to_noise[mz_mask]
 
         return masses, intensities, resolutions, signal_to_noise
 
