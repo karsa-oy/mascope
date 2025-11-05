@@ -134,7 +134,7 @@ def load_peaks(
     target_mzs: pd.Series,
     polarity: Literal["+", "-"] | None = None,
 ):
-    """Loads target_mzs peak profiles of required polarity from the sample file.
+    """Loads target_mzs peak timeseries of required polarity from the sample file.
     Loads peak_heights for Orbitrap files and peak_areas for TOF files.
 
     :param filename: Path to the sample file to be analyzed for matches.
@@ -154,7 +154,7 @@ def load_peaks(
     closest_mzs = peak_data.sel(mz=target_mzs, method="nearest").mz.values
     closest_mzs = np.unique(closest_mzs)
 
-    # Compute all peak profiles within MATCH_WINDOW_AMU of target m/z values
+    # Compute all peak timeseries within MATCH_WINDOW_AMU of target m/z values
     # to not compute them later in Match tab visualization
     all_mzs = peak_data.mz.values
     mz_mask = np.any(
@@ -162,15 +162,15 @@ def load_peaks(
     )
     mz_to_compute = all_mzs[mz_mask]
 
-    peak_profiles = m_compute.load_peak_profiles(filename, mz_to_compute)
-    # Narrow down to closest m/z values only after computing peak profiles
-    peak_profiles = peak_profiles.sel(mz=closest_mzs)
+    peak_timeseries = m_compute.load_peak_timeseries(filename, mz_to_compute)
+    # Narrow down to closest m/z values only after computing peak timeseries
+    peak_timeseries = peak_timeseries.sel(mz=closest_mzs)
 
     match instrument_type:
         case "orbi":
-            peaks = peak_profiles.peak_heights
+            peaks = peak_timeseries.peak_heights
         case "tof":
-            peaks = peak_profiles.peak_areas
+            peaks = peak_timeseries.peak_areas
 
     sample_file_type = get_sample_file_type(filename)
     if sample_file_type in ["orbi_zarr", "tof_zarr"]:
@@ -390,7 +390,7 @@ def mean_cosine_similarity(arr: np.ndarray) -> float:
 
     This function computes the pairwise cosine distances between vectors in a 2D array
     and returns the mean cosine similarity of the upper triangle of the similarity matrix.
-    :param arr: 2D array where each row is a vector (e.g., isotope profiles)
+    :param arr: 2D array where each row is a vector (e.g., isotope timeseries)
     :type arr: np.ndarray
     :return: Mean cosine similarity of the upper triangle of the similarity matrix
     :rtype: float

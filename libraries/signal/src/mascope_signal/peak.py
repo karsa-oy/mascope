@@ -49,7 +49,7 @@ class BasePeakDetector(ABC):
         self._sample_file_props = m_io.read_props(self._filename)
         self._sum_signal = m_compute.get_sum_signal(self._filename)
 
-        self.peak_profiles = None
+        self.peak_timeseries = None
 
     @property
     def u_list(self):
@@ -58,8 +58,8 @@ class BasePeakDetector(ABC):
         u_list = np.unique(mz_values.astype(int))
         return u_list
 
-    def _allocate_peak_profiles(self, peaks: xarray.Dataset) -> xarray.Dataset:
-        """Allocate peak profiles dataset structure."""
+    def _allocate_peak_timeseries(self, peaks: xarray.Dataset) -> xarray.Dataset:
+        """Allocate peak timeseries dataset structure."""
         # Get the tof values corresponding to the peak mzs
         mz_axis = self._sum_signal.mz.values
         peak_mzs = peaks.mz.values
@@ -78,30 +78,30 @@ class BasePeakDetector(ABC):
         data_shape = (peaks.mz.size, time_coord.size)
         peak_areas = da.full(data_shape, np.nan, dtype=np.float64)
         peak_heights = da.full(data_shape, np.nan, dtype=np.float64)
-        peak_profile_computed = da.full(peaks.mz.size, False, dtype=bool)
+        peak_timeseries_computed = da.full(peaks.mz.size, False, dtype=bool)
         data_vars = {
             "peak_areas": (("mz", "time"), peak_areas),
             "peak_heights": (("mz", "time"), peak_heights),
-            "is_profile_computed": (("mz"), peak_profile_computed),
+            "is_timeseries_computed": (("mz"), peak_timeseries_computed),
         }
 
-        peak_profiles = xarray.Dataset(
+        peak_timeseries = xarray.Dataset(
             data_vars=data_vars,
             coords=data_coords,
         )
-        self.peak_profiles = xarray.merge([peak_profiles, peaks])
+        self.peak_timeseries = xarray.merge([peak_timeseries, peaks])
 
     def write_peaks_to_zarr(self, overwrite=True):
-        if self.peak_profiles is None:
-            raise PeakDetectionError("No peak profiles to write to zarr.")
+        if self.peak_timeseries is None:
+            raise PeakDetectionError("No peak timeseries to write to zarr.")
 
-        runtime.logger.info("Writing peak profiles to the sample file...")
+        runtime.logger.info("Writing peak timeseries to the sample file...")
         m_io.write_peaks(
-            self.peak_profiles,
+            self.peak_timeseries,
             self._filename,
             overwrite=overwrite,
         )
-        runtime.logger.info("Writing peak profiles completed.")
+        runtime.logger.info("Writing peak timeseries completed.")
 
     @abstractmethod
     async def detect_peaks(
@@ -143,8 +143,8 @@ class OrbiPeakDetector(BasePeakDetector):
         datasets = [ds for ds in [peaks_pos, peaks_neg] if ds is not None]
         peaks = xarray.concat(datasets, dim="mz").sortby("mz")
 
-        runtime.logger.debug("Computing peak profiles...")
-        self._allocate_peak_profiles(peaks)
+        runtime.logger.debug("Computing peak timeseries...")
+        self._allocate_peak_timeseries(peaks)
         self._flag_weak_peaks()
         self._flag_satellite_peaks()
 
@@ -184,19 +184,23 @@ class OrbiPeakDetector(BasePeakDetector):
 
     def _flag_weak_peaks(self):
         """Flag weak peaks based on signal-to-noise ratio."""
-        low_snr = self.peak_profiles.signal_to_noise.values < SIGNAL_TO_NOISE_THRESHOLD
+        low_snr = (
+            self.peak_timeseries.signal_to_noise.values < SIGNAL_TO_NOISE_THRESHOLD
+        )
         is_weak = low_snr
-        self.peak_profiles = self.peak_profiles.assign({"is_weak": (("mz"), is_weak)})
+        self.peak_timeseries = self.peak_timeseries.assign(
+            {"is_weak": (("mz"), is_weak)}
+        )
 
     def _flag_satellite_peaks(self):
         peaks_df = pd.DataFrame(
             {
-                "mz": self.peak_profiles.mz.values,
-                "intensity": self.peak_profiles.sum_peak_heights.values,
+                "mz": self.peak_timeseries.mz.values,
+                "intensity": self.peak_timeseries.sum_peak_heights.values,
             }
         )
         peaks_df = flag_satellite_peaks(peaks_df)
-        self.peak_profiles = self.peak_profiles.assign(
+        self.peak_timeseries = self.peak_timeseries.assign(
             {"is_satellite": (("mz"), peaks_df["is_satellite_peak"].values)}
         )
 
@@ -283,8 +287,8 @@ class TofPeakDetector(BasePeakDetector):
         ).assign_coords(mz=("mz", peak_mzs))
         peaks = peaks.sortby("mz")
 
-        runtime.logger.debug("Computing peak profiles...")
-        self._allocate_peak_profiles(peaks)
+        runtime.logger.debug("Computing peak timeseries...")
+        self._allocate_peak_timeseries(peaks)
         self._flag_weak_peaks()
         self._flag_satellite_peaks()
 
@@ -350,13 +354,15 @@ class TofPeakDetector(BasePeakDetector):
 
     def _flag_weak_peaks(self):
         """Flag weak peaks. Currently no weak peak criteria for TOF data."""
-        is_weak = np.full(len(self.peak_profiles.mz), False, dtype=bool)
-        self.peak_profiles = self.peak_profiles.assign({"is_weak": (("mz"), is_weak)})
+        is_weak = np.full(len(self.peak_timeseries.mz), False, dtype=bool)
+        self.peak_timeseries = self.peak_timeseries.assign(
+            {"is_weak": (("mz"), is_weak)}
+        )
 
     def _flag_satellite_peaks(self):
         """Flag satellite peaks. Currently no satellite peak criteria for TOF data."""
-        is_satellite = np.full(len(self.peak_profiles.mz), False, dtype=bool)
-        self.peak_profiles = self.peak_profiles.assign(
+        is_satellite = np.full(len(self.peak_timeseries.mz), False, dtype=bool)
+        self.peak_timeseries = self.peak_timeseries.assign(
             {"is_satellite": (("mz"), is_satellite)}
         )
 
@@ -422,12 +428,12 @@ class OrbiZarrPeakDetector(TofPeakDetector):
     def _flag_satellite_peaks(self):
         peaks_df = pd.DataFrame(
             {
-                "mz": self.peak_profiles.mz.values,
-                "intensity": self.peak_profiles.sum_peak_heights.values,
+                "mz": self.peak_timeseries.mz.values,
+                "intensity": self.peak_timeseries.sum_peak_heights.values,
             }
         )
         peaks_df = flag_satellite_peaks(peaks_df)
-        self.peak_profiles = self.peak_profiles.assign(
+        self.peak_timeseries = self.peak_timeseries.assign(
             {"is_satellite": (("mz"), peaks_df["is_satellite"].values)}
         )
 

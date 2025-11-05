@@ -130,7 +130,7 @@ def load_peak_data(base_filename, drop_bad_peaks=True):
     :return: Loaded peak data
     :rtype: xr.Dataset
     """
-    peak_data = load_file(base_filename, vars=["peak_profiles"])
+    peak_data = load_file(base_filename, vars=["peak_timeseries"])
     if drop_bad_peaks:
         bad_peak_mask = peak_data.is_weak | peak_data.is_satellite
         peak_data = peak_data.sel(mz=peak_data.mz.values[~bad_peak_mask])
@@ -312,14 +312,14 @@ def update_zarr_array_coord(base_filename, var, dim, coord):
 
 
 def write_peaks(
-    peak_profiles: xr.Dataset,
+    peak_timeseries: xr.Dataset,
     filename: str,
     overwrite: bool = False,
 ) -> None:
     """Write fitted peak areas and peak heights to zarr files
 
-    :param peak_profiles: Dataset containing peak areas and peak heights
-    :type peak_profiles: xr.Dataset
+    :param peak_timeseries: Dataset containing peak areas and peak heights
+    :type peak_timeseries: xr.Dataset
     :param filename: Sample file name
     :type filename: str
     :param overwrite: Flag to overwrite peaks if they already exist, defaults to False
@@ -327,21 +327,21 @@ def write_peaks(
     :raises FileExistsError: Peak areas or peak heights already exist for the sample file
     :return: None
     """
-    peak_profiles_path = filename_to_zarr_path(filename, "peak_profiles")
+    peak_timeseries_path = filename_to_zarr_path(filename, "peak_timeseries")
 
     def _full_overwrite():
         """Full-write helper"""
-        runtime.logger.debug(f"Full overwrite of peak_profiles at {peak_profiles_path}")
-        if os.path.exists(peak_profiles_path):
+        runtime.logger.debug(f"Full overwrite of peak_timeseries at {peak_timeseries_path}")
+        if os.path.exists(peak_timeseries_path):
             try:
-                rmtree(peak_profiles_path)
+                rmtree(peak_timeseries_path)
             except Exception as e:
-                runtime.logger.error(f"Failed to remove existing peak_profiles")
+                runtime.logger.error(f"Failed to remove existing peak timeseries")
                 raise
-        peak_profiles.to_zarr(peak_profiles_path, mode="w")
+        peak_timeseries.to_zarr(peak_timeseries_path, mode="w")
 
     # --- Full overwrite ---
-    file_not_processed = not os.path.exists(peak_profiles_path)
+    file_not_processed = not os.path.exists(peak_timeseries_path)
     if overwrite or file_not_processed:
         try:
             _full_overwrite()
@@ -349,23 +349,23 @@ def write_peaks(
         except FileNotFoundError as e:
             if ".partial" in str(e):
                 raise Exception(
-                    f"The path is probably too long: {peak_profiles_path}"
+                    f"The path is probably too long: {peak_timeseries_path}"
                 ) from e
             else:
                 raise
 
     # -- Partial update --
-    runtime.logger.debug(f"Writing new profiles into {peak_profiles_path}...")
+    runtime.logger.debug(f"Writing new peak timeseries into {peak_timeseries_path}...")
 
-    all_peak_profiles = xr.open_zarr(peak_profiles_path)
+    all_peak_timeseries = xr.open_zarr(peak_timeseries_path)
     try:
         # Find the integer indices for the (mz, time) region to update
-        mz_update = peak_profiles.coords["mz"].values
-        indexer = all_peak_profiles.get_index("mz").get_indexer(mz_update)
+        mz_update = peak_timeseries.coords["mz"].values
+        indexer = all_peak_timeseries.get_index("mz").get_indexer(mz_update)
     except KeyError:
         runtime.logger.error(
             "Failed to find exact 'mz' coordinates from input "
-            "in peak profiles. Cannot write new pea profiles into zarr."
+            "in peak timeseries. Cannot write new peak timeseries into zarr."
         )
         raise
 
@@ -382,21 +382,21 @@ def write_peaks(
             region = {"mz": slice(start_idx, end_idx + 1), "time": slice(None)}
             region_mask = (indexer >= start_idx) & (indexer <= end_idx)
             update_indices = np.where(region_mask)[0]
-            contiguous_mz_data = peak_profiles.isel(mz=update_indices)
+            contiguous_mz_data = peak_timeseries.isel(mz=update_indices)
             # Safe chunks disabled because the chunking is known to be compatible
             # otherwise region writing fails because of chunk mis-alignment
             contiguous_mz_data.to_zarr(
-                peak_profiles_path, mode="r+", region=region, safe_chunks=False
+                peak_timeseries_path, mode="r+", region=region, safe_chunks=False
             )
         except Exception:
             runtime.logger.error(
-                "Failed to write peak profiles for "
+                "Failed to write peak timeseries for "
                 f"mz values {mz_update[start_idx]} to {mz_update[end_idx]}."
             )
             raise
 
     runtime.logger.debug(
-        f"Successfully saved peak profiles for {mz_update} mz values at {peak_profiles_path}"
+        f"Successfully saved peak timeseries for {mz_update} mz values at {peak_timeseries_path}"
     )
 
 

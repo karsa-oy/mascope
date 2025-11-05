@@ -311,14 +311,14 @@ class TofCalibrationHandler(BaseCalibrationHandler):
                 )
 
         try:
-            peak_tofs = m_io.load_coord(self.filename, "peak_profiles", "tof")
+            peak_tofs = m_io.load_coord(self.filename, "peak_timeseries", "tof")
             new_peak_mz = tof_to_mass(peak_tofs, fit_mode, fit_parameters)
             m_io.update_zarr_array_coord(
-                self.filename, "peak_profiles", "mz", new_peak_mz
+                self.filename, "peak_timeseries", "mz", new_peak_mz
             )
         except PathNotFoundError:
             runtime.logger.warning(
-                f"peak_profiles not found in {self.filename}, "
+                f"peak_timeseries not found in {self.filename}, "
                 "thus their m/z coordinates were not updated."
             )
         return new_mz_axis
@@ -432,9 +432,9 @@ class OrbiCalibrationHandler(BaseCalibrationHandler):
             m_io.update_zarr_array_coord(self.filename, "signal", "mz", new_signal_mz)
         try:
             new_peak_mz = (
-                m_io.load_coord(self.filename, "peak_profiles", "mz") * old_factor_scaling
+                m_io.load_coord(self.filename, "peak_timeseries", "mz") * old_factor_scaling
             )
-            m_io.update_zarr_array_coord(self.filename, "peak_profiles", "mz", new_peak_mz)
+            m_io.update_zarr_array_coord(self.filename, "peak_timeseries", "mz", new_peak_mz)
         except PathNotFoundError:
             runtime.logger.warning(
                 f"Peak_areas/heights not found in {self.filename}, "

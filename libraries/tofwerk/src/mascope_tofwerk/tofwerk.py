@@ -371,18 +371,18 @@ def get_scan_timestamps(
         return scan_timestamp
 
 
-def get_peak_profiles(
+def get_peak_timeseries(
     datafile_path: str,
     mzs: Iterable[float],
     true_mz_axis: Iterable[float],
     t_min: float | None = None,
     t_max: float | None = None,
 ) -> xr.Dataset:
-    """Extracts the peak profiles for the specified m/z values in the time range (t_min, t_max).
+    """Extracts the peak timeseries for the specified m/z values in the time range (t_min, t_max).
 
     :param datafile_path: Path to the Tofwerk HDF5 file (.h5) containing the data.
     :type datafile_path: str
-    :param mzs: array of m/z values for which peak profiles are required.
+    :param mzs: array of m/z values for which peak timeseries are required.
     :type mzs: Iterable[float]
     :param true_mz_axis: Calibrated m/z axis values.
     :type true_mz_axis: Iterable[float]
@@ -390,7 +390,7 @@ def get_peak_profiles(
     :type t_min: float, optional
     :param t_max: End time [s], defaults to None
     :type t_max: float, optional
-    :return: An xarray Dataset containing the peak profiles
+    :return: An xarray Dataset containing the peak timeseries
     :rtype: xr.Dataset
     """
     with open_h5_file(datafile_path) as h5_file:
@@ -428,7 +428,7 @@ def get_peak_profiles(
         mz_slice = all_mzs[mz_start_ind : mz_end_ind + 1]
 
         # Initialize output array
-        peak_profiles = np.zeros((len(mzs), len(scan_time)))
+        peak_timeseries = np.zeros((len(mzs), len(scan_time)))
 
         # Get the coordinates of the scans
         scan_indices = np.where(time_mask)[0]
@@ -442,16 +442,16 @@ def get_peak_profiles(
             ]
 
             spec_segment *= conv_coeff
-            peak_profiles[:, j] = np.interp(
+            peak_timeseries[:, j] = np.interp(
                 mzs, mz_slice, spec_segment, left=0.0, right=0.0
             )
 
         # Convert to dask array
-        peak_profiles_dask = da.from_array(peak_profiles, chunks=("auto", "auto"))
+        peak_timeseries_dask = da.from_array(peak_timeseries, chunks=("auto", "auto"))
 
         # Export xarray array with time and mz coordinates
         return xr.DataArray(
-            peak_profiles_dask,
+            peak_timeseries_dask,
             dims=("mz", "time"),
             coords={"mz": mzs, "time": scan_time},
             name="signal",

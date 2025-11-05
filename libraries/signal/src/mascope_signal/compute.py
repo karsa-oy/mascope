@@ -509,78 +509,80 @@ def get_orbi_centroids_per_scan(
             )
 
 
-def load_peak_profiles(
+def load_peak_timeseries(
     base_filename: str,
     mzs: Iterable[float],
 ) -> xr.Dataset:
-    """Loads peak profiles from the sample file.
-    Computes missing peak profiles if needed.
+    """Loads peak timeseries from the sample file.
+    Computes missing peak timeseries if needed.
 
     :param base_filename: Sample file filename
     :type base_filename: str
     :param mzs: List of target m/z values
     :type mzs: Iterable[float]
-    :return: The peak profiles dataset
+    :return: The peak timeseries dataset
     :rtype: xr.Dataset
     """
-    # --- Load existing peak profiles from the sample file ---
-    peak_profiles = m_io.load_peak_data(base_filename).sel(mz=mzs, method="nearest")
+    # --- Load existing peak timeseries from the sample file ---
+    peak_timeseries = m_io.load_peak_data(base_filename).sel(mz=mzs, method="nearest")
     runtime.logger.debug(
-        f"Loading peak profiles for m/z values: {peak_profiles.mz.values} from {base_filename}"
+        f"Loading peak timeseries for m/z values: {peak_timeseries.mz.values} from {base_filename}"
     )
-    to_compute_mask = np.invert(peak_profiles.is_profile_computed.values)
+    to_compute_mask = np.invert(peak_timeseries.is_timeseries_computed.values)
     if not np.any(to_compute_mask):
         runtime.logger.debug(
-            f"All peak profiles are cached in {base_filename}, loading from file."
+            f"All peak timeseries are cached in {base_filename}, loading from file."
         )
-        return peak_profiles
+        return peak_timeseries
 
-    # --- Compute missing peak profiles ---
-    mz_coords = peak_profiles.mz.values
+    # --- Compute missing peak timeseries ---
+    mz_coords = peak_timeseries.mz.values
     mzs_to_compute = mz_coords[to_compute_mask]
-    new_peak_profiles = get_peak_profiles(base_filename, mzs_to_compute)
+    new_peak_timeseries = get_peak_timeseries(base_filename, mzs_to_compute)
 
-    sum_peak_heights = peak_profiles.sum_peak_heights.sel(mz=mzs_to_compute).values
-    sum_peak_areas = peak_profiles.sum_peak_areas.sel(mz=mzs_to_compute).values
+    sum_peak_heights = peak_timeseries.sum_peak_heights.sel(mz=mzs_to_compute).values
+    sum_peak_areas = peak_timeseries.sum_peak_areas.sel(mz=mzs_to_compute).values
 
-    # Normalize peak profile intensities to 1
-    new_peak_profiles_norm = new_peak_profiles / new_peak_profiles.sum(dim="time")
-    new_peak_profiles_norm = new_peak_profiles_norm.values
+    # Normalize peak timeseries intensities to 1
+    new_peak_timeseries_norm = new_peak_timeseries / new_peak_timeseries.sum(dim="time")
+    new_peak_timeseries_norm = new_peak_timeseries_norm.values
 
-    # Restore peak profiles intensities using fitted peak areas and heights
-    new_peak_profiles_area = new_peak_profiles_norm * sum_peak_areas[:, np.newaxis]
-    new_peak_profiles_height = new_peak_profiles_norm * sum_peak_heights[:, np.newaxis]
+    # Restore peak timeseries intensities using fitted peak areas and heights
+    new_peak_timeseries_area = new_peak_timeseries_norm * sum_peak_areas[:, np.newaxis]
+    new_peak_timeseries_height = (
+        new_peak_timeseries_norm * sum_peak_heights[:, np.newaxis]
+    )
 
-    # Insert/merge computed profiles into the cached peak_profiles dataset
+    # Insert/merge computed timeseries into the cached peak_timeseries dataset
     try:
         # Assign peak_areas and peak_heights for the computed mzs
-        peak_profiles["peak_areas"].loc[dict(mz=mzs_to_compute)] = (
-            new_peak_profiles_area
+        peak_timeseries["peak_areas"].loc[dict(mz=mzs_to_compute)] = (
+            new_peak_timeseries_area
         )
-        peak_profiles["peak_heights"].loc[dict(mz=mzs_to_compute)] = (
-            new_peak_profiles_height
+        peak_timeseries["peak_heights"].loc[dict(mz=mzs_to_compute)] = (
+            new_peak_timeseries_height
         )
-        # Mark profiles as computed
-        peak_profiles["is_profile_computed"].loc[dict(mz=mzs_to_compute)] = True
+        # Mark timeseries as computed
+        peak_timeseries["is_timeseries_computed"].loc[dict(mz=mzs_to_compute)] = True
 
     except Exception as e:
-        runtime.logger.error(f"Failed to merge computed peak profiles: {e}")
+        runtime.logger.error(f"Failed to merge computed peak timeseries: {e}")
         raise
 
-    # --- Store new peak profiles in the sample file ---
-    m_io.write_peaks(peak_profiles, base_filename)
+    # --- Store new peak timeseries in the sample file ---
+    m_io.write_peaks(peak_timeseries, base_filename)
 
-    return peak_profiles
+    return peak_timeseries
 
 
-def get_peak_profiles(
+def get_peak_timeseries(
     base_filename: str,
     mzs: Iterable[float],
     t_min: float | None = None,
     t_max: float | None = None,
     polarity: Literal["+", "-"] | None = None,
 ) -> xr.DataArray:
-    """Get peak profiles for given peak m/z values in the time range [t_min, t_max]
+    """Get peak timeseries for given peak m/z values in the time range [t_min, t_max]
 
     :param datafile_path: Path to the data file
     :type datafile_path: str
@@ -592,7 +594,7 @@ def get_peak_profiles(
     :type t_max: float, optional
     :param polarity: Polarity of the scan to extract, defaults to None (get all scans)
     :type polarity: str, optional
-    :return: Peak profiles for the given m/z values
+    :return: peak timeseries for the given m/z values
     :rtype: xr.DataArray
     """
     sample_type = m_name.get_sample_file_type(base_filename)
@@ -601,7 +603,7 @@ def get_peak_profiles(
             datafile_path = m_name.filename_to_datafile_path(base_filename)
 
             # Orbitrap raw files store raw data, mzs need to be uncalibrated
-            # before extracting peak profiles
+            # before extracting peak timeseries
             props = m_io.read_props(base_filename)
             calibration = props["mz_calibration"]
             factor = 1.0
@@ -609,16 +611,16 @@ def get_peak_profiles(
                 fit_parameters = calibration["par"]
                 factor = fit_parameters["calibration_factor"]
             uncalibrated_mzs = np.array(mzs) / factor
-            peak_profiles = m_thermo.get_peak_profiles(
+            peak_timeseries = m_thermo.get_peak_timeseries(
                 datafile_path, uncalibrated_mzs, t_min, t_max, polarity
             )
             # Calibrate m/z coordinate
-            return peak_profiles.assign_coords(mz=peak_profiles.mz.values * factor)
+            return peak_timeseries.assign_coords(mz=peak_timeseries.mz.values * factor)
         case "tof_h5":
             # Get calibrated m/z values
             sum_signal_mz = get_sum_signal(base_filename).mz.values
             datafile_path = m_name.filename_to_datafile_path(base_filename)
-            return m_tofwerk.get_peak_profiles(
+            return m_tofwerk.get_peak_timeseries(
                 datafile_path, mzs, sum_signal_mz, t_min, t_max
             )
         case "tof_zarr" | "orbi_zarr":
@@ -627,7 +629,7 @@ def get_peak_profiles(
             signal = signal.interpolate_na(dim="mz", method="linear")
             # Fill the remaining nan values with zeros
             signal = signal.fillna(0)
-            # Extract the peak profiles for the closest m/z values
+            # Extract the peak timeseries for the closest m/z values
             return signal.sel(mz=mzs, method="nearest").signal
 
 

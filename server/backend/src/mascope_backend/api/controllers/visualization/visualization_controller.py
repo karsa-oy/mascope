@@ -198,11 +198,11 @@ def _load_peaks_and_averaged_signal(sample, target_isotopes):
     mz_mask = np.any(np.abs(all_mzs[:, None] - closest_mzs[None, :]) <= DMZ, axis=1)
     mz_to_extract = all_mzs[mz_mask]
 
-    peak_profiles = m_compute.load_peak_profiles(sample.filename, mz_to_extract)
+    peak_timeseries = m_compute.load_peak_timeseries(sample.filename, mz_to_extract)
 
     # Attach sample file metadata to peak_data
     props = read_props(sample.filename)
-    peak_profiles.attrs.update({"props": props})
+    peak_timeseries.attrs.update({"props": props})
 
     averaged_signal = (
         m_compute.get_sum_signal(
@@ -215,7 +215,7 @@ def _load_peaks_and_averaged_signal(sample, target_isotopes):
         .sel(mz=slice(np.min(mz_to_extract) - DMZ, np.max(mz_to_extract) + DMZ))
         .compute()
     )
-    return peak_profiles, averaged_signal
+    return peak_timeseries, averaged_signal
 
 
 async def _fetch_target_isotopes(
@@ -275,7 +275,7 @@ async def _process_isotope(
     isotope_averaged_spec = ctx.averaged_signal.sel(mz=slice(*mz_range))
 
     isotope_slice = ctx.peak_data.sel(mz=slice(*mz_range))
-    peak_profiles = get_peaks(isotope_slice, ctx.instrument_property.peak_data_type)
+    peak_timeseries = get_peaks(isotope_slice, ctx.instrument_property.peak_data_type)
     mean_peak_heights = isotope_slice.peak_heights.sel(
         time=ctx.time_scan, method="nearest"
     ).mean(dim="time")
@@ -327,7 +327,7 @@ async def _process_isotope(
 
     for peak in mean_peak_heights:
         peak_result = await _process_peak(
-            peak, ctx, peak_profiles, isotope_result.sum_timeseries
+            peak, ctx, peak_timeseries, isotope_result.sum_timeseries
         )
         isotope_result.spectrum_traces.append(peak_result["peak_trace"])
         if peak_result["timeseries_trace"]:
@@ -352,7 +352,7 @@ async def _process_isotope(
     return isotope_result
 
 
-async def _process_peak(peak, ctx: IsotopeContext, peak_profiles, sum_timeseries):
+async def _process_peak(peak, ctx: IsotopeContext, peak_timeseries, sum_timeseries):
     """
     Processes a single peak for a given isotope,
     generating visualization traces and updating the sum timeseries if the peak matches.
@@ -361,8 +361,8 @@ async def _process_peak(peak, ctx: IsotopeContext, peak_profiles, sum_timeseries
     :type peak: xarray.DataArray or similar
     :param ctx: The context containing isotope and processing parameters.
     :type ctx: IsotopeContext
-    :param peak_profiles: The peak profiles for the isotope.
-    :type peak_profiles: xarray.DataArray or similar
+    :param peak_timeseries: The peak timeseries for the isotope.
+    :type peak_timeseries: xarray.DataArray or similar
     :param sum_timeseries: The current sum timeseries to update, or None.
     :type sum_timeseries: xarray.DataArray or None
     :return: Dictionary with peak trace, timeseries trace, match status, and updated sum_timeseries.
@@ -382,7 +382,7 @@ async def _process_peak(peak, ctx: IsotopeContext, peak_profiles, sum_timeseries
     }
     timeseries_trace = None
     if match:
-        match_timeseries = peak_profiles.sel(mz=peak_mz).copy()
+        match_timeseries = peak_timeseries.sel(mz=peak_mz).copy()
         timeseries_time = match_timeseries.time.values.astype(np.float32)
 
         # Unsure gap in timeseries in case of several polarities within one sample file

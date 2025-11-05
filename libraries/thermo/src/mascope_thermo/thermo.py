@@ -406,7 +406,7 @@ def get_scan_timestamps(
         return np.asarray(scan_time)
 
 
-def get_peak_profiles(
+def get_peak_timeseries(
     datafile_path: str,
     mzs: Iterable[float],
     t_min: float | None = None,
@@ -414,11 +414,11 @@ def get_peak_profiles(
     polarity: Literal["+", "-"] | None = None,
     ppm: float = 5,
 ) -> xr.Dataset:
-    """Extracts the peak profiles for the specified m/z values in the time range (t_min, t_max).
+    """Extracts the peak timeseries for the specified m/z values in the time range (t_min, t_max).
 
     :param datafile_path: Path to the Thermo Fisher raw file (.raw) containing the data.
     :type datafile_path: str
-    :param mzs: array of m/z values for which peak profiles are required.
+    :param mzs: array of m/z values for which peak timeseries are required.
     :type mzs: float
     :param t_min: Start time [s], optional, defaults to None
     :type t_min: float
@@ -428,7 +428,7 @@ def get_peak_profiles(
     :type polarity: str
     :param ppm: Mass tolerance in parts-per-million for centroid binning, defaults to 10.
     :type ppm: float, optional
-    :return: An xarray Dataset containing the peak profiles
+    :return: An xarray Dataset containing the peak timeseries
     :rtype: xr.Dataset
     """
     mzs = np.asarray(mzs, dtype=float)
@@ -466,7 +466,7 @@ def get_peak_profiles(
             setting.MassRanges = [mz_range]
             settings.append(setting)
 
-        # Get profiles for the m/z values, -1 for all scans
+        # Get timeseries for the m/z values, -1 for all scans
         chromatogram = RawFile.GetChromatogramData(settings, -1, -1)
         traces = ChromatogramSignal.FromChromatogramData(chromatogram)
 
@@ -476,11 +476,11 @@ def get_peak_profiles(
                 trace.Intensities, dtype=np.float64, count=len(trace.Intensities)
             )[py_scan_indices]
 
-        peak_profiles_dask = da.from_array(intensities_for_mz_values, chunks="auto")
+        peak_timeseries_dask = da.from_array(intensities_for_mz_values, chunks="auto")
 
         # Export xarray array with time and mz coordinates
         result = xr.DataArray(
-            peak_profiles_dask,
+            peak_timeseries_dask,
             dims=("mz", "time"),
             coords={"mz": mzs, "time": np.array(scan_time)},
             name="signal",
