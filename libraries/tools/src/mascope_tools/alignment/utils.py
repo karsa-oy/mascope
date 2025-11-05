@@ -25,7 +25,11 @@ else:
 CACHE_FOLDER = os.path.abspath(os.path.join(os.getcwd(), "cached_spectra"))
 # TODO increase chunk size after resolving the issue with blocked server
 DOWNLOAD_CHUNK_SIZE = 1
-MAX_RETRIES = 5 # Number of retries for fetching data from server
+MAX_RETRIES = 5  # Number of retries for fetching data from server
+
+# Satellite peak detection defaults
+NEUTRON_MASS = 1.00866491606  # Da
+DEFAULT_TIGHT_WINDOW_PPM = 3.0  # ppm
 
 
 def create_cache_folder():
@@ -318,165 +322,210 @@ def filter_centroids(
 def flag_satellite_peaks(
     peaks: pd.DataFrame,
     base_peak_percentile: float = 99.9,
-    top_n_bases: int | None = None,
-    window_ppm: float = 10.0,
-    ratio_max: float = 0.1,
-    ratio_min: float = 0.0001,
-    symmetry_tolerance_ppm: float = 5.0,
-    isotope_tolerance_ppm: float = 5.0,
-    charge_range: tuple[int, int] = (1, 3),
+    top_n_bases: int | None = 5,
+    window_ppm: float = 350.0,
+    ratio_max: float = 0.04,
+    ratio_min: float = 1e-6,
+    symmetry_tolerance_ppm: float = 1.5,
+    isotope_tolerance_ppm: float = 2.0,
+    charge_range: tuple[int, int] = (1, 2),
 ) -> pd.DataFrame:
     """Flag Thermo/FTMS satellite peaks around very intense base peaks.
     Adds a boolean column 'is_satellite_peak' to the returned DataFrame.
 
     Heuristics:
-    - Satellites are much weaker than the base peak and lie within a narrow ppm window.
+    - Satellites are much weaker than the base peak and lie around them.
     - They tend to appear symmetrically around the base.
     - Isotopes (+1.003355/z) are excluded.
 
     :param peaks: DataFrame containing peaks with 'mz' and 'intensity' columns.
     :type peaks: pd.DataFrame
-    :param base_peak_percentile: Percentile for selecting base peaks, defaults to 99.9.
+    :param base_peak_percentile: Percentile for selecting base peaks.
     :type base_peak_percentile: float, optional
     :param top_n_bases: If specified, overrides the percentile and selects the top N bases.
     :type top_n_bases: int | None, optional
-    :param window_ppm: Search window around base peaks in ppm, defaults to 10.0.
+    :param window_ppm: Search window around base peaks in ppm.
     :type window_ppm: float, optional
-    :param ratio_max: Maximum intensity ratio for satellite peaks relative to base peaks, defaults to 0.1.
+    :param ratio_max: Maximum intensity ratio for satellite peaks relative to base peaks.
     :type ratio_max: float, optional
-    :param ratio_min: Minimum intensity ratio for satellite peaks relative to base peaks, defaults to 0.0001.
+    :param ratio_min: Minimum intensity ratio for satellite peaks relative to base peaks.
     :type ratio_min: float, optional
-    :param symmetry_tolerance_ppm: Tolerance for symmetric pairing around the base peak in ppm, defaults to 5.0.
+    :param symmetry_tolerance_ppm: Tolerance for symmetric pairing around the base peak in ppm.
     :type symmetry_tolerance_ppm: float, optional
-    :param isotope_tolerance_ppm: Tolerance for excluding +1 isotopes in ppm, defaults to 5.0.
+    :param isotope_tolerance_ppm: Tolerance for excluding +1 isotopes in ppm.
     :type isotope_tolerance_ppm: float, optional
-    :param charge_range: Range of charge states to consider for isotopes, defaults to (1, 3).
+    :param charge_range: Range of charge states to consider for isotopes.
     :type charge_range: tuple[int, int], optional
     :return: DataFrame with an additional boolean column 'is_satellite_peak' indicating satellite peaks.
     :rtype: pd.DataFrame
     """
-    flagged_peaks = peaks.copy()
-    if flagged_peaks.empty:
-        flagged_peaks["is_satellite_peak"] = False
-        return flagged_peaks
+    if peaks.empty:
+        out = peaks.copy()
+        out["is_satellite_peak"] = False
+        return out
 
-    mz = flagged_peaks["mz"].to_numpy()
-    intensity = flagged_peaks["intensity"].to_numpy()
+    if "mz" not in peaks.columns or "intensity" not in peaks.columns:
+        raise ValueError("peaks must contain 'mz' and 'intensity' columns.")
 
+    df = peaks.copy()
+    mz = df["mz"].to_numpy(dtype=float)
+    intensity = df["intensity"].to_numpy(dtype=float)
+
+    # Remove non-positive intensities early (cannot be parents nor satellites).
+    valid_mask = intensity > 0
+    if not np.all(valid_mask):
+        mz = mz[valid_mask]
+        intensity = intensity[valid_mask]
+        original_index = np.flatnonzero(valid_mask)
+    else:
+        original_index = np.arange(mz.size)
+
+    if mz.size == 0:
+        out = peaks.copy()
+        out["is_satellite_peak"] = False
+        return out
+
+    # Sort by m/z for efficient window querying.
     order = np.argsort(mz)
     mz_sorted = mz[order]
     intensity_sorted = intensity[order]
-    num_of_peaks = mz_sorted.size
+    n_peaks = mz_sorted.size
 
-    # Choose base peaks
-    base_peak_threshold = np.percentile(intensity_sorted, base_peak_percentile)
-    base_mask = intensity_sorted >= base_peak_threshold
-    if top_n_bases is not None and top_n_bases < base_mask.sum():
-        idx_bases = np.flatnonzero(base_mask)
-        top_local = idx_bases[
-            np.argsort(intensity_sorted[idx_bases])[::-1][:top_n_bases]
+    # Select base peaks (intensity-based).
+    base_thr = np.quantile(intensity_sorted, base_peak_percentile / 100.0)
+    base_candidates = np.flatnonzero(intensity_sorted >= base_thr)
+    if top_n_bases is not None and base_candidates.size > top_n_bases:
+        # Keep top_n_bases highest-intensity indices.
+        strongest_local = np.argsort(intensity_sorted[base_candidates])[::-1][
+            :top_n_bases
         ]
-        base_mask[:] = False
-        base_mask[top_local] = True
-    base_idx = np.flatnonzero(base_mask)
+        base_indices = np.sort(base_candidates[strongest_local])
+    else:
+        base_indices = base_candidates
 
-    is_satellite_sorted = np.zeros(num_of_peaks, dtype=bool)
+    if base_indices.size == 0:
+        # No bases found at this percentile; return all False.
+        result = peaks.copy()
+        result["is_satellite_peak"] = False
+        return result
 
-    for base_index in base_idx:
-        base_mass = mz_sorted[base_index]
-        base_intensity = intensity_sorted[base_index]
-        if base_intensity <= 0:
+    # Precompute charges and isotope delta masses.
+    charges = np.arange(charge_range[0], charge_range[1] + 1, dtype=int)
+    isotope_deltas = NEUTRON_MASS / charges  # Da
+
+    is_satellite_sorted = np.zeros(n_peaks, dtype=bool)
+
+    # Precompute ppm to Da helper inline (avoid extra function call in tight loop).
+    def ppm_to_da_local(mass: float, ppm: float) -> float:
+        return mass * ppm * 1e-6
+
+    symmetry_ppm = symmetry_tolerance_ppm
+    isotope_ppm = isotope_tolerance_ppm
+    win_ppm = window_ppm
+    ratio_lo = ratio_min
+    ratio_hi = ratio_max
+
+    for base_idx in base_indices:
+        parent_mz = mz_sorted[base_idx]
+        parent_intensity = intensity_sorted[base_idx]
+        if parent_intensity <= 0:
             continue
 
-        window_da = ppm_to_da(base_mass, window_ppm)
-        lower_window_index = np.searchsorted(
-            mz_sorted, base_mass - window_da, side="left"
-        )
-        upper_window_index = np.searchsorted(
-            mz_sorted, base_mass + window_da, side="right"
-        )
+        win_da = ppm_to_da_local(parent_mz, win_ppm)
+        left = np.searchsorted(mz_sorted, parent_mz - win_da, side="left")
+        right = np.searchsorted(mz_sorted, parent_mz + win_da, side="right")
 
-        # Relative intensity filter
-        candidate_indices = [
-            i for i in range(lower_window_index, upper_window_index) if i != base_index
-        ]
-        candidate_indices = [
-            i
-            for i in candidate_indices
-            if ratio_min <= (intensity_sorted[i] / base_intensity) <= ratio_max
-        ]
-        if not candidate_indices:
+        if right - left <= 1:
             continue
 
-        # Exclude +1 isotopes on high-mass side
-        kept = []
-        for i in candidate_indices:
-            dmz = mz_sorted[i] - base_mass
-            if dmz <= 0:
-                kept.append(i)
-                continue
-            is_isotope = False
-            for z in range(charge_range[0], charge_range[1] + 1):
-                isotope_da = 1.0033548378 / z
-                tolerance_da = max(
-                    ppm_to_da(base_mass, isotope_tolerance_ppm),
-                    ppm_to_da(base_mass + dmz, isotope_tolerance_ppm),
-                )
-                if abs(dmz - isotope_da) <= tolerance_da:
-                    is_isotope = True
-                    break
-            if not is_isotope:
-                kept.append(i)
-        candidate_indices = kept
-        if not candidate_indices:
+        cand_idx = np.arange(left, right)
+        cand_idx = cand_idx[cand_idx != base_idx]
+        if cand_idx.size == 0:
             continue
 
-        # Symmetry pairing around the base
-        tolerance_symmetry_da = ppm_to_da(base_mass, symmetry_tolerance_ppm)
-        candidates_set = set(candidate_indices)
-        used = set()
-        for i in list(candidate_indices):
-            if i in used:
-                continue
-            dmz = mz_sorted[i] - base_mass
-            target_mass = base_mass - dmz
-            left_symmetry_index = np.searchsorted(
-                mz_sorted, target_mass - tolerance_symmetry_da, side="left"
-            )
-            right_symmetry_index = np.searchsorted(
-                mz_sorted, target_mass + tolerance_symmetry_da, side="right"
-            )
+        rel_ratio = intensity_sorted[cand_idx] / parent_intensity
+        ratio_mask = (rel_ratio >= ratio_lo) & (rel_ratio <= ratio_hi)
+        cand_idx = cand_idx[ratio_mask]
+        if cand_idx.size == 0:
+            continue
 
-            mirror = None
-            for k in range(left_symmetry_index, right_symmetry_index):
-                if k == base_index or k == i:
+        cand_mz = mz_sorted[cand_idx]
+        dmz = cand_mz - parent_mz
+
+        # Exclude +1 isotopes (only dmz > 0).
+        pos_mask = dmz > 0
+        if np.any(pos_mask):
+            dmz_pos = dmz[pos_mask]
+            cand_idx_pos = cand_idx[pos_mask]
+            exclude_iso = np.zeros(dmz_pos.size, dtype=bool)
+            # Vectorized isotope exclusion.
+            for iso_da in isotope_deltas:
+                tolerance_da = ppm_to_da_local(parent_mz + iso_da, isotope_ppm)
+                exclude_iso |= np.abs(dmz_pos - iso_da) <= tolerance_da
+            keep_pos = ~exclude_iso
+            # Recombine positive + negative side indices.
+            cand_idx = np.concatenate([cand_idx[~pos_mask], cand_idx_pos[keep_pos]])
+            dmz = mz_sorted[cand_idx] - parent_mz
+            rel_ratio = intensity_sorted[cand_idx] / parent_intensity
+
+        if cand_idx.size == 0:
+            continue
+
+        # Symmetry detection: match |dmz_left| ≈ dmz_right within tolerance.
+        left_mask = dmz < 0
+        right_mask = dmz > 0
+        left_dmz = -dmz[left_mask]
+        right_dmz = dmz[right_mask]
+        left_idx = cand_idx[left_mask]
+        right_idx = cand_idx[right_mask]
+
+        # Tolerance (Da) computed at parent m/z.
+        sym_tol_da = ppm_to_da_local(parent_mz, symmetry_ppm)
+
+        # Use sorted arrays for matching.
+        if left_dmz.size and right_dmz.size:
+            # For each right offset, search approximate left match.
+            # Sort left_dmz for binary search.
+            left_order = np.argsort(left_dmz)
+            left_dmz_sorted = left_dmz[left_order]
+            left_idx_sorted = left_idx[left_order]
+
+            for r_off, r_i in zip(right_dmz, right_idx):
+                lo = np.searchsorted(left_dmz_sorted, r_off - sym_tol_da, side="left")
+                hi = np.searchsorted(left_dmz_sorted, r_off + sym_tol_da, side="right")
+                if hi <= lo:
                     continue
-                if k in candidates_set:
-                    mirror = k
-                    break
+                # Choose closest left offset.
+                segment = left_dmz_sorted[lo:hi]
+                closest_rel = np.argmin(np.abs(segment - r_off))
+                l_i = left_idx_sorted[lo + closest_rel]
 
-            if mirror is not None:
-                intensity_ratio_candidate = intensity_sorted[i] / base_intensity
-                mirror_intensity_ratio = intensity_sorted[mirror] / base_intensity
-                if (
-                    min(intensity_ratio_candidate, mirror_intensity_ratio)
-                    / max(intensity_ratio_candidate, mirror_intensity_ratio)
-                    >= 0.5
-                ):  # similar magnitude
-                    is_satellite_sorted[i] = True
-                    is_satellite_sorted[mirror] = True
-                    used.add(i)
-                    used.add(mirror)
-            else:
-                # Single-sided artifact near base, very low ratio
-                if abs(dmz) <= ppm_to_da(base_mass, min(5.0, window_ppm)) and (
-                    intensity_sorted[i] / base_intensity
-                ) <= min(ratio_max, 0.03):
-                    is_satellite_sorted[i] = True
-                    used.add(i)
+                # Compare intensity ratios for similarity.
+                r_ratio = intensity_sorted[r_i] / parent_intensity
+                l_ratio = intensity_sorted[l_i] / parent_intensity
+                ratio_similarity = min(r_ratio, l_ratio) / max(r_ratio, l_ratio)
+                if ratio_similarity >= 0.5:
+                    is_satellite_sorted[r_i] = True
+                    is_satellite_sorted[l_i] = True
 
-    # Back to original order
-    is_satellite = np.zeros(num_of_peaks, dtype=bool)
-    is_satellite[order] = is_satellite_sorted
-    flagged_peaks["is_satellite_peak"] = is_satellite
-    return flagged_peaks
+        # Single-sided satellites (weak, very near parent).
+        # Restrict to those still unflagged.
+        unresolved = cand_idx[~is_satellite_sorted[cand_idx]]
+        if unresolved.size:
+            tight_window_da = ppm_to_da_local(
+                parent_mz, min(win_ppm * 0.5, DEFAULT_TIGHT_WINDOW_PPM)
+            )
+            near_mask = np.abs(mz_sorted[unresolved] - parent_mz) <= tight_window_da
+            weak_mask = (intensity_sorted[unresolved] / parent_intensity) <= ratio_hi
+            final_mask = near_mask & weak_mask
+            is_satellite_sorted[unresolved[final_mask]] = True
+
+    # Map back to original indexing.
+    back_flags = np.zeros(n_peaks, dtype=bool)
+    back_flags[order] = is_satellite_sorted
+    full_flags = np.zeros(df.shape[0], dtype=bool)
+    full_flags[original_index] = back_flags
+
+    out = peaks.copy()
+    out["is_satellite_peak"] = full_flags
+    return out
