@@ -149,7 +149,7 @@ def load_peaks(
     :rtype: xarray.DataArray
     """
     target_mzs = np.asarray(target_mzs)
-    peak_data = m_io.load_file(filename, vars=["peak_profiles"])
+    peak_data = m_io.load_peak_data(filename)
     # Select unique closest m/z values from the peak data
     closest_mzs = peak_data.sel(mz=target_mzs, method="nearest").mz.values
     closest_mzs = np.unique(closest_mzs)

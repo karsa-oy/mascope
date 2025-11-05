@@ -9,7 +9,7 @@ from sqlalchemy import (
     desc,
     func,
 )
-from mascope_file.io import load_file
+from mascope_file.io import load_peak_data
 from mascope_file.name import parse_path_from_item_filename
 
 import mascope_signal.compute as m_compute
@@ -928,7 +928,7 @@ async def get_sample_file_peaks(
 
     # Step 2: Load peak data
     try:
-        sample_file_data = load_file(filename, vars=["peak_profiles"])
+        sample_file_data = load_peak_data(filename)
     except FileNotFoundError as e:
         raise NotFoundException(
             f"Sample file with name '{filename}' was not found or has not been processed"
@@ -1028,7 +1028,7 @@ async def compute_sample_file_peaks(
     await compute_peaks(filename)
 
     # Return completion message and peak details.
-    sample_file = load_file(filename, vars=["peak_profiles"])
+    sample_file = load_peak_data(filename)
     message = f"Detected {sample_file.mz.size} peaks for file '{filename}'"
     runtime.logger.info(message)
 
@@ -1081,7 +1081,7 @@ async def get_sample_file_peak_timeseries(
     filename = sample_file_data.get("data").get("filename")
     # Step 2: Load the sample file
     try:
-        sample_file = load_file(filename, vars=["peak_profiles"])
+        sample_file = load_peak_data(filename)
         peaks = get_peaks(sample_file, "height")
     except FileNotFoundError:
         raise NotFoundException(f"Sample file with name '{filename}' not found")

@@ -938,7 +938,7 @@ async def sample_batch_export_peaks(
 
             await send_progress_user_notification(notification, 0.9)
 
-            sample_file = m_io.load_file(filename, vars=["peak_profiles"])
+            sample_file = m_io.load_peak_data(filename)
             peak_data_item = get_peaks(sample_file, unit).sum(dim="time").compute()
 
             await send_progress_user_notification(notification, 1)

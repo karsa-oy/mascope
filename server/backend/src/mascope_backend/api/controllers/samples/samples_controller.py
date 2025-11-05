@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from datetime import datetime
 import asyncio
 import numpy as np
-from mascope_file.io import load_file
+from mascope_file.io import load_peak_data
 import mascope_signal.compute as m_compute
 from mascope_signal.peak import get_peaks
 from sqlalchemy import and_, select, func, cast, Float, Integer, desc, asc
@@ -320,7 +320,7 @@ async def get_sample_peaks(
 
     # --- Load sample file peak data and get polarity filter ---
     try:
-        sample_file_data = load_file(sample.filename, vars=["peak_profiles"])
+        sample_file_data = load_peak_data(sample.filename)
     except FileNotFoundError as e:
         raise NotFoundException(
             f"Sample file with name '{sample.filename}' was not found or has not been processed"
@@ -454,7 +454,7 @@ async def get_sample_peak_timeseries(
 
     # Step 4: Load sample file data
     try:
-        sample_file = load_file(sample.filename, vars=["peak_profiles"])
+        sample_file = load_peak_data(sample.filename)
         peaks = get_peaks(sample_file, "height")
     except FileNotFoundError:
         raise NotFoundException(f"Sample file '{sample.filename}' not found")

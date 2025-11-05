@@ -843,7 +843,7 @@ async def sample_item_export_peaks(
         if instrument_type == "tof":
             peak_data_type = "peak_areas"
 
-        sample_file = m_io.load_file(filename, vars=["peak_profiles"])
+        sample_file = m_io.load_peak_data(filename)
         sample_peak_data = sample_file[peak_data_type].dropna(dim="mz", how="all")
 
         await send_progress_user_notification(notification, 0.8)

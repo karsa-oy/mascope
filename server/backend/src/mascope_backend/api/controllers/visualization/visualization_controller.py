@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from sqlalchemy import select
 from colorcet import glasbey_hv as colormap
 
-from mascope_file.io import load_file, read_props
+from mascope_file.io import load_peak_data, read_props
 from mascope_file.name import get_instrument_type
 
 import mascope_signal.compute as m_compute
@@ -188,7 +188,7 @@ def _load_peaks_and_averaged_signal(sample, target_isotopes):
     :return: Tuple of (peak_data, averaged_signal) for the specified m/z window.
     :rtype: tuple
     """
-    peak_data = load_file(sample.filename, vars=["peak_profiles"])
+    peak_data = load_peak_data(sample.filename)
     all_mzs = peak_data.mz.values
 
     target_mzs = np.array([iso.mz for iso in target_isotopes])

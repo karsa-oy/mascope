@@ -515,9 +515,7 @@ def load_peak_profiles(
     :rtype: xr.Dataset
     """
     # --- Load existing peak profiles from the sample file ---
-    peak_profiles = m_io.load_file(base_filename, vars=["peak_profiles"]).sel(
-        mz=mzs, method="nearest"
-    )
+    peak_profiles = m_io.load_peak_data(base_filename).sel(mz=mzs, method="nearest")
     runtime.logger.debug(
         f"Loading peak profiles for m/z values: {peak_profiles.mz.values} from {base_filename}"
     )
