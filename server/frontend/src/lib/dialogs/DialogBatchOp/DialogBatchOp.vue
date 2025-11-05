@@ -25,7 +25,7 @@ import { useApp } from '@/stores'
 import PaneSelectTargets from './PaneSelectTargets.vue'
 
 const app = useApp()
-const confirm = useConfirm()
+const layer = 'dialog_batch_op' // Help-mode layer for dialog
 
 const props = defineProps({
   batch: {
@@ -47,6 +47,9 @@ watch([action, ready], () => {
 watch(visible, (value) => {
   if (!value) {
     action.value = null
+    app.ui.help.set(null)
+  } else {
+    app.ui.help.set(layer)
   }
 })
 

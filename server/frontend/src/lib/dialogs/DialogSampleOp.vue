@@ -27,6 +27,7 @@ import {
 } from '@/lib/constants'
 
 const app = useApp()
+const layer = 'dialog_sample_op' // Help-mode layer for dialog
 
 const props = defineProps({
   item: {
@@ -47,6 +48,9 @@ watch(action, (value) => {
 watch(visible, (value) => {
   if (!value) {
     action.value = null
+    app.ui.help.set(null)
+  } else {
+    app.ui.help.set(layer)
   }
 })
 const tab = ref('sample-details')

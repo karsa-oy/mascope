@@ -34,6 +34,7 @@ import { collectionTypes, getAllowedWorkspaceTypes, getAllowedBatchTypes } from 
 const confirm = useConfirm()
 
 const app = useApp()
+const layer = 'dialog_target_op' // Help-mode layer for dialog
 
 const action = defineModel('action')
 
@@ -559,6 +560,7 @@ watch(action, async (value) => {
 // Close dialog when visibility changes to false
 watch(visible, (value) => {
   if (!value) {
+    app.ui.help.set(null)
     action.value = null
     // Reset all state for fresh data on next open
     selected.workspace = null
@@ -577,6 +579,8 @@ watch(visible, (value) => {
     add.name = ''
     add.formula = ''
     add.cas = ''
+  } else {
+    app.ui.help.set(layer)
   }
 })
 
