@@ -434,7 +434,7 @@ class OrbiZarrPeakDetector(TofPeakDetector):
         )
         peaks_df = flag_satellite_peaks(peaks_df)
         self.peak_timeseries = self.peak_timeseries.assign(
-            {"is_satellite": (("mz"), peaks_df["is_satellite"].values)}
+            {"is_satellite": (("mz"), peaks_df["is_satellite_peak"].values)}
         )
 
 
