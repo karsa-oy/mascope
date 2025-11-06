@@ -466,7 +466,6 @@ def flag_satellite_peaks(
             # Recombine positive + negative side indices.
             cand_idx = np.concatenate([cand_idx[~pos_mask], cand_idx_pos[keep_pos]])
             dmz = mz_sorted[cand_idx] - parent_mz
-            rel_ratio = intensity_sorted[cand_idx] / parent_intensity
 
         if cand_idx.size == 0:
             continue

@@ -589,8 +589,8 @@ def get_peak_timeseries(
 ) -> xr.DataArray:
     """Get peak timeseries for given peak m/z values in the time range [t_min, t_max]
 
-    :param datafile_path: Path to the data file
-    :type datafile_path: str
+    :param base_filename: Sample file filename
+    :type base_filename: str
     :param mzs: List of target m/z values
     :type mzs: Iterable[float]
     :param t_min: Left border of the time range [s], defaults to None

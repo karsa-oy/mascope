@@ -324,14 +324,15 @@ def write_peaks(
     :type filename: str
     :param overwrite: Flag to overwrite peaks if they already exist, defaults to False
     :type overwrite: bool, optional
-    :raises FileExistsError: Peak areas or peak heights already exist for the sample file
     :return: None
     """
     peak_timeseries_path = filename_to_zarr_path(filename, "peak_timeseries")
 
     def _full_overwrite():
         """Full-write helper"""
-        runtime.logger.debug(f"Full overwrite of peak_timeseries at {peak_timeseries_path}")
+        runtime.logger.debug(
+            f"Full overwrite of peak_timeseries at {peak_timeseries_path}"
+        )
         if os.path.exists(peak_timeseries_path):
             try:
                 rmtree(peak_timeseries_path)

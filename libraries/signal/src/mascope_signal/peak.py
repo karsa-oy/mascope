@@ -104,9 +104,7 @@ class BasePeakDetector(ABC):
         runtime.logger.info("Writing peak timeseries completed.")
 
     @abstractmethod
-    async def detect_peaks(
-        self, if_exists: Literal["fail", "append", "replace"] = "fail"
-    ):
+    async def detect_peaks(self):
         raise NotImplementedError("Subclasses must implement detect_peaks method")
 
     @abstractmethod
