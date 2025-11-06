@@ -184,6 +184,11 @@ def get_sum_signal(
             case "tof_h5" | "tof_zarr":
                 if calibration:
                     full_sum_signal = get_sum_signal(base_filename)
+                    # Reverse compartibility correction on m/z axis
+                    full_sum_signal = full_sum_signal.where(
+                        full_sum_signal["mz"] >= m_tofwerk.DEFAULT_NONSENSE_MZ,
+                        drop=True,
+                    )
                     sum_signal = sum_signal.assign_coords(mz=full_sum_signal.mz.values)
 
     # Save the computed sum signal to the sample file for future use
