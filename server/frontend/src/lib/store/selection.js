@@ -141,7 +141,10 @@ export const useSelection = (name, key, records, options = {}) => {
   // focus logging
   if (singleselect) {
     watch(focused, (nextFocus, prevFocus) => {
-      if (nextFocus !== prevFocus) {
+      // Compare ids, not object references!
+      const prevId = prevFocus ? prevFocus[key] : null
+      const nextId = nextFocus ? nextFocus[key] : null
+      if (prevId !== nextId) {
         if (prevFocus) {
           logger.debug(`unfocusing`, {
             icon: '☁️',
@@ -161,9 +164,13 @@ export const useSelection = (name, key, records, options = {}) => {
   // selection logging
   if (multiselect) {
     watch(selected, (nextSelected, prevSelected) => {
+      // Extract IDs for comparison
+      const prevIds = prevSelected.map((p) => p[key])
+      const nextIds = nextSelected.map((n) => n[key])
+
       let icon = '☁️'
       prevSelected.forEach((selected) => {
-        const newlyUnselected = !nextSelected.map((p) => p[key]).includes(selected[key])
+        const newlyUnselected = !nextIds.includes(selected[key])
         const data = { record: selected }
         if (newlyUnselected) {
           if (nextSelected.length >= 1) {
@@ -175,7 +182,7 @@ export const useSelection = (name, key, records, options = {}) => {
       })
       icon = '🔍'
       nextSelected.forEach((selected) => {
-        const newlySelected = !prevSelected.map((p) => p[key]).includes(selected[key])
+        const newlySelected = !prevIds.includes(selected[key])
         const data = { record: selected }
         if (newlySelected) {
           if (!focused.value) {
@@ -293,19 +300,26 @@ export const useSelection = (name, key, records, options = {}) => {
       room = subscribe
     }
     watch(focused, (next, prev) => {
-      if (prev) {
-        logger.debug(`unsubscribing from`, {
-          icon: '📪',
-          data: { room: room(prev) }
-        })
-        api.socket.emit('unsubscribe', room(prev))
-      }
-      if (next) {
-        logger.debug(`subscribing to`, {
-          icon: '📬',
-          data: { room: room(next) }
-        })
-        api.socket.emit('subscribe', room(next))
+      // Extract room IDs
+      const prevRoom = prev ? room(prev) : null
+      const nextRoom = next ? room(next) : null
+
+      // Only unsubscribe/subscribe if room ID actually changed
+      if (prevRoom !== nextRoom) {
+        if (prevRoom) {
+          logger.debug(`unsubscribing from`, {
+            icon: '📪',
+            data: { room: prevRoom }
+          })
+          api.socket.emit('unsubscribe', prevRoom)
+        }
+        if (nextRoom) {
+          logger.debug(`subscribing to`, {
+            icon: '📬',
+            data: { room: nextRoom }
+          })
+          api.socket.emit('subscribe', nextRoom)
+        }
       }
     })
   }
