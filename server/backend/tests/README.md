@@ -187,9 +187,13 @@ server/backend/tests/
 
 ### Mock implementation strategies
 
-- **Factory pattern for mocks**: The `mock_sio_factory` creates specialized Socket.IO mocks that patch the exact module path where services import Socket.IO. Each controller needs to be patched at its specific import path, not at a global level.
-- **Component-specific mocks**: Specialized fixtures like `mock_sio_workspace` target specific modules with the correct import paths, preventing side effects in other components.
-- **Verification support**: Mocks include pre-configured AsyncMock instances for async methods like Socket.IO's `emit`, allowing tests to verify event emissions with assertions like `mock_sio.emit.assert_called_once_with()`.
+- **Factory pattern for mocks**: The `mock_emit_record_factory` creates specialized mocks for the `emit_record_created`, `emit_record_updated`, and `emit_record_deleted` functions. The factory patches the exact module path where controllers import these functions. Each controller needs to be patched at its specific import path, not at a global level.
+- **Component-specific mocks**: Specialized fixtures like `mock_emit_workspace` target specific modules with the correct import paths, preventing side effects in other components. The mock returns a `MagicMock` container with three `AsyncMock` attributes (`created`, `updated`, `deleted`) for verifying each type of record event emission.
+- **Verification support**: Mocks include pre-configured `AsyncMock` instances for the async `emit_record_*` functions, allowing tests to verify event emissions with assertions like:
+  - `mock_emit_workspace.created.assert_called_once()` - Verify creation event
+  - `mock_emit_workspace.updated.assert_called_once()` - Verify update event
+  - `mock_emit_workspace.deleted.assert_called_once()` - Verify deletion event
+  - `call_args.kwargs["record_type"]` - Verify specific event parameters
 
 ### Test data management
 

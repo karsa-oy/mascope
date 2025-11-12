@@ -17,7 +17,7 @@ Unit testing approach for API components:
 - Verify database interactions work as expected
 """
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime, timezone
 import pytest
 import pytest_asyncio
@@ -246,12 +246,11 @@ async def test_workspaces(async_session_factory):
 
 
 @pytest.fixture
-def mock_sio_factory():
-    """Factory fixture for creating Socket.IO mocks for different controllers.
+def mock_emit_record_factory():
+    """Factory fixture for creating emit_record_* function mocks for different controllers.
 
-    This fixture returns a function that creates properly configured Socket.IO mocks
-    for specific controllers. The factory approach allows each test module to create
-    mocks that patch the correct import path for its specific controller.
+    This fixture returns a function that creates specific controller mocks for the
+    emit_record_created, emit_record_updated, and emit_record_deleted functions.
 
     Benefits:
     1. Prevents real Socket.IO events during tests
@@ -259,44 +258,50 @@ def mock_sio_factory():
     3. Records all calls to emit for assertion checking
 
     Verification Methods:
-    - Verify event was called: mock_sio.emit.assert_called_once_with("event_name", namespace="/")
-    - Verify specific event with room: mock_sio.emit.assert_any_call("event_name", room="room_id", namespace="/")
-    - Check call count: assert mock_sio.emit.call_count == 2
-    - Full history of all calls with their arguments: mock_sio.emit.call_args_list
+    - Verify created was called: mock_emit.created.assert_called_once()
+    - Verify with specific args: mock_emit.updated.assert_called_with(record_type="workspace", ...)
+    - Check call count: assert mock_emit.deleted.call_count == 2
+    - Full history: mock_emit.created.call_args_list
 
-    Usage examples:
-    - In controller-specific conftest.py:
-      @pytest.fixture
-      def mock_sio_workspace(mock_sio_factory):
-          return mock_sio_factory("mascope_backend.api.controllers.workspace.workspace_controller")
+    Usage in controller-specific conftest.py:
+    @pytest.fixture
+    def mock_emit_workspace(mock_emit_record_factory):
+        return mock_emit_record_factory("mascope_backend.api.controllers.workspace.workspace_controller")
 
-    - In tests:
-      def test_something(mock_sio_workspace):
-          # Use mock_sio_workspace for assertions
+    In tests:
+    def test_something(mock_emit_workspace):
+        mock_emit_workspace.created.assert_called_once()
 
-    :return: A function that creates and configures Socket.IO mocks
+    :return: A function that creates and configures emit_record mocks
     :rtype: callable
     """
 
-    def _make_mock_sio(module_path):
-        """Create a Socket.IO mock for a specific module path.
+    def _make_mock_emit(module_path):
+        """Create emit_record function mocks for a specific module path.
 
-        :param module_path: Full import path to the module using Socket.IO
+        :param module_path: Full import path to the module using emit_record functions
         :type module_path: str
-        :return: Configured AsyncMock for Socket.IO
+        :return: MagicMock object with mocked created, updated, deleted functions
         :rtype: MagicMock
         """
-        # Create the patch for the specified module path
-        mock = patch(f"{module_path}.sio").start()
+        # Create patches for all three emit functions
+        mock_created = patch(
+            f"{module_path}.emit_record_created", new_callable=AsyncMock
+        ).start()
+        mock_updated = patch(
+            f"{module_path}.emit_record_updated", new_callable=AsyncMock
+        ).start()
+        mock_deleted = patch(
+            f"{module_path}.emit_record_deleted", new_callable=AsyncMock
+        ).start()
 
-        # Configure the mock with an AsyncMock for the emit method
-        mock.emit = AsyncMock()
+        # Create a MagicMock container to hold all three mocks
+        mock_container = MagicMock()
+        mock_container.created = mock_created
+        mock_container.updated = mock_updated
+        mock_container.deleted = mock_deleted
 
-        # Return the configured mock
-        return mock
+        return mock_container
 
-    # Yield the factory function to the test
-    yield _make_mock_sio
-
-    # Clean up all patches after tests are done
+    yield _make_mock_emit
     patch.stopall()

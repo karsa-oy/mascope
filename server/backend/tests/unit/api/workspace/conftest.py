@@ -35,18 +35,23 @@ def workspace_update_model():
 
 
 @pytest.fixture
-def mock_sio_workspace(mock_sio_factory):
-    """Mock Socket.IO for the workspace controller.
+def mock_emit_workspace(mock_emit_record_factory):
+    """Mock emit_record_* functions for the workspace controller.
 
-    This fixture uses the mock_sio_factory to create a properly configured
-    Socket.IO mock specifically for the workspace controller. It patches
-    the exact import path where the workspace controller accesses Socket.IO.
+    This fixture uses the mock_emit_record_factory to create properly configured
+    mocks for emit_record_created, emit_record_updated, and emit_record_deleted
+    functions in the workspace controller.
 
-    :param mock_sio_factory: Factory function for creating Socket.IO mocks
-    :type mock_sio_factory: callable from mock_sio_factory fixture
-    :return: Configured AsyncMock for Socket.IO in the workspace controller
+    The returned object has three AsyncMock attributes:
+    - created: Mock for emit_record_created
+    - updated: Mock for emit_record_updated
+    - deleted: Mock for emit_record_deleted
+
+    :param mock_emit_record_factory: Factory function for creating emit_record mocks
+    :type mock_emit_record_factory: callable from mock_emit_record_factory fixture
+    :return: MagicMock with created, updated, deleted AsyncMock attributes
     :rtype: MagicMock
     """
-    return mock_sio_factory(
+    return mock_emit_record_factory(
         "mascope_backend.api.controllers.workspace.workspace_controller"
     )

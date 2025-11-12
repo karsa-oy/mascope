@@ -201,7 +201,7 @@ async def test_get_workspace_existence(test_workspaces, workspace_id, should_exi
 
 @pytest.mark.asyncio
 async def test_create_workspace(
-    workspace_create_model, mock_sio_workspace, async_session_factory
+    workspace_create_model, mock_emit_workspace, async_session_factory
 ):
     """Test creating a new workspace.
 
@@ -212,11 +212,13 @@ async def test_create_workspace(
     4. Socket.IO events are emitted properly
 
     :param workspace_create_model: Sample workspace creation data
-    :param mock_sio_workspace: Mocked Socket.IO for event verification
+    :param mock_emit_workspace: Mocked Socket.IO for event verification
     :param async_session_factory: Factory for creating database sessions
     """
     # Execute the controller function
-    result = await workspace_service.create_workspace(workspace_create_model)
+    result = await workspace_service.create_workspace(
+        workspace=workspace_create_model, independent_transaction=True
+    )
 
     # Verify response structure
     assert isinstance(result, dict)
@@ -247,8 +249,12 @@ async def test_create_workspace(
             == workspace_create_model.workspace_description
         )
 
-    # Verify Socket.IO event was emitted
-    mock_sio_workspace.emit.assert_called_once_with("workspace_reload", namespace="/")
+    # Verify emit_record_created was called
+    mock_emit_workspace.created.assert_called_once()
+    call_args = mock_emit_workspace.created.call_args
+    assert call_args.kwargs["record_type"] == "workspace"
+    assert call_args.kwargs["record_id"] == workspace_data["workspace_id"]
+    assert call_args.kwargs.get("room") is None  # Broadcasts to all
 
 
 @pytest.mark.asyncio
@@ -264,7 +270,7 @@ async def test_update_workspace(
     workspace_update_model,
     workspace_id,
     should_exist,
-    mock_sio_workspace,
+    mock_emit_workspace,
     async_session_factory,
 ):
     """Test updating an existing workspace.
@@ -280,13 +286,15 @@ async def test_update_workspace(
     :param workspace_update_model: Sample workspace update data
     :param workspace_id: ID of the workspace to update
     :param should_exist: Whether the workspace should exist
-    :param mock_sio_workspace: Mocked Socket.IO for event verification
+    :param mock_emit_workspace: Mocked Socket.IO for event verification
     :param async_session_factory: Factory for creating database sessions
     """
     if should_exist:
         # Positive case - workspace should exist and be updated
         result = await workspace_service.update_workspace(
-            workspace_id, workspace_update_model
+            workspace_id=workspace_id,
+            workspace_update=workspace_update_model,
+            independent_transaction=True,
         )
 
         # Verify response structure
@@ -305,9 +313,12 @@ async def test_update_workspace(
         )
         assert "workspace_utc_modified" in workspace_data
 
-        # Verify Socket.IO events were emitted
-        assert mock_sio_workspace.emit.call_count == 1
-        mock_sio_workspace.emit.assert_any_call("workspace_reload", namespace="/")
+        # Verify emit_record_updated was called
+        mock_emit_workspace.updated.assert_called_once()
+        call_args = mock_emit_workspace.updated.call_args
+        assert call_args.kwargs["record_type"] == "workspace"
+        assert call_args.kwargs["record_id"] == workspace_id
+        assert call_args.kwargs.get("room") is None  # Broadcasts to all
 
         # Verify workspace was actually updated in the database
         async with async_session_factory() as session:
@@ -325,7 +336,7 @@ async def test_update_workspace(
         # Negative case - workspace should not exist
         with pytest.raises(ApiException) as exc_info:
             await workspace_service.update_workspace(
-                workspace_id, workspace_update_model
+                workspace_id, workspace_update_model, True
             )
 
         assert (
@@ -371,7 +382,7 @@ async def test_partial_update_workspace(
     update_model = WorkspaceUpdate(**partial_update)
 
     # Execute update
-    result = await workspace_service.update_workspace(workspace_id, update_model)
+    result = await workspace_service.update_workspace(workspace_id, update_model, True)
 
     # Verify response
     assert "updated successfully" in result["message"]
@@ -398,7 +409,7 @@ async def test_partial_update_workspace(
 
 @pytest.mark.asyncio
 async def test_update_both_fields_workspace(
-    test_workspaces, mock_sio_workspace, async_session_factory
+    test_workspaces, mock_emit_workspace, async_session_factory
 ):
     """Test updating both name and description simultaneously.
 
@@ -408,7 +419,7 @@ async def test_update_both_fields_workspace(
     3. Database state reflects all changes
 
     :param test_workspaces: Pre-populated workspace fixtures
-    :param mock_sio_workspace: Mocked Socket.IO for event verification
+    :param mock_emit_workspace: Mocked Socket.IO for event verification
     :param async_session_factory: Factory for creating database sessions
     """
     workspace_id = test_workspaces[0].workspace_id
@@ -418,7 +429,7 @@ async def test_update_both_fields_workspace(
     }
 
     update_model = WorkspaceUpdate(**update_data)
-    result = await workspace_service.update_workspace(workspace_id, update_model)
+    result = await workspace_service.update_workspace(workspace_id, update_model, True)
 
     # Verify response
     assert "updated successfully" in result["message"]
@@ -426,6 +437,9 @@ async def test_update_both_fields_workspace(
     assert (
         result["data"]["workspace_description"] == update_data["workspace_description"]
     )
+
+    # Verify emit_record_updated was called
+    mock_emit_workspace.updated.assert_called_once()
 
     # Verify database state
     async with async_session_factory() as session:
@@ -449,7 +463,7 @@ async def test_delete_workspace(
     test_workspaces,
     workspace_id,
     should_exist,
-    mock_sio_workspace,
+    mock_emit_workspace,
     async_session_factory,
 ):
     """Test deleting a workspace.
@@ -464,7 +478,7 @@ async def test_delete_workspace(
     :param test_workspaces: Pre-populated workspace fixtures
     :param workspace_id: ID of the workspace to delete
     :param should_exist: Whether the workspace should exist
-    :param mock_sio_workspace: Mocked Socket.IO for event verification
+    :param mock_emit_workspace: Mocked Socket.IO for event verification
     :param async_session_factory: Factory for creating database sessions
     """
     if should_exist:
@@ -474,16 +488,19 @@ async def test_delete_workspace(
             workspace_name = workspace.workspace_name
 
         # Positive case - workspace should exist and be deleted
-        result = await workspace_service.delete_workspace(workspace_id)
+        result = await workspace_service.delete_workspace(workspace_id, True)
 
         # Verify response structure
         assert isinstance(result, dict)
         assert "message" in result
         assert f"Workspace '{workspace_name}' deleted successfully" in result["message"]
 
-        # Verify Socket.IO events were emitted
-        assert mock_sio_workspace.emit.call_count == 1
-        mock_sio_workspace.emit.assert_any_call("workspace_reload", namespace="/")
+        # Verify emit_record_deleted was called
+        mock_emit_workspace.deleted.assert_called_once()
+        call_args = mock_emit_workspace.deleted.call_args
+        assert call_args.kwargs["record_type"] == "workspace"
+        assert call_args.kwargs["record_id"] == workspace_id
+        assert call_args.kwargs.get("room") is None
 
         # Verify workspace was actually deleted from the database
         async with async_session_factory() as session:
@@ -492,7 +509,7 @@ async def test_delete_workspace(
     else:
         # Negative case - workspace should not exist
         with pytest.raises(ApiException) as exc_info:
-            await workspace_service.delete_workspace(workspace_id)
+            await workspace_service.delete_workspace(workspace_id, True)
 
         assert (
             f"Workspace with ID '{workspace_id}' not found"
