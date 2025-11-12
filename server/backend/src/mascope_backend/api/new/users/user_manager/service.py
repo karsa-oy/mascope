@@ -8,17 +8,23 @@ such as access token cleanup for external services like Jupyter.
 """
 
 from typing import Any, Dict, Optional
+from sqlalchemy import select
 from fastapi import Request, Response
 from fastapi_users import BaseUserManager, IntegerIDMixin
 from fastapi_users import models
-from mascope_backend.db.models import User
+from mascope_backend.db import async_session
+from mascope_backend.db.models import User, Role
 from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
 from mascope_backend.api.new.auth.config import auth_settings
 from mascope_backend.api.new.users import exceptions
-from mascope_backend.api.new.users.schemas import UserCreate, UserUpdate
+from mascope_backend.api.new.users.schemas import UserCreate, UserUpdate, UserRead
 from mascope_backend.api.new.auth.access_token.service import regenerate_access_token
 from mascope_backend.api.new.users.access_token.service import delete_user_access_tokens
-from mascope_backend.socket import event_emitter
+from mascope_backend.socket.records.service import (
+    emit_record_created,
+    emit_record_updated,
+    emit_record_deleted,
+)
 from mascope_backend.socket.auth import (
     authenticate_socket_connection,
     SocketUnauthenticatedError,
@@ -67,6 +73,22 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
             raise NotFoundException(f"User with ID '{id}' not found")
 
         return user
+
+    async def _get_user_dict_with_role(self, user: User) -> dict:
+        """
+        Convert User model to dict including role_name from joined Role table.
+
+        :param user: User model instance
+        :return: User dict with role_name field
+        """
+        async with async_session() as session:
+            query = select(Role.role_name).filter(Role.role_id == user.role_id)
+            result = await session.execute(query)
+            role_name = result.scalar_one_or_none()
+            user_data = user.to_dict()
+            user_data["role_name"] = role_name
+
+            return user_data
 
     async def create(
         self,
@@ -131,7 +153,11 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
         updated_user = await super().update(user_update, user, safe, request)
 
         # Handle file-converter token on role change
-        if user_update.role_id is not None and old_role_id != updated_user.role_id:
+        if (
+            hasattr(user_update, "role_id")  # UserUpdateMe does not have role_id
+            and user_update.role_id is not None
+            and old_role_id != updated_user.role_id
+        ):
             editor_level = auth_settings.ROLE_ACCESS_LEVELS.get("editor")
             promoted_to_editor = old_role_id < editor_level <= updated_user.role_id
             demoted_to_guest = old_role_id >= editor_level > updated_user.role_id
@@ -155,7 +181,14 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
 
     async def on_after_register(self, user: User, request: Optional[Request] = None):
         runtime.logger.info(f"User {user.username} was registered.")
-        await event_emitter.emit("user.reload", user)
+
+        user_dict = await self._get_user_dict_with_role(user)
+        validated_user_dict = UserRead.model_validate(user_dict).model_dump()
+        await emit_record_created(
+            record_type="user",
+            record_id=str(user.id),
+            record=validated_user_dict,
+        )
 
     async def on_after_forgot_password(
         self, user: User, token: str, request: Optional[Request] = None
@@ -236,7 +269,21 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
             runtime.logger.info(f"User `{user.username}` password was changed.")
             await delete_user_access_tokens(user_id=user.id)
 
-        await event_emitter.emit("user.reload", user)
+        user_dict = await self._get_user_dict_with_role(user)
+        validated_user_dict = UserRead.model_validate(user_dict).model_dump()
+
+        # Broadcast to all clients for admin views
+        await emit_record_updated(
+            record_type="user", record_id=str(user.id), record=validated_user_dict
+        )
+
+        # Also emit to the specific user's room for their own profile updates
+        await emit_record_updated(
+            record_type="user_me",
+            record_id=str(user.id),
+            record=validated_user_dict,
+            room=f"user-{user.id}",
+        )
         return
 
     async def on_after_delete(
@@ -249,4 +296,4 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
 
         :param user: The deleted user
         """
-        await event_emitter.emit("user.reload", user)
+        await emit_record_deleted(record_type="user", record_id=str(user.id))

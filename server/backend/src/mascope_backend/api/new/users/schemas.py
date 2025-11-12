@@ -1,8 +1,8 @@
 from datetime import datetime
 from typing import Optional
-from mascope_backend.api.new.users.exceptions import InvalidFieldsException
 from pydantic import EmailStr, Field, field_validator, model_validator
 from fastapi_users import schemas
+from mascope_backend.api.new.users.exceptions import InvalidFieldsException
 from mascope_backend.api.new.auth.config import auth_settings
 from mascope_backend.api.models.base_pydantic_model import QueryParamsModel
 

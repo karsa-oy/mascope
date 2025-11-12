@@ -5,8 +5,7 @@ import { useData } from '@/lib/store'
 
 import { useAuth } from '../../auth'
 
-// helper to execute route with a role if
-// superuser and do nothing otherwise:
+// helper to execute route with admin+ role and do nothing otherwise:
 const sudo = (execute) => {
   const auth = useAuth()
   const role = auth.user.role_name
@@ -19,6 +18,7 @@ const sudo = (execute) => {
 
 export const useUser = defineStore('app.data.user', () => {
   const name = 'user'
+  const key = 'id'
 
   const data = useData(
     name,
@@ -30,7 +30,7 @@ export const useUser = defineStore('app.data.user', () => {
         })
       ) ?? [],
     {
-      events: ['user_reload_all']
+      key
     }
   )
 

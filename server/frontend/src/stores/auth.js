@@ -93,7 +93,9 @@ export const useAuth = defineStore('app.auth', () => {
       }
     }
   )
-  api.socket.on('user_reload_me', identify)
+
+  // Listen for profile updates via socket and refresh user data
+  api.socket.on('user_me_updated', identify)
 
   return {
     user,
