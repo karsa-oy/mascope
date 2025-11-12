@@ -531,7 +531,7 @@ def load_peak_timeseries(
     # --- Load existing peak timeseries from the sample file ---
     peak_timeseries = m_io.load_peak_data(base_filename).sel(mz=mzs, method="nearest")
     runtime.logger.debug(
-        f"Loading peak timeseries for m/z values: {peak_timeseries.mz.values} from {base_filename}"
+        f"Loading peak timeseries for {peak_timeseries.mz.size} m/z values from {base_filename}"
     )
     to_compute_mask = np.invert(peak_timeseries.is_timeseries_computed.values)
     if not np.any(to_compute_mask):

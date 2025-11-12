@@ -86,7 +86,6 @@ class BaseCalibrationHandler:
         instrument_type = m_name.get_instrument_type(self.filename)
         peaks = load_peaks(
             filename=self.filename,
-            instrument_type=instrument_type,
             target_mzs=target_isotopes_df.mz,
         )
         parsed_peaks = parse_and_filter_peaks(peaks)
@@ -432,9 +431,12 @@ class OrbiCalibrationHandler(BaseCalibrationHandler):
             m_io.update_zarr_array_coord(self.filename, "signal", "mz", new_signal_mz)
         try:
             new_peak_mz = (
-                m_io.load_coord(self.filename, "peak_timeseries", "mz") * old_factor_scaling
+                m_io.load_coord(self.filename, "peak_timeseries", "mz")
+                * old_factor_scaling
             )
-            m_io.update_zarr_array_coord(self.filename, "peak_timeseries", "mz", new_peak_mz)
+            m_io.update_zarr_array_coord(
+                self.filename, "peak_timeseries", "mz", new_peak_mz
+            )
         except PathNotFoundError:
             runtime.logger.warning(
                 f"Peak_areas/heights not found in {self.filename}, "

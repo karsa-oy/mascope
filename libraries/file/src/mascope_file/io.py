@@ -336,8 +336,8 @@ def write_peaks(
         if os.path.exists(peak_timeseries_path):
             try:
                 rmtree(peak_timeseries_path)
-            except Exception as e:
-                runtime.logger.error(f"Failed to remove existing peak timeseries")
+            except Exception:
+                runtime.logger.error("Failed to remove existing peak timeseries")
                 raise
         peak_timeseries.to_zarr(peak_timeseries_path, mode="w")
 
@@ -378,7 +378,8 @@ def write_peaks(
         (indexer[start], indexer[end]) for start, end in zip(group_starts, group_ends)
     ]
 
-    for start_idx, end_idx in contiguous_regions:
+    total_num_regions = len(contiguous_regions)
+    for i, (start_idx, end_idx) in enumerate(contiguous_regions):
         try:
             region = {"mz": slice(start_idx, end_idx + 1), "time": slice(None)}
             region_mask = (indexer >= start_idx) & (indexer <= end_idx)
@@ -389,6 +390,11 @@ def write_peaks(
             contiguous_mz_data.to_zarr(
                 peak_timeseries_path, mode="r+", region=region, safe_chunks=False
             )
+            progress_percent = (i + 1) / total_num_regions * 100
+            if progress_percent % 10 == 0:
+                runtime.logger.debug(
+                    f"{progress_percent:.1f}% done writing peak timeseries..."
+                )
         except Exception:
             runtime.logger.error(
                 "Failed to write peak timeseries for "
@@ -397,7 +403,7 @@ def write_peaks(
             raise
 
     runtime.logger.debug(
-        f"Successfully saved peak timeseries for {mz_update} mz values at {peak_timeseries_path}"
+        f"Successfully saved peak timeseries for {len(mz_update)} mz values at {peak_timeseries_path}"
     )
 
 

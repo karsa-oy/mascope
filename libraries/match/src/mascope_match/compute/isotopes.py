@@ -77,7 +77,6 @@ async def compute_match_isotopes(
         # --- Load sample peaks ---
         peaks = load_peaks(
             filename=filename,
-            instrument_type=instrument_type,
             target_mzs=target_isotopes_df.mz,
             polarity=polarity,
         )
@@ -130,7 +129,6 @@ async def compute_match_isotopes(
 
 def load_peaks(
     filename: str,
-    instrument_type: str,
     target_mzs: pd.Series,
     polarity: Literal["+", "-"] | None = None,
 ):
@@ -139,8 +137,6 @@ def load_peaks(
 
     :param filename: Path to the sample file to be analyzed for matches.
     :type filename: str
-    :param instrument_type: Type of the instrument used for the sample file, e.g., "orbi" or "tof".
-    :type instrument_type: str
     :param target_mzs: Series of target m/z values to be matched against the sample peaks.
     :type target_mzs: pd.Series
     :param polarity: Polarity of the sample, either "+", "-", or "+-". Defaults to None.
@@ -148,6 +144,7 @@ def load_peaks(
     :return: DataArray containing detected peaks with their m/z, intensity, and time information.
     :rtype: xarray.DataArray
     """
+    instrument_type = get_instrument_type(filename)
     target_mzs = np.asarray(target_mzs)
     peak_data = m_io.load_peak_data(filename)
     # Select unique closest m/z values from the peak data

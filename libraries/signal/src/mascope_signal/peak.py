@@ -3,7 +3,6 @@ import asyncio
 import os
 import math
 from concurrent.futures import ProcessPoolExecutor
-from typing import Literal
 import numpy as np
 import pandas as pd
 from scipy.signal._peak_finding_utils import _select_by_peak_distance
