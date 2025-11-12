@@ -13,20 +13,16 @@ from mascope_backend.api.lib.exceptions.api_exceptions import (
     handle_exception,
     api_e_response_json,
 )
+from mascope_backend.api.lib.utils import handle_reloads, beautify_func_name
 from mascope_backend.socket.notifications import (
     UserNotification,
-    emit_user_notification,
-    handle_reloads,
     handle_notifications,
 )
 
 from mascope_backend.runtime import runtime
 
 
-def api_controller(
-    success_reload_events: list[tuple[str, str]] | None = None,
-    error_reload_events: list[tuple[str, str]] | None = None,
-):
+def api_controller():
     """
     A decorator for controller functions to handle exceptions and standardize error responses.
 
@@ -36,43 +32,15 @@ def api_controller(
     For non-processed exceptions, an ApiException is raised with a custom or default error
     message, providing additional context about where the error occurred.
 
-    Also handles emit reload events based on execution outcome if independent_transaction flag is set.
-
-    Usage:
-        @api_controller(
-            success_reload_events=[("sample_batch_reload", "sample_batch_id")],
-            error_reload_events=[("sample_batch_error", "sample_batch_id")]
-        )
-        async def some_controller_function(...):
-            ...
-
-    :param success_reload_events: List of tuples (event_name, room_key) for success UI reload notifications
-    :type success_reload_events: list[tuple[str, str]] | None
-    :param error_reload_events: List of tuples (event_name, room_key) for error UI reload notifications
-    :type error_reload_events: list[tuple[str, str]] | None
     :return: The decorated controller function wrapped in a try-except block for exception handling
     :rtype: Callable
     """
-    # Convert None to empty lists
-    success_reload_events = success_reload_events or []
-    error_reload_events = error_reload_events or []
 
     def decorator(func: Callable):
         @wraps(func)
         async def wrapper(*args, **kwargs):
-            independent_transaction = kwargs.get("independent_transaction", False)
             try:
-                result = await func(*args, **kwargs)
-
-                # Emit reload events only if this is an independent transaction
-                if independent_transaction:
-                    await handle_reloads(
-                        f"Success reload {func.__name__}",
-                        success_reload_events,
-                        kwargs,
-                        result,
-                    )
-                return result
+                return await func(*args, **kwargs)
             except ApiException as e:
                 # Handle already processed exceptions
                 if e.status_code == 200:
@@ -91,28 +59,10 @@ def api_controller(
 
                 user_message = f"{context_message}. {e.user_message}"
 
-                # Emit error reload events if this is an independent transaction
-                if independent_transaction:
-                    await handle_reloads(
-                        f"ApiException reload (status {e.status_code}) {func.__name__}",
-                        error_reload_events,
-                        kwargs,
-                        e.tech_message,
-                    )
-
                 raise ApiException(user_message, e.tech_message, e.status_code)
             except Exception as e:
                 context_message = f"Failed to {beautify_func_name(func.__name__)}"
                 api_exc = process_exception(e, context_message)
-
-                # Emit error reload events if this is an independent transaction
-                if independent_transaction:
-                    await handle_reloads(
-                        f"Unhandled Exception reload {func.__name__}",
-                        error_reload_events,
-                        kwargs,
-                        None,
-                    )
 
                 raise api_exc
 
@@ -259,7 +209,7 @@ def api_controller_background_task(
 
     Usage:
         @api_controller_background_task(
-            success_reload=[("sample_batch_reload", "affected_sample_batch_ids")]
+            success_reload=[("match", "affected_sample_batch_ids")],
         )
         async def import_sample_items(
             sample_batch_id: str,
@@ -417,28 +367,3 @@ def api_controller_background_task(
         return wrapper
 
     return decorator
-
-
-# utils
-
-
-def beautify_func_name(func_name: str, max_words: int = None) -> str:
-    """
-    Beautify a function name by replacing underscores with spaces.
-    Optionally, limit the number of words used in the beautified name.
-
-    :param func_name: The function name to beautify.
-    :type func_name: str
-    :param max_words: Maximum number of words to include in the beautified name.
-    :type max_words: int, optional
-    :return: The beautified function name.
-    :rtype: str
-    """
-    if not isinstance(func_name, str):
-        raise ValueError("Function name must be a string.")
-
-    # Replace underscores with spaces and capitalize the first letter
-    words = func_name.replace("_", " ").split()
-    beautified_name = " ".join(words[:max_words]) if max_words else " ".join(words)
-
-    return beautified_name
