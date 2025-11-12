@@ -382,13 +382,11 @@ async def delete_sample_file(
             "Exactly one parameter must be provided: either sample_file_id or filename"
         )
     target_filename = filename
-    instrument = None
 
     # --- Handle sample_file_id case ---
     if sample_file_id:
         sample_file_data = (await get_sample_file(sample_file_id))["data"]
         target_filename = sample_file_data["filename"]
-        instrument = sample_file_data["instrument"]
 
     # --- Handle filename case - try to find database record ---
     elif filename:
@@ -397,7 +395,6 @@ async def delete_sample_file(
             result = await session.execute(stmt)
             if sample_file := result.scalar_one_or_none():
                 sample_file_id = sample_file.sample_file_id
-                instrument = sample_file.instrument
 
     # --- Safety check - verify no associated sample items exist ---
     if associated_samples := (await get_samples(filename=target_filename))["data"]:

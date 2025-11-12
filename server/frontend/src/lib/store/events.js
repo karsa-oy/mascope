@@ -17,7 +17,7 @@ export const useEvents = (name, key, refs, methods, events, logger) => {
 
   // Event deduplication cache with TTL
   const processedEvents = new Map()
-  // TODO_congiguration
+  // TODO_configuration
   const EVENT_CACHE_TTL = 30000 // 30 seconds
 
   // Cleanup expired events periodically
@@ -69,7 +69,7 @@ export const useEvents = (name, key, refs, methods, events, logger) => {
 
   const handleCreated = (record_id, record, index) => {
     if (index === -1) {
-      // Add new record
+      // Not found → add new record
       records.value = [...records.value, record]
 
       // Reindex all records
@@ -79,8 +79,8 @@ export const useEvents = (name, key, refs, methods, events, logger) => {
   }
 
   const handleUpdated = (record_id, record, index, timestamp, changed_fields) => {
-    if (index < 0) {
-      // Record not in current list - ignore partial updates for unlisted records
+    if (index === -1) {
+      // Not found → ignore
       logger.debug(`ignoring update for unlisted record ${record_id}`)
       return
     }
@@ -129,8 +129,8 @@ export const useEvents = (name, key, refs, methods, events, logger) => {
   }
 
   const handleDeleted = (record_id, index) => {
-    if (index >= 0) {
-      // Type-safe immutable delete for proper reactivity with shallowRef
+    if (index !== -1) {
+      // Found → delete, type-safe immutable delete for proper reactivity with shallowRef
       records.value = records.value.filter((r) => String(r[key]) !== String(record_id))
 
       // Reindex remaining records

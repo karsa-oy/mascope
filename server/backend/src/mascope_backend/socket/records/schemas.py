@@ -17,12 +17,13 @@ class RecordEvent(BaseModel):
       - Partial update: record contains only changed fields, changed_fields=[...]
         Frontend merges changed fields into existing record
     - deleted: Record removed (no record data, just ID)
-    - reload: Bulk reload trigger (no record data, signals store to reload it's list with API call)
+    - reload: Bulk reload trigger (no record data, signals store to reload its list with API call)
     """
 
     event_id: str = Field(
         ...,
-        length=record_sync_config.EVENT_ID_LENGTH,
+        min_length=record_sync_config.EVENT_ID_LENGTH,
+        max_length=record_sync_config.EVENT_ID_LENGTH,
         description="Unique event identifier",
     )
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

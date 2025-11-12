@@ -38,7 +38,7 @@ export const useBatch = defineStore('app.data.batch', () => {
     ...data,
     // api
     create: (batch) =>
-      api.http.post(`/sample/batches/`, batch, {
+      api.http.post(`/sample/batches`, batch, {
         use: 'create',
         type: 'create_batch'
       }),

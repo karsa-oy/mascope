@@ -309,14 +309,14 @@ async def create_sample_batch(
     Validates constraints for ACQUISITION batches.
 
     Steps:
-    1. Validate batch constraints:
+    - Validate batch constraints:
         - workspace type constraints for ACQUISITION batches
         - target collection type constraints for the sample batch type
         - ionization mechanism polarity compatibility
-    2. Construct a new SampleBatch object with the provided details and a generated unique ID.
-    3. Associate the new sample batch with target collections if any are provided in the request.
-    4. Commit the transaction to persist the new sample batch in the database.
-    5. Return the details of the created sample batch as a dictionary.
+    - Construct a new SampleBatch object with the provided details and a generated unique ID.
+    - Associate the new sample batch with target collections if any are provided in the request.
+    - Commit the transaction to persist the new sample batch in the database.
+    - Return the details of the created sample batch as a dictionary.
 
     :param sample_batch: Data for creating the sample batch.
     :type sample_batch: SampleBatchCreate
@@ -326,7 +326,7 @@ async def create_sample_batch(
     :rtype: dict
     """
     async with async_session() as session:
-        # Step 1: Validate workspace type for ACQUISITION batches
+        # --- Validate workspace type for ACQUISITION batches ---
         if sample_batch.sample_batch_type == "ACQUISITION":
             if not (
                 workspace := await session.get(Workspace, sample_batch.workspace_id)
@@ -347,7 +347,7 @@ async def create_sample_batch(
             sample_batch_type=sample_batch.sample_batch_type,
         )
 
-        # Step 2: Construct new sample batch
+        # --- Construct new sample batch object ---
         new_sample_batch = SampleBatch(
             sample_batch_id=gen_id(16),
             **sample_batch.model_dump(
@@ -364,7 +364,7 @@ async def create_sample_batch(
 
         session.add(new_sample_batch)
 
-        # Step3: Associate with target collections if provided
+        # --- Associate with target collections if provided ---
         for target_collection_id in sample_batch.target_collection_ids:
             new_target_collection_in_sample_batch = TargetCollectionInSampleBatch(
                 target_collection_id=target_collection_id,
@@ -372,11 +372,11 @@ async def create_sample_batch(
             )
             session.add(new_target_collection_in_sample_batch)
 
-        # Step 4: Commit transaction and refresh instance
+        # --- Commit transaction and refresh instance ---
         await session.commit()
         await session.refresh(new_sample_batch)
 
-    # Step 5: Emit creation event
+    # --- Emit creation event ---
     batch_data = SampleBatchRead.model_validate(new_sample_batch).model_dump()
     if independent_transaction:
         await emit_record_created(
@@ -386,7 +386,7 @@ async def create_sample_batch(
             room=new_sample_batch.workspace_id,
         )
 
-    # Step 5: Return created sample batch
+    # --- Return created sample batch data ---
     return {
         "message": f"Sample batch '{new_sample_batch.sample_batch_name}' was created.",
         "data": batch_data,

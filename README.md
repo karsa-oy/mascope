@@ -551,7 +551,7 @@ from mascope_backend.socket.records import (
 # Emit record creation (broadcast or to specific room)
 await emit_record_created(
     record_type="batch",           # Frontend store name
-    record_id=str(batch.id),       # Record ID as string
+    record_id=str(batch.sample_batch_id),       # Record ID should be string
     record=batch_dict,             # Full record as dict
     room=workspace_id              # Optional: target specific room
 )
@@ -559,14 +559,15 @@ await emit_record_created(
 # Full update
 await emit_record_updated(
     record_type="batch",
-    record_id=str(batch.id),
-    record=batch_dict
+    record_id=str(batch.sample_batch_id),
+    record=batch_dict,
+    room=batch.workspace_id,
 )
 
 # Partial update (frontend merges fields)
 await emit_record_updated(
     record_type="batch",
-    record_id=str(batch.id),
+    record_id=str(batch.sample_batch_id),
     record={"status": "ready"},
     changed_fields=["status"]
 )
@@ -574,6 +575,9 @@ await emit_record_updated(
 # Deletion
 await emit_record_deleted(
     record_type="batch",
+    record_id=str(batch.sample_batch_id),
+    room=workspace_id
+)
 
 ```
 
