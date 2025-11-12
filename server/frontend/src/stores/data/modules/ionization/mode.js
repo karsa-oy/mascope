@@ -15,8 +15,7 @@ export const useIonizationMode = defineStore('app.data.ionization.mode', () => {
         type: 'load_ionization_modes'
       }),
     {
-      key,
-      events: ['ionization_mode_reload']
+      key
     }
   )
 

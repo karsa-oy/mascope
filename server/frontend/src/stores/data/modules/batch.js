@@ -20,7 +20,6 @@ export const useBatch = defineStore('app.data.batch', () => {
       }),
     {
       key,
-      events: ['sample_batch_reload'],
       deps: () => ({
         workspace_id: useWorkspace().focusedId
       }),

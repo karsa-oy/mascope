@@ -6,16 +6,11 @@ import { useData } from '@/lib/store'
 export const useTargetCompound = defineStore('app.data.target.compound', () => {
   const name = 'target_compound'
 
-  const data = useData(
-    name,
-    () =>
-      api.http.get(`/target/compounds`, {
-        use: 'read',
-        type: 'load_target_compounds'
-      }),
-    {
-      events: ['targets_all_reload']
-    }
+  const data = useData(name, () =>
+    api.http.get(`/target/compounds`, {
+      use: 'read',
+      type: 'load_target_compounds'
+    })
   )
 
   return {

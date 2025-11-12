@@ -21,7 +21,7 @@ export const useMatchIon = defineStore('app.data.match.ion', () => {
       }),
     {
       key,
-      events: ['match_reload', 'ion_reload'],
+      events: ['match_reload'], // Cross-store event (match updates trigger reload)
       deps: () => {
         const sampleId = useSample().focusedId
         const batchId = useBatch().focusedId

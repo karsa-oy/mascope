@@ -37,8 +37,8 @@ export const useTargetCollection = defineStore('app.data.target.collection', () 
       }),
     {
       key,
-      events: ['targets_all_reload'],
       selection: {
+        subscribe: true,
         /**
          * Hook to automatically load detailed data when focused
          * and clear when unfocused

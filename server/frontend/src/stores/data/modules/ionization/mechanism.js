@@ -16,7 +16,6 @@ export const useIonizationMechanism = defineStore('app.data.ionization.mechanism
       }),
     {
       key,
-      events: ['ionization_mechanism_reload'],
       selection: true
     }
   )

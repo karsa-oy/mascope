@@ -37,7 +37,6 @@ export const usePeak = defineStore('app.data.peak', () => {
     },
     {
       key: 'mz',
-      events: ['peak_reload'],
       deps: () => ({
         sample_item_id: useSample().focusedId
       }),

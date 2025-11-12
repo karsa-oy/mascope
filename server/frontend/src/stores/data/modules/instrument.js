@@ -17,7 +17,6 @@ export const useInstrument = defineStore('app.data.instrument', () => {
       }),
     {
       key,
-      events: ['instruments_reload'],
       selection: {
         mode: 'single',
         persist: true,

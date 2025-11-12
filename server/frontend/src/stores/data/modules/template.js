@@ -6,16 +6,11 @@ import { useData } from '@/lib/store'
 export const useTemplate = defineStore('app.data.template', () => {
   const name = 'template'
 
-  const data = useData(
-    name,
-    () =>
-      api.http.get(`/attribute_templates`, {
-        use: 'read',
-        type: 'load_attribute_templates'
-      }),
-    {
-      events: ['template_reload']
-    }
+  const data = useData(name, () =>
+    api.http.get(`/attribute_templates`, {
+      use: 'read',
+      type: 'load_attribute_templates'
+    })
   )
 
   return {

@@ -17,7 +17,6 @@ export const useWorkspace = defineStore('app.data.workspace', () => {
       }),
     {
       key,
-      events: ['workspace_reload'],
       selection: {
         mode: 'single',
         subscribe: true,
