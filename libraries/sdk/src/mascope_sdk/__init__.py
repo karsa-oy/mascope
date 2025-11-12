@@ -1,17 +1,9 @@
 import json
 import warnings
 import requests
-import sys
 from loguru import logger
 from requests.exceptions import HTTPError, Timeout, RequestException
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
-
-logger.remove()
-logger.add(
-    sys.stderr,
-    format="<green>{time:HH:mm:ss}</green> | <level>{level}</level> | <level>{message}</level>",
-    colorize=True,
-)
 
 # Suppress only the InsecureRequestWarning from requests
 warnings.simplefilter("ignore", InsecureRequestWarning)
