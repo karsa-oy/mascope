@@ -20,6 +20,7 @@ export const useAuth = defineStore('app.auth', () => {
         validateStatus: (status) => status < 500
       })) ?? false
   }
+
   const login = async ({ email, password }) => {
     const params = new URLSearchParams()
     params.append('grant_type', 'password')
@@ -32,6 +33,7 @@ export const useAuth = defineStore('app.auth', () => {
     })
     await identify()
   }
+
   const logout = async () => {
     await api.http.post(
       `/auth/logout`,
@@ -43,7 +45,8 @@ export const useAuth = defineStore('app.auth', () => {
     )
     await identify()
   }
-  // First owner management
+
+  // --- First owner management ---
   const checkFirstOwner = async () => {
     const response = await api.http.get('/users/first-owner/status', {
       type: 'first_owner_status',
@@ -63,7 +66,9 @@ export const useAuth = defineStore('app.auth', () => {
     )
     await checkFirstOwner()
   }
-  // Hooks
+  // --- Login callback system (pub-sub pattern) ---
+  // Stores register callbacks via auth.onLogin(() => sync())
+  // When user actually logs in, all registered callbacks fire
   const handlers = ref([])
 
   function onLogin(callback) {
@@ -74,17 +79,22 @@ export const useAuth = defineStore('app.auth', () => {
   watch(
     () => user.value,
     async (newUser, oldUser) => {
-      // Trigger login callbacks when user logs in
-      if (newUser && oldUser !== newUser) {
+      // Compare by ID, not object references (prevents false positives on profile updates)
+      const oldId = oldUser && typeof oldUser === 'object' ? oldUser.id : null
+      const newId = newUser && typeof newUser === 'object' ? newUser.id : null
+      // Fire login callbacks ONLY when user ID changes from null to valid (user login)
+      if (newId && !oldId) {
         handlers.value.forEach(({ callback }) => callback())
       }
 
-      // Socket subscriptions
-      if (oldUser) {
-        api.socket.emit('unsubscribe', `user-${oldUser.id}`)
-      }
-      if (newUser) {
-        api.socket.emit('subscribe', `user-${newUser.id}`)
+      // Socket subscriptions to user room - if user ID changed
+      if (oldId !== newId) {
+        if (oldId) {
+          api.socket.emit('unsubscribe', `user-${oldId}`)
+        }
+        if (newId) {
+          api.socket.emit('subscribe', `user-${newId}`)
+        }
       }
 
       // Check first owner status only when no authenticated user found
