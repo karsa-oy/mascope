@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import select, update, case, exists
 
+from mascope_backend.socket.records import emit_record_updated
 from mascope_backend.db import async_session
 from mascope_backend.db.models import SampleBatch, SampleItem
 from mascope_backend.api.lib.api_features import (
@@ -16,22 +17,14 @@ from mascope_backend.api.models.sample.batches.config import sample_batch_config
 from mascope_backend.runtime import runtime
 
 
-# TODO_reload - should emit affected batches ids to the workspace rooms
-@api_controller(
-    success_reload_events=[
-        ("sample_batch_reload", "affected_workspace_ids"),
-    ],
-    error_reload_events=[
-        ("sample_batch_reload", "affected_workspace_ids"),
-    ],
-)
+@api_controller()
 async def update_sample_batch_status(
     sample_batch_ids: list[str],
     status: str,
     independent_transaction: bool = False,
 ) -> dict:
     """
-    Updates the status of multiple sample batches.
+    Updates the status of multiple sample batches and emits targeted partial updates.
 
     :param sample_batch_ids: List of sample batch IDs to update
     :type sample_batch_ids: list[str]
@@ -81,24 +74,33 @@ async def update_sample_batch_status(
         )
 
         updated_count = result.rowcount
-
         await session.commit()
 
-        skipped_count = len(sample_batch_ids) - updated_count
-        message = f"Updated {updated_count}/{len(sample_batch_ids)} batches to status '{status}'"
+        # Get affected workspaces for room targeting
+        batches = (
+            await session.execute(
+                select(SampleBatch.sample_batch_id, SampleBatch.workspace_id).where(
+                    SampleBatch.sample_batch_id.in_(sample_batch_ids)
+                )
+            )
+        ).all()
 
+        # Emit targeted partial (status field) update events for each batch
+        if independent_transaction:
+            for batch_id, workspace_id in batches:
+                await emit_record_updated(
+                    record_type="batch",
+                    record_id=batch_id,
+                    record={
+                        "status": status,
+                    },  # Partial record - only changed field
+                    room=workspace_id,
+                    changed_fields=["status"],  # Signals frontend to merge
+                )
+
+        message = f"Updated {updated_count}/{len(sample_batch_ids)} batches to status '{status}'"
         if updated_count > 0:
             runtime.logger.info(message)
-
-        affected_workspace_ids = list(
-            (
-                await session.execute(
-                    select(SampleBatch.workspace_id)
-                    .where(SampleBatch.sample_batch_id.in_(sample_batch_ids))
-                    .distinct()
-                )
-            ).scalars()
-        )
 
         return {
             "status": "success",
@@ -106,10 +108,7 @@ async def update_sample_batch_status(
             "data": {
                 "total_batches": len(sample_batch_ids),
                 "updated_batches": updated_count,
-                "skipped_batches": skipped_count,
+                "skipped_batches": len(sample_batch_ids) - updated_count,
                 "target_status": status,
-            },
-            "_notification_data": {
-                "affected_workspace_ids": affected_workspace_ids,
             },
         }
