@@ -4,8 +4,8 @@ from sqlalchemy import (
     desc,
     func,
 )
+from mascope_backend.socket.records.service import emit_record_reload
 from mascope_backend.db import async_session
-from mascope_backend.socket import sio
 from mascope_backend.db.id import gen_id
 from mascope_backend.db.models import AttributeTemplate
 from mascope_backend.api.lib.api_features import api_controller
@@ -143,7 +143,7 @@ async def create_attribute_template(template_data: AttributeTemplateCreateBody):
         await session.refresh(new_template)
 
     # Step 4: Emit the event to inform the clients about the new template
-    await sio.emit("template_reload", namespace="/")
+    await emit_record_reload(record_type="template")
 
     # Step 5: Return created template
     return {
@@ -191,7 +191,7 @@ async def update_attribute_template(
         await session.commit()
 
     # Step 4: Emit an "template_reload" event to notify clients about the updated template.
-    await sio.emit("template_reload", namespace="/")
+    await emit_record_reload(record_type="template")
 
     # Step 5: Return the updated template as a dictionary.
     return {
@@ -228,7 +228,7 @@ async def delete_attribute_template(attribute_template_id: str):
         await session.commit()
 
     # Step 3: Emit an "template_reload" event to notify clients about the deletion.
-    await sio.emit("template_reload", namespace="/")
+    await emit_record_reload(record_type="template")
 
     return {
         "message": f"Attribute template '{template.name}' deleted successfully.",

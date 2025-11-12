@@ -33,9 +33,9 @@ from mascope_backend.runtime import runtime
 
 @api_controller_background_task(
     success_notification_rooms=["sid"],
-    success_reload=[("match_reload", "affected_sample_batch_ids")],
+    success_reload=[("match", "affected_sample_batch_ids")],
     error_notification_rooms=["sid"],
-    error_reload=[("match_reload", "affected_sample_batch_ids")],
+    error_reload=[("match", "affected_sample_batch_ids")],
 )
 async def process_sample_item(
     sample_item: SampleItemCreate,

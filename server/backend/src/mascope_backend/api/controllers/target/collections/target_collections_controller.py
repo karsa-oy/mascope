@@ -4,7 +4,7 @@ import asyncio
 from sqlalchemy import asc, desc, func, select, delete, and_
 from sqlalchemy.orm import joinedload
 
-from mascope_backend.socket import sio
+from mascope_backend.socket.records.service import emit_record_reload
 from mascope_backend.db import async_session
 from mascope_backend.db.id import gen_id
 from mascope_backend.db.models import (
@@ -204,14 +204,7 @@ async def get_target_collection(target_collection_id: str) -> dict:
         }
 
 
-@api_controller(
-    success_reload_events=[
-        ("collection_reload", "affected_sample_batch_ids"),
-    ],
-    error_reload_events=[
-        ("collection_reload", "affected_sample_batch_ids"),
-    ],
-)
+@api_controller()
 async def create_target_collection(
     target_collection_create: TargetCollectionCreate,
     independent_transaction: bool = False,
@@ -329,9 +322,16 @@ async def create_target_collection(
         )
 
     # Step 7: Emit reload events
-    await sio.emit("targets_all_reload", namespace="/")
-    for batch_id in sample_batch_ids:
-        await sio.emit("collection_reload", room=batch_id, namespace="/")
+    if independent_transaction:
+        # Update target.collection list
+        await emit_record_reload(record_type="target_collection")
+
+        # Update match.collection list (MatchBrowser table)
+        for batch_id in sample_batch_ids:
+            await emit_record_reload(
+                record_type="match_collection",
+                room=batch_id,
+            )
 
     # Fetch the created collection with associations for return
     created_collection = await fetch_target_collection(
@@ -356,9 +356,6 @@ async def create_target_collection(
         "status": "success",
         "message": message,
         "data": created_collection,
-        "_notification_data": {
-            "affected_sample_batch_ids": sample_batch_ids,
-        },
     }
 
 
@@ -570,23 +567,28 @@ async def update_target_collection(
 
     # Step 8: Emit reload events based on change types
     reload_events = []
-    # Always emit targets reload if anything changed
-    if any([changes["compounds"], changes["batches"], changes["basic_fields"]]):
-        reload_events.append(sio.emit("targets_all_reload", namespace="/"))
 
-    if any([changes["batches"], changes["basic_fields"]]):
-        # Reload collection data for affected batches
-        reload_events.extend(
-            [
-                sio.emit("collection_reload", room=batch_id, namespace="/")
-                for batch_id in affected_sample_batch_ids
-            ]
-        )
+    if independent_transaction:
+        # emit target.collection reload if anything changed
+        if any([changes["compounds"], changes["batches"], changes["basic_fields"]]):
+            reload_events.append(emit_record_reload(record_type="target_collection"))
 
+        # Reload match_collection for affected batches
+        if any([changes["batches"], changes["basic_fields"]]):
+            reload_events.extend(
+                [
+                    emit_record_reload("match_collection", room=batch_id)
+                    for batch_id in affected_sample_batch_ids
+                ]
+            )
+
+    # Reload match.ion table data in the target collection
     if changes["compounds"]:
-        # Reload match ion table data in the target collection
         reload_events.append(
-            sio.emit("ion_reload", room=target_collection_id, namespace="/")
+            emit_record_reload(
+                record_type="match_ion",
+                room=target_collection_id,
+            )
         )
 
     if reload_events:
@@ -613,14 +615,7 @@ async def update_target_collection(
     }
 
 
-@api_controller(
-    success_reload_events=[
-        ("collection_reload", "affected_sample_batch_ids"),
-    ],
-    error_reload_events=[
-        ("collection_reload", "affected_sample_batch_ids"),
-    ],
-)
+@api_controller()
 async def delete_target_collection(
     target_collection_id: str,
     delete_orphan_compounds: bool = False,
@@ -709,8 +704,16 @@ async def delete_target_collection(
                 )
 
     # Step 6: Emit reload events
-    # TODO_reload - handle emitting without specific rooms (to all clients)
-    await sio.emit("targets_all_reload", namespace="/")
+    if independent_transaction:
+        # Update target.collection list
+        await emit_record_reload(record_type="target_collection")
+
+        # Update match.collection list (MatchBrowser table)
+        for batch_id in affected_sample_batch_ids:
+            await emit_record_reload(
+                record_type="match_collection",
+                room=batch_id,
+            )
 
     message = (
         f"Target collection '{target_collection.target_collection_name}' was deleted"
@@ -727,7 +730,4 @@ async def delete_target_collection(
     return {
         "status": "success",
         "message": message,
-        "_notification_data": {
-            "affected_sample_batch_ids": list(affected_sample_batch_ids),
-        },
     }

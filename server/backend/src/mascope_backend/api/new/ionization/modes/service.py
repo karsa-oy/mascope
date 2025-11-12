@@ -1,5 +1,10 @@
 from sqlalchemy import select, and_, or_
 
+from mascope_backend.socket.records.service import (
+    emit_record_created,
+    emit_record_updated,
+    emit_record_deleted,
+)
 from mascope_backend.db import async_session
 from mascope_backend.db.id import gen_id
 from mascope_backend.db.models import IonizationMode, SampleBatch, SampleItem
@@ -12,7 +17,6 @@ from mascope_backend.api.new.ionization.modes.schema import (
     IonizationModeCreate,
     IonizationModeUpdate,
 )
-from mascope_backend.socket import sio
 
 from .util import (
     fetch_all_ionization_modes,
@@ -70,11 +74,16 @@ async def create_ionization_mode(
 
         # Step 5: Refresh and return
         await session.refresh(new_ionization_mode)
-        await sio.emit("ionization_mode_reload")
-        return {
-            "message": "Ionization mode created successfully.",
-            "data": new_ionization_mode.to_dict(),
-        }
+
+    await emit_record_created(
+        record_type="ionization_mode",
+        record_id=new_ionization_mode.ionization_mode_id,
+        record=new_ionization_mode.to_dict(),
+    )
+    return {
+        "message": "Ionization mode created successfully.",
+        "data": new_ionization_mode.to_dict(),
+    }
 
 
 @api_controller()
@@ -277,12 +286,17 @@ async def update_ionization_mode(
         # Commit and return
         await session.commit()
         await session.refresh(ionization_mode)
-        await sio.emit("ionization_mode_reload")
-        return {
-            "message": f"Ionization mode {ionization_mode.ionization_mode_name} "
-            "updated successfully.",
-            "data": ionization_mode.to_dict(),
-        }
+
+    await emit_record_updated(
+        record_type="ionization_mode",
+        record_id=ionization_mode_id,
+        record=ionization_mode.to_dict(),
+    )
+    return {
+        "message": f"Ionization mode {ionization_mode.ionization_mode_name} "
+        "updated successfully.",
+        "data": ionization_mode.to_dict(),
+    }
 
 
 @api_controller()
@@ -322,7 +336,11 @@ async def delete_ionization_mode(ionization_mode_id: str) -> dict:
         # Step 3: Delete the ionization mode and commit changes
         await session.delete(ionization_mode)
         await session.commit()
-        await sio.emit("ionization_mode_reload")
-        return {
-            "message": f"Ionization mode {ionization_mode.ionization_mode_name} deleted successfully.",
-        }
+
+    await emit_record_deleted(
+        record_type="ionization_mode",
+        record_id=ionization_mode_id,
+    )
+    return {
+        "message": f"Ionization mode {ionization_mode.ionization_mode_name} deleted successfully.",
+    }

@@ -1,7 +1,6 @@
 from typing import List, Optional
 from sqlalchemy import asc, desc, func, select
 from sqlalchemy.orm import joinedload
-from mascope_backend.socket import sio
 from mascope_backend.db import async_session
 from mascope_backend.db.models import (
     IonizationMechanism,
@@ -392,15 +391,9 @@ async def update_target_ion(target_ion_id: str, target_ion_update: TargetIonUpda
                     batch.sample_batch_id for batch in affected_batches
                 ]
 
-                # Emit signal for affected sample batches
                 for sample_batch_id in affected_batch_ids:
                     await aggregate_and_recreate_matches(
                         sample_batch_id=sample_batch_id,
-                    )
-                    await sio.emit(
-                        "sample_batch_reload",
-                        room=sample_batch_id,
-                        namespace="/",
                     )
 
         return {

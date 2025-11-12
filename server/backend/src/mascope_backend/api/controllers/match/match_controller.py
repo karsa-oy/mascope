@@ -70,9 +70,9 @@ from mascope_backend.runtime import runtime
 
 @api_controller_background_task(
     success_notification_rooms=["sid"],
-    success_reload=[("match_reload", "sample_batch_id")],
+    success_reload=[("match", "sample_batch_id")],
     error_notification_rooms=["sid"],
-    error_reload=[("match_reload", "sample_batch_id")],
+    error_reload=[("match", "sample_batch_id")],
 )
 async def rematch_sample(
     sample_item_id: str,
@@ -171,9 +171,9 @@ async def rematch_sample(
 
 @api_controller_background_task(
     success_notification_rooms=["sid"],
-    success_reload=[("match_reload", "affected_sample_batch_ids")],
+    success_reload=[("match", "affected_sample_batch_ids")],
     error_notification_rooms=["sid"],
-    error_reload=[("match_reload", "affected_sample_batch_ids")],
+    error_reload=[("match", "affected_sample_batch_ids")],
 )
 async def rematch_samples(
     sample_item_ids: list[str],
@@ -239,7 +239,7 @@ async def rematch_samples(
 
 @api_controller_background_task(
     success_notification_rooms=["sid"],
-    success_reload=[("match_reload", "affected_sample_batch_ids")],
+    success_reload=[("match", "affected_sample_batch_ids")],
     error_notification_rooms=["sid"],
 )
 async def match_remove_sample(
@@ -301,9 +301,9 @@ async def match_remove_sample(
 
 @api_controller_background_task(
     success_notification_rooms=["sample_item_id", "instrument"],
-    success_reload=[("match_reload", "sample_batch_id")],
+    success_reload=[("match", "sample_batch_id")],
     error_notification_rooms=["sample_item_id", "instrument"],
-    error_reload=[("match_reload", "sample_batch_id")],
+    error_reload=[("match", "sample_batch_id")],
 )
 async def match_compute_sample(
     sample_item_id: str,
@@ -426,9 +426,9 @@ async def match_compute_sample(
 
 @api_controller_background_task(
     success_notification_rooms=["sid"],
-    success_reload=[("match_reload", "affected_sample_batch_ids")],
+    success_reload=[("match", "affected_sample_batch_ids")],
     error_notification_rooms=["sid"],
-    error_reload=[("match_reload", "affected_sample_batch_ids")],
+    error_reload=[("match", "affected_sample_batch_ids")],
 )
 async def match_compute_samples(
     sample_item_ids: list[str],
@@ -488,9 +488,9 @@ async def match_compute_samples(
 
 @api_controller_background_task(
     success_notification_rooms=["sid"],
-    success_reload=[("match_reload", "affected_sample_batch_ids")],
+    success_reload=[("match", "affected_sample_batch_ids")],
     error_notification_rooms=["sid"],
-    error_reload=[("match_reload", "affected_sample_batch_ids")],
+    error_reload=[("match", "affected_sample_batch_ids")],
 )
 async def rematch_batches(
     sample_batch_ids: list[str],
@@ -703,9 +703,9 @@ async def rematch_batches(
 
 @api_controller_background_task(
     success_notification_rooms=["sample_batch_id"],
-    success_reload=[("match_reload", "sample_batch_id")],
+    success_reload=[("match", "sample_batch_id")],
     error_notification_rooms=["sample_batch_id"],
-    error_reload=[("match_reload", "sample_batch_id")],
+    error_reload=[("match", "sample_batch_id")],
 )
 async def rematch_batch(
     sample_batch_id: str,
@@ -936,7 +936,7 @@ async def rematch_batch(
 
 @api_controller_background_task(
     success_notification_rooms=["sample_batch_id"],
-    success_reload=[("match_reload", "sample_batch_id")],
+    success_reload=[("match", "sample_batch_id")],
     error_notification_rooms=["sid"],
 )
 async def match_remove_batch(
@@ -1001,9 +1001,9 @@ async def match_remove_batch(
 
 @api_controller_background_task(
     success_notification_rooms=["sample_batch_id"],
-    success_reload=[("match_reload", "sample_batch_id")],
+    success_reload=[("match", "sample_batch_id")],
     error_notification_rooms=["sample_batch_id"],
-    error_reload=[("match_reload", "sample_batch_id")],
+    error_reload=[("match", "sample_batch_id")],
 )
 async def match_compute_batch(
     sample_batch_id: str,

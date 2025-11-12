@@ -16,7 +16,11 @@ from mascope_file.name import get_instrument_type
 import mascope_file.io as m_io
 import mascope_signal.compute as m_compute
 
-from mascope_backend.socket import sio
+from mascope_backend.socket.records.service import (
+    emit_record_created,
+    emit_record_updated,
+    emit_record_deleted,
+)
 from mascope_backend.socket.notifications import (
     UserNotification,
     send_progress_user_notification,
@@ -35,6 +39,7 @@ from mascope_backend.api.lib.api_features import (
 from mascope_backend.api.lib.exceptions.api_exceptions import (
     NotFoundException,
 )
+from mascope_backend.api.controllers.samples.samples_controller import get_sample
 from mascope_backend.api.controllers.sample.lib.sample_batches_fetch import (
     fetch_sample_batch,
 )
@@ -191,11 +196,7 @@ async def get_sample_item(sample_item_id: str) -> dict:
     }
 
 
-@api_controller(
-    success_reload_events=[
-        ("sample_reload", "affected_sample_batch_ids"),
-    ],
-)
+@api_controller()
 async def create_sample_items(
     sample_items: list[SampleItemCreate], independent_transaction: bool = False
 ) -> dict:
@@ -308,16 +309,27 @@ async def create_sample_items(
         sample_batch_ids=affected_sample_batch_ids
     )
 
+    # Emit creation events for each sample item
+    created_sample_items_data = [
+        SampleItemRead.model_validate(si).model_dump() for si in created_sample_items
+    ]
+
+    if independent_transaction:
+        for sample_item in created_sample_items_data:
+            sample = (await get_sample(sample_item["sample_item_id"])).get("data")
+            await emit_record_created(
+                record_type="sample",
+                record_id=sample_item["sample_item_id"],
+                record=sample,
+                room=sample_item["sample_batch_id"],
+            )
+
     message = f"Successfully created {len(created_sample_items)} sample items."
     runtime.logger.debug(message)
     return {
         "message": message,
         "results": len(created_sample_items),
-        "data": [
-            SampleItemRead.model_validate(si).model_dump()
-            for si in created_sample_items
-        ],
-        "_notification_data": {"affected_sample_batch_ids": affected_sample_batch_ids},
+        "data": created_sample_items_data,
     }
 
 
@@ -409,25 +421,24 @@ async def update_sample_item(
             sid=sid,
             process_id=process_id,
         )
-    # Step 6: Directly reload batch if needed # TODO_invalidation
-    elif changed_fields:
-        await sio.emit(
-            "sample_reload",
+    # Step 6: Emit update event if fields changed
+    sample_item_data = SampleItemRead.model_validate(existing_sample_item).model_dump()
+    if changed_fields and independent_transaction:
+        sample = (await get_sample(sample_item_id)).get("data")
+        await emit_record_updated(
+            record_type="sample",
+            record_id=existing_sample_item.sample_item_id,
+            record=sample,
             room=existing_sample_item.sample_batch_id,
-            namespace="/",
         )
 
     return {
         "message": f"Sample '{existing_sample_item.sample_item_name}' was updated.",
-        "data": SampleItemRead.model_validate(existing_sample_item).model_dump(),
+        "data": sample_item_data,
     }
 
 
-@api_controller(
-    success_reload_events=[
-        ("sample_reload", "affected_sample_batch_ids"),
-    ],  # TODO_invalidation
-)
+@api_controller()
 async def delete_sample_items(
     sample_item_ids: list[str], independent_transaction: bool = False
 ):
@@ -476,20 +487,26 @@ async def delete_sample_items(
         sample_batch_ids=affected_sample_batch_ids
     )
 
+    # Emit deletion events for each sample item
+    if independent_transaction:
+        for sample_item in sample_items:
+            await emit_record_deleted(
+                record_type="sample",
+                record_id=sample_item.sample_item_id,
+                room=sample_item.sample_batch_id,
+            )
+
     s = "s" if len(sample_item_ids) > 1 else ""
     message = f"Deleted {len(sample_item_ids)} sample item{s}."
     runtime.logger.debug(message)
     return {
         "message": message,
-        "_notification_data": {"affected_sample_batch_ids": affected_sample_batch_ids},
     }
 
 
 @api_controller_background_task(
     success_notification_rooms=["sid"],
-    success_reload=[("sample_reload", "sample_batch_id")],
     error_notification_rooms=["sid"],
-    error_reload=[("sample_reload", "sample_batch_id")],
 )
 async def copy_sample_items(
     sample_item_ids: list[str],
@@ -538,7 +555,9 @@ async def copy_sample_items(
 
         missing_ids = set(sample_item_ids) - {s.sample_item_id for s in source_samples}
         if missing_ids:
-            raise NotFoundException(f"Sample items not found: {list(missing_ids)}")
+            raise NotFoundException(
+                f"Sample items not found: {', '.join(list(missing_ids))}"
+            )
 
     # Validate target batch
     target_batch = await fetch_sample_batch(sample_batch_id)
@@ -634,6 +653,17 @@ async def copy_sample_items(
             notification,
         )
 
+    # Emit updated events for samples with copied match data
+    if independent_transaction:
+        for created_sample in created_samples:
+            sample = (await get_sample(created_sample["sample_item_id"])).get("data")
+            await emit_record_created(
+                record_type="sample",
+                record_id=created_sample["sample_item_id"],
+                record=sample,
+                room=sample_batch_id,
+            )
+
     # Step 6: Set rematch status if samples need recomputation
     if requires_rematch:
         await update_sample_batch_status(
@@ -659,17 +689,11 @@ async def copy_sample_items(
         "results": len(created_samples),
         "message": message,
         "data": created_samples,
-        "_notification_data": {
-            "affected_sample_item_ids": [
-                si["sample_item_id"] for si in created_samples
-            ],
-        },
     }
 
 
 @api_controller_background_task(
     success_notification_rooms=["sid"],
-    success_reload=[("sample_reload", "affected_sample_batch_ids")],
     error_notification_rooms=["sid"],
 )
 async def move_sample_items(
@@ -741,7 +765,7 @@ async def move_sample_items(
     copy_result = await copy_sample_items(
         sample_item_ids=sample_item_ids,
         sample_batch_id=sample_batch_id,
-        independent_transaction=False,
+        independent_transaction=True,
         sid=sid,
         process_id=gen_id(8),
         parent_id=process_id,
@@ -752,6 +776,7 @@ async def move_sample_items(
     if moved_samples and copy_result["status"] == "success":
         await delete_sample_items(
             sample_item_ids=sample_item_ids,
+            independent_transaction=True,
         )
     message = f"Moved {len(sample_item_ids)} samples successfully to batch '{batch.sample_batch_name}'."
 
@@ -760,10 +785,6 @@ async def move_sample_items(
         "results": len(moved_samples),
         "message": message,
         "data": moved_samples,
-        "_notification_data": {
-            "affected_sample_item_ids": sample_item_ids,
-            "affected_sample_batch_ids": [sample_batch_id, *affected_sample_batch_ids],
-        },
     }
 
 

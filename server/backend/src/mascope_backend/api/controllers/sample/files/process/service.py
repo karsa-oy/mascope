@@ -73,9 +73,9 @@ CALIBRATION_ITERATIONS = 7
 
 @api_controller_background_task(
     success_notification_rooms=["instrument"],
-    success_reload=[("match_reload", "affected_sample_batch_ids")],
+    success_reload=[("match", "affected_sample_batch_ids")],
     error_notification_rooms=["instrument"],
-    error_reload=[("match_reload", "affected_sample_batch_ids")],
+    error_reload=[("match", "affected_sample_batch_ids")],
 )
 async def auto_process_sample_file(
     sample_file_id: str,

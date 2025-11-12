@@ -2,8 +2,8 @@ import os
 import shutil
 
 from datetime import datetime, timedelta, timezone
-from fastapi import APIRouter, BackgroundTasks, File, Request, Depends, UploadFile
 from typing import Callable
+from fastapi import APIRouter, BackgroundTasks, File, Request, Depends, UploadFile
 
 from tuspyserver import create_tus_router
 

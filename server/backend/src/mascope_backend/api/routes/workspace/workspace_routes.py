@@ -69,7 +69,7 @@ async def get_workspace_route(workspace_id: str, user=Depends(guest_user)):
 @workspace_router.patch("/{workspace_id}")
 @api_route()
 async def update_workspace_route(
-    workspace_id: str, workspace: WorkspaceUpdate, user=Depends(editor_user)
+    workspace_id: str, workspace_update: WorkspaceUpdate, user=Depends(editor_user)
 ):
     """Update an existing workspace's details.
 
@@ -77,8 +77,8 @@ async def update_workspace_route(
 
     :param workspace_id: The unique identifier of the workspace.
     :type workspace_id: str
-    :param workspace: The workspace update data.
-    :type workspace: WorkspaceUpdate
+    :param workspace_update: The workspace update data.
+    :type workspace_update: WorkspaceUpdate
     :param user: The current authenticated user with editor permissions, defaults to Depends(editor_user).
     :type user: User, optional
     :return: A dictionary containing the updated workspace details.
@@ -86,7 +86,11 @@ async def update_workspace_route(
     """
     # Check if locked workspace - only owners can update
     await locked_access(user, Workspace, workspace_id, min_role="owner")
-    return await update_workspace(workspace_id, workspace)
+    return await update_workspace(
+        workspace_id=workspace_id,
+        workspace_update=workspace_update,
+        independent_transaction=True,
+    )
 
 
 @workspace_router.post("")
@@ -101,7 +105,7 @@ async def create_workspace_route(workspace: WorkspaceCreate, user=Depends(editor
     :return: A dictionary containing the newly created workspace's details.
     :rtype: dict
     """
-    return await create_workspace(workspace)
+    return await create_workspace(workspace=workspace, independent_transaction=True)
 
 
 @workspace_router.delete("/{workspace_id}")
@@ -120,4 +124,6 @@ async def delete_workspace_route(workspace_id: str, user=Depends(editor_user)):
     """
     # Check if locked workspace - only owners can delete
     await locked_access(user, Workspace, workspace_id, min_role="owner")
-    return await delete_workspace(workspace_id)
+    return await delete_workspace(
+        workspace_id=workspace_id, independent_transaction=True
+    )

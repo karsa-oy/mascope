@@ -4,7 +4,7 @@ from fastapi import HTTPException
 from sqlalchemy import asc, desc, func, select, or_, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from mascope_file.string import norm
-from mascope_backend.socket import sio
+from mascope_backend.socket.records.service import emit_record_reload
 from mascope_backend.db import async_session
 from mascope_backend.db.id import gen_id
 from mascope_backend.db.models import (
@@ -384,8 +384,9 @@ async def create_target_compound(
 
     if independent_transaction:
         await session.commit()
-        # STEP 3: Emit global target reload event to inform all clients.
-        await sio.emit("targets_all_reload", namespace="/")
+
+        # reload target.compound list (compound not in any collections yet)
+        await emit_record_reload(record_type="target_compound")
     else:
         await session.flush()
 
@@ -582,13 +583,24 @@ async def update_target_compound(
 
         await session.commit()
 
-        # Step 5: Emit reload events for affected collections
-        reload_events = [
-            sio.emit("ion_reload", room=target_collection_id, namespace="/")
-            for target_collection_id in affected_target_collection_ids
-        ]
-        # Always emit global targets reload
-        reload_events.append(sio.emit("targets_all_reload", namespace="/"))
+        # -- Emit reload events ---
+        reload_events = []
+
+        # 1. Reload for each affected collection (both stores subscribed to same rooms)
+        for collection_id in affected_target_collection_ids:
+            reload_events.extend(
+                [
+                    emit_record_reload(
+                        record_type="target_collection", room=collection_id
+                    ),  # target.collection store detailed
+                    emit_record_reload(
+                        record_type="match_ion", room=collection_id
+                    ),  # match.ion store list
+                ]
+            )
+
+        # 2. Reload compound list globally
+        reload_events.append(emit_record_reload(record_type="target_compound"))
 
         if reload_events:
             await asyncio.gather(*reload_events)
@@ -655,14 +667,24 @@ async def delete_target_compound(
     if independent_transaction:
         await session.commit()
 
-        #  Emit reload events for affected collections
-        reload_events = [
-            sio.emit("ion_reload", room=collection_id, namespace="/")
-            for collection_id in affected_target_collection_ids
-        ]
-        # Always emit global targets reload
-        reload_events.append(sio.emit("targets_all_reload", namespace="/"))
+        # Emit reload events
+        reload_events = []
 
+        # 1. Reload for each affected collection (both stores subscribed to same rooms)
+        for collection_id in affected_target_collection_ids:
+            reload_events.extend(
+                [
+                    emit_record_reload(
+                        record_type="target_collection", room=collection_id
+                    ),  # target.collection store detailed
+                    emit_record_reload(
+                        record_type="match_ion", room=collection_id
+                    ),  # match.ion store list
+                ]
+            )
+
+        # 2. Reload compound list globally
+        reload_events.append(emit_record_reload(record_type="target_compound"))
         if reload_events:
             await asyncio.gather(*reload_events)
     else:

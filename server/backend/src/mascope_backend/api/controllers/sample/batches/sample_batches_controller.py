@@ -23,7 +23,12 @@ from mascope_backend.db.models import (
     SampleBatch,
     TargetCollectionInSampleBatch,
 )
-from mascope_backend.socket import sio
+from mascope_backend.socket.records import (
+    emit_record_created,
+    emit_record_updated,
+    emit_record_deleted,
+    emit_record_reload,
+)
 from mascope_backend.api.lib.api_features import (
     api_controller,
     api_controller_background_task,
@@ -294,11 +299,7 @@ async def get_batch_targets(sample_batch_id: str, deduplicate: bool = False) -> 
     }
 
 
-@api_controller(
-    success_reload_events=[
-        ("sample_batch_reload", "workspace_id"),
-    ],  # TODO_reload fix when the reload is working properly
-)
+@api_controller()
 async def create_sample_batch(
     sample_batch: SampleBatchCreate,
     independent_transaction: bool = False,
@@ -375,16 +376,24 @@ async def create_sample_batch(
         await session.commit()
         await session.refresh(new_sample_batch)
 
+    # Step 5: Emit creation event
+    batch_data = SampleBatchRead.model_validate(new_sample_batch).model_dump()
+    if independent_transaction:
+        await emit_record_created(
+            record_type="batch",
+            record_id=new_sample_batch.sample_batch_id,
+            record=batch_data,
+            room=new_sample_batch.workspace_id,
+        )
+
     # Step 5: Return created sample batch
     return {
         "message": f"Sample batch '{new_sample_batch.sample_batch_name}' was created.",
-        "data": SampleBatchRead.model_validate(new_sample_batch).model_dump(),
+        "data": batch_data,
     }
 
 
-@api_controller(
-    # TODO_reload fix when the reload is working properly
-)
+@api_controller()
 async def update_sample_batch(
     sample_batch_id: str,
     sample_batch_update: SampleBatchUpdate,
@@ -483,32 +492,34 @@ async def update_sample_batch(
         )
         batch.status = "rematch"  # update in-memory obj to reflect status change avoid extra db call
 
-    # Step 6: Emit reload events based on change types
-    reload_events = []
-    if changes["collections"]:
-        reload_events.append(
-            sio.emit("collection_reload", room=sample_batch_id, namespace="/")
+    # Step 6: Emit update event
+    batch_data = SampleBatchRead.model_validate(batch).model_dump()
+
+    if independent_transaction:
+        await emit_record_updated(
+            record_type="batch",
+            record_id=sample_batch_id,
+            record=batch_data,
+            room=batch.workspace_id,
         )
 
-    if changes["name"] or changes["description"]:
-        reload_events.append(
-            sio.emit("sample_batch_reload", room=batch.workspace_id, namespace="/")
-        )
-
-    if reload_events:  # TODO_reload remove when the reload is working properly
-        await asyncio.gather(*reload_events)
+        # If collections changed, also emit match.collection reload
+        if changes["collections"]:
+            await emit_record_reload(
+                record_type="match_collection",
+                room=sample_batch_id,
+            )
 
     return {
         "status": "success",
         "message": f"Sample batch '{batch.sample_batch_name}' was updated"
         + (" and flagged for rematch" if needs_rematch else ""),
-        "data": SampleBatchRead.model_validate(batch).model_dump(),
+        "data": batch_data,
     }
 
 
 @api_controller_background_task(
     success_notification_rooms=["workspace_id"],
-    success_reload=[("sample_batch_reload", "workspace_id")],
     error_notification_rooms=["workspace_id"],
 )
 async def delete_sample_batch(
@@ -546,6 +557,12 @@ async def delete_sample_batch(
         await session.delete(sample_batch)
         await session.commit()
 
+    # Step 3: Emit deletion event
+    if independent_transaction:
+        await emit_record_deleted(
+            record_type="batch", record_id=sample_batch_id, room=workspace_id
+        )
+
     return {
         "message": f"Sample batch '{sample_batch.sample_batch_name}' was deleted.",
         "_notification_data": {
@@ -556,9 +573,9 @@ async def delete_sample_batch(
 
 @api_controller_background_task(
     success_notification_rooms=["sid"],
-    success_reload=[("match_reload", "affected_sample_batch_ids")],
+    success_reload=[("match", "affected_sample_batch_ids")],
     error_notification_rooms=["sid"],
-    error_reload=[("match_reload", "affected_sample_batch_ids")],
+    error_reload=[("match", "affected_sample_batch_ids")],
 )
 async def import_sample_items(
     sample_batch_id: str,
@@ -738,9 +755,7 @@ async def import_sample_items(
 
 @api_controller_background_task(
     success_notification_rooms=["workspace_id"],
-    success_reload=[("sample_batch_reload", "workspace_id")],
     error_notification_rooms=["sid"],
-    error_reload=[("sample_batch_reload", "workspace_id")],
 )
 async def copy_sample_batch(
     sample_batch_id: str,
@@ -826,8 +841,11 @@ async def copy_sample_batch(
     )
 
     # Create the new sample batch
-    create_sample_batch_result = await create_sample_batch(new_sample_batch_body)
-    new_sample_batch = create_sample_batch_result["data"]
+    new_sample_batch = (
+        await create_sample_batch(
+            sample_batch=new_sample_batch_body, independent_transaction=True
+        )
+    ).get("data")
 
     # Step 5: Copy sample items associated with the original sample batch
     await copy_sample_items(

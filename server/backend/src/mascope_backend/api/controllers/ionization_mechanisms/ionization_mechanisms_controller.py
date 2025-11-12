@@ -10,7 +10,10 @@ from sqlalchemy import (
     func,
     delete,
 )
-from mascope_backend.socket import sio
+from mascope_backend.socket.records.service import (
+    emit_record_created,
+    emit_record_deleted,
+)
 from mascope_backend.db import async_session
 from mascope_backend.db.id import gen_id
 from mascope_backend.db.models import (
@@ -269,19 +272,21 @@ async def create_ionization_mechanism(
         raise NotFoundException(
             f"Ionization mechanism with ID '{new_ionization_mechanism.ionization_mechanism_id}' not found after it should have been created"
         )
+    ionization_mechanism_data = IonizationMechanismRead.model_validate(
+        new_ionization_mechanism
+    ).model_dump()
 
-    # Step 6: Emit the reload event
-    await sio.emit(
-        "ionization_mechanism_reload",
-        namespace="/",
+    # Step 6: Emit creation event
+    await emit_record_created(
+        record_type="ionization_mechanism",
+        record_id=new_ionization_mechanism.ionization_mechanism_id,
+        record=ionization_mechanism_data,
     )
 
     # Step 7: Return created ionization mechanism details with a success message
     return {
         "message": f"Ionization mechanism '{new_ionization_mechanism.ionization_mechanism}' was created successfully.",
-        "data": IonizationMechanismRead.model_validate(
-            new_ionization_mechanism
-        ).model_dump(),
+        "data": ionization_mechanism_data,
     }
 
 
@@ -351,10 +356,10 @@ async def delete_ionization_mechanism(ionization_mechanism_id: str) -> dict:
         # Commit the transaction
         await session.commit()
 
-    # Step 4: Emit the reload event
-    await sio.emit(
-        "ionization_mechanism_reload",
-        namespace="/",
+    # Step 4: Emit deletion event
+    await emit_record_deleted(
+        record_type="ionization_mechanism",
+        record_id=ionization_mechanism_id,
     )
 
     return {

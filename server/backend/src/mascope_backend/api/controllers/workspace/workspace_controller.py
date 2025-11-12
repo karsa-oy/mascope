@@ -6,7 +6,11 @@ from sqlalchemy import (
     desc,
     func,
 )
-from mascope_backend.socket import sio
+from mascope_backend.socket.records import (
+    emit_record_created,
+    emit_record_updated,
+    emit_record_deleted,
+)
 from mascope_backend.db import async_session
 from mascope_backend.db.id import gen_id
 from mascope_backend.db.models import Workspace
@@ -137,7 +141,10 @@ async def get_workspace(workspace_id: str) -> dict:
 
 
 @api_controller()
-async def create_workspace(workspace: WorkspaceCreate) -> dict:
+async def create_workspace(
+    workspace: WorkspaceCreate,
+    independent_transaction: bool = False,
+) -> dict:
     """
     Creates a new workspace with the specified details.
 
@@ -149,6 +156,8 @@ async def create_workspace(workspace: WorkspaceCreate) -> dict:
 
     :param workspace: Workspace creation details from the request body.
     :type workspace: WorkspaceCreate
+    :param independent_transaction: Flag to indicate if the operation should be treated as an independent transaction, defaults to False.
+    :type independent_transaction: bool, optional
     :return: The created workspace's details.
     :rtype: dict
     """
@@ -171,18 +180,28 @@ async def create_workspace(workspace: WorkspaceCreate) -> dict:
         await session.commit()
         await session.refresh(new_workspace)
 
-        # Step 3: Emit event
-        await sio.emit("workspace_reload", namespace="/")
+    # Step 3: Emit creation event to all clients
+    workspace_data = WorkspaceRead.model_validate(new_workspace).model_dump()
+    if independent_transaction:
+        await emit_record_created(
+            record_type="workspace",
+            record_id=new_workspace.workspace_id,
+            record=workspace_data,
+        )
 
     # Step 4: Return the new workspace details
     return {
         "message": f"Workspace '{new_workspace.workspace_name}' created successfully.",
-        "data": WorkspaceRead.model_validate(new_workspace).model_dump(),
+        "data": workspace_data,
     }
 
 
 @api_controller()
-async def update_workspace(workspace_id: str, workspace: WorkspaceUpdate) -> dict:
+async def update_workspace(
+    workspace_id: str,
+    workspace_update: WorkspaceUpdate,
+    independent_transaction: bool = False,
+) -> dict:
     """
     Updates an existing workspace with new data provided in the workspace update request body.
 
@@ -195,15 +214,17 @@ async def update_workspace(workspace_id: str, workspace: WorkspaceUpdate) -> dic
 
     :param workspace_id: The unique identifier of the workspace to update.
     :type workspace_id: str
-    :param workspace: The new data for the workspace update.
-    :type workspace: WorkspaceUpdate
+    :param workspace_update: The new data for the workspace update.
+    :type workspace_update: WorkspaceUpdate
+    :param independent_transaction: Flag indicating if operation is independent transaction, defaults to False.
+    :type independent_transaction: bool, optional
     :raises NotFoundException: If no workspace is found with the provided ID.
     :return: The updated workspace data as a dictionary.
     :rtype: dict
     """
     # Step 1: Fetch the existing workspace
     async with async_session() as session:
-        update_data = workspace.model_dump(exclude_unset=True)
+        update_data = workspace_update.model_dump(exclude_unset=True)
         existing_workspace = await session.get(Workspace, workspace_id)
         if not existing_workspace:
             raise NotFoundException(f"Workspace with ID '{workspace_id}' not found")
@@ -233,17 +254,25 @@ async def update_workspace(workspace_id: str, workspace: WorkspaceUpdate) -> dic
         await session.commit()
         await session.refresh(existing_workspace)
 
-    # Step 6: Emit socket.io events
-    await sio.emit("workspace_reload", namespace="/")
+    # Step 6: Emit update event to all clients
+    workspace_data = WorkspaceRead.model_validate(existing_workspace).model_dump()
+    if independent_transaction:
+        await emit_record_updated(
+            record_type="workspace",
+            record_id=workspace_id,
+            record=workspace_data,
+        )
 
     return {
         "message": f"Workspace '{existing_workspace.workspace_name}' updated successfully.",
-        "data": WorkspaceRead.model_validate(existing_workspace).model_dump(),
+        "data": workspace_data,
     }
 
 
 @api_controller()
-async def delete_workspace(workspace_id: str):
+async def delete_workspace(
+    workspace_id: str, independent_transaction: bool = False
+) -> dict:
     """
     Deletes a workspace by its unique identifier.
 
@@ -254,6 +283,8 @@ async def delete_workspace(workspace_id: str):
 
     :param workspace_id: The unique identifier of the workspace to delete.
     :type workspace_id: str
+    :param independent_transaction: Flag indicating if operation is independent transaction, defaults to False.
+    :type independent_transaction: bool, optional
     :raises NotFoundException: If no workspace is found with the provided ID.
     """
     # Step 1: Fetch the workspace
@@ -266,9 +297,14 @@ async def delete_workspace(workspace_id: str):
         await session.delete(workspace)
         await session.commit()
 
-    # Step 3: Emit socket.io events
-    await sio.emit("workspace_reload", namespace="/")
+    # Step 3: Emit deletion event to all clients
+    workspace_name = workspace.workspace_name
+    if independent_transaction:
+        await emit_record_deleted(
+            record_type="workspace",
+            record_id=workspace_id,
+        )
 
     return {
-        "message": f"Workspace '{workspace.workspace_name}' deleted successfully.",
+        "message": f"Workspace '{workspace_name}' deleted successfully.",
     }
