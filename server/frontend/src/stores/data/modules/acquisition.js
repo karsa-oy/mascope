@@ -2,12 +2,18 @@ import { ref, reactive, computed, watch, watchEffect } from 'vue'
 import { defineStore } from 'pinia'
 
 import { api } from '@/api'
+import { makeLogger } from '@/lib/logging'
 import { runtime } from '@/lib/runtime'
 
 import { useInstrument } from './instrument'
 
 export const useAcquisition = defineStore('app.data.acquisition', () => {
   const instrument = useInstrument()
+
+  const logger = makeLogger({
+    prefix: 'data acquisition',
+    icon: '🗃️'
+  })
 
   const list = ref([])
   const selected = ref([])
@@ -122,8 +128,62 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
     }
   }
 
-  api.socket.on('acquisitions_reload', () => {
-    load()
+  // Socket event listeners for record updates
+  api.socket.on('acquisition_created', (payload) => {
+    const { record } = payload
+
+    // Check if this file belongs to the currently focused instrument
+    if (record.instrument === instrument.focused?.instrument) {
+      // Add to list if within current time filter
+      const fileDate = new Date(record.datetime_utc)
+      const shouldInclude = (() => {
+        if (time.mode.startsWith('Last')) {
+          const daysAgo = new Date()
+          daysAgo.setDate(daysAgo.getDate() - days.value)
+          return fileDate >= daysAgo
+        } else if (time.mode === 'range') {
+          if (time.range.min && fileDate < time.range.min) return false
+          if (time.range.max && fileDate > time.range.max) return false
+          return true
+        }
+        return false
+      })()
+
+      if (shouldInclude) {
+        list.value = [...list.value, record]
+        logger.log(`added ${record.filename}`)
+      } else {
+        logger.debug(`ignoring ${record.filename} (outside time filter)`)
+      }
+    }
+  })
+
+  api.socket.on('acquisition_updated', (payload) => {
+    const { record_id, record } = payload
+
+    // Find and update the acquisition
+    const index = list.value.findIndex((f) => f.sample_file_id === record_id)
+    if (index >= 0) {
+      list.value[index] = record
+      logger.log(`updated ${record.filename}`)
+    }
+  })
+
+  api.socket.on('acquisition_deleted', (payload) => {
+    const { record_id } = payload
+
+    // Remove from list if present
+    const index = list.value.findIndex((f) => f.sample_file_id === record_id)
+    if (index >= 0) {
+      const filename = list.value[index].filename
+      list.value = list.value.filter((_, i) => i !== index)
+      logger.log(`removed ${filename}`)
+
+      // Unfocus if deleted file was selected
+      if (selected.value.some((s) => s.sample_file_id === record_id)) {
+        unfocus()
+      }
+    }
   })
 
   // mz calibration

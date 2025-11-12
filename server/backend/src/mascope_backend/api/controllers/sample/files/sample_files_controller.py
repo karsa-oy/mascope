@@ -17,8 +17,13 @@ from mascope_signal.peak import get_peaks
 from mascope_backend.db import async_session
 from mascope_backend.db.id import gen_id
 from mascope_backend.db.models import SampleFile, User
-from mascope_backend.socket import sio
 from mascope_backend.socket import event_emitter
+from mascope_backend.socket.records.service import (
+    emit_record_created,
+    emit_record_updated,
+    emit_record_deleted,
+    emit_record_reload,
+)
 from mascope_backend.api.new.instruments import get_instruments
 
 from mascope_backend.api.lib.api_features import (
@@ -220,16 +225,17 @@ async def create_sample_file(
         # Step 4: Refresh instance
         await session.refresh(new_sample_file)
 
-        # Step 5. Trigger instruments and acquisitions reload
-        # This refreshes the file lists and related data in the UI
-        await sio.emit(
-            "acquisitions_reload", namespace="/", room=new_sample_file.instrument
+        # Step 5. Emit creation event and handle instrument changes
+        await emit_record_created(
+            record_type="acquisition",
+            record_id=new_sample_file.sample_file_id,
+            record=new_sample_file.to_dict(),
+            room=new_sample_file.instrument,
         )
 
         if new_sample_file.instrument not in initial_instruments:
-            # New instrument detected - reload instruments and create acquisition workspaces
+            # New instrument detected - create workspaces and emit instrument events
             await create_acquisition_workspaces()
-            await sio.emit("instruments_reload", namespace="/")
 
         # Step 6: Trigger automatic processing of the sample file
         from mascope_backend.api.controllers.sample.files.process.service import (
@@ -263,8 +269,8 @@ async def delete_sample_file_db_record(sample_file_id: str) -> dict[str, str]:
     Deletes a sample file database record by its unique identifier.
 
     Steps:
-    1. Fetch the sample file by its ID from the database.
-    2. If the sample file is found, delete it from the session and commit the changes to the database.
+    - Fetch the sample file by its ID from the database.
+    - If the sample file is found, delete it from the session and commit the changes to the database.
 
     :param sample_file_id: The unique identifier of the sample file to delete.
     :type sample_file_id: str
@@ -272,7 +278,7 @@ async def delete_sample_file_db_record(sample_file_id: str) -> dict[str, str]:
     :return: Dictionary with status and success message.
     :rtype: dict[str, str]
     """
-    # Step 1: Fetch the sample file
+    # --- Fetch the sample file ---
     async with async_session() as session:
         sample_file = await session.get(SampleFile, sample_file_id)
         if not sample_file:
@@ -280,9 +286,16 @@ async def delete_sample_file_db_record(sample_file_id: str) -> dict[str, str]:
 
         filename = sample_file.filename
 
-        # Step 2: Delete the sample file and commit changes
+        # --- Delete the sample file and commit changes ---
         await session.delete(sample_file)
         await session.commit()
+
+    # --- Emit deletion event when db record was deleted ---
+    await emit_record_deleted(
+        record_type="acquisition",
+        record_id=sample_file_id,
+        room=sample_file.instrument,
+    )
 
     return {
         "status": "success",
@@ -346,12 +359,12 @@ async def delete_sample_file(
     Performs sample item association check for safety.
 
     Steps:
-    1. Validate that exactly one parameter is provided.
-    2. If sample_file_id is provided, fetch sample file and get filename.
-    3. If filename is provided, try to find corresponding database record.
-    4. Check for associated sample items and block deletion if found.
-    5. Delete database record if exists.
-    6. Delete filestore file.
+    - Validate that exactly one parameter is provided.
+    - If sample_file_id is provided, fetch sample file and get filename.
+    - If filename is provided, try to find corresponding database record.
+    - Check for associated sample items and block deletion if found.
+    - Delete database record if exists.
+    - Delete filestore file.
 
     :param sample_file_id: The ID of the sample file to delete (optional).
     :type sample_file_id: str | None
@@ -363,26 +376,30 @@ async def delete_sample_file(
     :return: Dictionary with status and message.
     :rtype: dict[str, str]
     """
-    # Step 1: Validate parameters
+    # --- Validate parameters ---
     if not (sample_file_id or filename) or (sample_file_id and filename):
         raise ValueError(
             "Exactly one parameter must be provided: either sample_file_id or filename"
         )
     target_filename = filename
+    instrument = None
 
-    # Step 2: Handle sample_file_id case
+    # --- Handle sample_file_id case ---
     if sample_file_id:
-        target_filename = (await get_sample_file(sample_file_id))["data"]["filename"]
+        sample_file_data = (await get_sample_file(sample_file_id))["data"]
+        target_filename = sample_file_data["filename"]
+        instrument = sample_file_data["instrument"]
 
-    # Step 3: Handle filename case - try to find database record
+    # --- Handle filename case - try to find database record ---
     elif filename:
         async with async_session() as session:
             stmt = select(SampleFile).where(SampleFile.filename == filename)
             result = await session.execute(stmt)
             if sample_file := result.scalar_one_or_none():
                 sample_file_id = sample_file.sample_file_id
+                instrument = sample_file.instrument
 
-    # Step 4: Safety check - verify no associated sample items exist
+    # --- Safety check - verify no associated sample items exist ---
     if associated_samples := (await get_samples(filename=target_filename))["data"]:
         sample_item_ids = [sample["sample_item_id"] for sample in associated_samples]
         message = (
@@ -393,7 +410,7 @@ async def delete_sample_file(
         raise_api_warning(message, data, status_code=207)
         return {"status": "error", "message": message}
 
-    # Step 5: Delete database record if exists
+    # --- Delete database record if exists ---
     db_record_deleted = False
     if sample_file_id:
         try:
@@ -404,7 +421,7 @@ async def delete_sample_file(
             # Record doesn't exist, continue with filestore deletion
             pass
 
-    # Step 6: Delete filestore file
+    # --- Delete filestore file ---
     filestore_deleted = False
     try:
         filestore_result = await delete_sample_file_from_filestore(target_filename)
@@ -412,7 +429,7 @@ async def delete_sample_file(
     except NotFoundException:
         pass
 
-    # Step 7: Determine overall status and message
+    # --- Determine overall status and message ---
     match (db_record_deleted, filestore_deleted):
         case (True, True):
             status = "success"
@@ -441,10 +458,10 @@ async def delete_sample_files(
     Only deletes files that don't have existing sample items associated with them.
 
     Steps:
-    1. Collect all sample file data and check associations upfront.
-    2. Delete files that have no associations.
-    3. Emit socket events for instruments and acquisitions.
-    4. Return results with information about deleted and skipped files.
+    - Collect all sample file data and check associations upfront.
+    - Delete files that have no associations.
+    - Emit socket events for instruments and acquisitions.
+    - Return results with information about deleted and skipped files.
 
     :param sample_file_ids: List of IDs of the sample files to delete (optional).
     :type sample_file_ids: list[str] | None
@@ -463,7 +480,7 @@ async def delete_sample_files(
     instruments_affected = set()
     files_to_delete = []
 
-    # Step 1: Process by sample_file_ids
+    # --- Process by sample_file_ids ---
     if sample_file_ids:
         for sample_file_id in sample_file_ids:
             try:
@@ -492,7 +509,7 @@ async def delete_sample_files(
             except NotFoundException:
                 skipped_files_not_found.append(sample_file_id)
 
-    # Step 1: Process by filenames
+    # --- Process by filenames ---
     elif filenames:
         for filename in filenames:
             # Check for associated sample items
@@ -518,7 +535,7 @@ async def delete_sample_files(
                     }
                 )
 
-    # Step 2: Delete files without sample_item associations
+    # --- Delete files without sample_item associations ---
     for file_data in files_to_delete:
         try:
             # Call delete_sample_file with appropriate parameter
@@ -549,7 +566,7 @@ async def delete_sample_files(
             )
             skipped_files_not_found.append(identifier)
 
-    # Step 3: Emit reload events if instruments were affected
+    # --- Emit reload events if instruments were affected ---
     if instruments_affected:
         # Get current instruments list after deletions
         final_instruments = [
@@ -563,18 +580,10 @@ async def delete_sample_files(
             for instrument in instruments_affected
             if instrument not in final_instruments
         ]:
-            # Clean up orphaned acquisition workspaces for removed instruments
+            # Clean up orphaned workspaces and emit instrument deletion events
             await delete_acquisition_workspaces()
 
-            # Tell UI to reload instruments list since some instruments disappeared
-            await sio.emit("instruments_reload", namespace="/")
-
-        # Tell UI to reload acquisition data for each affected instrument
-        # This refreshes the file lists and related data in the UI
-        for instrument in instruments_affected:
-            await sio.emit("acquisitions_reload", namespace="/", room=instrument)
-
-    # Step 4: Prepare response data and message
+    # --- Prepare response data and message ---
     skipped_files = skipped_files_associations + skipped_files_not_found
     data = {
         "deleted": deleted_files,
@@ -625,14 +634,6 @@ async def update_sample_file(
     """
     Updates an existing sample file with new data.
 
-    Steps:
-    1. Fetch the existing sample file from the database using the provided ID.
-    2. Update the sample file's properties with the new data.
-    3. Commit the changes to the database.
-    4. Refresh the instance to get updated data from the database.
-    5. Reload instrument data.
-    6. Return the updated sample file data.
-
     :param sample_file_id: The ID of the sample file to update.
     :type sample_file_id: str
     :param sample_file_update_data: New data for updating the sample file.
@@ -646,42 +647,41 @@ async def update_sample_file(
             [i["instrument"] for i in (await get_instruments())["data"]]
         )
 
-        # Step 1: Fetch the sample file
         sample_file = await session.get(SampleFile, sample_file_id)
         if not sample_file:
             raise NotFoundException(f"Sample file with ID '{sample_file_id}' not found")
 
-        # Step 2: Update properties
+        # --- Update properties ---
         for key, value in sample_file_update_data.model_dump(
             exclude_unset=True
         ).items():
             setattr(sample_file, key, value)
 
-        # Step 3: Commit changes
         await session.commit()
-
-        # Step 4: Refresh instance
         await session.refresh(sample_file)
 
-        # Step 5. Trigger instruments reload
-        final_instruments = set(
-            [i["instrument"] for i in (await get_instruments())["data"]]
-        )
-        if initial_instruments != final_instruments:
-            # Handle instrument changes and handle acquisition workspaces creation/deletion
-            if added_instruments := final_instruments - initial_instruments:
-                await create_acquisition_workspaces()
-            if removed_instruments := initial_instruments - final_instruments:
-                await delete_acquisition_workspaces()
+    # --- Emit acquisition updated event to instrument room ---
+    await emit_record_updated(
+        record_type="acquisition",
+        record_id=sample_file.sample_file_id,
+        record=sample_file.to_dict(),
+        room=sample_file.instrument,
+    )
 
-            # Reload instruments list since instruments changed
-            await sio.emit("instruments_reload", namespace="/")
+    # --- Trigger instruments reload ---
+    final_instruments = set(
+        [i["instrument"] for i in (await get_instruments())["data"]]
+    )
+    # Handle instrument changes and handle acquisition workspaces creation/deletion
+    if final_instruments > initial_instruments:  # Check for added instruments
+        await create_acquisition_workspaces()
+    if initial_instruments > final_instruments:  # Check for removed instruments
+        await delete_acquisition_workspaces()
 
-        # Step 6: Return updated sample file
-        return {
-            "message": f"Sample file '{sample_file.filename}' updated successfully.",
-            "data": sample_file.to_dict(),
-        }
+    return {
+        "message": f"Sample file '{sample_file.filename}' updated successfully.",
+        "data": sample_file.to_dict(),
+    }
 
 
 # ---------------------
@@ -1031,7 +1031,7 @@ async def compute_sample_file_peaks(
     message = f"Detected {sample_file.mz.size} peaks for file '{filename}'"
     runtime.logger.info(message)
 
-    await sio.emit("peak_reload", room=sample_file_id, namespace="/")
+    await emit_record_reload(record_type="peak", room=sample_file_id)
 
     return {
         "message": message,

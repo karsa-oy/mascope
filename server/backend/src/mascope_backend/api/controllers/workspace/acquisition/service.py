@@ -4,7 +4,11 @@ from sqlalchemy import (
     select,
     func,
 )
-from mascope_backend.socket import sio
+from mascope_file.name import resolve_instrument_type
+from mascope_backend.socket.records.service import (
+    emit_record_created,
+    emit_record_deleted,
+)
 from mascope_backend.db import async_session
 from mascope_backend.db.id import gen_id
 from mascope_backend.db.models import Workspace
@@ -71,17 +75,17 @@ async def create_acquisition_workspaces() -> dict:
     Auto-creates missing ACQUISITION workspaces for all instruments.
 
     Steps:
-    1. Retrieve all available instruments from the system
-    2. Validate existing acquisition workspaces (debug check for duplicates)
-    3. Query existing ACQUISITION workspaces from database
-    4. Identify instruments missing acquisition workspaces
-    5. Create new workspaces for missing instruments
-    6. Emit socket events to notify clients of changes
+    - Retrieve all available instruments from the system
+    - Validate existing acquisition workspaces (debug check for duplicates)
+    - Query existing ACQUISITION workspaces from database
+    - Identify instruments missing acquisition workspaces
+    - Create new workspaces for missing instruments
+    - Emit socket events to notify clients of changes
 
     :return: Summary of created workspaces
     :rtype: dict
     """
-    # Step 1: Get all available instruments
+    # --- Get all available instruments ---
     if not (
         instruments := [i["instrument"] for i in (await get_instruments())["data"]]
     ):
@@ -89,7 +93,7 @@ async def create_acquisition_workspaces() -> dict:
         runtime.logger.warning(message)
         return {"message": message, "results": 0, "data": []}
 
-    # Step 2: Debug validation - check for duplicate acquisition workspaces per instrument
+    # --- Debug validation - check for duplicate acquisition workspaces per instrument ---
     async with async_session() as session:
         duplicate_check_stmt = (
             select(
@@ -108,7 +112,7 @@ async def create_acquisition_workspaces() -> dict:
                 "Each instrument should have only one acquisition workspace."
             )
 
-    # Step 3: Get existing acquisition workspaces
+    # --- Get existing acquisition workspaces ---
     async with async_session() as session:
         stmt = select(Workspace.instrument).where(
             Workspace.workspace_type == "ACQUISITION"
@@ -116,17 +120,16 @@ async def create_acquisition_workspaces() -> dict:
         result = await session.execute(stmt)
         existing_instruments = set(result.scalars().all())
 
-        # Step 4: Find missing instruments
+        # --- Find missing instruments ---
         if not (missing_instruments := list(set(instruments) - existing_instruments)):
             message = f"All {len(instruments)} instruments have acquisition workspaces"
             runtime.logger.debug(message)
             return {"message": message, "results": 0, "data": []}
 
-        # Step 5: Create missing acquisition workspaces
+        # --- Create missing acquisition workspaces and emit socket events ---
         created_workspaces = []
         for instrument in missing_instruments:
             workspace_name = f"{workspace_config.ACQUISITION_NAME_PREFIX} {instrument}"
-
             workspace_data = WorkspaceCreate(
                 workspace_name=workspace_name,
                 workspace_description=f"Acquisition workspace for {instrument}",
@@ -146,9 +149,28 @@ async def create_acquisition_workspaces() -> dict:
 
         await session.commit()
 
-    # Step 6: Emit socket events to notify clients
-    if created_workspaces:
-        await sio.emit("workspace_reload", namespace="/")
+    # --- Emit workspace events ---
+    created_workspaces_data = [
+        WorkspaceRead.model_validate(ws).model_dump() for ws in created_workspaces
+    ]
+    for workspace in created_workspaces_data:
+        await emit_record_created(
+            record_type="workspace",
+            record_id=workspace["workspace_id"],
+            record=workspace,
+        )
+
+    # --- Emit instrument creation events for any new instruments ---
+    for instrument in missing_instruments:
+        instrument_type = resolve_instrument_type(instrument, throw=False)
+        await emit_record_created(
+            record_type="instrument",
+            record_id=instrument,
+            record={
+                "instrument": instrument,
+                "type": instrument_type,
+            },
+        )
 
     message = f"Created {len(created_workspaces)} acquisition workspaces for instruments: {', '.join(missing_instruments)}"
     runtime.logger.debug(message)
@@ -168,17 +190,17 @@ async def delete_acquisition_workspaces() -> dict:
     Deletes ACQUISITION workspaces for instruments that no longer exist in the system.
 
     Steps:
-    1. Retrieve all current instruments from sample files
-    2. Identify workspaces for instruments that no longer exist
-    3. Delete orphaned acquisition workspaces
+    - Retrieve all current instruments from sample files
+    - Identify workspaces for instruments that no longer exist
+    - Delete orphaned acquisition workspaces
 
     :return: Summary of deleted workspaces
     :rtype: dict
     """
-    # Step 1: Get all current instruments from sample files
+    # --- Get all current instruments from sample files ---
     instruments = {i["instrument"] for i in (await get_instruments())["data"]}
 
-    # Step 2: Find orphaned existing acquisition workspaces
+    # --- Find orphaned existing acquisition workspaces ---
     async with async_session() as session:
         to_remove = select(Workspace).where(
             Workspace.workspace_type == "ACQUISITION",
@@ -192,8 +214,9 @@ async def delete_acquisition_workspaces() -> dict:
             runtime.logger.debug(message)
             return {"message": message}
 
-    # Step 3: Delete orphaned acquisition workspaces
+    # --- Delete orphaned acquisition workspaces and emit events ---
     deleted_workspaces = []
+    deleted_instruments = []
     for ws in orphaned_workspaces:
         deleted_workspaces.append(
             {
@@ -202,9 +225,19 @@ async def delete_acquisition_workspaces() -> dict:
                 "instrument": ws.instrument,
             }
         )
-        await delete_workspace(ws.workspace_id)
+        deleted_instruments.append(ws.instrument)
 
-    deleted_instruments = [ws["instrument"] for ws in deleted_workspaces]
+        await delete_workspace(
+            workspace_id=ws.workspace_id, independent_transaction=True
+        )
+
+    # --- Emit instrument deletion events ---
+    for instrument in deleted_instruments:
+        await emit_record_deleted(
+            record_type="instrument",
+            record_id=instrument,
+        )
+
     message = f"Deleted {len(deleted_workspaces)} acquisition workspaces for instruments: {', '.join(deleted_instruments)}"
     runtime.logger.info(message)
 
