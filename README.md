@@ -530,9 +530,54 @@ backend/
       lib/                 shared code
       models/              pydantic data models
       routes/              fastapi routes
+    socket/
+      records/             targeted record event emission (created/updated/deleted/reload)
 ```
 
 A `new` API structure is being organized in under `api.new`.
+
+#### Backend Socket Events
+
+The backend emits targeted record events following a standardized pattern:
+
+```python
+from mascope_backend.socket.records import (
+    emit_record_created,
+    emit_record_updated,
+    emit_record_deleted,
+    emit_record_reload
+)
+
+# Emit record creation (broadcast or to specific room)
+await emit_record_created(
+    record_type="batch",           # Frontend store name
+    record_id=str(batch.id),       # Record ID as string
+    record=batch_dict,             # Full record as dict
+    room=workspace_id              # Optional: target specific room
+)
+
+# Full update
+await emit_record_updated(
+    record_type="batch",
+    record_id=str(batch.id),
+    record=batch_dict
+)
+
+# Partial update (frontend merges fields)
+await emit_record_updated(
+    record_type="batch",
+    record_id=str(batch.id),
+    record={"status": "ready"},
+    changed_fields=["status"]
+)
+
+# Deletion
+await emit_record_deleted(
+    record_type="batch",
+
+```
+
+Events follow the naming convention `{record_type}_{operation}` (e.g., `batch_created`, `batch_updated`, `batch_deleted`). The `record_type` should match the frontend store name for automatic handling.
 
 ### Backend Auth
 
@@ -901,13 +946,32 @@ In rare cases, it makes sense to forego the handler in favor of creating custom 
 The frontend socket API uses [SocketIO](https://socket.io/docs/v4/client-socket-instance/), exposing its API as transparently as possible. Basic event handling is done as follows:
 
 ```js
-// log workspaces on reload event:
-api.socket.on("workspace_reload", async () => {
-  const workspaces = api.http.get(`/workspaces`, {
-    use: "read",
-    type: "load_workspaces",
-  });
-  console.log(workspaces);
+// Manual event handling (rarely needed - most stores use auto-registration)
+api.socket.on("acquisition_created", (payload) => {
+  const { record_id, record } = payload;
+  console.log("New acquisition:", record);
+});
+```
+
+**Automatic Event Handling**
+
+The `useData` composable automatically registers socket event listeners for CRUD + reload operations:
+
+```js
+const data = useData("batch", method, {
+  // Auto-registers: batch_created, batch_updated, batch_deleted, batch_reload
+  // No manual socket.on() needed
+});
+```
+
+**Cross-Store Events**
+
+For events that affect multiple stores (e.g., match updates trigger sample reload), specify in the `events` array:
+
+```js
+const data = useData("sample", method, {
+  events: ["match_reload"], // Cross-store event
+  // sample_created/updated/deleted/reload auto-registered
 });
 ```
 
@@ -944,9 +1008,11 @@ Our frontend data layer is built around composable functions that provide reacti
 
 **_Core Composables_**
 
-The data library provides two main composables:
+The data library provides main composables:
 
-- **`useData`**: Handles reactive data loading with dependency-based triggering, selection management, and automatic reloading
+- **`useData`**: Handles reactive data loading with dependency-based triggering, selection management, and automatic socket event handling
+- **`useEvents`**: Manages socket record events (created/updated/deleted/reload) with deduplication and type-safe ID comparison
+- **`useLoader`**: Handles data fetching, synchronization, and detailed record loading
 - **`useSelection`**: Manages selection state (focus/select/unselect) with optional localStorage persistence and socket subscriptions
 
 Additionally, a **`useFilter`** store exists to centralize selection state across stores. This allows stores to optionally use other stores' selected records as filter parameters. Currently unused - all data loading is handled via dependency management. Reserved for future advanced filtering scenarios where data needs to be filtered by selections from multiple other stores.
@@ -959,24 +1025,26 @@ The useData composable creates reactive data collections with dependency-based l
 import { useData } from "@/stores/data/lib";
 
 const data = useData(
-  "batch", // name
+  "batch", // name - used for auto-registering socket events (batch_created, batch_updated, etc.)
   ({ workspace_id }) =>
     api.http.get(`/sample/batches`, { params: { workspace_id } }), // main load method, populates list, params passed from deps
   {
-    deps: () => ({ workspace_id: useWorkspace().focusedId }), // dependencies that trigger loading, become method params
-    events: ["sample_batch_reload"], // socket events that trigger reload
-    selection: true, // enable selection
     key: "sample_batch_id", // primary key field
+    deps: () => ({ workspace_id: useWorkspace().focusedId }), // dependencies that trigger loading, become method params
+    events: ["match_reload"], // only cross-store events (regular events auto-registered)
+    selection: true, // enable selection
+    read: (sample_batch_id) =>
+      api.http.get(`/sample/batches/${sample_batch_id}`), // optional: single record fetch
   }
 );
 ```
 
 **Key Options:**
 
-- **`deps`**: Function returning parameters object. Store loads when any dependency value changes. Null values prevent loading until dependency becomes available.
-- **`events`**: Array of socket event names that trigger store reload
-- **`selection`**: Enable selection management (see below)
 - **`key`**: Primary key field name (defaults to `${name}_id`)
+- **`deps`**: Function returning parameters object. Store loads when any dependency value changes. Null values prevent loading until dependency becomes available.
+- **`events`**: Array of **cross-store** socket event names (e.g., `match_reload`). Store-specific CRUD events (`batch_created`, `batch_updated`, `batch_deleted`, `batch_reload`) are **automatically registered** based on store name.
+- **`selection`**: Enable selection management (see below)
 - **`read`**: Optional function to fetch single record by ID for `reloadRecord()`
 - **`detailed`**: Optional ref to hold detailed record with associations
 
@@ -988,6 +1056,28 @@ The composable returns:
 - `filteredIds`: Array of IDs from filtered records
 - `detailed`: Detailed record data (if `detailed` option provided)
 - Selection properties (if `selection` enabled - see below)
+
+**_Socket Event Handling_**
+
+Socket events are automatically handled by the `useEvents` composable:
+
+- **Auto-registered events**: `{name}_created`, `{name}_updated`, `{name}_deleted`, `{name}_reload`
+- **Event deduplication**: 30-second TTL cache prevents duplicate processing
+- **Type-safe ID comparison**: Handles mixed int/varchar primary keys (User/Role use int, others use varchar)
+- **Partial updates**: When `changed_fields` is provided, frontend merges fields instead of replacing entire record
+- **Cross-store events**: Specified in `events` array (e.g., `match_reload` can trigger multiple stores)
+
+**_Store-Specific Reload Events_**
+
+When a store-specific reload event fires, the store:
+
+1. Reloads its `list` data
+2. Calls `reloadRecord()` to refresh `focused` and `detailed` records
+
+**_Detailed Record Loading_**
+
+For stores needing detailed data with associations (need api endpoint with details), provide `detailed` ref and `read` function.
+Separate load method can be specified, to be used in external calls:
 
 **_Dependency-Based Loading_**
 
@@ -1051,27 +1141,6 @@ data.unselect(record);
 data.selected; // array of selected records
 data.selectedIds; // array of selected IDs
 ```
-
-**_Store-Specific Reload Events_**
-
-Each store configures its own socket events for reloading. Events follow naming convention matching store names:
-
-```js
-events: ["sample_batch_reload"]; // Reloads batch store
-events: ["workspace_reload"]; // Reloads workspace store
-events: ["match_reload"]; // Can trigger multiple stores
-```
-
-When a reload event fires, the store:
-
-1. Reloads its `list` data
-2. Calls `reloadRecord()` to refresh `focused` and `detailed` records
-3. Executes optional `hook()` callback
-
-**_Detailed Record Loading_**
-
-For stores needing detailed data with associations (need api endpoint with details), provide `detailed` ref and `read` function.
-Separate load method can be specified, to be used in external calls:
 
 ```js
 import { ref } from "vue";
@@ -1163,7 +1232,7 @@ export const useWorkspace = defineStore("app.data.workspace", () => {
       }),
     {
       key: "workspace_id",
-      events: ["workspace_reload"],
+      events: [], // Only cross-store events if needed
       selection: {
         mode: "single",
         persist: true,
@@ -1199,7 +1268,13 @@ export const useWorkspace = defineStore("app.data.workspace", () => {
 });
 ```
 
-This pattern provides automatic data loading via dependencies, selection management with optional persistence, store-specific reload events, and detailed record loading while maintaining clean separation of concerns.
+This pattern provides:
+
+- Automatic data loading via dependencies
+- Real-time updates via auto-registered socket events
+- Selection management with optional persistence
+- Detailed record loading
+- Clean separation of concerns
 
 **_Filter Store_**
 
