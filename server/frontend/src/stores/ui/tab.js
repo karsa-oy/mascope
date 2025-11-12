@@ -34,13 +34,12 @@ export const useTab = defineStore('app.ui.tab', () => {
       }
     }
   )
-  // Switch to batch tab when samples loaded AND batch focused
+  // Switch to batch tab when samples INITIALLY loaded (0 → N) AND batch focused
   // Leave batch tab when samples become empty
   watch(
     () => data.sample.list.length,
-    (length) => {
-      if (length > 0 && data.batch.focused) {
-        // Samples loaded + batch focused → enter batch tab
+    (length, oldLength) => {
+      if (oldLength === 0 && length > 0 && data.batch.focused) {
         active.value = 'batch'
       } else if (length === 0 && active.value === 'batch') {
         // Samples empty → leave batch tab
