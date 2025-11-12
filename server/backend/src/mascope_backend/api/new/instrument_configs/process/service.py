@@ -38,9 +38,7 @@ from mascope_backend.runtime import runtime
 
 @api_controller_background_task(
     success_notification_rooms=["sid"],
-    success_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
     error_notification_rooms=["sid"],
-    error_reload=[("sample_batch_reload", "affected_sample_batch_ids")],
 )
 async def process_instrument_config(
     filenames: list[str],
@@ -184,7 +182,8 @@ async def process_instrument_config(
     if independent_transaction:
         await rematch_samples(
             sample_item_ids=affected_sample_item_ids,
-            independent_transaction=False,
+            full_remove=True,
+            independent_transaction=True,
             sid=sid,
             process_id=gen_id(8),
             parent_id=process_id,
