@@ -327,6 +327,7 @@ def write_peaks(
     :return: None
     """
     peak_timeseries_path = filename_to_zarr_path(filename, "peak_timeseries")
+    synchronizer = get_zarr_synchronizer(peak_timeseries_path)
 
     def _full_overwrite():
         """Full-write helper"""
@@ -339,7 +340,9 @@ def write_peaks(
             except Exception:
                 runtime.logger.error("Failed to remove existing peak timeseries")
                 raise
-        peak_timeseries.to_zarr(peak_timeseries_path, mode="w")
+        peak_timeseries.to_zarr(
+            peak_timeseries_path, mode="w", synchronizer=synchronizer
+        )
 
     # --- Full overwrite ---
     file_not_processed = not os.path.exists(peak_timeseries_path)
@@ -358,7 +361,7 @@ def write_peaks(
     # -- Partial update --
     runtime.logger.debug(f"Writing new peak timeseries into {peak_timeseries_path}...")
 
-    all_peak_timeseries = xr.open_zarr(peak_timeseries_path)
+    all_peak_timeseries = xr.open_zarr(peak_timeseries_path, synchronizer=synchronizer)
     try:
         # Find the integer indices for the (mz, time) region to update
         mz_update = peak_timeseries.coords["mz"].values
@@ -388,7 +391,11 @@ def write_peaks(
             # Safe chunks disabled because the chunking is known to be compatible
             # otherwise region writing fails because of chunk mis-alignment
             contiguous_mz_data.to_zarr(
-                peak_timeseries_path, mode="r+", region=region, safe_chunks=False
+                peak_timeseries_path,
+                mode="r+",
+                region=region,
+                safe_chunks=False,
+                synchronizer=synchronizer,
             )
             progress_percent = (i + 1) / total_num_regions * 100
             if progress_percent % 10 == 0:
