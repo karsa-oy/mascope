@@ -28,8 +28,12 @@ from mascope_backend.api.models.sample.batches.sample_batch_pydantic_model impor
     SampleBatchCopyBody,
     SampleBatchUpdateStatusBody,
 )
+from mascope_backend.api.routes.sample.batches.export.routes import (
+    sample_batches_export_router,
+)
 
 sample_batches_router = APIRouter(prefix="/api/sample/batches", tags=["Sample Batches"])
+sample_batches_router.include_router(sample_batches_export_router)
 
 
 @sample_batches_router.get("")
