@@ -100,8 +100,20 @@ function handleServerError(error) {
     return handleUnauthorizedError(error)
   }
 
+  // Handle timeout errors (no response from server)
+  if (error.code === 'ECONNABORTED' || !error.response) {
+    console.error(`⏱️ [api:http] ${type} ${method} ${url} timeout or network error`, error)
+    const app = useApp()
+    app.ui.notification.push({
+      type,
+      status: 'error',
+      message: 'Request timed out. Please try again or contact support.'
+    })
+    return Promise.reject(error)
+  }
+
   // log to console for developers
-  const { detail, error: message } = error?.response?.data
+  const { detail, error: message } = error?.response?.data || {}
   console.error(
     `🚫 [api:http] ${type} ${method} ${url} server failure: ${detail?.error_message}`,
     error
@@ -111,7 +123,7 @@ function handleServerError(error) {
   app.ui.notification.push({
     type,
     status: 'error',
-    message
+    message: message || 'An error occurred'
   })
   // throw
   return Promise.reject(error)
