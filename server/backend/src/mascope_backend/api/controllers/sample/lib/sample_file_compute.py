@@ -19,4 +19,4 @@ async def compute_peaks(filename: str):
     # Step 2: Detect peaks in the sample file.
     peak_detector = get_peak_detector(filename, instrument_functions)
     await peak_detector.detect_peaks()
-    peak_detector.write_peaks_to_zarr()
+    await peak_detector.write_peaks_to_zarr()

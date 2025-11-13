@@ -90,12 +90,12 @@ class BasePeakDetector(ABC):
         )
         self.peak_timeseries = xarray.merge([peak_timeseries, peaks])
 
-    def write_peaks_to_zarr(self, overwrite=True):
+    async def write_peaks_to_zarr(self, overwrite=True):
         if self.peak_timeseries is None:
             raise PeakDetectionError("No peak timeseries to write to zarr.")
 
         runtime.logger.info("Writing peak timeseries to the sample file...")
-        m_io.write_peaks(
+        await m_io.write_peaks(
             self.peak_timeseries,
             self._filename,
             overwrite=overwrite,
@@ -127,12 +127,12 @@ class OrbiPeakDetector(BasePeakDetector):
         runtime.logger.debug("Reading centroids from the Thermo file...")
         # Get CALIBRATED centroids
         try:
-            peaks_pos = self._extract_peaks_for_polarity("+")
+            peaks_pos = await self._extract_peaks_for_polarity("+")
         except Exception as e:
             runtime.logger.debug("No positive polarity data found.")
             peaks_pos = None
         try:
-            peaks_neg = self._extract_peaks_for_polarity("-")
+            peaks_neg = await self._extract_peaks_for_polarity("-")
         except Exception as e:
             runtime.logger.debug("No negative polarity data found.")
             peaks_neg = None
@@ -145,11 +145,14 @@ class OrbiPeakDetector(BasePeakDetector):
         self._flag_weak_peaks()
         self._flag_satellite_peaks()
 
-    def _extract_peaks_for_polarity(self, polarity: str) -> xarray.Dataset:
+    async def _extract_peaks_for_polarity(self, polarity: str) -> xarray.Dataset:
         """A workaround to extract peaks for a given polarity from Thermo Orbitrap files."""
-        peak_mzs, peak_heights, resolutions, signal_to_noise = (
-            m_compute.get_orbi_centroids(self._filename, polarity=polarity)
-        )
+        (
+            peak_mzs,
+            peak_heights,
+            resolutions,
+            signal_to_noise,
+        ) = await m_compute.get_orbi_centroids(self._filename, polarity=polarity)
 
         sigmas = peak_mzs / resolutions / m_fitting.SIGMA_MULTIPLIER
         mz_mins = peak_mzs - 3 * sigmas

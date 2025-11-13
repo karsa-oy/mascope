@@ -69,7 +69,7 @@ async def visualize_ion_focus(
         target_ion_id, min_isotope_abundance, instrument_property
     )
 
-    peak_data, averaged_signal = _load_peaks_and_averaged_signal(
+    peak_data, averaged_signal = await _load_peaks_and_averaged_signal(
         sample, target_isotopes
     )
 
@@ -177,7 +177,7 @@ class IsotopeResult:
     main_isotope_height: float = 0
 
 
-def _load_peaks_and_averaged_signal(sample, target_isotopes):
+async def _load_peaks_and_averaged_signal(sample, target_isotopes):
     """
     Loads peak data and averaged signal for the specified sample and target isotopes.
 
@@ -198,7 +198,9 @@ def _load_peaks_and_averaged_signal(sample, target_isotopes):
     mz_mask = np.any(np.abs(all_mzs[:, None] - closest_mzs[None, :]) <= DMZ, axis=1)
     mz_to_extract = all_mzs[mz_mask]
 
-    peak_timeseries = m_compute.load_peak_timeseries(sample.filename, mz_to_extract)
+    peak_timeseries = await m_compute.load_peak_timeseries(
+        sample.filename, mz_to_extract
+    )
 
     # Attach sample file metadata to peak_data
     props = read_props(sample.filename)

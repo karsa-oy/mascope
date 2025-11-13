@@ -836,7 +836,7 @@ async def sample_item_export_peaks(
 
         peak_detector = get_peak_detector(filename, instrument_functions)
         await peak_detector.detect_peaks()
-        peak_detector.write_peaks_to_zarr()
+        await peak_detector.write_peaks_to_zarr()
 
         if instrument_type == "orbi":
             peak_data_type = "peak_heights"

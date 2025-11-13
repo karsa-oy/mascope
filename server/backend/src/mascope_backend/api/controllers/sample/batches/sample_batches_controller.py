@@ -927,7 +927,7 @@ async def sample_batch_export_peaks(
 
             peak_detector = get_peak_detector(filename, instrument_functions)
             await peak_detector.detect_peaks()
-            peak_detector.write_peaks_to_zarr()
+            await peak_detector.write_peaks_to_zarr()
 
             # Assign peak abundance units
             instrument_type = get_instrument_type(filename)

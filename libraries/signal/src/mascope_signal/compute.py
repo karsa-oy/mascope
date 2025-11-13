@@ -2,6 +2,7 @@ import os
 import json
 import hashlib
 from typing import Iterable, Literal
+import asyncio
 
 import dask.array as da
 import numpy as np
@@ -413,7 +414,7 @@ def get_tic_per_scan(
     return tic_time, tic_per_scan
 
 
-def get_orbi_centroids(
+async def get_orbi_centroids(
     base_filename: str,
     u_list: Iterable[float] | None = None,
     t_min: float | None = None,
@@ -446,8 +447,13 @@ def get_orbi_centroids(
     match sample_type:
         case "orbi_raw":
             datafile_path = m_name.filename_to_datafile_path(base_filename)
-            masses, intensities, resolutions, signal_to_noise = m_thermo.get_centroids(
-                datafile_path, u_list, t_min, t_max, polarity=polarity
+            masses, intensities, resolutions, signal_to_noise = await asyncio.to_thread(
+                m_thermo.get_centroids,
+                datafile_path,
+                u_list,
+                t_min,
+                t_max,
+                polarity=polarity,
             )
             props = m_io.read_props(base_filename)
             calibration = props["mz_calibration"]
@@ -514,7 +520,7 @@ def get_orbi_centroids_per_scan(
             )
 
 
-def load_peak_timeseries(
+async def load_peak_timeseries(
     base_filename: str,
     mzs: Iterable[float],
 ) -> xr.Dataset:
@@ -543,7 +549,7 @@ def load_peak_timeseries(
     # --- Compute missing peak timeseries ---
     mz_coords = peak_timeseries.mz.values
     mzs_to_compute = mz_coords[to_compute_mask]
-    new_peak_timeseries = get_peak_timeseries(base_filename, mzs_to_compute)
+    new_peak_timeseries = await get_peak_timeseries(base_filename, mzs_to_compute)
 
     sum_peak_heights = peak_timeseries.sum_peak_heights.sel(mz=mzs_to_compute).values
     sum_peak_areas = peak_timeseries.sum_peak_areas.sel(mz=mzs_to_compute).values
@@ -575,12 +581,12 @@ def load_peak_timeseries(
         raise
 
     # --- Store new peak timeseries in the sample file ---
-    m_io.write_peaks(peak_timeseries, base_filename)
+    await m_io.write_peaks(peak_timeseries, base_filename)
 
     return peak_timeseries
 
 
-def get_peak_timeseries(
+async def get_peak_timeseries(
     base_filename: str,
     mzs: Iterable[float],
     t_min: float | None = None,
@@ -616,8 +622,13 @@ def get_peak_timeseries(
                 fit_parameters = calibration["par"]
                 factor = fit_parameters["calibration_factor"]
             uncalibrated_mzs = np.array(mzs) / factor
-            peak_timeseries = m_thermo.get_peak_timeseries(
-                datafile_path, uncalibrated_mzs, t_min, t_max, polarity
+            peak_timeseries = await asyncio.to_thread(
+                m_thermo.get_peak_timeseries,
+                datafile_path,
+                uncalibrated_mzs,
+                t_min,
+                t_max,
+                polarity,
             )
             # Calibrate m/z coordinate
             return peak_timeseries.assign_coords(mz=peak_timeseries.mz.values * factor)
@@ -625,8 +636,13 @@ def get_peak_timeseries(
             # Get calibrated m/z values
             sum_signal_mz = get_sum_signal(base_filename).mz.values
             datafile_path = m_name.filename_to_datafile_path(base_filename)
-            return m_tofwerk.get_peak_timeseries(
-                datafile_path, mzs, sum_signal_mz, t_min, t_max
+            return await asyncio.to_thread(
+                m_tofwerk.get_peak_timeseries,
+                datafile_path,
+                mzs,
+                sum_signal_mz,
+                t_min,
+                t_max,
             )
         case "tof_zarr" | "orbi_zarr":
             signal = load_signal(base_filename, t_min, t_max)

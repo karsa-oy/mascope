@@ -84,7 +84,7 @@ class BaseCalibrationHandler:
         target_isotopes_df = pd.DataFrame(target_isotopes_result["data"])
 
         instrument_type = m_name.get_instrument_type(self.filename)
-        peaks = load_peaks(
+        peaks = await load_peaks(
             filename=self.filename,
             target_mzs=target_isotopes_df.mz,
         )

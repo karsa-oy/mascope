@@ -75,7 +75,7 @@ async def compute_match_isotopes(
             return pd.DataFrame()
 
         # --- Load sample peaks ---
-        peaks = load_peaks(
+        peaks = await load_peaks(
             filename=filename,
             target_mzs=target_isotopes_df.mz,
             polarity=polarity,
@@ -127,7 +127,7 @@ async def compute_match_isotopes(
         raise ValueError(error_message) from e
 
 
-def load_peaks(
+async def load_peaks(
     filename: str,
     target_mzs: pd.Series,
     polarity: Literal["+", "-"] | None = None,
@@ -159,7 +159,7 @@ def load_peaks(
     )
     mz_to_compute = all_mzs[mz_mask]
 
-    peak_timeseries = m_compute.load_peak_timeseries(filename, mz_to_compute)
+    peak_timeseries = await m_compute.load_peak_timeseries(filename, mz_to_compute)
     # Narrow down to closest m/z values only after computing peak timeseries
     peak_timeseries = peak_timeseries.sel(mz=closest_mzs)
 

@@ -6,6 +6,7 @@ from shutil import rmtree
 import numpy as np
 import xarray as xr
 import zarr
+import asyncio
 
 
 from mascope_file.name import parse_path_from_item_filename, filename_to_zarr_path
@@ -311,7 +312,7 @@ def update_zarr_array_coord(base_filename, var, dim, coord):
         group[dim][:] = coord
 
 
-def write_peaks(
+async def write_peaks(
     peak_timeseries: xr.Dataset,
     filename: str,
     overwrite: bool = False,
@@ -382,6 +383,7 @@ def write_peaks(
     ]
 
     total_num_regions = len(contiguous_regions)
+    last_logged_percent = -1
     for i, (start_idx, end_idx) in enumerate(contiguous_regions):
         try:
             region = {"mz": slice(start_idx, end_idx + 1), "time": slice(None)}
@@ -390,18 +392,22 @@ def write_peaks(
             contiguous_mz_data = peak_timeseries.isel(mz=update_indices)
             # Safe chunks disabled because the chunking is known to be compatible
             # otherwise region writing fails because of chunk mis-alignment
-            contiguous_mz_data.to_zarr(
+            await asyncio.to_thread(
+                contiguous_mz_data.to_zarr,
                 peak_timeseries_path,
                 mode="r+",
                 region=region,
                 safe_chunks=False,
                 synchronizer=synchronizer,
             )
-            progress_percent = (i + 1) / total_num_regions * 100
-            if progress_percent % 10 == 0:
+            progress_percent = int((i + 1) / total_num_regions * 100)
+            if progress_percent // 10 > last_logged_percent // 10:
                 runtime.logger.debug(
-                    f"{progress_percent:.1f}% done writing peak timeseries..."
+                    f"{progress_percent}% done writing peak timeseries..."
                 )
+                last_logged_percent = progress_percent
+
+            await asyncio.sleep(0)
         except Exception:
             runtime.logger.error(
                 "Failed to write peak timeseries for "

@@ -93,7 +93,7 @@ async def run():
                     sample_file.filename, instrument_functions
                 )
                 await peak_detector.detect_peaks()
-                peak_detector.write_peaks_to_zarr()
+                await peak_detector.write_peaks_to_zarr()
                 BaseMigrationHelper.delete_old_zarr_files(sample_file.filename)
             except Exception as e:
                 tqdm.write(
@@ -166,8 +166,8 @@ class BaseMigrationHelper:
             "add_signal_to_noise must be implemented in subclasses."
         )
 
-    def write_peak_timeseries(self):
-        m_io.write_peaks(
+    async def write_peak_timeseries(self):
+        await m_io.write_peaks(
             self.peak_timeseries, self.sample_file.filename, overwrite=True
         )
 
@@ -188,7 +188,7 @@ class BaseMigrationHelper:
         self.flag_computed_timeseries()
         self.add_polarity()
         await self.add_signal_to_noise()
-        self.write_peak_timeseries()
+        await self.write_peak_timeseries()
         self.delete_old_zarr_files(self.sample_file.filename)
 
 
@@ -214,7 +214,7 @@ class OrbiRawMigrationHelper(BaseMigrationHelper):
         Polarity is ignored since mixed polarity files would have raised an exception earlier
         and will be recomputed separately.
         """
-        peak_mzs, _, _, signal_to_noise = m_compute.get_orbi_centroids(
+        peak_mzs, _, _, signal_to_noise = await m_compute.get_orbi_centroids(
             self.sample_file.filename,
         )
         snr_interpolated = np.interp(
