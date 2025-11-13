@@ -6,9 +6,6 @@ from mascope_backend.api.controllers.match.aggregate.match_aggregate_controller 
     aggregate_and_create_matches,
     aggregate_and_recreate_matches,
 )
-from mascope_backend.api.controllers.match.aggregate.batch.match_aggregate_batch_controller import (
-    get_batch_and_aggregated_matches,
-)
 from mascope_backend.api.controllers.sample.batches.sample_batches_controller import (
     get_sample_batch,
 )
@@ -175,22 +172,3 @@ async def aggregate_and_recreate_matches_route(
         "status": result.get("status"),
         "message": result.get("message", ""),
     }
-
-
-@match_aggregate_batch_router.get("/{sample_batch_id}/all")
-@api_route(token_access=True)
-async def get_batch_and_aggregated_matches_route(
-    sample_batch_id: str,
-    user=Depends(guest_user),
-):
-    """Retrieve all batch and aggregated match data for a sample batch.
-    May be used in the mascope_sdk lib for Jypter server.
-
-    :param sample_batch_id: The unique identifier of the sample batch.
-    :type sample_batch_id: str
-    :param user: The current authenticated user, defaults to Depends(guest_user).
-    :type user: User
-    :return: Batch and aggregated match data.
-    :rtype: dict
-    """
-    return await get_batch_and_aggregated_matches(sample_batch_id=sample_batch_id)
