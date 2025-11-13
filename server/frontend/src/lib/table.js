@@ -34,53 +34,6 @@ export function fromSpreadsheet(text, fields) {
     rows
   }
 }
-export function toSpreadsheet(filename, sheets) {
-  let workbook = xlsx.utils.book_new()
-  for (let sheet of sheets) {
-    let { rows, cols, name } = sheet
-    // construct header
-    let fields = cols.map((col) => col.field)
-    let headerLabels = cols.map((col) => col.label)
-    let header = Object.fromEntries(fields.map((field, index) => [field, headerLabels[index]]))
-    // helper function for selecting only used columns
-    let selectFields = (row) =>
-      Object.fromEntries(Object.entries(row).filter(([field]) => fields.includes(field)))
-    // add header and filter out unused fields
-    let formattedRows = [header].concat(rows.map(selectFields))
-    let worksheet = xlsx.utils.json_to_sheet(formattedRows, {
-      // the default header uses field names
-      // so we omit since we add our own header
-      skipHeader: true
-    })
-    worksheet = fitColWidths(worksheet)
-    xlsx.utils.book_append_sheet(workbook, worksheet, name)
-  }
-  try {
-    xlsx.writeFile(workbook, filename, { type: 'xlsx' })
-  } catch (err) {
-    console.error(err)
-  }
-}
-function fitColWidths(worksheet) {
-  const data = xlsx.utils.sheet_to_json(worksheet)
-  if (data.length == 0) return
-  const colLengths = Object.keys(data[0]).map((k) => (k ? k.toString().length : 0))
-  for (const d of data) {
-    Object.values(d).forEach((element, index) => {
-      const length = element ? element.toString().length : 0
-      if (colLengths[index] < length) {
-        colLengths[index] = length
-      }
-    })
-  }
-  worksheet['!cols'] = colLengths.map((l) => {
-    return {
-      wch: l
-    }
-  })
-  return worksheet
-}
-
 /*
  *  Compare records or record arrays by a field
  *

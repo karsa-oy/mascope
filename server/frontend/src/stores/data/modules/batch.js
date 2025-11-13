@@ -2,11 +2,9 @@ import { defineStore } from 'pinia'
 
 import { api } from '@/api'
 
-import { toSpreadsheet } from '@/lib/table'
 import { useData } from '@/lib/store'
 
 import { useWorkspace } from './workspace'
-import { useMatchCollection } from './match'
 
 export const useBatch = defineStore('app.data.batch', () => {
   const name = 'batch'
