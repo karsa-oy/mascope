@@ -107,106 +107,21 @@ export const useBatch = defineStore('app.data.batch', () => {
         type: 'export_batch_peaks'
       }),
     /**
-     * Exports the sample batch and associated match data to an Excel spreadsheet.
+     * Export sample batch and its samples' match data to Excel spreadsheet.
      *
-     * This function gathers data from the focused sample batch, including the batch details,
-     * samples, and match data for compounds and ions. The data is then formatted into multiple sheets
-     * within an Excel workbook and saved as a file.
+     * Initiates a background task to generate a multi-sheet Excel file containing
+     * batch metadata, samples, match compounds, and match ions. The generated file
+     * is automatically downloaded when ready.
      *
      * @async
-     * @function batchExportCsv
-     * @returns {Promise<void>} - This function does not return a value but triggers a file download.
+     * @param {Object} params - Export parameters
+     * @param {string} params.sample_batch_id - Sample batch unique identifier
      */
-    exportCsv: async ({ sample_batch_id }) => {
-      const workspace = useWorkspace()
-      const matchCollection = useMatchCollection()
-
-      if (!sample_batch_id) {
-        console.error('📄 [export] no sample batch ID provided.')
-        return
-      }
-
-      const matches = await api.http.get(`/match/aggregate/batch/${sample_batch_id}/all`, {
-        use: 'read',
-        type: 'aggregate_batch_matches'
+    exportSpreadsheet: async ({ sample_batch_id }) => {
+      return await api.http.get(`/sample/batches/${sample_batch_id}/export/spreadsheet`, {
+        use: 'process',
+        type: 'export_batch_spreadsheet'
       })
-      const batch = matches.sample_batch
-
-      const samples = await api.http.get(`/samples`, {
-        params: {
-          sample_batch_id,
-          sort: 'datetime_utc'
-        },
-        use: 'read',
-        type: 'load_samples'
-      })
-
-      const datetimestamp = new Date().toJSON().slice(0, -5).replace(/[-:]/g, '')
-      const filename = `${datetimestamp}_${batch.sample_batch_name.replaceAll(' ', '_')}.xlsx`
-
-      toSpreadsheet(filename, [
-        {
-          name: 'Batch',
-          rows: [
-            { field: 'Name', value: batch.sample_batch_name },
-            { field: 'Description', value: batch.sample_batch_description },
-            { field: 'Workspace', value: workspace.focused?.workspace_name || 'N/A' },
-            { field: '', value: '' },
-            {
-              field: 'Target collections',
-              value:
-                matchCollection.list?.map((row) => row.target_collection_name).join(', ') ?? 'none'
-            },
-            { field: '', value: '' },
-            { field: 'Parameters', value: '' }
-          ],
-          cols: [
-            { field: 'field', label: 'Batch' },
-            { field: 'value', label: '' }
-          ]
-        },
-        {
-          name: 'Samples',
-          rows: samples,
-          cols: [
-            { field: 'sample_item_name', label: 'Sample name' },
-            { field: 'filename', label: 'Filename' },
-            { field: 'datetime', label: 'Datetime' },
-            { field: 'sample_item_type', label: 'Sample type' },
-            { field: 'tic', label: 'TIC' },
-            { field: 'filter_id', label: 'Filter ID' },
-            { field: 'match_score', label: 'Match score' }
-          ]
-        },
-        {
-          name: 'Match compounds',
-          rows: matches.match_compounds,
-          cols: [
-            { field: 'sample_item_name', label: 'Sample name' },
-            { field: 'filename', label: 'Filename' },
-            { field: 'sample_item_type', label: 'Sample type' },
-            { field: 'target_compound_name', label: 'Compound name' },
-            { field: 'target_compound_formula', label: 'Compound formula' },
-            { field: 'sample_peak_intensity_sum', label: 'Total peak intensity (cps)' },
-            { field: 'match_score', label: 'Match score' }
-          ]
-        },
-        {
-          name: 'Match ions',
-          rows: matches.match_ions,
-          cols: [
-            { field: 'sample_item_name', label: 'Sample name' },
-            { field: 'filename', label: 'Filename' },
-            { field: 'sample_item_type', label: 'Sample type' },
-            { field: 'target_compound_name', label: 'Compound name' },
-            { field: 'target_compound_formula', label: 'Compound formula' },
-            { field: 'ionization_mechanism', label: 'Ionization mechanism' },
-            { field: 'target_ion_formula', label: 'Ion formula' },
-            { field: 'sample_peak_intensity_sum', label: 'Total peak intensity (cps)' },
-            { field: 'match_score', label: 'Match score' }
-          ]
-        }
-      ])
     }
   }
 })

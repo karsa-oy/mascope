@@ -157,7 +157,7 @@ export const useBatchContextMenu = defineStore('browser.sample.batchCtxMenu', ()
 
           icon: 'pi ph ph-table',
           command: async () => {
-            await app.data.batch.exportCsv(row.value)
+            await app.data.batch.exportSpreadsheet(row.value)
           },
           visible: row.value !== null
         },
