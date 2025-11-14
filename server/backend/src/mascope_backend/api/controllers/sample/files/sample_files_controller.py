@@ -1,6 +1,5 @@
 import os
 import shutil
-from typing import Literal
 from datetime import datetime
 from fastapi import HTTPException, UploadFile, BackgroundTasks
 from sqlalchemy import (

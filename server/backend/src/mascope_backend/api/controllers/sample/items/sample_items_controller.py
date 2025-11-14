@@ -15,7 +15,6 @@ from sqlalchemy import (
 from mascope_file.name import get_instrument_type
 import mascope_file.io as m_io
 import mascope_signal.compute as m_compute
-from mascope_signal.peak import get_peak_detector
 
 from mascope_backend.socket import sio
 from mascope_backend.socket.notifications import (
@@ -60,7 +59,6 @@ from mascope_backend.api.models.sample.items.sample_item_pydantic_model import (
     SampleItemRead,
     SampleItemUpdate,
 )
-from mascope_backend.api.new.instrument_configs.lib import read_instrument_functions
 from mascope_backend.api.new.instrument_configs.service import get_instrument_config
 from mascope_backend.api.new.instrument_configs.schemas import (
     SetInstrumentConfigBody,
@@ -829,14 +827,10 @@ async def sample_item_export_peaks(
 
     try:
         filename = sample["filename"]
-        instrument_functions = await read_instrument_functions(filename=filename)
         instrument_type = get_instrument_type(filename)
 
         await send_progress_user_notification(notification, 0.1)
 
-        peak_detector = get_peak_detector(filename, instrument_functions)
-        await peak_detector.detect_peaks()
-        await peak_detector.write_peaks_to_zarr()
 
         if instrument_type == "orbi":
             peak_data_type = "peak_heights"
