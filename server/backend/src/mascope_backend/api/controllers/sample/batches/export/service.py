@@ -2,6 +2,7 @@
 Sample batch export service for generating batch scope Excel spreadsheets, csv files, etc.
 """
 
+import asyncio
 from datetime import datetime
 import pandas as pd
 
@@ -47,7 +48,7 @@ async def sample_batch_export_spreadsheet(
     :param parent_id: Parent process ID if this is a subtask, defaults to None.
     :type parent_id: str, optional
     :return: Dictionary with success message, filename, and download info.
-    :rtype
+    :rtype: dict
     """
     # --- Fetch batch data ---
     batch_data_result = await get_batch_data(sample_batch_id)
@@ -168,17 +169,15 @@ async def sample_batch_export_spreadsheet(
 
     runtime.logger.info(f"Writing spreadsheet to file {file}")
 
-    with pd.ExcelWriter(filepath, engine="openpyxl") as writer:
-        batch_info_df.to_excel(writer, sheet_name="Batch", index=False, header=False)
-        samples_df.to_excel(writer, sheet_name="Samples", index=False)
-        if not compounds_df.empty:
-            compounds_df.to_excel(writer, sheet_name="Match compounds", index=False)
-        if not ions_df.empty:
-            ions_df.to_excel(writer, sheet_name="Match ions", index=False)
-
-        # Auto-adjust column widths for readability for all sheets
-        for worksheet in writer.sheets.values():
-            auto_adjust_column_width(worksheet)
+    # Offload blocking I/O to thread pool
+    await asyncio.to_thread(
+        _write_excel_file,
+        filepath,
+        batch_info_df,
+        samples_df,
+        compounds_df,
+        ions_df,
+    )
 
     message = f"Spreadsheet for sample batch '{sample_batch_name}' was exported to file '{file}'."
     runtime.logger.info(message)
@@ -191,3 +190,33 @@ async def sample_batch_export_spreadsheet(
             "download": file,
         },
     }
+
+
+def _write_excel_file(
+    filepath: str,
+    batch_info_df: pd.DataFrame,
+    samples_df: pd.DataFrame,
+    compounds_df: pd.DataFrame,
+    ions_df: pd.DataFrame,
+) -> None:
+    """
+    Write DataFrames to Excel file with auto-adjusted columns.
+
+    :param filepath: Full path to output Excel file
+    :param batch_info_df: Batch metadata DataFrame
+    :param samples_df: Samples with match data DataFrame
+    :param compounds_df: Match compounds DataFrame
+    :param ions_df: Match ions DataFrame
+    """
+    with pd.ExcelWriter(filepath, engine="openpyxl") as writer:
+        batch_info_df.to_excel(writer, sheet_name="Batch", index=False, header=False)
+        samples_df.to_excel(writer, sheet_name="Samples", index=False)
+
+        if not compounds_df.empty:
+            compounds_df.to_excel(writer, sheet_name="Match compounds", index=False)
+        if not ions_df.empty:
+            ions_df.to_excel(writer, sheet_name="Match ions", index=False)
+
+        # Auto-adjust column widths for all sheets
+        for worksheet in writer.sheets.values():
+            auto_adjust_column_width(worksheet)
