@@ -826,11 +826,10 @@ async def sample_item_export_peaks(
     await send_progress_user_notification(notification, 0.1)
 
     try:
-        filename = sample["filename"]
+        filename = sample.filename
         instrument_type = get_instrument_type(filename)
 
         await send_progress_user_notification(notification, 0.1)
-
 
         if instrument_type == "orbi":
             peak_data_type = "peak_heights"
@@ -846,7 +845,7 @@ async def sample_item_export_peaks(
         raise e
 
     # File creation timestamp
-    base_datetime = sample["datetime"]
+    base_datetime = sample.datetime
     # Get sample peak timestamps local
     sample_peak_time = sample_peak_data.time.values
     # Convert peak time to timedelta
@@ -854,7 +853,7 @@ async def sample_item_export_peaks(
     # Get scan timestamps relative to the base datetime
     scan_timestamps = sample_peak_timedelta + pd.Timestamp(base_datetime)
     # Get scan timestamps UTC
-    base_datetime_utc = sample["datetime_utc"]
+    base_datetime_utc = sample.datetime_utc
     scan_timestamps_utc = sample_peak_timedelta + pd.Timestamp(base_datetime_utc)
     # Get ticks for each time scan
     _, scan_tics = m_compute.get_tic_per_scan(filename)
@@ -886,11 +885,11 @@ async def sample_item_export_peaks(
         sample_batch_name=sample_batch.sample_batch_name,
         sample_item_name=sample.sample_item_name,
         filename=filename,
-        filter_id=sample["filter_id"],
-        sample_item_type=sample["sample_item_type"],
-        sample_file_id=sample["sample_file_id"],
-        sample_item_id=sample["sample_item_id"],
-        instrument=sample["instrument"],
+        filter_id=sample.filter_id,
+        sample_item_type=sample.sample_item_type,
+        sample_file_id=sample.sample_file_id,
+        sample_item_id=sample.sample_item_id,
+        instrument=sample.instrument,
     )
 
     await send_progress_user_notification(notification, 1)
