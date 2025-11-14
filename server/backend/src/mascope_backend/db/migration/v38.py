@@ -16,12 +16,13 @@ from sqlalchemy import select
 from mascope_backend.db import async_session, configure_database_engine
 from mascope_backend.db.ops.backup import create_db_backup
 from mascope_backend.db.models import SampleFile
+from mascope_backend.db.id import gen_id
 from mascope_backend.api.new.instrument_configs.lib import read_instrument_functions
 
 import mascope_file.name as m_name
 import mascope_file.io as m_io
 import mascope_signal.compute as m_compute
-from mascope_signal.peak import get_peak_detector
+from mascope_signal.peak import get_peak_detector, PEAK_ID_LENGTH
 
 from mascope_tools.alignment.utils import flag_satellite_peaks
 
@@ -166,6 +167,12 @@ class BaseMigrationHelper:
             "add_signal_to_noise must be implemented in subclasses."
         )
 
+    def assign_peak_ids(self):
+        peak_ids = [
+            gen_id(PEAK_ID_LENGTH) for _ in range(self.peak_timeseries.mz.shape[0])
+        ]
+        self.peak_timeseries = self.peak_timeseries.assign({"id": (("mz"), peak_ids)})
+
     async def write_peak_timeseries(self):
         await m_io.write_peaks(
             self.peak_timeseries, self.sample_file.filename, overwrite=True
@@ -188,6 +195,7 @@ class BaseMigrationHelper:
         self.flag_computed_timeseries()
         self.add_polarity()
         await self.add_signal_to_noise()
+        self.assign_peak_ids()
         await self.write_peak_timeseries()
         self.delete_old_zarr_files(self.sample_file.filename)
 

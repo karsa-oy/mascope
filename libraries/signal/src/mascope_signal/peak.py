@@ -18,6 +18,7 @@ import mascope_file.io as m_io
 import mascope_signal.compute as m_compute
 import mascope_signal.fitting as m_fitting
 from mascope_tools.alignment.utils import flag_satellite_peaks
+from mascope_backend.db.id import gen_id
 
 from mascope_signal.runtime import runtime
 
@@ -32,6 +33,8 @@ EXECUTOR = ProcessPoolExecutor(max_workers=max_workers)
 # Define the delta m/z around unit masses for peak detection
 DMZ = 0.5
 SIGNAL_TO_NOISE_THRESHOLD = 3
+
+PEAK_ID_LENGTH = 20
 
 
 class PeakDetectionError(Exception):
@@ -66,10 +69,12 @@ class BasePeakDetector(ABC):
         unique_tofs = np.interp(peak_mzs, mz_axis, np.arange(len(mz_axis)))
 
         time_coord = m_compute.get_scan_timestamps(self._filename)
+        peak_ids = [gen_id(PEAK_ID_LENGTH) for _ in range(peaks.mz.size)]
         data_coords = {
             "mz": peaks.mz,
             "time": time_coord,
             "tof": (("mz"), unique_tofs),
+            "id": (("mz"), peak_ids),
         }
 
         # Allocate dask arrays for peak areas and heights with NaN initialization
