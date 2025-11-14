@@ -1,5 +1,3 @@
-import * as xlsx from 'xlsx'
-
 import { beautifySnakeCase } from './utils'
 
 export function fromSpreadsheet(text, fields) {
