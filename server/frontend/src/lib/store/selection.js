@@ -249,8 +249,10 @@ export const useSelection = (name, key, records, options = {}) => {
 
   // automatically reassign next focus after reload
   const prepRefocus = () => () => {
-    // scheduled lazy focus takes priority
-    const previousId = focused.value ? focused.value[key] : null
+    // Capture previous selection state BEFORE reload (works for both single & multi-select)
+    const previousSelectedIds = selected.value.map((s) => s[key])
+
+    // --- scheduled lazy focus takes priority ---
     const nextId = toFocus.value?.[key]
     const nextValid = records()
       .map((record) => record[key])
@@ -261,26 +263,29 @@ export const useSelection = (name, key, records, options = {}) => {
       focus({ [key]: nextId })
       return focused.value
     }
-    // using the previously focused value
-    const previousValid = records()
-      .map((record) => record[key])
-      .includes(previousId)
-    if (previousId && previousValid) {
-      logger.debug(`refocusing on ${previousId}`)
-      focus({ [key]: previousId })
-      return focused.value
+
+    // --- Restore previous selection by IDs (both single/multi select) ---
+    if (previousSelectedIds.length > 0) {
+      const recordsToRestore = records().filter((r) => previousSelectedIds.includes(r[key]))
+      if (recordsToRestore.length > 0) {
+        logger.debug(`refocusing ${recordsToRestore.length} record(s)`)
+        selected.value = recordsToRestore
+        return focused.value
+      }
     }
-    // then try to restore state
+    // --- try to restore state from localStorage (only if persist enabled) ---
     const restored = restoreState()
     if (restored) {
       return focused.value
     }
-    // then try to unfocus if allowed
+
+    // --- try to unfocus if allowed ---
     if (allowUnfocus) {
       unfocus()
       return focused.value
     }
-    // finally try to autofocus on the first record
+
+    // --- finally try to autofocus on the first record  as fallback ---
     const resolved = records().length > 0 ? records()[0] : null
     if (!resolved) {
       logger.warn('refocus failed to resolve the default record.')
