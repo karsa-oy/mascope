@@ -167,25 +167,47 @@ function onSelect({ points }) {
   scroller.scrollToSamples(app.data.sample.selectedIds)
 }
 
-/**
- * Sync chart selection with sample selection
- */
-watch(
-  () => app.data.sample.selected,
-  (selected) => {
-    if (!plot.value) return
+let syncTimeout = null
+let loadingTimeout = null
 
-    if (selected.length <= 0) {
+/**
+ * Sync chart selection with sample selection (ID-based)
+ */
+const syncChartSelection = async () => {
+  if (syncTimeout) {
+    clearTimeout(syncTimeout)
+  }
+
+  syncTimeout = setTimeout(() => {
+    if (!plot.value || !app.data.sample.list.length) return
+
+    const selectedIds = app.data.sample.selectedIds
+
+    if (selectedIds.length === 0) {
       plot.value.resetSelection()
     } else {
-      // Select samples in the chart
-      const pointIndices = selected.map((sample) => app.data.sample.list.indexOf(sample))
-      plot.value?.selectPoints(pointIndices)
-    }
-  }
-)
+      // ID-based index lookup (handles stale object references)
+      const pointIndices = app.data.sample.list
+        .map((sample, index) => (selectedIds.includes(sample.sample_item_id) ? index : null))
+        .filter((index) => index !== null)
 
-let loadingTimeout = null
+      if (pointIndices.length > 0) {
+        plot.value.selectPoints(pointIndices)
+      }
+    }
+  }, 50) // Debounce rapid updates
+}
+
+// Watch sample store selection changes (ID-based)
+watch(() => app.data.sample.selectedIds, syncChartSelection)
+
+// Watch traces changes (collection focus/unfocus, data reload, scale changes)
+watch(traces, () => {
+  // Reapply selection whenever traces change
+  syncChartSelection()
+})
+
+// Watch loading state for loading spinner
 watch(
   () => app.data.match.batch_overview.pending,
   (isLoading) => {
@@ -207,6 +229,7 @@ watch(
 
 onUnmounted(() => {
   if (loadingTimeout) clearTimeout(loadingTimeout)
+  if (syncTimeout) clearTimeout(syncTimeout)
 })
 </script>
 
