@@ -10,7 +10,7 @@ class MatchIsotopeBase(BaseModel):
     match_isotope_id: str = Field(..., description="ID of match isotope, primary key")
     target_isotope_id: str = Field(..., description="Foreign key to target_isotope")
     sample_item_id: str = Field(..., description="Foreign key to sample_item")
-    sample_peak_id: int = Field(..., description="ID of the sample peak")
+    sample_peak_id: str = Field(..., description="ID of the sample peak")
     sample_peak_mz: float = Field(
         ..., description="Mass-to-charge ratio of the sample peak"
     )

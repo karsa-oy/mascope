@@ -119,7 +119,7 @@ class BaseCalibrationHandler:
         # Fill np.nan with serializable defaults for unmatched isotopes
         match_df = match_df.fillna(
             {
-                "sample_peak_id": -1,
+                "sample_peak_id": "",
                 "sample_peak_intensity": 0.0,
                 "sample_peak_intensity_relative": 0.0,
                 "match_abundance_error": 1.0,

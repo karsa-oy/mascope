@@ -196,6 +196,7 @@ def parse_and_filter_peaks(peaks: "xarray.DataArray") -> dict:  # type: ignore #
     parsed_peaks = {
         "peak_intensities": peak_intensities[non_zero_peaks],
         "peak_mzs": peaks.mz.values[non_zero_peaks],
+        "peak_ids": peaks.id.values[non_zero_peaks],
         "peak_tofs": peaks.tof.values[non_zero_peaks],
     }
 
@@ -219,6 +220,7 @@ def match(row, parsed_peaks):
     peak_sorting = np.asarray(parsed_peaks["peak_sorting"])
     peak_tofs = parsed_peaks["peak_tofs"]
     peak_intensities = parsed_peaks["peak_intensities"]
+    peak_ids = parsed_peaks["peak_ids"]
 
     sorted_peak_mzs = peak_mzs[peak_sorting]
     mz_diffs = np.abs(sorted_peak_mzs - row.mz)
@@ -231,7 +233,7 @@ def match(row, parsed_peaks):
     closest_mz_index = np.argmin(mz_diffs_within_window)
     match_index = np.where(mz_diffs == mz_diffs_within_window[closest_mz_index])[0][0]
 
-    row["sample_peak_id"] = int(match_index)
+    row["sample_peak_id"] = peak_ids[match_index]
     row["sample_peak_mz"] = float(peak_mzs[match_index])
     row["sample_peak_tof"] = peak_tofs[match_index]
     row["sample_peak_intensity"] = peak_intensities[match_index]

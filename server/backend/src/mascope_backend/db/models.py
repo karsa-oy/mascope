@@ -773,7 +773,7 @@ class MatchIsotope(Base):
         ForeignKey("sample_item.sample_item_id", ondelete="CASCADE"),
         nullable=False,
     )
-    sample_peak_id = Column(Integer, nullable=False)
+    sample_peak_id = Column(String(20), nullable=False)
     sample_peak_mz = Column(Float, nullable=False)
     sample_peak_intensity = Column(Float, nullable=False)
     sample_peak_intensity_relative = Column(Float, nullable=False)
