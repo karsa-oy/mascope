@@ -8,54 +8,45 @@ and filestore records via HTTP requests to the API service.
 from datetime import timedelta, datetime
 import requests
 
-from mascope_file.name import get_instrument_type, timestamp_from_filename
-from mascope_runtime import Runtime
+from mascope_sdk import create_instrument_config
+from mascope_backend.api.new.instrument_configs.schemas import PeakShape
+from mascope_file.name import get_instrument_name
 
-runtime = Runtime("file-converter")
+from .schema import SampleFileProps
+from .runtime import runtime
 
-host = runtime.config.server if runtime.mode == "prod" else "localhost"
-url = f"http://{host}:{runtime.meta.api_port}"
+HOST = runtime.config.server if runtime.mode == "prod" else "localhost"
+URL = f"http://{HOST}:{runtime.meta.api_port}"
 
 
-def create_sample_file_db_record(data: dict, access_token: str) -> None:
+def create_sample_file_db_record(data: SampleFileProps, access_token: str) -> None:
     """Create a sample file database record via HTTP request.
 
     :param data: Sample file object to create
-    :type data: dict
+    :type data: SampleFileProps
     :param access_token: Access token required for request authentication
     :type access_token: str
     :raises Exception: HTTP request failed
     """
-    filename = data["filename"]
-    instrument_type = get_instrument_type(filename)
-    runtime.logger.info(f"Creating sample file database record for file: {filename}")
+    runtime.logger.info(
+        f"Creating sample file database record for file: {data.filename}"
+    )
 
-    instrument_name = filename.split("_")[0]
-    committed_length = data["committed_length"]
-    utc_offset = timedelta(seconds=int(data["utc_offset"]))
-    mz_calibration = data.get("mz_calibration")
-    method_file = data.get("method_file")
-
-    if instrument_type == "tof":
-        date = timestamp_from_filename(filename).isoformat()
-    else:
-        date = data.get("timestamp")
-
+    utc_offset = timedelta(seconds=int(data.utc_offset))
+    date = data.timestamp
     date_utc = (datetime.fromisoformat(date) - utc_offset).isoformat()
 
     sample_file_db_record = {
-        "filename": filename,
-        "instrument": instrument_name,
+        "filename": data.filename,
+        "instrument": data.filename.split("_")[0],
         "datetime": date,
         "datetime_utc": date_utc,
-        "length": committed_length,
-        "range": data["range"],
-        "mz_calibration": mz_calibration,
-        "polarity": data["polarity"],
+        "length": data.length,
+        "range": data.range,
+        "method_file": data.method_file,
+        "mz_calibration": data.mz_calibration,
+        "polarity": data.polarity,
     }
-
-    if method_file:
-        sample_file_db_record["method_file"] = method_file
 
     headers = {
         "Content-Type": "application/json",
@@ -65,7 +56,7 @@ def create_sample_file_db_record(data: dict, access_token: str) -> None:
 
     try:
         response = requests.post(
-            f"{url}/api/sample/files",
+            f"{URL}/api/sample/files",
             headers=headers,
             json=sample_file_db_record,
             timeout=180,
@@ -102,7 +93,7 @@ def check_sample_file_db_record(filename: str, access_token: str) -> bool:
 
     try:
         response = requests.get(
-            f"{url}/api/sample/files", headers=headers, params=params, timeout=10
+            f"{URL}/api/sample/files", headers=headers, params=params, timeout=10
         )
 
         if response.status_code == 200:
@@ -139,7 +130,7 @@ def delete_sample_file_by_filename(filename: str, access_token: str) -> bool:
 
     try:
         response = requests.post(
-            f"{url}/api/sample/files/delete",
+            f"{URL}/api/sample/files/delete",
             headers=headers,
             json={"filenames": [filename]},
             timeout=30,
@@ -160,3 +151,32 @@ def delete_sample_file_by_filename(filename: str, access_token: str) -> bool:
     except requests.exceptions.RequestException as e:
         runtime.logger.error(f"Failed to delete file {filename}: {e}")
         raise Exception(f"Failed to delete file: {e}") from e
+
+
+def create_instrument_config_db_record(
+    sample_file_props: SampleFileProps,
+    peakshape: PeakShape,
+    resolution_function: list,
+    access_token: str,
+) -> None:
+    """Create an instrument configuration database record via HTTP request.
+
+    :param instrument_config: Instrument configuration object to create
+    :type instrument_config: dict
+    :param access_token: Access token required for request authentication
+    :type access_token: str
+    :raises Exception: HTTP request failed
+    """
+    runtime.logger.info(
+        f"Creating instrument config database record for file: {sample_file_props.filename}"
+    )
+
+    create_instrument_config(
+        mascope_url=URL,
+        access_token=access_token,
+        instrument=get_instrument_name(sample_file_props.filename),
+        datetime_utc=sample_file_props.timestamp,
+        peakshape=peakshape.model_dump(),
+        resolution_function=resolution_function,
+        method_file=sample_file_props.method_file,
+    )

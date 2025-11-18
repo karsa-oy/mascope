@@ -78,6 +78,7 @@ class Runtime:
         if log and not self.context:
             self.logging = RuntimeLogging(self)
             self.logging.configure()
+            self.logger.debug(f"Initialized runtime for module '{module}'")
 
     @property
     def mode(self) -> RuntimeMode:

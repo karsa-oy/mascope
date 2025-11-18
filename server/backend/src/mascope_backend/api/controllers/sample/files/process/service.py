@@ -18,14 +18,6 @@ from mascope_backend.api.lib.exceptions.api_exceptions import (
     ApiException,
 )
 
-from mascope_backend.api.new.instrument_configs.schemas import (
-    CreateInstrumentConfigBody,
-    SetInstrumentConfigBody,
-)
-from mascope_backend.api.new.instrument_configs.process.service import (
-    process_instrument_config,
-)
-
 from mascope_backend.api.controllers.workspace.acquisition.service import (
     get_acquisition_workspace,
 )
@@ -33,9 +25,7 @@ from mascope_backend.api.controllers.sample.batches.sample_batches_controller im
     get_sample_batches,
     create_sample_batch,
 )
-from mascope_backend.api.controllers.sample.files.sample_files_controller import (
-    compute_sample_file_peaks,
-)
+
 from mascope_backend.api.controllers.sample.items.sample_items_controller import (
     create_sample_items,
 )
@@ -92,10 +82,8 @@ async def auto_process_sample_file(
 
     Steps:
     - Validate sample file existence
-    - Create a new instrument config and process
     - Get ACQUISITION workspace for the instrument
     - Create ACQUISITION batches and sample items for each sample file ionization mode
-    - Compute peak data for the sample file
     - Perform calibration and match computation for created ACQUISITION samples
     - Schedule rematch tasks for other affected samples
     - Return processing results with affected IDs or UI reloads
@@ -120,36 +108,6 @@ async def auto_process_sample_file(
         if not (sample_file := await session.get(SampleFile, sample_file_id)):
             raise NotFoundException(f"Sample file with ID '{sample_file_id}' not found")
 
-    # --- Create a new instrument config and process --- #
-    method_file_exists = sample_file.method_file and sample_file.method_file.strip()
-    if method_file_exists:
-        method_file = sample_file.method_file
-    else:
-        # Fallback to auto-generated method file name
-        timestamp = sample_file.datetime.strftime("%Y-%m-%d %H:%M:%S")
-        method_file = f"{timestamp} Acquisition {sample_file.instrument}"
-
-    instrument_config = SetInstrumentConfigBody(
-        new_record=CreateInstrumentConfigBody(
-            method_file=method_file,
-        )
-    )
-
-    process_instrument_config_result = await process_instrument_config(
-        filenames=[sample_file.filename],
-        instrument_config=instrument_config,
-        independent_transaction=False,
-        sid=sid,
-        process_id=gen_id(8),
-        parent_id=process_id,
-    )
-    # Collect affected items from instrument config processing
-    all_affected_sample_item_ids.update(
-        process_instrument_config_result["_notification_data"].get(
-            "affected_sample_item_ids", []
-        )
-    )
-
     # --- Get ACQUISITION workspace for the instrument --- #
     acquisition_workspace = (
         await get_acquisition_workspace(sample_file.instrument)
@@ -169,15 +127,6 @@ async def auto_process_sample_file(
     ]
     all_affected_sample_item_ids.update(
         sample["sample_item_id"] for sample in acquisition_sample_items
-    )
-
-    # --- Compute peak data for the sample file --- #
-    await compute_sample_file_peaks(
-        sample_file_id=sample_file_id,
-        independent_transaction=False,
-        sid=sid,
-        process_id=gen_id(8),
-        parent_id=process_id,
     )
 
     # --- Perform calibration and match computation for created ACQUISITION samples --- #

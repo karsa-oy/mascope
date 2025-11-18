@@ -33,3 +33,50 @@ async def file_processing_error(sid, error_data):
     )
 
     await emit_user_notification(file_processing_notification, user_sid)
+
+
+@sio.event(namespace="/file-converter")
+@file_converter_socket_auth(minimum_role="editor")
+async def file_processing_progress(sid, progress_data):
+    """Handle file processing progress events from file converter service."""
+    instrument = progress_data.get("instrument")
+    user_sid = progress_data.get("user_sid")
+    filename = progress_data.get("filename")
+    progress = progress_data.get("progress", 0.0)
+
+    file_processing_notification = UserNotification(
+        process_id=file_processing_notification_process_id,
+        type="file_processing",
+        status="pending",
+        message=f"Processing {filename}: {progress:.1f}%",
+        data={
+            "instrument": instrument,
+            "filename": filename,
+        },
+        progress=progress,
+    )
+
+    await emit_user_notification(file_processing_notification, user_sid)
+
+
+@sio.event(namespace="/file-converter")
+@file_converter_socket_auth(minimum_role="editor")
+async def file_processing_success(sid, success_data):
+    """Handle file processing success events from file converter service."""
+    instrument = success_data.get("instrument")
+    user_sid = success_data.get("user_sid")
+    filename = success_data.get("filename")
+
+    file_processing_notification = UserNotification(
+        process_id=file_processing_notification_process_id,
+        type="file_processing",
+        status="success",
+        message=f"Successfully processed {filename}",
+        data={
+            "instrument": instrument,
+            "filename": filename,
+        },
+        progress=100,
+    )
+
+    await emit_user_notification(file_processing_notification, user_sid)

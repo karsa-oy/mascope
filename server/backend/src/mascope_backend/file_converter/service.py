@@ -7,8 +7,8 @@ from time import sleep
 from mascope_backend.file_converter.socket.client import FileConverterSocketClient
 from mascope_backend.file_converter.watcher import FSWatcher
 
-from mascope_thermo.generator import RawProcessor
-from mascope_tofwerk.generator import H5Processor
+from mascope_thermo.processor import RawProcessor
+from mascope_tofwerk.processor import H5Processor
 
 from .runtime import runtime
 
@@ -57,7 +57,6 @@ def run():
             socket_client=SOCKET_CLIENT,
             file_queue=h5_file_queue,
             shutdown_event=SHUTDOWN_EVENT,
-            lock=streamer_lock,
         )
         for _ in range(runtime.config.h5_threads)
     ]
@@ -77,7 +76,6 @@ def run():
             socket_client=SOCKET_CLIENT,
             file_queue=raw_file_queue,
             shutdown_event=SHUTDOWN_EVENT,
-            lock=streamer_lock,
         )
         for _ in range(runtime.config.raw_threads)
     ]
