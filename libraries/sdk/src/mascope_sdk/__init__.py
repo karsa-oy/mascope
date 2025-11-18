@@ -1224,16 +1224,17 @@ def get_sample_file_metadata(
 # Instrument functions API
 
 
-def create_instrument_function(
+def create_instrument_config(
     mascope_url: str,
     access_token: str,
     instrument: str,
     datetime_utc: str,
     peakshape: dict,
     resolution_function: list,
+    method_file: str,
 ) -> dict:
     """
-    Create a new instrument function record in the database.
+    Create a new instrument config record in the database.
 
     :param mascope_url: Base URL of the Mascope API.
     :type mascope_url: str
@@ -1247,19 +1248,22 @@ def create_instrument_function(
     :type peakshape: dict
     :param resolution_function: List containing resolution function parameters.
     :type resolution_function: list
-    :return: The created instrument function details as received from the API response.
+    :param method_file: Name of the method file used.
+    :type method_file: str
+    :return: The created instrument config details as received from the API response.
              Returns None if creation failed or an error occurs.
     :rtype: dict or None
 
-    Example instrument function input data:
-        instrument_function_data = {
+    Example instrument config input data:
+        instrument_config_data = {
             "instrument": "KLTOF1",
             "datetime_utc": "2024-04-04T07:51:00.717774",
             "peakshape": {
                 "x": [-30.0, -29.9, -29.8, 29.8, 29.9, 30.0,],
                 "y": [0.0, 3.0326e-06, 4.8616e-06, 7.4314e-03, 1.2687e-02, 2.2572e-02,]
             },
-            "resolution_function": [0.0001098, 0.0003524]
+            "resolution_function": [0.0001098, 0.0003524],
+            "method_file": "example_method.meth"
         }
     """
     # Construct the request body based on the function parameters
@@ -1268,12 +1272,13 @@ def create_instrument_function(
         "datetime_utc": datetime_utc,
         "peakshape": peakshape,
         "resolution_function": resolution_function,
+        "method_file": method_file,
     }
 
-    # Make the POST request to the instrument_functions endpoint
+    # Make the POST request to the instrument_configs endpoint
     resp = api_post(
         url=mascope_url,
-        path="instrument_functions",
+        path="instrument_configs",
         access_token=access_token,
         data=data,
     )
@@ -1284,15 +1289,15 @@ def create_instrument_function(
 
     # Successfully created the instrument function, extract 'data' from the response JSON
     response_json = resp.json()
-    created_instrument_function = response_json.get("data", None)
+    created_instrument_config = response_json.get("data", None)
 
-    if not created_instrument_function:
+    if not created_instrument_config:
         logger.error(
-            f"Failed to create instrument function. Status code: {resp.status_code}"
+            f"Failed to create instrument config. Status code: {resp.status_code}"
         )
         return None
 
-    return created_instrument_function
+    return created_instrument_config
 
 
 ###########################
