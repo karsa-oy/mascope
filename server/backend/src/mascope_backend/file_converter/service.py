@@ -9,9 +9,7 @@ from mascope_backend.file_converter.watcher import FSWatcher
 from mascope_thermo.generator import RawProcessor
 from mascope_tofwerk.generator import H5Processor
 
-from mascope_runtime import Runtime
-
-runtime = Runtime("file-converter")
+from .runtime import runtime
 
 host = runtime.config.server if runtime.mode == "prod" else "localhost"
 url = f"http://{host}:{runtime.meta.api_port}"
