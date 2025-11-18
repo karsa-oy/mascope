@@ -1,6 +1,7 @@
 import os
 
-from multiprocessing import Event, Lock, Queue
+from multiprocessing import Queue
+from threading import Event, Lock
 from time import sleep
 
 from mascope_backend.file_converter.socket.client import FileConverterSocketClient
@@ -11,35 +12,29 @@ from mascope_tofwerk.generator import H5Processor
 
 from .runtime import runtime
 
-host = runtime.config.server if runtime.mode == "prod" else "localhost"
-url = f"http://{host}:{runtime.meta.api_port}"
-
 
 def main():
     """Main loop of the service. Connect socket.io and then do nothing."""
-
-    global socket_client
-    runtime.logger.info(f"Attempting to connect to {url}...")
-    while not shutdown_event.is_set():
+    runtime.logger.info(f"Attempting to connect to {URL}...")
+    while not SHUTDOWN_EVENT.is_set():
         # Keep trying to connect to socket.io server
         try:
-            socket_client.connect()
+            SOCKET_CLIENT.connect()
             break
         except Exception:
             # Connection timed out, wait before retry
             sleep(1)
     # socket.io connection established
-    while not shutdown_event.is_set():
+    while not SHUTDOWN_EVENT.is_set():
         # Wait for shutdown event
         sleep(1)
 
 
 # Global variables
-cache = None
-raw_file_queue = Queue()
-h5_file_queue = Queue()
-shutdown_event = Event()
-socket_client = FileConverterSocketClient(url)
+SHUTDOWN_EVENT = Event()
+HOST = runtime.config.server if runtime.mode == "prod" else "localhost"
+URL = f"http://{HOST}:{runtime.meta.api_port}"
+SOCKET_CLIENT = FileConverterSocketClient(URL)
 
 
 def run():
@@ -48,11 +43,6 @@ def run():
     :raises Exception: Parsing command line arguments failed
     """
 
-    global cache
-    global raw_file_queue
-    global h5_file_queue
-    global shutdown_event
-
     if not os.path.exists(runtime.config.source):
         runtime.logger.info(
             f"Creating missing source directory {runtime.config.source}"
@@ -60,15 +50,13 @@ def run():
         os.makedirs(runtime.config.source)
 
     # Initialize streamer thread(s)
-    cache = dict()
-    streamer_lock = Lock()
-
     # tof streamers
+    h5_file_queue = Queue()
     h5_streamers = [
         H5Processor(
-            socket_client=socket_client,
+            socket_client=SOCKET_CLIENT,
             file_queue=h5_file_queue,
-            shutdown_event=shutdown_event,
+            shutdown_event=SHUTDOWN_EVENT,
             lock=streamer_lock,
         )
         for _ in range(runtime.config.h5_threads)
@@ -78,16 +66,17 @@ def run():
         pattern="*.h5",
         file_queue=h5_file_queue,
         interval=runtime.config.interval,  # default 3
-        shutdown_event=shutdown_event,
+        shutdown_event=SHUTDOWN_EVENT,
     )
     h5_fs_watcher.start()
 
     # orbi file processors
+    raw_file_queue = Queue()
     raw_processors = [
         RawProcessor(
-            socket_client=socket_client,
+            socket_client=SOCKET_CLIENT,
             file_queue=raw_file_queue,
-            shutdown_event=shutdown_event,
+            shutdown_event=SHUTDOWN_EVENT,
             lock=streamer_lock,
         )
         for _ in range(runtime.config.raw_threads)
@@ -97,7 +86,7 @@ def run():
         pattern="*.raw",
         file_queue=raw_file_queue,
         interval=runtime.config.interval,  # default 3
-        shutdown_event=shutdown_event,
+        shutdown_event=SHUTDOWN_EVENT,
     )
     raw_fs_watcher.start()
 
@@ -112,7 +101,13 @@ def run():
         main()
     except Exception:
         # Shutdown gracefully on exception
-        shutdown_event.set()
+        SHUTDOWN_EVENT.set()
+    finally:
+        # Wait for all threads to finish
+        for processor in processors:
+            processor.join()
+        raw_fs_watcher.join()
+        h5_fs_watcher.join()
 
 
 if __name__ == "__main__":
