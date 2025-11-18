@@ -8,8 +8,11 @@ from typing import Literal
 from mascope_backend.api.controllers.sample.lib.sample_file_fetch import (
     fetch_sample_files,
 )
-from mascope_backend.api.controllers.sample.lib.sample_file_compute import (
+from mascope_signal.peak import (
     compute_peaks,
+)
+from mascope_backend.api.new.instrument_configs.lib import (
+    read_instrument_functions,
 )
 from mascope_backend.db import init_db
 from mascope_backend.runtime import runtime
@@ -63,7 +66,10 @@ async def refit_peaks():
             )
         )
         try:
-            await compute_peaks(sample_file.filename)
+            instrument_functions = await read_instrument_functions(
+                filename=sample_file.filename
+            )
+            await compute_peaks(sample_file.filename, instrument_functions)
         except FileNotFoundError:
             runtime.logger.error(
                 f"Error computing peaks for sample file {sample_file.filename}. File not found."

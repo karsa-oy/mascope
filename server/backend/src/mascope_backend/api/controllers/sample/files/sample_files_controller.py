@@ -12,7 +12,7 @@ from mascope_file.io import load_peak_data
 from mascope_file.name import parse_path_from_item_filename
 
 import mascope_signal.compute as m_compute
-from mascope_signal.peak import get_peaks
+from mascope_signal.peak import compute_peaks, get_peaks
 
 from mascope_backend.db import async_session
 from mascope_backend.db.id import gen_id
@@ -25,7 +25,9 @@ from mascope_backend.socket.records.service import (
     emit_record_reload,
 )
 from mascope_backend.api.new.instruments import get_instruments
-
+from mascope_backend.api.new.instrument_configs.lib import (
+    read_instrument_functions,
+)
 from mascope_backend.api.lib.api_features import (
     api_controller,
     api_controller_background_task,
@@ -40,9 +42,7 @@ from mascope_backend.api.controllers.workspace.acquisition.service import (
     create_acquisition_workspaces,
     delete_acquisition_workspaces,
 )
-from mascope_backend.api.controllers.sample.lib.sample_file_compute import (
-    compute_peaks,
-)
+
 from mascope_backend.api.models.sample.files.sample_file_pydantic_model import (
     SampleFileCreate,
     SampleFileUpdate,
@@ -1021,7 +1021,8 @@ async def compute_sample_file_peaks(
     filename = sample_file_data.get("data").get("filename")
 
     # Step 2: Load instrument functions and determine instrument type.
-    await compute_peaks(filename)
+    instrument_functions = await read_instrument_functions(filename=filename)
+    await compute_peaks(filename, instrument_functions)
 
     # Return completion message and peak details.
     sample_file = load_peak_data(filename)

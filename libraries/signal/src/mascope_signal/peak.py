@@ -447,6 +447,13 @@ class TofZarrPeakDetector(TofPeakDetector):
     pass
 
 
+async def compute_peaks(filename: str, instrument_functions: tuple):
+    """Compute peaks for a sample file."""
+    peak_detector = get_peak_detector(filename, instrument_functions)
+    await peak_detector.detect_peaks()
+    await peak_detector.write_peaks_to_zarr()
+
+
 def get_peak_detector(
     filename: str,
     instrument_functions: tuple,
