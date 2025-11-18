@@ -344,7 +344,7 @@ async def fit_instrument_config(
         peakshape_numpy,
         resolution_function_partial,
         stats,
-    ) = await fit_instrument_functions(
+    ) = fit_instrument_functions(
         sample_file.filename, r_sq_thres=fit_params.threshold, dmz=dmz
     )
 

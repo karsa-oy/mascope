@@ -19,7 +19,7 @@ SIGMA_MULTIPLIER = 2 * np.sqrt(2 * np.log(2))
 MIN_NUM_PEAKS = 3
 
 
-async def fit_instrument_functions(filename: str, dmz=0.5, r_sq_thres=0.95) -> tuple:
+def fit_instrument_functions(filename: str, dmz=0.5, r_sq_thres=0.95) -> tuple:
     """Calculate instrument functions
 
     Compute the median peak shape from the normalized peak shapes (p_ys).
@@ -50,7 +50,7 @@ async def fit_instrument_functions(filename: str, dmz=0.5, r_sq_thres=0.95) -> t
     mz = sum_signal.mz.values
 
     # Get x-domain, normalized peak shapes and associated peak positions and FWHMs
-    p_x, p_ys, p_mzs, p_fwhms = await process_peak_shapes(
+    p_x, p_ys, p_mzs, p_fwhms = process_peak_shapes(
         mz, spec, instrument_type, dmz, r_sq_thres
     )
     # Check if there are enough peaks for peak shape estimation
@@ -60,7 +60,7 @@ async def fit_instrument_functions(filename: str, dmz=0.5, r_sq_thres=0.95) -> t
         raise ValueError(error_message)
 
     peak_shape, ps_stats = calculate_peakshape(p_x, p_ys)
-    resolution_function, resfun_stats = await fit_resolution_function(
+    resolution_function, resfun_stats = fit_resolution_function(
         instrument_type, p_mzs, p_fwhms
     )
 
@@ -70,7 +70,7 @@ async def fit_instrument_functions(filename: str, dmz=0.5, r_sq_thres=0.95) -> t
     return peak_shape, resolution_function, stats
 
 
-async def process_peak_shapes(
+def process_peak_shapes(
     mz: np.ndarray,
     spec: np.ndarray,
     instrument_type: str,
@@ -359,7 +359,7 @@ def calculate_peakshape(p_x: np.ndarray, p_ys: np.ndarray) -> tuple:
     return peak_shape, {"peakshape": stats}
 
 
-async def fit_resolution_function(
+def fit_resolution_function(
     instrument_type: str, p_mzs: list | np.ndarray, p_fwhms: list | np.ndarray, ndev=1
 ) -> partial:
     """Calculate the resolution function for a given instrument type
