@@ -38,7 +38,7 @@ def create_sample_file_db_record(data: SampleFileProps, access_token: str) -> No
 
     sample_file_db_record = {
         "filename": data.filename,
-        "instrument": data.filename.split("_")[0],
+        "instrument": get_instrument_name(data.filename),
         "datetime": date,
         "datetime_utc": date_utc,
         "length": data.length,

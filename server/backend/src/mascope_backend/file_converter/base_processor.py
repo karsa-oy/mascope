@@ -433,7 +433,7 @@ class BaseFileProcessor(Thread, ABC, metaclass=FileProcessorMeta):
                 instrument = None
                 self.file_to_process = self.file_queue.get(timeout=0.1)
                 file_basename = os.path.basename(self.file_to_process)
-                instrument = file_basename.split("_")[0]
+                instrument = get_instrument_name(file_basename)
 
                 # Initialize file reader (separate error handling)
                 try:
