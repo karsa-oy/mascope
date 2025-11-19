@@ -429,6 +429,8 @@ class BaseFileProcessor(Thread, ABC, metaclass=FileProcessorMeta):
         # Main loop
         while not self.shutdown_event.is_set():
             try:
+                file_basename = None
+                instrument = None
                 self.file_to_process = self.file_queue.get(timeout=0.1)
                 file_basename = os.path.basename(self.file_to_process)
                 instrument = file_basename.split("_")[0]
@@ -518,13 +520,9 @@ class BaseFileProcessor(Thread, ABC, metaclass=FileProcessorMeta):
                 runtime.logger.error(
                     f"Unexpected error in {self.__class__.__name__}: {e}"
                 )
-                if (
-                    hasattr(self, "file_to_process")
-                    and self.file_to_process
-                    and file_basename
-                ):
+                if self.file_to_process is not None and file_basename is not None:
                     # Ensure finalize is called before emission
-                    if self.file_handle:
+                    if self.file_handle is not None:
                         self._finalize()
 
                     self.socket_client.emit(
