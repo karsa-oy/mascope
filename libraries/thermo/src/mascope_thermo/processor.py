@@ -96,7 +96,7 @@ class RawProcessor(BaseFileProcessor):
         :rtype: str
         """
         method_file = self.raw.SampleInformation.InstrumentMethodFile
-        return method_file if method_file else None
+        return method_file if method_file else ""
 
     @property
     def mz_calibration(self) -> None:
