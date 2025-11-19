@@ -6,10 +6,10 @@ and add new variables
 import asyncio
 import os
 import shutil
-import pandas as pd
 import numpy as np
 from tqdm import tqdm
 import contextlib
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 
 from sqlalchemy import select
 
@@ -24,9 +24,19 @@ import mascope_file.io as m_io
 import mascope_signal.compute as m_compute
 from mascope_signal.peak import get_peak_detector, PEAK_ID_LENGTH
 
-from mascope_tools.alignment.utils import flag_satellite_peaks
+from mascope_tools.alignment.utils import DEFAULT_TIGHT_WINDOW_PPM, NEUTRON_MASS
 
 from mascope_backend.runtime import runtime
+
+
+cpu_cores = os.cpu_count()
+# thread pool for I/O-bound and mixed tasks, reserve 2 cores for system responsiveness
+thread_pool = ThreadPoolExecutor(max_workers=max(1, cpu_cores - 2))
+# process pool for CPU-bound tasks with heavy disk I/O, serialization, etc.
+# Limit process pool to avoid disk saturation. Empirically: number of physical cores / 2.
+process_pool = ProcessPoolExecutor(max_workers=max(1, cpu_cores // 2))
+# Semaphore to limit concurrent migrations globally.
+semaphore = asyncio.Semaphore(max(1, cpu_cores - 2))
 
 
 class PolarityException(Exception):
@@ -46,7 +56,7 @@ def suppress_logger(loguru_logger):
 
 
 async def run():
-    # Create backup before migration
+    # Create backup and configure database engine
     await create_db_backup()
 
     # Setup new database version
@@ -55,7 +65,6 @@ async def run():
     old_db_path = os.path.join(runtime.config.database, f"mascope.v{old_version}.db")
     new_db_path = os.path.join(runtime.config.database, f"mascope.v{new_version}.db")
 
-    # Copy database file to new version
     shutil.copyfile(old_db_path, new_db_path)
 
     await configure_database_engine(new_version)
@@ -63,119 +72,114 @@ async def run():
         f"Starting v{new_version} migration: merging peak_areas and peak_heights."
     )
 
+    # Fetch all sample filenames
     async with async_session() as session:
-        stmt = select(SampleFile)
+        stmt = select(SampleFile.filename)
         result = await session.execute(stmt)
-        sample_files = result.scalars().all()
+        filenames = result.scalars().all()
+
+    # --- First pass: concurrent migration of sample files ---
+    async def bounded_migrate(filename):
+        async with semaphore:
+            return await migrate_sample_file(filename, thread_pool, process_pool)
 
     sample_to_recompute = []
-
-    # --- First pass: try migrating each sample file ---
     with suppress_logger(runtime.logger):
-        for sample_file in tqdm(sample_files):
-            try:
-                migration_helper = migration_helper_factory(sample_file)
-                await migration_helper.migrate()
-            except PolarityException as pe:
-                tqdm.write(f"WARNING: {pe}")
-                sample_to_recompute.append(sample_file)
-            except Exception as e:
-                tqdm.write(f"Error processing sample file {sample_file.filename}: {e}")
-                sample_to_recompute.append(sample_file)
+        tasks = [bounded_migrate(sf) for sf in filenames]
+        for migration_task_future in tqdm(
+            asyncio.as_completed(tasks), total=len(tasks)
+        ):
+            filename, exception = await migration_task_future
+            if exception is not None:
+                tqdm.write(
+                    f"WARNING: {exception}"
+                    if isinstance(exception, PolarityException)
+                    else f"Error processing sample file {filename}: {exception}"
+                )
+                sample_to_recompute.append(filename)
 
     # --- Second pass: recompute peaks for samples that failed first pass ---
+    # Not so many expected, so do sequentially to avoid overwhelming system.
     with suppress_logger(runtime.logger):
-        for sample_file in tqdm(sample_to_recompute):
+        for filename in tqdm(sample_to_recompute):
             try:
                 instrument_functions = await read_instrument_functions(
-                    filename=sample_file.filename
+                    filename=filename
                 )
-                peak_detector = get_peak_detector(
-                    sample_file.filename, instrument_functions
-                )
+                peak_detector = get_peak_detector(filename, instrument_functions)
                 await peak_detector.detect_peaks()
                 await peak_detector.write_peaks_to_zarr()
-                BaseMigrationHelper.delete_old_zarr_files(sample_file.filename)
+                BaseMigrationHelper.delete_old_zarr_files(filename)
             except Exception as e:
-                tqdm.write(
-                    f"Error recomputing peaks for sample file {sample_file.filename}: {e}"
-                )
+                tqdm.write(f"Error recomputing peaks for sample file {filename}: {e}")
+
+
+async def migrate_sample_file(
+    filename: str,
+    thread_pool: ThreadPoolExecutor,
+    process_pool: ProcessPoolExecutor,
+) -> tuple[str, Exception | None]:
+    """Migrate a single sample file. Returns (filename, exception) tuple."""
+    try:
+        loop = asyncio.get_running_loop()
+        migration_helper = await loop.run_in_executor(
+            thread_pool, migration_helper_factory, filename
+        )
+        await migration_helper.migrate(thread_pool, process_pool)
+        return filename, None
+    except PolarityException as pe:
+        return filename, pe
+    except Exception as e:
+        return filename, e
 
 
 class BaseMigrationHelper:
-    def __init__(self, sample_file: SampleFile):
-        self.sample_file = sample_file
-        self.peak_timeseries = m_io.load_file(
-            sample_file.filename, vars=["peak_areas", "peak_heights"]
+    def __init__(self, filename: str):
+        self.filename = filename
+        peak_areas = m_io.load_array(filename, var="peak_areas")
+        peak_heights = m_io.load_array(filename, var="peak_heights")
+        self.peak_timeseries = peak_areas.assign(
+            {"peak_heights": peak_heights.peak_heights}
         )
+        self.n_peaks = self.peak_timeseries.mz.shape[0]
 
-    def assign_peak_sums(self):
-        """Computes sums for areas and heights and assigns to peak_timeseries"""
-        peak_areas_sum = self.peak_timeseries["peak_areas"].sum(dim="time")
-        peak_heights_sum = self.peak_timeseries["peak_heights"].sum(dim="time")
-        self.peak_timeseries = self.peak_timeseries.assign(
-            {
-                "sum_peak_areas": peak_areas_sum,
-                "sum_peak_heights": peak_heights_sum,
-            }
-        )
+    @property
+    def sum_peak_areas(self):
+        return self.peak_timeseries["peak_areas"].sum(dim="time").values
 
-    def flag_satellites(self):
+    @property
+    def sum_peak_heights(self):
+        return self.peak_timeseries["peak_heights"].sum(dim="time").values
+
+    @property
+    def is_satellite(self):
         """Default implementation: no satellite flagging."""
-        is_satellite = np.full(self.peak_timeseries.mz.shape, False, dtype=bool)
-        self.peak_timeseries = self.peak_timeseries.assign(
-            {"is_satellite": (("mz"), is_satellite)}
-        )
+        is_satellite = np.full(self.n_peaks, False, dtype=bool)
+        return is_satellite
 
-    def flag_weak_peaks(self):
-        """Flag all peaks as non-weak.
-
-        For TOF data, weak peak detection is not performed.
-        For Orbitrap data, we filtered out peaks below S/N threshold during detection,
-        so all remaining peaks are considered strong.
-        """
-        is_weak = np.full(self.peak_timeseries.mz.shape, False, dtype=bool)
-        self.peak_timeseries = self.peak_timeseries.assign(
-            {"is_weak": (("mz"), is_weak)}
-        )
-
-    def flag_computed_timeseries(self):
-        """Flag all peaks as having computed timeseries.
-
-        For both TOF and Orbitrap data, we used to compute timeseries for all detected peaks.
-        """
-        is_timeseries_computed = np.full(
-            self.peak_timeseries.mz.shape, True, dtype=bool
-        )
-        self.peak_timeseries = self.peak_timeseries.assign(
-            {"is_timeseries_computed": (("mz"), is_timeseries_computed)}
-        )
-
-    def add_polarity(self):
-        polarity = m_compute.get_polarity_options(self.sample_file.filename)
+    @property
+    def polarity(self):
+        polarity = m_compute.get_polarity_options(self.filename)
         if polarity == "+-":
             raise PolarityException(
-                f"Sample file {self.sample_file.filename} has mixed polarity, cannot assign single polarity."
+                f"Sample file {self.filename} has mixed polarity, cannot assign single polarity."
             )
-        polarity_arr = np.full(self.peak_timeseries.mz.shape, polarity, dtype="U1")
-        self.peak_timeseries = self.peak_timeseries.assign(
-            {"polarity": (("mz"), polarity_arr)}
-        )
+        return np.full(self.n_peaks, polarity, dtype="U1")
 
-    async def add_signal_to_noise(self):
-        raise NotImplementedError(
-            "add_signal_to_noise must be implemented in subclasses."
-        )
+    @property
+    def peak_ids(self):
+        return [gen_id(PEAK_ID_LENGTH) for _ in range(self.n_peaks)]
 
-    def assign_peak_ids(self):
-        peak_ids = [
-            gen_id(PEAK_ID_LENGTH) for _ in range(self.peak_timeseries.mz.shape[0])
-        ]
-        self.peak_timeseries = self.peak_timeseries.assign({"id": (("mz"), peak_ids)})
+    async def signal_to_noise(self):
+        raise NotImplementedError("signal_to_noise must be implemented in subclasses.")
 
-    async def write_peak_timeseries(self):
-        await m_io.write_peaks(
-            self.peak_timeseries, self.sample_file.filename, overwrite=True
+    async def write_peak_timeseries(self, process_pool: ProcessPoolExecutor):
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            process_pool,
+            write_peaks,
+            self.peak_timeseries,
+            self.filename,
         )
 
     @staticmethod
@@ -183,37 +187,58 @@ class BaseMigrationHelper:
         """Delete old peak_areas and peak_heights zarr files."""
         peak_areas_path = m_name.filename_to_zarr_path(filename, "peak_areas")
         peak_heights_path = m_name.filename_to_zarr_path(filename, "peak_heights")
-        if os.path.exists(peak_areas_path):
-            shutil.rmtree(peak_areas_path)
-        if os.path.exists(peak_heights_path):
-            shutil.rmtree(peak_heights_path)
+        peak_area_sync_path = peak_areas_path.replace(".zarr", ".sync")
+        peak_height_sync_path = peak_heights_path.replace(".zarr", ".sync")
+        for path in [
+            peak_areas_path,
+            peak_heights_path,
+            peak_area_sync_path,
+            peak_height_sync_path,
+        ]:
+            if os.path.exists(path):
+                shutil.rmtree(path)
 
-    async def migrate(self):
-        self.assign_peak_sums()
-        self.flag_satellites()
-        self.flag_weak_peaks()
-        self.flag_computed_timeseries()
-        self.add_polarity()
-        await self.add_signal_to_noise()
-        self.assign_peak_ids()
-        await self.write_peak_timeseries()
-        self.delete_old_zarr_files(self.sample_file.filename)
+    async def migrate(
+        self,
+        thread_pool: ThreadPoolExecutor,
+        process_pool: ProcessPoolExecutor,
+    ) -> None:
+        loop = asyncio.get_running_loop()
+
+        def _sync_stage() -> dict:
+            vars_to_add = {
+                "sum_peak_areas": (("mz"), self.sum_peak_areas),
+                "sum_peak_heights": (("mz"), self.sum_peak_heights),
+                "polarity": (("mz"), self.polarity),
+                "peak_id": (("mz"), self.peak_ids),
+                "is_satellite": (("mz"), self.is_satellite),
+                "is_timeseries_computed": (("mz"), np.ones(self.n_peaks, dtype=bool)),
+                "is_weak": (("mz"), np.ones(self.n_peaks, dtype=bool)),
+            }
+            return vars_to_add
+
+        # Compute and assign all non-async variables in thread pool.
+        vars_to_add = await loop.run_in_executor(thread_pool, _sync_stage)
+        # Compute and assign async variables.
+        vars_to_add["signal_to_noise"] = (("mz"), await self.signal_to_noise())
+        # Bulk assign to avoid multiple copies.
+        self.peak_timeseries = self.peak_timeseries.assign(vars_to_add)
+        # Write out merged peak_timeseries using process pool.
+        await self.write_peak_timeseries(process_pool)
+        # Cleanup old separate arrays (thread pool is fine).
+        await loop.run_in_executor(
+            thread_pool, self.delete_old_zarr_files, self.filename
+        )
 
 
 class OrbiRawMigrationHelper(BaseMigrationHelper):
-    def flag_satellites(self):
-        peaks_df = pd.DataFrame(
-            {
-                "mz": self.peak_timeseries.mz.values,
-                "intensity": self.peak_timeseries.sum_peak_heights.values,
-            }
-        )
-        peaks_df = flag_satellite_peaks(peaks_df)
-        self.peak_timeseries = self.peak_timeseries.assign(
-            {"is_satellite": (("mz"), peaks_df["is_satellite_peak"].values)}
+    @property
+    def is_satellite(self):
+        return flag_satellite_peaks(
+            self.peak_timeseries.mz.values, self.sum_peak_heights
         )
 
-    async def add_signal_to_noise(
+    async def signal_to_noise(
         self,
     ) -> np.ndarray:
         """Extract pre-computed signal-to-noise ratio from raw Orbitrap data.
@@ -223,7 +248,7 @@ class OrbiRawMigrationHelper(BaseMigrationHelper):
         and will be recomputed separately.
         """
         peak_mzs, _, _, signal_to_noise = await m_compute.get_orbi_centroids(
-            self.sample_file.filename,
+            self.filename,
         )
         snr_interpolated = np.interp(
             self.peak_timeseries.mz.values,
@@ -232,17 +257,15 @@ class OrbiRawMigrationHelper(BaseMigrationHelper):
             left=np.nan,
             right=np.nan,
         )
-        self.peak_timeseries = self.peak_timeseries.assign(
-            {"signal_to_noise": (("mz"), snr_interpolated)}
-        )
+        return snr_interpolated
 
 
 class TofH5MigrationHelper(BaseMigrationHelper):
-    async def add_signal_to_noise(
+    async def signal_to_noise(
         self,
     ) -> np.ndarray:
         """Compute signal-to-noise ratio for each peak based on baseline noise."""
-        sum_signal = m_compute.get_sum_signal(self.sample_file.filename)
+        sum_signal = m_compute.get_sum_signal(self.filename)
         mz_axis = sum_signal.mz.values
         signal = sum_signal.values
         peak_mzs = self.peak_timeseries.mz.values
@@ -250,9 +273,7 @@ class TofH5MigrationHelper(BaseMigrationHelper):
         snr = np.empty(len(peak_mzs), dtype=np.float64)
 
         # Compute exclusion zone from the resolution function
-        _, resolution_function = await read_instrument_functions(
-            self.sample_file.filename
-        )
+        _, resolution_function = await read_instrument_functions(self.filename)
         resolutions = resolution_function(peak_mzs)
         exclusion = peak_mzs / resolutions
 
@@ -274,9 +295,7 @@ class TofH5MigrationHelper(BaseMigrationHelper):
             noise_std = np.std(baseline) if baseline.size > 0 else np.nan
             snr[i] = peak_heights[i] / noise_std if noise_std > 0 else np.nan
 
-        self.peak_timeseries = self.peak_timeseries.assign(
-            {"signal_to_noise": (("mz"), snr)}
-        )
+        return snr
 
 
 class TofZarrMigrationHelper(TofH5MigrationHelper):
@@ -295,12 +314,162 @@ MIGRATION_HELPER_MAP = {
 }
 
 
-def migration_helper_factory(sample_file: SampleFile) -> BaseMigrationHelper:
-    sample_file_type = m_name.get_sample_file_type(sample_file.filename)
+def migration_helper_factory(filename: str) -> BaseMigrationHelper:
+    sample_file_type = m_name.get_sample_file_type(filename)
     try:
-        return MIGRATION_HELPER_MAP[sample_file_type](sample_file)
+        return MIGRATION_HELPER_MAP[sample_file_type](filename)
     except KeyError:
-        raise ValueError(f"Unsupported sample file type: {sample_file_type}")
+        raise ValueError(f"Unsupported sample file type: {filename}")
+
+
+def write_peaks(peak_timeseries, filename: str) -> None:
+    """Simplified synchronous m_io.write_peaks to zarr function."""
+    peak_timeseries_path = m_name.filename_to_zarr_path(filename, "peak_timeseries")
+    synchronizer = m_io.get_zarr_synchronizer(peak_timeseries_path)
+    peak_timeseries.to_zarr(peak_timeseries_path, mode="w", synchronizer=synchronizer)
+
+
+def flag_satellite_peaks(
+    mz: np.ndarray,
+    intensity: np.ndarray,
+    base_peak_percentile: float = 99.9,
+    top_n_bases: int | None = 5,
+    window_ppm: float = 350.0,
+    ratio_max: float = 0.04,
+    ratio_min: float = 1e-6,
+    symmetry_tolerance_ppm: float = 1.5,
+    isotope_tolerance_ppm: float = 2.0,
+    charge_range: tuple[int, int] = (1, 2),
+) -> np.ndarray:
+    """flag_satellite_peaks from mascope_tools but without pandas dependency."""
+
+    # Remove non-positive intensities early (cannot be parents nor satellites).
+    valid_mask = intensity > 0
+    mz = mz[valid_mask]
+    intensity = intensity[valid_mask]
+
+    n_peaks = mz.size
+
+    # Select base peaks (intensity-based).
+    base_thr = np.quantile(intensity, base_peak_percentile / 100.0)
+    base_candidates = np.flatnonzero(intensity >= base_thr)
+    if top_n_bases is not None and base_candidates.size > top_n_bases:
+        # Keep top_n_bases highest-intensity indices.
+        strongest_local = np.argsort(intensity[base_candidates])[::-1][:top_n_bases]
+        base_indices = np.sort(base_candidates[strongest_local])
+    else:
+        base_indices = base_candidates
+
+    # Precompute charges and isotope delta masses.
+    charges = np.arange(charge_range[0], charge_range[1] + 1, dtype=int)
+    isotope_deltas = NEUTRON_MASS / charges  # Da
+
+    is_satellite = np.zeros(n_peaks, dtype=bool)
+
+    # Precompute ppm to Da helper inline (avoid extra function call in tight loop).
+    def ppm_to_da_local(mass: float, ppm: float) -> float:
+        return mass * ppm * 1e-6
+
+    symmetry_ppm = symmetry_tolerance_ppm
+    isotope_ppm = isotope_tolerance_ppm
+    win_ppm = window_ppm
+    ratio_lo = ratio_min
+    ratio_hi = ratio_max
+
+    for base_idx in base_indices:
+        parent_mz = mz[base_idx]
+        parent_intensity = intensity[base_idx]
+        if parent_intensity <= 0:
+            continue
+
+        win_da = ppm_to_da_local(parent_mz, win_ppm)
+        left = np.searchsorted(mz, parent_mz - win_da, side="left")
+        right = np.searchsorted(mz, parent_mz + win_da, side="right")
+
+        if right - left <= 1:
+            continue
+
+        cand_idx = np.arange(left, right)
+        cand_idx = cand_idx[cand_idx != base_idx]
+        if cand_idx.size == 0:
+            continue
+
+        rel_ratio = intensity[cand_idx] / parent_intensity
+        ratio_mask = (rel_ratio >= ratio_lo) & (rel_ratio <= ratio_hi)
+        cand_idx = cand_idx[ratio_mask]
+        if cand_idx.size == 0:
+            continue
+
+        cand_mz = mz[cand_idx]
+        dmz = cand_mz - parent_mz
+
+        # Exclude +1 isotopes (only dmz > 0).
+        pos_mask = dmz > 0
+        if np.any(pos_mask):
+            dmz_pos = dmz[pos_mask]
+            cand_idx_pos = cand_idx[pos_mask]
+            exclude_iso = np.zeros(dmz_pos.size, dtype=bool)
+            # Vectorized isotope exclusion.
+            for iso_da in isotope_deltas:
+                tolerance_da = ppm_to_da_local(parent_mz + iso_da, isotope_ppm)
+                exclude_iso |= np.abs(dmz_pos - iso_da) <= tolerance_da
+            keep_pos = ~exclude_iso
+            # Recombine positive + negative side indices.
+            cand_idx = np.concatenate([cand_idx[~pos_mask], cand_idx_pos[keep_pos]])
+            dmz = mz[cand_idx] - parent_mz
+
+        if cand_idx.size == 0:
+            continue
+
+        # Symmetry detection: match |dmz_left| ≈ dmz_right within tolerance.
+        left_mask = dmz < 0
+        right_mask = dmz > 0
+        left_dmz = -dmz[left_mask]
+        right_dmz = dmz[right_mask]
+        left_idx = cand_idx[left_mask]
+        right_idx = cand_idx[right_mask]
+
+        # Tolerance (Da) computed at parent m/z.
+        sym_tol_da = ppm_to_da_local(parent_mz, symmetry_ppm)
+
+        # Use sorted arrays for matching.
+        if left_dmz.size and right_dmz.size:
+            # For each right offset, search approximate left match.
+            # Sort left_dmz for binary search.
+            left_order = np.argsort(left_dmz)
+            left_dmz_sorted = left_dmz[left_order]
+            left_idx_sorted = left_idx[left_order]
+
+            for r_off, r_i in zip(right_dmz, right_idx):
+                lo = np.searchsorted(left_dmz_sorted, r_off - sym_tol_da, side="left")
+                hi = np.searchsorted(left_dmz_sorted, r_off + sym_tol_da, side="right")
+                if hi <= lo:
+                    continue
+                # Choose closest left offset.
+                segment = left_dmz_sorted[lo:hi]
+                closest_rel = np.argmin(np.abs(segment - r_off))
+                l_i = left_idx_sorted[lo + closest_rel]
+
+                # Compare intensity ratios for similarity.
+                r_ratio = intensity[r_i] / parent_intensity
+                l_ratio = intensity[l_i] / parent_intensity
+                ratio_similarity = min(r_ratio, l_ratio) / max(r_ratio, l_ratio)
+                if ratio_similarity >= 0.5:
+                    is_satellite[r_i] = True
+                    is_satellite[l_i] = True
+
+        # Single-sided satellites (weak, very near parent).
+        # Restrict to those still unflagged.
+        unresolved = cand_idx[~is_satellite[cand_idx]]
+        if unresolved.size:
+            tight_window_da = ppm_to_da_local(
+                parent_mz, min(win_ppm * 0.5, DEFAULT_TIGHT_WINDOW_PPM)
+            )
+            near_mask = np.abs(mz[unresolved] - parent_mz) <= tight_window_da
+            weak_mask = (intensity[unresolved] / parent_intensity) <= ratio_hi
+            final_mask = near_mask & weak_mask
+            is_satellite[unresolved[final_mask]] = True
+    return is_satellite
 
 
 if __name__ == "__main__":
