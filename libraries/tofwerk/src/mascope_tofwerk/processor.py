@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import h5py
 import numpy as np
 
@@ -187,7 +187,17 @@ class H5Processor(BaseFileProcessor):
         :return: UTC offset in seconds
         :rtype: float
         """
-        return float(self.h5["TimingData"].attrs["LocalTimeOffsetToUTC"][0]) * 3600.0
+        try:
+            utc_offset = (
+                float(self.h5["TimingData"].attrs["LocalTimeOffsetToUTC"][0]) * 3600.0
+            )
+        except KeyError:
+            # Fallback to local timezone offset
+            now = datetime.now()
+            utc_offset = (
+                now - now.astimezone(timezone.utc).replace(tzinfo=None)
+            ).seconds
+        return utc_offset
 
     def _process_instrument_config(
         self, sample_file_props: SampleFileProps
