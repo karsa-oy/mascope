@@ -70,12 +70,12 @@ async def get_sample_files(
     Retrieves a paginated list of sample files, optionally filtered by date range, instrument, or filename, and sorted by a specified column.
 
     Steps:
-    1. Construct a query to select all sample files.
-    2. Apply filtering based on provided date range, instrument, and filename parameters.
-    3. Apply sorting based on the provided sort and order parameters.
-    4. Apply pagination based on the provided page and limit parameters.
-    5. Execute the query and fetch the results.
-    6. Convert the results into a list of dictionaries for JSON serialization.
+    - Construct a query to select all sample files.
+    - Apply filtering based on provided date range, instrument, and filename parameters.
+    - Apply sorting based on the provided sort and order parameters.
+    - Apply pagination based on the provided page and limit parameters.
+    - Execute the query and fetch the results.
+    - Convert the results into a list of dictionaries for JSON serialization.
 
     :param datetime_min: Minimum date and time for filtering sample files, optional.
     :type datetime_min: datetime, optional
@@ -97,10 +97,10 @@ async def get_sample_files(
     :rtype: dict
     """
     async with async_session() as session:
-        # Step 1: Construct query
+        # --- Construct query
         stmt = select(SampleFile)
 
-        # Step 2: Apply filters
+        # --- Apply filters
         if datetime_min:
             stmt = stmt.where(SampleFile.datetime_utc >= datetime_min)
         if datetime_max:
@@ -108,27 +108,27 @@ async def get_sample_files(
         if instrument:
             stmt = stmt.where(SampleFile.instrument == instrument)
         if filename:
-            stmt = stmt.where(SampleFile.filename.contains(filename))
+            stmt = stmt.where(SampleFile.filename == filename)
 
-        # Step 3: Apply sorting
+        # --- Apply sorting
         stmt = (
             stmt.order_by(desc(getattr(SampleFile, sort)))
             if order == "desc"
             else stmt.order_by(asc(getattr(SampleFile, sort)))
         )
 
-        # Step 4: Apply pagination
+        # --- Apply pagination
         total = await session.scalar(
             select(func.count()).select_from(stmt)  # pylint: disable=not-callable
         )
         if page is not None and limit is not None:
             stmt = stmt.offset(page * limit).limit(limit)
 
-        # Step 5: Execute query and fetch results
+        # --- Execute query and fetch results
         result = await session.execute(stmt)
         sample_files = result.scalars().all()
 
-        # Step 6: Return results
+        # --- Return results
         return {
             "message": "Sample files retrieved successfully.",
             "results": total,
