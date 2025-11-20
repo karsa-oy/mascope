@@ -5,6 +5,7 @@ import asyncio
 import os
 from pathlib import Path
 import shutil
+import traceback
 from multiprocessing import Queue
 from queue import Empty
 from threading import Event, Thread, Lock
@@ -492,7 +493,7 @@ class BaseFileProcessor(Thread, ABC, metaclass=FileProcessorMeta):
                 except Exception as e:
                     error_msg = str(e)
                     runtime.logger.error(
-                        f"Failed to process file {Path(self.file_to_process).name}: {e}"
+                        f"Failed to process file {Path(self.file_to_process).name}: {e}\n{traceback.format_exc()}"
                     )
 
                     # CRITICAL: Finalize BEFORE error emission to ensure file is closed
