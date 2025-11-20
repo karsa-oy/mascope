@@ -2,6 +2,7 @@
 import asyncio
 from datetime import datetime, timezone
 import pandas as pd
+import numpy as np
 
 from sqlalchemy import (
     asc,
@@ -15,7 +16,10 @@ from sqlalchemy.orm import joinedload
 
 from mascope_file.name import get_instrument_type
 from mascope_file import io as m_io
+from mascope_signal import compute as m_compute
 from mascope_signal.peak import get_peaks
+from mascope_tools.alignment.calibration import CentroidedSpectrum, Spectra
+
 from mascope_backend.db import async_session
 from mascope_backend.db.id import gen_id
 from mascope_backend.db.models import (
@@ -64,6 +68,7 @@ from mascope_backend.api.controllers.sample.lib.sample_items_fetch import (
 from mascope_backend.api.controllers.sample.items.sample_items_controller import (
     create_sample_items,
     copy_sample_items,
+    get_sample_items,
 )
 from mascope_backend.api.controllers.samples.samples_controller import get_sample
 from mascope_backend.api.controllers.sample.lib.fetch_affected_sample_data import (
@@ -80,6 +85,9 @@ from mascope_backend.api.new.instrument_configs.process.service import (
 )
 from mascope_backend.api.new.instrument_configs.schemas import (
     SetInstrumentConfigBody,
+)
+from mascope_backend.api.new.instrument_configs.lib import (
+    read_instrument_functions,
 )
 from mascope_backend.api.new.ionization.modes.util import (
     resolve_ionization_modes_by_tokens,
@@ -998,4 +1006,152 @@ async def sample_batch_export_peaks(
             "sample_batch_id": sample_batch_id,
             "download": peakfile_name,
         },
+    }
+
+
+@api_controller_background_task(
+    success_notification_rooms=["workspace_id"],
+    error_notification_rooms=["sid"],
+)
+async def get_sample_batch_peaks(
+    sample_batch_id: str,
+    independent_transaction: bool = False,
+    sid: str | None = None,
+    process_id: str | None = None,
+    parent_id: str | None = None,
+):
+    """
+    Retrieves aligned peak data for all sample items within a specified sample batch.
+
+    :param sample_batch_id: ID of the sample batch to retrieve peak data from.
+    :type sample_batch_id: str
+    :param independent_transaction: Flag indicating if the operation is an independent transaction, defaults to False.
+    :type independent_transaction: bool, optional
+    :param sid: Session ID for targeting clients when emitting events, defaults to None.
+    :type sid: str, optional
+    :param process_id: Process ID for tracking the operation, defaults to None.
+    :type process_id: str, optional
+    :param parent_id: Parent process ID for tracking the operation, defaults to None.
+    :type parent_id: str, optional
+    :raises NotFoundException: If no sample items are found in the specified sample batch.
+    :raises ValueError: If the sample items belong to different instrument types.
+    :return: Aligned peak data including m/z values, intensities, and alignment ranges.
+    :rtype: dict
+    """
+    # --- Fetch sample items for the specified sample batch --- #
+    si_response = await get_sample_items(sample_batch_id=sample_batch_id)
+    sample_items = si_response.get("data")
+
+    if sample_items == []:
+        # This raises NotFoundException if no sample batch found
+        batch_rasponse = await get_sample_batch(sample_batch_id)
+        # If batch exists, that means it has no sample items
+        sample_batch = batch_rasponse.get("data")
+        sample_batch_name = sample_batch["sample_batch_name"]
+        raise NotFoundException(
+            f"No sample items found in the sample batch {sample_batch_name} with ID '{sample_batch_id}'."
+        )
+
+    # --- Collect instrument types and validate they are the same --- #
+    instrument_types = {get_instrument_type(item["filename"]) for item in sample_items}
+    if len(instrument_types) > 1:
+        raise ValueError(
+            "Batch contains samples from different instruments. "
+            "Aligning samples from different instruments is not supported."
+        )
+
+    # --- Infere intensity variable from instrument type --- #
+    instrument_type = instrument_types.pop()
+    intensity_variable = (
+        "sum_peak_areas" if instrument_type == "tof" else "sum_peak_heights"
+    )
+
+    # --- Load resolution functions for each sample file --- #
+    resolution_functions = dict()
+    for item in sample_items:
+        filename = item["filename"]
+        _, resolution_func = await read_instrument_functions(filename)
+        resolution_functions[filename] = resolution_func
+
+    # Peaks will be grouped and alligned by ionization mode
+    ionization_modes = set([item["ionization_mode_id"] for item in sample_items])
+    spectra = {ionization_mode: [] for ionization_mode in ionization_modes}
+
+    # Bound concurrency to avoid too many open files / blocking the loop
+    semaphore = asyncio.Semaphore(4)
+
+    def _sync_load_peak_data(filename, polarity):
+        """Synchronous helper to load peak data in a thread."""
+        timestamps = m_compute.get_scan_timestamps(filename, polarity=polarity)
+
+        peak_data = m_io.load_peak_data(filename)
+        polarity_coord = peak_data["polarity"].values
+        peak_data = peak_data[intensity_variable]
+        mz_mask = polarity_coord == polarity
+        mz = peak_data["mz"].values[mz_mask]
+        intensity = peak_data.values[mz_mask] / timestamps.size
+
+        return mz, intensity
+
+    async def _prepare_spec(sample_item):
+        """Prepare CentroidedSpectrum for a sample item."""
+        filename = sample_item["filename"]
+        polarity = sample_item["polarity"]
+        ionization_mode = sample_item["ionization_mode_id"]
+
+        async with semaphore:
+            mz, intensity = await asyncio.to_thread(
+                _sync_load_peak_data, filename, polarity
+            )
+
+        # Placeholder S/N values since they are not required for alignment
+        spec = CentroidedSpectrum(
+            mz=mz,
+            intensity=intensity,
+            resolution=resolution_functions[filename](mz),
+            signal_to_noise=np.ones(mz.size),
+        )
+        return ionization_mode, spec
+
+    # --- Load sample files and prepare CentroidedSpectrum objects --- #
+    collected_specs = await asyncio.gather(
+        *[_prepare_spec(item) for item in sample_items]
+    )
+    for ionization_mode, spec in collected_specs:
+        spectra[ionization_mode].append(spec)
+
+    # --- Align and sum spectra per ionization mode --- #
+    peak_per_mode = dict()
+    vlm_min_mzs, vlm_max_mzs = set(), set()
+    for ion_mode, specs in spectra.items():
+        peak_collection = Spectra(specs, timestamps=np.arange(len(specs)))
+
+        aligned_peak_sum, vlm_min_mz, vlm_max_mz = m_compute.sum_peak_collection(
+            peak_collection
+        )
+        peak_per_mode[ion_mode] = aligned_peak_sum
+        vlm_min_mzs.add(vlm_min_mz)
+        vlm_max_mzs.add(vlm_max_mz)
+
+    # --- Combine spectra from different ionization modes --- #
+    combined_mz = np.array([])
+    combined_intensity = np.array([])
+    for ion_mode, peaks in peak_per_mode.items():
+        combined_mz = np.concatenate((combined_mz, peaks.mz))
+        combined_intensity = np.concatenate((combined_intensity, peaks.intensity))
+
+    # --- Sort by m/z --- #
+    sorted_indices = np.argsort(combined_mz)
+    combined_mz = combined_mz[sorted_indices]
+    combined_intensity = combined_intensity[sorted_indices]
+
+    # --- Return aligned peak data --- #
+    return {
+        "data": {
+            "mzs": combined_mz.tolist(),
+            "intensities": combined_intensity.tolist(),
+            "min_aligned_mz": max(vlm_min_mzs),
+            "max_aligned_mz": min(vlm_max_mzs),
+        },
+        "message": f"Retrieved aligned peak data for sample batch with ID '{sample_batch_id}'.",
     }

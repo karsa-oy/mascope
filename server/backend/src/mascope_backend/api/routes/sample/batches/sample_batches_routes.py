@@ -1,4 +1,5 @@
 from fastapi import APIRouter, BackgroundTasks, Depends, Query
+from typing import Literal
 from mascope_backend.db.id import gen_id
 from mascope_backend.db.models import SampleBatch, Workspace
 from mascope_backend.api.lib.api_features import api_route
@@ -15,6 +16,7 @@ from mascope_backend.api.controllers.sample.batches.sample_batches_controller im
     import_sample_items,
     copy_sample_batch,
     sample_batch_export_peaks,
+    get_sample_batch_peaks,
 )
 from mascope_backend.api.controllers.sample.batches.status.service import (
     update_sample_batch_status,
@@ -340,5 +342,47 @@ async def sample_batch_export_peaks_route(
     )
     return {
         "message": f"Exporting peak data for batch '{sample_batch_name}', please wait.",
+        "process_id": process_id,
+    }
+
+
+@sample_batches_router.get("/{sample_batch_id}/peaks")
+@api_route(status_code=202)
+async def get_sample_batch_peaks_route(
+    request: Request,
+    sample_batch_id: str,
+    background_tasks: BackgroundTasks,
+    user=Depends(editor_user),
+):
+    """Export peaks for a specific sample batch.
+
+    Average peaks are collected from all samples in the batch.
+    The peaks are alligned, then total heights/areas are computed for orbi/tof.
+
+    :param sample_batch_id: The unique identifier of the sample batch.
+    :type sample_batch_id: str
+    :param background_tasks: Background task handler.
+    :type background_tasks: BackgroundTasks
+    :param user: The current authenticated user with editor permissions.
+    :type user: User
+    :return: A dictionary containing a message and process ID.
+    :rtype: dict
+    """
+    # Verify the existance of sample batch
+    await get_sample_batch(sample_batch_id)
+
+    sid = request.headers.get("X-SID")
+    process_id = gen_id(8)
+
+    background_tasks.add_task(
+        get_sample_batch_peaks,
+        sample_batch_id=sample_batch_id,
+        independent_transaction=True,
+        sid=sid,
+        process_id=process_id,
+    )
+
+    return {
+        "message": f"Exporting peaks for batch '{sample_batch_id}', please wait.",
         "process_id": process_id,
     }

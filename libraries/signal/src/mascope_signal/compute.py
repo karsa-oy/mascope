@@ -13,8 +13,15 @@ import mascope_file.name as m_name
 import mascope_file.io as m_io
 import mascope_thermo.thermo as m_thermo
 import mascope_tofwerk.tofwerk as m_tofwerk
+from mascope_tools.alignment.calibration import MassAligner, Spectra
 
 from mascope_signal.runtime import runtime
+
+
+# Peak alignment parameters
+ALIGNMENT_MIN_INTENSITY = 0.0  # Minimum intensity for mass alignment
+ALIGNMENT_WINDOW_FACTOR = 1.0  # Mass alignment window factor (times FWHM)
+ALIGNMENT_MIN_FRACTION = 1.0  # Minimum fraction of scans for mass alignment
 
 
 def get_scan_timestamps(
@@ -708,3 +715,39 @@ def get_metadata(
             raise NotImplementedError(
                 "Metadata retrieval for zarr files is not implemented"
             )
+
+
+def sum_peak_collection(
+    peak_collection: Spectra,
+) -> tuple[Spectra, float, float]:
+    """Aligns and sums provided collection of peak arrays.
+
+    :param peak_collection: Peak collection to align and sum
+    :type peak_collection: Spectra
+    :raises ValueError: If mass alignment fails
+    :return: Tuple of summed aligned peaks, min aligned m/z, max aligned m/z
+    :rtype: tuple[Spectra, float, float]
+    """
+    # Perform alignment using virtual lock mass algorithm
+    vlm_corrector = MassAligner(
+        min_peak_intensity=ALIGNMENT_MIN_INTENSITY,
+        min_fraction=ALIGNMENT_MIN_FRACTION,
+        window_factor=ALIGNMENT_WINDOW_FACTOR,
+    )
+    vlm_corrector.fit(peak_collection)
+    aligned_peaks = vlm_corrector.transform(peak_collection)
+    if vlm_corrector.points_mz.size < 2:
+        raise ValueError(
+            "Mass alignment failed: fewer than 2 alignment points found. "
+            "Check your filtering parameters and input data quality."
+        )
+
+    # Min and max aligned m/z
+    vlm_min_mz = vlm_corrector.points_mz.min()
+    vlm_max_mz = vlm_corrector.points_mz.max()
+
+    aligned_peak_sum = aligned_peaks.compute_sum_spectrum(
+        window_factor=ALIGNMENT_WINDOW_FACTOR, average=True
+    )
+
+    return aligned_peak_sum, vlm_min_mz, vlm_max_mz

@@ -131,7 +131,7 @@ def load_peak_data(base_filename, drop_bad_peaks=True):
     :return: Loaded peak data
     :rtype: xr.Dataset
     """
-    peak_data = load_file(base_filename, vars=["peak_timeseries"])
+    peak_data = load_array(base_filename, var="peak_timeseries")
     if drop_bad_peaks:
         bad_peak_mask = peak_data.is_weak | peak_data.is_satellite
         peak_data = peak_data.sel(mz=peak_data.mz.values[~bad_peak_mask])
