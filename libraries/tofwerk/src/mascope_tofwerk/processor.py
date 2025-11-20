@@ -106,13 +106,23 @@ class H5Processor(BaseFileProcessor):
         # Get FullSpectra attributes reference
         attrs = self.h5["FullSpectra"].attrs
         # Number of mass calibration parameters
-        num_params = attrs["MassCalibration nbrParameters"][0]
-        # Get mass calibration parameters
-        mass_calib_params = [
-            float(attrs[f"MassCalibration p{i + 1}"][0]) for i in range(num_params)
-        ]
+        try:
+            num_params = attrs["MassCalibration nbrParameters"][0]
+            # Get mass calibration parameters
+            mass_calib_params = [
+                float(attrs[f"MassCalibration p{i + 1}"][0]) for i in range(num_params)
+            ]
+            mass_calib_mode = int(attrs["MassCalibMode"][0])
+        except IndexError:
+            num_params = attrs["MassCalibration nbrParameters"]
+            # Get mass calibration parameters
+            mass_calib_params = [
+                float(attrs[f"MassCalibration p{i + 1}"]) for i in range(num_params)
+            ]
+            mass_calib_mode = int(attrs["MassCalibMode"])
+
         return {
-            "mode": int(attrs["MassCalibMode"][0]),
+            "mode": mass_calib_mode,
             "par": mass_calib_params,
         }
 
@@ -150,9 +160,12 @@ class H5Processor(BaseFileProcessor):
         :return: Sample interval [ns]
         :rtype: float
         """
-        return float(
-            self.h5["FullSpectra"].attrs["SampleInterval"][0] * 1e9
-        )  # [s]->[ns]
+        try:
+            return float(
+                self.h5["FullSpectra"].attrs["SampleInterval"][0] * 1e9
+            )  # [s]->[ns]
+        except IndexError:
+            return float(self.h5["FullSpectra"].attrs["SampleInterval"] * 1e9)
 
     @property
     def single_ion_signal(self) -> float:
@@ -161,7 +174,11 @@ class H5Processor(BaseFileProcessor):
         :return: Single ion signal [mV*ns/ion]
         :rtype: float
         """
-        return float(self.h5["FullSpectra"].attrs["Single Ion Signal"][0])
+        try:
+            sis = float(self.h5["FullSpectra"].attrs["Single Ion Signal"][0])
+        except IndexError:
+            sis = float(self.h5["FullSpectra"].attrs["Single Ion Signal"])
+        return sis
 
     @property
     def timestamp(self) -> str:
@@ -170,7 +187,10 @@ class H5Processor(BaseFileProcessor):
         :return: Timestamp
         :rtype: str
         """
-        filetime = float(self.h5["TimingData"].attrs["AcquisitionTimeZero"][0])
+        try:
+            filetime = float(self.h5["TimingData"].attrs["AcquisitionTimeZero"][0])
+        except IndexError:
+            filetime = float(self.h5["TimingData"].attrs["AcquisitionTimeZero"])
         # Windows FILETIME ticks: 100-nanosecond intervals since 1601-01-01
         epoch = datetime(1601, 1, 1)
         python_datetime = epoch + timedelta(
@@ -190,6 +210,10 @@ class H5Processor(BaseFileProcessor):
         try:
             utc_offset = (
                 float(self.h5["TimingData"].attrs["LocalTimeOffsetToUTC"][0]) * 3600.0
+            )
+        except IndexError:
+            utc_offset = float(
+                self.h5["TimingData"].attrs["LocalTimeOffsetToUTC"] * 3600.0
             )
         except KeyError:
             # Fallback to local timezone offset

@@ -65,13 +65,20 @@ def get_conversion_coefficient(h5_file) -> float:
     :return: Conversion coefficient.
     :rtype: float
     """
-    single_ion_signal = (
-        h5_file["FullSpectra"].attrs["Single Ion Signal"][0] * 1e-9
-    )  # [mV·s/ion]
-    sample_interval = h5_file["FullSpectra"].attrs["SampleInterval"][0]  # [s]
-    tof_period = h5_file["TimingData"].attrs["TofPeriod"][0] * 1e-9  # [s]
+    try:
+        single_ion_signal = (
+            h5_file["FullSpectra"].attrs["Single Ion Signal"][0] * 1e-9
+        )  # [mV·s/ion]
+        sample_interval = h5_file["FullSpectra"].attrs["SampleInterval"][0]  # [s]
+        tof_period = h5_file["TimingData"].attrs["TofPeriod"][0] * 1e-9  # [s]
+        n_extractions = h5_file.attrs["NbrWaveforms"][0]  # [ext]
+    except IndexError:
+        single_ion_signal = h5_file["FullSpectra"].attrs["Single Ion Signal"] * 1e-9
+        sample_interval = h5_file["FullSpectra"].attrs["SampleInterval"]  # [s]
+        tof_period = h5_file["TimingData"].attrs["TofPeriod"] * 1e-9  # [s]
+        n_extractions = h5_file.attrs["NbrWaveforms"]  # [ext]
+
     tof_frequency = 1 / tof_period  # [ext/s]
-    n_extractions = h5_file.attrs["NbrWaveforms"][0]  # [ext]
 
     # Coefficient to convert signal intensity from [mV] -> [ions/sec]
     conversion_coefficient = (
