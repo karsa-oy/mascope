@@ -279,6 +279,20 @@ class BaseFileProcessor(Thread, ABC, metaclass=FileProcessorMeta):
         )
         return peakshape_numpy, resolution_function_partial
 
+    def _emit_progress_notification(self, progress: int):
+        """Emit file processing progress notification."""
+        file_basename = os.path.basename(self.file_to_process)
+        instrument = get_instrument_name(file_basename)
+
+        self.socket_client.emit(
+            "file_processing_progress",
+            {
+                "filename": file_basename,
+                "instrument": instrument,
+                "progress": progress,
+            },
+        )
+
     def _finalize(self):
         """Finalize processing - close file and reset state."""
         self.active.clear()
@@ -346,61 +360,26 @@ class BaseFileProcessor(Thread, ABC, metaclass=FileProcessorMeta):
         instrument = get_instrument_name(filename)
 
         try:
-            self.socket_client.emit(
-                "file_processing_progress",
-                {
-                    "filename": file_basename,
-                    "instrument": instrument,
-                    "progress": 0,
-                },
-            )
+            self._emit_progress_notification(0)
             # Create filestore directory, write properties, and copy file
             self._create_filestore_directory(sample_file_props, file_path)
 
-            self.socket_client.emit(
-                "file_processing_progress",
-                {
-                    "filename": file_basename,
-                    "instrument": instrument,
-                    "progress": 10,
-                },
-            )
+            self._emit_progress_notification(10)
 
             # Fit instrument functions
             instrument_functions = self._create_instrument_config(sample_file_props)
 
-            self.socket_client.emit(
-                "file_processing_progress",
-                {
-                    "filename": file_basename,
-                    "instrument": instrument,
-                    "progress": 25,
-                },
-            )
+            self._emit_progress_notification(25)
 
             # Compute peak data
             self._compute_peaks(filename, instrument_functions)
 
-            self.socket_client.emit(
-                "file_processing_progress",
-                {
-                    "filename": file_basename,
-                    "instrument": instrument,
-                    "progress": 90,
-                },
-            )
+            self._emit_progress_notification(90)
 
             # Create database record
             self._create_db_record(sample_file_props)
 
-            self.socket_client.emit(
-                "file_processing_progress",
-                {
-                    "filename": file_basename,
-                    "instrument": instrument,
-                    "progress": 100,
-                },
-            )
+            self._emit_progress_notification(100)
 
         except FileExistsError as exc:
             # Check if filestore exists without database record (orphaned)
