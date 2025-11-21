@@ -8,7 +8,6 @@ and filestore records via HTTP requests to the API service.
 from datetime import timedelta, datetime
 import requests
 
-from mascope_sdk import create_instrument_config
 from mascope_backend.api.new.instrument_configs.schemas import PeakShape
 from mascope_file.name import get_instrument_name
 
@@ -171,12 +170,40 @@ def create_instrument_config_db_record(
         f"Creating instrument config database record for file: {sample_file_props.filename}"
     )
 
-    create_instrument_config(
-        mascope_url=URL,
-        access_token=access_token,
-        instrument=get_instrument_name(sample_file_props.filename),
-        datetime_utc=sample_file_props.timestamp,
-        peakshape=peakshape.model_dump(),
-        resolution_function=resolution_function,
-        method_file=sample_file_props.method_file,
-    )
+    # Construct the request body based on the function parameters
+    utc_offset = timedelta(seconds=int(sample_file_props.utc_offset))
+    date = sample_file_props.timestamp
+    date_utc = (datetime.fromisoformat(date) - utc_offset).isoformat()
+
+    data = {
+        "instrument": get_instrument_name(sample_file_props.filename),
+        "datetime_utc": date_utc,
+        "peakshape": peakshape.model_dump(),
+        "resolution_function": resolution_function,
+        "method_file": sample_file_props.method_file,
+    }
+
+    # Make the POST request to the instrument_configs endpoint
+    headers = {
+        "Content-Type": "application/json",
+        "X-Service-Name": "file-converter",
+        "Authorization": f"Bearer {access_token}",
+    }
+
+    try:
+        response = requests.post(
+            f"{URL}/api/instrument_configs",
+            headers=headers,
+            json=data,
+            timeout=180,
+        )
+
+        if response.status_code != 201:
+            raise Exception(
+                f"Failed to create database record! Status code: {response.status_code}"
+            )
+
+    except requests.exceptions.RequestException as e:
+        raise Exception(
+            f"Failed to create database record due to request error: {e}"
+        ) from e
