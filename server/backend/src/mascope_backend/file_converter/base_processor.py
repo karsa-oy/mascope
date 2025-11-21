@@ -34,6 +34,28 @@ from .schema import SampleFileProps
 mascope_sdk.SERVICE_NAME = "file-converter"
 
 
+def with_file_context(prop_getter) -> callable:
+    """Abstract file context manager decorator
+
+    :param prop_getter: Property getter function
+    :type prop_getter: callable
+    :return: Wrapped property getter
+    """
+
+    def wrapper(self):
+        # Use the class's context manager, passing the file path
+        with self._file_context_manager(  # pylint: disable=protected-access
+            self.file_to_process
+        ) as file_handle:
+            self.file_handle = file_handle
+            prop = prop_getter(self)
+
+        self.file_handle = None
+        return prop
+
+    return wrapper
+
+
 class FileProcessorMeta(ABCMeta):
     """Metaclass that automatically creates abstract properties based on SampleFileProps fields."""
 
@@ -50,13 +72,13 @@ class FileProcessorMeta(ABCMeta):
                 if field_name in namespace:
                     continue
 
-                field_type = field_info.annotation
-
                 # Add type to class annotations for type checker recognition
+                field_type = field_info.annotation
                 namespace["__annotations__"][field_name] = field_type
 
                 def make_abstract_property(prop_type, description):
-                    # Create abstract property with proper closure
+                    """Create abstract property with proper closure"""
+
                     def getter(self):
                         raise NotImplementedError
 
@@ -96,12 +118,11 @@ class BaseFileProcessor(Thread, ABC, metaclass=FileProcessorMeta):
         self.socket_client = socket_client
         self.file_queue = file_queue
         self.shutdown_event = shutdown_event
-        self.lock = Lock()
         self.cancel_event = Event()
         self.active = Event()
 
-        self.file_handle = None  # Abstract file reference (h5 or raw)
         self.file_to_process = None  # Path to the file to process
+        self.file_handle = None  # Abstract file reference, managed by context manager
 
     # Additional abstract properties not in SampleFileProps
     @property
@@ -115,14 +136,15 @@ class BaseFileProcessor(Thread, ABC, metaclass=FileProcessorMeta):
         raise NotImplementedError
 
     # Abstract methods - must be implemented by subclasses
+    @staticmethod
     @abstractmethod
-    def _open_file(self, file_path: str) -> None:
-        """Open the file for processing."""
-        raise NotImplementedError
+    def _file_context_manager(file_path: str):
+        """Get the file context manager for the specific file type.
 
-    @abstractmethod
-    def _close_file(self) -> None:
-        """Close the file and clean up resources."""
+        :param file_path: Path to the file
+        :type file_path: str
+        :return: File context manager
+        """
         raise NotImplementedError
 
     @abstractmethod
@@ -260,9 +282,6 @@ class BaseFileProcessor(Thread, ABC, metaclass=FileProcessorMeta):
     def _finalize(self):
         """Finalize processing - close file and reset state."""
         self.active.clear()
-        with self.lock:
-            self._close_file()
-            self.file_handle = None
         self.cancel_event.clear()
 
     def _get_file_context(self):
@@ -436,29 +455,7 @@ class BaseFileProcessor(Thread, ABC, metaclass=FileProcessorMeta):
                 file_basename = os.path.basename(self.file_to_process)
                 instrument = get_instrument_name(file_basename)
 
-                # Initialize file reader (separate error handling)
-                try:
-                    with self.lock:
-                        self._open_file(self.file_to_process)
-                except Exception as e:
-                    error_msg = f"Cannot open file: {str(e)}"
-                    runtime.logger.error(
-                        f"Failed to open file {Path(self.file_to_process)}: {e}"
-                    )
-
-                    self.socket_client.emit(
-                        "file_processing_error",
-                        {
-                            "filename": file_basename,
-                            "instrument": instrument,
-                            "error": error_msg,
-                        },
-                    )
-
-                    self._handle_failed_file(self.file_to_process)
-                    continue
-
-                # Main processing block (centralized error handling)
+                # Main processing block
                 try:
                     # Set active flag
                     runtime.logger.info(
@@ -523,8 +520,7 @@ class BaseFileProcessor(Thread, ABC, metaclass=FileProcessorMeta):
                 )
                 if self.file_to_process is not None and file_basename is not None:
                     # Ensure finalize is called before emission
-                    if self.file_handle is not None:
-                        self._finalize()
+                    self._finalize()
 
                     self.socket_client.emit(
                         "file_processing_error",

@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 from datetime import datetime, timedelta, timezone
-import h5py
 import numpy as np
 
 from mascope_backend.api.new.instrument_configs.schemas import (
@@ -11,7 +10,10 @@ from mascope_backend.api.new.instrument_configs.service import fit_instrument_fu
 from mascope_backend.file_converter.base_processor import (
     BaseFileProcessor,
     SampleFileProps,
+    with_file_context,
 )
+
+from mascope_tofwerk.tofwerk import open_h5_file
 
 
 class H5Processor(BaseFileProcessor):
@@ -23,18 +25,6 @@ class H5Processor(BaseFileProcessor):
             file_queue=file_queue,
             shutdown_event=shutdown_event,
         )
-        self.h5 = None  # The h5 file reference
-
-    def _open_file(self, file_path: str) -> None:
-        """Open h5 file for processing."""
-        self.h5 = h5py.File(file_path, "r")
-        self.file_handle = self.h5
-
-    def _close_file(self) -> None:
-        """Close h5 file and clean up resources."""
-        if self.h5:
-            self.h5.close()
-            self.h5 = None
 
     @property
     def file_extension(self) -> str:
@@ -51,13 +41,14 @@ class H5Processor(BaseFileProcessor):
         return self._strip_filepath(self.file_to_process)
 
     @property
+    @with_file_context
     def interval(self) -> float:
         """Mean measurement interval in seconds, i.e. length of one spectrum in the sample
 
         :return: Measurement interval [s]
         :rtype: float
         """
-        timestamps = self.h5["TimingData"]["BufTimes"][:].flatten()
+        timestamps = self.file_handle["TimingData"]["BufTimes"][:].flatten()
         non_zero_indices = np.where(timestamps != 0)[0]
 
         # Trim trailing zeros
@@ -68,6 +59,7 @@ class H5Processor(BaseFileProcessor):
         return float(np.mean(differences))  # [s]
 
     @property
+    @with_file_context
     def length(self) -> float:
         """Length of the sample file in seconds
 
@@ -75,7 +67,7 @@ class H5Processor(BaseFileProcessor):
         :rtype: float
         """
         # Get timestamp reference and retrieve first and last values
-        timestamps = self.h5["TimingData"]["BufTimes"]
+        timestamps = self.file_handle["TimingData"]["BufTimes"]
         t_first = timestamps[0, 0]
         # Last write may contain zero bufs, exclude them
         t_last_bufs = timestamps[-1]
@@ -85,18 +77,20 @@ class H5Processor(BaseFileProcessor):
         return float(t_last - t_first) + self.interval  # [s]
 
     @property
+    @with_file_context
     def method_file(self) -> str:
         """TofDaq Recorder configuration file name used in the acquisition.
 
         :return: Configuration file name
         :rtype: str
         """
-        method_file = self.h5.attrs["Configuration File"]
+        method_file = self.file_handle.attrs["Configuration File"]
         return (
             method_file.decode() if isinstance(method_file, bytes) else str(method_file)
         ).strip()
 
     @property
+    @with_file_context
     def mz_calibration(self) -> dict:
         """Mass calibration properties
 
@@ -104,7 +98,7 @@ class H5Processor(BaseFileProcessor):
         :rtype: dict
         """
         # Get FullSpectra attributes reference
-        attrs = self.h5["FullSpectra"].attrs
+        attrs = self.file_handle["FullSpectra"].attrs
         # Number of mass calibration parameters
         try:
             num_params = attrs["MassCalibration nbrParameters"][0]
@@ -127,6 +121,7 @@ class H5Processor(BaseFileProcessor):
         }
 
     @property
+    @with_file_context
     def range(self) -> list:
         """m/z range of the sample file
 
@@ -134,16 +129,17 @@ class H5Processor(BaseFileProcessor):
         :rtype: list
         """
         # Return a list of 1st and last m/z values
-        return self.h5["FullSpectra"]["MassAxis"][[0, -1]].tolist()
+        return self.file_handle["FullSpectra"]["MassAxis"][:].tolist()
 
     @property
+    @with_file_context
     def polarity(self) -> str:
         """Polarity option in the sample file.
 
         :return: '-' for negative, '+' for positive
         :rtype: str
         """
-        ion_mode = self.h5.attrs["IonMode"]
+        ion_mode = self.file_handle.attrs["IonMode"]
         ion_mode_str = (
             ion_mode.decode() if isinstance(ion_mode, bytes) else str(ion_mode)
         )
@@ -154,6 +150,7 @@ class H5Processor(BaseFileProcessor):
             return "+"
 
     @property
+    @with_file_context
     def sample_interval(self) -> float:
         """Sample interval in nanoseconds
 
@@ -162,12 +159,13 @@ class H5Processor(BaseFileProcessor):
         """
         try:
             return float(
-                self.h5["FullSpectra"].attrs["SampleInterval"][0] * 1e9
+                self.file_handle["FullSpectra"].attrs["SampleInterval"][0] * 1e9
             )  # [s]->[ns]
         except IndexError:
-            return float(self.h5["FullSpectra"].attrs["SampleInterval"] * 1e9)
+            return float(self.file_handle["FullSpectra"].attrs["SampleInterval"] * 1e9)
 
     @property
+    @with_file_context
     def single_ion_signal(self) -> float:
         """Single ion signal [mV*ns/ion]
 
@@ -175,12 +173,13 @@ class H5Processor(BaseFileProcessor):
         :rtype: float
         """
         try:
-            sis = float(self.h5["FullSpectra"].attrs["Single Ion Signal"][0])
+            sis = float(self.file_handle["FullSpectra"].attrs["Single Ion Signal"][0])
         except IndexError:
-            sis = float(self.h5["FullSpectra"].attrs["Single Ion Signal"])
+            sis = float(self.file_handle["FullSpectra"].attrs["Single Ion Signal"])
         return sis
 
     @property
+    @with_file_context
     def timestamp(self) -> str:
         """Timestamp in isoformat, local timezone
 
@@ -188,9 +187,13 @@ class H5Processor(BaseFileProcessor):
         :rtype: str
         """
         try:
-            filetime = float(self.h5["TimingData"].attrs["AcquisitionTimeZero"][0])
+            filetime = float(
+                self.file_handle["TimingData"].attrs["AcquisitionTimeZero"][0]
+            )
         except IndexError:
-            filetime = float(self.h5["TimingData"].attrs["AcquisitionTimeZero"])
+            filetime = float(
+                self.file_handle["TimingData"].attrs["AcquisitionTimeZero"]
+            )
         # Windows FILETIME ticks: 100-nanosecond intervals since 1601-01-01
         epoch = datetime(1601, 1, 1)
         python_datetime = epoch + timedelta(
@@ -201,6 +204,7 @@ class H5Processor(BaseFileProcessor):
         return python_datetime.isoformat()
 
     @property
+    @with_file_context
     def utc_offset(self) -> float:
         """UTC offset in seconds
 
@@ -209,11 +213,12 @@ class H5Processor(BaseFileProcessor):
         """
         try:
             utc_offset = (
-                float(self.h5["TimingData"].attrs["LocalTimeOffsetToUTC"][0]) * 3600.0
+                float(self.file_handle["TimingData"].attrs["LocalTimeOffsetToUTC"][0])
+                * 3600.0
             )
         except IndexError:
             utc_offset = float(
-                self.h5["TimingData"].attrs["LocalTimeOffsetToUTC"] * 3600.0
+                self.file_handle["TimingData"].attrs["LocalTimeOffsetToUTC"] * 3600.0
             )
         except KeyError:
             # Fallback to local timezone offset
@@ -222,6 +227,17 @@ class H5Processor(BaseFileProcessor):
                 now - now.astimezone(timezone.utc).replace(tzinfo=None)
             ).seconds
         return utc_offset
+
+    @staticmethod
+    def _file_context_manager(file_path: str):
+        """Context manager for h5 files
+
+        :param file_path: Path to the h5 file
+        :type file_path: str
+        :return: Context manager for h5 file
+        :rtype: context manager
+        """
+        return open_h5_file(file_path)
 
     def _process_instrument_config(
         self, sample_file_props: SampleFileProps
