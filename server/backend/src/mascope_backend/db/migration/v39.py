@@ -326,8 +326,10 @@ def migrate_sample_peak_id_to_varchar(conn: sqlite3.Connection) -> None:
         """
         CREATE TABLE IF NOT EXISTS match_isotope_new (
             match_isotope_id VARCHAR(32) NOT NULL PRIMARY KEY,
-            target_isotope_id VARCHAR(16) NOT NULL,
-            sample_item_id VARCHAR(16) NOT NULL,
+            target_isotope_id VARCHAR(16) NOT NULL
+                REFERENCES target_isotope(target_isotope_id) ON DELETE CASCADE,
+            sample_item_id VARCHAR(16) NOT NULL
+                REFERENCES sample_item(sample_item_id) ON DELETE CASCADE,
             sample_peak_id VARCHAR(20) NOT NULL,
             sample_peak_mz FLOAT NOT NULL,
             sample_peak_intensity FLOAT NOT NULL,
