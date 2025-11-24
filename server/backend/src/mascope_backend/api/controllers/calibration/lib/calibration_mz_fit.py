@@ -17,12 +17,14 @@ from mascope_match.compute.isotopes import (
     parse_and_filter_peaks,
     calculate_match_stats,
 )
-from mascope_match.params import TofMatchParams, OrbiMatchParams, BaseMatchParams
+from mascope_match.params import (
+    TofMatchParams,
+    OrbiMatchParams,
+    BaseMatchParams,
+    UnmatchedIsotopeParams,
+)
 from mascope_backend.api.lib.api_features import (
     api_controller,
-)
-from mascope_backend.api.new.instrument_configs.lib import (
-    read_instrument_functions,
 )
 from mascope_backend.api.controllers.target.isotopes.target_isotopes_controller import (
     get_target_isotopes,
@@ -116,19 +118,23 @@ class BaseCalibrationHandler:
             match_df = match_df[matched_mask]
             match_df = calculate_match_stats(match_df, peaks)
 
-        # Fill np.nan with serializable defaults for unmatched isotopes
-        match_df = match_df.fillna(
+        # Ensure correct dtypes for match_df columns to avoid warnings
+        match_df = match_df.astype(
             {
-                "sample_peak_id": "",
-                "sample_peak_intensity": 0.0,
-                "sample_peak_intensity_relative": 0.0,
-                "match_abundance_error": 1.0,
-                "match_isotope_similarity": 0.0,
-                "match_mz_error": self.params.refine_window + 1,
-                "match_score": 0.0,
-                "sample_peak_tof": -1.0,
+                "sample_peak_id": "string",
+                "sample_peak_mz": "float64",
+                "sample_peak_intensity": "float64",
+                "sample_peak_intensity_relative": "float64",
+                "match_abundance_error": "float64",
+                "match_isotope_similarity": "float64",
+                "match_mz_error": "float64",
+                "match_score": "float64",
+                "sample_peak_tof": "float64",
             }
         )
+        # Fill np.nan with serializable defaults for unmatched isotopes
+        default_unmatched_params = UnmatchedIsotopeParams().model_dump()
+        match_df = match_df.fillna(default_unmatched_params)
         # Matches contain duplicates for every ionization mechanism, we drop them
         match_df = (
             match_df.sort_values(by=["sample_peak_mz", "target_ion_id"])

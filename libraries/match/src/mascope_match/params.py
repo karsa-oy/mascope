@@ -33,7 +33,7 @@ DEFAULT_UNMATCHED_MATCH_ABUNDANCE_ERROR = 1.0
 DEFAULT_UNMATCHED_MATCH_MZ_ERROR = 0.0
 DEFAULT_UNMATCHED_MATCH_ISOTOPE_SIMILARITY = 0.0
 DEFAULT_UNMATCHED_MATCH_SCORE = 0.0
-DEFAULT_UNMATCHED_SAMPLE_PEAK_TOF = 0.0
+DEFAULT_UNMATCHED_SAMPLE_PEAK_TOF = -1.0
 
 
 class BaseMatchParams(BaseModel):
@@ -121,9 +121,9 @@ class MatchParams(BaseModel):
 class UnmatchedIsotopeParams(BaseModel):
     """Default parameters for isotopes without matching peaks."""
 
-    sample_peak_id: int = Field(
+    sample_peak_id: str = Field(
         DEFAULT_UNMATCHED_SAMPLE_PEAK_ID,
-        description="ID value for isotopes without matching peaks. -1 indicates no real peak.",
+        description="ID value for isotopes without matching peaks. Empty string indicates no real peak.",
     )
     sample_peak_intensity: float = Field(
         DEFAULT_UNMATCHED_SAMPLE_PEAK_INTENSITY,
