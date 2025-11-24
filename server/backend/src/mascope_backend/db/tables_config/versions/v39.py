@@ -497,6 +497,7 @@ table_configs = {
         """,
         "indexes": [
             "idx_match_isotope_sample_item ON match_isotope (sample_item_id)",
+            "idx_match_isotope_sample_peak_id ON match_isotope (sample_peak_id)",
         ],
     },
     "match_rating": {

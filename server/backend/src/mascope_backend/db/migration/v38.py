@@ -213,7 +213,7 @@ class BaseMigrationHelper:
                 "peak_id": (("mz"), self.peak_ids),
                 "is_satellite": (("mz"), self.is_satellite),
                 "is_timeseries_computed": (("mz"), np.ones(self.n_peaks, dtype=bool)),
-                "is_weak": (("mz"), np.ones(self.n_peaks, dtype=bool)),
+                "is_weak": (("mz"), np.zeros(self.n_peaks, dtype=bool)),
             }
             return vars_to_add
 

@@ -54,6 +54,7 @@ async def run() -> None:
 
     conn = get_sqlite_connection(dst)
     try:
+        migrate_sample_peak_id_to_varchar(conn)
         create_temp_tables(conn)
         sample_id_to_filename_map = load_sample_mapping(conn)
         executor = ThreadPoolExecutor(max_workers=CONCURRENCY)
@@ -141,8 +142,10 @@ async def run() -> None:
         # Ensure lock release even on exception
         try:
             conn.close()
-        except Exception:
-            pass
+        except Exception as e:
+            runtime.logger.exception(
+                f"Exception occurred while closing the database connection during migration v39 cleanup: {e}."
+            )
 
 
 def apply_sqlite_pragmas(conn: sqlite3.Connection) -> None:
@@ -266,7 +269,7 @@ async def gather_peak_lookups(
     ]
     results = await asyncio.wait_for(asyncio.gather(*futures), timeout=LOAD_TIMEOUT)
     peak_lookup_mapping = {}
-    for task, mapping in zip(tasks, results, strict=False):
+    for task, mapping in zip(tasks, results):
         peak_lookup_mapping[task.sample_item_id] = mapping
     return peak_lookup_mapping
 
@@ -309,6 +312,81 @@ def flush_updates(
         cur.executemany(
             "INSERT OR REPLACE INTO temp_deletes (target_isotope_id) VALUES (?);", chunk
         )
+    conn.commit()
+    cur.close()
+
+
+def migrate_sample_peak_id_to_varchar(conn: sqlite3.Connection) -> None:
+    """
+    Migrate match_isotope.sample_peak_id from INTEGER to VARCHAR(20) NOT NULL,
+    updating the table to match the v39 schema.
+    """
+    cur = conn.cursor()
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS match_isotope_new (
+            match_isotope_id VARCHAR(32) NOT NULL PRIMARY KEY,
+            target_isotope_id VARCHAR(16) NOT NULL,
+            sample_item_id VARCHAR(16) NOT NULL,
+            sample_peak_id VARCHAR(20) NOT NULL,
+            sample_peak_mz FLOAT NOT NULL,
+            sample_peak_intensity FLOAT NOT NULL,
+            sample_peak_intensity_relative FLOAT NOT NULL,
+            sample_peak_tof FLOAT NOT NULL,
+            match_abundance_error FLOAT NOT NULL,
+            match_mz_error FLOAT NOT NULL,
+            match_isotope_similarity FLOAT NOT NULL,
+            match_score FLOAT NOT NULL CHECK (match_score BETWEEN 0 AND 1),
+            match_isotope_utc_created TIMESTAMP,
+            match_isotope_utc_modified TIMESTAMP
+        );
+        """
+    )
+    cur.execute(
+        """
+        INSERT INTO match_isotope_new (
+            match_isotope_id,
+            target_isotope_id,
+            sample_item_id,
+            sample_peak_id,
+            sample_peak_mz,
+            sample_peak_intensity,
+            sample_peak_intensity_relative,
+            sample_peak_tof,
+            match_abundance_error,
+            match_mz_error,
+            match_isotope_similarity,
+            match_score,
+            match_isotope_utc_created,
+            match_isotope_utc_modified
+        )
+        SELECT
+            match_isotope_id,
+            target_isotope_id,
+            sample_item_id,
+            CAST(sample_peak_id AS VARCHAR(20)),
+            sample_peak_mz,
+            sample_peak_intensity,
+            sample_peak_intensity_relative,
+            sample_peak_tof,
+            match_abundance_error,
+            match_mz_error,
+            match_isotope_similarity,
+            match_score,
+            match_isotope_utc_created,
+            match_isotope_utc_modified
+        FROM match_isotope;
+        """
+    )
+    cur.execute("DROP TABLE match_isotope;")
+    cur.execute("ALTER TABLE match_isotope_new RENAME TO match_isotope;")
+    # Recreate indexes for optimal query performance
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_match_isotope_sample_item ON match_isotope (sample_item_id);"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_match_isotope_sample_peak_id ON match_isotope (sample_peak_id);"
+    )
     conn.commit()
     cur.close()
 
