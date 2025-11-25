@@ -49,7 +49,11 @@ async def connect(sid: str, environ: dict) -> bool:
         await authenticate_socket_connection(
             sid=sid, token=jwt_token, minimum_role="guest"
         )
-        runtime.logger.debug(f"User's socket client {sid} connected.")
+        worker_pid = os.getpid()
+        runtime.logger.debug(
+            f"Socket server: user's socket client {sid} connected to worker PID {worker_pid}"
+        )
+
         return True
 
     except SocketUnauthenticatedError as e:
@@ -68,5 +72,10 @@ async def disconnect(sid: str) -> None:
     :param sid: Socket session ID
     :type sid: str
     """
+    worker_pid = os.getpid()
+    runtime.logger.debug(
+        f"Socket server: user's socket client {sid} disconnected from worker PID {worker_pid}"
+    )
+
     await clear_user_session(sid)
     runtime.logger.debug(f"User session disconnected: {sid}")

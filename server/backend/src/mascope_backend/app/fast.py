@@ -73,6 +73,8 @@ fast = FastAPI(lifespan=lifespan)
 # logging middleware
 @fast.middleware("http")
 async def logger_middleware(request: Request, call_next):
+    worker_pid = os.getpid()
+
     # Make the request and receive a response
     response = await call_next(request)
 
@@ -83,6 +85,7 @@ async def logger_middleware(request: Request, call_next):
         client_host=request.client.host,
         request_id=str(uuid.uuid4()),
         status_code=response.status_code,
+        worker_pid=worker_pid,
     ):
         # Log request details and query params in debug mode
         if runtime.config.log_level.lower() == "debug":
@@ -90,7 +93,7 @@ async def logger_middleware(request: Request, call_next):
             full_url = f"{request.url.scheme}://{request.client.host}{request.url.path}"
             if query_params:
                 full_url += f"?{request.url.query}"
-            runtime.logger.debug(f"{full_url}")
+            runtime.logger.debug(f"{full_url} [Worker {worker_pid}]")
 
         # Log based on status code
         if 400 <= response.status_code < 500:

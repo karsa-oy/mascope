@@ -1,7 +1,7 @@
 import os
 
 from multiprocessing import Queue
-from threading import Event, Lock
+from threading import Event
 from time import sleep
 
 from mascope_backend.file_converter.socket.client import FileConverterSocketClient

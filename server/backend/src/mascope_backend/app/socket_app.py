@@ -1,9 +1,9 @@
 """Socket.IO ASGI application initialization."""
 
 import socketio
+from mascope_backend.app.fast import fast
 from mascope_backend.socket import init_socket
 from mascope_backend.socket.events import init_events
-from .fast import fast
 
 
 def create_socket_app():
@@ -12,7 +12,7 @@ def create_socket_app():
     sio = init_socket()
     init_events()
 
-    # Create ASGI app
+    # Create ASGI app combining Socket.IO + FastAPI
     return socketio.ASGIApp(socketio_server=sio, other_asgi_app=fast)
 
 

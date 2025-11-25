@@ -1,6 +1,6 @@
+from dataclasses import dataclass, field
 from typing import Any
 import numpy as np
-from dataclasses import dataclass, field
 from sqlalchemy import select
 from colorcet import glasbey_hv as colormap
 
@@ -16,8 +16,6 @@ from mascope_backend.socket import sio
 from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
 from mascope_backend.api.lib.api_features import api_controller_background_task
 from mascope_backend.api.controllers.samples.lib.samples_fetch import fetch_sample
-
-from mascope_backend.runtime import runtime
 
 # TODO_configuration shift traces color
 COLOR_OFFSET = 5
