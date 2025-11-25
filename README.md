@@ -292,40 +292,113 @@ runtime/
       filestreams/         # Network drive to receive incoming files
       logs/                # dev and prod logs
       temp/                # Temporary folder for ephemeral download files
-      ...                  # .mascope.toml config files
+      dev.mascope.toml     # (Optional) Dev-specific overrides config files for this env
+      prod.mascope.toml    # (Optional) Prod-specific overrides config files for this env
 ```
 
 Some folders may be symbolically linked to a runtime to facilitate network drives.
 
 ### Runtime Config
 
-The `mascope.toml` files inside a runtime configures the app. The configuration includes app wide settings (under `meta`) and [module](#runtime-modules) specific configuration settings. There are two files, that have the same schema:
+The `mascope.toml` files inside a runtime configures the app. Mascope uses a **three-layer configuration system** that combines base and mode-specific defaults with optional environment-specific overrides:
 
 ```py
-runtime/
-  env/
-    foo/
-      ...                  # Rest of the env's state
-      dev.mascope.toml     # Development app config - overrides base in dev mode
-      prod.mascope.toml    # Production app config - overrides base in prod mode
+root/
+  base.mascope.toml      # Layer 1: Shared defaults
+  dev.mascope.toml       # Layer 2: Dev mode defaults
+  prod.mascope.toml      # Layer 2: Prod mode defaults
+
+.runtime/env/{name}/
+  dev.mascope.toml       # Layer 3: Optional env-specific dev overrides
+  prod.mascope.toml      # Layer 3: Optional env-specific prod overrides
 ```
 
-Here is an example of a small `dev.mascope.toml` you may use during development to override specific values:
+#### Configuration Loading Order
+
+When the application starts, configurations are loaded and merged in this order:
+
+1. **`base.mascope.toml`** - Shared defaults for all modes (settings common to dev and prod)
+2. **`{mode}.mascope.toml`** - Mode-specific defaults (dev vs prod)
+3. **`{mode}.mascope.toml`** from `.runtime/env/{name}/` - Optional environment-specific overrides
+
+Later layers override earlier ones, allowing you to customize specific settings without duplicating entire configurations.
+
+#### Configuration Scope
+
+The configuration includes:
+
+- **App-wide settings** under `[meta]` (API port, filestore path, log level)
+- **Module-specific settings** for each [runtime module](#runtime-modules) (backend, file-converter, frontend, etc.)
+- **Infrastructure settings** (Redis, database paths, worker counts)
+
+### Mode-Specific Defaults
+
+The git-tracked mode configurations provide defaults for development vs production:
+
+**`base.mascope.toml`** (shared between modes configurations):
+
+```toml
+[backend.redis]
+port = 6379 # default Redis port
+image = "redis:7-alpine" # standart Redis image
+```
+
+**`dev.mascope.toml`** (for local development):
+
+```toml
+[backend]
+workers = 1  # Single worker for hot reload
+
+[backend.redis]
+host = "localhost"  # Local Redis container
+container_name = "mascope_redis_dev"
+
+[file-converter]
+server = "localhost"  # Connect to local backend
+```
+
+**`prod.mascope.toml`** (for production deployment):
+
+```toml
+[backend]
+workers = "auto"  # Multi-worker based on CPU cores
+
+[backend.redis]
+host = "redis"  # Docker Compose service name
+
+[file-converter]
+server = "backend"  # Docker service name
+```
+
+### Environment-Specific Overrides (Optional)
+
+For most use cases, the git-tracked mode defaults are sufficient. However, if you need custom settings for a specific environment, create an optional override file in `.runtime/env/{name}/`:
+
+**Example** `.runtime/env/foo/dev.mascope.toml`:
 
 ```toml
 [meta]
-description = "My weird overrides"
-log_level = "warning" # reduce overall log verbosity
-api_port = 9876 # change the API port
-filestore = "/home/mrfoo/secret/stash" # change the filestore path
+description = "Custom development environment"
+api_port = 9876        # change the API port
+log_level = "trace"    # Extra verbose logging for debugging
 
 [backend]
-log_level = "debug" # debug the backend
-database = "/home/mrfoo/secret/base" # change the database path
-filestreams = "./foostreams"
+log_level = "debug"    # Debug backend specifically
+workers = 2            # Test multi-worker locally
+database = "/home/mrfoo/secret/base"  # Custom database path
+
+[backend.redis]
+port = 6380  # Non-standard port
 ```
 
-Relative paths like `./database` are always resolved to the [runtime env]#runtime-env] path before the config is injected to the app.
+#### Path Resolution
+
+Relative paths like `./database` are always resolved relative to the active [runtime env](#runtime-envs) path before the config is injected into the app.
+
+For example:
+
+- `./database` → `/path/to/.runtime/env/default/database`
+- `./filestore` → `/path/to/.runtime/env/default/filestore`
 
 > [!NOTE]
 > For a complete list of options, refer to the defaults in `base.mascope.toml` at the monorepo root.
