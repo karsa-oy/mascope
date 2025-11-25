@@ -1,13 +1,22 @@
+"""
+Runtime configuration models and loaders.
+
+Defines Pydantic models for Mascope runtime configuration, including
+global settings, module-specific options, and infrastructure dependencies.
+Handles loading and validation of .mascope.toml configuration files with
+three-layer overlay system.
+"""
+
 from __future__ import annotations
+import os
+import tomllib
+from typing import Literal
 import typing
+from pydantic import BaseModel
 
 if typing.TYPE_CHECKING:
     from mascope_runtime import Runtime
 
-import os
-import tomllib
-from pydantic import BaseModel
-from typing import Literal
 
 # PYDANTIC MODELS
 
@@ -51,6 +60,21 @@ class ModuleConfig(BaseModel):
     # the backend, frontend, file-converter and tof-agent modules.
 
 
+class RedisConfig(BaseModel):
+    """
+    Redis infrastructure configuration.
+    """
+
+    host: str = "localhost"
+    port: int = 6379
+    container_name: str = "mascope_redis"
+    image: str = "redis:7-alpine"
+
+    def get_url(self) -> str:
+        """Build Redis URL from host and port."""
+        return f"redis://{self.host}:{self.port}"
+
+
 class BackendConfig(ModuleConfig):
     """
     Backend module specific configuration options
@@ -58,6 +82,24 @@ class BackendConfig(ModuleConfig):
 
     database: str = r"./database"  # path to the database folder
     filestreams: str = r"./filestreams"  # path to the file streams folder
+    redis: RedisConfig = RedisConfig()
+    workers: Literal["auto"] | int = "auto"  # uvicorn workers, auto -  half cpu cores
+
+    def get_worker_count(self) -> int:
+        """
+        Resolve worker count, calculating from CPU cores if set to "auto".
+
+        Rule of thumb for Mascope (mixed I/O + CPU workload):
+        - auto: half CPU cores
+        - explicit integer: use as-is
+
+        Returns:
+            int: Number of workers to use
+        """
+        if self.workers == "auto":
+            cpu_cores = os.cpu_count() or 1
+            return max(1, cpu_cores // 2)
+        return self.workers
 
 
 class FileConverterConfig(ModuleConfig):
@@ -65,7 +107,9 @@ class FileConverterConfig(ModuleConfig):
     File converter module specific configuration options
     """
 
-    server: str = r"backend"  # production host URL; the default works in our docker compose network
+    server: str = (
+        r"backend"  # production host URL; the default works in our docker compose network
+    )
     source: str = r"./filestreams"  # folder to monitor for files to convert
     raw_threads: int = 2  # number of threads for converting Orbitrap files
     h5_threads: int = 2  # number of threads for converting Tof files
