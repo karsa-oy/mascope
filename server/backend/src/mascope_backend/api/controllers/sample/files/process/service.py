@@ -8,14 +8,17 @@ processing instrument_config and matching the samples.
 
 import asyncio
 
+from sqlalchemy import select
+
 from mascope_backend.db import async_session, db_semaphore
 from mascope_backend.db.id import gen_id
-from mascope_backend.db.models import SampleFile, IonizationMode
+from mascope_backend.db.models import SampleFile, SampleItem, IonizationMode
 
 from mascope_backend.api.lib.api_features import api_controller_background_task
 from mascope_backend.api.lib.exceptions.api_exceptions import (
     NotFoundException,
     ApiException,
+    raise_api_warning,
 )
 
 from mascope_backend.api.controllers.workspace.acquisition.service import (
@@ -52,7 +55,9 @@ from mascope_backend.api.new.ionization.modes.util import (
     resolve_ionization_modes_by_peaks,
     resolve_ionization_modes_by_tokens,
 )
-
+from mascope_backend.socket.records.service import (
+    emit_record_deleted,
+)
 
 from mascope_backend.runtime import runtime
 
@@ -198,6 +203,224 @@ async def auto_process_sample_file(
             "affected_sample_item_ids": list(all_affected_sample_item_ids),
         },
     }
+
+
+@api_controller_background_task(
+    success_notification_rooms=["sid"],
+    success_reload=[("match", "affected_sample_batch_ids")],
+    error_notification_rooms=["sid"],
+    error_reload=[("match", "affected_sample_batch_ids")],
+)
+async def re_process_sample_files(
+    sample_file_ids: list[str],
+    independent_transaction: bool = None,
+    sid: str | None = None,
+    process_id: str | None = None,
+) -> dict:
+    """
+    Re-processes multiple sample files by their unique IDs.
+
+    Steps:
+    - Validate all sample files exist and have no user-created samples
+    - Delete existing ACQUISITION sample items for all files
+    - Run auto-process pipeline for each file
+    - Return aggregated results
+
+    :param sample_file_ids: List of IDs of the sample files to re-process
+    :type sample_file_ids: list[str]
+    :param independent_transaction: Indicates whether this operation should be treated as a standalone transaction.
+    :type independent_transaction: bool, optional
+    :param sid: Session ID for notifications
+    :type sid: str | None, optional
+    :param instrument: Instrument name for user notifications to its room
+    :type instrument: str | None, optional
+    :param process_id: Process ID for tracking
+    :type process_id: str | None, optional
+    :return: Processing results with aggregated data
+    :rtype: dict
+    """
+    processed_files = []
+    failed_files = []
+    affected_sample_batch_ids = set()
+    affected_sample_item_ids = set()
+
+    # --- Validate all sample files exist and collect data --- #
+    async with async_session() as session:
+        sample_files = []
+        for sample_file_id in sample_file_ids:
+            if not (sample_file := await session.get(SampleFile, sample_file_id)):
+                failed_files.append(
+                    {
+                        "sample_file_id": sample_file_id,
+                        "filename": "unknown",
+                        "message": f"Sample file with ID '{sample_file_id}' not found",
+                    }
+                )
+                continue
+            sample_files.append(sample_file)
+
+    # --- Check for user-created samples and validate each file --- #
+    valid_sample_files = []
+    async with async_session() as session:
+        for sample_file in sample_files:
+            # Check for user-created samples
+            sample_items = (
+                (
+                    await session.execute(
+                        select(SampleItem).where(
+                            SampleItem.filename == sample_file.filename,
+                            SampleItem.sample_item_type != "ACQUISITION",
+                        )
+                    )
+                )
+                .scalars()
+                .first()
+            )
+
+            if sample_items:
+                failed_files.append(
+                    {
+                        "sample_file_id": sample_file.sample_file_id,
+                        "filename": sample_file.filename,
+                        "message": (
+                            "Cannot re-process file as it has user-created samples associated with it."
+                        ),
+                    }
+                )
+                continue
+
+            # Verify ionization modes are defined
+            try:
+                ionization_modes = await resolve_ionization_modes_by_tokens(sample_file)
+                if len(ionization_modes) != len(sample_file.polarity):
+                    failed_files.append(
+                        {
+                            "sample_file_id": sample_file.sample_file_id,
+                            "filename": sample_file.filename,
+                            "message": (
+                                "Ionization modes count does not match polarity count of the file"
+                            ),
+                        }
+                    )
+                    continue
+            except Exception as e:
+                failed_files.append(
+                    {
+                        "sample_file_id": sample_file.sample_file_id,
+                        "filename": sample_file.filename,
+                        "message": f"Failed to resolve ionization modes: {str(e)}",
+                    }
+                )
+                continue
+
+            valid_sample_files.append(sample_file)
+
+    # --- Delete existing ACQUISITION sample items for valid files --- #
+    async with async_session() as session:
+        for sample_file in valid_sample_files:
+            acquisition_sample_items = (
+                (
+                    await session.execute(
+                        select(SampleItem).where(
+                            SampleItem.filename == sample_file.filename,
+                            SampleItem.sample_item_type == "ACQUISITION",
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+
+            for sample_item in acquisition_sample_items:
+                affected_sample_batch_ids.add(sample_item.sample_batch_id)
+                await session.delete(sample_item)
+                if independent_transaction:
+                    await emit_record_deleted(
+                        record_type="sample",
+                        record_id=sample_item.sample_item_id,
+                        room=sample_item.sample_batch_id,
+                    )
+
+        await session.commit()
+
+    # --- Process valid files --- #
+    for sample_file in valid_sample_files:
+        try:
+            result = await auto_process_sample_file(
+                sample_file_id=sample_file.sample_file_id,
+                independent_transaction=True,
+                sid=sid,
+                instrument=sample_file.instrument,
+                process_id=gen_id(8),
+            )
+
+            processed_files.append(
+                {
+                    "sample_file_id": sample_file.sample_file_id,
+                    "filename": sample_file.filename,
+                    "message": f"Successfully processed file {sample_file.filename}.",
+                }
+            )
+
+            # Collect notification data
+            notification_data = result.get("_notification_data", {})
+            if "affected_sample_batch_ids" in notification_data:
+                affected_sample_batch_ids.update(
+                    notification_data["affected_sample_batch_ids"]
+                )
+            if "affected_sample_item_ids" in notification_data:
+                affected_sample_item_ids.update(
+                    notification_data["affected_sample_item_ids"]
+                )
+
+        except Exception as e:
+            failed_files.append(
+                {
+                    "sample_file_id": sample_file.sample_file_id,
+                    "filename": sample_file.filename,
+                    "message": f"Processing failed: {str(e)}",
+                }
+            )
+
+    # --- Prepare response --- #
+    total_files = len(sample_file_ids)
+    processed_count = len(processed_files)
+    failed_count = len(failed_files)
+    notification_data = {
+        "total_files": total_files,
+        "processed_files": processed_files,
+        "failed_files": failed_files,
+        "summary": {
+            "processed": processed_count,
+            "failed": failed_count,
+            "total": total_files,
+        },
+    }
+    # Determine status and message
+    if failed_count == 0:
+        message = f"Successfully re-processed {processed_count} sample files."
+        return {
+            "message": message,
+            "data": notification_data,
+        }
+    elif processed_count == 0:
+        message = f"Failed to re-process all {total_files} sample files.\n" + "\n".join(
+            [f"{failed['filename']}: {failed['message']}" for failed in failed_files]
+        )
+        raise ApiException(
+            user_message=message, tech_message=notification_data, status_code=422
+        )
+    else:
+        message = (
+            f"Re-processed {processed_count} files successfully, {failed_count} files failed.\n"
+            + "\n".join(
+                [
+                    f"{failed['filename']}: {failed['message']}"
+                    for failed in failed_files
+                ]
+            )
+        )
+        raise_api_warning(message, notification_data, status_code=207)
 
 
 async def create_acquisition_batches_and_items(

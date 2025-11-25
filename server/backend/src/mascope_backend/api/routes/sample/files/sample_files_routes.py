@@ -13,6 +13,7 @@ from mascope_backend.api.new.auth.dependencies import guest_user, editor_user
 from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.controllers.sample.files.process.service import (
     auto_process_sample_file,
+    re_process_sample_files,
 )
 from mascope_backend.api.controllers.sample.files.sample_files_controller import (
     get_sample_files,
@@ -39,6 +40,7 @@ from mascope_backend.api.models.sample.files.sample_file_pydantic_model import (
     GetSampleFilePeakTimeseriesBody,
     GetSpectrumQueryParams,
     DeleteSampleFilesBody,
+    ReprocessSampleFilesBody,
 )
 
 from mascope_backend.runtime import runtime
@@ -301,6 +303,39 @@ async def process_sample_item_route(
 
     return {
         "message": f"Processing sample file '{sample_file.get('filename')}', please wait.",
+        "process_id": process_id,
+    }
+
+
+@sample_files_router.post("/reprocess")
+@api_route(status_code=202)
+async def reprocess_sample_items_route(
+    body: ReprocessSampleFilesBody,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    user=Depends(editor_user),
+):
+    """Reprocess a sample item, including calibration and matching.
+
+    :param body: The data for processing the sample item.
+    :param background_tasks: Background tasks for processing the item.
+    :param user: The current authenticated user with editor permissions.
+    :return: A dictionary confirming the processing has started.
+    """
+    # Get data for notifications
+    sid = request.headers.get("X-SID")
+    process_id = gen_id(8)
+
+    background_tasks.add_task(
+        re_process_sample_files,
+        sample_file_ids=body.sample_file_ids,
+        independent_transaction=True,
+        sid=sid,
+        process_id=process_id,
+    )
+
+    return {
+        "message": "Re-processing sample files, please wait.",
         "process_id": process_id,
     }
 

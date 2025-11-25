@@ -289,3 +289,17 @@ class DeleteSampleFilesBody(RequestBodyModel):
             raise ValueError("Cannot provide both sample_file_ids and filenames")
 
         return self
+
+
+class ReprocessSampleFilesBody(RequestBodyModel):
+    sample_file_ids: list[str] | None = Field(
+        None, description="List of sample file IDs to re-process", min_length=1
+    )
+
+    @field_validator("sample_file_ids")
+    @classmethod
+    def validate_unique_ids(cls, v: list[str] | None) -> list[str] | None:
+        """Validate that sample file IDs are unique."""
+        if v is not None and len(set(v)) != len(v):
+            raise ValueError("Sample file IDs must be unique")
+        return v

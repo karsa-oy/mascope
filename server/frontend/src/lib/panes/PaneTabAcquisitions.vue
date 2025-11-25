@@ -109,6 +109,23 @@ const contextMenuItems = ref([
         )
       }
     }
+  },
+  {
+    label: 'Re-process',
+    icon: 'pi pi-refresh',
+    command: () => {
+      const sample_file_ids = app.data.acquisition.selected.map(
+        ({ sample_file_id }) => sample_file_id
+      )
+      api.http.post(
+        `/sample/files/reprocess`,
+        { sample_file_ids },
+        {
+          use: 'process',
+          type: 'reprocess_sample_files'
+        }
+      )
+    }
   }
 ])
 const contextMenuRow = ref(null)
