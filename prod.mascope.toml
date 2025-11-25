@@ -1,0 +1,15 @@
+
+# MASCOPE PRODUCTION MODE CONFIGURATION
+# Overrides base.mascope.toml for prod mode 
+
+# Each section may also have
+# log_level =  "trace", "debug", "info", "warning", "success", "error" or "critical"
+
+[backend]
+workers = 2 # uvicorn workers ("auto" || int)
+
+[backend.redis]
+host = "redis"  # Docker Compose service name
+
+[file-converter]
+server = "backend"  # Connect to prod backend (Docker Compose service name)

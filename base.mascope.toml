@@ -1,5 +1,6 @@
 
-# MASCOPE DEFAULT BASE CONFIG
+# MASCOPE BASE CONFIGURATION
+# Shared defaults for all modes 
 
 # Each section may also have
 # log_level =  "trace", "debug", "info", "warning", "success", "error" or "critical"
@@ -34,7 +35,6 @@ tags = ['server', 'tof', 'orbi', 'file', 'all']
 log_path = './logs'
 color = "orange"
 # settings
-server = 'backend'
 source = './filestreams'
 raw_threads = 1
 h5_threads = 1

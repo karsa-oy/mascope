@@ -1,0 +1,17 @@
+
+# MASCOPE DEVELOPMENT MODE CONFIGURATION
+# Overrides base.mascope.toml for dev mode 
+
+# Each section may also have
+# log_level =  "trace", "debug", "info", "warning", "success", "error" or "critical"
+
+[backend]
+workers = 1  # uvicorn workers ("auto" || int)
+
+
+[backend.redis]
+host = "localhost"  # Dev Redis runs on localhost
+container_name = "mascope_redis_dev"
+
+[file-converter]
+server = "localhost"  # Connect to dev backend

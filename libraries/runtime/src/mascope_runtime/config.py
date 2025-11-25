@@ -274,16 +274,16 @@ class RuntimeConfigLoader:
         """
         Initializes the runtime configuration:
 
-         1. Depending on the runtime mode, load `dev.mascope.toml`
-            or `prod.mascope.toml` from the runtime environment;
-            missing values use defaults set in `base.mascope.toml`
-            in the runtime library.
-         2. Resolve relative paths into absolute paths, using the
-            runtime environment path (except for package paths,
-            which resolve relative to the Mascope root path).
-         3. Resolve log level for each module, using CLI arguments,
-            toml settings and defaults.
-         4. Validate the resulting dictionary using the Pydantic
+        1. Load config with 3-layer overlay:
+            - base.mascope.toml - Shared defaults for all modes
+            - {mode}.mascope.toml (runtime lib) - Mode-specific defaults
+            - {mode}.mascope.toml (env dir, optional) - Env-specific overrides
+        2. Resolve relative paths into absolute paths, using the
+           runtime environment path (except for package paths,
+           which resolve relative to the Mascope root path).
+        3. Resolve log level for each module, using CLI arguments,
+           toml settings and defaults.
+        4. Validate the resulting dictionary using the Pydantic
             model for the configuration.
 
         :param runtime: The parent runtime
@@ -313,18 +313,32 @@ class RuntimeConfigLoader:
 
     def _load_tomls(self):
         """
-        Over defaults from `base.mascope.toml` in the runtime
-        library, with settings in either `dev.mascope.toml` or
-        `prod.mascope.toml`, returning the result as a dict.
+        Load configuration with three-layer overlay system:
+
+        1. base.mascope.toml (runtime library, git tracked)
+           - Shared defaults for all modes
+        2. {mode}.mascope.toml (runtime library, git tracked)
+           - Mode-specific defaults (dev vs prod)
+           - Overrides base settings
+        3. {mode}.mascope.toml (env directory, not tracked)
+           - Environment-specific overrides
+           - Optional, for special cases only
 
         :return: Raw config dictionary
         :rtype: dict
         """
-        self.base = self.runtime.path("base.mascope.toml")
-        self.path = self.runtime.env.path(f"./{self.runtime.mode}.mascope.toml")
+        # Layer 1: Base defaults (git tracked)
+        base_path = self.runtime.path("base.mascope.toml")
+
+        # Layer 2: Mode defaults from runtime library (git tracked)
+        mode_base_path = self.runtime.path(f"{self.runtime.mode}.mascope.toml")
+
+        # Layer 3: Env-specific overrides (not tracked, optional)
+        mode_env_path = self.runtime.env.path(f"./{self.runtime.mode}.mascope.toml")
 
         raw_config = {}
-        for path in [self.base, self.path]:
+        # Apply layers in order: base → mode (lib) → mode (env)
+        for path in [base_path, mode_base_path, mode_env_path]:
             if os.path.exists(path):
                 with open(path, "rb") as f:
                     # apply overlay
