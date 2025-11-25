@@ -109,6 +109,21 @@ class Runtime:
         return self.module.config
 
     @property
+    def full_config(self) -> RuntimeConfig:
+        """
+        The complete runtime configuration including all modules and infrastructure.
+
+        Most modules should use `runtime.config` to access their module-specific
+        configuration and `runtime.meta` for global settings. However, management
+        tools like the CLI may need access to the full configuration to orchestrate
+        infrastructure and coordinate between modules.
+
+        Returns:
+            RuntimeConfig: The complete runtime configuration
+        """
+        return self._full_config
+
+    @property
     def logger(self):
         """
         The runtime's local (module specific) configuration
