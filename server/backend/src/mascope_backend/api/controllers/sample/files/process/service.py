@@ -141,41 +141,11 @@ async def auto_process_sample_file(
 
         # Perform calibration if calibration collection configured for this ionization mode
         if ionization_mode and ionization_mode.calibration_collection_id:
-            # Calibration with retry logic
-            mz_calibration_params = calibration_params_factory(sample_item["filename"])
-            for i in range(1, CALIBRATION_ITERATIONS + 1):
-                try:
-                    await calibration_mz_calibrate_sample(
-                        sample_item_id=sample_item_id,
-                        mz_calibration_params=mz_calibration_params,
-                        independent_transaction=False,
-                        sid=sid,
-                        process_id=gen_id(8),
-                        parent_id=process_id,
-                    )
-                    break
-                except ApiException as e:
-                    if i == CALIBRATION_ITERATIONS:
-                        runtime.logger.error(
-                            f"Failed to calibrate m/z with m/z tolerance {mz_calibration_params.mz_error_tolerance} "
-                            f"for sample item {sample_item["sample_item_name"]}: {e}"
-                        )
-                    else:
-                        # Double the m/z error tolerance, check refinement window limits, then retry
-                        old_tolerance = mz_calibration_params.mz_error_tolerance
-                        mz_calibration_params.mz_error_tolerance *= 2
-                        if (
-                            mz_calibration_params.refine_window
-                            <= mz_calibration_params.mz_error_tolerance
-                        ):
-                            mz_calibration_params.refine_window = (
-                                mz_calibration_params.mz_error_tolerance + 1
-                            )
-                        runtime.logger.warning(
-                            f"Not enough calibration peaks with m/z error tolerance {old_tolerance}, "
-                            f"retrying m/z calibration for sample {sample_item['sample_item_name']} with "
-                            f"mz_error_tolerance={mz_calibration_params.mz_error_tolerance}."
-                        )
+            await calibrate_with_retry(
+                sample_item=SampleItem(**sample_item),
+                sid=sid,
+                process_id=process_id,
+            )
         else:
             runtime.logger.warning(
                 f"Skipping m/z calibration for sample '{sample_item['sample_item_name']}': "
@@ -372,3 +342,54 @@ async def create_acquisition_batches_and_items(
     ).get("data", [])
 
     return acquisition_sample_items, acquisition_sample_batches
+
+
+async def calibrate_with_retry(
+    sample_item: SampleItem, sid: str | None = None, process_id: str | None = None
+) -> None:
+    """Calibrate sample item with retry logic
+
+    If no matching calibration peaks are found, the m/z error tolerance is doubled
+    and the calibration is retried, up to CALIBRATION_ITERATIONS times.
+
+    :param sample_item: Sample item to calibrate
+    :type sample_item: SampleItem
+    :param sid: Session ID for notifications
+    :type sid: str | None, optional
+    :param process_id: Process ID for tracking
+    :type process_id: str | None, optional
+    """
+    mz_calibration_params = calibration_params_factory(sample_item.filename)
+    for i in range(1, CALIBRATION_ITERATIONS + 1):
+        try:
+            await calibration_mz_calibrate_sample(
+                sample_item_id=sample_item.sample_item_id,
+                mz_calibration_params=mz_calibration_params,
+                independent_transaction=False,
+                sid=sid,
+                process_id=gen_id(8),
+                parent_id=process_id,
+            )
+            break
+        except ApiException as e:
+            if i == CALIBRATION_ITERATIONS:
+                runtime.logger.error(
+                    f"Failed to calibrate m/z with m/z tolerance {mz_calibration_params.mz_error_tolerance} "
+                    f"for sample item {sample_item.sample_item_name}: {e}"
+                )
+            else:
+                # Double the m/z error tolerance, check refinement window limits, then retry
+                old_tolerance = mz_calibration_params.mz_error_tolerance
+                mz_calibration_params.mz_error_tolerance *= 2
+                if (
+                    mz_calibration_params.refine_window
+                    <= mz_calibration_params.mz_error_tolerance
+                ):
+                    mz_calibration_params.refine_window = (
+                        mz_calibration_params.mz_error_tolerance + 1
+                    )
+                runtime.logger.warning(
+                    f"Not enough calibration peaks with m/z error tolerance {old_tolerance}, "
+                    f"retrying m/z calibration for sample {sample_item.sample_item_name} with "
+                    f"mz_error_tolerance={mz_calibration_params.mz_error_tolerance}."
+                )
