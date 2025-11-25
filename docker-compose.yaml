@@ -1,10 +1,34 @@
 services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
   backend: &backend
     command: "api-server"
     image: ghcr.io/karsa-oy/mascope/backend:latest
     build:
       dockerfile: server/backend/Dockerfile
       context: .
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'python -c "import socket; s=socket.socket(); s.settimeout(2); s.connect((''localhost'', 8090)); s.close()" || exit 1',
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 40s
     tty: true
     ports:
       - 8090:8090
@@ -22,6 +46,10 @@ services:
   file_converter:
     <<: *backend
     command: "file-converter"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck: {} # Disable inherited from backend healthcheck
     ports: []
   frontend:
     image: ghcr.io/karsa-oy/mascope/frontend:latest
@@ -29,6 +57,9 @@ services:
       context: server/frontend
       args:
         - MASCOPE_RUNTIME
+    depends_on:
+      backend:
+        condition: service_healthy
     environment:
       - MASCOPE_TIMEZONE
     secrets:
@@ -37,6 +68,9 @@ services:
     tty: true
     ports:
       - 443:443
+
+volumes:
+  redis_data:
 
 secrets:
   jwt_secret_key:
