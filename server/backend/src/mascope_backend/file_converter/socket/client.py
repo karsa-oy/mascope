@@ -28,6 +28,11 @@ class FileConverterSocketClient:
     def connect(self):
         """Connect to Mascope server"""
         try:
+            # Guard check if already connected (multiple workers race condition)
+            if self.sio.connected:
+                runtime.logger.debug("Already connected, skipping reconnect")
+                return
+
             self.sio.connect(
                 self.url,
                 headers={"X-Service-Name": "file-converter"},
