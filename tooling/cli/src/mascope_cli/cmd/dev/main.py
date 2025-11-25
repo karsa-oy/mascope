@@ -1,15 +1,23 @@
-from typing import List, Annotated, Optional
-import os
-import json
-import typer
-import platform
+"""
+Development environment management commands.
+
+Provides commands to run, monitor, and manage Mascope development services.
+"""
+
 import base64
+import json
+import os
+import platform
+from typing import List, Annotated, Optional
+import typer
 
 from mascope_runtime import Runtime
 
 from mascope_cli.runtime import runtime
 import mascope_cli.cmd.lib as lib
 
+from mascope_cli.cmd.dev.docker import dev_docker_app
+from mascope_cli.cmd.dev.redis import dev_redis_app, check_and_start_redis
 from mascope_cli.cmd.dev.tools import dev_tools_app
 
 
@@ -26,6 +34,8 @@ def main():
 
 
 # Add the tools_app as a subgroup under dev
+dev_app.add_typer(dev_docker_app, name="docker")
+dev_app.add_typer(dev_redis_app, name="redis")
 dev_app.add_typer(dev_tools_app, name="tools")
 
 
@@ -84,12 +94,32 @@ def run(
     ]
     if lab:
         selected.append({"name": "lab", "run": "uv run jupyter lab"})
+
     # use tags if no modules were selected
     if not len(selected):
         [tag] = modules
         selected = [mod for mod in runtime.modules if tag in mod["tags"]]
+
+    # Check if backend is being started
+    backend_selected = any(mod["name"] == "backend" for mod in selected)
+
+    # check if Redis is running before starting backend
+    if backend_selected:
+        runtime.logger.info("Checking Redis dependency")
+        redis_available = check_and_start_redis()
+
+        # prompt if Redis failed to start
+        if not redis_available:
+            runtime.logger.warning(
+                "Backend may fail to start in multi-worker mode without Redis"
+            )
+            if not typer.confirm("Continue anyway?", default=False):
+                runtime.logger.info("Aborted.")
+                raise typer.Exit(1)
+
     # set mode to dev
     runtime.state.mode = "dev"
+
     # set config env var
     frontend_runtime = Runtime("frontend", log=False)
     os.environ["MASCOPE_ENV"] = runtime.env.name
