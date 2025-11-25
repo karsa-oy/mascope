@@ -7,7 +7,8 @@ Instead, authentication happens per-event with the user data and access token be
 passed in conversion events.
 """
 
-from mascope_backend.socket.server import sio
+import os
+from mascope_backend.socket import sio
 from mascope_backend.runtime import runtime
 
 

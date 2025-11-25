@@ -1,7 +1,7 @@
 """Socket.IO session management."""
 
 from typing import Dict, Any
-from mascope_backend.socket.server import sio
+from mascope_backend.socket import sio
 from mascope_backend.db.models import User
 from mascope_backend.socket.auth.exceptions import SocketSessionError
 from mascope_backend.runtime import runtime

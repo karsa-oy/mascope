@@ -1,4 +1,4 @@
-from mascope_backend.socket.server import sio
+from mascope_backend.socket import sio
 from mascope_backend.socket.emitter import event_emitter
 from mascope_backend.runtime import runtime
 

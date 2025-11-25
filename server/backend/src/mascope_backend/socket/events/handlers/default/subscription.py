@@ -2,7 +2,7 @@
 Users room management.
 """
 
-from mascope_backend.socket.server import sio
+from mascope_backend.socket import sio
 from mascope_backend.socket.auth.decorators import socket_auth
 
 

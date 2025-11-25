@@ -2,7 +2,7 @@
 
 from copy import deepcopy
 from typing import Any
-from mascope_backend.socket.server import sio
+from mascope_backend.socket import sio
 from mascope_backend.socket.notifications.schemas import UserNotification
 
 from mascope_backend.runtime import runtime

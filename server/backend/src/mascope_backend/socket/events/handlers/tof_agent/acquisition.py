@@ -1,4 +1,4 @@
-from mascope_backend.socket.server import sio
+from mascope_backend.socket import sio
 from mascope_backend.db.id import gen_id
 from mascope_backend.socket.auth.decorators import socket_auth
 from mascope_backend.socket.notifications import (

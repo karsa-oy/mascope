@@ -4,7 +4,8 @@ Frontend user connection lifecycle for Mascope web application.
 Handles socket connections on the default namespace used by the main web application.
 """
 
-from mascope_backend.socket.server import sio
+import os
+from mascope_backend.socket import sio
 from mascope_backend.socket.auth import authenticate_socket_connection
 from mascope_backend.socket.auth.token import get_jwt_from_cookies
 from mascope_backend.socket.auth.session import clear_user_session
