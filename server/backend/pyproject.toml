@@ -28,6 +28,7 @@ dependencies = [
     "python-socketio~=5.11",
     "python-multipart>=0.0.20,<0.0.21",
     "pyyaml~=6.0",
+    "redis[hiredis]>=7.1.0",
     "requests~=2.32",
     "rich>=13.7.1,<14",
     "scipy~=1.13",
