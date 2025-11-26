@@ -11,6 +11,7 @@ import InputIcon from 'primevue/inputicon'
 import InputText from 'primevue/inputtext'
 import FloatLabel from 'primevue/floatlabel'
 import ContextMenu from 'primevue/contextmenu'
+import { useConfirm } from 'primevue/useconfirm'
 
 import { UppyContextProvider } from '@uppy/vue'
 import '@uppy/core/css/style.min.css'
@@ -32,6 +33,7 @@ import { useApp } from '@/stores'
 
 const app = useApp()
 const uppy = app.uppy.get()
+const confirm = useConfirm()
 
 onMounted(() => {
   uppy
@@ -99,14 +101,31 @@ const contextMenuItems = ref([
         ({ sample_file_id }) => sample_file_id
       )
       if (sample_file_ids.length > 0) {
-        api.http.post(
-          `/sample/files/delete`,
-          { sample_file_ids },
-          {
-            use: 'delete',
-            type: 'delete_sample_files'
+        confirm.require({
+          message: `Are you sure you want to delete the selected sample files?
+            This action cannot be undone.`,
+          header: 'Delete Sample Files',
+          icon: 'pi pi-exclamation-triangle',
+          rejectProps: {
+            label: 'Cancel',
+            severity: 'secondary',
+            outlined: true
+          },
+          acceptProps: {
+            label: 'Delete',
+            severity: 'danger'
+          },
+          accept: () => {
+            api.http.post(
+              `/sample/files/delete`,
+              { sample_file_ids },
+              {
+                use: 'delete',
+                type: 'delete_sample_files'
+              }
+            )
           }
-        )
+        })
       }
     }
   },
@@ -117,14 +136,35 @@ const contextMenuItems = ref([
       const sample_file_ids = app.data.acquisition.selected.map(
         ({ sample_file_id }) => sample_file_id
       )
-      api.http.post(
-        `/sample/files/reprocess`,
-        { sample_file_ids },
-        {
-          use: 'process',
-          type: 'reprocess_sample_files'
+      confirm.require({
+        message: `Are you sure you want to re-process the selected sample files?
+          This will delete existing acquisition data and recreate it. The action is
+          only available for files not associated with user-created batches.
+
+          Note, the files will be processed according to the currently defined ionization modes.
+          `,
+        header: 'Re-process Sample Files',
+        icon: 'pi pi-question-circle',
+        rejectProps: {
+          label: 'Cancel',
+          severity: 'secondary',
+          outlined: true
+        },
+        acceptProps: {
+          label: 'Re-process',
+          severity: 'info'
+        },
+        accept: () => {
+          api.http.post(
+            `/sample/files/reprocess`,
+            { sample_file_ids },
+            {
+              use: 'process',
+              type: 'reprocess_sample_files'
+            }
+          )
         }
-      )
+      })
     }
   }
 ])
