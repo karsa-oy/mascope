@@ -196,7 +196,7 @@ def parse_and_filter_peaks(peaks: "xarray.DataArray") -> dict:  # type: ignore #
     parsed_peaks = {
         "peak_intensities": peak_intensities[non_zero_peaks],
         "peak_mzs": peaks.mz.values[non_zero_peaks],
-        "peak_ids": peaks.id.values[non_zero_peaks],
+        "peak_ids": peaks.peak_id.values[non_zero_peaks],
         "peak_tofs": peaks.tof.values[non_zero_peaks],
     }
 

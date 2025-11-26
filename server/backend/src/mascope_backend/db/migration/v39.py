@@ -6,11 +6,20 @@ from dataclasses import dataclass
 from typing import Iterable, Sequence
 from concurrent.futures import ThreadPoolExecutor
 import sqlite3
+import xarray as xr
 
+import mascope_file.io as m_io
+import mascope_file.name as m_name
+from mascope_signal.peak import get_peak_detector
 from mascope_backend.runtime import runtime
 from mascope_backend.db import configure_database_engine
 from mascope_backend.db.ops.backup import create_db_backup
-import mascope_file.io as m_io
+from mascope_backend.api.new.instrument_configs.lib import read_instrument_functions
+from mascope_backend.api.controllers.match.match_controller import rematch_sample
+from mascope_backend.api.controllers.sample.items.sample_items_controller import (
+    get_sample_items,
+)
+
 
 # Determine concurrency level based on CPU cores
 # Reserve 2 cores for system responsiveness
@@ -22,7 +31,10 @@ CONCURRENCY = max(1, cpu_cores - 2)
 ISOTOPE_BUFFER_TARGET = 2_000_000  # rows before flush to temp SQL table
 SQLITE_BATCH_INSERT_SIZE = 100_000
 MAX_PENDING_FILES = 512  # cap memory usage
-LOAD_TIMEOUT = 30.0
+LOAD_TIMEOUT = 300.0
+
+
+failed_sample_filenames = set()
 
 
 # NOTE when __slots__ is defined, Python allocates a fixed set of attributes,
@@ -30,6 +42,7 @@ LOAD_TIMEOUT = 30.0
 # especially important when creating millions of small objects.
 @dataclass(slots=True)
 class IsotopeRow:
+    match_isotope_id: str
     target_isotope_id: str
     sample_item_id: str
     sample_peak_index: int
@@ -71,47 +84,70 @@ async def run() -> None:
             """Process the current batch of files for peak ID lookups and prepare updates/deletes."""
             if not current_file_batch:
                 return
+
             peak_lookup_tasks = []
+            # Pre-process unmatched isotopes to ensure they are always updated, not deleted.
             for sample_item_id, rows in current_file_batch.items():
+                unmatched_rows = [r for r in rows if r.sample_peak_index < 0]
+                if unmatched_rows:
+                    # update unmatched rows to empty string using match_isotope_id
+                    updates.extend((r.match_isotope_id, "") for r in unmatched_rows)
+
+            # Create lookup tasks only for rows with matched peaks.
+            for sample_item_id, rows in current_file_batch.items():
+                matched_rows = [r for r in rows if r.sample_peak_index >= 0]
+                if not matched_rows:
+                    continue
+
                 filename = sample_id_to_filename_map.get(sample_item_id)
                 if not filename:
-                    # No sample file -> delete all related isotopes
-                    deletes.extend(r.target_isotope_id for r in rows)
+                    runtime.logger.error(
+                        f"Sample item ID {sample_item_id} has no associated filename. "
+                        "Associated match_isotope records will be deleted."
+                    )
+                    # No sample file, so matched peaks cannot be resolved. Delete them.
+                    deletes.extend(r.match_isotope_id for r in matched_rows)
                     continue
-                required_peak_indices = [
-                    r.sample_peak_index for r in rows if r.sample_peak_index >= 0
-                ]
-                if not required_peak_indices:
-                    # No matched peaks
-                    updates.extend((r.target_isotope_id, "") for r in rows)
-                    continue
+
                 peak_lookup_tasks.append(
-                    PeakLookupTask(sample_item_id, filename, required_peak_indices)
+                    PeakLookupTask(
+                        sample_item_id,
+                        filename,
+                        [r.sample_peak_index for r in matched_rows],
+                    )
                 )
 
+            if not peak_lookup_tasks:
+                # All isotopes were unmatched and have been handled.
+                current_file_batch.clear()
+                return
+
             peak_mapping = await gather_peak_lookups(executor, peak_lookup_tasks)
+
             for sample_item_id, rows in current_file_batch.items():
-                peak_map = peak_mapping.get(sample_item_id, {})
-                if not peak_map and any(r.sample_peak_index >= 0 for r in rows):
-                    # Failed to load peaks -> delete all related isotopes
-                    deletes.extend(r.target_isotope_id for r in rows)
+                matched_rows = [r for r in rows if r.sample_peak_index >= 0]
+                if not matched_rows:
                     continue
-                for r in rows:
-                    if r.sample_peak_index < 0:
-                        # -1 indicates no matched peak
-                        updates.append((r.target_isotope_id, ""))
+
+                peak_map = peak_mapping.get(sample_item_id)
+
+                if peak_map is None:
+                    # Peak lookup was not performed (e.g., file not found) or failed entirely.
+                    # The `deletes` for this case were already handled above.
+                    continue
+
+                for r in matched_rows:
+                    new_id = peak_map.get(r.sample_peak_index)
+                    if new_id is not None:
+                        updates.append((r.match_isotope_id, new_id))
                     else:
-                        new_id = peak_map.get(r.sample_peak_index)
-                        (
-                            updates.append((r.target_isotope_id, new_id))
-                            if new_id is not None
-                            else deletes.append(r.target_isotope_id)
-                        )
+                        deletes.append(r.match_isotope_id)
+
             if len(updates) + len(deletes) >= ISOTOPE_BUFFER_TARGET:
-                # Flush to temp SQL tables
                 flush_updates(conn, updates, deletes)
                 updates.clear()
                 deletes.clear()
+
             current_file_batch.clear()
 
         # Stream and process isotope rows
@@ -137,6 +173,11 @@ async def run() -> None:
         restore_normal_pragmas(conn)
         conn.commit()
         conn.execute("VACUUM;")
+        conn.close()
+
+        runtime.logger.info("Rematching failed samples...")
+        await rematch_failed_samples()
+
         runtime.logger.info(f"Migration v39 complete in {time.time() - start:.2f}s")
     finally:
         # Ensure lock release even on exception
@@ -146,6 +187,36 @@ async def run() -> None:
             runtime.logger.exception(
                 f"Exception occurred while closing the database connection during migration v39 cleanup: {e}."
             )
+
+
+async def rematch_failed_samples() -> None:
+    """Rematch samples that failed during the migration process."""
+    n_for_rematch = len(failed_sample_filenames)
+    for i, filename in enumerate(failed_sample_filenames):
+        runtime.logger.info(f"({i+1}/{n_for_rematch}) Re-processing file {filename}...")
+        try:
+            instrument_functions = await read_instrument_functions(filename=filename)
+            peak_detector = get_peak_detector(filename, instrument_functions)
+            await peak_detector.detect_peaks()
+            await peak_detector.write_peaks_to_zarr()
+
+            sample_items_response = await get_sample_items(filename=filename)
+            sample_items = sample_items_response["data"]
+            if sample_items_response["results"] == 0:
+                runtime.logger.info(
+                    f"Sample file {filename} doesn't have associated items."
+                )
+            for sample_item in sample_items:
+                rematch_response = await rematch_sample(
+                    sample_item_id=sample_item["sample_item_id"], full_remove=True
+                )
+                if rematch_response["status"] == "failed":
+                    runtime.logger.error(
+                        f"Failed to rematch {sample_item["sample_item_id"]}."
+                    )
+
+        except Exception as e:
+            runtime.logger.error(f"Failed to re-process {filename}: {e}")
 
 
 def apply_sqlite_pragmas(conn: sqlite3.Connection) -> None:
@@ -200,7 +271,7 @@ def stream_isotopes(conn: sqlite3.Connection) -> Iterable[IsotopeRow]:
     """Stream isotope rows from match_isotope table in batches."""
     cur = conn.cursor()
     cur.execute(
-        "SELECT target_isotope_id, sample_item_id, sample_peak_id "
+        "SELECT match_isotope_id, target_isotope_id, sample_item_id, sample_peak_id "
         "FROM match_isotope ORDER BY sample_item_id;"
     )
     fetch = cur.fetchmany
@@ -208,8 +279,10 @@ def stream_isotopes(conn: sqlite3.Connection) -> Iterable[IsotopeRow]:
         rows = fetch(100_000)
         if not rows:
             break
-        for target_id, sample_item_id, peak_index in rows:
-            yield IsotopeRow(target_id, sample_item_id, int(peak_index))
+        for match_isotope_id, target_isotope_id, sample_item_id, peak_index in rows:
+            yield IsotopeRow(
+                match_isotope_id, target_isotope_id, sample_item_id, int(peak_index)
+            )
     cur.close()
 
 
@@ -225,27 +298,53 @@ def load_peak_ids_slice(filename: str, indices: Sequence[int]) -> dict[int, str]
     """
     if not indices:
         return {}
-    # Deduplicate & keep only non-negative
-    unique = sorted({i for i in indices if i >= 0})
-    if not unique:
+    # Keep only non-negative (=matched) indices
+    matched_indices = [i for i in indices if i >= 0]
+    if not matched_indices:
         return {}
 
     try:
-        peak_id_coordinates = m_io.load_coord(
-            filename, var="peak_timeseries", coord_name="id"
-        )
-        num_peak_ids = peak_id_coordinates.shape[0]
-        in_bounds_indices = [i for i in unique if i < num_peak_ids]
-        if not in_bounds_indices:
-            return {}
-        peak_id_slice = peak_id_coordinates[in_bounds_indices]
+        peak_id_coordinate = load_peak_id_coordinate(filename)
+        num_peak_ids = peak_id_coordinate.size
 
-        return {
-            idx: str(peak_id_slice[pos]) for pos, idx in enumerate(in_bounds_indices)
-        }
-    except Exception:
+        if max(matched_indices) >= num_peak_ids - 1:
+            runtime.logger.warning(
+                "Peaks are missing. "
+                f"The file {filename} is scheduled for rematching... "
+            )
+            failed_sample_filenames.add(filename)
+            return {}
+
+        peak_id_slice = peak_id_coordinate[matched_indices]
+
+        return {idx: str(peak_id_slice[pos]) for pos, idx in enumerate(matched_indices)}
+    except Exception as e:
         # Any failure -> delete related isotopes
+        runtime.logger.error(
+            f"Failed access peak timeseries of {filename} due to {type(e).__name__}: {e}. "
+            f"The file {filename} is scheduled for rematching... "
+        )
+        failed_sample_filenames.add(filename)
         return {}
+
+
+def load_peak_id_coordinate(filename: str):
+    """Load peak ID coordinates from the sample file.
+    Renames 'id' to 'peak_id' if necessary.
+    """
+    try:
+        peak_id_coordinate = m_io.load_coord(filename, "peak_timeseries", "peak_id")
+    except KeyError:
+        filepath = m_name.filename_to_zarr_path(filename, "peak_timeseries")
+        sync = m_io.get_zarr_synchronizer(filepath)
+        ds = xr.open_zarr(filepath, synchronizer=sync).load()
+        # Rename the coordinate in memory
+        id_values = ds["id"].values
+        ds = ds.reset_coords("id", drop=True).assign_coords(peak_id=("mz", id_values))
+        # Write back to Zarr
+        ds.to_zarr(filepath, mode="w", synchronizer=sync)
+        peak_id_coordinate = m_io.load_coord(filename, "peak_timeseries", "peak_id")
+    return peak_id_coordinate
 
 
 async def gather_peak_lookups(
@@ -280,17 +379,17 @@ def create_temp_tables(conn: sqlite3.Connection) -> None:
     cur.execute(
         """
         CREATE TEMP TABLE temp_updates (
-            target_isotope_id TEXT PRIMARY KEY,
+            match_isotope_id TEXT PRIMARY KEY,
             new_sample_peak_id TEXT
         );
-    """
+        """
     )
     cur.execute(
         """
         CREATE TEMP TABLE temp_deletes (
-            target_isotope_id TEXT PRIMARY KEY
+            match_isotope_id TEXT PRIMARY KEY
         );
-    """
+        """
     )
     cur.close()
 
@@ -300,17 +399,16 @@ def flush_updates(
 ) -> None:
     """Flush accumulated updates and deletes to temporary tables."""
     cur = conn.cursor()
-    # Batched inserts
     for i in range(0, len(updates), SQLITE_BATCH_INSERT_SIZE):
         chunk = updates[i : i + SQLITE_BATCH_INSERT_SIZE]
         cur.executemany(
-            "INSERT OR REPLACE INTO temp_updates (target_isotope_id, new_sample_peak_id) VALUES (?, ?);",
+            "INSERT OR REPLACE INTO temp_updates (match_isotope_id, new_sample_peak_id) VALUES (?, ?);",
             chunk,
         )
     for i in range(0, len(deletes), SQLITE_BATCH_INSERT_SIZE):
         chunk = [(d,) for d in deletes[i : i + SQLITE_BATCH_INSERT_SIZE]]
         cur.executemany(
-            "INSERT OR REPLACE INTO temp_deletes (target_isotope_id) VALUES (?);", chunk
+            "INSERT OR REPLACE INTO temp_deletes (match_isotope_id) VALUES (?);", chunk
         )
     conn.commit()
     cur.close()
@@ -402,16 +500,16 @@ def apply_final_update(conn: sqlite3.Connection) -> None:
         SET sample_peak_id = (
             SELECT new_sample_peak_id
             FROM temp_updates u
-            WHERE u.target_isotope_id = match_isotope.target_isotope_id
+            WHERE u.match_isotope_id = match_isotope.match_isotope_id
         )
-        WHERE target_isotope_id IN (SELECT target_isotope_id FROM temp_updates);
-    """
+        WHERE match_isotope_id IN (SELECT match_isotope_id FROM temp_updates);
+        """
     )
     cur.execute(
         """
         DELETE FROM match_isotope
-        WHERE target_isotope_id IN (SELECT target_isotope_id FROM temp_deletes);
-    """
+        WHERE match_isotope_id IN (SELECT match_isotope_id FROM temp_deletes);
+        """
     )
     conn.commit()
     cur.close()

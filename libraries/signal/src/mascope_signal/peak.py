@@ -74,7 +74,7 @@ class BasePeakDetector(ABC):
             "mz": peaks.mz,
             "time": time_coord,
             "tof": (("mz"), unique_tofs),
-            "id": (("mz"), peak_ids),
+            "peak_id": (("mz"), peak_ids),
         }
 
         # Allocate dask arrays for peak areas and heights with NaN initialization
