@@ -309,16 +309,16 @@ async def process_sample_item_route(
 
 @sample_files_router.post("/reprocess")
 @api_route(status_code=202)
-async def reprocess_sample_items_route(
+async def reprocess_sample_files_route(
     body: ReprocessSampleFilesBody,
     request: Request,
     background_tasks: BackgroundTasks,
     user=Depends(editor_user),
 ):
-    """Reprocess a sample item, including calibration and matching.
+    """Reprocess sample files, including calibration and matching.
 
-    :param body: The data for processing the sample item.
-    :param background_tasks: Background tasks for processing the item.
+    :param body: Request body containing sample file IDs to reprocess.
+    :param background_tasks: Background tasks for processing the files.
     :param user: The current authenticated user with editor permissions.
     :return: A dictionary confirming the processing has started.
     """

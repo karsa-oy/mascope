@@ -232,8 +232,6 @@ async def re_process_sample_files(
     :type independent_transaction: bool, optional
     :param sid: Session ID for notifications
     :type sid: str | None, optional
-    :param instrument: Instrument name for user notifications to its room
-    :type instrument: str | None, optional
     :param process_id: Process ID for tracking
     :type process_id: str | None, optional
     :return: Processing results with aggregated data
@@ -351,7 +349,7 @@ async def re_process_sample_files(
                 independent_transaction=True,
                 sid=sid,
                 instrument=sample_file.instrument,
-                process_id=gen_id(8),
+                process_id=process_id,
             )
 
             processed_files.append(
@@ -363,14 +361,14 @@ async def re_process_sample_files(
             )
 
             # Collect notification data
-            notification_data = result.get("_notification_data", {})
-            if "affected_sample_batch_ids" in notification_data:
+            file_notification_data = result.get("_notification_data", {})
+            if "affected_sample_batch_ids" in file_notification_data:
                 affected_sample_batch_ids.update(
-                    notification_data["affected_sample_batch_ids"]
+                    file_notification_data["affected_sample_batch_ids"]
                 )
-            if "affected_sample_item_ids" in notification_data:
+            if "affected_sample_item_ids" in file_notification_data:
                 affected_sample_item_ids.update(
-                    notification_data["affected_sample_item_ids"]
+                    file_notification_data["affected_sample_item_ids"]
                 )
 
         except Exception as e:
