@@ -26,6 +26,7 @@ from mascope_backend.api.controllers.workspace.acquisition.service import (
     get_acquisition_workspace,
 )
 from mascope_backend.api.controllers.sample.batches.sample_batches_controller import (
+    get_sample_batch,
     get_sample_batches,
     create_sample_batch,
 )
@@ -266,56 +267,64 @@ async def re_process_sample_files(
     async with async_session() as session:
         sample_filenames = {sf.filename for sf in sample_files}
         result = await session.execute(
-            select(SampleItem.filename).where(
+            select(SampleItem).where(
                 SampleItem.filename.in_(sample_filenames),
                 SampleItem.sample_item_type != "ACQUISITION",
             )
         )
-        user_created_filenames = set(result.scalars().all())
+        user_created_samples = result.scalars().all()
+        user_samples_dict = {
+            sample_item.filename: sample_item for sample_item in user_created_samples
+        }
 
-        for sample_file in sample_files:
-            # Check for user-created samples
-            if sample_file.filename in user_created_filenames:
-                failed_files.append(
-                    {
-                        "sample_file_id": sample_file.sample_file_id,
-                        "filename": sample_file.filename,
-                        "message": (
-                            "Cannot re-process file as it has user-created samples associated with it."
-                        ),
-                    }
-                )
-                continue
+    for sample_file in sample_files:
+        # Check for user-created samples
+        if sample_file.filename in user_samples_dict.keys():
+            user_batch_response = await get_sample_batch(
+                sample_batch_id=user_samples_dict[sample_file.filename].sample_batch_id
+            )
+            user_batch = user_batch_response["data"]
+            failed_files.append(
+                {
+                    "sample_file_id": sample_file.sample_file_id,
+                    "filename": sample_file.filename,
+                    "message": (
+                        "Cannot re-process file as it associated with a user-created "
+                        f"sample in the batch {user_batch['sample_batch_name']}."
+                    ),
+                }
+            )
+            continue
 
-            # Verify ionization modes are defined properly
-            try:
-                await resolve_ionization_modes_by_tokens(sample_file)
-            except ValueError as ve:
-                # Ionization mode resolution failed
-                failed_files.append(
-                    {
-                        "sample_file_id": sample_file.sample_file_id,
-                        "filename": sample_file.filename,
-                        "message": str(ve),
-                    }
-                )
-                continue
-            except Exception as e:  # pylint: disable=broad-except
-                # Other unexpected errors
-                failed_files.append(
-                    {
-                        "sample_file_id": sample_file.sample_file_id,
-                        "filename": sample_file.filename,
-                        "message": f"Failed to resolve ionization modes: {str(e)}",
-                    }
-                )
-                runtime.logger.error(
-                    "Unexpected error resolving ionization modes for sample file "
-                    f"{sample_file.filename}: {e}\n{traceback.format_exc()}"
-                )
-                continue
+        # Verify ionization modes are defined properly
+        try:
+            await resolve_ionization_modes_by_tokens(sample_file)
+        except ValueError as ve:
+            # Ionization mode resolution failed
+            failed_files.append(
+                {
+                    "sample_file_id": sample_file.sample_file_id,
+                    "filename": sample_file.filename,
+                    "message": str(ve),
+                }
+            )
+            continue
+        except Exception as e:  # pylint: disable=broad-except
+            # Other unexpected errors
+            failed_files.append(
+                {
+                    "sample_file_id": sample_file.sample_file_id,
+                    "filename": sample_file.filename,
+                    "message": f"Failed to resolve ionization modes: {str(e)}",
+                }
+            )
+            runtime.logger.error(
+                "Unexpected error resolving ionization modes for sample file "
+                f"{sample_file.filename}: {e}\n{traceback.format_exc()}"
+            )
+            continue
 
-            valid_sample_files.append(sample_file)
+        valid_sample_files.append(sample_file)
 
     # --- Delete existing ACQUISITION sample items for valid files --- #
     async with async_session() as session:
