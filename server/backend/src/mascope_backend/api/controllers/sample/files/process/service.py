@@ -8,7 +8,7 @@ processing instrument_config and matching the samples.
 
 import asyncio
 
-from sqlalchemy import select
+from sqlalchemy import select, delete
 
 from mascope_backend.db import async_session, db_semaphore
 from mascope_backend.db.id import gen_id
@@ -213,7 +213,7 @@ async def auto_process_sample_file(
 )
 async def re_process_sample_files(
     sample_file_ids: list[str],
-    independent_transaction: bool = None,
+    independent_transaction: bool = False,
     sid: str | None = None,
     process_id: str | None = None,
 ) -> dict:
@@ -244,38 +244,37 @@ async def re_process_sample_files(
 
     # --- Validate all sample files exist and collect data --- #
     async with async_session() as session:
-        sample_files = []
-        for sample_file_id in sample_file_ids:
-            if not (sample_file := await session.get(SampleFile, sample_file_id)):
-                failed_files.append(
-                    {
-                        "sample_file_id": sample_file_id,
-                        "filename": "unknown",
-                        "message": f"Sample file with ID '{sample_file_id}' not found",
-                    }
-                )
-                continue
-            sample_files.append(sample_file)
+        result = await session.execute(
+            select(SampleFile).where(SampleFile.sample_file_id.in_(sample_file_ids))
+        )
+        sample_files = result.scalars().all()
+        found_ids = {sf.sample_file_id for sf in sample_files}
+        missing_ids = set(sample_file_ids) - found_ids
+
+        for missing_id in missing_ids:
+            failed_files.append(
+                {
+                    "sample_file_id": missing_id,
+                    "filename": "unknown",
+                    "message": f"Sample file with ID '{missing_id}' not found",
+                }
+            )
 
     # --- Check for user-created samples and validate each file --- #
     valid_sample_files = []
     async with async_session() as session:
+        sample_filenames = {sf.filename for sf in sample_files}
+        result = await session.execute(
+            select(SampleItem.filename).where(
+                SampleItem.filename.in_(sample_filenames),
+                SampleItem.sample_item_type != "ACQUISITION",
+            )
+        )
+        user_created_filenames = set(result.scalars().all())
+
         for sample_file in sample_files:
             # Check for user-created samples
-            sample_items = (
-                (
-                    await session.execute(
-                        select(SampleItem).where(
-                            SampleItem.filename == sample_file.filename,
-                            SampleItem.sample_item_type != "ACQUISITION",
-                        )
-                    )
-                )
-                .scalars()
-                .first()
-            )
-
-            if sample_items:
+            if sample_file.filename in user_created_filenames:
                 failed_files.append(
                     {
                         "sample_file_id": sample_file.sample_file_id,
@@ -315,30 +314,30 @@ async def re_process_sample_files(
 
     # --- Delete existing ACQUISITION sample items for valid files --- #
     async with async_session() as session:
-        for sample_file in valid_sample_files:
-            acquisition_sample_items = (
-                (
-                    await session.execute(
-                        select(SampleItem).where(
-                            SampleItem.filename == sample_file.filename,
-                            SampleItem.sample_item_type == "ACQUISITION",
-                        )
-                    )
+        sample_filenames = {sf.filename for sf in valid_sample_files}
+        # Collect existing ACQUISITION sample items for notifications
+        acquisition_sample_items = (
+            (
+                await session.execute(
+                    select(SampleItem).where(SampleItem.filename.in_(sample_filenames))
                 )
-                .scalars()
-                .all()
             )
-
-            for sample_item in acquisition_sample_items:
-                affected_sample_batch_ids.add(sample_item.sample_batch_id)
-                await session.delete(sample_item)
-                if independent_transaction:
-                    await emit_record_deleted(
-                        record_type="sample",
-                        record_id=sample_item.sample_item_id,
-                        room=sample_item.sample_batch_id,
-                    )
-
+            .scalars()
+            .all()
+        )
+        # Delete
+        await session.execute(
+            delete(SampleItem).where(SampleItem.filename.in_(sample_filenames))
+        )
+        # Emit deletion notifications
+        for sample_item in acquisition_sample_items:
+            affected_sample_batch_ids.add(sample_item.sample_batch_id)
+            if independent_transaction:
+                await emit_record_deleted(
+                    record_type="sample",
+                    record_id=sample_item.sample_item_id,
+                    room=sample_item.sample_batch_id,
+                )
         await session.commit()
 
     # --- Process valid files --- #
