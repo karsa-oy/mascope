@@ -30,11 +30,14 @@ def socket_auth(minimum_role: str, service_name: Optional[str] = None):
     def decorator(handler: Callable):
         @wraps(handler)
         async def wrapper(sid: str, *args, **kwargs):
-            try:
-                session = await get_session_user(
-                    sid, namespace=f"/{service_name}" if service_name else None
-                )
+            # Build namespace (defaults to "/" for frontend users)
+            namespace = f"/{service_name}" if service_name else "/"
 
+            try:
+                # Get user session from Redis
+                session = await get_session_user(sid, namespace=namespace)
+
+                # Validate role permissions
                 required_role_id = auth_settings.ROLE_ACCESS_LEVELS.get(minimum_role)
                 if required_role_id is None:
                     runtime.logger.error(f"Invalid role configuration: {minimum_role}")

@@ -24,6 +24,7 @@ from mascope_backend.api.controllers.workspace.acquisition.service import (
 from mascope_backend.db.ops.batch.reset_processing_status import (
     reset_stuck_processing_batches,
 )
+from mascope_backend.socket.auth.redis_session_client import redis_session_client
 
 from mascope_backend.runtime import runtime
 
@@ -55,6 +56,16 @@ async def lifespan(app: FastAPI):
     runtime.logger.info("Fast App startup: garbage collecting the filestore")
     gc_filestore()
 
+    # Initialize Redis session client for cross-worker session storage
+    runtime.logger.info("Fast App startup: connecting Redis session client")
+    try:
+        await redis_session_client.connect()
+    except ConnectionError as e:
+        runtime.logger.error(
+            f"Fast App startup: Redis session client failed to connect: {e}"
+        )
+        runtime.logger.warning("Multi-worker session sharing will not work")
+
     # Initialize application components
     runtime.logger.info("Fast App startup: initializing application")
     await init_app()
@@ -63,6 +74,9 @@ async def lifespan(app: FastAPI):
     yield
 
     # --- SHUTDOWN TASKS ---
+    runtime.logger.info("Fast App shutdown: closing Redis session client")
+    await redis_session_client.disconnect()
+
     await wal_checkpoint()
 
 

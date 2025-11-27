@@ -24,7 +24,7 @@ async def connect(sid: str, environ: dict) -> bool:
     unauthenticated but still active.
 
     NOTE: Authentication on connection looks like current Socket.IO best practice.
-    The unathienticated connections may be rejected for security reasons.
+    The unauthenticated connections may be rejected for security reasons.
     This approach provides early authentication validation, clear connection lifecycle.
     Socket.IO will automatically disconnect the client if an exception raised
     during the connect or if event returned False.
@@ -51,16 +51,20 @@ async def connect(sid: str, environ: dict) -> bool:
         )
         worker_pid = os.getpid()
         runtime.logger.debug(
-            f"Socket server: user's socket client {sid} connected to worker PID {worker_pid}"
+            f"Socket server: user's socket client {sid} connected [Worker {worker_pid}]"
         )
 
         return True
 
     except SocketUnauthenticatedError as e:
-        runtime.logger.error(f"User socket session authentication failed: {str(e)}")
+        runtime.logger.error(
+            f"User socket session authentication failed: {str(e)} [Worker {worker_pid}]"
+        )
         return True
     except Exception as e:
-        runtime.logger.error(f"Unexpected errorduring user socket connection: {str(e)}")
+        runtime.logger.error(
+            f"Unexpected error during user socket connection: {str(e)} [Worker {worker_pid}]"
+        )
         return True
 
 
@@ -74,8 +78,9 @@ async def disconnect(sid: str) -> None:
     """
     worker_pid = os.getpid()
     runtime.logger.debug(
-        f"Socket server: user's socket client {sid} disconnected from worker PID {worker_pid}"
+        f"Socket server: user's socket client {sid} disconnected [Worker {worker_pid}]"
     )
 
+    # Clear session from Redis (primary cleanup)
     await clear_user_session(sid)
-    runtime.logger.debug(f"User session disconnected: {sid}")
+    runtime.logger.debug(f"User session disconnected: {sid} [Worker {worker_pid}]")
