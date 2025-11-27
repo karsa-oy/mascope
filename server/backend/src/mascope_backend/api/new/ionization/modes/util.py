@@ -165,7 +165,7 @@ async def resolve_ionization_modes_by_tokens(
     elif len(matched_ionization_modes) < len(sample_file.polarity):
         # Not enough ionization modes found by tokens
         raise ValueError(
-            f"Not ionization mode tokens found for each polarity in file {sample_file.filename}. "
+            f"No ionization mode token found for both polarities in file {sample_file.filename}. "
             "Configure tokens in ionization settings"
         )
     elif len(matched_ionization_modes) > len(sample_file.polarity):

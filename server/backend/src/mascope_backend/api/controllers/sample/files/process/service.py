@@ -289,7 +289,7 @@ async def re_process_sample_files(
                     "sample_file_id": sample_file.sample_file_id,
                     "filename": sample_file.filename,
                     "message": (
-                        "Cannot re-process file as it associated with a user-created "
+                        "Cannot re-process file as it is associated with a user-created "
                         f"sample in the batch {user_batch['sample_batch_name']}."
                     ),
                 }
@@ -326,10 +326,10 @@ async def re_process_sample_files(
 
         valid_sample_files.append(sample_file)
 
-    # --- Delete existing ACQUISITION sample items for valid files --- #
+    # --- Delete existing sample items for valid files --- #
     async with async_session() as session:
         sample_filenames = {sf.filename for sf in valid_sample_files}
-        # Collect existing ACQUISITION sample items for notifications
+        # Collect existing sample items for notifications
         acquisition_sample_items = (
             (
                 await session.execute(
