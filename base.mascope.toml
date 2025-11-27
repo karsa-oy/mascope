@@ -29,6 +29,7 @@ run = "uv run mascope-backend run api-server"
 [backend.redis] 
 port = 6379
 image = "redis:7-alpine"
+session_ttl = 86400 
 
 [file-converter]
 tags = ['server', 'tof', 'orbi', 'file', 'all']

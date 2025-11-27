@@ -7,17 +7,21 @@ from mascope_backend.runtime import runtime
 
 def create_socket_server() -> socketio.AsyncServer:
     """
-    Create Socket.IO server with optional Redis manager for multi-worker coordination.
+    Create Socket.IO server with Redis for multi-worker coordination.
 
-    When Redis is configured, validates connection before enabling Redis manager.
-    Falls back to single-worker mode if Redis is unavailable.
+    Sets up:
+    - AsyncRedisManager for cross-worker event routing (pub/sub)
+    - Falls back to single-worker mode if Redis is unavailable.
+
+    NOTE: Separate Redis client handles session storage
+    (see RedisSessionClient in redis_session_client.py)
 
     :return: Configured Socket.IO server instance
     :rtype: socketio.AsyncServer
     """
     client_manager = None
 
-    # Setup Redis if configured
+    # Setup Redis manager for pub/sub coordination
     if redis_url := (runtime.config.redis and runtime.config.redis.get_url()):
         try:
             client_manager = socketio.AsyncRedisManager(redis_url)

@@ -41,13 +41,14 @@ async def authenticate_socket_connection(
     service_name: Optional[str] = None,
 ) -> None:
     """
-    Authenticate Socket.IO connection.
+    Authenticate Socket.IO connection with Redis session storage.
 
     Validates the client's connection by:
-    1. Validating the token based on service type
-    2. Retrieving associated user
-    3. Verifying user's role meets minimum requirements
-    4. Updating socket session with user data
+    - Clearing any existing session to prevent stale data
+    - Validating the token (JWT for frontend, access token for services)
+    - Retrieving and verifying the associated user
+    - Checking role permissions
+    - Storing session in Redis for cross-worker access
 
     :param sid: Socket.IO session ID
     :type sid: str
@@ -63,10 +64,10 @@ async def authenticate_socket_connection(
     """
     namespace = f"/{service_name}" if service_name else "/"
     try:
-        # Step 1: Clear any existing session first to prevent stale data
+        # --- Clear any existing session first to prevent stale data ---
         await clear_user_session(sid=sid, namespace=namespace)
 
-        # Step 2: Validate provided authentication token
+        # --- Validate provided authentication token ---
         if service_name:
             # Service authentication (e.g., tof-agent)
             user = await validate_service_access_token(token, service_name)
@@ -74,10 +75,10 @@ async def authenticate_socket_connection(
             # Frontend user authentication
             user = await validate_jwt_token(token)
 
-        # Step 3: Verify role permissions
+        # --- Verify role permissions ---
         await verify_role_permission(user, minimum_role)
 
-        # Step 4: Save user session
+        # --- Save user session to Redis for cross-worker access ---
         await save_user_session(sid, user, namespace=namespace)
         runtime.logger.debug(
             f"{service_name.title() if service_name else 'User'} socket session {sid} "
