@@ -7,6 +7,7 @@ processing instrument_config and matching the samples.
 """
 
 import asyncio
+import traceback
 
 from sqlalchemy import select, delete
 
@@ -286,27 +287,31 @@ async def re_process_sample_files(
                 )
                 continue
 
-            # Verify ionization modes are defined
+            # Verify ionization modes are defined properly
             try:
-                ionization_modes = await resolve_ionization_modes_by_tokens(sample_file)
-                if len(ionization_modes) != len(sample_file.polarity):
-                    failed_files.append(
-                        {
-                            "sample_file_id": sample_file.sample_file_id,
-                            "filename": sample_file.filename,
-                            "message": (
-                                "Ionization modes count does not match polarity count of the file"
-                            ),
-                        }
-                    )
-                    continue
-            except Exception as e:
+                await resolve_ionization_modes_by_tokens(sample_file)
+            except ValueError as ve:
+                # Ionization mode resolution failed
+                failed_files.append(
+                    {
+                        "sample_file_id": sample_file.sample_file_id,
+                        "filename": sample_file.filename,
+                        "message": str(ve),
+                    }
+                )
+                continue
+            except Exception as e:  # pylint: disable=broad-except
+                # Other unexpected errors
                 failed_files.append(
                     {
                         "sample_file_id": sample_file.sample_file_id,
                         "filename": sample_file.filename,
                         "message": f"Failed to resolve ionization modes: {str(e)}",
                     }
+                )
+                runtime.logger.error(
+                    "Unexpected error resolving ionization modes for sample file "
+                    f"{sample_file.filename}: {e}\n{traceback.format_exc()}"
                 )
                 continue
 
@@ -441,40 +446,9 @@ async def create_acquisition_batches_and_items(
     sample_items_to_create = []
     acquisition_sample_batches = []
 
-    async def infer_sample_ionization_modes():
-        ionization_modes = []
-        # Resolve ionization modes based on tokens in filename
-        ionization_modes.extend(await resolve_ionization_modes_by_tokens(sample_file))
-        if len(ionization_modes) == len(sample_file.polarity):
-            # Found matching ionization modes for all polarities (1 or 2)
-            return ionization_modes
-        elif len(ionization_modes) > len(sample_file.polarity):
-            # Found too many ionization modes, likely overlapping tokens
-            raise ValueError(
-                f"Found too many matching ionization modes for file {sample_file.filename}. "
-                "Configure tokens in ionization settings"
-            )
-        else:
-            raise ValueError(
-                f"Not enough ionization mode tokens found for file {sample_file.filename}. "
-                "Configure tokens in ionization settings"
-            )
-            # TODO: Fallback to resolving by peaks if tokens were insufficient
-            ionization_modes.extend(
-                await resolve_ionization_modes_by_peaks(sample_file)
-            )
-        return ionization_modes
+    ionization_modes = await resolve_ionization_modes_by_tokens(sample_file)
 
-    runtime.logger.debug(
-        f"Inferring ionization modes for sample file {sample_file.filename}"
-    )
-    inferred_ionization_modes = await infer_sample_ionization_modes()
-    runtime.logger.debug(
-        f"Inferred {len(inferred_ionization_modes)} ionization modes for sample file "
-        f"{sample_file.filename}: {[im.ionization_mode_name for im in inferred_ionization_modes]}"
-    )
-
-    for ionization_mode in inferred_ionization_modes:
+    for ionization_mode in ionization_modes:
         # Step 1: Generate daily ACQUISITION batch name for this ionization mode
         ion_mode_name = ionization_mode.ionization_mode_name
         batch_name = (

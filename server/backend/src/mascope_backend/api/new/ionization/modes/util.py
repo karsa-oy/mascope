@@ -125,6 +125,8 @@ async def resolve_ionization_modes_by_tokens(
 ) -> list[IonizationMode]:
     """Resolve ionization modes based on tokens in the sample file.
 
+    Raises ValueError if the number of matched ionization modes is incorrect.
+
     :param sample_file: The sample file to resolve ionization modes for.
     :type sample_file: SampleFile
     :return: A list of resolved ionization modes.
@@ -150,7 +152,28 @@ async def resolve_ionization_modes_by_tokens(
                 f"with filename: {sample_file.filename}"
             )
             matched_ionization_modes.append(ionization_mode)
-    return matched_ionization_modes
+
+    if len(matched_ionization_modes) == len(sample_file.polarity):
+        # Found matching ionization modes for all polarities (1 or 2)
+        return matched_ionization_modes
+    elif len(matched_ionization_modes) == 0:
+        # No ionization modes found by tokens
+        raise ValueError(
+            f"No ionization mode tokens found for file {sample_file.filename}. "
+            "Configure tokens in ionization settings"
+        )
+    elif len(matched_ionization_modes) < len(sample_file.polarity):
+        # Not enough ionization modes found by tokens
+        raise ValueError(
+            f"Not ionization mode tokens found for each polarity in file {sample_file.filename}. "
+            "Configure tokens in ionization settings"
+        )
+    elif len(matched_ionization_modes) > len(sample_file.polarity):
+        # Found too many ionization modes, likely overlapping tokens
+        raise ValueError(
+            f"Found too many matching ionization modes for file {sample_file.filename}. "
+            "Configure tokens in ionization settings"
+        )
 
 
 async def token_is_unique(token: str, ignore_id: str | None = None) -> bool:
