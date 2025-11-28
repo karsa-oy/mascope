@@ -1,11 +1,13 @@
 """
-Application initialization functions.
-Contains startup procedures and system checks.
+FastAPI application with per-worker initialization.
+
+This module defines the FastAPI application instance and its lifespan context,
+which handles per-worker startup and shutdown tasks. The lifespan runs once
+per worker process, after main process initialization is complete.
 """
 
 import uuid
 import os
-import shutil
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request, status
@@ -13,7 +15,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from mascope_file.gc import gc_filestore
 from mascope_backend.db import init_db
 from mascope_backend.db.wal.engine import wal_checkpoint
 from mascope_backend.api.routes import routers
@@ -29,52 +30,64 @@ from mascope_backend.socket.auth.redis_session_client import redis_session_clien
 from mascope_backend.runtime import runtime
 
 
-# Define the lifespan context manager
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-    Lifespan context manager for FastAPI application.
-    Handles startup and shutdown events.
+    Per-worker lifespan context manager for FastAPI application.
+
+    This context manager handles worker-specific startup and shutdown tasks.
+    Each worker process runs this independently after the main process has
+    completed initialization (database migrations, file cleanup, etc.).
+
+    Worker startup tasks:
+    - Configure database engine and connection pool for this worker
+    - Connect to Redis for cross-worker session storage
+    - Verify application data exists (idempotent checks)
+
+    Worker shutdown tasks:
+    - Disconnect Redis client
+    - Perform WAL checkpoint
+
+    :param app: FastAPI application instance
+    :raises ConnectionError: If Redis connection fails (non-fatal, logged as warning)
     """
+    worker_pid = os.getpid()
+
     # --- STARTUP TASKS ---
+    runtime.logger.info(
+        f"Fast App startup: starting initialization [Worker {worker_pid}]"
+    )
     # Initialize database
-    runtime.logger.info("Fast App startup: initializing database")
+    runtime.logger.info(
+        f"Fast App startup: initializing database [Worker {worker_pid}]"
+    )
     await init_db()
 
-    # Reset stuck processing batches
-    runtime.logger.info("Fast App startup: resetting stuck processing batches")
-    await reset_stuck_processing_batches()
-
-    # Reset temp directory
-    runtime.logger.info("Fast App startup: initializing temp directory")
-    temp_dir = runtime.env.path("temp")
-    if os.path.exists(temp_dir):
-        shutil.rmtree(temp_dir)
-    os.mkdir(temp_dir)
-
-    # Clean filestore
-    runtime.logger.info("Fast App startup: garbage collecting the filestore")
-    gc_filestore()
-
     # Initialize Redis session client for cross-worker session storage
-    runtime.logger.info("Fast App startup: connecting Redis session client")
+    runtime.logger.info(
+        f"Fast App startup: connecting Redis session client [Worker {worker_pid}]"
+    )
     try:
         await redis_session_client.connect()
     except ConnectionError as e:
         runtime.logger.error(
-            f"Fast App startup: Redis session client failed to connect: {e}"
+            f"Fast App startup: Redis session client failed to connect: {e} [Worker {worker_pid}]"
         )
         runtime.logger.warning("Multi-worker session sharing will not work")
 
     # Initialize application components
-    runtime.logger.info("Fast App startup: initializing application")
-    await init_app()
+    runtime.logger.info(
+        f"Fast App startup: initializing application [Worker {worker_pid}]"
+    )
+    await init_app_data()
 
     # Yield control back to FastAPI
     yield
 
     # --- SHUTDOWN TASKS ---
-    runtime.logger.info("Fast App shutdown: closing Redis session client")
+    runtime.logger.info(
+        f"Fast App shutdown: closing Redis session client [Worker {worker_pid}]"
+    )
     await redis_session_client.disconnect()
 
     await wal_checkpoint()
@@ -239,12 +252,20 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
     return handle_exception(exc, context_message, response_type="http")
 
 
-async def init_app() -> None:
+async def init_app_data() -> None:
     """
-    Initialize application components and perform startup system checks.
+    Check that required application data exists in the database.
 
-    This function orchestrates all initialization procedures that need
-    to happen after database setup but before the app starts serving requests.
+    This function is called by each worker during startup to verify that
+    necessary application data (workspaces, default records, etc.) is present.
+    It's idempotent and safe to call multiple times.
+
+    Operations:
+    - Reset any stuck processing states from previous run
+    - Auto-create acquisition workspaces for all instruments
     """
+    # Reset stuck processing batches from previous run
+    await reset_stuck_processing_batches()
+
     # Auto-create acquisition workspaces for all instruments
     await create_acquisition_workspaces()

@@ -125,7 +125,7 @@ def check_and_start_redis() -> bool:
     # Skip Docker management for remote Redis hosts
     if redis_cfg.host not in ["localhost", "127.0.0.1"]:
         runtime.logger.info(f"Redis configured for remote host: {redis_cfg.host}")
-        runtime.logger.info("  Skipping Docker container management")
+        runtime.logger.info("Skipping Docker container management")
         return True
 
     # Check if Docker is running (with interactive prompts)

@@ -1,3 +1,10 @@
+"""
+Database initialization and configuration module.
+
+This module handles SQLite database connection setup, session management,
+and initialization procedures including schema migrations.
+"""
+
 import asyncio
 import os
 from typing import AsyncGenerator
@@ -9,12 +16,8 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy import text
 from mascope_backend.db.config import db_config
-from mascope_backend.db.migration_manager import (
-    detect_failed_database,
-    migrate,
-    DatabaseFailedError,
-)
-from mascope_backend.db.utils import get_available_db_version, get_current_db_version
+from mascope_backend.db.migration_manager import check_db_migration
+from mascope_backend.db.utils import get_current_db_version
 from mascope_backend.runtime import runtime
 
 
@@ -115,60 +118,19 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
 # Initialization and main interface functions
 async def init_db():
     """
-    Initialize the database by checking its version and performing any necessary migrations.
+    Initialize database connection for a worker process.
 
-    This function determines the current database version, checks for corruption markers,
-    and applies necessary migrations to bring the database up to the target version.
+    This function is called by each worker during startup.
+    It configures the database engine for this worker's connection pool.
 
-
-    Steps:
-    1. Determine the current database version from existing files and
-       the target database version required by the application
-    2. Check for corruption markers if a database exists
-    3. If corruption is detected, use a previous stable version as starting point
-    4. If current version matches target, just configure the engine
-    5. Otherwise, migrate the database to the target version
-    6. Test the database connection to ensure it's properly initialized
-
-    :raises RuntimeError: If a corrupted database is detected and no previous valid version exists
-    :raises Exception: If any error occurs during the initialization process
+    :raises Exception: If engine configuration or connection test fails
     """
     try:
-        # Get the current and target database versions
         current_version = get_current_db_version()
-        target_version = get_available_db_version()
+        await configure_database_engine(current_version)
 
-        runtime.logger.info(
-            f"Initializing mascope database, detected mascope database version: v{current_version}"
-        )
-        runtime.logger.info(f"Required mascope database version: v{target_version}")
-
-        # Check for corruption markers if there is an existing database
-        if current_version > 0:
-            try:
-                # This will either return the same version or raise a DatabaseFailedError
-                detect_failed_database(current_version)
-            except DatabaseFailedError as e:
-                if e.previous_version is not None:
-                    runtime.logger.warning(
-                        f"Using previous stable version v{e.previous_version} as starting point"
-                    )
-                    current_version = e.previous_version
-                else:
-                    # No previous version available - re-raise the error
-                    raise
-
-        # Configure or migrate the database as needed
-        if current_version == target_version:
-            runtime.logger.info("No database migration needed.")
-            await configure_database_engine(current_version)
-        else:
-            await migrate(current_version, target_version)
-
-        # Test the database connection after initialization
         await test_database_connection()
 
-        # Check WAL mode status after initialization
         await check_async_wal_status()
     except Exception as error:
         runtime.logger.error(f"Database initialization error: {error}")

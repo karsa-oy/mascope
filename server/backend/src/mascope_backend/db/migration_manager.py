@@ -11,7 +11,7 @@ import traceback
 from datetime import datetime
 from importlib import import_module
 
-from mascope_backend.db.utils import get_current_db_version
+from mascope_backend.db.utils import get_current_db_version, get_available_db_version
 from mascope_backend.db.wal.direct import get_journal_mode, direct_wal_checkpoint
 from mascope_backend.runtime import runtime
 
@@ -24,6 +24,50 @@ class DatabaseFailedError(RuntimeError):
     def __init__(self, message: str, previous_version: int | None = None):
         self.previous_version = previous_version
         super().__init__(message)
+
+
+async def check_db_migration():
+    """
+    Check database version and perform migrations if needed.
+
+    This function is called once in the main process before workers spawn.
+    It handles:
+    - Version detection
+    - Corruption checking
+    - Schema migrations
+
+    Does NOT configure the database engine - that's done per-worker.
+
+    :raises RuntimeError: If corrupted database detected with no recovery option
+    :raises Exception: If migration fails
+    """
+    current_version = get_current_db_version()
+    target_version = get_available_db_version()
+
+    # Check for corruption markers if there is an existing database
+    if current_version > 0:
+        try:
+            # This will either return the same version or raise a DatabaseFailedError
+            detect_failed_database(current_version)
+        except DatabaseFailedError as e:
+            if e.previous_version is not None:
+                runtime.logger.warning(
+                    f"Using previous stable version v{e.previous_version} as starting point"
+                )
+                current_version = e.previous_version
+            else:
+                # No previous version available - re-raise the error
+                raise
+
+    # Perform migration if needed
+    if current_version == target_version:
+        runtime.logger.info("No database migration needed")
+    else:
+        runtime.logger.info(
+            f"Detected mascope database version: v{current_version}. "
+            f"Required mascope database version: v{target_version}."
+        )
+        await migrate(current_version, target_version)
 
 
 async def migrate(current_version: int, target_version: int) -> int:

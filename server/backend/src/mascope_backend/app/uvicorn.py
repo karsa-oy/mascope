@@ -1,10 +1,30 @@
+"""
+Uvicorn server entry point with main process initialization.
+"""
+
+import asyncio
 import os
 import uvicorn
+from mascope_backend.app.startup import init_main_process
 from mascope_backend.runtime import runtime
 
 
 def run():
-    """Entry point to run Mascope server"""
+    """
+    Entry point to run Mascope server.
+
+    Initialization flow:
+    1. Main process initialization (runs once, always)
+       - Database migrations
+       - File system cleanup
+       - Application state reset
+    2. Start uvicorn with configured workers
+    3. Each worker runs its own lifespan initialization
+       - Redis connection
+       - Per-worker application setup
+
+    :raises Exception: If main process initialization fails
+    """
     expose = os.environ.get("MASCOPE_DEVHOST")
     host = "0.0.0.0" if (runtime.mode == "prod" or expose) else "localhost"
 
@@ -12,12 +32,12 @@ def run():
 
     if runtime.mode == "dev" and workers > 1:
         runtime.logger.warning(
-            f"You are using {workers} uvicorn workers which may cause memory issues on Windows. "
-            f"Uvicorn has port-sharing issues on Windows which may lead to occasional http timeouts. "
+            f"You are using {workers} uvicorn workers which may cause memory issues on Windows "
+            f"due to port-sharing issues on Windows which may lead to occasional http timeouts. "
             f"Consider using a single worker in development."
         )
 
-    # reload only works with single worker
+    # Hot reload only works with single worker
     enable_reload = runtime.mode == "dev" and workers == 1
 
     runtime.logger.info(
@@ -32,6 +52,10 @@ def run():
 
     if expose:
         runtime.logger.warning("Exposing dev server to the network")
+
+    # --- Main process initialization ---
+    # Run database migrations and cleanup ONCE before starting uvicorn
+    asyncio.run(init_main_process())
 
     uvicorn.run(
         "mascope_backend.app.socket_app:sio_app",
