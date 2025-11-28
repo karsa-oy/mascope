@@ -6,7 +6,7 @@
 # log_level =  "trace", "debug", "info", "warning", "success", "error" or "critical"
 
 [backend]
-workers = 2 # uvicorn workers ("auto" || int)
+workers = "auto" # uvicorn workers ("auto" || int)
 
 [backend.redis]
 host = "redis"  # Docker Compose service name
