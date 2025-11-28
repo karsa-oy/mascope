@@ -397,10 +397,12 @@ def cli():
     Provides direct access to Redis for debugging or manual operations.
 
     Example commands:
-        INFO              # Server info and stats
-        CLIENT LIST       # Show connected clients
-        PUBSUB CHANNELS   # List active pub/sub channels
-        MONITOR           # Watch all commands (Ctrl+C to exit)
+        INFO                                 # Server info and stats
+        CLIENT LIST                          # Show connected clients
+        PUBSUB CHANNELS                      # List active pub/sub channels
+        MONITOR                              # Watch all commands (Ctrl+C to exit)
+        KEYS mascope:session:*               # List all saved mascope sessions
+        TTL mascope:session:/:{session_key}  # Check session TTL
     """
     if not (redis_cfg := runtime.full_config.backend.redis):
         runtime.logger.warning("Redis not configured in .mascope.toml")

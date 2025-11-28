@@ -28,6 +28,10 @@ def run():
     expose = os.environ.get("MASCOPE_DEVHOST")
     host = "0.0.0.0" if (runtime.mode == "prod" or expose) else "localhost"
 
+    # --- Main process initialization ---
+    # Run database migrations and cleanup ONCE before starting uvicorn
+    asyncio.run(init_main_process())
+
     workers = runtime.config.get_worker_count()
 
     if runtime.mode == "dev" and workers > 1:
@@ -52,10 +56,6 @@ def run():
 
     if expose:
         runtime.logger.warning("Exposing dev server to the network")
-
-    # --- Main process initialization ---
-    # Run database migrations and cleanup ONCE before starting uvicorn
-    asyncio.run(init_main_process())
 
     uvicorn.run(
         "mascope_backend.app.socket_app:sio_app",
