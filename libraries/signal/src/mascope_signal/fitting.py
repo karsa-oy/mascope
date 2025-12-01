@@ -3,10 +3,15 @@ import warnings
 import numpy as np
 import lmfit
 from scipy.integrate import simpson
+from scipy.spatial.distance import pdist
 
 
 # Precompute sigma multiplier for peak generation
 SIGMA_MULTIPLIER = 2 * np.sqrt(2 * np.log(2))
+
+# Penalty factor for too close peaks
+# The fitted region is normalized, so 1e3 is a reasonable value
+PEAK_SEPARATION_PENALTY_FACTOR = 1e3
 
 
 def fit_n_peaks(
@@ -108,26 +113,24 @@ def fit_n_peaks(
         residual_norm = new_residual_norm
         prev_fit = fit
         prev_peaks = peaks
-        # Find the place to add next peak
-        # Loop through already fitted peaks
+
+        # --- Zero-out regions around already fitted peaks --- #
+        peak_data = np.array(peaks)
+        peak_positions = peak_data[:, 0]
+        peak_resolutions = peak_data[:, 2]
+        hwhms = (peak_positions / peak_resolutions) / 2
+        x = np.asarray(x)
+        # Vectorized mask, shape (n_peaks, len(x))
+        peak_region_masks = (
+            x[None, :] > (peak_positions[:, None] - hwhms[:, None])
+        ) & (x[None, :] < (peak_positions[:, None] + hwhms[:, None]))
+        total_peak_region_mask = np.any(peak_region_masks, axis=0)
+        fit.residual[total_peak_region_mask] = 0
+
+        # --- Set the position of next peak to the maximum of residual --- #
         max_residual_ind = np.argmax(fit.residual)
         max_residual = fit.residual[max_residual_ind]
         max_residual_mz = x[max_residual_ind]
-        for peak_pos, peak_hei, peak_res in peaks:
-            while max_residual > 0:
-                hwhm = (peak_pos / peak_res) / 2
-                # If the maximum of the residual is within the fitted peak, set
-                # it to 0 in order to ignore it
-                if max_residual_mz > (peak_pos - hwhm) and max_residual_mz < (
-                    peak_pos + hwhm
-                ):
-                    fit.residual[max_residual_ind] = 0
-                    max_residual_ind = np.argmax(fit.residual)
-                    max_residual = fit.residual[max_residual_ind]
-                    max_residual_mz = x[max_residual_ind]
-                else:
-                    break
-        # Set the position of next peak to the maximum of residual
         init_pos.append(max_residual_mz)
         init_hei.append(max_residual)
         init_res.append(
@@ -225,8 +228,14 @@ def fit_peaks(
             fit.params[par].value *= ymax
             if fit.params[par].stderr is not None:
                 fit.params[par].stderr *= ymax
-    peaks = [fit.params[par].value for par in fit.params if par.startswith("peak")]
-    peaks = [tuple(peaks[i : i + 3]) for i in range(0, len(peaks), 3)]
+    peaks = [
+        (
+            fit.params[f"peak{p}pos"].value,
+            fit.params[f"peak{p}hei"].value,
+            fit.params[f"peak{p}res"].value,
+        )
+        for p in range(npeaks)
+    ]
     return fit, peaks
 
 
@@ -290,7 +299,7 @@ def peak_kernel_residual(
     """Generate a kernel of peaks and calculate the residual with regards
     to 'y'. Objective function for the function 'fit_peaks'.
 
-    If the peaks are too close, the penalty is added to the residuals
+    If the peaks are too close, a penalty is added to the residuals.
 
     :param params: Parameters of peaks to be included in the kernel, in the format
         returned by the function 'fit_peaks'.
@@ -305,21 +314,23 @@ def peak_kernel_residual(
     :rtype: np.ndarray
     """
     # Minimum distance between peaks to avoid fitting at the same position
-    min_dist = np.mean(np.diff(x)) * 0.5
+    min_dist = np.min(np.diff(x)) * 0.5
 
-    # Extract current peak positions
     n_peaks = int(params["npeaks"].value)
-    positions = np.array([params[f"peak{p}pos"].value for p in range(n_peaks)])
-    # Matrix of differences between positions
-    position_diffs = np.abs(positions[:, None] - positions[None, :])
-    diagonal_mask = ~np.eye(n_peaks, dtype=bool)
-    # Check for too close peaks excluding matrix diagonal
-    close_peak_mask = (position_diffs < min_dist) & diagonal_mask
-    # Compute penalty for residuals for each pair of too close peaks
-    if np.any(close_peak_mask):
-        penalty = np.sum(min_dist - position_diffs[close_peak_mask]) * 1e3
-    else:
-        penalty = 0
+    penalty = 0
+    if n_peaks > 1:  # Only check for close peaks if there are at least 2 peaks
+        # Extract current peak positions
+        positions = np.array([params[f"peak{p}pos"].value for p in range(n_peaks)])
+        # Calculate pairwise distances between peak positions
+        position_diffs = pdist(positions.reshape(-1, 1))
+        # Identify pairs of peaks that are too close
+        close_peak_mask = position_diffs < min_dist
+        # Compute penalty for residuals for each pair of too close peaks
+        if np.any(close_peak_mask):
+            penalty = (
+                np.sum(min_dist - position_diffs[close_peak_mask])
+                * PEAK_SEPARATION_PENALTY_FACTOR
+            )
 
     # Compute residuals and add possible penalty
     kernel = gen_peak_kernel(params, x, peak_shape)
