@@ -290,6 +290,8 @@ def peak_kernel_residual(
     """Generate a kernel of peaks and calculate the residual with regards
     to 'y'. Objective function for the function 'fit_peaks'.
 
+    If the peaks are too close, the penalty is added to the residuals
+
     :param params: Parameters of peaks to be included in the kernel, in the format
         returned by the function 'fit_peaks'.
     :type params: dict
@@ -302,8 +304,28 @@ def peak_kernel_residual(
     :return: The residual 'y - kernel'
     :rtype: np.ndarray
     """
+    # Minimum distance between peaks to avoid fitting at the same position
+    min_dist = np.mean(np.diff(x)) * 0.5
+
+    # Extract current peak positions
+    n_peaks = int(params["npeaks"].value)
+    positions = np.array([params[f"peak{p}pos"].value for p in range(n_peaks)])
+    # Matrix of differences between positions
+    position_diffs = np.abs(positions[:, None] - positions[None, :])
+    diagonal_mask = ~np.eye(n_peaks, dtype=bool)
+    # Check for too close peaks excluding matrix diagonal
+    close_peak_mask = (position_diffs < min_dist) & diagonal_mask
+    # Compute penalty for residuals for each pair of too close peaks
+    if np.any(close_peak_mask):
+        penalty = np.sum(min_dist - position_diffs[close_peak_mask]) * 1e3
+    else:
+        penalty = 0
+
+    # Compute residuals and add possible penalty
     kernel = gen_peak_kernel(params, x, peak_shape)
-    return y - kernel
+    residual = y - kernel + penalty
+
+    return residual
 
 
 def gen_peak_kernel(params: dict, x: np.ndarray, peak_shape: dict) -> np.ndarray:
