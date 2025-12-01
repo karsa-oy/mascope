@@ -25,10 +25,10 @@ services:
           "CMD-SHELL",
           'python -c "import socket; s=socket.socket(); s.settimeout(2); s.connect((''localhost'', 8090)); s.close()" || exit 1',
         ]
-      interval: 5s
-      timeout: 3s
+      interval: 10s
+      timeout: 5s
       retries: 5
-      start_period: 40s
+      start_period: 24h # Increased period for potential long database migrations
     tty: true
     ports:
       - 8090:8090
