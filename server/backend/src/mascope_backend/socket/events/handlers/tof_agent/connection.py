@@ -2,6 +2,7 @@
 Tof Agent service connection lifecycle
 """
 
+import os
 from mascope_backend.socket import sio
 from mascope_backend.socket.auth import authenticate_socket_connection
 from mascope_backend.socket.auth.exceptions import SocketUnauthenticatedError
@@ -27,12 +28,13 @@ async def connect(sid: str, environ: dict, auth: dict) -> bool:
     :return: Connection acceptance status
     :rtype: bool
     """
+    worker_pid = os.getpid()
     try:
         # Step 1: Verify tof-agent connection
         service_name = environ.get("HTTP_X_SERVICE_NAME")
         if service_name != "tof-agent":
             raise SocketUnauthenticatedError(
-                f"Unexpected connection to tof-agent namespace: {service_name}"
+                f"Unexpected connection to tof-agent namespace: {service_name} [Worker {worker_pid}]"
             )
 
         # Step 2: Extract access token
@@ -44,14 +46,20 @@ async def connect(sid: str, environ: dict, auth: dict) -> bool:
         await authenticate_socket_connection(
             sid=sid, token=access_token, minimum_role="editor", service_name="tof-agent"
         )
-        runtime.logger.debug(f"Tof agent connected with sid {sid}")
+        runtime.logger.debug(
+            f"Tof agent connected with sid {sid} [Worker {worker_pid}]"
+        )
         return True
 
     except SocketUnauthenticatedError as e:
-        runtime.logger.error(f"Tof agent authentication failed. {str(e)}")
+        runtime.logger.error(
+            f"Tof agent authentication failed. {str(e) }[Worker {worker_pid}]"
+        )
         return False
     except Exception as e:
-        runtime.logger.error(f"Unexpected error in Tof agent connection: {str(e)}")
+        runtime.logger.error(
+            f"Unexpected error in Tof agent connection: {str(e)} [Worker {worker_pid}]"
+        )
         return False
 
 

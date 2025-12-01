@@ -36,20 +36,20 @@ async def connect(sid: str, environ: dict) -> bool:
     :return: Connection acceptance status
     :rtype: bool
     """
+    worker_pid = os.getpid()
     try:
-        # Step 1: Get cookies from environment
+        # --- Get cookies from environment ---
         cookies = environ.get("HTTP_COOKIE")
         if not cookies:
             raise SocketUnauthenticatedError("No cookies in request")
 
-        # Step 2: Extract JWT token
+        # --- Extract JWT token from cookies ---
         jwt_token = await get_jwt_from_cookies(cookies)
 
-        # Step 3: Authenticate socket connection and associate session with user
+        # --- Authenticate socket connection and associate session with user ---
         await authenticate_socket_connection(
             sid=sid, token=jwt_token, minimum_role="guest"
         )
-        worker_pid = os.getpid()
         runtime.logger.debug(
             f"Socket server: user's socket client {sid} connected [Worker {worker_pid}]"
         )

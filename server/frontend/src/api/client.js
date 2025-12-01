@@ -1,9 +1,11 @@
 import { initSocket } from './socket'
 import { initHttp } from './http'
 
-const initApi = () => ({
-  http: initHttp(),
-  socket: initSocket()
-})
+const initApi = async () => {
+  const socket = await initSocket()
+  const http = initHttp()
 
-export const api = initApi()
+  return { socket, http }
+}
+
+export const api = await initApi()

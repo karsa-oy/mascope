@@ -7,6 +7,7 @@ including registration, password updates, token management, and custom behaviors
 such as access token cleanup for external services like Jupyter.
 """
 
+import os
 from typing import Any, Dict, Optional
 from sqlalchemy import select
 from fastapi import Request, Response
@@ -220,13 +221,14 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
         :param response: Optional response built by the transport.
         Defaults to None
         """
+        worker_pid = os.getpid()
         try:
             # Step 1: Socket authentication
             if request and response and "set-cookie" in response.headers:
                 sid = request.headers.get("x-sid")
                 if not sid:
                     runtime.logger.error(
-                        f"There is no sid in the request headers. User: {user.username}"
+                        f"There is no sid in the request headers. User: {user.username} [Worker {worker_pid}]"
                     )
                     return
 
@@ -241,10 +243,12 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
             if user.role_id >= auth_settings.ROLE_ACCESS_LEVELS.get("editor"):
                 await regenerate_access_token(user=user, service_name="file-converter")
         except SocketUnauthenticatedError as e:
-            runtime.logger.error(f"Socket authentication failed after login: {str(e)}")
+            runtime.logger.error(
+                f"Socket authentication failed after login: {str(e)} [Worker {worker_pid}]"
+            )
         except Exception as e:
             runtime.logger.error(
-                f"Unexpected error during socket authentication after login: {str(e)}"
+                f"Unexpected error during socket authentication after login: {str(e)} [Worker {worker_pid}]"
             )
         return
 

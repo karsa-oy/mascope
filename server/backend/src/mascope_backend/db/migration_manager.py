@@ -61,7 +61,7 @@ async def check_db_migration():
 
     # Perform migration if needed
     if current_version == target_version:
-        runtime.logger.info("No database migration needed")
+        runtime.logger.info(f"No database migration needed, using v{current_version}.")
     else:
         runtime.logger.info(
             f"Detected mascope database version: v{current_version}. "

@@ -28,6 +28,13 @@ function handleRequestData(config) {
   const sid = api?.socket?.id
   if (sid) {
     config.headers['X-SID'] = sid
+  } else {
+    console.warn(`▶️ [api:http] socket SID not available for request ${method} ${url}`, {
+      hasApi: !!api,
+      hasSocket: !!api?.socket,
+      socketConnected: api?.socket?.connected,
+      socketId: api?.socket?.id
+    })
   }
   // handler
   let use, type

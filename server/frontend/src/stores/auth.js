@@ -26,6 +26,7 @@ export const useAuth = defineStore('app.auth', () => {
     params.append('grant_type', 'password')
     params.append('username', email)
     params.append('password', password)
+
     await api.http.post('/auth/login', params, {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       type: 'user_sign_in',
