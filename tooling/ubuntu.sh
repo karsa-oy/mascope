@@ -111,6 +111,16 @@ function install_tooling() {
     sudo apt install --yes --no-install-recommends libjemalloc2
     set_envvar 'LD_PRELOAD' "/usr/lib/x86_64-linux-gnu/libjemalloc.so.2"
     
+    # configure Redis memory overcommit for background saves
+    write_line "configuring Redis memory overcommit"
+    if ! grep -q "vm.overcommit_memory" /etc/sysctl.conf; then
+        sudo bash -c "echo 'vm.overcommit_memory = 1' >> /etc/sysctl.conf"
+        sudo sysctl -p
+        write_line "Redis memory overcommit enabled (vm.overcommit_memory = 1)"
+    else
+        write_line "Redis memory overcommit already configured, skipping."
+    fi
+
     if [[ -z $(command -v dotnet) ]]; then
         write_line "dotnet runtime not detected, installing..."
 
