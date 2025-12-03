@@ -377,7 +377,7 @@ class OrbiCalibrationHandler(BaseCalibrationHandler):
         # Show stats relative to the original m/z values
         self.stats = {
             "mz": observed_mzs,
-            "new_mz": observed_mzs * calibration_factor,
+            "new_mz": observed_mzs * old_factor_scaling,
             "pre_dmz": 1e6 * (observed_mzs - target_mzs) / target_mzs,
             "post_dmz": 1e6
             * (observed_mzs * old_factor_scaling - target_mzs)
