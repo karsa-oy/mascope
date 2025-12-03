@@ -117,6 +117,10 @@ class BaseCalibrationHandler:
         if matched_mask.any():
             match_df = match_df[matched_mask]
             match_df = calculate_match_stats(match_df, peaks)
+        else:
+            # No calibration peaks matched
+            # Return empty DataFrame for both match_df and good_matches_df
+            return match_df.iloc[0:0], match_df.iloc[0:0]
 
         # Ensure correct dtypes for match_df columns to avoid warnings
         match_df = match_df.astype(
