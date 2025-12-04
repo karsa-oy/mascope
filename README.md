@@ -123,6 +123,35 @@ mascope --log-level debug dev run             # set log level to debug
 mascope -l debug dev run                      # set log level to debug
 ```
 
+### Redis Commands
+
+```sh
+mascope dev redis start       # Start Redis container (auto-starts with backend)
+mascope dev redis stop        # Stop Redis container
+mascope dev redis restart     # Restart Redis container
+mascope dev redis status      # Show Redis configuration and status
+mascope dev redis logs        # View Redis logs (--follow, --tail options)
+mascope dev redis cli         # Open Redis CLI for debugging
+
+# Or access Redis CLI directly
+docker exec -it mascope_redis_dev redis-cli    # Dev mode
+docker exec -it mascope-redis-1 redis-cli      # Prod mode
+```
+
+**Useful Redis CLI commands:**
+
+```sh
+INFO                         # Server info and stats
+CLIENT LIST                  # Show connected clients
+KEYS mascope:session:*       # List all user sessions
+GET mascope:session:/:{sid}  # View session data
+TTL mascope:session:/:{sid}  # Check session TTL
+MONITOR                      # Watch all Redis commands (Ctrl+C to exit)
+PUBSUB CHANNELS              # List Socket.IO pub/sub channels
+```
+
+See [Redis CLI documentation](https://redis.io/docs/latest/develop/tools/cli/) for more commands.
+
 > [!IMPORTANT]
 > On **Windows** you need to use `mascope dev run --reload` to enable hot module reloading on the backend. This launches the backend on a separate Windows Terminal window.
 
@@ -245,12 +274,27 @@ The runtime can be executed in two major modes: `dev` and `prod`. While `dev` mo
 
 #### Dev mode
 
-The development environment works by running dev server commands listed in the [modules](#runtime-modules). These run `poetry` or `vite` dev servers and script to run other operations or services. By default, running
-`mascope dev run` spins up the `backend` and `frontend` dev servers and joins their logs to one output. To enable HMR for the `backend` on Windows, run `mascope dev run --reload`. You can also specify other modules (run `mascope module --runnable` to see which). For an overview of the `dev` mode api, run `mascope dev --help`.
+The development environment works by running dev server commands listed in the [modules](#runtime-modules). These run `poetry` or `vite` dev servers and script to run other operations or services.
+
+**Prerequisites:**
+
+- Docker daemon running (required for Redis)
+- Redis container will auto-start when running `mascope dev run backend`
+
+By default, running `mascope dev run` spins up the `backend` (with Redis) and `frontend` dev servers and joins their logs to one output. To enable HMR for the `backend` on Windows, run
+`mascope dev run --reload`. You can also specify other modules (run `mascope module --runnable` to see which). For an overview of the `dev` mode api, run `mascope dev --help`.
 
 #### Prod mode
 
-The production deployment for the mascope server - consisting of the `backend` and `frontend` (incl. proxy) modules - is deployed using `docker`. The docker files for these are in their respective folders. The whole thing is tied together with `docker compose`, allowing us to spin up the pair in tandem and automatically have them share a network (see `docker-compose.yaml` for config).
+The production deployment for the mascope server consists of containerized services orchestrated via `docker compose`:
+
+- **redis**: Redis server for Socket.IO coordination and session storage
+- **backend**: Multi-worker Python API server (Uvicorn + FastAPI + Socket.IO)
+- **frontend**: Nginx reverse proxy serving Vue.js bundle with sticky sessions
+- **file_converter**: Service responsible for transforming incoming data files and recording corresponding metadata to the
+  database.
+
+The containers share a Docker network and use healthchecks for proper startup order (redis → backend → frontend). See `docker-compose.yaml` for full configuration.
 
 See `mascope prod --help` for extensive documentation, but in short:
 
@@ -585,9 +629,32 @@ The main tech stack for the backend is as follows:
 - [FastAPI](https://fastapi.tiangolo.com/) - HTTP/S REST API
 - [Uvicorn](https://www.uvicorn.org/) - Main web server
 - [SocketIO](https://python-socketio.readthedocs.io/en/latest/index.html) - WebSocket event API
+- [Redis](https://redis.io/docs/latest/develop/) - Socket.IO coordination and session storage
 - [Pydantic](https://docs.pydantic.dev/dev/) - Data model validation
 - [SQLite](https://www.sqlite.org/docs.html) - In-process database
   - [SQLAlchemy](https://docs.sqlalchemy.org/en/20/index.html) - Object Relational Model
+
+### Multi-Worker Architecture
+
+Mascope backend uses **multiple uvicorn workers** for horizontal scaling and full CPU utilization:
+
+- **Dev mode**: 1 worker (enables hot reload, simplifies debugging)
+- **Prod mode**: Auto-scaling based on CPU cores (default: `cpu_count // 2`)
+- **Configuration**: Set via `[backend].workers` in `dev.mascope.toml` / `prod.mascope.toml` and can be overridden in environment-specific config files.
+
+**Redis Coordination:**
+
+Redis is required for cross-worker Socket.IO coordination. The backend uses two separate Redis clients:
+
+- **AsyncRedisManager**: Handles [Socket.IO](https://socket.io/docs/v4/redis-adapter/) pub/sub for event routing across workers
+- **RedisSessionClient**: Stores user authentication sessions for cross-worker RBAC validation
+
+**Redis Containers:**
+
+- **Dev**: `mascope_redis_dev` (local Docker container, accessible via `mascope dev redis cli`)
+- **Prod**: `mascope-redis-1` (runs inside Docker Compose stack, accessible via `docker exec -it mascope-redis-1 redis-cli`)
+
+Session data persists in Redis with a 24-hour TTL, automatically refreshed on user activity.
 
 ### Backend API
 
@@ -771,33 +838,92 @@ When running `mascope dev run`, autogenerated OpenAPI docs are available:
 
 To run the [API](#backend-api) we need to have multiple Python 'apps' and 'servers'.
 
+#### Single Worker (Dev Mode)
+
 ```mermaid
-flowchart LR
-    entry{Entrypoint}
+flowchart TB
+    entry[Entrypoint: uvicorn.run]
+    uvicorn[Uvicorn Worker Process]
+    sio_app[SocketIO ASGI App]
     fastapi[FastAPI App]
     sio[SocketIO Server]
-    sio_app[SocketIO ASGI App]
-    uvicorn[Uvicorn Run]
+    redis[Redis ServerPub/Sub Coordinator]
 
     entry --> uvicorn
     uvicorn --> sio_app
     sio_app --> fastapi
     sio_app --> sio
+    sio -.-> redis
 ```
 
-In production, Uvicorn sits behind an [Nginx](https://nginx.org/en/docs/) reverse-proxy additionally:
+#### Multi-Worker (Prod Mode)
 
 ```mermaid
-flowchart LR
-    entry{Entrypoint}
-    nginx[Nginx Reverse Proxy]
-    uvicorn[Uvicorn Run]
-    etc([...])
+flowchart TB
+    subgraph client[Client Browser]
+        http[HTTP Requests]
+        ws[WebSocket Connection]
+    end
 
-    entry --> nginx
-    nginx --> uvicorn
-    uvicorn --> etc
+    nginx[Nginx Reverse Proxy<br/>ip_hash sticky sessions]
+
+    subgraph redis_layer[Redis Layer]
+        redis[Redis Server<br/>AsyncRedisManager Client]
+        redis_sessions[Session Storage<br/>RedisSessionClient]
+    end
+
+    subgraph worker1[Worker 1 Process]
+        sio_app1[SocketIO ASGI App]
+        fastapi1[FastAPI Instance]
+        sio1[SocketIO Server]
+    end
+
+    subgraph worker2[Worker 2 Process]
+        sio_app2[SocketIO ASGI App]
+        fastapi2[FastAPI Instance]
+        sio2[SocketIO Server]
+    end
+
+    subgraph workerN[Worker N Process]
+        sio_appN[SocketIO ASGI App]
+        fastapiN[FastAPI Instance]
+        sioN[SocketIO Server]
+    end
+
+    http --> nginx
+    ws --> nginx
+
+    nginx -->|HTTP/WS| worker1
+    nginx -->|HTTP/WS| worker2
+    nginx -->|HTTP/WS| workerN
+
+    sio_app1 --> fastapi1
+    sio_app1 --> sio1
+    sio_app2 --> fastapi2
+    sio_app2 --> sio2
+    sio_appN --> fastapiN
+    sio_appN --> sioN
+
+    sio1 <-->|Pub/Sub| redis
+    sio2 <-->|Pub/Sub| redis
+    sioN <-->|Pub/Sub| redis
+
+    fastapi1 <-->|Session R/W| redis_sessions
+    fastapi2 <-->|Session R/W| redis_sessions
+    fastapiN <-->|Session R/W| redis_sessions
+
+    style redis fill:#ff6b6b
+    style redis_sessions fill:#ff6b6b
+    style nginx fill:#4ecdc4
 ```
+
+- Each worker has its own `sio_app` instance (FastAPI + SocketIO Server)
+- Redis `AsyncRedisManager` coordinates socket events across workers via Pub/Sub
+- Redis `RedisSessionClient` stores user sessions for cross-worker RBAC
+- Nginx `ip_hash` ensures same client → same worker for HTTP long-polling fallback
+
+In production, multiple Uvicorn workers run behind [Nginx](https://nginx.org/en/docs/http/load_balancing.html) with sticky sessions (`ip_hash`).
+Redis coordinates Socket.IO events across workers via pub/sub and stores user sessions for cross-worker authentication.
 
 ### Backend DB
 
