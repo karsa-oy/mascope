@@ -78,7 +78,7 @@ const tabs = computed(() => [
   },
   {
     label: 'Match',
-    icon: 'pi pi-wave-pulse',
+    icon: 'pi pi-verified',
     disabled: !app.data.match.visualized.ion,
     help: `
       <h1>Match View</h1>

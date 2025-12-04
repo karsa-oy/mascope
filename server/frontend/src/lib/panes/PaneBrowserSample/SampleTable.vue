@@ -140,7 +140,7 @@ const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top)
     >
       <Column sortable sortField="match.match_score" class="match-column">
         <template #header>
-          <span class="pi pi-verified" />
+          <span class="pi ph ph-seal-percent" />
         </template>
         <template #body="{ data }">
           <BaseMatchTag

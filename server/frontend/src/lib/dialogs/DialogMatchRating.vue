@@ -246,7 +246,7 @@ const peak = new Intl.NumberFormat('en-US', {
               <Column expander style="width: 3ch" />
               <Column sortable sortField="match.match_score" class="match-column">
                 <template #header>
-                  <span class="pi pi-verified" />
+                  <span class="pi ph ph-seal-percent" />
                 </template>
                 <template #body="{ data }">
                   <BaseMatchTag

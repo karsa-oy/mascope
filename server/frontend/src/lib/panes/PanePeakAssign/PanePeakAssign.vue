@@ -307,7 +307,10 @@ const expanded = ref({})
         </Column>
         <Column field="match_score" sortable>
           <template #header>
-            <span class="pi pi-verified" v-tooltip="{ value: 'Match score', showDelay: 500 }" />
+            <span
+              class="pi ph ph-seal-percent"
+              v-tooltip="{ value: 'Match score', showDelay: 500 }"
+            />
           </template>
           <template #body="{ data }">
             <BaseMatchTag
@@ -389,7 +392,7 @@ const expanded = ref({})
             </Column>
             <Column field="match_score" sortable>
               <template #header>
-                <span class="pi pi-verified" v-tooltip="'Match score'" />
+                <span class="pi ph ph-seal-percent" v-tooltip="'Match score'" />
               </template>
               <template #body="{ data }">
                 <BaseMatchTag

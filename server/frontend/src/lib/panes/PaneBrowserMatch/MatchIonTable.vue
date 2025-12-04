@@ -233,7 +233,7 @@ watch(
 
       <!-- Match Score Column -->
       <Column sortable sortField="match.match_score" class="match-column">
-        <template #header> <span class="pi pi-verified" /> </template>
+        <template #header> <span class="pi ph ph-seal-percent" /> </template>
         <template #body="{ data }">
           <BaseMatchTag
             :match-score="data.match?.match_score"
