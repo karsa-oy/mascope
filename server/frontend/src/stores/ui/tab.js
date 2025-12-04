@@ -10,17 +10,12 @@ export const useTab = defineStore('app.ui.tab', () => {
 
   const data = useData()
 
-  // Switch to 'match' tab when visualized ion focused (unless on sample tab)
   // When visualized ion unfocused, return to 'batch' if batch exists, else default
   watch(
     () => data.match.visualized.ion,
     (visualized) => {
-      if (visualized && active.value !== 'sample') {
-        active.value = 'match'
-      } else {
-        if (active.value === 'match') {
-          active.value = data.batch.focused ? 'batch' : DEFAULT_TAB
-        }
+      if (!visualized && active.value === 'match') {
+        active.value = data.batch.focused ? 'batch' : DEFAULT_TAB
       }
     }
   )

@@ -157,31 +157,21 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
   const workspace = useWorkspace()
   watch(() => workspace.focused, clear)
 
-  // Update visualization when sample/match.ion/match.collection focus changes
+  // Update visualization when sample focus changes (but keep same ion and collection)
   watch(
-    () => ({
-      focusedSample: sample.focused,
-      focusedIon: matchIon.focused,
-      focusedCollection: matchCollection.focused
-    }),
-    async ({ focusedSample, focusedCollection, focusedIon }, old) => {
-      const collectionChanged =
-        focusedCollection?.target_collection_id !== old?.focusedCollection?.target_collection_id
-
-      // clear visualization if requirements are missing or collection changed
-      if (!focusedSample || !focusedIon || !focusedCollection || collectionChanged) {
+    () => sample.focused,
+    async (focusedSample) => {
+      // Only update if we have an active visualization and a focused sample
+      if (!ion.value || !focusedSample) {
         clear()
         return
       }
 
-      // do nothing if no collection is focused
-      const collectionId = focusedCollection.target_collection_id
-      if (!collectionId) return
-
       const sampleId = focusedSample.sample_item_id
-      const ionId = focusedIon.target_ion_id
+      const ionId = cache.ionId
+      const collectionId = cache.collectionId
 
-      // Set the focusedIon visualization with the new focusedSample ID, ion ID, collection ID, and filter params
+      // Update visualization with new sample but same ion/collection
       await set({ sampleId, ionId, collectionId })
     }
   )

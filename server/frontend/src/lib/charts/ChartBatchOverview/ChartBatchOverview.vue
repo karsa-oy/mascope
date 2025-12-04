@@ -132,7 +132,7 @@ const layout = computed(() => {
 /**
  * Handle click on chart point - focus sample and ion directly
  */
-function onClick({ pointIndex, curveNumber }) {
+async function onClick({ pointIndex, curveNumber }) {
   if (pointIndex == null || curveNumber == null) return
 
   // Focus sample corresponding to the clicked data point
@@ -151,10 +151,12 @@ function onClick({ pointIndex, curveNumber }) {
 
   const { target_ion_id } = trace.matchData
 
-  // Focus in match.ion store by target_ion_id
-  if (target_ion_id) {
-    app.data.match.ion.focus({ target_ion_id })
-  }
+  app.ui.tab.active = 'match'
+  await app.data.match.visualized.set({
+    sampleId: app.data.sample.focusedId,
+    ionId: target_ion_id,
+    collectionId: app.data.match.collection.focusedId
+  })
 }
 
 /**
