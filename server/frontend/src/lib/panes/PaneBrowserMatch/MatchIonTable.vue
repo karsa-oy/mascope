@@ -116,8 +116,32 @@ const toggleExpanders = () => {
   }
 }
 
+const autoSelectTopMatches = (top = 30) => {
+  const ions = app.data.match.ion.list
+  if (ions.length > 0) {
+    // Sort ions by match_score descending, filter out match_score <= 0, and take up to 'top' results
+    const topIons = [...ions]
+      .filter((ion) => (ion.match?.match_score || 0) > 0)
+      .sort((a, b) => (b.match?.match_score || 0) - (a.match?.match_score || 0))
+      .slice(0, top)
+    app.data.match.ion.selected = topIons
+  } else {
+    app.data.match.ion.selected = []
+  }
+}
+
 // --- Injection & Watchers ---
 const tableHeight = inject('match-table-height')
+
+// Watch for ion list changes to auto-select top matches when collection is opened
+watch(
+  () => app.data.match.ion.list,
+  () => {
+    // Auto-select top matches if no ions are currently selected
+    if (app.data.match.ion.selected.length) return
+    autoSelectTopMatches()
+  }
+)
 
 // Watch for collection changes to reset expansion state
 watch(
