@@ -72,11 +72,11 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
       matchParams.set()
     }
 
+    // Update cache before "load" to prevent duplicate calls
+    Object.assign(cache, { sampleId, ionId, collectionId })
+
     // Load matches and activate visualization
     await load({ sampleId, ionId, collectionId, init: true })
-
-    // Update cache to reflect the new state
-    Object.assign(cache, { sampleId, ionId, collectionId })
   }
 
   async function reload({ init } = { init: false }) {
