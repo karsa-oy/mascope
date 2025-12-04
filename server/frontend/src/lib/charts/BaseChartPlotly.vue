@@ -143,8 +143,8 @@ const derived = computed(() => ({
 }))
 
 function handleClick(event) {
-  const { data, x, y } = event.points[0]
-  emit('click', { data, x, y, event: event.event, ...event.points[0] })
+  console.debug(`📊 [${props.id}] click event:`, event)
+
   // Clear any existing timeout
   if (clickTimeout) {
     clearTimeout(clickTimeout)
@@ -170,6 +170,7 @@ function handleSelect(event) {
 }
 
 function handleRelayout(data) {
+  console.debug(`📊 [${props.id}] relayout event:`, data)
 
   // Cancel pending click if double-click caused relayout
   if (clickTimeout) {
@@ -195,6 +196,7 @@ function handleRelayout(data) {
 }
 
 onMounted(() => {
+  console.debug(`📊 [${props.id}] creating chart`)
   // create the plot
   Plotly.newPlot(plot.value, props.data, derived.value.layout, derived.value.config)
   // add the event listener
@@ -205,6 +207,8 @@ onMounted(() => {
   created.value = true
 })
 onBeforeUnmount(() => {
+  console.debug(`📊 [${props.id}] destroying chart`)
+
   // Clear any pending click timeout
   if (clickTimeout) {
     clearTimeout(clickTimeout)
@@ -226,7 +230,7 @@ watch(
   () => ready.value,
   () => {
     if (ready.value) {
-      console.log(`📊 [chart] redrawing chart ${props.id} with height ${props.height}`)
+      console.debug(`📊 [${props.id}] redrawing chart with height ${props.height}`)
       // adapt to changes
       Plotly.react(plot.value, props.data, derived.value.layout, derived.value.config)
       // Relayout to autoranges to fix horizontal-only zoom

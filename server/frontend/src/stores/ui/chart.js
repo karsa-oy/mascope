@@ -8,6 +8,7 @@ export const useChart = defineStore('app.ui.chart', () => {
     list.value.push(chart)
     const destructor = () =>
       onBeforeUnmount(() => {
+        console.debug(`📊 [${chart.name}]: unregistering chart`)
         list.value = list.value.filter(({ id }) => chart.id !== id)
       })
     return destructor
@@ -15,8 +16,8 @@ export const useChart = defineStore('app.ui.chart', () => {
 
   function clear() {
     list.value.forEach((chart) => {
+      console.debug(`📊 [${chart.name}]: clearing`)
       chart.clear()
-      console.log(`📊 [chart]: cleared ${chart.name} data`)
     })
   }
 
