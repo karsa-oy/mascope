@@ -5,17 +5,12 @@ from sqlalchemy import select
 
 from mascope_file.name import parse_path_from_item_filename, get_instrument_type
 
-from mascope_backend.db.id import gen_id
+from mascope_backend.db import async_session
+from mascope_backend.db.models import SampleFile
 from mascope_backend.api.lib.exceptions.api_exceptions import (
     NotFoundException,
     raise_api_warning,
 )
-from mascope_backend.socket.notifications import (
-    UserNotification,
-    emit_user_notification,
-)
-from mascope_backend.db import async_session
-from mascope_backend.db.models import SampleFile
 from mascope_backend.api.lib.api_features import api_controller_background_task
 
 from mascope_backend.runtime import runtime

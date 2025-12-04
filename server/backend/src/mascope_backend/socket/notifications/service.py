@@ -9,26 +9,20 @@ from mascope_backend.runtime import runtime
 
 
 async def emit_user_notification(
-    notification: UserNotification = None,
-    room_id: str = None,
-    sid: str = None,
-):
+    notification: UserNotification,
+    room_id: str,
+) -> None:
     """
     Utility function to emit a Socket.IO event to a specified room_id.
 
     :param notification: The notification to send with the event.
     :param room_id: The room to which the event should be emitted.
-    :param sid: Optional. The session ID of the client. Used to send direct messages if needed.
     """
     notification_dict = notification.model_dump(exclude_none=True)
     if room_id:
         await sio.emit(
             "user_notification", notification_dict, room=room_id, namespace="/"
         )
-
-    # Check if the user has moved from the room; if so, send them a direct message
-    if sid and room_id != sid and room_id not in sio.rooms(sid, namespace="/"):
-        await sio.emit("user_notification", notification_dict, room=sid, namespace="/")
 
 
 async def send_progress_user_notification(
@@ -40,7 +34,6 @@ async def send_progress_user_notification(
     # Extract internal metadata and clean up the data dictionary
     room_ids = notification_copy.data.pop("_room_ids", [])
     instrument_room = notification_copy.data.pop("_instrument_room", None)
-    sid = notification_copy.data.pop("_sid", None)
 
     total_samples = notification_copy.data.pop("_total_samples", None)
     item_index = notification_copy.data.pop("_item_index", None)
@@ -102,8 +95,7 @@ async def send_progress_user_notification(
             )
     # Emit the notification to all specified rooms
     for room_id in room_ids:
-        await emit_user_notification(notification_copy, room_id, sid)
-    # for istrument room don't check if the user has moved from the room -> no sid is provided
+        await emit_user_notification(notification_copy, room_id)
     if instrument_room:
         await emit_user_notification(notification_copy, instrument_room)
 
@@ -113,18 +105,13 @@ async def handle_notifications(
     notification: UserNotification,
     kwargs: dict[str, Any],
     result: dict[str, Any] | None,
-    sid: str | None,
 ) -> None:
     """
     Emit Socket.IO user notifications to specified rooms.
 
-    Process flow:
-    1. Guard against empty rooms list
-    2. For each room:
-       - Find room_id in kwargs, result['data'], or result['_notification_data']
-       - Handle special case for 'instrument' room
-         TODO_notifications refactor this, looks like a hack
-       - Emit notification to the room
+    For each room:
+    - Find room_id in kwargs, result['data'], or result['_notification_data']
+    - Emit notification to the room
 
     :param rooms: List of room keys to find room IDs
     :type rooms: list[str] | None
@@ -135,8 +122,6 @@ async def handle_notifications(
     :param result: Controller function result that may contain room IDs in 'data'
             or '_notification_data' keys. May be None when handling error notifications.
     :type result: dict[str, Any] | None
-    :param sid: Socket.IO session ID for direct messaging
-    :type sid: str | None
     """
     for room in rooms:
         # Step 1: Check if room_id is in kwargs
@@ -167,8 +152,5 @@ async def handle_notifications(
                 f"No room ID found for user notification in room '{room}'"
             )
             continue
-        # for istrument room don't check if the user has moved from the room -> no sid is provided
-        if room_id and room == "instrument":
-            await emit_user_notification(notification, room_id)
-        if room_id is not None and room != "instrument":
-            await emit_user_notification(notification, room_id, sid)
+
+        await emit_user_notification(notification, room_id)

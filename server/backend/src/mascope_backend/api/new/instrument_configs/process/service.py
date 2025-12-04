@@ -129,7 +129,7 @@ async def process_instrument_config(
                 "method_file": method_file,
             },
         )
-        await emit_user_notification(notification=notification, room_id=sid, sid=sid)
+        await emit_user_notification(notification=notification, room_id=sid)
         # fit to the file
         new_fields = (await fit_instrument_config(sample_file=fit_sample_file))["data"][
             "instrument_functions"

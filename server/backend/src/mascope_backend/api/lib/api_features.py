@@ -271,7 +271,7 @@ def api_controller_background_task(
 
                 # Handle success user notifications
                 await handle_notifications(
-                    success_notification_rooms, notification, kwargs, result, sid
+                    success_notification_rooms, notification, kwargs, result
                 )
                 # Handle success reload notifications
                 # Emit reload events for remat_batch even if called as a part of remath_batches
@@ -295,7 +295,7 @@ def api_controller_background_task(
 
                     #  Emit warning user notifications for both independent and dependent transactions
                     await handle_notifications(
-                        error_notification_rooms, notification, kwargs, None, sid
+                        error_notification_rooms, notification, kwargs, None
                     )
                     if independent_transaction or (
                         func.__name__ == "rematch_batch" and parent_id
@@ -322,7 +322,7 @@ def api_controller_background_task(
                         # NOTE: for the error_notification_rooms the sio room id should be provided
                         # in the controller kwargs, since the result is not available
                         await handle_notifications(
-                            error_notification_rooms, notification, kwargs, None, sid
+                            error_notification_rooms, notification, kwargs, None
                         )
                         await handle_reloads(
                             context=f"ApiException reload (status {e.status_code}) {func.__name__}",
@@ -352,7 +352,7 @@ def api_controller_background_task(
                     # NOTE: for the error_notification_rooms the sio room id should be provided
                     # in the controller kwargs, since the result is not available
                     await handle_notifications(
-                        error_notification_rooms, notification, kwargs, None, sid
+                        error_notification_rooms, notification, kwargs, None
                     )
                     await handle_reloads(
                         f"Unhandled Exception reload {func.__name__}",
