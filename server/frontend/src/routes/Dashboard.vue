@@ -17,9 +17,9 @@ import {
   PaneBrowserMatch,
   PaneTabMatch,
   PaneTabAcquisitions,
-  PaneTabSample
+  PaneTabSample,
+  PaneTabBatch
 } from '@/lib/panes'
-import { ChartBatchOverview } from '@/lib/charts'
 import { HelpButton, HelpPopover } from '@/lib/help'
 
 import { useApp } from '@/stores'
@@ -156,7 +156,7 @@ const tabs = computed(() => [
                 <PaneTabAcquisitions :active="app.ui.tab.active == 'acquisitions'" />
               </TabPanel>
               <TabPanel value="batch">
-                <ChartBatchOverview v-if="app.ui.tab.active == 'batch'" />
+                <PaneTabBatch :active="app.ui.tab.active == 'batch'" />
               </TabPanel>
               <TabPanel value="sample" :pt="{ content: { style: { padding: 0 } } }">
                 <PaneTabSample v-if="app.ui.tab.active == 'sample'" />

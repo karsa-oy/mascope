@@ -125,6 +125,7 @@ export const useChartData = defineStore('chart.batch.overview', () => {
     records.value = []
   }
 
+  const resetChart = ref(0) // Reactive trigger for chart reset
 
   // Watch for batch change - clear records and trigger chart reset
   watch(
@@ -135,6 +136,7 @@ export const useChartData = defineStore('chart.batch.overview', () => {
           '🔄 [chart.batch.overview] batch changed - clearing records and resetting chart'
         )
         records.value = []
+        resetChart.value++ // Trigger chart reset
       }
     }
   )
@@ -329,6 +331,7 @@ export const useChartData = defineStore('chart.batch.overview', () => {
     traces,
     xFields,
     xField,
+    resetChart,
     pending
   }
 })

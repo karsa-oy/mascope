@@ -207,6 +207,20 @@ watch(traces, () => {
   syncChartSelection()
 })
 
+// Watch for chart reset trigger from data store
+watch(
+  () => data.resetChart,
+  () => {
+    if (plot.value) {
+      // Reset zoom state
+      zoom.rangeX = null
+      zoom.rangeY = null
+      // Reset chart zoom to autorange
+      plot.value.resetZoom()
+    }
+  }
+)
+
 // Watch loading state for loading spinner
 watch(
   () => data.pending,
