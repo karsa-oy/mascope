@@ -233,7 +233,7 @@ watch(
     if (isLoading) {
       loadingTimeout = setTimeout(() => {
         showSpinner.value = true
-      }, 300)
+      }, 1000)
     } else {
       showSpinner.value = false
     }
@@ -248,15 +248,13 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <figure style="height: calc(100vh - 200px)">
-    <div v-if="showSpinner" class="spinner">
-      <div>
-        <ProgressSpinner strokeWidth="5px" />
-      </div>
+  <figure style="height: calc(100vh - 200px); position: relative">
+    <div v-if="showSpinner" class="loading-indicator">
+      <ProgressSpinner strokeWidth="3px" />
     </div>
+
     <BaseChartPlotly
-      v-else
-      id="ChartSampleIntensity"
+      id="ChartBatchOverview"
       ref="plot"
       :title="chartTitle"
       :subtitle="chartSubtitle"
@@ -296,10 +294,18 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.spinner :deep(.p-progressspinner) {
-  height: auto !important;
-  width: 50px !important;
-  height: 50px !important;
-  opacity: 0.8;
+.loading-indicator {
+  position: absolute;
+  top: 10px;
+  left: 50px;
+  z-index: 1000;
+  background-color: transparent;
+  border-radius: 4px;
+  padding: 8px;
+}
+
+.loading-indicator :deep(.p-progressspinner) {
+  width: 20px !important;
+  height: 20px !important;
 }
 </style>
