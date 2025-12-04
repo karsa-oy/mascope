@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, watchEffect, useSlots } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, useSlots } from 'vue'
 
 import Plotly from 'plotly.js-dist-min'
 
@@ -56,6 +56,7 @@ const emit = defineEmits(['click', 'dragmode', 'select', 'zoom'])
 const plot = ref(null)
 const created = ref(false)
 const settings = ref()
+let clickTimeout = null
 
 const resetSelection = () => {
   if (plot.value && props.data.length > 0) {
@@ -144,6 +145,17 @@ const derived = computed(() => ({
 function handleClick(event) {
   const { data, x, y } = event.points[0]
   emit('click', { data, x, y, event: event.event, ...event.points[0] })
+  // Clear any existing timeout
+  if (clickTimeout) {
+    clearTimeout(clickTimeout)
+  }
+
+  // Debounce click to avoid conflict with double-click
+  clickTimeout = setTimeout(() => {
+    const { data, x, y } = event.points[0]
+    emit('click', { data, x, y, event: event.event, ...event.points[0] })
+    clickTimeout = null
+  }, 250) // 250ms delay to distinguish from double-click
 }
 
 function handleSelect(event) {
@@ -158,6 +170,13 @@ function handleSelect(event) {
 }
 
 function handleRelayout(data) {
+
+  // Cancel pending click if double-click caused relayout
+  if (clickTimeout) {
+    clearTimeout(clickTimeout)
+    clickTimeout = null
+  }
+
   // Handle zoom events
   const xmin = data['xaxis.range[0]']
   const xmax = data['xaxis.range[1]']
@@ -186,6 +205,12 @@ onMounted(() => {
   created.value = true
 })
 onBeforeUnmount(() => {
+  // Clear any pending click timeout
+  if (clickTimeout) {
+    clearTimeout(clickTimeout)
+    clickTimeout = null
+  }
+
   plot.value?.removeEventListener('plotly_click', handleClick)
   plot.value?.removeEventListener('plotly_relayout', handleRelayout)
   plot.value?.removeEventListener('plotly_selected', handleSelect)
