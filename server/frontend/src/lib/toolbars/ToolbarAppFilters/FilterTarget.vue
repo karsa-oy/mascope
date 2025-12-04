@@ -28,22 +28,24 @@ const label = computed(() => {
       ? compoundName
       : app.data.match.ion.focused?.target_compound_formula
   const ionLabel = app.data.match.ion.focused?.target_ion_formula
-  if (ionLabel) {
+  const ionCount = app.data.match.ion.selected.length
+  if (ionCount == 1 && compoundLabel && ionLabel) {
     return {
       short: `${compoundLabel} ❯ ${ionLabel}`,
-      full: `Target Ion
-             ${compoundLabel} ❯ ${ionLabel}`
+      full: `Target Ion:
+             ${collectionLabel} ❯ ${compoundLabel} ❯ ${ionLabel}`
     }
-  } else if (compoundLabel) {
+  } else if (ionCount > 1) {
+    const ionsLabel = `${ionCount} Ions`
     return {
-      short: `${compoundLabel}`,
-      full: `Target Compound
-             ${compoundLabel}`
+      short: `${collectionLabel} ❯ ${ionsLabel}`,
+      full: `Target Ions:
+             ${collectionLabel} ❯ ${ionsLabel}`
     }
-  } else if (collectionLabel) {
+  } else if (ionCount == 0 && collectionLabel) {
     return {
       short: collectionLabel,
-      full: `Target Collection
+      full: `Target Collection:
              ${collectionLabel}`
     }
   } else {

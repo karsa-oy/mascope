@@ -21,15 +21,15 @@ const label = computed(() => {
   if (sampleCount === 1) {
     const sampleName = app.data.sample.focused?.sample_item_name
     return {
-      short: `${prettyTrim(sampleName)}`,
-      full: `Sample selected
+      short: `${prettyTrim(sampleName, 30)}`,
+      full: `Sample selected:
              ${sampleName}`
     }
   } else {
     const samplesLabel = `${sampleCount} Samples`
     return {
       short: `${samplesLabel}`,
-      full: `Samples selected
+      full: `Samples selected:
              ${samplesLabel}`
     }
   }

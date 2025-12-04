@@ -12,7 +12,7 @@ export const useChartData = defineStore('chart.match.timeseries', () => {
   const app = useApp()
 
   app.ui.chart.register({
-    name: 'ChartMatchSpectra',
+    name: 'ChartMatchTimeseries',
     clear: () => {
       traces.value = []
       length.value = 0

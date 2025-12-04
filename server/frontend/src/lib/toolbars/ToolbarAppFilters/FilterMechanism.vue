@@ -25,7 +25,7 @@ const label = computed(() => {
   return mechanism
     ? {
         short: mechanism,
-        full: `Ionization Mechanism\n${mechanism}`
+        full: `Ionization Mechanism:\n${mechanism}`
       }
     : null
 })

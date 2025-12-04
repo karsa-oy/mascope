@@ -36,7 +36,7 @@ const chartTitle = computed(() => {
 
 const chartSubtitle = computed(() => {
   if (!app.data.match.collection.focused) return 'Select a target collection to visualize matches'
-  return `Collection: ${app.data.match.collection.focused.target_collection_name}`
+  return `${app.data.match.collection.focused.target_collection_name} > ${app.data.match.ion.selected.length} selected ions`
 })
 
 const unit = computed(() =>
