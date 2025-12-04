@@ -14,11 +14,16 @@ export const useMatchIon = defineStore('app.data.match.ion', () => {
   const data = useData(
     name,
     (params) =>
-      api.http.get('/match/records/ion', {
-        params,
-        use: 'read',
-        type: 'load_match_ion_records'
-      }),
+      api.http.post(
+        '/match/records/ion',
+        {
+          ...params
+        },
+        {
+          use: 'read',
+          type: 'load_match_ion_records'
+        }
+      ),
     {
       key,
       events: ['match_reload'], // Cross-store event (match updates trigger reload)
@@ -29,7 +34,7 @@ export const useMatchIon = defineStore('app.data.match.ion', () => {
 
         // Add sample/batch parameter based on selection
         return sampleId
-          ? { sample_item_id: sampleId, target_collection_id: collectionId }
+          ? { sample_item_ids: [sampleId], target_collection_id: collectionId }
           : { sample_batch_id: batchId, target_collection_id: collectionId }
       },
       selection: true

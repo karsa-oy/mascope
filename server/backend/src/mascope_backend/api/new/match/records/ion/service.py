@@ -14,16 +14,21 @@ from mascope_backend.db.models import (
     TargetCompound,
     TargetIon,
     IonizationMechanism,
+    IonizationMode,
     MatchIon,
 )
 from mascope_backend.api.lib.api_features import api_controller
-from mascope_backend.api.controllers.samples.lib.samples_fetch import fetch_sample
+from mascope_backend.api.controllers.samples.lib.samples_fetch import (
+    fetch_samples,
+)
+from mascope_backend.api.controllers.sample.lib.sample_items_fetch import (
+    fetch_sample_item_ids,
+)
 from mascope_backend.api.controllers.sample.lib.sample_batches_fetch import (
     fetch_sample_batch,
 )
 from mascope_backend.api.new.ionization.modes.util import (
     fetch_batch_ionization_mechanism_ids,
-    fetch_sample_ionization_mechanism_ids,
 )
 from mascope_backend.api.models.target.collections.config import (
     target_collection_config,
@@ -32,38 +37,45 @@ from mascope_backend.api.models.target.collections.config import (
 
 @api_controller()
 async def get_match_ion_records(
-    sample_item_id: str | None = None,
+    sample_item_ids: list[str] | None = None,
     sample_batch_id: str | None = None,
     target_collection_id: str | None = None,
+    target_ion_ids: list[str] | None = None,
 ) -> dict:
     """
-    Retrieves target ions with match ion data for sample or batch.
+    Retrieves target ions with match ion data for samples or a batch.
 
     Handles entity validation and orchestrates the data retrieval process.
     For sample-level queries, returns target ions with actual match data.
     For batch-level queries, returns target ions with placeholder match data.
 
-    :param sample_item_id: Unique identifier of the sample item, defaults to None
-    :type sample_item_id: str | None
+    :param sample_item_ids: List of unique identifiers of the sample items, defaults to None
+    :type sample_item_ids: list[str] | None
     :param sample_batch_id: Unique identifier of the sample batch, defaults to None
     :type sample_batch_id: str | None
     :param target_collection_id: Optional filter by specific target collection, defaults to None
     :type target_collection_id: str | None
+    :param target_ion_ids: Optional filter by specific target ions, defaults to None
+    :type target_ion_ids: list[str] | None
     :return: Dictionary containing status, message, results count, and match ion records data
     :rtype: dict
     """
-    if sample_item_id:
-        sample = await fetch_sample(sample_item_id)
-        entity_name = sample.sample_item_name
-        entity_type = "sample"
+    if sample_item_ids:
+        samples = await fetch_samples(sample_item_ids)
+        entity_name = ", ".join(sample.sample_item_name for sample in samples)
+        entity_type = "samples"
 
-        data = await _get_sample_match_ion_records(sample, target_collection_id)
+        data = await _get_sample_match_ion_records(
+            samples, target_collection_id, target_ion_ids
+        )
     else:
         sample_batch = await fetch_sample_batch(sample_batch_id)
         entity_name = sample_batch.sample_batch_name
         entity_type = "batch"
 
-        data = await _get_batch_match_ion_records(sample_batch, target_collection_id)
+        data = await _get_batch_match_ion_records(
+            sample_batch, target_collection_id, target_ion_ids
+        )
 
     if not data:
         return {
@@ -82,24 +94,37 @@ async def get_match_ion_records(
 
 
 async def _get_sample_match_ion_records(
-    sample: Sample, target_collection_id: str | None = None
+    samples: list[Sample],
+    target_collection_id: str | None = None,
+    target_ion_ids: list[str] | None = None,
 ) -> list[dict]:
     """
-    Retrieves target ions with match ion data for a sample.
+    Retrieves target ions with match ion data for a list of samples.
 
-    :param sample: Sample item SQLAlchemy object
-    :type sample: Sample
+    :param samples: List of sample item SQLAlchemy objects
+    :type samples: list[Sample]
     :param target_collection_id: Optional target collection filter
     :type target_collection_id: str | None
+    :param target_ion_ids: Optional target ion filter
+    :type target_ion_ids: list[str] | None
     :return: List of ion records with nested match data
     :rtype: list[dict]
     """
     async with async_session() as session:
-        # Get sample ionization mechanism IDs
-        sample_ionization_mechanism_ids = await fetch_sample_ionization_mechanism_ids(
-            sample.sample_item_id
+        sample_item_ids = [sample.sample_item_id for sample in samples]
+        sample_batch_ids = set([sample.sample_batch_id for sample in samples])
+        sample_ionization_mode_ids = set(
+            [sample.ionization_mode_id for sample in samples]
         )
-
+        result = await session.execute(
+            select(IonizationMode.ionization_mechanism_ids).where(
+                IonizationMode.ionization_mode_id.in_(sample_ionization_mode_ids)
+            )
+        )
+        ionization_mechanism_id_lists = result.scalars().all()
+        sample_ionization_mechanism_ids = set(
+            ion_id for id_list in ionization_mechanism_id_lists for ion_id in id_list
+        )
         query = (
             select(
                 TargetIon,
@@ -139,13 +164,12 @@ async def _get_sample_match_ion_records(
                 MatchIon,
                 and_(
                     MatchIon.target_ion_id == TargetIon.target_ion_id,
-                    MatchIon.sample_item_id == sample.sample_item_id,
+                    MatchIon.sample_item_id.in_(sample_item_ids),
                 ),
             )
             .where(
                 and_(
-                    TargetCollectionInSampleBatch.sample_batch_id
-                    == sample.sample_batch_id,
+                    TargetCollectionInSampleBatch.sample_batch_id.in_(sample_batch_ids),
                     TargetIon.ionization_mechanism_id.in_(
                         sample_ionization_mechanism_ids
                     ),
@@ -157,6 +181,9 @@ async def _get_sample_match_ion_records(
             query = query.where(
                 TargetCollection.target_collection_id == target_collection_id
             )
+
+        if target_ion_ids:
+            query = query.where(TargetIon.target_ion_id.in_(target_ion_ids))
 
         result = await session.execute(query)
         rows = result.all()
@@ -191,7 +218,7 @@ async def _get_sample_match_ion_records(
             else:
                 match_data = {
                     "match_ion_id": None,
-                    "sample_item_id": sample.sample_item_id,
+                    "sample_item_id": None,
                     "match_score": None,
                     "match_category": None,
                     "sample_peak_intensity_sum": None,

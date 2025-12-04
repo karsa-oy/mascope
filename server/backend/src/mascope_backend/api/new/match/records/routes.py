@@ -21,7 +21,7 @@ from mascope_backend.api.new.match.records import (
 )
 from mascope_backend.api.new.match.records.schemas import (
     MatchRecordsQueryParams,
-    MatchIonRecordsQueryParams,
+    MatchIonRecordsBody,
     MatchIsotopeRecordsQueryParams,
     MatchRecordsBatchOverviewQueryParams,
     MatchRecordsResponse,
@@ -96,10 +96,10 @@ async def get_match_collection_record_route(
     )
 
 
-@match_records_router.get("/ion", response_model=MatchRecordsResponse)
+@match_records_router.post("/ion", response_model=MatchRecordsResponse)
 @api_route()
 async def get_match_ion_records_route(
-    query_params: MatchIonRecordsQueryParams = Query(), user: User = Depends(guest_user)
+    body: MatchIonRecordsBody, user: User = Depends(guest_user)
 ) -> MatchRecordsResponse:
     """
     Retrieve target ions with match ion data.
@@ -107,14 +107,14 @@ async def get_match_ion_records_route(
     Supports both sample-level and batch-level queries with optional target collection filtering.
     Returns target compound and target ion data with nested match ion information.
 
-    :param query_params: Query parameters including sample/batch IDs and optional filters
-    :type query_params: MatchIonRecordsQueryParams
+    :param body: Request body including sample/batch IDs and optional filters
+    :type body: MatchIonRecordsBody
     :param user: Authenticated user with guest permissions
     :type user: User
     :return: Target ions with match data
     :rtype: MatchRecordsResponse
     """
-    result = await get_match_ion_records(**query_params.model_dump())
+    result = await get_match_ion_records(**body.model_dump())
     return MatchRecordsResponse.model_validate(result)
 
 

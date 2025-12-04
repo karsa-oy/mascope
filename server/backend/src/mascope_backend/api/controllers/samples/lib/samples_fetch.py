@@ -5,6 +5,7 @@ This module contains helper functions for fetching and processing
 Sample View related data.
 """
 
+from sqlalchemy import select
 from mascope_backend.db import async_session
 from mascope_backend.db.models import Sample
 from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
@@ -34,3 +35,30 @@ async def fetch_sample(sample_item_id: str) -> Sample:
             raise NotFoundException(f"Sample with ID '{sample_item_id}' not found")
     # Step 3: Return sample
     return sample
+
+
+async def fetch_samples(sample_item_ids: list[str]) -> list[Sample]:
+    """
+    Retrieves samples by their IDs.
+
+    - Execute a query to fetch the samples with the specified IDs.
+    - Check if the samples exist. If any is missing, raise a NotFoundException.
+
+    :param sample_item_ids: Unique identifiers of the samples to retrieve.
+    :type sample_item_ids: list[str]
+    :raises NotFoundException: If any of the samples with the given IDDs are not found.
+    :return: The requested samples' SQLAlchemy models.
+    :rtype: list[Sample]
+    """
+    async with async_session() as session:
+        # -- Fetch samples by IDs --
+        result = await session.execute(
+            select(Sample).where(Sample.sample_item_id.in_(sample_item_ids))
+        )
+        samples = result.scalars().all()
+        # -- Check if any of requested samples not found, raise exception --
+        if len(samples) != len(sample_item_ids):
+            missing_ids = set(sample_item_ids) - set(s.sample_item_id for s in samples)
+            raise NotFoundException(f"Samples with IDs '{missing_ids}' not found")
+
+    return samples
