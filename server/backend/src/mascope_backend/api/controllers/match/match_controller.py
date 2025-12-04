@@ -1091,36 +1091,36 @@ async def match_compute_batch(
                 sample, match_params
             )
             if target_isotopes_df is None or target_isotopes_df.empty:
+                # Only sample level aggregate to compute for this sample
                 skipped_samples.append(sample.sample_item_id)
                 runtime.logger.info(
                     f"No new target isotopes to compute match isotopes for the sample '{sample.sample_item_name}'."
                 )
-                continue  # Nothing to compute for this sample
-
-            # Step 3: Compute match_isotopes if the sample has passed all checks.
-            progress_notification = UserNotification(
-                process_id=process_id,
-                parent_id=parent_id,
-                type="match_compute_batch",
-                status="pending",
-                message=f"Processing sample {item_index + 1}/{total_samples_count} in sample batch '{sample_batch_name}'",
-                # NOTE: Set the internal metadata for the pending user_notifications like
-                # room_ids and sid of the user.
-                # Internal metadata will be cleaned up the from data in send_progress_user_notification.
-                data={
-                    "sample_batch_id": sample_batch_id,
-                    "_room_ids": [sample_batch_id],
-                    "_sid": sid,
-                    "_total_samples": total_samples_count,
-                    "_item_index": item_index,
-                },
-            )
-            match_data = await compute_and_create_sample_match_isotope_data(
-                sample, target_isotopes_df, progress_notification
-            )
-            # Track samples with matches
-            if not match_data["match_isotopes"].empty:
-                computed_samples.append(sample.sample_item_id)
+            else:
+                # Step 3: Compute match_isotopes if the sample has passed all checks.
+                progress_notification = UserNotification(
+                    process_id=process_id,
+                    parent_id=parent_id,
+                    type="match_compute_batch",
+                    status="pending",
+                    message=f"Processing sample {item_index + 1}/{total_samples_count} in sample batch '{sample_batch_name}'",
+                    # NOTE: Set the internal metadata for the pending user_notifications like
+                    # room_ids and sid of the user.
+                    # Internal metadata will be cleaned up the from data in send_progress_user_notification.
+                    data={
+                        "sample_batch_id": sample_batch_id,
+                        "_room_ids": [sample_batch_id],
+                        "_sid": sid,
+                        "_total_samples": total_samples_count,
+                        "_item_index": item_index,
+                    },
+                )
+                match_data = await compute_and_create_sample_match_isotope_data(
+                    sample, target_isotopes_df, progress_notification
+                )
+                # Track samples with matches
+                if not match_data["match_isotopes"].empty:
+                    computed_samples.append(sample.sample_item_id)
 
         except ApiException as e:
             runtime.logger.info(
@@ -1128,18 +1128,20 @@ async def match_compute_batch(
             )
             failed_samples.append(sample.sample_item_id)
 
-    # Step 4: Aggregate higher-level matches and update timestamps
-    match_aggregate_result = await aggregate_and_create_matches(
-        sample_batch_id=sample_batch_id
-    )
-    match_aggregate_status = match_aggregate_result.get("status")
-    if match_aggregate_status in ("success", "partial"):
-        runtime.logger.debug(
-            f"Aggregated new higher-level matches for sample batch '{sample_batch_name}'."
+        # Step 4: Aggregate higher-level matches and update timestamps
+        match_aggregate_result = await aggregate_and_create_matches(
+            sample_item_id=sample.sample_item_id
         )
-        await update_sample_modified_timestamps(
-            sample_item_ids=match_aggregate_result.get("affected_sample_item_ids", [])
-        )
+        match_aggregate_status = match_aggregate_result.get("status")
+        if match_aggregate_status in ("success", "partial"):
+            runtime.logger.debug(
+                f"Aggregated new higher-level matches for sample item '{sample.sample_item_name}'."
+            )
+            await update_sample_modified_timestamps(
+                sample_item_ids=match_aggregate_result.get(
+                    "affected_sample_item_ids", []
+                )
+            )
 
     # Step 5: Determine status based on outcomes
     computed_samples_count = len(computed_samples)

@@ -28,6 +28,9 @@ from mascope_backend.api.controllers.match.collections.match_collections_control
 from mascope_backend.api.controllers.match.samples.match_samples_controller import (
     delete_match_samples,
 )
+from mascope_backend.socket.records.service import (
+    emit_record_deleted,
+)
 
 from mascope_backend.runtime import runtime
 
@@ -168,6 +171,15 @@ async def remove_matches(
         message += f" ({orphaned_match_data.isotopes_count} orphaned isotope matches)"
 
     runtime.logger.info(message)
+
+    # Emit "sample_match_deleted" or "batch_match_deleted" notification event
+    record_type = "sample_match" if sample else "batch_match"
+    record_id = sample_item_id if sample else sample_batch_id
+    await emit_record_deleted(
+        record_type=record_type,
+        record_id=record_id,
+        room=sample.sample_batch_id if sample else sample_batch_id,
+    )
 
     return {
         "status": "success",

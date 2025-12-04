@@ -71,7 +71,9 @@ from mascope_backend.api.models.match.collections.match_collection_pydantic_mode
 from mascope_backend.api.models.match.samples.match_sample_pydantic_model import (
     MatchSampleBase,
 )
-
+from mascope_backend.socket.records.service import (
+    emit_record_created,
+)
 
 from mascope_backend.runtime import runtime
 
@@ -411,7 +413,8 @@ async def aggregate_and_create_matches(
 ) -> dict:
     """
     Processes aggregated match data by first aggregating data based on given filters and then creating
-    entries for each type of match data.
+    entries for each type of match data. After creating the entries, emit notification events for each
+    affected sample item.
 
     Steps:
     1. Aggregate match data based on the provided parameters.
@@ -430,6 +433,7 @@ async def aggregate_and_create_matches(
         return {
             "message": str(e),
         }
+
     # Aggregate the match data
     aggregated_result = await aggregate_matches(
         sample_batch_id=sample_batch_id,
@@ -506,6 +510,22 @@ async def aggregate_and_create_matches(
         # Collect sample_item_ids from created records
         for record in result.get("data", []):
             sample_item_ids.add(record.get("sample_item_id"))
+
+    # After all creations, emit notification events for each affected sample item
+    for sample_item_id in sample_item_ids:
+        if not sample_batch_id:
+            sample = await fetch_sample(sample_item_id)
+            sample_batch_id = sample.sample_batch_id
+        # Emit "sample_match_created" notification event
+        await emit_record_created(
+            record_type="sample_match",
+            record_id=sample_item_id,
+            record={
+                "sample_item_id": sample_item_id,
+                "sample_batch_id": sample_batch_id,
+            },
+            room=sample_batch_id,
+        )
 
     # Determine overall status
     statuses_set = set(statuses)
