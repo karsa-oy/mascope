@@ -191,11 +191,14 @@ onBeforeUnmount(() => {
   plot.value?.removeEventListener('plotly_selected', handleSelect)
 })
 
-const ready = computed(
-  () => created.value && props.data && derived.value.layout && app.ui.split.right
-)
+const ready = computed(() => created.value && derived.value.layout && app.ui.split.right)
 
-watchEffect(
+const dataReady = computed(() => {
+  return props.data
+})
+
+watch(
+  () => ready.value,
   () => {
     if (ready.value) {
       console.log(`📊 [chart] redrawing chart ${props.id} with height ${props.height}`)
@@ -209,6 +212,17 @@ watchEffect(
     }
   },
   { flush: 'post' }
+)
+
+watch(
+  () => props.data,
+  () => {
+    if (ready.value && dataReady.value) {
+      console.debug(`📊 [${props.id}] updating chart data`)
+      Plotly.react(plot.value, props.data, derived.value.layout, derived.value.config)
+    }
+  },
+  { deep: true }
 )
 </script>
 
