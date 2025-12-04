@@ -6,8 +6,7 @@ import {
   useMatchCollection,
   useMatchIon,
   useMatchParams,
-  useMatchVisualized,
-  useMatchBatchOverview
+  useMatchVisualized
 } from './modules/match'
 import { usePeak } from './modules/peak'
 import { useSample } from './modules/sample'
@@ -36,8 +35,7 @@ export const useData = () => ({
     params: useMatchParams(),
     collection: useMatchCollection(),
     ion: useMatchIon(),
-    visualized: useMatchVisualized(),
-    batch_overview: useMatchBatchOverview()
+    visualized: useMatchVisualized()
   },
   acquisition: useAcquisition()
 })

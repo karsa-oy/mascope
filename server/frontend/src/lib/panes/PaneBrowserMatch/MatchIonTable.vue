@@ -177,11 +177,11 @@ watch(
     <DataTable
       :value="app.data.match.ion.list"
       dataKey="target_ion_id"
-      v-model:selection="app.data.match.ion.focused"
+      v-model:selection="app.data.match.ion.selected"
       v-model:expandedRows="expandedRows"
       v-model:filters="filters"
-      selectionMode="single"
-      :metaKeySelection="false"
+      selectionMode="multiple"
+      :metaKeySelection="true"
       contextMenu
       v-model:contextMenuSelection="ionContextMenu.selection"
       @rowContextmenu="

@@ -37,7 +37,7 @@ export const useMatchIon = defineStore('app.data.match.ion', () => {
           ? { sample_item_ids: [sampleId], target_collection_id: collectionId }
           : { sample_batch_id: batchId, target_collection_id: collectionId }
       },
-      selection: true
+      selection: { mode: 'multiple' }
     }
   )
 

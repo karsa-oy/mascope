@@ -209,7 +209,7 @@ watch(traces, () => {
 
 // Watch loading state for loading spinner
 watch(
-  () => app.data.match.batch_overview.pending,
+  () => data.pending,
   (isLoading) => {
     if (loadingTimeout) {
       clearTimeout(loadingTimeout)
