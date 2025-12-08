@@ -120,17 +120,6 @@ onMounted(() => {
           <BaseCopyableField :field="num.relativeAbundance.format(data.relative_abundance)" />
         </template>
       </Column>
-
-      <!-- Resolution Column -->
-      <Column header="Resolution" field="resolution" sortable>
-        <template #body="{ data }">
-          <BaseCopyableField
-            :field="
-              data.resolution ? num.resolution?.format?.(data.resolution) || data.resolution : 'N/A'
-            "
-          />
-        </template>
-      </Column>
     </DataTable>
   </div>
 </template>
