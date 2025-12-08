@@ -242,6 +242,9 @@ async def create_sample_file(
             auto_process_sample_file,
         )
 
+        #  TODO Most likely can be moved to module imports after removing circular import
+        # with process_instrument_config https://github.com/karsa-oy/mascope/issues/1248
+
         background_tasks.add_task(
             auto_process_sample_file,
             sample_file_id=new_sample_file.sample_file_id,

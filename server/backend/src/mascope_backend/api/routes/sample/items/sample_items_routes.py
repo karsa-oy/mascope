@@ -79,10 +79,8 @@ async def create_sample_item_route(
 @sample_items_router.patch("/{sample_item_id}")
 @api_route()
 async def update_sample_item_route(
-    request: Request,
     sample_item_id: str,
     body: SampleItemUpdateBody,
-    background_tasks: BackgroundTasks,
     user=Depends(editor_user),
 ):
     """Update an existing sample item's details.
@@ -95,17 +93,10 @@ async def update_sample_item_route(
     # Check if locked sample item - only owners can update
     await locked_access(user, SampleItem, sample_item_id, min_role="owner")
 
-    sid = request.headers.get("X-SID")
-    process_id = gen_id(8)  # generate id for potential process_instrument_config
-
     return await update_sample_item(
         sample_item_id=sample_item_id,
         sample_item=body.sample_item,
-        instrument_config=body.instrument_config,
-        background_tasks=background_tasks,
         independent_transaction=True,
-        sid=sid,
-        process_id=process_id,
     )
 
 

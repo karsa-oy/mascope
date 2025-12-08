@@ -251,10 +251,6 @@ class SampleItemUpdateBody(BaseModel):
     sample_item: SampleItemUpdate = Field(
         ..., description="The sample item fields to update"
     )
-    instrument_config: SetInstrumentConfigBody | None = Field(
-        None,
-        description="An instrument config to set for the sample item.",
-    )
 
 
 class SampleItemsDeleteBody(BaseModel):

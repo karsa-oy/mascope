@@ -1,5 +1,4 @@
 from datetime import datetime, timezone
-from fastapi import BackgroundTasks
 
 import numpy as np
 import pandas as pd
@@ -63,13 +62,6 @@ from mascope_backend.api.models.sample.items.sample_item_pydantic_model import (
     SampleItemCreate,
     SampleItemRead,
     SampleItemUpdate,
-)
-from mascope_backend.api.new.instrument_configs.service import get_instrument_config
-from mascope_backend.api.new.instrument_configs.schemas import (
-    SetInstrumentConfigBody,
-)
-from mascope_backend.api.new.instrument_configs.process.service import (
-    process_instrument_config,
 )
 
 from mascope_backend.runtime import runtime
@@ -337,55 +329,35 @@ async def create_sample_items(
 async def update_sample_item(
     sample_item_id: str,
     sample_item: SampleItemUpdate,
-    instrument_config: SetInstrumentConfigBody | None = None,
-    background_tasks: BackgroundTasks | None = None,
     independent_transaction: bool = False,
-    sid: str | None = None,
-    process_id: str | None = None,
 ) -> dict:
     """
     Updates an existing sample item with new data provided in the sample item update request body.
 
     Steps:
-    1. Fetch the existing sample item by its ID from the database.
-    2. If the sample item is found, update its properties with the new data provided.
-    3. Set the sample item's modification timestamp to the current UTC time.
-    4. Commit the updated sample item to the database.
-    5. Process instrument configs for the sample item if needed.
-    6. Reload of sample batch happens in the end of update operation if only basic fields were updated,
-        or in the end of potential process_instrument_config.
+    - Fetch the existing sample item by its ID from the database.
+    - If the sample item is found, update its properties with the new data provided.
+    - Set the sample item's modification timestamp to the current UTC time.
+    - Commit the updated sample item to the database.
+    - Reload of sample batch happens in the end of update operation if only basic fields were updated.
 
     :param sample_item_id: The unique identifier of the sample item to update.
     :type sample_item_id: str
     :param sample_item: The new data for the sample item update.
     :type sample_item: SampleItemUpdate
-    :param instrument_config: Optional instrument configuration to process.
-    :type instrument_config: SetInstrumentConfigBody | None
-    :param background_tasks: FastAPI background tasks for processing instrument config post-update.
-    :type background_tasks: BackgroundTasks | None
     :param independent_transaction: Flag to indicate if the operation should be treated as an independent transaction.
     :type independent_transaction: bool
-    :param sid: Socket.IO session ID, used for emitting notifications to specific clients.
-    :type sid: str | None
-    :param process_id: Process identifier for tracking background operations.
-    :type process_id: str | None
     :raises NotFoundException: If no sample item is found with the provided ID.
     :return: The updated sample item data as a dictionary.
     :rtype: dict[str, Any]
     """
-    # verify instrument config exists
-    if instrument_config and instrument_config.instrument_function_id is not None:
-        await get_instrument_config(
-            instrument_function_id=instrument_config.instrument_function_id
-        )
-
-    # Step 1: Fetch the existing sample item
+    # --- Fetch the existing sample item ---
     async with async_session() as session:
         existing_sample_item = await session.get(SampleItem, sample_item_id)
         if not existing_sample_item:
             raise NotFoundException(f"Sample item with ID '{sample_item_id}' not found")
 
-        # Step 2: Update the sample item properties if anything changed
+        # --- Update the sample item properties if anything changed ---
         update_data = sample_item.model_dump(exclude_unset=True)
         changed_fields = {
             key: value
@@ -397,31 +369,14 @@ async def update_sample_item(
             for key, value in changed_fields.items():
                 setattr(existing_sample_item, key, value)
 
-            # Step 3: Update modification timestamp
+            # --- Update modification timestamp ---
             existing_sample_item.sample_item_utc_modified = datetime.now(timezone.utc)
 
-            # Step 4: Commit the updates
+            # --- Commit the updates ---
             await session.commit()
             await session.refresh(existing_sample_item)
 
-    # Step 5: Process instrument config
-    sample = await fetch_sample(sample_item_id)
-    current_instrument_id = getattr(sample, "instrument_function_id", None)
-
-    # Process only if there's a new record or the instrument_function_id changed
-    if instrument_config is not None and (
-        instrument_config.new_record
-        or instrument_config.instrument_function_id != current_instrument_id
-    ):
-        background_tasks.add_task(
-            process_instrument_config,
-            filenames=[existing_sample_item.filename],
-            instrument_config=instrument_config,
-            independent_transaction=True,
-            sid=sid,
-            process_id=process_id,
-        )
-    # Step 6: Emit update event if fields changed
+    # --- Emit update event if fields changed ---
     sample_item_data = SampleItemRead.model_validate(existing_sample_item).model_dump()
     if changed_fields and independent_transaction:
         sample = (await get_sample(sample_item_id)).get("data")
