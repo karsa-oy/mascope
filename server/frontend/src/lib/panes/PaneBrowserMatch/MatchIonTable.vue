@@ -90,7 +90,9 @@ const mechanismMap = computed(
 // expandable rows state - only one ion can be expanded at a time
 const expandedRows = ref({})
 const expandedIonId = ref(null)
-const showExpanders = ref(true)
+const expanderIcon = computed(() =>
+  app.data.sample.focused ? 'pi ph ph-seal-question' : 'pi pi-tag'
+)
 
 // --- Filtering ---
 // Filters configuration for each column
@@ -111,25 +113,33 @@ const filterOptions = computed(() => ({
   ]
 }))
 
+//
+const focusMatchIon = async (ionId) => {
+  if (!app.data.sample.focusedId) return
+  app.ui.tab.active = 'match'
+  await app.data.match.visualized.set({
+    sampleId: app.data.sample.focusedId,
+    ionId: ionId,
+    collectionId: app.data.match.collection.focusedId
+  })
+}
+
+const unfocusMatchIon = async () => {
+  await app.data.match.visualized.clear()
+}
+
 // --- Row Expansion for match isotopes level ---
-const onRowExpand = (event) => {
-  const ionId = event.data.target_ion_id
-  if (expandedIonId.value && expandedIonId.value !== ionId) {
-    expandedRows.value = {}
-  }
-  expandedIonId.value = ionId
-  expandedRows.value = { [ionId]: true }
-}
-
-const onRowCollapse = () => {
-  expandedIonId.value = null
-}
-
-const toggleExpanders = () => {
-  showExpanders.value = !showExpanders.value
-  if (!showExpanders.value) {
+function toggleRowExpansion(ionId) {
+  if (expandedRows.value[ionId]) {
+    // Collapse
     expandedRows.value = {}
     expandedIonId.value = null
+    unfocusMatchIon()
+  } else {
+    // Expand (and collapse others)
+    expandedRows.value = { [ionId]: true }
+    expandedIonId.value = ionId
+    focusMatchIon(ionId)
   }
 }
 
@@ -170,6 +180,37 @@ watch(
   }
 )
 
+// Watch for match ion visualization changes to sync expansion state
+// This is to implement 2-way binding with batch chart click events
+watch(
+  () => app.data.match.visualized.ion,
+  (ion) => {
+    if (ion) {
+      // Prevent reloading same isotopes
+      if (expandedIonId.value === ion.target_ion_id) return
+      // Expand the corresponding row
+      expandedRows.value = { [ion.target_ion_id]: true }
+      expandedIonId.value = ion.target_ion_id
+    }
+  }
+)
+
+// Watch ion selection to collapse expanded row when changed
+// This is to avoid stale expansion when changing selection
+watch(
+  () => app.data.match.ion.selected,
+  (newSelection, oldSelection) => {
+    if (newSelection.length === oldSelection.length) {
+      // Selection not actually changed, sample and thus match.ion data changed.
+      // Skip clearing
+      return
+    }
+    expandedRows.value = {}
+    expandedIonId.value = null
+    unfocusMatchIon()
+  }
+)
+
 // Watch mechanism focus and sync to dropdown filter
 watch(
   () => app.data.ionization.mechanism.focused,
@@ -204,15 +245,6 @@ watch(
   >
     <template #menu>
       <PopoverTargetCompoundAdd :collection="app.data.match.collection.focused" />
-      <Button
-        :icon="showExpanders ? 'pi pi-eye-slash' : 'pi pi-eye'"
-        v-tooltip.right="
-          showExpanders ? 'Hide isotope expanders column' : 'Show isotope expanders column'
-        "
-        text
-        size="small"
-        @click="toggleExpanders"
-      />
     </template>
 
     <DataTable
@@ -232,9 +264,9 @@ watch(
           await ionContextMenu.onClick(event)
         }
       "
-      @rowExpand="onRowExpand"
-      @rowCollapse="onRowCollapse"
-      filterDisplay="row"
+      :expandedRowIcon="expanderIcon"
+      :collapsedRowIcon="expanderIcon"
+      filterDisplay="menu"
       resizableColumns
       size="small"
       scrollable
@@ -246,7 +278,30 @@ watch(
       <template #empty>No match ions found.</template>
 
       <!-- Expander Column -->
-      <Column v-if="showExpanders" expander style="width: 3rem" />
+      <Column expander style="width: 3rem">
+        <template #body="{ data }">
+          <Button
+            :icon="app.data.sample.focused ? 'pi ph ph-seal-question' : 'pi pi-tag'"
+            size="small"
+            text
+            :severity="expandedIonId === data.target_ion_id ? 'info' : 'secondary'"
+            v-tooltip.top="
+              app.data.sample.focusedId
+                ? 'Visualize ion match'
+                : 'Click to select sample with the best match'
+            "
+            @click="
+              async () => {
+                if (app.data.sample.focusedId) {
+                  toggleRowExpansion(data.target_ion_id)
+                } else {
+                  app.data.sample.focus({ sample_item_id: data.match.sample_item_id })
+                }
+              }
+            "
+          />
+        </template>
+      </Column>
 
       <!-- Match Score Column -->
       <Column sortable sortField="match.match_score" class="match-column">
@@ -377,5 +432,11 @@ watch(
 }
 :deep(.p-datatable-row-expansion .match-isotope-container) {
   background-color: transparent !important;
+}
+:deep(.p-button.p-button-secondary:hover) {
+  background-color: var(--p-button-contrast-hover-color) !important;
+}
+:deep(.p-button.p-button-info:hover) {
+  background-color: var(--p-button-contrast-hover-color) !important;
 }
 </style>
