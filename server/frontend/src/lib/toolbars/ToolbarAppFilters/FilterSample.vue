@@ -39,7 +39,7 @@ const label = computed(() => {
 <template>
   <Chip
     v-if="active"
-    icon="pi pi-tags"
+    :icon="app.data.sample.selected.length > 1 ? 'pi pi-tags' : 'pi pi-tag'"
     :label="label.short"
     v-tooltip.bottom="label.full"
     removable

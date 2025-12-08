@@ -8,6 +8,7 @@ import Column from 'primevue/column'
 import { BaseTabbedPanel, BaseMatchTag, BaseCopyableField } from '@/lib/base'
 import { num } from '@/lib/formatters'
 import { collectionTypeIcons } from '@/lib/constants'
+import { prettyTrim } from '@/lib/utils'
 
 import { useApp } from '@/stores'
 import { useCollectionContextMenu } from './stores'
@@ -19,17 +20,33 @@ const contextMenu = useCollectionContextMenu()
 const tableHeight = inject('match-table-height')
 
 // Breadcrumb configuration - simple single level
-const breadcrumb = computed(() => ({
-  items: [
-    {
-      icon: 'pi ph ph-crosshair',
-      label: 'Target Collections',
-      disabled: true,
-      tooltip: null
-      // No action - this is the current view
-    }
-  ]
-}))
+const breadcrumb = computed(() => {
+  const entityName = app.data.sample.focused
+    ? app.data.sample.focused.sample_item_name
+    : app.data.batch.focused?.sample_batch_name || null
+
+  if (!entityName) return null
+
+  return {
+    items: [
+      {
+        icon: app.data.sample.focused ? 'pi pi-tag' : 'pi pi-tags',
+        label: `${prettyTrim(entityName, 25)}`,
+        disabled: true,
+        tooltip: app.data.sample.focused
+          ? `Matched collections for sample:\n ${app.data.sample.focused.sample_item_name}`
+          : `Matched collections for batch:\n ${app.data.batch.focused.sample_batch_name}`
+      },
+      {
+        icon: 'pi ph ph-crosshair',
+        label: 'Target Collections',
+        disabled: true,
+        tooltip: null
+        // No action - this is the current view
+      }
+    ]
+  }
+})
 </script>
 
 <template>

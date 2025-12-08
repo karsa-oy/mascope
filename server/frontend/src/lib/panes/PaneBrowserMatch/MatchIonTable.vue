@@ -14,6 +14,7 @@ import { PopoverTargetCompoundAdd } from '@/lib/dialogs'
 import MatchIsotopeTable from './MatchIsotopeTable.vue'
 import { num } from '@/lib/formatters'
 import { collectionTypeIcons } from '@/lib/constants'
+import { prettyTrim } from '@/lib/utils'
 
 import { useApp } from '@/stores'
 import { useCollectionContextMenu, useIonContextMenu } from './stores'
@@ -29,14 +30,31 @@ const breadcrumb = computed(() => {
   const collection = app.data.match.collection.focused
   if (!collection) return null
 
+  const entityName = app.data.sample.focused
+    ? app.data.sample.focused.sample_item_name
+    : app.data.batch.focused.sample_batch_name
+
   return {
     items: [
+      {
+        icon: 'pi pi-tags',
+        disabled: false,
+        tooltip: 'Back to batch',
+        action: () => app.data.sample.unfocus()
+      },
+      {
+        icon: app.data.sample.focused ? 'pi pi-tag' : 'pi pi-tags',
+        label: `${prettyTrim(entityName, 25)}`,
+        disabled: true,
+        tooltip: app.data.sample.focused
+          ? `Matched ions for sample:\n ${app.data.sample.focused.sample_item_name}`
+          : `Matched ions for batch:\n ${app.data.batch.focused.sample_batch_name}`
+      },
       {
         icon: 'pi ph ph-crosshair',
         label: 'Target Collections',
         action: () => app.data.match.collection.unfocus(),
         tooltip: 'Back to target collections'
-        // No context menu on this level
       },
       {
         icon: collectionTypeIcons[collection.target_collection_type] || 'pi ph ph-target',
@@ -52,9 +70,8 @@ const breadcrumb = computed(() => {
           collectionContextMenu.selection = collection
           collectionContextMenu.ref?.toggle(event)
         }
-        // No action = current view
       }
-    ]
+    ].slice(app.data.sample.focused ? 0 : 1)
   }
 })
 
