@@ -135,8 +135,16 @@ const layout = computed(() => {
 async function onClick({ pointIndex, curveNumber }) {
   if (pointIndex == null || curveNumber == null) return
 
-  // Focus sample corresponding to the clicked data point
+  // Focus on the corresponding ion using the trace index
+  const trace = data.traces[curveNumber]
+  if (!trace?.matchData) return
+
+  await app.data.match.visualized.clear()
+
+  const { target_ion_id } = trace.matchData
   const sample = app.data.sample.list[pointIndex]
+
+  // Focus sample corresponding to the clicked data point
   if (sample) {
     app.data.sample.focus(sample)
     // Scroll to sample in table
@@ -145,15 +153,9 @@ async function onClick({ pointIndex, curveNumber }) {
     app.data.sample.unfocus()
   }
 
-  // Focus on the corresponding ion using the trace index
-  const trace = data.traces[curveNumber]
-  if (!trace?.matchData) return
-
-  const { target_ion_id } = trace.matchData
-
   app.ui.tab.active = 'match'
   await app.data.match.visualized.set({
-    sampleId: app.data.sample.focusedId,
+    sampleId: sample.sample_item_id,
     ionId: target_ion_id,
     collectionId: app.data.match.collection.focusedId
   })
@@ -206,6 +208,7 @@ watch(() => app.data.sample.selectedIds, syncChartSelection)
 // Watch traces changes (collection focus/unfocus, data reload, scale changes)
 watch(traces, () => {
   // Reapply selection whenever traces change
+  if (data.pending) return // Skip syncing during loading to prevent blinking
   syncChartSelection()
 })
 
