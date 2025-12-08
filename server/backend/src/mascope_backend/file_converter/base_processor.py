@@ -214,12 +214,26 @@ class BaseFileProcessor(Thread, ABC, metaclass=FileProcessorMeta):
         data_raw_path = os.path.join(target_dir, f"data{self.file_extension}")
         shutil.copy(source_path, data_raw_path)
 
-    def _create_db_record(self, sample_file_props: SampleFileProps) -> None:
-        """Create database record for the sample file."""
+    def _create_db_record(
+        self,
+        sample_file_props: SampleFileProps,
+        instrument_function_id: str,
+    ) -> None:
+        """
+        Create database record for the sample file.
+
+        :param sample_file_props: File properties
+        :type sample_file_props: SampleFileProps
+        :param instrument_function_id: FK to instrument config
+        :type instrument_function_id: str
+        :raises RuntimeError: If database record creation fails
+        """
         try:
             file_context = self._get_file_context()
             create_sample_file_db_record(
-                sample_file_props, access_token=file_context.access_token
+                sample_file_props,
+                instrument_function_id,
+                access_token=file_context.access_token,
             )
 
         except Exception as e:
@@ -258,9 +272,12 @@ class BaseFileProcessor(Thread, ABC, metaclass=FileProcessorMeta):
     def _create_instrument_config(
         self,
         sample_file_props: SampleFileProps,
-    ) -> tuple[any, any]:
+    ) -> tuple[str, any, any]:
         """Create instrument config. Fit instrument functions (sub-class specific)
         and write to database
+
+        :rtype: tuple[str, any, any]
+        :return: Tuple of (instrument_function_id, peakshape_numpy, resolution_function_partial)
         """
         (
             peakshape,
@@ -271,13 +288,13 @@ class BaseFileProcessor(Thread, ABC, metaclass=FileProcessorMeta):
 
         file_context = self._get_file_context()
 
-        create_instrument_config_db_record(
+        instrument_function_id = create_instrument_config_db_record(
             sample_file_props,
             peakshape,
             resolution_function,
             access_token=file_context.access_token,
         )
-        return peakshape_numpy, resolution_function_partial
+        return instrument_function_id, peakshape_numpy, resolution_function_partial
 
     def _emit_progress_notification(self, progress: int):
         """Emit file processing progress notification."""
@@ -366,8 +383,10 @@ class BaseFileProcessor(Thread, ABC, metaclass=FileProcessorMeta):
 
             self._emit_progress_notification(10)
 
-            # Fit instrument functions
-            instrument_functions = self._create_instrument_config(sample_file_props)
+            # Fit instrument functions and get the ID
+            instrument_function_id, *instrument_functions = (
+                self._create_instrument_config(sample_file_props)
+            )
 
             self._emit_progress_notification(25)
 
@@ -376,8 +395,8 @@ class BaseFileProcessor(Thread, ABC, metaclass=FileProcessorMeta):
 
             self._emit_progress_notification(90)
 
-            # Create database record
-            self._create_db_record(sample_file_props)
+            # Create sample file DB record with instrument config FK
+            self._create_db_record(sample_file_props, instrument_function_id)
 
             self._emit_progress_notification(100)
 

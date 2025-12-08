@@ -16,6 +16,9 @@ FILE_UPLOAD_SIZE_LIMIT = 2.5 * 1024**3  # 2.5 GB
 
 
 class SampleFileBase(BaseModel):
+    instrument_function_id: str = Field(
+        ..., description="FK to instrument config used for processing this file"
+    )
     filename: str = Field(..., description="Name of the sample file")
     instrument: str = Field(..., description="Instrument associated with the file")
     method_file: Optional[str] = Field(None, description="Instrument config name")

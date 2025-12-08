@@ -18,11 +18,15 @@ HOST = runtime.config.server if runtime.mode == "prod" else "localhost"
 URL = f"http://{HOST}:{runtime.meta.api_port}"
 
 
-def create_sample_file_db_record(data: SampleFileProps, access_token: str) -> None:
+def create_sample_file_db_record(
+    data: SampleFileProps, instrument_function_id: str, access_token: str
+) -> None:
     """Create a sample file database record via HTTP request.
 
     :param data: Sample file object to create
     :type data: SampleFileProps
+    :param instrument_function_id: FK to instrument config
+    :type instrument_function_id: str
     :param access_token: Access token required for request authentication
     :type access_token: str
     :raises Exception: HTTP request failed
@@ -36,6 +40,7 @@ def create_sample_file_db_record(data: SampleFileProps, access_token: str) -> No
     date_utc = (datetime.fromisoformat(date) - utc_offset).isoformat()
 
     sample_file_db_record = {
+        "instrument_function_id": instrument_function_id,
         "filename": data.filename,
         "instrument": get_instrument_name(data.filename),
         "datetime": date,
@@ -157,13 +162,15 @@ def create_instrument_config_db_record(
     peakshape: PeakShape,
     resolution_function: list,
     access_token: str,
-) -> None:
+) -> str:
     """Create an instrument configuration database record via HTTP request.
 
     :param instrument_config: Instrument configuration object to create
     :type instrument_config: dict
     :param access_token: Access token required for request authentication
     :type access_token: str
+    :return: The created instrument_function_id
+    :rtype: str
     :raises Exception: HTTP request failed
     """
     runtime.logger.info(
@@ -202,6 +209,8 @@ def create_instrument_config_db_record(
             raise Exception(
                 f"Failed to create database record! Status code: {response.status_code}"
             )
+
+        return (response.json())["data"]["instrument_function_id"]
 
     except requests.exceptions.RequestException as e:
         raise Exception(

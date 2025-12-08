@@ -203,52 +203,25 @@ async def create_instrument_config(
     """
     Creates a new instrument function with the provided details.
 
-    Steps:
-    1. Check for conflicting instrument configs
-    2. Construct a new InstrumentConfig object with the provided details and a generated unique ID.
-    3. Add the new instrument function to the session and commit the changes to the database.
-    4. Refresh the instance and return the details of the created instrument function as a dictionary.
+    NOTE: Always creates a new record with unique ID, even if instrument/method_file
+    combination exists. Each sample file has its own instrument config.
 
     :param config: Data for creating the instrument function.
     :type config: InstrumentConfigCreateBody
     :return: A dictionary containing the created instrument function data.
     :rtype: dict
     """
-    # Step 1: Check for conflicting instrument configs
-    conflicts = (
-        await get_instrument_configs(
-            instrument=instrument_config.instrument,
-            method_file=instrument_config.method_file,
-        )
-    )["data"]
-    if conflicts:
-        # If conflict exists, log warning and return existing config
-        existing_config = conflicts[0]
-        message = (
-            f"Instrument config with method_file '{instrument_config.method_file}' "
-            f"already exists for instrument '{instrument_config.instrument}'. "
-            f"Using existing config: {existing_config.get('method_file')}"
-        )
-        runtime.logger.warning(message)
-
-        return {
-            "message": message,
-            "data": existing_config,
-        }
 
     async with async_session() as session:
-        # Step 2: Construct new instrument function
         new_instrument_config = InstrumentConfig(
             instrument_function_id=gen_id(32),
             **instrument_config.model_dump(),  # Unpack the Pydantic model's data
         )
 
-        # Step 3: Add to session and commit the changes to the database
         session.add(new_instrument_config)
         await session.commit()
-
-        # Step 4: Refresh the instance and return created instrument function
         await session.refresh(new_instrument_config)
+
         return {
             "message": "Instrument config created successfully.",
             "data": new_instrument_config.to_dict(),
