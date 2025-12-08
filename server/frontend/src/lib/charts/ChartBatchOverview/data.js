@@ -1,4 +1,4 @@
-import { ref, computed, watch, watchEffect } from 'vue'
+import { ref, computed, watch, watchEffect, onUnmounted } from 'vue'
 import { defineStore } from 'pinia'
 import { api } from '@/api'
 import { beautifySnakeCase } from '@/lib/utils'
@@ -160,6 +160,12 @@ export const useChartData = defineStore('chart.batch.overview', () => {
   api.socket.on('batch_match_deleted', (event) => {
     console.debug('📬 [api:sio] batch_match_deleted received:', event)
     handleBatchMatchRemoval(event)
+  })
+
+  onUnmounted(() => {
+    api.socket.off('sample_match_created', handleNewSample)
+    api.socket.off('sample_match_deleted', handleSampleMatchRemoval)
+    api.socket.off('batch_match_deleted', handleBatchMatchRemoval)
   })
   /**
    * X-axis field selection
