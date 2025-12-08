@@ -56,14 +56,14 @@ const breadcrumb = computed(() => {
     :contextMenu="contextMenu"
     :pt="
       app.ui.help.right(`
-        <h1>Target Browser: Collections</h1>
+        <h1>Match Browser: Collections</h1>
 
         <p>Shows the target collections associated
         with the currently selected batch, and provides
         features for managing them.</p>
 
         <p>
-        Click on a collection to view its targets.
+        Click on a collection to view the matched ions within the selected batch.
         </p>
 
         <p>

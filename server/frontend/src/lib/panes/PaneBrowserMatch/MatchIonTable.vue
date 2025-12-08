@@ -229,16 +229,21 @@ watch(
     :loading="app.data.match.ion.pending"
     :pt="
       app.ui.help.right(
-        `<h1>Target Browser: Ions</h1>
+        `<h1>Match Browser: Ions</h1>
         <p>
-        Shows target ions of the selected collection. Use column filters to search and filter results.
+        Shows matched ions of the selected collection. Use column filters to search and filter results.
         </p>
         <p>
-        If a sample is selected, shows match scores for each ion based on the sample data. Click on an ion
-        to visualize the match in Match View.
+        If a single sample is selected, shows match scores for each ion based on the sample data. Click on 
+        the match icon <span class='pi ph ph-seal-question'></span> on a row to visualize the match in Match View,
+        and see the individual isotope matches.
         </p>
         <p>
-        Right click on any ion to manage its parent compound. Click the expand icon to view isotope data for that ion.
+        If multiple samples are selected, shows the top match score of all batch samples for each ion.
+        Click on the sample icon <span class='pi pi-tag'></span> on a row to select the sample with the best match.
+        </p>
+        <p>
+        Right click on any ion to manage its parent compound.
         </p>`
       )
     "
