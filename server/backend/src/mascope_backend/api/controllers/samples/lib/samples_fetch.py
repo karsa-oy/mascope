@@ -46,7 +46,7 @@ async def fetch_samples(sample_item_ids: list[str]) -> list[Sample]:
 
     :param sample_item_ids: Unique identifiers of the samples to retrieve.
     :type sample_item_ids: list[str]
-    :raises NotFoundException: If any of the samples with the given IDDs are not found.
+    :raises NotFoundException: If any of the samples with the given IDs are not found.
     :return: The requested samples' SQLAlchemy models.
     :rtype: list[Sample]
     """

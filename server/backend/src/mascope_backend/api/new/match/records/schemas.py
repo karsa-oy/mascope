@@ -73,7 +73,7 @@ class MatchIonRecordsBody(RequestBodyModel):
 
         if sample_item_ids and sample_batch_id:
             raise ValueError(
-                "Please specify only one: either a sample item ID or a sample batch ID, not both."
+                "Please specify only one: either sample item IDs or a sample batch ID, not both."
             )
 
         if sample_item_ids and len(sample_item_ids) == 0:
@@ -84,7 +84,7 @@ class MatchIonRecordsBody(RequestBodyModel):
     @model_validator(mode="after")
     @classmethod
     def validate_target_filter(cls, values):
-        """Validate that only one of target_collection_id and target_ion_id is provided"""
+        """Validate that only one of target_collection_id and target_ion_ids is provided"""
         target_collection_id, target_ion_ids = (
             values.target_collection_id,
             values.target_ion_ids,
@@ -92,7 +92,7 @@ class MatchIonRecordsBody(RequestBodyModel):
 
         if target_collection_id and target_ion_ids:
             raise ValueError(
-                "Please specify only one: either a target collection ID or a target ion ID, not both."
+                "Please specify only one: either a target collection ID or target ion IDs, not both."
             )
 
         return values
