@@ -51,10 +51,10 @@ export const useSample = defineStore('app.data.sample', () => {
         use: 'create',
         type: 'create_sample'
       }),
-    update: ({ sample, instrument_config }) =>
+    update: ({ sample }) =>
       api.http.patch(
         `/sample/items/${sample.sample_item_id}`,
-        { sample_item: sample, instrument_config: instrument_config },
+        { sample_item: sample },
         {
           use: 'update',
           type: 'update_sample'

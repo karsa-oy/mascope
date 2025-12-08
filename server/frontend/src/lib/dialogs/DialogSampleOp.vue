@@ -233,8 +233,8 @@ async function save() {
         ) ?? {}
     )
   }
-  const { instrument_config } = instrumentConfig.payload
   if (props.action == 'create') {
+    const { instrument_config } = instrumentConfig.payload
     await app.data.sample.process({
       sample: {
         filename: input.filename,
@@ -248,8 +248,7 @@ async function save() {
         ...props.item, // To include sample_item_id
         ...sample_item,
         filename: input.filename
-      },
-      instrument_config
+      }
     })
   }
 }
@@ -386,7 +385,7 @@ const polarityOptions = computed(() => {
                 <InputText id="item-filename" v-model="input.filename" required disabled />
                 <label for="item-filename"> Filename </label>
               </FloatLabel>
-              <InstrumentConfigSelector v-model="instrumentConfig" />
+              <InstrumentConfigSelector v-model="instrumentConfig" :disabled="true" />
 
               <FloatLabel>
                 <Select

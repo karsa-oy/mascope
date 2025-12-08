@@ -5,14 +5,31 @@ import Select from 'primevue/select'
 import SelectButton from 'primevue/selectbutton'
 
 const instrumentConfig = defineModel()
+
+const props = defineProps({
+  disabled: {
+    type: Boolean,
+    default: false
+  }
+})
 </script>
 
 <template>
-  <div class="input-group row" v-if="instrumentConfig.input?.ready">
+  <div
+    class="input-group row"
+    v-if="instrumentConfig.input?.ready"
+    v-tooltip.top="{
+      value: instrumentConfig.input?.selected?.method_file
+        ? 'Instrument config is assigned during file upload and auto-processing'
+        : 'No instrument config assigned. Go to Instrument Config tab to create one for this file',
+      showDelay: 300
+    }"
+  >
     <FloatLabel v-if="instrumentConfig.input.creating" class="config-input">
       <InputText
         id="pending-instrument-config"
         v-model="instrumentConfig.input.new.method_file"
+        :disabled="disabled"
         required
       />
       <label for="pending-instrument-config"> Instrument config </label>
@@ -23,6 +40,7 @@ const instrumentConfig = defineModel()
         v-model="instrumentConfig.input.selected"
         :options="instrumentConfig.input.options"
         :invalid="instrumentConfig.status?.invalid"
+        :disabled="disabled"
         optionLabel="method_file"
       />
       <label for="select-instrument-config"> Instrument config </label>
@@ -50,6 +68,7 @@ const instrumentConfig = defineModel()
       optionDisabled="disabled"
       dataKey="value"
       :allowEmpty="false"
+      :disabled="disabled"
       style="width: 70px; flex-shrink: 0"
     >
       <template #option="{ option }">

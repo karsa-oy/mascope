@@ -67,44 +67,40 @@ api.http
   })
   .then(([sample_file]) => {
     sampleFile.value = sample_file
-    // load instrument configs
-    api.http
-      .get(`/instrument_configs`, {
-        params: {
-          filename: input.value.filename
-        },
-        use: 'read',
-        type: 'load_instrument_configs'
-      })
-      .then((instrument_configs) => {
-        if (instrument_configs?.length > 0) {
-          // populate options
-          input.value.options = instrument_configs
-          // resolve current config (if valid)
-          const sampleFileConfig = sample_file ? sample_file.method_file : null
-          const sampleFileConfigValid = sampleFileConfig
-            ? instrument_configs.map(({ method_file }) => method_file).includes(sampleFileConfig)
-            : false
-          const currentConfig = sampleFileConfigValid ? sampleFileConfig : null
-          // find the latest config
-          const latestConfig = instrument_configs.sort((a, b) =>
-            a.datetime_utc > b.datetime_utc ? -1 : a.datetime_utc < b.datetime_utc ? 1 : 0
-          )[0]?.method_file
-          // autoselect initial config
-          const initialConfig = currentConfig ?? latestConfig
-          input.value.selected = instrument_configs.find(
-            ({ method_file }) => method_file == initialConfig
-          )
-        }
-        // initialize other values
-        input.value.new = {
-          method_file: null
-        }
-        input.value.creating = !selectable.value
-        // mark ready
-        input.value.ready = true
-      })
+
+    // TODO remove/refactor component during https://github.com/karsa-oy/mascope/issues/1248
+    // sample has instrument_function_id, fetch that config directly
+    if (sample_file?.instrument_function_id) {
+      api.http
+        .get(`/instrument_configs/by_id/${sample_file.instrument_function_id}`, {
+          use: 'read',
+          type: 'get_instrument_config'
+        })
+        .then((config) => {
+          input.value.selected = config
+          input.value.options = [config]
+          input.value.creating = false
+          input.value.ready = true
+        })
+        .catch((error) => {
+          console.warn('Instrument config not found by ID', error)
+          // Config not found - treat as no config
+          input.value.selected = null
+          input.value.options = []
+          input.value.creating = true
+          input.value.new = { method_file: null }
+          input.value.ready = true
+        })
+    } else {
+      // Legacy sample files without instrument_function_id - show nothing
+      input.value.selected = null
+      input.value.options = []
+      input.value.creating = true
+      input.value.new = { method_file: null }
+      input.value.ready = true
+    }
   })
+
 api.http
   .get('/params', {
     type: 'read_params'
