@@ -1127,6 +1127,7 @@ async def match_compute_batch(
                 f"Computing match isotopes for sample '{sample.sample_item_name}' failed: {e}"
             )
             failed_samples.append(sample.sample_item_id)
+            continue
 
         # Step 4: Aggregate higher-level matches and update timestamps
         match_aggregate_result = await aggregate_and_create_matches(

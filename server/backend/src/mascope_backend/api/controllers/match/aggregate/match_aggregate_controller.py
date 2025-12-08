@@ -416,6 +416,8 @@ async def aggregate_and_create_matches(
     entries for each type of match data. After creating the entries, emit notification events for each
     affected sample item.
 
+    Note: For notification events, all samples are assumed to belong to the same sample batch.
+
     Steps:
     1. Aggregate match data based on the provided parameters.
     2. If data exists, create entries for each type of aggregated match data.
@@ -512,10 +514,13 @@ async def aggregate_and_create_matches(
             sample_item_ids.add(record.get("sample_item_id"))
 
     # After all creations, emit notification events for each affected sample item
+    if not sample_batch_id and sample_item_ids:
+        # fetch any sample to get the batch ID
+        first_sample_item_id = next(iter(sample_item_ids))
+        sample = await fetch_sample(first_sample_item_id)
+        sample_batch_id = sample.sample_batch_id
+
     for sample_item_id in sample_item_ids:
-        if not sample_batch_id:
-            sample = await fetch_sample(sample_item_id)
-            sample_batch_id = sample.sample_batch_id
         # Emit "sample_match_created" notification event
         await emit_record_created(
             record_type="sample_match",
