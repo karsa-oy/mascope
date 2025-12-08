@@ -32,7 +32,7 @@ const breadcrumb = computed(() => {
 
   const entityName = app.data.sample.focused
     ? app.data.sample.focused.sample_item_name
-    : app.data.batch.focused.sample_batch_name
+    : app.data.batch.focused?.sample_batch_name || ''
 
   return {
     items: [
@@ -113,7 +113,7 @@ const filterOptions = computed(() => ({
   ]
 }))
 
-//
+// --- Row Expansion for match ion visualization and isotopes ---
 const focusMatchIon = async (ionId) => {
   if (!app.data.sample.focusedId) return
   app.ui.tab.active = 'match'
@@ -128,7 +128,6 @@ const unfocusMatchIon = async () => {
   await app.data.match.visualized.clear()
 }
 
-// --- Row Expansion for match isotopes level ---
 function toggleRowExpansion(ionId) {
   if (expandedRows.value[ionId]) {
     // Collapse

@@ -156,7 +156,7 @@ const tabs = computed(() => [
                 <PaneTabAcquisitions :active="app.ui.tab.active == 'acquisitions'" />
               </TabPanel>
               <TabPanel value="batch">
-                <PaneTabBatch :active="app.ui.tab.active == 'batch'" />
+                <PaneTabBatch />
               </TabPanel>
               <TabPanel value="sample" :pt="{ content: { style: { padding: 0 } } }">
                 <PaneTabSample v-if="app.ui.tab.active == 'sample'" />
