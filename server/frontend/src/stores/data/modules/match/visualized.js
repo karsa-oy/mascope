@@ -53,6 +53,11 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
     ionId = cache.ionId,
     collectionId = cache.collectionId
   }) {
+    console.debug('[🧬 data match.visualized] Set', {
+      sampleId,
+      ionId,
+      collectionId
+    })
     const sampleChanged = sampleId !== cache.sampleId
     const ionChanged = ionId !== cache.ionId
     const collectionChanged = collectionId !== cache.collectionId
@@ -84,6 +89,7 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
   }
 
   async function clear() {
+    console.debug('[🧬 data match.visualized] Clear')
     if (!ion.value) {
       return
     }
@@ -161,6 +167,7 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
   watch(
     () => sample.focused,
     async (focusedSample) => {
+      console.debug('[🧬 data match.visualized] React to sample.focused')
       // Only update if we have an active visualization and a focused sample
       if (!ion.value || !focusedSample) {
         clear()
