@@ -73,16 +73,18 @@ export const useChartData = defineStore('chart.batch.overview', () => {
     // Process newly selected ions
     const newlySelectedIds = nextSelected.filter((id) => !prevSelected.includes(id))
 
-    for (const ionId of newlySelectedIds) {
+    if (newlySelectedIds.length > 0) {
       const sampleItemIds = app.data.sample.list.map((s) => s.sample_item_id)
-      const newRecords = await fetchMatchRecords(sampleItemIds, [ionId])
-
-      console.debug(
-        `🔄 [chart.batch.overview] adding ${newRecords.length} datapoints for newly selected ion ${ionId}`
+      const promises = newlySelectedIds.map((ionId) =>
+        fetchMatchRecords(sampleItemIds, [ionId]).then((newRecords) => {
+          console.debug(
+            `🔄 [chart.batch.overview] adding ${newRecords.length} datapoints for newly selected ion ${ionId}`
+          )
+          records.value = [...records.value, ...newRecords]
+        })
       )
-      records.value = [...records.value, ...newRecords]
+      await Promise.all(promises)
     }
-
     pending.value = false
   }
 
