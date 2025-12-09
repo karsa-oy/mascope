@@ -243,6 +243,24 @@ async function save() {
       instrument_config
     })
   } else if (props.action == 'update') {
+    // creating new instrument config
+    if (
+      instrumentConfig.input?.creating &&
+      instrumentConfig.payload?.instrument_config?.new_record
+    ) {
+      await api.http.post(
+        '/instrument_configs/process',
+        {
+          filename: input.filename,
+          instrument_config: instrumentConfig.payload.instrument_config
+        },
+        {
+          use: 'process',
+          type: 'process_instrument_config'
+        }
+      )
+    }
+
     await app.data.sample.update({
       sample: {
         ...props.item, // To include sample_item_id
@@ -272,13 +290,7 @@ const invalid = computed(() => {
   const invalidUpdate = action.value === 'update' && !changedInput.value // * see note below
   const allowedPolarities = ['+', '-']
   const polarityInvalid = !allowedPolarities.includes(input.polarity)
-  return (
-    !input.type ||
-    polarityInvalid ||
-    missingRequiredFields ||
-    instrumentConfig.status?.invalid ||
-    invalidUpdate
-  )
+  return !input.type || polarityInvalid || missingRequiredFields || invalidUpdate
 })
 
 const invalidMessage = computed(() => {
