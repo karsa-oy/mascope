@@ -18,12 +18,14 @@ import { prettyTrim } from '@/lib/utils'
 
 import { useApp } from '@/stores'
 import { useCollectionContextMenu, useIonContextMenu } from './stores'
+import { useSampleScroller } from '@/lib/panes/PaneBrowserSample/stores'
 import MatchCollectionContextMenu from './MatchCollectionContextMenu.vue'
 import MatchIonContextMenu from './MatchIonContextMenu.vue'
 
 const app = useApp()
 const collectionContextMenu = useCollectionContextMenu()
 const ionContextMenu = useIonContextMenu()
+const scroller = useSampleScroller()
 
 // --- Breadcrumb Navigation ---
 const breadcrumb = computed(() => {
@@ -140,6 +142,12 @@ function toggleRowExpansion(ionId) {
     expandedIonId.value = ionId
     focusMatchIon(ionId)
   }
+}
+
+const focusSampleWithBestMatch = (sampleId) => {
+  if (!sampleId) return
+  app.data.sample.focus({ sample_item_id: sampleId })
+  scroller.scrollToSample(sampleId)
 }
 
 const autoSelectTopMatches = (top = 30) => {
@@ -299,7 +307,7 @@ watch(
                 if (app.data.sample.focusedId) {
                   toggleRowExpansion(data.target_ion_id)
                 } else {
-                  app.data.sample.focus({ sample_item_id: data.match.sample_item_id })
+                  focusSampleWithBestMatch(data.match.sample_item_id)
                 }
               }
             "
