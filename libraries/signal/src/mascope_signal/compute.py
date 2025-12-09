@@ -13,7 +13,7 @@ import mascope_file.name as m_name
 import mascope_file.io as m_io
 import mascope_thermo.thermo as m_thermo
 import mascope_tofwerk.tofwerk as m_tofwerk
-from mascope_tools.alignment.calibration import MassAligner, Spectra
+from mascope_tools.alignment.calibration import MassAligner, Spectra, CentroidedSpectrum
 
 from mascope_signal.runtime import runtime
 
@@ -719,14 +719,14 @@ def get_metadata(
 
 def sum_peak_collection(
     peak_collection: Spectra,
-) -> tuple[Spectra, float, float]:
+) -> tuple[CentroidedSpectrum, float, float]:
     """Aligns and sums provided collection of peak arrays.
 
     :param peak_collection: Peak collection to align and sum
     :type peak_collection: Spectra
     :raises ValueError: If mass alignment fails
     :return: Tuple of summed aligned peaks, min aligned m/z, max aligned m/z
-    :rtype: tuple[Spectra, float, float]
+    :rtype: tuple[CentroidedSpectrum, float, float]
     """
     # Perform alignment using virtual lock mass algorithm
     vlm_corrector = MassAligner(

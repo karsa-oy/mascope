@@ -24,6 +24,7 @@ from mascope_backend.db import async_session
 from mascope_backend.db.id import gen_id
 from mascope_backend.db.models import (
     Workspace,
+    Sample,
     SampleBatch,
     TargetCollectionInSampleBatch,
 )
@@ -1039,8 +1040,10 @@ async def get_sample_batch_peaks(
     :rtype: dict
     """
     # --- Fetch sample items for the specified sample batch --- #
-    si_response = await get_sample_items(sample_batch_id=sample_batch_id)
-    sample_items = si_response.get("data")
+    async with async_session() as session:
+        stmt = select(Sample).where(Sample.sample_batch_id == sample_batch_id)
+        result = await session.execute(stmt)
+        sample_items = result.scalars().all()
 
     if sample_items == []:
         # This raises NotFoundException if no sample batch found
@@ -1053,7 +1056,7 @@ async def get_sample_batch_peaks(
         )
 
     # --- Collect instrument types and validate they are the same --- #
-    instrument_types = {get_instrument_type(item["filename"]) for item in sample_items}
+    instrument_types = {get_instrument_type(item.filename) for item in sample_items}
     if len(instrument_types) > 1:
         raise ValueError(
             "Batch contains samples from different instruments. "
@@ -1069,12 +1072,11 @@ async def get_sample_batch_peaks(
     # --- Load resolution functions for each sample file --- #
     resolution_functions = dict()
     for item in sample_items:
-        filename = item["filename"]
-        _, resolution_func = await read_instrument_functions(filename)
-        resolution_functions[filename] = resolution_func
+        _, resolution_func = await read_instrument_functions(item.filename)
+        resolution_functions[item.filename] = resolution_func
 
     # Peaks will be grouped and alligned by ionization mode
-    ionization_modes = set([item["ionization_mode_id"] for item in sample_items])
+    ionization_modes = set([item.ionization_mode_id for item in sample_items])
     spectra = {ionization_mode: [] for ionization_mode in ionization_modes}
 
     # Bound concurrency to avoid too many open files / blocking the loop
@@ -1085,22 +1087,24 @@ async def get_sample_batch_peaks(
         timestamps = m_compute.get_scan_timestamps(filename, polarity=polarity)
 
         peak_data = m_io.load_peak_data(filename)
+        peak_id = peak_data["peak_id"].values
         polarity_coord = peak_data["polarity"].values
         peak_data = peak_data[intensity_variable]
         mz_mask = polarity_coord == polarity
         mz = peak_data["mz"].values[mz_mask]
         intensity = peak_data.values[mz_mask] / timestamps.size
+        peak_id = peak_id[mz_mask]
 
-        return mz, intensity
+        return mz, intensity, peak_id
 
     async def _prepare_spec(sample_item):
         """Prepare CentroidedSpectrum for a sample item."""
-        filename = sample_item["filename"]
-        polarity = sample_item["polarity"]
-        ionization_mode = sample_item["ionization_mode_id"]
+        filename = sample_item.filename
+        polarity = sample_item.polarity
+        ionization_mode = sample_item.ionization_mode_id
 
         async with semaphore:
-            mz, intensity = await asyncio.to_thread(
+            mz, intensity, peak_id = await asyncio.to_thread(
                 _sync_load_peak_data, filename, polarity
             )
 
@@ -1110,6 +1114,7 @@ async def get_sample_batch_peaks(
             intensity=intensity,
             resolution=resolution_functions[filename](mz),
             signal_to_noise=np.ones(mz.size),
+            peak_id=peak_id,
         )
         return ionization_mode, spec
 
@@ -1136,20 +1141,24 @@ async def get_sample_batch_peaks(
     # --- Combine spectra from different ionization modes --- #
     combined_mz = np.array([])
     combined_intensity = np.array([])
+    combined_peak_ids = np.array([])
     for ion_mode, peaks in peak_per_mode.items():
         combined_mz = np.concatenate((combined_mz, peaks.mz))
         combined_intensity = np.concatenate((combined_intensity, peaks.intensity))
+        combined_peak_ids = np.concatenate((combined_peak_ids, peaks.peak_id))
 
     # --- Sort by m/z --- #
     sorted_indices = np.argsort(combined_mz)
     combined_mz = combined_mz[sorted_indices]
     combined_intensity = combined_intensity[sorted_indices]
+    combined_peak_ids = combined_peak_ids[sorted_indices]
 
     # --- Return aligned peak data --- #
     return {
         "data": {
             "mzs": combined_mz.tolist(),
             "intensities": combined_intensity.tolist(),
+            "peak_ids": combined_peak_ids.tolist(),
             "min_aligned_mz": max(vlm_min_mzs),
             "max_aligned_mz": min(vlm_max_mzs),
         },

@@ -35,11 +35,17 @@ class Spectrum(ABC):
 
 
 class CentroidedSpectrum(Spectrum):
-    def __init__(self, mz, intensity, resolution, signal_to_noise, metadata=None):
+    def __init__(
+        self, mz, intensity, resolution, signal_to_noise, peak_id=None, metadata=None
+    ):
         self._mz = np.array(mz)
         self._intensity = np.array(intensity)
         self._resolution = np.array(resolution)
         self._signal_to_noise = np.array(signal_to_noise)
+        if peak_id is not None:
+            self._peak_id = np.array(peak_id)
+        else:
+            self._peak_id = np.arange(len(self._mz))
         self._metadata = metadata or {}
 
     @property
@@ -57,6 +63,10 @@ class CentroidedSpectrum(Spectrum):
     @property
     def signal_to_noise(self):
         return self._signal_to_noise
+
+    @property
+    def peak_id(self):
+        return self._peak_id
 
     @property
     def metadata(self):
@@ -99,7 +109,14 @@ class Spectra:
         for i, s in enumerate(self.spectra):
             for j in range(len(s.mz)):
                 all_data.append(
-                    (i, s.mz[j], s.intensity[j], s.resolution[j], s.signal_to_noise[j])
+                    (
+                        i,
+                        s.mz[j],
+                        s.intensity[j],
+                        s.resolution[j],
+                        s.signal_to_noise[j],
+                        s.peak_id[j],
+                    )
                 )
 
         if not all_data:
@@ -108,7 +125,14 @@ class Spectra:
         # Create a DataFrame and sort by m/z for efficient processing
         df = pd.DataFrame(
             all_data,
-            columns=["scan_idx", "mz", "intensity", "resolution", "signal_to_noise"],
+            columns=[
+                "scan_idx",
+                "mz",
+                "intensity",
+                "resolution",
+                "signal_to_noise",
+                "peak_id",
+            ],
         )
         df.sort_values("mz", inplace=True)
         df.reset_index(drop=True, inplace=True)
@@ -146,7 +170,12 @@ class Spectra:
         clustered_df = self._cluster_and_map_peaks(window_factor)
         if clustered_df.empty:
             return CentroidedSpectrum(
-                mz=[], intensity=[], resolution=[], signal_to_noise=[], metadata={}
+                mz=[],
+                intensity=[],
+                resolution=[],
+                signal_to_noise=[],
+                peak_id=[],
+                metadata={},
             )
 
         # Group by the cluster_id to aggregate peaks
@@ -175,11 +204,15 @@ class Spectra:
             total_intensity /= len(self.spectra)
             total_snr /= len(self.spectra)
 
+        # Create lists of grouped peak IDs
+        peak_ids = grouped["peak_id"].apply(lambda ids: ids.tolist()).values
+
         return CentroidedSpectrum(
             mz=weighted_avg_mz.values,
             intensity=total_intensity,
             resolution=weighted_avg_res.values,
             signal_to_noise=total_snr,
+            peak_id=peak_ids,
             metadata={"average": average, "window_factor": window_factor},
         )
 
@@ -405,6 +438,7 @@ class MassAligner:
             intensity=spectrum.intensity,
             resolution=spectrum.resolution,
             signal_to_noise=spectrum.signal_to_noise,
+            peak_id=spectrum.peak_id,
             metadata=spectrum.metadata,
         )
 
@@ -452,6 +486,7 @@ def calibrate_aligned_spectra(
             intensity=spectrum.intensity,
             resolution=spectrum.resolution,
             signal_to_noise=spectrum.signal_to_noise,
+            peak_id=spectrum.peak_id,
             metadata=spectrum.metadata,
         )
         calibrated_spectra.append(calibrated_spectrum)
