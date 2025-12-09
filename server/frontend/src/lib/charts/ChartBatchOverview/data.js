@@ -271,7 +271,7 @@ export const useChartData = defineStore('chart.batch.overview', () => {
             x: xValues,
             y: yValues,
             mode: 'markers',
-            type: 'scatter',
+            type: 'scattergl',
             marker: {
               color: theme.value[index % theme.value.length],
               size: 10,
@@ -324,7 +324,7 @@ export const useChartData = defineStore('chart.batch.overview', () => {
         <extra></extra>
       `, // use "<extra></extra>" to get rid of extra block from the hoverbox
       mode: 'markers',
-      type: 'scatter',
+      type: 'scattergl',
       marker: {
         color: app.ui.darkmode.active ? '#888' : '#222',
         size: 10,
