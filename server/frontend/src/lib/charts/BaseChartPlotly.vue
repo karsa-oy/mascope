@@ -253,6 +253,17 @@ watch(
   },
   { deep: true }
 )
+
+watch(
+  () => props.layout,
+  () => {
+    if (ready.value && dataReady.value) {
+      console.debug(`📊 [${props.id}] updating chart layout`)
+      Plotly.relayout(plot.value, derived.value.layout)
+    }
+  },
+  { deep: true }
+)
 </script>
 
 <template>
