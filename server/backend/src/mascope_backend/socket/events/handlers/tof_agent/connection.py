@@ -53,7 +53,7 @@ async def connect(sid: str, environ: dict, auth: dict) -> bool:
 
     except SocketUnauthenticatedError as e:
         runtime.logger.error(
-            f"Tof agent authentication failed. {str(e) }[Worker {worker_pid}]"
+            f"Tof agent authentication failed. {str(e) } [Worker {worker_pid}]"
         )
         return False
     except Exception as e:

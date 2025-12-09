@@ -9,28 +9,26 @@ def create_socket_server() -> socketio.AsyncServer:
     """
     Create Socket.IO server with Redis for multi-worker coordination.
 
-    Sets up:
-    - AsyncRedisManager for cross-worker event routing (pub/sub)
-    - Falls back to single-worker mode if Redis is unavailable.
-
-    NOTE: Separate Redis client handles session storage
-    (see RedisSessionClient in redis_session_client.py)
+    Redis is required for all deployment modes (dev/prod) as it handles:
+    - Cross-worker Socket.IO event routing (pub/sub) - socketio.AsyncRedisManager redis client
+    - Session storage and RBAC validation - RedisSessionClient (see redis_session_client.py)
 
     :return: Configured Socket.IO server instance
     :rtype: socketio.AsyncServer
+    :raises RuntimeError: If Redis is not configured properly
     """
-    client_manager = None
+    if not runtime.config.redis or runtime.config.redis.get_url() is None:
+        raise RuntimeError(
+            "Redis configuration is required for Socket.IO server. "
+            "Check that Redis is configured in your mascope.toml file."
+        )
+    redis_url = runtime.config.redis.get_url()
 
-    # Setup Redis manager for pub/sub coordination
-    if redis_url := (runtime.config.redis and runtime.config.redis.get_url()):
-        try:
-            client_manager = socketio.AsyncRedisManager(redis_url)
-            runtime.logger.info(f"Socket server: Using Redis manager at {redis_url}")
-        except Exception as e:
-            runtime.logger.error(f"Failed to create Redis manager: {e}")
-            runtime.logger.warning("Falling back to single-worker mode")
-    else:
-        runtime.logger.info("Socket server: No Redis configured (single-worker mode)")
+    try:
+        client_manager = socketio.AsyncRedisManager(redis_url)
+        runtime.logger.info(f"Socket server: Connected to Redis at {redis_url}")
+    except Exception as e:
+        raise RuntimeError(f"Failed to connect to Redis at {redis_url}: {e}.") from e
 
     return socketio.AsyncServer(
         async_mode="asgi",  # run in ASGI mode

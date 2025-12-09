@@ -384,7 +384,7 @@ The git-tracked mode configurations provide defaults for development vs producti
 ```toml
 [backend.redis]
 port = 6379 # default Redis port
-image = "redis:7-alpine" # standart Redis image
+image = "redis:7-alpine" # standard Redis image
 ```
 
 **`dev.mascope.toml`** (for local development):

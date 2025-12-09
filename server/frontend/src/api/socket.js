@@ -15,10 +15,9 @@ export async function initSocket() {
 
   // Wait for connection
   if (!socket.connected) {
-    await new Promise((resolve) => {
-      socket.once('connect', resolve)
-      setTimeout(resolve, 3000) // 3s timeout
-    })
+    console.debug('⏳ [api:sio] Waiting for connection...')
+    await new Promise((resolve) => socket.once('connect', resolve))
+    console.debug('✅ [api:sio] Socket connected')
   }
   // logging handlers
   socket.onAny((eventName, ...event) => {

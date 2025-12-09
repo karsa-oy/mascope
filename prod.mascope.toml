@@ -1,6 +1,6 @@
 
 # MASCOPE PRODUCTION MODE CONFIGURATION
-# Overrides base.mascope.toml for prod mode 
+# Overrides base.mascope.toml for prod mode
 
 # Each section may also have
 # log_level =  "trace", "debug", "info", "warning", "success", "error" or "critical"

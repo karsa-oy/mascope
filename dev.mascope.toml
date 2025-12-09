@@ -1,6 +1,6 @@
 
 # MASCOPE DEVELOPMENT MODE CONFIGURATION
-# Overrides base.mascope.toml for dev mode 
+# Overrides base.mascope.toml for dev mode
 
 # Each section may also have
 # log_level =  "trace", "debug", "info", "warning", "success", "error" or "critical"
