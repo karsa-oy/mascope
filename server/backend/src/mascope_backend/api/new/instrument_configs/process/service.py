@@ -1,6 +1,7 @@
 import asyncio
 
 from mascope_file.io import delete_peaks
+from mascope_signal.peak import compute_peaks
 from mascope_backend.db import db_semaphore
 from mascope_backend.db.id import gen_id
 from mascope_backend.api.models.sample.files.sample_file_pydantic_model import (
@@ -24,6 +25,9 @@ from mascope_backend.api.controllers.sample.lib.sample_file_fetch import (
     fetch_sample_files,
 )
 from mascope_backend.api.controllers.match.match_controller import rematch_samples
+from mascope_backend.api.new.instrument_configs.lib import (
+    read_instrument_functions,
+)
 from mascope_backend.api.new.instrument_configs.schemas import (
     CreateInstrumentConfigBody,
     SetInstrumentConfigBody,
@@ -61,7 +65,7 @@ async def process_instrument_config(
       5B. Otherwise resolve existing instrument function id
       6. Fetch sample file records
       7. Update the sample file records
-      8. Delete existing peaks for sample files
+      8. Recompute peaks for sample files with new instrument config
       9. Gather affected sample data
       10. Recompute sample item matches
 
@@ -165,11 +169,14 @@ async def process_instrument_config(
     update_tasks = [process_file(sample_file) for sample_file in sample_files]
     await asyncio.gather(*update_tasks)
 
-    # Step 8. Delete existing peaks for sample files
+    # Step 8. Recompute peaks for sample files with new instrument config
     label = f"file {filenames[0]}" if len(filenames) == 1 else f"{len(filenames)} files"
-    runtime.logger.info(f"Deleting peaks for {label}")
+    runtime.logger.info(f"Recomputing peaks for {label}")
     for filename in filenames:
         delete_peaks(filename)
+
+        instrument_functions = await read_instrument_functions(filename=filename)
+        await compute_peaks(filename, instrument_functions)
 
     # Step 9. Gather affected sample data
     (
