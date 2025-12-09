@@ -17,7 +17,7 @@ export const useChartData = defineStore('chart.batch.overview', () => {
   })
 
   /**
-   * Flat records from batch_overview store - already filtered (match_category > 0) and joined
+   * Parsed records from API, used to construct figure traces
    * Structure: { sample_item_id, target_ion_id, sample_peak_intensity_sum, target_compound_name, ... }
    */
   const records = ref([])
