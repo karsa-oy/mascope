@@ -30,6 +30,12 @@ const breadcrumb = computed(() => {
   return {
     items: [
       {
+        icon: 'pi pi-tags',
+        disabled: false,
+        tooltip: 'Back to batch',
+        action: () => app.data.sample.unfocus()
+      },
+      {
         icon: app.data.sample.focused ? 'pi pi-tag' : 'pi pi-tags',
         label: `${prettyTrim(entityName, 25)}`,
         disabled: true,
@@ -39,12 +45,12 @@ const breadcrumb = computed(() => {
       },
       {
         icon: 'pi ph ph-crosshair',
-        label: 'Target Collections',
+        label: 'Target collections',
         disabled: true,
         tooltip: null
         // No action - this is the current view
       }
-    ]
+    ].slice(app.data.sample.focused ? 0 : 1)
   }
 })
 </script>

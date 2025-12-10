@@ -54,7 +54,7 @@ const breadcrumb = computed(() => {
       },
       {
         icon: 'pi ph ph-crosshair',
-        label: 'Target Collections',
+        label: 'Target collections',
         action: () => app.data.match.collection.unfocus(),
         tooltip: 'Back to target collections'
       },
@@ -72,6 +72,11 @@ const breadcrumb = computed(() => {
           collectionContextMenu.selection = collection
           collectionContextMenu.ref?.toggle(event)
         }
+      },
+      {
+        icon: 'pi ph ph-atom',
+        label: `${app.data.match.ion.list.length} ions`,
+        disabled: true
       }
     ].slice(app.data.sample.focused ? 0 : 1)
   }

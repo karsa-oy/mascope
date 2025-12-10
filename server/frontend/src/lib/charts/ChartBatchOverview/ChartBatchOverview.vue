@@ -31,12 +31,12 @@ const chartTitle = computed(() => {
 
   if (!batchName) return ''
 
-  return `${batchName} <i>(${sampleCount} samples)</i>`
+  return `<i>Batch:</i>\t<b> ${batchName} </b>\t<i>(${sampleCount} samples)</i>`
 })
 
 const chartSubtitle = computed(() => {
   if (!app.data.match.collection.focused) return 'Select a target collection to visualize matches'
-  return `${app.data.match.collection.focused.target_collection_name} > ${app.data.match.ion.selected.length} selected ions`
+  return `<i>Targets:</i>\t\t ${app.data.match.collection.focused.target_collection_name}\t\t<i>(${app.data.match.ion.selected.length} selected ions)</i>`
 })
 
 const unit = computed(() =>
