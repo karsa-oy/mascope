@@ -1,5 +1,4 @@
 from fastapi import APIRouter, BackgroundTasks, Depends, Query
-from typing import Literal
 from mascope_backend.db.id import gen_id
 from mascope_backend.db.models import SampleBatch, Workspace
 from mascope_backend.api.lib.api_features import api_route
@@ -354,10 +353,11 @@ async def get_sample_batch_peaks_route(
     background_tasks: BackgroundTasks,
     user=Depends(editor_user),
 ):
-    """Export peaks for a specific sample batch.
+    """Get batch peaks.
 
     Average peaks are collected from all samples in the batch.
-    The peaks are alligned, then total heights/areas are computed for orbi/tof.
+    The peaks are alligned, then total heights are computed if the instrument is orbi
+    and total areas if the instrument is tof.
 
     :param sample_batch_id: The unique identifier of the sample batch.
     :type sample_batch_id: str
@@ -383,6 +383,6 @@ async def get_sample_batch_peaks_route(
     )
 
     return {
-        "message": f"Exporting peaks for batch '{sample_batch_id}', please wait.",
+        "message": f"Aggregating peaks for the batch '{sample_batch_id}', please wait.",
         "process_id": process_id,
     }

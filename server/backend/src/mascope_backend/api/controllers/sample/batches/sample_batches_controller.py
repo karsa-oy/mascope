@@ -1013,7 +1013,7 @@ async def sample_batch_export_peaks(
 
 
 @api_controller_background_task(
-    success_notification_rooms=["workspace_id"],
+    success_notification_rooms=["sample_batch_id"],
     error_notification_rooms=["sid"],
 )
 async def get_sample_batch_peaks(
@@ -1041,19 +1041,23 @@ async def get_sample_batch_peaks(
     :return: Aligned peak data including m/z values, intensities, and alignment ranges.
     :rtype: dict
     """
-    # --- Validate batch existance --- #
+    # --- Validate batch existence --- #
     batch_response = await get_sample_batch(sample_batch_id)
     sample_batch = batch_response.get("data")
+    sample_batch_id = sample_batch["sample_batch_id"]
 
-    # --- Try load existing total batch cache --- #
+    # --- Try to load batch peak cache --- #
     try:
         batch_data_response = _load_existing_batch_cache(sample_batch)
-        runtime.logger.info("Loaded existing total batch cache.")
+        runtime.logger.info("Loaded existing batch peaks.")
         return batch_data_response
     except FileNotFoundError:
-        runtime.logger.info("Building per-sample caches and aligning peak data.")
+        runtime.logger.info(
+            "No existing batch peaks found. "
+            "Computing and aggregating aligned peaks from batch samples."
+        )
 
-    # --- Fetch sample items --- #
+    # --- Fetch Sample objects --- #
     async with async_session() as session:
         stmt = select(Sample).where(Sample.sample_batch_id == sample_batch_id)
         result = await session.execute(stmt)
@@ -1075,7 +1079,7 @@ async def get_sample_batch_peaks(
             "Aligning samples from different instruments is not supported."
         )
 
-    # --- Infere intensity variable from instrument type --- #
+    # --- Infer intensity variable from instrument type --- #
     instrument_type = instrument_types.pop()
     intensity_variable = (
         "sum_peak_areas" if instrument_type == "tof" else "sum_peak_heights"
@@ -1087,7 +1091,7 @@ async def get_sample_batch_peaks(
         _, resolution_func = await read_instrument_functions(item.filename)
         resolution_functions[item.filename] = resolution_func
 
-    # Peaks will be grouped and alligned by ionization mode
+    # Peaks will be grouped and aligned by ionization mode
     ionization_modes = set([item.ionization_mode_id for item in sample_items])
     spectra = {ionization_mode: [] for ionization_mode in ionization_modes}
 
@@ -1133,6 +1137,7 @@ async def get_sample_batch_peaks(
         return ionization_mode, spec
 
     # --- Load sample files and prepare CentroidedSpectrum objects --- #
+    runtime.logger.debug("Loading samples and preparing spectra...")
     collected_specs = await asyncio.gather(
         *[_prepare_spec(item) for item in sample_items]
     )
@@ -1140,6 +1145,7 @@ async def get_sample_batch_peaks(
         spectra[ionization_mode].append(spec)
 
     # --- Align and sum spectra per ionization mode --- #
+    runtime.logger.debug("Aligning and summing sample spectra...")
     peak_per_mode = dict()
     vlm_min_mzs, vlm_max_mzs = set(), set()
     for ion_mode, specs in spectra.items():
@@ -1152,7 +1158,7 @@ async def get_sample_batch_peaks(
         vlm_min_mzs.add(vlm_min_mz)
         vlm_max_mzs.add(vlm_max_mz)
 
-    # --- Combine spectra from different ionization modes --- #
+    # --- Concatenate spectra from different ionization modes --- #
     combined_mz = np.array([])
     combined_intensity = np.array([])
     combined_peak_ids = np.array([])
@@ -1167,11 +1173,12 @@ async def get_sample_batch_peaks(
     combined_intensity = combined_intensity[sorted_indices]
     combined_peak_ids = combined_peak_ids[sorted_indices]
 
-    # Can't store 2D array as variable, merge peak IDs per m/z
+    # Can't store 2D array as variable, join peak IDs per m/z into comma-separated strings
     combined_peak_ids = [",".join(id_list) for id_list in combined_peak_ids]
     sample_batch_utc_modified = str(sample_batch["sample_batch_utc_modified"])
 
-    # --- Save total batch cache --- #
+    # --- Save batch peaks --- #
+    runtime.logger.debug("Saving batch peaks cache...")
     batch_peaks = xr.Dataset(
         {
             "intensity": (("mz",), combined_intensity),
@@ -1188,8 +1195,9 @@ async def get_sample_batch_peaks(
         },
     )
     m_io.write_batch_cache(sample_batch_id, "peaks", batch_peaks)
+    runtime.logger.debug("Batch peaks cache saved.")
 
-    # --- Return aligned peak data --- #
+    # --- Return aggregated peak data --- #
     return {
         "data": {
             "mzs": combined_mz.tolist(),
@@ -1199,7 +1207,7 @@ async def get_sample_batch_peaks(
             "max_aligned_mz": min(vlm_max_mzs),
             "intensity_variable": intensity_variable,
         },
-        "message": f"Retrieved aligned peak data for sample batch with ID '{sample_batch_id}'.",
+        "message": f"Retrieved aggregated peak data for sample batch with ID '{sample_batch_id}'.",
     }
 
 
