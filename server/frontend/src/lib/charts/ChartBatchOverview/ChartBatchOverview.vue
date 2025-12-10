@@ -246,6 +246,17 @@ watch(
   { immediate: true }
 )
 
+watch(
+  () => scale.log,
+  (prev, next) => {
+    // Clear y-axis zoom when switching to log scale
+    if (next) {
+      scale.max = null
+      plot.value.resetZoom()
+    }
+  }
+)
+
 onUnmounted(() => {
   if (loadingTimeout) clearTimeout(loadingTimeout)
   if (syncTimeout) clearTimeout(syncTimeout)
