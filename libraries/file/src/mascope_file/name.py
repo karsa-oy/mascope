@@ -51,6 +51,11 @@ def parse_path_from_item_filename(item_filename):
     return runtime.filestore(instrument, date_dir, item_filename)
 
 
+def get_batch_cache_path(sample_batch_id):
+    """Get path to the sample batch cache folder"""
+    return os.path.join(runtime.filestore(), "sample_batches", sample_batch_id)
+
+
 def filename_to_zarr_path(base_filename, variable):
     """Derive full path to a zarr dataset from sample filename and the desired variable
 

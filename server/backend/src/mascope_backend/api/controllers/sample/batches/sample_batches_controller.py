@@ -1,6 +1,7 @@
 # pylint: disable=not-callable
 import asyncio
 from datetime import datetime, timezone
+import xarray as xr
 import pandas as pd
 import numpy as np
 
@@ -14,7 +15,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import joinedload
 
-from mascope_file.name import get_instrument_type
+import mascope_file.name as m_name
 from mascope_file import io as m_io
 from mascope_signal import compute as m_compute
 from mascope_signal.peak import get_peaks
@@ -69,7 +70,6 @@ from mascope_backend.api.controllers.sample.lib.sample_items_fetch import (
 from mascope_backend.api.controllers.sample.items.sample_items_controller import (
     create_sample_items,
     copy_sample_items,
-    get_sample_items,
 )
 from mascope_backend.api.controllers.samples.samples_controller import get_sample
 from mascope_backend.api.controllers.sample.lib.fetch_affected_sample_data import (
@@ -622,7 +622,9 @@ async def import_sample_items(
     sample_batch_name = sample_batch["sample_batch_name"]
 
     # --- Verify that all sample items are for the same instrument --- #
-    instrument_types = {get_instrument_type(item.filename) for item in sample_items}
+    instrument_types = {
+        m_name.get_instrument_type(item.filename) for item in sample_items
+    }
     if len(instrument_types) > 1:
         raise ValueError(
             "Importing samples from different instruments is not supported, please import samples for each instrument separately"
@@ -947,7 +949,7 @@ async def sample_batch_export_peaks(
             await send_progress_user_notification(notification, 0.1)
 
             # Assign peak abundance units
-            instrument_type = get_instrument_type(filename)
+            instrument_type = m_name.get_instrument_type(filename)
             if instrument_type == "orbi":
                 unit = "height"
             if instrument_type == "tof":
@@ -1039,24 +1041,34 @@ async def get_sample_batch_peaks(
     :return: Aligned peak data including m/z values, intensities, and alignment ranges.
     :rtype: dict
     """
-    # --- Fetch sample items for the specified sample batch --- #
+    # --- Validate batch existance --- #
+    batch_response = await get_sample_batch(sample_batch_id)
+    sample_batch = batch_response.get("data")
+
+    # --- Try load existing total batch cache --- #
+    try:
+        batch_data_response = _load_existing_batch_cache(sample_batch)
+        runtime.logger.info("Loaded existing total batch cache.")
+        return batch_data_response
+    except FileNotFoundError:
+        runtime.logger.info("Building per-sample caches and aligning peak data.")
+
+    # --- Fetch sample items --- #
     async with async_session() as session:
         stmt = select(Sample).where(Sample.sample_batch_id == sample_batch_id)
         result = await session.execute(stmt)
         sample_items = result.scalars().all()
 
-    if sample_items == []:
-        # This raises NotFoundException if no sample batch found
-        batch_rasponse = await get_sample_batch(sample_batch_id)
-        # If batch exists, that means it has no sample items
-        sample_batch = batch_rasponse.get("data")
-        sample_batch_name = sample_batch["sample_batch_name"]
+    if not sample_items:
         raise NotFoundException(
-            f"No sample items found in the sample batch {sample_batch_name} with ID '{sample_batch_id}'."
+            f"No sample items found in the sample batch {sample_batch["sample_batch_name"]} "
+            "with ID '{sample_batch_id}'."
         )
 
-    # --- Collect instrument types and validate they are the same --- #
-    instrument_types = {get_instrument_type(item.filename) for item in sample_items}
+    # --- Validate single instrument type --- #
+    instrument_types = {
+        m_name.get_instrument_type(item.filename) for item in sample_items
+    }
     if len(instrument_types) > 1:
         raise ValueError(
             "Batch contains samples from different instruments. "
@@ -1080,7 +1092,7 @@ async def get_sample_batch_peaks(
     spectra = {ionization_mode: [] for ionization_mode in ionization_modes}
 
     # Bound concurrency to avoid too many open files / blocking the loop
-    semaphore = asyncio.Semaphore(4)
+    semaphore = asyncio.Semaphore(6)
 
     def _sync_load_peak_data(filename, polarity):
         """Synchronous helper to load peak data in a thread."""
@@ -1107,13 +1119,15 @@ async def get_sample_batch_peaks(
             mz, intensity, peak_id = await asyncio.to_thread(
                 _sync_load_peak_data, filename, polarity
             )
+        resolution = resolution_functions[filename](mz)
+        signal_to_noise = np.ones(mz.size)
 
         # Placeholder S/N values since they are not required for alignment
         spec = CentroidedSpectrum(
             mz=mz,
             intensity=intensity,
-            resolution=resolution_functions[filename](mz),
-            signal_to_noise=np.ones(mz.size),
+            resolution=resolution,
+            signal_to_noise=signal_to_noise,
             peak_id=peak_id,
         )
         return ionization_mode, spec
@@ -1153,14 +1167,71 @@ async def get_sample_batch_peaks(
     combined_intensity = combined_intensity[sorted_indices]
     combined_peak_ids = combined_peak_ids[sorted_indices]
 
+    # Can't store 2D array as variable, merge peak IDs per m/z
+    combined_peak_ids = [",".join(id_list) for id_list in combined_peak_ids]
+    sample_batch_utc_modified = str(sample_batch["sample_batch_utc_modified"])
+
+    # --- Save total batch cache --- #
+    batch_peaks = xr.Dataset(
+        {
+            "intensity": (("mz",), combined_intensity),
+            "peak_id": (("mz",), combined_peak_ids),
+        },
+        coords={
+            "mz": (("mz",), combined_mz),
+        },
+        attrs={
+            "sample_batch_utc_modified": sample_batch_utc_modified,
+            "min_aligned_mz": float(max(vlm_min_mzs)),
+            "max_aligned_mz": float(min(vlm_max_mzs)),
+            "intensity_variable": intensity_variable,
+        },
+    )
+    m_io.write_batch_cache(sample_batch_id, "peaks", batch_peaks)
+
     # --- Return aligned peak data --- #
     return {
         "data": {
             "mzs": combined_mz.tolist(),
             "intensities": combined_intensity.tolist(),
-            "peak_ids": combined_peak_ids.tolist(),
+            "peak_ids": combined_peak_ids,
             "min_aligned_mz": max(vlm_min_mzs),
             "max_aligned_mz": min(vlm_max_mzs),
+            "intensity_variable": intensity_variable,
         },
         "message": f"Retrieved aligned peak data for sample batch with ID '{sample_batch_id}'.",
+    }
+
+
+def _load_existing_batch_cache(sample_batch: dict) -> dict:
+    """Helper to load existing batch cache"""
+    sample_batch_id = sample_batch["sample_batch_id"]
+    batch_peaks = m_io.load_batch_cache(sample_batch_id, "peaks")
+
+    # --- Validate cache timestamps --- #
+    old_timestamp = batch_peaks.attrs["sample_batch_utc_modified"]
+    new_timestamp = str(sample_batch["sample_batch_utc_modified"])
+    if old_timestamp != new_timestamp:
+        raise FileNotFoundError(
+            f"Batch cache for sample batch ID '{sample_batch_id}' is outdated "
+            "due to batch modification."
+        )
+
+    mz = batch_peaks.mz.values.tolist()
+    intensity = batch_peaks.intensity.values.tolist()
+    # Make sure peak ids list of lists are converted to lists
+    peak_id = batch_peaks.peak_id.values.tolist()
+    min_aligned_mz = float(batch_peaks.attrs["min_aligned_mz"])
+    max_aligned_mz = float(batch_peaks.attrs["max_aligned_mz"])
+    intensity_variable = batch_peaks.attrs["intensity_variable"]
+    return {
+        "data": {
+            "mzs": mz,
+            "intensities": intensity,
+            "peak_ids": peak_id,
+            "min_aligned_mz": min_aligned_mz,
+            "max_aligned_mz": max_aligned_mz,
+            "intensity_variable": intensity_variable,
+        },
+        "message": f"Retrieved aligned peak data for sample batch with ID '{sample_batch_id}' from batch cache.",
     }

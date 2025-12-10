@@ -9,10 +9,8 @@ import zarr
 import asyncio
 
 
-from mascope_file.name import parse_path_from_item_filename, filename_to_zarr_path
+import mascope_file.name as m_name
 from mascope_file.runtime import runtime
-
-# READ
 
 
 def get_zarr_synchronizer(zarr_path: str) -> zarr.ProcessSynchronizer:
@@ -61,7 +59,7 @@ def load_array(base_filename, var, prev_array=None):
     :rtype: xr.Dataset
     """
     runtime.logger.debug(f"Loading array {base_filename} : {var}")
-    var_path = filename_to_zarr_path(base_filename, var)
+    var_path = m_name.filename_to_zarr_path(base_filename, var)
 
     if not os.path.exists(var_path):
         if var == "signal":
@@ -97,7 +95,7 @@ def load_coord(base_filename, var, coord_name):
     :return: Requested coordinate array
     :rtype: np.array
     """
-    var_path = filename_to_zarr_path(base_filename, var)
+    var_path = m_name.filename_to_zarr_path(base_filename, var)
 
     if not os.path.exists(var_path):
         if var == "signal":
@@ -155,7 +153,7 @@ def load_file(base_filename, vars=None, prev_dataset=None):
     :rtype: xr.Dataset
     """
 
-    filepath = parse_path_from_item_filename(base_filename)
+    filepath = m_name.parse_path_from_item_filename(base_filename)
     if not os.path.exists(filepath):
         runtime.logger.warning(f"File not found: {filepath}")
         raise FileNotFoundError(filepath)
@@ -251,12 +249,11 @@ def read_props(base_filename: str) -> dict:
     :return: Properties dictionary
     :rtype: dict
     """
-    prop_path = os.path.join(parse_path_from_item_filename(base_filename), ".props")
+    prop_path = os.path.join(
+        m_name.parse_path_from_item_filename(base_filename), ".props"
+    )
     with open(prop_path, "r") as f:
         return json.load(f)
-
-
-# WRITE
 
 
 def write_props(base_filename, props):
@@ -267,7 +264,7 @@ def write_props(base_filename, props):
     :param props: Properties to write
     :type props: dict
     """
-    sample_data_path = parse_path_from_item_filename(base_filename)
+    sample_data_path = m_name.parse_path_from_item_filename(base_filename)
     # Write properties
     prop_path = os.path.join(sample_data_path, ".props")
     with open(prop_path, "w") as f:
@@ -282,7 +279,7 @@ def update_props(base_filename, props_to_update):
     :param props_to_update: Properties to update,
     :type props_to_update: dict
     """
-    sample_data_path = parse_path_from_item_filename(base_filename)
+    sample_data_path = m_name.parse_path_from_item_filename(base_filename)
     # Update properties
     prop_path = os.path.join(sample_data_path, ".props")
     with open(prop_path, "r") as f:
@@ -304,7 +301,7 @@ def update_zarr_array_coord(base_filename, var, dim, coord):
     :param coord: New coordinate array
     :type coord: np.array
     """
-    array_path = filename_to_zarr_path(base_filename, var)
+    array_path = m_name.filename_to_zarr_path(base_filename, var)
     sync = get_zarr_synchronizer(array_path)
     zarr_array = zarr.open(array_path, mode="a", synchronizer=sync)
     zarr_array[dim][:] = coord
@@ -327,7 +324,7 @@ async def write_peaks(
     :type overwrite: bool, optional
     :return: None
     """
-    peak_timeseries_path = filename_to_zarr_path(filename, "peak_timeseries")
+    peak_timeseries_path = m_name.filename_to_zarr_path(filename, "peak_timeseries")
     synchronizer = get_zarr_synchronizer(peak_timeseries_path)
 
     def _full_overwrite():
@@ -420,13 +417,55 @@ async def write_peaks(
     )
 
 
-def delete_peaks(base_filename: str):
+def delete_peaks(base_filename: str) -> None:
     """Delete sample file peaks.
 
     :param base_filename: Sample file filename
     :type base_filename: str
     """
-    sample_data_path = parse_path_from_item_filename(base_filename)
+    sample_data_path = m_name.parse_path_from_item_filename(base_filename)
     peak_dirs = glob.glob(os.path.join(sample_data_path, "peak_*"))
     for dir in peak_dirs:
         rmtree(dir)
+
+
+def load_batch_cache(
+    sample_batch_id: str,
+    zarr_filename: str,
+) -> xr.Dataset:
+    """Load batch cached data from the zarr file.
+
+    :param sample_batch_id: Sample batch ID
+    :type sample_batch_id: str
+    :param var: Name of a zarr file
+    :type var: str
+    :raises FileNotFoundError: Batch cache file not found
+    :return: Loaded batch cache data
+    :rtype: xr.Dataset
+    """
+    batch_path = m_name.get_batch_cache_path(sample_batch_id)
+    var_path = os.path.join(batch_path, f"{zarr_filename}.zarr")
+    if not os.path.exists(var_path):
+        raise FileNotFoundError(f"Batch cache file not found: {var_path}")
+    synchronizer = get_zarr_synchronizer(var_path)
+    return xr.open_zarr(var_path, synchronizer=synchronizer)
+
+
+def write_batch_cache(
+    sample_batch_id: str,
+    zarr_filename: str,
+    batch_peaks: xr.Dataset,
+) -> None:
+    """Write batch cache data to the zarr file.
+
+    :param sample_batch_id: Sample batch ID
+    :type sample_batch_id: str
+    :param zarr_filename: Name of a zarr file
+    :type zarr_filename: str
+    :param batch_peaks: Batch cache data to write
+    :type batch_peaks: xr.Dataset
+    """
+    batch_path = m_name.get_batch_cache_path(sample_batch_id)
+    var_path = os.path.join(batch_path, f"{zarr_filename}.zarr")
+    synchronizer = get_zarr_synchronizer(var_path)
+    batch_peaks.to_zarr(var_path, mode="w", synchronizer=synchronizer)
