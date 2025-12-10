@@ -266,6 +266,10 @@ export const useChartData = defineStore('chart.batch.overview', () => {
             : rep.target_compound_formula
           const traceName = `${compoundName}: ${rep.target_ion_formula}`
 
+          const colorIndex = app.data.match.ion.list.findIndex(
+            (ion) => ion.target_ion_id === rep.target_ion_id
+          )
+
           return {
             name: traceName,
             x: xValues,
@@ -273,7 +277,7 @@ export const useChartData = defineStore('chart.batch.overview', () => {
             mode: 'markers',
             type: 'scattergl',
             marker: {
-              color: theme.value[index % theme.value.length],
+              color: theme.value[colorIndex % theme.value.length],
               size: 10,
               symbol: maxMatchCategory === 2 ? 'square' : 'square-open'
             },
