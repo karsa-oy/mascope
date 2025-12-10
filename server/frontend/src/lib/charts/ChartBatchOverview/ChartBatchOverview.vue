@@ -135,13 +135,8 @@ const layout = computed(() => {
 async function onClick({ pointIndex, curveNumber }) {
   if (pointIndex == null || curveNumber == null) return
 
-  // Focus on the corresponding ion using the trace index
-  const trace = data.traces[curveNumber]
-  if (!trace?.matchData) return
-
   await app.data.match.visualized.clear()
 
-  const { target_ion_id } = trace.matchData
   const sample = app.data.sample.list[pointIndex]
 
   // Focus sample corresponding to the clicked data point
@@ -152,6 +147,12 @@ async function onClick({ pointIndex, curveNumber }) {
   } else {
     app.data.sample.unfocus()
   }
+
+  // Focus on the corresponding ion using the trace index
+  const trace = data.traces[curveNumber]
+  if (!trace?.matchData) return
+
+  const { target_ion_id } = trace.matchData
 
   app.ui.tab.active = 'match'
   await app.data.match.visualized.set({
