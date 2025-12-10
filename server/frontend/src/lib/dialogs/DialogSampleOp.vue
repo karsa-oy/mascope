@@ -244,10 +244,7 @@ async function save() {
     })
   } else if (props.action == 'update') {
     // creating new instrument config
-    if (
-      instrumentConfig.input?.creating &&
-      instrumentConfig.payload?.instrument_config?.new_record
-    ) {
+    if (instrumentConfig.input?.creating && !instrumentConfig.status?.invalid) {
       await api.http.post(
         '/instrument_configs/process',
         {
