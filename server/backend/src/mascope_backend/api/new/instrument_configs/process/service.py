@@ -1,6 +1,5 @@
 import asyncio
 
-from mascope_file.io import delete_peaks
 from mascope_signal.peak import compute_peaks
 from mascope_backend.db import db_semaphore
 from mascope_backend.db.id import gen_id
@@ -173,8 +172,6 @@ async def process_instrument_config(
     label = f"file {filenames[0]}" if len(filenames) == 1 else f"{len(filenames)} files"
     runtime.logger.info(f"Recomputing peaks for {label}")
     for filename in filenames:
-        delete_peaks(filename)
-
         instrument_functions = await read_instrument_functions(filename=filename)
         await compute_peaks(filename, instrument_functions)
 
