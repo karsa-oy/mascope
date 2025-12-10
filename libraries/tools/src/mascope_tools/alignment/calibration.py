@@ -184,10 +184,10 @@ class Spectra:
         # Calculate total intensity, SNR, and weighted averages for m/z and resolution
         total_intensity = grouped["intensity"].sum().values
 
-        weighted_avg_mz = grouped.apply(
+        weighted_avg_mz = grouped[["mz", "intensity"]].apply(
             lambda g: np.average(g["mz"], weights=g["intensity"])
         )
-        weighted_avg_res = grouped.apply(
+        weighted_avg_res = grouped[["resolution", "intensity"]].apply(
             lambda g: np.average(g["resolution"], weights=g["intensity"])
         )
 
@@ -198,7 +198,9 @@ class Spectra:
             denominator = np.sqrt(np.sum((S / R) ** 2))
             return numerator / denominator if denominator > 0 else 0.0
 
-        total_snr = grouped.apply(compute_total_snr).values
+        total_snr = (
+            grouped[["signal_to_noise", "intensity"]].apply(compute_total_snr).values
+        )
 
         if average and len(self.spectra) > 0:
             total_intensity /= len(self.spectra)
