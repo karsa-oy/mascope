@@ -222,10 +222,6 @@ onBeforeUnmount(() => {
 
 const ready = computed(() => created.value && derived.value.layout && app.ui.split.right)
 
-const dataReady = computed(() => {
-  return props.data
-})
-
 watch(
   () => ready.value,
   () => {
@@ -246,7 +242,7 @@ watch(
 watch(
   () => props.data,
   () => {
-    if (ready.value && dataReady.value) {
+    if (ready.value && props.data) {
       console.debug(`📊 [${props.id}] updating chart data`)
       Plotly.react(plot.value, props.data, derived.value.layout, derived.value.config)
     }
@@ -257,7 +253,7 @@ watch(
 watch(
   () => props.layout,
   () => {
-    if (ready.value && dataReady.value) {
+    if (ready.value && props.data) {
       console.debug(`📊 [${props.id}] updating chart layout`)
       Plotly.relayout(plot.value, derived.value.layout)
     }

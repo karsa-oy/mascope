@@ -28,25 +28,17 @@ export const useChartData = defineStore('chart.batch.overview', () => {
   /**
    * Parse API response data into chart records format
    */
-  const parseMatchRecords = (data) => {
-    return data.map((record) => ({
-      // Identifiers (for mapping/focusing/filtering)
-      target_ion_id: record.target_ion_id,
-      sample_item_id: record.match.sample_item_id,
-      match_ion_id: record.match.match_ion_id,
-      ionization_mechanism_id: record.ionization_mechanism_id,
-      // Display data (for trace building)
-      target_ion_formula: record.target_ion_formula,
-      target_compound_name: record.target_compound_name,
-      target_compound_formula: record.target_compound_formula,
-      ionization_mechanism: record.ionization_mechanism,
-      // Chart data (for plotting)
-      sample_peak_intensity_sum: record.match.sample_peak_intensity_sum || null,
-      match_category: record.match.match_category,
-      // unused in chart, but useful for debugging
-      match_score: record.match.match_score || null
-    }))
-  }
+  const parseMatchRecords = (data) =>
+    data.map((record) => {
+      // destructure the nested object "match"
+      const { match, ...rest } = record
+      // combine into a flat object
+      const flatRecord = {
+        ...rest,
+        ...match
+      }
+      return flatRecord
+    })
 
   /**
    * Fetch match records for given sample and ion IDs
