@@ -72,7 +72,7 @@ const layout = computed(() => ({
 </script>
 
 <template>
-  <figure style="padding: 0">
+  <figure v-if="app.data.match.visualized.isotopes?.length" style="padding: 0">
     <span style="margin-bottom: 1rem">
       isotope similarity:
       <Tag

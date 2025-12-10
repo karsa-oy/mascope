@@ -56,7 +56,9 @@ const heights = computed(() => [
         :alarming="app.data.match.visualized.ion?.match?.alarming"
         :style="'font-size: large'"
       />
-      <i>{{ app.data.match.visualized.ion?.target_ion_formula }}</i> for compound
+      {{ app.data.match.visualized.ion ? 'Ion ' : '' }}
+      <i>{{ app.data.match.visualized.ion?.target_ion_formula }}</i>
+      {{ app.data.match.visualized.ion ? ' of compound ' : '' }}
       <i>{{ app.data.match.visualized.ion?.target_compound_formula }}</i>
     </h1>
     <ToolbarMatchRating />
