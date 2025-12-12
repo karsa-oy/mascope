@@ -1,5 +1,5 @@
 """
-Fixtures for library unit testing.
+Fixtures for Mascope Tools testing.
 Provides test data generators, mocked dependencies, and utilities
-for testing library functions in isolation.
+for testing functions in isolation.
 """
