@@ -29,39 +29,36 @@ class GetMzCalibrationQueryParams(QueryParamsModel):
 
 
 class MzCalibrationParams(BaseModel):
-    refine_window: int = Field(..., description="Refine window parameter")
-    mz_error_tolerance: float | None = Field(None, description="m/z error tolerance")
+    refine_window: int = Field(
+        ...,
+        description="Maximum allowed m/z difference (window) for considering a peak as a potential calibration match.",
+    )
+    mz_error_tolerance: float | None = Field(
+        None,
+        description="Maximum allowed mean m/z error after calibration for the calibration to be accepted.",
+    )
     match_score_min: float = Field(
-        calibration_config.DEFAULT_MATCH_SCORE_MIN, description="Minimum match score"
+        calibration_config.DEFAULT_MATCH_SCORE_MIN,
+        description="Minimum required match score for a peak to be considered a valid calibration match.",
     )
     peak_intensity_min: float = Field(
         calibration_config.DEFAULT_PEAK_INTENSITY_MIN,
-        description="Minimum peak intensity",
+        description="Minimum intensity threshold for peaks to be considered in calibration.",
     )
     isotope_abundance_min: float = Field(
         calibration_config.DEFAULT_ISOTOPE_ABUNDANCE_MIN,
-        description="Minimum isotope abundance",
+        description="Minimum relative abundance required for an isotope peak to be considered in calibration.",
     )
 
 
 class OrbiCalibrationParams(MzCalibrationParams):
-    mz_error_tolerance: float = Field(
-        calibration_config.ORBI_MZ_ERROR_TOLERANCE, description="m/z error tolerance"
-    )
-    refine_window: int = Field(
-        calibration_config.ORBI_DEFAULT_REFINE_WINDOW,
-        description="Refine window parameter",
-    )
+    mz_error_tolerance: float = Field(calibration_config.ORBI_MZ_ERROR_TOLERANCE)
+    refine_window: int = Field(calibration_config.ORBI_DEFAULT_REFINE_WINDOW)
 
 
 class TofCalibrationParams(MzCalibrationParams):
-    mz_error_tolerance: float = Field(
-        calibration_config.TOF_MZ_ERROR_TOLERANCE, description="m/z error tolerance"
-    )
-    refine_window: int = Field(
-        calibration_config.TOF_DEFAULT_REFINE_WINDOW,
-        description="Refine window parameter",
-    )
+    mz_error_tolerance: float = Field(calibration_config.TOF_MZ_ERROR_TOLERANCE)
+    refine_window: int = Field(calibration_config.TOF_DEFAULT_REFINE_WINDOW)
 
 
 class CalibrationFitParams(MzCalibrationParams):
