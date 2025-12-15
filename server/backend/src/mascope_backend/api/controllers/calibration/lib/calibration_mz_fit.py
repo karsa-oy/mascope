@@ -14,7 +14,6 @@ import mascope_signal.compute as m_compute
 
 from mascope_match.compute.isotopes import (
     load_peaks,
-    parse_and_filter_peaks,
     calculate_match_stats,
 )
 from mascope_match.params import (
@@ -90,7 +89,7 @@ class BaseCalibrationHandler:
             filename=self.filename,
             target_mzs=target_isotopes_df.mz,
         )
-        parsed_peaks = parse_and_filter_peaks(peaks)
+        parsed_peaks = _parse_and_filter_peaks(peaks)
 
         match_df = target_isotopes_df.copy().assign(
             sample_peak_id=np.nan,
@@ -211,6 +210,32 @@ class BaseCalibrationHandler:
             "error": self.error,
             "warning": self.warning,
         }
+
+
+def _parse_and_filter_peaks(peaks: "xarray.DataArray") -> dict:  # type: ignore # noqa: F821
+    """
+    Parse and filter peaks from the detected peaks DataArray.
+    Only peaks with positive intensities across all time points are retained.
+
+    :param peaks: Detected peaks DataArray containing m/z, intensity, and time information.
+    :type peaks: xarray.DataArray
+    :return: Dictionary containing parsed peak intensities, m/z values, and TOF values.
+    :rtype: dict
+    """
+    positive_mask = (peaks.values > 0).all(axis=peaks.get_axis_num("time"))
+
+    peak_intensities = peaks.mean(dim="time").compute().values
+
+    parsed_peaks = {
+        "peak_intensities": peak_intensities[positive_mask],
+        "peak_mzs": peaks.mz.values[positive_mask],
+        "peak_ids": peaks.peak_id.values[positive_mask],
+        "peak_tofs": peaks.tof.values[positive_mask],
+    }
+
+    parsed_peaks["peak_sorting"] = np.argsort(parsed_peaks["peak_mzs"])
+
+    return parsed_peaks
 
 
 class TofCalibrationHandler(BaseCalibrationHandler):
