@@ -13,7 +13,6 @@ import mascope_file.io as m_io
 import mascope_signal.compute as m_compute
 
 from mascope_match.compute.isotopes import (
-    load_peaks,
     calculate_match_stats,
 )
 from mascope_match.params import (
@@ -84,12 +83,9 @@ class BaseCalibrationHandler:
         )
         target_isotopes_df = pd.DataFrame(target_isotopes_result["data"])
 
-        instrument_type = m_name.get_instrument_type(self.filename)
-        peaks = await load_peaks(
-            filename=self.filename,
+        peaks = await self._load_peaks(
             target_mzs=target_isotopes_df.mz,
         )
-        parsed_peaks = _parse_and_filter_peaks(peaks)
 
         match_df = target_isotopes_df.copy().assign(
             sample_peak_id=np.nan,
@@ -103,12 +99,15 @@ class BaseCalibrationHandler:
             sample_peak_tof=np.nan,
         )
 
+        averaged_peaks = peaks.mean(dim="time")
+        averaged_peaks_dict = {
+            "mz": averaged_peaks.mz.values,
+            "tof": averaged_peaks.tof.values,
+            "intensity": averaged_peaks.values,
+        }
         match_df = match_df.apply(
             self._match_max_in_range,
-            args=(
-                parsed_peaks,
-                match_params,
-            ),
+            args=(averaged_peaks_dict,),
             axis=1,
         ).reset_index(drop=True)
 
@@ -154,28 +153,94 @@ class BaseCalibrationHandler:
 
         return match_df, good_matches_df
 
+    async def _load_peaks(
+        self,
+        target_mzs: pd.Series,
+    ):
+        """Load peak timeseries of the potential calibration peaks.
+
+        :param target_mzs: Series of target m/z values to be matched against the sample peaks.
+        :type target_mzs: pd.Series
+        :return: DataArray containing detected peaks with their m/z, intensity, and time information.
+        :rtype: xarray.DataArray
+        """
+        target_mzs = np.asarray(target_mzs)
+        all_mzs = m_io.load_coord(self.filename, "peak_timeseries", "mz")
+        mz_mask = np.any(
+            np.abs(all_mzs[:, None] - target_mzs[None, :])
+            <= self.params.refine_window * 1e-6 * target_mzs[None, :],
+            axis=1,
+        )
+        potential_calibration_mzs = all_mzs[mz_mask]
+
+        peak_timeseries = await m_compute.load_peak_timeseries(
+            self.filename, potential_calibration_mzs
+        )
+
+        # Reverse compartibility with older zarr files
+        sample_file_type = m_name.get_sample_file_type(self.filename)
+        if sample_file_type in ["orbi_zarr", "tof_zarr"]:
+            peak_timeseries = peak_timeseries.dropna(dim="mz", how="all")
+
+        peaks = self._parse_and_filter_peaks(peak_timeseries)
+
+        return peaks
+
+    def _parse_and_filter_peaks(self, peak_timeseries: "xarray.Dataset") -> "Dataarray":  # type: ignore # noqa: F821
+        """
+        Parse and filter peaks from the peak timeseries.
+        Only peaks with positive intensities across all time points are retained.
+        In case of multipolarity files, the polarity of the peaks is considered.
+
+        :param peak_timeseries: Timeseries dataset of peaks.
+        :type peak_timeseries: xarray.Dataset
+        :return: Filtered DataArray of peaks with positive intensities.
+        :rtype: xarray.DataArray
+        """
+        instrument_type = m_name.get_instrument_type(self.filename)
+        match instrument_type:
+            case "orbi":
+                peaks = peak_timeseries.peak_heights
+            case "tof":
+                peaks = peak_timeseries.peak_areas
+
+        is_multipolarity_file = np.unique(peak_timeseries.polarity.values).size > 1
+        if is_multipolarity_file:
+            # Check positivity for the polarity of the peaks
+            # All target peaks should have the same polarity
+            polarity = peak_timeseries.polarity.values[0]
+            timestamps = m_compute.get_scan_timestamps(self.filename, polarity=polarity)
+
+            positive_mask = (
+                peaks.sel(time=timestamps, method="nearest").values > 0
+            ).all(axis=peaks.get_axis_num("time"))
+        else:
+            # Skip polarity selection, check positivity across all time points
+            positive_mask = (peaks.values > 0).all(axis=peaks.get_axis_num("time"))
+
+        filtered_peaks = peaks.sel(mz=peaks.mz.values[positive_mask])
+
+        return filtered_peaks
+
     def _match_max_in_range(
-        self, isotope_row: pd.Series, parsed_peaks: dict, match_params: BaseMatchParams
+        self,
+        isotope_row: pd.Series,
+        peaks: dict,  # type: ignore # noqa: F821
     ):
         """Match the isotope to the peak with the highest intensity within the m/z tolerance range."""
         target_mz = isotope_row["mz"]
-        mz_tolerance = match_params.mz_tolerance * 1e-6 * target_mz
-        mz_min = target_mz - mz_tolerance
-        mz_max = target_mz + mz_tolerance
+        mz_tolerance = self.params.refine_window * 1e-6 * target_mz
 
-        parsed_peaks = pd.DataFrame(parsed_peaks)
-        parsed_peaks.sort_values("peak_mzs", inplace=True)
-        peaks_in_range = parsed_peaks[parsed_peaks.peak_mzs.between(mz_min, mz_max)]
+        in_range_mask = np.abs(peaks["mz"] - target_mz) <= mz_tolerance
+        mz_in_range = peaks["mz"][in_range_mask]
+        tof_in_range = peaks["tof"][in_range_mask]
+        intensity_in_range = peaks["intensity"][in_range_mask]
 
-        if len(peaks_in_range) > 0:
-            max_peak_idx = peaks_in_range.peak_intensities.idxmax()
-            isotope_row["sample_peak_mz"] = peaks_in_range.at[max_peak_idx, "peak_mzs"]
-            isotope_row["sample_peak_tof"] = peaks_in_range.at[
-                max_peak_idx, "peak_tofs"
-            ]
-            isotope_row["sample_peak_intensity"] = peaks_in_range.at[
-                max_peak_idx, "peak_intensities"
-            ]
+        if np.any(in_range_mask):
+            max_peak_idx = np.argmax(intensity_in_range)
+            isotope_row["sample_peak_mz"] = mz_in_range[max_peak_idx]
+            isotope_row["sample_peak_tof"] = tof_in_range[max_peak_idx]
+            isotope_row["sample_peak_intensity"] = intensity_in_range[max_peak_idx]
 
         return isotope_row
 
@@ -210,32 +275,6 @@ class BaseCalibrationHandler:
             "error": self.error,
             "warning": self.warning,
         }
-
-
-def _parse_and_filter_peaks(peaks: "xarray.DataArray") -> dict:  # type: ignore # noqa: F821
-    """
-    Parse and filter peaks from the detected peaks DataArray.
-    Only peaks with positive intensities across all time points are retained.
-
-    :param peaks: Detected peaks DataArray containing m/z, intensity, and time information.
-    :type peaks: xarray.DataArray
-    :return: Dictionary containing parsed peak intensities, m/z values, and TOF values.
-    :rtype: dict
-    """
-    positive_mask = (peaks.values > 0).all(axis=peaks.get_axis_num("time"))
-
-    peak_intensities = peaks.mean(dim="time").compute().values
-
-    parsed_peaks = {
-        "peak_intensities": peak_intensities[positive_mask],
-        "peak_mzs": peaks.mz.values[positive_mask],
-        "peak_ids": peaks.peak_id.values[positive_mask],
-        "peak_tofs": peaks.tof.values[positive_mask],
-    }
-
-    parsed_peaks["peak_sorting"] = np.argsort(parsed_peaks["peak_mzs"])
-
-    return parsed_peaks
 
 
 class TofCalibrationHandler(BaseCalibrationHandler):
