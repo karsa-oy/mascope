@@ -535,7 +535,12 @@ async def load_peak_timeseries(
     :rtype: xr.Dataset
     """
     # --- Load existing peak timeseries from the sample file ---
+    mzs = np.unique(mzs)
     peak_timeseries = m_io.load_peak_data(base_filename).sel(mz=mzs, method="nearest")
+    # Remove duplicate m/z values if any
+    _, unique_idx = np.unique(peak_timeseries.mz.values, return_index=True)
+    peak_timeseries = peak_timeseries.isel(mz=np.sort(unique_idx))
+
     runtime.logger.debug(
         f"Loading peak timeseries for {peak_timeseries.mz.size} m/z values from {base_filename}"
     )
