@@ -7,12 +7,12 @@ from mascope_backend.api.new.auth.access_token.validation import (
     validate_service_access_token,
 )
 from mascope_backend.socket.auth.token import validate_jwt_token
-from mascope_backend.socket.auth.session import clear_user_session, save_user_session
 from mascope_backend.socket.auth.exceptions import (
     SocketAuthConfigError,
     SocketForbiddenError,
     SocketUnauthenticatedError,
 )
+from mascope_backend.socket.storage import clear_user_session, save_user_session
 from mascope_backend.runtime import runtime
 
 

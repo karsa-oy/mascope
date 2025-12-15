@@ -1,20 +1,31 @@
 """Redis client for cross-worker session storage.
 
-Dedicated Redis client for storing Socket.IO authentication sessions
-across multiple uvicorn workers. This client is separate from the AsyncRedisManager
-used by Socket.IO for pub/sub coordination.
+Manages Redis connection for socket-related state that must persist across
+multiple uvicorn workers. This client is separate from the AsyncRedisManager
+used by Socket.IO for pub/sub event coordination.
+
+Usage:
+- Authentication sessions (user_id, username, role_id)
+- Room membership tracking
+
+Redis key namespaces:
+- mascope:session:*  - Authentication sessions
+- mascope:rooms:*    - Room membership
 """
 
 from redis.asyncio import Redis, from_url
 from mascope_backend.runtime import runtime
 
 
-class RedisSessionClient:
+class RedisStorageClient:
     """
     Redis client manager for Socket.IO session storage.
 
-    Manages a single Redis connection used exclusively for storing
-    user authentication sessions across multiple workers.
+    Provides a single Redis connection shared by multiple storage concerns
+    (sessions, rooms, etc.). Each concern uses its own key namespace prefix
+    for isolation while sharing the connection pool.
+
+    Connection lifecycle managed by FastAPI lifespan (app/fast.py).
     """
 
     def __init__(self):
@@ -71,4 +82,4 @@ class RedisSessionClient:
 
 
 # Global Redis session client instance
-redis_session_client = RedisSessionClient()
+redis_storage_client = RedisStorageClient()

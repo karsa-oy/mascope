@@ -11,7 +11,7 @@ def create_socket_server() -> socketio.AsyncServer:
 
     Redis is required for all deployment modes (dev/prod) as it handles:
     - Cross-worker Socket.IO event routing (pub/sub) - socketio.AsyncRedisManager redis client
-    - Session storage and RBAC validation - RedisSessionClient (see redis_session_client.py)
+    - Session storage and RBAC validation - RedisStorageClient (see socket/storage/client.py)
 
     :return: Configured Socket.IO server instance
     :rtype: socketio.AsyncServer

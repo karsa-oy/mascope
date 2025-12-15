@@ -8,8 +8,8 @@ import os
 from mascope_backend.socket import sio
 from mascope_backend.socket.auth import authenticate_socket_connection
 from mascope_backend.socket.auth.token import get_jwt_from_cookies
-from mascope_backend.socket.auth.session import clear_user_session
 from mascope_backend.socket.auth.exceptions import SocketUnauthenticatedError
+from mascope_backend.socket.storage import clear_user_session
 from mascope_backend.runtime import runtime
 
 

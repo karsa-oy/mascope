@@ -25,7 +25,7 @@ from mascope_backend.api.controllers.workspace.acquisition.service import (
 from mascope_backend.db.ops.batch.reset_processing_status import (
     reset_stuck_processing_batches,
 )
-from mascope_backend.socket.auth.redis_session_client import redis_session_client
+from mascope_backend.socket.storage import redis_storage_client
 
 from mascope_backend.runtime import runtime
 
@@ -63,17 +63,17 @@ async def lifespan(app: FastAPI):
     )
     await init_db()
 
-    # Initialize Redis session client for cross-worker session storage
+    # Initialize Redis storage client for cross-worker socket state
     runtime.logger.info(
-        f"Fast App startup: connecting Redis session client [Worker {worker_pid}]"
+        f"Fast App startup: connecting Redis storage client [Worker {worker_pid}]"
     )
     try:
-        await redis_session_client.connect()
+        await redis_storage_client.connect()
     except ConnectionError as e:
         runtime.logger.error(
-            f"Fast App startup: Redis session client failed to connect: {e} [Worker {worker_pid}]"
+            f"Fast App startup: Redis storage client failed to connect: {e} [Worker {worker_pid}]"
         )
-        runtime.logger.warning("Multi-worker session sharing will not work")
+        runtime.logger.warning("Multi-worker storage sharing will not work")
 
     # Initialize application components
     runtime.logger.info(
@@ -86,9 +86,9 @@ async def lifespan(app: FastAPI):
 
     # --- SHUTDOWN TASKS ---
     runtime.logger.info(
-        f"Fast App shutdown: closing Redis session client [Worker {worker_pid}]"
+        f"Fast App shutdown: closing Redis storage client [Worker {worker_pid}]"
     )
-    await redis_session_client.disconnect()
+    await redis_storage_client.disconnect()
 
     await wal_checkpoint()
 

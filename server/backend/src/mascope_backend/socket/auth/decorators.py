@@ -7,7 +7,7 @@ from mascope_backend.api.new.auth.exceptions import InvalidTokenException
 from mascope_backend.api.new.auth.access_token.validation import (
     validate_service_access_token,
 )
-from mascope_backend.socket.auth.session import get_session_user
+from mascope_backend.socket.storage import get_session_user
 from mascope_backend.socket.auth.exceptions import (
     SocketAuthError,
     SocketForbiddenError,
