@@ -45,18 +45,18 @@ Data sources:
 
 from __future__ import annotations
 
-__version__ = '2025.9.4'
+__version__ = "2025.9.4"
 
 __all__ = [
-    'ELECTRON',
-    'ELEMENTARY_CHARGE',
-    'ELEMENTS',
-    'NEUTRON',
-    'POSITRON',
-    'PROTON',
-    'Element',
-    'Isotope',
-    'Particle',
+    "ELECTRON",
+    "ELEMENTARY_CHARGE",
+    "ELEMENTS",
+    "NEUTRON",
+    "POSITRON",
+    "PROTON",
+    "Element",
+    "Isotope",
+    "Particle",
 ]
 
 
@@ -157,9 +157,7 @@ class Element:
     @cached_property
     def nominalmass(self) -> int:
         """Mass number of most abundant natural stable isotope."""
-        return max(
-            self.isotopes.values(), key=lambda iso: iso.abundance
-        ).massnumber
+        return max(self.isotopes.values(), key=lambda iso: iso.abundance).massnumber
 
     @cached_property
     def exactmass(self) -> float:
@@ -170,8 +168,8 @@ class Element:
     def eleconfig_dict(self) -> dict[tuple[int, str], int]:
         """Ground state electron configuration (shell, subshell): electrons."""
         adict = {}
-        if self.eleconfig.startswith('['):
-            base = self.eleconfig.split(' ', 1)[0][1:-1]
+        if self.eleconfig.startswith("["):
+            base = self.eleconfig.split(" ", 1)[0][1:-1]
             adict.update(ELEMENTS[base].eleconfig_dict)
         for e in self.eleconfig.split()[bool(adict) :]:
             adict[(int(e[0]), e[1])] = int(e[2:]) if len(e) > 2 else 1
@@ -191,36 +189,30 @@ class Element:
         try:
             from . import elements_descriptions  # noqa: F401
         except ImportError:
-            return ''
+            return ""
 
         return ELEMENTS[self.symbol].description
 
     def validate(self) -> None:
         """Check consistency of data. Raise ValueError on failure."""
         if self.period not in PERIODS:
-            raise ValueError(f'{self.symbol} - invalid period: {self.period}')
+            raise ValueError(f"{self.symbol} - invalid period: {self.period}")
         if self.group not in GROUPS:
-            raise ValueError(f'{self.symbol} - invalid group: {self.group}')
+            raise ValueError(f"{self.symbol} - invalid group: {self.group}")
         if self.block not in BLOCKS:
-            raise ValueError(f'{self.symbol} - invalid block: {self.block}')
+            raise ValueError(f"{self.symbol} - invalid block: {self.block}")
         if self.series not in SERIES:
-            raise ValueError(f'{self.symbol} - invalid series: {self.series}')
+            raise ValueError(f"{self.symbol} - invalid series: {self.series}")
 
         if self.number != self.protons:
-            raise ValueError(
-                f'{self.symbol} - atomic number must equal proton number'
-            )
+            raise ValueError(f"{self.symbol} - atomic number must equal proton number")
         if self.protons != sum(self.eleshells):
-            raise ValueError(
-                f'{self.symbol} - number of protons must equal electrons'
-            )
+            raise ValueError(f"{self.symbol} - number of protons must equal electrons")
         if len(self.ionenergy) > 1:
             ionev_ = self.ionenergy[0]
             for ionev in self.ionenergy[1:]:
                 if ionev <= ionev_:
-                    raise ValueError(
-                        f'{self.symbol} - ionenergy not increasing'
-                    )
+                    raise ValueError(f"{self.symbol} - ionenergy not increasing")
                 ionev_ = ionev
 
         mass = 0.0
@@ -230,57 +222,52 @@ class Element:
             frac += iso.abundance
         if abs(mass - self.mass) > 0.03:
             raise ValueError(
-                f'{self.symbol} - average of isotope masses '
-                f'({mass:.4f}) != mass ({self.mass:.4f})'
+                f"{self.symbol} - average of isotope masses "
+                f"({mass:.4f}) != mass ({self.mass:.4f})"
             )
         if abs(frac - 1.0) > 1e-9:
-            raise ValueError(
-                f'{self.symbol} - sum of isotope abundances != 1.0'
-            )
+            raise ValueError(f"{self.symbol} - sum of isotope abundances != 1.0")
 
     def __repr__(self) -> str:
         ionenergy_list = []
         for i, j in enumerate(self.ionenergy):
             if i and (i % 5 == 0):
-                ionenergy_list.append(f'\n        {j}')
+                ionenergy_list.append(f"\n        {j}")
             else:
-                ionenergy_list.append(f'{j}')
-        ionenergy = ', '.join(ionenergy_list)
-        ionenergy = ionenergy.replace(' \n', '\n')
+                ionenergy_list.append(f"{j}")
+        ionenergy = ", ".join(ionenergy_list)
+        ionenergy = ionenergy.replace(" \n", "\n")
         if len(self.ionenergy) > 5:
-            ionenergy = f'(\n        {ionenergy},\n    )'
+            ionenergy = f"(\n        {ionenergy},\n    )"
         elif len(self.ionenergy) == 1:
-            ionenergy = f'({ionenergy},)'
+            ionenergy = f"({ionenergy},)"
         else:
-            ionenergy = f'({ionenergy})'
+            ionenergy = f"({ionenergy})"
 
         isotopes_list = []
         for massnum in sorted(self.isotopes):
             iso = self.isotopes[massnum]
             isotopes_list.append(
-                f'{massnum}: Isotope({iso.mass}, {iso.abundance}, {massnum})'
+                f"{massnum}: Isotope({iso.mass}, {iso.abundance}, {massnum})"
             )
-        isotopes = ',\n        '.join(isotopes_list)
+        isotopes = ",\n        ".join(isotopes_list)
         if len(self.isotopes) > 1:
-            isotopes = f'{{\n        {isotopes},\n    }},'
+            isotopes = f"{{\n        {isotopes},\n    }},"
         else:
-            isotopes = f'{{{isotopes}}},'
+            isotopes = f"{{{isotopes}}},"
 
-        return ',\n    '.join(
+        return ",\n    ".join(
             (
-                f'Element(\n    {self.number}, {self.symbol!r}, {self.name!r}',
-                f'group={self.group}, period={self.period},'
-                f' block={self.block!r}, series={self.series}',
-                f'mass={self.mass}, eleneg={self.eleneg},'
-                f' eleaffin={self.eleaffin}',
-                f'covrad={self.covrad}, atmrad={self.atmrad},'
-                f' vdwrad={self.vdwrad}',
-                f'tboil={self.tboil}, tmelt={self.tmelt},'
-                f' density={self.density}',
-                f'eleconfig={self.eleconfig!r}',
-                f'oxistates={self.oxistates!r}',
-                f'ionenergy={ionenergy}',
-                f'isotopes={isotopes}\n)',
+                f"Element(\n    {self.number}, {self.symbol!r}, {self.name!r}",
+                f"group={self.group}, period={self.period},"
+                f" block={self.block!r}, series={self.series}",
+                f"mass={self.mass}, eleneg={self.eleneg}," f" eleaffin={self.eleaffin}",
+                f"covrad={self.covrad}, atmrad={self.atmrad}," f" vdwrad={self.vdwrad}",
+                f"tboil={self.tboil}, tmelt={self.tmelt}," f" density={self.density}",
+                f"eleconfig={self.eleconfig!r}",
+                f"oxistates={self.oxistates!r}",
+                f"ionenergy={ionenergy}",
+                f"isotopes={isotopes}\n)",
             )
         )
 
@@ -344,7 +331,7 @@ class Elements:
         self._dict = {}
         for element in elements:
             if element.number > len(self._list) + 1:
-                raise ValueError('Elements must be added in order')
+                raise ValueError("Elements must be added in order")
             if element.number <= len(self._list):
                 self._list[element.number - 1] = element
             else:
@@ -372,14 +359,14 @@ class Elements:
         return self._dict[key]
 
     def __repr__(self) -> str:
-        elements = ',\n    '.join(
-            '\n    '.join(line for line in repr(element).splitlines())
+        elements = ",\n    ".join(
+            "\n    ".join(line for line in repr(element).splitlines())
             for element in self._list
         )
-        return f'Elements(\n    {elements},\n)'
+        return f"Elements(\n    {elements},\n)"
 
     def __str__(self) -> str:
-        return '[{}]'.format(', '.join(ele.symbol for ele in self._list))
+        return "[{}]".format(", ".join(ele.symbol for ele in self._list))
 
 
 # fmt: off
@@ -2076,62 +2063,62 @@ Examples:
 ELEMENTARY_CHARGE: float = 1.602176634e-19
 """Elementary charge in coulombs."""
 
-ELECTRON: Particle = Particle('Electron', 5.48579909065e-4, -ELEMENTARY_CHARGE)
+ELECTRON: Particle = Particle("Electron", 5.48579909065e-4, -ELEMENTARY_CHARGE)
 """Electron particle."""
 
-PROTON: Particle = Particle('Proton', 1.007276466621, ELEMENTARY_CHARGE)
+PROTON: Particle = Particle("Proton", 1.007276466621, ELEMENTARY_CHARGE)
 """Proton particle."""
 
-NEUTRON: Particle = Particle('Neutron', 1.00866491595, 0.0)
+NEUTRON: Particle = Particle("Neutron", 1.00866491595, 0.0)
 """Neutron particle."""
 
-POSITRON: Particle = Particle('Positron', 5.48579909065e-4, ELEMENTARY_CHARGE)
+POSITRON: Particle = Particle("Positron", 5.48579909065e-4, ELEMENTARY_CHARGE)
 """Positron or antielectron particle."""
 
 PERIODS: dict[int, str] = {
-    1: 'K',
-    2: 'L',
-    3: 'M',
-    4: 'N',
-    5: 'O',
-    6: 'P',
-    7: 'Q',
+    1: "K",
+    2: "L",
+    3: "M",
+    4: "N",
+    5: "O",
+    6: "P",
+    7: "Q",
 }
 
-BLOCKS: dict[str, str] = {'s': '', 'g': '', 'f': '', 'd': '', 'p': ''}
+BLOCKS: dict[str, str] = {"s": "", "g": "", "f": "", "d": "", "p": ""}
 
 GROUPS: dict[int, tuple[str, str]] = {
-    1: ('IA', 'Alkali metals'),
-    2: ('IIA', 'Alkaline earths'),
-    3: ('IIIB', ''),
-    4: ('IVB', ''),
-    5: ('VB', ''),
-    6: ('VIB', ''),
-    7: ('VIIB', ''),
-    8: ('VIIIB', ''),
-    9: ('VIIIB', ''),
-    10: ('VIIIB', ''),
-    11: ('IB', 'Coinage metals'),
-    12: ('IIB', ''),
-    13: ('IIIA', 'Boron group'),
-    14: ('IVA', 'Carbon group'),
-    15: ('VA', 'Pnictogens'),
-    16: ('VIA', 'Chalcogens'),
-    17: ('VIIA', 'Halogens'),
-    18: ('VIIIA', 'Noble gases'),
+    1: ("IA", "Alkali metals"),
+    2: ("IIA", "Alkaline earths"),
+    3: ("IIIB", ""),
+    4: ("IVB", ""),
+    5: ("VB", ""),
+    6: ("VIB", ""),
+    7: ("VIIB", ""),
+    8: ("VIIIB", ""),
+    9: ("VIIIB", ""),
+    10: ("VIIIB", ""),
+    11: ("IB", "Coinage metals"),
+    12: ("IIB", ""),
+    13: ("IIIA", "Boron group"),
+    14: ("IVA", "Carbon group"),
+    15: ("VA", "Pnictogens"),
+    16: ("VIA", "Chalcogens"),
+    17: ("VIIA", "Halogens"),
+    18: ("VIIIA", "Noble gases"),
 }
 
 SERIES: dict[int, str] = {
-    1: 'Nonmetals',
-    2: 'Noble gases',
-    3: 'Alkali metals',
-    4: 'Alkaline earth metals',
-    5: 'Metalloids',
-    6: 'Halogens',
-    7: 'Poor metals',
-    8: 'Transition metals',
-    9: 'Lanthanides',
-    10: 'Actinides',
+    1: "Nonmetals",
+    2: "Noble gases",
+    3: "Alkali metals",
+    4: "Alkaline earth metals",
+    5: "Metalloids",
+    6: "Halogens",
+    7: "Poor metals",
+    8: "Transition metals",
+    9: "Lanthanides",
+    10: "Actinides",
 }
 
 
@@ -2250,7 +2237,7 @@ def sqlite_script() -> str:
             ele.description.replace("'", "''").replace('"', '""'),
             linelen=74,
             indent=0,
-            joinstr='\n ',
+            joinstr="\n ",
         )
         sql.append(
             f"""INSERT INTO "element" VALUES (
@@ -2284,13 +2271,13 @@ def sqlite_script() -> str:
         for ele in ELEMENTS
     )
 
-    sqlstr = '\n'.join(sql)
-    sqlstr = sqlstr.replace('                ', '            ')
-    return sqlstr.replace('        ', '')
+    sqlstr = "\n".join(sql)
+    sqlstr = sqlstr.replace("                ", "            ")
+    return sqlstr.replace("        ", "")
 
 
 def word_wrap(
-    text: str, linelen: int = 79, indent: int = 0, joinstr: str = '\n'
+    text: str, linelen: int = 79, indent: int = 0, joinstr: str = "\n"
 ) -> str:
     """Return string, word-wrapped at linelen."""
     if len(text) < linelen:
@@ -2303,16 +2290,16 @@ def word_wrap(
         if llen < linelen:
             line.append(word)
         else:
-            result.append(' '.join(line))
+            result.append(" ".join(line))
             line = [word]
             llen = len(word)
     if line:
-        result.append(' '.join(line))
+        result.append(" ".join(line))
     return joinstr.join(result)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import doctest
 
-    print(f'ELEMENTS = {ELEMENTS!r}\n{sqlite_script()}')  # noqa: T201
+    print(f"ELEMENTS = {ELEMENTS!r}\n{sqlite_script()}")  # noqa: T201
     doctest.testmod(verbose=False)

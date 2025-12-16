@@ -6,8 +6,8 @@ from typing import List
 import numpy as np
 from IsoSpecPy import IsoThreshold
 
-from mascope_chem.molmass import Formula
-from mascope_chem.molmass.elements import ELECTRON
+from mascope_molmass import Formula
+from mascope_molmass.elements import ELECTRON, ELEMENTS
 
 from mascope_backend.db.id import gen_id
 from mascope_backend.db.models import (

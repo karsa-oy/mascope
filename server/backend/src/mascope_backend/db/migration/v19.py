@@ -12,8 +12,8 @@ from mascope_backend.api.models.match.match_pydantic_model import (
     RematchBatchesBody,
     RematchBatchBody,
 )
-from mascope_chem.molmass import Formula
-from mascope_chem.molmass.elements import ELECTRON
+from mascope_molmass import Formula
+from mascope_molmass.elements import ELECTRON
 
 
 from mascope_backend.db.models import (

@@ -1,6 +1,6 @@
 import unittest
 
-from mascope_chem.molmass import Formula
+from mascope_molmass import Formula
 
 
 ions = [

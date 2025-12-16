@@ -12,7 +12,7 @@ from mascope_backend.api.controllers.target.lib.compute.target_ions_compute impo
     generate_target_ions_from_mass,
 )
 
-from mascope_chem.molmass import Formula
+from mascope_molmass import Formula
 
 
 def assert_target_ions(
