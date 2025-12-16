@@ -68,6 +68,7 @@ def generate_target_ions_from_composition(
         mechanism = ionization_mechanism.ionization_mechanism
         # Handle the special case when generating ions for empty formula "()"
         if target_compound_formula == "()":
+            compound_formula = None
             if mechanism == "-" or mechanism == "+":
                 # Electron transfer does not apply
                 continue
@@ -76,51 +77,73 @@ def generate_target_ions_from_composition(
                 continue
             compound_formula = target_compound_formula
         else:
-            # parse the compound formula first, to properly handle parenthesis (e.g. (HNO3)2)
-            compound_formula = Formula(target_compound_formula).formula
+            compound_formula = Formula(target_compound_formula)
+
+        # Parse mechanism into Formula, excluding the operation sign (+/-)
+        # For electron transfer, the entire mechanism (+/-) is used
+        mechanism_formula = (
+            Formula(mechanism[1:]) if len(mechanism) > 1 else Formula(mechanism)
+        )
+
         try:
-            # get and save ions
-            raw_ion = Formula(
-                "("
-                + compound_formula
-                + mechanism[:-1]  # remove polarity sign before parenthesis
-                + ")"
-                + mechanism[-1]  # add polarity sign at the end
-            )
+            # Construct raw ion formula based on the compound formula and ionization mechanism
+            # Leverage molmass.Formula addition and subtraction operators
+            operation = mechanism[0]
+            if operation == "+":
+                # Addition mechanism
+                if compound_formula is None:
+                    # Special case: empty formula "()"
+                    raw_ion = mechanism_formula
+                else:
+                    raw_ion = compound_formula + mechanism_formula
+            elif operation == "-":
+                # Abstraction mechanism
+                raw_ion = compound_formula - mechanism_formula
+            else:
+                raise ValueError(f"Unknown ionization mechanism: {mechanism}")
         except ValueError as e:
-            # Failed to create a target ion for the combination of target compound and ionization mechanism
+            # Failed to create a target ion for the combination of target compound
+            # and ionization mechanism
             runtime.logger.warning(
                 f"Failed to parse ion formula for compound {target_compound_formula} and mechanism {mechanism}: {e}"
             )
             # Try to create ions with other mechanisms
             continue
-        else:
-            # construct and save ion row
-            ion = TargetIon(
-                target_ion_id=gen_id(16),
-                target_compound_id=target_compound.target_compound_id,
-                ionization_mechanism_id=ionization_mechanism.ionization_mechanism_id,
-                target_ion_formula=raw_ion.formula + charge_string(raw_ion),
-                filter_params={},
-            )
-            target_ions.append(ion)
+
+        # Strip brackets [] and charge from formula
+        ion_formula = raw_ion._formula_nocharge  # pylint: disable=protected-access
+        # TODO: Handle explicit isotopes in the formula
+        ion_formula = Formula(normalize_formula_with_isotopes(ion_formula)).formula
+
+        # construct and save ion row
+        runtime.logger.debug(
+            f"Generated ion formula {raw_ion.formula} for compound {compound_formula} with mechanism {mechanism}"
+        )
+        ion = TargetIon(
+            target_ion_id=gen_id(16),
+            target_compound_id=target_compound.target_compound_id,
+            ionization_mechanism_id=ionization_mechanism.ionization_mechanism_id,
+            target_ion_formula=ion_formula + charge_string(raw_ion),
+            filter_params={},
+        )
+        target_ions.append(ion)
 
             # Predict peaks of high resolution isotopes
             predicted_peaks = IsoThreshold(
-                formula=raw_ion.formula, threshold=ISOTOPE_ABUNDANCE_THRESHOLD
+                formula=ion_formula, threshold=ISOTOPE_ABUNDANCE_THRESHOLD
             )
-
-            # Extract high resolution masses and probabilities, correct masses for the electron charge
-            masses_high_res = [
-                (float(m) - ELECTRON.mass * raw_ion.charge) / abs(raw_ion.charge)
-                for m in predicted_peaks.masses
-            ]
+        # Extract high resolution masses and probabilities, correct masses for the electron charge
+        masses_high_res = [
+            (float(m) - ELECTRON.mass * raw_ion.charge) / abs(raw_ion.charge)
+            for m in predicted_peaks.masses
+        ]
+        probs_high_res = [float(p) for p in predicted_peaks.probs]
             probs_high_res = [float(p) for p in predicted_peaks.probs]
 
-            # Calculate low resolution isotope peaks
-            masses_low_res, probs_low_res = group_target_isotopes(
-                masses_high_res, probs_high_res, RESOLUTION_LOW
-            )
+        # Calculate low resolution isotope peaks
+        masses_low_res, probs_low_res = group_target_isotopes(
+            masses_high_res, probs_high_res, RESOLUTION_LOW
+        )
 
             # Store high resolution isotopes
             target_isotopes.extend(
@@ -157,7 +180,8 @@ def generate_target_ions_from_mass(
     target_compound: TargetCompoundBase,
     ionization_mechanisms: List[IonizationMechanism],
 ) -> tuple[list[TargetIon], list[TargetIsotope]]:
-    """Generate target ions and isotopes based on target compound mass and given ionization mechanisms
+    """Generate target ions and isotopes based on target compound mass and given
+    ionization mechanisms
 
     :param target_compound_mass: Mass of the target compound (composition not known)
     :type target_compound_mass: float
@@ -165,7 +189,10 @@ def generate_target_ions_from_mass(
     :type target_compound: TargetCompoundBase
     :param ionization_mechanisms: List of ionization mechanisms to apply to the target compound
     :type ionization_mechanisms: List[IonizationMechanism]
-    :return: 2-tuple of (list of ions (instances of TargetIon), list of isotopes (instances of TargetIsotope))
+    :return: 2-tuple of (
+        list of ions (instances of TargetIon),
+        list of isotopes (instances of TargetIsotope)
+        )
     :rtype: tuple
     """
     target_ions = []
@@ -174,6 +201,7 @@ def generate_target_ions_from_mass(
     # generate ion and isotope records
     for ionization_mechanism in ionization_mechanisms:
         mechanism = ionization_mechanism.ionization_mechanism
+        polarity = ionization_mechanism.ionization_mechanism_polarity
         # construct ion
         ion = TargetIon(
             target_ion_id=gen_id(16),
@@ -188,11 +216,14 @@ def generate_target_ions_from_mass(
         if len(mechanism) > 1:
             # Addition or abstraction mechanism
             # Calculate isotopic pattern of the ionization mechanism
-            raw_ion = Formula("(" + mechanism[1:-1] + ")" + mechanism[-1])
+            raw_ion = Formula("(" + mechanism[1:-1] + ")" + polarity)
             is_adduct = mechanism[0] == "+"
             if is_adduct:
                 # Addition mechanism
-                raw_isotopes = raw_ion.mz_spectrum().values()
+                raw_isotopes = [
+                    (isotope.mz, isotope.fraction)
+                    for isotope in raw_ion.spectrum().values()
+                ]
             else:
                 # Abstraction mechanism, no knowledge of the isotopic pattern
                 raw_isotopes = [
@@ -209,11 +240,11 @@ def generate_target_ions_from_mass(
                 TargetIsotope(
                     target_isotope_id=gen_id(16),
                     target_ion_id=ion.target_ion_id,
-                    mz=(target_compound_mass + reagent_mz),
-                    relative_abundance=reagent_rel_abu,
+                    mz=(target_compound_mass + mz),
+                    relative_abundance=fraction,
                     resolution="HIGH",
                 )
-                for reagent_mz, reagent_rel_abu in raw_isotopes
+                for mz, fraction in raw_isotopes
             ]
         )
         # Store low resolution isotopes

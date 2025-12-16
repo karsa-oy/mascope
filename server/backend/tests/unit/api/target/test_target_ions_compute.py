@@ -109,8 +109,14 @@ def assert_target_ion_formulae(
             if im.ionization_mechanism_id == ion.ionization_mechanism_id:
                 if im.ionization_mechanism in ["+", "-"]:
                     # For electron abstraction/addition, the formula remains unchanged
+                    # Strip [] and charge from formula
+                    ion_base_formula = (
+                        Formula(ion.target_ion_formula)
+                        .formula.replace("[", "")
+                        .replace("]", "")[:-1]
+                    )
                     assert (
-                        Formula(ion.target_ion_formula).formula
+                        ion_base_formula
                         == (Formula(target_compound.target_compound_formula)).formula
                     )
                 elif im.ionization_mechanism.startswith("+"):
@@ -119,7 +125,7 @@ def assert_target_ion_formulae(
                         Formula(ion.target_ion_formula).formula
                         == (
                             Formula(target_compound.target_compound_formula)
-                            + Formula(im.ionization_mechanism)
+                            + Formula(im.ionization_mechanism[1:])
                         ).formula
                     )
                 elif im.ionization_mechanism.startswith("-"):
@@ -128,7 +134,7 @@ def assert_target_ion_formulae(
                         Formula(ion.target_ion_formula).formula
                         == (
                             Formula(target_compound.target_compound_formula)
-                            - Formula(im.ionization_mechanism)
+                            - Formula(im.ionization_mechanism[1:])
                         ).formula
                     )
 
