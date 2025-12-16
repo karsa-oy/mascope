@@ -14,6 +14,7 @@ Redis key namespaces:
 """
 
 from redis.asyncio import Redis, from_url
+from mascope_backend.socket.storage.config import storage_config
 from mascope_backend.runtime import runtime
 
 
@@ -52,7 +53,7 @@ class RedisStorageClient:
             # Test connection
             await self._client.ping()
 
-            ttl_hours = runtime.config.redis.session_ttl / 3600
+            ttl_hours = storage_config.session_ttl / 3600
             runtime.logger.info(
                 f"Redis session client connected at {redis_url} "
                 f"(session TTL: {ttl_hours:.1f} hours)"

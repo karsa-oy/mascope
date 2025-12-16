@@ -69,7 +69,6 @@ class RedisConfig(BaseModel):
     port: int = 6379
     container_name: str = "mascope_redis"
     image: str = "redis:7-alpine"
-    session_ttl: int = 86400  # Socket session TTL in seconds (24 hours)
 
     def get_url(self) -> str:
         """Build Redis URL from host and port."""

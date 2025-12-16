@@ -14,22 +14,9 @@ import os
 from typing import Any
 from mascope_backend.db.models import User
 from mascope_backend.socket.storage.client import redis_storage_client
+from mascope_backend.socket.storage.config import storage_config
 from mascope_backend.socket.auth.exceptions import SocketSessionError
 from mascope_backend.runtime import runtime
-
-
-def _build_session_key(sid: str, namespace: str = "/") -> str:
-    """
-    Build Redis key for session storage.
-
-    :param sid: Socket.IO session ID
-    :type sid: str
-    :param namespace: Socket.IO namespace
-    :type namespace: str
-    :return: Redis key in format 'mascope:session:{namespace}:{sid}'
-    :rtype: str
-    """
-    return f"mascope:session:{namespace}:{sid}"
 
 
 async def save_user_session(sid: str, user: User, namespace: str = "/") -> None:
@@ -51,30 +38,28 @@ async def save_user_session(sid: str, user: User, namespace: str = "/") -> None:
     """
     try:
         worker_pid = os.getpid()
-        session_key = _build_session_key(sid, namespace)
         session_data = {
             "user_id": user.id,
             "username": user.username,
             "role_id": user.role_id,
         }
 
-        # TTL from config (default 24 hours)
-        session_ttl = runtime.config.redis.session_ttl
-
-        # Store in Redis with TTL
+        # Store in Redis with configured TTL
         await redis_storage_client.client.setex(
-            session_key,
-            session_ttl,
+            storage_config.session_key(sid, namespace),
+            storage_config.session_ttl,
             json.dumps(session_data),
         )
 
         runtime.logger.debug(
-            f"Redis session storage client: saved session for {sid}: user={user.username}, role_id={user.role_id} [Worker {worker_pid}]"
+            f"Redis session storage client: saved session for {sid}: user={user.username}, "
+            f"role_id={user.role_id} [Worker {worker_pid}]"
         )
 
     except Exception as e:
         runtime.logger.error(
-            f"Redis session storage client: failed to save session for SID '{sid}': {str(e)} [Worker {worker_pid}]"
+            f"Redis session storage client: failed to save session for SID '{sid}': {str(e)} "
+            f"[Worker {worker_pid}]"
         )
         raise SocketSessionError("Failed to save session") from e
 
@@ -93,8 +78,9 @@ async def clear_user_session(sid: str, namespace: str = "/") -> None:
     """
     worker_pid = os.getpid()
     try:
-        session_key = _build_session_key(sid, namespace)
-        deleted = await redis_storage_client.client.delete(session_key)
+        deleted = await redis_storage_client.client.delete(
+            storage_config.session_key(sid, namespace),
+        )
 
         if deleted:
             runtime.logger.debug(
@@ -130,7 +116,7 @@ async def get_session_user(sid: str, namespace: str = "/") -> dict[str, Any]:
     """
     worker_pid = os.getpid()
     try:
-        session_key = _build_session_key(sid, namespace)
+        session_key = storage_config.session_key(sid, namespace)
 
         # Get session data
         if not (data := await redis_storage_client.client.get(session_key)):
@@ -147,8 +133,9 @@ async def get_session_user(sid: str, namespace: str = "/") -> dict[str, Any]:
             raise SocketSessionError("Invalid session: missing or invalid role_id")
 
         # Refresh TTL on access (keeps active users sessions authenticated)
-        session_ttl = runtime.config.redis.session_ttl
-        await redis_storage_client.client.expire(session_key, session_ttl)
+        await redis_storage_client.client.expire(
+            session_key, storage_config.session_ttl
+        )
 
         runtime.logger.trace(
             f"Redis session storage client: retrieved session for {sid}, TTL refreshed [Worker {worker_pid}]"
@@ -158,7 +145,8 @@ async def get_session_user(sid: str, namespace: str = "/") -> dict[str, Any]:
 
     except json.JSONDecodeError as e:
         runtime.logger.error(
-            f"Redis session storage client: failed to decode session data for {sid}: {e} [Worker {worker_pid}]"
+            f"Redis session storage client: failed to decode session data for {sid}: {e} "
+            f"[Worker {worker_pid}]"
         )
         raise SocketSessionError("Corrupted session data") from e
     except SocketSessionError:
