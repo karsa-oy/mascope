@@ -11,7 +11,6 @@ class QueryParamsModel(BaseModel):
         "polarity",
         "ionization_mechanism_polarity",
         "ionization_mechanism",
-        "reagent",
         "filename",
         "method_file",
         check_fields=False,  # allows the validator to work across models without requiring these fields

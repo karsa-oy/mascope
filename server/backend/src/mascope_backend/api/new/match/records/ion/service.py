@@ -200,7 +200,6 @@ async def _get_sample_match_ion_records(
                 "ionization_mechanism_id": row.TargetIon.ionization_mechanism_id,
                 "ionization_mechanism": row.IonizationMechanism.ionization_mechanism,
                 "ionization_mechanism_polarity": row.IonizationMechanism.ionization_mechanism_polarity,
-                "reagent": row.IonizationMechanism.reagent,
                 "filter_params": row.TargetIon.filter_params,
             }
 
@@ -378,7 +377,6 @@ async def _get_batch_match_ion_records(
                 "ionization_mechanism_id": row.TargetIon.ionization_mechanism_id,
                 "ionization_mechanism": row.IonizationMechanism.ionization_mechanism,
                 "ionization_mechanism_polarity": row.IonizationMechanism.ionization_mechanism_polarity,
-                "reagent": row.IonizationMechanism.reagent,
                 "filter_params": row.TargetIon.filter_params,
             }
 

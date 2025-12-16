@@ -43,44 +43,37 @@ async def test_ionization_mechanisms(
             IonizationMechanism(
                 ionization_mechanism_id="unit-test-1",
                 ionization_mechanism_polarity="-",
-                ionization_mechanism="-H-",
-                reagent=None,
+                ionization_mechanism="-H+",
             ),
             IonizationMechanism(
                 ionization_mechanism_id="unit-test-2",
                 ionization_mechanism_polarity="-",
                 ionization_mechanism="+Br-",
-                reagent="CH2Br2",
             ),
             IonizationMechanism(
                 ionization_mechanism_id="unit-test-3",
                 ionization_mechanism_polarity="-",
                 ionization_mechanism="+NO3-",
-                reagent="HNO3",
             ),
             IonizationMechanism(
                 ionization_mechanism_id="unit-test-4",
                 ionization_mechanism_polarity="+",
                 ionization_mechanism="+H+",
-                reagent=None,
             ),
             IonizationMechanism(
                 ionization_mechanism_id="unit-test-5",
                 ionization_mechanism_polarity="+",
                 ionization_mechanism="+(CH4N2O)H+",
-                reagent="CH4N2O",
             ),
             IonizationMechanism(
                 ionization_mechanism_id="unit-test-6",
                 ionization_mechanism_polarity="+",
                 ionization_mechanism="+",
-                reagent=None,
             ),
             IonizationMechanism(
                 ionization_mechanism_id="unit-test-7",
                 ionization_mechanism_polarity="-",
                 ionization_mechanism="-",
-                reagent=None,
             ),
         ]
 

@@ -553,12 +553,6 @@ class IonizationMechanism(Base):
     ionization_mechanism: Mapped[str] = mapped_column(
         String, nullable=False, unique=True
     )
-    reagent: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    is_default: Mapped[int] = mapped_column(
-        Integer,
-        nullable=False,
-        server_default=text(f"{ionization_mechanism_config.DEFAULT_IS_DEFAULT_STATUS}"),
-    )
 
     # Define relationships
     target_ion = relationship(

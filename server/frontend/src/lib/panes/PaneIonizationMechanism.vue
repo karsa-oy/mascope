@@ -13,23 +13,28 @@ import InputText from 'primevue/inputtext'
 import FloatLabel from 'primevue/floatlabel'
 import { useConfirm } from 'primevue/useconfirm'
 
+import { isValidChemicalFormula } from '@/lib/chem'
 import { useApp } from '@/stores'
 
 const app = useApp()
 const confirm = useConfirm()
 
 const add = reactive({
-  mechanism: '',
-  reagent: null
+  mechanism: ''
 })
 
 const resetFields = () => {
   add.mechanism = ''
-  add.reagent = null
 }
 
 const polarityValid = computed(() => ['+', '-'].includes(add.mechanism.trim().slice(-1)))
 const prefixValid = computed(() => ['+', '-'].includes(add.mechanism.trim()[0]))
+const modificationValid = computed(() => {
+  const mech = add.mechanism.trim()
+  if (mech.length == 1) return true // Only polarity present
+  const core = mech.slice(1, -1)
+  return isValidChemicalFormula(core)
+})
 
 // reset when create successful
 watch(
@@ -53,14 +58,10 @@ defineExpose({
       <InputText
         v-model="add.mechanism"
         id="add-mechanism"
-        :invalid="add.mechanism.trim().length >= 3 || !prefixValid || !polarityValid"
+        :invalid="!modificationValid || !prefixValid || !polarityValid"
         style="width: 100%"
       />
       <label for="add-mechanism">Mechanism*</label>
-    </FloatLabel>
-    <FloatLabel style="flex-grow: 1">
-      <InputText v-model="add.reagent" id="add-reagent" style="width: 100%" />
-      <label for="add-reagent">Reagent</label>
     </FloatLabel>
     <Button
       label="Add"
@@ -68,15 +69,10 @@ defineExpose({
       @click="
         () =>
           app.data.ionization.mechanism.create({
-            ionization_mechanism: add.mechanism.trim(),
-            reagent: add.reagent?.trim() || null
+            ionization_mechanism: add.mechanism.trim()
           })
       "
-      :disabled="
-        (!add.mechanism.trim() && !(add.reagent && add.reagent.trim())) ||
-        !prefixValid ||
-        !polarityValid
-      "
+      :disabled="!add.mechanism.trim() || !modificationValid || !prefixValid || !polarityValid"
     />
   </menu>
   <section style="margin: 1rem 0">
@@ -88,7 +84,6 @@ defineExpose({
     >
       <Column field="ionization_mechanism_polarity" header="Polarity" width="2rem" sortable />
       <Column field="ionization_mechanism" header="Mechanism" width="40%" sortable />
-      <Column field="reagent" header="Reagent" width="40%" sortable />
       <Column field="ionization_mechanism_id" width="2rem">
         <template #body="{ data }">
           <Button

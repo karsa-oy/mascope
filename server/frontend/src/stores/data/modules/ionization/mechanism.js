@@ -28,13 +28,11 @@ export const useIonizationMechanism = defineStore('app.data.ionization.mechanism
         use: 'read',
         type: 'read_ionization_mechanism'
       }),
-    create: ({ ionization_mechanism_polarity, ionization_mechanism, reagent }) =>
+    create: ({ ionization_mechanism }) =>
       api.http.post(
         `/ionization_mechanisms`,
         {
-          ionization_mechanism_polarity,
-          ionization_mechanism,
-          reagent
+          ionization_mechanism
         },
         {
           use: 'create',

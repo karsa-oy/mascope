@@ -22,8 +22,6 @@ from mascope_backend.db.models import (
     TargetCompound,
     TargetIon,
     TargetIsotope,
-    SampleBatch,
-    SampleItem,
 )
 from mascope_backend.api.lib.api_features import api_controller
 from mascope_backend.api.lib.exceptions.api_exceptions import (
@@ -43,15 +41,13 @@ from mascope_backend.api.models.ionization_mechanisms.ionization_mechanism_pydan
 async def get_ionization_mechanisms(
     ionization_mechanism_polarity: str | None = None,
     ionization_mechanism: list | None = None,
-    reagent: str | None = None,
-    is_default: bool | None = None,
     sort: str | None = None,
     order: str | None = None,
     page: int | None = None,
     limit: int | None = None,
 ) -> dict:
     """
-    Retrieves a paginated list of ionization mechanisms, optionally filtered by polarity, mechanism, or reagent,
+    Retrieves a paginated list of ionization mechanisms, optionally filtered by polarity or mechanism,
     and sorted by a specified column.
 
     Steps:
@@ -65,9 +61,6 @@ async def get_ionization_mechanisms(
     :param ionization_mechanism_polarity: Filter by polarity, defaults to None.
     :param ionization_mechanism: Filter by mechanism, defaults to None.
     :type ionization_mechanism: list | None
-    :param reagent: Filter by reagent, defaults to None.
-    :param is_default: Filter by default acquisition ionization mechanism, defaults to None.
-    :type is_default: bool | None
     :param sort: Column to sort by, defaults to None.
     :param order: Sorting order, defaults to None.
     :param page: Page number for pagination, defaults to None (no pagination).
@@ -91,13 +84,6 @@ async def get_ionization_mechanisms(
         if ionization_mechanism:
             stmt = stmt.where(
                 IonizationMechanism.ionization_mechanism.in_(ionization_mechanism)
-            )
-        if reagent:
-            stmt = stmt.filter(IonizationMechanism.reagent == reagent)
-
-        if is_default is not None:
-            stmt = stmt.filter(
-                IonizationMechanism.is_default == (1 if is_default else 0)
             )
 
         # Step 3: Apply sorting

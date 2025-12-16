@@ -55,14 +55,6 @@ class IonizationMechanismBaseValidator:
             )
         return value
 
-    @field_validator("reagent")
-    @classmethod
-    def validate_reagent(cls, value: str | None) -> str | None:
-        """Validate reagent is not empty string."""
-        if value is not None and not value.strip():
-            raise ValueError("reagent cannot be an empty string.")
-        return value
-
     @model_validator(mode="after")
     @classmethod
     def validate_ionization_mechanism_and_polarity(cls, values):
@@ -104,12 +96,6 @@ class IonizationMechanismBase(IonizationMechanismBaseValidator, BaseModel):
     ionization_mechanism: str = Field(
         ...,
         description="Chemical formula modification (addition/abstraction) representing the ionized form.",
-    )
-    reagent: str | None = Field(
-        None, description="Reagent used in the ionization process, if applicable."
-    )
-    is_default: bool = Field(
-        ..., description="Whether this is a default acquisition ionization mechanism"
     )
 
     model_config = ConfigDict(from_attributes=True)
@@ -170,12 +156,6 @@ class IonizationMechanismUpdate(IonizationMechanismBaseValidator, BaseModel):
     ionization_mechanism: str | None = Field(
         None, description="Chemical formula modification representing the ionized form."
     )
-    reagent: str | None = Field(
-        None, description="Reagent used in the ionization process"
-    )
-    is_default: bool | None = Field(
-        None, description="Whether this is a default acquisition mechanism"
-    )
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -191,13 +171,7 @@ class GetIonizationMechanismsQueryParams(QueryParamsModel):
         None,
         description="Filter by the chemical formula modification of the ionization mechanism. Can specify multiple values.",
     )
-    reagent: str | None = Field(
-        None, description="Filter by the reagent used in the ionization process"
-    )
-    is_default: bool | None = Field(
-        None,
-        description="Filter by default status (true for default acquisition mechanisms)",
-    )
+
     sort: str | None = Field("ionization_mechanism", description="Field to sort by")
     order: str | None = Field(
         "asc",
