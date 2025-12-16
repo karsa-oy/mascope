@@ -58,9 +58,7 @@ class BaseCalibrationHandler:
         self.error = None
         self.warning = None
 
-    async def _match_calibration_compounds(
-        self, match_params: BaseMatchParams
-    ) -> tuple[pd.DataFrame, pd.DataFrame]:
+    async def _match_calibration_compounds(self) -> tuple[pd.DataFrame, pd.DataFrame]:
         """Match calibration compounds in the sample file."""
         target_compounds_result = await get_target_compound_in_target_collection(
             target_collection_id=self.params.calibration_collection_id,
@@ -282,15 +280,6 @@ class TofCalibrationHandler(BaseCalibrationHandler):
     @api_controller()
     async def fit(self):
         """Fit the m/z calibration for a TOF instrument."""
-        match_params = TofMatchParams(
-            peak_min_intensity=self.params.peak_intensity_min,
-        )
-        match_params.min_isotope_abundance = self.params.isotope_abundance_min
-        if self.params.mz_error_tolerance:
-            match_params.mz_tolerance = self.params.mz_error_tolerance
-        else:
-            self.params.mz_error_tolerance = match_params.mz_tolerance
-
         await send_progress_user_notification(self.notification, 0.25)
 
         _, tic_per_scan = m_compute.get_tic_per_scan(self.filename)
@@ -301,9 +290,7 @@ class TofCalibrationHandler(BaseCalibrationHandler):
 
         await send_progress_user_notification(self.notification, 0.35)
 
-        match_isotope_df, good_matches_df = await self._match_calibration_compounds(
-            match_params
-        )
+        match_isotope_df, good_matches_df = await self._match_calibration_compounds()
 
         n_relevant_isotopes = len(
             match_isotope_df[
@@ -401,20 +388,9 @@ class OrbiCalibrationHandler(BaseCalibrationHandler):
     @api_controller()
     async def fit(self):
         """Fit the m/z calibration for an Orbitrap instrument."""
-        match_params = OrbiMatchParams(
-            peak_min_intensity=self.params.peak_intensity_min,
-        )
-        match_params.min_isotope_abundance = self.params.isotope_abundance_min
-        if self.params.mz_error_tolerance:
-            match_params.mz_tolerance = self.params.mz_error_tolerance
-        else:
-            self.params.mz_error_tolerance = match_params.mz_tolerance
-
         await send_progress_user_notification(self.notification, 0.25)
 
-        match_isotope_df, good_matches_df = await self._match_calibration_compounds(
-            match_params
-        )
+        match_isotope_df, good_matches_df = await self._match_calibration_compounds()
 
         await send_progress_user_notification(self.notification, 0.75)
 
