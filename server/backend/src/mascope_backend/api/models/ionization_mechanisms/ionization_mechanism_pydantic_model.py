@@ -71,15 +71,25 @@ class IonizationMechanismBaseValidator:
         ionization_mechanism = values.ionization_mechanism
 
         # Match the polarity with the final ion charge
-        if polarity == "+" and not ionization_mechanism.endswith("+"):
+        if len(ionization_mechanism) == 1:
+            # Electron addition/abstraction case
+            if ionization_mechanism != polarity:
+                raise ValueError(
+                    f"Ionization mechanism {ionization_mechanism}: polarity {polarity} is inconsistent with the mechanism."
+                )
+            return values
+
+        if polarity == "+" and not (
+            ionization_mechanism[0] == ionization_mechanism[-1]
+        ):
             raise ValueError(
-                "Polarity is '+', but the ionization mechanism does not end with '+'. "
-                "The ion should carry a positive charge."
+                f"Ionization mechanism {ionization_mechanism}: polarity {polarity} is inconsistent with the mechanism."
             )
-        if polarity == "-" and not ionization_mechanism.endswith("-"):
+        if polarity == "-" and not (
+            ionization_mechanism[0] != ionization_mechanism[-1]
+        ):
             raise ValueError(
-                "Polarity is '-', but the ionization mechanism does not end with '-'. "
-                "The ion should carry a negative charge."
+                f"Ionization mechanism {ionization_mechanism}: polarity {polarity} is inconsistent with the mechanism."
             )
 
         return values
@@ -111,18 +121,34 @@ class IonizationMechanismCreate(IonizationMechanismBase):
     @model_validator(mode="before")
     @classmethod
     def auto_derive_fields(cls, values):
-        """Auto-derive polarity and is_default fields."""
+        """Auto-derive polarity field."""
         mechanism = values.get("ionization_mechanism")
+        polarity = values.get("ionization_mechanism_polarity")
 
         # Auto-derive polarity from the last character if not provided
-        if not values.get("ionization_mechanism_polarity"):
-            values["ionization_mechanism_polarity"] = mechanism[-1]
+        if polarity is None:
+            if len(mechanism) > 1:
+                if mechanism[0] == "+":
+                    polarity = mechanism[-1]
+                elif mechanism[0] == "-":
+                    # Reverse polarity for abstraction
+                    if mechanism[-1] == "+":
+                        polarity = "-"
+                    elif mechanism[-1] == "-":
+                        polarity = "+"
+                    else:
+                        raise ValueError(
+                            f"Invalid ionization mechanism {mechanism}: must end with '+' or '-'"
+                        )
+                else:
+                    raise ValueError(
+                        f"Invalid ionization mechanism {mechanism}: must start with '+' or '-'"
+                    )
+            else:
+                # Electron addition/abstraction case
+                polarity = mechanism[0]
 
-        # Auto-determine is_default if not explicitly set
-        if values.get("is_default") is None:
-            values["is_default"] = (
-                mechanism in ionization_mechanism_config.DEFAULT_ACQUISITION_MECHANISMS
-            )
+            values["ionization_mechanism_polarity"] = polarity
 
         return values
 
