@@ -15,7 +15,7 @@ from typing import Any
 from mascope_backend.db.models import User
 from mascope_backend.socket.storage.client import redis_storage_client
 from mascope_backend.socket.storage.config import storage_config
-from mascope_backend.socket.auth.exceptions import SocketSessionError
+from mascope_backend.socket.storage.exceptions import SocketSessionError
 from mascope_backend.runtime import runtime
 
 

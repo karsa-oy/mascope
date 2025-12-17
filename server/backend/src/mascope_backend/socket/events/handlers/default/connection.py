@@ -8,8 +8,15 @@ import os
 from mascope_backend.socket import sio
 from mascope_backend.socket.auth import authenticate_socket_connection
 from mascope_backend.socket.auth.token import get_jwt_from_cookies
-from mascope_backend.socket.auth.exceptions import SocketUnauthenticatedError
-from mascope_backend.socket.storage import clear_user_session
+from mascope_backend.socket.auth.exceptions import (
+    SocketUnauthenticatedError,
+)
+from mascope_backend.socket.storage import (
+    clear_user_session,
+    get_session_user,
+    room_tracker,
+    SocketSessionError,
+)
 from mascope_backend.runtime import runtime
 
 
@@ -72,6 +79,8 @@ async def connect(sid: str, environ: dict) -> bool:
 async def disconnect(sid: str) -> None:
     """
     Handle frontend user socket disconnections.
+    - Remove user from all room memberships (room_tracker)
+    - Clear authentication session (session manager)
 
     :param sid: Socket session ID
     :type sid: str
@@ -81,6 +90,23 @@ async def disconnect(sid: str) -> None:
         f"Socket server: user's socket client {sid} disconnected [Worker {worker_pid}]"
     )
 
-    # Clear session from Redis (primary cleanup)
-    await clear_user_session(sid)
-    runtime.logger.debug(f"User session disconnected: {sid} [Worker {worker_pid}]")
+    try:
+        # Clean up room memberships BEFORE clearing session (need user_id)
+        session = await get_session_user(sid)
+        user_id = session["user_id"]
+        await room_tracker.leave_all(user_id)
+
+        runtime.logger.debug(
+            f"User session disconnected: cleaned up rooms for user {user_id} (sid={sid}) "
+            f"[Worker {worker_pid}]"
+        )
+
+    except SocketSessionError:
+        # No session found - user was never authenticated or already cleaned up
+        runtime.logger.trace(
+            f"Socket disconnect: no session found for {sid} [Worker {worker_pid}]"
+        )
+
+    finally:
+        # Clear session from Redis storage
+        await clear_user_session(sid)

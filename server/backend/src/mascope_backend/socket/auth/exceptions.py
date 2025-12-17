@@ -30,13 +30,6 @@ class SocketForbiddenError(SocketAuthError):
         super().__init__(message=message, error_code="SOCKET_FORBIDDEN")
 
 
-class SocketSessionError(SocketAuthError):
-    """Raised when there are issues with socket session."""
-
-    def __init__(self, message: str = "Session error"):
-        super().__init__(message=message, error_code="SOCKET_SESSION_ERROR")
-
-
 class SocketAuthConfigError(SocketAuthError):
     """Raised when there are authentication configuration issues."""
 
