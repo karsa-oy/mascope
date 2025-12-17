@@ -233,9 +233,8 @@ def run_library_tests(
                     break
 
             if not found:
-                typer.echo(
-                    f"Warning: Test '{test_name}' not found. Running all library tests instead."
-                )
+                typer.echo(f"Warning: Test '{test_name}' not found. Exiting...")
+                return
 
     # Ensure all path separators are forward slashes for pytest
     test_path = test_path.replace("\\", "/")
@@ -251,9 +250,6 @@ def run_library_tests(
     # Run the command
     typer.echo(f"Running: {cmd_str}")
     lib.run(cmd_str)
-
-
-# ...existing code...
 
 
 @test_app.command()

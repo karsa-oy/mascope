@@ -1,5 +1,6 @@
 # pylint: disable=not-callable
 import asyncio
+from typing import Literal
 from datetime import datetime, timezone
 import xarray as xr
 import pandas as pd
@@ -1026,6 +1027,17 @@ async def get_sample_batch_peaks(
     """
     Retrieves aligned peak data for all sample items within a specified sample batch.
 
+    Steps:
+    - Validate the existence of the sample batch.
+    - Attempt to load existing cached peak data for the batch.
+    - If no cached data is found, fetch all sample items in the batch.
+    - Validate that all sample items belong to the same instrument type.
+    - Infer the appropriate intensity variable based on the instrument type.
+    - Load resolution functions for each sample file.
+    - Prepare CentroidedSpectrum objects for each sample item, grouped by ionization mode.
+    - Align peaks for each ionization mode using the MassSpecAligner (virtual lock mass).
+    - Compile aligned peak data into a structured response.
+
     :param sample_batch_id: ID of the sample batch to retrieve peak data from.
     :type sample_batch_id: str
     :param independent_transaction: Flag indicating if the operation is an independent transaction, defaults to False.
@@ -1098,8 +1110,24 @@ async def get_sample_batch_peaks(
     # Bound concurrency to avoid too many open files / blocking the loop
     semaphore = asyncio.Semaphore(6)
 
-    def _sync_load_peak_data(filename, polarity):
-        """Synchronous helper to load peak data in a thread."""
+    def _sync_load_peak_data(
+        filename: str, polarity: Literal["+", "-"]
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """
+        Synchronous helper to load peak data from file:
+        - Loads scan timestamps corresponding to the sample polarity
+        - Loads peak data
+        - Filters peaks corresponding to the sample polarity
+        - Averages peak intensities by number of scans (timestamps)
+        - Returns m/z values, intensities, and peak IDs
+
+        :param filename: Filename to load peak data from.
+        :type filename: str
+        :param polarity: Polarity to filter peaks by.
+        :type polarity: Literal["+", "-"]
+        :return: Tuple of m/z values, intensities, and peak IDs.
+        :rtype: tuple[np.ndarray, np.ndarray, np.ndarray]
+        """
         timestamps = m_compute.get_scan_timestamps(filename, polarity=polarity)
 
         peak_data = m_io.load_peak_data(filename)
@@ -1113,8 +1141,14 @@ async def get_sample_batch_peaks(
 
         return mz, intensity, peak_id
 
-    async def _prepare_spec(sample_item):
-        """Prepare CentroidedSpectrum for a sample item."""
+    async def _prepare_spec(sample_item: Sample) -> tuple[str, CentroidedSpectrum]:
+        """Creates a CentroidSpectrum object for a sample item.
+
+        :param sample_item: Sample item to prepare the spectrum for.
+        :type sample_item: Sample
+        :return: Tuple of ionization mode ID and CentroidedSpectrum object.
+        :rtype: tuple[str, CentroidedSpectrum]
+        """
         filename = sample_item.filename
         polarity = sample_item.polarity
         ionization_mode = sample_item.ionization_mode_id
