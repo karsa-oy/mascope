@@ -42,7 +42,6 @@ async def get_samples_centroids_route(
 ) -> dict:
     """Retrieve centroids for multiple sample items.
 
-    :param request: The HTTP request object.
     :param sample_item_ids: List of sample item IDs to retrieve centroids for.
     :param user: The current authenticated user with editor permissions.
     :return: A dictionary containing the process ID for retrieving centroids.

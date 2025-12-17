@@ -460,15 +460,15 @@ async def delete_sample_items(
 
 
 @api_controller_background_task(
-    success_notification_rooms=["sid"],
-    error_notification_rooms=["sid"],
+    success_notification_rooms=["user_id"],
+    error_notification_rooms=["user_id"],
 )
 async def copy_sample_items(
     sample_item_ids: list[str],
     sample_batch_id: str,
     always_copy_matches: bool = False,
     independent_transaction: bool = False,
-    sid: str | None = None,
+    user_id: int | None = None,
     process_id: str | None = None,
     parent_id: str | None = None,
 ) -> dict:
@@ -486,8 +486,8 @@ async def copy_sample_items(
     :type always_copy_matches: bool
     :param independent_transaction: Flag indicating whether the sample item copy is an independent transaction and if the operation should emit a reload event for the sample batch and if the sample should be rematched for new batch targets, defaults to False
     :type independent_transaction: bool, optional
-    :param sid: Session identifier for client notifications
-    :type sid: str | None
+    :param user_id: Current user triggered operation (for user notifications)
+    :type user_id: int | None, optional
     :param process_id: Process identifier for progress tracking
     :type process_id: str | None
     :param parent_id: Parent process identifier
@@ -599,8 +599,7 @@ async def copy_sample_items(
             data={
                 "sample_match_copies": [cmd._asdict() for cmd in match_copy_commands],
                 "sample_batch_id": sample_batch_id,
-                "_room_ids": [sid],
-                "_sid": sid,
+                "_user_id": user_id,
             },
         )
         await copy_sample_items_match_data(
@@ -648,14 +647,14 @@ async def copy_sample_items(
 
 
 @api_controller_background_task(
-    success_notification_rooms=["sid"],
-    error_notification_rooms=["sid"],
+    success_notification_rooms=["user_id"],
+    error_notification_rooms=["user_id"],
 )
 async def move_sample_items(
     sample_item_ids: list[str],
     sample_batch_id: str,
     independent_transaction: bool = False,
-    sid: str | None = None,
+    user_id: int | None = None,
     process_id: str | None = None,
     parent_id: str | None = None,
 ) -> dict:
@@ -676,8 +675,8 @@ async def move_sample_items(
     :type sample_batch_id: str
     :param independent_transaction: Flag indicating whether the sample item copy is an independent transaction and if the operation should emit a reload event for the sample batch and if the sample should be rematched for new batch targets, defaults to False
     :type independent_transaction: bool, optional
-    :param sid: Session identifier for client notifications
-    :type sid: str | None
+    :param user_id: Current user triggered operation (for user notifications)
+    :type user_id: int | None, optional
     :param process_id: Process identifier for progress tracking
     :type process_id: str | None
     :param parent_id: Parent process identifier
@@ -721,7 +720,7 @@ async def move_sample_items(
         sample_item_ids=sample_item_ids,
         sample_batch_id=sample_batch_id,
         independent_transaction=True,
-        sid=sid,
+        user_id=user_id,
         process_id=gen_id(8),
         parent_id=process_id,
     )
@@ -744,13 +743,13 @@ async def move_sample_items(
 
 
 @api_controller_background_task(
-    success_notification_rooms=["sid"],
-    error_notification_rooms=["sid"],
+    success_notification_rooms=["user_id"],
+    error_notification_rooms=["user_id"],
 )
 async def sample_item_export_peaks(
     sample_item_id: str,
     independent_transaction: bool = False,
-    sid=None,
+    user_id: int | None = None,
     process_id=None,
     parent_id=None,
 ):
@@ -777,8 +776,12 @@ async def sample_item_export_peaks(
     :type sample_item_id: str
     :param independent_transaction: Flag to indicate if the operation should be treated as an independent transaction, defaults to False.
     :type independent_transaction: bool, optional
-    :param sid: Session ID for targeting specific clients when emitting events, defaults to None.
-    :type sid: str, optional
+    :param user_id: Current user triggered operation (for user notifications)
+    :type user_id: int | None, optional
+    :param process_id: Process identifier for progress tracking
+    :type process_id: str | None
+    :param parent_id: Parent process identifier
+    :type parent_id: str | None
     """
     sample = await fetch_sample(sample_item_id)
     sample_batch = await fetch_sample_batch(sample.sample_batch_id)
@@ -790,12 +793,10 @@ async def sample_item_export_peaks(
         type="sample_item_export_peaks",
         status="pending",
         message=f"Exporting peak data for sample item '{sample.sample_item_name}'",
-        # NOTE set the internal room_ids for the pending user_notifications and sid of the user, will be removed from the data.
         data={
             "sample_item_id": sample_item_id,
             "sample_batch_id": sample_batch.sample_batch_id,
-            "_room_ids": [sid],
-            "_sid": sid,
+            "_user_id": user_id,
         },
     )
 

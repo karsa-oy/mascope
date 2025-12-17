@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, BackgroundTasks, Request
+from fastapi import APIRouter, Depends, BackgroundTasks
 from mascope_backend.api.new.auth.dependencies import guest_user
 from mascope_backend.api.lib.api_features import api_route
 
@@ -39,7 +39,6 @@ async def retrieve_cheminfo_by_mz_route(
 @cheminfo_router.post("/mz/match/sample/{sample_item_id}")
 @api_route(status_code=202)
 async def match_cheminfo_mz_route(
-    request: Request,
     sample_item_id: str,
     body: CheminfoMatchedQueryBody,
     background_tasks: BackgroundTasks,
@@ -56,7 +55,6 @@ async def match_cheminfo_mz_route(
     :rtype dict:
     """
     # Get the socket ID from request headers for notifications
-    sid = request.headers.get("X-SID")
     process_id = gen_id(8)
 
     # Add background task for processing
@@ -71,7 +69,7 @@ async def match_cheminfo_mz_route(
         sort=body.sort,
         order=body.order,
         independent_transaction=True,
-        sid=sid,
+        user_id=user.id,
         process_id=process_id,
     )
 

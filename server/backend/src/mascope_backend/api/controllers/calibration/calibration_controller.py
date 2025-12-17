@@ -39,6 +39,10 @@ from mascope_backend.api.controllers.sample.lib.fetch_affected_sample_data impor
 from mascope_backend.api.controllers.sample.lib.sample_batches_fetch import (
     fetch_sample_batch,
 )
+from mascope_backend.api.controllers.sample.lib.sample_file_fetch import (
+    fetch_sample_file,
+)
+from mascope_backend.api.controllers.samples.lib.samples_fetch import fetch_sample
 from mascope_backend.api.controllers.sample.batches.status.service import (
     update_sample_batch_status,
 )
@@ -103,14 +107,14 @@ async def get_mz_calibration(
 
 
 @api_controller_background_task(
-    success_notification_rooms=["sid"],
-    error_notification_rooms=["sid"],
+    success_notification_rooms=["sample_file_id"],
+    error_notification_rooms=["sample_file_id"],
 )
 async def calibration_mz_fit(
     sample_item_id: str,
     mz_calibration_params: MzCalibrationParams,
     independent_transaction: bool = False,
-    sid: str = None,
+    user_id: int | None = None,
     process_id=None,
     parent_id=None,
 ) -> dict:
@@ -132,12 +136,12 @@ async def calibration_mz_fit(
     :type mz_calibration_params: MzCalibrationParams
     :param independent_transaction: Whether to run as independent transaction
     :type independent_transaction: bool
-    :param sid: Session ID for notifications
-    :type sid: str
+    :param user_id: Current user triggered operation (for user notifications)
+    :type user_id: int | None, optional
     :param process_id: Process ID for tracking
-    :type process_id: str
+    :type process_id: str | None, optional
     :param parent_id: Parent process ID for tracking
-    :type parent_id: str
+    :type parent_id: str | None, optional
     :return: Dictionary containing fit results and notification data
     :rtype: dict
     :raises NotFoundException: If sample item, batch or calibration collection not found
@@ -145,7 +149,7 @@ async def calibration_mz_fit(
     """
     # Retrieve and validate sample and batch data
     async with async_session() as session:
-        sample = await session.get(SampleItem, sample_item_id)
+        sample = await session.get(Sample, sample_item_id)
         if not sample:
             raise NotFoundException(f"Sample item with ID '{sample_item_id}' not found")
 
@@ -175,13 +179,11 @@ async def calibration_mz_fit(
         type="calibration_mz_fit",
         status="pending",
         message=f"m/z fitting sample '{sample.sample_item_name}'.",
-        # NOTE: Set the internal metadata for the pending user_notifications like
-        # room_ids and sid of the user.
-        # Internal metadata will be cleaned up the from data in send_progress_user_notification.
         data={
             "sample_item_id": sample_item_id,
             "filename": sample.filename,
-            "_room_ids": [sid],
+            "_room_ids": [sample.sample_file_id],
+            "_user_id": user_id,
         },
     )
 
@@ -209,6 +211,7 @@ async def calibration_mz_fit(
         "affected_sample_item_ids": affected_sample_item_ids,
         "affected_sample_batch_ids": affected_sample_batch_ids,
         "sample_item_id": sample_item_id,
+        "sample_file_id": sample.sample_file_id,
         "filename": sample.filename,
     }
 
@@ -244,16 +247,16 @@ async def calibration_mz_fit(
 
 
 @api_controller_background_task(
-    success_notification_rooms=["sid"],
+    success_notification_rooms=["sample_file_id"],
     success_reload=[("match", "affected_sample_batch_ids")],
-    error_notification_rooms=["sid"],
+    error_notification_rooms=["sample_file_id"],
     error_reload=[("match", "affected_sample_batch_ids")],
 )
 async def calibration_mz_apply(
     fit: dict,
     filename: str,
     independent_transaction: bool = False,
-    sid: str = None,
+    user_id: int | None = None,
     process_id=None,
     parent_id=None,
 ):
@@ -267,6 +270,8 @@ async def calibration_mz_apply(
     :param filename: Name of the sample file.
     :return: List of calibrated sample item IDs.
     """
+    sample_file = await fetch_sample_file(filename)
+
     # Step 1: Get affected sample items and their batches
     (
         affected_sample_item_ids,
@@ -299,14 +304,11 @@ async def calibration_mz_apply(
         type="calibration_mz_apply",
         status="pending",
         message=f"Applying m/z fit for sample file '{filename}', {total_samples} sample item{'s' if total_samples != 1 else ''} affected.",
-        # NOTE: Set the internal metadata for the pending user_notifications like
-        # room_ids and sid of the user.
-        # Internal metadata will be cleaned up the from data in send_progress_user_notification.
         data={
             "sample_item_ids": affected_sample_item_ids,
             "filename": filename,
-            "_room_ids": [sid],
-            "_sid": sid,
+            "_room_ids": [sample_file.sample_file_id],
+            "_user_id": user_id,
         },
     )
 
@@ -359,19 +361,18 @@ async def calibration_mz_apply(
             data={
                 "sample_batch_id": sample_batch_id,
                 "_room_ids": [sample_batch_id],
-                "_sid": sid,
+                "_user_id": user_id,
             },
         )
         await send_progress_user_notification(batch_notification)
 
         # FAQ_match removes matches in all samples associated with filename
-        # Delete outdated matches, sid is not send to not receive the match_remove_sample notification for every sample
         for sample_item in batch_samples:
             await match_remove_sample(
                 sample_item_id=sample_item.sample_item_id,
                 full_remove=True,
                 independent_transaction=False,
-                sid=sid,
+                user_id=user_id,
                 process_id=gen_id(8),
                 parent_id=process_id,
             )
@@ -403,23 +404,24 @@ async def calibration_mz_apply(
             "affected_sample_item_ids": affected_sample_item_ids,
             "affected_sample_batch_ids": affected_sample_batch_ids,
             "filename": filename,
+            "sample_file_id": sample_file.sample_file_id,
         },
     }
 
 
 @api_controller_background_task(
-    success_notification_rooms=["sid"],
+    success_notification_rooms=["sample_file_id"],
     success_reload=[("match", "affected_sample_batch_ids")],
-    error_notification_rooms=["sid"],
+    error_notification_rooms=["sample_file_id"],
     error_reload=[("match", "affected_sample_batch_ids")],
 )
 async def calibration_mz_calibrate_sample(
     sample_item_id: str,
     mz_calibration_params: MzCalibrationParams,
     independent_transaction: bool = False,
-    sid: str = None,
-    process_id=None,
-    parent_id=None,
+    user_id: int | None = None,
+    process_id: str | None = None,
+    parent_id: str | None = None,
 ):
     """
     Performs m/z calibration on a single sample using specified calibration parameters.
@@ -437,21 +439,18 @@ async def calibration_mz_calibrate_sample(
     :type mz_calibration_params: MzCalibrationParams
     :param independent_transaction: Whether to run as independent transaction
     :type independent_transaction: bool
-    :param sid: Session ID for notifications
-    :type sid: str
+    :param user_id: Current user triggered operation (for user notifications)
+    :type user_id: int | None, optional
     :param process_id: Process ID for tracking
-    :type process_id: str
+    :type process_id: str | None, optional
     :param parent_id: Parent process ID for tracking
-    :type parent_id: str
+    :type parent_id: str | None, optional
     :raises NotFoundException: If the sample with the given ID is not found in the database.
     :raises ValueError: If the sample does not have a valid filename associated with it.
     :raises ApiException: For any exceptions that occur during the calibration process.
     """
-    # Step 1: Retrieve sample data and affected samples
-    async with async_session() as session:
-        sample = await session.get(SampleItem, sample_item_id)
-    if not sample:
-        raise NotFoundException(f"Sample item with ID '{sample_item_id}' not found")
+    # --- Retrieve sample data and affected samples ---
+    sample = await fetch_sample(sample_item_id)
 
     # Get affected samples data for this file
     (
@@ -468,14 +467,11 @@ async def calibration_mz_calibrate_sample(
         type="calibration_mz_calibrate_sample",
         status="pending",
         message=f"m/z calibrating sample '{sample.sample_item_name}'.",
-        # NOTE: Set the internal metadata for the pending user_notifications like
-        # room_ids and sid of the user.
-        # Internal metadata will be cleaned up the from data in send_progress_user_notification.
         data={
             "sample_item_id": sample_item_id,
             "filename": sample.filename,
-            "_room_ids": [sid],
-            "_sid": sid,
+            "_room_ids": [sample.sample_file_id],
+            "_user_id": user_id,
         },
     )
 
@@ -487,7 +483,7 @@ async def calibration_mz_calibrate_sample(
         sample_item_id=sample_item_id,
         mz_calibration_params=mz_calibration_params,
         independent_transaction=False,
-        sid=sid,
+        user_id=user_id,
         process_id=gen_id(8),
         parent_id=process_id,
     )
@@ -500,7 +496,7 @@ async def calibration_mz_calibrate_sample(
         fit=fit,
         filename=sample.filename,
         independent_transaction=False,
-        sid=sid,
+        user_id=user_id,
         process_id=gen_id(8),
         parent_id=process_id,
     )
@@ -512,6 +508,7 @@ async def calibration_mz_calibrate_sample(
         "message": f"Sample '{sample.sample_item_name}' m/z calibrated.",
         "_notification_data": {
             "sample_item_id": sample_item_id,
+            "sample_file_id": sample.sample_file_id,
             "filename": sample.filename,
             "affected_sample_item_ids": affected_sample_item_ids,
             "affected_sample_batch_ids": affected_sample_batch_ids,
@@ -520,18 +517,18 @@ async def calibration_mz_calibrate_sample(
 
 
 @api_controller_background_task(
-    success_notification_rooms=["sid"],
+    success_notification_rooms=["user_id"],
     success_reload=[("match", "affected_sample_batch_ids")],
-    error_notification_rooms=["sid"],
+    error_notification_rooms=["user_id"],
     error_reload=[("match", "affected_sample_batch_ids")],
 )
 async def calibration_mz_calibrate_samples(
     sample_item_ids: Iterable[str],
     mz_calibration_params: MzCalibrationParams,
     independent_transaction: bool = False,
-    sid: str = None,
-    process_id=None,
-    parent_id=None,
+    user_id: int | None = None,
+    process_id: str | None = None,
+    parent_id: str | None = None,
 ) -> list:
     """
     Performs m/z calibration on a set of sample provided a list of sample item ids using specified calibration parameters.
@@ -550,6 +547,12 @@ async def calibration_mz_calibrate_samples(
     :type mz_calibration_params: MzCalibrationParams
     :param independent_transaction: Flag indicating if the operation is an independent transaction, default to False.
     :type independent_transaction: bool
+    :param user_id: Current user triggered operation (for user notifications)
+    :type user_id: int | None, optional
+    :param process_id: Process identifier for tracking background operations, defaults to None.
+    :type process_id: str | None, optional
+    :param parent_id: Parent process identifier for tracking background operations, defaults to None.
+    :type parent_id: str | None, optional
     :raises NotFoundException: Raised if the sample batch or any samples within it are not found.
     :raises ApiException: Raised for any exceptions that occur during the calibration process.
     :return: A list of calibration results for each sample in the batch.
@@ -564,13 +567,9 @@ async def calibration_mz_calibrate_samples(
         type="calibration_mz_calibrate_samples",
         status="pending",
         message=f"m/z calibrating {len(sample_item_ids)} samples.",
-        # NOTE: Set the internal metadata for the pending user_notifications like
-        # room_ids and sid of the user.
-        # Internal metadata will be cleaned up the from data in send_progress_user_notification.
         data={
             "sample_item_ids": sample_item_ids,
-            "_room_ids": [sid],
-            "_sid": sid,
+            "_user_id": user_id,
         },
     )
     await send_progress_user_notification(notification)
@@ -587,7 +586,7 @@ async def calibration_mz_calibrate_samples(
                 sample_item_id=sample_item_id,
                 mz_calibration_params=mz_calibration_params,
                 independent_transaction=False,
-                sid=sid,
+                user_id=user_id,
                 process_id=gen_id(8),
                 parent_id=process_id,
             )
@@ -655,16 +654,16 @@ async def calibration_mz_calibrate_samples(
 
 
 @api_controller_background_task(
-    success_notification_rooms=["sid"],
+    success_notification_rooms=["sample_batch_id"],
     success_reload=[("match", "affected_sample_batch_ids")],
-    error_notification_rooms=["sid"],
+    error_notification_rooms=["sample_batch_id"],
     error_reload=[("match", "affected_sample_batch_ids")],
 )
 async def calibration_mz_calibrate_batch(
     sample_batch_id: str,
     mz_calibration_params: MzCalibrationParams,
     independent_transaction: bool = False,
-    sid: str | None = None,
+    user_id: int | None = None,
     process_id: str | None = None,
     parent_id: str | None = None,
 ) -> list:
@@ -686,8 +685,8 @@ async def calibration_mz_calibrate_batch(
     :type mz_calibration_params: MzCalibrationParams
     :param independent_transaction: Flag indicating if the operation is an independent transaction, default to False.
     :type independent_transaction: bool
-    :param sid: Session identifier for client notifications
-    :type sid: str | None
+    :param user_id: Current user triggered operation (for user notifications)
+    :type user_id: int | None, optional
     :param process_id: Process identifier for progress tracking
     :type process_id: str | None
     :param parent_id: Parent process identifier

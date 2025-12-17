@@ -1,4 +1,4 @@
-from fastapi import APIRouter, BackgroundTasks, Request, Depends, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, Query
 from mascope_backend.db.id import gen_id
 from mascope_backend.db.models import SampleBatch, Workspace
 from mascope_backend.api.lib.api_features import api_route
@@ -168,7 +168,6 @@ async def update_sample_batch_route(
 @sample_batches_router.delete("/{sample_batch_id}")
 @api_route(status_code=202)
 async def delete_sample_batch_route(
-    request: Request,
     sample_batch_id: str,
     background_tasks: BackgroundTasks,
     user=Depends(editor_user),
@@ -192,7 +191,6 @@ async def delete_sample_batch_route(
     # Check if locked sample batch - only owners can delete
     await locked_access(user, SampleBatch, sample_batch_id, min_role="owner")
 
-    sid = request.headers.get("X-SID")
     process_id = gen_id(8)
 
     background_tasks.add_task(
@@ -200,7 +198,7 @@ async def delete_sample_batch_route(
         sample_batch_id=sample_batch_id,
         workspace_id=sample_batch["workspace_id"],
         independent_transaction=True,
-        sid=sid,
+        user_id=user.id,
         process_id=process_id,
     )
 
@@ -213,7 +211,6 @@ async def delete_sample_batch_route(
 @sample_batches_router.post("/{sample_batch_id}/import")
 @api_route(status_code=202)
 async def import_sample_items_route(
-    request: Request,
     sample_batch_id: str,
     body: SampleBatchImportSamplesBody,
     background_tasks: BackgroundTasks,
@@ -250,7 +247,6 @@ async def import_sample_items_route(
     sample_batch = sample_batch_result.get("data")
     sample_batch_name = sample_batch["sample_batch_name"]
 
-    sid = request.headers.get("X-SID")
     process_id = gen_id(8)
 
     background_tasks.add_task(
@@ -259,7 +255,7 @@ async def import_sample_items_route(
         sample_items=body.sample_items,
         instrument_config=body.instrument_config,
         independent_transaction=True,
-        sid=sid,
+        user_id=user.id,
         process_id=process_id,
     )
     return {
@@ -271,7 +267,6 @@ async def import_sample_items_route(
 @sample_batches_router.post("/{sample_batch_id}/copy")
 @api_route(status_code=202)
 async def copy_sample_batch_route(
-    request: Request,
     sample_batch_id: str,
     body: SampleBatchCopyBody,
     background_tasks: BackgroundTasks,
@@ -293,7 +288,6 @@ async def copy_sample_batch_route(
     # Can't copy to locked workspace
     await locked_access(user, Workspace, body.workspace_id)
 
-    sid = request.headers.get("X-SID")
     process_id = gen_id(8)
 
     background_tasks.add_task(
@@ -303,7 +297,7 @@ async def copy_sample_batch_route(
         sample_batch_name=body.sample_batch_name,
         sample_batch_description=body.sample_batch_description,
         independent_transaction=True,
-        sid=sid,
+        user_id=user.id,
         process_id=process_id,
     )
     return {
@@ -315,7 +309,6 @@ async def copy_sample_batch_route(
 @sample_batches_router.get("/{sample_batch_id}/export_peaks")
 @api_route(status_code=202)
 async def sample_batch_export_peaks_route(
-    request: Request,
     sample_batch_id: str,
     background_tasks: BackgroundTasks,
     user=Depends(editor_user),
@@ -336,14 +329,13 @@ async def sample_batch_export_peaks_route(
     sample_batch = sample_batch_result.get("data")
     sample_batch_name = sample_batch["sample_batch_name"]
 
-    sid = request.headers.get("X-SID")
     process_id = gen_id(8)
 
     background_tasks.add_task(
         sample_batch_export_peaks,
         sample_batch_id=sample_batch_id,
         independent_transaction=True,
-        sid=sid,
+        user_id=user.id,
         process_id=process_id,
     )
     return {

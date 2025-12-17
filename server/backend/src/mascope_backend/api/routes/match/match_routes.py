@@ -1,5 +1,5 @@
 # pylint: disable=line-too-long
-from fastapi import APIRouter, BackgroundTasks, Depends, Request
+from fastapi import APIRouter, BackgroundTasks, Depends
 from fastapi.params import Query
 from mascope_backend.db.id import gen_id
 from mascope_backend.api.lib.exceptions.api_exceptions import ApiException
@@ -28,7 +28,6 @@ match_router = APIRouter(prefix="/api/match", tags=["Match Management"])
 @match_router.post("/rematch/batches")
 @api_route(status_code=202)
 async def rematch_batches_route(
-    request: Request,
     body: RematchBatchesBody,
     background_tasks: BackgroundTasks,
     full_remove: bool = Query(
@@ -44,7 +43,6 @@ async def rematch_batches_route(
 ):
     """Rematch multiple sample batches"""
     # Get data for notifications
-    sid = request.headers.get("X-SID")
     process_id = gen_id(8)
 
     background_tasks.add_task(
@@ -53,7 +51,7 @@ async def rematch_batches_route(
         full_remove=full_remove,
         force=force,
         independent_transaction=True,
-        sid=sid,
+        user_id=user.id,
         process_id=process_id,
     )
 
@@ -67,7 +65,6 @@ async def rematch_batches_route(
 @match_router.post("/rematch/batch/{sample_batch_id}")
 @api_route(status_code=202)
 async def rematch_batch_route(
-    request: Request,
     sample_batch_id: str,
     background_tasks: BackgroundTasks,
     full_remove: bool = Query(
@@ -108,7 +105,6 @@ async def rematch_batch_route(
             pass
 
     # Get data for notifications
-    sid = request.headers.get("X-SID")
     process_id = gen_id(8)
 
     background_tasks.add_task(
@@ -117,7 +113,7 @@ async def rematch_batch_route(
         full_remove=full_remove,
         force=force,
         independent_transaction=True,
-        sid=sid,
+        user_id=user.id,
         process_id=process_id,
     )
     return {
@@ -129,7 +125,6 @@ async def rematch_batch_route(
 @match_router.post("/compute/batch/{sample_batch_id}")
 @api_route(status_code=202)
 async def match_compute_batch_route(
-    request: Request,
     sample_batch_id: str,
     background_tasks: BackgroundTasks,
     user=Depends(editor_user),
@@ -139,14 +134,13 @@ async def match_compute_batch_route(
     sample_batch = await fetch_sample_batch(sample_batch_id)
 
     # Get data for notifications
-    sid = request.headers.get("X-SID")
     process_id = gen_id(8)
 
     background_tasks.add_task(
         match_compute_batch,
         sample_batch_id=sample_batch_id,
         independent_transaction=True,
-        sid=sid,
+        user_id=user.id,
         process_id=process_id,
     )
     return {
@@ -158,7 +152,6 @@ async def match_compute_batch_route(
 @match_router.delete("/remove/batch/{sample_batch_id}")
 @api_route(status_code=202)
 async def match_remove_batch_route(
-    request: Request,
     sample_batch_id: str,
     background_tasks: BackgroundTasks,
     full_remove: bool = Query(
@@ -178,7 +171,6 @@ async def match_remove_batch_route(
     sample_batch = await fetch_sample_batch(sample_batch_id)
 
     # Get data for notifications
-    sid = request.headers.get("X-SID")
     process_id = gen_id(8)
 
     background_tasks.add_task(
@@ -186,7 +178,7 @@ async def match_remove_batch_route(
         sample_batch_id=sample_batch_id,
         full_remove=full_remove,
         independent_transaction=True,
-        sid=sid,
+        user_id=user.id,
         process_id=process_id,
     )
     return {
@@ -198,7 +190,6 @@ async def match_remove_batch_route(
 @match_router.post("/rematch/sample/{sample_item_id}")
 @api_route(status_code=202)
 async def rematch_sample_route(
-    request: Request,
     sample_item_id: str,
     background_tasks: BackgroundTasks,
     full_remove: bool = Query(
@@ -218,7 +209,6 @@ async def rematch_sample_route(
     sample = await fetch_sample(sample_item_id)
 
     # Get data for notifications
-    sid = request.headers.get("X-SID")
     process_id = gen_id(8)
 
     background_tasks.add_task(
@@ -226,7 +216,7 @@ async def rematch_sample_route(
         sample_item_id=sample_item_id,
         full_remove=full_remove,
         independent_transaction=True,
-        sid=sid,
+        user_id=user.id,
         process_id=process_id,
     )
 
@@ -239,7 +229,6 @@ async def rematch_sample_route(
 @match_router.delete("/remove/sample/{sample_item_id}")
 @api_route(status_code=202)
 async def match_remove_sample_route(
-    request: Request,
     sample_item_id: str,
     background_tasks: BackgroundTasks,
     full_remove: bool = Query(
@@ -260,7 +249,6 @@ async def match_remove_sample_route(
     sample = await fetch_sample(sample_item_id)
 
     # Get data for notifications
-    sid = request.headers.get("X-SID")
     process_id = gen_id(8)
 
     background_tasks.add_task(
@@ -268,7 +256,7 @@ async def match_remove_sample_route(
         sample_item_id=sample_item_id,
         full_remove=full_remove,
         independent_transaction=True,
-        sid=sid,
+        user_id=user.id,
         process_id=process_id,
     )
     return {
@@ -280,7 +268,6 @@ async def match_remove_sample_route(
 @match_router.post("/compute/sample/{sample_item_id}")
 @api_route(status_code=202)
 async def match_compute_sample_route(
-    request: Request,
     sample_item_id: str,
     background_tasks: BackgroundTasks,
     user=Depends(editor_user),
@@ -290,13 +277,12 @@ async def match_compute_sample_route(
     sample = await fetch_sample(sample_item_id)
 
     # Get data for notifications
-    sid = request.headers.get("X-SID")
     process_id = gen_id(8)
     background_tasks.add_task(
         match_compute_sample,
         sample_item_id=sample_item_id,
         independent_transaction=True,
-        sid=sid,
+        user_id=user.id,
         process_id=process_id,
     )
     return {

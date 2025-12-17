@@ -2,7 +2,7 @@
 Sample batch export API routes.
 """
 
-from fastapi import APIRouter, BackgroundTasks, Request, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends
 from mascope_backend.db.id import gen_id
 from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.new.auth.dependencies import editor_user
@@ -19,7 +19,6 @@ sample_batches_export_router = APIRouter(tags=["Sample Batches Export"])
 @sample_batches_export_router.get("/{sample_batch_id}/export/spreadsheet")
 @api_route(status_code=202)
 async def sample_batch_export_spreadsheet_route(
-    request: Request,
     sample_batch_id: str,
     background_tasks: BackgroundTasks,
     user=Depends(editor_user),
@@ -41,14 +40,13 @@ async def sample_batch_export_spreadsheet_route(
     sample_batch = sample_batch_result.get("data")
     sample_batch_name = sample_batch["sample_batch_name"]
 
-    sid = request.headers.get("X-SID")
     process_id = gen_id(8)
 
     background_tasks.add_task(
         sample_batch_export_spreadsheet,
         sample_batch_id=sample_batch_id,
         independent_transaction=True,
-        sid=sid,
+        user_id=user.id,
         process_id=process_id,
     )
     return {

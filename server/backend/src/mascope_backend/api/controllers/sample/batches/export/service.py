@@ -24,13 +24,13 @@ from mascope_backend.runtime import runtime
 
 
 @api_controller_background_task(
-    success_notification_rooms=["sid"],
-    error_notification_rooms=["sid"],
+    success_notification_rooms=["user_id"],
+    error_notification_rooms=["user_id"],
 )
 async def sample_batch_export_spreadsheet(
     sample_batch_id: str,
     independent_transaction: bool = False,
-    sid: str | None = None,
+    user_id: int | None = None,
     process_id: str | None = None,
     parent_id: str | None = None,
 ):
@@ -41,8 +41,8 @@ async def sample_batch_export_spreadsheet(
     :type sample_batch_id: str
     :param independent_transaction: Flag for independent transaction handling, defaults to False.
     :type independent_transaction: bool, optional
-    :param sid: Session ID for targeting specific clients when emitting events, defaults to None.
-    :type sid: str, optional
+    :param user_id: Current user triggered operation (for user notifications)
+    :type user_id: int | None, optional
     :param process_id: Process ID for tracking this background task, defaults to None.
     :type process_id: str, optional
     :param parent_id: Parent process ID if this is a subtask, defaults to None.

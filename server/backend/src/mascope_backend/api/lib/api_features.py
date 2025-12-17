@@ -1,7 +1,6 @@
 import inspect
 from functools import wraps
 from typing import Callable
-from fastapi import Request
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.encoders import jsonable_encoder
 from rich.pretty import pretty_repr
@@ -121,10 +120,10 @@ def api_route(
     """
 
     def decorator(func: Callable):
-        # Step 1: Configure route access token settings
+        # --- Configure route access token settings ---
         func.token_access = token_access
 
-        # Step 2: Verify route security - either must be public or have auth dependency
+        # --- Verify route security - either must be public or have auth dependency ---
         if not public:
             signature = inspect.signature(func)
             if "user" not in signature.parameters:
@@ -140,30 +139,25 @@ def api_route(
 
         @wraps(func)
         async def wrapper(*args, **kwargs):
-            # Step 3: Log authenticated user information if available
+            # --- Log authenticated user information if available ---
             user = kwargs.get("user")
             if user:
                 runtime.logger.trace(f"User:\n{pretty_repr(user.to_dict())}")
 
-            # Step 4: Extract SID from request headers
-            sid = None
-            if request := kwargs.get("request"):
-                if isinstance(request, Request):
-                    sid = request.headers.get("X-SID")
             try:
-                # Step 5: Execute the route handler
+                # --- Execute the route handler
                 result = await func(*args, **kwargs)
 
-                # Step 6: if result is file, return as-is:
+                # --- If result is file, return as-is ---
                 if isinstance(result, FileResponse):
                     return result
 
-                # Step 6: Prepare response headers
+                # --- Prepare response headers ---
                 headers = {}
                 if result is not None and "process_id" in result:
                     headers["Process-ID"] = result.pop("process_id")
 
-                # Step 8: Return formatted JSON response
+                # --- Return formatted JSON response ---
                 return JSONResponse(
                     status_code=status_code,
                     content=jsonable_encoder(result),
@@ -172,7 +166,7 @@ def api_route(
             except ApiException as e:
                 return api_e_response_json(e)
             except Exception as e:
-                # Step 11: Handle generic exceptions
+                # --- Handle generic exceptions ---
                 context_message = f"Error in {beautify_func_name(func.__name__)}"
                 return handle_exception(e, context_message)
 
@@ -247,7 +241,6 @@ def api_controller_background_task(
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
-            sid = kwargs.get("sid")
             independent_transaction = kwargs.get("independent_transaction", False)
             process_id = kwargs.get("process_id", gen_id(8))  # Generate if not provided
             parent_id = kwargs.get("parent_id", None)
@@ -319,7 +312,7 @@ def api_controller_background_task(
                     notification.error = {"detail": e.tech_message}
                     #  Emit error user notifications only if this is an independent transaction
                     if independent_transaction:
-                        # NOTE: for the error_notification_rooms the sio room id should be provided
+                        # NOTE: for the error_notification_rooms the user_id should be provided
                         # in the controller kwargs, since the result is not available
                         await handle_notifications(
                             error_notification_rooms, notification, kwargs, None
@@ -349,7 +342,7 @@ def api_controller_background_task(
                     notification.status = "error"
                     notification.message = api_exc.user_message
                     notification.error = {"detail": api_exc.tech_message}
-                    # NOTE: for the error_notification_rooms the sio room id should be provided
+                    # NOTE: for the error_notification_rooms the user_id should be provided
                     # in the controller kwargs, since the result is not available
                     await handle_notifications(
                         error_notification_rooms, notification, kwargs, None

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, BackgroundTasks, Request
+from fastapi import APIRouter, Depends, BackgroundTasks
 
 from mascope_backend.db.id import gen_id
 from mascope_backend.api.new.auth.dependencies import editor_user, guest_user
@@ -120,15 +120,12 @@ async def delete_instrument_config_route(
 @instrument_configs_router.post("/fit")
 @api_route(status_code=202)
 async def fit_instrument_config_route(
-    request: Request,
     body: FitInstrumentConfigBody,
     background_tasks: BackgroundTasks,
     user=Depends(editor_user),
 ):
     """Fit instrument functions for a specific sample file.
 
-    :param request: The request object.
-    :type request: Request
     :param body: The details required for fitting instrument functions.
     :type body: FitInstrumentConfigBody
     :param background_tasks: Background tasks for asynchronous processing.
@@ -145,7 +142,7 @@ async def fit_instrument_config_route(
         sample_file=sample_file,
         fit_params=body.instrument_config_params,
         independent_transaction=True,
-        sid=request.headers.get("X-SID"),
+        user_id=user.id,
         process_id=process_id,
     )
     return {

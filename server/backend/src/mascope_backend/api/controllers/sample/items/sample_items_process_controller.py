@@ -32,17 +32,17 @@ from mascope_backend.runtime import runtime
 
 
 @api_controller_background_task(
-    success_notification_rooms=["sid"],
+    success_notification_rooms=["user_id"],
     success_reload=[("match", "affected_sample_batch_ids")],
-    error_notification_rooms=["sid"],
+    error_notification_rooms=["user_id"],
     error_reload=[("match", "affected_sample_batch_ids")],
 )
 async def process_sample_item(
     sample_item: SampleItemCreate,
     instrument_config: SetInstrumentConfigBody,
     independent_transaction: bool = False,
-    sid=None,
-    process_id=None,
+    user_id: int | None = None,
+    process_id: str | None = None,
 ) -> dict:
     """
     TODO_api_circular_import  destinguish sample and sample_item controller, should be moved to samples_controller.py?
@@ -65,8 +65,10 @@ async def process_sample_item(
     :type instrument_config: SetIntrumentConfigBody
     :param independent_transaction: Indicates whether this operation should be treated as a standalone transaction.
     :type independent_transaction: bool, optional
-    :param sid: Session ID for client-specific communications, defaults to None.
-    :type sid: str, optional
+    :param user_id: Current user triggered operation (for user notifications)
+    :type user_id: int | None, optional
+    :param process_id: Process identifier for progress tracking
+    :type process_id: str | None, optional
     :raises RuntimeError: Raised if calibration or match computation fails.
     :return: Details of the processed sample including matches.
     :rtype: dict
@@ -79,14 +81,10 @@ async def process_sample_item(
         type="process_sample_item",
         status="pending",
         message=f"Processing sample item '{sample_item.sample_item_name}', filename '{sample_item.filename}'.",
-        # NOTE: Set the internal metadata for the pending user_notifications like
-        # room_ids and sid of the user.
-        # Internal metadata will be cleaned up the from data in send_progress_user_notification.
         data={
             "filename": sample_item.filename,
             "sample_batch_id": sample_item.sample_batch_id,
-            "_room_ids": [sid],
-            "_sid": sid,
+            "_user_id": user_id,
         },
     )
     await send_progress_user_notification(notification, 0.1)
@@ -96,7 +94,7 @@ async def process_sample_item(
         filenames=[sample_item.filename],
         instrument_config=instrument_config,
         independent_transaction=False,
-        sid=sid,
+        user_id=user_id,
         process_id=gen_id(8),
         parent_id=process_id,
     )
@@ -123,8 +121,7 @@ async def process_sample_item(
         "sample_item_id": created_sample_item_id,
         "filename": sample_item.filename,
         "sample_batch_id": sample_item.sample_batch_id,
-        "_room_ids": [sid],
-        "_sid": sid,
+        "_user_id": user_id,
     }
     await send_progress_user_notification(notification, 0.2)
 
@@ -132,7 +129,7 @@ async def process_sample_item(
     await match_compute_sample(
         sample_item_id=created_sample_item_id,
         independent_transaction=False,
-        sid=sid,
+        user_id=user_id,
         process_id=gen_id(8),
         parent_id=process_id,
     )
@@ -153,7 +150,7 @@ async def process_sample_item(
             rematch_samples(
                 sample_item_ids=other_affected_sample_item_ids,
                 independent_transaction=True,  # Set to true to handle reloads independently
-                sid=sid,
+                user_id=user_id,
                 process_id=gen_id(8),
             )
         )

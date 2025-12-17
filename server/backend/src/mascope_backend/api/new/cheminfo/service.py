@@ -140,8 +140,8 @@ async def retrieve_cheminfo_by_mz(
 
 
 @api_controller_background_task(
-    success_notification_rooms=["sid"],
-    error_notification_rooms=["sid"],
+    success_notification_rooms=["user_id"],
+    error_notification_rooms=["user_id"],
 )
 async def match_cheminfo_by_mz(
     sample_item_id: str,
@@ -153,7 +153,7 @@ async def match_cheminfo_by_mz(
     sort: None | str = None,
     order: None | str = "asc",
     independent_transaction: bool = False,
-    sid: None | str = None,
+    user_id: None | int = None,
     process_id: None | str = None,
     parent_id: None | str = None,
 ) -> dict:
@@ -187,8 +187,8 @@ async def match_cheminfo_by_mz(
     :type order: None | str
     :param independent_transaction: Whether this is an independent transaction
     :type independent_transaction: bool
-    :param sid: Socket ID for notifications
-    :type sid: None | str
+    :param user_id: Current user triggered operation (for user notifications)
+    :type user_id: int | None, optional
     :param process_id: Process ID for tracking
     :type process_id: None | str
     :param parent_id: Parent process ID for nested operations

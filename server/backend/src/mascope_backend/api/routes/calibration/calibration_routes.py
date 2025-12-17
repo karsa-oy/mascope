@@ -1,4 +1,4 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Query
 from mascope_backend.api.new.auth.dependencies import editor_user, guest_user
 from mascope_backend.db.id import gen_id
 from mascope_backend.api.lib.api_features import api_route
@@ -56,7 +56,6 @@ async def get_mz_calibration_route(
     status_code=202,
 )
 async def calibration_mz_fit_route(
-    request: Request,
     mz_calibration_params: MzCalibrationParams,
     background_tasks: BackgroundTasks,
     sample_item_id: str = Query(
@@ -66,8 +65,6 @@ async def calibration_mz_fit_route(
 ):
     """Initiate m/z fitting for a sample.
 
-    :param request: The request object.
-    :type request: Request
     :param mz_calibration_params: Parameters for m/z calibration.
     :type mz_calibration_params: MzCalibrationParams
     :param background_tasks: Background tasks for async processing.
@@ -85,7 +82,6 @@ async def calibration_mz_fit_route(
     sample_item_name = sample["sample_item_name"]
 
     # Get data for notifications
-    sid = request.headers.get("X-SID")
     process_id = gen_id(8)
 
     background_tasks.add_task(
@@ -93,7 +89,7 @@ async def calibration_mz_fit_route(
         sample_item_id=sample_item_id,
         mz_calibration_params=mz_calibration_params,
         independent_transaction=True,
-        sid=sid,
+        user_id=user.id,
         process_id=process_id,
     )
     return {
@@ -107,7 +103,6 @@ async def calibration_mz_fit_route(
     status_code=202,
 )
 async def calibration_mz_apply_route(
-    request: Request,
     body: CalibrationMzApplyBody,
     background_tasks: BackgroundTasks,
     filename: str = Query(..., description="The filename to aply m/z fit"),
@@ -115,8 +110,6 @@ async def calibration_mz_apply_route(
 ):
     """Apply m/z calibration to a sample file.
 
-    :param request: The request object.
-    :type request: Request
     :param body: The calibration apply body.
     :type body: CalibrationMzApplyBody
     :param background_tasks: Background tasks for async processing.
@@ -134,7 +127,6 @@ async def calibration_mz_apply_route(
         raise NotFoundException(f"Sample file '{filename}' not found")
 
     # Get data for notifications
-    sid = request.headers.get("X-SID")
     process_id = gen_id(8)
 
     background_tasks.add_task(
@@ -142,7 +134,7 @@ async def calibration_mz_apply_route(
         filename=filename,
         fit=body.fit,
         independent_transaction=True,
-        sid=sid,
+        user_id=user.id,
         process_id=process_id,
     )
     return {
@@ -156,7 +148,6 @@ async def calibration_mz_apply_route(
     status_code=202,
 )
 async def calibration_mz_calibrate_sample_route(
-    request: Request,
     sample_item_id: str,
     mz_calibration_params: MzCalibrationParams,
     background_tasks: BackgroundTasks,
@@ -164,8 +155,6 @@ async def calibration_mz_calibrate_sample_route(
 ):
     """m/z calibrate specific sample.
 
-    :param request: The request object.
-    :type request: Request
     :param sample_item_id: The ID of the sample item.
     :type sample_item_id: str
     :param mz_calibration_params: Calibration parameters.
@@ -183,7 +172,6 @@ async def calibration_mz_calibrate_sample_route(
     sample_item_name = sample["sample_item_name"]
 
     # Get data for notifications
-    sid = request.headers.get("X-SID")
     process_id = gen_id(8)
 
     background_tasks.add_task(
@@ -191,7 +179,7 @@ async def calibration_mz_calibrate_sample_route(
         sample_item_id=sample_item_id,
         mz_calibration_params=mz_calibration_params,
         independent_transaction=True,
-        sid=sid,
+        user_id=user.id,
         process_id=process_id,
     )
     return {
@@ -205,7 +193,6 @@ async def calibration_mz_calibrate_sample_route(
     status_code=202,
 )
 async def calibration_mz_calibrate_batch_route(
-    request: Request,
     sample_batch_id: str,
     mz_calibration_params: MzCalibrationParams,
     background_tasks: BackgroundTasks,
@@ -216,8 +203,6 @@ async def calibration_mz_calibrate_batch_route(
     - Processing batches cannot be calibrated
     - Sets batch status to "processing" during calibration and "rematch" after completion
 
-    :param request: The request object.
-    :type request: Request
     :param sample_batch_id: The sample batch ID.
     :type sample_batch_id: str
     :param mz_calibration_params: Calibration parameters.
@@ -238,7 +223,6 @@ async def calibration_mz_calibrate_batch_route(
         raise ApiException(msg, notification_data, 409)
 
     # Get data for notifications
-    sid = request.headers.get("X-SID")
     process_id = gen_id(8)
 
     background_tasks.add_task(
@@ -246,7 +230,7 @@ async def calibration_mz_calibrate_batch_route(
         sample_batch_id=sample_batch_id,
         mz_calibration_params=mz_calibration_params,
         independent_transaction=True,
-        sid=sid,
+        user_id=user.id,
         process_id=process_id,
     )
     return {

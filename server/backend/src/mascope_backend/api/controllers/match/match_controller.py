@@ -69,16 +69,16 @@ from mascope_backend.runtime import runtime
 
 
 @api_controller_background_task(
-    success_notification_rooms=["sid"],
+    success_notification_rooms=["user_id"],
     success_reload=[("match", "sample_batch_id")],
-    error_notification_rooms=["sid"],
+    error_notification_rooms=["user_id"],
     error_reload=[("match", "sample_batch_id")],
 )
 async def rematch_sample(
     sample_item_id: str,
     full_remove: bool = False,
     independent_transaction: bool = False,
-    sid: str | None = None,
+    user_id: int | None = None,
     process_id: str | None = None,
     parent_id: str | None = None,
 ) -> dict:
@@ -90,7 +90,8 @@ async def rematch_sample(
     :param full_remove: If True, removes all existing matches before recomputing, defaults to False
     :type full_remove: bool
     :param independent_transaction: Flag for transaction handling
-    :param sid: Session ID for notifications
+    :param user_id: Current user triggered operation (for user notifications)
+    :type user_id: int | None, optional
     :param process_id: Process identifier
     :param parent_id: Parent process identifier
     """
@@ -105,7 +106,7 @@ async def rematch_sample(
         sample_item_id=sample_item_id,
         full_remove=full_remove,
         independent_transaction=False,
-        sid=sid,
+        user_id=user_id,
         process_id=gen_id(8),
         parent_id=process_id,
     )
@@ -114,7 +115,7 @@ async def rematch_sample(
     compute_result = await match_compute_sample(
         sample_item_id=sample_item_id,
         independent_transaction=False,
-        sid=sid,
+        user_id=user_id,
         process_id=gen_id(8),
         parent_id=process_id,
     )
@@ -170,18 +171,18 @@ async def rematch_sample(
 
 
 @api_controller_background_task(
-    success_notification_rooms=["sid"],
+    success_notification_rooms=["user_id"],
     success_reload=[("match", "affected_sample_batch_ids")],
-    error_notification_rooms=["sid"],
+    error_notification_rooms=["user_id"],
     error_reload=[("match", "affected_sample_batch_ids")],
 )
 async def rematch_samples(
     sample_item_ids: list[str],
     full_remove: bool = False,
     independent_transaction: bool = False,
-    sid: str = None,
-    process_id=None,
-    parent_id=None,
+    user_id: int | None = None,
+    process_id: str | None = None,
+    parent_id: str | None = None,
 ) -> dict:
     """
     Performs a rematch of multiple samples by removing and/or computing matches based on the specified parameters.
@@ -202,8 +203,12 @@ async def rematch_samples(
     :type full_remove: bool
     :param independent_transaction: Flag indicating whether the ramtching is an independent transaction, which affects event emission, defaults to False
     :type independent_transaction: bool, optional
-    :param sid: Session ID, used for targeting specific clients when emitting events, defaults to None
-    :type sid: str, optional
+    :param user_id: Current user triggered operation (for user notifications)
+    :type user_id: int | None, optional
+    :param process_id: Process identifier
+    :type process_id: str | None, optional
+    :param parent_id: Parent process identifier
+    :type parent_id: str | None, optional
     :return: The dict with rematched Sample object.
     rtype: dict
 
@@ -218,7 +223,7 @@ async def rematch_samples(
             sample_item_id=sample_item_id,
             full_remove=full_remove,
             independent_transaction=False,
-            sid=sid,
+            user_id=user_id,
             process_id=gen_id(8),
             parent_id=process_id,
         )
@@ -238,15 +243,15 @@ async def rematch_samples(
 
 
 @api_controller_background_task(
-    success_notification_rooms=["sid"],
+    success_notification_rooms=["user_id"],
     success_reload=[("match", "affected_sample_batch_ids")],
-    error_notification_rooms=["sid"],
+    error_notification_rooms=["user_id"],
 )
 async def match_remove_sample(
     sample_item_id: str,
     full_remove: bool = False,
     independent_transaction: bool = False,
-    sid: str | None = None,
+    user_id: int | None = None,
     process_id: str | None = None,
     parent_id: str | None = None,
 ) -> dict:
@@ -262,9 +267,12 @@ async def match_remove_sample(
     :type full_remove: bool
     :param independent_transaction: Flag for transaction handling, defaults to False.
     :type independent_transaction: bool
-    :param sid: Session ID for notifications
+    :param user_id: Current user triggered operation (for user notifications)
+    :type user_id: int | None, optional
     :param process_id: Process identifier
+    :type process_id: str | None, optional
     :param parent_id: Parent process identifier
+    :type parent_id: str | None, optional
     """
     sample = await fetch_sample(sample_item_id)
     runtime.logger.info(
@@ -300,16 +308,15 @@ async def match_remove_sample(
 
 
 @api_controller_background_task(
-    success_notification_rooms=["sample_item_id", "instrument"],
+    success_notification_rooms=["instrument"],
     success_reload=[("match", "sample_batch_id")],
-    error_notification_rooms=["sample_item_id", "instrument"],
+    error_notification_rooms=["instrument"],
     error_reload=[("match", "sample_batch_id")],
 )
 async def match_compute_sample(
     sample_item_id: str,
     independent_transaction: bool = False,
-    sid: str | None = None,
-    instrument: str | None = None,
+    user_id: int | None = None,
     process_id: str | None = None,
     parent_id: str | None = None,
 ) -> dict:
@@ -323,10 +330,8 @@ async def match_compute_sample(
     :type sample_item_id: str
     :param independent_transaction: Controls event emission behavior, defaults to False
     :type independent_transaction: bool, optional
-    :param sid: Session identifier for client notifications, defaults to None
-    :type sid: str, optional
-    :param instrument: Instrument name for user notifications to its room
-    :type instrument: str | None, optional
+    :param user_id: Current user triggered operation (for user notifications)
+    :type user_id: int | None, optional
     :param process_id: Process identifier for progress tracking
     :type process_id: str, optional
     :param parent_id: Parent process identifier
@@ -368,16 +373,10 @@ async def match_compute_sample(
             type="match_compute_sample",
             status="pending",
             message=f"Computing match isotopes for sample '{sample.sample_item_name}'.",
-            # NOTE: Set the internal metadata for the pending user_notifications like
-            # room_ids and sid of the user.
-            # The _instrument_room is provided separately to skip the check if the user
-            # has moved from the room (by not providing sid to emit_user_notification).
-            # Internal metadata will be cleaned up the from data in send_progress_user_notification.
             data={
                 "sample_item_id": sample_item_id,
-                "_room_ids": [sample_item_id],
-                "_instrument_room": sample.instrument,
-                "_sid": sid,
+                "_room_ids": [sample.instrument],
+                "_user_id": user_id,
             },
         )
         match_data = await compute_and_create_sample_match_isotope_data(
@@ -420,20 +419,23 @@ async def match_compute_sample(
     return {
         "status": compute_status,
         "message": message,
-        "_notification_data": {"sample_item_id": sample_item_id},
+        "_notification_data": {
+            "instrument": sample.instrument,  # For notification routing
+            "sample_batch_id": sample.sample_batch_id,  # For reload events
+        },
     }
 
 
 @api_controller_background_task(
-    success_notification_rooms=["sid"],
+    success_notification_rooms=["user_id"],
     success_reload=[("match", "affected_sample_batch_ids")],
-    error_notification_rooms=["sid"],
+    error_notification_rooms=["user_id"],
     error_reload=[("match", "affected_sample_batch_ids")],
 )
 async def match_compute_samples(
     sample_item_ids: list[str],
     independent_transaction: bool = False,
-    sid: str | None = None,
+    user_id: int | None = None,
     process_id: str | None = None,
     parent_id: str | None = None,
 ) -> dict:
@@ -451,8 +453,12 @@ async def match_compute_samples(
     :type sample_item_ids: str
     :param independent_transaction: Flag indicating whether the sample match computing is an independent transaction, which affects event emission, defaults to False
     :type independent_transaction: bool, optional
-    :param sid: Session ID, used for targeting specific clients when emitting events, defaults to None
-    :type sid: str, optional
+    :param user_id: Current user triggered operation (for user notifications)
+    :type user_id: int | None, optional
+    :param process_id: Process identifier for progress tracking
+    :type process_id: str | None, optional
+    :param parent_id: Parent process identifier
+    :type parent_id: str | None, optional
     :raises ApiException: Raised when no new target isotopes are available for match computation or if other critical preconditions are not met.
     :return: A dictionary containing the rematched sample object and a status message.
     :rtype: dict
@@ -462,7 +468,7 @@ async def match_compute_samples(
         await match_compute_sample(
             sample_item_id=sample_item_id,
             independent_transaction=False,
-            sid=sid,
+            user_id=user_id,
             process_id=gen_id(8),
             parent_id=process_id,
         )
@@ -487,9 +493,9 @@ async def match_compute_samples(
 
 
 @api_controller_background_task(
-    success_notification_rooms=["sid"],
+    success_notification_rooms=["user_id"],
     success_reload=[("match", "affected_sample_batch_ids")],
-    error_notification_rooms=["sid"],
+    error_notification_rooms=["user_id"],
     error_reload=[("match", "affected_sample_batch_ids")],
 )
 async def rematch_batches(
@@ -497,7 +503,7 @@ async def rematch_batches(
     full_remove: bool = False,
     force: bool = False,
     independent_transaction: bool = False,
-    sid: str | None = None,
+    user_id: int | None = None,
     process_id: str | None = None,
     parent_id: str | None = None,
 ) -> dict:
@@ -518,8 +524,8 @@ async def rematch_batches(
     :type force: bool
     :param independent_transaction: Flag for transaction handling
     :type independent_transaction: bool
-    :param sid: Session identifier for client notifications
-    :type sid: str | None
+    :param user_id: Current user triggered operation (for user notifications)
+    :type user_id: int | None, optional
     :param process_id: Process identifier for progress tracking
     :type process_id: str | None
     :param parent_id: Parent process identifier
@@ -573,13 +579,9 @@ async def rematch_batches(
             type="rematch_batches",
             status="pending",
             message=f"Rematching sample batch {batch_index}/{total_batches_count}.",
-            # NOTE: Set the internal metadata for the pending user_notifications like
-            # room_ids and sid of the user.
-            # Internal metadata will be cleaned up the from data in send_progress_user_notification.
             data={
                 "sample_batch_id": sample_batch_id,
-                "_room_ids": [sid],
-                "_sid": sid,
+                "_user_id": user_id,
                 "_batch_weight": batch_weight,
                 "_batch_index": batch_index,
             },
@@ -595,7 +597,7 @@ async def rematch_batches(
                 full_remove=full_remove,
                 force=force,
                 independent_transaction=False,
-                sid=sid,
+                user_id=user_id,
                 process_id=gen_id(8),
                 parent_id=process_id,
             )
@@ -712,7 +714,7 @@ async def rematch_batch(
     full_remove: bool = False,
     force: bool = False,
     independent_transaction: bool = False,
-    sid: str | None = None,
+    user_id: int | None = None,
     process_id: str | None = None,
     parent_id: str | None = None,
 ) -> dict:
@@ -737,8 +739,8 @@ async def rematch_batch(
     :type force: bool
     :param independent_transaction: Flag for transaction handling
     :type independent_transaction: bool
-    :param sid: Session identifier for client notifications
-    :type sid: str | None
+    :param user_id: Current user triggered operation (for user notifications)
+    :type user_id: int | None, optional
     :param process_id: Process identifier for progress tracking
     :type process_id: str | None
     :param parent_id: Parent process identifier
@@ -808,7 +810,7 @@ async def rematch_batch(
             data={
                 "sample_batch_id": sample_batch_id,
                 "_room_ids": [sample_batch_id],
-                "_sid": sid,
+                "_user_id": user_id,
             },
         )
         await send_progress_user_notification(progress_notification)
@@ -818,7 +820,7 @@ async def rematch_batch(
             sample_batch_id=sample_batch_id,
             full_remove=full_remove,  # conditionally remove all existing matches
             independent_transaction=False,
-            sid=sid,
+            user_id=user_id,
             process_id=gen_id(8),
             parent_id=process_id,
         )
@@ -827,7 +829,7 @@ async def rematch_batch(
         compute_result = await match_compute_batch(
             sample_batch_id=sample_batch_id,
             independent_transaction=False,
-            sid=sid,
+            user_id=user_id,
             process_id=gen_id(8),
             parent_id=process_id,
         )
@@ -937,13 +939,13 @@ async def rematch_batch(
 @api_controller_background_task(
     success_notification_rooms=["sample_batch_id"],
     success_reload=[("match", "sample_batch_id")],
-    error_notification_rooms=["sid"],
+    error_notification_rooms=["sample_batch_id"],
 )
 async def match_remove_batch(
     sample_batch_id: str,
     full_remove: bool = False,
     independent_transaction: bool = False,
-    sid: str | None = None,
+    user_id: int | None = None,
     process_id: str | None = None,
     parent_id: str | None = None,
 ) -> dict:
@@ -959,7 +961,8 @@ async def match_remove_batch(
     :type full_remove: bool
     :param independent_transaction: Flag indicating if the operation should be an independent transaction, default to False.
     :type independent_transaction: bool
-    :param sid: Session identifier for client notifications
+    :param user_id: Current user triggered operation (for user notifications)
+    :type user_id: int | None, optional
     :param process_id: Process identifier for progress tracking
     :param parent_id: Parent process identifier
     :return: Batch data with removal results and status message
@@ -1008,7 +1011,7 @@ async def match_remove_batch(
 async def match_compute_batch(
     sample_batch_id: str,
     independent_transaction: bool = False,
-    sid: str | None = None,
+    user_id: int | None = None,
     process_id: str | None = None,
     parent_id: str | None = None,
 ) -> dict:
@@ -1021,7 +1024,8 @@ async def match_compute_batch(
     :type sample_batch_id: str
     :param independent_transaction: Controls event emission behavior
     :type independent_transaction: bool
-    :param sid: Session identifier for client notifications
+    :param user_id: Current user triggered operation (for user notifications)
+    :type user_id: int | None, optional
     :param process_id: Process identifier for progress tracking
     :param parent_id: Parent process identifier
     :raises NotFoundException: When batch not found
@@ -1076,13 +1080,10 @@ async def match_compute_batch(
             type="match_compute_batch",
             status="pending",
             message=f"Processing sample {item_index + 1}/{total_samples_count} in sample batch '{sample_batch_name}'",
-            # NOTE: Set the internal metadata for the pending user_notifications like
-            # room_ids and sid of the user.
-            # Internal metadata will be cleaned up the from data in send_progress_user_notification.
             data={
                 "sample_batch_id": sample_batch_id,
                 "_room_ids": [sample_batch_id],
-                "_sid": sid,
+                "_user_id": user_id,
                 "_total_samples": total_samples_count,
                 "_item_index": item_index,
             },

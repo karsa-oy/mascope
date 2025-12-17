@@ -113,7 +113,7 @@ async def get_users(
 
 
 @api_controller()
-async def get_user(user_id: str) -> dict:
+async def get_user(user_id: int) -> dict:
     """
     Retrieves a user by their ID.
 
@@ -212,8 +212,6 @@ async def update_user(
     :type user_update: UserUpdate
     :param user_manager: The UserManager instance.
     :type user_manager: UserManager
-    :param request: The current HTTP request.
-    :type request: Request
     :raises NotFoundException: If the user does not exist.
     :raises LastOwnerDowngradeException: If attempting to downgrade the last owner
     :return: The updated user details.

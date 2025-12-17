@@ -519,14 +519,14 @@ async def update_sample_batch(
 
 
 @api_controller_background_task(
-    success_notification_rooms=["workspace_id"],
-    error_notification_rooms=["workspace_id"],
+    success_notification_rooms=["user_id"],
+    error_notification_rooms=["user_id"],
 )
 async def delete_sample_batch(
     sample_batch_id: str,
     workspace_id: str = None,
     independent_transaction: bool = False,
-    sid: str = None,
+    user_id: int | None = None,
     process_id=None,
 ):
     """
@@ -542,8 +542,8 @@ async def delete_sample_batch(
     :type workspace_id: str, optional
     :param independent_transaction: Indicates if the deletion should be considered an independent transaction, which affects event emission.
     :type independent_transaction: bool, optional
-    :param sid: Session ID, used for targeting specific clients when emitting events.
-    :type sid: str, optional
+    :param user_id: Current user triggered operation (for user notifications)
+    :type user_id: int | None, optional
     :raises NotFoundException: If no sample batch is found with the provided ID.
     """
     async with async_session() as session:
@@ -565,16 +565,13 @@ async def delete_sample_batch(
 
     return {
         "message": f"Sample batch '{sample_batch.sample_batch_name}' was deleted.",
-        "_notification_data": {
-            "sample_batch_id": sample_batch_id,
-        },
     }
 
 
 @api_controller_background_task(
-    success_notification_rooms=["sid"],
+    success_notification_rooms=["user_id"],
     success_reload=[("match", "affected_sample_batch_ids")],
-    error_notification_rooms=["sid"],
+    error_notification_rooms=["user_id"],
     error_reload=[("match", "affected_sample_batch_ids")],
 )
 async def import_sample_items(
@@ -582,8 +579,8 @@ async def import_sample_items(
     sample_items: list[SampleItemCreate],
     instrument_config: SetInstrumentConfigBody,
     independent_transaction: bool = False,
-    sid: str = None,
-    process_id=None,
+    user_id: int | None = None,
+    process_id: str | None = None,
 ):
     """
     Imports sample items to a specified batch by creating provided sample items and computing matches.
@@ -601,13 +598,15 @@ async def import_sample_items(
     :param sample_batch_id: ID of the sample batch where sample items will be imported.
     :type sample_batch_id: str
     :param sample_items: List of sample items to be created and imported.
-    :type sample_items: List[SampleItemCreate]
+    :type sample_items: list[SampleItemCreate]
     :param instrument_config: Instrument config to use for the imported files.
     :type instrument_config: InstrumentConfigBody
     :param independent_transaction: Flag to indicate if the operation should be treated as an independent transaction, defaults to False
     :type independent_transaction: bool, optional
-    :param sid: Session ID, used for emitting notifications to specific clients, defaults to None.
-    :type sid: str, optional
+    :param user_id: Current user triggered operation (for user notifications)
+    :type user_id: int | None, optional
+    :param process_id: Process identifier for progress tracking
+    :type process_id: str | None, optional
     """
     sample_batch_result = await get_sample_batch(sample_batch_id)
     sample_batch = sample_batch_result.get("data")
@@ -625,13 +624,9 @@ async def import_sample_items(
         type="import_sample_items",
         status="pending",
         message=f"Importing {len(sample_items)} sample{'s' if len(sample_items) > 1 else ''}.",
-        # NOTE: Set the internal metadata for the pending user_notifications like
-        # room_ids and sid of the user.
-        # Internal metadata will be cleaned up the from data in send_progress_user_notification.
         data={
             "sample_batch_id": sample_batch_id,
-            "_room_ids": [sid],
-            "_sid": sid,
+            "_user_id": user_id,
         },
     )
     await send_progress_user_notification(notification, 0.1)
@@ -641,7 +636,7 @@ async def import_sample_items(
         filenames=[item.filename for item in sample_items],
         instrument_config=instrument_config,
         independent_transaction=False,
-        sid=sid,
+        user_id=user_id,
         process_id=gen_id(8),
         parent_id=process_id,
     )
@@ -715,7 +710,7 @@ async def import_sample_items(
     await match_compute_samples(
         sample_item_ids=created_sample_item_ids,
         independent_transaction=False,
-        sid=sid,
+        user_id=user_id,
         process_id=gen_id(8),
         parent_id=process_id,
     )
@@ -734,7 +729,7 @@ async def import_sample_items(
             rematch_samples(
                 sample_item_ids=other_affected_sample_item_ids,
                 independent_transaction=True,  # Set to true to handle reloads independently
-                sid=sid,
+                user_id=user_id,
                 process_id=gen_id(8),
             )
         )
@@ -754,8 +749,8 @@ async def import_sample_items(
 
 
 @api_controller_background_task(
-    success_notification_rooms=["workspace_id"],
-    error_notification_rooms=["sid"],
+    success_notification_rooms=["user_id"],
+    error_notification_rooms=["user_id"],
 )
 async def copy_sample_batch(
     sample_batch_id: str,
@@ -763,7 +758,7 @@ async def copy_sample_batch(
     sample_batch_name: str,
     sample_batch_description: str,
     independent_transaction: bool = False,
-    sid=None,
+    user_id: int | None = None,
     process_id=None,
 ) -> dict:
     """
@@ -788,8 +783,10 @@ async def copy_sample_batch(
     :type sample_batch_description: str
     :param independent_transaction: Flag to indicate if the operation should be treated as an independent transaction, defaults to False
     :type independent_transaction: bool, optional
-    :param sid: Session ID, used for emitting notifications to specific clients, defaults to None.
-    :type sid: str, optional
+    :param user_id: Current user triggered operation (for user notifications)
+    :type user_id: int | None, optional
+    :param process_id: Process identifier for progress tracking
+    :type process_id: str | None, optional
     :raises NotFoundException: If the workspace or original sample batch is not found.
     """
     async with async_session() as session:
@@ -853,7 +850,7 @@ async def copy_sample_batch(
         sample_batch_id=new_sample_batch["sample_batch_id"],
         always_copy_matches=True,
         independent_transaction=False,
-        sid=sid,
+        user_id=user_id,
         process_id=gen_id(8),
         parent_id=process_id,
     )
@@ -866,19 +863,18 @@ async def copy_sample_batch(
         "message": f"Sample batch '{sample_batch_name}' was successfully copied to workspace '{workspace.workspace_name}'.",
         "_notification_data": {
             "sample_item_id": new_sample_batch_id,
-            "workspace_id": workspace_id,
         },
     }
 
 
 @api_controller_background_task(
-    success_notification_rooms=["sid"],
-    error_notification_rooms=["sid"],
+    success_notification_rooms=["user_id"],
+    error_notification_rooms=["user_id"],
 )
 async def sample_batch_export_peaks(
     sample_batch_id: str,
     independent_transaction: bool = False,
-    sid=None,
+    user_id: int | None = None,
     process_id=None,
     parent_id=None,
 ):
@@ -897,8 +893,12 @@ async def sample_batch_export_peaks(
     :type sample_batch_id: str
     :param independent_transaction: Flag to indicate if the operation should be treated as an independent transaction, defaults to False.
     :type independent_transaction: bool, optional
-    :param sid: Session ID for targeting specific clients when emitting events, defaults to None.
-    :type sid: str, optional
+    :param user_id: Current user triggered operation (for user notifications)
+    :type user_id: int | None, optional
+    :param process_id: Process identifier for progress tracking
+    :type process_id: str | None, optional
+    :param parent_id: Parent process identifier for progress tracking
+    :type parent_id: str | None, optional
     """
     # Get sample batch name
     sample_batch_result = await get_sample_batch(sample_batch_id)
@@ -925,10 +925,8 @@ async def sample_batch_export_peaks(
             type="sample_batch_export_peaks",
             status="pending",
             message=f"Exporting peak data for batch '{sample_batch_name}'.",
-            # NOTE set the internal room_ids for the pending user_notifications and sid of the user, will be removed from the data.
             data={
-                "_room_ids": [sid],
-                "_sid": sid,
+                "_user_id": user_id,
                 "_total_samples": total_samples,
                 "_item_index": index,
             },

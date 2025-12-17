@@ -24,7 +24,7 @@ UNITS = "counts/s"
 
 
 @api_controller_background_task(
-    error_notification_rooms=["sid"],
+    error_notification_rooms=["user_id"],
 )
 async def visualize_ion_focus(
     sample_item_id: str,
@@ -33,7 +33,7 @@ async def visualize_ion_focus(
     peak_min_intensity: float,
     mz_tolerance: float,
     independent_transaction: bool = False,
-    sid: str = None,
+    user_id: int | None = None,
     process_id: str = None,
 ):
     """
@@ -57,8 +57,8 @@ async def visualize_ion_focus(
     :type mz_tolerance: float
     :param independent_transaction: Indicates if the visualization should be considered an independent transaction, which affects sio event emission.
     :type independent_transaction: bool, optional
-    :param sid: Session ID, used for targeting specific clients when emitting events.
-    :type sid: str, optional
+    :param user_id: Current user triggered operation (for user notifications)
+    :type user_id: int | None, optional
     :raises NotFoundException: If the sample item or target ion does not exist or does not meet the specified criteria.
     """
     sample = await fetch_sample(sample_item_id)
@@ -121,8 +121,12 @@ async def visualize_ion_focus(
             },
         )
 
-    await sio.emit("visualization_signal_sum_spectrum", all_spectrum_traces, room=sid)
-    await sio.emit("visualization_signal_timeseries", all_timeseries_traces, room=sid)
+    await sio.emit(
+        "visualization_signal_sum_spectrum", all_spectrum_traces, room=f"user-{user_id}"
+    )
+    await sio.emit(
+        "visualization_signal_timeseries", all_timeseries_traces, room=f"user-{user_id}"
+    )
 
 
 # --- Helpers --- #

@@ -171,7 +171,7 @@ async def get_sample_file(sample_file_id: str) -> dict:
 async def create_sample_file(
     sample_file_create: SampleFileCreate,
     background_tasks: BackgroundTasks,
-    sid: str | None = None,
+    user_id: int | None = None,
     process_id: str | None = None,
 ) -> dict:
     """
@@ -190,8 +190,8 @@ async def create_sample_file(
     :type sample_file_create: SampleFileCreate
     :param background_tasks:  Background tasks for triggering an automatic processing for sample file after creation.
     :type background_tasks: BackgroundTasks
-    :param sid: User socketSession ID, used for emitting notifications to specific client, defaults to None.
-    :type sid: str | None
+    :param user_id: Current user triggered operation (for user notifications)
+    :type user_id: int | None, optional
     :param process_id: Process ID for tracking the background task.
     :type process_id: str | None
     :raises NotFoundException: If the new sample file is not found after creation.
@@ -249,8 +249,7 @@ async def create_sample_file(
             auto_process_sample_file,
             sample_file_id=new_sample_file.sample_file_id,
             independent_transaction=True,
-            sid=sid,
-            instrument=new_sample_file.instrument,
+            user_id=user_id,
             process_id=process_id,
         )
 
@@ -694,7 +693,6 @@ async def upload_sample_files(
     files: list[UploadFile],
     user: User,
     access_token: str,
-    sid: str | None = None,
 ) -> dict:
     """
     Handles upload of multiple sample files to the `filestreams` directory.
@@ -707,8 +705,8 @@ async def upload_sample_files(
     :type user: User
     :param access_token: Pre-validated user's access token for file converter service.
     :type access_token: str
-    :param sid: User's socket client session ID.
-    :type sid: str | None
+    :param user_id: Current user triggered operation (for user notifications)
+    :type user_id: int | None, optional
     :return: Dictionary with files upload results.
     :rtype: dict
     """
@@ -814,7 +812,6 @@ async def upload_sample_file(
     file_path: str,
     user: User,
     access_token: str,
-    sid: str | None = None,
 ) -> dict:
     """
     Handles upload of a single sample file from a given file path to the `filestreams` directory.
@@ -828,8 +825,6 @@ async def upload_sample_file(
     :type user: User
     :param access_token: Pre-validated user's access token for file converter service.
     :type access_token: str
-    :param sid: User's socket client session ID.
-    :type sid: str | None
     :return: Dictionary with file upload result.
     :rtype: dict
     """
@@ -852,7 +847,6 @@ async def upload_sample_file(
                 "username": user.username,
                 "role_id": user.role_id,
                 "access_token": access_token,
-                "user_sid": sid,
             },
         )
 
@@ -986,13 +980,13 @@ async def get_sample_file_peaks(
 
 
 @api_controller_background_task(
-    success_notification_rooms=["sid"],
-    error_notification_rooms=["sid"],
+    success_notification_rooms=["user_id"],
+    error_notification_rooms=["user_id"],
 )
 async def compute_sample_file_peaks(
     sample_file_id: str,
     independent_transaction: bool = False,
-    sid: str = None,
+    user_id: int | None = None,
     process_id: str | None = None,
     parent_id: str | None = None,
 ) -> dict:
@@ -1009,8 +1003,8 @@ async def compute_sample_file_peaks(
     :type sample_file_id: str
     :param independent_transaction: Flag to indicate if the operation should be treated as an independent transaction.
     :type independent_transaction: bool, optional
-    :param sid: Session ID for targeting specific clients when emitting events, used for notifications.
-    :type sid: str, optional
+    :param user_id: Current user triggered operation (for user notifications)
+    :type user_id: int | None, optional
     :param process_id: Optional identifier for the processing task, used for tracking.
     :type process_id: Optional[str]
     :param parent_id: Optional identifier of the parent task, if this task is part of a larger workflow.

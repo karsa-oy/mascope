@@ -40,17 +40,17 @@ from mascope_backend.runtime import runtime
 
 
 @api_controller_background_task(
-    success_notification_rooms=["sid"],
-    error_notification_rooms=["sid"],
+    success_notification_rooms=["user_id"],
+    error_notification_rooms=["user_id"],
 )
 async def process_instrument_config(
     filenames: list[str],
     instrument_config: SetInstrumentConfigBody,
     fit_filename: str | None = None,
     independent_transaction: bool = None,
-    sid=None,
-    process_id=None,
-    parent_id: str = None,
+    user_id: int | None = None,
+    process_id: str | None = None,
+    parent_id: str | None = None,
 ):
     """
     Conditionally fit and create instrument functions for a sample file.
@@ -72,6 +72,16 @@ async def process_instrument_config(
     :type filename: str
     :param instrument_config: An instrument config to set to the sample files.
     :type instrument_config: SetInstrumentConfigBody
+    :param fit_filename: Optional filename to use for fitting the instrument config.
+    :type fit_filename: str | None, optional
+    :param independent_transaction: Flag to indicate if the operation should be treated as an independent transaction.
+    :type independent_transaction: bool | None, optional
+    :param user_id: Current user triggered operation (for user notifications)
+    :type user_id: int | None, optional
+    :param process_id: Process identifier for progress tracking
+    :type process_id: str | None, optional
+    :param parent_id: Parent process identifier
+    :type parent_id: str | None, optional
     """
     if len(filenames) == 0:
         raise ValueError("Process instrument config: filenames must be provided")
@@ -129,7 +139,7 @@ async def process_instrument_config(
                 "method_file": method_file,
             },
         )
-        await emit_user_notification(notification=notification, room_id=sid)
+        await emit_user_notification(notification=notification, user_id=user_id)
         # fit to the file
         new_fields = (await fit_instrument_config(sample_file=fit_sample_file))["data"][
             "instrument_functions"
@@ -188,7 +198,7 @@ async def process_instrument_config(
             sample_item_ids=affected_sample_item_ids,
             full_remove=True,
             independent_transaction=True,
-            sid=sid,
+            user_id=user_id,
             process_id=gen_id(8),
             parent_id=process_id,
         )

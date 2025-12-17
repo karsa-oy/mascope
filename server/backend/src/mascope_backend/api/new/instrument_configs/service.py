@@ -282,16 +282,16 @@ async def delete_instrument_config(instrument_function_id: str):
 
 
 @api_controller_background_task(
-    success_notification_rooms=["sid"],
-    error_notification_rooms=["sid"],
+    success_notification_rooms=["user_id"],
+    error_notification_rooms=["user_id"],
 )
 async def fit_instrument_config(
     sample_file: SampleFile,
     fit_params: InstrumentConfigFitParams = InstrumentConfigFitParams(),
     independent_transaction: bool = False,
-    sid=None,
-    process_id=None,
-    parent_id=None,
+    user_id: int | None = None,
+    process_id: str | None = None,
+    parent_id: str | None = None,
 ) -> dict:
     """Fit instrument functions for the sample file.
 
@@ -305,8 +305,16 @@ async def fit_instrument_config(
 
     :param sample_file: The sample file containing spectrum for fitting instrument functions.
     :type sample_file: SampleFile
-    :param params: Instrument function fitting parameters.
-    :type params: InstrumentConfigFitParams
+    :param fit_params: Instrument function fitting parameters.
+    :type fit_params: InstrumentConfigFitParams
+    :param independent_transaction: Flag to indicate if the operation should be treated as an independent transaction.
+    :type independent_transaction: bool, optional
+    :param user_id: Current user triggered operation (for user notifications)
+    :type user_id: int | None, optional
+    :param process_id: Process identifier for progress tracking
+    :type process_id: str | None, optional
+    :param parent_id: Parent process identifier
+    :type parent_id: str | None, optional
     :return: A dict containing the fitted instrument function data and statistics.
     :rtype: dict
     """

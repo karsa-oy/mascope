@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, BackgroundTasks, Request
+from fastapi import APIRouter, Depends, BackgroundTasks
 
 from mascope_backend.db.id import gen_id
 
@@ -15,7 +15,6 @@ file_router = APIRouter(prefix="/api/file", tags=["Parameters"])
 @file_router.post("/download")
 @api_route(status_code=202)
 async def download_file_route(
-    request: Request,
     body: FileDownloadBody,
     background_tasks: BackgroundTasks,
     user=Depends(guest_user),
@@ -28,14 +27,13 @@ async def download_file_route(
     :return: Dictionary containing a message and the parameters.
     """
 
-    sid = request.headers.get("X-SID")
     process_id = gen_id(8)
 
     background_tasks.add_task(
         download_files,
         sample_file_ids=body.sample_file_ids,
         independent_transaction=True,
-        sid=sid,
+        user_id=user.id,
         process_id=process_id,
     )
     return {

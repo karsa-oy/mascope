@@ -125,17 +125,6 @@ class MatchIsotopeRecordsQueryParams(MatchRecordsQueryParams):
         return values
 
 
-class MatchRecordsBatchOverviewQueryParams(QueryParamsModel):
-    """Query parameters for match records endpoint"""
-
-    sample_batch_id: str = Field(
-        ..., description="Sample batch ID for batch-level match records"
-    )
-    target_collection_id: str = Field(
-        ..., description="Filter by specific target collection"
-    )
-
-
 class MatchRecordsResponse(BaseModel):
     """Response model for match records"""
 

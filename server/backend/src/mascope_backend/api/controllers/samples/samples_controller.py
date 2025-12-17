@@ -602,9 +602,9 @@ async def get_sample_spectrum(
 async def get_samples_centroids(
     sample_item_ids: list[str],
     independent_transaction: bool = False,
-    sid=None,
-    process_id=None,
-    parent_id=None,
+    user_id: int | None = None,
+    process_id: str | None = None,
+    parent_id: str | None = None,
 ) -> dict:
     """Extracts centroids for a list of sample items by their IDs.
 
@@ -612,12 +612,12 @@ async def get_samples_centroids(
     :type sample_item_ids: list[str]
     :param independent_transaction: Flag to indicate if the operation should be treated as an independent transaction, defaults to False.
     :type independent_transaction: bool, optional
-    :param sid: Session ID for targeting specific clients when emitting events, defaults to None.
-    :type sid: optional
+    :param user_id: Current user triggered operation (for user notifications)
+    :type user_id: int | None, optional
     :param process_id: Process identifier for tracking background operations, defaults to None.
-    :type process_id: optional
+    :type process_id: str | None, optional
     :param parent_id: Parent process identifier for tracking background operations, defaults to None.
-    :type parent_id: optional
+    :type parent_id: str | None, optional
     :return: A dictionary containing the extracted centroids for each sample item ID.
     :rtype: dict
     """

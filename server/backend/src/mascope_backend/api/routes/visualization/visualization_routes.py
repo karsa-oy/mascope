@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, BackgroundTasks, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends
 from mascope_backend.db.id import gen_id
 from mascope_backend.api.new.auth.dependencies import guest_user
 from mascope_backend.api.lib.api_features import api_route
@@ -21,14 +21,12 @@ visualization_router = APIRouter(prefix="/api/visualization", tags=["Visualizati
 @visualization_router.get("/ion_focus")
 @api_route(status_code=202)
 async def visualization_ion_focus_route(
-    request: Request,
     background_tasks: BackgroundTasks,
     query_params: GetVisualizationIonFocusQueryParams = Depends(),
     user=Depends(guest_user),
 ):
     """Initiate a visualization task for focusing on a specific ion in a sample.
 
-    :param request: The request object containing client information.
     :param background_tasks: Background task manager for running visualization tasks.
     :param query_params: Query parameters for the ion focus visualization.
     :param user: The authenticated user, defaults to Depends(guest_user).
@@ -43,14 +41,13 @@ async def visualization_ion_focus_route(
     target_ion_formula = ion["target_ion_formula"]
 
     # Get data for notifications
-    sid = request.headers.get("X-SID")
     process_id = gen_id(8)
 
     background_tasks.add_task(
         visualize_ion_focus,
         **query_params.model_dump(),
         independent_transaction=True,
-        sid=sid,
+        user_id=user.id,
         process_id=process_id,
     )
 

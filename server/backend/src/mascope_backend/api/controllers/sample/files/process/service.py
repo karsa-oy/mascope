@@ -54,7 +54,6 @@ from mascope_backend.api.models.sample.items.sample_item_pydantic_model import (
     SampleItemCreate,
 )
 from mascope_backend.api.new.ionization.modes.util import (
-    resolve_ionization_modes_by_peaks,
     resolve_ionization_modes_by_tokens,
 )
 from mascope_backend.socket.records.service import (
@@ -77,8 +76,7 @@ CALIBRATION_ITERATIONS = 7
 async def auto_process_sample_file(
     sample_file_id: str,
     independent_transaction: bool = None,
-    sid: str | None = None,
-    instrument: str | None = None,
+    user_id: int | None = None,
     process_id: str | None = None,
 ) -> dict:
     """
@@ -99,10 +97,8 @@ async def auto_process_sample_file(
     :type sample_file_id: str
     :param independent_transaction: Indicates whether this operation should be treated as a standalone transaction.
     :type independent_transaction: bool, optional
-    :param sid: Session ID for notifications
-    :type sid: str | None, optional
-    :param instrument: Instrument name for user notifications to its room
-    :type instrument: str | None, optional
+    :param user_id: Current user triggered operation (for user notifications)
+    :type user_id: int | None, optional
     :param process_id: Process ID for tracking
     :type process_id: str | None, optional
     :return: Processing results with affected IDs
@@ -150,7 +146,7 @@ async def auto_process_sample_file(
         if ionization_mode and ionization_mode.calibration_collection_id:
             await calibrate_with_retry(
                 sample_item=SampleItem(**sample_item),
-                sid=sid,
+                user_id=user_id,
                 process_id=process_id,
             )
         else:
@@ -162,8 +158,7 @@ async def auto_process_sample_file(
         await match_compute_sample(
             sample_item_id=sample_item_id,
             independent_transaction=False,
-            sid=sid,
-            instrument=instrument,
+            user_id=user_id,
             process_id=gen_id(8),
             parent_id=process_id,
         )
@@ -182,7 +177,7 @@ async def auto_process_sample_file(
             rematch_samples(
                 sample_item_ids=other_affected_sample_item_ids,
                 independent_transaction=True,  # Set to true to handle reloads independently
-                sid=sid,
+                user_id=user_id,
                 process_id=gen_id(8),
             )
         )
@@ -203,20 +198,21 @@ async def auto_process_sample_file(
         "_notification_data": {
             "affected_sample_batch_ids": affected_sample_batch_ids,
             "affected_sample_item_ids": list(all_affected_sample_item_ids),
+            "instrument": sample_file.instrument,
         },
     }
 
 
 @api_controller_background_task(
-    success_notification_rooms=["sid"],
+    success_notification_rooms=["user_id"],
     success_reload=[("match", "affected_sample_batch_ids")],
-    error_notification_rooms=["sid"],
+    error_notification_rooms=["user_id"],
     error_reload=[("match", "affected_sample_batch_ids")],
 )
 async def re_process_sample_files(
     sample_file_ids: list[str],
     independent_transaction: bool = False,
-    sid: str | None = None,
+    user_id: int | None = None,
     process_id: str | None = None,
 ) -> dict:
     """
@@ -232,8 +228,8 @@ async def re_process_sample_files(
     :type sample_file_ids: list[str]
     :param independent_transaction: Indicates whether this operation should be treated as a standalone transaction.
     :type independent_transaction: bool, optional
-    :param sid: Session ID for notifications
-    :type sid: str | None, optional
+    :param user_id: Current user triggered operation (for user notifications)
+    :type user_id: int | None, optional
     :param process_id: Process ID for tracking
     :type process_id: str | None, optional
     :return: Processing results with aggregated data
@@ -360,8 +356,7 @@ async def re_process_sample_files(
             result = await auto_process_sample_file(
                 sample_file_id=sample_file.sample_file_id,
                 independent_transaction=True,
-                sid=sid,
-                instrument=sample_file.instrument,
+                user_id=user_id,
                 process_id=process_id,
             )
 
@@ -548,7 +543,7 @@ async def create_acquisition_batches_and_items(
 
 
 async def calibrate_with_retry(
-    sample_item: SampleItem, sid: str | None = None, process_id: str | None = None
+    sample_item: SampleItem, user_id: int | None = None, process_id: str | None = None
 ) -> None:
     """Calibrate sample item with retry logic
 
@@ -557,8 +552,8 @@ async def calibrate_with_retry(
 
     :param sample_item: Sample item to calibrate
     :type sample_item: SampleItem
-    :param sid: Session ID for notifications
-    :type sid: str | None, optional
+    :param user_id: Current user triggered operation (for user notifications)
+    :type user_id: int | None, optional
     :param process_id: Process ID for tracking
     :type process_id: str | None, optional
     """
@@ -569,7 +564,7 @@ async def calibrate_with_retry(
                 sample_item_id=sample_item.sample_item_id,
                 mz_calibration_params=mz_calibration_params,
                 independent_transaction=False,
-                sid=sid,
+                user_id=user_id,
                 process_id=gen_id(8),
                 parent_id=process_id,
             )

@@ -22,7 +22,6 @@ from mascope_backend.api.new.match.records.schemas import (
     MatchRecordsQueryParams,
     MatchIonRecordsBody,
     MatchIsotopeRecordsQueryParams,
-    MatchRecordsBatchOverviewQueryParams,
     MatchRecordsResponse,
     MatchRecordsSingleResponse,
 )

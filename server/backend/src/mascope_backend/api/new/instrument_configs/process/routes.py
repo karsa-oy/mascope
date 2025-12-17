@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, BackgroundTasks, Request
+from fastapi import APIRouter, Depends, BackgroundTasks
 from mascope_backend.db.id import gen_id
 from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.controllers.sample.lib.sample_file_fetch import (
@@ -21,7 +21,6 @@ instrument_configs_process_router = APIRouter(
 @instrument_configs_process_router.post("")
 @api_route(status_code=202)
 async def process_instrument_config_route(
-    request: Request,
     body: ProcessInstrumentConfigBody,
     background_tasks: BackgroundTasks,
     user=Depends(editor_user),
@@ -42,8 +41,6 @@ async def process_instrument_config_route(
       - Specify a `body.instrument_config.new_record` with `resolution_function` and `method_file` to create
         a new instrument config and associate user-provided instrument functions with the sample file.
 
-    :param request: The incoming HTTP request object.
-    :type request: Request
     :param body: The request body containing details of the sample file, method file, and optional
                  instrument functions.
     :type body: ProcessInstrumentConfigBody
@@ -66,7 +63,7 @@ async def process_instrument_config_route(
         filenames=[body.filename],
         instrument_config=body.instrument_config,
         independent_transaction=True,
-        sid=request.headers.get("X-SID"),
+        user_id=user.id,
         process_id=process_id,
     )
     return {

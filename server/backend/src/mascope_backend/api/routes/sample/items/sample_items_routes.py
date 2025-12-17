@@ -1,4 +1,4 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, Request, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, Query
 from mascope_backend.db.id import gen_id
 from mascope_backend.db.models import SampleBatch, SampleItem
 from mascope_backend.api.lib.api_features import api_route
@@ -140,7 +140,6 @@ async def delete_sample_item_route(sample_item_id: str, user=Depends(editor_user
 @sample_items_router.post("/copy")
 @api_route(status_code=202)
 async def copy_sample_items_route(
-    request: Request,
     body: SampleItemsCopyBody,
     background_tasks: BackgroundTasks,
     user=Depends(editor_user),
@@ -156,14 +155,13 @@ async def copy_sample_items_route(
     # Can't copy to locked sample batch
     await locked_access(user, SampleBatch, body.sample_batch_id)
 
-    sid = request.headers.get("X-SID")
     process_id = gen_id(8)
     background_tasks.add_task(
         copy_sample_items,
         sample_item_ids=body.sample_item_ids,
         sample_batch_id=body.sample_batch_id,
         independent_transaction=True,
-        sid=sid,
+        user_id=user.id,
         process_id=process_id,
     )
     return {
@@ -175,7 +173,6 @@ async def copy_sample_items_route(
 @sample_items_router.post("/move")
 @api_route(status_code=202)
 async def move_sample_items_route(
-    request: Request,
     body: SampleItemsMoveBody,
     background_tasks: BackgroundTasks,
     user=Depends(editor_user),
@@ -194,14 +191,13 @@ async def move_sample_items_route(
     # Can't move to locked sample batch
     await locked_access(user, SampleBatch, body.sample_batch_id)
 
-    sid = request.headers.get("X-SID")
     process_id = gen_id(8)
     background_tasks.add_task(
         move_sample_items,
         sample_item_ids=body.sample_item_ids,
         sample_batch_id=body.sample_batch_id,
         independent_transaction=True,
-        sid=sid,
+        user_id=user.id,
         process_id=process_id,
     )
     return {
@@ -213,7 +209,6 @@ async def move_sample_items_route(
 @sample_items_router.post("/process")
 @api_route(status_code=202)
 async def process_sample_item_route(
-    request: Request,
     body: SampleItemProcessBody,
     background_tasks: BackgroundTasks,
     user=Depends(editor_user),
@@ -237,7 +232,6 @@ async def process_sample_item_route(
         )
 
     # Get data for notifications
-    sid = request.headers.get("X-SID")
     process_id = gen_id(8)
 
     background_tasks.add_task(
@@ -245,7 +239,7 @@ async def process_sample_item_route(
         sample_item=body.sample_item,
         instrument_config=body.instrument_config,
         independent_transaction=True,
-        sid=sid,
+        user_id=user.id,
         process_id=process_id,
     )
 
@@ -258,7 +252,6 @@ async def process_sample_item_route(
 @sample_items_router.get("/{sample_item_id}/export_peak_data")
 @api_route(status_code=202)
 async def sample_item_export_peaks_route(
-    request: Request,
     sample_item_id: str,
     background_tasks: BackgroundTasks,
     user=Depends(editor_user),
@@ -278,14 +271,13 @@ async def sample_item_export_peaks_route(
     sample_item_result = await get_sample_item(sample_item_id)
     sample_item_name = sample_item_result.get("data").get("sample_item_name")
 
-    sid = request.headers.get("X-SID")
     process_id = gen_id(8)
 
     background_tasks.add_task(
         sample_item_export_peaks,
         sample_item_id=sample_item_id,
         independent_transaction=True,
-        sid=sid,
+        user_id=user.id,
         process_id=process_id,
     )
     return {

@@ -3,7 +3,7 @@ import shutil
 
 from datetime import datetime, timedelta, timezone
 from typing import Callable
-from fastapi import APIRouter, BackgroundTasks, File, Request, Depends, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Depends, UploadFile
 
 from tuspyserver import create_tus_router
 
@@ -100,14 +100,12 @@ async def get_sample_file_route(sample_file_id: str, user=Depends(guest_user)):
 @sample_files_router.post("")
 @api_route(status_code=201, token_access=True)
 async def create_sample_file_route(
-    request: Request,
     sample_file_create: SampleFileCreate,
     background_tasks: BackgroundTasks,
     user=Depends(editor_user),
 ):
     """Create a new sample file record.
 
-    :param request: The request object.
     :param sample_file_create: Data required for creating a sample file.
     :param background_tasks: Background tasks for triggering an automatic processing for sample file after creation.
     :param user: Authenticated user with editor access.
@@ -116,7 +114,7 @@ async def create_sample_file_route(
     return await create_sample_file(
         sample_file_create=sample_file_create,
         background_tasks=background_tasks,
-        sid=request.headers.get("X-SID"),
+        user_id=user.id,
         process_id=gen_id(8),
     )
 
@@ -185,7 +183,6 @@ async def get_sample_file_peaks_route(
 @sample_files_router.get("/{sample_file_id}/peaks/compute")
 @api_route(status_code=202)
 async def compute_sample_file_peaks_route(
-    request: Request,
     sample_file_id: str,
     background_tasks: BackgroundTasks,
     user=Depends(editor_user),
@@ -193,7 +190,6 @@ async def compute_sample_file_peaks_route(
     """Compute all peaks for a sample file asynchronously.
 
     :param sample_file_id: ID of the sample file to compute peaks for.
-    :param request: The request object.
     :param background_tasks: FastAPI background task manager.
     :param user: Authenticated user with editor access.
     :return: Process initiation message.
@@ -202,14 +198,13 @@ async def compute_sample_file_peaks_route(
     sample_file_data = await get_sample_file(sample_file_id)
     filename = sample_file_data.get("data").get("filename")
 
-    sid = request.headers.get("X-SID")
     process_id = gen_id(8)
 
     background_tasks.add_task(
         compute_sample_file_peaks,
         sample_file_id=sample_file_id,
         independent_transaction=True,
-        sid=sid,
+        user_id=user.id,
         process_id=process_id,
     )
     return {
@@ -274,7 +269,6 @@ async def get_sample_file_metadata_route(
 @api_route(status_code=202)
 async def process_sample_item_route(
     sample_file_id: str,
-    request: Request,
     background_tasks: BackgroundTasks,
     user=Depends(editor_user),
 ):
@@ -289,15 +283,13 @@ async def process_sample_item_route(
     sample_file = (await get_sample_file(sample_file_id)).get("data")
 
     # Get data for notifications
-    sid = request.headers.get("X-SID")
     process_id = gen_id(8)
 
     background_tasks.add_task(
         auto_process_sample_file,
         sample_file_id=sample_file_id,
         independent_transaction=True,
-        sid=sid,
-        instrument=sample_file.instrument,
+        user_id=user.id,
         process_id=process_id,
     )
 
@@ -311,7 +303,6 @@ async def process_sample_item_route(
 @api_route(status_code=202)
 async def reprocess_sample_files_route(
     body: ReprocessSampleFilesBody,
-    request: Request,
     background_tasks: BackgroundTasks,
     user=Depends(editor_user),
 ):
@@ -323,14 +314,13 @@ async def reprocess_sample_files_route(
     :return: A dictionary confirming the processing has started.
     """
     # Get data for notifications
-    sid = request.headers.get("X-SID")
     process_id = gen_id(8)
 
     background_tasks.add_task(
         re_process_sample_files,
         sample_file_ids=body.sample_file_ids,
         independent_transaction=True,
-        sid=sid,
+        user_id=user.id,
         process_id=process_id,
     )
 
@@ -343,7 +333,6 @@ async def reprocess_sample_files_route(
 @sample_files_router.post("/upload")
 @api_route(status_code=201, token_access=True)
 async def upload_sample_files_route(
-    request: Request,
     files: list[UploadFile] = File(..., description="Multiple files to upload"),
     user=Depends(editor_user),
 ) -> dict:
@@ -353,8 +342,6 @@ async def upload_sample_files_route(
     This route takes an uploaded files from a form field and saves it in the `filestreams` directory
     on the server. Files are validated for size and extension before processing.
 
-    :param request: HTTP request object containing headers and metadata
-    :type request: Request
     :param files: List of files to be uploaded via multipart form data
     :type files: list[UploadFile]
     :param user: The authenticated user from dependency injection
@@ -365,9 +352,6 @@ async def upload_sample_files_route(
     # Validate files using Pydantic model
     validated_files = SampleFilesUpload(files=files)
 
-    # Extract user session ID from headers
-    sid = request.headers.get("X-SID")
-
     # Single token validation for the entire upload process
     access_token = await get_access_token(user=user, service_name="file-converter")
 
@@ -375,18 +359,14 @@ async def upload_sample_files_route(
         files=validated_files.files,
         user=user,
         access_token=access_token,
-        sid=sid,
     )
 
 
 def get_upload_handler(
-    request: Request,
     user=Depends(editor_user),
 ) -> Callable[[str, dict], None]:
     """Get the upload handler for processing file uploads.
 
-    :param request: The HTTP request object.
-    :type request: Request
     :param user: The current authenticated user with editor permissions.
     :type user: _type_, optional
     :return: A callable that handles the file upload.
@@ -399,8 +379,7 @@ def get_upload_handler(
         # Rename file from temporary name back to original
         dest_path = os.path.join(os.path.dirname(file_path), safe_filename)
         shutil.move(file_path, dest_path)
-        # Extract user session ID from headers
-        sid = request.headers.get("X-SID")
+
         # Single token validation for the entire upload process
         access_token = await get_access_token(user=user, service_name="file-converter")
         # Process the uploaded file
@@ -408,7 +387,6 @@ def get_upload_handler(
             dest_path,
             user=user,
             access_token=access_token,
-            sid=sid,
         )
 
     return handler

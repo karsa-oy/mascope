@@ -17,15 +17,15 @@ from mascope_backend.runtime import runtime
 
 
 @api_controller_background_task(
-    success_notification_rooms=["sid"],
-    error_notification_rooms=["sid"],
+    success_notification_rooms=["user_id"],
+    error_notification_rooms=["user_id"],
 )
 async def download_files(
     sample_file_ids: list[str],
     independent_transaction: bool = False,
-    sid=None,
-    process_id=None,
-    parent_id=None,
+    user_id: int | None = None,
+    process_id: str | None = None,
+    parent_id: str | None = None,
 ) -> dict:
     """
     Downloads sample files by their unique IDs and prepares them for client download.
@@ -41,12 +41,12 @@ async def download_files(
     :type sample_file_ids: list[str]
     :param independent_transaction: Flag to indicate if the operation should be treated as an independent transaction
     :type independent_transaction: bool, optional
-    :param sid: Session ID for targeting specific clients when emitting events
-    :type sid: str, optional
+    :param user_id: Current user triggered operation (for user notifications)
+    :type user_id: int | None, optional
     :param process_id: Optional identifier for the processing task
-    :type process_id: str, optional
+    :type process_id: str | None, optional
     :param parent_id: Optional identifier of the parent task
-    :type parent_id: str, optional
+    :type parent_id: str | None, optional
     :raises ApiException: If no downloadable files are found
     :return: A dictionary with information about found and not found files
     :rtype: dict
