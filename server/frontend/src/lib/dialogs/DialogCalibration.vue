@@ -1,9 +1,4 @@
 <script setup>
-import Tabs from 'primevue/tabs'
-import TabList from 'primevue/tablist'
-import Tab from 'primevue/tab'
-import TabPanels from 'primevue/tabpanels'
-import TabPanel from 'primevue/tabpanel'
 import ProgressSpinner from 'primevue/progressspinner'
 import Message from 'primevue/message'
 import DataTable from 'primevue/datatable'
@@ -55,7 +50,6 @@ watchEffect(async () => {
 })
 
 const state = reactive({
-  tab: 'info',
   previous: null
 })
 
@@ -88,7 +82,6 @@ watch(visible, init)
 function init(active) {
   if (active) {
     // reset state
-    state.tab = 'calibration'
     state.previous = { ...mzFit.mzCalibrationParams }
     refit()
   }
@@ -100,13 +93,11 @@ const unsynced = computed(() =>
 
 watch(previewSample, refit)
 
-watchEffect(() => {
-  if (state.tab == 'calibration') {
-    if (unsynced.value) {
-      refit()
-    }
+watch(() => mzFit.mzCalibrationParams, () => {
+  if (unsynced.value && visible.value) {
+    refit()
   }
-})
+}, { deep: true })
 
 async function refit() {
   const sample = batch.value ? previewSample.value : original.value
@@ -191,80 +182,74 @@ const formatter = new Intl.NumberFormat('en-US', {
 
 <template>
   <Dialog :header="title" v-model:visible="visible" style="width: 800px">
-    <Tabs v-model:value="state.tab">
-      <TabList>
-        <Tab value="calibration">Calibration</Tab>
-        <Tab value="settings">Settings</Tab>
-      </TabList>
-      <TabPanels>
-        <TabPanel value="calibration">
-          <div class="column">
-            <!-- Show warning message if it exists -->
-            <div class="message-container">
-              <Message
-                v-if="mzFit.status === 'warning'"
-                severity="warn"
-                style="inline-size: 400px; overflow-wrap: anywhere; margin-bottom: 1rem"
-                :closable="true"
-              >
-                {{ mzFit.error }}
-              </Message>
-            </div>
-            <Listbox
-              v-if="samples"
-              v-model:modelValue="previewSample"
-              :options="samples ?? []"
-              optionLabel="sample_item_name"
-              dataKey="sample_item_id"
-              style="height: 300px"
-            />
-            <DataTable
-              v-if="calibration.rows.length > 0"
-              :key="calibration.key"
-              :value="
-                calibration.rows.map((row, index) => ({
-                  ...row,
-                  type: index == calibration.rows.length - 1 ? 'summary' : 'stat'
-                }))
-              "
-              sortField="mz"
-              scrollable
-              scrollHeight="300px"
+    <div class="dialog-content">
+      <section class="settings-section">
+        <h3>Calibration Settings</h3>
+        <PaneSettingsCalibration v-model:mzCalibrationParams="mzFit.mzCalibrationParams" />
+      </section>
+      <section class="results-section">
+        <div class="message-container">
+          <Message
+            v-if="mzFit.status === 'warning'"
+            severity="warn"
+            style="inline-size: 600px; overflow-wrap: anywhere; margin-bottom: 0rem"
+            :closable="true"
+          >
+            {{ mzFit.error }}
+          </Message>
+        </div>
+        <h3>Calibration Results</h3>
+        <div class="scrollable-content">
+          <Listbox
+            v-if="samples"
+            v-model:modelValue="previewSample"
+            :options="samples ?? []"
+            optionLabel="sample_item_name"
+            dataKey="sample_item_id"
+            style="height: 300px"
+          />
+          <DataTable
+            v-if="calibration.rows.length > 0"
+            :key="calibration.key"
+            :value="
+              calibration.rows.map((row, index) => ({
+                ...row,
+                type: index == calibration.rows.length - 1 ? 'summary' : 'stat'
+              }))
+            "
+            sortField="mz"
+            class="calibration-table"
+          >
+            <Column
+              v-for="col of calibration.columns"
+              :key="col.field"
+              :field="col.field"
+              :header="col.label"
             >
-              <Column
-                v-for="col of calibration.columns"
-                :key="col.field"
-                :field="col.field"
-                :header="col.label"
-              >
-                <template #body="{ data }">
-                  <span
-                    :style="data.type == 'summary' ? 'font-weight: bold' : ''"
-                    v-if="data[col.field] !== null && data[col.field] !== undefined"
-                    >{{
-                      columnFormatters[col.field]
-                        ? columnFormatters[col.field].format(data[col.field])
-                        : formatter.format(data[col.field])
-                    }}</span
-                  >
-                  <span v-else>-</span>
-                </template>
-              </Column>
-            </DataTable>
-            <div v-else class="center" style="height: 200px; width: 100%; overflow: hidden">
-              <ProgressSpinner v-if="!(mzFit.status == 'error')" />
-              <Message v-else severity="error" style="inline-size: 400px; overflow-wrap: anywhere">
-                {{ mzFit.error ?? 'Calibration failed due to an unknown error.' }}
-              </Message>
-            </div>
+              <template #body="{ data }">
+                <span
+                  :class="data.type == 'summary' ? 'summary-cell' : ''"
+                  v-if="data[col.field] !== null && data[col.field] !== undefined"
+                  >{{
+                    columnFormatters[col.field]
+                      ? columnFormatters[col.field].format(data[col.field])
+                      : formatter.format(data[col.field])
+                  }}</span
+                >
+                <span v-else>-</span>
+              </template>
+            </Column>
+          </DataTable>
+          <div v-else class="center" style="height: 200px; width: 100%; overflow: hidden">
+            <ProgressSpinner v-if="!(mzFit.status == 'error')" />
+            <Message v-else severity="error" style="inline-size: 400px; overflow-wrap: anywhere">
+              {{ mzFit.error ?? 'Calibration failed due to an unknown error.' }}
+            </Message>
           </div>
-        </TabPanel>
-        <TabPanel value="settings">
-          <PaneSettingsCalibration v-model:mzCalibrationParams="mzFit.mzCalibrationParams" />
-        </TabPanel>
-      </TabPanels>
-    </Tabs>
-    <menu>
+        </div>
+      </section>
+    </div>
+    <menu class="dialog-actions">
       <Button label="Cancel" @click="() => (visible = false)" severity="secondary" />
       <Button
         label="Save"
@@ -276,20 +261,60 @@ const formatter = new Intl.NumberFormat('en-US', {
 </template>
 
 <style scoped>
-.cols {
+.dialog-content {
   display: flex;
-  flex-flow: row nowrap;
-  justify-content: space-around;
-  gap: 0.5rem;
+  flex-direction: column;
+  gap: 0rem;
+  max-height: 70vh;
+  overflow: hidden;
+}
+
+.settings-section {
+  border-radius: 8px;
+  padding: 0rem 1rem;
+  flex-shrink: 0;
+}
+
+.results-section {
+  border-radius: 8px;
+  padding: 1rem;
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-section h3,
+.results-section h3 {
+  margin-top: 0;
+  margin-bottom: 0.3rem;
+  font-weight: 600;
+  color: var(--text-color, #fff);
+}
+
+.scrollable-content {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.calibration-table :deep(.summary-cell) {
+  font-weight: bold;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--surface-border, #3c434d);
+  flex-shrink: 0;
 }
 
 .message-container {
   display: flex;
   justify-content: center;
   align-items: center;
-}
-
-:deep(.p-panel-header) {
-  padding-top: 0;
+  margin-bottom: 0.3rem;
 }
 </style>
