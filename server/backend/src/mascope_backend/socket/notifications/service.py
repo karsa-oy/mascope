@@ -4,45 +4,119 @@ from copy import deepcopy
 from typing import Any
 from mascope_backend.socket import sio
 from mascope_backend.socket.notifications.schemas import UserNotification
+from mascope_backend.socket.storage import room_tracker
 
 from mascope_backend.runtime import runtime
 
 
 async def emit_user_notification(
     notification: UserNotification,
-    room_id: str,
+    room_id: str | None = None,
+    user_id: int | None = None,
 ) -> None:
     """
-    Utility function to emit a Socket.IO event to a specified room_id.
+    Emit notification with flexible routing logic.
 
-    :param notification: The notification to send with the event.
-    :param room_id: The room to which the event should be emitted.
+    Routing behavior:
+        1. Only user_id → emit to user's personal room (user-{id})
+        2. Only room_id → emit to room (all subscribers see it)
+        3. Both provided:
+           - User in room → emit ONLY to room_id
+           - User NOT in room → emit to BOTH room_id AND user-{id}
+
+    Case 3: Active user who triggered request receives notification
+    even after navigating away, while other subscribers still get updates.
+
+    :param notification: Notification to send
+    :type notification: UserNotification
+    :param room_id: Target room (resource ID, instrument, etc.)
+    :type room_id: str | None
+    :param user_id: Target user ID
+    :type user_id: int | None
+    :raises ValueError: If neither room_id nor user_id provided
     """
+    if not room_id and not user_id:
+        raise ValueError("At least one of room_id or user_id must be provided")
+
     notification_dict = notification.model_dump(exclude_none=True)
-    if room_id:
+
+    # Case 1: Only user_id → emit to user's personal room
+    if user_id and not room_id:
+        user_room = f"user-{user_id}"
+        runtime.logger.debug(f"Notification: emitting to user room '{user_room}'")
+        await sio.emit(
+            "user_notification", notification_dict, room=user_room, namespace="/"
+        )
+        return
+
+    # Case 2: Only room_id → emit to room (all subscribers)
+    if room_id and not user_id:
+        runtime.logger.debug(f"Notification: emitting to room '{room_id}'")
         await sio.emit(
             "user_notification", notification_dict, room=room_id, namespace="/"
+        )
+        return
+
+    # Case 3: Both provided → smart dual emission
+    user_in_room = await room_tracker.is_in_room(user_id, room_id)
+
+    if user_in_room:
+        # User still viewing → emit only to room (user receives it there)
+        runtime.logger.debug(
+            f"Notification: emitting to room '{room_id}' (user {user_id} present)"
+        )
+        await sio.emit(
+            "user_notification", notification_dict, room=room_id, namespace="/"
+        )
+    else:
+        # User navigated away → emit to BOTH room and user
+        runtime.logger.debug(
+            f"Notification: dual emit to room '{room_id}' + user '{user_id}' "
+            f"(user left room)"
+        )
+        await sio.emit(
+            "user_notification", notification_dict, room=room_id, namespace="/"
+        )
+        await sio.emit(
+            "user_notification",
+            notification_dict,
+            room=f"user-{user_id}",
+            namespace="/",
         )
 
 
 async def send_progress_user_notification(
     notification: UserNotification, increment: float = None
 ):
-    # Create a deep copy of the notification to ensure the original is not modified
+    """
+    Send progress notifications with dynamic progress calculation.
+
+    Extracts internal metadata from notification.data, calculates progress,
+    and emits to all specified rooms with optional smart routing.
+
+    Internal metadata keys (removed before emission):
+        _user_id: User ID for smart routing
+        _room_ids: List of room IDs to emit to
+        _total_samples: Total items for progress calculation
+        _item_index: Current item index
+        _batch_weight: Weight for batch progress
+        _batch_index: Current batch index
+
+    :param notification: UserNotification with progress data
+    :param increment: Progress increment value
+    """
+    # Create a deep copy to avoid modifying original
     notification_copy = deepcopy(notification)
 
-    # Extract internal metadata and clean up the data dictionary
+    # Extract internal metadata
+    user_id = notification_copy.data.pop("_user_id", None)
     room_ids = notification_copy.data.pop("_room_ids", [])
-    instrument_room = notification_copy.data.pop("_instrument_room", None)
-
     total_samples = notification_copy.data.pop("_total_samples", None)
     item_index = notification_copy.data.pop("_item_index", None)
-
-    # total_batches = notification_copy.data.pop("_total_batches", None)
     batch_weight = notification_copy.data.pop("_batch_weight", None)
     batch_index = notification_copy.data.pop("_batch_index", None)
 
-    # Clear any keys that start with an underscore as they are meant for internal use only
+    # Clear any remaining internal keys (start with underscore)
     keys_to_remove = [
         key for key in notification_copy.data.keys() if key.startswith("_")
     ]
@@ -73,10 +147,11 @@ async def send_progress_user_notification(
             notification_copy.progress = (
                 (item_index + increment) / total_samples
             ) * 100
-
             notification_copy.message = f"Computing sample batch matches, processing sample {item_index + 1}/{total_samples}"
+
     if notification_copy.type == "rematch_batches":
         notification_copy.progress = (batch_index - 1 + increment) * batch_weight * 100
+
     if notification_copy.type == "sample_batch_export_peaks":
         if total_samples is not None and item_index is not None:
             notification_copy.progress = (
@@ -93,11 +168,16 @@ async def send_progress_user_notification(
             notification_copy.message = (
                 f"Copying sample {item_index + 1}/{total_samples} to new batch."
             )
-    # Emit the notification to all specified rooms
+
+    # Emit to all specified rooms with optional smart routing
     for room_id in room_ids:
-        await emit_user_notification(notification_copy, room_id)
-    if instrument_room:
-        await emit_user_notification(notification_copy, instrument_room)
+        await emit_user_notification(
+            notification_copy, room_id=room_id, user_id=user_id
+        )
+
+    # Fallback for direct user notifications if no rooms specified
+    if not room_ids and user_id is not None:
+        await emit_user_notification(notification_copy, user_id=user_id)
 
 
 async def handle_notifications(
@@ -107,50 +187,50 @@ async def handle_notifications(
     result: dict[str, Any] | None,
 ) -> None:
     """
-    Emit Socket.IO user notifications to specified rooms.
+    Emit notifications for background tasks with flexible routing.
 
-    For each room:
-    - Find room_id in kwargs, result['data'], or result['_notification_data']
-    - Emit notification to the room
+    Extracts room IDs and optional user_id from controller kwargs/result,
+    then emits with appropriate routing strategy.
 
-    :param rooms: List of room keys to find room IDs
-    :type rooms: list[str] | None
+    Extraction priority:
+        room_id: kwargs[key] → result[key] → result['data'][key] → result['_notification_data'][key]
+        user_id: kwargs['user_id'] → result['_notification_data']['user_id']
+
+    :param rooms: List of room keys (e.g., ["sample_batch_id", "user_id"])
+    :type rooms: list[str]
     :param notification: UserNotification instance to be emitted
     :type notification: UserNotification
-    :param kwargs:  Controller function kwargs that may contain room IDs
+    :param kwargs:  (may contain room values and user_id)
     :type kwargs: dict[str, Any]
-    :param result: Controller function result that may contain room IDs in 'data'
-            or '_notification_data' keys. May be None when handling error notifications.
+    :param result: Controller result (may contain room values in data/_notification_data)
     :type result: dict[str, Any] | None
     """
-    for room in rooms:
-        # Step 1: Check if room_id is in kwargs
-        room_id = kwargs.get(room)
+    user_id: int | None = kwargs.get("user_id")
+    if not user_id and result and isinstance(result, dict):
+        if notification_data := result.get("_notification_data"):
+            if isinstance(notification_data, dict):
+                user_id = notification_data.get("user_id")
 
-        #  Step 2:Try to find room_id in result
-        if not room_id and result:
-            if isinstance(result, dict):
-                # Try to find room_id directly in result
-                if room in result:
-                    room_id = result.get(room)
+    for room_key in rooms:
+        room_id = kwargs.get(room_key)
 
-                # Check if 'data' exists and is a dictionary
-                data = result.get("data")
-                if room_id is None and isinstance(data, dict) and room in data:
-                    room_id = data.get(room)
+        if not room_id and result and isinstance(result, dict):
+            # Try direct key
+            room_id = result.get(room_key)
 
-                # Check if '_notification_data' exists and is a dictionary
-                notification_data = result.get("_notification_data")
-                if (
-                    room_id is None
-                    and isinstance(notification_data, dict)
-                    and room in notification_data
-                ):
-                    room_id = notification_data.get(room)
-        if not room_id:
-            runtime.logger.warning(
-                f"No room ID found for user notification in room '{room}'"
-            )
-            continue
+            # Try nested in 'data'
+            if not room_id and (data := result.get("data")):
+                if isinstance(data, dict):
+                    room_id = data.get(room_key)
 
-        await emit_user_notification(notification, room_id)
+            # Try nested in '_notification_data'
+            if not room_id and (notification_data := result.get("_notification_data")):
+                if isinstance(notification_data, dict):
+                    room_id = notification_data.get(room_key)
+
+        # Special case: if room_key IS "user_id", emit directly to user
+        if room_key == "user_id" or not room_id:
+            await emit_user_notification(notification, user_id=user_id)
+        else:
+            # Normal case: room_id with optional user_id for smart routing
+            await emit_user_notification(notification, room_id=room_id, user_id=user_id)
