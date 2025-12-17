@@ -122,65 +122,49 @@ async def get_ionization_mechanism(ionization_mechanism_id: str) -> dict:
     Retrieves a single ionization mechanism by its unique ID.
 
     Steps:
-    1. Execute a query to fetch the ionization mechanism with the specified ID.
-    2. Check if the ionization mechanism exists. If not, raise a NotFoundException.
-    3. Return the ionization mechanism's details as a dictionary.
+    - Execute a query to fetch the ionization mechanism with the specified ID.
+    - Check if the ionization mechanism exists. If not, raise a NotFoundException.
+    - Retrieve all ionization modes that use this ionization mechanism.
+    - Return the ionization mechanism's details as a dictionary.
 
     :param ionization_mechanism_id: Unique identifier of the ionization mechanism to retrieve.
     :raises NotFoundException: If the ionization mechanism with the given ID is not found.
     :return: The requested ionization mechanism's details.
     """
     async with async_session() as session:
-        # Step 1: Fetch ionization mechanism by ID
+        # -- Fetch ionization mechanism by ID -- #
         ionization_mechanism = await session.get(
             IonizationMechanism, ionization_mechanism_id
         )
 
-        # Step 2: If ionization mechanism not found, raise exception
+        # -- If ionization mechanism not found, raise exception -- #
         if not ionization_mechanism:
             raise NotFoundException(
                 f"Ionization mechanism with ID '{ionization_mechanism_id}' not found"
             )
 
-        # Step 3: Retrieve ionization modes -> sample items -> sample batches
-        #         using the specified ionization mechanism
-        affected_ion_mode_ids = []
+        # -- Retrieve ionization modes using the specified ionization mechanism -- #
+        affected_ion_modes = []
         result = await session.execute(select(IonizationMode))
         all_ion_modes = result.scalars().all()
         for ion_mode in all_ion_modes:
             if ionization_mechanism_id in ion_mode.ionization_mechanism_ids:
-                affected_ion_mode_ids.append(ion_mode.ionization_mode_id)
+                affected_ion_modes.append(ion_mode)
 
-        result = await session.execute(
-            select(SampleItem).where(
-                SampleItem.ionization_mode_id.in_(affected_ion_mode_ids)
-            )
-        )
-        affected_sample_items = result.scalars().all()
-
-        affected_sample_batch_ids = list(
-            set(item.sample_batch_id for item in affected_sample_items)
-        )
-        result = await session.execute(
-            select(SampleBatch).where(
-                SampleBatch.sample_batch_id.in_(affected_sample_batch_ids)
-            )
-        )
-        affected_sample_batches = result.scalars().all()
-        affected_sample_batch_info = [
+        affected_ion_mode_info = [
             {
-                "sample_batch_id": batch.sample_batch_id,
-                "sample_batch_name": batch.sample_batch_name,
+                "ion_mode_id": ion_mode.ionization_mode_id,
+                "ion_mode_name": ion_mode.ionization_mode_name,
             }
-            for batch in affected_sample_batches
+            for ion_mode in affected_ion_modes
         ]
 
-        # Step 4: Return ionization mechanism details with sample batches
+        # -- Return ionization mechanism details with ionization modes -- #
         ionization_mechanism_data = IonizationMechanismRead.model_validate(
             ionization_mechanism
         ).model_dump()
-        ionization_mechanism_data["sample_batches_count"] = len(affected_sample_batches)
-        ionization_mechanism_data["sample_batches"] = affected_sample_batch_info
+        ionization_mechanism_data["ionization_modes_count"] = len(affected_ion_modes)
+        ionization_mechanism_data["ionization_modes"] = affected_ion_mode_info
         return {
             "message": f"Ionization mechanism '{ionization_mechanism.ionization_mechanism}' retrieved successfully.",
             "data": ionization_mechanism_data,
@@ -279,22 +263,23 @@ async def create_ionization_mechanism(
 @api_controller()
 async def delete_ionization_mechanism(ionization_mechanism_id: str) -> dict:
     """
-    Deletes an ionization mechanism by its ID, ensuring it's not used by any sample batches.
+    Deletes an ionization mechanism by its ID, ensuring it's not used in any ionization mode
 
     Steps:
-    1. Retrieve the ionization mechanism along with any referencing sample batches.
-    2. If no sample batches use this ionization mechanism, delete related TargetIsotope and TargetIon records.
-    3. Delete the ionization mechanism from the database.
-    4. If referenced, throw an ApiException preventing deletion.
+    - Retrieve the ionization mechanism along with any referencing ionization modes.
+    - If referenced in any ionization modes, raise an ApiException preventing deletion.
+    - If no ionization modes use this ionization mechanism, delete related TargetIsotope and TargetIon records.
+    - Delete the ionization mechanism from the database.
+    - Emit deletion event via socket.
 
     :param ionization_mechanism_id: The unique identifier of the ionization mechanism to delete.
     :type ionization_mechanism_id: str
-    :raises ApiException: If the ionization mechanism is referenced in any sample batch.
+    :raises ApiException: If the ionization mechanism is referenced by any ionization modes.
     :raises NotFoundException: If no ionization mechanism is found with the provided ID.
     :return: Deleted ionization mechanism message.
     :rtype: dict
     """
-    # Step 1: Fetch the ionization mechanism
+    # -- Fetch the ionization mechanism -- #
     async with async_session() as session:
         ionization_mechanism = await session.get(
             IonizationMechanism, ionization_mechanism_id
@@ -304,17 +289,20 @@ async def delete_ionization_mechanism(ionization_mechanism_id: str) -> dict:
                 f"Ionization mechanism with ID '{ionization_mechanism_id}' not found"
             )
 
-        # Step 2: Retrieve the ionization mechanism and check for sample batch references
+        # -- Retrieve the ionization mechanism and check for ionization mode references -- #
         ionization_data = await get_ionization_mechanism(ionization_mechanism_id)
         ionization_details = ionization_data.get("data")
-        if ionization_details["sample_batches_count"] > 0:
+
+        # -- Prevent deletion if referenced in any ionization modes -- #
+        if ionization_details["ionization_modes_count"] > 0:
             raise ApiException(
-                f"Ionization mechanism '{ionization_mechanism.ionization_mechanism}' cannot be deleted as it is used in {ionization_details['sample_batches_count']} sample batches.",
-                {"sample_batches": ionization_details["sample_batches"]},
+                f"Ionization mechanism '{ionization_mechanism.ionization_mechanism}' cannot be deleted as it is used in"
+                f" {ionization_details['ionization_modes_count']} ionization modes.",
+                {"ionization_modes": ionization_details["ionization_modes"]},
                 400,
             )
 
-        # Step 3: Manually delete related TargetIsotope and TargetIon records
+        # -- Manually delete related TargetIsotope and TargetIon records -- #
 
         # Delete TargetIsotope records
         delete_target_isotope_query = delete(TargetIsotope).where(
@@ -342,7 +330,7 @@ async def delete_ionization_mechanism(ionization_mechanism_id: str) -> dict:
         # Commit the transaction
         await session.commit()
 
-    # Step 4: Emit deletion event
+    # -- Emit deletion event -- #
     await emit_record_deleted(
         record_type="ionization_mechanism",
         record_id=ionization_mechanism_id,
