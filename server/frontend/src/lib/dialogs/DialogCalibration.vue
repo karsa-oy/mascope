@@ -58,6 +58,7 @@ const title = computed(() =>
     ? `Calibrate batch "${original.value?.sample_batch_name}"`
     : `Calibrate sample "${original.value?.sample_item_name}"`
 )
+const resultsTitle = computed(() => (batch.value ? 'Batch Calibration' : 'Calibration Results'))
 
 const confirmMessage = computed(() => {
   if (batch.value) {
@@ -198,7 +199,7 @@ const formatter = new Intl.NumberFormat('en-US', {
             {{ mzFit.error }}
           </Message>
         </div>
-        <h3>Calibration Results</h3>
+        <h3>{{ resultsTitle }}</h3>
         <div class="scrollable-content">
           <Listbox
             v-if="samples"
