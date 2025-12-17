@@ -12,6 +12,7 @@ import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import Listbox from 'primevue/listbox'
 import { useConfirm } from 'primevue/useconfirm'
+import { num } from '@/lib/formatters'
 
 import { computed, watch, reactive, ref, watchEffect } from 'vue'
 
@@ -171,10 +172,20 @@ const calibration = computed(() => ({
   ]
 }))
 
+const columnFormatters = computed(() => ({
+  mz: num.mz,
+  sample_peak_mz: num.mz,
+  calibration_mz: num.mz,
+  match_mz_error: num.mzError,
+  calibration_mz_error: num.mzError,
+  mz_error_diff: num.mzError,
+  calibrant_to_tic: num.ticFraction
+}))
+
 const formatter = new Intl.NumberFormat('en-US', {
-  minimumIntegerDigits: 2,
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2
+  minimumIntegerDigits: 1,
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 4
 })
 </script>
 
@@ -229,8 +240,12 @@ const formatter = new Intl.NumberFormat('en-US', {
                 <template #body="{ data }">
                   <span
                     :style="data.type == 'summary' ? 'font-weight: bold' : ''"
-                    v-if="data[col.field]"
-                    >{{ formatter.format(data[col.field]) }}</span
+                    v-if="data[col.field] !== null && data[col.field] !== undefined"
+                    >{{
+                      columnFormatters[col.field]
+                        ? columnFormatters[col.field].format(data[col.field])
+                        : formatter.format(data[col.field])
+                    }}</span
                   >
                   <span v-else>-</span>
                 </template>

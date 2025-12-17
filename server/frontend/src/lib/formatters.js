@@ -6,8 +6,8 @@ export const num = {
     maximumFractionDigits: 4
   }),
   mzError: new Intl.NumberFormat('en-US', {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
   }),
   isotopeSimilarity: new Intl.NumberFormat('en-US', {
     style: 'percent',
@@ -24,6 +24,11 @@ export const num = {
     maximumFractionDigits: 3
   }),
   relativeAbundanceError: new Intl.NumberFormat('en-US', {
+    style: 'percent',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }),
+  ticFraction: new Intl.NumberFormat('en-US', {
     style: 'percent',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
