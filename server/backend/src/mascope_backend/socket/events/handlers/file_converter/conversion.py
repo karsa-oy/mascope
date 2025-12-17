@@ -13,8 +13,8 @@ file_processing_notification_process_id = gen_id(8)
 @file_converter_socket_auth(minimum_role="editor")
 async def file_processing_error(sid, error_data):
     """Handle file processing error events from file converter service."""
+    user_id = error_data.get("user_id")
     instrument = error_data.get("instrument")
-    user_sid = error_data.get("user_sid")
     filename = error_data.get("filename")
     error_message = error_data.get("error", "Unknown processing error")
 
@@ -32,15 +32,17 @@ async def file_processing_error(sid, error_data):
         },
     )
 
-    await emit_user_notification(file_processing_notification, user_sid)
+    await emit_user_notification(
+        notification=file_processing_notification, user_id=user_id
+    )
 
 
 @sio.event(namespace="/file-converter")
 @file_converter_socket_auth(minimum_role="editor")
 async def file_processing_progress(sid, progress_data):
     """Handle file processing progress events from file converter service."""
+    user_id = progress_data.get("user_id")
     instrument = progress_data.get("instrument")
-    user_sid = progress_data.get("user_sid")
     filename = progress_data.get("filename")
     progress = progress_data.get("progress", 0.0)
 
@@ -56,15 +58,17 @@ async def file_processing_progress(sid, progress_data):
         progress=progress,
     )
 
-    await emit_user_notification(file_processing_notification, user_sid)
+    await emit_user_notification(
+        notification=file_processing_notification, user_id=user_id
+    )
 
 
 @sio.event(namespace="/file-converter")
 @file_converter_socket_auth(minimum_role="editor")
 async def file_processing_success(sid, success_data):
     """Handle file processing success events from file converter service."""
+    user_id = success_data.get("user_id")
     instrument = success_data.get("instrument")
-    user_sid = success_data.get("user_sid")
     filename = success_data.get("filename")
 
     file_processing_notification = UserNotification(
@@ -79,4 +83,6 @@ async def file_processing_success(sid, success_data):
         progress=100,
     )
 
-    await emit_user_notification(file_processing_notification, user_sid)
+    await emit_user_notification(
+        notification=file_processing_notification, user_id=user_id
+    )

@@ -52,7 +52,7 @@ class FileConverterSocketClient:
                     data.update(
                         {
                             "access_token": context.access_token,
-                            "user_sid": context.user_sid,
+                            "user_id": context.user_id,
                         }
                     )
             self.sio.emit(event, data, namespace="/file-converter")

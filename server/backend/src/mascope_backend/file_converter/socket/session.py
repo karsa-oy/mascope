@@ -12,7 +12,6 @@ class FileContext:
     username: str
     role_id: int
     access_token: str
-    user_sid: str
 
 
 class FileContextManager:

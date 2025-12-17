@@ -739,7 +739,6 @@ async def upload_sample_files(
                     "username": user.username,
                     "role_id": user.role_id,
                     "access_token": access_token,
-                    "user_sid": sid,
                 },
             )
 

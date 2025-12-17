@@ -37,7 +37,9 @@ async def instrument_acquisition_started(sid: str, acquisition_data: dict):
         data={"instrument": instrument, "filename": filename, "polarity": polarity},
     )
 
-    await emit_user_notification(instrument_acquisition_notification, instrument)
+    await emit_user_notification(
+        notification=instrument_acquisition_notification, room_id=instrument
+    )
 
 
 @sio.event(namespace="/tof-agent")
@@ -68,7 +70,9 @@ async def instrument_acquisition_progress(sid: str, acquisition_data: dict):
         data={"instrument": instrument, "filename": filename},
     )
 
-    await emit_user_notification(instrument_acquisition_notification, instrument)
+    await emit_user_notification(
+        notification=instrument_acquisition_notification, room_id=instrument
+    )
 
 
 @sio.event(namespace="/tof-agent")
@@ -99,4 +103,6 @@ async def instrument_acquisition_finished(sid: str, acquisition_data: dict):
         data={"instrument": instrument, "filename": filename},
     )
 
-    await emit_user_notification(instrument_acquisition_notification, instrument)
+    await emit_user_notification(
+        notification=instrument_acquisition_notification, room_id=instrument
+    )

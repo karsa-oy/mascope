@@ -8,7 +8,7 @@ import shutil
 import traceback
 from multiprocessing import Queue
 from queue import Empty
-from threading import Event, Thread, Lock
+from threading import Event, Thread
 from abc import ABC, abstractmethod, ABCMeta
 
 from mascope_signal.peak import compute_peaks
