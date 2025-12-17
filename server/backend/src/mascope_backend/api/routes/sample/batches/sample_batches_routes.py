@@ -243,7 +243,7 @@ async def import_sample_items_route(
             instrument_function_id=body.instrument_config.instrument_function_id
         )
 
-    # Verify the existance of sample batch
+    # Verify the existence of sample batch
     sample_batch_result = await get_sample_batch(sample_batch_id)
     sample_batch = sample_batch_result.get("data")
     sample_batch_name = sample_batch["sample_batch_name"]
@@ -325,7 +325,7 @@ async def sample_batch_export_peaks_route(
     :return: A dictionary containing a message and process ID.
     :rtype: dict
     """
-    # Verify the existance of sample batch
+    # Verify the existence of sample batch
     sample_batch_result = await get_sample_batch(sample_batch_id)
     sample_batch = sample_batch_result.get("data")
     sample_batch_name = sample_batch["sample_batch_name"]
@@ -356,7 +356,7 @@ async def get_sample_batch_peaks_route(
     """Get batch peaks.
 
     Average peaks are collected from all samples in the batch.
-    The peaks are alligned, then total heights are computed if the instrument is orbi
+    The peaks are aligned, then total heights are computed if the instrument is orbi
     and total areas if the instrument is tof.
 
     :param sample_batch_id: The unique identifier of the sample batch.
@@ -368,7 +368,7 @@ async def get_sample_batch_peaks_route(
     :return: A dictionary containing a message and process ID.
     :rtype: dict
     """
-    # Verify the existance of sample batch
+    # Verify the existence of sample batch
     await get_sample_batch(sample_batch_id)
 
     sid = request.headers.get("X-SID")

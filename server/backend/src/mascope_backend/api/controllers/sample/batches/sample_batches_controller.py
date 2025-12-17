@@ -1066,7 +1066,7 @@ async def get_sample_batch_peaks(
     if not sample_items:
         raise NotFoundException(
             f"No sample items found in the sample batch {sample_batch["sample_batch_name"]} "
-            "with ID '{sample_batch_id}'."
+            f"with ID '{sample_batch_id}'."
         )
 
     # --- Validate single instrument type --- #

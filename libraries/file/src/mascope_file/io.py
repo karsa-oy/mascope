@@ -437,8 +437,8 @@ def load_batch_cache(
 
     :param sample_batch_id: Sample batch ID
     :type sample_batch_id: str
-    :param var: Name of a zarr file
-    :type var: str
+    :param zarr_filename: Name of a zarr file
+    :type zarr_filename: str
     :raises FileNotFoundError: Batch cache file not found
     :return: Loaded batch cache data
     :rtype: xr.Dataset

@@ -116,6 +116,13 @@ server/backend/tests/
     ├── test_peak_fitting.py
     └── test_target_ion_compute.py
 
+libraries/
+├── sdk/tests
+    ├── conftest.py                # Fixtures for Mascope SDK tests
+    └── test_import.py             # Tests SDK import functions
+├── tools/tests
+    ├── conftest.py                # Fixtures for Mascope Tools library tests
+    └── test_calibration.py        # Tests calibration module functions
 ```
 
 ## Testing Tools Glossary 📖
@@ -264,6 +271,14 @@ Run a specific test by name:
 mascope test run -n workspace_model
 # Run with verbose output
 mascope test run -n workspace_crud -v
+```
+
+Run library tests:
+```bash
+# Run all SDK library tests
+mascope test run libraries -m sdk
+# Run all Tools library tests
+mascope test run libraries -m tools
 ```
 
 ### CI/CD integration 🚀

@@ -28,6 +28,10 @@ dependencies = [
     "pyarrow>=21.0.0",
     "pyteomics>=4.7.5",
     "tqdm>=4.67.1",
+]
+
+[dependency-groups]
+dev = [
     "pytest>=8.4.1",
 ]
 
