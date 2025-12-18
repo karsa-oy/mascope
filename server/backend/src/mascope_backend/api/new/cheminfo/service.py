@@ -1,5 +1,6 @@
 import re
 import httpx
+import traceback
 from sqlalchemy import select
 from mascope_backend.db import async_session
 from mascope_backend.db.models import (
@@ -16,6 +17,7 @@ from mascope_backend.api.new.cheminfo.config import cheminfo_config
 from mascope_backend.api.new.cheminfo.utils import (
     to_cheminfo_ionization_format,
     to_mascope_ion_mech,
+    to_explicit_isotope_format,
 )
 from mascope_backend.runtime import runtime
 from mascope_match.params import BaseMatchParams
@@ -36,9 +38,17 @@ async def retrieve_cheminfo_by_mz(
     Steps:
     - Fetch ionization mechanisms from database
     - Prepare request parameters and convert ionization mechanisms to ChemInfo format
+      + Possible "custom elements" in formulas are converted to explicit isotope format,
+        e.g. "^N" to "[15N]"
     - Make HTTP request to ChemInfo API
     - Process and format the results
+      + Possible explicit isotope formats in formulas are reverted back to custom element format
+        e.g. "[15N]" to "^N"
     - Apply sorting
+
+    NOTE: Conversion between custom element notation and explicit isotope notation is only a
+    best guess. E.g. "[15N]" will always be converted to "^N" even if the user intended to refer to
+    the explicit isotope itself.
 
     :param mz: The m/z value to search for
     :type mz: float
@@ -79,7 +89,7 @@ async def retrieve_cheminfo_by_mz(
             )
 
     # Prepare request parameters and convert ionization mechanisms to ChemInfo format
-
+    formula_ranges, custom_element_dict = to_explicit_isotope_format(formula_ranges)
     params = {
         "mass": mz,
         "ionizations": (
@@ -99,15 +109,22 @@ async def retrieve_cheminfo_by_mz(
         resp.raise_for_status()  # Raise exception for 4XX/5XX responses
         data = resp.json()
 
+    if len(data.get("result", [])) == 0:
+        raise ValueError(f"{data.get('log', 'No results')}")
+
     # Process and format the results
     results = []
     for raw in data.get("result", []):
         # Process each compound result from ChemInfo
         try:
+            formula = raw["mf"] if len(raw["mf"]) else "()"
+            # Revert explicit isotope format back to custom element format
+            for custom_elem, replaced_with in custom_element_dict.items():
+                formula = formula.replace(replaced_with, custom_elem)
             results.append(
                 {
                     "sample_peak_mz": mz,
-                    "target_compound_formula": raw["mf"] if len(raw["mf"]) else "()",
+                    "target_compound_formula": formula,
                     "target_compound_unsaturation": raw["unsaturation"],
                     "ionization_mechanism": to_mascope_ion_mech(
                         raw["ionization"]["mf"], all_ionization_mechanisms
@@ -117,7 +134,7 @@ async def retrieve_cheminfo_by_mz(
                 }
             )
         except Exception as e:
-            runtime.logger.error(repr(e))
+            runtime.logger.error(traceback.format_exc(e))
             # Skip malformed results rather than failing the entire request
             continue
 
@@ -234,24 +251,13 @@ async def match_cheminfo_by_mz(
         f"Matching {cheminfo_results} compounds against sample {sample_item_id}"
     )
 
-    def normalize_formula(formula: str) -> str:
-        """Normalize molecular formula by removing isotopic labels like [81Br] -> Br
-
-        :param formula: Formula to normalize
-        :type formula: str
-        :return: Normalized formula
-        :rtype: str
-        """
-        formula_norm = re.sub(r"\[\d+([A-Za-z]+)\]", r"\1", formula)
-        return formula_norm
-
     # Compute matches for the ChemInfo results
     ## Matches are computed for all ionization mechanisms for each returned formula
     ## and later filtered to keep only the one matching the original ChemInfo result
     matches_result = await aggregate_sample_match_compounds(
         sample_item_id=sample_item_id,
         target_compound_formulas=[
-            normalize_formula(info["target_compound_formula"]) for info in cheminfo_data
+            info["target_compound_formula"] for info in cheminfo_data
         ],
         ion_mechanism_ids=ionization_mechanism_ids,
         match_params=match_params,
@@ -267,7 +273,7 @@ async def match_cheminfo_by_mz(
             (
                 index
                 for index, match_compound in enumerate(matches)
-                if normalize_formula(info["target_compound_formula"])
+                if info["target_compound_formula"]
                 == match_compound["target_compound_formula"]
             ),
             None,
