@@ -23,6 +23,9 @@ ALIGNMENT_MIN_INTENSITY = 0.0  # Minimum intensity for mass alignment
 ALIGNMENT_WINDOW_FACTOR = 1.0  # Mass alignment window factor (times FWHM)
 ALIGNMENT_MIN_FRACTION = 1.0  # Minimum fraction of scans for mass alignment
 
+# Peak aggregation parameters
+AGGREGATION_WINDOW_FACTOR = 1  # Peak aggregation window factor (times FWHM)
+
 
 def get_scan_timestamps(
     base_filename: str,
@@ -725,8 +728,29 @@ def sum_peak_collection(
     :param peak_collection: Peak collection to align and sum
     :type peak_collection: Spectra
     :raises ValueError: If mass alignment fails
-    :return: Tuple of summed aligned peaks, min aligned m/z, max aligned m/z
+    :return: Tuple with summed aligned peaks, min aligned m/z, max aligned m/z
     :rtype: tuple[CentroidedSpectrum, float, float]
+    """
+    # Perform alignment using virtual lock mass algorithm
+    aligned_spectra, vlm_mz_min, vlm_mz_max = align_peak_collection(peak_collection)
+
+    aligned_peak_sum = aligned_spectra.compute_sum_spectrum(
+        window_factor=AGGREGATION_WINDOW_FACTOR, average=True
+    )
+
+    return aligned_peak_sum, vlm_mz_min, vlm_mz_max
+
+
+def align_peak_collection(
+    peak_collection: Spectra,
+) -> tuple[Spectra, float, float]:
+    """Aligns provided collection of peak arrays.
+
+    :param peak_collection: Peak collection to align
+    :type peak_collection: Spectra
+    :raises ValueError: If mass alignment fails
+    :return: Tuple with aligned peaks, min aligned m/z, max aligned m/z
+    :rtype: tuple[Spectra, float, float]
     """
     # Perform alignment using virtual lock mass algorithm
     vlm_corrector = MassAligner(
@@ -746,8 +770,4 @@ def sum_peak_collection(
     vlm_min_mz = vlm_corrector.points_mz.min()
     vlm_max_mz = vlm_corrector.points_mz.max()
 
-    aligned_peak_sum = aligned_peaks.compute_sum_spectrum(
-        window_factor=ALIGNMENT_WINDOW_FACTOR, average=True
-    )
-
-    return aligned_peak_sum, vlm_min_mz, vlm_max_mz
+    return aligned_peaks, vlm_min_mz, vlm_max_mz
