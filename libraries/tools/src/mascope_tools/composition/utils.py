@@ -173,3 +173,16 @@ def parse_atom_count_ranges(count_ranges: str) -> list:
             )
         )
     return atoms
+
+
+def normalize_formula_with_isotopes(formula: str) -> str:
+    """
+    Normalize a chemical formula by removing explicit isotope notations.
+
+    :param formula: Chemical formula string, e.g. "[13C]H4[18O]"
+    :type formula: str
+    :return: Normalized formula string, e.g. "CH4O"
+    :rtype: str
+    """
+    normalized_formula = re.sub(r"\[\d+([A-Za-z]+)\]", r"\1", formula)
+    return normalized_formula

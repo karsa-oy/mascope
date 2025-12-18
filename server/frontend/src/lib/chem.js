@@ -12,6 +12,7 @@ import { norm } from '@/lib/utils'
  * - "Ca(OH)2" ✓
  * - "(NH4)2SO4" ✓
  * - "()" ✓ (empty parentheses allowed)
+ * - "H^NO3" ✓ (custom element denoted by caret)
  * - "invalid123" ✗
  */
 export function isValidChemicalFormula(formula) {
@@ -21,8 +22,8 @@ export function isValidChemicalFormula(formula) {
   // Allow empty parentheses () as valid
   if (normalized === '()') return true
 
-  // Standard chemical formula regex
-  const regex = /^(?:[A-Z][a-z]?\d*|\([^()]*(?:\(.*\))?[^()]*\)\d+)+$/
+  // Chemical formula regex, allows caret (^) prefix for custom elements (e.g. ^N) and parenthesis groups as part of the formula
+  const regex = /^(?:\^?[A-Z][a-z]?\d*|\([^()]+\)\d*)+$/
   return regex.test(normalized)
   // See:
   //   Debugger: https://regex101.com/r/Mbjq8C/1

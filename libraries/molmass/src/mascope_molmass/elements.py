@@ -2043,6 +2043,23 @@ ELEMENTS: Elements = Elements(
         ionenergy=(),
         isotopes={276: Isotope(276.15159, 1.0, 276)},
     ),
+    Element(
+        110, '^N', 'Isotopically labelled nitrogen',
+        group=15, period=2, block='p', series=1,
+        mass=14.006703, eleneg=3.04, eleaffin=-0.07,
+        covrad=0.75, atmrad=0.75, vdwrad=1.55,
+        tboil=77.344, tmelt=63.15, density=1.17,
+        eleconfig='[He] 2s2 2p3',
+        oxistates='5, 4, 3, 2, -3*',
+        ionenergy=(
+            14.5341, 39.601, 47.488, 77.472, 97.888,
+            522.057, 667.029,
+        ),
+        isotopes={
+            14: Isotope(14.00307400443, 0.02, 14),
+            15: Isotope(15.00010889888, 0.98, 15),
+        },
+    ),
 )
 """Collection of chemical elements with lookup by number, symbol, and name.
 

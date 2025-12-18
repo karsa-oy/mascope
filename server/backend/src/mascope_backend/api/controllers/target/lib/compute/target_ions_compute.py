@@ -2,12 +2,14 @@
 Functions for target ions and target isotopes generation.
 """
 
+import re
 from typing import List
 import numpy as np
 from IsoSpecPy import IsoThreshold
 
 from mascope_molmass import Formula
 from mascope_molmass.elements import ELECTRON, ELEMENTS
+from mascope_tools.composition.utils import normalize_formula_with_isotopes
 
 from mascope_backend.db.id import gen_id
 from mascope_backend.db.models import (
@@ -75,7 +77,6 @@ def generate_target_ions_from_composition(
             if mechanism.startswith("-"):
                 # Cannot abstract from empty formula
                 continue
-            compound_formula = target_compound_formula
         else:
             compound_formula = Formula(target_compound_formula)
 
@@ -105,14 +106,15 @@ def generate_target_ions_from_composition(
             # Failed to create a target ion for the combination of target compound
             # and ionization mechanism
             runtime.logger.warning(
-                f"Failed to parse ion formula for compound {target_compound_formula} and mechanism {mechanism}: {e}"
+                f"Failed to parse ion formula for compound {target_compound_formula} "
+                f"and mechanism {mechanism}: {e}"
             )
             # Try to create ions with other mechanisms
             continue
 
         # Strip brackets [] and charge from formula
         ion_formula = raw_ion._formula_nocharge  # pylint: disable=protected-access
-        # TODO: Handle explicit isotopes in the formula
+        # Remove potential explicit isotopes in the formula
         ion_formula = Formula(normalize_formula_with_isotopes(ion_formula)).formula
 
         # construct and save ion row
@@ -128,7 +130,44 @@ def generate_target_ions_from_composition(
         )
         target_ions.append(ion)
 
-            # Predict peaks of high resolution isotopes
+        custom_elements = []
+        if "^" in ion_formula:
+            # Find custom element properties
+            elements = raw_ion._elements  # pylint: disable=protected-access
+            for symbol in elements:
+                if symbol.startswith("^"):
+                    try:
+                        element = ELEMENTS[symbol]
+                    except KeyError as e:
+                        raise ValueError(f"Unknown custom element: {symbol}") from e
+                    custom_elements.append(symbol)
+                    isotope_masses = [iso.mz for iso in element.isotopes.values()]
+                    isotope_abundances = [
+                        iso.abundance for iso in element.isotopes.values()
+                    ]
+                    isotope_counts = [
+                        raw_ion._elements[symbol][0]  # pylint: disable=protected-access
+                    ]
+                    # Remove custom element notation for isotope prediction
+                    pattern = rf"{re.escape(symbol)}\d*"
+                    ion_formula = re.sub(pattern, "", ion_formula)
+                    # Parse the ion formula again without custom elements
+                    ion_formula = Formula(ion_formula).formula
+
+        # Predict peaks of high resolution isotopes
+        if len(custom_elements) > 0:
+            predicted_peaks = IsoThreshold(
+                formula=ion_formula,
+                threshold=ISOTOPE_ABUNDANCE_THRESHOLD,
+                atomCounts=isotope_counts,  # pylint: disable=possibly-used-before-assignment
+                isotopeMasses=[
+                    isotope_masses  # pylint: disable=possibly-used-before-assignment
+                ],
+                isotopeProbabilities=[
+                    isotope_abundances  # pylint: disable=possibly-used-before-assignment
+                ],
+            )
+        else:
             predicted_peaks = IsoThreshold(
                 formula=ion_formula, threshold=ISOTOPE_ABUNDANCE_THRESHOLD
             )
@@ -138,39 +177,39 @@ def generate_target_ions_from_composition(
             for m in predicted_peaks.masses
         ]
         probs_high_res = [float(p) for p in predicted_peaks.probs]
-            probs_high_res = [float(p) for p in predicted_peaks.probs]
+        probs_high_res = [float(p) for p in predicted_peaks.probs]
 
         # Calculate low resolution isotope peaks
         masses_low_res, probs_low_res = group_target_isotopes(
             masses_high_res, probs_high_res, RESOLUTION_LOW
         )
 
-            # Store high resolution isotopes
-            target_isotopes.extend(
-                [
-                    TargetIsotope(
-                        target_isotope_id=gen_id(16),
-                        target_ion_id=ion.target_ion_id,
-                        mz=mz,
-                        relative_abundance=rel_abu,
-                        resolution="HIGH",
-                    )
-                    for mz, rel_abu in zip(masses_high_res, probs_high_res)
-                ]
-            )
-            # Store low resolution isotopes
-            target_isotopes.extend(
-                [
-                    TargetIsotope(
-                        target_isotope_id=gen_id(16),
-                        target_ion_id=ion.target_ion_id,
-                        mz=mz,
-                        relative_abundance=rel_abu,
-                        resolution="LOW",
-                    )
-                    for mz, rel_abu in zip(masses_low_res, probs_low_res)
-                ]
-            )
+        # Store high resolution isotopes
+        target_isotopes.extend(
+            [
+                TargetIsotope(
+                    target_isotope_id=gen_id(16),
+                    target_ion_id=ion.target_ion_id,
+                    mz=mz,
+                    relative_abundance=rel_abu,
+                    resolution="HIGH",
+                )
+                for mz, rel_abu in zip(masses_high_res, probs_high_res)
+            ]
+        )
+        # Store low resolution isotopes
+        target_isotopes.extend(
+            [
+                TargetIsotope(
+                    target_isotope_id=gen_id(16),
+                    target_ion_id=ion.target_ion_id,
+                    mz=mz,
+                    relative_abundance=rel_abu,
+                    resolution="LOW",
+                )
+                for mz, rel_abu in zip(masses_low_res, probs_low_res)
+            ]
+        )
 
     return target_ions, target_isotopes
 
