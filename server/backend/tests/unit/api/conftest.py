@@ -75,6 +75,11 @@ async def test_ionization_mechanisms(
                 ionization_mechanism_polarity="-",
                 ionization_mechanism="-",
             ),
+            IonizationMechanism(
+                ionization_mechanism_id="unit-test-8",
+                ionization_mechanism_polarity="-",
+                ionization_mechanism="+^NO3-",
+            ),
         ]
 
         for ionization_mechanism in ionization_mechanisms:
@@ -134,6 +139,12 @@ async def test_target_compounds_by_composition(
                 target_compound_id="target-compound-by-composition-5",
                 target_compound_name="Nitric acid dimer",
                 target_compound_formula="(HNO3)2",
+                cas_number=None,
+            ),
+            TargetCompound(
+                target_compound_id="target-compound-by-composition-6",
+                target_compound_name="Isotopically labeled nitric acid",
+                target_compound_formula="H^NO3",
                 cas_number=None,
             ),
         ]

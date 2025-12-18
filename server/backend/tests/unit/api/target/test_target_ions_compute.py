@@ -110,11 +110,7 @@ def assert_target_ion_formulae(
                 if im.ionization_mechanism in ["+", "-"]:
                     # For electron abstraction/addition, the formula remains unchanged
                     # Strip [] and charge from formula
-                    ion_base_formula = (
-                        Formula(ion.target_ion_formula)
-                        .formula.replace("[", "")
-                        .replace("]", "")[:-1]
-                    )
+                    ion_base_formula = Formula(ion.target_ion_formula)._formula_nocharge
                     assert (
                         ion_base_formula
                         == (Formula(target_compound.target_compound_formula)).formula
