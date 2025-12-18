@@ -24,13 +24,16 @@ The monorepo is structured as follows:
 mascope/           # Monorepo root directory
   agents/            # Instrument machine agents
   libraries/         # Shared libraries
-    chem/              # Chemical calculations
+    chem/              # LEGACY: Chemical calculations
     file/              # Sample file loading, names & paths
+    match/             # Matching (targeted analysis) module
+    molmass/           # Chemical formula parsing
     runtime/           # Config, logging, state and data
     sdk/               # Public client API library
     signal/            # Signal & peak processing
     thermo/            # ThermoFisher Orbitrap hardware API
     tofwerk/           # Tofwerk TOF hardware API
+    tools/             # Standalone package with peak alignment etc.
   server/            # Mascope app server
     backend/           # API server (Python, FastAPI, SQLite)
     frontend/          # Web client (Javascript, Vue, PrimeVue)
@@ -1660,15 +1663,17 @@ A set of shared libraries facilitate code sharing across the monorepo (excluding
 Javascript). In addition to the three libraries listed here, the [Runtime Library](#runtime-library)
 
 ```sh
-  libraries/         # Shared libraries
-    chem/              # Chemical calculations
+  libraries/
+    chem/              # LEGACY: Chemical calculations
     file/              # Sample file loading, names & paths
+    match/             # Matching (targeted analysis) module
+    molmass/           # Chemical formula parsing
     runtime/           # Config, logging, state and data
     sdk/               # Public client API library
     signal/            # Signal & peak processing
     thermo/            # ThermoFisher Orbitrap hardware API
     tofwerk/           # Tofwerk TOF hardware API
-    tools/             # Mascope Tools package
+    tools/             # Standalone package with peak alignment etc.
 ```
 
 The libraries dependency structure is as follows:
@@ -1676,7 +1681,7 @@ The libraries dependency structure is as follows:
 ```mermaid
 flowchart LR
     backend([mascope_backend])
-    chem([mascope_chem])
+    molmass([mascope_molmass])
     signal([mascope_signal])
     file([mascope_file])
     tofwerk([mascope_tofwerk])
@@ -1687,7 +1692,7 @@ flowchart LR
     cli([mascope_cli])
 
     classDef library fill:#ba642e,stroke-width: 0;
-    class chem,signal,file,tofwerk,thermo library;
+    class molmass,signal,file,tofwerk,thermo library;
 
     classDef service fill:#02607a,stroke-width: 0;
     class backend service;
@@ -1706,7 +1711,7 @@ flowchart LR
     backend --> signal
     backend --> tofwerk
     backend --> thermo
-    backend --> chem
+    backend --> molmass
 
     %% libraries
     thermo --> file
@@ -1722,7 +1727,7 @@ flowchart LR
     backend -.-> runtime
     thermo -.-> runtime
     tofwerk -.-> runtime
-    chem -.-> runtime
+    molmass -.-> runtime
     file -.-> runtime
     signal -.-> runtime
     tof_agent -.-> runtime
@@ -1759,6 +1764,12 @@ To publish the package in the _real_ [Python Package Index (PyPI)](https://pypi.
    cd ../..                                             # Navigate back to mascope root
    uv publish --token <MY_TOKEN>                        # Publish from root where dist/ exists
    ```
+
+### Molmass
+
+`mascope_molmass` is a fork of the [molmass](https://github.com/cgohlke/molmass/tree/master) package, used for chemical formula parsing and arithmetics, i.e. applying addition and abstraction ionization mechanisms to neutral molecule formulae. The reason for the fork is to have the ability to define "custom elements" in the `mascope_molmass/elements.py` module.
+
+The formula parsing has been adapted to allow the caret `^` to be used in a formula, denoting custom elements. The motivation is to enable defining custom isotopic distribution for an element, required to properly support analysing data measured with isotopically labeled ionization reagent. For example, `^N` is used to denote `[15N]` substituted nitrogen, with 98% substitution rate.
 
 ---
 

@@ -54,6 +54,9 @@ def generate_target_ions_from_composition(
 ) -> tuple[list[TargetIon], list[TargetIsotope]]:
     """Generate target ions and isotopes based on target compound composition and given ionization mechanisms
 
+    Leverages mascope_molmass.Formula to compute ion formulas (compound formula + ionization mechanism),
+    potentially including custom elements (e.g. ^N). Predicts isotopic patterns using IsoSpecPy.
+
     :param target_compound: Target compound to use as a base for the ions
     :type target_compound: TargetCompoundBase
     :param ionization_mechanisms: List of ionization mechanisms to apply to the target compound
