@@ -230,7 +230,13 @@ async def handle_notifications(
 
         # Special case: if room_key IS "user_id", emit directly to user
         if room_key == "user_id" or not room_id:
-            await emit_user_notification(notification, user_id=user_id)
+            if user_id is not None:
+                await emit_user_notification(notification, user_id=user_id)
+            else:
+                runtime.logger.warning(
+                    f"Cannot emit notification: no room_id for '{room_key}', no user_id available. "
+                    f"Notification type: {notification.type}, status: {notification.status}"
+                )
         else:
             # Normal case: room_id with optional user_id for smart routing
             await emit_user_notification(notification, room_id=room_id, user_id=user_id)

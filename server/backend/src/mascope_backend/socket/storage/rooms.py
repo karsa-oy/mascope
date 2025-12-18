@@ -51,9 +51,9 @@ class RoomTracker:
                 storage_config.members_key(room_id), storage_config.room_ttl
             )
 
-            await client.sadd(storage_config.user_key(str(user_id)), room_id)
+            await client.sadd(storage_config.user_key(user_id), room_id)
             await client.expire(
-                storage_config.user_key(str(user_id)), storage_config.room_ttl
+                storage_config.user_key(user_id), storage_config.room_ttl
             )
 
             runtime.logger.debug(
@@ -85,7 +85,7 @@ class RoomTracker:
             client = redis_storage_client.client
 
             await client.srem(storage_config.members_key(room_id), str(user_id))
-            await client.srem(storage_config.user_key(str(user_id)), room_id)
+            await client.srem(storage_config.user_key(user_id), room_id)
 
             runtime.logger.debug(
                 f"Room tracker: user {user_id} left room '{room_id}' [Worker {worker_pid}]"
@@ -144,7 +144,7 @@ class RoomTracker:
             client = redis_storage_client.client
 
             # Get all rooms user is in
-            rooms = await client.smembers(storage_config.user_key(str(user_id)))
+            rooms = await client.smembers(storage_config.user_key(user_id))
 
             if not rooms:
                 runtime.logger.trace(
@@ -158,7 +158,7 @@ class RoomTracker:
                 await client.srem(storage_config.members_key(room_id), str(user_id))
 
             # Delete user's room list
-            await client.delete(storage_config.user_key(str(user_id)))
+            await client.delete(storage_config.user_key(user_id))
 
             runtime.logger.debug(
                 f"Room tracker: cleaned up {len(rooms)} rooms for user {user_id} "
