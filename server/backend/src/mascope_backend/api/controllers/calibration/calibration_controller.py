@@ -734,7 +734,7 @@ async def calibration_mz_calibrate_batch(
             sample_item_ids=[sample.sample_item_id for sample in samples],
             mz_calibration_params=mz_calibration_params,
             independent_transaction=False,
-            sid=sid,
+            user_id=user_id,
             process_id=gen_id(8),
             parent_id=process_id,
         )
