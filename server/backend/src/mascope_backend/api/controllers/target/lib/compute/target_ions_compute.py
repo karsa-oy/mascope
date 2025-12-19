@@ -3,7 +3,6 @@ Functions for target ions and target isotopes generation.
 """
 
 import re
-from typing import List
 import numpy as np
 from IsoSpecPy import IsoThreshold
 
@@ -50,7 +49,7 @@ def charge_string(raw_ion: Formula) -> str:
 
 def generate_target_ions_from_composition(
     target_compound: TargetCompoundBase,
-    ionization_mechanisms: List[IonizationMechanism],
+    ionization_mechanisms: list[IonizationMechanism],
 ) -> tuple[list[TargetIon], list[TargetIsotope]]:
     """Generate target ions and isotopes based on target compound composition and given ionization mechanisms
 
@@ -60,7 +59,7 @@ def generate_target_ions_from_composition(
     :param target_compound: Target compound to use as a base for the ions
     :type target_compound: TargetCompoundBase
     :param ionization_mechanisms: List of ionization mechanisms to apply to the target compound
-    :type ionization_mechanisms: List[IonizationMechanism]
+    :type ionization_mechanisms: list[IonizationMechanism]
     :return: 2-tuple of (list of ions (instances of TargetIon), list of isotopes (instances of TargetIsotope))
     :rtype: tuple
     """
@@ -219,7 +218,7 @@ def generate_target_ions_from_composition(
 def generate_target_ions_from_mass(
     target_compound_mass: float,
     target_compound: TargetCompoundBase,
-    ionization_mechanisms: List[IonizationMechanism],
+    ionization_mechanisms: list[IonizationMechanism],
 ) -> tuple[list[TargetIon], list[TargetIsotope]]:
     """Generate target ions and isotopes based on target compound mass and given
     ionization mechanisms
@@ -229,7 +228,7 @@ def generate_target_ions_from_mass(
     :param target_compound: Target compound to use as a base for the ions
     :type target_compound: TargetCompoundBase
     :param ionization_mechanisms: List of ionization mechanisms to apply to the target compound
-    :type ionization_mechanisms: List[IonizationMechanism]
+    :type ionization_mechanisms: list[IonizationMechanism]
     :return: 2-tuple of (
         list of ions (instances of TargetIon),
         list of isotopes (instances of TargetIsotope)
@@ -305,7 +304,9 @@ def generate_target_ions_from_mass(
     return target_ions, target_isotopes
 
 
-def group_target_isotopes(masses: list, probs: list, resolution: float) -> tuple:
+def group_target_isotopes(
+    masses: list, probs: list, resolution: float
+) -> tuple[list, list]:
     """
     Group target isotope m/z and relative abundance (probs) to produce lower resolution isotopes.
 
@@ -318,7 +319,7 @@ def group_target_isotopes(masses: list, probs: list, resolution: float) -> tuple
     :param resolution: Resolution value
     :type resolution: float
     :return: Tuple with lists of grouped "mz", "relative_abundance" values
-    :rtype: tuple
+    :rtype: tuple[list, list]
     """
     # Convert to numpy arrays to simplify computations
     mz = np.array(masses)
