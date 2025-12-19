@@ -348,7 +348,6 @@ async def sample_batch_export_peaks_route(
 @sample_batches_router.get("/{sample_batch_id}/peaks")
 @api_route(status_code=202)
 async def get_sample_batch_peaks_route(
-    request: Request,
     sample_batch_id: str,
     background_tasks: BackgroundTasks,
     user=Depends(editor_user),
@@ -371,14 +370,13 @@ async def get_sample_batch_peaks_route(
     # Verify the existence of sample batch
     await get_sample_batch(sample_batch_id)
 
-    sid = request.headers.get("X-SID")
     process_id = gen_id(8)
 
     background_tasks.add_task(
         get_sample_batch_peaks,
         sample_batch_id=sample_batch_id,
         independent_transaction=True,
-        sid=sid,
+        user_id=user.id,
         process_id=process_id,
     )
 
