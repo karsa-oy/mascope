@@ -9,7 +9,6 @@
 workers = 1  # uvicorn workers ("auto" || int)
 log_level = "debug"
 
-
 [backend.redis]
 host = "localhost"  # Dev Redis runs on localhost
 container_name = "mascope_redis_dev"
