@@ -1,6 +1,5 @@
 # pylint: disable=not-callable
 import asyncio
-from typing import Literal
 from datetime import datetime, timezone
 import xarray as xr
 import pandas as pd
@@ -20,13 +19,12 @@ import mascope_file.name as m_name
 from mascope_file import io as m_io
 from mascope_signal import compute as m_compute
 from mascope_signal.peak import get_peaks
-from mascope_tools.alignment.calibration import CentroidedSpectrum, Spectra
+from mascope_tools.alignment.calibration import Spectra
 
 from mascope_backend.db import async_session
 from mascope_backend.db.id import gen_id
 from mascope_backend.db.models import (
     Workspace,
-    Sample,
     SampleBatch,
     TargetCollectionInSampleBatch,
 )
@@ -78,6 +76,8 @@ from mascope_backend.api.controllers.sample.lib.fetch_affected_sample_data impor
 )
 from mascope_backend.api.controllers.sample.batches.lib.util import (
     detect_update_batch_changes,
+    load_existing_batch_cache,
+    collect_spectra_per_ionization_mode,
 )
 from mascope_backend.api.controllers.sample.batches.status.service import (
     update_sample_batch_status,
@@ -87,9 +87,6 @@ from mascope_backend.api.new.instrument_configs.process.service import (
 )
 from mascope_backend.api.new.instrument_configs.schemas import (
     SetInstrumentConfigBody,
-)
-from mascope_backend.api.new.instrument_configs.lib import (
-    read_instrument_functions,
 )
 from mascope_backend.api.new.ionization.modes.util import (
     resolve_ionization_modes_by_tokens,
@@ -1058,7 +1055,7 @@ async def get_sample_batch_peaks(
 
     # --- Try to load batch peak cache --- #
     try:
-        batch_data_response = _load_existing_batch_cache(sample_batch)
+        batch_data_response = load_existing_batch_cache(sample_batch)
         runtime.logger.info("Loaded existing batch peaks.")
         return batch_data_response
     except FileNotFoundError:
@@ -1068,7 +1065,7 @@ async def get_sample_batch_peaks(
         )
 
     # --- Fetch sample items in the batch --- #
-    spectra, intensity_variable = await _collect_spectra_per_ionization_mode(
+    spectra, intensity_variable = await collect_spectra_per_ionization_mode(
         sample_batch_id
     )
 
@@ -1137,200 +1134,3 @@ async def get_sample_batch_peaks(
         },
         "message": f"Retrieved aggregated peak data for sample batch with ID '{sample_batch_id}'.",
     }
-
-
-def _load_existing_batch_cache(sample_batch: dict) -> dict:
-    """Helper to load existing batch cache"""
-    sample_batch_id = sample_batch["sample_batch_id"]
-    batch_peaks = m_io.load_batch_cache(sample_batch_id, "peaks")
-
-    # --- Validate cache timestamps --- #
-    old_timestamp = batch_peaks.attrs["sample_batch_utc_modified"]
-    new_timestamp = str(sample_batch["sample_batch_utc_modified"])
-    if old_timestamp != new_timestamp:
-        raise FileNotFoundError(
-            f"Batch cache for sample batch ID '{sample_batch_id}' is outdated "
-            "due to batch modification."
-        )
-
-    mz = batch_peaks.mz.values.tolist()
-    intensity = batch_peaks.intensity.values.tolist()
-    # Make sure peak ids list of lists are converted to lists
-    peak_id = batch_peaks.peak_id.values.tolist()
-    min_aligned_mz = float(batch_peaks.attrs["min_aligned_mz"])
-    max_aligned_mz = float(batch_peaks.attrs["max_aligned_mz"])
-    intensity_variable = batch_peaks.attrs["intensity_variable"]
-    return {
-        "data": {
-            "mzs": mz,
-            "intensities": intensity,
-            "peak_ids": peak_id,
-            "min_aligned_mz": min_aligned_mz,
-            "max_aligned_mz": max_aligned_mz,
-            "intensity_variable": intensity_variable,
-        },
-        "message": f"Retrieved aligned peak data for sample batch with ID '{sample_batch_id}' from batch cache.",
-    }
-
-
-async def _collect_spectra_per_ionization_mode(
-    sample_batch_id: str,
-) -> tuple[dict[str, list[CentroidedSpectrum]], str]:
-    """Collects CentroidedSpectrum objects for all sample items in a sample batch, grouped by ionization mode.
-
-    :param sample_batch_id: ID of the sample batch to collect spectra from.
-    :type sample_batch_id: str
-    :raises NotFoundException: if no sample items are found in the specified sample batch.
-    :return: Tuple of dictionary mapping ionization mode IDs to lists of CentroidedSpectrum objects
-             and the intensity variable.
-    :rtype: tuple[dict[str, list[CentroidedSpectrum]], str]
-    """
-    # --- Fetch Sample objects --- #
-    async with async_session() as session:
-        stmt = select(Sample).where(Sample.sample_batch_id == sample_batch_id)
-        result = await session.execute(stmt)
-        sample_items = result.scalars().all()
-
-    if not sample_items:
-        raise NotFoundException(
-            f"No sample items found in the sample batch with ID {sample_batch_id}."
-        )
-
-    # --- Infer intensity variable from instrument types of samples --- #
-    intensity_variable = _get_intensity_variable_from_samples(sample_items)
-
-    # --- Load resolution functions for each sample file --- #
-    resolution_functions = dict()
-    for item in sample_items:
-        _, resolution_func = await read_instrument_functions(item.filename)
-        resolution_functions[item.filename] = resolution_func
-
-    # Peaks will be grouped and aligned by ionization mode
-    ionization_modes = set([item.ionization_mode_id for item in sample_items])
-    spectra = {ionization_mode: [] for ionization_mode in ionization_modes}
-
-    # Bound concurrency to avoid too many open files / blocking the loop
-    semaphore = asyncio.Semaphore(6)
-
-    # --- Load sample files and prepare CentroidedSpectrum objects --- #
-    runtime.logger.debug("Loading samples and preparing spectra...")
-    collected_specs = await asyncio.gather(
-        *[
-            _prepare_spec(item, semaphore, resolution_functions, intensity_variable)
-            for item in sample_items
-        ]
-    )
-    for ionization_mode, spec in collected_specs:
-        spectra[ionization_mode].append(spec)
-
-    return spectra, intensity_variable
-
-
-def _get_intensity_variable_from_samples(sample_items: list[Sample]) -> str:
-    """Infers the intensity variable based on the instrument type of the provided sample items.
-
-    Returns "sum_peak_areas" for TOF instruments and "sum_peak_heights" for Orbitrap instruments.
-
-    :param sample_items: List of Sample objects to infer the intensity variable from.
-    :type sample_items: list[Sample]
-    :raises ValueError: if samples are from different instruments
-    :return: The inferred intensity variable.
-    :rtype: str
-    """
-    # --- Validate single instrument type --- #
-    instrument_types = {
-        m_name.get_instrument_type(item.filename) for item in sample_items
-    }
-    if len(instrument_types) > 1:
-        raise ValueError(
-            "Batch contains samples from different instruments. "
-            "Aligning samples from different instruments is not supported."
-        )
-
-    # --- Infer intensity variable from instrument type --- #
-    instrument_type = instrument_types.pop()
-    intensity_variable = (
-        "sum_peak_areas" if instrument_type == "tof" else "sum_peak_heights"
-    )
-    return intensity_variable
-
-
-async def _prepare_spec(
-    sample_item: Sample,
-    semaphore: asyncio.Semaphore,
-    resolution_functions: dict,
-    intensity_variable: Literal["sum_peak_areas", "sum_peak_heights"],
-) -> tuple[str, CentroidedSpectrum]:
-    """Creates a CentroidSpectrum object for a sample item.
-
-    :param sample_item: Sample item to prepare the spectrum for.
-    :type sample_item: Sample
-    :param semaphore: Semaphore to limit concurrent file loading.
-    :type semaphore: asyncio.Semaphore
-    :param resolution_functions: Dictionary of resolution functions per filename.
-    :type resolution_functions: dict
-    :return: Tuple of ionization mode ID and CentroidedSpectrum object.
-    :rtype: tuple[str, CentroidedSpectrum]
-    """
-    filename = sample_item.filename
-    polarity = sample_item.polarity
-    ionization_mode = sample_item.ionization_mode_id
-
-    async with semaphore:
-        mz, intensity, peak_id = await asyncio.to_thread(
-            _sync_load_peak_data, filename, polarity, intensity_variable
-        )
-    resolution = resolution_functions[filename](mz)
-    signal_to_noise = np.ones(mz.size)
-
-    # Placeholder S/N values since they are not required for alignment
-    spec = CentroidedSpectrum(
-        mz=mz,
-        intensity=intensity,
-        resolution=resolution,
-        signal_to_noise=signal_to_noise,
-        peak_id=peak_id,
-    )
-    return ionization_mode, spec
-
-
-def _sync_load_peak_data(
-    filename: str,
-    polarity: Literal["+", "-"],
-    intensity_variable: Literal["sum_peak_areas", "sum_peak_heights"],
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """
-    Synchronous helper to load peak data from file:
-    - Loads scan timestamps corresponding to the sample polarity
-    - Loads peak data
-    - Filters peaks corresponding to the sample polarity
-    - Averages peak intensities by number of scans (timestamps)
-    - Returns m/z values, intensities, and peak IDs
-
-    :param filename: Filename to load peak data from.
-    :type filename: str
-    :param polarity: Polarity to filter peaks by.
-    :type polarity: Literal["+", "-"]
-    :param intensity_variable: Intensity variable to use.
-    :type intensity_variable: Literal["sum_peak_areas", "sum_peak_heights"]
-    :return: Tuple of m/z values, intensities, and peak IDs.
-    :rtype: tuple[np.ndarray, np.ndarray, np.ndarray]
-    """
-    timestamps = m_compute.get_scan_timestamps(filename, polarity=polarity)
-
-    try:
-        peak_data = m_io.load_peak_data(filename)
-    except FileNotFoundError as e:
-        raise NotFoundException(
-            f"Could not load peak data for sample file '{filename}'. "
-            "Ensure that the sample file has been processed and peak data is available."
-        ) from e
-    peak_id = peak_data["peak_id"].values
-    polarity_coord = peak_data["polarity"].values
-    peak_data = peak_data[intensity_variable]
-    mz_mask = polarity_coord == polarity
-    mz = peak_data["mz"].values[mz_mask]
-    intensity = peak_data.values[mz_mask] / timestamps.size
-    peak_id = peak_id[mz_mask]
-
-    return mz, intensity, peak_id
