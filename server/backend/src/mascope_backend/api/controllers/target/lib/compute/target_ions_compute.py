@@ -180,7 +180,6 @@ def generate_target_ions_from_composition(
             for m in predicted_peaks.masses
         ]
         probs_high_res = [float(p) for p in predicted_peaks.probs]
-        probs_high_res = [float(p) for p in predicted_peaks.probs]
 
         # Calculate low resolution isotope peaks
         masses_low_res, probs_low_res = group_target_isotopes(

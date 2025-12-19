@@ -134,7 +134,9 @@ async def retrieve_cheminfo_by_mz(
                 }
             )
         except Exception as e:
-            runtime.logger.error(traceback.format_exc(e))
+            runtime.logger.error(
+                f"Error processing result {raw}:\n{e}: {traceback.format_exc()}"
+            )
             # Skip malformed results rather than failing the entire request
             continue
 
