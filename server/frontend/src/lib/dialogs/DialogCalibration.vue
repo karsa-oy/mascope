@@ -58,7 +58,6 @@ const title = computed(() =>
     ? `Calibrate batch "${original.value?.sample_batch_name}"`
     : `Calibrate sample "${original.value?.sample_item_name}"`
 )
-const resultsTitle = computed(() => (batch.value ? 'Batch Calibration' : 'Calibration Results'))
 
 const confirmMessage = computed(() => {
   if (batch.value) {
@@ -143,22 +142,22 @@ const calibration = computed(() => ({
   rows: mzFit.stats ?? [],
   columns: [
     { field: 'mz', label: 'Isotope m/z' },
-    { field: 'sample_peak_mz', label: 'Pre peak m/z' },
+    { field: 'sample_peak_mz', label: 'Observed m/z' },
     {
       field: 'match_mz_error',
-      label: 'Pre m/z error [ppm]',
+      label: 'Pre-calibration error [ppm]',
       subheading: null
     },
-    { field: 'calibration_mz', label: 'Post peak m/z' },
+    { field: 'calibration_mz', label: 'Calibrated m/z' },
     {
       field: 'calibration_mz_error',
-      label: 'Post m/z error [ppm]',
+      label: 'Post-calibration error [ppm]',
       subheading: null
     },
-    { field: 'mz_error_diff', label: 'm/z error diff', subheading: null },
+    { field: 'mz_error_diff', label: 'Error Δ [ppm]', subheading: null },
     {
       field: 'calibrant_to_tic',
-      label: 'fraction of TIC',
+      label: 'Fraction of TIC',
       subheading: null
     }
   ]
@@ -182,7 +181,7 @@ const formatter = new Intl.NumberFormat('en-US', {
 </script>
 
 <template>
-  <Dialog :header="title" v-model:visible="visible" style="width: 800px">
+  <Dialog :header="title" v-model:visible="visible" :style="{ width: samples ? '1200px' : '800px' }">
     <div class="dialog-content">
       <section class="settings-section">
         <h3>Calibration Settings</h3>
@@ -199,53 +198,63 @@ const formatter = new Intl.NumberFormat('en-US', {
             {{ mzFit.error }}
           </Message>
         </div>
-        <h3>{{ resultsTitle }}</h3>
-        <div class="scrollable-content">
-          <Listbox
-            v-if="samples"
-            v-model:modelValue="previewSample"
-            :options="samples ?? []"
-            optionLabel="sample_item_name"
-            dataKey="sample_item_id"
-            style="height: 300px"
-          />
-          <DataTable
-            v-if="calibration.rows.length > 0"
-            :key="calibration.key"
-            :value="
-              calibration.rows.map((row, index) => ({
-                ...row,
-                type: index == calibration.rows.length - 1 ? 'summary' : 'stat'
-              }))
-            "
-            sortField="mz"
-            class="calibration-table"
-          >
-            <Column
-              v-for="col of calibration.columns"
-              :key="col.field"
-              :field="col.field"
-              :header="col.label"
+        <h3>Calibration Results</h3>
+        <div class="content-wrapper" :class="{ 'batch-layout': !!samples }">
+          <div v-if="samples" class="list-wrapper">
+            <Listbox
+              v-model:modelValue="previewSample"
+              :options="samples ?? []"
+              optionLabel="sample_item_name"
+              dataKey="sample_item_id"
+              style="height: 100%; width: 100%; border: none"
+              :listStyle="{ height: '100%' }"
+            />
+          </div>
+          <div class="table-wrapper">
+            <DataTable
+              v-if="calibration.rows.length > 0"
+              :key="calibration.key"
+              :value="
+                calibration.rows.map((row, index) => ({
+                  ...row,
+                  type: index == calibration.rows.length - 1 ? 'summary' : 'stat'
+                }))
+              "
+              sortField="mz"
+              class="calibration-table"
+              scrollable
+              scrollHeight="flex"
             >
-              <template #body="{ data }">
-                <span
-                  :class="data.type == 'summary' ? 'summary-cell' : ''"
-                  v-if="data[col.field] !== null && data[col.field] !== undefined"
-                  >{{
-                    columnFormatters[col.field]
-                      ? columnFormatters[col.field].format(data[col.field])
-                      : formatter.format(data[col.field])
-                  }}</span
-                >
-                <span v-else>-</span>
-              </template>
-            </Column>
-          </DataTable>
-          <div v-else class="center" style="height: 200px; width: 100%; overflow: hidden">
-            <ProgressSpinner v-if="!(mzFit.status == 'error')" />
-            <Message v-else severity="error" style="inline-size: 400px; overflow-wrap: anywhere">
-              {{ mzFit.error ?? 'Calibration failed due to an unknown error.' }}
-            </Message>
+              <Column
+                v-for="col of calibration.columns"
+                :key="col.field"
+                :field="col.field"
+                :header="col.label"
+              >
+                <template #body="{ data }">
+                  <span
+                    :class="data.type == 'summary' ? 'summary-cell' : ''"
+                    v-if="data[col.field] !== null && data[col.field] !== undefined"
+                    >{{
+                      columnFormatters[col.field]
+                        ? columnFormatters[col.field].format(data[col.field])
+                        : formatter.format(data[col.field])
+                    }}</span
+                  >
+                  <span v-else>-</span>
+                </template>
+              </Column>
+            </DataTable>
+            <div
+              v-else
+              class="center"
+              style="height: 100%; width: 100%; overflow: hidden; display: flex; align-items: center; justify-content: center"
+            >
+              <ProgressSpinner v-if="!(mzFit.status == 'error')" />
+              <Message v-else severity="error" style="inline-size: 400px; overflow-wrap: anywhere">
+                {{ mzFit.error ?? 'Calibration failed due to an unknown error.' }}
+              </Message>
+            </div>
           </div>
         </div>
       </section>
@@ -266,7 +275,7 @@ const formatter = new Intl.NumberFormat('en-US', {
   display: flex;
   flex-direction: column;
   gap: 0rem;
-  max-height: 70vh;
+  height: 70vh;
   overflow: hidden;
 }
 
@@ -283,6 +292,7 @@ const formatter = new Intl.NumberFormat('en-US', {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
 .settings-section h3,
@@ -293,9 +303,37 @@ const formatter = new Intl.NumberFormat('en-US', {
   color: var(--text-color, #fff);
 }
 
-.scrollable-content {
+.content-wrapper {
   flex: 1;
-  overflow-y: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.content-wrapper.batch-layout {
+  flex-direction: row;
+  gap: 1rem;
+}
+
+.list-wrapper {
+  width: 280px;
+  flex-shrink: 0;
+  border: 1px solid var(--surface-border, #3c434d);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.table-wrapper {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.calibration-table {
+  flex: 1;
 }
 
 .calibration-table :deep(.summary-cell) {
