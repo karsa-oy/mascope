@@ -35,7 +35,6 @@ from mascope_backend.api.models.ionization_mechanisms.ionization_mechanism_pydan
     IonizationMechanismCreate,
     IonizationMechanismRead,
 )
-from mascope_molmass import Formula
 
 
 @api_controller()
@@ -181,7 +180,6 @@ async def create_ionization_mechanism(
 
     Steps:
     - Check if the ionization mechanism already exists using the get_ionization_mechanisms function.
-    - Validate the ionization mechanism formula using mascope_molmass.Formula
     - Create a new ionization mechanism instance and add it to the session.
     - Fetch all target compounds from the database.
     - For each target compound, create target ions with the new ionization mechanism.
@@ -210,20 +208,6 @@ async def create_ionization_mechanism(
         ionization_mechanism_id=gen_id(11),
         **ionization_mechanism_create.model_dump(),
     )
-
-    # --- Validate the ionization mechanism formula --- #
-    try:
-        mechanism = new_ionization_mechanism.ionization_mechanism
-        mechanism_formula = (
-            Formula(mechanism[1:]) if len(mechanism) > 1 else Formula(mechanism)
-        )
-        # Access _elements to trigger parsing and potentially raise an error
-        mechanism_formula._elements  # pylint: disable=pointless-statement,protected-access
-    except Exception as e:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid ionization mechanism formula '{ionization_mechanism_create.ionization_mechanism}': {str(e)}",
-        ) from e
 
     # --- Create a new ionization mechanism instance and add it to the session. --- #
     async with async_session() as session:

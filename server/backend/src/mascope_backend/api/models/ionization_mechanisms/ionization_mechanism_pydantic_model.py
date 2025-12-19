@@ -12,6 +12,7 @@ from mascope_backend.api.models.base_pydantic_model import QueryParamsModel
 from mascope_backend.api.models.ionization_mechanisms.config import (
     ionization_mechanism_config,
 )
+from mascope_molmass import Formula
 
 
 class IonizationMechanismBaseValidator:
@@ -41,6 +42,16 @@ class IonizationMechanismBaseValidator:
             raise ValueError(
                 "Invalid ionization mechanism: it cannot contain a combination of '+' and '-' in the middle."
             )
+
+        # Validate the ionization mechanism formula using mascope_molmass
+        try:
+            mechanism_formula = Formula(value[1:]) if len(value) > 1 else Formula(value)
+            # Access _elements to trigger parsing and potentially raise an error
+            mechanism_formula._elements  # pylint: disable=pointless-statement,protected-access
+        except Exception as e:
+            raise ValueError(
+                f"Invalid ionization mechanism formula '{value}': {str(e)}"
+            ) from e
 
         return value
 
