@@ -1,8 +1,0 @@
-# Auto detect text files and perform LF normalization
-* text=auto
-*.ppm binary
-*.pbm binary
-*.pgm binary
-*.pnm binary
-*.pam binary
-*.container binary
