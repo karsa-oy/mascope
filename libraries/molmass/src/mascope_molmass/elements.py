@@ -203,11 +203,16 @@ class Element:
             raise ValueError(f"{self.symbol} - invalid block: {self.block}")
         if self.series not in SERIES:
             raise ValueError(f"{self.symbol} - invalid series: {self.series}")
-
-        if self.number != self.protons:
-            raise ValueError(f"{self.symbol} - atomic number must equal proton number")
-        if self.protons != sum(self.eleshells):
-            raise ValueError(f"{self.symbol} - number of protons must equal electrons")
+        if not self.symbol.startswith("^"):
+            # The atom number does not match for custom elements ("^X")
+            if self.number != self.protons:
+                raise ValueError(
+                    f"{self.symbol} - atomic number must equal proton number"
+                )
+            if self.protons != sum(self.eleshells):
+                raise ValueError(
+                    f"{self.symbol} - number of protons must equal electrons"
+                )
         if len(self.ionenergy) > 1:
             ionev_ = self.ionenergy[0]
             for ionev in self.ionenergy[1:]:
@@ -2046,7 +2051,7 @@ ELEMENTS: Elements = Elements(
     Element(
         110, '^N', 'Isotopically labelled nitrogen',
         group=15, period=2, block='p', series=1,
-        mass=14.006703, eleneg=3.04, eleaffin=-0.07,
+        mass=14.9802, eleneg=3.04, eleaffin=-0.07,
         covrad=0.75, atmrad=0.75, vdwrad=1.55,
         tboil=77.344, tmelt=63.15, density=1.17,
         eleconfig='[He] 2s2 2p3',

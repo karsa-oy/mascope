@@ -620,7 +620,7 @@ class Formula:
                 else:
                     iso = 0
                 number = num * counts[level]
-                if formula[i - 1] == "^":
+                if i > 0 and formula[i - 1] == "^":
                     char = formula[i - 1]
                     i -= 1
                     ele = char + ele
@@ -634,6 +634,8 @@ class Formula:
                     elements[ele] = {iso: number}
                 ele = ""
                 num = 0
+            elif char == "^" and ele == "":
+                raise FormulaError(f"Character {char!r} in wrong place", formula, i)
 
         if num != 0:
             raise FormulaError("number preceding formula", formula, 0)

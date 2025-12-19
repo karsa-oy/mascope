@@ -17,8 +17,8 @@ def pytest_report_header(config: object) -> str:
 
         return (
             f"Python {sys.version.splitlines()[0]}\n"
-            f"packagedir: {molmass.__path__[0]}\n"
-            f"version: molmass {molmass.__version__}"
+            f"packagedir: {mascope_molmass.__path__[0]}\n"
+            f"version: molmass {mascope_molmass.__version__}"
         )
     except Exception as exc:
         return f"pytest_report_header failed: {exc!s}"

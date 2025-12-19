@@ -35,8 +35,8 @@
 
 import pytest
 
-import molmass
-from molmass import (
+import mascope_molmass
+from mascope_molmass import (
     AMINOACIDS,
     DEOXYNUCLEOTIDES,
     ELEMENTS,
@@ -67,7 +67,7 @@ from molmass import (
     mass_charge_ratio,
     split_charge,
 )
-from molmass.molmass import gcd, precision_digits
+from mascope_molmass.molmass import gcd, precision_digits
 
 
 @pytest.mark.skipif(__doc__ is None, reason='__doc__ is None')
@@ -75,9 +75,9 @@ def test_version():
     """Assert molmass versions match docstrings."""
     ver = ':Version: ' + __version__
     assert __doc__ is not None
-    assert molmass.__doc__ is not None
+    assert mascope_molmass.__doc__ is not None
     assert ver in __doc__
-    assert ver in molmass.__doc__
+    assert ver in mascope_molmass.__doc__
 
 
 def test_unused_import():
@@ -223,8 +223,8 @@ def test_etoh():
             'CHAcAgAlAmArAsAtAuBBaBeBhBiBkBrCaCdCeCfClCmCoCrCsCuDbDyErEsEuFFe'
             'FmFrGaGdGeHeHfHgHoHsIInIrKKrLaLiLrLuMdMgMnMoMtNNaNbNdNeNiNoNpOOs'
             'PPaPbPdPmPoPrPtPuRaRbReRfRhRnRuSSbScSeSgSiSmSnSrTaTbTcTeThTiTlTm'
-            'UVWXeYYbZnZr',
-            14693.181589000998,
+            "UVWXeYYbZnZr^N",
+            14708.161789000998,
         ),
         ('', '', 0.0),
         ('1H+', '[[1H]]+', PROTON.mass),
@@ -379,6 +379,7 @@ def test_formula_elements(formula, expected):
     [
         ('BrC2H5', 'C2H5Br'),
         ('[(CH3)3Si2]2NNa', 'C6H18NNaSi4'),
+        ("H^NO3", "HO3^N"),
     ],
 )
 def test_formula_formula(formula, expected):
@@ -507,6 +508,7 @@ def test_formula_mz(formula, expected):
         ('13C', Isotope(13.003355, 0.0107, 13)),
         ('SO4_2-', Isotope(95.952826812, 0.9407, 96, -2)),
         ('C48H32AgCuO12P2Ru4', Isotope(1439.588966, 0.0020507511, 1440)),
+        ("^NO3", Isotope(62.98485, 0.972873146, 63)),
     ],
 )
 def test_formula_isotope(formula, expected):
