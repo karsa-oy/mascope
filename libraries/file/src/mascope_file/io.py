@@ -469,3 +469,14 @@ def write_batch_cache(
     var_path = os.path.join(batch_path, f"{zarr_filename}.zarr")
     synchronizer = get_zarr_synchronizer(var_path)
     batch_peaks.to_zarr(var_path, mode="w", synchronizer=synchronizer)
+
+
+def delete_batch_cache(sample_batch_id: str) -> None:
+    """Delete sample batch cache.
+
+    :param sample_batch_id: Sample batch ID
+    :type sample_batch_id: str
+    """
+    batch_path = m_name.get_batch_cache_path(sample_batch_id)
+    if os.path.exists(batch_path):
+        rmtree(batch_path)

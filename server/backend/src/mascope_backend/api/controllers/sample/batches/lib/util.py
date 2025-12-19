@@ -93,6 +93,7 @@ def load_existing_batch_cache(sample_batch: dict) -> dict:
     old_timestamp = batch_peaks.attrs["sample_batch_utc_modified"]
     new_timestamp = str(sample_batch["sample_batch_utc_modified"])
     if old_timestamp != new_timestamp:
+        m_io.delete_batch_cache(sample_batch_id)
         raise FileNotFoundError(
             f"Batch cache for sample batch ID '{sample_batch_id}' is outdated "
             "due to batch modification."

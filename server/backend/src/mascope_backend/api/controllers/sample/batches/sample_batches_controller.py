@@ -540,8 +540,10 @@ async def delete_sample_batch(
     Deletes a sample batch by its unique ID and optionally emits relevant events.
 
     Steps:
-    1. Fetch the sample batch by its ID from the database to verify its existence.
-    2. If the sample batch exists, delete it from the session and commit the changes to the database.
+    - Fetch the sample batch by its ID from the database to verify its existence.
+    - Delete the sample batch from the database if it exists.
+    - Remove any cached batch data associated with the sample batch.
+    - Emit a deletion event if independent_transaction is True.
 
     :param sample_batch_id: Unique identifier of the sample batch to delete.
     :type sample_batch_id: str
@@ -554,17 +556,20 @@ async def delete_sample_batch(
     :raises NotFoundException: If no sample batch is found with the provided ID.
     """
     async with async_session() as session:
-        # Step 1: Fetch and verify sample batch existence
+        # --- Fetch and verify sample batch existence ---
         sample_batch = await session.get(SampleBatch, sample_batch_id)
         if not sample_batch:
             raise NotFoundException(
                 f"Sample batch with ID '{sample_batch_id}' not found"
             )
-        # Step 2: Delete sample batch and commit changes
+        # --- Delete sample batch and commit changes ---
         await session.delete(sample_batch)
         await session.commit()
 
-    # Step 3: Emit deletion event
+    # --- Cleanup batch cache ---
+    m_io.delete_batch_cache(sample_batch_id)
+
+    # --- Emit deletion event if independent transaction ---
     if independent_transaction:
         await emit_record_deleted(
             record_type="batch", record_id=sample_batch_id, room=workspace_id
