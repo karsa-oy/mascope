@@ -35,6 +35,7 @@ from mascope_backend.api.models.ionization_mechanisms.ionization_mechanism_pydan
     IonizationMechanismCreate,
     IonizationMechanismRead,
 )
+from mascope_molmass import Formula
 
 
 @api_controller()
@@ -179,12 +180,13 @@ async def create_ionization_mechanism(
     Creates a new ionization mechanism and generates corresponding ions for each existing target compound in the database.
 
     Steps:
-    1. Check if the ionization mechanism already exists using the get_ionization_mechanisms function.
-    2. Create a new ionization mechanism instance and add it to the session.
-    3. Fetch all target compounds from the database.
-    4. For each target compound, create target ions with the new ionization mechanism.
-    5. Commit the transaction to persist changes to the database.
-    6. Return the created ionization mechanism's details with a success message.
+    - Check if the ionization mechanism already exists using the get_ionization_mechanisms function.
+    - Validate the ionization mechanism formula using mascope_molmass.Formula
+    - Create a new ionization mechanism instance and add it to the session.
+    - Fetch all target compounds from the database.
+    - For each target compound, create target ions with the new ionization mechanism.
+    - Commit the transaction to persist changes to the database.
+    - Return the created ionization mechanism's details with a success message.
 
     :param ionization_mechanism: Ionization mechanism to create
     :type ionization_mechanism: IonizationMechanismCreate
@@ -193,7 +195,7 @@ async def create_ionization_mechanism(
     :return: Created ionization mechanism details.
     :rtype: dict
     """
-    # Step 1: Check if the ionization mechanism already exists
+    # --- Check if the ionization mechanism already exists --- #
     existing_mechanisms = await get_ionization_mechanisms(
         ionization_mechanism=[ionization_mechanism_create.ionization_mechanism]
     )
@@ -204,20 +206,35 @@ async def create_ionization_mechanism(
             detail=f"Ionization mechanism '{ionization_mechanism_create.ionization_mechanism}' already exists",
         )
 
-    # Step 2: Create a new ionization mechanism instance and add it to the session.
-    async with async_session() as session:
-        new_ionization_mechanism = IonizationMechanism(
-            ionization_mechanism_id=gen_id(11),
-            **ionization_mechanism_create.model_dump(),
+    new_ionization_mechanism = IonizationMechanism(
+        ionization_mechanism_id=gen_id(11),
+        **ionization_mechanism_create.model_dump(),
+    )
+
+    # --- Validate the ionization mechanism formula --- #
+    try:
+        mechanism = new_ionization_mechanism.ionization_mechanism
+        mechanism_formula = (
+            Formula(mechanism[1:]) if len(mechanism) > 1 else Formula(mechanism)
         )
+        # Access _elements to trigger parsing and potentially raise an error
+        mechanism_formula._elements  # pylint: disable=pointless-statement,protected-access
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid ionization mechanism formula '{ionization_mechanism_create.ionization_mechanism}': {str(e)}",
+        ) from e
+
+    # --- Create a new ionization mechanism instance and add it to the session. --- #
+    async with async_session() as session:
         session.add(new_ionization_mechanism)
 
-        # Step 3: Fetch all target compounds
+        # --- Fetch all target compounds --- #
         stmt = select(TargetCompound)
         result = await session.execute(stmt)
         target_compounds = result.scalars().all()
 
-        # Step 4: Create target ions with new mechanism for each compound
+        # --- Create target ions with new mechanism for each compound --- #
         for target_compound in target_compounds:
             try:
                 # Try if target compound is given by mass (try to parse composition into float)
@@ -234,7 +251,7 @@ async def create_ionization_mechanism(
                 session=session,
             )
 
-        # Step 5: Commit the transaction
+        # --- Commit the transaction --- #
         await session.commit()
         await session.refresh(new_ionization_mechanism)
 
@@ -246,14 +263,14 @@ async def create_ionization_mechanism(
         new_ionization_mechanism
     ).model_dump()
 
-    # Step 6: Emit creation event
+    # --- Emit creation event --- #
     await emit_record_created(
         record_type="ionization_mechanism",
         record_id=new_ionization_mechanism.ionization_mechanism_id,
         record=ionization_mechanism_data,
     )
 
-    # Step 7: Return created ionization mechanism details with a success message
+    # --- Return created ionization mechanism details with a success message --- #
     return {
         "message": f"Ionization mechanism '{new_ionization_mechanism.ionization_mechanism}' was created successfully.",
         "data": ionization_mechanism_data,
