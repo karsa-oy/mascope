@@ -7,32 +7,32 @@ from sqlalchemy import (
 )
 
 
-async def fetch_sample_file(filename: str) -> dict:
+async def fetch_sample_file(filename: str) -> SampleFile:
     """
     Retrieves a single sample file by its unique filename.
 
     Steps:
-    1. Execute a query to fetch the sample file with the specified filename.
-    2. Check if the sample file exists. If not, raise a NotFoundException.
-    3. Return the sample file's details as a dictionary.
+    - Execute a query to fetch the sample file by the filename.
+    - If the sample file is not found, raise a NotFoundException.
+    - Return the sample file's details.
 
     :param filename: Unique filename of the sample file to retrieve.
     :type filename: str
-    :raises NotFoundException: If the sample file with the given filename is not found.
+    :raises NotFoundException: If the sample file with the specified filename is not found.
     :return: The requested sample file's details.
-    :rtype: dict
+    :rtype: SampleFile
     """
     async with async_session() as session:
-        # Step 1: Fetch sample file by filename
+        # --- Fetch sample file by filename ---
         result = await session.execute(
             select(SampleFile).where(SampleFile.filename == filename)
         )
         sample_file = result.scalar_one_or_none()
-        # Step 2: Check existence
+        # --- Check if sample file exists ---
         if not sample_file:
             raise NotFoundException(f"Sample file with filename '{filename}' not found")
 
-        # Step 3: Return sample file details
+        # --- Return sample file details ---
         return sample_file
 
 
