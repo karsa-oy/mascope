@@ -259,29 +259,41 @@ async def calibration_mz_apply(
     user_id: int | None = None,
     process_id=None,
     parent_id=None,
-):
+) -> dict:
     """
     Apply m/z calibration to a sample file.
-    - Sets batch status to "processing" for all affected batches during operation.
-    - Removes existing matches for all affected samples since calibration invalidates them.
-    - Batch status sets to "rematch" for all affected batches because of removed matches.
+    Steps:
+    - Retrieve sample file
+    - Get affected sample items and their batches
+    - Set non-ACQUISITION batches to "processing"
+    - Prepare progress user notification
+    - Apply m/z calibration
+    - Update sample file database record with new calibration
+    - Notify completion for each affected batch and remove existing matches
+    - Set non-ACQUISITION batches to "rematch"
+    - Return m/z fit result data and message
 
     :param fit: Fit dictionary.
     :param filename: Name of the sample file.
-    :return: List of calibrated sample item IDs.
+    :param independent_transaction: Whether to run as independent transaction
+    :param user_id: Current user triggered operation (for user notifications)
+    :param process_id: Process ID for tracking
+    :param parent_id: Parent process ID for tracking
+    :return: Dictionary containing fit results and notification data
     """
+    # --- Retrieve sample file ---
     sample_file = await fetch_sample_file(filename)
 
-    # Step 1: Get affected sample items and their batches
+    # --- Get affected sample items and their batches ---
     (
         affected_sample_item_ids,
         affected_sample_batch_ids,
         affected_sample_items,
         affected_sample_batches,
     ) = await fetch_affected_sample_data(filenames=[filename], include_objects=True)
-    total_samples = len(affected_sample_item_ids)
 
-    # Set non-ACQUISITION batches to "processing", already "processing" batches will not change the status
+    # --- Set non-ACQUISITION batches to "processing" ---
+    # already "processing" batches will not change the status
     await update_sample_batch_status(
         sample_batch_ids=[
             batch.sample_batch_id
@@ -297,13 +309,14 @@ async def calibration_mz_apply(
         f"non-ACQUISITION batch(es) to 'processing' for calibration apply"
     )
 
-    # Step 2: Prepare progress user notification.
+    # --- Prepare progress user notification. ---
+    total_samples = len(affected_sample_item_ids)
     notification = UserNotification(
         process_id=process_id,
         parent_id=parent_id,
         type="calibration_mz_apply",
         status="pending",
-        message=f"Applying m/z fit for sample file '{filename}', {total_samples} sample item{'s' if total_samples != 1 else ''} affected.",
+        message=f"Applying m/z fit for sample file '{filename}'. Number of samples affected: {total_samples}.",
         data={
             "sample_item_ids": affected_sample_item_ids,
             "filename": filename,
@@ -314,13 +327,7 @@ async def calibration_mz_apply(
 
     await send_progress_user_notification(notification, 0.1)
 
-    # Step 3: Get sample file data and apply m/z fit
-    sample_file_data = await get_sample_files(filename=filename)
-    if not sample_file_data["data"]:
-        raise NotFoundException(f"Sample file '{filename}' not found")
-
-    sample_file = sample_file_data["data"][0]
-
+    # --- Apply m/z calibration ---
     calibration_handler = get_calibration_handler(filename, None, notification)
     await calibration_handler.apply(fit)
     updated_mz_axis = get_sum_signal(filename).mz.values
@@ -330,17 +337,16 @@ async def calibration_mz_apply(
 
     await send_progress_user_notification(notification, 0.3)
 
-    # Step 4: Update sample file database record
-    sample_file["mz_calibration"] = fit
-    sample_file["range"] = new_mz_range
-    runtime.logger.info(sample_file)
+    # --- Update sample file database record with new calibration ---
+    sample_file.mz_calibration = fit
+    sample_file.range = new_mz_range
     await update_sample_file(
-        sample_file["sample_file_id"], SampleFileUpdate(**sample_file)
+        sample_file.sample_file_id, SampleFileUpdate(**sample_file.to_dict())
     )
 
     await send_progress_user_notification(notification, 0.8)
 
-    # Step 5: Notify completion for each affected batch
+    # --- Notify completion for each affected batch and remove existing matches ---
     for sample_batch in affected_sample_batches:
         sample_batch_id = sample_batch.sample_batch_id
         sample_batch_name = sample_batch.sample_batch_name
@@ -357,7 +363,7 @@ async def calibration_mz_apply(
             parent_id=process_id,
             type="calibration_mz_apply",
             status="pending",
-            message=f"New m/z fit applied for sample file '{filename}'. {batch_samples_count} sample{'s' if batch_samples_count != 1 else ''} affected in sample batch '{sample_batch_name}'.",
+            message=f"Applied m/z fit to '{filename}'. Number of affected samples in in batch '{sample_batch_name}': {batch_samples_count}.",
             data={
                 "sample_batch_id": sample_batch_id,
                 "_room_ids": [sample_batch_id],
@@ -376,7 +382,7 @@ async def calibration_mz_apply(
                 process_id=gen_id(8),
                 parent_id=process_id,
             )
-    # Step 6: Set non-ACQUISITION batches to "rematch" , since calibration removes matches
+    # --- Set non-ACQUISITION batches to "rematch" , since calibration removes matches ---
     # ACQUISITION batches being matched for the first time
     await update_sample_batch_status(
         sample_batch_ids=[
@@ -392,8 +398,10 @@ async def calibration_mz_apply(
         f"non-ACQUISITION batch(es) to 'rematch' after applying m/z calibration"
     )
 
-    # Step 7: Return m/z fit result data and message
-    message = f"Applied m/z fit for sample file '{filename}', {total_samples} sample item{'s' if total_samples != 1 else ''} affected."
+    # --- Return m/z fit result data and message ---
+    message = (
+        f"Applied m/z fit to '{filename}'. Number of affected samples: {total_samples}."
+    )
     runtime.logger.info(message)
     return {
         "data": {
