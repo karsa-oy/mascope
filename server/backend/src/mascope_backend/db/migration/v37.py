@@ -20,6 +20,7 @@ from mascope_backend.api.controllers.sample.items.sample_items_controller import
 from mascope_backend.db import (
     Base,
     IonizationMode,
+    Sample,
     SampleItem,
     async_session,
     configure_database_engine,
@@ -305,54 +306,11 @@ async def modify_sample_batch_schema() -> None:
 async def update_sample_view() -> None:
     """
     Update the sample_view to reflect the new schema changes.
-
-    This view joins sample_item and sample_file tables and should include
-    the new ionization_mode_id field for sample data access.
     """
     runtime.logger.info("Updating sample_view with ionization_mode_id field...")
 
     async with async_session() as session:
-        # Step 1: Drop existing view
-        await session.execute(text("DROP VIEW IF EXISTS sample_view;"))
-
-        # Step 2: Recreate view with updated columns
-        await session.execute(
-            text(
-                """
-                CREATE VIEW sample_view AS
-                SELECT
-                    sample_item.sample_item_id,
-                    sample_file.sample_file_id,
-                    sample_file.instrument_function_id,
-                    sample_item.sample_batch_id,
-                    sample_item.sample_item_name,
-                    sample_file.filename,
-                    sample_file.instrument,
-                    sample_item.sample_item_type,
-                    sample_item.locked,
-                    sample_file.method_file,
-                    sample_item.t0,
-                    sample_item.t1,
-                    sample_item.sample_item_attributes,
-                    sample_item.filter_id,
-                    sample_file.length,
-                    sample_item.tic,
-                    sample_item.polarity,
-                    sample_item.ionization_mode_id,
-                    sample_file.range,
-                    sample_file.mz_calibration,
-                    sample_file.datetime,
-                    sample_file.datetime_utc,
-                    sample_item.sample_item_utc_created,
-                    sample_item.sample_item_utc_modified
-                FROM
-                    sample_item
-                JOIN
-                    sample_file ON sample_item.filename = sample_file.filename;
-                """
-            )
-        )
-
+        await Sample.update_view(session)
         await session.commit()
 
     runtime.logger.info(

@@ -9,8 +9,6 @@ It provides two entry points:
 import asyncio
 import os
 
-from sqlalchemy import text
-
 from mascope_backend.db import (
     Base,
     Sample,
@@ -40,48 +38,12 @@ async def create_database():
         # Acquire a connection
         connection = await session.connection()
 
-        # Explicitly create tables, excluding the Sample view
-        for table_name, table_obj in Base.metadata.tables.items():
-            if table_name != Sample.__tablename__:
-                await connection.run_sync(table_obj.create)
+        # Create all tables from Base metadata
+        await connection.run_sync(Base.metadata.create_all)
 
-        # Create the sample_view
-        await connection.execute(
-            text(
-                """
-            CREATE VIEW IF NOT EXISTS sample_view AS
-            SELECT
-                sample_item.sample_item_id,
-                sample_file.sample_file_id,
-                sample_file.instrument_function_id,
-                sample_item.sample_batch_id,
-                sample_item.sample_item_name,
-                sample_file.filename,
-                sample_file.instrument,
-                sample_item.sample_item_type,
-                sample_item.locked,
-                sample_file.method_file,
-                sample_item.t0,
-                sample_item.t1,
-                sample_item.sample_item_attributes,
-                sample_item.filter_id,
-                sample_file.length,
-                sample_item.tic,
-                sample_item.polarity,
-                sample_item.ionization_mode_id,
-                sample_file.range,
-                sample_file.mz_calibration,
-                sample_file.datetime,
-                sample_file.datetime_utc,
-                sample_item.sample_item_utc_created,
-                sample_item.sample_item_utc_modified
-            FROM
-                sample_item
-            JOIN
-                sample_file ON sample_item.filename = sample_file.filename
-            """
-            )
-        )
+        # Create the sample_view using the centralized definition
+        await connection.execute(Sample.create_view())
+
         await session.commit()
 
     runtime.logger.info("New database created successfully.")
