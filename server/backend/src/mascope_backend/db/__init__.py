@@ -3,21 +3,56 @@ Database initialization and configuration module.
 
 This module handles SQLite database connection setup, session management,
 and initialization procedures including schema migrations.
+
+Exports:
+- Database connection functions (configure_database_engine, async_session, etc.)
+- All ORM models from models.py
+- All view mappings from views.py
 """
 
 import asyncio
 import os
 from typing import AsyncGenerator
 
+from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import (
-    create_async_engine,
     AsyncSession,
     async_sessionmaker,
+    create_async_engine,
 )
-from sqlalchemy import text
+
 from mascope_backend.db.config import db_config
 from mascope_backend.db.migration_manager import check_db_migration
+
+# Re-export models and views for convenient importing
+from mascope_backend.db.models import (
+    AccessToken,
+    AttributeTemplate,
+    Base,
+    InstrumentFunction,
+    IonizationMechanism,
+    IonizationMode,
+    MatchCollection,
+    MatchCompound,
+    MatchIon,
+    MatchIsotope,
+    MatchRating,
+    MatchSample,
+    Role,
+    SampleBatch,
+    SampleFile,
+    SampleItem,
+    TargetCollection,
+    TargetCollectionInSampleBatch,
+    TargetCompound,
+    TargetCompoundInTargetCollection,
+    TargetIon,
+    TargetIsotope,
+    User,
+    Workspace,
+)
 from mascope_backend.db.utils import get_current_db_version
+from mascope_backend.db.views import Sample
 from mascope_backend.runtime import runtime
 
 
@@ -56,6 +91,14 @@ async def configure_database_engine(version):
         pool_timeout=db_config.POOL_TIMEOUT,
         connect_args=db_config.connect_args,
     )
+
+    # Enable foreign keys for every SQLite connection
+    @event.listens_for(engine.sync_engine, "connect")
+    def _set_sqlite_pragma(dbapi_conn, connection_record):
+        """Enable foreign key constraints for this connection."""
+        cursor = dbapi_conn.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
 
     # Define the global session maker using async_sessionmaker
     global ASYNC_SESSION_MAKER
@@ -129,15 +172,15 @@ async def init_db():
         current_version = get_current_db_version()
         await configure_database_engine(current_version)
 
-        await test_database_connection()
+        await _test_database_connection()
 
-        await check_async_wal_status()
+        await _check_async_wal_status()
     except Exception as error:
         runtime.logger.error(f"Database initialization error: {error}")
         raise
 
 
-async def test_database_connection():
+async def _test_database_connection():
     """
     Test the database connection by executing a simple query.
 
@@ -148,12 +191,18 @@ async def test_database_connection():
         async with async_session() as session:
             await session.execute(text("SELECT 1"))
         runtime.logger.info("Database connection established successfully.")
+
+        async with async_session() as session:
+            result = await session.execute(text("PRAGMA foreign_keys"))
+        fk_status = "enabled" if result.scalar() == 1 else "disabled"
+        runtime.logger.debug(f"Database foreign keys status: {fk_status}")
+
     except Exception as e:
         runtime.logger.error(f"Error while establishing the database connection: {e}")
         raise
 
 
-async def check_async_wal_status():
+async def _check_async_wal_status():
     """
     Check WAL status using configured SQLAlchemy async session.
     """
@@ -167,3 +216,41 @@ async def check_async_wal_status():
             )
     except Exception as e:
         runtime.logger.error(f"Error checking async WAL status: {e}")
+
+
+__all__ = [
+    # Connection management
+    "configure_database_engine",
+    "async_session",
+    "get_async_session",
+    "init_db",
+    # Migration manager
+    "check_db_migration",
+    # Models
+    "Base",
+    "User",
+    "Role",
+    "AccessToken",
+    "Workspace",
+    "SampleBatch",
+    "SampleFile",
+    "SampleItem",
+    "TargetCollection",
+    "TargetCollectionInSampleBatch",
+    "TargetCompound",
+    "TargetCompoundInTargetCollection",
+    "TargetIon",
+    "TargetIsotope",
+    "IonizationMechanism",
+    "IonizationMode",
+    "MatchSample",
+    "MatchCollection",
+    "MatchCompound",
+    "MatchIon",
+    "MatchIsotope",
+    "MatchRating",
+    "AttributeTemplate",
+    "InstrumentFunction",
+    # Views
+    "Sample",
+]
