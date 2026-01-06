@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime as dt, timezone
 from typing import Optional
 from sqlalchemy import (
     event,
@@ -30,9 +30,6 @@ from fastapi_users_db_sqlalchemy.access_token import (
 from mascope_backend.api.models.workspace.config import workspace_config
 from mascope_backend.api.models.sample.batches.config import sample_batch_config
 from mascope_backend.api.models.sample.items.config import sample_item_config
-from mascope_backend.api.models.ionization_mechanisms.config import (
-    ionization_mechanism_config,
-)
 from mascope_backend.api.models.target.collections.config import (
     target_collection_config,
 )
@@ -70,8 +67,8 @@ class User(SQLAlchemyBaseUserTable[int], Base):
     role_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("role.role_id", ondelete="SET NULL"), nullable=True
     )
-    registered_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP, default=lambda: datetime.now(timezone.utc), nullable=False
+    registered_at: Mapped[dt] = mapped_column(
+        TIMESTAMP, default=lambda: dt.now(timezone.utc), nullable=False
     )
 
     # Define relationships
@@ -132,11 +129,11 @@ class AccessToken(SQLAlchemyBaseAccessTokenTable[int], Base):
         String(50),
         nullable=True,
     )
-    created_at: Mapped[datetime] = mapped_column(
+    created_at: Mapped[dt] = mapped_column(
         TIMESTAMP(timezone=True),
         index=True,
         nullable=False,
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: dt.now(timezone.utc),
     )
 
     # Define relationships
@@ -239,9 +236,9 @@ class SampleBatch(Base):
         TIMESTAMP, nullable=True
     )
 
-    # Define relationships
+    # Relationships
     workspace = relationship("Workspace", back_populates="sample_batch")
-    sample_item = relationship(
+    sample_items = relationship(
         "SampleItem",
         back_populates="sample_batch",
         cascade="all, delete, delete-orphan",
@@ -262,7 +259,7 @@ def update_workspace_on_sample_batch_change(mapper, connection, target):
         stmt = (
             update(Workspace)
             .where(Workspace.workspace_id == target.workspace_id)
-            .values(workspace_utc_modified=datetime.now(timezone.utc))
+            .values(workspace_utc_modified=dt.now(timezone.utc))
         )
         connection.execute(stmt)
         runtime.logger.debug(
@@ -273,57 +270,93 @@ def update_workspace_on_sample_batch_change(mapper, connection, target):
 @event.listens_for(SampleBatch, "before_update")
 def update_modified_timestamp(mapper, connection, target):
     """Automatically update modification timestamp when SampleBatch is updated."""
-    target.sample_batch_utc_modified = datetime.now(timezone.utc)
+    target.sample_batch_utc_modified = dt.now(timezone.utc)
+
+
+class SampleFile(Base):
+    """
+    Represents raw acquisition files.
+
+    Each sample file corresponds to a single data file in the filestore.
+    Contains metadata about the instrument, calibration, and measurement parameters.
+    """
+
+    __tablename__ = "sample_file"
+
+    sample_file_id: Mapped[str] = mapped_column(String(16), primary_key=True)
+    instrument_function_id: Mapped[Optional[str]] = mapped_column(
+        String(32),
+        ForeignKey("instrument_function.instrument_function_id", ondelete="SET NULL"),
+    )
+    filename: Mapped[str] = mapped_column(String(256), unique=True)
+    instrument: Mapped[str] = mapped_column(String(64))
+    method_file: Mapped[Optional[str]] = mapped_column(String(256))
+    datetime: Mapped[dt] = mapped_column(TIMESTAMP)
+    datetime_utc: Mapped[dt] = mapped_column(TIMESTAMP)
+    length: Mapped[float] = mapped_column(Float)
+    range: Mapped[dict] = mapped_column(JSON)
+    mz_calibration: Mapped[Optional[dict]] = mapped_column(JSON)
+    polarity: Mapped[str] = mapped_column(String(4))
+
+    # Relationships
+    instrument_function = relationship(
+        "InstrumentFunction", back_populates="sample_file"
+    )
+    sample_items = relationship(
+        "SampleItem", back_populates="sample_file", cascade="all, delete, delete-orphan"
+    )
+
+    # Indexes
+    __table_args__ = (
+        Index("idx_sample_file_instrument_function", "instrument_function_id"),
+    )
 
 
 class SampleItem(Base):
+    """
+    Represents a processed sample derived from a sample file.
+
+    Each sample_item is a time-windowed segment of a sample_file that has been
+    analyzed and matched against target collections. Multiple sample_items can
+    be created from a single sample_file.
+    """
+
     __tablename__ = "sample_item"
+
     sample_item_id: Mapped[str] = mapped_column(String(16), primary_key=True)
     sample_batch_id: Mapped[str] = mapped_column(
         String(16),
         ForeignKey("sample_batch.sample_batch_id", ondelete="CASCADE"),
-        nullable=False,
     )
-    filename: Mapped[str] = mapped_column(String(256), nullable=False)
-    sample_item_name: Mapped[str] = mapped_column(String(256), nullable=False)
-    sample_item_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    sample_file_id: Mapped[str] = mapped_column(
+        String(16),
+        ForeignKey("sample_file.sample_file_id", ondelete="CASCADE"),
+    )
+    sample_item_name: Mapped[str] = mapped_column(String(256))
+    sample_item_type: Mapped[str] = mapped_column(String(64))
     locked: Mapped[int] = mapped_column(
         Integer,
-        nullable=False,
         server_default=text(f"{sample_item_config.DEFAULT_LOCKED_STATUS}"),
     )
-    sample_item_attributes: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
-    filter_id: Mapped[Optional[str]] = mapped_column(String(6), nullable=True)
-    tic: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    polarity: Mapped[Optional[str]] = mapped_column(String(1), nullable=True)
-    ionization_mode_id: Mapped[str] = mapped_column(
+    sample_item_attributes: Mapped[Optional[dict]] = mapped_column(JSON)
+    filter_id: Mapped[Optional[str]] = mapped_column(String(6))
+    tic: Mapped[Optional[float]] = mapped_column(Float)
+    polarity: Mapped[Optional[str]] = mapped_column(String(1))
+    ionization_mode_id: Mapped[Optional[str]] = mapped_column(
         String(16),
         ForeignKey(
             "ionization_mode.ionization_mode_id",
             ondelete="SET NULL",
         ),
-        nullable=True,
     )
-    t0: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    t1: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    sample_item_utc_created: Mapped[Optional[str]] = mapped_column(
-        TIMESTAMP, nullable=True
-    )
-    sample_item_utc_modified: Mapped[Optional[str]] = mapped_column(
-        TIMESTAMP, nullable=True
-    )
+    t0: Mapped[Optional[float]] = mapped_column(Float)
+    t1: Mapped[Optional[float]] = mapped_column(Float)
+    sample_item_utc_created: Mapped[Optional[str]] = mapped_column(TIMESTAMP)
+    sample_item_utc_modified: Mapped[Optional[str]] = mapped_column(TIMESTAMP)
 
-    # Define relationships
-    sample_batch = relationship("SampleBatch", back_populates="sample_item")
-    # TODO_db issue #376
-    # sample_file = relationship(
-    #     "SampleFile", back_populates="sample_item", foreign_keys=[filename]
-    # )
-    sample_file = relationship(
-        "SampleFile",
-        primaryjoin="foreign(SampleItem.filename)==remote(SampleFile.filename)",
-        viewonly=True,
-    )
+    # Relationships
+    sample_batch = relationship("SampleBatch", back_populates="sample_items")
+    sample_file = relationship("SampleFile", back_populates="sample_items")
     match_sample = relationship(
         "MatchSample",
         back_populates="sample_item",
@@ -355,8 +388,11 @@ class SampleItem(Base):
         cascade="all, delete, delete-orphan",
     )
 
-    # Define indexes
-    __table_args__ = (Index("idx_sample_item_sample_batch", "sample_batch_id"),)
+    # Indexes
+    __table_args__ = (
+        Index("idx_sample_item_sample_batch", "sample_batch_id"),
+        Index("idx_sample_item_sample_file", "sample_file_id"),
+    )
 
 
 @event.listens_for(SampleItem, "after_update")
@@ -366,37 +402,12 @@ def update_sample_batch_on_sample_item_change(mapper, connection, target):
         stmt = (
             update(SampleBatch)
             .where(SampleBatch.sample_batch_id == target.sample_batch_id)
-            .values(sample_batch_utc_modified=datetime.now(timezone.utc))
+            .values(sample_batch_utc_modified=dt.now(timezone.utc))
         )
         connection.execute(stmt)
         runtime.logger.debug(
             f"Updated SampleBatch '{target.sample_batch_id}' timestamp due to SampleItem change."
         )
-
-
-class SampleFile(Base):
-    __tablename__ = "sample_file"
-    sample_file_id = Column(String(16), nullable=False, primary_key=True)
-    instrument_function_id = Column(
-        String(32),
-        ForeignKey("instrument_function.instrument_function_id", ondelete="SET NULL"),
-        nullable=True,
-    )
-    filename = Column(String(256), nullable=False, unique=True)
-    instrument = Column(String(64))
-    method_file = Column(String(256), nullable=True)
-    datetime = Column(TIMESTAMP)
-    datetime_utc = Column(TIMESTAMP)
-    length = Column(Float)
-    range = Column(JSON)
-    mz_calibration = Column(JSON)
-    polarity = Column(String(4))
-
-    # Define relationships
-    instrument_function = relationship(
-        "InstrumentFunction", back_populates="sample_file"
-    )
-    # sample_item = relationship("SampleItem", back_populates="sample_file") # TODO_db issue #376
 
 
 class TargetCollection(Base):
