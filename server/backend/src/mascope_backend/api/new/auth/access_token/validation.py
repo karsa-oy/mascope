@@ -1,10 +1,10 @@
 """Access token validation."""
 
+from mascope_backend.api.new.auth.access_token.util import get_token_service
+from mascope_backend.api.new.auth.exceptions import InvalidTokenException
 from mascope_backend.api.new.auth.strategies.database import (
     get_database_strategy_context,
 )
-from mascope_backend.api.new.auth.access_token.util import get_token_service
-from mascope_backend.api.new.auth.exceptions import InvalidTokenException
 from mascope_backend.runtime import runtime
 
 

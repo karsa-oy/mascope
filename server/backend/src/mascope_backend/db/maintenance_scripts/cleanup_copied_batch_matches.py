@@ -19,17 +19,17 @@ Date: 2025-10-21
 Issue: #1170
 """
 
-import asyncio
 import argparse
+import asyncio
+
 from sqlalchemy import select
 
-from mascope_backend.db import async_session, configure_database_engine
-from mascope_backend.db.models import SampleBatch
-from mascope_backend.db.ops.match.remove_batch_matches import remove_batch_matches
-from mascope_backend.db.utils import get_current_db_version
 from mascope_backend.api.controllers.match.targets.batch.match_targets_batch_controller import (
     get_batch_data,
 )
+from mascope_backend.db import SampleBatch, async_session, configure_database_engine
+from mascope_backend.db.ops.match.remove_batch_matches import remove_batch_matches
+from mascope_backend.db.utils import get_current_db_version
 from mascope_backend.runtime import runtime
 
 

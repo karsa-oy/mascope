@@ -6,20 +6,21 @@ It defines the cookie transport and JWT strategy for mascope web-based interface
 and bearer transport with database access tokens for the mascope_sdk jupyter library authentication.
 """
 
-from rich.pretty import pretty_repr
 from fastapi import HTTPException, Request, status
 from fastapi_users.authentication import (
     AuthenticationBackend,
+)
+from rich.pretty import pretty_repr
+
+from mascope_backend.api.new.auth.access_token.util import get_token_service
+from mascope_backend.api.new.auth.strategies import (
+    get_database_strategy,
+    get_jwt_strategy,
 )
 from mascope_backend.api.new.auth.transports import (
     access_token_transport,
     cookie_transport,
 )
-from mascope_backend.api.new.auth.strategies import (
-    get_database_strategy,
-    get_jwt_strategy,
-)
-from mascope_backend.api.new.auth.access_token.util import get_token_service
 from mascope_backend.runtime import runtime
 
 

@@ -1,17 +1,17 @@
 import json
+
 from sqlalchemy import select, update
-from mascope_backend.db import async_session
-from mascope_backend.db.models import AccessToken, User
+
 from mascope_backend.api.lib.api_features import api_controller
-from mascope_backend.api.new.auth.backend import auth_backend_access_token
-from mascope_backend.api.new.auth.strategies.database import (
-    get_database_strategy_context,
-)
-from mascope_backend.api.new.auth.exceptions import InvalidTokenException
 from mascope_backend.api.new.auth.access_token.validation import (
     validate_service_access_token,
 )
-
+from mascope_backend.api.new.auth.backend import auth_backend_access_token
+from mascope_backend.api.new.auth.exceptions import InvalidTokenException
+from mascope_backend.api.new.auth.strategies.database import (
+    get_database_strategy_context,
+)
+from mascope_backend.db import AccessToken, User, async_session
 from mascope_backend.runtime import runtime
 
 

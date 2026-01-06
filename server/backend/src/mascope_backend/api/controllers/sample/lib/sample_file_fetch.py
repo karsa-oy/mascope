@@ -1,10 +1,9 @@
-from mascope_backend.db import async_session
-from mascope_backend.db.models import SampleFile
-from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
-
 from sqlalchemy import (
     select,
 )
+
+from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
+from mascope_backend.db import SampleFile, async_session
 
 
 async def fetch_sample_file(filename: str) -> SampleFile:

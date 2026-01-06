@@ -1,25 +1,24 @@
-from datetime import datetime, timezone
 from collections import defaultdict
+from datetime import datetime, timezone
+
 from sqlalchemy import (
-    select,
     delete,
     func,
+    select,
 )
-from mascope_backend.db import async_session
-from mascope_backend.db.id import gen_id
-from mascope_backend.db.models import MatchCollection, SampleItem
+
+from mascope_backend.api.controllers.sample.lib.sample_items_fetch import (
+    fetch_sample_item_ids,
+)
 from mascope_backend.api.lib.api_features import api_controller
 from mascope_backend.api.lib.exceptions.api_exceptions import (
     NotFoundException,
 )
-from mascope_backend.api.controllers.sample.lib.sample_items_fetch import (
-    fetch_sample_item_ids,
-)
 from mascope_backend.api.models.match.collections.match_collection_pydantic_model import (
     MatchCollectionBase,
 )
-
-
+from mascope_backend.db import MatchCollection, SampleItem, async_session
+from mascope_backend.db.id import gen_id
 from mascope_backend.runtime import runtime
 
 

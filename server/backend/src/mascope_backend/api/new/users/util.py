@@ -1,7 +1,7 @@
 from sqlalchemy import select
-from mascope_backend.db import async_session
-from mascope_backend.db.models import User
+
 from mascope_backend.api.new.users.exceptions import UsernameAlreadyExistsException
+from mascope_backend.db import User, async_session
 
 
 async def check_username_exists(username: str) -> bool:

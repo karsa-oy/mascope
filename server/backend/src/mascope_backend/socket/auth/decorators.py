@@ -2,19 +2,20 @@
 
 from functools import wraps
 from typing import Callable, Optional
-from mascope_backend.api.new.auth.config import auth_settings
-from mascope_backend.api.new.auth.exceptions import InvalidTokenException
+
 from mascope_backend.api.new.auth.access_token.validation import (
     validate_service_access_token,
 )
-from mascope_backend.socket.storage import get_session_user
+from mascope_backend.api.new.auth.config import auth_settings
+from mascope_backend.api.new.auth.exceptions import InvalidTokenException
+from mascope_backend.runtime import runtime
 from mascope_backend.socket.auth.exceptions import (
+    SocketAuthConfigError,
     SocketAuthError,
     SocketForbiddenError,
-    SocketAuthConfigError,
     SocketUnauthenticatedError,
 )
-from mascope_backend.runtime import runtime
+from mascope_backend.socket.storage import get_session_user
 
 
 def socket_auth(minimum_role: str, service_name: Optional[str] = None):

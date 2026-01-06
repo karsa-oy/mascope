@@ -1,15 +1,17 @@
 from fastapi import APIRouter, Depends
-from mascope_backend.api.lib.api_features import api_route
-from mascope_backend.api.new.auth.dependencies import guest_user, editor_user
+
 from mascope_backend.api.controllers.target.ions.target_ions_controller import (
-    get_target_ions,
     get_target_ion,
+    get_target_ions,
     update_target_ion,
 )
+from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.models.target.ions.target_ion_pydantic_model import (
-    TargetIonUpdate,
     GetTargetIonsQueryParams,
+    TargetIonUpdate,
 )
+from mascope_backend.api.new.auth.dependencies import editor_user, guest_user
+
 
 target_ions_router = APIRouter(prefix="/api/target/ions", tags=["Target Ions"])
 

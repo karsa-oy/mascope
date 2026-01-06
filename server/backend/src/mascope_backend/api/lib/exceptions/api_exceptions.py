@@ -1,12 +1,13 @@
 import traceback
+
 import httpx
 from fastapi import HTTPException, status
-from fastapi.responses import JSONResponse
-from fastapi.exceptions import RequestValidationError
 from fastapi.encoders import jsonable_encoder
-from mascope_backend.api.new.roles.exceptions import InvalidRoleException
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 
+from mascope_backend.api.new.roles.exceptions import InvalidRoleException
 from mascope_backend.runtime import runtime
 
 

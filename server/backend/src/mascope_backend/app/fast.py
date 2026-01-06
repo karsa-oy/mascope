@@ -6,28 +6,27 @@ which handles per-worker startup and shutdown tasks. The lifespan runs once
 per worker process, after main process initialization is complete.
 """
 
-import uuid
 import os
+import uuid
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request, status
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from mascope_backend.db import init_db
-from mascope_backend.db.wal.engine import wal_checkpoint
-from mascope_backend.api.routes import routers
-from mascope_backend.api.lib.exceptions.api_exceptions import handle_exception
 from mascope_backend.api.controllers.workspace.acquisition.service import (
     create_acquisition_workspaces,
 )
+from mascope_backend.api.lib.exceptions.api_exceptions import handle_exception
+from mascope_backend.api.routes import routers
+from mascope_backend.db import init_db
 from mascope_backend.db.ops.batch.reset_processing_status import (
     reset_stuck_processing_batches,
 )
-from mascope_backend.socket.storage import redis_storage_client
-
+from mascope_backend.db.wal.engine import wal_checkpoint
 from mascope_backend.runtime import runtime
+from mascope_backend.socket.storage import redis_storage_client
 
 
 @asynccontextmanager

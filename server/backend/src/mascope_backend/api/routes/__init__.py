@@ -1,27 +1,27 @@
 from mascope_backend.api.new.auth.routes import auth_router
-from mascope_backend.api.new.users.routes import users_router
-from mascope_backend.api.new.users.first_owner.routes import (
-    first_owner_router,
+from mascope_backend.api.new.cheminfo.routes import cheminfo_router
+from mascope_backend.api.new.file.routes import file_router
+from mascope_backend.api.new.instrument_configs.process.routes import (
+    instrument_configs_process_router,
 )
-from mascope_backend.api.new.users.me.routes import me_router
-from mascope_backend.api.new.users.admin.routes import admin_router
-from mascope_backend.api.new.users.owner.routes import owner_router
-from mascope_backend.api.new.roles.routes import roles_router
-from mascope_backend.api.new.params import params_router
+from mascope_backend.api.new.instrument_configs.routes import (
+    instrument_configs_router,
+)
 from mascope_backend.api.new.instruments import instruments_router
 from mascope_backend.api.new.ionization.modes.routes import (
     ionization_mode_router,
 )
-from mascope_backend.api.new.temp.routes import temp_router
-from mascope_backend.api.new.instrument_configs.routes import (
-    instrument_configs_router,
-)
-from mascope_backend.api.new.instrument_configs.process.routes import (
-    instrument_configs_process_router,
-)
-from mascope_backend.api.new.cheminfo.routes import cheminfo_router
-from mascope_backend.api.new.file.routes import file_router
 from mascope_backend.api.new.match.records.routes import match_records_router
+from mascope_backend.api.new.params import params_router
+from mascope_backend.api.new.roles.routes import roles_router
+from mascope_backend.api.new.temp.routes import temp_router
+from mascope_backend.api.new.users.admin.routes import admin_router
+from mascope_backend.api.new.users.first_owner.routes import (
+    first_owner_router,
+)
+from mascope_backend.api.new.users.me.routes import me_router
+from mascope_backend.api.new.users.owner.routes import owner_router
+from mascope_backend.api.new.users.routes import users_router
 from mascope_backend.api.routes.attribute_templates.attribute_templates_routes import (
     attribute_templates_router,
 )
@@ -45,15 +45,15 @@ from mascope_backend.api.routes.match.ions.match_ions_routes import match_ions_r
 from mascope_backend.api.routes.match.isotopes.match_isotopes_routes import (
     match_isotopes_router,
 )
-from mascope_backend.api.routes.match_rating.match_rating_routes import (
-    match_rating_router,
-)
 from mascope_backend.api.routes.match.match_routes import match_router
 from mascope_backend.api.routes.match.samples.match_samples_routes import (
     match_samples_router,
 )
 from mascope_backend.api.routes.match.targets.batch.match_targets_batch_routes import (
     match_targets_batch_router,
+)
+from mascope_backend.api.routes.match_rating.match_rating_routes import (
+    match_rating_router,
 )
 from mascope_backend.api.routes.sample.batches.sample_batches_routes import (
     sample_batches_router,
@@ -66,17 +66,17 @@ from mascope_backend.api.routes.sample.items.sample_items_routes import (
     sample_items_router,
 )
 from mascope_backend.api.routes.samples.samples_routes import samples_router
-from mascope_backend.api.routes.target.collections.target_collections_routes import (
-    target_collections_router,
-)
 from mascope_backend.api.routes.target.associations.target_collection_in_sample_batch_routes import (
     target_collection_in_sample_batch_router,
 )
-from mascope_backend.api.routes.target.compounds.target_compounds_routes import (
-    target_compounds_router,
-)
 from mascope_backend.api.routes.target.associations.target_compound_in_target_collection_routes import (
     target_compound_in_target_collection_router,
+)
+from mascope_backend.api.routes.target.collections.target_collections_routes import (
+    target_collections_router,
+)
+from mascope_backend.api.routes.target.compounds.target_compounds_routes import (
+    target_compounds_router,
 )
 from mascope_backend.api.routes.target.ions.target_ions_routes import target_ions_router
 from mascope_backend.api.routes.target.isotopes.target_isotopes_routes import (
@@ -86,6 +86,7 @@ from mascope_backend.api.routes.visualization.visualization_routes import (
     visualization_router,
 )
 from mascope_backend.api.routes.workspace.workspace_routes import workspace_router
+
 
 routers = [
     auth_router,

@@ -1,14 +1,15 @@
 from contextlib import asynccontextmanager
+
 from fastapi import Depends
-from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi_users_db_sqlalchemy.access_token import SQLAlchemyAccessTokenDatabase
 from fastapi_users.authentication.strategy.db import (
     AccessTokenDatabase,
     DatabaseStrategy,
 )
+from fastapi_users_db_sqlalchemy.access_token import SQLAlchemyAccessTokenDatabase
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from mascope_backend.api.new.auth.config import auth_settings
-from mascope_backend.db import async_session, get_async_session
-from mascope_backend.db.models import AccessToken
+from mascope_backend.db import AccessToken, async_session, get_async_session
 
 
 async def get_access_token_db(session: AsyncSession = Depends(get_async_session)):

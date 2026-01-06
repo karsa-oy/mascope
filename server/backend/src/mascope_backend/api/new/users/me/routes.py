@@ -1,18 +1,20 @@
 from fastapi import APIRouter, Depends, Request
 from fastapi.security import OAuth2PasswordRequestForm
-from mascope_backend.db.models import User
+
 from mascope_backend.api.lib.api_features import api_route
-from mascope_backend.api.new.auth.dependencies import guest_user, current_active_user
+from mascope_backend.api.new.auth.dependencies import current_active_user, guest_user
 from mascope_backend.api.new.users.exceptions import InvalidUsernameException
-from mascope_backend.api.new.users.user_manager.dependencies import get_user_manager
-from mascope_backend.api.new.users.service import update_user, get_user
-from mascope_backend.api.new.users.user_manager.service import UserManager
-from mascope_backend.api.new.users.schemas import UserUpdate
 from mascope_backend.api.new.users.me.exceptions import InvalidCurrentPasswordException
 from mascope_backend.api.new.users.me.schemas import (
     UserUpdateMe,
     UserUpdateMeCredentials,
 )
+from mascope_backend.api.new.users.schemas import UserUpdate
+from mascope_backend.api.new.users.service import get_user, update_user
+from mascope_backend.api.new.users.user_manager.dependencies import get_user_manager
+from mascope_backend.api.new.users.user_manager.service import UserManager
+from mascope_backend.db import User
+
 
 me_router = APIRouter(prefix="/api/users/me", tags=["Current User"])
 

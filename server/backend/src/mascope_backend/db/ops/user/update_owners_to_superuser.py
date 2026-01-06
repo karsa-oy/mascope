@@ -11,11 +11,11 @@ Entry Points:
 """
 
 import asyncio
+
 from sqlalchemy import update
 
-from mascope_backend.db import async_session
-from mascope_backend.db.models import User
 from mascope_backend.api.new.auth.config import auth_settings
+from mascope_backend.db import User, async_session
 from mascope_backend.runtime import runtime
 
 

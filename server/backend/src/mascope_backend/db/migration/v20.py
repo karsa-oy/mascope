@@ -2,15 +2,15 @@
 Migration script for v19 to v20 database migration.
 """
 
+import asyncio
 import os
 import shutil
-import asyncio
 
 from mascope_backend.db import configure_database_engine
-from mascope_backend.db.ops.restore import db_restore
-from mascope_backend.db.ops.maintenance import db_maintenance
-from mascope_backend.db.ops.clean_access_tokens import clean_access_tokens
 from mascope_backend.db.ops.backup import create_db_backup
+from mascope_backend.db.ops.clean_access_tokens import clean_access_tokens
+from mascope_backend.db.ops.maintenance import db_maintenance
+from mascope_backend.db.ops.restore import db_restore
 from mascope_backend.runtime import runtime
 
 

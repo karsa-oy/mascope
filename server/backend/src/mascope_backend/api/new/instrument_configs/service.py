@@ -1,15 +1,12 @@
 import asyncio
+
 from sqlalchemy import (
-    select,
     asc,
     desc,
     func,
+    select,
 )
-from mascope_signal.instrument_func.fit import fit_instrument_functions
-from mascope_file.name import get_instrument_name, get_instrument_type
-from mascope_backend.db.id import gen_id
-from mascope_backend.db import async_session
-from mascope_backend.db.models import SampleFile, InstrumentFunction as InstrumentConfig
+
 from mascope_backend.api.lib.api_features import (
     api_controller,
     api_controller_background_task,
@@ -18,18 +15,22 @@ from mascope_backend.api.lib.exceptions.api_exceptions import (
     ApiException,
     NotFoundException,
 )
-from mascope_backend.api.new.instrument_configs.schemas import (
-    CreateInstrumentConfigBody,
-    InstrumentFunctionData,
-    PeakShape,
-    InstrumentConfigFitParams,
-    SetInstrumentConfigBody,
-)
 from mascope_backend.api.new.instrument_configs.lib import (
     fetch_instrument_config_by_filename,
 )
-
+from mascope_backend.api.new.instrument_configs.schemas import (
+    CreateInstrumentConfigBody,
+    InstrumentConfigFitParams,
+    InstrumentFunctionData,
+    PeakShape,
+    SetInstrumentConfigBody,
+)
+from mascope_backend.db import InstrumentFunction as InstrumentConfig
+from mascope_backend.db import SampleFile, async_session
+from mascope_backend.db.id import gen_id
 from mascope_backend.runtime import runtime
+from mascope_file.name import get_instrument_name, get_instrument_type
+from mascope_signal.instrument_func.fit import fit_instrument_functions
 
 
 # This service reinforces the a uniqueness constraint:

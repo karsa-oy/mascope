@@ -1,18 +1,20 @@
 from fastapi import APIRouter, Depends
-from mascope_backend.api.lib.api_features import api_route
-from mascope_backend.api.new.auth.dependencies import editor_user, guest_user
+
 from mascope_backend.api.controllers.attribute_templates.attribute_templates_controller import (
-    get_attribute_templates,
-    get_attribute_template,
     create_attribute_template,
-    update_attribute_template,
     delete_attribute_template,
+    get_attribute_template,
+    get_attribute_templates,
+    update_attribute_template,
 )
+from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.models.attribute_templates.attribute_template_pydantic_model import (
     AttributeTemplateCreateBody,
     AttributeTemplateUpdateBody,
     GetAttributeTemplatesQueryParams,
 )
+from mascope_backend.api.new.auth.dependencies import editor_user, guest_user
+
 
 attribute_templates_router = APIRouter(
     prefix="/api/attribute_templates", tags=["Attribute Templates"]

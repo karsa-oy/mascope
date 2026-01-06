@@ -1,11 +1,12 @@
-from typing import Optional, List, Tuple
-from sqlalchemy import select
-from mascope_backend.db import async_session
-from mascope_backend.db.models import (
-    SampleItem,
-    SampleBatch,
-)
+from typing import List, Optional, Tuple
 
+from sqlalchemy import select
+
+from mascope_backend.db import (
+    SampleBatch,
+    SampleItem,
+    async_session,
+)
 from mascope_backend.runtime import runtime
 
 

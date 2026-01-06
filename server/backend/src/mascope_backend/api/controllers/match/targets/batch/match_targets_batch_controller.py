@@ -1,11 +1,4 @@
-from typing import Optional
-from mascope_backend.db import async_session
-from mascope_backend.db.models import (
-    SampleBatch,
-)
-from mascope_backend.api.lib.api_features import api_controller
-from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
-from mascope_backend.api.controllers.samples.samples_controller import get_samples
+
 from mascope_backend.api.controllers.match.compounds.match_compounds_controller import (
     get_match_compounds,
 )
@@ -14,6 +7,13 @@ from mascope_backend.api.controllers.match.ions.match_ions_controller import (
 )
 from mascope_backend.api.controllers.match.isotopes.match_isotopes_controller import (
     get_match_isotopes,
+)
+from mascope_backend.api.controllers.samples.samples_controller import get_samples
+from mascope_backend.api.lib.api_features import api_controller
+from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
+from mascope_backend.db import (
+    SampleBatch,
+    async_session,
 )
 
 

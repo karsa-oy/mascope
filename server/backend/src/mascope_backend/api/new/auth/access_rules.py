@@ -2,13 +2,15 @@
 API-level access rules for locked entities, extending RBAC controls from dependencies.py
 """
 
-from typing import Union, Type
+from typing import Type, Union
+
 from sqlalchemy import select
-from mascope_backend.db import async_session
-from mascope_backend.db.models import User, Workspace, SampleBatch, SampleItem
+
 from mascope_backend.api.new.auth.config import auth_settings
 from mascope_backend.api.new.auth.exceptions import ForbiddenAccessException
 from mascope_backend.api.new.roles.exceptions import InvalidRoleException
+from mascope_backend.db import SampleBatch, SampleItem, User, Workspace, async_session
+
 
 # Type alias for allowed lockable sqlalchemy models
 LockableModel = Union[Type[Workspace], Type[SampleBatch], Type[SampleItem]]

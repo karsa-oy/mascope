@@ -14,9 +14,10 @@ Redis keys:
 """
 
 import os
+
+from mascope_backend.runtime import runtime
 from mascope_backend.socket.storage.client import redis_storage_client
 from mascope_backend.socket.storage.config import storage_config
-from mascope_backend.runtime import runtime
 
 
 class RoomTracker:

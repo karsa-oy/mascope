@@ -7,22 +7,23 @@ by comparing current target isotope associations against existing match isotopes
 
 from dataclasses import dataclass
 
-from sqlalchemy import select, exists
-from mascope_backend.db import async_session
-from mascope_backend.db.models import (
-    Sample,
-    SampleBatch,
-    TargetIsotope,
-    TargetIon,
-    TargetCompound,
-    TargetCompoundInTargetCollection,
-    TargetCollectionInSampleBatch,
-    IonizationMechanism,
-    MatchIsotope,
-)
+from sqlalchemy import exists, select
+
 from mascope_backend.api.new.ionization.modes.util import (
     fetch_batch_ionization_mechanism_ids,
     fetch_sample_ionization_mechanism_ids,
+)
+from mascope_backend.db import (
+    IonizationMechanism,
+    MatchIsotope,
+    Sample,
+    SampleBatch,
+    TargetCollectionInSampleBatch,
+    TargetCompound,
+    TargetCompoundInTargetCollection,
+    TargetIon,
+    TargetIsotope,
+    async_session,
 )
 from mascope_backend.runtime import runtime
 

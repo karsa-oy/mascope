@@ -11,8 +11,9 @@ Internal:
 API/Service -> event_emitter.emit() -> @event_emitter.on handler -> socket.emit -> Frontend
 """
 
-from typing import Dict, List, Callable
 from asyncio import Queue
+from typing import Callable, Dict, List
+
 from mascope_backend.runtime import runtime
 
 

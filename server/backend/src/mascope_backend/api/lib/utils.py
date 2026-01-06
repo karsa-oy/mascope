@@ -2,8 +2,9 @@
 
 import re
 from typing import Any
-from mascope_backend.socket.records import emit_record_reload
+
 from mascope_backend.runtime import runtime
+from mascope_backend.socket.records import emit_record_reload
 
 
 def beautify_func_name(func_name: str, max_words: int = None) -> str:

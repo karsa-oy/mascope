@@ -1,5 +1,7 @@
 from fastapi_users.authentication import CookieTransport
+
 from mascope_backend.api.new.auth.config import auth_settings
+
 
 # Cookie-based authentication for web app (Mascope web-based interface)
 cookie_transport = CookieTransport(

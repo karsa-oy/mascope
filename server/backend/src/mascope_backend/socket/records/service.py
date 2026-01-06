@@ -1,11 +1,12 @@
 """Record synchronization event emission."""
 
 from typing import Any
-from mascope_backend.socket import sio
-from mascope_backend.socket.records.schemas import RecordEvent
-from mascope_backend.socket.records.config import record_sync_config
+
 from mascope_backend.db.id import gen_id
 from mascope_backend.runtime import runtime
+from mascope_backend.socket import sio
+from mascope_backend.socket.records.config import record_sync_config
+from mascope_backend.socket.records.schemas import RecordEvent
 
 
 async def emit_record_created(

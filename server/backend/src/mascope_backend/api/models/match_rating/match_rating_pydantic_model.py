@@ -1,6 +1,8 @@
-from typing import Optional, Dict, List
 from datetime import datetime as dt
+from typing import Dict, List, Optional
+
 from pydantic import BaseModel, Field
+
 from mascope_backend.api.models.base_pydantic_model import QueryParamsModel
 
 

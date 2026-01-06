@@ -3,19 +3,16 @@ Update .props for TOF files if any: rename mass_calibration to mz_calibration.
 """
 
 import asyncio
+import json
 import os
 import shutil
-import json
 
 from sqlalchemy import select
 
-from mascope_backend.db import async_session, configure_database_engine
-from mascope_backend.db.ops.backup import create_db_backup
-from mascope_backend.db.models import SampleFile
-
-import mascope_file.name as m_name
 import mascope_file.io as m_io
-
+import mascope_file.name as m_name
+from mascope_backend.db import SampleFile, async_session, configure_database_engine
+from mascope_backend.db.ops.backup import create_db_backup
 from mascope_backend.runtime import runtime
 
 

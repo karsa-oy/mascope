@@ -9,29 +9,28 @@ such as access token cleanup for external services like Jupyter.
 
 import os
 from typing import Any, Dict, Optional
-from sqlalchemy import select
+
 from fastapi import Request, Response
-from fastapi_users import BaseUserManager, IntegerIDMixin
-from fastapi_users import models
-from mascope_backend.db import async_session
-from mascope_backend.db.models import User, Role
+from fastapi_users import BaseUserManager, IntegerIDMixin, models
+from sqlalchemy import select
+
 from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
+from mascope_backend.api.new.auth.access_token.service import regenerate_access_token
 from mascope_backend.api.new.auth.config import auth_settings
 from mascope_backend.api.new.users import exceptions
-from mascope_backend.api.new.users.schemas import UserCreate, UserUpdate, UserRead
-from mascope_backend.api.new.auth.access_token.service import regenerate_access_token
 from mascope_backend.api.new.users.access_token.service import delete_user_access_tokens
+from mascope_backend.api.new.users.schemas import UserCreate, UserRead, UserUpdate
+from mascope_backend.db import Role, User, async_session
+from mascope_backend.runtime import runtime
+from mascope_backend.socket.auth import (
+    SocketUnauthenticatedError,
+    authenticate_socket_connection,
+)
 from mascope_backend.socket.records.service import (
     emit_record_created,
-    emit_record_updated,
     emit_record_deleted,
+    emit_record_updated,
 )
-from mascope_backend.socket.auth import (
-    authenticate_socket_connection,
-    SocketUnauthenticatedError,
-)
-
-from mascope_backend.runtime import runtime
 
 
 class UserManager(IntegerIDMixin, BaseUserManager[User, int]):

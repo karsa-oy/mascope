@@ -2,11 +2,11 @@
 
 from copy import deepcopy
 from typing import Any
+
+from mascope_backend.runtime import runtime
 from mascope_backend.socket import sio
 from mascope_backend.socket.notifications.schemas import UserNotification
 from mascope_backend.socket.storage import room_tracker
-
-from mascope_backend.runtime import runtime
 
 
 async def emit_user_notification(

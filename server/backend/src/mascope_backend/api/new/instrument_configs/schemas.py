@@ -1,4 +1,5 @@
 from datetime import datetime
+
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from mascope_backend.api.models.base_pydantic_model import QueryParamsModel

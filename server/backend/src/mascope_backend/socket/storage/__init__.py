@@ -17,9 +17,9 @@ from mascope_backend.socket.storage.rooms import (
     room_tracker,
 )
 from mascope_backend.socket.storage.sessions import (
-    save_user_session,
     clear_user_session,
     get_session_user,
+    save_user_session,
 )
 
 

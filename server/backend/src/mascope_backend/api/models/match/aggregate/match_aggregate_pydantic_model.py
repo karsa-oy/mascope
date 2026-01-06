@@ -1,11 +1,13 @@
 from typing import Optional
+
 from pydantic import BaseModel, Field
+
 from mascope_backend.api.models.target.compounds.target_compound_pydantic_model import (
     TargetCompoundMatches,
 )
 from mascope_match.params import (
-    TofMatchParams,
     OrbiMatchParams,
+    TofMatchParams,
 )
 
 

@@ -1,23 +1,25 @@
 from fastapi import APIRouter, Body, Depends, Path, Request
+
 from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.new.auth.config import auth_settings
 from mascope_backend.api.new.auth.dependencies import admin_user
 from mascope_backend.api.new.auth.exceptions import ForbiddenAccessException
+from mascope_backend.api.new.users.access_token.service import delete_user_access_tokens
 from mascope_backend.api.new.users.exceptions import InvalidUsernameException
-from mascope_backend.api.new.users.user_manager.dependencies import get_user_manager
+from mascope_backend.api.new.users.password.service import reset_user_password
 from mascope_backend.api.new.users.schemas import (
     UserCreate,
     UserUpdate,
 )
 from mascope_backend.api.new.users.service import (
+    delete_user,
     get_user,
     register_user,
     update_user,
-    delete_user,
 )
-from mascope_backend.api.new.users.access_token.service import delete_user_access_tokens
-from mascope_backend.api.new.users.password.service import reset_user_password
+from mascope_backend.api.new.users.user_manager.dependencies import get_user_manager
 from mascope_backend.api.new.users.user_manager.service import UserManager
+
 
 admin_router = APIRouter(prefix="/api/users/admin", tags=["User Management Admin"])
 

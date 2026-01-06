@@ -1,19 +1,19 @@
 from sqlalchemy import (
-    select,
     asc,
     desc,
     func,
+    select,
 )
-from mascope_backend.socket.records.service import emit_record_reload
-from mascope_backend.db import async_session
-from mascope_backend.db.id import gen_id
-from mascope_backend.db.models import AttributeTemplate
+
 from mascope_backend.api.lib.api_features import api_controller
 from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
 from mascope_backend.api.models.attribute_templates.attribute_template_pydantic_model import (
     AttributeTemplateCreateBody,
     AttributeTemplateUpdateBody,
 )
+from mascope_backend.db import AttributeTemplate, async_session
+from mascope_backend.db.id import gen_id
+from mascope_backend.socket.records.service import emit_record_reload
 
 
 @api_controller()

@@ -22,7 +22,7 @@ from datetime import datetime, timezone
 import pytest
 import pytest_asyncio
 
-from mascope_backend.db.models import IonizationMechanism, TargetCompound, Workspace
+from mascope_backend.db import IonizationMechanism, TargetCompound, Workspace
 
 
 @pytest_asyncio.fixture(scope="session")

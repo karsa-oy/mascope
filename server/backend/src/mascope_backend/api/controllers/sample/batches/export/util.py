@@ -2,8 +2,8 @@
 Excel utility functions for batch export operations.
 """
 
-from openpyxl.worksheet.worksheet import Worksheet
 from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.worksheet import Worksheet
 
 
 def auto_adjust_column_width(

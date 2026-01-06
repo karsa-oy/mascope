@@ -1,6 +1,6 @@
+from mascope_backend.runtime import runtime
 from mascope_backend.socket import sio
 from mascope_backend.socket.emitter import event_emitter
-from mascope_backend.runtime import runtime
 
 
 @event_emitter.on("file-converter.auth")

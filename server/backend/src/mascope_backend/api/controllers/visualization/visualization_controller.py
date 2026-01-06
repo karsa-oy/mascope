@@ -1,21 +1,20 @@
 from dataclasses import dataclass, field
 from typing import Any
-import numpy as np
-from sqlalchemy import select
-from colorcet import glasbey_hv as colormap
 
-from mascope_file.io import load_peak_data, read_props
-from mascope_file.name import get_instrument_type
+import numpy as np
+from colorcet import glasbey_hv as colormap
+from sqlalchemy import select
 
 import mascope_signal.compute as m_compute
+from mascope_backend.api.controllers.samples.lib.samples_fetch import fetch_sample
+from mascope_backend.api.lib.api_features import api_controller_background_task
+from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
+from mascope_backend.db import TargetIsotope, async_session
+from mascope_backend.socket import sio
+from mascope_file.io import load_peak_data, read_props
+from mascope_file.name import get_instrument_type
 from mascope_signal.peak import filter_peaks, get_peaks
 
-from mascope_backend.db import async_session
-from mascope_backend.db.models import TargetIsotope
-from mascope_backend.socket import sio
-from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
-from mascope_backend.api.lib.api_features import api_controller_background_task
-from mascope_backend.api.controllers.samples.lib.samples_fetch import fetch_sample
 
 # TODO_configuration shift traces color
 COLOR_OFFSET = 5

@@ -6,7 +6,8 @@ with validation rules and business logic constraints.
 """
 
 import re
-from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from mascope_backend.api.models.base_pydantic_model import QueryParamsModel
 from mascope_backend.api.models.ionization_mechanisms.config import (

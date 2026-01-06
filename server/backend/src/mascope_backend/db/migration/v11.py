@@ -1,6 +1,6 @@
 import os
-import sqlite3
 import shutil
+import sqlite3
 
 from mascope_backend.runtime import runtime
 

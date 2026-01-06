@@ -13,15 +13,15 @@ Issue: #1211
 """
 
 import asyncio
+
 from sqlalchemy import select
 
-from mascope_backend.db import async_session, configure_database_engine
-from mascope_backend.db.models import User
+from mascope_backend.api.new.auth.config import auth_settings
+from mascope_backend.db import User, async_session, configure_database_engine
 from mascope_backend.db.ops.user.update_owners_to_superuser import (
     update_owners_superuser_rights,
 )
 from mascope_backend.db.utils import get_current_db_version
-from mascope_backend.api.new.auth.config import auth_settings
 from mascope_backend.runtime import runtime
 
 

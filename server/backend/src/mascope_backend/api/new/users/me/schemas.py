@@ -1,6 +1,8 @@
 from typing import Optional
-from pydantic import Field, field_validator, model_validator
+
 from fastapi_users import schemas
+from pydantic import Field, field_validator, model_validator
+
 from mascope_backend.api.new.users.exceptions import InvalidFieldsException
 from mascope_backend.api.new.users.me.exceptions import (
     PasswordMismatchException,

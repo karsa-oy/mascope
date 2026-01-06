@@ -5,6 +5,7 @@ Centralized configuration for sample batch types and rules.
 """
 
 from pydantic import BaseModel
+
 from mascope_backend.api.models.target.collections.config import (
     target_collection_config,
 )

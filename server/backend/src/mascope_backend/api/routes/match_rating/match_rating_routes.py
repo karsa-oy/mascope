@@ -1,15 +1,17 @@
 from fastapi import APIRouter, Depends
-from mascope_backend.api.lib.api_features import api_route
-from mascope_backend.api.new.auth.dependencies import guest_user, editor_user
+
 from mascope_backend.api.controllers.match_rating.match_rating_controller import (
-    get_match_ratings,
-    get_match_rating,
     create_match_rating,
+    get_match_rating,
+    get_match_ratings,
 )
+from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.models.match_rating.match_rating_pydantic_model import (
-    MatchRatingCreate,
     GetMatchRatingsQueryParams,
+    MatchRatingCreate,
 )
+from mascope_backend.api.new.auth.dependencies import editor_user, guest_user
+
 
 match_rating_router = APIRouter(
     prefix="/api/match_ratings",

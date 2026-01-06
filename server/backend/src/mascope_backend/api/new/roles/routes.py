@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends
+
 from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.new.auth.dependencies import admin_user, owner_user
 from mascope_backend.api.new.roles.schemas import GetRolesQueryParams
 from mascope_backend.api.new.roles.service import get_roles
+
 
 roles_router = APIRouter(prefix="/api/roles", tags=["Roles"])
 

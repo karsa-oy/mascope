@@ -1,18 +1,21 @@
 from typing import List
+
 from fastapi import APIRouter, Depends
-from mascope_backend.api.new.auth.dependencies import guest_user, editor_user
-from mascope_backend.api.lib.api_features import api_route
+
 from mascope_backend.api.controllers.match.ions.match_ions_controller import (
-    get_match_ions,
-    get_match_ion,
     create_match_ions,
     delete_match_ions,
+    get_match_ion,
+    get_match_ions,
 )
+from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.models.match.ions.match_ion_pydantic_model import (
-    MatchIonBase,
-    GetMatchIonsQueryParams,
     DeleteMatchIonsPayload,
+    GetMatchIonsQueryParams,
+    MatchIonBase,
 )
+from mascope_backend.api.new.auth.dependencies import editor_user, guest_user
+
 
 match_ions_router = APIRouter(prefix="/api/match/ions", tags=["Match Ions"])
 

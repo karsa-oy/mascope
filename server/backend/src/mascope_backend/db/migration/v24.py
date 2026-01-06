@@ -5,8 +5,6 @@ Migration script for v23 to v24 database migration.
 import os
 import shutil
 
-from mascope_file.name import get_sample_file_type
-from mascope_file.io import delete_peaks
 from mascope_backend.api.controllers.match.match_controller import (
     match_compute_sample,
     match_remove_sample,
@@ -15,10 +13,11 @@ from mascope_backend.api.controllers.sample.items.sample_items_controller import
     get_sample_items,
 )
 from mascope_backend.db import configure_database_engine
-from mascope_backend.db.ops.maintenance import db_maintenance
 from mascope_backend.db.ops.backup import create_db_backup
-
+from mascope_backend.db.ops.maintenance import db_maintenance
 from mascope_backend.runtime import runtime
+from mascope_file.io import delete_peaks
+from mascope_file.name import get_sample_file_type
 
 
 async def run():

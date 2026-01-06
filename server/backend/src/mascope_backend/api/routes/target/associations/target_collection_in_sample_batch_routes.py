@@ -1,12 +1,13 @@
 from fastapi import APIRouter, Depends
-from mascope_backend.api.lib.api_features import api_route
-from mascope_backend.api.new.auth.dependencies import guest_user
+
 from mascope_backend.api.controllers.target.associations.target_collection_in_sample_batch_controller import (
     get_target_collections_in_sample_batch,
 )
+from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.models.target.collections.target_collection_pydantic_model import (
     GetTargetCollectionsInSampleBatchQueryParams,
 )
+from mascope_backend.api.new.auth.dependencies import guest_user
 
 
 target_collection_in_sample_batch_router = APIRouter(

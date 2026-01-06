@@ -3,9 +3,9 @@ Core authentication configuration including JWT, cookies, and access tokens sett
 """
 
 from pydantic import BaseModel
+
 from mascope_backend.api.new.auth.access_token.config import AccessTokenConfig
 from mascope_backend.api.new.auth.secrets import jwt_secret_key
-
 from mascope_backend.runtime import runtime
 
 

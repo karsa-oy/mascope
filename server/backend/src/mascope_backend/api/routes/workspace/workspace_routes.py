@@ -6,28 +6,30 @@ CRUD operations and workspace management functionality.
 """
 
 from fastapi import APIRouter, Depends, Query
-from mascope_backend.db.models import Workspace
-from mascope_backend.api.new.auth.dependencies import (
-    guest_user,
-    editor_user,
-)
-from mascope_backend.api.new.auth.access_rules import locked_access
-from mascope_backend.api.lib.api_features import api_route
+
 from mascope_backend.api.controllers.workspace.workspace_controller import (
-    get_workspaces,
-    get_workspace,
     create_workspace,
-    update_workspace,
     delete_workspace,
+    get_workspace,
+    get_workspaces,
+    update_workspace,
 )
+from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.models.workspace.workspace_pydantic_model import (
+    GetWorkspacesQueryParams,
     WorkspaceCreate,
     WorkspaceUpdate,
-    GetWorkspacesQueryParams,
+)
+from mascope_backend.api.new.auth.access_rules import locked_access
+from mascope_backend.api.new.auth.dependencies import (
+    editor_user,
+    guest_user,
 )
 from mascope_backend.api.routes.workspace.acquisition.routes import (
     acquisition_workspaces_router,
 )
+from mascope_backend.db import Workspace
+
 
 workspace_router = APIRouter(prefix="/api/workspaces", tags=["Workspace"])
 workspace_router.include_router(acquisition_workspaces_router)

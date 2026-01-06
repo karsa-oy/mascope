@@ -1,11 +1,12 @@
 from fastapi_users import FastAPIUsers
-from mascope_backend.db.models import User
-from mascope_backend.api.new.users.user_manager.dependencies import get_user_manager
+
 from mascope_backend.api.new.auth.backend import (
-    auth_backend_jwt,
     auth_backend_access_token,
+    auth_backend_jwt,
     get_enabled_backends,
 )
+from mascope_backend.api.new.users.user_manager.dependencies import get_user_manager
+from mascope_backend.db import User
 
 
 # FastAPI Users setup with authentication with both backends

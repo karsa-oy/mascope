@@ -7,24 +7,25 @@ with custom operations and integrations, including role filtering, validation, e
 """
 
 from typing import Optional, Union
-from sqlalchemy import asc, desc, select, func
-from mascope_backend.db import async_session
-from mascope_backend.db.models import User, Role
+
+from sqlalchemy import asc, desc, func, select
+
 from mascope_backend.api.lib.api_features import api_controller
 from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
 from mascope_backend.api.new.auth.config import auth_settings
-from mascope_backend.api.new.users.user_manager.service import UserManager
-from mascope_backend.api.new.users.schemas import UserCreate, UserRead, UserUpdate
-from mascope_backend.api.new.users.me.schemas import (
-    UserUpdateMe,
-    UserUpdateMeCredentials,
-)
-from mascope_backend.api.new.users.util import check_username_exists
+from mascope_backend.api.new.roles.exceptions import InvalidRoleException
 from mascope_backend.api.new.users.first_owner.util import (
     check_last_owner_deletion,
     check_owner_role_change,
 )
-from mascope_backend.api.new.roles.exceptions import InvalidRoleException
+from mascope_backend.api.new.users.me.schemas import (
+    UserUpdateMe,
+    UserUpdateMeCredentials,
+)
+from mascope_backend.api.new.users.schemas import UserCreate, UserRead, UserUpdate
+from mascope_backend.api.new.users.user_manager.service import UserManager
+from mascope_backend.api.new.users.util import check_username_exists
+from mascope_backend.db import Role, User, async_session
 
 
 @api_controller()

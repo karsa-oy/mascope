@@ -4,36 +4,37 @@ Ionization mechanisms controller for managing ionization mechanism operations.
 """
 from fastapi import HTTPException
 from sqlalchemy import (
-    select,
     asc,
+    delete,
     desc,
     func,
-    delete,
+    select,
 )
-from mascope_backend.socket.records.service import (
-    emit_record_created,
-    emit_record_deleted,
-)
-from mascope_backend.db import async_session
-from mascope_backend.db.id import gen_id
-from mascope_backend.db.models import (
-    IonizationMechanism,
-    IonizationMode,
-    TargetCompound,
-    TargetIon,
-    TargetIsotope,
+
+from mascope_backend.api.controllers.target.ions.target_ions_controller import (
+    create_target_ions,
 )
 from mascope_backend.api.lib.api_features import api_controller
 from mascope_backend.api.lib.exceptions.api_exceptions import (
     ApiException,
     NotFoundException,
 )
-from mascope_backend.api.controllers.target.ions.target_ions_controller import (
-    create_target_ions,
-)
 from mascope_backend.api.models.ionization_mechanisms.ionization_mechanism_pydantic_model import (
     IonizationMechanismCreate,
     IonizationMechanismRead,
+)
+from mascope_backend.db import (
+    IonizationMechanism,
+    IonizationMode,
+    TargetCompound,
+    TargetIon,
+    TargetIsotope,
+    async_session,
+)
+from mascope_backend.db.id import gen_id
+from mascope_backend.socket.records.service import (
+    emit_record_created,
+    emit_record_deleted,
 )
 
 

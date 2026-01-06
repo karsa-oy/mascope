@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
-from mascope_backend.api.new.auth.dependencies import guest_user
+
 from mascope_backend.api.lib.api_features import api_route
+from mascope_backend.api.new.auth.dependencies import guest_user
 from mascope_backend.api.new.instruments.service import get_instruments
 
 

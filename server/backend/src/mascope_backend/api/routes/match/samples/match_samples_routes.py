@@ -1,18 +1,21 @@
 from typing import List
+
 from fastapi import APIRouter, Depends
-from mascope_backend.api.new.auth.dependencies import guest_user, editor_user
-from mascope_backend.api.lib.api_features import api_route
+
 from mascope_backend.api.controllers.match.samples.match_samples_controller import (
-    get_match_samples,
-    get_match_sample,
     create_match_samples,
     delete_match_samples,
+    get_match_sample,
+    get_match_samples,
 )
-from mascope_backend.api.models.match.samples.match_sample_pydantic_model import (
-    MatchSampleBase,
-    GetMatchSamplesQueryParams,
-)
+from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.models.match.match_pydantic_model import FilterSamplePayload
+from mascope_backend.api.models.match.samples.match_sample_pydantic_model import (
+    GetMatchSamplesQueryParams,
+    MatchSampleBase,
+)
+from mascope_backend.api.new.auth.dependencies import editor_user, guest_user
+
 
 match_samples_router = APIRouter(prefix="/api/match/samples", tags=["Match Samples"])
 

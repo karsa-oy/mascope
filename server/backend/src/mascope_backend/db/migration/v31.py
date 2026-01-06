@@ -9,18 +9,22 @@ Schema changes:
 - Set is_default=true for: -H-, +Br-, +H+, +(CH4N2O)H+, +CH4N2OH+
 """
 
+import asyncio
 import os
 import shutil
-import asyncio
-from sqlalchemy import text, func, update
 
-from mascope_backend.db import configure_database_engine, async_session
-from mascope_backend.db.models import IonizationMechanism
-from mascope_backend.db.ops.backup import create_db_backup
-from mascope_backend.db.ops.maintenance import db_maintenance
+from sqlalchemy import func, text, update
+
 from mascope_backend.api.models.ionization_mechanisms.config import (
     ionization_mechanism_config,
 )
+from mascope_backend.db import (
+    IonizationMechanism,
+    async_session,
+    configure_database_engine,
+)
+from mascope_backend.db.ops.backup import create_db_backup
+from mascope_backend.db.ops.maintenance import db_maintenance
 from mascope_backend.runtime import runtime
 
 

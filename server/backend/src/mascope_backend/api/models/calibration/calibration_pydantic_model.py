@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field, model_validator
+
 from mascope_backend.api.models.base_pydantic_model import QueryParamsModel
 from mascope_backend.api.models.calibration.config import calibration_config
 

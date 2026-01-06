@@ -1,9 +1,11 @@
-from typing import Optional, List
+from typing import List, Optional
+
 from pydantic import BaseModel, Field
+
+from mascope_backend.api.models.base_pydantic_model import QueryParamsModel
 from mascope_backend.api.models.match.match_pydantic_model import (
     FilterSamplePayload,
 )
-from mascope_backend.api.models.base_pydantic_model import QueryParamsModel
 
 
 class MatchIonBase(BaseModel):

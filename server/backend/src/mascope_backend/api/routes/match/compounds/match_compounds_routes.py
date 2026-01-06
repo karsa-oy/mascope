@@ -1,18 +1,21 @@
 from typing import List
+
 from fastapi import APIRouter, Depends
-from mascope_backend.api.lib.api_features import api_route
+
 from mascope_backend.api.controllers.match.compounds.match_compounds_controller import (
-    get_match_compounds,
-    get_match_compound,
     create_match_compounds,
     delete_match_compounds,
+    get_match_compound,
+    get_match_compounds,
 )
+from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.models.match.compounds.match_compound_pydantic_model import (
-    MatchCompoundBase,
-    GetMatchCompoundsQueryParams,
     DeleteMatchCompoundsPayload,
+    GetMatchCompoundsQueryParams,
+    MatchCompoundBase,
 )
 from mascope_backend.api.new.auth.dependencies import editor_user, guest_user
+
 
 match_compounds_router = APIRouter(
     prefix="/api/match/compounds", tags=["Match Compounds"]

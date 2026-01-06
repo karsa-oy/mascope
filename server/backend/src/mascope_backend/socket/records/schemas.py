@@ -2,7 +2,9 @@
 
 from datetime import datetime, timezone
 from typing import Any, Literal
+
 from pydantic import BaseModel, Field, model_validator
+
 from mascope_backend.socket.records.config import record_sync_config
 
 

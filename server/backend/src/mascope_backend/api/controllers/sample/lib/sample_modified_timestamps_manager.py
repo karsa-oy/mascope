@@ -7,12 +7,13 @@ preventing circular timestamp updates.
 """
 
 from datetime import datetime, timezone
-from sqlalchemy import update, select
-from mascope_backend.db import async_session
-from mascope_backend.db.models import SampleItem, SampleBatch
+
+from sqlalchemy import select, update
+
 from mascope_backend.api.controllers.sample.lib.fetch_affected_sample_data import (
     fetch_affected_sample_data,
 )
+from mascope_backend.db import SampleBatch, SampleItem, async_session
 from mascope_backend.runtime import runtime
 
 

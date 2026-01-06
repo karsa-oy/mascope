@@ -1,18 +1,21 @@
 from typing import List
+
 from fastapi import APIRouter, Depends
-from mascope_backend.api.new.auth.dependencies import guest_user, editor_user
-from mascope_backend.api.lib.api_features import api_route
+
 from mascope_backend.api.controllers.match.isotopes.match_isotopes_controller import (
-    get_match_isotope,
-    get_match_isotopes,
     create_match_isotopes,
     delete_match_isotopes,
+    get_match_isotope,
+    get_match_isotopes,
 )
+from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.models.match.isotopes.match_isotopes_pydantic_model import (
-    MatchIsotopeBase,
-    GetMatchesQueryParams,
     DeleteMatchIsotopesPayload,
+    GetMatchesQueryParams,
+    MatchIsotopeBase,
 )
+from mascope_backend.api.new.auth.dependencies import editor_user, guest_user
+
 
 match_isotopes_router = APIRouter(prefix="/api/match/isotopes", tags=["Match Isotopes"])
 

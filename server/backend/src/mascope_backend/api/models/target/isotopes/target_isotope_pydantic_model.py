@@ -6,6 +6,7 @@ with validation rules and business logic constraints.
 """
 
 from pydantic import Field, field_validator
+
 from mascope_backend.api.models.base_pydantic_model import QueryParamsModel
 from mascope_backend.api.models.target.isotopes.config import target_isotope_config
 

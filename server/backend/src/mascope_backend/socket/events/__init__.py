@@ -7,5 +7,4 @@ communication and the internal event emitters for server-side events.
 
 def init_events():
     """Initialize event handlers and emitters."""
-    from . import handlers
-    from . import emitters
+    from . import emitters, handlers

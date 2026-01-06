@@ -1,49 +1,48 @@
 import os
 import shutil
-
 from datetime import datetime, timedelta, timezone
 from typing import Callable
-from fastapi import APIRouter, BackgroundTasks, File, Depends, UploadFile
 
+from fastapi import APIRouter, BackgroundTasks, Depends, File, UploadFile
 from tuspyserver import create_tus_router
 
-from mascope_backend.api.new.auth.access_token.service import get_access_token
-from mascope_backend.db.id import gen_id
-from mascope_backend.api.new.auth.dependencies import guest_user, editor_user
-from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.controllers.sample.files.process.service import (
     auto_process_sample_file,
     re_process_sample_files,
 )
 from mascope_backend.api.controllers.sample.files.sample_files_controller import (
-    get_sample_files,
-    get_sample_file,
+    compute_sample_file_peaks,
     create_sample_file,
     delete_sample_file,
     delete_sample_files,
+    get_sample_file,
+    get_sample_file_metadata,
+    get_sample_file_peak_timeseries,
+    get_sample_file_peaks,
+    get_sample_file_spectrum,
+    get_sample_files,
     update_sample_file,
     upload_sample_file,
     upload_sample_files,
-    get_sample_file_peaks,
-    compute_sample_file_peaks,
-    get_sample_file_peak_timeseries,
-    get_sample_file_spectrum,
-    get_sample_file_metadata,
 )
+from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.models.sample.files.sample_file_pydantic_model import (
-    SampleFileCreate,
-    SampleFileUpdate,
-    SampleFilesUpload,
-    GetSampleFilesQueryParams,
+    DeleteSampleFilesBody,
     GetRecentSampleFilesQueryParams,
     GetSampleFilePeaksQueryParams,
     GetSampleFilePeakTimeseriesBody,
+    GetSampleFilesQueryParams,
     GetSpectrumQueryParams,
-    DeleteSampleFilesBody,
     ReprocessSampleFilesBody,
+    SampleFileCreate,
+    SampleFilesUpload,
+    SampleFileUpdate,
 )
-
+from mascope_backend.api.new.auth.access_token.service import get_access_token
+from mascope_backend.api.new.auth.dependencies import editor_user, guest_user
+from mascope_backend.db.id import gen_id
 from mascope_backend.runtime import runtime
+
 
 sample_files_router = APIRouter(prefix="/api/sample/files", tags=["Sample Files"])
 

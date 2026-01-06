@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 from sqlalchemy import select
-from mascope_backend.db.models import Sample
+from mascope_backend.db import Sample
 from mascope_backend.db import async_session
 import mascope_file.name as m_name
 import warnings

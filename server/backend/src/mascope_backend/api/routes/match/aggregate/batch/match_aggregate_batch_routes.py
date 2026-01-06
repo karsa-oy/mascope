@@ -1,17 +1,18 @@
 from fastapi import APIRouter, Depends
-from mascope_backend.api.lib.api_features import api_route
+
 from mascope_backend.api.controllers.match.aggregate.match_aggregate_controller import (
-    aggregate_matches,
-    aggregate_match_isotope_filtered_data,
     aggregate_and_create_matches,
     aggregate_and_recreate_matches,
+    aggregate_match_isotope_filtered_data,
+    aggregate_matches,
 )
 from mascope_backend.api.controllers.sample.batches.sample_batches_controller import (
     get_sample_batch,
 )
+from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.models.match.aggregate.match_aggregate_pydantic_model import (
-    AggregateMatchIsotopeFilteredDataBody,
     AggregateAndCreateMatchesBody,
+    AggregateMatchIsotopeFilteredDataBody,
 )
 from mascope_backend.api.new.auth.dependencies import editor_user, guest_user
 

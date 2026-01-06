@@ -1,19 +1,20 @@
 import json
 from datetime import datetime, timezone
+
 from sqlalchemy import (
-    select,
     asc,
     desc,
     func,
+    select,
 )
-from mascope_backend.db import async_session
-from mascope_backend.db.id import gen_id
-from mascope_backend.db.models import MatchRating
+
 from mascope_backend.api.lib.api_features import api_controller
 from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
 from mascope_backend.api.models.match_rating.match_rating_pydantic_model import (
     MatchRatingCreate,
 )
+from mascope_backend.db import MatchRating, async_session
+from mascope_backend.db.id import gen_id
 
 
 @api_controller()

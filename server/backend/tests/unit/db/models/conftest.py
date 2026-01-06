@@ -5,7 +5,7 @@ Fixtures for database model tests.
 from datetime import datetime, timezone
 import pytest_asyncio
 
-from mascope_backend.db.models import Workspace, SampleBatch
+from mascope_backend.db import Workspace, SampleBatch
 
 
 @pytest_asyncio.fixture

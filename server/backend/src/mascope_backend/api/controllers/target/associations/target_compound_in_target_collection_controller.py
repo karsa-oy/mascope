@@ -1,14 +1,15 @@
 from sqlalchemy import (
-    select,
     asc,
     desc,
     func,
+    select,
 )
-from mascope_backend.db import async_session
-from mascope_backend.db.models import (
-    TargetCompoundInTargetCollection,
-)
+
 from mascope_backend.api.lib.api_features import api_controller
+from mascope_backend.db import (
+    TargetCompoundInTargetCollection,
+    async_session,
+)
 
 
 @api_controller()

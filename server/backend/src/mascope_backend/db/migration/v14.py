@@ -1,13 +1,13 @@
+import asyncio
 import os
 import shutil
-import asyncio
-from sqlalchemy import text, select
-from mascope_backend.db import configure_database_engine, async_session
-from mascope_backend.db.models import SampleBatch
+
+from sqlalchemy import select, text
+
 from mascope_backend.api.controllers.match.aggregate.match_aggregate_controller import (
     aggregate_and_create_matches,
 )
-
+from mascope_backend.db import SampleBatch, async_session, configure_database_engine
 from mascope_backend.runtime import runtime
 
 
@@ -24,7 +24,9 @@ async def run():
 
     # Step 2: Rename match table to match_isotope
     runtime.logger.info("Renaming match table to match_isotope.")
-    async with async_session() as session:  # Perform database operations using async_session
+    async with (
+        async_session() as session
+    ):  # Perform database operations using async_session
         # Create backup of the current match table
         await session.execute(text("CREATE TABLE match_backup AS SELECT * FROM match;"))
         # Drop the old match table
@@ -91,7 +93,9 @@ async def run():
 
     #  Step 3: Create new match_ tables
     runtime.logger.info("Creating new match_ tables.")
-    async with async_session() as session:  # Perform database operations using async_session
+    async with (
+        async_session() as session
+    ):  # Perform database operations using async_session
         # Create match_sample table
         await session.execute(
             text(

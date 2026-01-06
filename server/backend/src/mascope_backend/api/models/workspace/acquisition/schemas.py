@@ -5,6 +5,7 @@ Defines data models for acquisition workspace related requests and responses
 """
 
 from pydantic import Field, field_validator
+
 from mascope_backend.api.models.base_pydantic_model import QueryParamsModel
 
 

@@ -35,7 +35,7 @@ from fastapi.testclient import TestClient
 
 from mascope_backend.app.fast import fast
 from mascope_backend.api.new.auth.config import auth_settings
-from mascope_backend.db.models import User, Role
+from mascope_backend.db import User, Role
 
 
 @pytest_asyncio.fixture(scope="session")

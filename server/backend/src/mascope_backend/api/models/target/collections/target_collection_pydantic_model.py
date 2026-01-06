@@ -5,14 +5,15 @@ Defines data models for target collection related requests and responses
 with validation rules and business logic constraints.
 """
 
-from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from mascope_backend.api.models.base_pydantic_model import QueryParamsModel
 from mascope_backend.api.models.target.collections.config import (
     target_collection_config,
 )
 from mascope_backend.api.models.target.compounds.target_compound_pydantic_model import (
     TargetCompoundBase,
 )
-from mascope_backend.api.models.base_pydantic_model import QueryParamsModel
 
 
 class TargetCollectionBaseValidator:

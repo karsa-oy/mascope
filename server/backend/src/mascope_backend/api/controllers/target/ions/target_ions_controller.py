@@ -1,26 +1,17 @@
 from typing import List, Optional
+
 from sqlalchemy import asc, desc, func, select
 from sqlalchemy.orm import joinedload
-from mascope_backend.db import async_session
-from mascope_backend.db.models import (
-    IonizationMechanism,
-    TargetIon,
-    TargetCompound,
-    TargetCollection,
-    TargetCompoundInTargetCollection,
-    TargetCollectionInSampleBatch,
-    SampleBatch,
-    Sample,
+
+from mascope_backend.api.controllers.match.aggregate.match_aggregate_controller import (
+    aggregate_and_recreate_matches,
 )
-from mascope_backend.api.lib.api_features import api_controller
-from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
 from mascope_backend.api.controllers.target.lib.compute.target_ions_compute import (
     generate_target_ions_from_composition,
     generate_target_ions_from_mass,
 )
-from mascope_backend.api.controllers.match.aggregate.match_aggregate_controller import (
-    aggregate_and_recreate_matches,
-)
+from mascope_backend.api.lib.api_features import api_controller
+from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
 from mascope_backend.api.models.target.compounds.target_compound_pydantic_model import (
     TargetCompoundBase,
 )
@@ -29,6 +20,17 @@ from mascope_backend.api.models.target.ions.target_ion_pydantic_model import (
 )
 from mascope_backend.api.new.ionization.modes.util import (
     fetch_batch_ionization_mechanism_ids,
+)
+from mascope_backend.db import (
+    IonizationMechanism,
+    Sample,
+    SampleBatch,
+    TargetCollection,
+    TargetCollectionInSampleBatch,
+    TargetCompound,
+    TargetCompoundInTargetCollection,
+    TargetIon,
+    async_session,
 )
 
 

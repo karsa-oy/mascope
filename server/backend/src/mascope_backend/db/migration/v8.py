@@ -1,11 +1,11 @@
-import nest_asyncio
 import os
-
-import sqlite3
 import shutil
+import sqlite3
 
+import nest_asyncio
 
 from mascope_backend.runtime import runtime
+
 
 # patch asyncio to supported run_until_complete
 # when an event loop is already running

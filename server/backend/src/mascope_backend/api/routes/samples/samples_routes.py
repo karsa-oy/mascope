@@ -1,21 +1,23 @@
 from fastapi import APIRouter, Depends, Query
-from mascope_backend.api.new.auth.dependencies import guest_user
-from mascope_backend.api.lib.api_features import api_route
+
 from mascope_backend.api.controllers.samples.samples_controller import (
-    get_samples,
     get_sample,
-    get_sample_peaks,
     get_sample_peak_timeseries,
+    get_sample_peaks,
     get_sample_spectrum,
-    get_samples_spectra,
+    get_samples,
     get_samples_centroids,
+    get_samples_spectra,
 )
+from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.models.samples.sample_pydantic_model import (
-    GetSamplePeakTimeseriesBody,
     GetSamplePeaksQueryParams,
-    GetSamplesQueryParams,
+    GetSamplePeakTimeseriesBody,
     GetSampleSpectrumQueryParams,
+    GetSamplesQueryParams,
 )
+from mascope_backend.api.new.auth.dependencies import guest_user
+
 
 samples_router = APIRouter(prefix="/api/samples", tags=["Samples Loading"])
 

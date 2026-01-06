@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field, field_validator
+
 from mascope_backend.api.new.auth.config import auth_settings
 
 

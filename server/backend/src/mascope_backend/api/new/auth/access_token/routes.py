@@ -1,13 +1,15 @@
 from fastapi import APIRouter, Body, Depends
+
 from mascope_backend.api.new.auth.access_token.exceptions import (
     InternalServiceAccessException,
 )
+from mascope_backend.api.new.auth.access_token.schemas import AccessTokenRequest
+from mascope_backend.api.new.auth.access_token.service import regenerate_access_token
 from mascope_backend.api.new.auth.dependencies import (
     guest_user,
     role_based_access,
 )
-from mascope_backend.api.new.auth.access_token.schemas import AccessTokenRequest
-from mascope_backend.api.new.auth.access_token.service import regenerate_access_token
+
 
 # Access token-based routes for Jupyter server or external API access
 access_token_router = APIRouter(prefix="/access_token")

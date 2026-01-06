@@ -4,17 +4,15 @@ Service to handle the status of sample batches.
 
 from datetime import datetime, timezone
 
-from sqlalchemy import select, update, case, exists
+from sqlalchemy import case, exists, select, update
 
-from mascope_backend.socket.records import emit_record_updated
-from mascope_backend.db import async_session
-from mascope_backend.db.models import SampleBatch, SampleItem
 from mascope_backend.api.lib.api_features import (
     api_controller,
 )
 from mascope_backend.api.models.sample.batches.config import sample_batch_config
-
+from mascope_backend.db import SampleBatch, SampleItem, async_session
 from mascope_backend.runtime import runtime
+from mascope_backend.socket.records import emit_record_updated
 
 
 @api_controller()

@@ -5,9 +5,8 @@ Provides endpoints for loading match records at collection and ion levels,
 supporting both sample-specific and batch-level queries with optional filtering.
 """
 
-from fastapi import APIRouter, Depends, Query, Path
+from fastapi import APIRouter, Depends, Path, Query
 
-from mascope_backend.db.models import User
 from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.lib.exceptions.api_exceptions import (
     NotFoundException,
@@ -19,12 +18,13 @@ from mascope_backend.api.new.match.records import (
     get_match_isotope_records,
 )
 from mascope_backend.api.new.match.records.schemas import (
-    MatchRecordsQueryParams,
     MatchIonRecordsBody,
     MatchIsotopeRecordsQueryParams,
+    MatchRecordsQueryParams,
     MatchRecordsResponse,
     MatchRecordsSingleResponse,
 )
+from mascope_backend.db import User
 
 
 match_records_router = APIRouter(prefix="/api/match/records", tags=["Match Records"])

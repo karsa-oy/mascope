@@ -4,10 +4,11 @@ UI reload  notifications system.
 """
 
 from typing import NamedTuple
+
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
-from mascope_backend.db.models import SampleItem, SampleBatch
-from mascope_backend.db import async_session
+
+from mascope_backend.db import SampleBatch, SampleItem, async_session
 
 
 class AffectedSampleData(NamedTuple):

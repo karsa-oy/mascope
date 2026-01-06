@@ -1,13 +1,15 @@
 from typing import Annotated
+
 import typer
 
 from mascope_backend.db.ops.backup import run_db_backup
 from mascope_backend.db.ops.clean_access_tokens import run_db_clean_access_tokens
 from mascope_backend.db.ops.create_database import run_db_create
 from mascope_backend.db.ops.filestore import ACTIONS, run_action
-from mascope_backend.db.ops.restore import run_db_restore
 from mascope_backend.db.ops.maintenance import run_db_maintenance
+from mascope_backend.db.ops.restore import run_db_restore
 from mascope_backend.db.wal.cli import journal_app, wal_app
+
 
 db_app = typer.Typer()
 

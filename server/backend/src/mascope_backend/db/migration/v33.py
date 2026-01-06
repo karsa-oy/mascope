@@ -6,12 +6,12 @@ import asyncio
 import os
 import shutil
 
-from sqlalchemy import select, text
+from sqlalchemy import text
 
 from mascope_backend.db import async_session, configure_database_engine
 from mascope_backend.db.ops.backup import create_db_backup
-
 from mascope_backend.runtime import runtime
+
 
 # List of tables and columns to drop
 DROP_TABLES = ["match_interference"]

@@ -1,5 +1,6 @@
 from nanoid import generate
 
+
 alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890"
 
 

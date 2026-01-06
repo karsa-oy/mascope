@@ -12,11 +12,12 @@ access to keep active users authenticated indefinitely.
 import json
 import os
 from typing import Any
-from mascope_backend.db.models import User
+
+from mascope_backend.db import User
+from mascope_backend.runtime import runtime
 from mascope_backend.socket.storage.client import redis_storage_client
 from mascope_backend.socket.storage.config import storage_config
 from mascope_backend.socket.storage.exceptions import SocketSessionError
-from mascope_backend.runtime import runtime
 
 
 async def save_user_session(sid: str, user: User, namespace: str = "/") -> None:

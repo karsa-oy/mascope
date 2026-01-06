@@ -1,15 +1,14 @@
-import nest_asyncio
 import os
-import pandas as pd
-import sqlite3
 import shutil
+import sqlite3
 
+import nest_asyncio
+import pandas as pd
 from scipy.io import loadmat
 
+from mascope_backend.runtime import runtime
 from mascope_file.name import filename_to_zarr_path
 
-
-from mascope_backend.runtime import runtime
 
 # patch asyncio to supported run_until_complete
 # when an event loop is already running

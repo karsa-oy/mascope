@@ -1,8 +1,9 @@
 """Socket.IO server initialization and configuration."""
 
 import socketio
-from mascope_backend.socket.logging import get_socket_logger
+
 from mascope_backend.runtime import runtime
+from mascope_backend.socket.logging import get_socket_logger
 
 
 def create_socket_server() -> socketio.AsyncServer:

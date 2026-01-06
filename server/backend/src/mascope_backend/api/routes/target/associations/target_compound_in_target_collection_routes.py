@@ -1,12 +1,14 @@
 from fastapi import APIRouter, Depends
-from mascope_backend.api.new.auth.dependencies import guest_user
-from mascope_backend.api.lib.api_features import api_route
+
 from mascope_backend.api.controllers.target.associations.target_compound_in_target_collection_controller import (
     get_target_compound_in_target_collection,
 )
+from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.models.target.compounds.target_compound_pydantic_model import (
     GetTargetCompoundInTargetCollectionQueryParams,
 )
+from mascope_backend.api.new.auth.dependencies import guest_user
+
 
 target_compound_in_target_collection_router = APIRouter(
     prefix="/api/target/associations/target_compound_in_target_collections",

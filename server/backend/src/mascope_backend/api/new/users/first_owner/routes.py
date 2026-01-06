@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Body, Depends, Request
+
 from mascope_backend.api.lib.api_features import api_route
+from mascope_backend.api.new.users.exceptions import InvalidUsernameException
 from mascope_backend.api.new.users.first_owner.exceptions import (
     FirstOwnerRegistrationNotAvailableException,
 )
@@ -7,11 +9,11 @@ from mascope_backend.api.new.users.first_owner.schemas import FirstOwnerCreate
 from mascope_backend.api.new.users.first_owner.util import (
     check_first_owner_registration,
 )
-from mascope_backend.api.new.users.user_manager.dependencies import get_user_manager
-from mascope_backend.api.new.users.exceptions import InvalidUsernameException
 from mascope_backend.api.new.users.service import register_user
+from mascope_backend.api.new.users.user_manager.dependencies import get_user_manager
 from mascope_backend.api.new.users.user_manager.service import UserManager
 from mascope_backend.runtime import runtime
+
 
 first_owner_router = APIRouter(prefix="/api/users/first-owner", tags=["First Owner"])
 

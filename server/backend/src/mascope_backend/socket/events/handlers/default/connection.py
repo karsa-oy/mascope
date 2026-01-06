@@ -5,19 +5,20 @@ Handles socket connections on the default namespace used by the main web applica
 """
 
 import os
+
+from mascope_backend.runtime import runtime
 from mascope_backend.socket import sio
 from mascope_backend.socket.auth import authenticate_socket_connection
-from mascope_backend.socket.auth.token import get_jwt_from_cookies
 from mascope_backend.socket.auth.exceptions import (
     SocketUnauthenticatedError,
 )
+from mascope_backend.socket.auth.token import get_jwt_from_cookies
 from mascope_backend.socket.storage import (
+    SocketSessionError,
     clear_user_session,
     get_session_user,
     room_tracker,
-    SocketSessionError,
 )
-from mascope_backend.runtime import runtime
 
 
 @sio.event(namespace="/")

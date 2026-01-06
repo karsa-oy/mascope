@@ -1,10 +1,11 @@
 from typing import Optional
+
 from sqlalchemy.future import select
-from mascope_backend.db import async_session
-from mascope_backend.db.models import Role
+
 from mascope_backend.api.lib.api_features import api_controller
-from mascope_backend.api.new.roles.exceptions import InvalidRoleException
 from mascope_backend.api.new.auth.config import auth_settings
+from mascope_backend.api.new.roles.exceptions import InvalidRoleException
+from mascope_backend.db import Role, async_session
 
 
 @api_controller()

@@ -1,11 +1,11 @@
 from sqlalchemy import func, select
-from mascope_backend.db import async_session
-from mascope_backend.db.models import User
+
 from mascope_backend.api.new.auth.config import auth_settings
 from mascope_backend.api.new.users.first_owner.exceptions import (
     LastOwnerDeletionException,
     LastOwnerDowngradeException,
 )
+from mascope_backend.db import User, async_session
 
 
 async def check_first_owner_registration() -> bool:

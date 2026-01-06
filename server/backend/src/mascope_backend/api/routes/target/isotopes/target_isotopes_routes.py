@@ -6,15 +6,17 @@ retrieval with filtering, sorting, and pagination capabilities.
 """
 
 from fastapi import APIRouter, Depends, Query
-from mascope_backend.api.new.auth.dependencies import guest_user
-from mascope_backend.api.lib.api_features import api_route
+
 from mascope_backend.api.controllers.target.isotopes.target_isotopes_controller import (
     get_target_isotope,
     get_target_isotopes,
 )
+from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.models.target.isotopes.target_isotope_pydantic_model import (
     GetTargetIsotopesQueryParams,
 )
+from mascope_backend.api.new.auth.dependencies import guest_user
+
 
 target_isotopes_router = APIRouter(
     prefix="/api/target/isotopes", tags=["Target Isotopes"]

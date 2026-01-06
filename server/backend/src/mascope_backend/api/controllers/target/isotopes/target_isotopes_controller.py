@@ -2,21 +2,22 @@
 Target isotope service layer.
 """
 
-from sqlalchemy import select, asc, desc, func
+from sqlalchemy import asc, desc, func, select
 from sqlalchemy.orm import joinedload
-from mascope_backend.db import async_session
-from mascope_backend.db.models import (
-    SampleBatch,
-    TargetCollection,
-    TargetCompoundInTargetCollection,
-    TargetIon,
-    IonizationMechanism,
-    TargetIsotope,
-)
+
 from mascope_backend.api.lib.api_features import api_controller
 from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
 from mascope_backend.api.new.ionization.modes.util import (
     fetch_batch_ionization_mechanism_ids,
+)
+from mascope_backend.db import (
+    IonizationMechanism,
+    SampleBatch,
+    TargetCollection,
+    TargetCompoundInTargetCollection,
+    TargetIon,
+    TargetIsotope,
+    async_session,
 )
 
 

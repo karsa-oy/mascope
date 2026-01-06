@@ -8,8 +8,9 @@ passed in conversion events.
 """
 
 import os
-from mascope_backend.socket import sio
+
 from mascope_backend.runtime import runtime
+from mascope_backend.socket import sio
 
 
 @sio.event(namespace="/file-converter")

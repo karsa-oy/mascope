@@ -8,9 +8,8 @@ import shutil
 from mascope_backend.db import (
     configure_database_engine,
 )
-from mascope_backend.db.ops.maintenance import db_maintenance
 from mascope_backend.db.ops.backup import create_db_backup
-
+from mascope_backend.db.ops.maintenance import db_maintenance
 from mascope_backend.runtime import runtime
 
 

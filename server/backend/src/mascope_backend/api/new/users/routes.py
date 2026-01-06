@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Path
+
 from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.new.auth.dependencies import admin_user
 from mascope_backend.api.new.users.schemas import (
@@ -8,6 +9,7 @@ from mascope_backend.api.new.users.service import (
     get_user,
     get_users,
 )
+
 
 users_router = APIRouter(prefix="/api/users", tags=["Users"])
 

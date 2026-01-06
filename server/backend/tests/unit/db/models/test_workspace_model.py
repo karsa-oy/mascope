@@ -8,7 +8,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from mascope_backend.db.models import Workspace, SampleBatch
+from mascope_backend.db import Workspace, SampleBatch
 
 
 @pytest.mark.asyncio

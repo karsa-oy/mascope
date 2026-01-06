@@ -3,11 +3,13 @@ Route dependencies
 """
 
 from fastapi import Depends
-from mascope_backend.db.models import User
-from mascope_backend.api.new.auth.config import auth_settings
+
 from mascope_backend.api.new.auth import fastapi_users, get_enabled_backends
+from mascope_backend.api.new.auth.config import auth_settings
 from mascope_backend.api.new.auth.exceptions import ForbiddenAccessException
 from mascope_backend.api.new.roles.exceptions import InvalidRoleException
+from mascope_backend.db import User
+
 
 # Dependencies for active, verified, and superuser users
 current_user = fastapi_users.current_user(get_enabled_backends=get_enabled_backends)

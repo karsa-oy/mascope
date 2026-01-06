@@ -1,18 +1,20 @@
-from fastapi import APIRouter, Query, Depends
-from mascope_backend.api.new.auth.dependencies import editor_user, guest_user
-from mascope_backend.api.lib.api_features import api_route
+from fastapi import APIRouter, Depends, Query
+
 from mascope_backend.api.controllers.target.collections.target_collections_controller import (
-    get_target_collections,
-    get_target_collection,
     create_target_collection,
     delete_target_collection,
+    get_target_collection,
+    get_target_collections,
     update_target_collection,
 )
+from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.models.target.collections.target_collection_pydantic_model import (
     GetTargetCollectionsQueryParams,
     TargetCollectionCreate,
     TargetCollectionUpdate,
 )
+from mascope_backend.api.new.auth.dependencies import editor_user, guest_user
+
 
 target_collections_router = APIRouter(
     prefix="/api/target/collections", tags=["Target Collections"]

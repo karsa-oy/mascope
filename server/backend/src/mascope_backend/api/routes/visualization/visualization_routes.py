@@ -1,7 +1,5 @@
 from fastapi import APIRouter, BackgroundTasks, Depends
-from mascope_backend.db.id import gen_id
-from mascope_backend.api.new.auth.dependencies import guest_user
-from mascope_backend.api.lib.api_features import api_route
+
 from mascope_backend.api.controllers.sample.items.sample_items_controller import (
     get_sample_item,
 )
@@ -11,9 +9,13 @@ from mascope_backend.api.controllers.target.ions.target_ions_controller import (
 from mascope_backend.api.controllers.visualization.visualization_controller import (
     visualize_ion_focus,
 )
+from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.models.visualization.visualization_pydantic_model import (
     GetVisualizationIonFocusQueryParams,
 )
+from mascope_backend.api.new.auth.dependencies import guest_user
+from mascope_backend.db.id import gen_id
+
 
 visualization_router = APIRouter(prefix="/api/visualization", tags=["Visualization"])
 

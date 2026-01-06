@@ -1,26 +1,27 @@
 # pylint: disable=line-too-long
 from fastapi import APIRouter, BackgroundTasks, Depends
 from fastapi.params import Query
-from mascope_backend.db.id import gen_id
-from mascope_backend.api.lib.exceptions.api_exceptions import ApiException
-from mascope_backend.api.new.auth.dependencies import editor_user, admin_user
-from mascope_backend.api.lib.api_features import api_route
 
 from mascope_backend.api.controllers.match.match_controller import (
-    rematch_batches,
-    rematch_batch,
     match_compute_batch,
-    match_remove_batch,
-    rematch_sample,
     match_compute_sample,
-    match_remove_sample,
     match_remove_all,
+    match_remove_batch,
+    match_remove_sample,
+    rematch_batch,
+    rematch_batches,
+    rematch_sample,
 )
-from mascope_backend.api.controllers.samples.lib.samples_fetch import fetch_sample
 from mascope_backend.api.controllers.sample.lib.sample_batches_fetch import (
     fetch_sample_batch,
 )
+from mascope_backend.api.controllers.samples.lib.samples_fetch import fetch_sample
+from mascope_backend.api.lib.api_features import api_route
+from mascope_backend.api.lib.exceptions.api_exceptions import ApiException
 from mascope_backend.api.models.match.match_pydantic_model import RematchBatchesBody
+from mascope_backend.api.new.auth.dependencies import admin_user, editor_user
+from mascope_backend.db.id import gen_id
+
 
 match_router = APIRouter(prefix="/api/match", tags=["Match Management"])
 

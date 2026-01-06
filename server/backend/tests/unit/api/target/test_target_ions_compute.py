@@ -1,6 +1,6 @@
 import pytest
 
-from mascope_backend.db.models import (
+from mascope_backend.db import (
     IonizationMechanism,
     TargetCompound,
     TargetIon,

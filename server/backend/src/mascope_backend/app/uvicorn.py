@@ -4,7 +4,9 @@ Uvicorn server entry point with main process initialization.
 
 import asyncio
 import os
+
 import uvicorn
+
 from mascope_backend.app.startup import init_main_process
 from mascope_backend.runtime import runtime
 

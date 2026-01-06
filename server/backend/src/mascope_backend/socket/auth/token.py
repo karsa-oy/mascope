@@ -1,9 +1,11 @@
 """Socket-specific JWT token validation and extraction."""
 
 import re
+
 from mascope_backend.api.new.auth.backend import auth_backend_jwt
-from mascope_backend.socket.auth.exceptions import SocketUnauthenticatedError
 from mascope_backend.runtime import runtime
+from mascope_backend.socket.auth.exceptions import SocketUnauthenticatedError
+
 
 # JWT token pattern (header.payload.signature)
 JWT_PATTERN = re.compile(r"^[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+$")

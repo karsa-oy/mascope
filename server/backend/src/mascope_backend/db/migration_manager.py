@@ -5,15 +5,16 @@ This module centralizes all database migration logic, including version checking
 migration execution, and corruption detection.
 """
 
-import os
 import inspect
+import os
 import traceback
 from datetime import datetime
 from importlib import import_module
 
-from mascope_backend.db.utils import get_current_db_version, get_available_db_version
-from mascope_backend.db.wal.direct import get_journal_mode, direct_wal_checkpoint
+from mascope_backend.db.utils import get_available_db_version, get_current_db_version
+from mascope_backend.db.wal.direct import direct_wal_checkpoint, get_journal_mode
 from mascope_backend.runtime import runtime
+
 
 db_dir = runtime.config.database
 

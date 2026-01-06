@@ -1,5 +1,7 @@
-import typer
 from typing import Annotated
+
+import typer
+
 
 backend_app = typer.Typer()
 

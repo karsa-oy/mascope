@@ -1,18 +1,21 @@
 from typing import List
+
 from fastapi import APIRouter, Depends
-from mascope_backend.api.lib.api_features import api_route
+
 from mascope_backend.api.controllers.match.collections.match_collections_controller import (
-    get_match_collections,
-    get_match_collection,
     create_match_collections,
     delete_match_collections,
+    get_match_collection,
+    get_match_collections,
 )
+from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.models.match.collections.match_collection_pydantic_model import (
-    MatchCollectionBase,
-    GetMatchCollectionsQueryParams,
     DeleteMatchCollectionsPayload,
+    GetMatchCollectionsQueryParams,
+    MatchCollectionBase,
 )
 from mascope_backend.api.new.auth.dependencies import editor_user, guest_user
+
 
 match_collections_router = APIRouter(
     prefix="/api/match/collections", tags=["Match Collections"]

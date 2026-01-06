@@ -6,6 +6,7 @@ SQLAlchemy async session context. Safe for concurrent operations.
 """
 
 from sqlalchemy import text
+
 from mascope_backend.db import async_session
 from mascope_backend.runtime import runtime
 

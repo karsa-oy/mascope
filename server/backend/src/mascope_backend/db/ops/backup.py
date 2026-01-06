@@ -1,10 +1,11 @@
+import asyncio
 import gc
 import os
-import asyncio
 import sqlite3
 from datetime import datetime
+
 from mascope_backend.db.utils import get_current_db_version
-from mascope_backend.db.wal.direct import get_journal_mode, direct_wal_checkpoint
+from mascope_backend.db.wal.direct import direct_wal_checkpoint, get_journal_mode
 from mascope_backend.runtime import runtime
 
 

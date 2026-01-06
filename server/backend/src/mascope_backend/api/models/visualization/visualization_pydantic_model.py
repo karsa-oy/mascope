@@ -1,4 +1,5 @@
 from pydantic import Field
+
 from mascope_backend.api.models.base_pydantic_model import QueryParamsModel
 
 

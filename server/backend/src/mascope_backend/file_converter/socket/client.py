@@ -1,6 +1,7 @@
 import socketio
-from mascope_backend.file_converter.socket.session import FileContextManager
+
 from mascope_backend.file_converter.socket.events import SocketEventHandler
+from mascope_backend.file_converter.socket.session import FileContextManager
 from mascope_backend.runtime import runtime
 
 

@@ -1,17 +1,17 @@
 from functools import partial
-import numpy as np
 
+import numpy as np
 from sqlalchemy import (
-    select,
     desc,
+    select,
 )
 
-from mascope_signal.instrument_func.fit import r_orbi, r_tof
 from mascope_backend.api.controllers.sample.lib.sample_file_fetch import (
     fetch_sample_file,
 )
+from mascope_backend.db import InstrumentFunction as InstrumentConfig
 from mascope_backend.db import async_session
-from mascope_backend.db.models import InstrumentFunction as InstrumentConfig
+from mascope_signal.instrument_func.fit import r_orbi, r_tof
 
 
 async def fetch_instrument_config_by_filename(filename: str) -> InstrumentConfig | None:

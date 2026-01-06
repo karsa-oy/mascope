@@ -1,17 +1,18 @@
 """
 Context managers for user management outside of FastAPI request context.
 
-This module provides async context managers for accessing user management 
-functionality in non-HTTP contexts (e.g., Socket.IO authentication, 
+This module provides async context managers for accessing user management
+functionality in non-HTTP contexts (e.g., Socket.IO authentication,
 CLI commands). Unlike dependencies.py which is used for HTTP routes,
 these utilities manage their own database sessions.
 """
 
 from contextlib import asynccontextmanager
+
 from fastapi_users.db import SQLAlchemyUserDatabase
-from mascope_backend.db import async_session
-from mascope_backend.db.models import User
+
 from mascope_backend.api.new.users.user_manager.service import UserManager
+from mascope_backend.db import User, async_session
 
 
 @asynccontextmanager

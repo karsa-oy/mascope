@@ -1,33 +1,33 @@
 # pylint: disable=not-callable
 from datetime import datetime, timezone
+
 from sqlalchemy import (
-    select,
     func,
+    select,
 )
-from mascope_file.name import resolve_instrument_type
-from mascope_backend.socket.records.service import (
-    emit_record_created,
-    emit_record_deleted,
-)
-from mascope_backend.db import async_session
-from mascope_backend.db.id import gen_id
-from mascope_backend.db.models import Workspace
-from mascope_backend.api.lib.api_features import api_controller
-from mascope_backend.api.lib.exceptions.api_exceptions import (
-    NotFoundException,
-)
+
 from mascope_backend.api.controllers.workspace.workspace_controller import (
     delete_workspace,
     get_workspaces,
 )
+from mascope_backend.api.lib.api_features import api_controller
+from mascope_backend.api.lib.exceptions.api_exceptions import (
+    NotFoundException,
+)
+from mascope_backend.api.models.workspace.config import workspace_config
 from mascope_backend.api.models.workspace.workspace_pydantic_model import (
     WorkspaceCreate,
     WorkspaceRead,
 )
-from mascope_backend.api.models.workspace.config import workspace_config
 from mascope_backend.api.new.instruments.service import get_instruments
-
+from mascope_backend.db import Workspace, async_session
+from mascope_backend.db.id import gen_id
 from mascope_backend.runtime import runtime
+from mascope_backend.socket.records.service import (
+    emit_record_created,
+    emit_record_deleted,
+)
+from mascope_file.name import resolve_instrument_type
 
 
 @api_controller()

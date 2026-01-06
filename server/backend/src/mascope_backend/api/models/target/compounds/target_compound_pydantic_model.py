@@ -1,5 +1,7 @@
 from typing import Optional
+
 from pydantic import BaseModel, Field
+
 from mascope_backend.api.models.base_pydantic_model import QueryParamsModel
 
 

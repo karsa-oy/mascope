@@ -5,11 +5,10 @@ It allows admins or owners to delete access tokens for other users.
 """
 
 from sqlalchemy import delete
-from mascope_backend.db import async_session
-from mascope_backend.db.models import AccessToken, User
+
 from mascope_backend.api.lib.api_features import api_controller
 from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
-
+from mascope_backend.db import AccessToken, User, async_session
 from mascope_backend.runtime import runtime
 
 

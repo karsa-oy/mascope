@@ -1,12 +1,13 @@
+import asyncio
 import os
 import shutil
-import asyncio
-from sqlalchemy import delete, insert
-from mascope_backend.db import configure_database_engine, async_session
-from mascope_backend.db.models import Base, Role
+
+from sqlalchemy import insert
+
+from mascope_backend.api.new.auth.config import auth_settings
+from mascope_backend.db import Base, Role, async_session, configure_database_engine
 from mascope_backend.db.ops.backup import create_db_backup
 from mascope_backend.runtime import runtime
-from mascope_backend.api.new.auth.config import auth_settings
 
 
 async def run():

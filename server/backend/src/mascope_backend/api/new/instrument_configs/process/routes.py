@@ -1,17 +1,19 @@
-from fastapi import APIRouter, Depends, BackgroundTasks
-from mascope_backend.db.id import gen_id
-from mascope_backend.api.lib.api_features import api_route
+from fastapi import APIRouter, BackgroundTasks, Depends
+
 from mascope_backend.api.controllers.sample.lib.sample_file_fetch import (
     fetch_sample_file,
 )
+from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.new.auth.dependencies import editor_user
-from mascope_backend.api.new.instrument_configs.service import get_instrument_config
-from mascope_backend.api.new.instrument_configs.process.service import (
-    process_instrument_config,
-)
 from mascope_backend.api.new.instrument_configs.process.schemas import (
     ProcessInstrumentConfigBody,
 )
+from mascope_backend.api.new.instrument_configs.process.service import (
+    process_instrument_config,
+)
+from mascope_backend.api.new.instrument_configs.service import get_instrument_config
+from mascope_backend.db.id import gen_id
+
 
 instrument_configs_process_router = APIRouter(
     prefix="/api/instrument_configs/process", tags=["Instrument Configs"]

@@ -7,13 +7,14 @@ It provides two entry points:
 """
 
 import asyncio
+
 from mascope_backend.db import (
+    AccessToken,
     async_session,
     configure_database_engine,
 )
-from mascope_backend.db.models import AccessToken
-from mascope_backend.db.utils import get_current_db_version
 from mascope_backend.db.ops.backup import create_db_backup
+from mascope_backend.db.utils import get_current_db_version
 from mascope_backend.runtime import runtime
 
 

@@ -1,13 +1,15 @@
 from typing import Optional, Tuple
+
 import pandas as pd
-from mascope_match.params import (
-    BaseMatchParams,
-    DEFAULT_PROBABLE_MATCH_THRESHOLD,
-    DEFAULT_POSSIBLE_MATCH_THRESHOLD,
-)
+
 from mascope_backend.api.controllers.match.lib.match_util import similarity_factor
 from mascope_backend.api.models.target.collections.config import (
     target_collection_config,
+)
+from mascope_match.params import (
+    DEFAULT_POSSIBLE_MATCH_THRESHOLD,
+    DEFAULT_PROBABLE_MATCH_THRESHOLD,
+    BaseMatchParams,
 )
 
 

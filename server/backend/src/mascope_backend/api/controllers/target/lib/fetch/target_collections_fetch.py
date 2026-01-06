@@ -3,17 +3,15 @@ Target collection validation helpers.
 """
 
 # pylint: disable=not-callable
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.orm import joinedload
-from mascope_backend.db import async_session
-from mascope_backend.db.models import TargetCollection, SampleBatch
+
 from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
+from mascope_backend.api.models.sample.batches.config import sample_batch_config
 from mascope_backend.api.models.target.collections.config import (
     target_collection_config,
 )
-from mascope_backend.api.models.sample.batches.config import sample_batch_config
-
-
+from mascope_backend.db import SampleBatch, TargetCollection, async_session
 from mascope_backend.runtime import runtime
 
 

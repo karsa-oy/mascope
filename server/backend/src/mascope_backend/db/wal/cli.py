@@ -8,11 +8,12 @@ All operations use direct SQLite connections.
 import typer
 
 from .direct import (
+    check_wal_status,
+    direct_wal_checkpoint,
     get_journal_mode,
     set_journal_mode,
-    direct_wal_checkpoint,
-    check_wal_status,
 )
+
 
 # Create sub-applications
 journal_app = typer.Typer(name="journal", help="Journal mode operations")

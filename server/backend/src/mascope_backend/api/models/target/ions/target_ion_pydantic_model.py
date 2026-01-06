@@ -1,4 +1,5 @@
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
+
 from mascope_backend.api.models.base_pydantic_model import QueryParamsModel
 from mascope_match.params import BaseMatchParams
 

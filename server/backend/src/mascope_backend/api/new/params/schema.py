@@ -1,8 +1,8 @@
 from pydantic import BaseModel
 
-from mascope_match.params import MatchParams
-from mascope_backend.api.new.instrument_configs.params import InstrumentConfigParams
 from mascope_backend.api.new.cheminfo.config import ChemInfoConfig
+from mascope_backend.api.new.instrument_configs.params import InstrumentConfigParams
+from mascope_match.params import MatchParams
 
 
 class Params(BaseModel):

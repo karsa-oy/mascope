@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends
-from mascope_backend.api.lib.api_features import api_route
+
 from mascope_backend.api.controllers.match.targets.batch.match_targets_batch_controller import (
     get_batch_data,
 )
+from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.new.auth.dependencies import guest_user
+
 
 match_targets_batch_router = APIRouter(
     prefix="/api/match/targets/batch", tags=["Match Batch Loading"]

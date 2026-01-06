@@ -5,9 +5,8 @@ This module contains helper functions for fetching and processing
 sample batch-related data.
 """
 
-from mascope_backend.db import async_session
-from mascope_backend.db.models import SampleBatch
 from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
+from mascope_backend.db import SampleBatch, async_session
 
 
 async def fetch_sample_batch(sample_batch_id: str) -> SampleBatch:

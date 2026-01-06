@@ -1,16 +1,18 @@
-from fastapi import APIRouter, Depends, Body, Query
-from mascope_backend.api.new.auth.dependencies import guest_user, editor_user
-from mascope_backend.api.lib.api_features import api_route
+from fastapi import APIRouter, Body, Depends, Query
+
 from mascope_backend.api.controllers.ionization_mechanisms.ionization_mechanisms_controller import (
-    get_ionization_mechanisms,
-    get_ionization_mechanism,
     create_ionization_mechanism,
     delete_ionization_mechanism,
+    get_ionization_mechanism,
+    get_ionization_mechanisms,
 )
+from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.models.ionization_mechanisms.ionization_mechanism_pydantic_model import (
-    IonizationMechanismCreate,
     GetIonizationMechanismsQueryParams,
+    IonizationMechanismCreate,
 )
+from mascope_backend.api.new.auth.dependencies import editor_user, guest_user
+
 
 ionization_mechanisms_router = APIRouter(
     prefix="/api/ionization_mechanisms",

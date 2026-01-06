@@ -6,16 +6,18 @@ of acquisition workspaces based on available instruments.
 """
 
 from fastapi import APIRouter, Depends, Query
-from mascope_backend.api.new.auth.dependencies import guest_user, owner_user
-from mascope_backend.api.lib.api_features import api_route
+
 from mascope_backend.api.controllers.workspace.acquisition.service import (
-    get_acquisition_workspace,
     create_acquisition_workspaces,
     delete_acquisition_workspaces,
+    get_acquisition_workspace,
 )
+from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.models.workspace.acquisition.schemas import (
     GetAcquisitionWorkspaceQueryParams,
 )
+from mascope_backend.api.new.auth.dependencies import guest_user, owner_user
+
 
 acquisition_workspaces_router = APIRouter(
     prefix="/acquisition", tags=["Acquisition Workspace Management"]

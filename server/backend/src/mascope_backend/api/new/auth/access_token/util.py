@@ -1,7 +1,7 @@
 from sqlalchemy import select
-from mascope_backend.db import async_session
-from mascope_backend.db.models import AccessToken
+
 from mascope_backend.api.new.auth.exceptions import InvalidTokenException
+from mascope_backend.db import AccessToken, async_session
 
 
 async def validate_token_exists(token: str) -> bool:

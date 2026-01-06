@@ -6,7 +6,7 @@ Tests the logic in the workspace controllers.
 from datetime import datetime
 import pytest
 
-from mascope_backend.db.models import Workspace
+from mascope_backend.db import Workspace
 import mascope_backend.api.controllers.workspace.workspace_controller as workspace_service
 from mascope_backend.api.lib.exceptions.api_exceptions import ApiException
 from mascope_backend.api.models.workspace.workspace_pydantic_model import (

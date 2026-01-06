@@ -1,12 +1,10 @@
 import os
-
 from multiprocessing import Queue
 from threading import Event
 from time import sleep
 
 from mascope_backend.file_converter.socket.client import FileConverterSocketClient
 from mascope_backend.file_converter.watcher import FSWatcher
-
 from mascope_thermo.processor import RawProcessor
 from mascope_tofwerk.processor import H5Processor
 

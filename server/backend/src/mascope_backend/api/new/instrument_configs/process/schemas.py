@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 from mascope_backend.api.new.instrument_configs.params import InstrumentConfigParams
 from mascope_backend.api.new.instrument_configs.schemas import SetInstrumentConfigBody
 
+
 instrument_config_params = InstrumentConfigParams()
 
 

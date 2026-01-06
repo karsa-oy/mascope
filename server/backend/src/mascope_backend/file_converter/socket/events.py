@@ -1,6 +1,8 @@
 from typing import TYPE_CHECKING
+
 from mascope_backend.file_converter.socket.session import FileContext
 from mascope_backend.runtime import runtime
+
 
 if TYPE_CHECKING:
     from .client import FileConverterSocketClient

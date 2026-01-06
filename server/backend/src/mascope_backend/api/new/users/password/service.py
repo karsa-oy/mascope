@@ -6,6 +6,7 @@ This module handles admin/owner password management for other users.
 
 import secrets
 import string
+
 from mascope_backend.api.lib.api_features import api_controller
 from mascope_backend.api.new.users.schemas import UserUpdate
 from mascope_backend.api.new.users.service import update_user

@@ -3,24 +3,23 @@ Functions for target ions and target isotopes generation.
 """
 
 import re
+
 import numpy as np
 from IsoSpecPy import IsoThreshold
 
-from mascope_molmass import Formula
-from mascope_molmass.elements import ELECTRON, ELEMENTS
-from mascope_tools.composition.utils import normalize_formula_with_isotopes
-
-from mascope_backend.db.id import gen_id
-from mascope_backend.db.models import (
+from mascope_backend.api.models.target.compounds.target_compound_pydantic_model import (
+    TargetCompoundBase,
+)
+from mascope_backend.db import (
     IonizationMechanism,
     TargetIon,
     TargetIsotope,
 )
-from mascope_backend.api.models.target.compounds.target_compound_pydantic_model import (
-    TargetCompoundBase,
-)
-
+from mascope_backend.db.id import gen_id
 from mascope_backend.runtime import runtime
+from mascope_molmass import Formula
+from mascope_molmass.elements import ELECTRON, ELEMENTS
+from mascope_tools.composition.utils import normalize_formula_with_isotopes
 
 
 # Threshold for high resolution isotope peaks prediction, r.a.>1%

@@ -6,19 +6,21 @@ It provides two entry points:
 - A sync function `run()` as the Poetry command entry point
 """
 
-import os
 import asyncio
+import os
+
 from sqlalchemy import text
+
 from mascope_backend.db import (
-    configure_database_engine,
+    Base,
+    Sample,
     async_session,
+    configure_database_engine,
 )
 from mascope_backend.db.ops.backup import create_db_backup
 from mascope_backend.db.utils import get_available_db_version, get_current_db_version
 from mascope_backend.db.wal.engine import enable_wal_mode
-
 from mascope_backend.runtime import runtime
-from mascope_backend.db.models import Base, Sample
 
 
 async def create_database():

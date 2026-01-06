@@ -6,7 +6,6 @@ import argparse
 import fnmatch
 import os
 import shutil
-
 from datetime import datetime
 
 from mascope_backend.runtime import runtime

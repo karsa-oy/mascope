@@ -15,8 +15,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import update
 
-from mascope_backend.db import async_session
-from mascope_backend.db.models import SampleBatch
+from mascope_backend.db import SampleBatch, async_session
 from mascope_backend.runtime import runtime
 
 

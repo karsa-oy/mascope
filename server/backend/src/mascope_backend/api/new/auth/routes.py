@@ -1,9 +1,11 @@
 from fastapi import APIRouter
+
 from mascope_backend.api.new.auth import (
-    fastapi_users,
     auth_backend_jwt,
+    fastapi_users,
 )
 from mascope_backend.api.new.auth.access_token.routes import access_token_router
+
 
 # main Auth router
 auth_router = APIRouter(prefix="/api/auth", tags=["Auth"])

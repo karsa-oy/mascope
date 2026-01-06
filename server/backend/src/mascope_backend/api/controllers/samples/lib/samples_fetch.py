@@ -6,9 +6,9 @@ Sample View related data.
 """
 
 from sqlalchemy import select
-from mascope_backend.db import async_session
-from mascope_backend.db.models import Sample
+
 from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
+from mascope_backend.db import Sample, async_session
 
 
 async def fetch_sample(sample_item_id: str) -> Sample:

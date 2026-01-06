@@ -2,23 +2,23 @@
 Collection-level match records service for target collections with match data.
 """
 
-from sqlalchemy import select, and_
+from sqlalchemy import and_, select
 
-from mascope_backend.db import async_session
-from mascope_backend.db.models import (
+from mascope_backend.api.controllers.sample.lib.sample_batches_fetch import (
+    fetch_sample_batch,
+)
+from mascope_backend.api.controllers.samples.lib.samples_fetch import fetch_sample
+from mascope_backend.api.lib.api_features import api_controller
+from mascope_backend.api.models.target.collections.config import (
+    target_collection_config,
+)
+from mascope_backend.db import (
+    MatchCollection,
     Sample,
     SampleBatch,
     TargetCollection,
     TargetCollectionInSampleBatch,
-    MatchCollection,
-)
-from mascope_backend.api.lib.api_features import api_controller
-from mascope_backend.api.controllers.samples.lib.samples_fetch import fetch_sample
-from mascope_backend.api.controllers.sample.lib.sample_batches_fetch import (
-    fetch_sample_batch,
-)
-from mascope_backend.api.models.target.collections.config import (
-    target_collection_config,
+    async_session,
 )
 
 

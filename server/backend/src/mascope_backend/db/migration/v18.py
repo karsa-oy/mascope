@@ -1,9 +1,15 @@
+import asyncio
 import os
 import shutil
-import asyncio
+
 from sqlalchemy import insert, select
-from mascope_backend.db import configure_database_engine, async_session
-from mascope_backend.db.models import AccessToken, Base
+
+from mascope_backend.db import (
+    AccessToken,
+    Base,
+    async_session,
+    configure_database_engine,
+)
 from mascope_backend.db.ops.backup import create_db_backup
 from mascope_backend.runtime import runtime
 

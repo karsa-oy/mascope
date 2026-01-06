@@ -3,10 +3,11 @@ Target compound fetching utilities.
 """
 
 from sqlalchemy import select
-from mascope_backend.db import async_session
-from mascope_backend.db.models import (
-    TargetCompoundInTargetCollection,
+
+from mascope_backend.db import (
     TargetCollectionInSampleBatch,
+    TargetCompoundInTargetCollection,
+    async_session,
 )
 
 

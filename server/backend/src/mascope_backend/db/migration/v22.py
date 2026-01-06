@@ -2,19 +2,20 @@
 Migration script for v21 to v22 database migration.
 """
 
+import asyncio
 import os
 import shutil
-import asyncio
 
-from sqlalchemy import text, select
+from sqlalchemy import select, text
+
 from mascope_backend.db import (
+    SampleItem,
     async_session,
     configure_database_engine,
 )
-from mascope_backend.db.ops.maintenance import db_maintenance
 from mascope_backend.db.ops.backup import create_db_backup
+from mascope_backend.db.ops.maintenance import db_maintenance
 from mascope_backend.db.ops.restore import db_restore
-from mascope_backend.db.models import SampleItem
 from mascope_backend.runtime import runtime
 from mascope_signal.compute import get_scan_timestamps
 

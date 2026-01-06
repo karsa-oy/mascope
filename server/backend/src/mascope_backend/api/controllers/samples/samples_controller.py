@@ -1,25 +1,27 @@
 # pylint: disable=line-too-long
+import asyncio
 from dataclasses import dataclass
 from datetime import datetime
-import asyncio
+
 import numpy as np
-from mascope_file.io import load_peak_data
+from sqlalchemy import Float, Integer, and_, asc, cast, desc, func, select
+
 import mascope_signal.compute as m_compute
-from mascope_signal.peak import get_peaks
-from sqlalchemy import and_, select, func, cast, Float, Integer, desc, asc
-from mascope_backend.db import async_session
-from mascope_backend.db.models import (
-    Sample,
-    MatchSample,
-    MatchCollection,
-    TargetCollection,
-)
 from mascope_backend.api.lib.api_features import api_controller
 from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
 from mascope_backend.api.models.target.collections.config import (
     target_collection_config,
 )
+from mascope_backend.db import (
+    MatchCollection,
+    MatchSample,
+    TargetCollection,
+    async_session,
+)
+from mascope_backend.db.views import Sample
 from mascope_backend.runtime import runtime
+from mascope_file.io import load_peak_data
+from mascope_signal.peak import get_peaks
 
 
 @api_controller()

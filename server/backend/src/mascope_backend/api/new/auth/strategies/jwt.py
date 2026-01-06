@@ -1,4 +1,5 @@
 from fastapi_users.authentication import JWTStrategy
+
 from mascope_backend.api.new.auth.config import auth_settings
 
 

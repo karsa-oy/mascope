@@ -13,9 +13,9 @@ It handles tasks:
 import os
 import shutil
 
-from mascope_file.gc import gc_filestore
 from mascope_backend.db import check_db_migration
 from mascope_backend.runtime import runtime
+from mascope_file.gc import gc_filestore
 
 
 async def init_main_process():

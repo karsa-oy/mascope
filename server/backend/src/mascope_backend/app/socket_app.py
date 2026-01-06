@@ -1,6 +1,7 @@
 """Socket.IO ASGI application initialization."""
 
 import socketio
+
 from mascope_backend.app.fast import fast
 from mascope_backend.socket import init_socket
 from mascope_backend.socket.events import init_events

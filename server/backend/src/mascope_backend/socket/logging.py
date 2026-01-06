@@ -1,6 +1,8 @@
-import logging
 import inspect
+import logging
+
 from mascope_backend.runtime import runtime
+
 
 logger = runtime.logger.bind(method="EVENT")
 

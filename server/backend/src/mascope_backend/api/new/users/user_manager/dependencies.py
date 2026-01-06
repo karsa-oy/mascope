@@ -1,17 +1,17 @@
 """
 FastAPI dependency injection module for user management.
 
-This module provides dependency functions specifically designed for FastAPI's 
+This module provides dependency functions specifically designed for FastAPI's
 dependency injection system. These dependencies are used in route declarations
 to provide user management capabilities through FastAPI Users library.
 """
 
 from fastapi import Depends
-from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi_users.db import SQLAlchemyUserDatabase
-from mascope_backend.db import get_async_session
-from mascope_backend.db.models import User
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from mascope_backend.api.new.users.user_manager.service import UserManager
+from mascope_backend.db import User, get_async_session
 
 
 async def get_user_db(session: AsyncSession = Depends(get_async_session)):

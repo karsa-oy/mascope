@@ -1,19 +1,22 @@
 from typing import List
+
 from fastapi import APIRouter, Depends
-from mascope_backend.api.lib.api_features import api_route
-from mascope_backend.api.new.auth.dependencies import editor_user, guest_user
+
 from mascope_backend.api.controllers.target.compounds.target_compounds_controller import (
-    get_target_compounds,
-    get_target_compound,
     create_target_compound,
     delete_target_compound,
+    get_target_compound,
+    get_target_compounds,
     update_target_compound,
 )
+from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.models.target.compounds.target_compound_pydantic_model import (
+    GetTargetCompoundsQueryParams,
     TargetCompoundBase,
     TargetCompoundUpdate,
-    GetTargetCompoundsQueryParams,
 )
+from mascope_backend.api.new.auth.dependencies import editor_user, guest_user
+
 
 # TODO_target_compound_management refactor to send the same result as as other routes
 

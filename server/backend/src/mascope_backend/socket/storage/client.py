@@ -14,8 +14,9 @@ Redis key namespaces:
 """
 
 from redis.asyncio import Redis, from_url
-from mascope_backend.socket.storage.config import storage_config
+
 from mascope_backend.runtime import runtime
+from mascope_backend.socket.storage.config import storage_config
 
 
 class RedisStorageClient:

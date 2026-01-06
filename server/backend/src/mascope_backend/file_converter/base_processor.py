@@ -3,32 +3,31 @@
 
 import asyncio
 import os
-from pathlib import Path
 import shutil
 import traceback
+from abc import ABC, ABCMeta, abstractmethod
 from multiprocessing import Queue
+from pathlib import Path
 from queue import Empty
 from threading import Event, Thread
-from abc import ABC, abstractmethod, ABCMeta
 
-from mascope_signal.peak import compute_peaks
-
+import mascope_sdk
 from mascope_file.io import write_props
 from mascope_file.name import (
     get_instrument_name,
     parse_path_from_item_filename,
 )
-
-import mascope_sdk
+from mascope_signal.peak import compute_peaks
 
 from .api import (
-    create_sample_file_db_record,
-    create_instrument_config_db_record,
     check_sample_file_db_record,
+    create_instrument_config_db_record,
+    create_sample_file_db_record,
     delete_sample_file_by_filename,
 )
 from .runtime import runtime
 from .schema import SampleFileProps
+
 
 # Configure service name to use in request headers
 mascope_sdk.SERVICE_NAME = "file-converter"

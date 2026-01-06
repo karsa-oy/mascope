@@ -1,7 +1,7 @@
 from sqlalchemy import select
-from mascope_backend.db import async_session
-from mascope_backend.db.models import SampleFile
+
 from mascope_backend.api.lib.api_features import api_controller
+from mascope_backend.db import SampleFile, async_session
 from mascope_file.name import resolve_instrument_type
 
 

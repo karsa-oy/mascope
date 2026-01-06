@@ -2,9 +2,9 @@
 Migration script for v20 to v21 database migration.
 """
 
+import asyncio
 import os
 import shutil
-import asyncio
 
 from sqlalchemy import select
 
@@ -12,16 +12,14 @@ from mascope_backend.api.controllers.match.match_controller import (
     rematch_batches,
 )
 from mascope_backend.api.models.match.match_pydantic_model import (
-    RematchBatchesBody,
     RematchBatchBody,
+    RematchBatchesBody,
 )
-
-from mascope_backend.db import configure_database_engine, async_session
-from mascope_backend.db.models import SampleBatch
-from mascope_backend.db.ops.filestore import delete_sum_signal, refit_peaks
-from mascope_backend.db.ops.restore import db_restore
-from mascope_backend.db.ops.maintenance import db_maintenance
+from mascope_backend.db import SampleBatch, async_session, configure_database_engine
 from mascope_backend.db.ops.backup import create_db_backup
+from mascope_backend.db.ops.filestore import delete_sum_signal, refit_peaks
+from mascope_backend.db.ops.maintenance import db_maintenance
+from mascope_backend.db.ops.restore import db_restore
 from mascope_backend.runtime import runtime
 
 

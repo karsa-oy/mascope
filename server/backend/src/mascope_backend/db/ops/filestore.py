@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import asyncio
 import glob
 import os
@@ -8,15 +9,16 @@ from typing import Literal
 from mascope_backend.api.controllers.sample.lib.sample_file_fetch import (
     fetch_sample_files,
 )
-from mascope_signal.peak import (
-    compute_peaks,
-)
 from mascope_backend.api.new.instrument_configs.lib import (
     read_instrument_functions,
 )
 from mascope_backend.db import init_db
 from mascope_backend.runtime import runtime
 from mascope_file.name import parse_path_from_item_filename
+from mascope_signal.peak import (
+    compute_peaks,
+)
+
 
 # Actions
 

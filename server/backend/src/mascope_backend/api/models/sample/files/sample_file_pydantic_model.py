@@ -1,14 +1,17 @@
 import os
-from typing import Optional, Dict, List, Annotated, Literal
 from datetime import datetime as dt
-from pydantic import BaseModel, Field, field_validator, model_validator
+from typing import Annotated, Dict, List, Literal, Optional
+
 from fastapi import UploadFile
 from fastapi.exceptions import RequestValidationError
+from pydantic import BaseModel, Field, field_validator, model_validator
+
 from mascope_backend.api.models.base_pydantic_model import (
+    CommonValidators,
     QueryParamsModel,
     RequestBodyModel,
-    CommonValidators,
 )
+
 
 # TODO_configuration Default sample file upload params
 FILE_UPLOAD_EXTENSIONS = {".h5", ".raw"}

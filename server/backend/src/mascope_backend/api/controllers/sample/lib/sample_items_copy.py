@@ -1,14 +1,16 @@
 from typing import NamedTuple
+
 from sqlalchemy import (
     select,
 )
-from mascope_backend.db import async_session
-from mascope_backend.db.models import (
-    MatchIsotope,
-    MatchIon,
-    MatchCompound,
+
+from mascope_backend.db import (
     MatchCollection,
+    MatchCompound,
+    MatchIon,
+    MatchIsotope,
     MatchSample,
+    async_session,
 )
 from mascope_backend.db.id import gen_id
 from mascope_backend.socket.notifications import (

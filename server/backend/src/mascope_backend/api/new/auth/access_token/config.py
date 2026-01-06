@@ -3,6 +3,7 @@ Configuration settings specific to access tokens used for service-to-service aut
 """
 
 from typing import List
+
 from pydantic import BaseModel
 
 
