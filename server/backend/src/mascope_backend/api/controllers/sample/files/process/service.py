@@ -23,13 +23,14 @@ from mascope_backend.api.controllers.match.match_controller import (
 )
 from mascope_backend.api.controllers.sample.batches.sample_batches_controller import (
     create_sample_batch,
-    get_sample_batch,
     get_sample_batches,
 )
 from mascope_backend.api.controllers.sample.items.sample_items_controller import (
     create_sample_items,
 )
-from mascope_backend.api.controllers.samples.samples_controller import get_sample
+from mascope_backend.api.controllers.sample.lib.fetch_affected_sample_data import (
+    fetch_affected_sample_data,
+)
 from mascope_backend.api.controllers.workspace.acquisition.service import (
     get_acquisition_workspace,
 )
@@ -51,6 +52,8 @@ from mascope_backend.api.new.ionization.modes.util import (
 )
 from mascope_backend.db import (
     IonizationMode,
+    Sample,
+    SampleBatch,
     SampleFile,
     SampleItem,
     async_session,
@@ -118,7 +121,7 @@ async def auto_process_sample_file(
     ).get("data")
 
     # --- Create ACQUISITION batches and sample items for each sample file ionization mode --- #
-    acquisition_sample_items, acquisition_sample_batches = (
+    acquisition_samples, acquisition_sample_batches = (
         await create_acquisition_batches_and_items(
             sample_file=sample_file,
             workspace_id=acquisition_workspace.get("workspace_id"),
@@ -130,29 +133,29 @@ async def auto_process_sample_file(
         batch.get("sample_batch_id") for batch in acquisition_sample_batches
     ]
     all_affected_sample_item_ids.update(
-        sample["sample_item_id"] for sample in acquisition_sample_items
+        sample["sample_item_id"] for sample in acquisition_samples
     )
 
     # --- Perform calibration and match computation for created ACQUISITION samples --- #
-    for sample_item in acquisition_sample_items:
-        sample_item_id = sample_item["sample_item_id"]
+    for sample in acquisition_samples:
+        sample_item_id = sample["sample_item_id"]
 
         # Get ionization mode to check calibration collection
         async with async_session() as session:
             ionization_mode = await session.get(
-                IonizationMode, sample_item["ionization_mode_id"]
+                IonizationMode, sample["ionization_mode_id"]
             )
 
         # Perform calibration if calibration collection configured for this ionization mode
         if ionization_mode and ionization_mode.calibration_collection_id:
             await calibrate_with_retry(
-                sample_item=SampleItem(**sample_item),
+                sample=SampleItem(**sample),
                 user_id=user_id,
                 process_id=process_id,
             )
         else:
             runtime.logger.warning(
-                f"Skipping m/z calibration for sample '{sample_item['sample_item_name']}': "
+                f"Skipping m/z calibration for sample '{sample['sample_item_name']}': "
                 f"Calibration collection is not set for the ionization mode '{ionization_mode.ionization_mode_name}'."
             )
 
@@ -166,7 +169,7 @@ async def auto_process_sample_file(
 
     # --- Schedule rematch tasks for other affected samples --- #
     acquisition_sample_item_ids = {
-        sample["sample_item_id"] for sample in acquisition_sample_items
+        sample["sample_item_id"] for sample in acquisition_samples
     }
     # exclude the processed sample
     other_affected_sample_item_ids = (
@@ -187,15 +190,19 @@ async def auto_process_sample_file(
             f"Started independent rematch task for {len(other_affected_sample_item_ids)} affected samples"
         )
 
-    # --- Return processing results with affected IDs for UI reloads --- #
-    processed_samples = [
-        (await get_sample(sample_item_id=item["sample_item_id"]))["data"]
-        for item in acquisition_sample_items
-    ]
+    # --- Return processed results with affected IDs for UI reloads --- #
+    acquisition_samples = (
+        await fetch_affected_sample_data(
+            sample_item_ids=[
+                sample["sample_item_id"] for sample in acquisition_samples
+            ],
+            include_objects=True,
+        )
+    ).affected_samples
 
     return {
-        "message": f"Auto-processing complete for {sample_file.filename}, processed {len(processed_samples)} samples.",
-        "data": processed_samples,
+        "message": f"Auto-processing complete for {sample_file.filename}, processed {len(acquisition_samples)} samples.",
+        "data": acquisition_samples,
         "_notification_data": {
             "affected_sample_batch_ids": affected_sample_batch_ids,
             "affected_sample_item_ids": list(all_affected_sample_item_ids),
@@ -247,47 +254,62 @@ async def re_process_sample_files(
             select(SampleFile).where(SampleFile.sample_file_id.in_(sample_file_ids))
         )
         sample_files = result.scalars().all()
-        found_ids = {sf.sample_file_id for sf in sample_files}
-        missing_ids = set(sample_file_ids) - found_ids
 
-        for missing_id in missing_ids:
-            failed_files.append(
-                {
-                    "sample_file_id": missing_id,
-                    "filename": "unknown",
-                    "message": f"Sample file with ID '{missing_id}' not found",
-                }
-            )
+    found_ids = {sf.sample_file_id for sf in sample_files}
+    missing_ids = set(sample_file_ids) - found_ids
 
-    # --- Check for user-created samples and validate each file --- #
-    valid_sample_files = []
+    for missing_id in missing_ids:
+        failed_files.append(
+            {
+                "sample_file_id": missing_id,
+                "filename": "unknown",
+                "message": f"Sample file with ID '{missing_id}' not found",
+            }
+        )
+
+    if not sample_files:
+        message = f"None of the {len(sample_file_ids)} sample files found"
+        raise ApiException(
+            user_message=message,
+            tech_message={"failed_files": failed_files},
+            status_code=404,
+        )
+
+    # --- Check for user-created samples --- #
     async with async_session() as session:
-        sample_filenames = {sf.filename for sf in sample_files}
+        # Query for found_ids
         result = await session.execute(
-            select(SampleItem).where(
-                SampleItem.filename.in_(sample_filenames),
+            select(SampleItem, SampleBatch)
+            .join(
+                SampleBatch, SampleItem.sample_batch_id == SampleBatch.sample_batch_id
+            )
+            .where(
+                SampleItem.sample_file_id.in_(found_ids),
                 SampleItem.sample_item_type != "ACQUISITION",
             )
         )
-        user_created_samples = result.scalars().all()
-        user_samples_dict = {
-            sample_item.filename: sample_item for sample_item in user_created_samples
-        }
+        user_created_samples = result.all()
+
+    # Map sample_file_id → (sample_item, batch) for fast lookup
+    user_samples_dict = {
+        sample_item.sample_file_id: (sample_item, batch)
+        for sample_item, batch in user_created_samples
+    }
+
+    # --- Validate each file --- #
+    valid_sample_files = []
 
     for sample_file in sample_files:
         # Check for user-created samples
-        if sample_file.filename in user_samples_dict.keys():
-            user_batch_response = await get_sample_batch(
-                sample_batch_id=user_samples_dict[sample_file.filename].sample_batch_id
-            )
-            user_batch = user_batch_response["data"]
+        if sample_file.sample_file_id in user_samples_dict:
+            sample_item, batch = user_samples_dict[sample_file.sample_file_id]
             failed_files.append(
                 {
                     "sample_file_id": sample_file.sample_file_id,
                     "filename": sample_file.filename,
                     "message": (
                         "Cannot re-process file as it is associated with a user-created "
-                        f"sample in the batch {user_batch['sample_batch_name']}."
+                        f"sample in the batch {batch.sample_batch_name}."
                     ),
                 }
             )
@@ -321,35 +343,43 @@ async def re_process_sample_files(
             )
             continue
 
+        # Passed all validations
         valid_sample_files.append(sample_file)
 
     # --- Delete existing sample items for valid files --- #
-    async with async_session() as session:
-        sample_filenames = {sf.filename for sf in valid_sample_files}
-        # Collect existing sample items for notifications
-        acquisition_sample_items = (
-            (
-                await session.execute(
-                    select(SampleItem).where(SampleItem.filename.in_(sample_filenames))
+    if valid_sample_files:
+        valid_sample_file_ids = {sf.sample_file_id for sf in valid_sample_files}
+
+        async with async_session() as session:
+            # Collect existing sample items for notifications
+            acquisition_sample_items = (
+                (
+                    await session.execute(
+                        select(SampleItem).where(
+                            SampleItem.sample_file_id.in_(valid_sample_file_ids)
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            # Delete
+            await session.execute(
+                delete(SampleItem).where(
+                    SampleItem.sample_file_id.in_(valid_sample_file_ids)
                 )
             )
-            .scalars()
-            .all()
-        )
-        # Delete
-        await session.execute(
-            delete(SampleItem).where(SampleItem.filename.in_(sample_filenames))
-        )
-        # Emit deletion notifications
-        for sample_item in acquisition_sample_items:
-            affected_sample_batch_ids.add(sample_item.sample_batch_id)
-            if independent_transaction:
-                await emit_record_deleted(
-                    record_type="sample",
-                    record_id=sample_item.sample_item_id,
-                    room=sample_item.sample_batch_id,
-                )
-        await session.commit()
+            await session.commit()
+
+            # Emit deletion notifications
+            for sample_item in acquisition_sample_items:
+                affected_sample_batch_ids.add(sample_item.sample_batch_id)
+                if independent_transaction:
+                    await emit_record_deleted(
+                        record_type="sample",
+                        record_id=sample_item.sample_item_id,
+                        room=sample_item.sample_batch_id,
+                    )
 
     # --- Process valid files --- #
     for sample_file in valid_sample_files:
@@ -380,7 +410,7 @@ async def re_process_sample_files(
                     file_notification_data["affected_sample_item_ids"]
                 )
 
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             failed_files.append(
                 {
                     "sample_file_id": sample_file.sample_file_id,
@@ -454,13 +484,13 @@ async def create_acquisition_batches_and_items(
     ionization_modes = await resolve_ionization_modes_by_tokens(sample_file)
 
     for ionization_mode in ionization_modes:
-        # Step 1: Generate daily ACQUISITION batch name for this ionization mode
+        # --- Generate daily ACQUISITION batch name for this ionization mode ---
         ion_mode_name = ionization_mode.ionization_mode_name
         batch_name = (
             f"{sample_file.datetime.strftime('%Y-%m-%d')} {ion_mode_name} acquisition"
         )
 
-        # Step 2: Get or create daily ACQUISITION batch for this ionization mode
+        # --- Get or create daily ACQUISITION batch for this ionization mode ---
         # Wrapped the entire get-or-create logic in semaphore to prevent race conditions
         async with db_semaphore:
             # Check if batch already exists
@@ -525,7 +555,7 @@ async def create_acquisition_batches_and_items(
         sample_items_to_create.append(
             SampleItemCreate(
                 sample_batch_id=acquisition_sample_batch["sample_batch_id"],
-                filename=sample_file.filename,
+                sample_file_id=sample_file.sample_file_id,
                 sample_item_name=sample_file.datetime.strftime("%Y-%m-%d %H:%M:%S"),
                 sample_item_type="ACQUISITION",
                 sample_item_attributes={},
@@ -534,35 +564,35 @@ async def create_acquisition_batches_and_items(
             )
         )
     # Step 3: Create ACQUISITION sample items
-    acquisition_sample_items = (
+    acquisition_samples = (
         await create_sample_items(
             sample_items=sample_items_to_create, independent_transaction=True
         )
     ).get("data", [])
 
-    return acquisition_sample_items, acquisition_sample_batches
+    return acquisition_samples, acquisition_sample_batches
 
 
 async def calibrate_with_retry(
-    sample_item: SampleItem, user_id: int | None = None, process_id: str | None = None
+    sample: Sample, user_id: int | None = None, process_id: str | None = None
 ) -> None:
-    """Calibrate sample item with retry logic
+    """Calibrate sample with retry logic
 
     If no matching calibration peaks are found, the m/z error tolerance is doubled
     and the calibration is retried, up to CALIBRATION_ITERATIONS times.
 
-    :param sample_item: Sample item to calibrate
-    :type sample_item: SampleItem
+    :param sample: Sample to calibrate
+    :type sample: Sample
     :param user_id: Current user triggered operation (for user notifications)
     :type user_id: int | None, optional
     :param process_id: Process ID for tracking
     :type process_id: str | None, optional
     """
-    mz_calibration_params = calibration_params_factory(sample_item.filename)
+    mz_calibration_params = calibration_params_factory(sample.filename)
     for i in range(1, CALIBRATION_ITERATIONS + 1):
         try:
             await calibration_mz_calibrate_sample(
-                sample_item_id=sample_item.sample_item_id,
+                sample_item_id=sample.sample_item_id,
                 mz_calibration_params=mz_calibration_params,
                 independent_transaction=False,
                 user_id=user_id,
@@ -574,7 +604,7 @@ async def calibrate_with_retry(
             if i == CALIBRATION_ITERATIONS:
                 runtime.logger.error(
                     f"Failed to calibrate m/z with m/z tolerance {mz_calibration_params.mz_error_tolerance} "
-                    f"for sample item {sample_item.sample_item_name}: {e}"
+                    f"for sample item {sample.sample_item_name}: {e}"
                 )
             else:
                 # Double the m/z error tolerance, check refinement window limits, then retry
@@ -589,6 +619,6 @@ async def calibrate_with_retry(
                     )
                 runtime.logger.warning(
                     f"Not enough calibration peaks with m/z error tolerance {old_tolerance}, "
-                    f"retrying m/z calibration for sample {sample_item.sample_item_name} with "
+                    f"retrying m/z calibration for sample {sample.sample_item_name} with "
                     f"mz_error_tolerance={mz_calibration_params.mz_error_tolerance}."
                 )

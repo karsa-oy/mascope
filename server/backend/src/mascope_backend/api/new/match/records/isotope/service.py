@@ -4,13 +4,13 @@ Isotope-level match records service for target isotopes with match data.
 
 from sqlalchemy import and_, select
 
-from mascope_backend.api.controllers.sample.items.sample_items_controller import (
-    get_sample_items,
-)
 from mascope_backend.api.controllers.sample.lib.sample_batches_fetch import (
     fetch_sample_batch,
 )
 from mascope_backend.api.controllers.samples.lib.samples_fetch import fetch_sample
+from mascope_backend.api.controllers.samples.samples_controller import (
+    get_samples,
+)
 from mascope_backend.api.lib.api_features import api_controller
 from mascope_backend.api.models.target.collections.config import (
     target_collection_config,
@@ -391,13 +391,11 @@ async def _get_batch_match_isotope_records(
         )
 
         # Determine resolution based on instrument types in batch
-        sample_items = await get_sample_items(
-            sample_batch_id=sample_batch.sample_batch_id
-        )
+        samples = await get_samples(sample_batch_id=sample_batch.sample_batch_id)
         instrument_types = set(
             [
-                resolve_instrument_type(get_instrument_name(sample_item["filename"]))
-                for sample_item in sample_items["data"]
+                resolve_instrument_type(get_instrument_name(sample["filename"]))
+                for sample in samples["data"]
             ]
         )
         isotope_resolution = "HIGH" if "orbi" in instrument_types else "LOW"

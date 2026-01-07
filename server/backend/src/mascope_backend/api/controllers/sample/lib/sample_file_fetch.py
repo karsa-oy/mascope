@@ -6,30 +6,44 @@ from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
 from mascope_backend.db import SampleFile, async_session
 
 
-async def fetch_sample_file(filename: str) -> SampleFile:
+async def fetch_sample_file(
+    sample_file_id: str | None = None, filename: str | None = None
+) -> SampleFile:
     """
-    Retrieves a single sample file by its unique filename.
+    Retrieves a single sample file by its unique id or filename.
 
-    Steps:
-    - Execute a query to fetch the sample file by the filename.
-    - If the sample file is not found, raise a NotFoundException.
-    - Return the sample file's details.
+    param sample_file_id: The unique identifier of the sample file.
+    :type sample_file_id: str | None
+    :param filename: The filename of the sample file.
+    :type filename: str | None
 
-    :param filename: Unique filename of the sample file to retrieve.
-    :type filename: str
-    :raises NotFoundException: If the sample file with the specified filename is not found.
+    :raises NotFoundException: If the sample file is not found.
     :return: The requested sample file's details.
     :rtype: SampleFile
     """
+    # Validate input - exactly one parameter must be provided
+    provided_params = sum(x is not None for x in [sample_file_id, filename])
+    if provided_params != 1:
+        raise ValueError("Exactly one of sample_file_id or filename must be provided")
+
     async with async_session() as session:
-        # --- Fetch sample file by filename ---
-        result = await session.execute(
-            select(SampleFile).where(SampleFile.filename == filename)
-        )
+        # --- Fetch sample file provided parameter ---
+        if sample_file_id:
+            result = await session.execute(
+                select(SampleFile).where(SampleFile.sample_file_id == sample_file_id)
+            )
+        else:
+            result = await session.execute(
+                select(SampleFile).where(SampleFile.filename == filename)
+            )
+
         sample_file = result.scalar_one_or_none()
+
         # --- Check if sample file exists ---
         if not sample_file:
-            raise NotFoundException(f"Sample file with filename '{filename}' not found")
+            raise NotFoundException(
+                f"Sample file {sample_file_id or filename} not found"
+            )
 
         # --- Return sample file details ---
         return sample_file

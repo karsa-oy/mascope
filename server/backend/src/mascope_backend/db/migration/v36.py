@@ -95,7 +95,7 @@ async def _migrate_orbi_files():
             await compute_peaks(sample_file.filename, if_exists="replace")
 
             runtime.logger.info(f"Rematching samples for file {sample_file.filename}.")
-            await _rematch_samples_by_filename(sample_file.filename)
+            await _rematch_sample_files_by_id(sample_file.sample_file_id)
         except Exception as e:
             runtime.logger.error(
                 f"Failed to update .props for file {sample_file.filename}: {e}"
@@ -169,9 +169,9 @@ def _remove_peaks(sample_file):
         rmtree(zarr_dir)
 
 
-async def _rematch_samples_by_filename(filename):
+async def _rematch_sample_files_by_id(sample_file_id: str):
     async with async_session() as session:
-        stmt = select(SampleItem).where(SampleItem.filename == filename)
+        stmt = select(SampleItem).where(SampleItem.sample_file_id == sample_file_id)
         result = await session.execute(stmt)
         sample_items = result.scalars().all()
 

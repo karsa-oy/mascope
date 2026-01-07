@@ -6,9 +6,8 @@ UI reload  notifications system.
 from typing import NamedTuple
 
 from sqlalchemy import select
-from sqlalchemy.orm import joinedload
 
-from mascope_backend.db import SampleBatch, SampleItem, async_session
+from mascope_backend.db import Sample, SampleBatch, SampleItem, async_session
 
 
 class AffectedSampleData(NamedTuple):
@@ -20,78 +19,80 @@ class AffectedSampleData(NamedTuple):
 
     affected_sample_item_ids: list[str]
     affected_sample_batch_ids: list[str]
-    affected_sample_items: list[SampleItem] | None = None
+    affected_samples: list[Sample] | None = None
     affected_sample_batches: list[SampleBatch] | None = None
 
 
 async def fetch_affected_sample_data(
-    filenames: list[str] | None = None,
     sample_item_ids: list[str] | None = None,
+    sample_file_ids: list[str] | None = None,
     include_objects: bool = False,
 ) -> AffectedSampleData:
     """
-    Fetches affected sample data (item IDs, batch IDs, and related objects) based on
-    filenames or sample item IDs.
+    Fetches affected sample data (IDs, Sample view objects, and SampleBatch objects).
 
     This function serves as a unified helper for collecting data needed for UI reload events.
-    Exactly one of the parameters must be provided.
+    Exactly one of the filter parameters must be provided.
 
-    :param filenames: List of filenames to fetch affected data for, defaults to None
-    :type filenames: list[str], optional
     :param sample_item_ids: List of sample item IDs to fetch affected data for, defaults to None
     :type sample_item_ids: list[str], optional
+    :param sample_file_ids: List of sample file IDs to fetch affected data for
+    :type sample_file_ids: list[str] | None
     :param include_objects: Whether to include the actual SampleItem/SampleBatch objects
     :type include_objects: bool, defaults to False
     :return: Consolidated affected sample data including IDs and objects
     :rtype: AffectedSampleData
-    :raises ValueError: If neither filenames nor sample_item_ids is provided,
-                       or if both are provided
+    :raises ValueError: If zero or multiple filter parameters provided
     """
-    # Validate input parameters
-    if (filenames is None and sample_item_ids is None) or (
-        filenames is not None and sample_item_ids is not None
-    ):
+    # Validate input - exactly one parameter must be provided
+    provided_params = sum(x is not None for x in [sample_item_ids, sample_file_ids])
+    if provided_params != 1:
         raise ValueError(
-            "Either filenames OR sample_item_ids must be provided, but not both"
+            "Exactly one of sample_item_ids or sample_file_ids must be provided"
         )
 
     async with async_session() as session:
-        if include_objects:
-            query = select(SampleItem).options(joinedload(SampleItem.sample_batch))
-        else:
-            query = select(SampleItem.sample_item_id, SampleItem.sample_batch_id)
+        # --- Get IDs using SampleItem (no joins needed) ---
+        id_query = select(SampleItem.sample_item_id, SampleItem.sample_batch_id)
 
-        # Apply the appropriate filter
-        if filenames:
-            query = query.filter(SampleItem.filename.in_(filenames))
-        else:
-            query = query.filter(SampleItem.sample_item_id.in_(sample_item_ids))
+        if sample_item_ids:
+            id_query = id_query.where(SampleItem.sample_item_id.in_(sample_item_ids))
+        else:  # sample_file_ids
+            id_query = id_query.where(SampleItem.sample_file_id.in_(sample_file_ids))
 
-        result = await session.execute(query)
+        id_result = await session.execute(id_query)
+        rows = id_result.all()
 
-        if include_objects:
-            # Extract data from objects
-            sample_items = result.scalars().all()
+        # Extract IDs
+        affected_sample_item_ids = [row[0] for row in rows]
+        affected_sample_batch_ids = list({row[1] for row in rows})
 
-            # Collect data from objects
-            affected_sample_item_ids = {item.sample_item_id for item in sample_items}
-            affected_sample_batch_ids = {item.sample_batch_id for item in sample_items}
-            affected_sample_batches = {item.sample_batch for item in sample_items}
-
+        # Early return if no IDs found or objects not requested
+        if not affected_sample_item_ids or not include_objects:
             return AffectedSampleData(
-                affected_sample_item_ids=list(affected_sample_item_ids),
-                affected_sample_batch_ids=list(affected_sample_batch_ids),
-                affected_sample_items=sample_items,
-                affected_sample_batches=list(affected_sample_batches),
+                affected_sample_item_ids=affected_sample_item_ids,
+                affected_sample_batch_ids=affected_sample_batch_ids,
+                affected_samples=None,
+                affected_sample_batches=None,
             )
-        else:
-            # Extract IDs only
-            rows = result.all()
 
-            affected_sample_item_ids = {row[0] for row in rows}
-            affected_sample_batch_ids = {row[1] for row in rows}
+        # --- Fetch Sample view objects (includes filename and all joined data) ---
+        sample_query = select(Sample).where(
+            Sample.sample_item_id.in_(affected_sample_item_ids)
+        )
+        sample_result = await session.execute(sample_query)
+        samples = sample_result.scalars().all()
 
-            return AffectedSampleData(
-                affected_sample_item_ids=list(affected_sample_item_ids),
-                affected_sample_batch_ids=list(affected_sample_batch_ids),
-            )
+        # --- Fetch SampleBatch objects ---
+        batch_query = select(SampleBatch).where(
+            SampleBatch.sample_batch_id.in_(affected_sample_batch_ids)
+        )
+        batch_result = await session.execute(batch_query)
+        batches = batch_result.scalars().all()
+
+        return AffectedSampleData(
+            affected_sample_item_ids=affected_sample_item_ids,
+            affected_sample_batch_ids=affected_sample_batch_ids,
+            affected_samples=list(samples),
+            affected_sample_batches=list(batches),
+        )

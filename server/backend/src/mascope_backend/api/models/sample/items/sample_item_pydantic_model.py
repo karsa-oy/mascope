@@ -102,7 +102,7 @@ class SampleItemBase(BaseModel):
     """Base model with common fields for sample items."""
 
     sample_batch_id: str = Field(..., description="ID of the associated sample batch")
-    filename: str = Field(..., description="Name of the sample file")
+    sample_file_id: str = Field(..., description="ID of the associated sample file")
     sample_item_name: str = Field(..., description="Name of the sample item")
     sample_item_type: str = Field(..., description="Type of the sample item")
     sample_item_attributes: Dict = Field(
@@ -222,8 +222,9 @@ class GetSampleItemsQueryParams(GetSampleItemsQueryValidator, QueryParamsModel):
         None,
         description="The sample batch ID for which you want to fetch the sample items",
     )
-    filename: str | None = Field(
-        None, description="The filename for which you want to fetch the sample items"
+    sample_file_id: str | None = Field(
+        None,
+        description="The sample file ID for which you want to fetch the sample items",
     )
     sample_item_type: list[str] | None = Field(
         default=None,

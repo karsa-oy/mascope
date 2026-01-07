@@ -223,7 +223,7 @@ async def process_sample_item_route(
     :return: A dictionary confirming the processing has started.
     """
     # Verify the existance of sample file
-    await fetch_sample_file(filename=body.sample_item.filename)
+    await fetch_sample_file(sample_file_id=body.sample_item.sample_file_id)
     # Verify instrument config exists
     if (
         body.instrument_config

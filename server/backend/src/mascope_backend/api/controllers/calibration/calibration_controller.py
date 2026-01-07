@@ -20,9 +20,6 @@ from mascope_backend.api.controllers.sample.batches.status.service import (
 from mascope_backend.api.controllers.sample.files.sample_files_controller import (
     update_sample_file,
 )
-from mascope_backend.api.controllers.sample.items.sample_items_controller import (
-    get_sample_item,
-)
 from mascope_backend.api.controllers.sample.lib.fetch_affected_sample_data import (
     fetch_affected_sample_data,
 )
@@ -146,11 +143,8 @@ async def calibration_mz_fit(
     :raises ApiException: If m/z fitting fails
     """
     # Retrieve and validate sample and batch data
+    sample = await fetch_sample(sample_item_id)
     async with async_session() as session:
-        sample = await session.get(Sample, sample_item_id)
-        if not sample:
-            raise NotFoundException(f"Sample item with ID '{sample_item_id}' not found")
-
         ionization_mode = await session.get(IonizationMode, sample.ionization_mode_id)
         if not ionization_mode:
             raise NotFoundException(
@@ -168,7 +162,7 @@ async def calibration_mz_fit(
         affected_sample_item_ids,
         affected_sample_batch_ids,
         *_,
-    ) = await fetch_affected_sample_data(filenames=[sample.filename])
+    ) = await fetch_affected_sample_data(sample_file_ids=[sample.sample_file_id])
 
     # Prepare progress user notification.
     notification = UserNotification(
@@ -280,15 +274,17 @@ async def calibration_mz_apply(
     :return: Dictionary containing fit results and notification data
     """
     # --- Retrieve sample file ---
-    sample_file = await fetch_sample_file(filename)
+    sample_file = await fetch_sample_file(filename=filename)
 
     # --- Get affected sample items and their batches ---
     (
         affected_sample_item_ids,
         affected_sample_batch_ids,
-        affected_sample_items,
+        affected_samples,
         affected_sample_batches,
-    ) = await fetch_affected_sample_data(filenames=[filename], include_objects=True)
+    ) = await fetch_affected_sample_data(
+        sample_file_ids=[sample_file.sample_file_id], include_objects=True
+    )
 
     # --- Set non-ACQUISITION batches to "processing" ---
     # already "processing" batches will not change the status
@@ -349,9 +345,9 @@ async def calibration_mz_apply(
         sample_batch_id = sample_batch.sample_batch_id
         sample_batch_name = sample_batch.sample_batch_name
         batch_samples = [
-            item
-            for item in affected_sample_items
-            if item.sample_batch_id == sample_batch_id
+            sample
+            for sample in affected_samples
+            if sample.sample_batch_id == sample_batch_id
         ]
         batch_samples_count = len(batch_samples)
 
@@ -463,7 +459,7 @@ async def calibration_mz_calibrate_sample(
         affected_sample_item_ids,
         affected_sample_batch_ids,
         *_,
-    ) = await fetch_affected_sample_data(filenames=[sample.filename])
+    ) = await fetch_affected_sample_data(sample_file_ids=[sample.sample_file_id])
     runtime.logger.info(f"...m/z calibrating sample '{sample.sample_item_name}' ...")
 
     # Step 2: Prepare progress user notification.
@@ -604,18 +600,18 @@ async def calibration_mz_calibrate_samples(
             )
         except ApiException as e:
             # Get sample details for the failure report
-            sample = (await get_sample_item(sample_item_id=sample_item_id))["data"]
+            sample = fetch_sample(sample_item_id=sample_item_id)
 
             # log the error and add the sample to the failed list
             runtime.logger.warning(
-                f"Calibrating sample '{sample['sample_item_name']}' failed: {e.user_message}"
+                f"Calibrating sample '{sample.sample_item_name}' failed: {e.user_message}"
             )
             failed_sample_items.append(
                 {
                     "sample_item": {
-                        "sample_item_id": sample["sample_item_id"],
-                        "sample_item_name": sample["sample_item_name"],
-                        "filename": sample["filename"],
+                        "sample_item_id": sample.sample_item_id,
+                        "sample_item_name": sample.sample_item_name,
+                        "filename": sample.filename,
                     },
                     "warning_message": e.user_message,
                 }

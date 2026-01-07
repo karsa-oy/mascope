@@ -7,6 +7,7 @@ import numpy as np
 from sqlalchemy import Float, Integer, and_, asc, cast, desc, func, select
 
 import mascope_signal.compute as m_compute
+from mascope_backend.api.controllers.samples.lib.samples_fetch import fetch_sample
 from mascope_backend.api.lib.api_features import api_controller
 from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
 from mascope_backend.api.models.target.collections.config import (
@@ -745,15 +746,14 @@ async def _load_sample_data(sample_item_id: str) -> SampleData:
     :return: SampleData object containing sample information
     :rtype: SampleData
     """
-    sample = await get_sample(sample_item_id)
-    sample = sample["data"]
+    sample = await fetch_sample(sample_item_id)
     sample_data = SampleData(
-        sample_item_id=sample["sample_item_id"],
-        sample_item_name=sample["sample_item_name"],
-        filename=sample["filename"],
-        t0=sample["t0"],
-        t1=sample["t1"],
-        polarity=sample["polarity"],
+        sample_item_id=sample.sample_item_id,
+        sample_item_name=sample.sample_item_name,
+        filename=sample.filename,
+        t0=sample.t0,
+        t1=sample.t1,
+        polarity=sample.polarity,
     )
     return sample_data
 

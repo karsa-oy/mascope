@@ -121,11 +121,11 @@ def load_existing_batch_cache(sample_batch: dict) -> dict:
 async def collect_spectra_per_ionization_mode(
     sample_batch_id: str,
 ) -> tuple[dict[str, list[CentroidedSpectrum]], str]:
-    """Collects CentroidedSpectrum objects for all sample items in a sample batch, grouped by ionization mode.
+    """Collects CentroidedSpectrum objects for all samples in a sample batch, grouped by ionization mode.
 
     :param sample_batch_id: ID of the sample batch to collect spectra from.
     :type sample_batch_id: str
-    :raises NotFoundException: if no sample items are found in the specified sample batch.
+    :raises NotFoundException: if no samples are found in the specified sample batch.
     :return: Tuple of dictionary mapping ionization mode IDs to lists of CentroidedSpectrum objects
              and the intensity variable.
     :rtype: tuple[dict[str, list[CentroidedSpectrum]], str]
@@ -134,24 +134,24 @@ async def collect_spectra_per_ionization_mode(
     async with async_session() as session:
         stmt = select(Sample).where(Sample.sample_batch_id == sample_batch_id)
         result = await session.execute(stmt)
-        sample_items = result.scalars().all()
+        samples = result.scalars().all()
 
-    if not sample_items:
+    if not samples:
         raise NotFoundException(
-            f"No sample items found in the sample batch with ID {sample_batch_id}."
+            f"No samples found in the sample batch with ID {sample_batch_id}."
         )
 
     # --- Infer intensity variable from instrument types of samples --- #
-    intensity_variable = _get_intensity_variable_from_samples(sample_items)
+    intensity_variable = _get_intensity_variable_from_samples(samples)
 
     # --- Load resolution functions for each sample file --- #
     resolution_functions = dict()
-    for item in sample_items:
-        _, resolution_func = await read_instrument_functions(item.filename)
-        resolution_functions[item.filename] = resolution_func
+    for sample in samples:
+        _, resolution_func = await read_instrument_functions(sample.filename)
+        resolution_functions[sample.filename] = resolution_func
 
     # Peaks will be grouped and aligned by ionization mode
-    ionization_modes = set([item.ionization_mode_id for item in sample_items])
+    ionization_modes = set([sample.ionization_mode_id for sample in samples])
     spectra = {ionization_mode: [] for ionization_mode in ionization_modes}
 
     # Bound concurrency to avoid too many open files / blocking the loop
@@ -161,8 +161,8 @@ async def collect_spectra_per_ionization_mode(
     runtime.logger.debug("Loading samples and preparing spectra...")
     collected_specs = await asyncio.gather(
         *[
-            _prepare_spec(item, semaphore, resolution_functions, intensity_variable)
-            for item in sample_items
+            _prepare_spec(sample, semaphore, resolution_functions, intensity_variable)
+            for sample in samples
         ]
     )
     for ionization_mode, spec in collected_specs:
@@ -171,20 +171,20 @@ async def collect_spectra_per_ionization_mode(
     return spectra, intensity_variable
 
 
-def _get_intensity_variable_from_samples(sample_items: list[Sample]) -> str:
-    """Infers the intensity variable based on the instrument type of the provided sample items.
+def _get_intensity_variable_from_samples(samples: list[Sample]) -> str:
+    """Infers the intensity variable based on the instrument type of the provided samples.
 
     Returns "sum_peak_areas" for TOF instruments and "sum_peak_heights" for Orbitrap instruments.
 
-    :param sample_items: List of Sample objects to infer the intensity variable from.
-    :type sample_items: list[Sample]
+    :param samples: List of Sample objects to infer the intensity variable from.
+    :type samples: list[Sample]
     :raises ValueError: if samples are from different instruments
     :return: The inferred intensity variable.
     :rtype: str
     """
     # --- Validate single instrument type --- #
     instrument_types = {
-        m_name.get_instrument_type(item.filename) for item in sample_items
+        m_name.get_instrument_type(sample.filename) for sample in samples
     }
     if len(instrument_types) > 1:
         raise ValueError(
@@ -201,15 +201,15 @@ def _get_intensity_variable_from_samples(sample_items: list[Sample]) -> str:
 
 
 async def _prepare_spec(
-    sample_item: Sample,
+    sample: Sample,
     semaphore: asyncio.Semaphore,
     resolution_functions: dict,
     intensity_variable: Literal["sum_peak_areas", "sum_peak_heights"],
 ) -> tuple[str, CentroidedSpectrum]:
-    """Creates a CentroidSpectrum object for a sample item.
+    """Creates a CentroidSpectrum object for a sample.
 
-    :param sample_item: Sample item to prepare the spectrum for.
-    :type sample_item: Sample
+    :param sample: Sample to prepare the spectrum for.
+    :type sample: Sample
     :param semaphore: Semaphore to limit concurrent file loading.
     :type semaphore: asyncio.Semaphore
     :param resolution_functions: Dictionary of resolution functions per filename.
@@ -217,9 +217,9 @@ async def _prepare_spec(
     :return: Tuple of ionization mode ID and CentroidedSpectrum object.
     :rtype: tuple[str, CentroidedSpectrum]
     """
-    filename = sample_item.filename
-    polarity = sample_item.polarity
-    ionization_mode = sample_item.ionization_mode_id
+    filename = sample.filename
+    polarity = sample.polarity
+    ionization_mode = sample.ionization_mode_id
 
     async with semaphore:
         mz, intensity, peak_id = await asyncio.to_thread(

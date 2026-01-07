@@ -12,9 +12,7 @@ import xarray as xr
 import mascope_file.io as m_io
 import mascope_file.name as m_name
 from mascope_backend.api.controllers.match.match_controller import rematch_sample
-from mascope_backend.api.controllers.sample.items.sample_items_controller import (
-    get_sample_items,
-)
+from mascope_backend.api.controllers.samples.samples_controller import get_samples
 from mascope_backend.api.new.instrument_configs.lib import read_instrument_functions
 from mascope_backend.db import configure_database_engine
 from mascope_backend.db.ops.backup import create_db_backup
@@ -201,19 +199,19 @@ async def rematch_failed_samples() -> None:
             await peak_detector.detect_peaks()
             await peak_detector.write_peaks_to_zarr()
 
-            sample_items_response = await get_sample_items(filename=filename)
-            sample_items = sample_items_response["data"]
-            if sample_items_response["results"] == 0:
+            samples_response = await get_samples(filename=filename)
+            samples = samples_response["data"]
+            if samples_response["results"] == 0:
                 runtime.logger.info(
-                    f"Sample file {filename} doesn't have associated items."
+                    f"Sample file {filename} doesn't have associated samples."
                 )
-            for sample_item in sample_items:
+            for sample in samples:
                 rematch_response = await rematch_sample(
-                    sample_item_id=sample_item["sample_item_id"], full_remove=True
+                    sample_item_id=sample["sample_item_id"], full_remove=True
                 )
                 if rematch_response["status"] == "failed":
                     runtime.logger.error(
-                        f"Failed to rematch {sample_item["sample_item_id"]}."
+                        f"Failed to rematch {sample["sample_item_id"]}."
                     )
 
         except Exception as e:

@@ -165,7 +165,7 @@ async def get_ionization_modes_by_filename(filename: str) -> dict:
     :return: A dictionary containing message and retrieved ionization modes.
     :rtype: dict
     """
-    sample_file = await fetch_sample_file(filename)
+    sample_file = await fetch_sample_file(filename=filename)
     ionization_modes = await resolve_ionization_modes_by_tokens(sample_file)
     if not ionization_modes:
         raise NotFoundException(

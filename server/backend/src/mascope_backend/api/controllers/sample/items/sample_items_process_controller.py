@@ -10,6 +10,9 @@ from mascope_backend.api.controllers.sample.items.sample_items_controller import
 from mascope_backend.api.controllers.sample.lib.fetch_affected_sample_data import (
     fetch_affected_sample_data,
 )
+from mascope_backend.api.controllers.sample.lib.sample_file_fetch import (
+    fetch_sample_file,
+)
 from mascope_backend.api.controllers.samples.samples_controller import get_sample
 from mascope_backend.api.lib.api_features import (
     api_controller_background_task,
@@ -76,13 +79,15 @@ async def process_sample_item(
     # Initialize collector for affected sample items
     all_affected_sample_item_ids = set()
 
+    sample_file = await fetch_sample_file(sample_file_id=sample_item.sample_file_id)
+
     notification = UserNotification(
         process_id=process_id,
         type="process_sample_item",
         status="pending",
-        message=f"Processing sample item '{sample_item.sample_item_name}', filename '{sample_item.filename}'.",
+        message=f"Processing sample item '{sample_item.sample_item_name}', filename '{sample_file.filename}'.",
         data={
-            "filename": sample_item.filename,
+            "filename": sample_file.filename,
             "sample_batch_id": sample_item.sample_batch_id,
             "_user_id": user_id,
         },
@@ -91,7 +96,7 @@ async def process_sample_item(
 
     # --- Process instrument functions for the sample file --- #
     instrument_config_result = await process_instrument_config(
-        filenames=[sample_item.filename],
+        filenames=[sample_file.filename],
         instrument_config=instrument_config,
         independent_transaction=False,
         user_id=user_id,
@@ -119,7 +124,7 @@ async def process_sample_item(
     notification.message = f"Sample '{sample_item.sample_item_name}' record created with ID: {created_sample_item_id}."
     notification.data = {
         "sample_item_id": created_sample_item_id,
-        "filename": sample_item.filename,
+        "filename": sample_file.filename,
         "sample_batch_id": sample_item.sample_batch_id,
         "_user_id": user_id,
     }
@@ -176,7 +181,7 @@ async def process_sample_item(
         "data": sample,
         "_notification_data": {
             "sample_item_id": created_sample_item_id,
-            "filename": sample["filename"],
+            "sample_file_id": sample["sample_file_id"],
             "affected_sample_batch_ids": affected_sample_batch_ids,
             "affected_sample_item_ids": list(all_affected_sample_item_ids),
         },

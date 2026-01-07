@@ -186,11 +186,12 @@ async def process_instrument_config(
         await compute_peaks(filename, instrument_functions)
 
     # Step 9. Gather affected sample data
+    sample_file_ids = [sf.sample_file_id for sf in sample_files]
     (
         affected_sample_item_ids,
         affected_sample_batch_ids,
         *_,
-    ) = await fetch_affected_sample_data(filenames=filenames)
+    ) = await fetch_affected_sample_data(sample_file_ids=sample_file_ids)
 
     # Step 10. Recompute sample item matches
     if independent_transaction:

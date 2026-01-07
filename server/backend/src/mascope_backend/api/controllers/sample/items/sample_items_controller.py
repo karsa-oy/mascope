@@ -47,6 +47,7 @@ from mascope_backend.api.models.sample.items.sample_item_pydantic_model import (
     SampleItemUpdate,
 )
 from mascope_backend.db import (
+    Sample,
     SampleFile,
     SampleItem,
     async_session,
@@ -68,7 +69,7 @@ from mascope_file.name import get_instrument_type
 @api_controller()
 async def get_sample_items(
     sample_batch_id: str | None = None,
-    filename: str | None = None,
+    sample_file_id: str | None = None,
     sample_item_type: list[str] | None = None,
     polarity: list[str] | None = None,
     sort: str = "sample_item_utc_created",
@@ -88,8 +89,8 @@ async def get_sample_items(
 
     :param sample_batch_id: The sample batch ID for which you want to fetch the sample items, defaults to None
     :type sample_batch_id: str | None, optional
-    :param filename: The filename for which you want to fetch the sample items, defaults to None
-    :type filename: str | None, optional
+    :param sample_file_id: The sample file ID for which you want to fetch the sample items, defaults to None
+    :type sample_file_id: str | None, optional
     :param sample_item_type: Filter by sample item types, can specify multiple types, defaults to None
     :type sample_item_type: list[str] | None
     :param polarity: Filter by ion polarity mode of the sample item, '+' for positive or '-' for negative
@@ -117,8 +118,8 @@ async def get_sample_items(
         if sample_batch_id:
             stmt = stmt.filter(SampleItem.sample_batch_id == sample_batch_id)
 
-        if filename:
-            stmt = stmt.filter(SampleItem.filename == filename)
+        if sample_file_id:
+            stmt = stmt.filter(SampleItem.sample_file_id == sample_file_id)
 
         if sample_item_type:
             stmt = stmt.filter(SampleItem.sample_item_type.in_(sample_item_type))
@@ -194,17 +195,18 @@ async def create_sample_items(
     Creates multiple sample items in bulk after verifying associated sample files exist.
 
     Steps:
-    1. Validate all sample files exist.
-    2. Process each sample item and conditionally compute missing TIC, t0, t1 fields.
-    3. Bulk create new sample items.
-    4. Fetch created sample items for response and affected sample batches.
-    5. Update modified timestamps for affected batches.
+    - Validate all sample files exist.
+    - Process each sample item and conditionally compute missing TIC, t0, t1 fields.
+    - Bulk create new sample items.
+    - Fetch created samples (with filename) for response and affected sample batches.
+    - Update modified timestamps for affected batches.
+    - Emit creation events
 
     :param sample_items: List of sample item details for bulk creation
     :type sample_items: list[SampleItemCreate]
     :param independent_transaction: Flag for independent transaction, defaults to False.
     :type independent_transaction: bool, optional
-    :return: Details of created sample items
+    :return: Details of created sample items with full sample data (including filename)
     :rtype: dict
     :raises NotFoundException: If any associated sample file does not exist
     """
@@ -215,37 +217,49 @@ async def create_sample_items(
             "data": [],
         }
     async with async_session() as session:
-        # Step 1: Verify all sample files exist
-        sample_filenames = {si.filename for si in sample_items}
-        existing_filenames = set(
+        # --- Validate all sample files exist and fetch metadata ---
+        sample_file_ids = {si.sample_file_id for si in sample_items}
+
+        sample_files = (
             (
                 await session.execute(
-                    select(SampleFile.filename).where(
-                        SampleFile.filename.in_(sample_filenames)
+                    select(SampleFile).where(
+                        SampleFile.sample_file_id.in_(sample_file_ids)
                     )
                 )
-            ).scalars()
+            )
+            .scalars()
+            .all()
         )
 
-        if missing_files := list(sample_filenames - existing_filenames):
-            raise NotFoundException(f"Sample files not found: {missing_files}")
+        # Create lookup map: sample_file_id → SampleFile
+        sample_files_map = {sf.sample_file_id: sf for sf in sample_files}
 
-        # Step 2: Process each sample item and conditionally compute missing TIC, t0, t1 fields
+        # Check for missing files
+        found_ids = set(sample_files_map.keys())
+        if missing_ids := list(sample_file_ids - found_ids):
+            raise NotFoundException(f"Sample files not found: {missing_ids}")
+
+        # --- Process each sample item and conditionally compute missing TIC, t0, t1 fields ---
         sample_items_data = []
+
         for sample_item in sample_items:
+            sample_file = sample_files_map[sample_item.sample_file_id]
+
             # Determine if TIC computation is needed
             tic_computation_needed = (
                 sample_item.tic is None
                 or sample_item.t0 is None
                 or sample_item.t1 is None
             )
+
             # Compute TIC data if needed
             computed_tic = computed_t0 = computed_t1 = None
             if tic_computation_needed:
                 try:
                     tic_time, tic_values = m_compute.get_tic_per_scan(
-                        base_filename=sample_item.filename,
-                        polarity=sample_item.polarity,
+                        base_filename=sample_file.filename,
+                        polarity=sample_item.polarity,  # sample_item polarity (+ or -)
                     )
                     computed_tic = float(np.sum(tic_values))
                     computed_t0 = float(tic_time[0])
@@ -256,7 +270,7 @@ async def create_sample_items(
                     )
                     raise NotFoundException(
                         f"No scans with '{verbose_polarity}' polarity were found "
-                        f"in the file '{sample_item.filename}'."
+                        f"in the file '{sample_file.filename}'."
                     ) from e
 
             sample_item_dict = {
@@ -276,14 +290,14 @@ async def create_sample_items(
 
             sample_items_data.append(sample_item_dict)
 
-        # Step 3: Bulk insert to avoid event listeners
+        # --- Bulk insert to avoid event listeners ---
         await session.execute(insert(SampleItem).values(sample_items_data))
         await session.commit()
 
-    # Step 4: Fetch created sample items for response and affected sample batches
+    # --- Fetch created samples with full data (includes filename) and affected sample batches ---
     created_item_ids = [si["sample_item_id"] for si in sample_items_data]
 
-    _, affected_sample_batch_ids, fetched_samples_list, _ = (
+    _, affected_sample_batch_ids, affected_samples, _ = (
         await fetch_affected_sample_data(
             sample_item_ids=created_item_ids,
             include_objects=True,
@@ -291,35 +305,40 @@ async def create_sample_items(
     )
 
     # Preserve insertion order
-    samples_by_id = {s.sample_item_id: s for s in fetched_samples_list}
-    created_sample_items = [samples_by_id[item_id] for item_id in created_item_ids]
+    samples_by_id = {s.sample_item_id: s for s in affected_samples}
+    created_samples = [samples_by_id[item_id] for item_id in created_item_ids]
 
-    # Step 5: Update modified timestamps for affected batches
+    # --- Update modified timestamps for affected batches ---
     await update_sample_batches_modified_timestamp(
         sample_batch_ids=affected_sample_batch_ids
     )
 
-    # Emit creation events for each sample item
-    created_sample_items_data = [
-        SampleItemRead.model_validate(si).model_dump() for si in created_sample_items
+    # --- Convert to response format (includes filename from Sample view) ---
+    created_samples_data = [
+        {
+            column.name: getattr(sample, column.name)
+            for column in Sample.__table__.columns
+        }
+        for sample in created_samples
     ]
 
+    # --- Emit creation events ---
     if independent_transaction:
-        for sample_item in created_sample_items_data:
-            sample = (await get_sample(sample_item["sample_item_id"])).get("data")
+        for sample in created_samples_data:
             await emit_record_created(
                 record_type="sample",
-                record_id=sample_item["sample_item_id"],
+                record_id=sample["sample_item_id"],
                 record=sample,
-                room=sample_item["sample_batch_id"],
+                room=sample["sample_batch_id"],
             )
 
-    message = f"Successfully created {len(created_sample_items)} sample items."
+    message = f"Successfully created {len(created_samples)} sample items."
     runtime.logger.debug(message)
+
     return {
         "message": message,
-        "results": len(created_sample_items),
-        "data": created_sample_items_data,
+        "results": len(created_samples),
+        "data": created_samples_data,
     }
 
 
@@ -502,7 +521,7 @@ async def copy_sample_items(
     # Fetch and validate source samples
     async with async_session() as session:
         result = await session.execute(
-            select(SampleItem).where(SampleItem.sample_item_id.in_(sample_item_ids))
+            select(Sample).where(Sample.sample_item_id.in_(sample_item_ids))
         )
         source_samples = result.scalars().all()
 

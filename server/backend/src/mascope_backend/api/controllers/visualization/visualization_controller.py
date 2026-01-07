@@ -9,7 +9,7 @@ import mascope_signal.compute as m_compute
 from mascope_backend.api.controllers.samples.lib.samples_fetch import fetch_sample
 from mascope_backend.api.lib.api_features import api_controller_background_task
 from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
-from mascope_backend.db import TargetIsotope, async_session
+from mascope_backend.db import Sample, TargetIsotope, async_session
 from mascope_backend.socket import sio
 from mascope_file.io import load_peak_data, read_props
 from mascope_file.name import get_instrument_type
@@ -178,12 +178,12 @@ class IsotopeResult:
     main_isotope_height: float = 0
 
 
-async def _load_peaks_and_averaged_signal(sample, target_isotopes):
+async def _load_peaks_and_averaged_signal(sample: Sample, target_isotopes):
     """
     Loads peak data and averaged signal for the specified sample and target isotopes.
 
     :param sample: The sample object containing filename and time range.
-    :type sample: Any
+    :type sample: Sample
     :param target_isotopes: List of target isotope objects with m/z values.
     :type target_isotopes: list
     :return: Tuple of (peak_data, averaged_signal) for the specified m/z window.
