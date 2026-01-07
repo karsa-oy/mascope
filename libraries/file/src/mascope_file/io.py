@@ -119,20 +119,23 @@ def load_coord(base_filename, var, coord_name):
     return coord_array
 
 
-def load_peak_data(base_filename, drop_bad_peaks=True):
+def load_peak_data(base_filename: str, drop_bad_peaks: bool = True) -> xr.Dataset:
     """Load peak data from sample file
 
     :param base_filename: Sample file filename
     :type base_filename: str
     :param drop_bad_peaks: Flag to drop weak and satellite peaks, defaults to True
     :type drop_bad_peaks: bool, optional
-    :return: Loaded peak data
+    :return: Loaded peak data with sample file properties attached
     :rtype: xr.Dataset
     """
     peak_data = load_array(base_filename, var="peak_timeseries")
     if drop_bad_peaks:
         bad_peak_mask = peak_data.is_weak | peak_data.is_satellite
         peak_data = peak_data.sel(mz=peak_data.mz.values[~bad_peak_mask])
+    # Add zarr file properties to attributes for reverse compatibility
+    props = read_props(base_filename)
+    peak_data.attrs["props"] = props
     return peak_data
 
 
