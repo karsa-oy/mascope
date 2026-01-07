@@ -1,3 +1,13 @@
+"""
+Database restoration operations for schema validation and orphan cleanup.
+
+This module provides functionality to:
+- Validate table schemas against expected configurations
+- Restore tables to correct schema when mismatches are detected
+- Delete orphaned records that violate foreign key constraints
+- Create missing indexes for query performance
+"""
+
 import asyncio
 import gc
 import os
@@ -62,17 +72,16 @@ async def db_restore(tables_to_restore=None):
 
     # Step 4: Delete orphaned records after restoring schema
     runtime.logger.info("Checking for orphaned records...")
-    for table_name in tables_to_restore:
-        await loop.run_in_executor(
-            None, delete_orphaned_records_sync, db_path, table_name
-        )
+    await loop.run_in_executor(None, delete_all_orphaned_records_sync, db_path)
 
     # Step 5: Create indexes after restoring schema and cleaning up orphans
     runtime.logger.info("Checking for missing indexes...")
-    for table_name in tables_to_restore:
-        await loop.run_in_executor(
-            None, create_indexes_sync, db_path, table_name, table_configs[table_name]
-        )
+    indexes_created = await loop.run_in_executor(
+        None, create_all_indexes_sync, db_path, tables_to_restore, table_configs
+    )
+
+    if indexes_created == 0:
+        runtime.logger.info("✅ All indexes present - no missing indexes found!")
 
 
 # -----------------------------
@@ -106,22 +115,26 @@ def restore_table_sync(db_path, table_name, schema_info):
         conn.commit()
 
 
-def delete_orphaned_records_sync(db_path, table_name):
+def delete_all_orphaned_records_sync(db_path):
     """
-    Synchronously delete orphaned records based on foreign key constraints.
+    Synchronously delete all orphaned records across all tables.
     """
     with sqlite3.connect(db_path) as conn:
-        delete_orphaned_records(conn, table_name)
+        delete_all_orphaned_records(conn)
         conn.commit()
 
 
-def create_indexes_sync(db_path, table_name, schema_info):
+def create_all_indexes_sync(db_path, tables_to_restore, table_configs):
     """
-    Synchronously create indexes.
+    Synchronously create all missing indexes and return count.
     """
+    total_created = 0
     with sqlite3.connect(db_path) as conn:
-        create_indexes(conn, table_name, schema_info)
+        for table_name in tables_to_restore:
+            created = create_indexes(conn, table_name, table_configs[table_name])
+            total_created += created
         conn.commit()
+    return total_created
 
 
 # -----------------------------
@@ -180,111 +193,144 @@ def restore_data_from_backup(cursor, table_name, columns):
     cursor.execute(f"DROP TABLE {table_name}_backup;")
 
 
-def delete_orphaned_records(conn, table_name):
+def delete_all_orphaned_records(conn):
     """
-    Deletes orphaned records from specified tables based on foreign key constraints.
+    Orphan cleanup using table_configs to determine FK relationships.
+
+    Processes tables in dependency order so that parent records are not deleted
+    before checking child records. Handles both CASCADE and SET NULL relationships.
 
     :param conn: Database connection object.
-    :param table_name: Name of the table to check and delete orphaned records.
     """
     cursor = conn.cursor()
-    # Enable foreign key constraint enforcement to ensure cascade deletes
+
+    # Enable foreign key constraint enforcement
     cursor.execute("PRAGMA foreign_keys = ON;")
-    if table_name == "sample_batch":
-        cursor.execute(
-            """
-            DELETE FROM sample_batch 
-            WHERE workspace_id = '_DELETE' OR workspace_id NOT IN (SELECT workspace_id FROM workspace);
-        """
-        )
-        deleted_count = cursor.rowcount
-        if deleted_count > 0:
-            runtime.logger.info(
-                f"🗑️ Deleted {deleted_count} orphaned sample_batch records due to invalid workspace_id."
-            )
-    elif table_name == "target_compound_in_target_collection":
-        cursor.execute(
-            """
-            DELETE FROM target_compound_in_target_collection 
-            WHERE target_compound_id NOT IN (SELECT target_compound_id FROM target_compound);
-        """
-        )
-        deleted_count = cursor.rowcount
-        if deleted_count > 0:
-            runtime.logger.info(
-                f"🗑️ Deleted {deleted_count} orphaned target_compound_in_target_collection records due to invalid target_compound_id."
-            )
 
-    elif table_name == "target_collection_in_sample_batch":
-        cursor.execute(
-            """
-            DELETE FROM target_collection_in_sample_batch 
-            WHERE sample_batch_id NOT IN (SELECT sample_batch_id FROM sample_batch);
-        """
-        )
-        deleted_count = cursor.rowcount
-        if deleted_count > 0:
-            runtime.logger.warning(
-                f"🗑️ Deleted {deleted_count} orphaned target_collection_in_sample_batch records due to invalid sample_batch_id."
-            )
+    table_configs = get_table_configs()
+    total_deleted = 0
 
-    elif table_name == "sample_item":
-        # Check for sample_item records that have no corresponding sample_file
-        cursor.execute(
-            """
-            DELETE FROM sample_item
-            WHERE filename NOT IN (SELECT filename FROM sample_file);
-            """
-        )
-        deleted_count = cursor.rowcount
-        if deleted_count > 0:
-            runtime.logger.info(
-                f"🗑️ Deleted {deleted_count} orphaned sample_item records with missing corresponding sample_file references."
-            )
+    # Define processing order: children first, then parents
+    orphan_check_order = [
+        # Match tables (deepest children - depend on sample_item and targets)
+        "match_isotope",
+        "match_rating",
+        "match_ion",
+        "match_compound",
+        "match_collection",
+        "match_sample",
+        # Sample hierarchy
+        "sample_item",  # depends on sample_file and sample_batch
+        # Junction tables
+        "target_collection_in_sample_batch",
+        "target_compound_in_target_collection",
+        # Target hierarchy
+        "target_isotope",  # depends on target_ion
+        "target_ion",  # depends on target_compound and ionization_mechanism
+        # Sample batch
+        "sample_batch",  # depends on workspace
+        # Auth
+        "access_token",  # depends on user
+    ]
 
-    elif table_name in ["match", "match_isotope"]:
-        cursor.execute(
-            f"""
-            DELETE FROM {table_name}
-            WHERE sample_item_id NOT IN (SELECT sample_item_id FROM sample_item);
-            """
-        )
-        deleted_count = cursor.rowcount
-        if deleted_count > 0:
-            runtime.logger.info(
-                f"🗑️ Deleted {deleted_count} orphaned {table_name} records due to invalid sample_item_id."
-            )
+    for table_name in orphan_check_order:
+        if table_name not in table_configs:
+            continue
 
-    # Disable foreign key constraints temporarily to allow for orphans data restore
-    cursor.execute("PRAGMA foreign_keys = OFF;")
+        table_config = table_configs[table_name]
+
+        # Skip if no foreign keys
+        if "fks" not in table_config or not table_config["fks"]:
+            continue
+
+        # Check each foreign key relationship
+        for local_col, (ref_table, ref_col, on_update, on_delete) in table_config[
+            "fks"
+        ].items():
+
+            # Only check CASCADE relationships (SET NULL shouldn't create orphans)
+            if on_delete == "CASCADE":
+                deleted = _delete_orphans_for_fk(
+                    cursor, table_name, local_col, ref_table, ref_col
+                )
+                total_deleted += deleted
+
+    if total_deleted == 0:
+        runtime.logger.info(
+            "✅ No orphaned records found - database integrity verified!"
+        )
+    else:
+        runtime.logger.warning(f"⚠️ Total orphaned records deleted: {total_deleted}")
+
+
+def _delete_orphans_for_fk(cursor, table_name, local_col, ref_table, ref_col):
+    """
+    Delete orphaned records for a specific foreign key relationship.
+
+    :param cursor: Database cursor
+    :param table_name: Table containing the foreign key
+    :param local_col: Local column name
+    :param ref_table: Referenced table name
+    :param ref_col: Referenced column name
+    :return: Number of deleted records
+    """
+    # Delete records where FK points to non-existent parent
+    query = f"""
+        DELETE FROM {table_name}
+        WHERE {local_col} NOT IN (
+            SELECT {ref_col} FROM {ref_table}
+        );
+    """
+
+    cursor.execute(query)
+    deleted_count = cursor.rowcount
+
+    if deleted_count > 0:
+        runtime.logger.info(
+            f"🗑️  Deleted {deleted_count} orphaned {table_name} records "
+            f"(FK {local_col} references non-existent {ref_table}.{ref_col})"
+        )
+
+    return deleted_count
 
 
 def create_indexes(conn, table_name, schema_info):
     """
     Creates indexes for the specified table based on the provided schema information.
-        - If the index name starts with 'ix_', it creates a UNIQUE index.
-        - For any other case, it defaults to creating a regular index.
+    Returns the number of indexes created.
+
+    :param conn: Database connection
+    :param table_name: Name of table to create indexes for
+    :param schema_info: Schema configuration dict
+    :return: Number of indexes created
     """
     cursor = conn.cursor()
-    if "indexes" in schema_info:
-        # Fetch the current list of indexes on the table
-        cursor.execute(f"PRAGMA index_list('{table_name}')")
-        existing_indexes = {
-            index[1] for index in cursor.fetchall()
-        }  # Fetch index names
+    indexes_created = 0
 
-        for index_sql in schema_info["indexes"]:
-            index_name = index_sql.split(" ")[0]
-            # Check if the index already exists
-            if index_name not in existing_indexes:
-                # If the index is prefixed with 'ix_', it is a unique index
-                if index_name.startswith("ix_"):
-                    cursor.execute(f"CREATE UNIQUE INDEX IF NOT EXISTS {index_sql}")
-                    runtime.logger.info(f"🆕 Unique index {index_name} created.")
-                # Otherwise, create a regular index
-                else:
-                    cursor.execute(f"CREATE INDEX IF NOT EXISTS {index_sql}")
-                    runtime.logger.info(f"🆕 Index {index_name} created.")
+    if "indexes" not in schema_info:
+        return 0
+
+    # Fetch the current list of indexes on the table
+    cursor.execute(f"PRAGMA index_list('{table_name}')")
+    existing_indexes = {index[1] for index in cursor.fetchall()}  # Fetch index names
+
+    for index_sql in schema_info["indexes"]:
+        index_name = index_sql.split(" ")[0]
+        # Check if the index already exists
+        if index_name not in existing_indexes:
+            # If the index is prefixed with 'ix_', it is a unique index
+            if index_name.startswith("ix_"):
+                cursor.execute(f"CREATE UNIQUE INDEX IF NOT EXISTS {index_sql}")
+                runtime.logger.info(
+                    f"🆕 Created unique index {index_name} on {table_name}"
+                )
+            # Otherwise, create a regular index
+            else:
+                cursor.execute(f"CREATE INDEX IF NOT EXISTS {index_sql}")
+                runtime.logger.info(f"🆕 Created index {index_name} on {table_name}")
+            indexes_created += 1
+
+    return indexes_created
 
 
 def normalize_default_value(value):
