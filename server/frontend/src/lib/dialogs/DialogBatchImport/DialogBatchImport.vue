@@ -182,7 +182,7 @@ function preprocess() {
     if (!imported.filterId) {
       imported.filterId = generated.filterId = genId(6, false)
     }
-    imported.items = autosampler.preprocess(acquisitions, imported.parsed)
+    imported.items = autosampler.preprocess(acquisitions, imported.parsed, imported.filterId)
   }
   if (imported.type === 'generic') {
     imported.items = generic.preprocess(acquisitions, imported.parsed, props.polarity)

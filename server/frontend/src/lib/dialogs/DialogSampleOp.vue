@@ -80,7 +80,8 @@ const template = reactive({
 })
 const input = reactive({
   fields: template.selected.template,
-  filename: null,
+  filename: null, // for display
+  sample_file_id: null, // the actual reference api uses
   filterId: null,
   instrument: null,
   type: null,
@@ -118,6 +119,7 @@ async function init(active) {
   // reset inputs
   // User is creating or updating a sample item
   input.filename = original.value?.filename
+  input.sample_file_id = original.value?.sample_file_id
   input.instrument = original.value?.instrument
   input.polarity = original.value?.polarity ?? null
   if (polarityOptions.value.length === 1) {
@@ -215,9 +217,10 @@ async function save() {
   visible.value = null
   emit('submit')
   const sample_item = {
+    sample_batch_id: app.data.batch.focused.sample_batch_id,
+    sample_file_id: input.sample_file_id,
     sample_item_name: input.fields.find((field) => field.label == 'sample_item_name').value,
     sample_item_type: input.type,
-    sample_batch_id: app.data.batch.focused.sample_batch_id,
     filter_id: input.filterId,
     polarity: input.polarity,
     ionization_mode_id: input.ionization_mode_id,
@@ -236,10 +239,7 @@ async function save() {
   if (props.action == 'create') {
     const { instrument_config } = instrumentConfig.payload
     await app.data.sample.process({
-      sample: {
-        filename: input.filename,
-        ...sample_item
-      },
+      sample: sample_item,
       instrument_config
     })
   } else if (props.action == 'update') {

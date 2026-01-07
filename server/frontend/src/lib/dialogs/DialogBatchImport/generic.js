@@ -53,7 +53,8 @@ export const generic = {
 
     return parsed.map((parsed, index) => ({
       datetime: acquisitions[index]?.datetime ?? null,
-      filename: acquisitions[index]?.filename ?? null,
+      filename: acquisitions[index]?.filename ?? null, // for display
+      sample_file_id: acquisitions[index]?.sample_file_id ?? null, //  reference that api needs
       polarity: polarities[index],
       ...parsed,
       sample_batch_id: app.data.batch.focused.sample_batch_id

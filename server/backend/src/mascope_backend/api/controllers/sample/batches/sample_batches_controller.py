@@ -35,6 +35,9 @@ from mascope_backend.api.controllers.sample.items.sample_items_controller import
 from mascope_backend.api.controllers.sample.lib.fetch_affected_sample_data import (
     fetch_affected_sample_data,
 )
+from mascope_backend.api.controllers.sample.lib.sample_batches_fetch import (
+    fetch_sample_batch,
+)
 from mascope_backend.api.controllers.sample.lib.sample_file_fetch import (
     fetch_sample_file,
 )
@@ -84,6 +87,7 @@ from mascope_backend.api.new.ionization.modes.util import (
 )
 from mascope_backend.db import (
     SampleBatch,
+    SampleFile,
     TargetCollectionInSampleBatch,
     Workspace,
     async_session,
@@ -618,14 +622,27 @@ async def import_sample_items(
     :param process_id: Process identifier for progress tracking
     :type process_id: str | None, optional
     """
-    sample_batch_result = await get_sample_batch(sample_batch_id)
-    sample_batch = sample_batch_result.get("data")
-    sample_batch_name = sample_batch["sample_batch_name"]
+    sample_batch = await fetch_sample_batch(sample_batch_id)
+    sample_batch_name = sample_batch.sample_batch_name
 
-    # --- Verify that all sample items are for the same instrument --- #
-    instrument_types = {
-        m_name.get_instrument_type(item.filename) for item in sample_items
-    }
+    # Fetch all sample files by ID
+    async with async_session() as session:
+        sample_files = (
+            (
+                await session.execute(
+                    select(SampleFile).where(
+                        SampleFile.sample_file_id.in_(
+                            [si.sample_file_id for si in sample_items]
+                        )
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+    # --- Verify that all samples are for the same instrument --- #
+    instrument_types = {m_name.get_instrument_type(sf.filename) for sf in sample_files}
     if len(instrument_types) > 1:
         raise ValueError(
             "Importing samples from different instruments is not supported, please import samples for each instrument separately"
@@ -645,7 +662,7 @@ async def import_sample_items(
 
     # --- Process instrument configs for the sample files --- #
     instrument_config_result = await process_instrument_config(
-        filenames=[item.filename for item in sample_items],
+        filenames=[sf.filename for sf in sample_files],
         instrument_config=instrument_config,
         independent_transaction=False,
         user_id=user_id,
@@ -655,7 +672,7 @@ async def import_sample_items(
 
     # --- Resolve ionization methods for the sample items to be created --- #
     for item in sample_items:
-        sample_file = await fetch_sample_file(item.filename)
+        sample_file = await fetch_sample_file(sample_file_id=item.sample_file_id)
         ionization_modes = await resolve_ionization_modes_by_tokens(sample_file)
         # Filter ionization modes by polarity
         ionization_modes = [
@@ -813,7 +830,7 @@ async def copy_sample_batch(
             select(SampleBatch)
             .options(
                 joinedload(SampleBatch.target_collection),
-                joinedload(SampleBatch.sample_item),
+                joinedload(SampleBatch.sample_items),
             )
             .filter(SampleBatch.sample_batch_id == sample_batch_id)
         )
@@ -858,7 +875,7 @@ async def copy_sample_batch(
 
     # Step 5: Copy sample items associated with the original sample batch
     await copy_sample_items(
-        sample_item_ids=[s.sample_item_id for s in original_sample_batch.sample_item],
+        sample_item_ids=[s.sample_item_id for s in original_sample_batch.sample_items],
         sample_batch_id=new_sample_batch["sample_batch_id"],
         always_copy_matches=True,
         independent_transaction=False,

@@ -32,13 +32,14 @@ export const autosampler = {
       return result
     }
   },
-  preprocess: (acquisitions, parsed) => {
+  preprocess: (acquisitions, parsed, filterId) => {
     const app = useApp()
     return parsed.map((parsed, i) => {
       const item = {
-        filename: acquisitions[i]?.filename ?? null,
+        filename: acquisitions[i]?.filename ?? null, // for display/validation
+        sample_file_id: acquisitions[i]?.sample_file_id ?? null, //  reference that api needs
         sample_batch_id: app.data.batch.focused.sample_batch_id,
-        filter_id: imported.filterId,
+        filter_id: filterId,
         sample_item_attributes: {}
       }
       Object.entries(parsed).forEach(([key, value]) => {
