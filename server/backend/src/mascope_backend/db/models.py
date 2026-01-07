@@ -1,42 +1,52 @@
-from datetime import datetime as dt, timezone
+"""
+SQLAlchemy ORM models for the Mascope application.
+
+This module defines all database models including user management, workspaces,
+samples, targets, and analysis matches.
+"""
+
+from datetime import datetime as dt
+from datetime import timezone
 from typing import Optional
-from sqlalchemy import (
-    event,
-    TIMESTAMP,
-    Column,
-    Boolean,
-    Index,
-    Float,
-    ForeignKey,
-    Integer,
-    String,
-    Text,
-    JSON,
-    func,
-    or_,
-    select,
-    text,
-    update,
-)
-from sqlalchemy.orm import relationship, Mapped, mapped_column
-from sqlalchemy.sql.schema import CheckConstraint
-from sqlalchemy.orm import declarative_base
+
 from fastapi_users.db import (
     SQLAlchemyBaseUserTable,
 )
 from fastapi_users_db_sqlalchemy.access_token import (
     SQLAlchemyBaseAccessTokenTable,
 )
-from mascope_backend.api.models.workspace.config import workspace_config
+from sqlalchemy import (
+    JSON,
+    TIMESTAMP,
+    Boolean,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    event,
+    func,
+    or_,
+    select,
+    text,
+    update,
+)
+from sqlalchemy.orm import Mapped, declarative_base, mapped_column, relationship
+from sqlalchemy.sql.schema import CheckConstraint
+
 from mascope_backend.api.models.sample.batches.config import sample_batch_config
 from mascope_backend.api.models.sample.items.config import sample_item_config
 from mascope_backend.api.models.target.collections.config import (
     target_collection_config,
 )
+from mascope_backend.api.models.workspace.config import workspace_config
 from mascope_backend.runtime import runtime
 
 
 class BaseMixin(object):
+    """Mixin providing common utility methods for all models."""
+
     def to_dict(
         self,
     ):
@@ -48,6 +58,8 @@ Base = declarative_base(cls=BaseMixin)
 
 
 class User(SQLAlchemyBaseUserTable[int], Base):
+    """User authentication and authorization model."""
+
     __tablename__ = "user"
 
     # User table fields required for FastAPI Users. Kept unchanged for easier compatibility.
@@ -71,7 +83,7 @@ class User(SQLAlchemyBaseUserTable[int], Base):
         TIMESTAMP, default=lambda: dt.now(timezone.utc), nullable=False
     )
 
-    # Define relationships
+    # Relationships
     role = relationship("Role", back_populates="user")
     access_token = relationship(
         "AccessToken", back_populates="user", cascade="all, delete, delete-orphan"
@@ -101,15 +113,15 @@ class User(SQLAlchemyBaseUserTable[int], Base):
 
 
 class Role(Base):
+    """User role and permissions model."""
+
     __tablename__ = "role"
 
     role_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    role_name: Mapped[str] = mapped_column(
-        String(length=50), unique=True, nullable=False
-    )
-    permissions: Mapped[dict] = mapped_column(JSON, nullable=True)
+    role_name: Mapped[str] = mapped_column(String(50), unique=True)
+    permissions: Mapped[Optional[dict]] = mapped_column(JSON)
 
-    # Define relationships
+    # Relationships
     user = relationship("User", back_populates="role")
 
 
@@ -136,7 +148,7 @@ class AccessToken(SQLAlchemyBaseAccessTokenTable[int], Base):
         default=lambda: dt.now(timezone.utc),
     )
 
-    # Define relationships
+    # Relationships
     user = relationship("User", back_populates="access_token")
 
     @classmethod
@@ -171,70 +183,62 @@ class AccessToken(SQLAlchemyBaseAccessTokenTable[int], Base):
 
 
 class Workspace(Base):
+    """Workspace container for organizing sample batches."""
+
     __tablename__ = "workspace"
+
     workspace_id: Mapped[str] = mapped_column(String(16), primary_key=True)
-    workspace_name: Mapped[str] = mapped_column(String(256), nullable=False)
-    workspace_description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    workspace_name: Mapped[str] = mapped_column(String(256))
+    workspace_description: Mapped[Optional[str]] = mapped_column(Text)
     workspace_type: Mapped[str] = mapped_column(
         String(64),
-        nullable=False,
         server_default=text(f"{workspace_config.DEFAULT_WORKSPACE_TYPE}"),
     )
     locked: Mapped[int] = mapped_column(
         Integer,
-        nullable=False,
         server_default=text(f"{workspace_config.DEFAULT_LOCKED_STATUS}"),
     )
-    instrument: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
-    icon: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
-    workspace_utc_created: Mapped[Optional[str]] = mapped_column(
-        TIMESTAMP, nullable=True
-    )
-    workspace_utc_modified: Mapped[Optional[str]] = mapped_column(
-        TIMESTAMP, nullable=True
-    )
-    # Define relationships
+    instrument: Mapped[Optional[str]] = mapped_column(String(64))
+    icon: Mapped[Optional[dict]] = mapped_column(JSON)
+    workspace_utc_created: Mapped[Optional[str]] = mapped_column(TIMESTAMP)
+    workspace_utc_modified: Mapped[Optional[str]] = mapped_column(TIMESTAMP)
+
+    # Relationships
     sample_batch = relationship(
         "SampleBatch", back_populates="workspace", cascade="all, delete, delete-orphan"
     )
 
 
 class SampleBatch(Base):
+    """Sample batch grouping related samples for analysis."""
+
     __tablename__ = "sample_batch"
+
     sample_batch_id: Mapped[str] = mapped_column(String(16), primary_key=True)
     workspace_id: Mapped[str] = mapped_column(
         String(16),
         ForeignKey("workspace.workspace_id", ondelete="CASCADE"),
-        nullable=False,
     )
-    sample_batch_name: Mapped[str] = mapped_column(String, nullable=False)
-    sample_batch_description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    sample_batch_name: Mapped[str] = mapped_column(String(256))
+    sample_batch_description: Mapped[Optional[str]] = mapped_column(Text)
     sample_batch_type: Mapped[str] = mapped_column(
         String(64),
-        nullable=False,
         server_default=text(f"{sample_batch_config.DEFAULT_SAMPLE_BATCH_TYPE}"),
     )
     status: Mapped[str] = mapped_column(
         String(20),
-        nullable=False,
         server_default=text(f"{sample_batch_config.DEFAULT_SAMPLE_BATCH_STATUS}"),
     )
     locked: Mapped[int] = mapped_column(
         Integer,
-        nullable=False,
         server_default=text(f"{sample_batch_config.DEFAULT_LOCKED_STATUS}"),
     )
     polarity: Mapped[str] = mapped_column(
         String(4),
-        nullable=False,
         server_default=text(f"'{sample_batch_config.ANALYSIS_POLARITY}'"),
     )
-    sample_batch_utc_created: Mapped[Optional[str]] = mapped_column(
-        TIMESTAMP, nullable=True
-    )
-    sample_batch_utc_modified: Mapped[Optional[str]] = mapped_column(
-        TIMESTAMP, nullable=True
-    )
+    sample_batch_utc_created: Mapped[Optional[str]] = mapped_column(TIMESTAMP)
+    sample_batch_utc_modified: Mapped[Optional[str]] = mapped_column(TIMESTAMP)
 
     # Relationships
     workspace = relationship("Workspace", back_populates="sample_batch")
@@ -411,19 +415,21 @@ def update_sample_batch_on_sample_item_change(mapper, connection, target):
 
 
 class TargetCollection(Base):
+    """Collection of target compounds for analysis."""
+
     __tablename__ = "target_collection"
-    target_collection_id = Column(String(16), nullable=False, primary_key=True)
-    target_collection_name = Column(String(256), nullable=False)
-    target_collection_description = Column(Text)
-    target_collection_type = Column(
+
+    target_collection_id: Mapped[str] = mapped_column(String(16), primary_key=True)
+    target_collection_name: Mapped[str] = mapped_column(String(256))
+    target_collection_description: Mapped[Optional[str]] = mapped_column(Text)
+    target_collection_type: Mapped[str] = mapped_column(
         String(64),
-        nullable=False,
         server_default=text(
             f"{target_collection_config.DEFAULT_TARGET_COLLECTION_TYPE}"
         ),
     )
 
-    # Define relationships
+    # Relationships
     sample_batch = relationship(
         "TargetCollectionInSampleBatch",
         back_populates="target_collection",
@@ -442,41 +448,43 @@ class TargetCollection(Base):
 
 
 class TargetCollectionInSampleBatch(Base):
+    """Junction table linking target collections to sample batches."""
+
     __tablename__ = "target_collection_in_sample_batch"
-    target_collection_id = Column(
+
+    target_collection_id: Mapped[str] = mapped_column(
         String(16),
         ForeignKey("target_collection.target_collection_id", ondelete="CASCADE"),
         primary_key=True,
-        nullable=False,
     )
-    sample_batch_id = Column(
+    sample_batch_id: Mapped[str] = mapped_column(
         String(16),
         ForeignKey("sample_batch.sample_batch_id", ondelete="CASCADE"),
         primary_key=True,
-        nullable=False,
     )
 
-    # Define relationships
+    # Relationships
     target_collection = relationship("TargetCollection", back_populates="sample_batch")
     sample_batch = relationship("SampleBatch", back_populates="target_collection")
 
 
 class TargetCompoundInTargetCollection(Base):
+    """Junction table linking target compounds to target collections."""
+
     __tablename__ = "target_compound_in_target_collection"
-    target_compound_id = Column(
+
+    target_compound_id: Mapped[str] = mapped_column(
         String(16),
         ForeignKey("target_compound.target_compound_id", ondelete="CASCADE"),
         primary_key=True,
-        nullable=False,
     )
-    target_collection_id = Column(
+    target_collection_id: Mapped[str] = mapped_column(
         String(16),
         ForeignKey("target_collection.target_collection_id", ondelete="CASCADE"),
         primary_key=True,
-        nullable=False,
     )
 
-    # Define relationships
+    # Relationships
     target_collection = relationship(
         "TargetCollection", back_populates="target_compound"
     )
@@ -484,13 +492,16 @@ class TargetCompoundInTargetCollection(Base):
 
 
 class TargetCompound(Base):
-    __tablename__ = "target_compound"
-    target_compound_id = Column(String(16), nullable=False, primary_key=True)
-    target_compound_name = Column(Text)
-    target_compound_formula = Column(String(256), nullable=False)
-    cas_number = Column(String(12))
+    """Target compound definition."""
 
-    # Define relationships
+    __tablename__ = "target_compound"
+
+    target_compound_id: Mapped[str] = mapped_column(String(16), primary_key=True)
+    target_compound_name: Mapped[Optional[str]] = mapped_column(Text)
+    target_compound_formula: Mapped[str] = mapped_column(String(256))
+    cas_number: Mapped[Optional[str]] = mapped_column(String(12))
+
+    # Relationships
     target_collection = relationship(
         "TargetCompoundInTargetCollection",
         back_populates="target_compound",
@@ -509,25 +520,26 @@ class TargetCompound(Base):
 
 
 class TargetIon(Base):
+    """Target ion derived from target compound and ionization mechanism."""
+
     __tablename__ = "target_ion"
-    target_ion_id = Column(String(16), nullable=False, primary_key=True)
-    target_compound_id = Column(
+
+    target_ion_id: Mapped[str] = mapped_column(String(16), primary_key=True)
+    target_compound_id: Mapped[str] = mapped_column(
         String(16),
         ForeignKey("target_compound.target_compound_id", ondelete="CASCADE"),
-        nullable=False,
     )
-    ionization_mechanism_id = Column(
+    ionization_mechanism_id: Mapped[str] = mapped_column(
         String(16),
         ForeignKey(
             "ionization_mechanism.ionization_mechanism_id",
             ondelete="CASCADE",
         ),
-        nullable=False,
     )
-    target_ion_formula = Column(String(256), nullable=False)
-    filter_params = Column(JSON)
+    target_ion_formula: Mapped[str] = mapped_column(String(256))
+    filter_params: Mapped[Optional[dict]] = mapped_column(JSON)
 
-    # Define relationships
+    # Relationships
     target_compound = relationship("TargetCompound", back_populates="target_ion")
     ionization_mechanism = relationship(
         "IonizationMechanism", back_populates="target_ion"
@@ -548,24 +560,22 @@ class TargetIon(Base):
         cascade="all, delete, delete-orphan",
     )
 
-    # Define indexes
+    # Indexes
     __table_args__ = (
         Index("idx_target_ion_ionization_mechanism", "ionization_mechanism_id"),
     )
 
 
 class IonizationMechanism(Base):
+    """Ionization mechanism table."""
+
     __tablename__ = "ionization_mechanism"
 
     ionization_mechanism_id: Mapped[str] = mapped_column(String(16), primary_key=True)
-    ionization_mechanism_polarity: Mapped[str] = mapped_column(
-        String(1), nullable=False
-    )
-    ionization_mechanism: Mapped[str] = mapped_column(
-        String, nullable=False, unique=True
-    )
+    ionization_mechanism_polarity: Mapped[str] = mapped_column(String(1))
+    ionization_mechanism: Mapped[str] = mapped_column(String(256), unique=True)
 
-    # Define relationships
+    # Relationships
     target_ion = relationship(
         "TargetIon",
         back_populates="ionization_mechanism",
@@ -574,46 +584,42 @@ class IonizationMechanism(Base):
 
 
 class IonizationMode(Base):
+    """Ionization mode configuration."""
+
     __tablename__ = "ionization_mode"
 
     ionization_mode_id: Mapped[str] = mapped_column(String(16), primary_key=True)
-    ionization_mode_name: Mapped[str] = mapped_column(String(256), nullable=False)
+    ionization_mode_name: Mapped[str] = mapped_column(String(256))
     ionization_mode_token: Mapped[Optional[str]] = mapped_column(
-        String(256), unique=True, nullable=True
+        String(256), unique=True
     )
-    ionization_mode_polarity: Mapped[str] = mapped_column(String(1), nullable=False)
-    ionization_mechanism_ids: Mapped[list[str]] = mapped_column(JSON, nullable=False)
-    calibration_collection_id: Mapped[Optional[str]] = mapped_column(
-        String(16), nullable=True
-    )
-    diagnostic_collection_id: Mapped[Optional[str]] = mapped_column(
-        String(16), nullable=True
-    )
+    ionization_mode_polarity: Mapped[str] = mapped_column(String(1))
+    ionization_mechanism_ids: Mapped[list[str]] = mapped_column(JSON)
+    calibration_collection_id: Mapped[Optional[str]] = mapped_column(String(16))
+    diagnostic_collection_id: Mapped[Optional[str]] = mapped_column(String(16))
 
 
 class TargetIsotope(Base):
+    """Target isotope table."""
+
     __tablename__ = "target_isotope"
-    target_isotope_id = Column(String(16), nullable=False, primary_key=True)
-    target_ion_id = Column(
+
+    target_isotope_id: Mapped[str] = mapped_column(String(16), primary_key=True)
+    target_ion_id: Mapped[str] = mapped_column(
         String(16),
         ForeignKey(
             "target_ion.target_ion_id",
             ondelete="CASCADE",
         ),
-        nullable=False,
     )
-    mz = Column(Float, nullable=False)
-    relative_abundance = Column(
+    mz: Mapped[float] = mapped_column(Float)
+    relative_abundance: Mapped[float] = mapped_column(
         Float,
         CheckConstraint("relative_abundance >= 0 AND relative_abundance <= 1"),
-        nullable=False,
     )
-    resolution = Column(
-        String(8),
-        nullable=False,
-    )
+    resolution: Mapped[str] = mapped_column(String(8))
 
-    # Define relationships
+    # Relationships
     target_ion = relationship("TargetIon", back_populates="target_isotope")
     match_isotope = relationship(
         "MatchIsotope",
@@ -623,181 +629,189 @@ class TargetIsotope(Base):
 
 
 class MatchSample(Base):
+    """Sample-level match result."""
+
     __tablename__ = "match_sample"
-    match_sample_id = Column(String(32), nullable=False, primary_key=True)
-    sample_item_id = Column(
+
+    match_sample_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    sample_item_id: Mapped[str] = mapped_column(
         String(16),
         ForeignKey("sample_item.sample_item_id", ondelete="CASCADE"),
-        nullable=False,
     )
-    match_score = Column(
-        Float, CheckConstraint("match_score BETWEEN 0 AND 1"), nullable=False
+    match_score: Mapped[float] = mapped_column(
+        Float, CheckConstraint("match_score BETWEEN 0 AND 1")
     )
-    match_category = Column(
-        Integer, CheckConstraint("match_category BETWEEN 0 AND 2"), nullable=False
+    match_category: Mapped[int] = mapped_column(
+        Integer, CheckConstraint("match_category BETWEEN 0 AND 2")
     )
-    sample_peak_intensity_sum = Column(Float, nullable=False)
-    match_sample_utc_created = Column(TIMESTAMP)
-    match_sample_utc_modified = Column(TIMESTAMP)
+    sample_peak_intensity_sum: Mapped[float] = mapped_column(Float)
+    match_sample_utc_created: Mapped[Optional[str]] = mapped_column(TIMESTAMP)
+    match_sample_utc_modified: Mapped[Optional[str]] = mapped_column(TIMESTAMP)
 
-    # Define relationships
+    # Relationships
     sample_item = relationship("SampleItem", back_populates="match_sample")
 
-    # Define indexes
+    # Indexes
     __table_args__ = (Index("idx_match_sample_sample_item", "sample_item_id"),)
 
 
 class MatchCollection(Base):
+    """Collection-level match result."""
+
     __tablename__ = "match_collection"
-    match_collection_id = Column(String(32), nullable=False, primary_key=True)
-    sample_item_id = Column(
+
+    match_collection_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    sample_item_id: Mapped[str] = mapped_column(
         String(16),
         ForeignKey("sample_item.sample_item_id", ondelete="CASCADE"),
-        nullable=False,
     )
-    target_collection_id = Column(
+    target_collection_id: Mapped[str] = mapped_column(
         String(16),
         ForeignKey("target_collection.target_collection_id", ondelete="CASCADE"),
-        nullable=False,
     )
-    match_score = Column(
-        Float, CheckConstraint("match_score BETWEEN 0 AND 1"), nullable=False
+    match_score: Mapped[float] = mapped_column(
+        Float, CheckConstraint("match_score BETWEEN 0 AND 1")
     )
-    match_category = Column(
-        Integer, CheckConstraint("match_category BETWEEN 0 AND 2"), nullable=False
+    match_category: Mapped[int] = mapped_column(
+        Integer, CheckConstraint("match_category BETWEEN 0 AND 2")
     )
-    sample_peak_intensity_sum = Column(Float, nullable=False)
-    match_collection_utc_created = Column(TIMESTAMP)
-    match_collection_utc_modified = Column(TIMESTAMP)
+    sample_peak_intensity_sum: Mapped[float] = mapped_column(Float)
+    match_collection_utc_created: Mapped[Optional[str]] = mapped_column(TIMESTAMP)
+    match_collection_utc_modified: Mapped[Optional[str]] = mapped_column(TIMESTAMP)
 
-    # Define relationships
+    # Relationships
     sample_item = relationship("SampleItem", back_populates="match_collection")
     target_collection = relationship(
         "TargetCollection", back_populates="match_collection"
     )
 
-    # Define indexes
+    # Indexes
     __table_args__ = (Index("idx_match_collection_sample_item", "sample_item_id"),)
 
 
 class MatchCompound(Base):
+    """Compound-level match result."""
+
     __tablename__ = "match_compound"
-    match_compound_id = Column(String(32), nullable=False, primary_key=True)
-    sample_item_id = Column(
+
+    match_compound_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    sample_item_id: Mapped[str] = mapped_column(
         String(16),
         ForeignKey("sample_item.sample_item_id", ondelete="CASCADE"),
-        nullable=False,
     )
-    target_compound_id = Column(
+    target_compound_id: Mapped[str] = mapped_column(
         String(16),
         ForeignKey("target_compound.target_compound_id", ondelete="CASCADE"),
-        nullable=False,
     )
-    match_score = Column(
-        Float, CheckConstraint("match_score BETWEEN 0 AND 1"), nullable=False
+    match_score: Mapped[float] = mapped_column(
+        Float, CheckConstraint("match_score BETWEEN 0 AND 1")
     )
-    match_category = Column(
-        Integer, CheckConstraint("match_category BETWEEN 0 AND 2"), nullable=False
+    match_category: Mapped[int] = mapped_column(
+        Integer, CheckConstraint("match_category BETWEEN 0 AND 2")
     )
-    sample_peak_intensity_sum = Column(Float, nullable=False)
-    match_compound_utc_created = Column(TIMESTAMP)
-    match_compound_utc_modified = Column(TIMESTAMP)
+    sample_peak_intensity_sum: Mapped[float] = mapped_column(Float)
+    match_compound_utc_created: Mapped[Optional[str]] = mapped_column(TIMESTAMP)
+    match_compound_utc_modified: Mapped[Optional[str]] = mapped_column(TIMESTAMP)
 
-    # Define relationships
+    # Relationships
     sample_item = relationship("SampleItem", back_populates="match_compound")
     target_compound = relationship("TargetCompound", back_populates="match_compound")
 
-    # Define indexes
+    # Indexes
     __table_args__ = (Index("idx_match_compound_sample_item", "sample_item_id"),)
 
 
 class MatchIon(Base):
+    """Ion-level match result."""
+
     __tablename__ = "match_ion"
-    match_ion_id = Column(String(32), nullable=False, primary_key=True)
-    sample_item_id = Column(
+
+    match_ion_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    sample_item_id: Mapped[str] = mapped_column(
         String(16),
         ForeignKey("sample_item.sample_item_id", ondelete="CASCADE"),
-        nullable=False,
     )
-    target_ion_id = Column(
+    target_ion_id: Mapped[str] = mapped_column(
         String(16),
         ForeignKey("target_ion.target_ion_id", ondelete="CASCADE"),
-        nullable=False,
     )
-    match_score = Column(
-        Float, CheckConstraint("match_score BETWEEN 0 AND 1"), nullable=False
+    match_score: Mapped[float] = mapped_column(
+        Float, CheckConstraint("match_score BETWEEN 0 AND 1")
     )
-    match_category = Column(
-        Integer, CheckConstraint("match_category BETWEEN 0 AND 2"), nullable=False
+    match_category: Mapped[int] = mapped_column(
+        Integer, CheckConstraint("match_category BETWEEN 0 AND 2")
     )
-    sample_peak_intensity_sum = Column(Float, nullable=False)
-    match_ion_utc_created = Column(TIMESTAMP)
-    match_ion_utc_modified = Column(TIMESTAMP)
+    sample_peak_intensity_sum: Mapped[float] = mapped_column(Float)
+    match_ion_utc_created: Mapped[Optional[str]] = mapped_column(TIMESTAMP)
+    match_ion_utc_modified: Mapped[Optional[str]] = mapped_column(TIMESTAMP)
 
-    # Define relationships
+    # Relationships
     sample_item = relationship("SampleItem", back_populates="match_ion")
     target_ion = relationship("TargetIon", back_populates="match_ion")
 
-    # Define indexes
+    # Indexes
     __table_args__ = (Index("idx_match_ion_sample_item", "sample_item_id"),)
 
 
 class MatchRating(Base):
+    """User rating for match quality."""
+
     __tablename__ = "match_rating"
-    match_rating_id = Column(String(32), nullable=False, primary_key=True)
-    sample_item_id = Column(
+
+    match_rating_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    sample_item_id: Mapped[str] = mapped_column(
         String(16),
         ForeignKey("sample_item.sample_item_id", ondelete="CASCADE"),
-        nullable=False,
     )
-    target_ion_id = Column(
+    target_ion_id: Mapped[str] = mapped_column(
         String(16),
         ForeignKey("target_ion.target_ion_id", ondelete="CASCADE"),
-        nullable=False,
     )
-    match_rating_utc_created = Column(TIMESTAMP)
-    rating = Column(Integer, CheckConstraint("rating BETWEEN 0 AND 2"), nullable=False)
-    checklist = Column(JSON)
-    environment = Column(JSON)
+    match_rating_utc_created: Mapped[Optional[str]] = mapped_column(TIMESTAMP)
+    rating: Mapped[int] = mapped_column(
+        Integer, CheckConstraint("rating BETWEEN 0 AND 2")
+    )
+    checklist: Mapped[Optional[dict]] = mapped_column(JSON)
+    environment: Mapped[Optional[dict]] = mapped_column(JSON)
 
-    # Define relationships
+    # Relationships
     sample_item = relationship("SampleItem", back_populates="match_rating")
     target_ion = relationship("TargetIon", back_populates="match_rating")
 
 
 class MatchIsotope(Base):
+    """Isotope-level match result."""
+
     __tablename__ = "match_isotope"
-    match_isotope_id = Column(String(32), nullable=False, primary_key=True)
-    target_isotope_id = Column(
+
+    match_isotope_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    target_isotope_id: Mapped[str] = mapped_column(
         String(16),
         ForeignKey("target_isotope.target_isotope_id", ondelete="CASCADE"),
-        nullable=False,
     )
-    sample_item_id = Column(
+    sample_item_id: Mapped[str] = mapped_column(
         String(16),
         ForeignKey("sample_item.sample_item_id", ondelete="CASCADE"),
-        nullable=False,
     )
-    sample_peak_id = Column(String(20), nullable=False)
-    sample_peak_mz = Column(Float, nullable=False)
-    sample_peak_intensity = Column(Float, nullable=False)
-    sample_peak_intensity_relative = Column(Float, nullable=False)
-    sample_peak_tof = Column(Float, nullable=False)
-    match_abundance_error = Column(Float, nullable=False)
-    match_mz_error = Column(Float, nullable=False)
-    match_isotope_similarity = Column(Float, nullable=False)
-    match_score = Column(
-        Float, CheckConstraint("match_score BETWEEN 0 AND 1"), nullable=False
+    sample_peak_id: Mapped[str] = mapped_column(String(20))
+    sample_peak_mz: Mapped[float] = mapped_column(Float)
+    sample_peak_intensity: Mapped[float] = mapped_column(Float)
+    sample_peak_intensity_relative: Mapped[float] = mapped_column(Float)
+    sample_peak_tof: Mapped[float] = mapped_column(Float)
+    match_abundance_error: Mapped[float] = mapped_column(Float)
+    match_mz_error: Mapped[float] = mapped_column(Float)
+    match_isotope_similarity: Mapped[float] = mapped_column(Float)
+    match_score: Mapped[float] = mapped_column(
+        Float, CheckConstraint("match_score BETWEEN 0 AND 1")
     )
-    # match_category = Column(Integer, CheckConstraint("match_category BETWEEN 0 AND 2"))
-    match_isotope_utc_created = Column(TIMESTAMP)
-    match_isotope_utc_modified = Column(TIMESTAMP)
+    match_isotope_utc_created: Mapped[Optional[str]] = mapped_column(TIMESTAMP)
+    match_isotope_utc_modified: Mapped[Optional[str]] = mapped_column(TIMESTAMP)
 
-    # Define relationships
+    # Relationships
     sample_item = relationship("SampleItem", back_populates="match_isotope")
     target_isotope = relationship("TargetIsotope", back_populates="match_isotope")
 
-    # Define indexes
+    # Indexes
     __table_args__ = (
         Index("idx_match_isotope_sample_item", "sample_item_id"),
         Index("idx_match_isotope_sample_peak_id", "sample_peak_id"),
@@ -805,21 +819,27 @@ class MatchIsotope(Base):
 
 
 class AttributeTemplate(Base):
+    """Attribute template for addtional sample metadata."""
+
     __tablename__ = "attribute_template"
-    attribute_template_id = Column(String(16), nullable=False, primary_key=True)
-    name = Column(String(256), nullable=False)
-    type = Column(String(64))
-    template = Column(JSON)
+
+    attribute_template_id: Mapped[str] = mapped_column(String(16), primary_key=True)
+    name: Mapped[str] = mapped_column(String(256))
+    type: Mapped[Optional[str]] = mapped_column(String(64))
+    template: Mapped[Optional[dict]] = mapped_column(JSON)
 
 
 class InstrumentFunction(Base):
-    __tablename__ = "instrument_function"
-    instrument_function_id = Column(String(32), nullable=False, primary_key=True)
-    instrument = Column(String(64), nullable=False)
-    method_file = Column(String(256), nullable=False)
-    datetime_utc = Column(TIMESTAMP, nullable=False)
-    peakshape = Column(JSON)
-    resolution_function = Column(JSON)
+    """Instrument funciton parameters."""
 
-    # Define relationships
+    __tablename__ = "instrument_function"
+
+    instrument_function_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    instrument: Mapped[str] = mapped_column(String(64))
+    method_file: Mapped[str] = mapped_column(String(256))
+    datetime_utc: Mapped[dt] = mapped_column(TIMESTAMP)
+    peakshape: Mapped[Optional[dict]] = mapped_column(JSON)
+    resolution_function: Mapped[Optional[dict]] = mapped_column(JSON)
+
+    # Relationships
     sample_file = relationship("SampleFile", back_populates="instrument_function")
