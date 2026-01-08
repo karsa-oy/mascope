@@ -100,6 +100,7 @@ async def compute_match_isotopes(
         # --- Extract peak data and perform matching ---
         runtime.logger.debug("Parse peak data")
         parsed_peaks = parse_and_filter_peaks(peaks)
+        runtime.logger.debug("Perform isotope matching")
         match_isotope_df = match_isotope_df.apply(
             match, args=(parsed_peaks,), axis=1
         ).reset_index()
@@ -110,11 +111,13 @@ async def compute_match_isotopes(
 
         # Calculate match stats for isotopes with actual matches
         if matched_mask.any():
+            runtime.logger.debug("Calculate match statistics for matched isotopes")
             match_isotope_df = calculate_match_stats(match_isotope_df, peaks)
 
         # Set default values for unmatched isotopes
         unmatched_mask = ~matched_mask
         if unmatched_mask.any():
+            runtime.logger.debug("Assign default values to unmatched isotopes")
             match_isotope_df = assign_defaults_to_unmatched(
                 match_isotope_df, unmatched_mask
             )
@@ -297,6 +300,14 @@ def calculate_match_stats(
     match_isotope_df.drop(columns=["relative_abundance_norm"], inplace=True)
 
     # Step 3: Calculate isotope similarities by ion group
+    # To avoid repetitive .sel calls, find closest peak timeseries indices in one go
+    # and use cheap .isel indexing inside assign_isotope_similarity
+    all_peak_mzs = peaks.mz.values
+    sample_peak_mzs = match_isotope_df["sample_peak_mz"].values
+    closest_indices = np.abs(all_peak_mzs[None, :] - sample_peak_mzs[:, None]).argmin(
+        axis=1
+    )
+    match_isotope_df["closest_peak_idx"] = closest_indices
     match_isotope_df = match_isotope_df.groupby(["target_ion_id"], group_keys=False)[
         match_isotope_df.columns
     ].apply(assign_isotope_similarity, peaks=peaks)
@@ -336,14 +347,9 @@ def assign_isotope_similarity(ion_group, peaks):
     :rtype: pd.DataFrame
     """
     if len(ion_group) > 1:
-        similarity = mean_cosine_similarity(
-            np.array(
-                [
-                    peaks.sel(mz=peak_mz, method="nearest")
-                    for peak_mz in ion_group["sample_peak_mz"]
-                ]
-            )
-        )
+        peak_indices = ion_group["closest_peak_idx"].values
+        closest_timeseries = peaks.isel(mz=peak_indices).values
+        similarity = mean_cosine_similarity(closest_timeseries)
     else:
         similarity = 1.0
     ion_group = ion_group.assign(match_isotope_similarity=similarity)
