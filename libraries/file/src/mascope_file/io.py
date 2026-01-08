@@ -13,6 +13,9 @@ import mascope_file.name as m_name
 from mascope_file.runtime import runtime
 
 
+CONCURRENT_WRITE_LIMIT = 2  # Max number of concurrent writes to prevent OutOfMemory
+
+
 def get_zarr_synchronizer(zarr_path: str) -> zarr.ProcessSynchronizer:
     """Get zarr synchronizer for a given zarr file
 
@@ -312,6 +315,51 @@ def update_zarr_array_coord(base_filename, var, dim, coord):
         group[dim][:] = coord
 
 
+def get_dataset_vars(dataset: xr.Dataset) -> list:
+    """Extracts dataset variables and their properties.
+
+    :param dataset: xr.Dataset
+    :type dataset: xr.Dataset
+    :return: List of variables with their properties
+    :rtype: list
+    """
+    variables = []
+    for name, da in dataset.data_vars.items():
+        dims = tuple(da.dims)
+        dtype = da.dtype
+        variables.append({"name": name, "dims": dims, "dtype": dtype})
+    return variables
+
+
+def calculate_mz_chunk_size(
+    time_coord_size: int, variables: list, desired_chunk_mb: int = 50
+) -> int:
+    """Calculates an appropriate chunk size along the 'mz' dimension based on the desired chunk size in MB.
+
+    :param time_coord_size: Size of the 'time' coordinate dimension
+    :type time_coord_size: int
+    :param variables: List of dataset variables with their properties
+    :type variables: list
+    :param desired_chunk_mb: Desired chunk size in megabytes, defaults to 50
+    :type desired_chunk_mb: int, optional
+    :return: Calculated chunk size along 'mz' dimension
+    :rtype: int
+    """
+    desired_bytes = desired_chunk_mb * 1024 * 1024
+    bytes_per_mz = 0  # Bytes consumed per mz index across all variables
+    for v in variables:
+        dtype = np.dtype(v["dtype"])
+        if v["dims"] == ("mz", "time") or v["dims"] == ("time", "mz"):
+            bytes_per_mz += dtype.itemsize * time_coord_size
+        elif v["dims"] == ("mz",):
+            bytes_per_mz += dtype.itemsize
+        elif dtype.kind == "U":
+            if v["dims"] == ("mz",):
+                bytes_per_mz += dtype.itemsize
+    chunk_mz = desired_bytes // bytes_per_mz
+    return int(chunk_mz)
+
+
 async def write_peaks(
     peak_timeseries: xr.Dataset,
     filename: str,
@@ -349,7 +397,7 @@ async def write_peaks(
     file_not_processed = not os.path.exists(peak_timeseries_path)
     if overwrite or file_not_processed:
         try:
-            _full_overwrite()
+            await asyncio.to_thread(_full_overwrite)
             return
         except FileNotFoundError as e:
             if ".partial" in str(e):
@@ -362,61 +410,130 @@ async def write_peaks(
     # -- Partial update --
     runtime.logger.debug(f"Writing new peak timeseries into {peak_timeseries_path}...")
 
+    # Lazy load target dataset metadata to get indexing and chunk info
     all_peak_timeseries = xr.open_zarr(peak_timeseries_path, synchronizer=synchronizer)
-    try:
-        # Find the integer indices for the (mz, time) region to update
-        mz_update = peak_timeseries.coords["mz"].values
-        indexer = all_peak_timeseries.get_index("mz").get_indexer(mz_update)
-    except KeyError:
-        runtime.logger.error(
-            "Failed to find exact 'mz' coordinates from input "
-            "in peak timeseries. Cannot write new peak timeseries into zarr."
-        )
-        raise
 
-    # Group contiguous indices in indexer for efficient region writing
-    breaks = np.diff(indexer) != 1
-    group_starts = np.insert(np.where(breaks)[0] + 1, 0, 0)
-    group_ends = np.append(np.where(breaks)[0], indexer.size - 1)
-    contiguous_regions = [
-        (indexer[start], indexer[end]) for start, end in zip(group_starts, group_ends)
-    ]
+    # Calculate mz chunk size
+    time_coord_size = all_peak_timeseries.time.size
+    variables = get_dataset_vars(peak_timeseries)
+    mz_chunk_size = calculate_mz_chunk_size(time_coord_size, variables)
 
-    total_num_regions = len(contiguous_regions)
-    last_logged_percent = -1
-    for i, (start_idx, end_idx) in enumerate(contiguous_regions):
-        try:
-            region = {"mz": slice(start_idx, end_idx + 1), "time": slice(None)}
-            region_mask = (indexer >= start_idx) & (indexer <= end_idx)
-            update_indices = np.where(region_mask)[0]
-            contiguous_mz_data = peak_timeseries.isel(mz=update_indices)
-            # Safe chunks disabled because the chunking is known to be compatible
-            # otherwise region writing fails because of chunk mis-alignment
-            await asyncio.to_thread(
-                contiguous_mz_data.to_zarr,
-                peak_timeseries_path,
-                mode="r+",
-                region=region,
-                safe_chunks=False,
-                synchronizer=synchronizer,
-            )
-            progress_percent = int((i + 1) / total_num_regions * 100)
-            if progress_percent // 10 > last_logged_percent // 10:
-                runtime.logger.debug(
-                    f"{progress_percent}% done writing peak timeseries..."
-                )
-                last_logged_percent = progress_percent
+    # Get indexer for input mz values
+    mz_update = peak_timeseries.coords["mz"].values
+    indexer = all_peak_timeseries.get_index("mz").get_indexer(mz_update)
 
-            await asyncio.sleep(0)
-        except Exception:
-            runtime.logger.error(
-                "Failed to write peak timeseries for "
-                f"mz values {mz_update[start_idx]} to {mz_update[end_idx]}."
-            )
-            raise
+    # Calculate which Zarr chunk index each peak belongs to
+    chunk_indices = indexer // mz_chunk_size
+    unique_chunks = np.unique(chunk_indices)
 
     runtime.logger.debug(
-        f"Successfully saved peak timeseries for {len(mz_update)} mz values at {peak_timeseries_path}"
+        f"Updating {len(indexer)} peaks scattered across {len(unique_chunks)} Zarr chunks."
+    )
+
+    # Semaphore to prevent OutOfMemory
+    semaphore = asyncio.Semaphore(CONCURRENT_WRITE_LIMIT)
+
+    async def protected_write(chunk_idx):
+        async with semaphore:
+            # Calculate boundaries of this Zarr chunk
+            c_start = int(chunk_idx * mz_chunk_size)
+            c_end = int((chunk_idx + 1) * mz_chunk_size)
+
+            # Filter input data that belongs to this specific chunk
+            mask = (indexer >= c_start) & (indexer < c_end)
+            relevant_indices = indexer[mask]
+
+            # Slice the input dataset to get only data for this chunk
+            subset_data = peak_timeseries.isel(mz=np.where(mask)[0])
+
+            # Run the Read-Modify-Write in a thread
+            await asyncio.to_thread(
+                _process_chunk_sync,
+                c_start,
+                c_end,
+                peak_timeseries_path,
+                subset_data,
+                relevant_indices,
+                synchronizer,
+            )
+
+    # --- Create tasks for each chunk update ---
+    tasks = [protected_write(c_idx) for c_idx in unique_chunks]
+
+    # --- Execute all chunk updates concurrently ---
+    try:
+        await asyncio.gather(*tasks)
+    except Exception:
+        runtime.logger.error("Failed during batched chunk update.")
+        raise
+
+    runtime.logger.debug(
+        f"Successfully saved peak timeseries for {len(mz_update)} mz values."
+    )
+
+
+def _process_chunk_sync(
+    chunk_start: int,
+    chunk_end: int,
+    peak_timeseries_path: str,
+    update_data: xr.Dataset,
+    update_indices_in_chunk: np.ndarray,
+    synchronizer: zarr.ProcessSynchronizer,
+) -> None:
+    """Helper to execute chunk processing, to be run in a thread.
+
+    Performs Read-Modify-Write on a single Zarr chunk.
+
+    :param chunk_start: Index of chunk start
+    :type chunk_start: int
+    :param chunk_end: Index of chunk end
+    :type chunk_end: int
+    :param peak_timeseries_path: Path to peak timeseries zarr file
+    :type peak_timeseries_path: str
+    :param update_data: Data to write into this chunk
+    :type update_data: xr.Dataset
+    :param update_indices_in_chunk: Indices (global) within this chunk to update
+    :type update_indices_in_chunk: np.ndarray
+    :param synchronizer: Zarr file synchronizer
+    :type synchronizer: zarr.ProcessSynchronizer
+    """
+    # --- Define the region for the whole chunk ---
+    full_ds = xr.open_zarr(peak_timeseries_path, synchronizer=synchronizer)
+    max_idx = full_ds.mz.size
+    current_chunk_end = min(chunk_end, max_idx)
+
+    region_slice = slice(chunk_start, current_chunk_end)
+    region_map = {"mz": region_slice, "time": slice(None)}
+
+    # --- READ: Load the existing chunk from Zarr into memory
+    ds_chunk = full_ds.isel(mz=region_slice).load()
+    full_ds.close()
+
+    # --- MODIFY: Update the specific indices in this chunk ---
+    # 'update_data' contains only the new peaks.
+    # 'update_indices_in_chunk' are global indices.
+    # must map global indices to local chunk indices (0 to chunk_size).
+    local_indices = update_indices_in_chunk - chunk_start
+
+    # Iterate variables to update
+    for var_name in update_data.data_vars:
+        if var_name in ds_chunk:
+            arr = ds_chunk[var_name].values
+            update_arr = update_data[var_name].values
+            if arr.ndim == 1:
+                # Variable depends only on 'mz'
+                arr[local_indices] = update_arr
+            else:
+                # Variable depends on 'mz' and 'time'
+                arr[local_indices, :] = update_arr
+
+    # --- WRITE: Save the modified chunk back to Zarr ---
+    ds_chunk.to_zarr(
+        peak_timeseries_path,
+        mode="r+",
+        region=region_map,
+        safe_chunks=False,
+        synchronizer=synchronizer,
     )
 
 
