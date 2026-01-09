@@ -193,7 +193,7 @@ def parse_and_filter_peaks(peaks: "xarray.DataArray") -> dict:  # type: ignore #
     :return: Dictionary containing parsed peak intensities, m/z values, and TOF values.
     :rtype: dict
     """
-    peak_intensities = peaks.mean(dim="time").compute().values
+    peak_intensities = peaks.mean(dim="time").values
     non_zero_peaks = peak_intensities > 0
 
     parsed_peaks = {
@@ -324,13 +324,13 @@ def calculate_match_stats(
     )
 
     # Step 5: Calculate match scores
-    def score(row):
-        row["match_score"] = (1 - min(1.0, abs(row.match_abundance_error))) * max(
-            0, (1 - 1e-2 * abs(row.match_mz_error))
-        )
-        return row
-
-    match_isotope_df = match_isotope_df.apply(score, axis=1, result_type="broadcast")
+    abundance_term = 1.0 - np.minimum(
+        1.0, np.abs(match_isotope_df["match_abundance_error"].values)
+    )
+    mz_term = np.maximum(
+        0.0, 1.0 - 1e-2 * np.abs(match_isotope_df["match_mz_error"].values)
+    )
+    match_isotope_df["match_score"] = abundance_term * mz_term
 
     return match_isotope_df
 
