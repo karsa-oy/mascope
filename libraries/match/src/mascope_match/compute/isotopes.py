@@ -96,14 +96,15 @@ async def compute_match_isotopes(
             match_score=unmatched_isotope_params.match_score,
             sample_peak_tof=np.nan,
         )
+        match_isotope_df["sample_peak_id"] = match_isotope_df["sample_peak_id"].astype(
+            "object"
+        )
 
         # --- Extract peak data and perform matching ---
         runtime.logger.debug("Parse peak data")
         parsed_peaks = parse_and_filter_peaks(peaks)
         runtime.logger.debug("Perform isotope matching")
-        match_isotope_df = match_isotope_df.apply(
-            match, args=(parsed_peaks,), axis=1
-        ).reset_index()
+        match_isotope_df = _match_assign(match_isotope_df, parsed_peaks)
 
         # --- Calculate match stats and assign defaults for unmatched isotopes ---
         # Create a mask for matched isotopes (those with actual peak data)
@@ -208,40 +209,56 @@ def parse_and_filter_peaks(peaks: "xarray.DataArray") -> dict:  # type: ignore #
     return parsed_peaks
 
 
-def match(row, parsed_peaks):
-    """Match a target isotope with the closest peak in the sample spectrum.
+def _match_assign(match_isotope_df: pd.DataFrame, parsed_peaks: dict) -> pd.DataFrame:
+    """Match target isotopes with the closest peak in the sample spectrum.
 
-    :param row: Row of the DataFrame containing target isotope properties.
-    :type row: pd.Series
+    :param match_isotope_df: DataFrame containing target isotope properties.
+    :type match_isotope_df: pd.DataFrame
     :param parsed_peaks: Parsed peak data containing intensities, m/z values, and TOF values.
     :type parsed_peaks: dict
-    :return: Row with matched peak information, including sample_peak_id, sample_peak_mz,
-                sample_peak_tof, and sample_peak_intensity.
-    :rtype: pd.Series
+    :return: DataFrame with matched peak information
+    :rtype: pd.DataFrame
     """
     peak_mzs = np.asarray(parsed_peaks["peak_mzs"])
     peak_sorting = np.asarray(parsed_peaks["peak_sorting"])
-    peak_tofs = parsed_peaks["peak_tofs"]
-    peak_intensities = parsed_peaks["peak_intensities"]
-    peak_ids = parsed_peaks["peak_ids"]
+    sorted_mzs = peak_mzs[peak_sorting]
 
-    sorted_peak_mzs = peak_mzs[peak_sorting]
-    mz_diffs = np.abs(sorted_peak_mzs - row.mz)
-    mz_diffs_within_window = mz_diffs[mz_diffs <= MATCH_WINDOW_AMU]
+    target_mzs = match_isotope_df["mz"].values
 
-    no_peaks_within_window = mz_diffs_within_window.size == 0
-    if no_peaks_within_window:
-        return row
+    # nearest neighbor in sorted_mzs
+    insertion_positions = np.searchsorted(sorted_mzs, target_mzs)
+    insertion_positions = np.clip(insertion_positions, 1, len(sorted_mzs) - 1)
+    left_insert_index = insertion_positions - 1
+    right_insert_index = insertion_positions
 
-    closest_mz_index = np.argmin(mz_diffs_within_window)
-    match_index = np.where(mz_diffs == mz_diffs_within_window[closest_mz_index])[0][0]
+    is_right_closer = np.abs(sorted_mzs[right_insert_index] - target_mzs) < np.abs(
+        sorted_mzs[left_insert_index] - target_mzs
+    )
+    nearest_neighbor_indices = np.where(
+        is_right_closer, right_insert_index, left_insert_index
+    )
+    nearest_neighbor_difference = np.abs(
+        sorted_mzs[nearest_neighbor_indices] - target_mzs
+    )
 
-    row["sample_peak_id"] = peak_ids[match_index]
-    row["sample_peak_mz"] = float(peak_mzs[match_index])
-    row["sample_peak_tof"] = peak_tofs[match_index]
-    row["sample_peak_intensity"] = peak_intensities[match_index]
+    is_within_tolerance = nearest_neighbor_difference <= MATCH_WINDOW_AMU
+    closest_peak_index = peak_sorting[nearest_neighbor_indices]
 
-    return row
+    # Assign only for matches
+    match_isotope_df.loc[is_within_tolerance, "sample_peak_id"] = np.array(
+        parsed_peaks["peak_ids"]
+    )[closest_peak_index[is_within_tolerance]]
+    match_isotope_df.loc[is_within_tolerance, "sample_peak_mz"] = peak_mzs[
+        closest_peak_index[is_within_tolerance]
+    ].astype(float)
+    match_isotope_df.loc[is_within_tolerance, "sample_peak_tof"] = np.asarray(
+        parsed_peaks["peak_tofs"]
+    )[closest_peak_index[is_within_tolerance]]
+    match_isotope_df.loc[is_within_tolerance, "sample_peak_intensity"] = np.asarray(
+        parsed_peaks["peak_intensities"]
+    )[closest_peak_index[is_within_tolerance]]
+
+    return match_isotope_df
 
 
 def calculate_match_stats(
