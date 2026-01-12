@@ -63,6 +63,9 @@ async def modify_ionization_mechanism_schema():
     Also, update specific ionization mechanisms to reflect new parsing logic.
     """
     async with async_session() as session:
+        # Disable FK enforcement during table recreation
+        await session.execute(text("PRAGMA foreign_keys = OFF;"))
+
         # Create a backup of the ionization_mechanism table
         await session.execute(
             text(
@@ -98,6 +101,9 @@ async def modify_ionization_mechanism_schema():
 
         # Clean up backup table
         await session.execute(text("DROP TABLE ionization_mechanism_backup;"))
+
+        # Re-enable FK enforcement
+        await session.execute(text("PRAGMA foreign_keys = ON;"))
 
         # Update ionization mechanisms as per new parsing logic
         result = await session.execute(

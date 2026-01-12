@@ -246,6 +246,9 @@ async def modify_sample_item_schema() -> None:
     runtime.logger.info("Recreating sample_item table with updated schema...")
 
     async with async_session() as session:
+        # Disable FK enforcement during table recreation
+        await session.execute(text("PRAGMA foreign_keys = OFF;"))
+
         # Step 1: Create backup table with all current data (including ionization_mode_id)
         await session.execute(
             text(
@@ -285,6 +288,9 @@ async def modify_sample_item_schema() -> None:
 
         # Step 5: Clean up backup table
         await session.execute(text("DROP TABLE sample_item_backup;"))
+
+        # Re-enable FK enforcement
+        await session.execute(text("PRAGMA foreign_keys = ON;"))
 
         await session.commit()
 
