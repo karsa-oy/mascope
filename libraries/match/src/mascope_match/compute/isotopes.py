@@ -123,6 +123,9 @@ async def compute_match_isotopes(
                 match_isotope_df, unmatched_mask
             )
 
+        # Drop helper column
+        match_isotope_df.drop(columns=["closest_peak_idx"], inplace=True)
+
         # --- Return a DataFrame containing match details for all target isotopes ---
         return match_isotope_df
     except Exception as e:
@@ -258,6 +261,14 @@ def _match_assign(match_isotope_df: pd.DataFrame, parsed_peaks: dict) -> pd.Data
         parsed_peaks["peak_intensities"]
     )[closest_peak_index[is_within_tolerance]]
 
+    # Store closest peak index as a helper for later calculations, will be dropped later
+    match_isotope_df.loc[is_within_tolerance, "closest_peak_idx"] = closest_peak_index[
+        is_within_tolerance
+    ]
+    match_isotope_df["closest_peak_idx"] = match_isotope_df["closest_peak_idx"].astype(
+        "Int64"
+    )
+
     return match_isotope_df
 
 
@@ -317,14 +328,6 @@ def calculate_match_stats(
     match_isotope_df.drop(columns=["relative_abundance_norm"], inplace=True)
 
     # Step 3: Calculate isotope similarities by ion group
-    # To avoid repetitive .sel calls, find closest peak timeseries indices in one go
-    # and use cheap .isel indexing inside assign_isotope_similarity
-    all_peak_mzs = peaks.mz.values
-    sample_peak_mzs = match_isotope_df["sample_peak_mz"].values
-    closest_indices = np.abs(all_peak_mzs[None, :] - sample_peak_mzs[:, None]).argmin(
-        axis=1
-    )
-    match_isotope_df["closest_peak_idx"] = closest_indices
     match_isotope_df = match_isotope_df.groupby(["target_ion_id"], group_keys=False)[
         match_isotope_df.columns
     ].apply(assign_isotope_similarity, peaks=peaks)
