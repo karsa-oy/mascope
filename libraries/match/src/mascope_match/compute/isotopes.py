@@ -366,8 +366,8 @@ def assign_isotope_similarity(ion_group, peaks):
     :return: Group of isotopes with an additional column for match_isotope_similarity.
     :rtype: pd.DataFrame
     """
-    if len(ion_group) > 1:
-        peak_indices = ion_group["closest_peak_idx"].values
+    peak_indices = ion_group["closest_peak_idx"].dropna().astype(int).values
+    if len(peak_indices) > 1:
         closest_timeseries = peaks.isel(mz=peak_indices).values
         similarity = mean_cosine_similarity(closest_timeseries)
     else:
