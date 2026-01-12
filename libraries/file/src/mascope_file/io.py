@@ -419,8 +419,15 @@ async def write_peaks(
     mz_chunk_size = calculate_mz_chunk_size(time_coord_size, variables)
 
     # Get indexer for input mz values
-    mz_update = peak_timeseries.coords["mz"].values
-    indexer = all_peak_timeseries.get_index("mz").get_indexer(mz_update)
+    try:
+        mz_update = peak_timeseries.coords["mz"].values
+        indexer = all_peak_timeseries.get_index("mz").get_indexer(mz_update)
+    except Exception as e:
+        runtime.logger.error(
+            "Failed to find provided m/z values in existing peak timeseries."
+            "Cannot write peak timeseries."
+        )
+        raise e
 
     # Calculate which Zarr chunk index each peak belongs to
     chunk_indices = indexer // mz_chunk_size
