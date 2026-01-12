@@ -21,36 +21,10 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from mascope_backend.db import models
 from mascope_backend.db.config import db_config
 from mascope_backend.db.migration_manager import check_db_migration
-
-# Re-export models and views for convenient importing
-from mascope_backend.db.models import (
-    AccessToken,
-    AttributeTemplate,
-    Base,
-    InstrumentFunction,
-    IonizationMechanism,
-    IonizationMode,
-    MatchCollection,
-    MatchCompound,
-    MatchIon,
-    MatchIsotope,
-    MatchRating,
-    MatchSample,
-    Role,
-    SampleBatch,
-    SampleFile,
-    SampleItem,
-    TargetCollection,
-    TargetCollectionInSampleBatch,
-    TargetCompound,
-    TargetCompoundInTargetCollection,
-    TargetIon,
-    TargetIsotope,
-    User,
-    Workspace,
-)
+from mascope_backend.db.models import *  # noqa: F403, F401 - re-export models
 from mascope_backend.db.utils import get_current_db_version
 from mascope_backend.db.views import Sample
 from mascope_backend.runtime import runtime
@@ -226,31 +200,8 @@ __all__ = [
     "init_db",
     # Migration manager
     "check_db_migration",
-    # Models
-    "Base",
-    "User",
-    "Role",
-    "AccessToken",
-    "Workspace",
-    "SampleBatch",
-    "SampleFile",
-    "SampleItem",
-    "TargetCollection",
-    "TargetCollectionInSampleBatch",
-    "TargetCompound",
-    "TargetCompoundInTargetCollection",
-    "TargetIon",
-    "TargetIsotope",
-    "IonizationMechanism",
-    "IonizationMode",
-    "MatchSample",
-    "MatchCollection",
-    "MatchCompound",
-    "MatchIon",
-    "MatchIsotope",
-    "MatchRating",
-    "AttributeTemplate",
-    "InstrumentFunction",
     # Views
     "Sample",
+    # Models (dynamically included from models.__all__)
+    *models.__all__,
 ]

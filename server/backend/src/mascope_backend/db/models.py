@@ -843,3 +843,31 @@ class InstrumentFunction(Base):
 
     # Relationships
     sample_file = relationship("SampleFile", back_populates="instrument_function")
+
+
+__all__ = [
+    "Base",
+    "User",
+    "Role",
+    "AccessToken",
+    "Workspace",
+    "SampleBatch",
+    "SampleFile",
+    "SampleItem",
+    "TargetCollection",
+    "TargetCollectionInSampleBatch",
+    "TargetCompound",
+    "TargetCompoundInTargetCollection",
+    "TargetIon",
+    "TargetIsotope",
+    "IonizationMechanism",
+    "IonizationMode",
+    "MatchSample",
+    "MatchCollection",
+    "MatchCompound",
+    "MatchIon",
+    "MatchIsotope",
+    "MatchRating",
+    "AttributeTemplate",
+    "InstrumentFunction",
+]
