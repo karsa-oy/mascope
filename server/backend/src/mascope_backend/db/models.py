@@ -445,6 +445,16 @@ class TargetCollection(Base):
         back_populates="target_collection",
         cascade="all, delete, delete-orphan",
     )
+    calibration_ionization_modes = relationship(
+        "IonizationMode",
+        foreign_keys="IonizationMode.calibration_collection_id",
+        back_populates="calibration_collection",
+    )
+    diagnostic_ionization_modes = relationship(
+        "IonizationMode",
+        foreign_keys="IonizationMode.diagnostic_collection_id",
+        back_populates="diagnostic_collection",
+    )
 
 
 class TargetCollectionInSampleBatch(Base):
@@ -595,8 +605,26 @@ class IonizationMode(Base):
     )
     ionization_mode_polarity: Mapped[str] = mapped_column(String(1))
     ionization_mechanism_ids: Mapped[list[str]] = mapped_column(JSON)
-    calibration_collection_id: Mapped[Optional[str]] = mapped_column(String(16))
-    diagnostic_collection_id: Mapped[Optional[str]] = mapped_column(String(16))
+    calibration_collection_id: Mapped[Optional[str]] = mapped_column(
+        String(16),
+        ForeignKey("target_collection.target_collection_id", ondelete="SET NULL"),
+    )
+    diagnostic_collection_id: Mapped[Optional[str]] = mapped_column(
+        String(16),
+        ForeignKey("target_collection.target_collection_id", ondelete="SET NULL"),
+    )
+
+    # Relationships
+    calibration_collection = relationship(
+        "TargetCollection",
+        foreign_keys=[calibration_collection_id],
+        back_populates="calibration_ionization_modes",
+    )
+    diagnostic_collection = relationship(
+        "TargetCollection",
+        foreign_keys=[diagnostic_collection_id],
+        back_populates="diagnostic_ionization_modes",
+    )
 
 
 class TargetIsotope(Base):

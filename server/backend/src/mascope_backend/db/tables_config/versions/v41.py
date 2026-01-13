@@ -122,7 +122,20 @@ table_configs = {
             "calibration_collection_id": ("VARCHAR(16)", 0, None, 0),
             "diagnostic_collection_id": ("VARCHAR(16)", 0, None, 0),
         },
-        "fks": {},
+        "fks": {
+            "calibration_collection_id": (
+                "target_collection",
+                "target_collection_id",
+                "NO ACTION",
+                "SET NULL",
+            ),
+            "diagnostic_collection_id": (
+                "target_collection",
+                "target_collection_id",
+                "NO ACTION",
+                "SET NULL",
+            ),
+        },
         "create_sql": """
             CREATE TABLE ionization_mode (
                 ionization_mode_id VARCHAR(16) NOT NULL PRIMARY KEY,
