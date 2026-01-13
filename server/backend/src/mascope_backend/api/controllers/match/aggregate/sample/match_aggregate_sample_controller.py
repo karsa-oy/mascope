@@ -320,8 +320,8 @@ async def aggregate_sample_match_compound(
             polarity=sample.polarity,
         )
 
-        # Drop the 'index' column from the match_isotope_df DataFrame
-        match_isotope_df = match_isotope_df.drop(columns=["index"])
+        # Drop the 'index' column from the match_isotope_df DataFrame if it exists
+        match_isotope_df = match_isotope_df.drop(columns=["index"], errors="ignore")
         # Step 5: Apply filters to the computed isotope matches based on the provided parameters.
         filtered_match_isotope_df = apply_match_params(match_isotope_df, match_params)
 
@@ -490,8 +490,8 @@ async def aggregate_sample_match_compounds(
             polarity=sample.polarity,
         )
 
-        # Drop the 'index' column from the match_isotope_df DataFrame
-        match_isotope_df = match_isotope_df.drop(columns=["index"])
+        # Drop the 'index' column from the match_isotope_df DataFrame if it exists
+        match_isotope_df = match_isotope_df.drop(columns=["index"], errors="ignore")
         # Step 5: Apply filters to the computed isotope matches based on the provided parameters.
         filtered_match_isotope_df = apply_match_params(match_isotope_df, match_params)
 
