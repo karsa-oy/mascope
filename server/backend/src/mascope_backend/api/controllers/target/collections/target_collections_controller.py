@@ -2,7 +2,7 @@
 # pylint: disable=not-callable
 import asyncio
 
-from sqlalchemy import and_, asc, delete, desc, func, select
+from sqlalchemy import and_, asc, delete, desc, func, or_, select
 from sqlalchemy.orm import joinedload
 
 from mascope_backend.api.controllers.sample.batches.status.service import (
@@ -29,6 +29,7 @@ from mascope_backend.api.models.target.collections.target_collection_pydantic_mo
     TargetCollectionUpdate,
 )
 from mascope_backend.db import (
+    IonizationMode,
     TargetCollection,
     TargetCollectionInSampleBatch,
     TargetCompound,
@@ -37,7 +38,10 @@ from mascope_backend.db import (
 )
 from mascope_backend.db.id import gen_id
 from mascope_backend.runtime import runtime
-from mascope_backend.socket.records.service import emit_record_reload
+from mascope_backend.socket.records.service import (
+    emit_record_reload,
+    emit_record_updated,
+)
 
 
 @api_controller()
@@ -627,12 +631,12 @@ async def delete_target_collection(
     Affected sample batches are set to "rematch" status.
 
     Steps:
-    1. Fetch target collection and identify affected batches and compounds
-    2. Identify orphan compounds if deletion is requested
-    3. Delete the target collection from database
-    4. Set rematch status for affected sample batches
-    5. Delete orphan compounds if requested
-    6. Emit appropriate reload events
+    - Fetch target collection and identify affected batches, compounds and ionization modes
+    - Identify orphan compounds if deletion is requested
+    - Delete the target collection from database
+    - Set rematch status for affected sample batches
+    - Delete orphan compounds if requested
+    - Emit appropriate socket events
 
     :param target_collection_id: ID of the target collection to delete
     :type target_collection_id: str
@@ -644,7 +648,7 @@ async def delete_target_collection(
     :return: Deletion results with success message
     :rtype: dict
     """
-    # Step 1: Fetch target collection and identify affected data
+    # -- Fetch target collection and identify affected data --
     target_collection = await fetch_target_collection(target_collection_id)
 
     affected_sample_batch_ids = {
@@ -654,7 +658,21 @@ async def delete_target_collection(
         assoc.target_compound_id for assoc in target_collection.target_compound
     }
 
-    # Step 2: Identify orphan compounds if deletion is requested
+    # Query ionization modes that reference this collection (will be SET NULL on delete)
+    async with async_session() as session:
+        affected_modes_result = await session.execute(
+            select(IonizationMode).where(
+                or_(
+                    IonizationMode.calibration_collection_id == target_collection_id,
+                    IonizationMode.diagnostic_collection_id == target_collection_id,
+                )
+            )
+        )
+        affected_ionization_mode_ids = [
+            mode.ionization_mode_id for mode in affected_modes_result.scalars()
+        ]
+
+    # -- Identify orphan compounds if their deletion is requested --
     orphan_compound_ids = []
     if delete_orphan_compounds and collection_compound_ids:
         async with async_session() as session:
@@ -674,13 +692,13 @@ async def delete_target_collection(
                 if other_usage == 0:
                     orphan_compound_ids.append(compound_id)
 
-    # Step 3: Delete the target collection from database
+    # -- Delete the target collection from database --
     async with async_session() as session:
         collection_to_delete = await session.get(TargetCollection, target_collection_id)
         await session.delete(collection_to_delete)
         await session.commit()
 
-    # Step 4: Set rematch status for affected sample batches
+    # -- Set rematch status for affected sample batches --
     batch_status_result = None
     if affected_sample_batch_ids:
         batch_status_result = await update_sample_batch_status(
@@ -689,7 +707,7 @@ async def delete_target_collection(
             independent_transaction=True,
         )
 
-    # Step 5: Delete orphan compounds if requested
+    # -- Delete orphan compounds if requested --
     deleted_compound_count = 0
     if orphan_compound_ids:
         for compound_id in orphan_compound_ids:
@@ -704,7 +722,18 @@ async def delete_target_collection(
                     f"Failed to delete orphan compound {compound_id}: {e.user_message}"
                 )
 
-    # Step 6: Emit reload events
+    # -- Emit record updates for ionization modes (CASCADE SET NULL occurred) --
+    for ionization_mode_id in affected_ionization_mode_ids:
+        async with async_session() as session:
+            mode = await session.get(IonizationMode, ionization_mode_id)
+            if mode:
+                await emit_record_updated(
+                    record_type="ionization_mode",
+                    record_id=ionization_mode_id,
+                    record=mode.to_dict(),
+                )
+
+    # -- Emit reload events for independent transactions --
     if independent_transaction:
         # Update target.collection list
         await emit_record_reload(record_type="target_collection")
@@ -716,6 +745,7 @@ async def delete_target_collection(
                 room=batch_id,
             )
 
+    # -- Build response message --
     message = (
         f"Target collection '{target_collection.target_collection_name}' was deleted"
     )
