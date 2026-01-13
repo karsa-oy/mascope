@@ -367,8 +367,10 @@ async def create_target_compound(
         except ValueError:
             target_compound_mass = None
 
+        # Add the compound to session (before creating ions that reference it)
+        session.add(target_compound)
+
         # Create target ions for the compound
-        # Fetch ionization mechanisms
         ionization_mechanisms_data = await get_ionization_mechanisms()
         ionization_mechanisms = [
             IonizationMechanism(**ionization_mechanism_dict)
@@ -382,8 +384,6 @@ async def create_target_compound(
             independent_transaction=False,
             session=session,
         )
-        # Add the compound to be committed to the db
-        session.add(target_compound)
 
     if independent_transaction:
         await session.commit()
