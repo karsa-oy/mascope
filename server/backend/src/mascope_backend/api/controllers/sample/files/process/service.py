@@ -52,7 +52,6 @@ from mascope_backend.api.new.ionization.modes.util import (
 )
 from mascope_backend.db import (
     IonizationMode,
-    Sample,
     SampleBatch,
     SampleFile,
     SampleItem,
@@ -82,6 +81,7 @@ async def auto_process_sample_file(
     independent_transaction: bool = None,
     user_id: int | None = None,
     process_id: str | None = None,
+    parent_id: str | None = None,
 ) -> dict:
     """
     Main orchestrator for automatic sample file processing pipeline.
@@ -105,6 +105,8 @@ async def auto_process_sample_file(
     :type user_id: int | None, optional
     :param process_id: Process ID for tracking
     :type process_id: str | None, optional
+    :param parent_id: Parent process ID for tracking hierarchical processes
+    :type parent_id: str | None, optional
     :return: Processing results with affected IDs
     """
     # Initialize collector for affected sample items
@@ -149,7 +151,7 @@ async def auto_process_sample_file(
         # Perform calibration if calibration collection configured for this ionization mode
         if ionization_mode and ionization_mode.calibration_collection_id:
             await calibrate_with_retry(
-                sample=SampleItem(**sample),
+                sample=sample,
                 user_id=user_id,
                 process_id=process_id,
             )
@@ -386,9 +388,10 @@ async def re_process_sample_files(
         try:
             result = await auto_process_sample_file(
                 sample_file_id=sample_file.sample_file_id,
-                independent_transaction=True,
+                independent_transaction=False,
                 user_id=user_id,
-                process_id=process_id,
+                process_id=gen_id(8),
+                parent_id=process_id,
             )
 
             processed_files.append(
@@ -432,13 +435,14 @@ async def re_process_sample_files(
             "failed": failed_count,
             "total": total_files,
         },
+        "affected_sample_batch_ids": list(affected_sample_batch_ids),
     }
     # Determine status and message
     if failed_count == 0:
         message = f"Successfully re-processed {processed_count} sample files."
         return {
             "message": message,
-            "data": notification_data,
+            "_notification_data": notification_data,
         }
     elif processed_count == 0:
         message = f"Failed to re-process all {total_files} sample files.\n" + "\n".join(
@@ -574,25 +578,25 @@ async def create_acquisition_batches_and_items(
 
 
 async def calibrate_with_retry(
-    sample: Sample, user_id: int | None = None, process_id: str | None = None
+    sample: dict, user_id: int | None = None, process_id: str | None = None
 ) -> None:
     """Calibrate sample with retry logic
 
     If no matching calibration peaks are found, the m/z error tolerance is doubled
     and the calibration is retried, up to CALIBRATION_ITERATIONS times.
 
-    :param sample: Sample to calibrate
-    :type sample: Sample
+    :param sample: Sample dict to calibrate
+    :type sample: dict
     :param user_id: Current user triggered operation (for user notifications)
     :type user_id: int | None, optional
     :param process_id: Process ID for tracking
     :type process_id: str | None, optional
     """
-    mz_calibration_params = calibration_params_factory(sample.filename)
+    mz_calibration_params = calibration_params_factory(sample["filename"])
     for i in range(1, CALIBRATION_ITERATIONS + 1):
         try:
             await calibration_mz_calibrate_sample(
-                sample_item_id=sample.sample_item_id,
+                sample_item_id=sample["sample_item_id"],
                 mz_calibration_params=mz_calibration_params,
                 independent_transaction=False,
                 user_id=user_id,
