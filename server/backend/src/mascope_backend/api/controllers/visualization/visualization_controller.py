@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
+import xarray as xr
 from colorcet import glasbey_hv as colormap
 from sqlalchemy import select
 
@@ -178,16 +179,18 @@ class IsotopeResult:
     main_isotope_height: float = 0
 
 
-async def _load_peaks_and_averaged_signal(sample: Sample, target_isotopes):
+async def _load_peaks_and_averaged_signal(
+    sample: Sample, target_isotopes: list[TargetIsotope]
+) -> tuple[xr.DataArray, xr.DataArray]:
     """
     Loads peak data and averaged signal for the specified sample and target isotopes.
 
     :param sample: The sample object containing filename and time range.
     :type sample: Sample
     :param target_isotopes: List of target isotope objects with m/z values.
-    :type target_isotopes: list
+    :type target_isotopes: list[TargetIsotope]
     :return: Tuple of (peak_data, averaged_signal) for the specified m/z window.
-    :rtype: tuple
+    :rtype: tuple[xr.DataArray, xr.DataArray]
     """
     peak_data = load_peak_data(sample.filename)
     all_mzs = peak_data.mz.values

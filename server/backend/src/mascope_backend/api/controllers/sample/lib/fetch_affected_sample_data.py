@@ -48,7 +48,7 @@ async def fetch_affected_sample_data(
     provided_params = sum(x is not None for x in [sample_item_ids, sample_file_ids])
     if provided_params != 1:
         raise ValueError(
-            "Exactly one of sample_item_ids or sample_file_ids must be provided"
+            "Provide either sample_item_ids or sample_file_ids, but not both."
         )
 
     async with async_session() as session:

@@ -21,22 +21,18 @@ async def fetch_sample_file(
     :return: The requested sample file's details.
     :rtype: SampleFile
     """
-    # Validate input - exactly one parameter must be provided
-    provided_params = sum(x is not None for x in [sample_file_id, filename])
-    if provided_params != 1:
-        raise ValueError("Exactly one of sample_file_id or filename must be provided")
+    if not sample_file_id and not filename:
+        raise ValueError("Provide at least one: sample_file_id or filename")
+
+    # --- Fetch sample file provided parameter ---
+    stmt = select(SampleFile)
+    if sample_file_id:
+        stmt = stmt.where(SampleFile.sample_file_id == sample_file_id)
+    if filename:
+        stmt = stmt.where(SampleFile.filename == filename)
 
     async with async_session() as session:
-        # --- Fetch sample file provided parameter ---
-        if sample_file_id:
-            result = await session.execute(
-                select(SampleFile).where(SampleFile.sample_file_id == sample_file_id)
-            )
-        else:
-            result = await session.execute(
-                select(SampleFile).where(SampleFile.filename == filename)
-            )
-
+        result = await session.execute(stmt)
         sample_file = result.scalar_one_or_none()
 
         # --- Check if sample file exists ---

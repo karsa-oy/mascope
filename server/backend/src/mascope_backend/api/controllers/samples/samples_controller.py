@@ -1,6 +1,5 @@
 # pylint: disable=line-too-long
 import asyncio
-from dataclasses import dataclass
 from datetime import datetime
 
 import numpy as np
@@ -311,7 +310,7 @@ async def get_sample_peaks(
     """
 
     # --- Get sample data ---
-    sample = await _load_sample_data(sample_item_id)
+    sample = await fetch_sample(sample_item_id)
 
     if (t_min is not None and t_min > sample.t0) or (
         t_max is not None and t_max < sample.t1
@@ -429,7 +428,7 @@ async def get_sample_peak_timeseries(
     :rtype: dict
     """
     # Step 1: Get sample data and extract required fields
-    sample = await _load_sample_data(sample_item_id)
+    sample = await fetch_sample(sample_item_id)
 
     # Step 2: Validate and set effective time limits with auto-correction
     t_min_eff, t_max_eff, time_adjustment_info = _validate_time_range(
@@ -543,7 +542,7 @@ async def get_sample_spectrum(
     :rtype: dict
     """
     # Step 1: Get sample data
-    sample = await _load_sample_data(sample_item_id)
+    sample = await fetch_sample(sample_item_id)
 
     # Step 2: Validate and set effective time limits with auto-correction
     t_min_eff, t_max_eff, time_adjustment_info = _validate_time_range(
@@ -706,7 +705,7 @@ async def get_samples_spectra(
 
     # Load all sample data in parallel
     sample_data_list = await asyncio.gather(
-        *[_load_sample_data(sample_id) for sample_id in sample_item_ids]
+        *[fetch_sample(sample_id) for sample_id in sample_item_ids]
     )
 
     # Prepare the response data
@@ -722,40 +721,6 @@ async def get_samples_spectra(
         "results": len(spectra_data),
         "data": spectra_data,
     }
-
-
-@dataclass
-class SampleData:
-    """
-    Data class to hold sample information.
-    """
-
-    sample_item_id: str
-    sample_item_name: str
-    filename: str
-    t0: float
-    t1: float
-    polarity: str
-
-
-async def _load_sample_data(sample_item_id: str) -> SampleData:
-    """Load sample data from the database by sample item ID.
-
-    :param sample_item_id: Unique identifier for the sample item
-    :type sample_item_id: str
-    :return: SampleData object containing sample information
-    :rtype: SampleData
-    """
-    sample = await fetch_sample(sample_item_id)
-    sample_data = SampleData(
-        sample_item_id=sample.sample_item_id,
-        sample_item_name=sample.sample_item_name,
-        filename=sample.filename,
-        t0=sample.t0,
-        t1=sample.t1,
-        polarity=sample.polarity,
-    )
-    return sample_data
 
 
 def _validate_time_range(
