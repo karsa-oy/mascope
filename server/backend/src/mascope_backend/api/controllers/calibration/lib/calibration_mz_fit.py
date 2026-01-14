@@ -95,6 +95,7 @@ class BaseCalibrationHandler:
             match_mz_error=np.nan,
             match_score=np.nan,
             sample_peak_tof=np.nan,
+            matched_peak_idx=np.nan,
         )
 
         averaged_peaks = peaks.mean(dim="time")
@@ -175,7 +176,7 @@ class BaseCalibrationHandler:
             self.filename, potential_calibration_mzs
         )
 
-        # Reverse compartibility with older zarr files
+        # Reverse compatibility with older zarr files
         sample_file_type = m_name.get_sample_file_type(self.filename)
         if sample_file_type in ["orbi_zarr", "tof_zarr"]:
             peak_timeseries = peak_timeseries.dropna(dim="mz", how="all")
@@ -239,6 +240,7 @@ class BaseCalibrationHandler:
             isotope_row["sample_peak_mz"] = mz_in_range[max_peak_idx]
             isotope_row["sample_peak_tof"] = tof_in_range[max_peak_idx]
             isotope_row["sample_peak_intensity"] = intensity_in_range[max_peak_idx]
+            isotope_row["matched_peak_idx"] = max_peak_idx
 
         return isotope_row
 

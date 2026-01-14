@@ -124,7 +124,7 @@ async def compute_match_isotopes(
             )
 
         # Drop helper column
-        match_isotope_df.drop(columns=["closest_peak_idx"], inplace=True)
+        match_isotope_df.drop(columns=["matched_peak_idx"], inplace=True)
 
         # --- Return a DataFrame containing match details for all target isotopes ---
         return match_isotope_df
@@ -262,10 +262,10 @@ def _match_assign(match_isotope_df: pd.DataFrame, parsed_peaks: dict) -> pd.Data
     )[closest_peak_index[is_within_tolerance]]
 
     # Store closest peak index as a helper for later calculations, will be dropped later
-    match_isotope_df.loc[is_within_tolerance, "closest_peak_idx"] = closest_peak_index[
+    match_isotope_df.loc[is_within_tolerance, "matched_peak_idx"] = closest_peak_index[
         is_within_tolerance
     ]
-    match_isotope_df["closest_peak_idx"] = match_isotope_df["closest_peak_idx"].astype(
+    match_isotope_df["matched_peak_idx"] = match_isotope_df["matched_peak_idx"].astype(
         "Int64"
     )
 
@@ -366,7 +366,7 @@ def assign_isotope_similarity(ion_group, peaks):
     :return: Group of isotopes with an additional column for match_isotope_similarity.
     :rtype: pd.DataFrame
     """
-    peak_indices = ion_group["closest_peak_idx"].dropna().astype(int).values
+    peak_indices = ion_group["matched_peak_idx"].dropna().astype(int).values
     if len(peak_indices) > 1:
         closest_timeseries = peaks.isel(mz=peak_indices).values
         similarity = mean_cosine_similarity(closest_timeseries)
