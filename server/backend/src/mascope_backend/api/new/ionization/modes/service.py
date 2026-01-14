@@ -271,6 +271,10 @@ async def update_ionization_mode(
                     case "ionization_mode_token":
                         # Token can always be updated
                         continue
+                    case "diagnostic_collection_id" | "calibration_collection_id":
+                        # Allow setting calibration and diagnostic collection if not yet defined
+                        # NOTE: This does not affect existing acquisition batches
+                        continue
                     case _:
                         # Other fields cannot be changed if the mode is used in acquisition batches
                         if getattr(ionization_mode, key) != value:
