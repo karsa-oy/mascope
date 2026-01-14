@@ -28,6 +28,24 @@ ISOTOPE_ABUNDANCE_THRESHOLD = 0.01
 RESOLUTION_LOW = 1e4
 
 
+class SkipIonizationMechanism(Exception):
+    """Exception to skip an ionization mechanism when generating target ions."""
+
+    pass
+
+
+class UnknownIonizationMechanism(Exception):
+    """Exception for unknown ionization mechanisms."""
+
+    pass
+
+
+class UnknownCustomElement(Exception):
+    """Exception for unknown custom elements in formulas."""
+
+    pass
+
+
 def charge_string(raw_ion: Formula) -> str:
     """Get charge string (+/-) based on ion formula
 
@@ -69,43 +87,13 @@ def generate_target_ions_from_composition(
     target_compound_formula = target_compound.target_compound_formula.rstrip()
     for ionization_mechanism in ionization_mechanisms:
         mechanism = ionization_mechanism.ionization_mechanism
-        # Handle the special case when generating ions for empty formula "()"
-        if target_compound_formula == "()":
-            compound_formula = None
-            if mechanism == "-" or mechanism == "+":
-                # Electron transfer does not apply
-                continue
-            if mechanism.startswith("-"):
-                # Cannot abstract from empty formula
-                continue
-        else:
-            compound_formula = Formula(target_compound_formula)
-
-        # Parse mechanism into Formula, excluding the operation sign (+/-)
-        # For electron transfer, the entire mechanism (+/-) is used
-        mechanism_formula = (
-            Formula(mechanism[1:]) if len(mechanism) > 1 else Formula(mechanism)
-        )
 
         try:
-            # Construct raw ion formula based on the compound formula and ionization mechanism
-            # Leverage molmass.Formula addition and subtraction operators
-            operation = mechanism[0]
-            if operation == "+":
-                # Addition mechanism
-                if compound_formula is None:
-                    # Special case: empty formula "()"
-                    raw_ion = mechanism_formula
-                else:
-                    raw_ion = compound_formula + mechanism_formula
-            elif operation == "-":
-                # Abstraction mechanism
-                raw_ion = compound_formula - mechanism_formula
-            else:
-                raise ValueError(f"Unknown ionization mechanism: {mechanism}")
-        except ValueError as e:
-            # Failed to create a target ion for the combination of target compound
-            # and ionization mechanism
+            compound_formula = _get_compound_formula(target_compound_formula, mechanism)
+            raw_ion = _get_raw_ion(mechanism, compound_formula)
+        except (SkipIonizationMechanism, ValueError):
+            continue
+        except UnknownIonizationMechanism as e:
             runtime.logger.warning(
                 f"Failed to parse ion formula for compound {target_compound_formula} "
                 f"and mechanism {mechanism}: {e}"
@@ -131,87 +119,159 @@ def generate_target_ions_from_composition(
         )
         target_ions.append(ion)
 
-        custom_elements = []
-        if "^" in ion_formula:
-            # Find custom element properties
-            elements = raw_ion._elements  # pylint: disable=protected-access
-            for symbol in elements:
-                if symbol.startswith("^"):
-                    try:
-                        element = ELEMENTS[symbol]
-                    except KeyError as e:
-                        raise ValueError(f"Unknown custom element: {symbol}") from e
-                    custom_elements.append(symbol)
-                    isotope_masses = [iso.mz for iso in element.isotopes.values()]
-                    isotope_abundances = [
-                        iso.abundance for iso in element.isotopes.values()
-                    ]
-                    isotope_counts = [
-                        raw_ion._elements[symbol][0]  # pylint: disable=protected-access
-                    ]
-                    # Remove custom element notation for isotope prediction
-                    pattern = rf"{re.escape(symbol)}\d*"
-                    ion_formula = re.sub(pattern, "", ion_formula)
-                    # Parse the ion formula again without custom elements
-                    ion_formula = Formula(ion_formula).formula
-
-        # Predict peaks of high resolution isotopes
-        if len(custom_elements) > 0:
-            predicted_peaks = IsoThreshold(
-                formula=ion_formula,
-                threshold=ISOTOPE_ABUNDANCE_THRESHOLD,
-                atomCounts=isotope_counts,  # pylint: disable=possibly-used-before-assignment
-                isotopeMasses=[
-                    isotope_masses  # pylint: disable=possibly-used-before-assignment
-                ],
-                isotopeProbabilities=[
-                    isotope_abundances  # pylint: disable=possibly-used-before-assignment
-                ],
+        predicted_isotopes = dict()
+        # Predict high resolution isotopes
+        predicted_isotopes["HIGH"] = predict_isotopes(raw_ion, ion_formula)
+        # Group for low resolution
+        predicted_isotopes["LOW"] = group_target_isotopes(
+            *predicted_isotopes["HIGH"], RESOLUTION_LOW
+        )
+        # Store target isotopes
+        for resolution, (masses, probs) in predicted_isotopes.items():
+            target_isotopes.extend(
+                [
+                    TargetIsotope(
+                        target_isotope_id=gen_id(16),
+                        target_ion_id=ion.target_ion_id,
+                        mz=mz,
+                        relative_abundance=rel_abu,
+                        resolution=resolution,
+                    )
+                    for mz, rel_abu in zip(masses, probs)
+                ]
             )
-        else:
-            predicted_peaks = IsoThreshold(
-                formula=ion_formula, threshold=ISOTOPE_ABUNDANCE_THRESHOLD
-            )
-        # Extract high resolution masses and probabilities, correct masses for the electron charge
-        masses_high_res = [
-            (float(m) - ELECTRON.mass * raw_ion.charge) / abs(raw_ion.charge)
-            for m in predicted_peaks.masses
-        ]
-        probs_high_res = [float(p) for p in predicted_peaks.probs]
-
-        # Calculate low resolution isotope peaks
-        masses_low_res, probs_low_res = group_target_isotopes(
-            masses_high_res, probs_high_res, RESOLUTION_LOW
-        )
-
-        # Store high resolution isotopes
-        target_isotopes.extend(
-            [
-                TargetIsotope(
-                    target_isotope_id=gen_id(16),
-                    target_ion_id=ion.target_ion_id,
-                    mz=mz,
-                    relative_abundance=rel_abu,
-                    resolution="HIGH",
-                )
-                for mz, rel_abu in zip(masses_high_res, probs_high_res)
-            ]
-        )
-        # Store low resolution isotopes
-        target_isotopes.extend(
-            [
-                TargetIsotope(
-                    target_isotope_id=gen_id(16),
-                    target_ion_id=ion.target_ion_id,
-                    mz=mz,
-                    relative_abundance=rel_abu,
-                    resolution="LOW",
-                )
-                for mz, rel_abu in zip(masses_low_res, probs_low_res)
-            ]
-        )
 
     return target_ions, target_isotopes
+
+
+def _get_compound_formula(
+    target_compound_formula: str, ionization_mechanism: str
+) -> Formula | None:
+    """Get compound formula as Formula instance, handling special cases.
+
+    :param target_compound_formula: Target compound formula string
+    :type target_compound_formula: str
+    :param ionization_mechanism: Ionization mechanism string
+    :type ionization_mechanism: str
+    :raises SkipIonizationMechanism: If the ionization mechanism cannot be applied:
+        - Electron transfer on empty formula
+        - Abstraction from empty formula
+    :raises SkipIonizationMechanism: If the ionization mechanism cannot be applied.
+    :return: Compound formula as Formula instance, or None for empty formula "()"
+    :rtype: Formula | None
+    """
+    # Handle the special case when generating ions for empty formula "()"
+    if target_compound_formula == "()":
+        compound_formula = None
+        if ionization_mechanism == "-" or ionization_mechanism == "+":
+            # Electron transfer does not apply
+            raise SkipIonizationMechanism()
+        if ionization_mechanism.startswith("-"):
+            # Cannot subtract from empty formula
+            raise SkipIonizationMechanism()
+    else:
+        compound_formula = Formula(target_compound_formula)
+
+    return compound_formula
+
+
+def _get_raw_ion(ionization_mechanism: str, compound_formula: Formula) -> Formula:
+    """Get raw ion Formula based on ionization mechanism and compound formula.
+    Leverage molmass.Formula addition and subtraction operators
+
+    :param ionization_mechanism: Ionization mechanism string
+    :type ionization_mechanism: str
+    :param compound_formula: Compound formula as Formula instance
+    :type compound_formula: Formula
+    :raises UnknownIonizationMechanism: If the ionization mechanism is unknown.
+    :return: Raw ion as Formula instance
+    :rtype: Formula
+    """
+    if len(ionization_mechanism) > 1:
+        # Parse mechanism into Formula, excluding the operation sign (+/-)
+        mechanism_formula = Formula(ionization_mechanism[1:])
+    else:
+        # For electron transfer, the entire mechanism (+/-) is used
+        mechanism_formula = Formula(ionization_mechanism)
+
+    operation = ionization_mechanism[0]
+    if operation == "+":
+        # Addition mechanism
+        if compound_formula is None:
+            # Special case: empty formula "()"
+            raw_ion = mechanism_formula
+        else:
+            raw_ion = compound_formula + mechanism_formula
+    elif operation == "-":
+        # Subtraction mechanism
+        raw_ion = compound_formula - mechanism_formula
+    else:
+        raise UnknownIonizationMechanism(ionization_mechanism)
+
+    return raw_ion
+
+
+def predict_isotopes(
+    raw_ion: Formula, ion_formula: str
+) -> tuple[list[float], list[float]]:
+    """Predicts isotope masses and abundances for a given ion formula using IsoSpecPy.
+    raw_ion is used to extract custom element isotopic patterns if needed.
+
+    :param raw_ion: Formula instance of the ion
+    :type raw_ion: Formula
+    :param ion_formula: Ion formula string
+    :type ion_formula: str
+    :raises ValueError: If a custom element is unknown.
+    :return: 2-tuple of lists (masses, abundances)
+    :rtype: tuple[list[float], list[float]]
+    """
+    custom_elements = []
+    if "^" in ion_formula:
+        # Find custom element properties
+        elements = raw_ion._elements  # pylint: disable=protected-access
+        for symbol in elements:
+            if symbol.startswith("^"):
+                try:
+                    element = ELEMENTS[symbol]
+                except KeyError as e:
+                    raise UnknownCustomElement(symbol) from e
+                custom_elements.append(symbol)
+                isotope_masses = [iso.mz for iso in element.isotopes.values()]
+                isotope_abundances = [
+                    iso.abundance for iso in element.isotopes.values()
+                ]
+                isotope_counts = [
+                    raw_ion._elements[symbol][0]  # pylint: disable=protected-access
+                ]
+                # Remove custom element notation for isotope prediction
+                pattern = rf"{re.escape(symbol)}\d*"
+                ion_formula = re.sub(pattern, "", ion_formula)
+                # Parse the ion formula again without custom elements
+                ion_formula = Formula(ion_formula).formula
+
+    iso_params = {
+        "formula": ion_formula,
+        "threshold": ISOTOPE_ABUNDANCE_THRESHOLD,
+    }
+    if len(custom_elements) > 0:
+        # Use custom isotope abundances and masses for custom elements
+        iso_params["atomCounts"] = (
+            isotope_counts  # pylint: disable=possibly-used-before-assignment
+        )
+        iso_params["isotopeMasses"] = [isotope_masses]
+        iso_params["isotopeProbabilities"] = [
+            isotope_abundances  # pylint: disable=possibly-used-before-assignment
+        ]
+
+    predicted_peaks = IsoThreshold(**iso_params)
+    # Masses are corrected for the electron charge
+    masses_high_res = [
+        (float(m) - ELECTRON.mass * raw_ion.charge) / abs(raw_ion.charge)
+        for m in predicted_peaks.masses
+    ]
+    probs_high_res = [float(p) for p in predicted_peaks.probs]
+
+    return masses_high_res, probs_high_res
 
 
 def generate_target_ions_from_mass(
