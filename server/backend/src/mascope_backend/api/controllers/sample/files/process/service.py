@@ -31,13 +31,15 @@ from mascope_backend.api.controllers.sample.items.sample_items_controller import
 from mascope_backend.api.controllers.sample.lib.fetch_affected_sample_data import (
     fetch_affected_sample_data,
 )
+from mascope_backend.api.controllers.sample.lib.sample_file_fetch import (
+    fetch_sample_file,
+)
 from mascope_backend.api.controllers.workspace.acquisition.service import (
     get_acquisition_workspace,
 )
 from mascope_backend.api.lib.api_features import api_controller_background_task
 from mascope_backend.api.lib.exceptions.api_exceptions import (
     ApiException,
-    NotFoundException,
     raise_api_warning,
 )
 from mascope_backend.api.models.sample.batches.config import sample_batch_config
@@ -113,9 +115,7 @@ async def auto_process_sample_file(
     all_affected_sample_item_ids = set()
 
     # --- Validate sample file existence --- #
-    async with async_session() as session:
-        if not (sample_file := await session.get(SampleFile, sample_file_id)):
-            raise NotFoundException(f"Sample file with ID '{sample_file_id}' not found")
+    sample_file = await fetch_sample_file(sample_file_id=sample_file_id)
 
     # --- Get ACQUISITION workspace for the instrument --- #
     acquisition_workspace = (
@@ -412,7 +412,14 @@ async def re_process_sample_files(
                 affected_sample_item_ids.update(
                     file_notification_data["affected_sample_item_ids"]
                 )
-
+        except ApiException as ae:
+            failed_files.append(
+                {
+                    "sample_file_id": sample_file.sample_file_id,
+                    "filename": sample_file.filename,
+                    "message": f"Processing failed: {ae.user_message}",
+                }
+            )
         except Exception as e:  # pylint: disable=broad-except
             failed_files.append(
                 {
@@ -608,7 +615,7 @@ async def calibrate_with_retry(
             if i == CALIBRATION_ITERATIONS:
                 runtime.logger.error(
                     f"Failed to calibrate m/z with m/z tolerance {mz_calibration_params.mz_error_tolerance} "
-                    f"for sample item {sample.sample_item_name}: {e}"
+                    f"for sample item {sample["sample_item_name"]}: {e}"
                 )
             else:
                 # Double the m/z error tolerance, check refinement window limits, then retry
@@ -623,6 +630,6 @@ async def calibrate_with_retry(
                     )
                 runtime.logger.warning(
                     f"Not enough calibration peaks with m/z error tolerance {old_tolerance}, "
-                    f"retrying m/z calibration for sample {sample.sample_item_name} with "
+                    f"retrying m/z calibration for sample {sample["sample_item_name"]} with "
                     f"mz_error_tolerance={mz_calibration_params.mz_error_tolerance}."
                 )
