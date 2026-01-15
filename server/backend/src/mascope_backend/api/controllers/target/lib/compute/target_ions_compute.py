@@ -22,8 +22,9 @@ from mascope_molmass.elements import ELECTRON, ELEMENTS
 from mascope_tools.composition.utils import normalize_formula_with_isotopes
 
 
-# Threshold for high resolution isotope peaks prediction, r.a.>1%
-ISOTOPE_ABUNDANCE_THRESHOLD = 0.01
+# Threshold for high resolution isotope peaks prediction
+# We store "all" isotopes in the database, filter by abundance later if needed
+ISOTOPE_ABUNDANCE_THRESHOLD = 0.00001  # 0.001 %
 # Low/TOF resolution constant
 RESOLUTION_LOW = 1e4
 
