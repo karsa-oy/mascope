@@ -511,35 +511,55 @@ def sort_matches_by_formula(matches: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def replace_atom_with_isotope(ion: str, isotope_label: str) -> str:
-    """
-    Replaces one atom of an element in a chemical formula with a specified isotope.
+def replace_atom_with_isotope(ion_formula: str, isotope_label: str) -> str:
+    """Replace atoms in ion formula with their corresponding isotopic labels.
+
+    :param ion_formula: Formula of the ion, Hill order, with a charge at the end.
+    :type ion_formula: str
+    :param isotope_label: Label of the isotope to replace, e.g. "13C", "13C+2H", "13C3".
+    :type isotope_label: str
+    :return: Modified ion formula with isotopes.
+    :rtype: str
     """
     if not isinstance(isotope_label, str) or isotope_label in {"M0", "---", ""}:
-        return ion
+        return ion_formula
     isotope_labels = [f"[{iso_label}]" for iso_label in isotope_label.split("+")]
 
     # Separate the charge at the end of the formula, if any
-    ion_charge = ion[-1] if ion[-1] in "+-" else ""
-    ion_formula = ion[:-1] if ion_charge else ion
+    ion_charge = ion_formula[-1] if ion_formula[-1] in "+-" else ""
+    ion_formula = ion_formula[:-1] if ion_charge else ion_formula
     element_counts = ParseFormula(ion_formula)
 
+    new_formula_parts = []
     for iso in isotope_labels:
-        element_match = re.search(r"\[\d*([A-Z][a-z]*)\]", iso)
+        # Match isotope label with optional count, e.g. [13C2]
+        element_match = re.match(r"\[(\d+)([A-Z][a-z]*)(\d*)\]", iso)
         if not element_match:
-            return f"[]{ion}"  # Invalid isotope label format
+            raise ValueError(f"Invalid isotope label: {iso}.")
 
-        isotope_element = element_match.group(1)
+        isotope_mass = element_match.group(1)
+        isotope_element = element_match.group(2)
+        isotope_count_str = element_match.group(3)
+        isotope_count = int(isotope_count_str) if isotope_count_str else 1
 
         # Check if the isotope's element exists in the formula
-        if isotope_element not in element_counts:
-            return f"[]{ion}"  # Isotope element not found in the formula
+        if (
+            isotope_element not in element_counts
+            or element_counts[isotope_element] < isotope_count
+        ):
+            raise ValueError(
+                f"Isotope element not found in the formula: {isotope_element}"
+            )
 
         # Decrement the count of the target element
-        element_counts[isotope_element] -= 1
+        element_counts[isotope_element] -= isotope_count
+
+        # Add the isotope label to the formula parts
+        new_formula_parts.append(
+            f"[{isotope_mass}{isotope_element}]{isotope_count_str}"
+        )
 
     # Rebuild the formula string
-    new_formula_parts = isotope_labels
     for element in element_counts.keys():
         count = element_counts[element]
         if count == 0:
@@ -554,13 +574,22 @@ def replace_atom_with_isotope(ion: str, isotope_label: str) -> str:
 
 
 def update_ion_with_isotope_label(matches: pd.DataFrame) -> pd.DataFrame:
-    """
-    Update the 'ion' column in the matches DataFrame to prepend the isotope label
-    (if present and not 'M0' or '---') before the first element symbol.
+    """Update ion formulas in the matches DataFrame by replacing atoms with isotopic labels.
+
+    :param matches: Matches DataFrame with 'ion' and 'isotope_label' columns.
+    :type matches: pd.DataFrame
+    :return: Updated matches DataFrame with modified 'ion' formulas.
+    :rtype: DataFrame
     """
     matches = matches.copy()
-    matches["ion"] = [
-        replace_atom_with_isotope(ion, isotope_label)
-        for ion, isotope_label in zip(matches["ion"], matches["isotope_label"])
-    ]
+    modified_ion_labels = []
+    for ion, isotope_label in zip(matches["ion"], matches["isotope_label"]):
+        try:
+            updated_ion = replace_atom_with_isotope(ion, isotope_label)
+        except ValueError:
+            # If replacement fails, prepend empty brackets to indicate an issue
+            updated_ion = f"[]{ion}"
+        modified_ion_labels.append(updated_ion)
+
+    matches["ion"] = modified_ion_labels
     return matches
