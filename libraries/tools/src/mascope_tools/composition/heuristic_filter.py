@@ -6,7 +6,7 @@ from typing import Any
 import numpy as np
 from scipy.spatial.distance import cosine
 import polars as pl
-from IsoSpecPy import IsoThreshold, ParseFormula, PeriodicTbl
+from IsoSpecPy import IsoThreshold, ParseFormula, PeriodicTbl, IsoDistribution
 from mascope_tools.composition.constants import (
     DEFAULT_ELEMENTAL_RATIO_RANGE,
     ISOTOPE_ABUNDANCE_THRESHOLD,
@@ -359,14 +359,7 @@ def predict_isotopes(
         )
         predicted_masses_neutral = np.fromiter(predicted_peaks.masses, dtype=float)
         predicted_intensities = np.fromiter(predicted_peaks.probs, dtype=float)
-
-        composition = ParseFormula(ion_formula)
-        elements = list(composition.keys())
-        elemental_masses = [PeriodicTbl.symbol_to_masses[el] for el in elements]
-        isotope_labels = [
-            conf_to_label(conf, elements, elemental_masses)
-            for conf in predicted_peaks.confs
-        ]
+        isotope_labels = extract_isotope_labels(ion_formula, predicted_peaks)
         # Convert neutral masses to m/z
         predicted_mzs = (predicted_masses_neutral - ELECTRON_MASS * ion_charge) / abs(
             ion_charge
@@ -375,6 +368,34 @@ def predict_isotopes(
         predicted_mzs, predicted_intensities, isotope_labels = [], [], []
 
     return predicted_mzs, predicted_intensities, isotope_labels
+
+
+def extract_isotope_labels(
+    ion_formula: str, predicted_isotopes: IsoDistribution
+) -> list[str]:
+    """Convert isotope configurations to labels.
+    Requires IsoDistribution with confs.
+
+    :param ion_formula: Ion formula string.
+    :type ion_formula: str
+    :param predicted_isotopes: Predicted isotope distribution.
+    :type predicted_isotopes: IsoDistribution
+    :return: List of isotope labels.
+    :rtype: list[str]
+    """
+    try:
+        composition = ParseFormula(ion_formula)
+        elements = list(composition.keys())
+        elemental_masses = [PeriodicTbl.symbol_to_masses[el] for el in elements]
+        isotope_labels = [
+            conf_to_label(conf, elements, elemental_masses)
+            for conf in predicted_isotopes.confs
+        ]
+    except AttributeError:
+        raise AttributeError(
+            "Predicted isotopes must include configurations (confs) for label extraction."
+        )
+    return isotope_labels
 
 
 def score_pattern(
