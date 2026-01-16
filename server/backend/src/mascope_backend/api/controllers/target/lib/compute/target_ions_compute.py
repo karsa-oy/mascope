@@ -20,7 +20,8 @@ from mascope_backend.runtime import runtime
 from mascope_molmass import Formula
 from mascope_molmass.elements import ELECTRON, ELEMENTS
 from mascope_tools.composition.utils import normalize_formula_with_isotopes
-
+from mascope_tools.composition.heuristic_filter import extract_isotope_labels
+from mascope_tools.composition.finder import replace_atom_with_isotope
 
 # Threshold for high resolution isotope peaks prediction
 # We store "all" isotopes in the database, filter by abundance later if needed
@@ -131,7 +132,7 @@ def generate_target_ions_from_composition(
             *predicted_isotopes["HIGH"], RESOLUTION_LOW
         )
         # Store target isotopes
-        for resolution, (masses, probs) in predicted_isotopes.items():
+        for resolution, (masses, probs, formulae) in predicted_isotopes.items():
             target_isotopes.extend(
                 [
                     TargetIsotope(
@@ -141,7 +142,7 @@ def generate_target_ions_from_composition(
                         relative_abundance=rel_abu,
                         resolution=resolution,
                     )
-                    for mz, rel_abu in zip(masses, probs)
+                    for mz, rel_abu, form in zip(masses, probs, formulae)
                 ]
             )
 
@@ -249,7 +250,7 @@ def _get_raw_ion(ionization_mechanism: str, compound_formula: Formula) -> Formul
 
 def predict_isotopes(
     raw_ion: Formula, ion_formula: str
-) -> tuple[list[float], list[float]]:
+) -> tuple[list[float], list[float], list[str]]:
     """Predicts isotope masses and abundances for a given ion formula using IsoSpecPy.
     raw_ion is used to extract custom element isotopic patterns if needed.
 
@@ -257,9 +258,10 @@ def predict_isotopes(
     :type raw_ion: Formula
     :param ion_formula: Ion formula string
     :type ion_formula: str
-    :raises UnknownCustomElement: If a custom element is unknown.
-    :return: 2-tuple of lists (masses, abundances)
-    :rtype: tuple[list[float], list[float]]
+    :raises ValueError: If a custom element is unknown.
+    :return: 3-tuple lists of
+        (m/z values, relative abundances, isotope formulae)
+    :rtype: tuple[list[float], list[float], list[str]]
     """
     custom_elements = []
     if "^" in ion_formula:
@@ -288,6 +290,7 @@ def predict_isotopes(
     iso_params = {
         "formula": ion_formula,
         "threshold": ISOTOPE_ABUNDANCE_THRESHOLD,
+        "get_confs": True,
     }
     if len(custom_elements) > 0:
         # Use custom isotope abundances and masses for custom elements
@@ -305,9 +308,17 @@ def predict_isotopes(
         (float(m) - ELECTRON.mass * raw_ion.charge) / abs(raw_ion.charge)
         for m in predicted_peaks.masses
     ]
+    # Probabilities are basically relative abundances
     probs_high_res = [float(p) for p in predicted_peaks.probs]
+    # Build isotope formulae
+    isotope_labels = extract_isotope_labels(ion_formula, predicted_peaks)
+    charge = charge_string(raw_ion)
+    isotope_formulae = [
+        replace_atom_with_isotope(ion_formula, label) + charge
+        for label in isotope_labels
+    ]
 
-    return masses_high_res, probs_high_res
+    return masses_high_res, probs_high_res, isotope_formulae
 
 
 def generate_target_ions_from_mass(
@@ -400,35 +411,43 @@ def generate_target_ions_from_mass(
 
 
 def group_target_isotopes(
-    masses: list, probs: list, resolution: float
-) -> tuple[list, list]:
+    masses: list, probs: list, formulae: list, resolution: float
+) -> tuple[list, list, list]:
     """
-    Group target isotope m/z and relative abundance (probs) to produce lower resolution isotopes.
+    Group target isotope m/z, relative abundance (probs), and isotope formulae
+    to produce lower resolution isotopes.
 
     The width of the group/bin is defined as dmz = FWHM / 2 = m/z / resolution / 2.
+
+    The isotope formulae are concatenated with "/" separator for all isotopes
+    that fall within the same bin.
 
     :param masses: High resolution target isotope m/z
     :type masses: list
     :param probs: High resolution target isotope relative abundance
     :type probs: list
+    :param formulae: High resolution target isotope formulae
+    :type formulae: list
     :param resolution: Resolution value
     :type resolution: float
-    :return: Tuple with lists of grouped "mz", "relative_abundance" values
-    :rtype: tuple[list, list]
+    :return: Tuple with lists of grouped "mz", "relative_abundance",
+            "target_isotope_formula" values
+    :rtype: tuple[list, list, list]
     """
     # Convert to numpy arrays to simplify computations
     mz = np.array(masses)
     intensity = np.array(probs)
+    formula = np.array(formulae)
 
     # Sort by m/z to ensure proper binning
     sorted_indices = np.argsort(mz)
     mz = mz[sorted_indices]
     intensity = intensity[sorted_indices]
+    formula = formula[sorted_indices]
 
-    # Init grouped m/z and intensity lists
     mz_grouped = []
     intensity_grouped = []
-
+    formula_grouped = []
     i = 0
     while i < mz.size:
         # Calculate bin width for the current m/z
@@ -440,6 +459,7 @@ def group_target_isotopes(
         # Extract values within the current bin
         mz_bin = mz[bin_mask]
         intensity_bin = intensity[bin_mask]
+        formula_bin = formula[bin_mask]
 
         # Final isotope intensity
         intensity_total = np.sum(intensity_bin)
@@ -453,8 +473,9 @@ def group_target_isotopes(
         # Store grouped values
         mz_grouped.append(mz_bin_center)
         intensity_grouped.append(intensity_total)
+        formula_grouped.append("/".join(formula_bin.tolist()))
 
         # Move to the next bin, skipping all processed values
         i += np.sum(bin_mask)
 
-    return mz_grouped, intensity_grouped
+    return mz_grouped, intensity_grouped, formula_grouped
