@@ -14,9 +14,6 @@ from mascope_backend.api.models.sample.batches.config import sample_batch_config
 from mascope_backend.api.models.sample.items.sample_item_pydantic_model import (
     SampleItemCreate,
 )
-from mascope_backend.api.new.instrument_configs.schemas import (
-    SetInstrumentConfigBody,
-)
 
 
 class SampleBatchBaseValidator:
@@ -253,10 +250,6 @@ class GetSampleBatchTargetsQueryParams(QueryParamsModel):
 class SampleBatchImportSamplesBody(BaseModel):
     sample_items: list[SampleItemCreate] = Field(
         ..., description="Sample items to be created and imported to the sample batch"
-    )
-    instrument_config: SetInstrumentConfigBody = Field(
-        ...,
-        description="Instrument config to use for imported sample files",
     )
 
     @model_validator(mode="after")

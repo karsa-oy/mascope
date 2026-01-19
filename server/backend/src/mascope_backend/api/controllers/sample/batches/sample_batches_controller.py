@@ -76,12 +76,6 @@ from mascope_backend.api.models.sample.batches.sample_batch_pydantic_model impor
 from mascope_backend.api.models.sample.items.sample_item_pydantic_model import (
     SampleItemCreate,
 )
-from mascope_backend.api.new.instrument_configs.process.service import (
-    process_instrument_config,
-)
-from mascope_backend.api.new.instrument_configs.schemas import (
-    SetInstrumentConfigBody,
-)
 from mascope_backend.api.new.ionization.modes.util import (
     resolve_ionization_modes_by_tokens,
 )
@@ -591,7 +585,6 @@ async def delete_sample_batch(
 async def import_sample_items(
     sample_batch_id: str,
     sample_items: list[SampleItemCreate],
-    instrument_config: SetInstrumentConfigBody,
     independent_transaction: bool = False,
     user_id: int | None = None,
     process_id: str | None = None,
@@ -601,7 +594,6 @@ async def import_sample_items(
 
     Steps:
     - Verify that all sample items are for the same instrument
-    - Process instrument configs for the sample files
     - Resolve ionization methods for the sample items to be created
     - Create provided sample items and save them to the database
     - Get all affected batch IDs
@@ -613,8 +605,6 @@ async def import_sample_items(
     :type sample_batch_id: str
     :param sample_items: List of sample items to be created and imported.
     :type sample_items: list[SampleItemCreate]
-    :param instrument_config: Instrument config to use for the imported files.
-    :type instrument_config: InstrumentConfigBody
     :param independent_transaction: Flag to indicate if the operation should be treated as an independent transaction, defaults to False
     :type independent_transaction: bool, optional
     :param user_id: Current user triggered operation (for user notifications)
@@ -660,16 +650,6 @@ async def import_sample_items(
     )
     await send_progress_user_notification(notification, 0.1)
 
-    # --- Process instrument configs for the sample files --- #
-    instrument_config_result = await process_instrument_config(
-        filenames=[sf.filename for sf in sample_files],
-        instrument_config=instrument_config,
-        independent_transaction=False,
-        user_id=user_id,
-        process_id=gen_id(8),
-        parent_id=process_id,
-    )
-
     # --- Resolve ionization methods for the sample items to be created --- #
     for item in sample_items:
         sample_file = await fetch_sample_file(sample_file_id=item.sample_file_id)
@@ -694,11 +674,6 @@ async def import_sample_items(
 
     # Collect affected items from instrument config processing
     affected_sample_item_ids = set()
-    affected_sample_item_ids.update(
-        instrument_config_result["_notification_data"].get(
-            "affected_sample_item_ids", []
-        )
-    )
 
     await send_progress_user_notification(notification, 0.15)
 

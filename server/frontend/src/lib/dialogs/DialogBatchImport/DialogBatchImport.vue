@@ -216,8 +216,7 @@ const submit = () => {
   emit('submit')
   app.data.batch.importSamples({
     batch: app.data.batch.focused,
-    sample_items: imported.items,
-    instrument_config: instrumentConfig.payload?.instrument_config
+    sample_items: imported.items
   })
   visible.value = false
 }

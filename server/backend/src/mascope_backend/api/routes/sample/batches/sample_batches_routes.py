@@ -27,7 +27,6 @@ from mascope_backend.api.models.sample.batches.sample_batch_pydantic_model impor
 )
 from mascope_backend.api.new.auth.access_rules import locked_access
 from mascope_backend.api.new.auth.dependencies import editor_user, guest_user
-from mascope_backend.api.new.instrument_configs.service import get_instrument_config
 from mascope_backend.api.routes.sample.batches.export.routes import (
     sample_batches_export_router,
 )
@@ -239,12 +238,6 @@ async def import_sample_items_route(
     if any(si.sample_batch_id != sample_batch_id for si in body.sample_items):
         raise ValueError("The sample_batch_id in the route and sample_items must match")
 
-    # Verify instrument config exists
-    if body.instrument_config.instrument_function_id is not None:
-        await get_instrument_config(
-            instrument_function_id=body.instrument_config.instrument_function_id
-        )
-
     # Verify the existence of sample batch
     sample_batch_result = await get_sample_batch(sample_batch_id)
     sample_batch = sample_batch_result.get("data")
@@ -256,7 +249,6 @@ async def import_sample_items_route(
         import_sample_items,
         sample_batch_id=sample_batch_id,
         sample_items=body.sample_items,
-        instrument_config=body.instrument_config,
         independent_transaction=True,
         user_id=user.id,
         process_id=process_id,

@@ -65,12 +65,11 @@ export const useBatch = defineStore('app.data.batch', () => {
           type: 'copy_batch'
         }
       ),
-    importSamples: async ({ batch, sample_items, instrument_config }) => {
+    importSamples: async ({ batch, sample_items }) => {
       return await api.http.post(
         `/sample/batches/${batch.sample_batch_id}/import`,
         {
-          sample_items,
-          instrument_config
+          sample_items
         },
         {
           use: 'process',
