@@ -3,7 +3,6 @@ from datetime import datetime
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from mascope_backend.api.models.base_pydantic_model import QueryParamsModel
-from mascope_backend.api.new.instrument_configs.params import instrument_config_params
 
 
 class GetInstrumentConfigsQueryParams(QueryParamsModel):
@@ -44,7 +43,7 @@ class InstrumentFunctionData(BaseModel):
 
 class InstrumentConfigFitParams(BaseModel):
     threshold: float = Field(
-        default=instrument_config_params.threshold,
+        default=0.95,
         description="R-squared threshold filtering non-(skewed) Gaussian peaks from instrument function evaluation",
     )
 

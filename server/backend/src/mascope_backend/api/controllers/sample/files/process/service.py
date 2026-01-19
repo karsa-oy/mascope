@@ -2,8 +2,7 @@
 """
 Controller for sample files auto-processing pipeline.
 
-Handles automated creation of ACQUISITION workspaces, batches, and sample items,
-processing instrument_config and matching the samples.
+Handles automated creation of ACQUISITION workspaces, batches, and sample items, and matching the samples.
 """
 
 import asyncio

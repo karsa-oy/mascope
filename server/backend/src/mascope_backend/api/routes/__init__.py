@@ -1,9 +1,6 @@
 from mascope_backend.api.new.auth.routes import auth_router
 from mascope_backend.api.new.cheminfo.routes import cheminfo_router
 from mascope_backend.api.new.file.routes import file_router
-from mascope_backend.api.new.instrument_configs.process.routes import (
-    instrument_configs_process_router,
-)
 from mascope_backend.api.new.instrument_configs.routes import (
     instrument_configs_router,
 )
@@ -114,7 +111,6 @@ routers = [
     ionization_mode_router,
     instruments_router,
     instrument_configs_router,
-    instrument_configs_process_router,
     calibration_router,
     match_records_router,
     match_targets_batch_router,

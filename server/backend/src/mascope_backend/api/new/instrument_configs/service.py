@@ -12,7 +12,6 @@ from mascope_backend.api.lib.api_features import (
     api_controller_background_task,
 )
 from mascope_backend.api.lib.exceptions.api_exceptions import (
-    ApiException,
     NotFoundException,
 )
 from mascope_backend.api.new.instrument_configs.lib import (
@@ -23,12 +22,10 @@ from mascope_backend.api.new.instrument_configs.schemas import (
     InstrumentConfigFitParams,
     InstrumentFunctionData,
     PeakShape,
-    SetInstrumentConfigBody,
 )
 from mascope_backend.db import InstrumentFunction as InstrumentConfig
 from mascope_backend.db import SampleFile, async_session
 from mascope_backend.db.id import gen_id
-from mascope_backend.runtime import runtime
 from mascope_file.name import get_instrument_name, get_instrument_type
 from mascope_signal.instrument_func.fit import fit_instrument_functions
 
@@ -169,6 +166,7 @@ async def get_instrument_config(
             )
 
         # Step 2: Construct query based on parameters
+        instrument_config = None
         if filename:
             # 2A: Fetch instrument function by filename
             instrument_config = await fetch_instrument_config_by_filename(filename)
@@ -184,6 +182,7 @@ async def get_instrument_config(
 
         # Step 4: Check existence
         if not instrument_config:
+            label = ""
             if filename:
                 label = f"for filename {filename}"
             elif instrument_function_id:
@@ -336,7 +335,9 @@ async def fit_instrument_config(
     )
 
     # Get resolution function coefficients
-    partial_coefficients = resolution_function_partial.keywords
+    partial_coefficients = (
+        resolution_function_partial.keywords  # pylint: disable=no-member
+    )
     if instrument_type == "tof":
         resolution_function = [partial_coefficients["a"], partial_coefficients["b"]]
     else:
@@ -365,54 +366,3 @@ async def fit_instrument_config(
             "statistics": stats,
         },
     }
-
-
-@api_controller()
-async def resolve_instrument_config(
-    sample_file: SampleFile,
-) -> SetInstrumentConfigBody:
-    """
-    Resolve instrument configuration for sample file processing.
-
-    Attempts to find existing instrument config by filename. If not found, prepares
-    configuration body for creating new instrument config using sample_file.method_file
-    if available, otherwise generates backup method_file name based on timestamp and instrument.
-
-    This function handles the business logic for determining whether to use existing
-    or create new instrument configurations during the auto-processing pipeline.
-
-    :param sample_file: Sample file record from database
-    :type sample_file: SampleFile
-    :return: Instrument config body for processing
-    :rtype: SetInstrumentConfigBody
-    """
-    try:
-        existing_config = await get_instrument_config(filename=sample_file.filename)
-        instrument_config = SetInstrumentConfigBody(
-            instrument_function_id=existing_config["data"]["instrument_function_id"]
-        )
-        runtime.logger.debug(
-            f"Using existing instrument config: {existing_config['data']['method_file']}"
-        )
-        return instrument_config
-
-    except ApiException:
-        # Create new instrument config - check if sample_file has method_file reference,
-        # otherwise use auto-generated backup
-        if sample_file.method_file and sample_file.method_file.strip():
-            # Use existing method_file from sample_file record
-            method_file = sample_file.method_file
-            runtime.logger.debug(f"Using sample_file method_file: {method_file}")
-        else:
-            # Fallback to auto-generated method file name
-            timestamp = sample_file.datetime.strftime("%Y-%m-%d %H:%M:%S")
-            method_file = f"{timestamp} Acquisition {sample_file.instrument}"
-            runtime.logger.debug(f"Generated backup method_file: {method_file}")
-
-        instrument_config = SetInstrumentConfigBody(
-            new_record=CreateInstrumentConfigBody(
-                method_file=method_file,
-            )
-        )
-        runtime.logger.debug(f"Creating new instrument config: {method_file}")
-        return instrument_config
