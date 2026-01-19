@@ -12,6 +12,7 @@ from mascope_backend.api.controllers.sample.lib.sample_file_fetch import (
 from mascope_backend.db import InstrumentFunction as InstrumentConfig
 from mascope_backend.db import async_session
 from mascope_signal.instrument_func.fit import r_orbi, r_tof
+from mascope_backend.runtime import runtime
 
 
 async def fetch_instrument_config_by_filename(filename: str) -> InstrumentConfig | None:
@@ -24,6 +25,19 @@ async def fetch_instrument_config_by_filename(filename: str) -> InstrumentConfig
     """
     async with async_session() as session:
         sample_file = await fetch_sample_file(filename=filename)
+        if sample_file.instrument_function_id:
+            stmt = select(InstrumentConfig).where(
+                InstrumentConfig.instrument_function_id
+                == sample_file.instrument_function_id
+            )
+            results = await session.execute(stmt)
+            instrument_config = results.scalar_one_or_none()
+            runtime.logger.debug(f"Found instrument config by ID for {filename}")
+            return instrument_config
+
+        # Fallback to searching by method file and instrument
+        # TODO: Remove fallback after instrument_function_id is fully implemented, see issue #1299
+        runtime.logger.debug(f"Falling back to method_file lookup for {filename}")
         stmt = (
             (
                 select(InstrumentConfig)
@@ -86,6 +100,7 @@ def parse_instrument_functions(
         )
 
     # Derive callable from resolution function parameters
+    resolution_function = None
     if len(resolution_func_coeffs) == 1:
         # Use native Orbitrap resolution function
         p1 = resolution_func_coeffs[0]
