@@ -16,9 +16,6 @@ from mascope_backend.api.models.base_pydantic_model import (
     QueryParamsModel,
 )
 from mascope_backend.api.models.sample.items.config import sample_item_config
-from mascope_backend.api.new.instrument_configs.schemas import (
-    SetInstrumentConfigBody,
-)
 
 
 class SampleItemBaseValidator:
@@ -279,7 +276,4 @@ class SampleItemsMoveBody(BaseModel):
 class SampleItemProcessBody(BaseModel):
     sample_item: SampleItemCreate = Field(
         ..., description="Sample item to be processed (created, calibrated, matched)"
-    )
-    instrument_config: SetInstrumentConfigBody = Field(
-        ..., description="Instrument config to set for the sample item"
     )

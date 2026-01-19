@@ -237,10 +237,8 @@ async function save() {
     )
   }
   if (props.action == 'create') {
-    const { instrument_config } = instrumentConfig.payload
     await app.data.sample.process({
-      sample: sample_item,
-      instrument_config
+      sample: sample_item
     })
   } else if (props.action == 'update') {
     // creating new instrument config

@@ -93,12 +93,11 @@ export const useSample = defineStore('app.data.sample', () => {
           type: 'move_sample'
         }
       ),
-    process: async ({ sample, instrument_config }) => {
+    process: async ({ sample }) => {
       return await api.http.post(
         `/sample/items/process`,
         {
-          sample_item: sample,
-          instrument_config
+          sample_item: sample
         },
         {
           use: 'process',

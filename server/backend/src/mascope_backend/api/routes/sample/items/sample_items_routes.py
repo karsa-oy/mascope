@@ -222,24 +222,12 @@ async def process_sample_item_route(
     :param user: The current authenticated user with editor permissions.
     :return: A dictionary confirming the processing has started.
     """
-    # Verify the existance of sample file
-    await fetch_sample_file(sample_file_id=body.sample_item.sample_file_id)
-    # Verify instrument config exists
-    if (
-        body.instrument_config
-        and body.instrument_config.instrument_function_id is not None
-    ):
-        await get_instrument_config(
-            instrument_function_id=body.instrument_config.instrument_function_id
-        )
-
     # Get data for notifications
     process_id = gen_id(8)
 
     background_tasks.add_task(
         process_sample_item,
         sample_item=body.sample_item,
-        instrument_config=body.instrument_config,
         independent_transaction=True,
         user_id=user.id,
         process_id=process_id,

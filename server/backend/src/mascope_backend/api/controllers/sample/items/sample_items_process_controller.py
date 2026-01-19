@@ -20,12 +20,6 @@ from mascope_backend.api.lib.api_features import (
 from mascope_backend.api.models.sample.items.sample_item_pydantic_model import (
     SampleItemCreate,
 )
-from mascope_backend.api.new.instrument_configs.process.service import (
-    process_instrument_config,
-)
-from mascope_backend.api.new.instrument_configs.schemas import (
-    SetInstrumentConfigBody,
-)
 from mascope_backend.db.id import gen_id
 from mascope_backend.runtime import runtime
 from mascope_backend.socket.notifications import (
@@ -42,7 +36,6 @@ from mascope_backend.socket.notifications import (
 )
 async def process_sample_item(
     sample_item: SampleItemCreate,
-    instrument_config: SetInstrumentConfigBody,
     independent_transaction: bool = False,
     user_id: int | None = None,
     process_id: str | None = None,
@@ -55,7 +48,6 @@ async def process_sample_item(
     NOTE that the sample_file record with the same filename should already exist in the database.
 
     Steps:
-    - Process instrument functions for the sample file
     - Create a new sample item
     - Compute matches for the sample item
     - Create separate independent task to recompute matches for other affected samples
@@ -64,8 +56,6 @@ async def process_sample_item(
 
     :param sample_item: Details of the sample item to be created.
     :type sample_item: SampleItemCreate
-    :param instrument_config: An instrument config to use for the processed item.
-    :type instrument_config: SetIntrumentConfigBody
     :param independent_transaction: Indicates whether this operation should be treated as a standalone transaction.
     :type independent_transaction: bool, optional
     :param user_id: Current user triggered operation (for user notifications)
@@ -93,22 +83,6 @@ async def process_sample_item(
         },
     )
     await send_progress_user_notification(notification, 0.1)
-
-    # --- Process instrument functions for the sample file --- #
-    instrument_config_result = await process_instrument_config(
-        filenames=[sample_file.filename],
-        instrument_config=instrument_config,
-        independent_transaction=False,
-        user_id=user_id,
-        process_id=gen_id(8),
-        parent_id=process_id,
-    )
-    # Collect affected items from instrument config processing
-    all_affected_sample_item_ids.update(
-        instrument_config_result["_notification_data"].get(
-            "affected_sample_item_ids", []
-        )
-    )
 
     # --- Create a new sample item --- #
     created_sample_item = (
