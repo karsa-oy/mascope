@@ -12,13 +12,12 @@ import Tab from 'primevue/tab'
 import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 import TextArea from 'primevue/textarea'
-import { useConfirm } from 'primevue/useconfirm'
 
 import { api } from '@/api'
 
 import { equals } from '@/lib/table'
 import { DEFAULT_SAMPLE_BATCH_TYPE, ANALYSIS_POLARITY } from '@/lib/constants'
-import { clone, instrumentType as getInstrumentType } from '@/lib/utils'
+import { clone } from '@/lib/utils'
 
 import { useApp } from '@/stores'
 
