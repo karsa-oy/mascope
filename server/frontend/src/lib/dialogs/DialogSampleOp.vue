@@ -364,12 +364,7 @@ const polarityOptions = computed(() => {
       </ScrollPanel>
     </Panel>
     <menu>
-      <ToolbarTemplate
-        v-model:template="template.selected"
-        :default="defaultTemplate"
-        v-if="tab == 'sample-details'"
-      />
-      <div style="width: 320px" v-else />
+      <ToolbarTemplate v-model:template="template.selected" :default="defaultTemplate" />
       <menu>
         <Message v-if="invalidMessage" severity="error">
           {{ invalidMessage }}
