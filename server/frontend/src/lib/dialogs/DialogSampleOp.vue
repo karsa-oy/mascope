@@ -8,16 +8,10 @@ import InputText from 'primevue/inputtext'
 import Button from 'primevue/button'
 import Panel from 'primevue/panel'
 import Dialog from 'primevue/dialog'
-import Tabs from 'primevue/tabs'
-import TabList from 'primevue/tablist'
-import Tab from 'primevue/tab'
-import TabPanels from 'primevue/tabpanels'
-import TabPanel from 'primevue/tabpanel'
 import Message from 'primevue/message'
 
 import { api } from '@/api'
 import { ToolbarTemplate } from '@/lib/toolbars'
-import { PaneInstrumentConfig, InstrumentConfigSelector } from '@/lib/panes'
 import { clone, strToSnakeCase, beautifySnakeCase, beautifyConstant, genId } from '@/lib/utils'
 import { useApp } from '@/stores'
 import {
@@ -53,7 +47,6 @@ watch(visible, (value) => {
     app.ui.help.set(layer)
   }
 })
-const tab = ref('sample-details')
 
 const defaultTemplate = computed(() => ({
   name: 'default',
@@ -89,14 +82,8 @@ const input = reactive({
   ionization_mode_id: null
 })
 const initial = ref()
-const changedInput = computed(
-  () => JSON.stringify(input) !== initial.value || instrumentConfig.status?.changed === true // * see note below
-)
-const instrumentConfig = reactive({
-  status: {},
-  payload: {},
-  input: {}
-})
+const changedInput = computed(() => JSON.stringify(input) !== initial.value)
+
 const generated = reactive({
   filterId: null
 })
@@ -114,7 +101,6 @@ watch(visible, init)
 async function init(active) {
   if (!active) return
   // reset state
-  tab.value = 'sample-details'
   template.selected = defaultTemplate.value
   // reset inputs
   // User is creating or updating a sample item
@@ -129,9 +115,6 @@ async function init(active) {
   input.type = original.value?.sample_item_type ?? 'ONLINE'
   input.ionization_mode_id = original.value?.ionization_mode_id ?? null
 
-  instrumentConfig.status = {}
-  instrumentConfig.input = {}
-  instrumentConfig.payload = {}
   // reset generated
   generated.filterId = null
   // fill fields
@@ -241,21 +224,6 @@ async function save() {
       sample: sample_item
     })
   } else if (props.action == 'update') {
-    // creating new instrument config
-    if (instrumentConfig.input?.creating && !instrumentConfig.status?.invalid) {
-      await api.http.post(
-        '/instrument_configs/process',
-        {
-          filename: input.filename,
-          instrument_config: instrumentConfig.payload.instrument_config
-        },
-        {
-          use: 'process',
-          type: 'process_instrument_config'
-        }
-      )
-    }
-
     await app.data.sample.update({
       sample: {
         ...props.item, // To include sample_item_id
@@ -312,13 +280,6 @@ const polarityOptions = computed(() => {
       return [{ label: 'Unknown', value: null }]
   }
 })
-
-// * Note that for older samples, the dialog may open immediately valid!
-
-// This is because legacy samples have no instrument config, and the instrument config pane
-// will force _some_ config to be chosen. This means that opening the dialog for a legacy
-// sample will immediately be a valid change, since the dialog has automatically updated
-// the previous 'null' method_file to the first instrument config in the list.
 </script>
 
 <template>
@@ -329,99 +290,78 @@ const polarityOptions = computed(() => {
     contentStyle="flex-grow: 1; display: flex; flex-flow: column; gap: 0.5rem; justify-content: space-between"
   >
     <Panel>
-      <Tabs v-model:value="tab">
-        <TabList>
-          <Tab value="sample-details">Sample Details</Tab>
-          <Tab value="instrument-config" :disabled="!input.filename"> Instrument Config </Tab>
-        </TabList>
-        <TabPanel value="sample-details">
-          <ScrollPanel style="width: 100%; height: 50vh">
-            <div class="sample-field-grid">
-              <FloatLabel v-for="field in input.fields" :key="field.label">
-                <InputText :id="`field-${field.label}`" v-model="field.value" required />
-                <label :for="`field-${field.label}`">
-                  {{ beautifySnakeCase(field.label) }}
-                </label>
-              </FloatLabel>
+      <ScrollPanel style="width: 100%; height: 50vh">
+        <div class="sample-field-grid">
+          <FloatLabel v-for="field in input.fields" :key="field.label">
+            <InputText :id="`field-${field.label}`" v-model="field.value" required />
+            <label :for="`field-${field.label}`">
+              {{ beautifySnakeCase(field.label) }}
+            </label>
+          </FloatLabel>
 
-              <div class="input-group">
-                <FloatLabel>
-                  <Select
-                    inputId="item-filter-id"
-                    v-model="input.filterId"
-                    :options="filters"
-                    :disabled="sampleTypesFilterIdNotAllowed.includes(input.type)"
-                    style="min-width: 200px"
-                  />
-                  <label for="item-filter-id">Filter ID</label>
-                </FloatLabel>
-                <Button
-                  @click="input.filterId = generated.filterId = genId(6, false)"
-                  icon="pi pi-sparkles"
-                  :disabled="sampleTypesFilterIdNotAllowed.includes(input.type)"
-                  v-tooltip="'Generate new filter ID'"
-                />
-              </div>
-
-              <FloatLabel>
-                <Select
-                  inputId="item-type"
-                  v-model="input.type"
-                  :options="sampleTypeOptions"
-                  dataKey="value"
-                  optionValue="value"
-                  optionLabel="label"
-                />
-                <label for="item-type"> Sample type </label>
-              </FloatLabel>
-
-              <FloatLabel>
-                <Select
-                  inputId="polarity-type"
-                  v-model="input.polarity"
-                  :options="polarityOptions"
-                  dataKey="value"
-                  optionValue="value"
-                  optionLabel="label"
-                  :disabled="polarityOptions.length === 1"
-                />
-                <label for="item-type"> Polarity </label>
-              </FloatLabel>
-
-              <FloatLabel>
-                <InputText id="item-filename" v-model="input.filename" required disabled />
-                <label for="item-filename"> Filename </label>
-              </FloatLabel>
-              <InstrumentConfigSelector v-model="instrumentConfig" :disabled="true" />
-
-              <FloatLabel>
-                <Select
-                  inputId="ionization-mode"
-                  v-model="input.ionization_mode_id"
-                  :options="ionizationModeOptions"
-                  dataKey="value"
-                  optionValue="value"
-                  optionLabel="label"
-                  :disabled="action !== 'create'"
-                />
-                <label for="ionization-mode">Ionization Mode</label>
-              </FloatLabel>
-            </div>
-          </ScrollPanel>
-        </TabPanel>
-        <TabPanel value="instrument-config">
-          <ScrollPanel style="width: 100%; height: 50vh">
-            <PaneInstrumentConfig
-              v-if="visible"
-              :fitTo="input.filename"
-              :autofit="tab == 'instrument-config'"
-              v-model:status="instrumentConfig.status"
-              v-model:input="instrumentConfig.input"
-              v-model:payload="instrumentConfig.payload"
+          <div class="input-group">
+            <FloatLabel>
+              <Select
+                inputId="item-filter-id"
+                v-model="input.filterId"
+                :options="filters"
+                :disabled="sampleTypesFilterIdNotAllowed.includes(input.type)"
+                style="min-width: 200px"
+              />
+              <label for="item-filter-id">Filter ID</label>
+            </FloatLabel>
+            <Button
+              @click="input.filterId = generated.filterId = genId(6, false)"
+              icon="pi pi-sparkles"
+              :disabled="sampleTypesFilterIdNotAllowed.includes(input.type)"
+              v-tooltip="'Generate new filter ID'"
             />
-          </ScrollPanel>
-        </TabPanel>
-      </Tabs>
+          </div>
+
+          <FloatLabel>
+            <Select
+              inputId="item-type"
+              v-model="input.type"
+              :options="sampleTypeOptions"
+              dataKey="value"
+              optionValue="value"
+              optionLabel="label"
+            />
+            <label for="item-type"> Sample type </label>
+          </FloatLabel>
+
+          <FloatLabel>
+            <Select
+              inputId="polarity-type"
+              v-model="input.polarity"
+              :options="polarityOptions"
+              dataKey="value"
+              optionValue="value"
+              optionLabel="label"
+              :disabled="polarityOptions.length === 1"
+            />
+            <label for="item-type"> Polarity </label>
+          </FloatLabel>
+
+          <FloatLabel>
+            <InputText id="item-filename" v-model="input.filename" required disabled />
+            <label for="item-filename"> Filename </label>
+          </FloatLabel>
+
+          <FloatLabel>
+            <Select
+              inputId="ionization-mode"
+              v-model="input.ionization_mode_id"
+              :options="ionizationModeOptions"
+              dataKey="value"
+              optionValue="value"
+              optionLabel="label"
+              :disabled="action !== 'create'"
+            />
+            <label for="ionization-mode">Ionization Mode</label>
+          </FloatLabel>
+        </div>
+      </ScrollPanel>
     </Panel>
     <menu>
       <ToolbarTemplate
@@ -430,13 +370,6 @@ const polarityOptions = computed(() => {
         v-if="tab == 'sample-details'"
       />
       <div style="width: 320px" v-else />
-      <Message
-        v-if="instrumentConfig.status?.message"
-        :severity="instrumentConfig.status?.message?.severity"
-        :icon="instrumentConfig.status?.message?.icon"
-      >
-        {{ instrumentConfig.status?.message?.contents }}
-      </Message>
       <menu>
         <Message v-if="invalidMessage" severity="error">
           {{ invalidMessage }}
