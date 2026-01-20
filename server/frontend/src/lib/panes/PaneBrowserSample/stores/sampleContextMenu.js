@@ -25,8 +25,7 @@ export const useSampleContextMenu = defineStore('browser.sample.sampleCtxMenu', 
   const selection = ref(null)
   const dialog = reactive({
     op: null,
-    calibration: false,
-    instrumentConfig: false
+    calibration: false
   })
 
   // paste context

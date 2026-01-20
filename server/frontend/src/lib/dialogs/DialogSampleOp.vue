@@ -220,9 +220,7 @@ async function save() {
     )
   }
   if (props.action == 'create') {
-    await app.data.sample.process({
-      sample: sample_item
-    })
+    await app.data.sample.process(sample_item)
   } else if (props.action == 'update') {
     await app.data.sample.update({
       sample: {
