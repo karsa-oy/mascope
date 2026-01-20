@@ -1,14 +1,8 @@
-import asyncio
-
 from mascope_backend.api.controllers.match.match_controller import (
     match_compute_sample,
-    rematch_samples,
 )
 from mascope_backend.api.controllers.sample.items.sample_items_controller import (
     create_sample_items,
-)
-from mascope_backend.api.controllers.sample.lib.fetch_affected_sample_data import (
-    fetch_affected_sample_data,
 )
 from mascope_backend.api.controllers.sample.lib.sample_file_fetch import (
     fetch_sample_file,
@@ -50,8 +44,6 @@ async def process_sample_item(
     Steps:
     - Create a new sample item
     - Compute matches for the sample item
-    - Create separate independent task to recompute matches for other affected samples
-    - Gather all affected batch IDs for ui reload events
     - Fetch processed sample details including match data
 
     :param sample_item: Details of the sample item to be created.
@@ -66,8 +58,6 @@ async def process_sample_item(
     :return: Details of the processed sample including matches.
     :rtype: dict
     """
-    # Initialize collector for affected sample items
-    all_affected_sample_item_ids = set()
 
     sample_file = await fetch_sample_file(sample_file_id=sample_item.sample_file_id)
 
@@ -92,9 +82,6 @@ async def process_sample_item(
     ).get("data")[0]
     created_sample_item_id = created_sample_item["sample_item_id"]
 
-    # Add newly created item to affected items
-    all_affected_sample_item_ids.add(created_sample_item_id)
-
     notification.message = f"Sample '{sample_item.sample_item_name}' record created with ID: {created_sample_item_id}."
     notification.data = {
         "sample_item_id": created_sample_item_id,
@@ -118,37 +105,15 @@ async def process_sample_item(
     )
     await send_progress_user_notification(notification, 0.9)
 
-    # --- Create separate independent task to recompute matches for other affected samples --- #
-    other_affected_sample_item_ids = [
-        si_id
-        for si_id in all_affected_sample_item_ids
-        if si_id != created_sample_item_id  # exclude the processed sample
-    ]
-    if other_affected_sample_item_ids:
-        asyncio.create_task(
-            rematch_samples(
-                sample_item_ids=other_affected_sample_item_ids,
-                independent_transaction=True,  # Set to true to handle reloads independently
-                user_id=user_id,
-                process_id=gen_id(8),
-            )
-        )
-
-        runtime.logger.info(
-            f"Started independent rematch task for {len(other_affected_sample_item_ids)} affected samples"
-        )
-
-    # --- Gather all affected batch IDs for ui reload events --- #
-    _, affected_sample_batch_ids, *_ = await fetch_affected_sample_data(
-        sample_item_ids=list(all_affected_sample_item_ids)
-    )
-
     # --- Fetch processed sample details including match data --- #
     sample = (
         await get_sample(
             sample_item_id=created_sample_item_id,
         )
     )["data"]
+
+    # Prepare affected IDs for notifications
+    affected_sample_batch_ids = [sample_item.sample_batch_id]
 
     return {
         "message": f"Sample '{sample['sample_item_name']}' was successfully processed.",
@@ -157,6 +122,6 @@ async def process_sample_item(
             "sample_item_id": created_sample_item_id,
             "sample_file_id": sample["sample_file_id"],
             "affected_sample_batch_ids": affected_sample_batch_ids,
-            "affected_sample_item_ids": list(all_affected_sample_item_ids),
+            "affected_sample_item_ids": [created_sample_item_id],
         },
     }

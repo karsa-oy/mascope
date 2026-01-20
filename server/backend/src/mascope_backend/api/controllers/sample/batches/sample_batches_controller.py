@@ -1,5 +1,4 @@
 # pylint: disable=not-callable
-import asyncio
 from datetime import datetime, timezone
 
 import numpy as np
@@ -18,7 +17,6 @@ from sqlalchemy.orm import joinedload
 import mascope_file.name as m_name
 from mascope_backend.api.controllers.match.match_controller import (
     match_compute_samples,
-    rematch_samples,
 )
 from mascope_backend.api.controllers.sample.batches.lib.util import (
     collect_spectra_per_ionization_mode,
@@ -31,9 +29,6 @@ from mascope_backend.api.controllers.sample.batches.status.service import (
 from mascope_backend.api.controllers.sample.items.sample_items_controller import (
     copy_sample_items,
     create_sample_items,
-)
-from mascope_backend.api.controllers.sample.lib.fetch_affected_sample_data import (
-    fetch_affected_sample_data,
 )
 from mascope_backend.api.controllers.sample.lib.sample_batches_fetch import (
     fetch_sample_batch,
@@ -596,9 +591,7 @@ async def import_sample_items(
     - Verify that all sample items are for the same instrument
     - Resolve ionization methods for the sample items to be created
     - Create provided sample items and save them to the database
-    - Get all affected batch IDs
-    - Rematch imported sample items
-    - Create separate independent task to recompute matches for other affected samples
+    - Match imported sample items
     - Return the status message
 
     :param sample_batch_id: ID of the sample batch where sample items will be imported.
@@ -662,18 +655,15 @@ async def import_sample_items(
         ]
         if not ionization_modes:
             raise ValueError(
-                f"Could not resolve ionization mode for file '{item.filename}'. "
+                f"Could not resolve ionization mode for file '{sample_file.filename}'. "
                 "No valid ionization mode token in the filename for the selected polarity."
             )
         if len(ionization_modes) > 1:
             raise ValueError(
-                f"Could not resolve ionization mode for file '{item.filename}'. "
+                f"Could not resolve ionization mode for file '{sample_file.filename}'. "
                 "Multiple ionization mode tokens matched the filename."
             )
         item.ionization_mode_id = ionization_modes[0].ionization_mode_id
-
-    # Collect affected items from instrument config processing
-    affected_sample_item_ids = set()
 
     await send_progress_user_notification(notification, 0.15)
 
@@ -687,30 +677,10 @@ async def import_sample_items(
         item["sample_item_id"] for item in created_sample_items_data
     ]
 
-    # Add created sample items to the rematch set
-    affected_sample_item_ids.update(created_sample_item_ids)
-
     notification.message = f"Created {len(sample_items)} sample{'s records' if len(sample_items) > 1 else 'record'}."
     await send_progress_user_notification(notification, 0.2)
 
-    # --- Get all affected batch IDs --- #
-    _, affected_sample_batch_ids, *_ = await fetch_affected_sample_data(
-        sample_item_ids=list(affected_sample_item_ids)
-    )
-
-    # Check for spillover effects (affects on other batches)
-    other_affected_batches = [
-        bid for bid in affected_sample_batch_ids if bid != sample_batch_id
-    ]
-
-    if other_affected_batches:
-        other_affected_batches_message = (
-            f"Import affected {len(other_affected_batches)} other sample batches"
-        )
-        runtime.logger.info(other_affected_batches_message)
-        notification.message += other_affected_batches_message
-
-    # --- Rematch imported sample items --- #
+    # --- Match imported sample items --- #
     await match_compute_samples(
         sample_item_ids=created_sample_item_ids,
         independent_transaction=False,
@@ -719,34 +689,19 @@ async def import_sample_items(
         parent_id=process_id,
     )
 
-    notification.message = f"Rematched {len(affected_sample_item_ids)} sample items affected by the import."
+    notification.message = (
+        f"Matched {len(created_sample_item_ids)} imported sample items."
+    )
     await send_progress_user_notification(notification, 0.9)
 
-    # --- Create separate independent task to recompute matches for other affected samples --- #
-    other_affected_sample_item_ids = [
-        si_id
-        for si_id in affected_sample_item_ids
-        if si_id not in created_sample_item_ids  # exclude the imported samples
-    ]
-    if other_affected_sample_item_ids:
-        asyncio.create_task(
-            rematch_samples(
-                sample_item_ids=other_affected_sample_item_ids,
-                independent_transaction=True,  # Set to true to handle reloads independently
-                user_id=user_id,
-                process_id=gen_id(8),
-            )
-        )
-
-        runtime.logger.info(
-            f"Started independent rematch task for {len(other_affected_sample_item_ids)} affected samples"
-        )
+    # --- Prepare affected IDs for notifications --- #
+    affected_sample_batch_ids = [sample_batch_id]
 
     # --- Return the status message --- #
     return {
         "message": f"{len(sample_items)} sample{'s' if len(sample_items) > 1 else ''} was imported to the sample batch '{sample_batch_name}'.",
         "_notification_data": {
-            "affected_sample_item_ids": list(affected_sample_item_ids),
+            "affected_sample_item_ids": created_sample_item_ids,
             "affected_sample_batch_ids": affected_sample_batch_ids,
         },
     }
