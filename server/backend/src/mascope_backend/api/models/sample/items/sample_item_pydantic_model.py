@@ -271,9 +271,3 @@ class SampleItemsMoveBody(BaseModel):
         ..., description="ID of the sample batch where to move sample items"
     )
     sample_item_ids: list[str] = Field(..., description="Sample item IDs to move")
-
-
-class SampleItemProcessBody(BaseModel):
-    sample_item: SampleItemCreate = Field(
-        ..., description="Sample item to be processed (created, calibrated, matched)"
-    )

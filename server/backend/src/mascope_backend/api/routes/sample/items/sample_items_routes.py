@@ -211,13 +211,13 @@ async def move_sample_items_route(
 @sample_items_router.post("/process")
 @api_route(status_code=202)
 async def process_sample_item_route(
-    body: SampleItemProcessBody,
+    sample_item: SampleItemCreate,
     background_tasks: BackgroundTasks,
     user=Depends(editor_user),
 ):
     """Process a sample item, including creation and matching.
 
-    :param body: The data for processing the sample item.
+    :param sample_item: The data for processing the sample item.
     :param background_tasks: Background tasks for processing the item.
     :param user: The current authenticated user with editor permissions.
     :return: A dictionary confirming the processing has started.
@@ -227,14 +227,14 @@ async def process_sample_item_route(
 
     background_tasks.add_task(
         process_sample_item,
-        sample_item=body.sample_item,
+        sample_item=sample_item,
         independent_transaction=True,
         user_id=user.id,
         process_id=process_id,
     )
 
     return {
-        "message": f"Processing sample '{body.sample_item.sample_item_name}', please wait.",
+        "message": f"Processing sample '{sample_item.sample_item_name}', please wait.",
         "process_id": process_id,
     }
 
