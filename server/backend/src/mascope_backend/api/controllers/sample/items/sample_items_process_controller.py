@@ -15,7 +15,6 @@ from mascope_backend.api.models.sample.items.sample_item_pydantic_model import (
     SampleItemCreate,
 )
 from mascope_backend.db.id import gen_id
-from mascope_backend.runtime import runtime
 from mascope_backend.socket.notifications import (
     UserNotification,
     send_progress_user_notification,
@@ -30,7 +29,7 @@ from mascope_backend.socket.notifications import (
 )
 async def process_sample_item(
     sample_item: SampleItemCreate,
-    independent_transaction: bool = False,
+    independent_transaction: bool = False,  # pylint: disable=unused-argument
     user_id: int | None = None,
     process_id: str | None = None,
 ) -> dict:

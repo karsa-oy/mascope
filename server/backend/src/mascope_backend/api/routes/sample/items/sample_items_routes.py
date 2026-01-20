@@ -13,14 +13,10 @@ from mascope_backend.api.controllers.sample.items.sample_items_controller import
 from mascope_backend.api.controllers.sample.items.sample_items_process_controller import (
     process_sample_item,
 )
-from mascope_backend.api.controllers.sample.lib.sample_file_fetch import (
-    fetch_sample_file,
-)
 from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.models.sample.items.sample_item_pydantic_model import (
     GetSampleItemsQueryParams,
     SampleItemCreate,
-    SampleItemProcessBody,
     SampleItemsCopyBody,
     SampleItemsDeleteBody,
     SampleItemsMoveBody,
@@ -28,7 +24,6 @@ from mascope_backend.api.models.sample.items.sample_item_pydantic_model import (
 )
 from mascope_backend.api.new.auth.access_rules import locked_access
 from mascope_backend.api.new.auth.dependencies import editor_user, guest_user
-from mascope_backend.api.new.instrument_configs.service import get_instrument_config
 from mascope_backend.db import SampleBatch, SampleItem
 from mascope_backend.db.id import gen_id
 
@@ -39,7 +34,8 @@ sample_items_router = APIRouter(prefix="/api/sample/items", tags=["Sample Items"
 @sample_items_router.get("")
 @api_route()
 async def get_sample_items_route(
-    query_params: GetSampleItemsQueryParams = Query(), user=Depends(guest_user)
+    query_params: GetSampleItemsQueryParams = Query(),
+    user=Depends(guest_user),  # pylint: disable=unused-argument
 ):
     """Retrieve a list of sample items.
 
@@ -52,7 +48,10 @@ async def get_sample_items_route(
 
 @sample_items_router.get("/{sample_item_id}")
 @api_route()
-async def get_sample_item_route(sample_item_id: str, user=Depends(guest_user)):
+async def get_sample_item_route(
+    sample_item_id: str,
+    user=Depends(guest_user),  # pylint: disable=unused-argument
+):
     """Retrieve details of a specific sample item by ID.
 
     :param sample_item_id: The unique identifier of the sample item.
@@ -65,7 +64,8 @@ async def get_sample_item_route(sample_item_id: str, user=Depends(guest_user)):
 @sample_items_router.post("")
 @api_route(status_code=201)
 async def create_sample_item_route(
-    sample_item: SampleItemCreate, user=Depends(editor_user)
+    sample_item: SampleItemCreate,
+    user=Depends(editor_user),  # pylint: disable=unused-argument
 ):
     """Create a new sample item.
 

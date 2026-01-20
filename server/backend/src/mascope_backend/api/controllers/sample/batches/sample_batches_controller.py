@@ -524,8 +524,8 @@ async def delete_sample_batch(
     sample_batch_id: str,
     workspace_id: str = None,
     independent_transaction: bool = False,
-    user_id: int | None = None,
-    process_id=None,
+    user_id: int | None = None,  # pylint: disable=unused-argument
+    process_id=None,  # pylint: disable=unused-argument
 ):
     """
     Deletes a sample batch by its unique ID and optionally emits relevant events.
@@ -580,7 +580,7 @@ async def delete_sample_batch(
 async def import_sample_items(
     sample_batch_id: str,
     sample_items: list[SampleItemCreate],
-    independent_transaction: bool = False,
+    independent_transaction: bool = False,  # pylint: disable=unused-argument
     user_id: int | None = None,
     process_id: str | None = None,
 ):
@@ -716,7 +716,7 @@ async def copy_sample_batch(
     workspace_id: str,
     sample_batch_name: str,
     sample_batch_description: str,
-    independent_transaction: bool = False,
+    independent_transaction: bool = False,  # pylint: disable=unused-argument
     user_id: int | None = None,
     process_id=None,
 ) -> dict:
@@ -832,7 +832,7 @@ async def copy_sample_batch(
 )
 async def sample_batch_export_peaks(
     sample_batch_id: str,
-    independent_transaction: bool = False,
+    independent_transaction: bool = False,  # pylint: disable=unused-argument
     user_id: int | None = None,
     process_id=None,
     parent_id=None,
@@ -898,6 +898,7 @@ async def sample_batch_export_peaks(
 
             # Assign peak abundance units
             instrument_type = m_name.get_instrument_type(filename)
+            unit = ""
             if instrument_type == "orbi":
                 unit = "height"
             if instrument_type == "tof":
@@ -966,10 +967,10 @@ async def sample_batch_export_peaks(
 )
 async def get_sample_batch_peaks(
     sample_batch_id: str,
-    independent_transaction: bool = False,
-    user_id: int | None = None,
-    process_id: str | None = None,
-    parent_id: str | None = None,
+    independent_transaction: bool = False,  # pylint: disable=unused-argument
+    user_id: int | None = None,  # pylint: disable=unused-argument
+    process_id: str | None = None,  # pylint: disable=unused-argument
+    parent_id: str | None = None,  # pylint: disable=unused-argument
 ):
     """
     Retrieves aligned peak data for all sample items within a specified sample batch.
