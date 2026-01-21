@@ -8,6 +8,10 @@ from mascope_backend.db import (
 )
 
 from mascope_backend.api.controllers.target.lib.compute.target_ions_compute import (
+    SkipIonizationMechanism,
+    UnknownIonizationMechanism,
+    _get_compound_formula,
+    _get_raw_ion,
     generate_target_ions_from_composition,
     generate_target_ions_from_mass,
 )
@@ -56,32 +60,31 @@ def assert_target_ions(
             for im in ionization_mechanisms
         )
     except AssertionError:
-        # Handle special case for the "empty" target compound
-        if target_compound.target_compound_formula == "()":
-            skipped_mechanisms = 0
-            for ionization_mechanism in ionization_mechanisms:
-                # Abstraction mechanisms not valid for "()"
-                if ionization_mechanism.ionization_mechanism.startswith("-"):
-                    assert not any(
-                        ion.ionization_mechanism_id
-                        == ionization_mechanism.ionization_mechanism_id
-                        for ion in target_ions
-                    )
-                    skipped_mechanisms += 1
-                    continue
-                # Electron abstraction and addition do not apply to "()"
-                if ionization_mechanism.ionization_mechanism in ["+", "-"]:
-                    assert not any(
-                        ion.ionization_mechanism_id
-                        == ionization_mechanism.ionization_mechanism_id
-                        for ion in target_ions
-                    )
-                    skipped_mechanisms += 1
-                    continue
-            # Check that the number of target ions matches the number of ionization mechanisms minus skipped ones
-            assert len(target_ions) == len(ionization_mechanisms) - skipped_mechanisms
-        else:
-            raise
+        skipped_mechanisms = 0
+        generated_im_ids = {ion.ionization_mechanism_id for ion in target_ions}
+        for ionization_mechanism in ionization_mechanisms:
+            if ionization_mechanism.ionization_mechanism_id in generated_im_ids:
+                continue
+            try:
+                compound_formula = _get_compound_formula(
+                    target_compound.target_compound_formula,
+                    ionization_mechanism.ionization_mechanism,
+                )
+                _get_raw_ion(
+                    ionization_mechanism.ionization_mechanism, compound_formula
+                )
+            except (
+                SkipIonizationMechanism,
+                UnknownIonizationMechanism,
+                ValueError,
+            ):
+                skipped_mechanisms += 1
+                continue
+            pytest.fail(
+                f"Ionization mechanism {ionization_mechanism.ionization_mechanism} should have produced an ion"
+            )
+        # Check that the number of target ions matches the number of ionization mechanisms minus skipped ones
+        assert len(target_ions) == len(ionization_mechanisms) - skipped_mechanisms
 
 
 def assert_target_ion_formulae(
@@ -115,6 +118,12 @@ def assert_target_ion_formulae(
                         ion_base_formula
                         == (Formula(target_compound.target_compound_formula)).formula
                     )
+                    if im.ionization_mechanism == "+":
+                        # Ion should have a positive charge
+                        assert ion.target_ion_formula.endswith("+")
+                    else:
+                        # Ion should have a negative charge
+                        assert ion.target_ion_formula.endswith("-")
                 elif im.ionization_mechanism.startswith("+"):
                     # For adducts, the formula is modified by adding the adduct
                     assert (

@@ -156,7 +156,6 @@ def _get_compound_formula(
     :raises SkipIonizationMechanism: If the ionization mechanism cannot be applied:
         - Electron transfer on empty formula
         - Abstraction from empty formula
-    :raises SkipIonizationMechanism: If the ionization mechanism cannot be applied.
     :return: Compound formula as Formula instance, or None for empty formula "()"
     :rtype: Formula | None
     """
@@ -169,6 +168,22 @@ def _get_compound_formula(
         if ionization_mechanism.startswith("-"):
             # Cannot subtract from empty formula
             raise SkipIonizationMechanism()
+    elif ionization_mechanism.startswith("-"):
+        # For subtraction mechanisms, ensure the compound formula can support it
+        compound_formula = Formula(target_compound_formula)
+        mechanism_formula = Formula(ionization_mechanism[1:])
+        for element, (
+            count,
+            _,
+        ) in mechanism_formula._elements.items():  # pylint: disable=protected-access
+            if (
+                element not in compound_formula._elements
+            ):  # pylint: disable=protected-access
+                raise SkipIonizationMechanism()
+            if (
+                compound_formula._elements[element][0] < count
+            ):  # pylint: disable=protected-access
+                raise SkipIonizationMechanism()
     else:
         compound_formula = Formula(target_compound_formula)
 
@@ -190,11 +205,13 @@ def _get_raw_ion(ionization_mechanism: str, compound_formula: Formula) -> Formul
     if len(ionization_mechanism) > 1:
         # Parse mechanism into Formula, excluding the operation sign (+/-)
         mechanism_formula = Formula(ionization_mechanism[1:])
+        operation = ionization_mechanism[0]
     else:
         # For electron transfer, the entire mechanism (+/-) is used
         mechanism_formula = Formula(ionization_mechanism)
+        # Electron is added for "-" and subtracted for "+"
+        operation = "+"
 
-    operation = ionization_mechanism[0]
     if operation == "+":
         # Addition mechanism
         if compound_formula is None:
@@ -221,7 +238,7 @@ def predict_isotopes(
     :type raw_ion: Formula
     :param ion_formula: Ion formula string
     :type ion_formula: str
-    :raises ValueError: If a custom element is unknown.
+    :raises UnknownCustomElement: If a custom element is unknown.
     :return: 2-tuple of lists (masses, abundances)
     :rtype: tuple[list[float], list[float]]
     """
