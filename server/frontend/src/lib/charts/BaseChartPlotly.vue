@@ -251,7 +251,7 @@ watch(
 watch(
   () => props.data,
   () => {
-    if (ready.value && props.data) {
+    if (ready.value && props.data && plot.value) {
       console.debug(`📊 [${props.id}] updating chart data`)
       Plotly.react(plot.value, props.data, derived.value.layout, derived.value.config)
     }
@@ -262,7 +262,7 @@ watch(
 watch(
   () => props.layout,
   () => {
-    if (ready.value && props.data) {
+    if (ready.value && props.data && plot.value) {
       console.debug(`📊 [${props.id}] updating chart layout`)
       Plotly.relayout(plot.value, derived.value.layout)
     }
