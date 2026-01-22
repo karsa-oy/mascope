@@ -115,7 +115,7 @@ const tabs = computed(() => [
         }
       "
     >
-      <SplitterPanel :size="app.ui.split.left">
+      <SplitterPanel :size="app.ui.split.left" minSize="30">
         <Splitter
           layout="vertical"
           stateStorage="local"
@@ -135,7 +135,7 @@ const tabs = computed(() => [
           </SplitterPanel>
         </Splitter>
       </SplitterPanel>
-      <SplitterPanel :size="app.ui.split.right">
+      <SplitterPanel :size="app.ui.split.right" minSize="30">
         <Panel id="charts">
           <Tabs v-model:value="app.ui.tab.active">
             <TabList>
