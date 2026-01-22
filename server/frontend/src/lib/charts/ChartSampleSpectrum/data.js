@@ -115,7 +115,7 @@ export const useChartData = defineStore('chart.sample.spectrum', () => {
             type: 'scatter' + gl,
             mode: 'lines+markers',
             line: {
-              color: 'white'
+              color: '#fb8f74'
             },
             x: [focused.mz, focused.mz], // *
             y: [0, focused.height], // *
