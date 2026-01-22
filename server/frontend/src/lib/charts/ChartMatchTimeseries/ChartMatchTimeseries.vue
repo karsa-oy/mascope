@@ -1,10 +1,9 @@
 <script setup>
-import { computed, toRaw } from 'vue'
+import { ref, computed, toRaw } from 'vue'
 
 import Tag from 'primevue/tag'
 
 import { useApp } from '@/stores'
-import { clone } from '@/lib/utils'
 import { num } from '@/lib/formatters'
 
 import BaseChartPlotly from '../BaseChartPlotly.vue'
@@ -22,12 +21,17 @@ const props = defineProps({
   }
 })
 
+const plot = ref(null)
+
 const sampleLength = computed(() =>
   // Length of the selected sample in seconds
   app.data.sample.selected.length != 1 ? null : app.data.sample.selected[0].length
 )
 
 const traces = computed(() => {
+  if (plot.value === null) return []
+  // Reset zoom when data changes
+  plot.value.resetZoom()
   // Scale trace y-values based on "sum / average" toggle
   if (sampleLength.value === null) {
     return []
@@ -85,10 +89,10 @@ const layout = computed(() => ({
     </span>
     <BaseChartPlotly
       id="ChartMatchTimeseries"
+      ref="plot"
       title="Timeseries"
       :data="traces"
-      :layout="clone(layout)"
-      :height="height"
+      :layout="layout"
     />
   </figure>
 </template>

@@ -160,7 +160,6 @@ const layout = computed(() => {
           :ref="(el) => (plots[index] = el)"
           :data="isotopeChart.traces"
           :layout="clone(layout)"
-          :height="height"
           hideTitle
         >
           <template v-slot:settings>
