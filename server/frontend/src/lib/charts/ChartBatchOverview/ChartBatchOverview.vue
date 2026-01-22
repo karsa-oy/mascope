@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, toRaw, onUnmounted } from 'vue'
+import { ref, computed, watch, toRaw, nextTick, onUnmounted } from 'vue'
 
 import Select from 'primevue/select'
 import FloatLabel from 'primevue/floatlabel'
@@ -254,6 +254,17 @@ watch(
     if (next) {
       scale.max = null
       plot.value.resetZoom()
+    }
+  }
+)
+
+watch(
+  () => app.ui.tab.active,
+  async (newValue, oldValue) => {
+    if (newValue === 'batch') {
+      // Wait for DOM to update after tab switch, then resize plot
+      await nextTick()
+      plot.value.resize()
     }
   }
 )

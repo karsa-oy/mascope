@@ -86,10 +86,19 @@ const selectPoints = (pointIndices) => {
   }
 }
 
+// Force Plotly to recalculate container dimensions
+const resize = () => {
+  if (plot.value) {
+    console.debug(`📊 [${props.id}] resizing chart`)
+    Plotly.Plots.resize(plot.value)
+  }
+}
+
 defineExpose({
   resetSelection,
   resetZoom,
-  selectPoints
+  selectPoints,
+  resize
 })
 
 const derived = computed(() => ({
