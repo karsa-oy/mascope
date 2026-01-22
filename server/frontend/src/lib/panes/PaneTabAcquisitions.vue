@@ -239,7 +239,7 @@ const derivedPolarity = computed(() => {
 </script>
 
 <template>
-  <div>
+  <div class="pane-wrapper">
     <menu class="acquisition-menu">
       <div class="row">
         <Button
@@ -262,9 +262,9 @@ const derivedPolarity = computed(() => {
         v-model="app.data.acquisition.time.mode"
         :options="['Last 24 hours', 'Last 7 days', 'Last 30 days', 'Last 90 days']"
         style="flex-direction: row-reverse"
-        placeholder="Custom range"
+        placeholder="Recent"
       />
-      <FloatLabel>
+      <FloatLabel class="datepicker-label">
         <label>Min. Datetime</label>
         <DatePicker
           v-model="app.data.acquisition.time.range.min"
@@ -275,7 +275,7 @@ const derivedPolarity = computed(() => {
           :class="'full ' + (app.data.acquisition.time.mode == 'range' ? '' : 'inactive')"
         />
       </FloatLabel>
-      <FloatLabel>
+      <FloatLabel class="datepicker-label">
         <label>Max. Datetime</label>
         <DatePicker
           v-model="app.data.acquisition.time.range.max"
@@ -290,10 +290,9 @@ const derivedPolarity = computed(() => {
         inputId="polarity"
         v-model="polarityDropdown"
         :options="['+-', '+', '-']"
-        style="max-width: 125px"
+        style="max-width: 100px"
         placeholder="Polarity"
       />
-      <div style="flex-grow: 1; flex-shrink: 1" />
       <FloatLabel style="flex-grow: 1; max-width: 250px">
         <IconField class="full">
           <InputIcon>
@@ -310,145 +309,203 @@ const derivedPolarity = computed(() => {
         v-tooltip.left="'Clear filters and selection'"
       />
     </menu>
-  </div>
-  <div>
-    <UppyContextProvider :uppy="uppy">
-      <div id="uppy-drop-target">
-        <DataTable
-          v-if="acquisitions?.length"
-          v-model:selection="app.data.acquisition.selected"
-          v-model:contextMenuSelection="contextMenuRow"
-          :value="acquisitions"
-          :totalRecords="acquisitions.length"
-          scrollable
-          scrollHeight="calc(100vh - 320px)"
-          sortField="datetime"
-          :sortOrder="-1"
-          size="small"
-          selectionMode="multiple"
-          dataKey="filename"
-          :metaKeySelection="true"
-          @rowContextmenu="
-            (event) => {
-              contextMenuRow = event.data
-              event.originalEvent.preventDefault()
-              if (
-                !app.data.acquisition.selected.some(
-                  ({ sample_file_id }) => sample_file_id === contextMenuRow.sample_file_id
-                )
-              ) {
-                app.data.acquisition.selected = [contextMenuRow]
-              }
-              contextMenuRef?.show(event.originalEvent)
-            }
-          "
-          :virtualScrollerOptions="{ itemSize: 28 }"
-        >
-          <Column header="Filename" field="filename" sortable />
-          <Column header="Polarity" field="polarity" sortable />
-          <Column header="Datetime" field="datetime" sortable />
-          <template #footer>
-            <div
-              style="
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                padding: 0.5rem;
-              "
-            >
-              <strong v-if="app.data.acquisition.multiselected" style="font-style: italic">
-                {{ app.data.acquisition.selected.length }} files selected
-              </strong>
-              <div v-else style="min-width: 11ch" />
-
-              <div class="info-text">
-                <span v-if="!app.data.batch.focused">
-                  <span class="pi pi-info-circle" />
-                  Select a batch to process the files.
-                </span>
-                <span v-else-if="hasBothPolarities">
-                  <span class="pi pi-info-circle" />
-                  Cannot process files with both "+" and "-" polarities selected.
-                </span>
-                <span v-else-if="onlyMixedPolaritySelected">
-                  <span class="pi pi-info-circle" />
-                  Only mixed polarity files selected. Please choose a polarity from the dropdown.
-                </span>
-              </div>
-            </div>
-          </template>
-        </DataTable>
-        <div v-else class="center" style="min-height: 150px">
-          <i class="info-line"> <span class="pi pi-inbox" /><span>No acquisitions found</span> </i>
-        </div>
-        <i class="info-line">
-          <span class="pi pi-file-arrow-up" /><span>Drag sample files here to upload them</span>
-        </i>
-        <menu class="bottom-menu">
-          <Button id="uppy-upload-trigger" label="Upload" icon="pi pi-file-arrow-up" @click="" />
-          <Button
-            label="Process selected"
-            icon="pi pi-file-plus"
-            :disabled="
-              app.data.acquisition.selected?.length == 0 ||
-              !app.data.batch.focused ||
-              hasBothPolarities ||
-              onlyMixedPolaritySelected
-            "
-            :tooltip="
-              !app.data.batch.focused || app.data.acquisition.selected.length === 0
-                ? 'Select acquisitions and a batch in order to process sample files'
-                : ''
-            "
-            @click="
-              () => {
-                if (app.data.acquisition.focused) {
-                  dialog.sample = 'create'
-                } else if (app.data.acquisition.multiselected) {
-                  dialog.batchImport = true
+    <div class="pane-content">
+      <UppyContextProvider :uppy="uppy">
+        <div id="uppy-drop-target" class="uppy-container">
+          <div class="table-container">
+            <DataTable
+              v-if="acquisitions?.length"
+              v-model:selection="app.data.acquisition.selected"
+              v-model:contextMenuSelection="contextMenuRow"
+              :value="acquisitions"
+              :totalRecords="acquisitions.length"
+              scrollable
+              scrollHeight="flex"
+              sortField="datetime"
+              :sortOrder="-1"
+              size="small"
+              selectionMode="multiple"
+              dataKey="filename"
+              :metaKeySelection="true"
+              @rowContextmenu="
+                (event) => {
+                  contextMenuRow = event.data
+                  event.originalEvent.preventDefault()
+                  if (
+                    !app.data.acquisition.selected.some(
+                      ({ sample_file_id }) => sample_file_id === contextMenuRow.sample_file_id
+                    )
+                  ) {
+                    app.data.acquisition.selected = [contextMenuRow]
+                  }
+                  contextMenuRef?.show(event.originalEvent)
                 }
-              }
-            "
-          />
-        </menu>
-      </div>
-    </UppyContextProvider>
+              "
+              :virtualScrollerOptions="{ itemSize: 28 }"
+            >
+              <Column header="Filename" field="filename" sortable />
+              <Column header="Polarity" field="polarity" sortable />
+              <Column header="Datetime" field="datetime" sortable />
+              <template #footer>
+                <div
+                  style="
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding: 0.5rem;
+                  "
+                >
+                  <strong v-if="app.data.acquisition.multiselected" style="font-style: italic">
+                    {{ app.data.acquisition.selected.length }} files selected
+                  </strong>
+                  <div v-else style="min-width: 11ch" />
 
-    <DialogSampleOp
-      v-model:action="dialog.sample"
-      :item="app.data.acquisition.focused"
-      @submit="app.data.acquisition.unfocus()"
-    />
-    <DialogBatchImport
-      v-model:visible="dialog.batchImport"
-      :files="app.data.acquisition.selected"
-      :polarity="derivedPolarity"
-      @submit="app.data.acquisition.unfocus()"
-    />
-    <DialogFileUpload
-      :files="app.uppy.invalidFiles"
-      @upload="
-        $event.map((file) => {
-          try {
-            uppy.addFile(file)
-          } catch (error) {
-            uppy.info(error, 'error')
-          }
-        })
-      "
-    />
-    <DialogIonizationOp v-model:visible="dialog.mechanism" />
-    <ContextMenu :model="contextMenuItems" ref="contextMenuRef" />
+                  <div class="info-text">
+                    <span v-if="!app.data.batch.focused">
+                      <span class="pi pi-info-circle" />
+                      Select a batch to process the files.
+                    </span>
+                    <span v-else-if="hasBothPolarities">
+                      <span class="pi pi-info-circle" />
+                      Cannot process files with both "+" and "-" polarities selected.
+                    </span>
+                    <span v-else-if="onlyMixedPolaritySelected">
+                      <span class="pi pi-info-circle" />
+                      Only mixed polarity files selected. Please choose a polarity from the
+                      dropdown.
+                    </span>
+                  </div>
+                </div>
+              </template>
+            </DataTable>
+            <div v-else class="center" style="min-height: 150px">
+              <i class="info-line">
+                <span class="pi pi-inbox" /><span>No acquisitions found</span>
+              </i>
+            </div>
+          </div>
+          <div class="bottom-section">
+            <i class="info-line">
+              <span class="pi pi-file-arrow-up" /><span>Drag sample files here to upload them</span>
+            </i>
+            <menu class="bottom-menu">
+              <Button
+                id="uppy-upload-trigger"
+                label="Upload"
+                icon="pi pi-file-arrow-up"
+                @click=""
+              />
+              <Button
+                label="Process selected"
+                icon="pi pi-file-plus"
+                :disabled="
+                  app.data.acquisition.selected?.length == 0 ||
+                  !app.data.batch.focused ||
+                  hasBothPolarities ||
+                  onlyMixedPolaritySelected
+                "
+                :tooltip="
+                  !app.data.batch.focused || app.data.acquisition.selected.length === 0
+                    ? 'Select acquisitions and a batch in order to process sample files'
+                    : ''
+                "
+                @click="
+                  () => {
+                    if (app.data.acquisition.focused) {
+                      dialog.sample = 'create'
+                    } else if (app.data.acquisition.multiselected) {
+                      dialog.batchImport = true
+                    }
+                  }
+                "
+              />
+            </menu>
+          </div>
+        </div>
+      </UppyContextProvider>
+
+      <DialogSampleOp
+        v-model:action="dialog.sample"
+        :item="app.data.acquisition.focused"
+        @submit="app.data.acquisition.unfocus()"
+      />
+      <DialogBatchImport
+        v-model:visible="dialog.batchImport"
+        :files="app.data.acquisition.selected"
+        :polarity="derivedPolarity"
+        @submit="app.data.acquisition.unfocus()"
+      />
+      <DialogFileUpload
+        :files="app.uppy.invalidFiles"
+        @upload="
+          $event.map((file) => {
+            try {
+              uppy.addFile(file)
+            } catch (error) {
+              uppy.info(error, 'error')
+            }
+          })
+        "
+      />
+      <DialogIonizationOp v-model:visible="dialog.mechanism" />
+      <ContextMenu :model="contextMenuItems" ref="contextMenuRef" />
+    </div>
   </div>
 </template>
 
 <style scoped>
+.pane-content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.uppy-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.table-container {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.table-container :deep(.p-datatable) {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.table-container :deep(.p-datatable-table-container) {
+  flex: 1;
+  min-height: 0;
+}
+
+.bottom-section {
+  flex-shrink: 0;
+  padding-top: 0.5rem;
+}
+
 .acquisition-menu {
-  gap: 1rem;
+  gap: 0.5rem;
   align-items: baseline;
   height: fit-content;
   width: 100%;
+  max-width: 100%;
   margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.datepicker-label {
+  flex: 0 0 auto;
+  width: 160px;
+}
+
+.datepicker-label :deep(.p-datepicker-input) {
+  width: 100%;
 }
 
 .bottom-menu {
@@ -462,9 +519,9 @@ const derivedPolarity = computed(() => {
 
 menu {
   display: flex;
-  flex-flow: row nowrap;
+  flex-flow: row wrap;
   gap: 0.5rem;
-  justify-content: space-between;
+  justify-content: left;
   align-items: center;
   padding: 0;
   margin: 0;
