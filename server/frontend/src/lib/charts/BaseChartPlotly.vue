@@ -272,7 +272,10 @@ watch(
 </script>
 
 <template>
-  <div style="position: relative; width: 100%; height: 100%" :class="props.loading ? 'faded' : ''">
+  <div
+    style="position: relative; width: 100%; height: 100%; min-width: 0"
+    :class="props.loading ? 'faded' : ''"
+  >
     <div class="overlay" v-if="props.loading">
       <ProgressSpinner />
     </div>
@@ -280,7 +283,7 @@ watch(
       ref="plot"
       :id="id"
       class="plot"
-      style="width: 100%; height: 100%"
+      style="width: 100%; height: 100%; min-width: 0"
       :key="`${win.width}-${win.height}-${height}`"
       @contextmenu="
         (e) => {
@@ -314,6 +317,13 @@ watch(
 .plot :deep(*) {
   font-family: Inter !important;
 }
+
+/* Override Plotly's fixed-width container to allow shrinking */
+.plot :deep(.svg-container) {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
 :deep(.legendtext),
 :deep(.icon) > path,
 :deep(.gtitle),

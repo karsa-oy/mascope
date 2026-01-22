@@ -76,7 +76,10 @@ const layout = computed(() => ({
 </script>
 
 <template>
-  <figure v-if="app.data.match.visualized.isotopes?.length" style="padding: 0">
+  <figure
+    v-if="app.data.match.visualized.isotopes?.length"
+    style="padding: 0; margin: 0; width: 100%; min-width: 0; overflow: hidden; flex-shrink: 1"
+  >
     <span style="margin-bottom: 1rem">
       isotope similarity:
       <Tag
@@ -87,12 +90,14 @@ const layout = computed(() => ({
         "
       />
     </span>
-    <BaseChartPlotly
-      id="ChartMatchTimeseries"
-      ref="plot"
-      title="Timeseries"
-      :data="traces"
-      :layout="layout"
-    />
+    <div style="width: 100%; min-width: 0; overflow: hidden">
+      <BaseChartPlotly
+        id="ChartMatchTimeseries"
+        ref="plot"
+        title="Timeseries"
+        :data="traces"
+        :layout="layout"
+      />
+    </div>
   </figure>
 </template>

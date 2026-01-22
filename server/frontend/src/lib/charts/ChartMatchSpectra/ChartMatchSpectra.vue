@@ -133,6 +133,7 @@ const layout = computed(() => {
         :style="`
             flex-shrink: 1;
             flex-grow: 1;
+            min-width: 0;
             position: relative;
           `"
         :class="sidebarOpen ? 'sidebarOpen' : ''"

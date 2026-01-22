@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, reactive } from 'vue'
+import { computed, ref } from 'vue'
 
 import Splitter from 'primevue/splitter'
 import SplitterPanel from 'primevue/splitterpanel'
@@ -45,61 +45,77 @@ const heights = computed(() => [
 </script>
 
 <template>
-  <menu class="topbar">
-    <div>
-      <SidebarMatchParams v-model:open="sidebarOpen" />
-    </div>
-    <h1>
-      <BaseMatchTag
-        :matchScore="app.data.match.visualized.ion?.match?.match_score"
-        :matchCategory="uiMatchCategory"
-        :alarming="app.data.match.visualized.ion?.match?.alarming"
-        :style="'font-size: large'"
-      />
-      {{ app.data.match.visualized.ion ? 'Ion ' : '' }}
-      <i>{{ app.data.match.visualized.ion?.target_ion_formula }}</i>
-      {{ app.data.match.visualized.ion ? ' of compound ' : '' }}
-      <i>{{ app.data.match.visualized.ion?.target_compound_formula }}</i>
-    </h1>
-    <ToolbarMatchRating />
-  </menu>
-  <Splitter
-    layout="vertical"
-    stateStorage="local"
-    stateKey="match-tab-split"
-    style="height: calc(100vh - 200px); width: 100%"
-    @resizeend="
-      ({ sizes }) => {
-        top = sizes[0]
-        bottom = sizes[1]
-      }
-    "
-  >
-    <SplitterPanel :size="50">
-      <ChartMatchSpectra v-model="scale" :sidebarOpen="sidebarOpen" :height="heights[0]" />
-    </SplitterPanel>
-    <SplitterPanel :size="50">
-      <ChartMatchTimeseries v-model="scale" :height="heights[1]" />
-    </SplitterPanel>
-  </Splitter>
+  <div class="pane-wrapper">
+    <menu class="topbar">
+      <div>
+        <SidebarMatchParams v-model:open="sidebarOpen" />
+      </div>
+      <h1>
+        <BaseMatchTag
+          :matchScore="app.data.match.visualized.ion?.match?.match_score"
+          :matchCategory="uiMatchCategory"
+          :alarming="app.data.match.visualized.ion?.match?.alarming"
+          :style="'font-size: large'"
+        />
+        {{ app.data.match.visualized.ion ? 'Ion ' : '' }}
+        <i>{{ app.data.match.visualized.ion?.target_ion_formula }}</i>
+        {{ app.data.match.visualized.ion ? ' of compound ' : '' }}
+        <i>{{ app.data.match.visualized.ion?.target_compound_formula }}</i>
+      </h1>
+      <ToolbarMatchRating />
+    </menu>
+    <Splitter
+      layout="vertical"
+      stateStorage="local"
+      stateKey="match-tab-split"
+      class="match-splitter"
+      @resizeend="
+        ({ sizes }) => {
+          top = sizes[0]
+          bottom = sizes[1]
+        }
+      "
+    >
+      <SplitterPanel :size="50">
+        <ChartMatchSpectra v-model="scale" :sidebarOpen="sidebarOpen" :height="heights[0]" />
+      </SplitterPanel>
+      <SplitterPanel :size="50">
+        <ChartMatchTimeseries v-model="scale" :height="heights[1]" />
+      </SplitterPanel>
+    </Splitter>
+  </div>
 </template>
 
 <style scoped>
+.match-splitter {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
 .topbar {
   width: 100%;
+  max-width: 100%;
   display: flex;
   flex-flow: row nowrap;
   justify-content: space-between;
   align-items: flex-start;
   margin: 0;
   padding: 0;
-  gap: 1rem;
-  margin-bottom: 1rem;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  flex-shrink: 0;
 
   h1 {
     margin: 0;
     padding: 0;
     padding-top: 0.5rem;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: center;
   }
 }
 </style>
