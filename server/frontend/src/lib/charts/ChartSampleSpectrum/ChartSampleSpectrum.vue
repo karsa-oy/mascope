@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, computed, toRaw, watch, watchEffect } from 'vue'
+import { ref, reactive, computed, toRaw, watch, watchEffect, nextTick } from 'vue'
 
 import { useApp } from '@/stores'
 import { usePreview } from '@/lib/panes'
@@ -11,6 +11,7 @@ import { useChartData } from './data.js'
 const app = useApp()
 const data = useChartData()
 
+const plot = ref({})
 const preview = usePreview()
 
 const props = defineProps({
@@ -58,6 +59,15 @@ watch(
   () => [scale.value.mode, scale.value.log],
   () => {
     zoom.rangeY = { autorange: true }
+  }
+)
+
+watch(
+  () => props.height,
+  async () => {
+    console.debug(`📊 [ChartSampleSpectrum] height changed to ${props.height}`)
+    await nextTick()
+    plot.value.resize()
   }
 )
 
@@ -115,6 +125,7 @@ const config = {
 <template>
   <BaseChartPlotly
     id="ChartSampleSpectrum"
+    ref="plot"
     title="Sum spectrum"
     :data="traces"
     :layout="layout"
@@ -127,7 +138,6 @@ const config = {
         }
       }
     "
-    :height="height"
   >
     <template v-slot:settings>
       <ToolbarIntensityScale v-model="scale" />
