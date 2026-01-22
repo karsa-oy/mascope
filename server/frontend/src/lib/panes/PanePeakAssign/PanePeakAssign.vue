@@ -246,8 +246,8 @@ const expanded = ref({})
     </template>
     <div class="col" style="gap: 1rem; align-items: stretch; max-width: 900px">
       <menu class="topbar">
-        <FloatLabel style="flex-shrink: 1">
-          <InputNumber v-model="params.mzPrecision" id="mzPrecision" :max="100" />
+        <FloatLabel style="flex: 0 0 80px">
+          <InputNumber v-model="params.mzPrecision" id="mzPrecision" :max="100" fluid />
           <label for="mzPrecision">m/z precision</label>
         </FloatLabel>
         <FloatLabel style="flex-grow: 1">

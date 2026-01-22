@@ -200,6 +200,16 @@
     place-items: center;
   }
 
+  /* Pane tab wrappers */
+  .pane-wrapper {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 100%;
+    height: calc(100vh - 180px);
+    overflow: hidden;
+  }
+
   /* measurement mode */
 
   .measure-mode .p-togglebutton.p-togglebutton-checked::before {

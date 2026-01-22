@@ -1,12 +1,9 @@
 <script setup>
 import Panel from 'primevue/panel'
-import Button from 'primevue/button'
 import TabMenu from 'primevue/tabmenu'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
-import ContextMenu from 'primevue/contextmenu'
 
-import { BaseCopyableField } from '@/lib/base'
 import { num } from '@/lib/formatters'
 import { useApp } from '@/stores'
 
@@ -23,7 +20,7 @@ const props = defineProps({
 <template>
   <Panel
     class="browser"
-    style="border: none; width: 400px"
+    style="border: none; min-width: 280px; max-width: 400px; width: 100%"
     v-if="app.data.peak.list.length > 0"
     :pt="
       app.ui.help.top(`

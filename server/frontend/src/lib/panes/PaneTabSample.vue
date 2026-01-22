@@ -27,34 +27,53 @@ const bottomHeight = computed(() => ((height.value - padding) * bottomSplit.valu
 </script>
 
 <template>
-  <Splitter
-    layout="vertical"
-    stateStorage="local"
-    stateKey="sample-tab-split"
-    :style="`height: calc(100vh - ${padding}px); width: 100%`"
-    @resizeend="
-      ({ sizes }) => {
-        topSplit = sizes[0]
-        bottomSplit = sizes[1]
-      }
-    "
-  >
-    <SplitterPanel>
-      <ChartSampleSpectrum :height="topHeight" />
-    </SplitterPanel>
-    <SplitterPanel>
-      <div class="row">
-        <PaneBrowserPeak :height="bottomHeight" />
-        <PanePeakAssign :height="bottomHeight" />
-      </div>
-    </SplitterPanel>
-  </Splitter>
+  <div class="pane-wrapper">
+    <Splitter
+      layout="vertical"
+      stateStorage="local"
+      stateKey="sample-tab-split"
+      class="sample-splitter"
+      @resizeend="
+        ({ sizes }) => {
+          topSplit = sizes[0]
+          bottomSplit = sizes[1]
+        }
+      "
+    >
+      <SplitterPanel>
+        <ChartSampleSpectrum :height="topHeight" />
+      </SplitterPanel>
+      <SplitterPanel>
+        <div class="row">
+          <PaneBrowserPeak :height="bottomHeight - 3" />
+          <PanePeakAssign :height="bottomHeight - 3" />
+        </div>
+      </SplitterPanel>
+    </Splitter>
+  </div>
 </template>
 
 <style scoped>
-.row {
+.sample-splitter {
   height: 100%;
-  justify-content: space-around;
+  width: 100%;
+}
+
+.row {
+  display: flex;
+  flex-flow: row wrap;
+  height: 100%;
+  width: 100%;
+  max-width: 100%;
+  justify-content: flex-start;
   gap: 0.5rem;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.row > :deep(*) {
+  flex: 1 1 300px;
+  min-width: 0;
+  max-width: 100%;
 }
 </style>
