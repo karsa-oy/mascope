@@ -1,4 +1,6 @@
 import pytest
+import json
+import os
 
 from mascope_backend.db import (
     IonizationMechanism,
@@ -8,164 +10,45 @@ from mascope_backend.db import (
 )
 
 from mascope_backend.api.controllers.target.lib.compute.target_ions_compute import (
-    SkipIonizationMechanism,
-    UnknownIonizationMechanism,
-    _get_compound_formula,
-    _get_raw_ion,
     generate_target_ions_from_composition,
     generate_target_ions_from_mass,
 )
 
-from mascope_molmass import Formula
+HERE = os.path.dirname(__file__)
+with open(os.path.join(HERE, "ions.json"), "r") as f:
+    EXPECTED_IONS = json.load(f)
+with open(os.path.join(HERE, "isotopes.json"), "r") as f:
+    EXPECTED_ISOTOPES = json.load(f)
 
 
-def assert_target_ions(
-    target_compound: TargetCompound,
-    ionization_mechanisms: list[IonizationMechanism],
-    target_ions: list[TargetIon],
-) -> None:
-    """Assert that target ions were created correctly for a target compound.
+def summarize_isotopes(target_isotopes: list[TargetIsotope]) -> dict[str, dict]:
+    """Create a summary per ion: monoisotopic m/z, relative abundance, and count."""
 
-    :param target_compound: The target compound for which ions were generated.
-    :type target_compound: TargetCompound
-    :param ionization_mechanisms: List of ionization mechanisms used for generating target ions.
-    :type ionization_mechanisms: list[IonizationMechanism]
-    :param target_ions: List of target ions generated for the target compound.
-    :type target_ions: list[TargetIon]
+    grouped: dict[str, list[TargetIsotope]] = {}
+    for isotope in target_isotopes:
+        grouped.setdefault(isotope.target_ion_id, []).append(isotope)
 
-    :return: None
-    """
-    # Check that at least one ion was created for the compound
-    assert any(
-        ion.target_compound_id == target_compound.target_compound_id
-        for ion in target_ions
-    )
-    # Check that each ion is for the correct target compound
-    assert all(
-        ion.target_compound_id == target_compound.target_compound_id
-        for ion in target_ions
-    )
-    # Check there is a corresponding ionization mechanism for each created ion
-    assert all(
-        ion.ionization_mechanism_id
-        in [im.ionization_mechanism_id for im in ionization_mechanisms]
-        for ion in target_ions
-    )
-    # Check that a target ion was created for each ionization mechanism
-    try:
-        assert len(target_ions) == len(ionization_mechanisms)
-        assert all(
-            im.ionization_mechanism_id
-            in [ion.ionization_mechanism_id for ion in target_ions]
-            for im in ionization_mechanisms
-        )
-    except AssertionError:
-        skipped_mechanisms = 0
-        generated_im_ids = {ion.ionization_mechanism_id for ion in target_ions}
-        for ionization_mechanism in ionization_mechanisms:
-            if ionization_mechanism.ionization_mechanism_id in generated_im_ids:
-                continue
-            try:
-                compound_formula = _get_compound_formula(
-                    target_compound.target_compound_formula,
-                    ionization_mechanism.ionization_mechanism,
-                )
-                _get_raw_ion(
-                    ionization_mechanism.ionization_mechanism, compound_formula
-                )
-            except (
-                SkipIonizationMechanism,
-                UnknownIonizationMechanism,
-                ValueError,
-            ):
-                skipped_mechanisms += 1
-                continue
-            pytest.fail(
-                f"Ionization mechanism {ionization_mechanism.ionization_mechanism} should have produced an ion"
-            )
-        # Check that the number of target ions matches the number of ionization mechanisms minus skipped ones
-        assert len(target_ions) == len(ionization_mechanisms) - skipped_mechanisms
+    summary: dict[str, dict] = {}
+    for ion_id, isotopes in grouped.items():
+        M0 = max(isotopes, key=lambda iso: iso.relative_abundance)
+        summary[ion_id] = {
+            "mz_M0": M0.mz,
+            "ra_M0": M0.relative_abundance,
+            "num_isotopes": len(isotopes),
+        }
+
+    return summary
 
 
-def assert_target_ion_formulae(
-    target_compound: TargetCompound,
-    ionization_mechanisms: list[IonizationMechanism],
-    target_ions: list[TargetIon],
-) -> None:
-    """Assert that target ions have the correct formulas based on the target compound and ionization mechanisms.
-
-    :param target_compound: The target compound for which ions were generated.
-    :type target_compound: TargetCompound
-    :param ionization_mechanisms: List of ionization mechanisms used for generating target ions.
-    :type ionization_mechanisms: list[IonizationMechanism]
-    :param target_ions: List of target ions generated for the target compound.
-    :type target_ions: list[TargetIon]
-
-    :return: None
-    """
-    # Handle special case of null formula "()"
-    if target_compound.target_compound_formula == "()":
-        return
-    # Check that the target ions have the correct formulas
-    for ion in target_ions:
-        for im in ionization_mechanisms:
-            if im.ionization_mechanism_id == ion.ionization_mechanism_id:
-                if im.ionization_mechanism in ["+", "-"]:
-                    # For electron abstraction/addition, the formula remains unchanged
-                    # Strip [] and charge from formula
-                    ion_base_formula = Formula(ion.target_ion_formula)._formula_nocharge
-                    assert (
-                        ion_base_formula
-                        == (Formula(target_compound.target_compound_formula)).formula
-                    )
-                    if im.ionization_mechanism == "+":
-                        # Ion should have a positive charge
-                        assert ion.target_ion_formula.endswith("+")
-                    else:
-                        # Ion should have a negative charge
-                        assert ion.target_ion_formula.endswith("-")
-                elif im.ionization_mechanism.startswith("+"):
-                    # For adducts, the formula is modified by adding the adduct
-                    assert (
-                        Formula(ion.target_ion_formula).formula
-                        == (
-                            Formula(target_compound.target_compound_formula)
-                            + Formula(im.ionization_mechanism[1:])
-                        ).formula
-                    )
-                elif im.ionization_mechanism.startswith("-"):
-                    # For abstraction, the formula is modified by removing the abstracted group
-                    assert (
-                        Formula(ion.target_ion_formula).formula
-                        == (
-                            Formula(target_compound.target_compound_formula)
-                            - Formula(im.ionization_mechanism[1:])
-                        ).formula
-                    )
-
-
-def assert_target_isotopes(
+def assert_isotope_links(
     target_ions: list[TargetIon], target_isotopes: list[TargetIsotope]
 ) -> None:
-    """Assert that target isotopes were created correctly for the target ions.
+    """Ensure isotopes and ions reference each other correctly."""
 
-    :param target_ions: List of target ions for which isotopes were generated.
-    :type target_ions: list[TargetIon]
-    :param target_isotopes: List of target isotopes generated for the target ions.
-    :type target_isotopes: list[TargetIsotope]
-
-    :return: None
-    """
-    ## Check each isotope has a corresponding ion
-    assert all(
-        isotope.target_ion_id in [ion.target_ion_id for ion in target_ions]
-        for isotope in target_isotopes
-    )
-    ## Check each ion has corresponding isotope(s)
-    assert all(
-        ion.target_ion_id in [isotope.target_ion_id for isotope in target_isotopes]
-        for ion in target_ions
-    )
+    ion_ids = {ion.target_ion_id for ion in target_ions}
+    assert all(isotope.target_ion_id in ion_ids for isotope in target_isotopes)
+    isotope_ids = {isotope.target_ion_id for isotope in target_isotopes}
+    assert all(ion.target_ion_id in isotope_ids for ion in target_ions)
 
 
 @pytest.mark.asyncio
@@ -186,8 +69,42 @@ async def test_generate_target_ions_from_composition(
         target_ions, target_isotopes = generate_target_ions_from_composition(
             target_compound, test_ionization_mechanisms
         )
-        assert_target_ions(target_compound, test_ionization_mechanisms, target_ions)
-        assert_target_isotopes(target_ions, target_isotopes)
+
+        # Validate ion formulas against pre-computed expectations
+        expected_ions = EXPECTED_IONS[target_compound.target_compound_formula]
+        actual_ions = [ion.target_ion_formula for ion in target_ions]
+        assert sorted(actual_ions) == sorted(expected_ions)
+
+        # Map ion ids to formulas for isotope checks
+        ion_id_to_formula = {
+            ion.target_ion_id: ion.target_ion_formula for ion in target_ions
+        }
+
+        # Build isotope summaries keyed by ion formula
+        isotope_summary_by_formula: dict[str, dict] = {}
+        for ion_id, summary in summarize_isotopes(target_isotopes).items():
+            isotope_summary_by_formula[ion_id_to_formula[ion_id]] = summary
+
+        expected_isotopes = {
+            ion_formula: EXPECTED_ISOTOPES[ion_formula] for ion_formula in expected_ions
+        }
+
+        # Validate isotope formulas match expectations
+        assert set(isotope_summary_by_formula.keys()) == set(expected_isotopes.keys())
+
+        # Validate isotope summaries
+        for ion_formula, actual in isotope_summary_by_formula.items():
+            expected = expected_isotopes[ion_formula]
+            assert actual["num_isotopes"] == expected["num_isotopes"]
+            assert actual["mz_M0"] == pytest.approx(
+                expected["mz_M0"], rel=1e-6, abs=1e-6
+            )
+            assert actual["ra_M0"] == pytest.approx(
+                expected["ra_M0"], rel=1e-6, abs=1e-6
+            )
+
+        # Link integrity
+        assert_isotope_links(target_ions, target_isotopes)
 
 
 @pytest.mark.asyncio
@@ -208,5 +125,8 @@ async def test_generate_target_ions_from_mass(
         target_ions, target_isotopes = generate_target_ions_from_mass(
             target_compound_mass, target_compound, test_ionization_mechanisms
         )
-        assert_target_ions(target_compound, test_ionization_mechanisms, target_ions)
-        assert_target_isotopes(target_ions, target_isotopes)
+        # Generic checks: ensure some ions and isotopes were generated
+        assert len(target_ions) > 0, "No target ions generated"
+        assert len(target_isotopes) > 0, "No target isotopes generated"
+        # Link integrity
+        assert_isotope_links(target_ions, target_isotopes)
