@@ -68,6 +68,14 @@ onBeforeUnmount(() => {
   )
 })
 
+// Handle Ctrl+A to select all rows (virtual scroller only selects visible rows by default)
+const onKeyDown = (event) => {
+  if (event.ctrlKey && event.key === 'a') {
+    event.preventDefault()
+    app.data.sample.selected = [...samples.value]
+  }
+}
+
 const { height } = useWindowSize()
 const padding = 100
 const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top) / 100 - 50)
@@ -114,6 +122,7 @@ const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top)
           await contextMenu.onClick(event)
         }
       "
+      @keydown="onKeyDown"
       reorderableColumns
       resizableColumns
       :sortField="customizer.config.sortField"
