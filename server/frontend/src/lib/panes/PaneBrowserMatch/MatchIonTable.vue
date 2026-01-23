@@ -56,11 +56,19 @@ const breadcrumb = computed(() => {
         icon: 'pi ph ph-crosshair',
         label: 'Target collections',
         action: () => app.data.match.collection.unfocus(),
-        tooltip: 'Back to target collections'
+        tooltip: 'Back to target collections',
+        contextMenu: {
+          items: collectionContextMenu.entries.value
+        },
+        contextMenuHandler: async (event) => {
+          // Trigger "edit batch targets" context menu from breadcrumb
+          await collectionContextMenu.onClick(event)
+        }
       },
       {
         icon: collectionTypeIcons[collection.target_collection_type] || 'pi ph ph-target',
         label: `${collection.target_collection_name}`,
+        action: () => {}, // Dummy action to switch cursor to pointer
         tooltip: collection.target_collection_description
           ? `${collection.target_collection_description} (${collection.target_collection_type?.toLowerCase()})`
           : collection.target_collection_type?.toLowerCase() || 'Collection targets',

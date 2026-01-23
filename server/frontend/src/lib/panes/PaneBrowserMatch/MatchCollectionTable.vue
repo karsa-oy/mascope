@@ -46,9 +46,16 @@ const breadcrumb = computed(() => {
       {
         icon: 'pi ph ph-crosshair',
         label: 'Target collections',
-        disabled: true,
-        tooltip: null
-        // No action - this is the current view
+        action: () => {}, // Dummy action to switch cursor to pointer
+        disabled: false,
+        tooltip: "Right click to manage batch's target collections",
+        contextMenu: {
+          items: contextMenu.entries.value
+        },
+        contextMenuHandler: async (event) => {
+          // Trigger "edit batch targets" context menu from breadcrumb
+          await contextMenu.onClick(event)
+        }
       }
     ].slice(app.data.sample.focused ? 0 : 1)
   }
