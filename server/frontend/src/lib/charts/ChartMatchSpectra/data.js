@@ -20,8 +20,10 @@ export const useChartData = defineStore('chart.match.spectra', () => {
     }
   })
 
-  api.socket.on('visualization_signal_sum_spectrum', (payload) => {
-    for (let trace of payload) {
+  api.socket.on('visualization_signal_sum_spectrum', ({ sid, data }) => {
+    // Ignore if SID does not match (user has multiple sessions open)
+    if (sid !== api.socket.id) return
+    for (let trace of data) {
       length.value = length.value + trace.x.length
       unit.value = trace.unit ? trace.unit : unit.value
       trace.x = new Float32Array(trace.x)
@@ -44,7 +46,7 @@ export const useChartData = defineStore('chart.match.spectra', () => {
         }
       }
     }
-    traces.value = [...traces.value, ...payload]
+    traces.value = [...traces.value, ...data]
   })
   return { traces, length, unit }
 })

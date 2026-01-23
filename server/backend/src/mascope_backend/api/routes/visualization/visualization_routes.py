@@ -1,4 +1,4 @@
-from fastapi import APIRouter, BackgroundTasks, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
 
 from mascope_backend.api.controllers.sample.items.sample_items_controller import (
     get_sample_item,
@@ -23,6 +23,7 @@ visualization_router = APIRouter(prefix="/api/visualization", tags=["Visualizati
 @visualization_router.get("/ion_focus")
 @api_route(status_code=202)
 async def visualization_ion_focus_route(
+    request: Request,
     background_tasks: BackgroundTasks,
     query_params: GetVisualizationIonFocusQueryParams = Depends(),
     user=Depends(guest_user),
@@ -44,6 +45,7 @@ async def visualization_ion_focus_route(
 
     # Get data for notifications
     process_id = gen_id(8)
+    sid = request.headers.get("x-sid", None)
 
     background_tasks.add_task(
         visualize_ion_focus,
@@ -51,6 +53,7 @@ async def visualization_ion_focus_route(
         independent_transaction=True,
         user_id=user.id,
         process_id=process_id,
+        sid=sid,
     )
 
     return {

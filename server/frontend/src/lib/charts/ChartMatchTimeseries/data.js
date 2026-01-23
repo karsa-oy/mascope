@@ -19,14 +19,16 @@ export const useChartData = defineStore('chart.match.timeseries', () => {
     }
   })
 
-  api.socket.on('visualization_signal_timeseries', (payload) => {
-    for (let trace of payload) {
+  api.socket.on('visualization_signal_timeseries', ({ sid, data }) => {
+    // Ignore if SID does not match (user has multiple sessions open)
+    if (sid !== api.socket.id) return
+    for (let trace of data) {
       length.value = trace.x.length
       unit.value = trace.unit ? trace.unit : unit.value
       trace.x = new Float32Array(trace.x)
       trace.y = new Float32Array(trace.y)
     }
-    traces.value = [...traces.value, ...payload]
+    traces.value = [...traces.value, ...data]
   })
   return { traces, length, unit }
 })
