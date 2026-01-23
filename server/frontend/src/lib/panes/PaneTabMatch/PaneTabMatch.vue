@@ -39,8 +39,8 @@ const [initTop, initBottom] = JSON.parse(storedState ?? '[50, 50]')
 const top = ref(initTop)
 const bottom = ref(initBottom)
 const heights = computed(() => [
-  ((height.value - 300) * top.value) / 100,
-  ((height.value - 300) * bottom.value) / 100
+  ((height.value - 350) * top.value) / 100,
+  ((height.value - 350) * bottom.value) / 100
 ])
 </script>
 
@@ -97,7 +97,7 @@ const heights = computed(() => [
   width: 100%;
   max-width: 100%;
   display: flex;
-  flex-flow: row nowrap;
+  flex-flow: row wrap;
   justify-content: space-between;
   align-items: flex-start;
   margin: 0;
@@ -114,7 +114,7 @@ const heights = computed(() => [
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
+    white-space: normal;
     text-align: center;
   }
 }
