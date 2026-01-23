@@ -2,7 +2,6 @@
 import { ref, onMounted } from 'vue'
 
 import ContextMenu from 'primevue/contextmenu'
-import Button from 'primevue/button'
 
 import { DialogBatchOp, DialogCalibration } from '@/lib/dialogs'
 

@@ -12,7 +12,16 @@ export const useCollectionContextMenu = defineStore('collectionContextMenu', () 
   })
 
   const entries = computed(() => {
-    if (!selection.value) return []
+    if (!selection.value)
+      return [
+        {
+          label: 'Edit batch targets',
+          icon: 'pi pi-bullseye',
+          command: () => {
+            dialog.op = 'update_targets'
+          }
+        }
+      ]
 
     return [
       {
@@ -42,11 +51,11 @@ export const useCollectionContextMenu = defineStore('collectionContextMenu', () 
   const onClick = async (event) => {
     // Handle DataTable row context menu events
     const data = event?.data || selection.value
-    if (!data?.target_collection_id) return
-
-    selection.value = data
-    // Load detailed data for context menu operations
-    await app.data.target.collection.loadDetailed(data.target_collection_id)
+    if (data?.target_collection_id) {
+      selection.value = data
+      // Load detailed data for context menu operations
+      await app.data.target.collection.loadDetailed(data.target_collection_id)
+    }
     ref_.value?.toggle(event.originalEvent || event)
   }
 
