@@ -93,8 +93,8 @@ const breadcrumb = computed(() => {
   >
     <template #menu>
       <Button
-        v-tooltip.top="'Create collection'"
-        label="Create collection"
+        v-tooltip.top="'Create target collection'"
+        label="Create target collection"
         class="hiddenlabel"
         icon="pi pi-plus"
         text
@@ -103,6 +103,7 @@ const breadcrumb = computed(() => {
       />
     </template>
     <DataTable
+      v-if="app.data.batch.focused"
       :value="app.data.match.collection.list"
       dataKey="target_collection_id"
       v-model:selection="app.data.match.collection.focused"
