@@ -364,7 +364,7 @@ async def update_target_ion(target_ion_id: str, target_ion_update: TargetIonUpda
     :return: The updated target ion data and count of affected batches.
     :rtype: dict
     """
-    n_affected_batches = 0
+    all_affected_batches = set()
     async with async_session() as session:
         target_ion = await session.get(TargetIon, target_ion_id)
         if not target_ion:
@@ -420,7 +420,7 @@ async def update_target_ion(target_ion_id: str, target_ion_update: TargetIonUpda
 
             # Update affected sample batches to rematch status
             affected_batch_ids = {s.sample_batch_id for s in affected_samples}
-            n_affected_batches += len(affected_batch_ids)
+            all_affected_batches.update(affected_batch_ids)
             await update_sample_batch_status(
                 list(affected_batch_ids), "rematch", independent_transaction=True
             )
@@ -429,7 +429,7 @@ async def update_target_ion(target_ion_id: str, target_ion_update: TargetIonUpda
             "data": target_ion.to_dict(),
             "message": (
                 f"Target ion `{target_ion.target_ion_formula}` updated successfully. "
-                f"{n_affected_batches} affected batches pending rematch."
+                f"{len(all_affected_batches)} affected batches pending rematch."
             ),
         }
 
