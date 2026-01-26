@@ -640,6 +640,7 @@ class TargetIsotope(Base):
             ondelete="CASCADE",
         ),
     )
+    target_isotope_formula: Mapped[str] = mapped_column(String(256))
     mz: Mapped[float] = mapped_column(Float)
     relative_abundance: Mapped[float] = mapped_column(
         Float,

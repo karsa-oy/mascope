@@ -141,6 +141,7 @@ def generate_target_ions_from_composition(
                         mz=mz,
                         relative_abundance=rel_abu,
                         resolution=resolution,
+                        target_isotope_formula=form,
                     )
                     for mz, rel_abu, form in zip(masses, probs, formulae)
                 ]
