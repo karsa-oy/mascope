@@ -172,14 +172,15 @@ def _get_compound_formula(
         # For subtraction mechanisms, ensure the compound formula can support it
         compound_formula = Formula(target_compound_formula)
         mechanism_formula = Formula(ionization_mechanism[1:])
-        for element, (
-            count,
-            _,
+        for (
+            element,
+            counts,
         ) in mechanism_formula._elements.items():  # pylint: disable=protected-access
             if (
                 element not in compound_formula._elements
             ):  # pylint: disable=protected-access
                 raise SkipIonizationMechanism()
+            count = counts[0]
             if (
                 compound_formula._elements[element][0] < count
             ):  # pylint: disable=protected-access
