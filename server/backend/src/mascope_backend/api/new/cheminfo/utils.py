@@ -12,11 +12,13 @@ def to_cheminfo_ionization_format(ionization: str) -> str:
     Convert Mascope ionization mechanism format to ChemInfo API format.
 
     Mascope ionization mechanisms are defined in the format:
-        <modification operation><modification formula><polarity>
+        <modification operation><modification formula><polarity of modification>
     where:
     - "modification operation" is either "+" for addition or "-" for subtraction
     - "modification formula" is the chemical formula subtracted from or added to the parent molecule
-    - "polarity" is the charge polarity of the resulting ion ("+" or "-").
+    - "polarity of modification" is the charge polarity of the added/subtracted ion ("+" or "-").
+        Therefore the polarity of the resulting ion for operation "+" is the same as the polarity of the modification,
+        and for operation "-" it is the opposite.
 
     The ChemInfo API accepts ionizations in the format:
         <polarity>(<modification formula>)<modification operation>
@@ -27,22 +29,29 @@ def to_cheminfo_ionization_format(ionization: str) -> str:
 
     Examples how Mascope ionization mechanisms get converted:
     - "+H+" (Mascope) becomes "+(H)" (ChemInfo)
-    - "-Cl-" (Mascope) becomes "-(Cl)-1" (ChemInfo)
+    - "+Cl-" (Mascope) becomes "-(Cl)" (ChemInfo)
     - "+" (Mascope) becomes "+()" (ChemInfo)
+    - "-H+" (Mascope) becomes "-(H)-1" (ChemInfo)
 
     :param ionization: Ionization mechanism string in Mascope format
     :type ionization: str
     :return: Ionization string formatted for ChemInfo API
     :rtype: str
     """
-    polarity = ionization[-1]  # Last character is the charge polarity
+    if len(ionization) == 1:
+        # Special case of electron abstraction/addition
+        return f"{ionization}()"
+    mod_polarity = ionization[-1]  # Last character is the modification polarity
     body = (
         ionization[1:-1] if len(ionization) > 1 else ""
     )  # Extract the middle part (if any)
     operation = (
         "-1" if ionization[0] == "-" else ""
     )  # Determine if this is a subtraction operation
-
+    # Determine the resulting ion polarity (reverses if operation is subtraction)
+    polarity = (
+        mod_polarity if ionization[0] == "+" else ("-" if mod_polarity == "+" else "+")
+    )
     # Strip custom element notation from body for ChemInfo API
     body, _ = to_explicit_isotope_format(body)
 
@@ -125,7 +134,7 @@ def to_mascope_ion_mech(ionization: str, all_ionization_mechanisms: list) -> dic
 
     The ChemInfo API returns ionizations in formats like:
     - "+(H)+" for protonation
-    - "(-)(Cl)-1" for deprotonation
+    - "(-1)(H)-1" for deprotonation
 
     This function parses this format and finds the matching ionization mechanism in provided
     Mascope database ionization mechanisms.
@@ -152,8 +161,11 @@ def to_mascope_ion_mech(ionization: str, all_ionization_mechanisms: list) -> dic
     # Remove explicit isotope notation from body
     body = to_custom_element_format(body)
 
+    # For subtraction operations, the modification polarity is reversed relative to the resulting ion polarity
+    mod_polarity = polarity if operation == "+" else ("-" if polarity == "+" else "+")
+
     # Reconstruct the Mascope ionization format
-    ionization_str = f"{operation}{body}{polarity}" if body else polarity
+    ionization_str = f"{operation}{body}{mod_polarity}" if body else mod_polarity
 
     # Find matching mechanism in our database results all_ionization_mechanisms
     # will raise IndexError if not found
