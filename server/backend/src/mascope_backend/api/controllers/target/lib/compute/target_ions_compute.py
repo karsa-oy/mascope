@@ -91,7 +91,10 @@ def generate_target_ions_from_composition(
         try:
             compound_formula = _get_compound_formula(target_compound_formula, mechanism)
             raw_ion = _get_raw_ion(mechanism, compound_formula)
-        except (SkipIonizationMechanism, ValueError):
+        except (SkipIonizationMechanism, ValueError) as e:
+            runtime.logger.debug(
+                f"Skipping ionization mechanism {mechanism} for compound {target_compound_formula}: {e}"
+            )
             continue
         except UnknownIonizationMechanism as e:
             runtime.logger.warning(
@@ -164,10 +167,14 @@ def _get_compound_formula(
         compound_formula = None
         if ionization_mechanism == "-" or ionization_mechanism == "+":
             # Electron transfer does not apply
-            raise SkipIonizationMechanism()
+            raise SkipIonizationMechanism(
+                "Electron transfer does not apply to empty formula"
+            )
         if ionization_mechanism.startswith("-"):
             # Cannot subtract from empty formula
-            raise SkipIonizationMechanism()
+            raise SkipIonizationMechanism(
+                "Subtraction mechanisms do not apply to empty formula"
+            )
     elif ionization_mechanism.startswith("-"):
         # For subtraction mechanisms, ensure the compound formula can support it
         compound_formula = Formula(target_compound_formula)
@@ -177,14 +184,24 @@ def _get_compound_formula(
             counts,
         ) in mechanism_formula._elements.items():  # pylint: disable=protected-access
             if (
-                element not in compound_formula._elements
-            ):  # pylint: disable=protected-access
-                raise SkipIonizationMechanism()
+                element
+                not in compound_formula._elements  # pylint: disable=protected-access
+            ):
+                raise SkipIonizationMechanism(
+                    f"Element {element} from mechanism formula {mechanism_formula.formula} "
+                    f"not in compound formula {compound_formula.formula}"
+                )
             count = counts[0]
             if (
-                compound_formula._elements[element][0] < count
-            ):  # pylint: disable=protected-access
-                raise SkipIonizationMechanism()
+                compound_formula._elements[element][  # pylint: disable=protected-access
+                    0
+                ]
+                < count
+            ):
+                raise SkipIonizationMechanism(
+                    f"Cannot subtract {count} of element {element} from compound formula "
+                    f"{compound_formula.formula}"
+                )
     else:
         compound_formula = Formula(target_compound_formula)
 
