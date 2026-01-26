@@ -1,10 +1,13 @@
 from typing import List, Optional
 
-from sqlalchemy import asc, desc, func, select
+from sqlalchemy import and_, asc, desc, exists, func, literal_column, select
 from sqlalchemy.orm import joinedload
 
-from mascope_backend.api.controllers.match.aggregate.match_aggregate_controller import (
-    aggregate_and_recreate_matches,
+from mascope_backend.api.controllers.match.ions.match_ions_controller import (
+    delete_match_ions,
+)
+from mascope_backend.api.controllers.sample.batches.status.service import (
+    update_sample_batch_status,
 )
 from mascope_backend.api.controllers.target.lib.compute.target_ions_compute import (
     generate_target_ions_from_composition,
@@ -23,15 +26,18 @@ from mascope_backend.api.new.ionization.modes.util import (
 )
 from mascope_backend.db import (
     IonizationMechanism,
-    Sample,
+    IonizationMode,
     SampleBatch,
+    SampleFile,
+    SampleItem,
     TargetCollection,
     TargetCollectionInSampleBatch,
-    TargetCompound,
     TargetCompoundInTargetCollection,
     TargetIon,
     async_session,
 )
+
+from mascope_backend.runtime import runtime
 
 
 @api_controller()
@@ -332,73 +338,147 @@ async def create_target_ions(
 
 @api_controller()
 async def update_target_ion(target_ion_id: str, target_ion_update: TargetIonUpdate):
+    """
+    Updates filter parameters for a target ion and triggers re-matching for affected samples.
+
+    Filter parameters are instrument-specific matching settings. When these change,
+    any existing match ions for affected samples must be deleted and the batch
+    status set to pending rematch.
+
+    Steps:
+    - Fetch the target ion from the database.
+    - Determine which instruments are affected by comparing existing vs new filter params.
+    - If deleting params for a specific instrument, remove that key from filter_params.
+    - If updating params, merge new values and track which instruments changed.
+    - Commit target ion changes to the database.
+    - For each affected instrument, find all sample items linked to this ion via the
+      batch → collection → compound chain, filtered by ionization mechanism.
+    - Delete existing match ions for those samples and mark affected batches for rematch.
+
+    :param target_ion_id: The ID of the target ion to update.
+    :type target_ion_id: str
+    :param target_ion_update: Update payload containing either new match_params
+        or a delete_instrument_params field to remove params for a specific instrument.
+    :type target_ion_update: TargetIonUpdate
+    :raises NotFoundException: If the target ion doesn't exist.
+    :return: The updated target ion data and count of affected batches.
+    :rtype: dict
+    """
+    n_affected_batches = 0
     async with async_session() as session:
         target_ion = await session.get(TargetIon, target_ion_id)
         if not target_ion:
             raise NotFoundException(f"Target ion with ID '{target_ion_id}' not found")
 
-        existing_match_params = target_ion.filter_params or {}
-
-        # Create a new dictionary for updated match params
-        new_match_params = existing_match_params.copy()
+        existing_params = target_ion.filter_params or {}
+        new_params = existing_params.copy()
         affected_instruments = set()
-
-        # Handle deletion of filter parameters for a specific instrument
+        # Determine changes to filter params based on update payload
         if target_ion_update.delete_instrument_params:
-            instrument_to_delete = target_ion_update.delete_instrument_params
-            if instrument_to_delete in new_match_params:
-                del new_match_params[instrument_to_delete]
-                target_ion.filter_params = new_match_params
-                affected_instruments.add(instrument_to_delete)
-
-        # Handle updating filter parameters
+            instrument = target_ion_update.delete_instrument_params
+            if instrument in new_params:
+                # Params for this instrument are being deleted
+                del new_params[instrument]
+                target_ion.filter_params = new_params
+                affected_instruments.add(instrument)
         else:
-            updated_match_params = target_ion_update.match_params
-            for instrument, update_params in updated_match_params.items():
-                update_params_dict = update_params.model_dump()
-                # Check for changes in match params
+            for instrument, update_params in target_ion_update.match_params.items():
+                update_dict = update_params.model_dump()
                 if (
-                    instrument not in existing_match_params
-                    or existing_match_params[instrument] != update_params_dict
+                    instrument not in existing_params
+                    or existing_params[instrument] != update_dict
                 ):
-                    new_match_params[instrument] = update_params_dict
+                    # Params for this instrument are new or changed
+                    new_params[instrument] = update_dict
+                    target_ion.filter_params = new_params
                     affected_instruments.add(instrument)
 
-                    # update record params
-                    target_ion.filter_params = new_match_params
+        if not affected_instruments:
+            return {
+                "data": target_ion.to_dict(),
+                "message": f"Target ion `{target_ion.target_ion_formula}` unchanged.",
+            }
+        # Update modified target ion db record
+        await session.commit()
+        await session.refresh(target_ion)
 
-        # Commit and refresh if there are any changes
-        if affected_instruments:
-            await session.commit()
-            await session.refresh(target_ion)
+        # Find affected samples and delete match ions for the updated ion
+        ion_mechanism_id = target_ion.ionization_mechanism_id
+        for instrument in affected_instruments:
+            affected_samples = await _find_samples_for_ion_and_instrument(
+                session, target_ion_id, ion_mechanism_id, instrument
+            )
+            runtime.logger.debug(
+                f"Setting rematch status for the updated ion for {len(affected_samples)} affected samples"
+            )
 
-            # Find and notify affected sample batches
-            for instrument in affected_instruments:
-                stmt = (
-                    select(SampleBatch.sample_batch_id)
-                    .join(Sample)
-                    .join(TargetCollectionInSampleBatch)
-                    .join(TargetCollection)
-                    .join(TargetCompoundInTargetCollection)
-                    .join(TargetCompound)
-                    .join(TargetIon)
-                    .where(TargetIon.target_ion_id == target_ion_id)
-                    # Filter sample batches by instrument
-                    .where(Sample.instrument == instrument)
-                    .distinct()
+            for sample in affected_samples:
+                await delete_match_ions(
+                    sample_item_id=sample.sample_item_id,
+                    target_ion_ids=[target_ion_id],
                 )
-                result = await session.execute(stmt)
-                affected_batches = result.fetchall()
-                affected_batch_ids = [
-                    batch.sample_batch_id for batch in affected_batches
-                ]
 
-                for sample_batch_id in affected_batch_ids:
-                    await aggregate_and_recreate_matches(
-                        sample_batch_id=sample_batch_id,
-                    )
+            # Update affected sample batches to rematch status
+            affected_batch_ids = {s.sample_batch_id for s in affected_samples}
+            n_affected_batches += len(affected_batch_ids)
+            await update_sample_batch_status(
+                list(affected_batch_ids), "rematch", independent_transaction=True
+            )
 
         return {
             "data": target_ion.to_dict(),
-            "message": f"Target ion `{target_ion.target_ion_formula}` updated successfully.",
+            "message": (
+                f"Target ion `{target_ion.target_ion_formula}` updated successfully. "
+                f"{n_affected_batches} affected batches pending rematch."
+            ),
         }
+
+
+async def _find_samples_for_ion_and_instrument(
+    session, target_ion_id: str, ion_mechanism_id: str, instrument: str
+) -> list[SampleItem]:
+    """
+    Finds sample items linked to a target ion via the batch / target collection chain,
+    filtered by instrument and ionization mechanism.
+    """
+    stmt = (
+        select(SampleItem)
+        .join(
+            SampleFile,
+            and_(
+                SampleFile.sample_file_id == SampleItem.sample_file_id,
+                SampleFile.instrument == instrument,
+            ),
+        )
+        .join(SampleBatch, SampleBatch.sample_batch_id == SampleItem.sample_batch_id)
+        .join(
+            TargetCollectionInSampleBatch,
+            TargetCollectionInSampleBatch.sample_batch_id
+            == SampleBatch.sample_batch_id,
+        )
+        .join(
+            TargetCompoundInTargetCollection,
+            TargetCompoundInTargetCollection.target_collection_id
+            == TargetCollectionInSampleBatch.target_collection_id,
+        )
+        .join(
+            TargetIon,
+            TargetIon.target_compound_id
+            == TargetCompoundInTargetCollection.target_compound_id,
+        )
+        .join(
+            IonizationMode,
+            IonizationMode.ionization_mode_id == SampleItem.ionization_mode_id,
+        )
+        .where(TargetIon.target_ion_id == target_ion_id)
+        .where(
+            exists(
+                select(literal_column("1"))
+                .select_from(func.json_each(IonizationMode.ionization_mechanism_ids))
+                .where(literal_column("value") == ion_mechanism_id)
+            )
+        )
+        .distinct()
+    )
+    result = await session.execute(stmt)
+    return result.scalars().all()
