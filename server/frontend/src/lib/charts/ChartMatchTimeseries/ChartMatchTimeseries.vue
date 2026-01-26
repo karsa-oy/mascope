@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, toRaw } from 'vue'
+import { ref, computed, toRaw, watch } from 'vue'
 
 import Tag from 'primevue/tag'
 
@@ -30,8 +30,6 @@ const sampleLength = computed(() =>
 
 const traces = computed(() => {
   if (plot.value === null) return []
-  // Reset zoom when data changes
-  plot.value.resetZoom()
   // Scale trace y-values based on "sum / average" toggle
   if (sampleLength.value === null) {
     return []
@@ -44,6 +42,16 @@ const traces = computed(() => {
       })
     : data.traces.toReversed()
 })
+
+watch(
+  () => app.data.match.visualized.isotopes,
+  () => {
+    // Reset zoom when data changes
+    if (plot.value !== null) {
+      plot.value.resetZoom()
+    }
+  }
+)
 
 const layout = computed(() => ({
   xaxis: {
