@@ -179,7 +179,7 @@ const autoSelectTopMatches = (top = 30) => {
 
 // Handle Ctrl+A to select all rows (virtual scroller only selects visible rows by default)
 const onKeyDown = (event) => {
-  if (event.ctrlKey && event.key === 'a') {
+  if ((event.ctrlKey || event.metaKey) && event.key === 'a') {
     event.preventDefault()
     app.data.match.ion.selected = [...app.data.match.ion.list]
   }
