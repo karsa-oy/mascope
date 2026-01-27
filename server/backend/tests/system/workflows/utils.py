@@ -13,13 +13,20 @@ class FakeNotification:
         self.type = "test"
 
 
+def _to_dict(sample: Sample) -> dict:
+    """
+    Convert Sample object to a dictionary of column names and values.
+    """
+    return {col.name: getattr(sample, col.name) for col in sample.__table__.columns}
+
+
 @pytest.mark.asyncio
 async def collect_samples():
     async with async_session() as session:
         result = await session.execute(select(Sample))
         samples = result.scalars().all()
 
-    samples = [sf.to_dict() for sf in samples]
+    samples = [_to_dict(sample) for sample in samples]
     samples = pd.DataFrame(samples)
 
     samples["file_type"] = samples["filename"].apply(

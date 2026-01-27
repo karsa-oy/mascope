@@ -327,7 +327,9 @@ def generate_target_ions_from_mass(
     target_compound: TargetCompoundBase,
     ionization_mechanisms: list[IonizationMechanism],
 ) -> tuple[list[TargetIon], list[TargetIsotope]]:
-    """Generate target ions and isotopes based on target compound mass and given
+    """TODO: deprecate this function in favor of composition-based generation
+
+    Generate target ions and isotopes based on target compound mass and given
     ionization mechanisms
 
     :param target_compound_mass: Mass of the target compound (composition not known)
@@ -390,6 +392,8 @@ def generate_target_ions_from_mass(
                     mz=(target_compound_mass + mz),
                     relative_abundance=fraction,
                     resolution="HIGH",
+                    # Use the ion formula as placeholder
+                    target_isotope_formula=ion.target_ion_formula,
                 )
                 for mz, fraction in raw_isotopes
             ]
@@ -403,6 +407,8 @@ def generate_target_ions_from_mass(
                     mz=(target_compound_mass + reagent_mz),
                     relative_abundance=reagent_rel_abu,
                     resolution="LOW",
+                    # Use the ion formula as placeholder
+                    target_isotope_formula=ion.target_ion_formula,
                 )
                 for reagent_mz, reagent_rel_abu in raw_isotopes
             ]
