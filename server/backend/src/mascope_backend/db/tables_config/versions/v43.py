@@ -245,7 +245,8 @@ table_configs = {
                 mz FLOAT NOT NULL,
                 relative_abundance FLOAT NOT NULL
                     CHECK (relative_abundance BETWEEN 0 AND 1),
-                resolution VARCHAR(8) NOT NULL
+                resolution VARCHAR(8) NOT NULL,
+                target_isotope_formula VARCHAR(256) NOT NULL,
             );
         """,
     },

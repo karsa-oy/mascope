@@ -259,7 +259,7 @@ def predict_isotopes(
     :type raw_ion: Formula
     :param ion_formula: Ion formula string
     :type ion_formula: str
-    :raises ValueError: If a custom element is unknown.
+    :raises UnknownCustomElement: If a custom element is unknown.
     :return: 3-tuple lists of
         (m/z values, relative abundances, isotope formulae)
     :rtype: tuple[list[float], list[float], list[str]]
