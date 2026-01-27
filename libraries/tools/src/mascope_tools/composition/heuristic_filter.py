@@ -376,6 +376,10 @@ def extract_isotope_labels(
     """Convert isotope configurations to labels.
     Requires IsoDistribution with confs.
 
+    Examples:
+        >>> extract_isotope_labels("C6H12O6", predicted_isotopes)
+        ['13C', '13C2', '13C+2H', ...]
+
     :param ion_formula: Ion formula string.
     :type ion_formula: str
     :param predicted_isotopes: Predicted isotope distribution.

@@ -514,6 +514,16 @@ def sort_matches_by_formula(matches: pd.DataFrame) -> pd.DataFrame:
 def replace_atom_with_isotope(ion_formula: str, isotope_label: str) -> str:
     """Replace atoms in ion formula with their corresponding isotopic labels.
 
+    Examples:
+        >>> replace_atom_with_isotope("C6H12O6+", "13C2")
+        '[13C]2C4H12O6+'
+        >>> replace_atom_with_isotope("C10H15N-", "15N")
+        '[15N]C10H15-'
+        >>> replace_atom_with_isotope("C5H5+", "13C+2H")
+        '[13C][2H]C4H45+'
+        >>> replace_atom_with_isotope("C3H7O2-", "M0")
+        'C3H7O2-'
+
     :param ion_formula: Formula of the ion, Hill order, with a charge at the end.
     :type ion_formula: str
     :param isotope_label: Label of the isotope to replace, e.g. "13C", "13C+2H", "13C3".
@@ -523,6 +533,9 @@ def replace_atom_with_isotope(ion_formula: str, isotope_label: str) -> str:
     """
     if not isinstance(isotope_label, str) or isotope_label in {"M0", "---", ""}:
         return ion_formula
+
+    # Split multiple isotopes if present, wrap each in square brackets
+    # e.g. "13C+2H" -> ["[13C]", "[2H]"]
     isotope_labels = [f"[{iso_label}]" for iso_label in isotope_label.split("+")]
 
     # Separate the charge at the end of the formula, if any
