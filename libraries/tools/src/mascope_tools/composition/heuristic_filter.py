@@ -383,6 +383,9 @@ def extract_isotope_labels(
     :return: List of isotope labels.
     :rtype: list[str]
     """
+    if ion_formula.endswith(("+", "-")):
+        # Remove charge character for parsing
+        ion_formula = ion_formula[:-1]
     try:
         composition = ParseFormula(ion_formula)
         elements = list(composition.keys())
