@@ -327,7 +327,9 @@ def process_resolution(
     else:
         # Low resolution: check if the values are present within 1 ppm tolerance
         def is_in_1ppm(value, array):
-            return np.any(np.abs(array - value) / value * 1e6 <= LOW_PPM_THRESHOLD)
+            return bool(
+                np.any(np.abs(array - value) / value * 1e6 <= LOW_PPM_THRESHOLD)
+            )
 
         present_iso_mask = (
             ion_group_filt["mz"]
