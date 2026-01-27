@@ -77,7 +77,7 @@ onMounted(() => {
     </div>
 
     <!-- No data message -->
-    <div v-else-if="!isotopeData.length">No isotopes found for {{ ionFormula }}</div>
+    <div v-else-if="!isotopeData.length">No matched isotopes found for {{ ionFormula }}</div>
 
     <!-- Isotope data table -->
     <DataTable
