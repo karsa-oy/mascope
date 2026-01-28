@@ -1,6 +1,14 @@
 from typing import List, Optional
 
-from sqlalchemy import and_, asc, desc, exists, func, literal_column, select
+from sqlalchemy import (
+    and_,
+    asc,
+    cast,
+    desc,
+    func,
+    select,
+    String,
+)
 from sqlalchemy.orm import joinedload
 
 from mascope_backend.api.controllers.match.ions.match_ions_controller import (
@@ -472,10 +480,8 @@ async def _find_samples_for_ion_and_instrument(
         )
         .where(TargetIon.target_ion_id == target_ion_id)
         .where(
-            exists(
-                select(literal_column("1"))
-                .select_from(func.json_each(IonizationMode.ionization_mechanism_ids))
-                .where(literal_column("value") == ion_mechanism_id)
+            cast(IonizationMode.ionization_mechanism_ids, String).contains(
+                f'"{ion_mechanism_id}"'
             )
         )
         .distinct()
