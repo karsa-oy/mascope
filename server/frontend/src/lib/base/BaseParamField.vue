@@ -50,6 +50,7 @@ watch(
 const emit = defineEmits(['change'])
 watch(param, (value) => {
   if (value !== null) {
+    inner.value = value
     emit('change')
   }
 })

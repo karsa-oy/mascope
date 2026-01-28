@@ -30,7 +30,9 @@ export const useMatchParams = defineStore('app.data.match.params', () => {
   )
   const areDefault = computed(() => {
     if (matchVisualized.instrumentType && typeDefaults.value) {
-      return Object.keys(typeDefaults.value).every((key) => ui.value[key] === typeDefaults[key])
+      return Object.keys(typeDefaults.value).every(
+        (key) => ui.value[key] === typeDefaults.value[key]
+      )
     } else {
       return
     }
