@@ -3,6 +3,7 @@ import { ref, watch, watchEffect, computed } from 'vue'
 
 import Button from 'primevue/button'
 import Listbox from 'primevue/listbox'
+import ContextMenu from 'primevue/contextmenu'
 
 import { useApp } from '@/stores'
 import { DialogWorkspaceOp } from '@/lib/dialogs'
@@ -14,6 +15,8 @@ const sidebarMenu = useSidebarMenu()
 const open = computed(() => sidebarMenu.open && sidebarMenu.tab === 'workspaces')
 
 const dialog = ref()
+const workspaceContextMenu = ref()
+const selectedWorkspace = ref(null)
 
 watch(
   () => app.data.workspace.focused,
@@ -74,6 +77,7 @@ const vHelpLayer = app.ui.help.directive(layer)
             }
           }
         "
+        @contextmenu.prevent
         :options="app.data.workspace.list"
         optionLabel="workspace_name"
         listStyle="height: calc(100vh - 300px)"
@@ -89,7 +93,17 @@ const vHelpLayer = app.ui.help.directive(layer)
         "
       >
         <template #option="{ option }">
-          <div class="row" style="gap: 1rem">
+          <div
+            class="row"
+            style="gap: 1rem; width: 100%; justify-content: flex-start"
+            @contextmenu="
+              (event) => {
+                event.preventDefault()
+                selectedWorkspace = option
+                workspaceContextMenu.toggle(event)
+              }
+            "
+          >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="32"
@@ -100,6 +114,11 @@ const vHelpLayer = app.ui.help.directive(layer)
             >
               <path
                 d="M216,72H130.67L102.93,51.2a16.12,16.12,0,0,0-9.6-3.2H40A16,16,0,0,0,24,64V200a16,16,0,0,0,16,16H216.89A15.13,15.13,0,0,0,232,200.89V88A16,16,0,0,0,216,72Zm0,128H40V64H93.33L123.2,86.4A8,8,0,0,0,128,88h88Z"
+                v-if="option.workspace_type === 'ANALYSIS'"
+              ></path>
+              <path
+                v-else
+                d="M224,208H203.94A88.05,88.05,0,0,0,144,64.37V32a16,16,0,0,0-16-16H80A16,16,0,0,0,64,32V136a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V80.46A72,72,0,0,1,181.25,208H32a8,8,0,0,0,0,16H224a8,8,0,0,0,0-16Zm-96-72H80V32h48V136ZM72,184a8,8,0,0,1,0-16h64a8,8,0,0,1,0,16Z"
               ></path>
             </svg>
             <div class="col" style="gap: 1rem; align-items: flex-start">
@@ -111,5 +130,25 @@ const vHelpLayer = app.ui.help.directive(layer)
       </Listbox>
     </section>
   </div>
-  <DialogWorkspaceOp v-model:action="dialog" />
+  <ContextMenu
+    ref="workspaceContextMenu"
+    appendTo="self"
+    :model="[
+      {
+        label: 'Edit workspace',
+        icon: 'pi pi-pen-to-square',
+        command: () => {
+          dialog = 'edit'
+        }
+      },
+      {
+        label: 'Delete workspace',
+        icon: 'pi pi-trash',
+        command: () => {
+          dialog = 'delete'
+        }
+      }
+    ]"
+  />
+  <DialogWorkspaceOp v-model:action="dialog" :workspace="selectedWorkspace" />
 </template>

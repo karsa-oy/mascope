@@ -18,9 +18,13 @@ const props = defineProps({
   }
 })
 
-const original = computed(() =>
-  action.value == 'create' ? null : (app.data.workspace.focused ?? props.workspace)
-)
+const original = computed(() => {
+  if (action.value == 'create') {
+    return null
+  }
+  // Use the passed workspace prop if available, otherwise use the focused workspace
+  return props.workspace ?? app.data.workspace.focused
+})
 
 const info = reactive({
   name: null,
@@ -107,7 +111,7 @@ watch(action, init)
 function init() {
   info.name = original.value?.workspace_name
   info.desc = original.value?.workspace_description
-  ;(info.message = null), (info.initial = original.value)
+  ;((info.message = null), (info.initial = original.value))
 }
 
 const invalid = computed(() =>
