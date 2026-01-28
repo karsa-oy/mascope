@@ -180,7 +180,10 @@ const filteredWorkspaces = computed(() => {
     .map((workspace, index) => ({
       // create labels, demarcating the current one
       ...workspace,
-      label: index > 0 ? workspace.workspace_name : `${workspace.workspace_name} (current)`
+      label:
+        workspace.workspace_id === app.data.workspace.focusedId
+          ? `${workspace.workspace_name} (current)`
+          : workspace.workspace_name
     }))
 })
 
@@ -490,11 +493,14 @@ async function init(mode) {
       // Clone to avoid mutating the original collection data
       batches.selected = clone(original.value?.sample_batches ?? [])
 
-      // Set workspace for display
-      selected.workspace = app.data.workspace.focused
-
-      // Load batches for the current workspace
-      await loadBatches(selected.workspace, info.type)
+      // Don't allow selecting immutable ACQUISITION workspaces
+      if (app.data.workspace.focused.workspace_type === 'ACQUISITION') {
+        selected.workspace = null
+      } else {
+        // Set workspace for display and load batches
+        selected.workspace = app.data.workspace.focused
+        await loadBatches(selected.workspace, info.type)
+      }
 
       // Update "select all" checkbox to reflect current workspace state
       selected.all.batches =
