@@ -410,81 +410,84 @@ async def update_target_ion(target_ion_id: str, target_ion_update: TargetIonUpda
         await session.commit()
         await session.refresh(target_ion)
 
-        # Find affected samples and delete match ions for the updated ion
-        ion_mechanism_id = target_ion.ionization_mechanism_id
-        for instrument in affected_instruments:
-            affected_samples = await _find_samples_for_ion_and_instrument(
-                session, target_ion_id, ion_mechanism_id, instrument
-            )
-            runtime.logger.debug(
-                f"Setting rematch status for the updated ion for {len(affected_samples)} affected samples"
-            )
+    # Find affected samples and delete match ions for the updated ion
+    ion_mechanism_id = target_ion.ionization_mechanism_id
+    for instrument in affected_instruments:
+        affected_samples = await _find_samples_for_ion_and_instrument(
+            target_ion_id, ion_mechanism_id, instrument
+        )
+        runtime.logger.debug(
+            f"Setting rematch status for the updated ion for {len(affected_samples)} affected samples"
+        )
 
-            for sample in affected_samples:
-                await delete_match_ions(
-                    sample_item_id=sample.sample_item_id,
-                    target_ion_ids=[target_ion_id],
-                )
-
-            # Update affected sample batches to rematch status
-            affected_batch_ids = {s.sample_batch_id for s in affected_samples}
-            all_affected_batches.update(affected_batch_ids)
-            await update_sample_batch_status(
-                list(affected_batch_ids), "rematch", independent_transaction=True
+        for sample in affected_samples:
+            await delete_match_ions(
+                sample_item_id=sample.sample_item_id,
+                target_ion_ids=[target_ion_id],
             )
 
-        return {
-            "data": target_ion.to_dict(),
-            "message": (
-                f"Target ion `{target_ion.target_ion_formula}` updated successfully. "
-                f"{len(all_affected_batches)} affected batches pending rematch."
-            ),
-        }
+        # Update affected sample batches to rematch status
+        affected_batch_ids = {s.sample_batch_id for s in affected_samples}
+        all_affected_batches.update(affected_batch_ids)
+        await update_sample_batch_status(
+            list(affected_batch_ids), "rematch", independent_transaction=True
+        )
+
+    return {
+        "data": target_ion.to_dict(),
+        "message": (
+            f"Target ion `{target_ion.target_ion_formula}` updated successfully. "
+            f"{len(all_affected_batches)} affected batches pending rematch."
+        ),
+    }
 
 
 async def _find_samples_for_ion_and_instrument(
-    session, target_ion_id: str, ion_mechanism_id: str, instrument: str
+    target_ion_id: str, ion_mechanism_id: str, instrument: str
 ) -> list[SampleItem]:
     """
     Finds sample items linked to a target ion via the batch / target collection chain,
     filtered by instrument and ionization mechanism.
     """
-    stmt = (
-        select(SampleItem)
-        .join(
-            SampleFile,
-            and_(
-                SampleFile.sample_file_id == SampleItem.sample_file_id,
-                SampleFile.instrument == instrument,
-            ),
-        )
-        .join(SampleBatch, SampleBatch.sample_batch_id == SampleItem.sample_batch_id)
-        .join(
-            TargetCollectionInSampleBatch,
-            TargetCollectionInSampleBatch.sample_batch_id
-            == SampleBatch.sample_batch_id,
-        )
-        .join(
-            TargetCompoundInTargetCollection,
-            TargetCompoundInTargetCollection.target_collection_id
-            == TargetCollectionInSampleBatch.target_collection_id,
-        )
-        .join(
-            TargetIon,
-            TargetIon.target_compound_id
-            == TargetCompoundInTargetCollection.target_compound_id,
-        )
-        .join(
-            IonizationMode,
-            IonizationMode.ionization_mode_id == SampleItem.ionization_mode_id,
-        )
-        .where(TargetIon.target_ion_id == target_ion_id)
-        .where(
-            cast(IonizationMode.ionization_mechanism_ids, String).contains(
-                f'"{ion_mechanism_id}"'
+    async with async_session() as session:
+        stmt = (
+            select(SampleItem)
+            .join(
+                SampleFile,
+                and_(
+                    SampleFile.sample_file_id == SampleItem.sample_file_id,
+                    SampleFile.instrument == instrument,
+                ),
             )
+            .join(
+                SampleBatch, SampleBatch.sample_batch_id == SampleItem.sample_batch_id
+            )
+            .join(
+                TargetCollectionInSampleBatch,
+                TargetCollectionInSampleBatch.sample_batch_id
+                == SampleBatch.sample_batch_id,
+            )
+            .join(
+                TargetCompoundInTargetCollection,
+                TargetCompoundInTargetCollection.target_collection_id
+                == TargetCollectionInSampleBatch.target_collection_id,
+            )
+            .join(
+                TargetIon,
+                TargetIon.target_compound_id
+                == TargetCompoundInTargetCollection.target_compound_id,
+            )
+            .join(
+                IonizationMode,
+                IonizationMode.ionization_mode_id == SampleItem.ionization_mode_id,
+            )
+            .where(TargetIon.target_ion_id == target_ion_id)
+            .where(
+                cast(IonizationMode.ionization_mechanism_ids, String).contains(
+                    f'"{ion_mechanism_id}"'
+                )
+            )
+            .distinct()
         )
-        .distinct()
-    )
-    result = await session.execute(stmt)
-    return result.scalars().all()
+        result = await session.execute(stmt)
+        return result.scalars().all()
