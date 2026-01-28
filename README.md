@@ -1319,7 +1319,7 @@ const data = useData('sample', method, {
   selection: {
     mode: 'multiple', *// 'single', 'multiple' or 'binary' (default)*
     persist: true, *// localStorage persistence*
-    subscribe: ({ sample_file_id }) => sample_file_id *// socket room subscription*
+    subscribe: ({ sample_item_id }) => sample_item_id *// socket room subscription*
   }
 })
 ```

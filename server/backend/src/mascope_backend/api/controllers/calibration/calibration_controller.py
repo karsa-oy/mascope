@@ -102,8 +102,8 @@ async def get_mz_calibration(
 
 
 @api_controller_background_task(
-    success_notification_rooms=["sample_file_id"],
-    error_notification_rooms=["sample_file_id"],
+    success_notification_rooms=["user_id"],
+    error_notification_rooms=["user_id"],
 )
 async def calibration_mz_fit(
     sample_item_id: str,
@@ -174,7 +174,7 @@ async def calibration_mz_fit(
         data={
             "sample_item_id": sample_item_id,
             "filename": sample.filename,
-            "_room_ids": [sample.sample_file_id],
+            "_room_ids": [user_id],
             "_user_id": user_id,
         },
     )
@@ -239,9 +239,9 @@ async def calibration_mz_fit(
 
 
 @api_controller_background_task(
-    success_notification_rooms=["sample_file_id"],
+    success_notification_rooms=["user_id"],
     success_reload=[("match", "affected_sample_batch_ids")],
-    error_notification_rooms=["sample_file_id"],
+    error_notification_rooms=["user_id"],
     error_reload=[("match", "affected_sample_batch_ids")],
 )
 async def calibration_mz_apply(
@@ -412,9 +412,9 @@ async def calibration_mz_apply(
 
 
 @api_controller_background_task(
-    success_notification_rooms=["sample_file_id"],
+    success_notification_rooms=["user_id"],
     success_reload=[("match", "affected_sample_batch_ids")],
-    error_notification_rooms=["sample_file_id"],
+    error_notification_rooms=["user_id"],
     error_reload=[("match", "affected_sample_batch_ids")],
 )
 async def calibration_mz_calibrate_sample(
@@ -472,7 +472,7 @@ async def calibration_mz_calibrate_sample(
         data={
             "sample_item_id": sample_item_id,
             "filename": sample.filename,
-            "_room_ids": [sample.sample_file_id],
+            "_room_ids": [user_id],
             "_user_id": user_id,
         },
     )

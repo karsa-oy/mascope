@@ -33,7 +33,7 @@ export const useSample = defineStore('app.data.sample', () => {
       }),
       selection: {
         mode: 'multiple',
-        subscribe: ({ sample_file_id }) => sample_file_id
+        subscribe: ({ sample_item_id }) => sample_item_id
       },
       read: (sample_item_id) =>
         api.http.get(`/samples/${sample_item_id}`, {

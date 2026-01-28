@@ -11,6 +11,9 @@ from sqlalchemy import (
 )
 
 import mascope_signal.compute as m_compute
+from mascope_backend.api.controllers.sample.lib.fetch_affected_sample_data import (
+    fetch_affected_sample_data,
+)
 from mascope_backend.api.controllers.samples.samples_controller import get_samples
 from mascope_backend.api.controllers.workspace.acquisition.service import (
     create_acquisition_workspaces,
@@ -1013,6 +1016,12 @@ async def compute_sample_file_peaks(
     sample_file_data = await get_sample_file(sample_file_id)
     filename = sample_file_data.get("data").get("filename")
 
+    # Get affected samples data for this file
+    (
+        affected_sample_item_ids,
+        _,
+        *_,
+    ) = await fetch_affected_sample_data(sample_file_ids=[sample_file_id])
     # Step 2: Load instrument functions and determine instrument type.
     instrument_functions = await read_instrument_functions(filename=filename)
     await compute_peaks(filename, instrument_functions)
@@ -1022,7 +1031,7 @@ async def compute_sample_file_peaks(
     message = f"Detected {sample_file.mz.size} peaks for file '{filename}'"
     runtime.logger.info(message)
 
-    await emit_record_reload(record_type="peak", room=sample_file_id)
+    await emit_record_reload(record_type="peak", room=affected_sample_item_ids)
 
     return {
         "message": message,
