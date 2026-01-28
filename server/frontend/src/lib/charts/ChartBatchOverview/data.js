@@ -80,6 +80,24 @@ export const useChartData = defineStore('chart.batch.overview', () => {
     pending.value = false
   }
 
+  /** Handle ion reload event */
+  const handleIonReload = async (event) => {
+    console.debug('🔄 [chart.batch.overview] handling match_ion_reload event', event)
+    const targetIonId = event.record_id
+    // De-select and re-select the ion to trigger data reload
+    const selectedIds = app.data.match.ion.selectedIds
+    if (selectedIds.includes(targetIonId)) {
+      await handleIonsSelected(
+        selectedIds.filter((id) => id !== targetIonId),
+        selectedIds
+      )
+      await handleIonsSelected(
+        [...selectedIds, targetIonId],
+        selectedIds.filter((id) => id !== targetIonId)
+      )
+    }
+  }
+
   /**
    * Handle new sample match creation
    */
@@ -155,11 +173,16 @@ export const useChartData = defineStore('chart.batch.overview', () => {
     console.debug('📬 [api:sio] batch_match_deleted received:', event)
     handleBatchMatchRemoval(event)
   })
+  api.socket.on('match_ion_reload', (event) => {
+    console.debug('📬 [api:sio] match_ion_reload received:', event)
+    handleIonReload(event)
+  })
 
   onUnmounted(() => {
     api.socket.off('sample_match_created', handleNewSample)
     api.socket.off('sample_match_deleted', handleSampleMatchRemoval)
     api.socket.off('batch_match_deleted', handleBatchMatchRemoval)
+    api.socket.off('match_ion_reload', handleIonReload)
   })
   /**
    * X-axis field selection
