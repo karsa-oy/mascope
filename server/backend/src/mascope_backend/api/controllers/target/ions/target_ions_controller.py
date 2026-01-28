@@ -412,7 +412,6 @@ async def update_target_ion(target_ion_id: str, target_ion_update: TargetIonUpda
         await session.commit()
         await session.refresh(target_ion)
 
-    reload_events = set()
     # Find affected samples and delete match ions for the updated ion
     ion_mechanism_id = target_ion.ionization_mechanism_id
     for instrument in affected_instruments:
@@ -428,13 +427,6 @@ async def update_target_ion(target_ion_id: str, target_ion_update: TargetIonUpda
                 sample_item_id=sample.sample_item_id,
                 target_ion_ids=[target_ion_id],
             )
-            reload_events.add(
-                emit_record_reload(
-                    record_type="match_ion",
-                    record_id=target_ion_id,
-                    room=sample.sample_batch_id,
-                )
-            )
 
         # Update affected sample batches to rematch status
         affected_batch_ids = {s.sample_batch_id for s in affected_samples}
@@ -443,9 +435,11 @@ async def update_target_ion(target_ion_id: str, target_ion_update: TargetIonUpda
             list(affected_batch_ids), "rematch", independent_transaction=True
         )
 
-    # -- Emit reload events ---
-    if reload_events:
-        await asyncio.gather(*reload_events)
+    await emit_record_reload(
+        record_type="match_ion",
+        record_id=target_ion_id,
+        room=list(affected_batch_ids),
+    )
 
     return {
         "data": target_ion.to_dict(),
