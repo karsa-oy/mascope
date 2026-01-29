@@ -40,7 +40,7 @@ const props = defineProps({
     >
     <DataTable
       :value="app.data.peak.list"
-      dataKey="mz"
+      dataKey="peak_id"
       selectionMode="single"
       :metaKeySelection="false"
       v-model:selection="app.data.peak.focused"

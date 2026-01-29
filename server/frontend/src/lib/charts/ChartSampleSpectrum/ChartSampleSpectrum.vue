@@ -143,9 +143,15 @@ const config = {
     :config="config"
     :loading="data.loading"
     @click="
-      ({ x, event, data }) => {
-        if (event.button === 0 && data.name === 'Peak') {
-          app.data.peak.focus({ mz: x })
+      (clickData) => {
+        if (clickData.event.button === 0) {
+          // Focus the closest peak to the clicked m/z value
+          if (!app.data.peak.list.length) return
+          app.data.peak.focus({
+            peak_id: app.data.peak.list.reduce((closest, peak) =>
+              Math.abs(peak.mz - clickData.x) < Math.abs(closest.mz - clickData.x) ? peak : closest
+            ).peak_id
+          })
         }
       }
     "

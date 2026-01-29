@@ -8,6 +8,7 @@ import { useSample } from './sample'
 
 export const usePeak = defineStore('app.data.peak', () => {
   const name = 'peak'
+  const key = 'peak_id'
 
   const data = useData(
     name,
@@ -24,9 +25,10 @@ export const usePeak = defineStore('app.data.peak', () => {
         type: 'load_sample_peaks'
       })
       if (data) {
-        const { mz, area, height } = data
+        const { peak_id, mz, area, height } = data
         const records = mz.map((mz, i) => ({
           mz: mz,
+          peak_id: peak_id[i],
           area: area[i],
           height: height[i]
         }))
@@ -36,7 +38,7 @@ export const usePeak = defineStore('app.data.peak', () => {
       }
     },
     {
-      key: 'mz',
+      key,
       deps: () => ({
         sample_item_id: useSample().focusedId
       }),

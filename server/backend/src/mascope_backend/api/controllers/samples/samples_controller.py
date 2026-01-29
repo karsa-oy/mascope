@@ -344,6 +344,7 @@ async def get_sample_peaks(
 
     # --- Extract and format the data ---
     response_data = {
+        "peak_id": sample_file_data.peak_id.values,
         "mz": sample_file_data.mz.values,
     }
     if areas:
@@ -365,6 +366,7 @@ async def get_sample_peaks(
             "message": message,
             "results": 0,
             "data": {
+                "peak_id": [],
                 "mz": [],
                 "area": [] if areas else None,
                 "height": [] if heights else None,
