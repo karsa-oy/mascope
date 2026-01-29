@@ -67,6 +67,7 @@ from mascope_backend.db import (
 from mascope_backend.runtime import runtime
 from mascope_backend.socket.records.service import (
     emit_record_created,
+    emit_record_reload,
 )
 from mascope_file.name import get_instrument_type
 from mascope_match.params import BaseMatchParams
@@ -522,6 +523,11 @@ async def aggregate_and_create_matches(
                 "sample_batch_id": sample_batch_id,
             },
             room=sample_batch_id,
+        )
+        # Emit "peak_reload" notification event since "target_isotope_formula" may have changed
+        await emit_record_reload(
+            record_type="peak",
+            room=sample_item_id,
         )
 
     # Determine overall status

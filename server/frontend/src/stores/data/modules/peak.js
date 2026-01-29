@@ -25,12 +25,13 @@ export const usePeak = defineStore('app.data.peak', () => {
         type: 'load_sample_peaks'
       })
       if (data) {
-        const { peak_id, mz, area, height } = data
+        const { peak_id, mz, area, height, target_isotope_formula } = data
         const records = mz.map((mz, i) => ({
           mz: mz,
           peak_id: peak_id[i],
           area: area[i],
-          height: height[i]
+          height: height[i],
+          target_isotope_formula: target_isotope_formula[i]
         }))
         return records
       } else {

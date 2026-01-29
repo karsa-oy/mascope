@@ -66,6 +66,11 @@ const props = defineProps({
           {{ num.peakIntensity.format(data.area) }}
         </template>
       </Column>
+      <Column field="target_isotope_formula" header="formula" sortable style="height: 20px">
+        <template #body="{ data }">
+          {{ data.target_isotope_formula }}
+        </template>
+      </Column>
     </DataTable>
   </Panel>
 </template>
