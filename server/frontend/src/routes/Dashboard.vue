@@ -159,7 +159,7 @@ const tabs = computed(() => [
                 <PaneTabBatch />
               </TabPanel>
               <TabPanel value="sample" :pt="{ content: { style: { padding: 0 } } }">
-                <PaneTabSample v-if="app.ui.tab.active == 'sample'" />
+                <PaneTabSample />
               </TabPanel>
               <TabPanel value="match" :pt="{ content: { style: { padding: 0 } } }">
                 <PaneTabMatch />

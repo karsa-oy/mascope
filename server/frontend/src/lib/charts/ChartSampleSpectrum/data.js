@@ -6,11 +6,10 @@ import { api } from '@/api'
 import { usePreview } from '@/lib/panes'
 
 export const useChartData = defineStore('chart.sample.spectrum', () => {
-  const mainTraces = shallowRef([])
+  const spectrumData = shallowRef(null)
   const length = ref()
   const unit = ref('')
   const loading = ref(false)
-  const mzRangeMax = ref()
 
   const app = useApp()
   const preview = usePreview()
@@ -22,22 +21,19 @@ export const useChartData = defineStore('chart.sample.spectrum', () => {
     }
   })
 
-  const shouldLoad = computed(() => app.ui.tab.active === 'sample' && app.data.peak.list.length > 0)
-
-  // load triggering
-  watchEffect(() => {
-    if (shouldLoad.value) {
-      load()
+  // Watch for sample change - clear data and reset chart
+  watch(
+    () => app.data.sample.focusedId,
+    (sampleId, oldSampleId) => {
+      if (sampleId !== oldSampleId) {
+        console.debug('🔄 [chart.sample.spectrum] sample changed - resetting chart')
+        unload()
+      }
+      if (sampleId) {
+        load()
+      }
     }
-  })
-
-  // unload triggering
-  watchEffect(() => {
-    const sampleUnfocused = !app.data.sample.focused?.sample_file_id
-    if (sampleUnfocused) {
-      unload()
-    }
-  })
+  )
 
   const gl = ''
 
@@ -47,19 +43,37 @@ export const useChartData = defineStore('chart.sample.spectrum', () => {
     // start loading
     loading.value = true
     // get spectrum data from the backend
-    const data = await api.http.get(`/samples/${sampleItemId}/spectrum`, {
+    spectrumData.value = await api.http.get(`/samples/${sampleItemId}/spectrum`, {
       use: 'read',
       type: 'get_spectrum'
     })
 
-    mzRangeMax.value = (mz, dmz) => {
-      const from = data.mz.findLastIndex((val) => val < mz - dmz)
-      const to = data.mz.findIndex((val) => val > mz + dmz)
-      const intensities = data.intensity.slice(from, to + 1)
-      return Math.max(...intensities)
+    unit.value = spectrumData.value.intensity_unit
+    length.value = spectrumData.value.intensity.length
+    loading.value = false
+  }
+
+  const mainTraces = computed(() => {
+    const traces = []
+    // add spectrum trace
+    if (spectrumData.value) {
+      traces.push({
+        name: 'Signal',
+        line: {
+          color: 'green'
+        },
+        mode: 'lines',
+        type: 'scatter' + gl,
+        x: new Float32Array(spectrumData.value.mz),
+        y: new Float32Array(spectrumData.value.intensity),
+        hovertemplate:
+          ['<i>Signal</i>', 'm/z: <b>%{x:.4f}</b>', `intensity: <b>%{y:.3e}</b>`].join('<br>') +
+          '<extra></extra>' // use "<extra></extra>" to get rid of extra block from the hoverbox
+      })
     }
-    mainTraces.value = [
-      {
+    // add peak traces
+    if (app.data.peak.list.length > 0) {
+      traces.push({
         name: 'Peak',
         type: 'scatter' + gl,
         mode: 'lines',
@@ -87,25 +101,11 @@ export const useChartData = defineStore('chart.sample.spectrum', () => {
         // ** Add [height, area] into "customdata" to enable
         // access in ChartSampleSpectrum when scaling for
         // "average" instead of "sum".
-      },
-      {
-        name: 'Signal',
-        line: {
-          color: 'green'
-        },
-        mode: 'lines',
-        type: 'scatter' + gl,
-        x: new Float32Array(data.mz),
-        y: new Float32Array(data.intensity),
-        hovertemplate:
-          ['<i>Signal</i>', 'm/z: <b>%{x:.4f}</b>', `intensity: <b>%{y:.3e}</b>`].join('<br>') +
-          '<extra></extra>' // use "<extra></extra>" to get rid of extra block from the hoverbox
-      }
-    ]
-    unit.value = data.intensity_unit
-    length.value = data.intensity.length
-    loading.value = false
-  }
+      })
+    }
+    return traces
+  })
+
   const focusTrace = computed(() => {
     const focused = app.data.peak.focused
     return focused
@@ -161,12 +161,8 @@ export const useChartData = defineStore('chart.sample.spectrum', () => {
 
   // unload data and switch tab if necessary
   function unload() {
-    mainTraces.value = []
-    const tabOpen = app.ui.tab.active === 'sample'
-    if (tabOpen) {
-      app.ui.tab.default()
-    }
+    spectrumData.value = null
   }
 
-  return { traces, length, unit, loading, mzRangeMax }
+  return { traces, length, unit, loading }
 })

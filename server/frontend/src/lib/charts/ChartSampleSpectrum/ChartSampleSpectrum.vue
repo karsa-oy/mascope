@@ -71,6 +71,17 @@ watch(
   }
 )
 
+watch(
+  () => app.ui.tab.active,
+  async (newValue, oldValue) => {
+    if (newValue === 'sample') {
+      // Wait for DOM to update after tab switch, then resize plot
+      await nextTick()
+      plot.value.resize()
+    }
+  }
+)
+
 watchEffect(() => {
   if (app.data.peak.focused) {
     const mz = preview.peak?.mz ?? app.data.peak.focused.mz
