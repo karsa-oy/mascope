@@ -24,8 +24,6 @@ const app = useApp()
 
 const preview = usePreview()
 
-const visible = defineModel('visible')
-
 const props = defineProps({
   height: {
     type: Number,
@@ -45,6 +43,7 @@ const results = ref([])
 const totalMatches = ref(0)
 const displayedMatches = ref(0)
 const loading = ref(false)
+const lastRequestParams = ref(null)
 
 onMounted(() => {
   // Load configuration from api on component creation
@@ -120,6 +119,7 @@ watch(
 watchEffect(() => {
   // Only proceed if chemConfig is loaded
   if (!chemConfig.value) return
+  if (!app.data.sample.focused) return
   const ionMode = app.data.ionization.mode.list.find(
     (im) => im.ionization_mode_id === app.data.sample.focused.ionization_mode_id
   )
@@ -150,8 +150,17 @@ watchDebounced(
     if (!chemConfig.value || !deps.peakFocused) {
       results.value = []
       loading.value = false
+      lastRequestParams.value = null
       return
     }
+    // Create a comparable string of current parameters
+    const currentParams = JSON.stringify(deps)
+    // Skip if parameters haven't changed from last request
+    if (lastRequestParams.value === currentParams) {
+      return
+    }
+    // Store current params before making request
+    lastRequestParams.value = currentParams
 
     // Update UI to show loading state immediately
     loading.value = true
