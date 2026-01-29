@@ -6,7 +6,7 @@ by comparing current target associations against existing matches.
 """
 
 import pandas as pd
-from sqlalchemy import exists, select
+from sqlalchemy import and_, exists, select
 
 from mascope_backend.api.new.ionization.modes.util import (
     fetch_sample_ionization_mechanism_ids,
@@ -61,13 +61,11 @@ async def fetch_sample_unmatched_target_isotopes(
             "LOW" if (get_instrument_type(sample.filename)) == "tof" else "HIGH"
         )
 
-        match_exists_subquery = (
-            select(1)
-            .select_from(MatchIsotope)
-            .where(
-                (MatchIsotope.target_isotope_id == TargetIsotope.target_isotope_id)
-                & (MatchIsotope.sample_item_id == sample.sample_item_id)
-            )
+        # Subquery for previously matched isotopes
+        matched_isotopes_subquery = (
+            select(MatchIsotope.target_isotope_id)
+            .where(MatchIsotope.sample_item_id == sample.sample_item_id)
+            .distinct()
         )
 
         stmt = (
@@ -81,7 +79,7 @@ async def fetch_sample_unmatched_target_isotopes(
                 IonizationMechanism.ionization_mechanism,
             )
             .select_from(TargetIsotope)
-            .join(TargetIon)
+            .join(TargetIon, TargetIon.target_ion_id == TargetIsotope.target_ion_id)
             .join(
                 IonizationMechanism,
                 IonizationMechanism.ionization_mechanism_id
@@ -102,19 +100,14 @@ async def fetch_sample_unmatched_target_isotopes(
                 == TargetCompoundInTargetCollection.target_collection_id,
             )
             .where(
-                TargetCollectionInSampleBatch.sample_batch_id
-                == sample.sample_batch_id,  # target collection association filtering
-                TargetIon.ionization_mechanism_id.in_(
-                    ionization_mechanism_ids
-                ),  # sample ionization mechanism filtering
-                IonizationMechanism.ionization_mechanism_polarity
-                == sample.polarity,  # sample polarity filtering
-                TargetIsotope.relative_abundance
-                >= match_params.min_isotope_abundance,  # match_params filtering
-                TargetIsotope.resolution == resolution_type,  # match_params filtering
-                ~exists(match_exists_subquery),
+                TargetCollectionInSampleBatch.sample_batch_id == sample.sample_batch_id,
+                TargetIon.ionization_mechanism_id.in_(ionization_mechanism_ids),
+                IonizationMechanism.ionization_mechanism_polarity == sample.polarity,
+                TargetIsotope.relative_abundance >= match_params.min_isotope_abundance,
+                TargetIsotope.resolution == resolution_type,
+                # Exclude already matched isotopes
+                TargetIsotope.target_isotope_id.notin_(matched_isotopes_subquery),
             )
-            .distinct()
         )
         if not (rows := (await session.execute(stmt)).all()):
             return pd.DataFrame()
