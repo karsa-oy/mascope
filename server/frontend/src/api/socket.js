@@ -1,5 +1,6 @@
 import { io } from 'socket.io-client'
 
+import { useApp } from '@/stores'
 import { runtime } from '@/lib/runtime.js'
 import { ref } from 'vue'
 
@@ -32,6 +33,12 @@ export async function initSocket() {
   // reconnect handler
   socket.io.on('reconnect_attempt', (attempt) => {
     console.debug('🔄 [api:sio] Socket reconnect attempt')
+    const app = useApp()
+    app.ui.notification.push({
+      type: 'connection',
+      status: 'info',
+      message: 'Trying to reconnect...'
+    })
   })
   socket.on('connect', () => {
     // Use 'connect' event to detect reconnections, since the socket.io server
@@ -41,6 +48,12 @@ export async function initSocket() {
     activeSubscriptions.forEach((room) => {
       socket.emit('subscribe', room)
       console.debug(`📬 [api:sio] Re-subscribed to room: ${room}`)
+    })
+    const app = useApp()
+    app.ui.notification.push({
+      type: 'connection',
+      status: 'success',
+      message: 'Reconnected to server'
     })
     socketConnected.value = true
   })
