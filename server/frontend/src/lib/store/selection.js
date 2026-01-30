@@ -316,14 +316,14 @@ export const useSelection = (name, key, records, options = {}) => {
             icon: '📪',
             data: { room: prevRoom }
           })
-          api.socket.emit('unsubscribe', prevRoom)
+          api.socket.removeSubscription(prevRoom)
         }
         if (nextRoom) {
           logger.debug(`subscribing to`, {
             icon: '📬',
             data: { room: nextRoom }
           })
-          api.socket.emit('subscribe', nextRoom)
+          api.socket.addSubscription(nextRoom)
         }
       }
     })

@@ -91,10 +91,10 @@ export const useAuth = defineStore('app.auth', () => {
       // Socket subscriptions to user room - if user ID changed
       if (oldId !== newId) {
         if (oldId) {
-          api.socket.emit('unsubscribe', `user-${oldId}`)
+          api.socket.removeSubscription(`user-${oldId}`)
         }
         if (newId) {
-          api.socket.emit('subscribe', `user-${newId}`)
+          api.socket.addSubscription(`user-${newId}`)
         }
       }
 
