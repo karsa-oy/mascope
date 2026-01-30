@@ -59,6 +59,7 @@ export async function initSocket() {
       message: 'Reconnected to server'
     })
     socketConnected.value = true
+    window.location.reload()
   })
 
   // Attach subscription management methods to socket
