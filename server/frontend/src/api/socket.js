@@ -5,7 +5,6 @@ import { runtime } from '@/lib/runtime.js'
 import { ref } from 'vue'
 
 const host = location.hostname
-const activeSubscriptions = new Set()
 
 export async function initSocket() {
   // init socket in `/` namespace
@@ -14,6 +13,7 @@ export async function initSocket() {
     withCredentials: true, // Enables cookie sending
     transports: ['websocket']
   })
+  const activeSubscriptions = new Set()
   const socketConnected = ref(false)
 
   console.debug('📭 [api:sio] initialized socket for', runtime.mode, ':', url, socket)
@@ -29,8 +29,11 @@ export async function initSocket() {
   socket.onAny((eventName, ...event) => {
     console.debug(`📬 [api:sio] ${eventName} received:`, event)
   })
-
-  // reconnect handler
+  // connection status handlers
+  socket.on('disconnect', (reason) => {
+    console.warn('⚠️ [api:sio] Socket disconnected:', reason)
+    socketConnected.value = false
+  })
   socket.io.on('reconnect_attempt', (attempt) => {
     console.debug('🔄 [api:sio] Socket reconnect attempt')
     const app = useApp()
@@ -56,10 +59,6 @@ export async function initSocket() {
       message: 'Reconnected to server'
     })
     socketConnected.value = true
-  })
-  socket.on('disconnect', (reason) => {
-    console.warn('⚠️ [api:sio] Socket disconnected:', reason)
-    socketConnected.value = false
   })
 
   // Attach subscription management methods to socket
