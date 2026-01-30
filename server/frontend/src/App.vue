@@ -1,17 +1,20 @@
 <script setup>
-import { onMounted } from 'vue'
-
+import BlockUI from 'primevue/blockui'
 import ConfirmDialog from 'primevue/confirmdialog'
-import Toast from 'primevue/toast'
-import { useToast } from 'primevue/usetoast'
+import Message from 'primevue/message'
 import Panel from 'primevue/panel'
 import ProgressSpinner from 'primevue/progressspinner'
+import Toast from 'primevue/toast'
+import { useToast } from 'primevue/usetoast'
 
+import { api } from '@/api'
 import { runtime } from '@/lib/runtime.js'
 import { beautifySnakeCase } from '@/lib/utils'
 import { BaseKarsaLogo } from '@/lib/base'
 import { useApp } from '@/stores'
 import { PaneLogin, PaneOwnerSignup } from '@/lib/panes'
+
+const { connected } = api
 
 const app = useApp()
 const toast = useToast()
@@ -74,6 +77,14 @@ app.ui.notification
   </div>
   <Toast position="bottom-right" v-if="!app.ui.notification.drawer" />
   <ConfirmDialog />
+
+  <!-- Disconnected - Block UI with an overlay and show an error message -->
+  <BlockUI :blocked="!connected" fullScreen />
+  <div v-if="!connected" class="connection-message">
+    <Message size="large" severity="error" icon="pi pi-times-circle"
+      >No connection to the server</Message
+    >
+  </div>
 </template>
 
 <style>
@@ -90,5 +101,12 @@ app.ui.notification
 }
 strong {
   opacity: 0.5;
+}
+.connection-message {
+  position: fixed;
+  top: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
 }
 </style>
