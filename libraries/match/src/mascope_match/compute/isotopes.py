@@ -65,7 +65,7 @@ async def compute_match_isotopes(
             resolution_type = (  # noqa: F841
                 "LOW" if instrument_type == "tof" else "HIGH"
             )
-            query = "relative_abundance >= @match_params.min_isotope_abundance and resolution == @resolution_type"
+            query = "resolution == @resolution_type"
             target_isotopes_df = target_isotopes_df.query(query).reset_index(drop=True)
         else:
             runtime.logger.debug("Using database-pre-filtered target isotopes")

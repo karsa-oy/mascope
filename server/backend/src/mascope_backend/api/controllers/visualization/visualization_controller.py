@@ -29,7 +29,6 @@ UNITS = "counts/s"
 async def visualize_ion_focus(
     sample_item_id: str,
     target_ion_id: str,
-    min_isotope_abundance: float,
     peak_min_intensity: float,
     mz_tolerance: float,
     independent_transaction: bool = False,
@@ -50,8 +49,6 @@ async def visualize_ion_focus(
     :type sample_item_id: str
     :param target_ion_id: ID of the target ion to focus on.
     :type target_ion_id: str
-    :param min_isotope_abundance: Minimum relative abundance threshold for isotopes.
-    :type min_isotope_abundance: float
     :param peak_min_intensity: Minimum peak intensity threshold for considering a match.
     :type peak_min_intensity: float
     :param mz_tolerance: Tolerance for mass-to-charge ratio (m/z) error, in parts per million (ppm).
@@ -69,7 +66,7 @@ async def visualize_ion_focus(
     sample = await fetch_sample(sample_item_id)
     instrument_property = InstrumentPropertyResolver(sample)
     target_isotopes = await _fetch_target_isotopes(
-        target_ion_id, min_isotope_abundance, instrument_property
+        target_ion_id, instrument_property
     )
 
     peak_data, averaged_signal = await _load_peaks_and_averaged_signal(
@@ -236,15 +233,13 @@ async def _load_peaks_and_averaged_signal(
 
 
 async def _fetch_target_isotopes(
-    target_ion_id, min_isotope_abundance, instrument_property
+    target_ion_id, instrument_property
 ):
     """
     Fetches target isotopes for a given target ion ID, minimum isotope abundance, and instrument property.
 
     :param target_ion_id: ID of the target ion to fetch isotopes for.
     :type target_ion_id: str
-    :param min_isotope_abundance: Minimum relative abundance threshold for isotopes.
-    :type min_isotope_abundance: float
     :param instrument_property: Instrument property resolver with resolution information.
     :type instrument_property: InstrumentPropertyResolver
     :raises NotFoundException: If no isotopes are found matching the criteria.
@@ -257,7 +252,6 @@ async def _fetch_target_isotopes(
             select(TargetIsotope)
             .where(
                 TargetIsotope.target_ion_id == target_ion_id,
-                TargetIsotope.relative_abundance >= min_isotope_abundance,
                 TargetIsotope.resolution == instrument_property.resolution,
             )
             .order_by(TargetIsotope.relative_abundance.desc())

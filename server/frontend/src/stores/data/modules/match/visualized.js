@@ -150,7 +150,6 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
       params: {
         sample_item_id: sample_item_id,
         target_ion_id: target_ion_id,
-        min_isotope_abundance: matchParams.ui.min_isotope_abundance,
         peak_min_intensity: matchParams.ui.peak_min_intensity,
         mz_tolerance: matchParams.ui.mz_tolerance
       },

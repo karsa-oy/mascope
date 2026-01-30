@@ -103,7 +103,6 @@ async def fetch_sample_unmatched_target_isotopes(
                 TargetCollectionInSampleBatch.sample_batch_id == sample.sample_batch_id,
                 TargetIon.ionization_mechanism_id.in_(ionization_mechanism_ids),
                 IonizationMechanism.ionization_mechanism_polarity == sample.polarity,
-                TargetIsotope.relative_abundance >= match_params.min_isotope_abundance,
                 TargetIsotope.resolution == resolution_type,
                 # Exclude already matched isotopes
                 TargetIsotope.target_isotope_id.notin_(matched_isotopes_subquery),

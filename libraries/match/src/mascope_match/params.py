@@ -10,8 +10,7 @@ from pydantic import BaseModel, Field, model_validator
 TOF_FITTING_THRESHOLD = 0.9
 ORBI_FITTING_THRESHOLD = 0.6
 
-# Global match parameter defaults
-DEFAULT_MIN_ISOTOPE_ABUNDANCE = 0.1
+# Default match thresholds
 DEFAULT_PROBABLE_MATCH_THRESHOLD = 0.8
 DEFAULT_POSSIBLE_MATCH_THRESHOLD = 0.7
 
@@ -40,10 +39,6 @@ class BaseMatchParams(BaseModel):
     """Base class for instrument-specific match parameters."""
 
     # global
-    min_isotope_abundance: float = Field(
-        DEFAULT_MIN_ISOTOPE_ABUNDANCE,
-        description="Minimum relative abundance of isotopes to consider in the match.",
-    )
     possible_match_threshold: float = Field(
         DEFAULT_POSSIBLE_MATCH_THRESHOLD,
         description="Threshold score above which a match is considered possible, but below the probable match threshold.",

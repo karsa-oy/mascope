@@ -196,16 +196,6 @@ const matchRangeMiddle = computed(
         :key="key"
       />
       <BaseParamField
-        label="Min. isotope abundance"
-        v-model:param="app.data.match.params.ui.min_isotope_abundance"
-        @change="app.data.match.visualized.reload"
-        :range="{ min: 0, max: 1, step: 0.01 }"
-        disabled
-        col
-        small
-        :key="key"
-      />
-      <BaseParamField
         label="Isotope ratio tolerance"
         v-model:param="app.data.match.params.ui.isotope_ratio_tolerance"
         @change="app.data.match.visualized.reload"

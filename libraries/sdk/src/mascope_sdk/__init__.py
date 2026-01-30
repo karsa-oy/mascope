@@ -509,7 +509,6 @@ def get_sample_compound_matches(
             "mz_tolerance": 72,
             "isotope_ratio_tolerance": 0.2,
             "peak_min_intensity": 0.0,
-            "min_isotope_abundance": 0.15,
             "probable_match_threshold": 0.8,
             "possible_match_threshold": 0.4,
         }

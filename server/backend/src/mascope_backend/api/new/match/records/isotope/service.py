@@ -36,7 +36,7 @@ from mascope_backend.db import (
     async_session,
 )
 from mascope_file.name import get_instrument_name, resolve_instrument_type
-from mascope_match.params import BaseMatchParams, DEFAULT_MIN_ISOTOPE_ABUNDANCE
+from mascope_match.params import BaseMatchParams
 
 
 @api_controller()
@@ -190,8 +190,6 @@ async def _get_sample_match_isotope_records(
                         sample_ionization_mechanism_ids
                     ),
                     TargetIsotope.resolution == isotope_resolution,
-                    TargetIsotope.relative_abundance
-                    > DEFAULT_MIN_ISOTOPE_ABUNDANCE,  # TODO: to be removed in context of issue #1311
                 )
             )
         )
@@ -333,7 +331,6 @@ def _apply_match_params(
             abs(match_data["match_abundance_error"])
             <= params["isotope_ratio_tolerance"],
             match_data["sample_peak_intensity"] >= params["peak_min_intensity"],
-            isotope_data["relative_abundance"] >= params["min_isotope_abundance"],
         ]
     )
 
@@ -347,7 +344,6 @@ def _apply_match_params(
             abs(match_data["match_mz_error"]) <= params["mz_tolerance"],
             abs(match_data["match_abundance_error"])
             <= params["isotope_ratio_tolerance"],
-            isotope_data["relative_abundance"] >= params["min_isotope_abundance"],
         ]
     )
 
