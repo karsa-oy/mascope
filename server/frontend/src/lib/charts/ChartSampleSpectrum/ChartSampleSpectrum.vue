@@ -86,9 +86,7 @@ watchEffect(() => {
   if (app.data.peak.focused) {
     const mz = preview.peak?.mz ?? app.data.peak.focused.mz
     const factor = scale.value.mode == 'sum' ? sampleLength.value : 1
-    const height = preview.peak
-      ? factor * data.mzRangeMax(mz, 0.3)
-      : factor * Math.max(app.data.peak.focused.height, data.mzRangeMax(mz, 0.3))
+    const height = factor * app.data.peak.focused.height
     zoom.rangeX = { range: [mz - 0.3, mz + 0.3], autorange: false }
     zoom.rangeY = scale.value.log
       ? { range: null, autorange: true }
