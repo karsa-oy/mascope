@@ -1,6 +1,7 @@
 import { io } from 'socket.io-client'
 
 import { runtime } from '@/lib/runtime.js'
+import { ref } from 'vue'
 
 const host = location.hostname
 const activeSubscriptions = new Set()
@@ -12,12 +13,15 @@ export async function initSocket() {
     withCredentials: true, // Enables cookie sending
     transports: ['websocket']
   })
+  const socketConnected = ref(false)
+
   console.debug('📭 [api:sio] initialized socket for', runtime.mode, ':', url, socket)
 
   // Wait for connection
   if (!socket.connected) {
     console.debug('⏳ [api:sio] Waiting for connection...')
     await new Promise((resolve) => socket.once('connect', resolve))
+    socketConnected.value = true
     console.debug('✅ [api:sio] Socket connected')
   }
   // logging handlers
@@ -38,9 +42,11 @@ export async function initSocket() {
       socket.emit('subscribe', room)
       console.debug(`📬 [api:sio] Re-subscribed to room: ${room}`)
     })
+    socketConnected.value = true
   })
   socket.on('disconnect', (reason) => {
     console.warn('⚠️ [api:sio] Socket disconnected:', reason)
+    socketConnected.value = false
   })
 
   // Attach subscription management methods to socket
@@ -53,5 +59,5 @@ export async function initSocket() {
     this.emit('unsubscribe', room)
   }
 
-  return socket
+  return { socket, socketConnected }
 }
