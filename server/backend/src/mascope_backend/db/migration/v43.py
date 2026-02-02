@@ -234,7 +234,24 @@ def process_ion_group(
     # --- Get raw ion formula and ion string ---
     ion_formula = ion_group["target_ion_formula"][0][:-1]  # remove charge
     ionization_mechanism = ion_group["ionization_mechanism"][0]
-    target_compound_formula = Formula(ion_group["target_compound_formula"][0])
+    compound_formula_str = ion_group["target_compound_formula"][0]
+
+    if compound_formula_str.replace(".", "", 1).isdigit():
+        # Special case: isotopes were generated from mass, keep old values
+        for row in ion_group.iter_rows(named=True):
+            updated_isotopes.append(
+                TargetIsotope(
+                    target_ion_id=ion_id,
+                    target_isotope_id=row["target_isotope_id"],
+                    mz=row["mz"],
+                    relative_abundance=row["relative_abundance"],
+                    resolution=row["resolution"],
+                    target_isotope_formula=f"{row['mz']:.4f}{ionization_mechanism}",
+                )
+            )
+        return updated_isotopes, ion_rematch_samples
+
+    target_compound_formula = Formula(compound_formula_str)
     raw_ion = _get_raw_ion(ionization_mechanism, target_compound_formula)
 
     # --- Predict isotopes with a new abundance threshold ---
