@@ -89,14 +89,14 @@ const buttonConfig = computed(() => {
   }
 })
 
-const addCompound = () => {
+const addCompound = async () => {
   const common = {
     target_collection_id: targetCollection.value.target_collection_id,
     target_collection_name: targetCollection.value.target_collection_name,
     target_collection_type: targetCollection.value.target_collection_type
   }
   if (existingCompound.value) {
-    app.data.target.collection.update({
+    await app.data.target.collection.update({
       ...common,
       target_compound_ids: [
         ...new Set([
@@ -106,7 +106,7 @@ const addCompound = () => {
       ]
     })
   } else {
-    app.data.target.collection.update({
+    await app.data.target.collection.update({
       ...common,
       target_compound_ids: targetCompounds.value.map(
         ({ target_compound_id }) => target_compound_id
@@ -119,6 +119,10 @@ const addCompound = () => {
         }
       ]
     })
+  }
+  // Refresh matches for focused sample
+  if (app.data.sample.focusedId) {
+    app.data.sample.rematch(app.data.sample.focused)
   }
   // Clear form
   Object.assign(input, {
