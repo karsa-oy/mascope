@@ -189,6 +189,7 @@ article {
     'progress';
   gap: 0.5rem;
   padding: 0.5rem;
+  overflow: hidden;
 }
 
 #filters {
@@ -210,5 +211,17 @@ menu {
 }
 menu > :deep(*) {
   height: 60px;
+}
+
+/* Prevent content from expanding the splitter beyond article width */
+article :deep(.p-splitter),
+article :deep(.p-splitterpanel),
+article :deep(.p-panel-content-container),
+article :deep(.p-panel-content-wrapper),
+article :deep(.p-panel-content),
+article :deep(.p-tabs),
+article :deep(.p-tabpanels),
+article :deep(.p-tabpanel) {
+  min-width: 0;
 }
 </style>

@@ -114,29 +114,13 @@ const layout = computed(() => {
 </script>
 
 <template>
-  <div>
-    <div
-      class="row"
-      :style="`
-          gap: 0rem;
-          align-items: space-between;
-          justify-content: flex-start;
-          width: 100%;
-          max-width: 100%;
-          padding: 0;
-          margin: 0;
-        `"
-    >
+  <div class="spectra-container">
+    <div class="row spectra-scroll">
       <figure
         v-for="(isotopeChart, index) of isotopeCharts"
         :key="`${isotopeChart.target_isotope_id}-${height}`"
-        :style="`
-            flex-shrink: 1;
-            flex-grow: 1;
-            min-width: 0;
-            position: relative;
-          `"
-        :class="sidebarOpen ? 'sidebarOpen' : ''"
+        class="spectra-figure"
+        :class="{ sidebarOpen }"
       >
         <h3 :style="`color: ${isotopeChart.traces[0]?.line.color}; margin: 0`">
           <BaseMatchTag
@@ -201,6 +185,31 @@ const layout = computed(() => {
 </template>
 
 <style scoped>
+.spectra-container {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.spectra-scroll {
+  display: inline-flex;
+  flex-flow: row nowrap;
+  gap: 0;
+  align-items: flex-start;
+  justify-content: flex-start;
+  min-width: 100%;
+  padding: 0;
+  margin: 0;
+}
+
+.spectra-figure {
+  flex-shrink: 0;
+  flex-grow: 1;
+  min-width: 300px;
+  position: relative;
+}
+
 #chart-spectrum-controls :global(fieldset) {
   margin: 0 !important;
 }
