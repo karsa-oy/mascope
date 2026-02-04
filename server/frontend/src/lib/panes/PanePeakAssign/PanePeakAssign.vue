@@ -291,6 +291,7 @@ const expanded = ref({})
         :scrollHeight="`${height - 100}px`"
         size="small"
         v-model:expandedRows="expanded"
+        :virtualScrollerOptions="{ itemSize: 35.5 }"
       >
         <Column expander />
         <Column field="target_compound_formula" header="Formula" sortable />
