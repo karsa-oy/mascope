@@ -73,7 +73,7 @@ async def get_match_isotope_records(
         entity_name = sample.sample_item_name
         entity_type = "sample"
 
-        data = await _get_sample_match_isotope_records(
+        data = await get_sample_match_isotope_records(
             sample, target_collection_id, target_ion_id, match_params
         )
     else:
@@ -101,7 +101,7 @@ async def get_match_isotope_records(
     }
 
 
-async def _get_sample_match_isotope_records(
+async def get_sample_match_isotope_records(
     sample: Sample,
     target_collection_id: str | None = None,
     target_ion_id: str | None = None,
@@ -221,6 +221,7 @@ async def _get_sample_match_isotope_records(
                 "ionization_mechanism_polarity": row.IonizationMechanism.ionization_mechanism_polarity,
                 "filter_params": row.TargetIon.filter_params,
                 "target_isotope_id": row.TargetIsotope.target_isotope_id,
+                "target_isotope_formula": row.TargetIsotope.target_isotope_formula,
                 "mz": row.TargetIsotope.mz,
                 "relative_abundance": row.TargetIsotope.relative_abundance,
                 "resolution": row.TargetIsotope.resolution,

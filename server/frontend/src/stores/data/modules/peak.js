@@ -19,19 +19,22 @@ export const usePeak = defineStore('app.data.peak', () => {
       const data = await api.http.get(`/samples/${sample_item_id}/peaks`, {
         params: {
           areas: true,
-          heights: true
+          heights: true,
+          matches: true
         },
         use: 'read',
         type: 'load_sample_peaks'
       })
       if (data) {
-        const { peak_id, mz, area, height, target_isotope_formula } = data
+        const { peak_id, mz, area, height, match } = data
         const records = mz.map((mz, i) => ({
           mz: mz,
           peak_id: peak_id[i],
           area: area[i],
           height: height[i],
-          target_isotope_formula: target_isotope_formula[i]
+          match: match[i],
+          target_isotope_formula:
+            match[i].length > 0 ? match[i].map((m) => m.target_isotope_formula).join('; ') : null
         }))
         return records
       } else {

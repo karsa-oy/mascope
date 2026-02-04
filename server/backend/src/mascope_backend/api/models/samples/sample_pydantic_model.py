@@ -104,6 +104,10 @@ class GetSamplePeaksQueryParams(CommonValidators, QueryParamsModel):
     mz_max: float | None = Field(
         None, gt=0, description="End of the m/z range for spectrum filtering"
     )
+    matches: bool = Field(
+        False,
+        description="Include match data in the response. If True, match data related to peaks will be included.",
+    )
 
     @model_validator(mode="after")
     @classmethod
