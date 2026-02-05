@@ -128,7 +128,7 @@ const layout = computed(() => {
             :match-category="getIsotopeCategory(isotopeChart)"
             :alarming="isotopeChart.match?.alarming"
           />
-          Isotope {{ num.mz.format(isotopeChart.mz) }}
+          {{ isotopeChart.target_isotope_formula }}: {{ num.mz.format(isotopeChart.mz) }}
         </h3>
         <!--
             This chart uses a *function ref* to enable dynamically
@@ -141,7 +141,7 @@ const layout = computed(() => {
           -->
         <BaseChartPlotly
           :id="`ChartMatchSpectrum-${isotopeChart.target_isotope_id}`"
-          :title="`Isotope ${num.mz.format(isotopeChart.mz)}`"
+          :title="`${isotopeChart.target_isotope_formula}: ${num.mz.format(isotopeChart.mz)}`"
           :ref="(el) => (plots[index] = el)"
           :data="isotopeChart.traces"
           :layout="clone(layout)"

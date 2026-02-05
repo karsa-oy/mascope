@@ -170,6 +170,7 @@ async def aggregate_sample_match_ion(
                 "target_compound_id": row["target_compound_id"],
                 "target_ion_id": row["target_ion_id"],
                 "target_isotope_id": row["target_isotope_id"],
+                "target_isotope_formula": row["target_isotope_formula"],
                 "mz": row["mz"],
                 "relative_abundance": row["relative_abundance"],
                 "resolution": row["resolution"],
