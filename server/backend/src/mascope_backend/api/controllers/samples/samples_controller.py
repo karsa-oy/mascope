@@ -1,5 +1,4 @@
 # pylint: disable=line-too-long
-import asyncio
 from datetime import datetime
 
 import numpy as np
