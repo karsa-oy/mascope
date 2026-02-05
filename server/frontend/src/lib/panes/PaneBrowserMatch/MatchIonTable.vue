@@ -130,7 +130,6 @@ const filterOptions = computed(() => ({
 // --- Row Expansion for match ion visualization and isotopes ---
 const focusMatchIon = async (ionId) => {
   if (!app.data.sample.focusedId) return
-  app.ui.tab.active = 'match'
   await app.data.match.visualized.set({
     sampleId: app.data.sample.focusedId,
     ionId: ionId,

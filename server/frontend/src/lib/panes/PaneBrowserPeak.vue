@@ -1,8 +1,9 @@
 <script setup>
+import Button from 'primevue/button'
+import Column from 'primevue/column'
+import DataTable from 'primevue/datatable'
 import Panel from 'primevue/panel'
 import TabMenu from 'primevue/tabmenu'
-import DataTable from 'primevue/datatable'
-import Column from 'primevue/column'
 
 import { num } from '@/lib/formatters'
 import { useApp } from '@/stores'
@@ -36,7 +37,14 @@ const props = defineProps({
       <TabMenu :model="[{ label: 'Peaks', icon: 'pi ph ph-crosshair' }]" style="overflow: hidden" />
     </template>
     <template #icons>
-      <span style="opacity: 0.5">{{ app.data.peak.list.length }} peaks detected </span></template
+      <span style="opacity: 0.5"
+        >{{
+          app.data.peak.list.filter(
+            (p) => p.target_isotope_formula !== null && p.target_isotope_formula !== ''
+          ).length
+        }}/{{ app.data.peak.list.length }}
+        peaks matched
+      </span></template
     >
     <DataTable
       :value="app.data.peak.list"
@@ -44,31 +52,52 @@ const props = defineProps({
       selectionMode="single"
       :metaKeySelection="false"
       v-model:selection="app.data.peak.focused"
-      sortField="area"
+      sortField="height"
       :sortOrder="-1"
       size="small"
       scrollable
       :scrollHeight="`${height}px`"
-      :virtualScrollerOptions="{ itemSize: 20 }"
+      :virtualScrollerOptions="{ itemSize: 35.5 }"
     >
-      <Column field="mz" header="m/z" sortable style="height: 20px">
+      <Column field="mz" header="m/z" sortable style="height: 20px; min-width: 6rem">
         <template #body="{ data }">
           {{ num.mz.format(data.mz) }}
         </template>
       </Column>
-      <Column field="height" header="height" sortable style="height: 20px">
+      <Column field="height" header="height" sortable style="height: 20px; min-width: 6rem">
         <template #body="{ data }">
           {{ num.peakIntensity.format(data.height) }}
         </template>
       </Column>
-      <Column field="area" header="area" sortable style="height: 20px">
+      <Column field="area" header="area" sortable style="height: 20px; min-width: 6rem">
         <template #body="{ data }">
           {{ num.peakIntensity.format(data.area) }}
         </template>
       </Column>
       <Column field="target_isotope_formula" header="formula" sortable style="height: 20px">
         <template #body="{ data }">
-          {{ data.target_isotope_formula }}
+          <div class="formula-buttons">
+            <Button
+              size="small"
+              text
+              severity="secondary"
+              v-tooltip.top="'Visualize ion match'"
+              @click="
+                async () => {
+                  if (data.match.length > 0) {
+                    app.data.match.visualized.set({
+                      sampleId: app.data.sample.focusedId,
+                      ionId: data.match[index].target_ion_id,
+                      collectionId: app.data.match.collection.focusedId
+                    })
+                  }
+                }
+              "
+              v-for="(formula, index) in data.target_isotope_formula?.split('; ')"
+            >
+              {{ formula }}
+            </Button>
+          </div>
         </template>
       </Column>
     </DataTable>
@@ -78,5 +107,17 @@ const props = defineProps({
 <style scoped>
 :deep(.p-panel-header) {
   display: flex !important;
+}
+
+:deep(.p-datatable .p-datatable-tbody > tr) {
+  height: 36px !important;
+}
+
+.formula-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  align-items: flex-start;
+  align-content: center;
 }
 </style>
