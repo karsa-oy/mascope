@@ -50,3 +50,23 @@ app.directive('help', help.directive())
 
 // init
 app.mount('#app')
+
+/** 
+  Patch addEventListener to add passive flag for scroll-blocking events
+  This is to get rid of "[Violation] Added non-passive event listener to a
+  scroll-blocking event" warnings in the console
+*/
+const originalAddEventListener = EventTarget.prototype.addEventListener
+EventTarget.prototype.addEventListener = function (type, listener, options) {
+  const scrollBlockingEvents = ['touchstart', 'touchmove', 'wheel']
+  if (scrollBlockingEvents.includes(type) && options !== true && typeof options !== 'object') {
+    options = { passive: true }
+  } else if (
+    scrollBlockingEvents.includes(type) &&
+    typeof options === 'object' &&
+    options.passive !== false
+  ) {
+    options = { ...options, passive: true }
+  }
+  return originalAddEventListener.call(this, type, listener, options)
+}
