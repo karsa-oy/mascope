@@ -73,7 +73,7 @@ async def get_match_isotope_records(
         entity_name = sample.sample_item_name
         entity_type = "sample"
 
-        data = await get_sample_match_isotope_records(
+        data = await _get_sample_match_isotope_records(
             sample, target_collection_id, target_ion_id, match_params
         )
     else:
@@ -101,7 +101,7 @@ async def get_match_isotope_records(
     }
 
 
-async def get_sample_match_isotope_records(
+async def _get_sample_match_isotope_records(
     sample: Sample,
     target_collection_id: str | None = None,
     target_ion_id: str | None = None,

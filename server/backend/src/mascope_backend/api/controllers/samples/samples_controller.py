@@ -390,47 +390,48 @@ async def get_sample_peaks(
         response_data.pop("height", None)
 
     if matches:
-        from mascope_backend.api.new.match.records.isotope.service import (
-            get_sample_match_isotope_records,
-        )
-
-        # --- Join with match data ---
-        sample_peak_ids = sample_file_data.peak_id.values.tolist()
-        match_rows = await get_sample_match_isotope_records(
-            sample,
-        )
-        # Build a mapping from sample_peak_id to target_isotope_formula
-        peak_id_to_match = {}
-        for row in match_rows:
-            # Check if there already match data for the same peak
-            existing_match = peak_id_to_match.get(row["match"]["sample_peak_id"], None)
-            if existing_match is not None:
-                # Check if same isotope formula already there, to avoid duplicates
-                peak_isotope_formulae = [
-                    match["target_isotope_formula"] for match in existing_match
-                ]
-                if not any(
-                    existing_formula == row["target_isotope_formula"]
-                    for existing_formula in peak_isotope_formulae
-                ):
-                    # Not a duplicate, append with separator
-                    peak_id_to_match[row["match"]["sample_peak_id"]].append(
-                        {
-                            "target_isotope_formula": row["target_isotope_formula"],
-                            "target_ion_id": row["target_ion_id"],
-                            "target_ion_formula": row["target_ion_formula"],
-                        }
+        # --- Lightweight query for peak matches ---
+        # Only fetch matched isotopes with minimal fields needed for the response
+        async with async_session() as session:
+            query = (
+                select(
+                    MatchIsotope.sample_peak_id,
+                    TargetIsotope.target_isotope_formula,
+                    TargetIon.target_ion_id,
+                    TargetIon.target_ion_formula,
+                )
+                .select_from(MatchIsotope)
+                .join(
+                    TargetIsotope,
+                    TargetIsotope.target_isotope_id == MatchIsotope.target_isotope_id,
+                )
+                .join(
+                    TargetIon,
+                    TargetIon.target_ion_id == TargetIsotope.target_ion_id,
+                )
+                .where(
+                    and_(
+                        MatchIsotope.sample_item_id == sample.sample_item_id,
+                        MatchIsotope.match_score > 0,
                     )
-            else:
-                # First formula for this peak
-                peak_id_to_match[row["match"]["sample_peak_id"]] = [
+                )
+            )
+            result = await session.execute(query)
+            match_rows = result.all()
+
+        # Build a mapping from sample_peak_id to match data
+        sample_peak_ids = sample_file_data.peak_id.values.tolist()
+        peak_id_to_match = {peak_id: [] for peak_id in sample_peak_ids}
+        for row in match_rows:
+            if row.sample_peak_id in peak_id_to_match:
+                peak_id_to_match[row.sample_peak_id].append(
                     {
-                        "target_isotope_formula": row["target_isotope_formula"],
-                        "target_ion_id": row["target_ion_id"],
-                        "target_ion_formula": row["target_ion_formula"],
+                        "target_isotope_formula": row.target_isotope_formula,
+                        "target_ion_id": row.target_ion_id,
+                        "target_ion_formula": row.target_ion_formula,
                     }
-                ]
-        # Create list of formulas in the same order as sample_peak_ids
+                )
+        # Create list of matches in the same order as sample_peak_ids
         response_data["match"] = [
             peak_id_to_match.get(peak_id, []) for peak_id in sample_peak_ids
         ]
