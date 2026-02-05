@@ -24,6 +24,7 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
   // state
   const ion = ref(null)
   const isotopes = ref(null)
+  const isotopeSelected = ref(null)
 
   // Cache for tracking current visualization context
   const cache = reactive({
@@ -96,6 +97,7 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
     ui.chart.clear()
     ion.value = null
     isotopes.value = null
+    isotopeSelected.value = null
     Object.assign(cache, { sampleId: null, ionId: null, collectionId: null })
   }
 
@@ -187,6 +189,7 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
     // state
     ion,
     isotopes,
+    isotopeSelected,
     instrument,
     instrumentType,
     // actions

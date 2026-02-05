@@ -11,7 +11,6 @@ import { FilterMatchMode } from '@primevue/core/api'
 
 import { BaseTabbedPanel, BaseMatchTag, BaseCopyableField } from '@/lib/base'
 import { PopoverTargetCompoundAdd } from '@/lib/dialogs'
-import MatchIsotopeTable from './MatchIsotopeTable.vue'
 import { num } from '@/lib/formatters'
 import { collectionTypeIcons } from '@/lib/constants'
 import { prettyTrim } from '@/lib/utils'
@@ -440,15 +439,6 @@ watch(
           />
         </template>
       </Column>
-
-      <!-- Expansion slot for match isotopes data -->
-      <template #expansion="slotProps">
-        <MatchIsotopeTable
-          v-if="expandedIonId === slotProps.data.target_ion_id"
-          :ion-id="slotProps.data.target_ion_id"
-          :ion-formula="slotProps.data.target_ion_formula"
-        />
-      </template>
     </DataTable>
   </BaseTabbedPanel>
 

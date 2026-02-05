@@ -1,13 +1,13 @@
 <script setup>
-import { ref, computed, toRaw } from 'vue'
+import { nextTick, ref, computed, toRaw, watch } from 'vue'
 
 import Tag from 'primevue/tag'
 
 import { BaseMatchTag } from '@/lib/base'
 import { clone } from '@/lib/utils'
 import { num } from '@/lib/formatters'
+import { formatIsotopeFormula } from '@/lib/chem'
 import { useApp } from '@/stores'
-import { ToolbarIntensityScale } from '@/lib/toolbars'
 
 import BaseChartPlotly from '../BaseChartPlotly.vue'
 import { useChartData } from './data.js'
@@ -51,8 +51,18 @@ const traces = computed(() => {
 
 // transform raw visualiation data into seperate charts
 const isotopeCharts = computed(() => {
-  // create an array corresponding to visualized isotopes
-  return clone(app.data.match.visualized.isotopes)?.map((isotope) => {
+  // Build array with first isotope and selected isotope (if different)
+  const isotopeList = []
+
+  if (app.data.match.visualized.isotopes?.[0]) {
+    isotopeList.push(app.data.match.visualized.isotopes[0])
+  }
+  if (app.data.match.visualized.isotopeSelected) {
+    isotopeList.push(app.data.match.visualized.isotopeSelected)
+  }
+
+  // Map over the limited isotope list
+  return isotopeList.map((isotope) => {
     // split up the chart's traces by isotope
     const start = traces.value?.findIndex(
       (trace) => trace.target_isotope_id === isotope.target_isotope_id
@@ -88,6 +98,34 @@ const rangeY = computed(
       ? { range: [0, scale.value.max], autorange: false } // use set scale
       : { range: null, autorange: true } // otherwise auto set scale
 )
+
+// Watch for changes in number of isotope charts and resize all plots
+watch(
+  () => isotopeCharts.value.length,
+  async (newLength, oldLength) => {
+    // Clear stale refs when chart count decreases
+    if (newLength < oldLength) {
+      for (let i = newLength; i < oldLength; i++) {
+        delete plots.value[i]
+      }
+    }
+    // Wait for DOM to update and refs to be assigned
+    await nextTick()
+    console.log('Resizing plots:', Object.keys(plots.value))
+    Object.values(plots.value).forEach((plot) => {
+      if (plot?.resize) {
+        plot.resize()
+      }
+    })
+  }
+)
+
+// Resize plots when container dimensions change
+watch([() => app.ui.split.right, () => props.height], async () => {
+  await nextTick()
+  Object.values(plots.value).forEach((plot) => plot?.resize?.())
+})
+
 // standard plotly layout, a clone of this is used for each chart
 const layout = computed(() => {
   return {
@@ -107,8 +145,7 @@ const layout = computed(() => {
     },
     margin: { l: 50, r: 20, t: 40, b: 40 },
     dragmode: 'zoom',
-    showlegend: false,
-    height: props.height
+    showlegend: false
   }
 })
 </script>
@@ -128,7 +165,8 @@ const layout = computed(() => {
             :match-category="getIsotopeCategory(isotopeChart)"
             :alarming="isotopeChart.match?.alarming"
           />
-          {{ isotopeChart.target_isotope_formula }}: {{ num.mz.format(isotopeChart.mz) }}
+          {{ formatIsotopeFormula(isotopeChart.target_isotope_formula) }}:
+          {{ num.mz.format(isotopeChart.mz) }}
         </h3>
         <!--
             This chart uses a *function ref* to enable dynamically
@@ -145,11 +183,9 @@ const layout = computed(() => {
           :ref="(el) => (plots[index] = el)"
           :data="isotopeChart.traces"
           :layout="clone(layout)"
+          :config="{ displayModeBar: false }"
           hideTitle
         >
-          <template v-slot:settings>
-            <ToolbarIntensityScale v-model="scale" />
-          </template>
         </BaseChartPlotly>
         <div class="float">
           <Tag
@@ -186,8 +222,11 @@ const layout = computed(() => {
 
 <style scoped>
 .spectra-container {
+  flex: 1;
   width: 100%;
+  height: 100%;
   min-width: 0;
+  min-height: 0;
   overflow-x: auto;
   overflow-y: hidden;
 }
@@ -199,15 +238,32 @@ const layout = computed(() => {
   align-items: flex-start;
   justify-content: flex-start;
   min-width: 100%;
+  height: 100%;
   padding: 0;
   margin: 0;
 }
 
 .spectra-figure {
-  flex-shrink: 0;
+  flex-shrink: 1;
   flex-grow: 1;
-  min-width: 300px;
+  min-width: 200px;
+  height: 100%;
+  min-height: 0;
   position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.spectra-figure h3 {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0.25rem 0;
+}
+
+.spectra-figure :deep(.chart-wrapper) {
+  flex: 1;
+  min-height: 0;
 }
 
 #chart-spectrum-controls :global(fieldset) {

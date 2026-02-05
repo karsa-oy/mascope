@@ -8,6 +8,7 @@ import { num } from '@/lib/formatters'
 
 import BaseChartPlotly from '../BaseChartPlotly.vue'
 import { useChartData } from './data.js'
+import { ToolbarIntensityScale } from '@/lib/toolbars'
 
 const app = useApp()
 const data = useChartData()
@@ -67,6 +68,7 @@ const layout = computed(() => ({
     showgrid: true,
     autorange: true,
     rangemode: 'tozero',
+    type: scale.value.log ? 'log' : 'lin',
     gridcolor: '#33333399',
     gridwidth: 1,
     autorange: true
@@ -95,7 +97,11 @@ const layout = computed(() => ({
         title="Timeseries"
         :data="traces"
         :layout="layout"
-      />
+      >
+        <template v-slot:settings>
+          <ToolbarIntensityScale v-model="scale" />
+        </template>
+      </BaseChartPlotly>
     </div>
   </figure>
 </template>
