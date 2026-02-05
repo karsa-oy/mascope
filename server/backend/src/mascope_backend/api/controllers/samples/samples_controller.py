@@ -495,12 +495,15 @@ async def get_sample_peak_timeseries(
     if time_adjustment_info:
         message += time_adjustment_info
 
+    # Replace NaN values with None for JSON serialization
+    heights_list = [None if np.isnan(v) else v for v in peak_timeseries.values.tolist()]
+
     return {
         "message": message,
         "results": len(peak_timeseries.time.values),
         "data": {
             "mz": peak_mz_data,
-            "height": peak_timeseries.values.tolist(),
+            "height": heights_list,
             "time": peak_timeseries.time.values.tolist(),
         },
     }
@@ -521,12 +524,12 @@ async def get_sample_spectrum(
     by the sample's polarity and optional time and/or m/z ranges.
 
     Steps:
-    1. Get sample data and extract required fields (t0, t1, polarity).
-    2. Set effective time limits with validation and auto-correction.
-    3. Compute averaged spectrum in the time range with polarity filtering.
-    4. Filter by m/z range if provided.
-    5. Extract m/z values and their corresponding intensities from the spectrum.
-    6. Return the spectrum data, including the total number of m/z points and optional metadata.
+    - Get sample data and extract required fields (t0, t1, polarity).
+    - Set effective time limits with validation and auto-correction.
+    - Compute averaged spectrum in the time range with polarity filtering.
+    - Filter by m/z range if provided.
+    - Extract m/z values and their corresponding intensities from the spectrum, filter out NaNs.
+    - Return the spectrum data, including the total number of m/z points and optional metadata.
 
     :param sample_item_id: Unique identifier for the sample from which to retrieve the spectrum
     :type sample_item_id: str
@@ -541,15 +544,15 @@ async def get_sample_spectrum(
     :return: A dictionary containing spectrum data with m/z values, intensities, and metadata
     :rtype: dict
     """
-    # Step 1: Get sample data
+    # - Get sample data
     sample = await fetch_sample(sample_item_id)
 
-    # Step 2: Validate and set effective time limits with auto-correction
+    # - Validate and set effective time limits with auto-correction
     t_min_eff, t_max_eff, time_adjustment_info = _validate_time_range(
         t_min, t_max, sample.t0, sample.t1
     )
 
-    # Step 3: Compute averaged spectrum in the time range with polarity filtering
+    # - Compute averaged spectrum in the time range with polarity filtering
     intensity_unit = "counts/s"
 
     # Use specific time range with polarity filtering
@@ -575,15 +578,16 @@ async def get_sample_spectrum(
             },
         }
 
-    # Step 4: Filter by m/z range if provided
+    # - Filter by m/z range if provided
     if mz_min is not None and mz_max is not None:
         spectrum = spectrum.sel(mz=slice(mz_min, mz_max)).compute()
 
-    # Step 5: Extract m/z values and intensities
+    # - Filter out NaN values to ensure JSON serialization, and convert to lists
+    spectrum = spectrum.dropna(dim="mz", how="any")
     mz_values = spectrum.mz.values.tolist()
     intensity_values = spectrum.values.tolist()
 
-    # Step 6: Return the spectrum data with metadata
+    # - Return the spectrum data with metadata
     message = f"Retrieved spectrum data with {len(mz_values)} m/z points from sample '{sample.sample_item_name}' with '{sample.polarity}' polarity."
 
     if time_adjustment_info:
