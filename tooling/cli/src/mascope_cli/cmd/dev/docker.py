@@ -138,31 +138,25 @@ def wait_for_docker(
         return False
 
 
-def check_and_start_docker(allow_skip: bool = True, auto_start: bool = True) -> bool:
+def check_and_start_docker() -> None:
     """
     Check if Docker is running and start it if necessary.
 
     High-level function for services that require Docker.
 
-    :param allow_skip: If True, offer option to continue without Docker
-    :param auto_start: If True, offer to auto-start Docker
     :return: True if Docker is running, False if user chose to skip
     :raises typer.Exit: If user chooses to abort
-    :rtype: bool
+    :rtype: None
     """
     if is_docker_running():
         return True
 
-    runtime.logger.error("Docker daemon is not running")
-    runtime.logger.info("  Docker is required for this operation")
+    runtime.logger.error("Docker daemon is not running, it is required to run Mascope.")
 
     # Build options based on parameters
     options = []
-    if auto_start:
-        options.append("  [s] Try to start Docker automatically")
+    options.append("  [s] Try to start Docker automatically")
     options.append("  [w] I'll start Docker manually (wait and retry)")
-    if allow_skip:
-        options.append("  [n] Continue without Docker")
     options.append("  [a] Abort")
 
     typer.echo("\nOptions:")
@@ -176,22 +170,22 @@ def check_and_start_docker(allow_skip: bool = True, auto_start: bool = True) -> 
         show_default=True,
     ).lower()
 
-    if choice == "s" and auto_start:
+    if choice == "s":
         if start_docker_desktop():
             typer.echo(
                 "Waiting for Docker to initialize (this may take 20-30 seconds)..."
             )
-            return wait_for_docker(max_wait=90)
+            if wait_for_docker(max_wait=90):
+                return
         else:
             runtime.logger.error("Failed to start Docker Desktop automatically")
-            return False
+            raise typer.Exit(1)
 
     elif choice == "w":
-        return wait_for_docker(max_wait=60)
-
-    elif choice == "n" and allow_skip:
-        runtime.logger.warning("Continuing without Docker")
-        return False
+        if wait_for_docker(max_wait=60):
+            return
+        runtime.logger.error("Docker did not start within timeout")
+        raise typer.Exit(1)
 
     else:  # "a" or any other input
         runtime.logger.info("Aborted")
