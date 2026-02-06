@@ -1,5 +1,5 @@
 <script setup>
-import { ref, inject, computed, watch } from 'vue'
+import { ref, inject, computed, watch, onBeforeUnmount } from 'vue'
 
 import Button from 'primevue/button'
 import DataTable from 'primevue/datatable'
@@ -16,15 +16,17 @@ import { collectionTypeIcons } from '@/lib/constants'
 import { prettyTrim } from '@/lib/utils'
 
 import { useApp } from '@/stores'
-import { useCollectionContextMenu, useIonContextMenu } from './stores'
+import { useCollectionContextMenu, useIonContextMenu, useIonScroller } from './stores'
 import { useSampleScroller } from '@/lib/panes/PaneBrowserSample/stores'
 import MatchCollectionContextMenu from './MatchCollectionContextMenu.vue'
 import MatchIonContextMenu from './MatchIonContextMenu.vue'
 
 const app = useApp()
+const ionTable = ref(null)
 const collectionContextMenu = useCollectionContextMenu()
 const ionContextMenu = useIonContextMenu()
-const scroller = useSampleScroller()
+const sampleScroller = useSampleScroller()
+const ionScroller = useIonScroller()
 
 // --- Breadcrumb Navigation ---
 const breadcrumb = computed(() => {
@@ -158,7 +160,7 @@ function toggleRowExpansion(ionId) {
 const focusSampleWithBestMatch = (sampleId) => {
   if (!sampleId) return
   app.data.sample.focus({ sample_item_id: sampleId })
-  scroller.scrollToSample(sampleId)
+  sampleScroller.scrollToSample(sampleId)
 }
 
 const autoSelectTopMatches = (top = 30) => {
@@ -185,6 +187,39 @@ const onKeyDown = (event) => {
 
 // --- Injection & Watchers ---
 const tableHeight = inject('match-table-height')
+
+// Watch for table ref to become available and bind to scroller
+watch(
+  ionTable,
+  (newTableRef) => {
+    if (newTableRef) {
+      ionScroller.bind(
+        newTableRef,
+        () => app.data.match.ion.list,
+        () => ({ sortField: 'match.match_score', sortOrder: -1 })
+      )
+    }
+  },
+  { immediate: true }
+)
+
+// Watch for focused ion and scroll to it
+watch(
+  () => app.data.match.visualized?.ion?.target_ion_id,
+  (ionId) => {
+    if (ionId) {
+      ionScroller.scrollToIon(ionId)
+    }
+  }
+)
+
+onBeforeUnmount(() => {
+  ionScroller.bind(
+    null,
+    () => [],
+    () => ({ sortField: 'match.match_score', sortOrder: -1 })
+  )
+})
 
 // Watch for ion list changes to auto-select top matches when collection is opened
 watch(
@@ -279,6 +314,7 @@ watch(
     </template>
 
     <DataTable
+      ref="ionTable"
       :value="app.data.match.ion.list"
       dataKey="target_ion_id"
       v-model:selection="app.data.match.ion.selected"
@@ -306,6 +342,9 @@ watch(
       :virtualScrollerOptions="{ itemSize: 35.74 }"
       sortField="match.match_score"
       :sortOrder="-1"
+      :pt="{
+        bodyRow: ({ context }) => ({ id: app.data.match.ion.list[context.index]?.target_ion_id })
+      }"
     >
       <template #empty>No match ions found.</template>
 
