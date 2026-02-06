@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, toRaw, watch } from 'vue'
+import { ref, computed, toRaw, watch, onMounted } from 'vue'
 
 import Tag from 'primevue/tag'
 
@@ -54,6 +54,10 @@ watch(
   }
 )
 
+onMounted(() => {
+  scale.value.log = true
+})
+
 const layout = computed(() => ({
   xaxis: {
     title: { text: 'Time [s]' },
@@ -77,7 +81,6 @@ const layout = computed(() => ({
   dragmode: 'zoom',
   showlegend: true,
   legend: {
-    xanchor: 'right',
     x: 1,
     y: 1
   },

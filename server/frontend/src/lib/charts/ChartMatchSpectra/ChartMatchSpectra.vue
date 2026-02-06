@@ -137,7 +137,7 @@ const layout = computed(() => {
       },
       gridcolor: '#33333399',
       rangemode: 'nonnegative',
-      type: scale.value.log ? 'log' : 'lin',
+      type: 'lin',
       ...rangeY.value
     },
     xaxis: {
