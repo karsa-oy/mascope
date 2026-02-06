@@ -80,7 +80,7 @@ class User(SQLAlchemyBaseUserTable[int], Base):
         Integer, ForeignKey("role.role_id", ondelete="SET NULL"), nullable=True
     )
     registered_at: Mapped[dt] = mapped_column(
-        TIMESTAMP, default=lambda: dt.now(timezone.utc), nullable=False
+        TIMESTAMP(timezone=True), default=lambda: dt.now(timezone.utc), nullable=False
     )
 
     # Relationships
@@ -192,16 +192,20 @@ class Workspace(Base):
     workspace_description: Mapped[Optional[str]] = mapped_column(Text)
     workspace_type: Mapped[str] = mapped_column(
         String(64),
-        server_default=text(f"{workspace_config.DEFAULT_WORKSPACE_TYPE}"),
+        server_default=text(f"'{workspace_config.DEFAULT_WORKSPACE_TYPE}'"),
     )
     locked: Mapped[int] = mapped_column(
         Integer,
-        server_default=text(f"{workspace_config.DEFAULT_LOCKED_STATUS}"),
+        server_default=text(f"'{workspace_config.DEFAULT_LOCKED_STATUS}'"),
     )
     instrument: Mapped[Optional[str]] = mapped_column(String(64))
     icon: Mapped[Optional[dict]] = mapped_column(JSON)
-    workspace_utc_created: Mapped[Optional[str]] = mapped_column(TIMESTAMP)
-    workspace_utc_modified: Mapped[Optional[str]] = mapped_column(TIMESTAMP)
+    workspace_utc_created: Mapped[Optional[str]] = mapped_column(
+        TIMESTAMP(timezone=True)
+    )
+    workspace_utc_modified: Mapped[Optional[str]] = mapped_column(
+        TIMESTAMP(timezone=True)
+    )
 
     # Relationships
     sample_batch = relationship(
@@ -223,22 +227,26 @@ class SampleBatch(Base):
     sample_batch_description: Mapped[Optional[str]] = mapped_column(Text)
     sample_batch_type: Mapped[str] = mapped_column(
         String(64),
-        server_default=text(f"{sample_batch_config.DEFAULT_SAMPLE_BATCH_TYPE}"),
+        server_default=text(f"'{sample_batch_config.DEFAULT_SAMPLE_BATCH_TYPE}'"),
     )
     status: Mapped[str] = mapped_column(
         String(20),
-        server_default=text(f"{sample_batch_config.DEFAULT_SAMPLE_BATCH_STATUS}"),
+        server_default=text(f"'{sample_batch_config.DEFAULT_SAMPLE_BATCH_STATUS}'"),
     )
     locked: Mapped[int] = mapped_column(
         Integer,
-        server_default=text(f"{sample_batch_config.DEFAULT_LOCKED_STATUS}"),
+        server_default=text(f"'{sample_batch_config.DEFAULT_LOCKED_STATUS}'"),
     )
     polarity: Mapped[str] = mapped_column(
         String(4),
         server_default=text(f"'{sample_batch_config.ANALYSIS_POLARITY}'"),
     )
-    sample_batch_utc_created: Mapped[Optional[str]] = mapped_column(TIMESTAMP)
-    sample_batch_utc_modified: Mapped[Optional[str]] = mapped_column(TIMESTAMP)
+    sample_batch_utc_created: Mapped[Optional[str]] = mapped_column(
+        TIMESTAMP(timezone=True)
+    )
+    sample_batch_utc_modified: Mapped[Optional[str]] = mapped_column(
+        TIMESTAMP(timezone=True)
+    )
 
     # Relationships
     workspace = relationship("Workspace", back_populates="sample_batch")
@@ -295,8 +303,8 @@ class SampleFile(Base):
     filename: Mapped[str] = mapped_column(String(256), unique=True)
     instrument: Mapped[str] = mapped_column(String(64))
     method_file: Mapped[Optional[str]] = mapped_column(String(256))
-    datetime: Mapped[dt] = mapped_column(TIMESTAMP)
-    datetime_utc: Mapped[dt] = mapped_column(TIMESTAMP)
+    datetime: Mapped[dt] = mapped_column(TIMESTAMP(timezone=True))
+    datetime_utc: Mapped[dt] = mapped_column(TIMESTAMP(timezone=True))
     length: Mapped[float] = mapped_column(Float)
     range: Mapped[dict] = mapped_column(JSON)
     mz_calibration: Mapped[Optional[dict]] = mapped_column(JSON)
@@ -340,7 +348,7 @@ class SampleItem(Base):
     sample_item_type: Mapped[str] = mapped_column(String(64))
     locked: Mapped[int] = mapped_column(
         Integer,
-        server_default=text(f"{sample_item_config.DEFAULT_LOCKED_STATUS}"),
+        server_default=text(f"'{sample_item_config.DEFAULT_LOCKED_STATUS}'"),
     )
     sample_item_attributes: Mapped[Optional[dict]] = mapped_column(JSON)
     filter_id: Mapped[Optional[str]] = mapped_column(String(6))
@@ -355,8 +363,12 @@ class SampleItem(Base):
     )
     t0: Mapped[Optional[float]] = mapped_column(Float)
     t1: Mapped[Optional[float]] = mapped_column(Float)
-    sample_item_utc_created: Mapped[Optional[str]] = mapped_column(TIMESTAMP)
-    sample_item_utc_modified: Mapped[Optional[str]] = mapped_column(TIMESTAMP)
+    sample_item_utc_created: Mapped[Optional[str]] = mapped_column(
+        TIMESTAMP(timezone=True)
+    )
+    sample_item_utc_modified: Mapped[Optional[str]] = mapped_column(
+        TIMESTAMP(timezone=True)
+    )
 
     # Relationships
     sample_batch = relationship("SampleBatch", back_populates="sample_items")
@@ -425,7 +437,7 @@ class TargetCollection(Base):
     target_collection_type: Mapped[str] = mapped_column(
         String(64),
         server_default=text(
-            f"{target_collection_config.DEFAULT_TARGET_COLLECTION_TYPE}"
+            f"'{target_collection_config.DEFAULT_TARGET_COLLECTION_TYPE}'"
         ),
     )
 
@@ -675,8 +687,12 @@ class MatchSample(Base):
         Integer, CheckConstraint("match_category BETWEEN 0 AND 2")
     )
     sample_peak_intensity_sum: Mapped[float] = mapped_column(Float)
-    match_sample_utc_created: Mapped[Optional[str]] = mapped_column(TIMESTAMP)
-    match_sample_utc_modified: Mapped[Optional[str]] = mapped_column(TIMESTAMP)
+    match_sample_utc_created: Mapped[Optional[str]] = mapped_column(
+        TIMESTAMP(timezone=True)
+    )
+    match_sample_utc_modified: Mapped[Optional[str]] = mapped_column(
+        TIMESTAMP(timezone=True)
+    )
 
     # Relationships
     sample_item = relationship("SampleItem", back_populates="match_sample")
@@ -706,8 +722,12 @@ class MatchCollection(Base):
         Integer, CheckConstraint("match_category BETWEEN 0 AND 2")
     )
     sample_peak_intensity_sum: Mapped[float] = mapped_column(Float)
-    match_collection_utc_created: Mapped[Optional[str]] = mapped_column(TIMESTAMP)
-    match_collection_utc_modified: Mapped[Optional[str]] = mapped_column(TIMESTAMP)
+    match_collection_utc_created: Mapped[Optional[str]] = mapped_column(
+        TIMESTAMP(timezone=True)
+    )
+    match_collection_utc_modified: Mapped[Optional[str]] = mapped_column(
+        TIMESTAMP(timezone=True)
+    )
 
     # Relationships
     sample_item = relationship("SampleItem", back_populates="match_collection")
@@ -740,8 +760,12 @@ class MatchCompound(Base):
         Integer, CheckConstraint("match_category BETWEEN 0 AND 2")
     )
     sample_peak_intensity_sum: Mapped[float] = mapped_column(Float)
-    match_compound_utc_created: Mapped[Optional[str]] = mapped_column(TIMESTAMP)
-    match_compound_utc_modified: Mapped[Optional[str]] = mapped_column(TIMESTAMP)
+    match_compound_utc_created: Mapped[Optional[str]] = mapped_column(
+        TIMESTAMP(timezone=True)
+    )
+    match_compound_utc_modified: Mapped[Optional[str]] = mapped_column(
+        TIMESTAMP(timezone=True)
+    )
 
     # Relationships
     sample_item = relationship("SampleItem", back_populates="match_compound")
@@ -773,8 +797,12 @@ class MatchIon(Base):
         Integer, CheckConstraint("match_category BETWEEN 0 AND 2")
     )
     sample_peak_intensity_sum: Mapped[float] = mapped_column(Float)
-    match_ion_utc_created: Mapped[Optional[str]] = mapped_column(TIMESTAMP)
-    match_ion_utc_modified: Mapped[Optional[str]] = mapped_column(TIMESTAMP)
+    match_ion_utc_created: Mapped[Optional[str]] = mapped_column(
+        TIMESTAMP(timezone=True)
+    )
+    match_ion_utc_modified: Mapped[Optional[str]] = mapped_column(
+        TIMESTAMP(timezone=True)
+    )
 
     # Relationships
     sample_item = relationship("SampleItem", back_populates="match_ion")
@@ -798,7 +826,9 @@ class MatchRating(Base):
         String(16),
         ForeignKey("target_ion.target_ion_id", ondelete="CASCADE"),
     )
-    match_rating_utc_created: Mapped[Optional[str]] = mapped_column(TIMESTAMP)
+    match_rating_utc_created: Mapped[Optional[str]] = mapped_column(
+        TIMESTAMP(timezone=True)
+    )
     rating: Mapped[int] = mapped_column(
         Integer, CheckConstraint("rating BETWEEN 0 AND 2")
     )
@@ -835,8 +865,12 @@ class MatchIsotope(Base):
     match_score: Mapped[float] = mapped_column(
         Float, CheckConstraint("match_score BETWEEN 0 AND 1")
     )
-    match_isotope_utc_created: Mapped[Optional[str]] = mapped_column(TIMESTAMP)
-    match_isotope_utc_modified: Mapped[Optional[str]] = mapped_column(TIMESTAMP)
+    match_isotope_utc_created: Mapped[Optional[str]] = mapped_column(
+        TIMESTAMP(timezone=True)
+    )
+    match_isotope_utc_modified: Mapped[Optional[str]] = mapped_column(
+        TIMESTAMP(timezone=True)
+    )
 
     # Relationships
     sample_item = relationship("SampleItem", back_populates="match_isotope")
@@ -868,7 +902,7 @@ class InstrumentFunction(Base):
     instrument_function_id: Mapped[str] = mapped_column(String(32), primary_key=True)
     instrument: Mapped[str] = mapped_column(String(64))
     method_file: Mapped[str] = mapped_column(String(256))
-    datetime_utc: Mapped[dt] = mapped_column(TIMESTAMP)
+    datetime_utc: Mapped[dt] = mapped_column(TIMESTAMP(timezone=True))
     peakshape: Mapped[Optional[dict]] = mapped_column(JSON)
     resolution_function: Mapped[Optional[dict]] = mapped_column(JSON)
 
