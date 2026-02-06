@@ -44,7 +44,7 @@ const loading = computed(() => app.data.match.visualized.isotopes === null)
       scrollHeight="flex"
     >
       <!-- Match Score Column -->
-      <Column sortable sortField="match.match_score" class="match-column">
+      <Column class="match-column">
         <template #header>
           <span class="pi ph ph-seal-percent" />
         </template>
@@ -63,21 +63,21 @@ const loading = computed(() => app.data.match.visualized.isotopes === null)
       </Column>
 
       <!-- formula Column -->
-      <Column header="Substitution" field="formula" sortable style="width: 8rem">
+      <Column header="Substitution" field="formula" style="width: 8rem">
         <template #body="{ data }">
           {{ formatIsotopeFormula(data.target_isotope_formula) }}
         </template>
       </Column>
 
       <!-- m/z Column -->
-      <Column header="m/z" field="mz" sortable style="width: 8rem">
+      <Column header="m/z" field="mz" style="width: 8rem">
         <template #body="{ data }">
           <BaseCopyableField :field="num.mz.format(data.mz)" />
         </template>
       </Column>
 
       <!-- Relative Abundance Column -->
-      <Column header="r.a." field="relative_abundance" sortable style="width: 8rem">
+      <Column header="r.a." field="relative_abundance" style="width: 8rem">
         <template #body="{ data }">
           <BaseCopyableField :field="num.relativeAbundance.format(data.relative_abundance)" />
         </template>
@@ -112,5 +112,10 @@ const loading = computed(() => app.data.match.visualized.isotopes === null)
   flex: 1;
   min-height: 0;
   overflow: auto;
+}
+
+/* Make first row appear selected */
+.isotope-table-container :deep(.p-datatable tbody > tr:first-child) {
+  background-color: var(--p-datatable-row-selected-background) !important;
 }
 </style>

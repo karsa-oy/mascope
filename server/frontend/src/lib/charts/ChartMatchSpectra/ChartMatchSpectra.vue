@@ -57,7 +57,10 @@ const isotopeCharts = computed(() => {
   if (app.data.match.visualized.isotopes?.[0]) {
     isotopeList.push(app.data.match.visualized.isotopes[0])
   }
-  if (app.data.match.visualized.isotopeSelected) {
+  if (
+    app.data.match.visualized.isotopeSelected &&
+    app.data.match.visualized.isotopeSelected !== isotopeList[0]
+  ) {
     isotopeList.push(app.data.match.visualized.isotopeSelected)
   }
 
