@@ -202,7 +202,7 @@ async def get_match_ions(
                     TargetCollection.target_collection_name,
                     TargetCollection.target_collection_type,
                 )
-                .distinct()
+                .distinct(MatchIon.match_ion_id)
             )
 
         # Step 10: Apply sorting

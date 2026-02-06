@@ -116,6 +116,7 @@ async def get_target_ions(
         raise ValueError(
             "Both 'page' and 'limit' must be provided together or both omitted."
         )
+
     async with async_session() as session:
         # Construct the base query
         stmt = select(TargetIon)
@@ -172,7 +173,7 @@ async def get_target_ions(
                         target_collection_ids
                     ),
                     TargetIon.ionization_mechanism_id.in_(ionization_mechanism_ids),
-                ).distinct()
+                ).distinct(TargetIon.target_ion_id)
 
             # Filter ions by target_collection_id if specified
             if target_collection_id:
@@ -495,7 +496,7 @@ async def _find_samples_for_ion_and_instrument(
                     f'"{ion_mechanism_id}"'
                 )
             )
-            .distinct()
+            .distinct(SampleItem.sample_item_id)
         )
         result = await session.execute(stmt)
         return result.scalars().all()

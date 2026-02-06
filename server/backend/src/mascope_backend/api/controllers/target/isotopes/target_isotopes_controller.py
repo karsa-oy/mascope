@@ -182,7 +182,7 @@ async def get_target_isotopes(
                     TargetIon.ionization_mechanism_id.in_(
                         batch_ionization_mechanism_ids
                     ),
-                ).distinct()
+                ).distinct(TargetIsotope.target_isotope_id)
 
             # Filter isotopes by target_collection_id if specified
             if target_collection_id:

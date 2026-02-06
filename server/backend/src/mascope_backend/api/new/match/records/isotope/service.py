@@ -145,7 +145,7 @@ async def _get_sample_match_isotope_records(
                     target_collection_config.APP_ALARMING_COLLECTION_TYPES
                 ).label("alarming"),
             )
-            .distinct()
+            .distinct(TargetIsotope.target_isotope_id)
             .select_from(TargetIsotope)
             .join(
                 TargetIon,
@@ -406,7 +406,7 @@ async def _get_batch_match_isotope_records(
                     target_collection_config.APP_ALARMING_COLLECTION_TYPES
                 ).label("alarming"),
             )
-            .distinct()
+            .distinct(TargetIsotope.target_isotope_id)
             .select_from(TargetIsotope)
             .join(
                 TargetIon,

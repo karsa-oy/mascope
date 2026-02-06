@@ -80,28 +80,37 @@ async def get_samples(
     :rtype: dict
     """
     async with async_session() as session:
-        stmt = (
+        # Subquery: alarming flag per sample_item_id, max to check if ANY
+        # collection is alarming (returns 1 if any is True, 0 otherwise)
+        alarming_subq = (
             select(
-                Sample,
-                MatchSample,
-                # max to check if ANY collection is alarming (returns 1 if any is True, 0 otherwise)
+                MatchCollection.sample_item_id,
                 func.max(
                     TargetCollection.target_collection_type.in_(
                         target_collection_config.APP_ALARMING_COLLECTION_TYPES
                     ).cast(Integer)
                 ).label("alarming"),
             )
-            .outerjoin(MatchSample, Sample.sample_item_id == MatchSample.sample_item_id)
-            .outerjoin(
-                MatchCollection,
-                MatchCollection.sample_item_id == Sample.sample_item_id,
-            )
-            .outerjoin(
+            .join(
                 TargetCollection,
                 TargetCollection.target_collection_id
                 == MatchCollection.target_collection_id,
             )
-            .group_by(Sample.sample_item_id, MatchSample.sample_item_id)
+            .group_by(MatchCollection.sample_item_id)
+            .subquery()
+        )
+
+        # Main query
+        stmt = (
+            select(
+                Sample,
+                MatchSample,
+                alarming_subq.c.alarming,
+            )
+            .outerjoin(MatchSample, Sample.sample_item_id == MatchSample.sample_item_id)
+            .outerjoin(
+                alarming_subq, Sample.sample_item_id == alarming_subq.c.sample_item_id
+            )
         )
 
         if sample_item_id:
@@ -204,29 +213,36 @@ async def get_sample(
         if not (sample := await session.get(Sample, sample_item_id)):
             raise NotFoundException(f"Sample with ID '{sample_item_id}' not found")
 
-        stmt = (
+        # Subquery: alarming flag, max to check if ANY collection is alarming
+        alarming_subq = (
             select(
-                Sample,
-                MatchSample,
-                # max to check if ANY collection is alarming
+                MatchCollection.sample_item_id,
                 func.max(
                     TargetCollection.target_collection_type.in_(
                         target_collection_config.APP_ALARMING_COLLECTION_TYPES
                     ).cast(Integer)
                 ).label("alarming"),
             )
-            .outerjoin(MatchSample, Sample.sample_item_id == MatchSample.sample_item_id)
-            .outerjoin(
-                MatchCollection,
-                MatchCollection.sample_item_id == Sample.sample_item_id,
-            )
-            .outerjoin(
+            .join(
                 TargetCollection,
                 TargetCollection.target_collection_id
                 == MatchCollection.target_collection_id,
             )
+            .group_by(MatchCollection.sample_item_id)
+            .subquery()
+        )
+
+        stmt = (
+            select(
+                Sample,
+                MatchSample,
+                alarming_subq.c.alarming,
+            )
+            .outerjoin(MatchSample, Sample.sample_item_id == MatchSample.sample_item_id)
+            .outerjoin(
+                alarming_subq, Sample.sample_item_id == alarming_subq.c.sample_item_id
+            )
             .where(Sample.sample_item_id == sample_item_id)
-            .group_by(Sample.sample_item_id, MatchSample.sample_item_id)
         )
 
         result = await session.execute(stmt)

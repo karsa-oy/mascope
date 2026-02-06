@@ -1,6 +1,7 @@
 import asyncio
 
 from sqlalchemy import (
+    and_,
     asc,
     desc,
     func,
@@ -58,13 +59,13 @@ async def get_instrument_configs(
     Retrieves a paginated list of instrument configs, optionally filtered by instrument and sorted by a specified column.
 
     Steps:
-    1. Construct select query.
-    2. Apply filtering if specified.
-    3. Group by method_file and instrument to enforce uniqueness
-    3. Apply sorting if specified
-    4. Apply pagination based on page/limit args
-    5. Execute the query and fetch the results
-    6. Serialize results for the API
+    - Construct select query.
+    - Apply filtering if specified.
+    - Group by method_file and instrument to enforce uniqueness
+    - Apply sorting if specified
+    - Apply pagination based on page/limit args
+    - Execute the query and fetch the results
+    - Serialize results for the API
 
     :param instrument: Filter by instrument name.
     :param config_name: Filter by config name.
@@ -80,16 +81,35 @@ async def get_instrument_configs(
         raise ValueError(
             "Both 'page' and 'limit' must be provided together or both omitted."
         )
+
+    if filename and (instrument or method_file):
+        raise ValueError(
+            "get instrument configs: when providing a filename, you may not provide an instrument or method_file"
+        )
+
     async with async_session() as session:
-        # Step 1: construct query
-        stmt = select(InstrumentConfig)
-
-        if filename and (instrument or method_file):
-            raise ValueError(
-                "get instrument configs: when providing a filename, you may not provide an instrument or method_file"
+        # Subquery: get latest datetime_utc for each (method_file, instrument) pair
+        latest_subq = (
+            select(
+                InstrumentConfig.method_file,
+                InstrumentConfig.instrument,
+                func.max(InstrumentConfig.datetime_utc).label("max_datetime_utc"),
             )
+            .group_by(InstrumentConfig.method_file, InstrumentConfig.instrument)
+            .subquery()
+        )
 
-        # Step 2: Apply filters if provided
+        # Main query: join to get full records for latest configs
+        stmt = select(InstrumentConfig).join(
+            latest_subq,
+            and_(
+                InstrumentConfig.method_file == latest_subq.c.method_file,
+                InstrumentConfig.instrument == latest_subq.c.instrument,
+                InstrumentConfig.datetime_utc == latest_subq.c.max_datetime_utc,
+            ),
+        )
+
+        # -- Apply filters if provided --
         if instrument:
             stmt = stmt.where(InstrumentConfig.instrument == instrument)
         if method_file:
@@ -100,12 +120,7 @@ async def get_instrument_configs(
         if datetime_utc:
             stmt = stmt.where(InstrumentConfig.datetime_utc == datetime_utc)
 
-        # Step 3: Group by method_file & instrument to enforce uniqueness
-        stmt = stmt.group_by(
-            InstrumentConfig.method_file, InstrumentConfig.instrument
-        ).having(func.max(InstrumentConfig.datetime_utc))
-
-        # Step 4: Apply sorting
+        # -- Apply sorting --
         if sort:
             stmt = (
                 stmt.order_by(desc(getattr(InstrumentConfig, sort)))
@@ -113,18 +128,18 @@ async def get_instrument_configs(
                 else stmt.order_by(asc(getattr(InstrumentConfig, sort)))
             )
 
-        # Step 4: Apply pagination
+        # -- Apply pagination --
         total = await session.scalar(
             select(func.count()).select_from(stmt)  # pylint: disable=not-callable
         )
         if page is not None and limit is not None:
             stmt = stmt.offset(page * limit).limit(limit)
 
-        # Step 5: Execute the query
+        # -- Execute the query --
         result = await session.execute(stmt)
         instrument_configs = result.scalars().all()
 
-        # Step 6: Serialize results to dict
+        # -- Serialize results to dict --
         return {
             "message": "Instrument functions retrieved successfully.",
             "results": total,
