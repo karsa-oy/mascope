@@ -455,10 +455,19 @@ class RuntimeConfigLoader:
         # Layer 3: Env-specific overrides (not tracked, optional)
         mode_env_path = self.runtime.env.path(f"./{self.runtime.mode}.mascope.toml")
 
+        # Debug output
+        self.runtime.logger.trace("Config loading:")
+        self.runtime.logger.trace(f"  Runtime env.name: {self.runtime.env.name}")
+        self.runtime.logger.trace(f"  Runtime mode: {self.runtime.mode}")
+        self.runtime.logger.trace(f"  Layer 1 (base): {base_path}")
+        self.runtime.logger.trace(f"  Layer 2 (mode): {mode_base_path}")
+        self.runtime.logger.trace(f"  Layer 3 (env):  {mode_env_path}")
+
         raw_config = {}
         # Apply layers in order: base → mode (lib) → mode (env)
         for path in [base_path, mode_base_path, mode_env_path]:
             if os.path.exists(path):
+                self.runtime.logger.trace(f"  ✅ Loading: {path}")
                 with open(path, "rb") as f:
                     # apply overlay
                     overlay = tomllib.load(f)
@@ -471,6 +480,9 @@ class RuntimeConfigLoader:
                         raw_config[module_key] = self._deep_merge(
                             base_config, module_overlay
                         )
+            else:
+                self.runtime.logger.trace(f"  ❌ Not found: {path}")
+
         return raw_config
 
     def _resolve_paths(self, unresolved: any | None = None) -> None:
@@ -493,9 +505,23 @@ class RuntimeConfigLoader:
                 # resolve relative paths
                 if value.startswith("./"):
                     # resolve against env
-                    resolved[key] = self.runtime.env.realpath(value)
-                # keep non-relative paths as-is
+                    resolved_path = self.runtime.env.realpath(value)
+                    resolved[key] = resolved_path
+
+                    # Debug logging for important paths
+                    if key in [
+                        "filestore",
+                        "database",
+                        "log_path",
+                        "source",
+                        "data_dir",
+                    ]:
+                        self.runtime.logger.trace(
+                            f"Path resolved: {key}: '{value}' → '{resolved_path}'"
+                        )
+
                 else:
+                    # keep non-relative paths as-is
                     resolved[key] = value
             else:
                 resolved[key] = value
