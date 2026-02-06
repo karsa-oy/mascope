@@ -130,7 +130,8 @@ onBeforeUnmount(() => {
                       collectionId:
                         data.match[index].target_collection_ids.find(
                           (id) => id === app.data.match.collection.focusedId // In case the currently focused collection is among the matches, prioritize it
-                        ) || data.match[index].target_collection_ids[0] // Otherwise just take the first one
+                        ) || data.match[index].target_collection_ids[0], // Otherwise just take the first one
+                      isotopeId: data.match[index].target_isotope_id
                     })
                   }
                 }

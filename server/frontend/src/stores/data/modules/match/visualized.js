@@ -52,12 +52,14 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
   async function set({
     sampleId = cache.sampleId,
     ionId = cache.ionId,
-    collectionId = cache.collectionId
+    collectionId = cache.collectionId,
+    isotopeId = null
   }) {
     console.debug('[🧬 data match.visualized] Set', {
       sampleId,
       ionId,
-      collectionId
+      collectionId,
+      isotopeId
     })
     const sampleChanged = sampleId !== cache.sampleId
     const ionChanged = ionId !== cache.ionId
@@ -82,7 +84,7 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
     Object.assign(cache, { sampleId, ionId, collectionId })
 
     // Load matches and activate visualization
-    await load({ sampleId, ionId, collectionId, init: true })
+    await load({ sampleId, ionId, collectionId, isotopeId, init: true })
   }
 
   async function reload({ init } = { init: false }) {
@@ -101,14 +103,14 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
     Object.assign(cache, { sampleId: null, ionId: null, collectionId: null })
   }
 
-  async function load({ sampleId, ionId, collectionId, init } = { init: true }) {
+  async function load({ sampleId, ionId, collectionId, isotopeId, init } = { init: true }) {
     isotopes.value = null
     // Resolve IDs from current state or cache
     const sample_item_id =
       sampleId ?? ion.value?.match?.sample_item_id ?? sample.focused?.sample_item_id
     const target_ion_id = ionId ?? ion.value?.target_ion_id
     const target_collection_id = collectionId ?? matchCollection.focused.target_collection_id
-    const target_isotope_id = isotopeSelected.value?.target_isotope_id
+    const target_isotope_id = isotopeId ?? isotopeSelected.value?.target_isotope_id
     if (!sample_item_id || !target_ion_id || !target_collection_id) {
       isotopeSelected.value = null
       return
