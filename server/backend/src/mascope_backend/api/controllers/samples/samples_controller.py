@@ -17,6 +17,8 @@ from mascope_backend.db import (
     MatchIsotope,
     MatchSample,
     TargetCollection,
+    TargetCompound,
+    TargetCompoundInTargetCollection,
     TargetIon,
     TargetIsotope,
     async_session,
@@ -398,6 +400,7 @@ async def get_sample_peaks(
                     TargetIsotope.target_isotope_formula,
                     TargetIon.target_ion_id,
                     TargetIon.target_ion_formula,
+                    TargetCollection.target_collection_id,
                 )
                 .select_from(MatchIsotope)
                 .join(
@@ -407,6 +410,28 @@ async def get_sample_peaks(
                 .join(
                     TargetIon,
                     TargetIon.target_ion_id == TargetIsotope.target_ion_id,
+                )
+                .join(
+                    TargetCompound,
+                    TargetCompound.target_compound_id == TargetIon.target_compound_id,
+                )
+                .join(
+                    TargetCompoundInTargetCollection,
+                    TargetCompoundInTargetCollection.target_compound_id
+                    == TargetCompound.target_compound_id,
+                )
+                .join(
+                    TargetCollection,
+                    TargetCollection.target_collection_id
+                    == TargetCompoundInTargetCollection.target_collection_id,
+                )
+                .join(
+                    MatchCollection,
+                    and_(
+                        MatchCollection.sample_item_id == MatchIsotope.sample_item_id,
+                        MatchCollection.target_collection_id
+                        == TargetCollection.target_collection_id,
+                    ),
                 )
                 .where(
                     and_(
@@ -419,20 +444,40 @@ async def get_sample_peaks(
             match_rows = result.all()
 
         # Build a mapping from sample_peak_id to match data
+        # Group by isotope formula to avoid duplicates, collecting all collection IDs
         sample_peak_ids = sample_file_data.peak_id.values.tolist()
-        peak_id_to_match = {peak_id: [] for peak_id in sample_peak_ids}
+        peak_id_to_match = {peak_id: {} for peak_id in sample_peak_ids}
+
         for row in match_rows:
             if row.sample_peak_id in peak_id_to_match:
-                peak_id_to_match[row.sample_peak_id].append(
-                    {
+                # Use isotope formula as key to deduplicate
+                if (
+                    row.target_isotope_formula
+                    not in peak_id_to_match[row.sample_peak_id]
+                ):
+                    peak_id_to_match[row.sample_peak_id][row.target_isotope_formula] = {
                         "target_isotope_formula": row.target_isotope_formula,
                         "target_ion_id": row.target_ion_id,
                         "target_ion_formula": row.target_ion_formula,
+                        "target_collection_ids": [row.target_collection_id],
                     }
-                )
+                else:
+                    # Same isotope in another collection - add collection ID if not already present
+                    if (
+                        row.target_collection_id
+                        not in peak_id_to_match[row.sample_peak_id][
+                            row.target_isotope_formula
+                        ]["target_collection_ids"]
+                    ):
+                        peak_id_to_match[row.sample_peak_id][
+                            row.target_isotope_formula
+                        ]["target_collection_ids"].append(row.target_collection_id)
+
         # Create list of matches in the same order as sample_peak_ids
+        # Convert dict values to list for each peak
         response_data["match"] = [
-            peak_id_to_match.get(peak_id, []) for peak_id in sample_peak_ids
+            list(peak_id_to_match.get(peak_id, {}).values())
+            for peak_id in sample_peak_ids
         ]
     else:
         response_data["match"] = None
