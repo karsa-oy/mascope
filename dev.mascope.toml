@@ -9,9 +9,18 @@
 workers = 1  # uvicorn workers ("auto" || int)
 log_level = "debug"
 
+[backend.database]
+type = "postgres"   # "sqlite" or "postgres"
+
+# Connection
+host = "localhost"
+
+# Engine
+pool_size = 5
+max_overflow = 10
+
 [backend.redis]
 host = "localhost"  # Dev Redis runs on localhost
-container_name = "mascope_redis_dev"
 
 [file-converter]
 server = "localhost"  # Connect to dev backend

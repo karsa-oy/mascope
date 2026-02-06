@@ -8,6 +8,16 @@
 [backend]
 workers = "auto" # uvicorn workers ("auto" || int)
 
+[backend.database]
+type = "sqlite"   # "sqlite" or "postgres"
+
+# Connection
+host = "postgres"  # Docker Compose service name
+
+# Engine
+pool_size = 20
+max_overflow = 30
+
 [backend.redis]
 host = "redis"  # Docker Compose service name
 

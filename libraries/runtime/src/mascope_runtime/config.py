@@ -40,6 +40,104 @@ class MetaConfig(BaseModel):
     filestore: str = r"./filestore"  # filestore path
 
 
+class DatabaseConfig(BaseModel):
+    """
+    Database configuration settings.
+
+    Centralized configuration for PostgreSQL database connections, timeouts, and engine settings.
+    """
+
+    # Database type selector
+    type: Literal["sqlite", "postgres"] = "sqlite"
+
+    # Storage paths (relative to runtime env)
+    data_dir: str = "./database"  # SQLite only: env./database/mascope.v43.db
+
+    # PostgreSQL connection settings
+    host: str = "localhost"
+    port: int = 5432
+    database: str = "mascope"  # Base name - actual will be mascope_{env}
+    user: str = "mascope_user"  # password loaded via secret
+
+    # Container settings (PostgreSQL only)
+    container_name: str = "mascope_dev_postgres"
+
+    # Connection timeout
+    connection_timeout: int = 30  # How long to wait when database is locked
+
+    # SQLAlchemy engine settings
+    pool_size: int = 5  # Base pool size - max persistent connections kept open
+    max_overflow: int = (
+        10  # Additional connections allowed beyond pool_size when needed
+    )
+    pool_timeout: int = 60  # Seconds to wait for available connection before timeout
+    pool_pre_ping: bool = True  # Check connection liveness before using from pool
+    expire_on_commit: bool = False  # Keep objects loaded after commit
+
+    def get_sqlite_path(self, version: int) -> str:
+        """Get full path to SQLite database file."""
+        return os.path.join(self.data_dir, f"mascope.v{version}.db")
+
+    def get_sqlite_url(self, version: int) -> str:
+        """
+        Build SQLite async URL (aiosqlite driver).
+
+        :param version: Database schema version
+        :return: SQLite async connection URL
+        """
+        return f"sqlite+aiosqlite:///{self.get_sqlite_path(version)}"
+
+    def get_sqlite_url_sync(self, version: int) -> str:
+        """
+        Build SQLite sync URL (sqlite3 driver).
+
+        Used by Alembic for migrations.
+
+        :param version: Database schema version
+        :return: SQLite sync connection URL
+        """
+        return f"sqlite:///{self.get_sqlite_path(version)}"
+
+    def get_connect_args(self) -> dict:
+        """Get database-specific connect_args for engine."""
+        if self.type == "sqlite":
+            return {"timeout": self.connection_timeout}
+        return {}
+
+    def get_postgres_database_name(self, env_name: str) -> str:
+        """
+        Get environment-specific database name.
+
+        :param env_name: Runtime environment name (e.g., 'default', 'test-env')
+        :return: Database name like 'mascope_default' or 'mascope_test_env'
+        """
+        # Sanitize env name for PostgreSQL (replace hyphens with underscores)
+        safe_env = env_name.replace("-", "_").replace(" ", "_")
+        return f"{self.database}_{safe_env}"
+
+    def get_postgres_url(self, password: str, env_name: str) -> str:
+        """
+        Build PostgreSQL async URL (asyncpg driver).
+
+        :param password: Database password
+        :param env_name: Runtime environment name
+        :return: PostgreSQL async connection URL
+        """
+        db_name = self.get_postgres_database_name(env_name)
+        return f"postgresql+asyncpg://{self.user}:{password}@{self.host}:{self.port}/{db_name}"
+
+    def get_postgres_url_sync(self, password: str, env_name: str) -> str:
+        """
+        Build PostgreSQL sync URL (psycopg2 driver) - used by Alembic.
+
+        :param password: Database password
+        :param env_name: Runtime environment name
+        :return: PostgreSQL sync connection URL
+        """
+        db_name = self.get_postgres_database_name(env_name)
+        return f"postgresql+psycopg2://{self.user}:{password}@{self.host}:{self.port}/{db_name}"
+
+
 class ModuleConfig(BaseModel):
     """
     Base class for module-specific configuration; every  module
@@ -67,10 +165,9 @@ class RedisConfig(BaseModel):
 
     host: str = "localhost"
     port: int = 6379
-    container_name: str = "mascope_redis"
-    image: str = "redis:7-alpine"
+    container_name: str = "mascope_dev_redis"
 
-    def get_url(self) -> str:
+    def get_redis_url(self) -> str:
         """Build Redis URL from host and port."""
         return f"redis://{self.host}:{self.port}"
 
@@ -80,7 +177,7 @@ class BackendConfig(ModuleConfig):
     Backend module specific configuration options
     """
 
-    database: str = r"./database"  # path to the database folder
+    database: DatabaseConfig = DatabaseConfig()
     filestreams: str = r"./filestreams"  # path to the file streams folder
     redis: RedisConfig = RedisConfig()
     workers: Literal["auto"] | int = "auto"  # uvicorn workers, auto -  half cpu cores
@@ -311,6 +408,28 @@ class RuntimeConfigLoader:
         """
         return self._resolved
 
+    def _deep_merge(self, base: dict, overlay: dict) -> dict:
+        """
+        Deep merge overlay into base, preserving nested dicts.
+
+        :param base: Base dictionary
+        :param overlay: Overlay dictionary to merge
+        :return: Merged dictionary
+        """
+        result = base.copy()
+        for key, value in overlay.items():
+            if (
+                key in result
+                and isinstance(result[key], dict)
+                and isinstance(value, dict)
+            ):
+                # Recursively merge nested dicts
+                result[key] = self._deep_merge(result[key], value)
+            else:
+                # Override with overlay value
+                result[key] = value
+        return result
+
     def _load_tomls(self):
         """
         Load configuration with three-layer overlay system:
@@ -347,11 +466,11 @@ class RuntimeConfigLoader:
                         module_key = module.replace("-", "_")
                         if module_key not in raw_config:
                             raw_config[module_key] = {}
-                        raw_config[module_key] = {
-                            "name": module,  # pass the module name
-                            **raw_config[module_key],  # inherit previous layer
-                            **module_overlay,  # override with overlay
-                        }
+
+                        base_config = {"name": module, **raw_config[module_key]}
+                        raw_config[module_key] = self._deep_merge(
+                            base_config, module_overlay
+                        )
         return raw_config
 
     def _resolve_paths(self, unresolved: any | None = None) -> None:
