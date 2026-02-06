@@ -1,123 +1,72 @@
 """
-Redis container management for multi-worker development.
+Redis utilities for development.
 
-Provides commands to start, stop, and manage Redis Docker containers
-required for Socket.IO coordination across multiple uvicorn workers.
+Container managed by docker-compose. Use 'mascope dev up/down' for lifecycle management.
 """
 
-import os
 import subprocess
+import time
 from typing import Annotated
 import typer
-from mascope_cli.cmd.dev.docker import (
-    is_docker_running,
-    check_and_start_docker,
-)
+
+from mascope_cli.cmd.dev.docker import is_docker_running
 from mascope_cli.runtime import runtime
 
 dev_redis_app = typer.Typer()
 
 
-def _manage_redis_container() -> bool:
-    """
-    Manage local Redis Docker container.
+def _is_container_running() -> bool:
+    """Check if Redis container is running."""
+    container_name = runtime.full_config.backend.redis.container_name
 
-    Checks if container exists and is running, starts if stopped,
-    or creates if it doesn't exist.
+    try:
+        result = subprocess.run(
+            [
+                "docker",
+                "ps",
+                "--filter",
+                f"name={container_name}",
+                "--format",
+                "{{.Names}}",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        return container_name in result.stdout
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return False
 
-    :raise: subprocess.CalledProcessError: If Docker commands fail
-    :return: True if container is running or successfully started
-    :rtype: bool
-    """
+
+def _is_redis_responding() -> bool:
+    """Check if Redis responds to PING."""
     redis_cfg = runtime.full_config.backend.redis
 
-    # Check if container is running
     result = subprocess.run(
         [
             "docker",
-            "ps",
-            "--filter",
-            f"name={redis_cfg.container_name}",
-            "--format",
-            "{{.Names}}",
-        ],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-
-    if redis_cfg.container_name in result.stdout:
-        runtime.logger.success(
-            f"Redis container '{redis_cfg.container_name}' is running on port {redis_cfg.port}"
-        )
-        return True
-
-    # Check if container exists but is stopped
-    result = subprocess.run(
-        [
-            "docker",
-            "ps",
-            "-a",
-            "--filter",
-            f"name={redis_cfg.container_name}",
-            "--format",
-            "{{.Names}}",
-        ],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-
-    # Start if exists
-    if redis_cfg.container_name in result.stdout:
-        runtime.logger.info(f"Starting Redis container '{redis_cfg.container_name}'...")
-        subprocess.run(
-            ["docker", "start", redis_cfg.container_name],
-            capture_output=True,
-            check=True,
-        )
-        runtime.logger.success(f"Redis started on port {redis_cfg.port}")
-        return True
-
-    # Container doesn't exist, create it
-    runtime.logger.info(
-        f"Creating Redis container '{redis_cfg.container_name}' on port {redis_cfg.port}..."
-    )
-    subprocess.run(
-        [
-            "docker",
-            "run",
-            "-d",
-            "-p",
-            f"{redis_cfg.port}:{redis_cfg.port}",
-            "--name",
+            "exec",
             redis_cfg.container_name,
-            "--restart",
-            "unless-stopped",
-            redis_cfg.image,
-            "redis-server",
-            "--port",
+            "redis-cli",
+            "-p",
             str(redis_cfg.port),
+            "ping",
         ],
         capture_output=True,
-        check=True,
+        text=True,
+        timeout=5,
+        check=False,
     )
-    runtime.logger.success(f"Redis created and started on port {redis_cfg.port}")
-    return True
+
+    return result.returncode == 0 and "PONG" in result.stdout
 
 
-def check_and_start_redis() -> bool:
+def _check_prerequisites() -> bool:
     """
-    Check if Redis is running and start it if necessary.
+    Check if Redis environment is ready.
 
-    Validates Redis configuration, checks container status, and automatically
-    creates/starts the container if needed. Only manages local Docker containers
-    (localhost/127.0.0.1); remote Redis hosts are assumed to be externally managed.
-
-    :return: True if Redis is running or successfully started, False otherwise
-    :rtype: bool
+    :return: True if all checks pass
     """
-    # Validate Redis configuration exists
     if not (redis_cfg := runtime.full_config.backend.redis):
         runtime.logger.warning("Redis not configured in .mascope.toml")
         return False
@@ -126,233 +75,84 @@ def check_and_start_redis() -> bool:
     if redis_cfg.host not in ["localhost", "127.0.0.1"]:
         runtime.logger.info(f"Redis configured for remote host: {redis_cfg.host}")
         runtime.logger.info("Skipping Docker container management")
-        return True
-
-    # Check if Docker is running (with interactive prompts)
-    if not check_and_start_docker(allow_skip=True, auto_start=True):
-        return False  # User chose to skip or Docker failed to start
-
-    # Manage local Docker container
-    try:
-        return _manage_redis_container()
-    except subprocess.CalledProcessError as e:
-        runtime.logger.error(f"Failed to start Redis: {e}")
-        runtime.logger.info("  Redis is required for multi-worker mode.")
-        runtime.logger.info(
-            f"  Run manually: docker run -d -p {redis_cfg.port}:{redis_cfg.port} "
-            f"--name {redis_cfg.container_name} {redis_cfg.image}"
-        )
         return False
-    except FileNotFoundError:
-        runtime.logger.error(
-            "Docker not found. Install Docker to use Redis for multi-worker mode."
-        )
+
+    if not is_docker_running():
+        runtime.logger.error("Docker daemon is not running")
         return False
+
+    return True
+
+
+def _check_redis() -> bool:
+    """
+    Check if Redis is ready.
+
+    :return: True if configured, running, and responding
+    """
+    if not _check_prerequisites():
+        return False
+
+    if not _is_container_running():
+        return False
+
+    return _is_redis_responding()
+
+
+def wait_for_redis(max_wait: int = 30) -> bool:
+    """
+    Wait for Redis container to be running and responding (public check for other modules).
+
+    :param max_wait: Maximum wait time in seconds
+    :return: True if Redis is ready within timeout, False otherwise
+    """
+    runtime.logger.info("Waiting for redis...")
+
+    waited = 0
+    while waited < max_wait:
+        if _check_redis():
+            runtime.logger.success("Redis is ready")
+            return True
+        time.sleep(2)
+        waited += 2
+
+    runtime.logger.warning(f"Redis not ready after {max_wait}s")
+    return False
 
 
 @dev_redis_app.callback()
 def main():
-    """
-    Manage Redis for multi-worker Socket.IO
-    """
-
-
-@dev_redis_app.command()
-def start():
-    """
-    Start Redis container (or check if already running).
-
-    Checks configuration, creates container if needed, and ensures Redis is running.
-    """
-    check_and_start_redis()
-
-
-@dev_redis_app.command()
-def stop():
-    """
-    Stop the Redis container.
-
-    Container is not removed and can be restarted with 'start' command.
-    """
-    if not (redis_cfg := runtime.full_config.backend.redis):
-        runtime.logger.warning("Redis not configured in .mascope.toml")
-        return
-
-    runtime.logger.info(f"Stopping Redis container '{redis_cfg.container_name}'...")
-
-    result = subprocess.run(
-        ["docker", "stop", redis_cfg.container_name],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-
-    if result.returncode == 0:
-        runtime.logger.success("Redis container stopped")
-    else:
-        runtime.logger.warning(
-            f"Container '{redis_cfg.container_name}' not found or already stopped"
-        )
-
-
-@dev_redis_app.command()
-def restart():
-    """
-    Restart the Redis container.
-
-    Useful for clearing Redis data or applying configuration changes.
-    """
-    if not (redis_cfg := runtime.full_config.backend.redis):
-        runtime.logger.warning("Redis not configured in .mascope.toml")
-        return
-
-    runtime.logger.info(f"Restarting Redis container '{redis_cfg.container_name}'...")
-
-    result = subprocess.run(
-        ["docker", "restart", redis_cfg.container_name],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-
-    if result.returncode == 0:
-        runtime.logger.success("Redis container restarted")
-    else:
-        runtime.logger.warning(f"Container '{redis_cfg.container_name}' not found")
-        runtime.logger.info("  Run 'mascope dev redis start' to create it")
-
-
-@dev_redis_app.command()
-def remove():
-    """
-    Remove the Redis container completely.
-
-    WARNING: This will delete any data stored in Redis.
-    Container can be recreated with 'start' command.
-    """
-    if not (redis_cfg := runtime.full_config.backend.redis):
-        runtime.logger.warning("Redis not configured in .mascope.toml")
-        return
-
-    # Confirm before removing
-    if not typer.confirm(
-        f"Remove Redis container '{redis_cfg.container_name}'? This will delete all data."
-    ):
-        runtime.logger.info("Cancelled.")
-        return
-
-    runtime.logger.info(f"Removing Redis container '{redis_cfg.container_name}'...")
-    subprocess.run(
-        ["docker", "rm", "-f", redis_cfg.container_name],
-        capture_output=True,
-        check=False,
-    )
-    runtime.logger.success("Redis container removed")
+    """Redis utilities (container managed by docker-compose)"""
 
 
 @dev_redis_app.command()
 def status():
     """
     Show Redis container status and configuration.
-
-    Displays current configuration from .mascope.toml, worker settings,
-    and Docker container status.
     """
-    if not (redis_cfg := runtime.full_config.backend.redis):
-        runtime.logger.warning("Redis not configured in .mascope.toml")
-        typer.echo("\nTo enable Redis, add to your .mascope.toml:")
-        typer.echo(
-            """
-            [redis]
-            host = "localhost"
-            port = 6379
-            container_name = "mascope_redis"
-            image = "redis:7-alpine"
-            """
-        )
+    if not _check_prerequisites():
         return
 
-    # Display Redis configuration
-    typer.secho("\n=== Redis Configuration ===", bold=True)
-    typer.echo(f"Host:           {redis_cfg.host}")
-    typer.echo(f"Port:           {redis_cfg.port}")
-    typer.echo(f"URL:            {redis_cfg.get_url()}")
-    typer.echo(f"Container name: {redis_cfg.container_name}")
-    typer.echo(f"Image:          {redis_cfg.image}")
+    redis_cfg = runtime.full_config.backend.redis
 
-    # Display worker configuration if backend exists
-    if backend_cfg := runtime.full_config.backend:
-        workers_config = backend_cfg.workers
-        workers_actual = backend_cfg.get_worker_count()
+    # Configuration
+    runtime.logger.info("=== Configuration ===")
+    runtime.logger.info(f"Host: {redis_cfg.host}:{redis_cfg.port}")
+    runtime.logger.info(f"URL:  {redis_cfg.get_redis_url()}")
+    runtime.logger.info(f"Container: {redis_cfg.container_name}")
 
-        typer.secho("\n=== Worker Configuration ===", bold=True)
-        typer.echo(f"Config:         {workers_config}")
-        if workers_config == "auto":
-            typer.echo(
-                f"Calculated:     {workers_actual} ({os.cpu_count()} CPU cores // 2)"
-            )
-        else:
-            typer.echo(f"Workers:        {workers_actual}")
-
-    # Check Docker status
-    if not is_docker_running():
-        typer.secho("\n=== Docker Status ===", bold=True)
-        typer.secho("Status: NOT RUNNING", fg=typer.colors.RED)
-        typer.echo("  Start Docker to use Redis")
-        typer.echo("============================\n")
+    # Status
+    runtime.logger.info("=== Status ===")
+    if not _is_container_running():
+        runtime.logger.warning("Container not running")
+        runtime.logger.info("Run 'mascope dev up' to start")
         return
 
-    # Check Docker container status
-    typer.secho("\n=== Container Status ===", bold=True)
-
-    try:
-        # Check if running
-        result = subprocess.run(
-            [
-                "docker",
-                "ps",
-                "--filter",
-                f"name={redis_cfg.container_name}",
-                "--format",
-                "{{.Status}}",
-            ],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-
-        if result.stdout.strip():
-            typer.secho("Status: RUNNING", fg=typer.colors.GREEN)
-            typer.echo(f"  {result.stdout.strip()}")
-        else:
-            # Check if stopped
-            result = subprocess.run(
-                [
-                    "docker",
-                    "ps",
-                    "-a",
-                    "--filter",
-                    f"name={redis_cfg.container_name}",
-                    "--format",
-                    "{{.Status}}",
-                ],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-
-            if result.stdout.strip():
-                typer.secho("Status: STOPPED", fg=typer.colors.YELLOW)
-                typer.echo(f"  {result.stdout.strip()}")
-                typer.echo("\nRun 'mascope dev redis start' to start it")
-            else:
-                typer.secho("Status: NOT CREATED", fg=typer.colors.BLUE)
-                typer.echo("\nRun 'mascope dev redis start' to create it")
-
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        typer.secho("Status: UNKNOWN (Docker not available)", fg=typer.colors.RED)
-
-    typer.echo("============================\n")
+    if _is_redis_responding():
+        runtime.logger.success("Redis ready")
+    else:
+        runtime.logger.warning("Redis not responding")
+        runtime.logger.info("Check logs: mascope dev redis logs")
 
 
 @dev_redis_app.command()
@@ -369,24 +169,29 @@ def logs(
     """
     Show Redis container logs.
 
-    Useful for debugging connection issues or monitoring Redis activity.
+    Useful for debugging connection issues or monitoring activity.
     """
-    if not (redis_cfg := runtime.full_config.backend.redis):
-        runtime.logger.warning("Redis not configured in .mascope.toml")
+    if not _check_prerequisites():
         return
 
+    if not _is_container_running():
+        runtime.logger.warning("Container not running")
+        runtime.logger.info("Run 'mascope dev up' to start")
+        return
+
+    container_name = runtime.full_config.backend.redis.container_name
     cmd = ["docker", "logs"]
+
     if follow:
         cmd.append("-f")
-    cmd.extend(["--tail", str(tail), redis_cfg.container_name])
+    cmd.extend(["--tail", str(tail), container_name])
 
     try:
         subprocess.run(cmd, check=True)
     except subprocess.CalledProcessError:
-        runtime.logger.warning(f"Container '{redis_cfg.container_name}' not found")
-        runtime.logger.info("  Run 'mascope dev redis start' to create it")
+        runtime.logger.warning(f"Container '{container_name}' not found")
     except KeyboardInterrupt:
-        runtime.logger.success("\nStopped following logs")
+        runtime.logger.success("Stopped following logs")
 
 
 @dev_redis_app.command()
@@ -404,41 +209,18 @@ def cli():
         KEYS mascope:session:*               # List all saved mascope sessions
         TTL mascope:session:/:{session_key}  # Check session TTL
     """
-    if not (redis_cfg := runtime.full_config.backend.redis):
-        runtime.logger.warning("Redis not configured in .mascope.toml")
+    if not _check_prerequisites():
         return
 
-    # Check if Docker is running
-    if not is_docker_running():
-        runtime.logger.error("Docker daemon is not running")
-        runtime.logger.info("  Start Docker Desktop first")
+    if not _is_container_running():
+        runtime.logger.warning("Redis container is not running")
+        runtime.logger.info("Run 'mascope dev up' first")
         return
 
-    # Check if container is running
-    result = subprocess.run(
-        [
-            "docker",
-            "ps",
-            "--filter",
-            f"name={redis_cfg.container_name}",
-            "--format",
-            "{{.Names}}",
-        ],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    redis_cfg = runtime.full_config.backend.redis
 
-    if redis_cfg.container_name not in result.stdout:
-        runtime.logger.warning(f"Container '{redis_cfg.container_name}' is not running")
-        runtime.logger.info("  Run 'mascope dev redis start' first")
-        return
-
-    runtime.logger.info(
-        f"Opening Redis CLI in container '{redis_cfg.container_name}'..."
-    )
-    runtime.logger.info("  Type 'exit' or press Ctrl+D to close")
-    typer.echo("")
+    runtime.logger.info("Opening Redis CLI")
+    runtime.logger.info("Type 'exit' or press Ctrl+D to close")
 
     try:
         subprocess.run(
@@ -456,4 +238,4 @@ def cli():
     except subprocess.CalledProcessError:
         runtime.logger.error("Failed to open Redis CLI")
     except KeyboardInterrupt:
-        runtime.logger.success("\nClosed Redis CLI")
+        runtime.logger.success("Closed Redis CLI")

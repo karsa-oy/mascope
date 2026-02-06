@@ -8,22 +8,38 @@ import base64
 import json
 import os
 import platform
+from pathlib import Path
 from typing import List, Annotated, Optional
 import typer
 
-from mascope_runtime import Runtime
 
 from mascope_cli.runtime import runtime
-import mascope_cli.cmd.lib as lib
-
-from mascope_cli.cmd.dev.docker import dev_docker_app
-from mascope_cli.cmd.dev.redis import dev_redis_app, check_and_start_redis
+from mascope_cli.cmd import lib
+from mascope_cli.cmd.dev.docker import (
+    dev_docker_app,
+    check_and_start_docker,
+)
+from mascope_cli.cmd.dev.migrate import (
+    dev_migrate_app,
+    check_pending_migrations,
+    run_migrations,
+)
+from mascope_cli.cmd.dev.postgres import (
+    create_database,
+    dev_postgres_app,
+    wait_for_server,
+)
+from mascope_cli.cmd.dev.redis import dev_redis_app, wait_for_redis
 from mascope_cli.cmd.dev.tools import dev_tools_app
+from mascope_runtime import Runtime
 
 
 dev_app = typer.Typer()
 
 concurrently = "concurrently.cmd" if platform.system() == "Windows" else "concurrently"
+
+# Path to dev docker-compose file
+DEV_COMPOSE_PATH = Path(os.environ["MASCOPE_PATH"]) / "docker-compose.dev.yaml"
 
 
 @dev_app.callback()
@@ -33,10 +49,198 @@ def main():
     """
 
 
-# Add the tools_app as a subgroup under dev
+# Add subcommands
 dev_app.add_typer(dev_docker_app, name="docker")
+dev_app.add_typer(dev_migrate_app, name="migrate")
+dev_app.add_typer(dev_postgres_app, name="postgres")
 dev_app.add_typer(dev_redis_app, name="redis")
 dev_app.add_typer(dev_tools_app, name="tools")
+
+
+def _check_data_dirs():
+    """
+    Create PostgreSQL data directory if not exists.
+
+    Creates directories with user permissions before Docker starts
+    to avoid root-owned directories.
+
+    Note: Currently Redis uses named volume, not bind mount, so no directory needed
+    """
+    # PostgreSQL data directory (dev mode)
+    postgres_dir = Path(os.environ["MASCOPE_PATH"]) / ".runtime" / "database" / "dev"
+    if not postgres_dir.exists():
+        postgres_dir.mkdir(parents=True, exist_ok=True)
+        runtime.logger.success(f"PostgreSQL data directory created at {postgres_dir}")
+    else:
+        runtime.logger.debug(f"PostgreSQL data directory located at {postgres_dir}")
+
+
+def _run_dev_compose(args: list[str]):
+    """
+    Execute docker-compose command for dev environment.
+
+    :param args: Docker compose arguments (e.g., ['up', '-d'])
+    """
+    db_cfg = runtime.full_config.backend.database
+    redis_cfg = runtime.full_config.backend.redis
+
+    lib.run(
+        command=f"docker compose --file '{DEV_COMPOSE_PATH}' {' '.join(args)}",
+        vars={
+            "MASCOPE_ENV": runtime.env.name,
+            "MASCOPE_PATH": os.environ["MASCOPE_PATH"],
+            # Inject config values
+            "POSTGRES_CONTAINER_NAME": db_cfg.container_name,
+            "POSTGRES_PORT": str(db_cfg.port),
+            "POSTGRES_USER": db_cfg.user,
+            "REDIS_CONTAINER_NAME": redis_cfg.container_name,
+            "REDIS_PORT": str(redis_cfg.port),
+        },
+    )
+
+
+def _run_application(
+    modules: List[str],
+    host: bool = False,
+    lab: bool = False,
+    reload: bool = False,
+):
+    """
+    Internal helper to run application services.
+
+    :param modules: List of module names or tags to run
+    :param host: Whether to expose to network
+    :param lab: Whether to include jupyter lab
+    :param reload: Whether to use Windows reload mode
+    """
+    # Select modules by name
+    selected = [mod for mod in runtime.modules if mod["name"] in modules]
+
+    if lab:
+        selected.append({"name": "lab", "run": "uv run jupyter lab"})
+
+    # Use tags if no modules selected by name
+    if not selected:
+        [tag] = modules
+        selected = [mod for mod in runtime.modules if tag in mod["tags"]]
+
+    # Set mode to dev
+    runtime.state.mode = "dev"
+
+    # Set config env var
+    frontend_runtime = Runtime("frontend", log=False)
+    os.environ["MASCOPE_ENV"] = runtime.env.name
+    os.environ["MASCOPE_RUNTIME"] = json.dumps(
+        {
+            "mode": frontend_runtime.mode,
+            "env": frontend_runtime.env.name,
+            "meta": frontend_runtime.meta.model_dump(),
+            "config": frontend_runtime.config.model_dump(),
+            "version": os.environ["MASCOPE_VERSION"],
+        }
+    )
+
+    # If --host set, expose dev server to network
+    if host:
+        os.environ["MASCOPE_DEVHOST"] = "HOST"
+
+    # Build module runner
+    def run_module(mod):
+        """Run a module with optional Windows reload mode."""
+        if reload and mod["name"] == "backend":
+            # Helper to pass env vars
+            def pass_envvar(var):
+                value = os.environ.get(var)
+                return (
+                    f"[Environment]::SetEnvironmentVariable('{var}', '{value}')"
+                    if value
+                    else None
+                )
+
+            pass_envvars = " && ".join(
+                [
+                    pass_envvar(var)
+                    for var in [
+                        "MASCOPE_LOGLEVEL",
+                        "MASCOPE_LOGGREP",
+                        "MASCOPE_ENV",  # runtime env
+                        "MASCOPE_DEVHOST",  # host option
+                    ]
+                    if pass_envvar(var)
+                ]
+            )
+            # construct the command
+            cmd = f"{pass_envvars} && {mod['run']}"
+            # complex commands are best encoded to avoid needing escape chars
+            base64_cmd = base64.b64encode(bytearray(cmd, "utf-16-le")).decode()
+            # open a new tab in the current windows terminal and run
+            return f'"wt --window 0 pwsh -noExit -EncodedCommand {base64_cmd}"'
+        else:
+            # default behavior
+            return f'"{mod["run"]}"'
+
+    # Run concurrently
+    names = f"--names {','.join(mod['name'] for mod in selected)}"
+    cmds = f"{' '.join([run_module(mod) for mod in selected])}"
+
+    runtime.logger.info(f"Starting: {', '.join(mod['name'] for mod in selected)}")
+    lib.run(f"{concurrently} --raw {names} {cmds}")
+
+
+@dev_app.command()
+def up(
+    detach: Annotated[
+        bool,
+        typer.Option("--detach", "-d", help="Run containers in background"),
+    ] = True,
+    build: Annotated[
+        bool,
+        typer.Option("--build", help="Rebuild images before starting"),
+    ] = False,
+):
+    """
+    Start development dependencies (PostgreSQL, Redis).
+
+    Does NOT run migrations or application.
+    Use 'mascope dev run' for automatic workflow.
+    """
+    check_and_start_docker()
+
+    # Prepare data directories before starting containers
+    _check_data_dirs()
+
+    args = ["up"]
+    if detach:
+        args.append("-d")
+    if build:
+        args.append("--build")
+
+    runtime.logger.info("Starting development dependencies...")
+    _run_dev_compose(args)
+
+    if detach:
+        runtime.logger.success("Development dependencies started")
+        runtime.logger.info("Run 'mascope dev run' to start the application")
+
+
+@dev_app.command()
+def down(
+    volumes: Annotated[
+        bool,
+        typer.Option("--volumes", "-v", help="Remove named volumes"),
+    ] = False,
+):
+    """
+    Stop and remove development containers.
+
+    Data in bind mounts (PostgreSQL) is preserved.
+    """
+    args = ["down"]
+    if volumes:
+        args.append("-v")
+
+    _run_dev_compose(args)
+    runtime.logger.success("Development dependencies stopped")
 
 
 @dev_app.command()
@@ -74,113 +278,118 @@ def run(
     ] = False,
 ):
     """
-    Run your development environment
+    Run application services in development environment:
+    - Checks Docker is running
+    - Starts dependencies (PostgreSQL, Redis)
+    - Runs migrations (if backend + PostgreSQL configured)
+    - Starts application
 
-    Pass modules to run as arguments, for example `mascope
-    dev run backend file-converter`.
-
-    Runs the backend and frontend only by default. You can
-    also use module group tags to run multiple services
-    at once, e.g `mascope dev run file`, which will run
-    the backend, the file-converter and the frontend.
+    Pass modules to run as arguments. You can also use
+    module group tags to run multiple services at once.
 
     Run `mascope groups` to discover the full list of runtime groups.
+
+    Examples:
+        mascope dev run                    # Backend + frontend (default)
+        mascope dev run backend            # Backend only
+        mascope dev run file-converter     # Explicit services
+        mascope dev run file               # Module group tag
+
+    Manual control:
+        mascope dev up                     # Dependencies only
+        mascope dev migrate upgrade        # Migrations manually
     """
-    # select modules by name
-    selected = [
-        mod
+    selected_modules = modules or ["backend", "frontend"]
+    # --- check Docker ---
+    check_and_start_docker()
+
+    # --- check dependencies running ---
+    _check_data_dirs()
+    _run_dev_compose(["up", "-d"])
+
+    # --- wait for services ---
+    if not wait_for_redis(max_wait=30):
+        runtime.logger.error("Redis failed to start")
+        raise typer.Exit(1)
+
+    db_cfg = runtime.full_config.backend.database
+    if db_cfg.type == "postgres":
+        if not wait_for_server(max_wait=30):
+            runtime.logger.error("PostgreSQL server failed to start")
+            raise typer.Exit(1)
+
+    # --- migrations (if backend selected + PostgreSQL) ---
+    backend_selected = any(
+        mod["name"] == "backend"
         for mod in runtime.modules
-        if mod["name"] in (modules or ["backend", "frontend"])
-    ]
-    if lab:
-        selected.append({"name": "lab", "run": "uv run jupyter lab"})
-
-    # use tags if no modules were selected
-    if not len(selected):
-        [tag] = modules
-        selected = [mod for mod in runtime.modules if tag in mod["tags"]]
-
-    # Check if backend is being started
-    backend_selected = any(mod["name"] == "backend" for mod in selected)
-
-    # check if Redis is running before starting backend
-    if backend_selected:
-        runtime.logger.info("Checking Redis dependency")
-        redis_available = check_and_start_redis()
-
-        # prompt if Redis failed to start
-        if not redis_available:
-            runtime.logger.warning(
-                "Backend may fail to start in multi-worker mode without Redis"
-            )
-            if not typer.confirm("Continue anyway?", default=False):
-                runtime.logger.info("Aborted.")
-                raise typer.Exit(1)
-
-    # set mode to dev
-    runtime.state.mode = "dev"
-
-    # set config env var
-    frontend_runtime = Runtime("frontend", log=False)
-    os.environ["MASCOPE_ENV"] = runtime.env.name
-    os.environ["MASCOPE_RUNTIME"] = json.dumps(
-        {
-            "mode": frontend_runtime.mode,
-            "env": frontend_runtime.env.name,
-            "meta": frontend_runtime.meta.model_dump(),
-            "config": frontend_runtime.config.model_dump(),
-            "version": os.environ["MASCOPE_VERSION"],
-        }
+        if mod["name"] in selected_modules
     )
-    # if --host set, expose dev server to network
-    if host:
-        os.environ["MASCOPE_DEVHOST"] = "HOST"
 
-    # build a module runner
-    def run_module(mod):
-        """
-        Run a module, overriding the backend's default behavior
-        when a reload flag is passed.
-        """
-        if reload and mod["name"] == "backend":
-            # helper to pass env vars
-            def pass_envvar(var):
-                value = os.environ.get(var)
-                return (
-                    f"[Environment]::SetEnvironmentVariable('{var}', '{value}')"
-                    if value
-                    else None
-                )
+    if backend_selected and db_cfg.type == "postgres":
+        runtime.logger.info("Checking database...")
+        if not create_database():
+            runtime.logger.error("Failed to create database")
+            raise typer.Exit(1)
 
-            pass_envvars = " && ".join(
-                [
-                    pass_envvar(var)
-                    for var in [
-                        "MASCOPE_LOGLEVEL",  # pass the log level
-                        "MASCOPE_LOGGREP",  # pass the log grep
-                        "MASCOPE_ENV",  # pass the runtime env
-                        "MASCOPE_DEVHOST",  # pass host option
-                    ]
-                    if pass_envvar(var)
-                ]
-            )
-            # construct the command
-            cmd = f"{pass_envvars} && {mod['run']}"
-            # complex commands are best encoded to avoid needing escape chars
-            base64_cmd = base64.b64encode(bytearray(cmd, "utf-16-le")).decode()
-            # open a new tab in the current windows terminal and run
-            return f'"wt --window 0 pwsh -noExit -EncodedCommand {base64_cmd}"'
+        runtime.logger.info("Checking migrations...")
+        if check_pending_migrations():
+            runtime.logger.info("Pending migrations detected")
+
+            if not run_migrations():
+                raise typer.Exit(1)
         else:
-            # default behavior
-            return f'"{mod["run"]}"'
+            runtime.logger.success("Database up to date")
 
-    # construct arguments
-    names = f"--names {','.join([f'{mod["name"]}' for mod in selected])}"
-    cmds = f"{' '.join([run_module(mod) for mod in selected])}"
-    # run command
-    command = f"{concurrently} --raw {names} {cmds}"
-    print(f"Running command: {command}")
-    lib.run(command)
+    # --- run application ---
+    _run_application(
+        modules=selected_modules,
+        host=host,
+        lab=lab,
+        reload=reload,
+    )
+
+
+@dev_app.command()
+def logs(
+    follow: Annotated[
+        bool,
+        typer.Option("--follow", "-f", help="Follow log output"),
+    ] = False,
+    service: Annotated[
+        Optional[str],
+        typer.Argument(help="Service name (postgres, redis, db-migrate)"),
+    ] = None,
+):
+    """Show logs from development containers."""
+    args = ["logs"]
+    if follow:
+        args.append("-f")
+    if service:
+        args.append(service)
+
+    _run_dev_compose(args)
+
+
+@dev_app.command()
+def ps():
+    """List running development containers."""
+    check_and_start_docker()
+    _run_dev_compose(["ps"])
+
+
+@dev_app.command()
+def restart(
+    service: Annotated[
+        Optional[str],
+        typer.Argument(help="Service to restart (postgres, redis)"),
+    ] = None,
+):
+    """Restart development services."""
+    args = ["restart"]
+    if service:
+        args.append(service)
+
+    _run_dev_compose(args)
 
 
 @dev_app.command()

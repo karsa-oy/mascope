@@ -1,0 +1,53 @@
+# Development environment dependencies
+# Services: PostgreSQL, Redis
+# Application services (backend, frontend, etc.) run locally
+#
+# Usage:
+#   mascope dev up             # Start dependencies only
+#   mascope dev down           # Stop dependencies
+#   mascope dev run            # Start everything (deps + auto migrations + app)
+#   mascope dev logs postgres  # View logs from development containers.
+
+name: mascope_dev
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ${POSTGRES_CONTAINER_NAME:-mascope_dev_postgres}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432" # Exposed for DBeaver, psql, etc.
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mascope_user}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mascope_user}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - ${MASCOPE_PATH}/.runtime/database/dev:/var/lib/postgresql/data
+    secrets:
+      - postgres_password
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: ${REDIS_CONTAINER_NAME:-mascope_dev_redis}
+    ports:
+      - "${REDIS_PORT:-6379}:6379" # Exposed for redis-cli access
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    volumes:
+      - redis_dev_data:/data
+    restart: unless-stopped
+
+volumes:
+  redis_dev_data: # Docker manages this volume
+
+secrets:
+  postgres_password:
+    file: ${MASCOPE_PATH}/.runtime/secrets/postgres_password.txt
