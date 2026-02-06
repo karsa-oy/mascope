@@ -125,27 +125,23 @@ class Sample:
     @classmethod
     def create_view(cls) -> str:
         """
-        Generate SQL CREATE VIEW statement for sample_view.
+        Generate raw SQL CREATE VIEW statement for sample_view.
 
-        Returns SQLAlchemy TextClause ready for execution.
-        Use this in migrations so that view definition stays in sync with
-        the Python model definition.
+        Returns plain SQL string (not wrapped in text()) for use with op.execute().
 
         Example:
-            # In migration script:
-            from mascope_backend.db import Sample
+            # In Alembic migration:
+            from mascope_backend.db.views import Sample
 
-            async with async_session() as session:
-                await session.execute(Sample.create_view())
-                await session.commit()
+            def upgrade():
+                op.execute(Sample.create_view())
 
         :param cls: The Sample class
         :type cls: Type[Sample]
-        :return: SQLAlchemy TextClause with CREATE VIEW statement
+        :return: Raw SQL CREATE VIEW statement
         :rtype: str
         """
-        return text(
-            """
+        return """
             CREATE VIEW sample_view AS
             SELECT
                 -- Primary key
@@ -179,27 +175,18 @@ class Sample:
             FROM sample_item si
             INNER JOIN sample_file sf ON si.sample_file_id = sf.sample_file_id;
         """
-        )
 
     @classmethod
     def drop_view(cls) -> str:
         """
-        Generate SQL DROP VIEW statement for sample_view.
-
-        Example:
-            # In migration script:
-            from mascope_backend.db import Sample
-
-            async with async_session() as session:
-                await session.execute(Sample.drop_view())
-                await session.commit()
+        Generate raw SQL DROP VIEW statement for sample_view.
 
         :param cls: The Sample class
         :type cls: Type[Sample]
-        :return: SQLAlchemy TextClause with DROP VIEW IF EXISTS statement
+        :return: Raw SQL DROP VIEW statement
         :rtype: str
         """
-        return text("DROP VIEW IF EXISTS sample_view;")
+        return "DROP VIEW IF EXISTS sample_view"
 
     @classmethod
     async def update_view(cls, session) -> None:
@@ -221,5 +208,5 @@ class Sample:
         :type session: AsyncSession
         :return: None
         """
-        await session.execute(cls.drop_view())
-        await session.execute(cls.create_view())
+        await session.execute(text(cls.drop_view()))
+        await session.execute(text(cls.create_view()))
