@@ -74,7 +74,7 @@ export function findExistingCompound(compoundList, searchCompound) {
 
 /**
  * Formats isotope formulae by extracting isotope specifications
- * Returns "M0" for main isotope (no brackets) or all isotope bracketed patterns with their counts
+ * Returns "M0" for main isotope (no brackets) or all isotope bracketed patterns with their counts and forward slashes
  *
  * @param {string} formula - Chemical formula potentially containing isotope specifications in brackets
  * @returns {string} Formatted isotope string
@@ -84,13 +84,13 @@ export function findExistingCompound(compoundList, searchCompound) {
  * - "[13C]C2H6O3" -> "[13C]"
  * - "[13C]C2[2H]H5O3" -> "[13C][2H]"
  * - "[13C]2CH6O3" -> "[13C]2"
- * - "[13C]2C[2H]H5O3" -> "[13C]2[2H]"
+ * - "[13C]C2H6O3/C3H6[18O]O2" -> "[13C]/[18O]"
  */
 export function formatIsotopeFormula(formula) {
   if (!formula) return ''
 
-  // Match all bracket pairs with optional trailing digits: [content]digits
-  const matches = formula.match(/\[[^\]]+\]\d*/g)
+  // Match all bracket pairs with optional trailing digits and forward slashes: [content]digits or /
+  const matches = formula.match(/\[[^\]]+\]\d*|\//g)
 
   return matches ? matches.join('') : 'M0'
 }
