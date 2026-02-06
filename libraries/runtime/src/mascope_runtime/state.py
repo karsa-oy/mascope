@@ -1,6 +1,3 @@
-import os
-import json
-
 """
 This file provides an API representing runtime state,
 
@@ -20,14 +17,14 @@ Overrides
 
 Additionally, an 'override' API is exposed allowing
 the CLI to temporarily override a variable. Each field
-in the `state` object has two values: `active` and 
+in the `state` object has two values: `active` and
 `override`. The `active` value is persisted which the
 `override` value is emphemeral, being cleared with
 every time a CLI command is run.
 
-When the CLI wants to temporarily override state, it can 
-use the `.override` method to do so. Since passing `None` 
-to this method will clear it, the CLI will thereby naturally 
+When the CLI wants to temporarily override state, it can
+use the `.override` method to do so. Since passing `None`
+to this method will clear it, the CLI will thereby naturally
 reset the override whenever no option is passed. This is
 currently only used for overriding the `env` selected.
 
@@ -37,6 +34,10 @@ In the production containers, a special `state.json`
 is used. You can find this file committed in
 `runtime/lib/state.prod.json`
 """
+
+import os
+import json
+
 
 default_state = {
     "env": {"active": "default", "override": None},
@@ -78,6 +79,13 @@ class RuntimeJsonState(object):
     def __getattr__(self, attr: str) -> any:
         global state_path
         self.ensure_state_json()
+
+        # Check environment variable override for 'env'
+        if attr == "env":
+            env_override = os.environ.get("MASCOPE_ENV")
+            if env_override:
+                return env_override
+
         with open(state_path, "r") as f:
             state = json.load(f)
             return state[attr]["override"] or state[attr]["active"]

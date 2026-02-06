@@ -10,6 +10,50 @@ services:
     volumes:
       - redis_data:/data
     command: redis-server --appendonly yes
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    # ports:
+    #   - "${MASCOPE_DB_PORT:-5432}:5432" # Exposed for DBeaver, psql, etc.
+    environment:
+      POSTGRES_USER: ${MASCOPE_DB_USER:-mascope_user}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -h localhost -U ${MASCOPE_DB_USER:-mascope_user} -d postgres",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - ${MASCOPE_PATH}/.runtime/database/prod:/var/lib/postgresql/data
+    secrets:
+      - postgres_password
+
+  db_init:
+    image: ghcr.io/karsa-oy/mascope/backend:latest
+    build:
+      dockerfile: server/backend/Dockerfile
+      context: .
+    entrypoint: []
+    command: ["/bin/bash", "/app/tooling/db-init.sh"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      MASCOPE_ENV: ${MASCOPE_ENV}
+      MASCOPE_DB_NAME: ${MASCOPE_DB_NAME:-mascope}
+      MASCOPE_DB_USER: ${MASCOPE_DB_USER:-mascope_user}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    volumes:
+      - ./.runtime/env/${MASCOPE_ENV:-default}:/app/.runtime/env/${MASCOPE_ENV:-default}
+    secrets:
+      - postgres_password
+    restart: "no" # Run once and exit
+
   backend: &backend
     command: "api-server"
     image: ghcr.io/karsa-oy/mascope/backend:latest
@@ -17,6 +61,8 @@ services:
       dockerfile: server/backend/Dockerfile
       context: .
     depends_on:
+      db_init:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
     healthcheck:
@@ -28,20 +74,31 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 24h # Increased period for potential long database migrations
+      start_period: 30s
     tty: true
     ports:
       - 8090:8090
     volumes:
-      - ./.runtime/env/${MASCOPE_ENV:-default}:/app/.runtime/env/prod
-      - ${MASCOPE_FILESTORE}:/app/.runtime/env/prod/filestore
+      # Mount runtime env directory (contains config overrides)
+      - ./.runtime/env/${MASCOPE_ENV:-default}:/app/.runtime/env/${MASCOPE_ENV:-default}
+
+      # Mount filestore (matches resolved path in config)
+      - ${MASCOPE_FILESTORE}:/app/.runtime/env/${MASCOPE_ENV:-default}/filestore
+
+      # Mount SQLite database (TODO temporary, for migrationin prod - remove after migration complete)
+      - ./.runtime/env/${MASCOPE_ENV:-default}/database:/app/.runtime/env/${MASCOPE_ENV:-default}/database
     environment:
+      MASCOPE_ENV: ${MASCOPE_ENV}
       MASCOPE_LOGLEVEL: ${MASCOPE_LOGLEVEL}
       MASCOPE_TIMEZONE: ${MASCOPE_TIMEZONE}
+      MASCOPE_DB_NAME: ${MASCOPE_DB_NAME:-mascope}
+      MASCOPE_DB_USER: ${MASCOPE_DB_USER:-mascope_user}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
       JWT_SECRET_KEY_FILE: /run/secrets/jwt_secret_key
       SERVER_OWNER_SECRET_KEY_FILE: /run/secrets/server_owner_secret_key
     secrets:
       - jwt_secret_key
+      - postgres_password
       - server_owner_secret_key
   file_converter:
     <<: *backend
@@ -75,6 +132,8 @@ volumes:
 secrets:
   jwt_secret_key:
     file: .runtime/secrets/jwt_secret_key.txt
+  postgres_password:
+    file: .runtime/secrets/postgres_password.txt
   server_owner_secret_key:
     file: .runtime/secrets/server_owner_secret_key.txt
   ssl_certificate:

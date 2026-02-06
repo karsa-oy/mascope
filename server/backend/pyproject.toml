@@ -13,6 +13,7 @@ dependencies = [
     "mascope_tofwerk",
     "mascope_file",
     "mascope_signal",
+    "mascope_match",
     # external
     "aiosqlite>=0.21,<0.22",
     "colorcet~=3.1",

@@ -249,20 +249,18 @@ class Runtime:
 
     def filestore(self, *args: list[str]) -> str:
         """
-        Resolves the path relative to the filestore
+        Resolves the path relative to the filestore.
 
-        In `prod` mode, return the path inside the container, otherwise return the
-        path specified in the config `meta.filestore`
+        The filestore path (config `meta.filestore`) is resolved by the config loader during initialization:
+        - Relative paths like './filestore' are resolved against the active runtime env
+        - Dev: './filestore' -> 'C:/path/to/.runtime/env/{MASCOPE_ENV}/filestore'
+        - Prod: './filestore' -> '/app/.runtime/env/{MASCOPE_ENV}/filestore'
 
-        :return: Filestore path
+        :param *args: Optional path segments to append to filestore base path
+        :return: Filestore path with optional segments appended
         :rtype: str
         """
-        base_path = (
-            "/app/.runtime/env/prod/filestore"
-            if self.mode == "prod"
-            else self.meta.filestore
-        )
-        return os.path.join(base_path, *args)
+        return os.path.join(self.meta.filestore, *args)
 
     def secret(self, envvar: str, path: str, all_lines: bool = False) -> str:
         """

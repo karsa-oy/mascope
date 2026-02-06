@@ -8,6 +8,7 @@ dependencies = [
     "mascope_runtime",
     "mascope_thermo",
     "mascope_tofwerk",
+    "mascope_tools", 
     "dask",
     "lmfit~=1.3",
     "numpy~=1.26",
