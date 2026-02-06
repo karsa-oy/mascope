@@ -21,7 +21,7 @@ async def db_maintenance():
     await create_db_backup()
 
     # Determine the current version and paths
-    data_path = runtime.config.database
+    data_path = runtime.config.database.data_dir
     current_version = get_current_db_version()
     db_path = os.path.join(data_path, f"mascope.v{current_version}.db")
 

@@ -41,13 +41,13 @@ class RedisStorageClient:
         :raises RuntimeError: If Redis is not configured
         :raises ConnectionError: If Redis connection fails
         """
-        if not runtime.config.redis or runtime.config.redis.get_url() is None:
+        if not runtime.config.redis or runtime.config.redis.get_redis_url() is None:
             raise RuntimeError(
                 "Redis configuration is required for session storage. "
                 "Check that Redis is configured in your mascope.toml file."
             )
 
-        redis_url = runtime.config.redis.get_url()
+        redis_url = runtime.config.redis.get_redis_url()
 
         try:
             self._client = from_url(redis_url, decode_responses=True)

@@ -31,8 +31,8 @@ def get_current_db_version() -> int:
     :rtype: int
     """
     v = 0
-    if os.path.exists(runtime.config.database):
-        files = os.listdir(runtime.config.database)
+    if os.path.exists(runtime.config.database.data_dir):
+        files = os.listdir(runtime.config.database.data_dir)
         databases = [
             f
             for f in files
@@ -51,4 +51,7 @@ def get_current_db_path() -> Path:
     :return: Path to the current database file
     :rtype: Path
     """
-    return Path(runtime.config.database) / f"mascope.v{get_current_db_version()}.db"
+    return (
+        Path(runtime.config.database.data_dir)
+        / f"mascope.v{get_current_db_version()}.db"
+    )

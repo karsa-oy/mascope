@@ -16,7 +16,7 @@ from mascope_backend.db.wal.direct import direct_wal_checkpoint, get_journal_mod
 from mascope_backend.runtime import runtime
 
 
-db_dir = runtime.config.database
+db_dir = runtime.config.database.data_dir
 
 
 class DatabaseFailedError(RuntimeError):

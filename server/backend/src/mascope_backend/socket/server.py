@@ -18,12 +18,12 @@ def create_socket_server() -> socketio.AsyncServer:
     :rtype: socketio.AsyncServer
     :raises RuntimeError: If Redis is not configured properly
     """
-    if not runtime.config.redis or runtime.config.redis.get_url() is None:
+    if not runtime.config.redis or runtime.config.redis.get_redis_url() is None:
         raise RuntimeError(
             "Redis configuration is required for Socket.IO server. "
             "Check that Redis is configured in your mascope.toml file."
         )
-    redis_url = runtime.config.redis.get_url()
+    redis_url = runtime.config.redis.get_redis_url()
 
     try:
         client_manager = socketio.AsyncRedisManager(redis_url)

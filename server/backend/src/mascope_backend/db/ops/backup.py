@@ -17,7 +17,7 @@ async def create_db_backup():
     all WAL data into the main database file for a complete backup.
     """
     # Get the current database version and path
-    database_dir = runtime.config.database
+    database_dir = runtime.config.database.data_dir
     current_version = get_current_db_version()
     db_path = os.path.join(database_dir, f"mascope.v{current_version}.db")
     backup_dir = os.path.join(database_dir, "backup")

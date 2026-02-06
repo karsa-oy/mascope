@@ -72,7 +72,7 @@ async def init_db_and_create():
             f"Existing database with the last available version {existing_version} detected, creating a backup."
         )
         db_path = os.path.join(
-            runtime.config.database, f"mascope.v{existing_version}.db"
+            runtime.config.database.data_dir, f"mascope.v{existing_version}.db"
         )
         if not os.path.exists(db_path):
             runtime.logger.error("Existing database file not found.")
