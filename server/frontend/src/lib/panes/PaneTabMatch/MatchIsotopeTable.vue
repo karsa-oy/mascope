@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { computed } from 'vue'
 
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
@@ -8,61 +8,14 @@ import ProgressSpinner from 'primevue/progressspinner'
 import { BaseMatchTag, BaseCopyableField } from '@/lib/base'
 import { num } from '@/lib/formatters'
 import { formatIsotopeFormula } from '@/lib/chem'
-import { api } from '@/api'
 
 import { useApp } from '@/stores'
 
 const app = useApp()
 
-// --- State ---
-const isotopeData = ref([])
-const loading = ref(false)
-
 // --- Computed ---
-const ionId = () => app.data.match.visualized.ion?.target_ion_id
 const ionFormula = () => app.data.match.visualized.ion?.target_ion_formula
-
-// --- API ---
-/**
- * Load isotope data for the specified ion
- * Can be moved to store as (match.ion.detailed?) if needed elsewhere
- */
-const loadIsotopes = async () => {
-  if (!ionId()) return
-
-  try {
-    loading.value = true
-    const sampleId = app.data.sample.focusedId
-    const batchId = app.data.batch.focusedId
-
-    const params = { target_ion_id: ionId() }
-    if (sampleId) {
-      params.sample_item_id = sampleId
-    } else if (batchId) {
-      params.sample_batch_id = batchId
-    }
-
-    isotopeData.value =
-      (await api.http.get('/match/records/isotope', {
-        params,
-        use: 'read',
-        type: 'load_match_isotope_records'
-      })) || []
-  } catch (error) {
-    console.error('Failed to load isotopes:', error)
-    isotopeData.value = []
-  } finally {
-    loading.value = false
-  }
-}
-
-watch(
-  [ionId, () => app.data.sample.focusedId],
-  () => {
-    loadIsotopes()
-  },
-  { immediate: true }
-)
+const loading = computed(() => app.data.match.visualized.isotopes === null)
 </script>
 
 <template>
@@ -73,12 +26,14 @@ watch(
     </div>
 
     <!-- No data message -->
-    <div v-else-if="!isotopeData.length">No matched isotopes found for {{ ionFormula() }}</div>
+    <div v-else-if="!app.data.match.visualized.isotopes?.length">
+      No matched isotopes found for {{ ionFormula() }}
+    </div>
 
     <!-- Isotope data table -->
     <DataTable
       v-else
-      :value="isotopeData"
+      :value="app.data.match.visualized.isotopes"
       :dataKey="(isotope) => isotope.target_isotope_id"
       selectionMode="single"
       v-model:selection="app.data.match.visualized.isotopeSelected"
@@ -108,7 +63,7 @@ watch(
       </Column>
 
       <!-- formula Column -->
-      <Column header="formula" field="formula" sortable style="width: 8rem">
+      <Column header="Substitution" field="formula" sortable style="width: 8rem">
         <template #body="{ data }">
           {{ formatIsotopeFormula(data.target_isotope_formula) }}
         </template>

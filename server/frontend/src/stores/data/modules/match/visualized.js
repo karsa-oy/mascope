@@ -102,12 +102,15 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
   }
 
   async function load({ sampleId, ionId, collectionId, init } = { init: true }) {
+    isotopes.value = null
     // Resolve IDs from current state or cache
     const sample_item_id =
       sampleId ?? ion.value?.match?.sample_item_id ?? sample.focused?.sample_item_id
     const target_ion_id = ionId ?? ion.value?.target_ion_id
     const target_collection_id = collectionId ?? matchCollection.focused.target_collection_id
+    const target_isotope_id = isotopeSelected.value?.target_isotope_id
     if (!sample_item_id || !target_ion_id || !target_collection_id) {
+      isotopeSelected.value = null
       return
     }
 
@@ -139,6 +142,12 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
       // Format mz to 4 decimal places
       mz: isotope.mz.toFixed(4)
     }))
+
+    // Persist isotope selection if still valid
+    if (target_isotope_id) {
+      isotopeSelected.value =
+        isotopes.value.find((iso) => iso.target_isotope_id === target_isotope_id) ?? null
+    }
 
     // Initialize params from backend on first load
     if (init) {
