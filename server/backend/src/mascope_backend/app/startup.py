@@ -32,9 +32,12 @@ async def init_main_process():
 
     :raises Exception: If any critical initialization step fails
     """
-    # Initialize database (includes migrations)
-    runtime.logger.info("Main process: checking if database migrations are needed")
-    await check_db_migration()
+    db_cfg = runtime.config.database
+
+    # Initialize database (includes migrations) if database is ready
+    if db_cfg.type == "sqlite":
+        runtime.logger.info("Main process: checking if database migrations are needed")
+        await check_db_migration()
 
     # Reset temp directory
     runtime.logger.info("Main process: initializing temp directory")

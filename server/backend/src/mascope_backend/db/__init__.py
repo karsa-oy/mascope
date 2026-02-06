@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from mascope_backend.db import models
-from mascope_backend.db.config import db_config
+from mascope_backend.db.secrets import postgres_password
 from mascope_backend.db.migration_manager import check_db_migration
 from mascope_backend.db.models import *  # noqa: F403, F401 - re-export models
 from mascope_backend.db.utils import get_current_db_version
@@ -32,52 +32,71 @@ from mascope_backend.runtime import runtime
 
 # Initialize global variables at module load
 ASYNC_SESSION_MAKER = None  # Global async session maker
-db_dir = runtime.config.database
+db_cfg = runtime.config.database
 
 # Semaphore to limit concurrent database operations
-db_semaphore = asyncio.Semaphore(db_config.POOL_SIZE)
+db_semaphore = asyncio.Semaphore(db_cfg.pool_size)
 
 
 # Database configuration and session management
-async def configure_database_engine(version):
+async def configure_database_engine(
+    version: int | None = None,
+    db_type: str | None = None,
+):
     """
-    Configures the database engine and sets up the global session maker using SQLAlchemy's async_sessionmaker.
-    This function is called during initialization to establish a connection with the database.
+    Configures the database engine based on type and sets up the
+    global session maker using SQLAlchemy's async_sessionmaker.
+    This function is called during initialization to establish
+    a connection with the database.
 
-    :param version: The current version of the database to configure the connection.
-    :type version: int
+    :param version: Required for SQLite, ignored for PostgreSQL
+    :param db_type: Override configured type (for explicit control)
     """
-    db_path = os.path.join(db_dir, f"mascope.v{version}.db")
+    # Use explicit type or fall back to config
+    engine_type = db_type or db_cfg.type
+    database_url = ""
+    if engine_type == "sqlite":
+        if version is None:
+            raise ValueError("SQLite requires version parameter")
 
-    # Define the database URL using SQLite and async mode
-    database_url = f"sqlite+aiosqlite:///{db_path}"
+        database_url = db_cfg.get_sqlite_url(version=version)
+        runtime.logger.info(
+            f"Using SQLite v{version} at {db_cfg.get_sqlite_path(version)}"
+        )
+    if engine_type == "postgres":
+        database_url = db_cfg.get_postgres_url(
+            password=postgres_password, env_name=runtime.env.name
+        )
+        runtime.logger.info(
+            f"Using PostgreSQL at {db_cfg.host}:{db_cfg.port}/{db_cfg.database}"
+        )
 
-    #  Enable detailed logging if trace mode is enabled
     trace_mode = runtime.config.log_level.lower() == "trace"
 
-    # Create the async engine for SQLAlchemy
     engine = create_async_engine(
         database_url,
-        pool_pre_ping=db_config.POOL_PRE_PING,
+        pool_pre_ping=db_cfg.pool_pre_ping,
         echo=trace_mode,
-        pool_size=db_config.POOL_SIZE,
-        max_overflow=db_config.MAX_OVERFLOW,
-        pool_timeout=db_config.POOL_TIMEOUT,
-        connect_args=db_config.connect_args,
+        pool_size=db_cfg.pool_size,
+        max_overflow=db_cfg.max_overflow,
+        pool_timeout=db_cfg.pool_timeout,
+        connect_args=db_cfg.get_connect_args() if engine_type == "sqlite" else {},
     )
 
-    # Enable foreign keys for every SQLite connection
-    @event.listens_for(engine.sync_engine, "connect")
-    def _set_sqlite_pragma(dbapi_conn, connection_record):
-        """Enable foreign key constraints for this connection."""
-        cursor = dbapi_conn.cursor()
-        cursor.execute("PRAGMA foreign_keys=ON")
-        cursor.close()
+    # Enable foreign keys for every SQLite connection, for PostgreSQL it's default
+    if engine_type == "sqlite":
+
+        @event.listens_for(engine.sync_engine, "connect")
+        def _set_sqlite_pragma(dbapi_conn, connection_record):
+            """Enable foreign key constraints for this connection."""
+            cursor = dbapi_conn.cursor()
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.close()
 
     # Define the global session maker using async_sessionmaker
     global ASYNC_SESSION_MAKER
     ASYNC_SESSION_MAKER = async_sessionmaker(
-        engine, expire_on_commit=db_config.EXPIRE_ON_COMMIT
+        engine, expire_on_commit=db_cfg.expire_on_commit
     )
 
 
@@ -109,8 +128,10 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
     """
     Dependency-injected session for FastAPI route handlers.
 
-    This function yields a session that is automatically managed by FastAPI's dependency injection system.
-    It ensures that the session is opened at the start of the request and closed when the request finishes.
+    This function yields a session that is automatically managed by FastAPI's
+    dependency injection system.
+    It ensures that the session is opened at the start of the request and closed
+    when the request finishes.
 
     Key points:
     - Automatically manages session lifecycle (opened and closed at the correct time).
@@ -143,8 +164,11 @@ async def init_db():
     :raises Exception: If engine configuration or connection test fails
     """
     try:
-        current_version = get_current_db_version()
-        await configure_database_engine(current_version)
+        if db_cfg.type == "sqlite":
+            current_version = get_current_db_version()
+            await configure_database_engine(version=current_version)
+        elif db_cfg.type == "postgres":
+            await configure_database_engine()
 
         await _test_database_connection()
 
@@ -161,15 +185,27 @@ async def _test_database_connection():
     :raises Exception: If the connection cannot be established
     """
     try:
-        # create a new session and close it
+        # Test basic connection
         async with async_session() as session:
             await session.execute(text("SELECT 1"))
         runtime.logger.info("Database connection established successfully.")
 
-        async with async_session() as session:
-            result = await session.execute(text("PRAGMA foreign_keys"))
-        fk_status = "enabled" if result.scalar() == 1 else "disabled"
-        runtime.logger.debug(f"Database foreign keys status: {fk_status}")
+        # Database-specific checks
+        if db_cfg.type == "sqlite":
+            async with async_session() as session:
+                result = await session.execute(text("PRAGMA foreign_keys"))
+                fk_status = "enabled" if result.scalar() == 1 else "disabled"
+                runtime.logger.debug(f"SQLite foreign keys status: {fk_status}")
+        else:  # postgres
+            async with async_session() as session:
+                result = await session.execute(text("SELECT version()"))
+                pg_version = result.scalar()
+                runtime.logger.debug(f"PostgreSQL version: {pg_version}")
+
+                # Test list databases
+                result = await session.execute(text("SELECT datname FROM pg_database"))
+                databases = [row[0] for row in result.fetchall()]
+                runtime.logger.debug(f"Available databases: {databases}\n")
 
     except Exception as e:
         runtime.logger.error(f"Error while establishing the database connection: {e}")
@@ -181,15 +217,21 @@ async def _check_async_wal_status():
     Check WAL status using configured SQLAlchemy async session.
     """
     try:
-        async with async_session() as session:
-            journal_mode = (await session.execute(text("PRAGMA journal_mode"))).scalar()
-            busy_timeout = (await session.execute(text("PRAGMA busy_timeout"))).scalar()
+        if db_cfg.type == "sqlite":
+            async with async_session() as session:
+                journal_mode = (
+                    await session.execute(text("PRAGMA journal_mode"))
+                ).scalar()
+                busy_timeout = (
+                    await session.execute(text("PRAGMA busy_timeout"))
+                ).scalar()
 
-            runtime.logger.debug(
-                f"Database WAL status: journal mode - {journal_mode}, busy timeout - {busy_timeout}ms"
-            )
+                runtime.logger.debug(
+                    f"Database WAL status: journal mode - {journal_mode}, busy timeout - {busy_timeout}ms"
+                )
+    # PostgreSQL doesn't need WAL checks (it's always WAL)
     except Exception as e:
-        runtime.logger.error(f"Error checking async WAL status: {e}")
+        runtime.logger.error(f"Error checking database status: {e}")
 
 
 __all__ = [

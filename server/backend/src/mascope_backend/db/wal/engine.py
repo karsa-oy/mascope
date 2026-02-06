@@ -57,13 +57,19 @@ async def wal_checkpoint():
 
     For blocking checkpoint modes, use direct_wal_checkpoint() from direct module.
     """
+    if runtime.config.database.type == "postgres":
+        runtime.logger.debug(
+            "WAL checkpoint skipped - PostgreSQL manages WAL automatically"
+        )
+        return
+
     try:
         async with async_session() as session:
             # Check journal mode
             journal_mode = await session.execute(text("PRAGMA journal_mode"))
             if journal_mode.scalar().lower() != "wal":
                 runtime.logger.debug("Checkpoint skipped - not in WAL mode")
-
+                return
             # Execute passive checkpoint
             result = await session.execute(text("PRAGMA wal_checkpoint(PASSIVE)"))
             checkpoint_info = result.fetchone()
