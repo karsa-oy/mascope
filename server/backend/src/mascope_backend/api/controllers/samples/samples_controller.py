@@ -397,6 +397,7 @@ async def get_sample_peaks(
             query = (
                 select(
                     MatchIsotope.sample_peak_id,
+                    TargetIsotope.target_isotope_id,
                     TargetIsotope.target_isotope_formula,
                     TargetIon.target_ion_id,
                     TargetIon.target_ion_formula,
@@ -444,18 +445,16 @@ async def get_sample_peaks(
             match_rows = result.all()
 
         # Build a mapping from sample_peak_id to match data
-        # Group by isotope formula to avoid duplicates, collecting all collection IDs
+        # Group by isotope id to avoid duplicates, collecting all collection IDs
         sample_peak_ids = sample_file_data.peak_id.values.tolist()
         peak_id_to_match = {peak_id: {} for peak_id in sample_peak_ids}
 
         for row in match_rows:
             if row.sample_peak_id in peak_id_to_match:
-                # Use isotope formula as key to deduplicate
-                if (
-                    row.target_isotope_formula
-                    not in peak_id_to_match[row.sample_peak_id]
-                ):
-                    peak_id_to_match[row.sample_peak_id][row.target_isotope_formula] = {
+                # Use isotope id as key to deduplicate
+                if row.target_isotope_id not in peak_id_to_match[row.sample_peak_id]:
+                    peak_id_to_match[row.sample_peak_id][row.target_isotope_id] = {
+                        "target_isotope_id": row.target_isotope_id,
                         "target_isotope_formula": row.target_isotope_formula,
                         "target_ion_id": row.target_ion_id,
                         "target_ion_formula": row.target_ion_formula,
@@ -466,12 +465,12 @@ async def get_sample_peaks(
                     if (
                         row.target_collection_id
                         not in peak_id_to_match[row.sample_peak_id][
-                            row.target_isotope_formula
+                            row.target_isotope_id
                         ]["target_collection_ids"]
                     ):
-                        peak_id_to_match[row.sample_peak_id][
-                            row.target_isotope_formula
-                        ]["target_collection_ids"].append(row.target_collection_id)
+                        peak_id_to_match[row.sample_peak_id][row.target_isotope_id][
+                            "target_collection_ids"
+                        ].append(row.target_collection_id)
 
         # Create list of matches in the same order as sample_peak_ids
         # Convert dict values to list for each peak
