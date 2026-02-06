@@ -111,7 +111,6 @@ watch(
     }
     // Wait for DOM to update and refs to be assigned
     await nextTick()
-    console.log('Resizing plots:', Object.keys(plots.value))
     Object.values(plots.value).forEach((plot) => {
       if (plot?.resize) {
         plot.resize()
@@ -159,7 +158,7 @@ const layout = computed(() => {
         class="spectra-figure"
         :class="{ sidebarOpen }"
       >
-        <h3 :style="`color: ${isotopeChart.traces[0]?.line.color}; margin: 0`">
+        <h3 :style="`margin: 0`">
           <BaseMatchTag
             :match-score="isotopeChart.match?.match_score"
             :match-category="getIsotopeCategory(isotopeChart)"

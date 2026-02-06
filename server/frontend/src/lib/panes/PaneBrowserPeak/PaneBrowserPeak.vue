@@ -1,4 +1,5 @@
 <script setup>
+import { ref, watch, onBeforeUnmount } from 'vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
@@ -7,14 +8,50 @@ import TabMenu from 'primevue/tabmenu'
 
 import { num } from '@/lib/formatters'
 import { useApp } from '@/stores'
+import { usePeakScroller } from './stores'
 
 const app = useApp()
+const peakTable = ref(null)
+const scroller = usePeakScroller()
 
 const props = defineProps({
   height: {
     type: Number,
     required: true
   }
+})
+
+// Watch for table ref to become available and bind to scroller
+watch(
+  peakTable,
+  (newTableRef) => {
+    if (newTableRef) {
+      scroller.bind(
+        newTableRef,
+        () => app.data.peak.list,
+        () => ({ sortField: 'height', sortOrder: -1 })
+      )
+    }
+  },
+  { immediate: true }
+)
+
+// Watch for focused peak and scroll to it
+watch(
+  () => app.data.peak.focusedId,
+  (peakId) => {
+    if (peakId) {
+      scroller.scrollToPeak(peakId)
+    }
+  }
+)
+
+onBeforeUnmount(() => {
+  scroller.bind(
+    null,
+    () => [],
+    () => ({ sortField: 'height', sortOrder: -1 })
+  )
 })
 </script>
 
@@ -47,6 +84,7 @@ const props = defineProps({
       </span></template
     >
     <DataTable
+      ref="peakTable"
       :value="app.data.peak.list"
       dataKey="peak_id"
       selectionMode="single"
@@ -58,6 +96,7 @@ const props = defineProps({
       scrollable
       :scrollHeight="`${height}px`"
       :virtualScrollerOptions="{ itemSize: 35.5 }"
+      :pt="{ bodyRow: ({ context }) => ({ id: app.data.peak.list[context.index]?.peak_id }) }"
     >
       <Column field="mz" header="m/z" sortable style="height: 20px; min-width: 6rem">
         <template #body="{ data }">
@@ -85,10 +124,13 @@ const props = defineProps({
               @click="
                 async () => {
                   if (data.match.length > 0) {
-                    app.data.match.visualized.set({
+                    await app.data.match.visualized.set({
                       sampleId: app.data.sample.focusedId,
                       ionId: data.match[index].target_ion_id,
-                      collectionId: app.data.match.collection.focusedId
+                      collectionId:
+                        data.match[index].target_collection_ids.find(
+                          (id) => id === app.data.match.collection.focusedId // In case the currently focused collection is among the matches, prioritize it
+                        ) || data.match[index].target_collection_ids[0] // Otherwise just take the first one
                     })
                   }
                 }

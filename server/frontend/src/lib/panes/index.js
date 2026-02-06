@@ -1,4 +1,4 @@
-export { default as PaneBrowserPeak } from './PaneBrowserPeak.vue'
+export { default as PaneBrowserPeak } from './PaneBrowserPeak/PaneBrowserPeak.vue'
 export { default as PaneProgress } from './PaneProgress.vue'
 export { default as PaneSettingsCalibration } from './PaneSettingsCalibration.vue'
 export { default as PaneTabAcquisitions } from './PaneTabAcquisitions.vue'

@@ -179,7 +179,7 @@ const addButtonDisabled = computed(
         popover.toggle(event)
       }
     "
-    v-tooltip="
+    v-tooltip.left="
       plusButtonDisabled
         ? 'Open a target collection to add a compound'
         : `Add compound to ${targetCollection?.target_collection_name ?? 'selected collection'}`

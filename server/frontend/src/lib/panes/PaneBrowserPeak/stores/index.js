@@ -1,0 +1,1 @@
+export { usePeakScroller } from './peakScroller'
