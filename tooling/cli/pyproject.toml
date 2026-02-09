@@ -9,6 +9,11 @@ dependencies = [
     "mascope_runtime",
     "typer>=0.15.2,<0.16",
     "rich>=13.7.1,<14",
+    # migrate commands
+    "alembic>=1.18.1",
+    "sqlalchemy~=2.0",
+    # postgres commands
+    "psycopg2-binary>=2.9.11",
 ]
 
 [build-system]

@@ -1650,15 +1650,21 @@ name = "mascope-cli"
 version = "0.0.0"
 source = { editable = "tooling/cli" }
 dependencies = [
+    { name = "alembic" },
     { name = "mascope-runtime" },
+    { name = "psycopg2-binary" },
     { name = "rich" },
+    { name = "sqlalchemy" },
     { name = "typer" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "alembic", specifier = ">=1.18.1" },
     { name = "mascope-runtime", editable = "libraries/runtime" },
+    { name = "psycopg2-binary", specifier = ">=2.9.11" },
     { name = "rich", specifier = ">=13.7.1,<14" },
+    { name = "sqlalchemy", specifier = "~=2.0" },
     { name = "typer", specifier = ">=0.15.2,<0.16" },
 ]
 
