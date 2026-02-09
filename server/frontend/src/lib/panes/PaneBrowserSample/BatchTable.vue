@@ -70,7 +70,7 @@ const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top)
         }
       "
       resizableColumns
-      sortField="sample_batch_utc_created"
+      sortField="sample_batch_name"
       :sortOrder="-1"
       size="small"
       scrollable
