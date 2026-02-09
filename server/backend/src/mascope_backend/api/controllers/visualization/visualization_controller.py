@@ -253,12 +253,13 @@ async def _fetch_isotopes(sample_item_id, target_ion_id):
     async with async_session() as session:
         stmt = (
             select(TargetIsotope, MatchIsotope)
-            .where(TargetIsotope.target_ion_id == target_ion_id)
-            .where(MatchIsotope.sample_item_id == sample_item_id)
+            .select_from(MatchIsotope)
             .join(
                 TargetIsotope,
                 MatchIsotope.target_isotope_id == TargetIsotope.target_isotope_id,
             )
+            .where(TargetIsotope.target_ion_id == target_ion_id)
+            .where(MatchIsotope.sample_item_id == sample_item_id)
             .order_by(TargetIsotope.relative_abundance.desc())
         )
         result = await session.execute(stmt)
