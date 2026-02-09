@@ -65,7 +65,7 @@ async def fetch_sample_unmatched_target_isotopes(
         matched_isotopes_subquery = (
             select(MatchIsotope.target_isotope_id)
             .where(MatchIsotope.sample_item_id == sample.sample_item_id)
-            .distinct()
+            .distinct(MatchIsotope.target_isotope_id)
         )
 
         stmt = (
