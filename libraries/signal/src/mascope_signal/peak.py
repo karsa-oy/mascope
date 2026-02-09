@@ -507,38 +507,36 @@ def filter_peaks(
     :return: Filtered peaks as xarray.DataArray.
     :rtype: xarray.DataArray
     """
-    # Filter by m/z and time ranges
+    # --- Lazy coordinate slicing ---
     if mz_range is not None:
         peaks = peaks.sel(mz=slice(*mz_range))
     if t_range is not None:
         peaks = peaks.sel(time=slice(*t_range))
 
+    # Remove empty mz rows
     peaks = peaks.dropna(dim="mz", how="all")
 
-    # Compute peak intensities
+    # --- Compute peak intensities ---
     if "time" in peaks.dims:
-        peak_intensities = peaks.sum(dim="time").values
+        peak_intensities = peaks.sum("time")
     else:
-        peak_intensities = peaks.values
+        peak_intensities = peaks
 
-    keep = np.ones(len(peaks), dtype=bool)
-
-    # Filter by intensity
+    # --- Intensity filtering ---
     if intensity is not None:
-        keep &= peak_intensities > intensity
-
-    # Filter by distance
-    if distance is not None:
-        peak_indices = peaks.tof.values
-        keep &= _select_by_peak_distance(
-            peak_indices.astype(np.intp),
-            peak_intensities.astype(np.float64),
-            distance,
+        peaks = peaks.where(peak_intensities > intensity, drop=True)
+        peak_intensities = peak_intensities.where(
+            peak_intensities > intensity, drop=True
         )
 
-    # Return filtered peaks
-    filtered = peaks[keep]
-    return filtered.compute() if hasattr(filtered, "compute") else filtered
+    # --- Distance filtering (here we need numpy arrays, so we materialize) ---
+    if distance is not None:
+        tof_vals = peaks["tof"].values.astype(np.intp)
+        heights = peak_intensities.values.astype(np.float64)
+        keep = _select_by_peak_distance(tof_vals, heights, distance)
+        peaks = peaks.isel(mz=keep)
+
+    return peaks
 
 
 def get_peaks(sample_file: xarray.Dataset, intensity_mode="area"):
