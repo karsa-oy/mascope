@@ -358,13 +358,18 @@ def _process_isotope(
         peak_trace_mode = "lines"
         peak_line_color = "grey"
 
+    # Get peak height. Can't use iso.sample_peak_intensity since peak area is used for TOFs
+    peak_height = ctx.mean_peak_heights.sel(
+        mz=iso.sample_peak_mz, method="nearest"
+    ).item()
+
     peak_trace = {
         "name": "{:.6f}".format(iso.sample_peak_mz),
         "type": "scatter",
         "mode": peak_trace_mode,
         "line": {"color": peak_line_color},
         "x": [iso.sample_peak_mz, iso.sample_peak_mz],
-        "y": [0, iso.sample_peak_intensity],
+        "y": [0, peak_height],
         "unit": UNITS,
     }
     isotope_result.spectrum_traces.append(peak_trace)
@@ -385,7 +390,10 @@ def _process_isotope(
     # If there is a matching peak, add timeseries trace and update sum timeseries
     if is_match:
         isotope_result.match_count += 1
-        match_timeseries = ctx.peak_timeseries.sel(mz=iso.sample_peak_mz)
+        match_timeseries = ctx.peak_timeseries.sel(
+            mz=iso.sample_peak_mz, method="nearest"
+        )
+
         timeseries_time = match_timeseries.time.values.astype(np.float32)
         timeseries_y = match_timeseries.values.astype(np.float32)
 
