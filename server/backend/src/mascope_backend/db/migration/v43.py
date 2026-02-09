@@ -17,7 +17,6 @@ import polars as pl
 import numpy as np
 
 from mascope_molmass import Formula
-from mascope_match.params import DEFAULT_MIN_ISOTOPE_ABUNDANCE
 
 from mascope_backend.api.controllers.target.lib.compute.target_ions_compute import (
     _get_raw_ion,
@@ -44,6 +43,7 @@ from mascope_backend.runtime import runtime
 DECIMAL_PLACES = 10
 # How much the stored in the DB isotopes can deviate from the predicted for low resolution:
 LOW_PPM_THRESHOLD = 5.0  # ppm
+DEFAULT_MIN_ISOTOPE_ABUNDANCE = 0.1
 
 
 async def run():

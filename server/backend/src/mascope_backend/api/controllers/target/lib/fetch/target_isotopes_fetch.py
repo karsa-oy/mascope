@@ -6,7 +6,7 @@ by comparing current target associations against existing matches.
 """
 
 import pandas as pd
-from sqlalchemy import and_, exists, select
+from sqlalchemy import select
 
 from mascope_backend.api.new.ionization.modes.util import (
     fetch_sample_ionization_mechanism_ids,

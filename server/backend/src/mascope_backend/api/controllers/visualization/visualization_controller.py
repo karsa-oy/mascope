@@ -160,7 +160,7 @@ class IsotopeResult:
 async def _load_peaks_and_averaged_signal(
     sample: Sample,
     isotopes: list[SimpleNamespace],
-) -> tuple[xr.DataArray, xr.DataArray]:
+) -> tuple[xr.DataArray, xr.DataArray, xr.DataArray]:
     """
     Loads peak data and averaged signal for the specified sample and match isotopes.
 
@@ -168,8 +168,6 @@ async def _load_peaks_and_averaged_signal(
     :type sample: Sample
     :param isotopes: List of match isotope data.
     :type isotopes: list[SimpleNamespace]
-    :param instrument_property: The instrument property resolver for determining peak data type.
-    :type instrument_property: InstrumentPropertyResolver
     :return: Tuple of (peak_timeseries, mean_peak_heights, averaged_signal) for the specified m/z window.
     :rtype: tuple[xr.DataArray, xr.DataArray, xr.DataArray]
     """

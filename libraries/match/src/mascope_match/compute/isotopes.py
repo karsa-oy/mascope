@@ -249,7 +249,7 @@ def _match_assign(match_isotope_df: pd.DataFrame, parsed_peaks: dict) -> pd.Data
     candidate_lists: list[list[int]] = []
     for i in range(n_targets):
         candidates = np.where(diff_in_range[i])[0]
-        # Sort candidates by (m/z, diff)
+        # Sort candidates by (diff, then m/z)
         sort_idx = np.lexsort((peak_mzs[candidates], diff_matrix[i, candidates]))
         candidates = candidates[sort_idx].tolist()
         candidate_lists.append(candidates)

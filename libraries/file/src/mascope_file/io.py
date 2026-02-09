@@ -123,7 +123,27 @@ def load_coord(base_filename, var, coord_name):
 
 
 def load_peak_data(base_filename: str, drop_bad_peaks: bool = True) -> xr.Dataset:
-    """Load peak data from sample file
+    """Load peak data from sample file.
+    The function DOES NOT guarantee that the timeseries data is complete.
+
+    Peak data has the following structure:
+    Dimensions:
+    - mz
+    - time
+    Coordinates:
+    - peak_id (mz)
+    - time (time)
+    - tof (mz)
+    Data variables:
+    - is_satellite (mz)
+    - is_timeseries_computed (mz)
+    - is_weak (mz)
+    - peak_areas (mz, time)
+    - peak_heights (mz, time)
+    - polarity (mz)
+    - signal_to_noise (mz)
+    - sum_peak_areas (mz)
+    - sum_peak_heights (mz)
 
     :param base_filename: Sample file filename
     :type base_filename: str

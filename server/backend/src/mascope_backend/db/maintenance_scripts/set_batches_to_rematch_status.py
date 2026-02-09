@@ -63,7 +63,7 @@ def get_user_confirmation() -> bool:
 
 
 async def set_batches_to_rematch_status() -> None:
-    """ """
+    """Set all existing sample batches to 'rematch' status."""
     current_db_version = get_current_db_version()
     if current_db_version is None:
         runtime.logger.error("No database found. Please create a database first.")
@@ -92,6 +92,7 @@ async def set_batches_to_rematch_status() -> None:
         )
     except Exception as e:
         runtime.logger.error(f"Error setting rematch status: {e}")
+        raise
 
     runtime.logger.info(
         f"Finished setting {len(sample_batch_ids)} batches to 'rematch' status"
