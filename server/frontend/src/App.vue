@@ -22,7 +22,7 @@ const toast = useToast()
 // toaster
 app.ui.notification
   .on('*', (notification) => {
-    if (notification === null) return // TODO: Fail-safe, see issue #1008
+    if (notification === null) return
     const { status, type, message, data, error } = notification
     if (status !== 'pending') {
       const severity =

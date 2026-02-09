@@ -28,15 +28,7 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
   const unfocus = () => {
     selected.value = []
   }
-  const pending = reactive({
-    filename: null,
-    instrument: null,
-    polarity: null,
-    sample: null,
-    instrument_config: null,
-    measurement: null,
-    conversion: null
-  })
+
   const ready = reactive({
     filename: null
   })
@@ -54,16 +46,11 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
   })
   watch(time, () => unfocus())
 
-  const mzCalibration = ref(null)
-
   // instrument
 
   watch(
     computed(() => instrument.focused?.instrument),
     async () => {
-      mzCalibration.value = null
-      pending.filename = null
-      await loadMzCalibration()
       await load()
     }
   )
@@ -188,18 +175,6 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
 
   // mz calibration
 
-  async function loadMzCalibration() {
-    const lastMzCalibration = await api.http.get(`/calibration/mz_calibration`, {
-      params: {
-        instrument: instrument.focused?.instrument
-      },
-      use: 'read',
-      type: 'load_mz_calibration'
-    })
-    if (!lastMzCalibration) return
-    mzCalibration.value = lastMzCalibration
-  }
-
   const resetFilters = () => {
     selected.value = []
     time.mode = initTime().mode
@@ -215,7 +190,6 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
     unfocus,
     ready,
     time,
-    mzCalibration,
     // actions
     load,
     resetFilters
