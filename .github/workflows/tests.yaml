@@ -32,6 +32,10 @@ jobs:
           echo "SERVER_OWNER_SECRET_KEY_FILE=test_server_owner_secret.txt" >> $GITHUB_ENV
           echo "test_server_owner_secret_key_for_testing_only" > test_server_owner_secret.txt
 
+          # Set up PostgreSQL password for tests (not actually used, unit tests use mocks)
+          echo "POSTGRES_PASSWORD_FILE=test_postgres_password.txt" >> $GITHUB_ENV
+          echo "test_postgres_password_for_testing_only" > test_postgres_password.txt
+
       - name: Create virtual environment and install dependencies
         run: |
           # Create a virtual environment
