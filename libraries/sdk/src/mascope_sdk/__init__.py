@@ -15,9 +15,16 @@ SERVICE_NAME = "mascope_sdk"
 # API request wrappers
 
 
-def api_get(url: str, path: str, access_token: str, params: dict = None):
+def api_get(
+    url: str, path: str, access_token: str, params: dict = None, stream: bool = False
+):
     """
     Send a GET request to the specified API endpoint with optional query parameters.
+
+    Optionally, the response can be streamed to handle large response bodies. In streaming mode,
+    the function will return the response object without attempting to parse the content, allowing
+    the caller to process the response in chunks.
+    NOTE: When using streaming, the caller is responsible for closing the response.
 
     :param url: The base URL of the server.
     :type url: str
@@ -27,6 +34,8 @@ def api_get(url: str, path: str, access_token: str, params: dict = None):
     :type access_token: str
     :param params: A dictionary of query parameters to include in the request.
     :type params: dict, optional
+    :param stream: Whether to stream the response content, defaults to False.
+    :type stream: bool, optional
     :return: The response object if the request was successful, otherwise None.
     :rtype: requests.Response or None
     """
@@ -39,12 +48,19 @@ def api_get(url: str, path: str, access_token: str, params: dict = None):
 
         # Send GET request with query parameters (if provided)
         resp = requests.get(
-            full_url, params=params, headers=headers, verify=False, timeout=30
+            full_url,
+            params=params,
+            headers=headers,
+            verify=False,
+            timeout=(30, 300),  # (connect timeout, read timeout)
+            stream=stream,
         )
         resp.raise_for_status()  # Raise HTTPError for bad responses
-        message = json.loads(resp.content).get("message", None)
-        if message is not None:
-            logger.debug(message)
+        # Skip message parsing for streamed responses to avoid loading entire content into memory
+        if not stream:
+            message = json.loads(resp.content).get("message", None)
+            if message is not None:
+                logger.debug(message)
     except HTTPError as http_err:
         if resp.status_code == 401 or resp.status_code == 403:
             response = json.loads(resp.content)
@@ -307,7 +323,15 @@ def get_sample_batch_data(
 
     This function interacts with the Mascope API to fetch comprehensive data
     for a given sample batch. It retrieves data for samples and combined match/targets data
-    for compounds, ions and isotopes
+    for compounds, ions and isotopes.
+
+    The data is retrieved in streaming mode to be able to handle potentially large responses.
+
+    - Call the API to get the batch data
+    - Parse the streamed response content
+    - Extract relevant information from the aggregate match data
+    - Build the response structure containing batch information, samples and combined target/match
+      data for compounds, ions, and isotopes.
 
     :param mascope_url: The base URL of the Mascope instance.
     :type mascope_url: str
@@ -325,11 +349,12 @@ def get_sample_batch_data(
              Returns an empty dictionary if the request fails or no data is found.
     :rtype: dict
     """
-    # Step 1: Call the API to get the batch data (stored in database)
+    # - Call the API to get the batch data (stored in database)
     resp = api_get(
         url=mascope_url,
         path=f"match/targets/batch/{sample_batch_id}",
         access_token=access_token,
+        stream=True,
     )
     if not resp:
         logger.error(
@@ -337,13 +362,28 @@ def get_sample_batch_data(
         )
         return {}
 
-    # Step 2: Parse the response content
-    batch_data = json.loads(resp.content)
+    # - Parse the streamed response content
+    # Use iter_content to read chunks and accumulate, avoiding loading entire response at once
+    try:
+        chunks = []
+        for chunk in resp.iter_content(chunk_size=8192, decode_unicode=True):
+            if chunk:
+                chunks.append(chunk)
+        content = "".join(chunks)
+        batch_data = json.loads(content)
+    except json.JSONDecodeError as e:
+        logger.error(
+            f"Failed to parse JSON response for sample batch {sample_batch_id}: {e}"
+        )
+        return {}
+    finally:
+        resp.close()  # Ensure the connection is released back to the pool
+
     if not batch_data:
         logger.error(f"No data returned for sample batch with ID {sample_batch_id}.")
         return {}
 
-    # Step 3: Extract relevant information from the aggregate match data
+    # - Extract relevant information from the aggregate match data
     result = batch_data.get("result", {})
     sample_batch = batch_data.get("data", {}).get("sample_batch", {})
     samples = batch_data.get("data", {}).get("samples", [])
@@ -351,7 +391,7 @@ def get_sample_batch_data(
     ions = batch_data.get("data", {}).get("ions", [])
     isotopes = batch_data.get("data", {}).get("isotopes", [])
 
-    # Step 4: Build the response structure
+    # - Build the response structure
     response = {
         "result": result,
         "sample_batch": sample_batch,
