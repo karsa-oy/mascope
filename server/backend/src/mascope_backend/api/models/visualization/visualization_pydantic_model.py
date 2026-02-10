@@ -12,3 +12,6 @@ class GetVisualizationIonFocusQueryParams(QueryParamsModel):
     mz_tolerance: int = Field(
         ..., description="Tolerance for mass-to-charge ratio (m/z) error."
     )
+    isotope_ratio_tolerance: float = Field(
+        ..., description="Tolerance for isotope ratio error (e.g., 0.1 for 10%)"
+    )

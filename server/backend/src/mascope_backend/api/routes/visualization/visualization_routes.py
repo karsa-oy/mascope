@@ -35,7 +35,7 @@ async def visualization_ion_focus_route(
     :param user: The authenticated user, defaults to Depends(guest_user).
     :return: A dictionary with a message indicating task initiation and a process ID.
     """
-    # Verify the existance
+    # Verify the existence
     sample_data = await get_sample_item(query_params.sample_item_id)
     sample = sample_data.get("data")
     sample_item_name = sample["sample_item_name"]

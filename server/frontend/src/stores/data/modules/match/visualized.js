@@ -151,7 +151,8 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
         sample_item_id: sample_item_id,
         target_ion_id: target_ion_id,
         peak_min_intensity: matchParams.ui.peak_min_intensity,
-        mz_tolerance: matchParams.ui.mz_tolerance
+        mz_tolerance: matchParams.ui.mz_tolerance,
+        isotope_ratio_tolerance: matchParams.ui.isotope_ratio_tolerance
       },
       use: 'read',
       type: 'read_visualized_ion'

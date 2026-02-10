@@ -32,6 +32,7 @@ async def visualize_ion_focus(
     target_ion_id: str,
     peak_min_intensity: float,
     mz_tolerance: float,
+    isotope_ratio_tolerance: float,
     independent_transaction: bool = False,
     user_id: int | None = None,
     process_id: str = None,
@@ -54,6 +55,8 @@ async def visualize_ion_focus(
     :type peak_min_intensity: float
     :param mz_tolerance: Tolerance for mass-to-charge ratio (m/z) error, in parts per million (ppm).
     :type mz_tolerance: float
+    :param isotope_ratio_tolerance: The maximum allowed deviation in expected isotope ratios, (0.1 means 10%).
+    :type isotope_ratio_tolerance: float
     :param independent_transaction: Indicates if the visualization should be considered an independent transaction, which affects sio event emission.
     :type independent_transaction: bool, optional
     :param user_id: Current user triggered operation (for user notifications)
@@ -91,6 +94,7 @@ async def visualize_ion_focus(
             mean_peak_heights=mean_peak_heights,
             peak_min_intensity=peak_min_intensity,
             mz_tolerance=mz_tolerance,
+            isotope_ratio_tolerance=isotope_ratio_tolerance,
         )
         isotope_result = _process_isotope(iso, ctx, sum_timeseries)
         match_counter += isotope_result.match_count
@@ -145,6 +149,7 @@ class IsotopeContext:
     mean_peak_heights: xr.DataArray
     peak_min_intensity: float
     mz_tolerance: float
+    isotope_ratio_tolerance: float
     color_offset: int = COLOR_OFFSET
 
 
@@ -346,8 +351,17 @@ def _process_isotope(
         }
     )
 
+    # Get peak height. Can't use iso.sample_peak_intensity since peak area is used for TOFs
+    peak_height = ctx.mean_peak_heights.sel(
+        mz=iso.sample_peak_mz, method="nearest"
+    ).item()
+
     # Derive match criteria
-    is_match = iso.match_score > 0.0
+    match_score_ok = iso.match_score > 0.0
+    intensity_ok = peak_height >= ctx.peak_min_intensity
+    mz_ok = abs(iso.match_mz_error) <= ctx.mz_tolerance
+    abundance_ratio_ok = abs(iso.match_abundance_error) <= ctx.isotope_ratio_tolerance
+    is_match = match_score_ok and intensity_ok and mz_ok and abundance_ratio_ok
 
     # Add peak trace for the sample peak matching the isotope, if exists
     if is_match:
@@ -356,11 +370,6 @@ def _process_isotope(
     else:
         peak_trace_mode = "lines"
         peak_line_color = "grey"
-
-    # Get peak height. Can't use iso.sample_peak_intensity since peak area is used for TOFs
-    peak_height = ctx.mean_peak_heights.sel(
-        mz=iso.sample_peak_mz, method="nearest"
-    ).item()
 
     peak_trace = {
         "name": "{:.6f}".format(iso.sample_peak_mz),
