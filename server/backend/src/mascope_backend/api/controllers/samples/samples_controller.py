@@ -2,7 +2,8 @@
 from datetime import datetime
 
 import numpy as np
-from sqlalchemy import Float, Integer, and_, asc, cast, desc, func, select
+import pandas as pd
+from sqlalchemy import Float, Integer, and_, asc, cast, desc, func, label, select
 
 import mascope_signal.compute as m_compute
 from mascope_backend.api.controllers.samples.lib.samples_fetch import fetch_sample
@@ -11,9 +12,9 @@ from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
 from mascope_backend.api.models.target.collections.config import (
     target_collection_config,
 )
+from mascope_backend.api.new.match.params.lib import apply_match_params
 from mascope_backend.db import (
     MatchCollection,
-    MatchIon,
     MatchIsotope,
     MatchSample,
     TargetCollection,
@@ -391,17 +392,24 @@ async def get_sample_peaks(
         response_data.pop("height", None)
 
     if matches:
-        # --- Lightweight query for peak matches ---
-        # Only fetch matched isotopes with minimal fields needed for the response
+        # --- Query for peak matches ---
         async with async_session() as session:
+            # Not all fields are returned in the response, but are needed for match filtering
             query = (
                 select(
                     MatchIsotope.sample_peak_id,
+                    MatchIsotope.match_mz_error,
+                    MatchIsotope.match_abundance_error,
+                    MatchIsotope.match_isotope_similarity,
+                    MatchIsotope.match_score,
+                    MatchIsotope.sample_peak_intensity,
                     TargetIsotope.target_isotope_id,
+                    TargetIsotope.relative_abundance,
                     TargetIsotope.target_isotope_formula,
                     TargetIon.target_ion_id,
                     TargetIon.target_ion_formula,
                     TargetCollection.target_collection_id,
+                    label("instrument", sample.instrument),
                 )
                 .select_from(MatchIsotope)
                 .join(
@@ -437,22 +445,28 @@ async def get_sample_peaks(
                 .where(
                     and_(
                         MatchIsotope.sample_item_id == sample.sample_item_id,
-                        MatchIsotope.match_score > 0,
+                        MatchIsotope.match_score > 0,  # pre-filter by match score
                     )
                 )
             )
             result = await session.execute(query)
             match_rows = result.all()
 
+        # Apply filtering parameters
+        match_df = apply_match_params(pd.DataFrame(match_rows))
+
         # Build a mapping from sample_peak_id to match data
         # Group by isotope id to avoid duplicates, collecting all collection IDs
         sample_peak_ids = sample_file_data.peak_id.values.tolist()
         peak_id_to_match = {peak_id: {} for peak_id in sample_peak_ids}
 
-        for row in match_rows:
+        for _, row in match_df.iterrows():
+            if row.match_category == 0:
+                continue  # Skip matches that were filtered out
             if row.sample_peak_id in peak_id_to_match:
                 # Use isotope id as key to deduplicate
                 if row.target_isotope_id not in peak_id_to_match[row.sample_peak_id]:
+                    # Select fields to return in the response
                     peak_id_to_match[row.sample_peak_id][row.target_isotope_id] = {
                         "target_isotope_id": row.target_isotope_id,
                         "target_isotope_formula": row.target_isotope_formula,
