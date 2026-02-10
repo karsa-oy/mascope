@@ -4,6 +4,7 @@ import Button from 'primevue/button'
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
 import Panel from 'primevue/panel'
+import ProgressSpinner from 'primevue/progressspinner'
 import TabMenu from 'primevue/tabmenu'
 
 import { num } from '@/lib/formatters'
@@ -84,6 +85,7 @@ onBeforeUnmount(() => {
       </span></template
     >
     <DataTable
+      v-if="!app.data.peak.pending"
       ref="peakTable"
       :value="app.data.peak.list"
       dataKey="peak_id"
@@ -144,6 +146,11 @@ onBeforeUnmount(() => {
         </template>
       </Column>
     </DataTable>
+    <div v-else class="center" style="width: 100%; height: 220px">
+      <div class="col">
+        <ProgressSpinner />
+      </div>
+    </div>
   </Panel>
 </template>
 

@@ -72,7 +72,7 @@ export const useChartData = defineStore('chart.sample.spectrum', () => {
       })
     }
     // add peak traces
-    if (app.data.peak.list.length > 0) {
+    if (!app.data.peak.pending && app.data.peak.list.length > 0) {
       traces.push({
         name: 'Peak',
         type: 'scatter' + gl,
