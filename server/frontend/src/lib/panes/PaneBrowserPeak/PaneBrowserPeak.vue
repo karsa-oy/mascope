@@ -46,6 +46,16 @@ watch(
     }
   }
 )
+// Watch for changes in the peak list and scroll to focused peak if needed
+// (after refreshing data)
+watch(
+  () => app.data.peak.list,
+  () => {
+    if (app.data.peak.focusedId) {
+      scroller.scrollToPeak(app.data.peak.focusedId)
+    }
+  }
+)
 
 onBeforeUnmount(() => {
   scroller.bind(
