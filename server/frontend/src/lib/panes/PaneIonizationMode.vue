@@ -9,11 +9,15 @@ import { reactive, computed, watch, ref } from 'vue'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
+import IconField from 'primevue/iconfield'
+import InputIcon from 'primevue/inputicon'
 import InputText from 'primevue/inputtext'
 import FloatLabel from 'primevue/floatlabel'
 import Select from 'primevue/select'
 import MultiSelect from 'primevue/multiselect'
+import Fieldset from 'primevue/fieldset'
 import { useConfirm } from 'primevue/useconfirm'
+import { FilterMatchMode } from '@primevue/core/api'
 
 import { useApp } from '@/stores'
 
@@ -110,6 +114,10 @@ const mode = {
   }
 }
 
+const filters = ref({
+  global: { value: null, matchMode: FilterMatchMode.CONTAINS }
+})
+
 // Reset mechanisms when polarity changes
 watch(
   () => add.ionization_mode_polarity,
@@ -135,125 +143,140 @@ defineExpose({
 </script>
 
 <template>
-  <menu class="row" style="margin-top: 1.5rem; gap: 0.5rem; flex-wrap: wrap">
-    <FloatLabel style="flex-grow: 1; min-width: 200px">
-      <InputText
-        v-model="add.ionization_mode_name"
-        id="add-mode-name"
-        style="width: 100%"
-        v-tooltip="{
-          value: 'Enter a descriptive name for the ionization mode (e.g. Nitrate)',
-          showDelay: 1000
-        }"
-      />
-      <label for="add-mode-name">Mode Name*</label>
-    </FloatLabel>
+  <Fieldset legend="Create New Ionization Mode">
+    <menu class="row" style="gap: 0.5rem; flex-wrap: wrap; padding-top: 1rem">
+      <FloatLabel style="flex-grow: 1; min-width: 200px">
+        <InputText
+          v-model="add.ionization_mode_name"
+          id="add-mode-name"
+          style="width: 100%"
+          v-tooltip="{
+            value: 'Enter a descriptive name for the ionization mode',
+            showDelay: 500
+          }"
+        />
+        <label for="add-mode-name">Mode Name*</label>
+      </FloatLabel>
 
-    <FloatLabel style="flex-grow: 1; min-width: 150px">
-      <InputText
-        v-model="add.ionization_mode_token"
-        id="add-mode-token"
-        style="width: 100%"
-        v-tooltip="{
-          value: 'Enter a short token used in filenames to identify this mode (e.g., _NO3_)',
-          showDelay: 1000
-        }"
-      />
-      <label for="add-mode-token">Filename token</label>
-    </FloatLabel>
+      <FloatLabel style="flex-grow: 1; min-width: 150px">
+        <InputText
+          v-model="add.ionization_mode_token"
+          id="add-mode-token"
+          style="width: 100%"
+          v-tooltip="{
+            value: 'Enter a unique token used in filenames to identify this mode',
+            showDelay: 500
+          }"
+        />
+        <label for="add-mode-token">Filename token</label>
+      </FloatLabel>
 
-    <FloatLabel style="flex-grow: 1; min-width: 120px">
-      <Select
-        v-model="add.ionization_mode_polarity"
-        :options="polarityOptions"
-        optionLabel="label"
-        optionValue="value"
-        id="add-polarity"
-        style="width: 100%"
-        v-tooltip="{ value: 'Select the ion polarity for this mode', showDelay: 1000 }"
-      />
-      <label for="add-polarity">Polarity*</label>
-    </FloatLabel>
+      <FloatLabel style="flex-grow: 1; min-width: 120px">
+        <Select
+          v-model="add.ionization_mode_polarity"
+          :options="polarityOptions"
+          optionLabel="label"
+          optionValue="value"
+          id="add-polarity"
+          style="width: 100%"
+          v-tooltip="{ value: 'Select the ion polarity for this mode', showDelay: 500 }"
+        />
+        <label for="add-polarity">Polarity*</label>
+      </FloatLabel>
 
-    <FloatLabel style="flex-grow: 2; min-width: 200px">
-      <MultiSelect
-        v-model="add.ionization_mechanism_ids"
-        :options="availableMechanisms"
-        :disabled="!add.ionization_mode_polarity"
-        :showToggleAll="false"
-        optionLabel="ionization_mechanism"
-        optionValue="ionization_mechanism_id"
-        id="add-mechanisms"
-        style="width: 100%"
-        :placeholder="add.ionization_mode_polarity ? 'Select mechanisms' : 'Select polarity first'"
-        v-tooltip="{
-          value:
-            'Choose one or more ionization mechanisms to apply for files acquired in this mode',
-          showDelay: 1000
-        }"
-      />
-      <label for="add-mechanisms">Mechanisms*</label>
-    </FloatLabel>
+      <FloatLabel style="flex-grow: 2; min-width: 200px">
+        <MultiSelect
+          v-model="add.ionization_mechanism_ids"
+          :options="availableMechanisms"
+          :disabled="!add.ionization_mode_polarity"
+          :showToggleAll="false"
+          optionLabel="ionization_mechanism"
+          optionValue="ionization_mechanism_id"
+          id="add-mechanisms"
+          style="width: 100%"
+          :placeholder="
+            add.ionization_mode_polarity ? 'Select mechanisms' : 'Select polarity first'
+          "
+          v-tooltip="{
+            value:
+              'Choose one or more ionization mechanisms to apply for files acquired in this mode',
+            showDelay: 500
+          }"
+        />
+        <label for="add-mechanisms">Mechanisms*</label>
+      </FloatLabel>
 
-    <FloatLabel style="flex-grow: 1; min-width: 180px">
-      <Select
-        v-model="add.calibration_collection_id"
-        :options="calibrationCollections"
-        optionLabel="target_collection_name"
-        optionValue="target_collection_id"
-        id="add-calibration"
-        style="width: 100%"
-        v-tooltip="{
-          value: 'Select a target collection for this ionization mode to use for mass calibration',
-          showDelay: 1000
-        }"
-      />
-      <label for="add-calibration">Calibration Collection</label>
-    </FloatLabel>
+      <FloatLabel style="flex-grow: 1; min-width: 180px">
+        <Select
+          v-model="add.calibration_collection_id"
+          :options="calibrationCollections"
+          optionLabel="target_collection_name"
+          optionValue="target_collection_id"
+          id="add-calibration"
+          style="width: 100%"
+          v-tooltip="{
+            value:
+              'Select a target collection for this ionization mode to use for mass calibration',
+            showDelay: 500
+          }"
+        />
+        <label for="add-calibration">Calibration Collection</label>
+      </FloatLabel>
 
-    <FloatLabel style="flex-grow: 1; min-width: 180px">
-      <Select
-        v-model="add.diagnostic_collection_id"
-        :options="diagnosticCollections"
-        optionLabel="target_collection_name"
-        optionValue="target_collection_id"
-        id="add-diagnostic"
-        style="width: 100%"
-        v-tooltip="{
-          value: 'Select a target collection for this ionization mode to use for quality control',
-          showDelay: 1000
-        }"
-      />
-      <label for="add-diagnostic">Diagnostic Collection</label>
-    </FloatLabel>
+      <FloatLabel style="flex-grow: 1; min-width: 180px">
+        <Select
+          v-model="add.diagnostic_collection_id"
+          :options="diagnosticCollections"
+          optionLabel="target_collection_name"
+          optionValue="target_collection_id"
+          id="add-diagnostic"
+          style="width: 100%"
+          v-tooltip="{
+            value: 'Select a target collection for this ionization mode to use for quality control',
+            showDelay: 500
+          }"
+        />
+        <label for="add-diagnostic">Diagnostic Collection</label>
+      </FloatLabel>
 
-    <Button
-      label="Add"
-      icon="pi pi-plus"
-      @click="
-        () =>
-          app.data.ionization.mode.create({
-            ionization_mode_name: add.ionization_mode_name.trim(),
-            ionization_mode_token: add.ionization_mode_token.trim() || null,
-            ionization_mode_polarity: add.ionization_mode_polarity,
-            ionization_mechanism_ids: add.ionization_mechanism_ids,
-            calibration_collection_id: add.calibration_collection_id,
-            diagnostic_collection_id: add.diagnostic_collection_id
-          })
-      "
-      :disabled="
-        !add.ionization_mode_name.trim() ||
-        !add.ionization_mode_polarity ||
-        !add.ionization_mechanism_ids.length
-      "
-      style="align-self: flex-end"
-      v-tooltip="{ value: 'Add this ionization mode to the database', showDelay: 1000 }"
-    />
-  </menu>
+      <Button
+        label="Create"
+        icon="pi pi-plus"
+        @click="
+          () =>
+            app.data.ionization.mode.create({
+              ionization_mode_name: add.ionization_mode_name.trim(),
+              ionization_mode_token: add.ionization_mode_token.trim() || null,
+              ionization_mode_polarity: add.ionization_mode_polarity,
+              ionization_mechanism_ids: add.ionization_mechanism_ids,
+              calibration_collection_id: add.calibration_collection_id,
+              diagnostic_collection_id: add.diagnostic_collection_id
+            })
+        "
+        :disabled="
+          !add.ionization_mode_name.trim() ||
+          !add.ionization_mode_polarity ||
+          !add.ionization_mechanism_ids.length
+        "
+        style="align-self: flex-end"
+        v-tooltip="{ value: 'Add this ionization mode to the database', showDelay: 500 }"
+      />
+    </menu>
+  </Fieldset>
 
   <section style="margin: 1rem 0">
     <DataTable
-      :value="app.data.ionization.mode.list"
+      :value="
+        app.data.ionization.mode.list.filter(
+          (im) => !im.ionization_mode_name.startsWith('AutoGenerated')
+        )
+      "
+      v-model:filters="filters"
+      :globalFilterFields="[
+        'ionization_mode_name',
+        'ionization_mode_token',
+        'ionization_mode_polarity'
+      ]"
       scrollable
       scrollHeight="calc(85vh - 300px)"
       tableStyle="min-width: 800px"
@@ -317,7 +340,7 @@ defineExpose({
             v-tooltip="{
               value:
                 'Select a target collection for this ionization mode to use for mass calibration',
-              showDelay: 1000
+              showDelay: 500
             }"
           />
           <span v-else>
@@ -345,7 +368,7 @@ defineExpose({
             v-tooltip="{
               value:
                 'Select a target collection for this ionization mode to use for quality control',
-              showDelay: 1000
+              showDelay: 500
             }"
           />
           <span v-else>
@@ -365,7 +388,7 @@ defineExpose({
           <div class="row" style="justify-content: flex-end; gap: 0.25rem">
             <template v-if="editing(data)">
               <Button
-                v-tooltip="{ value: 'Cancel editing', showDelay: 1000 }"
+                v-tooltip="{ value: 'Cancel editing', showDelay: 500 }"
                 icon="pi pi-times"
                 text
                 size="small"
@@ -373,7 +396,7 @@ defineExpose({
                 @click="mode.cancel"
               />
               <Button
-                v-tooltip="{ value: 'Save changes', showDelay: 1000 }"
+                v-tooltip="{ value: 'Save changes', showDelay: 500 }"
                 icon="pi pi-check"
                 text
                 size="small"
@@ -383,14 +406,14 @@ defineExpose({
             </template>
             <template v-else>
               <Button
-                v-tooltip="{ value: 'Edit ionization mode', showDelay: 1000 }"
+                v-tooltip="{ value: 'Edit ionization mode', showDelay: 500 }"
                 icon="pi pi-pencil"
                 text
                 size="small"
                 @click="mode.edit(data)"
               />
               <Button
-                v-tooltip="{ value: 'Delete ionization mode', showDelay: 1000 }"
+                v-tooltip="{ value: 'Delete ionization mode', showDelay: 500 }"
                 icon="pi pi-trash"
                 text
                 size="small"
@@ -402,6 +425,19 @@ defineExpose({
       </Column>
     </DataTable>
   </section>
+  <div class="row" style="padding-top: 1rem">
+    <IconField>
+      <InputIcon>
+        <i class="pi pi-search" />
+      </InputIcon>
+      <InputText
+        v-model="filters['global'].value"
+        type="text"
+        placeholder="Search ionization modes"
+        style="width: 480px"
+      />
+    </IconField>
+  </div>
 </template>
 
 <style scoped>
