@@ -39,6 +39,24 @@ const samples = computed(
     []
 )
 
+const filters = ref({
+  global: { value: null, matchMode: FilterMatchMode.CONTAINS }
+})
+
+const filteredSamples = computed(() => {
+  if (!filters.value.global?.value) {
+    return samples.value
+  }
+
+  const filterLower = filters.value.global.value.toLowerCase()
+  return samples.value.filter((sample) => {
+    return Object.values(sample).some((value) => {
+      if (value == null) return false
+      return String(value).toLowerCase().includes(filterLower)
+    })
+  })
+})
+
 const batchStatus = computed(() => {
   if (!batch.value) return null
 
@@ -77,22 +95,22 @@ onBeforeUnmount(() => {
 const onKeyDown = (event) => {
   if ((event.ctrlKey || event.metaKey) && event.key === 'a') {
     event.preventDefault()
-    app.data.sample.selected = [...samples.value]
+    app.data.sample.selected = [...filteredSamples.value]
   }
 }
 
 const { height } = useWindowSize()
 const padding = 100
 const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top) / 100 - 50)
-
-const filters = ref({
-  global: { value: null, matchMode: FilterMatchMode.CONTAINS }
-})
 </script>
 
 <template>
   <BaseTabbedPanel
-    label="Samples"
+    :label="
+      filters.global?.value
+        ? `Samples (${filteredSamples.length}/${samples.length})`
+        : `Samples (${samples.length})`
+    "
     icon="pi pi-tags"
     :clear="app.data.batch.unfocus"
     :back-label="'Back to batches'"
