@@ -369,8 +369,15 @@ def create():
         runtime.logger.info("Run 'mascope dev up' first")
         return
 
-    if not _is_database_ready():
-        create_database()
-    else:
+    if _is_database_ready():
+        db_cfg = runtime.full_config.backend.database
+        runtime.logger.info(
+            f"Database '{db_cfg.get_postgres_database_name(runtime.env.name)}' already exists"
+        )
+        return
+
+    if not create_database():
         runtime.logger.error("Database creation failed")
         raise typer.Exit(1)
+
+    runtime.logger.success("Database created successfully")
