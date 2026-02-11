@@ -200,10 +200,10 @@ class Workspace(Base):
     )
     instrument: Mapped[Optional[str]] = mapped_column(String(64))
     icon: Mapped[Optional[dict]] = mapped_column(JSON)
-    workspace_utc_created: Mapped[Optional[str]] = mapped_column(
+    workspace_utc_created: Mapped[Optional[dt]] = mapped_column(
         TIMESTAMP(timezone=True)
     )
-    workspace_utc_modified: Mapped[Optional[str]] = mapped_column(
+    workspace_utc_modified: Mapped[Optional[dt]] = mapped_column(
         TIMESTAMP(timezone=True)
     )
 
@@ -241,10 +241,10 @@ class SampleBatch(Base):
         String(4),
         server_default=text(f"'{sample_batch_config.ANALYSIS_POLARITY}'"),
     )
-    sample_batch_utc_created: Mapped[Optional[str]] = mapped_column(
+    sample_batch_utc_created: Mapped[Optional[dt]] = mapped_column(
         TIMESTAMP(timezone=True)
     )
-    sample_batch_utc_modified: Mapped[Optional[str]] = mapped_column(
+    sample_batch_utc_modified: Mapped[Optional[dt]] = mapped_column(
         TIMESTAMP(timezone=True)
     )
 
@@ -363,10 +363,10 @@ class SampleItem(Base):
     )
     t0: Mapped[Optional[float]] = mapped_column(Float)
     t1: Mapped[Optional[float]] = mapped_column(Float)
-    sample_item_utc_created: Mapped[Optional[str]] = mapped_column(
+    sample_item_utc_created: Mapped[Optional[dt]] = mapped_column(
         TIMESTAMP(timezone=True)
     )
-    sample_item_utc_modified: Mapped[Optional[str]] = mapped_column(
+    sample_item_utc_modified: Mapped[Optional[dt]] = mapped_column(
         TIMESTAMP(timezone=True)
     )
 
@@ -687,10 +687,10 @@ class MatchSample(Base):
         Integer, CheckConstraint("match_category BETWEEN 0 AND 2")
     )
     sample_peak_intensity_sum: Mapped[float] = mapped_column(Float)
-    match_sample_utc_created: Mapped[Optional[str]] = mapped_column(
+    match_sample_utc_created: Mapped[Optional[dt]] = mapped_column(
         TIMESTAMP(timezone=True)
     )
-    match_sample_utc_modified: Mapped[Optional[str]] = mapped_column(
+    match_sample_utc_modified: Mapped[Optional[dt]] = mapped_column(
         TIMESTAMP(timezone=True)
     )
 
@@ -722,10 +722,10 @@ class MatchCollection(Base):
         Integer, CheckConstraint("match_category BETWEEN 0 AND 2")
     )
     sample_peak_intensity_sum: Mapped[float] = mapped_column(Float)
-    match_collection_utc_created: Mapped[Optional[str]] = mapped_column(
+    match_collection_utc_created: Mapped[Optional[dt]] = mapped_column(
         TIMESTAMP(timezone=True)
     )
-    match_collection_utc_modified: Mapped[Optional[str]] = mapped_column(
+    match_collection_utc_modified: Mapped[Optional[dt]] = mapped_column(
         TIMESTAMP(timezone=True)
     )
 
@@ -760,10 +760,10 @@ class MatchCompound(Base):
         Integer, CheckConstraint("match_category BETWEEN 0 AND 2")
     )
     sample_peak_intensity_sum: Mapped[float] = mapped_column(Float)
-    match_compound_utc_created: Mapped[Optional[str]] = mapped_column(
+    match_compound_utc_created: Mapped[Optional[dt]] = mapped_column(
         TIMESTAMP(timezone=True)
     )
-    match_compound_utc_modified: Mapped[Optional[str]] = mapped_column(
+    match_compound_utc_modified: Mapped[Optional[dt]] = mapped_column(
         TIMESTAMP(timezone=True)
     )
 
@@ -797,10 +797,10 @@ class MatchIon(Base):
         Integer, CheckConstraint("match_category BETWEEN 0 AND 2")
     )
     sample_peak_intensity_sum: Mapped[float] = mapped_column(Float)
-    match_ion_utc_created: Mapped[Optional[str]] = mapped_column(
+    match_ion_utc_created: Mapped[Optional[dt]] = mapped_column(
         TIMESTAMP(timezone=True)
     )
-    match_ion_utc_modified: Mapped[Optional[str]] = mapped_column(
+    match_ion_utc_modified: Mapped[Optional[dt]] = mapped_column(
         TIMESTAMP(timezone=True)
     )
 
@@ -826,7 +826,7 @@ class MatchRating(Base):
         String(16),
         ForeignKey("target_ion.target_ion_id", ondelete="CASCADE"),
     )
-    match_rating_utc_created: Mapped[Optional[str]] = mapped_column(
+    match_rating_utc_created: Mapped[Optional[dt]] = mapped_column(
         TIMESTAMP(timezone=True)
     )
     rating: Mapped[int] = mapped_column(
@@ -865,10 +865,10 @@ class MatchIsotope(Base):
     match_score: Mapped[float] = mapped_column(
         Float, CheckConstraint("match_score BETWEEN 0 AND 1")
     )
-    match_isotope_utc_created: Mapped[Optional[str]] = mapped_column(
+    match_isotope_utc_created: Mapped[Optional[dt]] = mapped_column(
         TIMESTAMP(timezone=True)
     )
-    match_isotope_utc_modified: Mapped[Optional[str]] = mapped_column(
+    match_isotope_utc_modified: Mapped[Optional[dt]] = mapped_column(
         TIMESTAMP(timezone=True)
     )
 
