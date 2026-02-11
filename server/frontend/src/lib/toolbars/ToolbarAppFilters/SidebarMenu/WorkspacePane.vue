@@ -78,6 +78,8 @@ const vHelpLayer = app.ui.help.directive(layer)
           }
         "
         @contextmenu.prevent
+        filter
+        :filterPlaceholder="'Search workspaces'"
         :options="app.data.workspace.list"
         optionLabel="workspace_name"
         listStyle="height: calc(100vh - 300px)"
