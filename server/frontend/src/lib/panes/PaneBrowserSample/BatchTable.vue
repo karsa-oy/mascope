@@ -1,11 +1,17 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 
 import { useWindowSize } from '@vueuse/core'
 
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
+import IconField from 'primevue/iconfield'
+import InputIcon from 'primevue/inputicon'
+import InputText from 'primevue/inputtext'
+
+import { FilterMatchMode } from '@primevue/core/api'
+
 import { BaseTabbedPanel, BaseCopyableField, BaseStatusIcon } from '@/lib/base'
 import { useApp } from '@/stores'
 
@@ -18,6 +24,10 @@ const batchStatusStore = useBatchStatus()
 const { height } = useWindowSize()
 const padding = 100
 const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top) / 100 - 50)
+
+const filters = ref({
+  global: { value: null, matchMode: FilterMatchMode.CONTAINS }
+})
 </script>
 
 <template v-if="app.data.batch.list">
@@ -40,19 +50,27 @@ const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top)
     "
   >
     <template #menu>
-      <Button
-        v-tooltip.top="'Create batch'"
-        label="Create batch"
-        class="hiddenlabel"
-        icon="pi pi-plus"
-        text
-        size="small"
-        @click="
-          () => {
-            contextMenu.dialog.op = 'create'
-          }
-        "
-      />
+      <div class="row">
+        <IconField>
+          <InputIcon>
+            <i class="pi pi-search" />
+          </InputIcon>
+          <InputText v-model="filters['global'].value" type="text" placeholder="Search batches" />
+        </IconField>
+        <Button
+          v-tooltip.top="'Create batch'"
+          label="Create batch"
+          class="hiddenlabel"
+          icon="pi pi-plus"
+          text
+          size="small"
+          @click="
+            () => {
+              contextMenu.dialog.op = 'create'
+            }
+          "
+        />
+      </div>
     </template>
     <DataTable
       :value="app.data.batch.list"
@@ -72,6 +90,7 @@ const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top)
       resizableColumns
       sortField="sample_batch_name"
       :sortOrder="-1"
+      v-model:filters="filters"
       size="small"
       scrollable
       :scrollHeight="`${tableHeight}px`"
