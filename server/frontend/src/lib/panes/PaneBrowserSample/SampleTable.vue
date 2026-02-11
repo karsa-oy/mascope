@@ -4,7 +4,6 @@ import { useWindowSize } from '@vueuse/core'
 
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
-import Button from 'primevue/button'
 import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
 import InputText from 'primevue/inputtext'
@@ -20,7 +19,6 @@ import { useApp } from '@/stores'
 import SampleTableCustomizer from './SampleTableCustomizer.vue'
 import SampleContextMenu from './SampleContextMenu.vue'
 import {
-  useBatchTableConfig,
   useBatchStatus,
   useCustomizerPopover,
   useSampleContextMenu,
@@ -31,7 +29,6 @@ const app = useApp()
 const sampleTable = ref(null)
 const scroller = useSampleScroller()
 
-const batchTable = useBatchTableConfig()
 const customizer = useCustomizerPopover()
 const contextMenu = useSampleContextMenu()
 
@@ -84,28 +81,6 @@ const onKeyDown = (event) => {
   }
 }
 
-// Navigation between batches
-const batchIndex = computed(() => {
-  if (!batch.value || batchTable.sortedFilteredBatchList.length === 0) return -1
-  return batchTable.sortedFilteredBatchList.findIndex(
-    (b) => b.sample_batch_id === batch.value.sample_batch_id
-  )
-})
-
-const previousBatch = () => {
-  if (batchTable.sortedFilteredBatchList.length === 0) return
-  const currentIndex = batchIndex.value
-  if (currentIndex <= 0) return
-  app.data.batch.focused = batchTable.sortedFilteredBatchList[currentIndex - 1]
-}
-
-const nextBatch = () => {
-  if (batchTable.sortedFilteredBatchList.length === 0) return
-  const currentIndex = batchIndex.value
-  if (currentIndex >= batchTable.sortedFilteredBatchList.length - 1) return
-  app.data.batch.focused = batchTable.sortedFilteredBatchList[currentIndex + 1]
-}
-
 const { height } = useWindowSize()
 const padding = 100
 const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top) / 100 - 50)
@@ -138,30 +113,6 @@ const filters = ref({
   >
     <template #menu>
       <div class="row">
-        <Button
-          v-tooltip.top="
-            batchIndex > 0
-              ? 'Previous batch: ' +
-                (batchTable.sortedFilteredBatchList[batchIndex - 1]?.sample_batch_name ?? '')
-              : undefined
-          "
-          text
-          icon="pi pi-arrow-left"
-          @click="previousBatch"
-          :disabled="batchIndex <= 0"
-        />
-        <Button
-          v-tooltip.top="
-            batchIndex < batchTable.sortedFilteredBatchList.length - 1
-              ? 'Next batch: ' +
-                (batchTable.sortedFilteredBatchList[batchIndex + 1]?.sample_batch_name ?? '')
-              : undefined
-          "
-          text
-          icon="pi pi-arrow-right"
-          @click="nextBatch"
-          :disabled="batchIndex >= batchTable.sortedFilteredBatchList.length - 1"
-        />
         <IconField>
           <InputIcon>
             <i class="pi pi-search" />
@@ -173,7 +124,7 @@ const filters = ref({
     </template>
     <DataTable
       ref="sampleTable"
-      v-if="samples.length > 0 && app.data.batch.focused"
+      v-if="samples.length > 0 && batch"
       :value="samples"
       dataKey="sample_item_id"
       selectionMode="multiple"

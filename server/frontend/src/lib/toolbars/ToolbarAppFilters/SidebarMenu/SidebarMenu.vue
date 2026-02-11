@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watchEffect } from 'vue'
+import { computed, ref, watchEffect } from 'vue'
 
 import Button from 'primevue/button'
 import Drawer from 'primevue/drawer'
@@ -11,7 +11,7 @@ import TabPanel from 'primevue/tabpanel'
 import ContextMenu from 'primevue/contextmenu'
 
 import { DialogWorkspaceOp } from '@/lib/dialogs'
-import { BatchContextMenu, useBatchContextMenu } from '@/lib/panes'
+import { BatchContextMenu, useBatchContextMenu, useBatchTableConfig } from '@/lib/panes'
 
 import { useSidebarMenu } from './state.js'
 import WorkspacePane from './WorkspacePane.vue'
@@ -27,6 +27,31 @@ const sidebarMenu = useSidebarMenu()
 const dialog = ref()
 const workspaceContextMenu = ref()
 const batchContextMenu = useBatchContextMenu()
+const batchTable = useBatchTableConfig()
+
+// Navigation between batches
+const batch = computed(() => app.data.batch.focused)
+
+const batchIndex = computed(() => {
+  if (!batch.value || batchTable.sortedFilteredBatchList.length === 0) return -1
+  return batchTable.sortedFilteredBatchList.findIndex(
+    (b) => b.sample_batch_id === batch.value.sample_batch_id
+  )
+})
+
+const previousBatch = () => {
+  if (batchTable.sortedFilteredBatchList.length === 0) return
+  const currentIndex = batchIndex.value
+  if (currentIndex <= 0) return
+  app.data.batch.focused = batchTable.sortedFilteredBatchList[currentIndex - 1]
+}
+
+const nextBatch = () => {
+  if (batchTable.sortedFilteredBatchList.length === 0) return
+  const currentIndex = batchIndex.value
+  if (currentIndex >= batchTable.sortedFilteredBatchList.length - 1) return
+  app.data.batch.focused = batchTable.sortedFilteredBatchList[currentIndex + 1]
+}
 
 watchEffect(() => {
   if (!sidebarMenu.open) {
@@ -86,10 +111,22 @@ watchEffect(() => {
     <template v-if="app.data.batch.focused">
       <span class="pi ph ph-caret-right" style="opacity: 0.5" />
       <Button
-        icon="pi pi-tags"
-        :label="app.data.batch.focused.sample_batch_name"
         v-tooltip.bottom="
-          `${app.data.batch.focused?.sample_batch_description ?? 'No description'}
+          batchIndex > 0
+            ? 'Previous batch: ' +
+              (batchTable.sortedFilteredBatchList[batchIndex - 1]?.sample_batch_name ?? '')
+            : undefined
+        "
+        text
+        icon="pi pi-arrow-left"
+        @click="previousBatch"
+        :disabled="batchIndex <= 0"
+      />
+      <Button
+        icon="pi pi-tags"
+        :label="batch.sample_batch_name"
+        v-tooltip.bottom="
+          `${batch?.sample_batch_description ?? 'No description'}
                           (right click for options)`
         "
         severity="secondary"
@@ -105,6 +142,18 @@ watchEffect(() => {
             batchContextMenu.onClick(event)
           }
         "
+      />
+      <Button
+        v-tooltip.bottom="
+          batchIndex < batchTable.sortedFilteredBatchList.length - 1
+            ? 'Next batch: ' +
+              (batchTable.sortedFilteredBatchList[batchIndex + 1]?.sample_batch_name ?? '')
+            : undefined
+        "
+        text
+        icon="pi pi-arrow-right"
+        @click="nextBatch"
+        :disabled="batchIndex >= batchTable.sortedFilteredBatchList.length - 1"
       />
     </template>
   </menu>
