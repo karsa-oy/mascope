@@ -129,9 +129,11 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
         type: 'load_matches'
       }
     )
-    isotopes.value = []
-    if (!response?.match_ions?.[0]) return
-
+    if (!response?.match_ions?.[0]) {
+      isotopes.value = []
+      isotopeSelected.value = null
+      return
+    }
     // Store ion with nested match structure intact
     ion.value = response.match_ions[0]
 

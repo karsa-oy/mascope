@@ -52,6 +52,8 @@ const traces = computed(() => {
 // transform raw visualiation data into seperate charts
 const isotopeCharts = computed(() => {
   // Build array with first isotope and selected isotope (if different)
+  if (app.data.match.visualized.isotopes === null) return []
+
   const isotopeList = []
 
   if (app.data.match.visualized.isotopes?.[0]) {
