@@ -4,6 +4,11 @@ import { useWindowSize } from '@vueuse/core'
 
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
+import IconField from 'primevue/iconfield'
+import InputIcon from 'primevue/inputicon'
+import InputText from 'primevue/inputtext'
+
+import { FilterMatchMode } from '@primevue/core/api'
 
 import { BaseTabbedPanel, BaseMatchTag, BaseCopyableField } from '@/lib/base'
 import { DialogSampleOp, DialogCalibration } from '@/lib/dialogs'
@@ -79,6 +84,10 @@ const onKeyDown = (event) => {
 const { height } = useWindowSize()
 const padding = 100
 const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top) / 100 - 50)
+
+const filters = ref({
+  global: { value: null, matchMode: FilterMatchMode.CONTAINS }
+})
 </script>
 
 <template>
@@ -103,7 +112,15 @@ const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top)
     "
   >
     <template #menu>
-      <SampleTableCustomizer />
+      <div class="row">
+        <IconField>
+          <InputIcon>
+            <i class="pi pi-search" />
+          </InputIcon>
+          <InputText v-model="filters['global'].value" type="text" placeholder="Search samples" />
+        </IconField>
+        <SampleTableCustomizer />
+      </div>
     </template>
     <DataTable
       ref="sampleTable"
@@ -127,6 +144,7 @@ const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top)
       resizableColumns
       :sortField="customizer.config.sortField"
       :sortOrder="customizer.config.sortOrder"
+      v-model:filters="filters"
       @sort="
         ({ sortField, sortOrder }) => {
           customizer.config.sortField = sortField

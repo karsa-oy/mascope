@@ -125,7 +125,7 @@ function createLabel(field) {
 <template v-if="app.data.batch.list">
   <Button
     v-tooltip.top="'Configure column visibility'"
-    icon="pi pi-ellipsis-h"
+    icon="pi pi-cog"
     severity="secondary"
     text
     size="small"
