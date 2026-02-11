@@ -1,4 +1,5 @@
 export * from './batchContextMenu.js'
+export * from './batchTableConfig.js'
 export * from './batchStatus.js'
 export * from './clipboard.js'
 export * from './customizerPopover.js'
