@@ -75,6 +75,24 @@ def _check_data_dirs():
         runtime.logger.debug(f"PostgreSQL data directory located at {postgres_dir}")
 
 
+def _resolve_modules(module_names: List[str]) -> List[dict]:
+    """
+    Resolve module names or tags to actual module definitions.
+
+    :param module_names: List of module names or a single tag
+    :return: List of resolved module dictionaries
+    """
+    # Select modules by name
+    resolved = [mod for mod in runtime.modules if mod["name"] in module_names]
+
+    # Use tags if no modules selected by name
+    if not resolved:
+        [tag] = module_names
+        resolved = [mod for mod in runtime.modules if tag in mod["tags"]]
+
+    return resolved
+
+
 def _run_dev_compose(args: list[str]):
     """
     Execute docker-compose command for dev environment.
@@ -100,7 +118,7 @@ def _run_dev_compose(args: list[str]):
 
 
 def _run_application(
-    modules: List[str],
+    modules: List[dict],
     host: bool = False,
     lab: bool = False,
     reload: bool = False,
@@ -108,21 +126,15 @@ def _run_application(
     """
     Internal helper to run application services.
 
-    :param modules: List of module names or tags to run
+    :param modules: List of resolved modules to run
     :param host: Whether to expose to network
     :param lab: Whether to include jupyter lab
     :param reload: Whether to use Windows reload mode
     """
-    # Select modules by name
-    selected = [mod for mod in runtime.modules if mod["name"] in modules]
+    selected = modules.copy()
 
     if lab:
         selected.append({"name": "lab", "run": "uv run jupyter lab"})
-
-    # Use tags if no modules selected by name
-    if not selected:
-        [tag] = modules
-        selected = [mod for mod in runtime.modules if tag in mod["tags"]]
 
     # Set mode to dev
     runtime.state.mode = "dev"
@@ -300,6 +312,19 @@ def run(
         mascope dev migrate upgrade        # Migrations manually
     """
     selected_modules = modules or ["backend", "frontend"]
+
+    # --- Resolve module names/tags to actual modules ---
+    resolved_modules = _resolve_modules(selected_modules)
+
+    if not resolved_modules:
+        runtime.logger.error(
+            f"No configured modules found for: {', '.join(selected_modules)}"
+        )
+        raise typer.Exit(1)
+
+    # --- Check if backend is selected (for migration logic) ---
+    backend_selected = any(mod["name"] == "backend" for mod in resolved_modules)
+
     # --- check Docker ---
     check_and_start_docker()
 
@@ -319,12 +344,6 @@ def run(
             raise typer.Exit(1)
 
     # --- migrations (if backend selected + PostgreSQL) ---
-    backend_selected = any(
-        mod["name"] == "backend"
-        for mod in runtime.modules
-        if mod["name"] in selected_modules
-    )
-
     if backend_selected and db_cfg.type == "postgres":
         runtime.logger.info("Checking database...")
         if not create_database():
@@ -342,7 +361,7 @@ def run(
 
     # --- run application ---
     _run_application(
-        modules=selected_modules,
+        modules=resolved_modules,
         host=host,
         lab=lab,
         reload=reload,

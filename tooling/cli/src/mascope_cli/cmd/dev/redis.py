@@ -74,7 +74,6 @@ def _check_prerequisites() -> bool:
     # Skip Docker management for remote Redis hosts
     if redis_cfg.host not in ["localhost", "127.0.0.1"]:
         runtime.logger.info(f"Redis configured for remote host: {redis_cfg.host}")
-        runtime.logger.info("Skipping Docker container management")
         return False
 
     if not is_docker_running():
