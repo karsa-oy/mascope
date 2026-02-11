@@ -264,9 +264,6 @@ async def run():
         password=postgres_password, env_name=runtime.env.name
     )
 
-    runtime.logger.info(f"SQLite:     {sqlite_url}")
-    runtime.logger.info(f"PostgreSQL: {postgres_url}")
-
     sqlite_engine = create_async_engine(sqlite_url, echo=False)
     postgres_engine = create_async_engine(postgres_url, echo=False)
 

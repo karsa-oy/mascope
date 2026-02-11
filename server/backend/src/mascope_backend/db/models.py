@@ -884,7 +884,7 @@ class MatchIsotope(Base):
 
 
 class AttributeTemplate(Base):
-    """Attribute template for addtional sample metadata."""
+    """Attribute template for additional sample metadata."""
 
     __tablename__ = "attribute_template"
 
@@ -895,7 +895,7 @@ class AttributeTemplate(Base):
 
 
 class InstrumentFunction(Base):
-    """Instrument funciton parameters."""
+    """Instrument function parameters."""
 
     __tablename__ = "instrument_function"
 

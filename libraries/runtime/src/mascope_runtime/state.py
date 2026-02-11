@@ -19,7 +19,7 @@ Additionally, an 'override' API is exposed allowing
 the CLI to temporarily override a variable. Each field
 in the `state` object has two values: `active` and
 `override`. The `active` value is persisted which the
-`override` value is emphemeral, being cleared with
+`override` value is ephemeral, being cleared with
 every time a CLI command is run.
 
 When the CLI wants to temporarily override state, it can

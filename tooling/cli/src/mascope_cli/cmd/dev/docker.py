@@ -149,7 +149,7 @@ def check_and_start_docker() -> None:
     :rtype: None
     """
     if is_docker_running():
-        return True
+        return
 
     runtime.logger.error("Docker daemon is not running, it is required to run Mascope.")
 
