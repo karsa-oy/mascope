@@ -60,7 +60,7 @@ from mascope_backend.socket.notifications import (
 )
 from mascope_backend.socket.records.service import (
     emit_record_created,
-    emit_record_deleted,
+    emit_record_reload,
     emit_record_updated,
 )
 from mascope_file.name import get_instrument_type
@@ -459,13 +459,12 @@ async def delete_sample_items(
         sample_batch_ids=affected_sample_batch_ids
     )
 
-    # Emit deletion events for each sample item
+    # Emit reload events to each affected sample batch
     if independent_transaction:
-        for sample_item in sample_items:
-            await emit_record_deleted(
+        for sample_batch_id in affected_sample_batch_ids:
+            await emit_record_reload(
                 record_type="sample",
-                record_id=sample_item.sample_item_id,
-                room=sample_item.sample_batch_id,
+                room=sample_batch_id,
             )
 
     s = "s" if len(sample_item_ids) > 1 else ""
@@ -624,16 +623,12 @@ async def copy_sample_items(
             notification,
         )
 
-    # Emit updated events for samples with copied match data
+    # Emit reload event to the target sample batch
     if independent_transaction:
-        for created_sample in created_samples:
-            sample = (await get_sample(created_sample["sample_item_id"])).get("data")
-            await emit_record_created(
-                record_type="sample",
-                record_id=created_sample["sample_item_id"],
-                record=sample,
-                room=sample_batch_id,
-            )
+        await emit_record_reload(
+            record_type="sample",
+            room=sample_batch_id,
+        )
 
     # Step 6: Set rematch status if samples need recomputation
     if requires_rematch:
