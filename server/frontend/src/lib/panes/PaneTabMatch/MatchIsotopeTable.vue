@@ -4,7 +4,6 @@ import { computed } from 'vue'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import ProgressSpinner from 'primevue/progressspinner'
-import Tooltip from 'primevue/tooltip'
 
 import { BaseMatchTag, BaseCopyableField } from '@/lib/base'
 import { num } from '@/lib/formatters'

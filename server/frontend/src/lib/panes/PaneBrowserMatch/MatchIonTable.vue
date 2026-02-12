@@ -6,7 +6,6 @@ import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
-import MultiSelect from 'primevue/multiselect'
 import { FilterMatchMode } from '@primevue/core/api'
 
 import { BaseTabbedPanel, BaseMatchTag, BaseCopyableField } from '@/lib/base'
@@ -413,10 +412,13 @@ watch(
         </template>
       </Column>
 
-      <!-- Compound Column -->
-      <Column field="target_compound_name" header="Compound" sortable style="min-width: 12rem">
+      <!-- Compound (formula & name) Column -->
+      <Column field="target_compound_formula" header="Compound" sortable style="min-width: 10rem">
         <template #body="{ data }">
-          <BaseCopyableField :field="data.target_compound_name" />
+          <BaseCopyableField
+            :field="data.target_compound_formula"
+            :tooltip="{ value: data.target_compound_name, position: 'right' }"
+          />
         </template>
         <template #filter="{ filterModel, filterCallback }">
           <InputText
@@ -425,29 +427,6 @@ watch(
             @input="filterCallback()"
             placeholder="Search compound..."
             size="small"
-          />
-        </template>
-      </Column>
-
-      <!-- Compound Formula Column -->
-      <Column
-        field="target_compound_formula"
-        header="Compound Formula"
-        sortable
-        style="min-width: 10rem"
-      >
-        <template #body="{ data }">
-          <BaseCopyableField :field="data.target_compound_formula" />
-        </template>
-        <template #filter="{ filterModel, filterCallback }">
-          <MultiSelect
-            v-model="filterModel.value"
-            @change="filterCallback()"
-            :options="filterOptions.compounds"
-            placeholder="Select compounds..."
-            size="small"
-            :maxSelectedLabels="2"
-            style="min-width: 10rem"
           />
         </template>
       </Column>

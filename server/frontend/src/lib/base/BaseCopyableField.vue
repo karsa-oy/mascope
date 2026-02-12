@@ -1,10 +1,23 @@
 <script setup>
+import { computed } from 'vue'
 import Button from 'primevue/button'
 
-const { field } = defineProps({
+const { field, tooltip } = defineProps({
   field: {
     required: true
+  },
+  tooltip: {
+    type: [String, Object],
+    default: null
   }
+})
+
+const tooltipConfig = computed(() => {
+  if (!tooltip) return null
+  if (typeof tooltip === 'string') {
+    return { value: tooltip, position: 'top' }
+  }
+  return tooltip
 })
 
 const emit = defineEmits(['copy'])
@@ -20,7 +33,7 @@ async function copyField(text) {
 
 <template>
   <span class="field">
-    <span>{{ field }}</span>
+    <span v-tooltip="tooltipConfig">{{ field }}</span>
     <Button
       v-if="field && String(field).length > 0"
       v-tooltip.bottom="{ value: 'Copy to clipboard', showDelay: 2000 }"
