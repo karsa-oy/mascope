@@ -83,8 +83,6 @@ async def compute_match_isotopes(
         )
         # Get positive-intensity, averaged peaks
         parsed_peaks = _parse_and_filter_peaks(peak_timeseries)
-        # Filter out timeseries of zero-intensity peaks
-        filtered_timeseries = peak_timeseries.isel(mz=parsed_peaks["non_zero_mask"])
 
         runtime.logger.debug("Perform isotope matching")
 
@@ -98,7 +96,6 @@ async def compute_match_isotopes(
             sample_peak_intensity=np.nan,
             sample_peak_intensity_relative=np.nan,
             match_abundance_error=np.nan,
-            match_isotope_similarity=np.nan,
             match_mz_error=np.nan,
             match_score=unmatched_isotope_params.match_score,
             sample_peak_tof=np.nan,
@@ -119,9 +116,7 @@ async def compute_match_isotopes(
         # Calculate match stats for isotopes with actual matches
         if matched_mask.any():
             runtime.logger.debug("Calculate match statistics for matched isotopes")
-            match_isotope_df = calculate_match_stats(
-                match_isotope_df, filtered_timeseries
-            )
+            match_isotope_df = calculate_match_stats(match_isotope_df)
 
         # Set default values for unmatched isotopes
         unmatched_mask = ~matched_mask
@@ -336,15 +331,11 @@ def _match_assign(match_isotope_df: pd.DataFrame, parsed_peaks: dict) -> pd.Data
     return match_isotope_df
 
 
-def calculate_match_stats(
-    match_isotope_df: pd.DataFrame, peaks: "xarray.DataArray"  # type: ignore # noqa: F821
-) -> pd.DataFrame:
+def calculate_match_stats(match_isotope_df: pd.DataFrame) -> pd.DataFrame:
     """Calculate match statistics for isotopes.
 
     :param match_isotope_df: DataFrame containing matched isotopes with their properties.
     :type match_isotope_df: pd.DataFrame
-    :param peaks: Detected peaks DataArray containing m/z, intensity, and time information.
-    :type peaks: xarray.DataArray
     :return: DataFrame with match statistics for each isotope, including relative peak intensities,
               abundance matching errors, isotope similarities, m/z errors, and match scores.
     :rtype: pd.DataFrame
@@ -407,44 +398,7 @@ def calculate_match_stats(
     )
     match_isotope_df["match_score"] = abundance_term * mz_term
 
-    # --- Calculate isotope similarities by ion group ---
-    match_isotope_df = match_isotope_df.groupby(["target_ion_id"], group_keys=False)[
-        match_isotope_df.columns
-    ].apply(assign_isotope_similarity, peaks=peaks)
-
-    match_isotope_df["match_isotope_similarity"] = match_isotope_df[
-        "match_isotope_similarity"
-    ].fillna(0.0)
-
     return match_isotope_df
-
-
-def assign_isotope_similarity(ion_group, peaks):
-    """
-    Assign isotope similarity to a group of isotopes
-
-    :param ion_group: Group of isotopes sharing the same target ion ID.
-    :type ion_group: pd.DataFrame
-    :param peaks: Detected peaks DataArray containing m/z, intensity, and time information.
-    :type peaks: xarray.DataArray
-    :return: Group of isotopes with an additional column for match_isotope_similarity.
-    :rtype: pd.DataFrame
-    """
-    peak_indices = ion_group["matched_peak_idx"].dropna().astype(int).values
-    if len(peak_indices) > 1:
-        closest_timeseries = peaks.isel(mz=peak_indices).values
-        # Use isotope relative abundances as weights for similarity calculation
-        # to reduce the impact of low-abundance isotopes with noisy signals
-        rel_abundances = (
-            ion_group.loc[ion_group["matched_peak_idx"].notna(), "relative_abundance"]
-            .astype(float)
-            .values
-        )
-        similarity = mean_weighted_cosine_similarity(closest_timeseries, rel_abundances)
-    else:
-        similarity = 1.0
-    ion_group = ion_group.assign(match_isotope_similarity=similarity)
-    return ion_group
 
 
 def assign_defaults_to_unmatched(
@@ -478,59 +432,3 @@ def assign_defaults_to_unmatched(
             match_isotope_df.loc[unmatched_mask, column] = value
 
     return match_isotope_df
-
-
-def mean_weighted_cosine_similarity(
-    arr: np.ndarray, weights: np.ndarray, weight_power: float = 1.5
-) -> float:
-    """
-    Compute weighted mean pairwise cosine similarity for rows in arr.
-    weights are per-row (e.g., target relative_abundance). Pairwise product of powered weights is used
-    as pair weights and the weighted average of pairwise cosine similarities is returned
-
-    :param arr: 2D array (n_isotopes * n_timepoints)
-    :type arr: np.ndarray
-    :param weights: 1D array of relative abundances for the n_isotopes rows
-    :type weights: np.ndarray
-    :param weight_power: Exponent applied to abundances to tune downweighting of small values
-    :type weight_power: float, optional
-    :return: weighted mean cosine similarity
-    :rtype: float
-    """
-    n = arr.shape[0]
-    if n < 2:
-        return 1.0
-
-    # Tweak effect of small weights
-    weights = np.power(weights, weight_power)
-
-    # compute L2 (Euclidean) norm of each row
-    # This is sqrt(sum of squares across time) for each isotope.
-    norms = np.linalg.norm(arr, axis=1)
-    non_zero_norm_mask = norms > 0
-    if non_zero_norm_mask.sum() < 2:
-        # Not enough valid rows to compute similarity
-        return 1.0
-
-    normalized_valid_arrays = (
-        arr[non_zero_norm_mask] / norms[non_zero_norm_mask][:, None]
-    )  # shape (n_valid, t)
-    valid_weights = weights[non_zero_norm_mask]
-
-    # weighted mean of pairwise cosine similarities via matrix operations
-    weighted_arrays = normalized_valid_arrays.T @ valid_weights
-    weighted_similarity_sum = normalized_valid_arrays @ weighted_arrays
-    weighted_sum = float(np.dot(valid_weights, weighted_similarity_sum))
-
-    # subtract diagonal (s_ii = 1 for normalized valid rows)
-    sum_of_squared_valid_weights = float((valid_weights * valid_weights).sum())
-    numerator = 0.5 * (weighted_sum - sum_of_squared_valid_weights)
-
-    # denominator = sum_{i<j} w_i w_j over all isotopes (including invalid rows)
-    sum_w_all = float(weights.sum())
-    sum_w_all_sq = float((weights * weights).sum())
-    denominator = 0.5 * (sum_w_all * sum_w_all - sum_w_all_sq)
-
-    weighted_mean = numerator / denominator
-    # Cut to reasonable range
-    return float(max(0.0, min(1.0, weighted_mean)))

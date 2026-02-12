@@ -2,7 +2,6 @@ from typing import Optional, Tuple
 
 import pandas as pd
 
-from mascope_backend.api.controllers.match.lib.match_util import similarity_factor
 from mascope_backend.api.models.target.collections.config import (
     target_collection_config,
 )
@@ -143,7 +142,6 @@ async def aggregate_match_isotopes(
             "relative_abundance",
             "match_mz_error",
             "match_abundance_error",
-            "match_isotope_similarity",
             "sample_peak_intensity",
             "sample_peak_intensity_relative",
             "sample_peak_mz",
@@ -218,11 +216,6 @@ async def aggregate_match_ions(
             {
                 "match_score": lambda x: (
                     x
-                    * similarity_factor(
-                        filtered_match_isotope_df.loc[
-                            x.index, "match_isotope_similarity"
-                        ]
-                    )
                     * filtered_match_isotope_df.loc[x.index, "relative_abundance"]
                     / filtered_match_isotope_df.loc[x.index, "relative_abundance"].sum()
                 ).sum(),

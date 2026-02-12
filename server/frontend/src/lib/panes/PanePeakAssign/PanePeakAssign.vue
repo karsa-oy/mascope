@@ -380,11 +380,6 @@ const expanded = ref({})
                 {{ num.mz.format(data.mz) }}
               </template>
             </Column>
-            <Column field="data.match_isotope_similarity" header="Similarity" sortable>
-              <template #body="{ data }">
-                {{ num.isotopeSimilarity.format(data.match_isotope_similarity) }}
-              </template>
-            </Column>
             <Column field="match_mz_error" header="Error (ppm)" sortable>
               <template #body="{ data }">
                 {{ num.mzError.format(data.match_mz_error) }}

@@ -184,7 +184,6 @@ async def aggregate_sample_match_ion(
                     "sample_peak_tof": row["sample_peak_tof"],
                     "match_abundance_error": row["match_abundance_error"],
                     "match_mz_error": row["match_mz_error"],
-                    "match_isotope_similarity": row["match_isotope_similarity"],
                     "match_score": row["match_score"],
                     "match_category": row["match_category"],
                     "alarming": row["alarming"],

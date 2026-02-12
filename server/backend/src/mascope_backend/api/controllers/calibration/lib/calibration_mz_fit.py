@@ -85,7 +85,6 @@ class BaseCalibrationHandler:
             sample_peak_intensity=np.nan,
             sample_peak_intensity_relative=np.nan,
             match_abundance_error=np.nan,
-            match_isotope_similarity=np.nan,
             match_mz_error=np.nan,
             match_score=np.nan,
             sample_peak_tof=np.nan,
@@ -107,7 +106,7 @@ class BaseCalibrationHandler:
         matched_mask = ~match_df["sample_peak_mz"].isna()
         if matched_mask.any():
             match_df = match_df[matched_mask]
-            match_df = calculate_match_stats(match_df, peaks)
+            match_df = calculate_match_stats(match_df)
         else:
             # No calibration peaks matched
             # Return empty DataFrame for both match_df and good_matches_df
@@ -121,7 +120,6 @@ class BaseCalibrationHandler:
                 "sample_peak_intensity": "float64",
                 "sample_peak_intensity_relative": "float64",
                 "match_abundance_error": "float64",
-                "match_isotope_similarity": "float64",
                 "match_mz_error": "float64",
                 "match_score": "float64",
                 "sample_peak_tof": "float64",

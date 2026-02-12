@@ -239,7 +239,6 @@ async def _get_sample_match_isotope_records(
                     "sample_peak_tof": row.MatchIsotope.sample_peak_tof,
                     "match_abundance_error": row.MatchIsotope.match_abundance_error,
                     "match_mz_error": row.MatchIsotope.match_mz_error,
-                    "match_isotope_similarity": row.MatchIsotope.match_isotope_similarity,
                     "match_score": row.MatchIsotope.match_score,
                     "match_isotope_utc_created": row.MatchIsotope.match_isotope_utc_created,
                     "match_isotope_utc_modified": row.MatchIsotope.match_isotope_utc_modified,
@@ -259,7 +258,6 @@ async def _get_sample_match_isotope_records(
                     "sample_peak_tof": None,
                     "match_abundance_error": None,
                     "match_mz_error": None,
-                    "match_isotope_similarity": None,
                     "match_score": None,
                     "match_isotope_utc_created": None,
                     "match_isotope_utc_modified": None,
@@ -310,7 +308,6 @@ def _apply_match_params(
     required_fields = [
         "match_mz_error",
         "match_abundance_error",
-        "match_isotope_similarity",
         "sample_peak_intensity",
     ]
 
@@ -490,7 +487,6 @@ async def _get_batch_match_isotope_records(
                 "sample_peak_tof": None,
                 "match_abundance_error": None,
                 "match_mz_error": None,
-                "match_isotope_similarity": None,
                 "match_score": None,
                 "match_isotope_utc_created": None,
                 "match_isotope_utc_modified": None,

@@ -829,7 +829,6 @@ class MatchIsotope(Base):
     sample_peak_tof: Mapped[float] = mapped_column(Float)
     match_abundance_error: Mapped[float] = mapped_column(Float)
     match_mz_error: Mapped[float] = mapped_column(Float)
-    match_isotope_similarity: Mapped[float] = mapped_column(Float)
     match_score: Mapped[float] = mapped_column(
         Float, CheckConstraint("match_score BETWEEN 0 AND 1")
     )

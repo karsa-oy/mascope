@@ -29,9 +29,6 @@ class MatchIsotopeBase(BaseModel):
     match_mz_error: float = Field(
         ..., description="Mass-to-charge ratio error of the match"
     )
-    match_isotope_similarity: float = Field(
-        ..., description="Similarity of the isotope match"
-    )
     match_score: float = Field(..., description="Score of the match")
 
 

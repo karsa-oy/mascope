@@ -88,16 +88,6 @@ const layout = computed(() => ({
     v-if="app.data.match.visualized.isotopes?.length"
     style="padding: 0; margin: 0; width: 100%; min-width: 0; overflow: hidden; flex-shrink: 1"
   >
-    <span style="margin-bottom: 1rem">
-      isotope similarity:
-      <Tag
-        :value="
-          num.isotopeSimilarity.format(
-            app.data.match.visualized.isotopes?.[0].match.match_isotope_similarity
-          )
-        "
-      />
-    </span>
     <div style="width: 100%; min-width: 0; overflow: hidden">
       <BaseChartPlotly
         id="ChartMatchTimeseries"
