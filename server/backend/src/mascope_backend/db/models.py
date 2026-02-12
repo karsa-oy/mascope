@@ -303,8 +303,10 @@ class SampleFile(Base):
     filename: Mapped[str] = mapped_column(String(256), unique=True)
     instrument: Mapped[str] = mapped_column(String(64))
     method_file: Mapped[Optional[str]] = mapped_column(String(256))
-    datetime: Mapped[dt] = mapped_column(TIMESTAMP(timezone=True))
-    datetime_utc: Mapped[dt] = mapped_column(TIMESTAMP(timezone=True))
+    datetime: Mapped[dt] = mapped_column(
+        TIMESTAMP(timezone=False), nullable=False  # stored literal local time
+    )
+    datetime_utc: Mapped[dt] = mapped_column(TIMESTAMP(timezone=True))  # stored as UTC
     length: Mapped[float] = mapped_column(Float)
     range: Mapped[dict] = mapped_column(JSON)
     mz_calibration: Mapped[Optional[dict]] = mapped_column(JSON)

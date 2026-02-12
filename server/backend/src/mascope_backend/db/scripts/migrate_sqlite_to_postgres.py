@@ -39,9 +39,6 @@ from mascope_backend.runtime import runtime
 
 db_cfg = runtime.config.database
 
-# Helsinki timezone for local datetime columns
-HELSINKI_TZ = ZoneInfo("Europe/Helsinki")
-
 # FK dependency order - CRITICAL for referential integrity
 TABLE_ORDER = [
     # Independent tables (no FKs)
@@ -88,7 +85,7 @@ def add_timezone_to_datetime(column_name: str, value: dt, table_name: str) -> dt
 
     Rules:
     - Columns ending with '_utc' -> UTC
-    - sample_file.datetime (instrument local time) -> Helsinki timezone
+    - sample_file.datetime: Keep naive (instrument local time, no timezone)
     - All others -> UTC (safe default)
 
     :param column_name: Name of the datetime column
@@ -99,13 +96,13 @@ def add_timezone_to_datetime(column_name: str, value: dt, table_name: str) -> dt
     if value.tzinfo is not None:
         return value  # Already has timezone
 
+    # sample_file.datetime: local instrument time, store as naive literal
+    if table_name == "sample_file" and column_name == "datetime":
+        return value
+
     # UTC columns: anything ending with _utc
     if column_name.endswith("_utc"):
         return value.replace(tzinfo=tz.utc)
-
-    # sample_file.datetime is instrument local time (Helsinki)
-    if table_name == "sample_file" and column_name == "datetime":
-        return value.replace(tzinfo=HELSINKI_TZ)
 
     # Default: UTC (safe for registered_at, created_at, etc.)
     return value.replace(tzinfo=tz.utc)

@@ -166,7 +166,7 @@ def upgrade() -> None:
         sa.Column("filename", sa.String(length=256), nullable=False),
         sa.Column("instrument", sa.String(length=64), nullable=False),
         sa.Column("method_file", sa.String(length=256), nullable=True),
-        sa.Column("datetime", sa.TIMESTAMP(timezone=True), nullable=False),
+        sa.Column("datetime", sa.TIMESTAMP(timezone=False), nullable=False),
         sa.Column("datetime_utc", sa.TIMESTAMP(timezone=True), nullable=False),
         sa.Column("length", sa.Float(), nullable=False),
         sa.Column("range", sa.JSON(), nullable=False),
