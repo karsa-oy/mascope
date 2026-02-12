@@ -32,9 +32,7 @@ export const usePeak = defineStore('app.data.peak', () => {
           peak_id: peak_id[i],
           area: area[i],
           height: height[i],
-          match: match[i],
-          target_isotope_formula:
-            match[i].length > 0 ? match[i].map((m) => m.target_isotope_formula).join('; ') : null
+          match: match[i]
         }))
         return records
       } else {

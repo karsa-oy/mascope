@@ -125,7 +125,7 @@ onBeforeUnmount(() => {
           {{ num.peakIntensity.format(data.area) }}
         </template>
       </Column>
-      <Column field="target_isotope_formula" header="formula" sortable style="height: 20px">
+      <Column field="match" header="formula" sortable style="height: 20px">
         <template #body="{ data }">
           <div class="formula-buttons">
             <Button
@@ -138,19 +138,19 @@ onBeforeUnmount(() => {
                   if (data.match.length > 0) {
                     await app.data.match.visualized.set({
                       sampleId: app.data.sample.focusedId,
-                      ionId: data.match[index].target_ion_id,
+                      ionId: match.target_ion_id,
                       collectionId:
-                        data.match[index].target_collection_ids.find(
+                        match.target_collection_ids.find(
                           (id) => id === app.data.match.collection.focusedId // In case the currently focused collection is among the matches, prioritize it
-                        ) || data.match[index].target_collection_ids[0], // Otherwise just take the first one
+                        ) || match.target_collection_ids[0], // Otherwise just take the first one,
                       isotopeId: data.match[index].target_isotope_id
                     })
                   }
                 }
               "
-              v-for="(formula, index) in data.target_isotope_formula?.split('; ')"
+              v-for="(match, index) in data.match"
             >
-              {{ formula }}
+              {{ match.target_isotope_formula }}
             </Button>
           </div>
         </template>
