@@ -408,6 +408,8 @@ async def get_sample_peaks(
                     TargetIsotope.target_isotope_formula,
                     TargetIon.target_ion_id,
                     TargetIon.target_ion_formula,
+                    TargetIon.ionization_mechanism_id,
+                    TargetCompound.target_compound_formula,
                     TargetCollection.target_collection_id,
                     label("instrument", sample.instrument),
                 )
@@ -472,7 +474,9 @@ async def get_sample_peaks(
                         "target_isotope_formula": row.target_isotope_formula,
                         "target_ion_id": row.target_ion_id,
                         "target_ion_formula": row.target_ion_formula,
+                        "target_compound_formula": row.target_compound_formula,
                         "target_collection_ids": [row.target_collection_id],
+                        "ionization_mechanism_id": row.ionization_mechanism_id,
                     }
                 else:
                     # Same isotope in another collection - add collection ID if not already present

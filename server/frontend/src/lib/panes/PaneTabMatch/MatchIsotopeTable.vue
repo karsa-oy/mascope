@@ -4,6 +4,7 @@ import { computed } from 'vue'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import ProgressSpinner from 'primevue/progressspinner'
+import Tooltip from 'primevue/tooltip'
 
 import { BaseMatchTag, BaseCopyableField } from '@/lib/base'
 import { num } from '@/lib/formatters'
@@ -38,7 +39,7 @@ const loading = computed(() => app.data.match.visualized.isotopes === null)
       selectionMode="single"
       v-model:selection="app.data.match.visualized.isotopeSelected"
       size="small"
-      sortField="relative_abundance"
+      sortField="formula"
       :sortOrder="-1"
       scrollable
       scrollHeight="flex"
@@ -65,7 +66,9 @@ const loading = computed(() => app.data.match.visualized.isotopes === null)
       <!-- formula Column -->
       <Column header="Substitution" field="formula" style="width: 8rem">
         <template #body="{ data }">
-          {{ formatIsotopeFormula(data.target_isotope_formula) }}
+          <span v-tooltip="data.target_isotope_formula">
+            {{ formatIsotopeFormula(data.target_isotope_formula) }}
+          </span>
         </template>
       </Column>
 

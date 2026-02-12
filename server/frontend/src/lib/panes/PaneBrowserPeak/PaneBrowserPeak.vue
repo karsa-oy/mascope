@@ -132,7 +132,13 @@ onBeforeUnmount(() => {
               size="small"
               text
               severity="secondary"
-              v-tooltip.top="'Visualize ion match'"
+              v-tooltip.top="
+                `${match.target_compound_formula}${
+                  app.data.ionization.mechanism.list.find(
+                    (m) => m.ionization_mechanism_id === match.ionization_mechanism_id
+                  )?.ionization_mechanism || ''
+                }:\n ${match.target_ion_formula}`
+              "
               @click="
                 async () => {
                   if (data.match.length > 0) {
