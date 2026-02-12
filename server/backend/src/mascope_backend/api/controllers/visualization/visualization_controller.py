@@ -20,7 +20,8 @@ from mascope_signal.peak import filter_peaks, get_peaks
 
 # TODO_configuration shift traces color
 COLOR_OFFSET = 5
-DMZ = 0.3
+DMZ_TOF = 0.5
+DMZ_ORBI = 0.01
 UNITS = "counts/s"
 
 
@@ -95,6 +96,9 @@ async def visualize_ion_focus(
             peak_min_intensity=peak_min_intensity,
             mz_tolerance=mz_tolerance,
             isotope_ratio_tolerance=isotope_ratio_tolerance,
+            mz_range=(
+                DMZ_ORBI if get_instrument_type(sample.filename) == "orbi" else DMZ_TOF
+            ),
         )
         isotope_result = _process_isotope(iso, ctx, sum_timeseries)
         match_counter += isotope_result.match_count
@@ -150,6 +154,7 @@ class IsotopeContext:
     peak_min_intensity: float
     mz_tolerance: float
     isotope_ratio_tolerance: float
+    mz_range: float
     color_offset: int = COLOR_OFFSET
 
 
@@ -297,7 +302,7 @@ def _process_isotope(
     isotope_result = IsotopeResult(
         main_isotope_height=ctx.main_isotope_height, sum_timeseries=sum_timeseries
     )
-    mz_min, mz_max = iso.mz - DMZ, iso.mz + DMZ
+    mz_min, mz_max = iso.mz - ctx.mz_range, iso.mz + ctx.mz_range
     isotope_averaged_spec = ctx.averaged_signal.sel(mz=slice(mz_min, mz_max))
     isotope_peak_heights = ctx.mean_peak_heights.sel(mz=slice(mz_min, mz_max))
 
