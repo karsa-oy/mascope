@@ -178,14 +178,10 @@ async def _load_peaks_and_averaged_signal(
     """
 
     # --- Get averaged signal around target isotopes (+-DMZ) --- #
-    target_mzs = np.array([iso.mz for iso in isotopes])
-    target_mz_range = (np.min(target_mzs), np.max(target_mzs))
-
-    all_peak_mzs = m_io.load_coord(sample.filename, "peak_timeseries", "mz")
-    closest_indices = np.searchsorted(all_peak_mzs, target_mz_range)
-    closest_indices = np.clip(closest_indices, 0, len(all_peak_mzs) - 1)
-    closest_mzs = all_peak_mzs[closest_indices]
-    mz_min, mz_max = (closest_mzs[0] - DMZ, closest_mzs[1] + DMZ)
+    match_mzs = [
+        iso.sample_peak_mz for iso in isotopes if iso.sample_peak_mz is not None
+    ]
+    mz_min, mz_max = min(match_mzs) - DMZ, max(match_mzs) + DMZ
     averaged_signal = (
         m_compute.get_sum_signal(
             sample.filename,
@@ -199,9 +195,6 @@ async def _load_peaks_and_averaged_signal(
     )
 
     # --- Load peak timeseries for matched isotopes --- #
-    match_mzs = [
-        iso.sample_peak_mz for iso in isotopes if iso.sample_peak_mz is not None
-    ]
     peak_timeseries = await m_compute.load_peak_timeseries(sample.filename, match_mzs)
 
     # --- Get peak heights to plot isotope expected heights ---
