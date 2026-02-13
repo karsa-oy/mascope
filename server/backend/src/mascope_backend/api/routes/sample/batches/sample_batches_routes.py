@@ -158,7 +158,7 @@ async def update_sample_batch_route(
     :rtype: dict
     """
     # Check if locked sample batch - only owners can update
-    await locked_access(user, SampleBatch, sample_batch_id, min_role="owner")
+    await locked_access(user, SampleBatch, sample_batch_id, min_role="admin")
 
     return await update_sample_batch(
         sample_batch_id=sample_batch_id,
