@@ -190,6 +190,7 @@ async def calibration_mz_fit(
         filename=sample.filename,
         calibration_collection_id=ionization_mode.calibration_collection_id,
         ionization_mechanism_ids=ionization_mode.ionization_mechanism_ids,
+        polarity=ionization_mode.ionization_mode_polarity,
         **mz_calibration_params.model_dump(),
     )
     calibration_handler = get_calibration_handler(

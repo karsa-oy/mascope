@@ -35,10 +35,12 @@ async def test_calibration_fitting():
         ionization_mode = ionization_mode_response["data"]
         calibration_collection_id = ionization_mode["calibration_collection_id"]
         orbi_calibration_params = OrbiCalibrationParams()
+        polarity = ionization_mode.get("ionization_mode_polarity")
         calibration_fit_parameters = CalibrationFitParams(
             filename=sample.filename,
             calibration_collection_id=calibration_collection_id,
             ionization_mechanism_ids=mechanisms,
+            polarity=polarity,
             **orbi_calibration_params.model_dump(),
         )
         calibration_handler = get_calibration_handler(

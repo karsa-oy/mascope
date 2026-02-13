@@ -164,9 +164,14 @@ class BaseCalibrationHandler:
         )
         potential_calibration_mzs = all_mzs[mz_mask]
 
-        peak_timeseries = await m_compute.load_peak_timeseries(
-            self.filename, potential_calibration_mzs
+        scan_timestamps = m_compute.get_scan_timestamps(
+            self.filename, polarity=self.params.polarity
         )
+        peak_timeseries = (
+            await m_compute.load_peak_timeseries(
+                self.filename, potential_calibration_mzs
+            )
+        ).sel(time=scan_timestamps, method="nearest")
 
         # Reverse compatibility with older zarr files
         sample_file_type = m_name.get_sample_file_type(self.filename)
@@ -181,7 +186,6 @@ class BaseCalibrationHandler:
         """
         Parse and filter peaks from the peak timeseries.
         Only peaks with positive intensities across all time points are retained.
-        In case of multipolarity files, the polarity of the peaks is considered.
 
         :param peak_timeseries: Timeseries dataset of peaks.
         :type peak_timeseries: xarray.Dataset
@@ -195,20 +199,8 @@ class BaseCalibrationHandler:
             case "tof":
                 peaks = peak_timeseries.peak_areas
 
-        is_multipolarity_file = np.unique(peak_timeseries.polarity.values).size > 1
-        if is_multipolarity_file:
-            # Check positivity for the polarity of the peaks
-            # All target peaks should have the same polarity
-            polarity = peak_timeseries.polarity.values[0]
-            timestamps = m_compute.get_scan_timestamps(self.filename, polarity=polarity)
-
-            positive_mask = (
-                peaks.sel(time=timestamps, method="nearest").values > 0
-            ).all(axis=peaks.get_axis_num("time"))
-        else:
-            # Skip polarity selection, check positivity across all time points
-            positive_mask = (peaks.values > 0).all(axis=peaks.get_axis_num("time"))
-
+        # Keep only peaks with positive intensities across all time points
+        positive_mask = (peaks.values > 0).all(axis=peaks.get_axis_num("time"))
         filtered_peaks = peaks.sel(mz=peaks.mz.values[positive_mask])
 
         return filtered_peaks
@@ -278,9 +270,6 @@ class TofCalibrationHandler(BaseCalibrationHandler):
 
         _, tic_per_scan = m_compute.get_tic_per_scan(self.filename)
         tic = np.sum(tic_per_scan)
-        if tic < self.params.tic_threshold:
-            self.warning = "TIC is too low! Check ionization device."
-            return self.fit_result, self.stats, self.error, self.warning
 
         await send_progress_user_notification(self.notification, 0.35)
 

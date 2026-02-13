@@ -63,15 +63,13 @@ class TofCalibrationParams(MzCalibrationParams):
 
 
 class CalibrationFitParams(MzCalibrationParams):
-    tic_threshold: float = Field(
-        calibration_config.TIC_THRESHOLD, description="TIC threshold"
-    )
     calibration_collection_id: str | None = Field(
         None, description="Calibration collection ID"
     )
     ionization_mechanism_ids: list[str | None] = Field(
         None, description="Ionization mechanism IDs"
     )
+    polarity: str | None = Field(None, description="Polarity of the ionization mode")
 
 
 class CalibrationMzApplyBody(BaseModel):
