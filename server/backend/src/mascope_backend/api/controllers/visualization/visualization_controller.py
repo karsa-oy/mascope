@@ -299,11 +299,7 @@ def _process_isotope(
     )
     mz_min, mz_max = iso.mz - DMZ, iso.mz + DMZ
     isotope_averaged_spec = ctx.averaged_signal.sel(mz=slice(mz_min, mz_max))
-
     isotope_peak_heights = ctx.mean_peak_heights.sel(mz=slice(mz_min, mz_max))
-    isotope_peak_heights = filter_peaks(
-        isotope_peak_heights, intensity=ctx.peak_min_intensity
-    )
 
     if isotope_averaged_spec.size == 0:
         # No spectrum in the given mz range
@@ -316,7 +312,10 @@ def _process_isotope(
         if ctx.index == 0:
             # Main isotope: determine main isotope height
             try:
-                peak = isotope_peak_heights.sel(mz=iso.mz, method="nearest")
+                filtered_isotope_peak_heights = filter_peaks(
+                    isotope_peak_heights, intensity=ctx.peak_min_intensity
+                )
+                peak = filtered_isotope_peak_heights.sel(mz=iso.mz, method="nearest")
                 isotope_result.main_isotope_height = peak.item()
             except KeyError:
                 # Fall-back if no peak is found
@@ -344,6 +343,29 @@ def _process_isotope(
         }
     )
 
+    # Convert to float32 for more efficient serialization to the frontend
+    peak_x = isotope_peak_heights.mz.values.astype(np.float32)
+    peak_y = isotope_peak_heights.values.astype(np.float32)
+    # Triplicate each peak to create vertical lines in the plot
+    peak_x = np.repeat(peak_x, 3).tobytes()
+    peak_y = (
+        np.column_stack([np.zeros_like(peak_y), peak_y, np.zeros_like(peak_y)])
+        .flatten()
+        .tobytes()
+    )
+    # Add all peaks trace for the isotope
+    isotope_result.spectrum_traces.append(
+        {
+            "name": "{:.6f}".format(iso.sample_peak_mz),
+            "type": "scatter",
+            "mode": "lines",
+            "line": {"color": "grey"},
+            "x": peak_x,
+            "y": peak_y,
+            "unit": UNITS,
+        }
+    )
+
     # Get peak height. Can't use iso.sample_peak_intensity since peak area is used for TOFs
     peak_height = ctx.mean_peak_heights.sel(
         mz=iso.sample_peak_mz, method="nearest"
@@ -356,24 +378,18 @@ def _process_isotope(
     abundance_ratio_ok = abs(iso.match_abundance_error) <= ctx.isotope_ratio_tolerance
     is_match = match_score_ok and intensity_ok and mz_ok and abundance_ratio_ok
 
-    # Add peak trace for the sample peak matching the isotope, if exists
     if is_match:
-        peak_trace_mode = "lines+markers"
-        peak_line_color = "white"
-    else:
-        peak_trace_mode = "lines"
-        peak_line_color = "grey"
-
-    peak_trace = {
-        "name": "{:.6f}".format(iso.sample_peak_mz),
-        "type": "scatter",
-        "mode": peak_trace_mode,
-        "line": {"color": peak_line_color},
-        "x": [iso.sample_peak_mz, iso.sample_peak_mz],
-        "y": [0, peak_height],
-        "unit": UNITS,
-    }
-    isotope_result.spectrum_traces.append(peak_trace)
+        # Add the matched peak in white on top of peaks trace to highlight it
+        peak_trace = {
+            "name": "{:.6f}".format(iso.sample_peak_mz),
+            "type": "scatter",
+            "mode": "lines+markers",
+            "line": {"color": "white"},
+            "x": [iso.sample_peak_mz, iso.sample_peak_mz],
+            "y": [0, peak_height],
+            "unit": UNITS,
+        }
+        isotope_result.spectrum_traces.append(peak_trace)
 
     # Add isotope expected trace
     isotope_result.spectrum_traces.append(
