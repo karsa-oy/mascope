@@ -461,6 +461,16 @@ async def get_sample_peak_timeseries(
     except FileNotFoundError:
         raise NotFoundException(f"Sample file '{sample.filename}' not found")
 
+    if len(peaks.mz) == 0:
+        return {
+            "message": f"No peaks found for sample '{sample.filename}' with polarity '{sample.polarity}' in time range [{t_min_eff}, {t_max_eff}] seconds.",
+            "results": 0,
+            "data": {
+                "mz": None,
+                "height": [],
+                "time": [],
+            },
+        }
     # Step 5: Filter sample file peaks to include times in filtered time_array and
     # select nearest to requested peak m/z
     peak_timeseries = peaks.sel(time=time_array, method="nearest").sel(
