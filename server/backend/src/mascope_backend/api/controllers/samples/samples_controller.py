@@ -506,7 +506,9 @@ async def get_sample_peak_timeseries(
         message += time_adjustment_info
 
     # Replace NaN values with None for JSON serialization
-    heights_list = [None if np.isnan(v) else v for v in peak_timeseries.values.tolist()]
+    heights_array = peak_timeseries.values.astype(float)
+    heights_array = np.where(np.isnan(heights_array), None, heights_array)
+    heights_list = heights_array.tolist()
 
     return {
         "message": message,
