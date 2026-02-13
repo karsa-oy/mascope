@@ -456,7 +456,7 @@ async def get_sample_peak_timeseries(
 
     # Step 4: Load sample file data
     try:
-        sample_file = load_peak_data(sample.filename)
+        sample_file = await m_compute.load_peak_timeseries(sample.filename, [peak_mz])
         peaks = get_peaks(sample_file, "height")
     except FileNotFoundError:
         raise NotFoundException(f"Sample file '{sample.filename}' not found")
