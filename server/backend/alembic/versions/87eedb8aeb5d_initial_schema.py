@@ -1,9 +1,9 @@
 # pylint: disable=no-member
 """Initial schema
 
-Revision ID: b2fafb2c5eed
+Revision ID: 87eedb8aeb5d
 Revises:
-Create Date: 2026-01-29 11:19:30.014986
+Create Date: 2026-02-13 13:59:51.401875
 
 """
 from typing import Sequence, Union
@@ -13,9 +13,8 @@ import sqlalchemy as sa
 
 from mascope_backend.db.views import Sample
 
-
 # revision identifiers, used by Alembic.
-revision: str = "b2fafb2c5eed"
+revision: str = "87eedb8aeb5d"
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -30,7 +29,9 @@ def upgrade() -> None:
         sa.Column("name", sa.String(length=256), nullable=False),
         sa.Column("type", sa.String(length=64), nullable=True),
         sa.Column("template", sa.JSON(), nullable=True),
-        sa.PrimaryKeyConstraint("attribute_template_id"),
+        sa.PrimaryKeyConstraint(
+            "attribute_template_id", name=op.f("pk_attribute_template")
+        ),
     )
     op.create_table(
         "instrument_function",
@@ -40,23 +41,30 @@ def upgrade() -> None:
         sa.Column("datetime_utc", sa.TIMESTAMP(timezone=True), nullable=False),
         sa.Column("peakshape", sa.JSON(), nullable=True),
         sa.Column("resolution_function", sa.JSON(), nullable=True),
-        sa.PrimaryKeyConstraint("instrument_function_id"),
+        sa.PrimaryKeyConstraint(
+            "instrument_function_id", name=op.f("pk_instrument_function")
+        ),
     )
     op.create_table(
         "ionization_mechanism",
         sa.Column("ionization_mechanism_id", sa.String(length=16), nullable=False),
         sa.Column("ionization_mechanism_polarity", sa.String(length=1), nullable=False),
         sa.Column("ionization_mechanism", sa.String(length=256), nullable=False),
-        sa.PrimaryKeyConstraint("ionization_mechanism_id"),
-        sa.UniqueConstraint("ionization_mechanism"),
+        sa.PrimaryKeyConstraint(
+            "ionization_mechanism_id", name=op.f("pk_ionization_mechanism")
+        ),
+        sa.UniqueConstraint(
+            "ionization_mechanism",
+            name=op.f("uq_ionization_mechanism_ionization_mechanism"),
+        ),
     )
     op.create_table(
         "role",
         sa.Column("role_id", sa.Integer(), autoincrement=True, nullable=False),
         sa.Column("role_name", sa.String(length=50), nullable=False),
         sa.Column("permissions", sa.JSON(), nullable=True),
-        sa.PrimaryKeyConstraint("role_id"),
-        sa.UniqueConstraint("role_name"),
+        sa.PrimaryKeyConstraint("role_id", name=op.f("pk_role")),
+        sa.UniqueConstraint("role_name", name=op.f("uq_role_role_name")),
     )
     op.create_table(
         "target_collection",
@@ -69,7 +77,9 @@ def upgrade() -> None:
             server_default=sa.text("'TARGETS'"),
             nullable=False,
         ),
-        sa.PrimaryKeyConstraint("target_collection_id"),
+        sa.PrimaryKeyConstraint(
+            "target_collection_id", name=op.f("pk_target_collection")
+        ),
     )
     op.create_table(
         "target_compound",
@@ -77,7 +87,7 @@ def upgrade() -> None:
         sa.Column("target_compound_name", sa.Text(), nullable=True),
         sa.Column("target_compound_formula", sa.String(length=256), nullable=False),
         sa.Column("cas_number", sa.String(length=12), nullable=True),
-        sa.PrimaryKeyConstraint("target_compound_id"),
+        sa.PrimaryKeyConstraint("target_compound_id", name=op.f("pk_target_compound")),
     )
     op.create_table(
         "workspace",
@@ -97,7 +107,7 @@ def upgrade() -> None:
         sa.Column("icon", sa.JSON(), nullable=True),
         sa.Column("workspace_utc_created", sa.TIMESTAMP(timezone=True), nullable=True),
         sa.Column("workspace_utc_modified", sa.TIMESTAMP(timezone=True), nullable=True),
-        sa.PrimaryKeyConstraint("workspace_id"),
+        sa.PrimaryKeyConstraint("workspace_id", name=op.f("pk_workspace")),
     )
     op.create_table(
         "ionization_mode",
@@ -111,15 +121,20 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(
             ["calibration_collection_id"],
             ["target_collection.target_collection_id"],
+            name=op.f("fk_ionization_mode_calibration_collection_id_target_collection"),
             ondelete="SET NULL",
         ),
         sa.ForeignKeyConstraint(
             ["diagnostic_collection_id"],
             ["target_collection.target_collection_id"],
+            name=op.f("fk_ionization_mode_diagnostic_collection_id_target_collection"),
             ondelete="SET NULL",
         ),
-        sa.PrimaryKeyConstraint("ionization_mode_id"),
-        sa.UniqueConstraint("ionization_mode_token"),
+        sa.PrimaryKeyConstraint("ionization_mode_id", name=op.f("pk_ionization_mode")),
+        sa.UniqueConstraint(
+            "ionization_mode_token",
+            name=op.f("uq_ionization_mode_ionization_mode_token"),
+        ),
     )
     op.create_table(
         "sample_batch",
@@ -155,9 +170,12 @@ def upgrade() -> None:
             "sample_batch_utc_modified", sa.TIMESTAMP(timezone=True), nullable=True
         ),
         sa.ForeignKeyConstraint(
-            ["workspace_id"], ["workspace.workspace_id"], ondelete="CASCADE"
+            ["workspace_id"],
+            ["workspace.workspace_id"],
+            name=op.f("fk_sample_batch_workspace_id_workspace"),
+            ondelete="CASCADE",
         ),
-        sa.PrimaryKeyConstraint("sample_batch_id"),
+        sa.PrimaryKeyConstraint("sample_batch_id", name=op.f("pk_sample_batch")),
     )
     op.create_table(
         "sample_file",
@@ -166,7 +184,7 @@ def upgrade() -> None:
         sa.Column("filename", sa.String(length=256), nullable=False),
         sa.Column("instrument", sa.String(length=64), nullable=False),
         sa.Column("method_file", sa.String(length=256), nullable=True),
-        sa.Column("datetime", sa.TIMESTAMP(timezone=False), nullable=False),
+        sa.Column("datetime", sa.TIMESTAMP(), nullable=False),
         sa.Column("datetime_utc", sa.TIMESTAMP(timezone=True), nullable=False),
         sa.Column("length", sa.Float(), nullable=False),
         sa.Column("range", sa.JSON(), nullable=False),
@@ -175,13 +193,14 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(
             ["instrument_function_id"],
             ["instrument_function.instrument_function_id"],
+            name=op.f("fk_sample_file_instrument_function_id_instrument_function"),
             ondelete="SET NULL",
         ),
-        sa.PrimaryKeyConstraint("sample_file_id"),
-        sa.UniqueConstraint("filename"),
+        sa.PrimaryKeyConstraint("sample_file_id", name=op.f("pk_sample_file")),
+        sa.UniqueConstraint("filename", name=op.f("uq_sample_file_filename")),
     )
     op.create_index(
-        "idx_sample_file_instrument_function",
+        op.f("ix_sample_file_instrument_function_id"),
         "sample_file",
         ["instrument_function_id"],
         unique=False,
@@ -193,14 +212,24 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(
             ["target_collection_id"],
             ["target_collection.target_collection_id"],
+            name=op.f(
+                "fk_target_compound_in_target_collection_target_collection_id_target_collection"
+            ),
             ondelete="CASCADE",
         ),
         sa.ForeignKeyConstraint(
             ["target_compound_id"],
             ["target_compound.target_compound_id"],
+            name=op.f(
+                "fk_target_compound_in_target_collection_target_compound_id_target_compound"
+            ),
             ondelete="CASCADE",
         ),
-        sa.PrimaryKeyConstraint("target_compound_id", "target_collection_id"),
+        sa.PrimaryKeyConstraint(
+            "target_compound_id",
+            "target_collection_id",
+            name=op.f("pk_target_compound_in_target_collection"),
+        ),
     )
     op.create_table(
         "target_ion",
@@ -212,17 +241,19 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(
             ["ionization_mechanism_id"],
             ["ionization_mechanism.ionization_mechanism_id"],
+            name=op.f("fk_target_ion_ionization_mechanism_id_ionization_mechanism"),
             ondelete="CASCADE",
         ),
         sa.ForeignKeyConstraint(
             ["target_compound_id"],
             ["target_compound.target_compound_id"],
+            name=op.f("fk_target_ion_target_compound_id_target_compound"),
             ondelete="CASCADE",
         ),
-        sa.PrimaryKeyConstraint("target_ion_id"),
+        sa.PrimaryKeyConstraint("target_ion_id", name=op.f("pk_target_ion")),
     )
     op.create_index(
-        "idx_target_ion_ionization_mechanism",
+        op.f("ix_target_ion_ionization_mechanism_id"),
         "target_ion",
         ["ionization_mechanism_id"],
         unique=False,
@@ -238,9 +269,14 @@ def upgrade() -> None:
         sa.Column("username", sa.String(length=100), nullable=False),
         sa.Column("role_id", sa.Integer(), nullable=True),
         sa.Column("registered_at", sa.TIMESTAMP(timezone=True), nullable=False),
-        sa.ForeignKeyConstraint(["role_id"], ["role.role_id"], ondelete="SET NULL"),
-        sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("username"),
+        sa.ForeignKeyConstraint(
+            ["role_id"],
+            ["role.role_id"],
+            name=op.f("fk_user_role_id_role"),
+            ondelete="SET NULL",
+        ),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_user")),
+        sa.UniqueConstraint("username", name=op.f("uq_user_username")),
     )
     op.create_index(op.f("ix_user_email"), "user", ["email"], unique=True)
     op.create_table(
@@ -249,8 +285,13 @@ def upgrade() -> None:
         sa.Column("user_id", sa.Integer(), nullable=False),
         sa.Column("service_name", sa.String(length=50), nullable=True),
         sa.Column("created_at", sa.TIMESTAMP(timezone=True), nullable=False),
-        sa.ForeignKeyConstraint(["user_id"], ["user.id"], ondelete="CASCADE"),
-        sa.PrimaryKeyConstraint("token"),
+        sa.ForeignKeyConstraint(
+            ["user_id"],
+            ["user.id"],
+            name=op.f("fk_access_token_user_id_user"),
+            ondelete="CASCADE",
+        ),
+        sa.PrimaryKeyConstraint("token", name=op.f("pk_access_token")),
     )
     op.create_index(
         op.f("ix_access_token_created_at"), "access_token", ["created_at"], unique=False
@@ -281,35 +322,60 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(
             ["ionization_mode_id"],
             ["ionization_mode.ionization_mode_id"],
+            name=op.f("fk_sample_item_ionization_mode_id_ionization_mode"),
             ondelete="SET NULL",
         ),
         sa.ForeignKeyConstraint(
-            ["sample_batch_id"], ["sample_batch.sample_batch_id"], ondelete="CASCADE"
+            ["sample_batch_id"],
+            ["sample_batch.sample_batch_id"],
+            name=op.f("fk_sample_item_sample_batch_id_sample_batch"),
+            ondelete="CASCADE",
         ),
         sa.ForeignKeyConstraint(
-            ["sample_file_id"], ["sample_file.sample_file_id"], ondelete="CASCADE"
+            ["sample_file_id"],
+            ["sample_file.sample_file_id"],
+            name=op.f("fk_sample_item_sample_file_id_sample_file"),
+            ondelete="CASCADE",
         ),
-        sa.PrimaryKeyConstraint("sample_item_id"),
+        sa.PrimaryKeyConstraint("sample_item_id", name=op.f("pk_sample_item")),
     )
     op.create_index(
-        "idx_sample_item_sample_batch", "sample_item", ["sample_batch_id"], unique=False
+        op.f("ix_sample_item_sample_batch_id"),
+        "sample_item",
+        ["sample_batch_id"],
+        unique=False,
     )
     op.create_index(
-        "idx_sample_item_sample_file", "sample_item", ["sample_file_id"], unique=False
+        op.f("ix_sample_item_sample_file_id"),
+        "sample_item",
+        ["sample_file_id"],
+        unique=False,
     )
     op.create_table(
         "target_collection_in_sample_batch",
         sa.Column("target_collection_id", sa.String(length=16), nullable=False),
         sa.Column("sample_batch_id", sa.String(length=16), nullable=False),
         sa.ForeignKeyConstraint(
-            ["sample_batch_id"], ["sample_batch.sample_batch_id"], ondelete="CASCADE"
+            ["sample_batch_id"],
+            ["sample_batch.sample_batch_id"],
+            name=op.f(
+                "fk_target_collection_in_sample_batch_sample_batch_id_sample_batch"
+            ),
+            ondelete="CASCADE",
         ),
         sa.ForeignKeyConstraint(
             ["target_collection_id"],
             ["target_collection.target_collection_id"],
+            name=op.f(
+                "fk_target_collection_in_sample_batch_target_collection_id_target_collection"
+            ),
             ondelete="CASCADE",
         ),
-        sa.PrimaryKeyConstraint("target_collection_id", "sample_batch_id"),
+        sa.PrimaryKeyConstraint(
+            "target_collection_id",
+            "sample_batch_id",
+            name=op.f("pk_target_collection_in_sample_batch"),
+        ),
     )
     op.create_table(
         "target_isotope",
@@ -319,10 +385,17 @@ def upgrade() -> None:
         sa.Column("mz", sa.Float(), nullable=False),
         sa.Column("relative_abundance", sa.Float(), nullable=False),
         sa.Column("resolution", sa.String(length=8), nullable=False),
-        sa.ForeignKeyConstraint(
-            ["target_ion_id"], ["target_ion.target_ion_id"], ondelete="CASCADE"
+        sa.CheckConstraint(
+            "relative_abundance >= 0 AND relative_abundance <= 1",
+            name=op.f("ck_target_isotope_relative_abundance_range"),
         ),
-        sa.PrimaryKeyConstraint("target_isotope_id"),
+        sa.ForeignKeyConstraint(
+            ["target_ion_id"],
+            ["target_ion.target_ion_id"],
+            name=op.f("fk_target_isotope_target_ion_id_target_ion"),
+            ondelete="CASCADE",
+        ),
+        sa.PrimaryKeyConstraint("target_isotope_id", name=op.f("pk_target_isotope")),
     )
     op.create_table(
         "match_collection",
@@ -338,18 +411,32 @@ def upgrade() -> None:
         sa.Column(
             "match_collection_utc_modified", sa.TIMESTAMP(timezone=True), nullable=True
         ),
+        sa.CheckConstraint(
+            "match_category BETWEEN 0 AND 2",
+            name=op.f("ck_match_collection_match_category_range"),
+        ),
+        sa.CheckConstraint(
+            "match_score BETWEEN 0 AND 1",
+            name=op.f("ck_match_collection_match_score_range"),
+        ),
         sa.ForeignKeyConstraint(
-            ["sample_item_id"], ["sample_item.sample_item_id"], ondelete="CASCADE"
+            ["sample_item_id"],
+            ["sample_item.sample_item_id"],
+            name=op.f("fk_match_collection_sample_item_id_sample_item"),
+            ondelete="CASCADE",
         ),
         sa.ForeignKeyConstraint(
             ["target_collection_id"],
             ["target_collection.target_collection_id"],
+            name=op.f("fk_match_collection_target_collection_id_target_collection"),
             ondelete="CASCADE",
         ),
-        sa.PrimaryKeyConstraint("match_collection_id"),
+        sa.PrimaryKeyConstraint(
+            "match_collection_id", name=op.f("pk_match_collection")
+        ),
     )
     op.create_index(
-        "idx_match_collection_sample_item",
+        op.f("ix_match_collection_sample_item_id"),
         "match_collection",
         ["sample_item_id"],
         unique=False,
@@ -368,18 +455,30 @@ def upgrade() -> None:
         sa.Column(
             "match_compound_utc_modified", sa.TIMESTAMP(timezone=True), nullable=True
         ),
+        sa.CheckConstraint(
+            "match_category BETWEEN 0 AND 2",
+            name=op.f("ck_match_compound_match_category_range"),
+        ),
+        sa.CheckConstraint(
+            "match_score BETWEEN 0 AND 1",
+            name=op.f("ck_match_compound_match_score_range"),
+        ),
         sa.ForeignKeyConstraint(
-            ["sample_item_id"], ["sample_item.sample_item_id"], ondelete="CASCADE"
+            ["sample_item_id"],
+            ["sample_item.sample_item_id"],
+            name=op.f("fk_match_compound_sample_item_id_sample_item"),
+            ondelete="CASCADE",
         ),
         sa.ForeignKeyConstraint(
             ["target_compound_id"],
             ["target_compound.target_compound_id"],
+            name=op.f("fk_match_compound_target_compound_id_target_compound"),
             ondelete="CASCADE",
         ),
-        sa.PrimaryKeyConstraint("match_compound_id"),
+        sa.PrimaryKeyConstraint("match_compound_id", name=op.f("pk_match_compound")),
     )
     op.create_index(
-        "idx_match_compound_sample_item",
+        op.f("ix_match_compound_sample_item_id"),
         "match_compound",
         ["sample_item_id"],
         unique=False,
@@ -394,16 +493,32 @@ def upgrade() -> None:
         sa.Column("sample_peak_intensity_sum", sa.Float(), nullable=False),
         sa.Column("match_ion_utc_created", sa.TIMESTAMP(timezone=True), nullable=True),
         sa.Column("match_ion_utc_modified", sa.TIMESTAMP(timezone=True), nullable=True),
-        sa.ForeignKeyConstraint(
-            ["sample_item_id"], ["sample_item.sample_item_id"], ondelete="CASCADE"
+        sa.CheckConstraint(
+            "match_category BETWEEN 0 AND 2",
+            name=op.f("ck_match_ion_match_category_range"),
+        ),
+        sa.CheckConstraint(
+            "match_score BETWEEN 0 AND 1", name=op.f("ck_match_ion_match_score_range")
         ),
         sa.ForeignKeyConstraint(
-            ["target_ion_id"], ["target_ion.target_ion_id"], ondelete="CASCADE"
+            ["sample_item_id"],
+            ["sample_item.sample_item_id"],
+            name=op.f("fk_match_ion_sample_item_id_sample_item"),
+            ondelete="CASCADE",
         ),
-        sa.PrimaryKeyConstraint("match_ion_id"),
+        sa.ForeignKeyConstraint(
+            ["target_ion_id"],
+            ["target_ion.target_ion_id"],
+            name=op.f("fk_match_ion_target_ion_id_target_ion"),
+            ondelete="CASCADE",
+        ),
+        sa.PrimaryKeyConstraint("match_ion_id", name=op.f("pk_match_ion")),
     )
     op.create_index(
-        "idx_match_ion_sample_item", "match_ion", ["sample_item_id"], unique=False
+        op.f("ix_match_ion_sample_item_id"),
+        "match_ion",
+        ["sample_item_id"],
+        unique=False,
     )
     op.create_table(
         "match_isotope",
@@ -425,24 +540,32 @@ def upgrade() -> None:
         sa.Column(
             "match_isotope_utc_modified", sa.TIMESTAMP(timezone=True), nullable=True
         ),
+        sa.CheckConstraint(
+            "match_score BETWEEN 0 AND 1",
+            name=op.f("ck_match_isotope_match_score_range"),
+        ),
         sa.ForeignKeyConstraint(
-            ["sample_item_id"], ["sample_item.sample_item_id"], ondelete="CASCADE"
+            ["sample_item_id"],
+            ["sample_item.sample_item_id"],
+            name=op.f("fk_match_isotope_sample_item_id_sample_item"),
+            ondelete="CASCADE",
         ),
         sa.ForeignKeyConstraint(
             ["target_isotope_id"],
             ["target_isotope.target_isotope_id"],
+            name=op.f("fk_match_isotope_target_isotope_id_target_isotope"),
             ondelete="CASCADE",
         ),
-        sa.PrimaryKeyConstraint("match_isotope_id"),
+        sa.PrimaryKeyConstraint("match_isotope_id", name=op.f("pk_match_isotope")),
     )
     op.create_index(
-        "idx_match_isotope_sample_item",
+        op.f("ix_match_isotope_sample_item_id"),
         "match_isotope",
         ["sample_item_id"],
         unique=False,
     )
     op.create_index(
-        "idx_match_isotope_sample_peak_id",
+        op.f("ix_match_isotope_sample_peak_id"),
         "match_isotope",
         ["sample_peak_id"],
         unique=False,
@@ -458,13 +581,22 @@ def upgrade() -> None:
         sa.Column("rating", sa.Integer(), nullable=False),
         sa.Column("checklist", sa.JSON(), nullable=True),
         sa.Column("environment", sa.JSON(), nullable=True),
-        sa.ForeignKeyConstraint(
-            ["sample_item_id"], ["sample_item.sample_item_id"], ondelete="CASCADE"
+        sa.CheckConstraint(
+            "rating BETWEEN 0 AND 2", name=op.f("ck_match_rating_rating_range")
         ),
         sa.ForeignKeyConstraint(
-            ["target_ion_id"], ["target_ion.target_ion_id"], ondelete="CASCADE"
+            ["sample_item_id"],
+            ["sample_item.sample_item_id"],
+            name=op.f("fk_match_rating_sample_item_id_sample_item"),
+            ondelete="CASCADE",
         ),
-        sa.PrimaryKeyConstraint("match_rating_id"),
+        sa.ForeignKeyConstraint(
+            ["target_ion_id"],
+            ["target_ion.target_ion_id"],
+            name=op.f("fk_match_rating_target_ion_id_target_ion"),
+            ondelete="CASCADE",
+        ),
+        sa.PrimaryKeyConstraint("match_rating_id", name=op.f("pk_match_rating")),
     )
     op.create_table(
         "match_sample",
@@ -479,13 +611,27 @@ def upgrade() -> None:
         sa.Column(
             "match_sample_utc_modified", sa.TIMESTAMP(timezone=True), nullable=True
         ),
-        sa.ForeignKeyConstraint(
-            ["sample_item_id"], ["sample_item.sample_item_id"], ondelete="CASCADE"
+        sa.CheckConstraint(
+            "match_category BETWEEN 0 AND 2",
+            name=op.f("ck_match_sample_match_category_range"),
         ),
-        sa.PrimaryKeyConstraint("match_sample_id"),
+        sa.CheckConstraint(
+            "match_score BETWEEN 0 AND 1",
+            name=op.f("ck_match_sample_match_score_range"),
+        ),
+        sa.ForeignKeyConstraint(
+            ["sample_item_id"],
+            ["sample_item.sample_item_id"],
+            name=op.f("fk_match_sample_sample_item_id_sample_item"),
+            ondelete="CASCADE",
+        ),
+        sa.PrimaryKeyConstraint("match_sample_id", name=op.f("pk_match_sample")),
     )
     op.create_index(
-        "idx_match_sample_sample_item", "match_sample", ["sample_item_id"], unique=False
+        op.f("ix_match_sample_sample_item_id"),
+        "match_sample",
+        ["sample_item_id"],
+        unique=False,
     )
     # ### end Alembic commands ###
 
@@ -500,31 +646,37 @@ def downgrade() -> None:
     op.execute(Sample.drop_view())
 
     # ### commands auto generated by Alembic - please adjust! ###
-    op.drop_index("idx_match_sample_sample_item", table_name="match_sample")
+    op.drop_index(op.f("ix_match_sample_sample_item_id"), table_name="match_sample")
     op.drop_table("match_sample")
     op.drop_table("match_rating")
-    op.drop_index("idx_match_isotope_sample_peak_id", table_name="match_isotope")
-    op.drop_index("idx_match_isotope_sample_item", table_name="match_isotope")
+    op.drop_index(op.f("ix_match_isotope_sample_peak_id"), table_name="match_isotope")
+    op.drop_index(op.f("ix_match_isotope_sample_item_id"), table_name="match_isotope")
     op.drop_table("match_isotope")
-    op.drop_index("idx_match_ion_sample_item", table_name="match_ion")
+    op.drop_index(op.f("ix_match_ion_sample_item_id"), table_name="match_ion")
     op.drop_table("match_ion")
-    op.drop_index("idx_match_compound_sample_item", table_name="match_compound")
+    op.drop_index(op.f("ix_match_compound_sample_item_id"), table_name="match_compound")
     op.drop_table("match_compound")
-    op.drop_index("idx_match_collection_sample_item", table_name="match_collection")
+    op.drop_index(
+        op.f("ix_match_collection_sample_item_id"), table_name="match_collection"
+    )
     op.drop_table("match_collection")
     op.drop_table("target_isotope")
     op.drop_table("target_collection_in_sample_batch")
-    op.drop_index("idx_sample_item_sample_file", table_name="sample_item")
-    op.drop_index("idx_sample_item_sample_batch", table_name="sample_item")
+    op.drop_index(op.f("ix_sample_item_sample_file_id"), table_name="sample_item")
+    op.drop_index(op.f("ix_sample_item_sample_batch_id"), table_name="sample_item")
     op.drop_table("sample_item")
     op.drop_index(op.f("ix_access_token_created_at"), table_name="access_token")
     op.drop_table("access_token")
     op.drop_index(op.f("ix_user_email"), table_name="user")
     op.drop_table("user")
-    op.drop_index("idx_target_ion_ionization_mechanism", table_name="target_ion")
+    op.drop_index(
+        op.f("ix_target_ion_ionization_mechanism_id"), table_name="target_ion"
+    )
     op.drop_table("target_ion")
     op.drop_table("target_compound_in_target_collection")
-    op.drop_index("idx_sample_file_instrument_function", table_name="sample_file")
+    op.drop_index(
+        op.f("ix_sample_file_instrument_function_id"), table_name="sample_file"
+    )
     op.drop_table("sample_file")
     op.drop_table("sample_batch")
     op.drop_table("ionization_mode")

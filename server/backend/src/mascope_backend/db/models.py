@@ -21,8 +21,8 @@ from sqlalchemy import (
     Boolean,
     Float,
     ForeignKey,
-    Index,
     Integer,
+    MetaData,
     String,
     Text,
     event,
@@ -43,6 +43,22 @@ from mascope_backend.api.models.target.collections.config import (
 from mascope_backend.api.models.workspace.config import workspace_config
 from mascope_backend.runtime import runtime
 
+# Naming convention for all constraints and indexes.
+# Provides predictable names in Alembic migrations (required for DROP/ALTER operations).
+# Convention:
+#   ix_ : indexes (auto-generated via index=True or Index())
+#   uq_ : unique constraints
+#   ck_ : check constraints  (ck_<table>_<constraint_name>)
+#   fk_ : foreign keys
+#   pk_ : primary keys
+NAMING_CONVENTION = {
+    "ix": "ix_%(column_0_label)s",
+    "uq": "uq_%(table_name)s_%(column_0_name)s",
+    "ck": "ck_%(table_name)s_%(constraint_name)s",
+    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
+    "pk": "pk_%(table_name)s",
+}
+
 
 class BaseMixin(object):
     """Mixin providing common utility methods for all models."""
@@ -54,7 +70,10 @@ class BaseMixin(object):
         return data
 
 
-Base = declarative_base(cls=BaseMixin)
+Base = declarative_base(
+    cls=BaseMixin,
+    metadata=MetaData(naming_convention=NAMING_CONVENTION),
+)
 
 
 class User(SQLAlchemyBaseUserTable[int], Base):
@@ -76,7 +95,7 @@ class User(SQLAlchemyBaseUserTable[int], Base):
     username: Mapped[str] = mapped_column(
         String(length=100), unique=True, nullable=False
     )
-    role_id: Mapped[int] = mapped_column(
+    role_id: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("role.role_id", ondelete="SET NULL"), nullable=True
     )
     registered_at: Mapped[dt] = mapped_column(
@@ -128,7 +147,7 @@ class Role(Base):
 class AccessToken(SQLAlchemyBaseAccessTokenTable[int], Base):
     """
     AccessToken model for storing access tokens linked to user accounts.
-    Supports different servicess for authentication.
+    Supports different services for authentication.
     """
 
     __tablename__ = "access_token"
@@ -137,10 +156,7 @@ class AccessToken(SQLAlchemyBaseAccessTokenTable[int], Base):
     user_id: Mapped[int] = mapped_column(
         ForeignKey("user.id", ondelete="CASCADE"), nullable=False
     )
-    service_name: Mapped[str] = mapped_column(
-        String(50),
-        nullable=True,
-    )
+    service_name: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     created_at: Mapped[dt] = mapped_column(
         TIMESTAMP(timezone=True),
         index=True,
@@ -291,6 +307,12 @@ class SampleFile(Base):
 
     Each sample file corresponds to a single data file in the filestore.
     Contains metadata about the instrument, calibration, and measurement parameters.
+
+    Datetime columns:
+      - datetime:     Instrument local time, stored as TIMESTAMP WITHOUT TIME ZONE.
+                      Preserves the literal value recorded by the instrument.
+      - datetime_utc: UTC equivalent, stored as TIMESTAMP WITH TIME ZONE.
+                      Use this for all time-based calculations and comparisons.
     """
 
     __tablename__ = "sample_file"
@@ -299,6 +321,7 @@ class SampleFile(Base):
     instrument_function_id: Mapped[Optional[str]] = mapped_column(
         String(32),
         ForeignKey("instrument_function.instrument_function_id", ondelete="SET NULL"),
+        index=True,
     )
     filename: Mapped[str] = mapped_column(String(256), unique=True)
     instrument: Mapped[str] = mapped_column(String(64))
@@ -320,11 +343,6 @@ class SampleFile(Base):
         "SampleItem", back_populates="sample_file", cascade="all, delete, delete-orphan"
     )
 
-    # Indexes
-    __table_args__ = (
-        Index("idx_sample_file_instrument_function", "instrument_function_id"),
-    )
-
 
 class SampleItem(Base):
     """
@@ -341,10 +359,12 @@ class SampleItem(Base):
     sample_batch_id: Mapped[str] = mapped_column(
         String(16),
         ForeignKey("sample_batch.sample_batch_id", ondelete="CASCADE"),
+        index=True,
     )
     sample_file_id: Mapped[str] = mapped_column(
         String(16),
         ForeignKey("sample_file.sample_file_id", ondelete="CASCADE"),
+        index=True,
     )
     sample_item_name: Mapped[str] = mapped_column(String(256))
     sample_item_type: Mapped[str] = mapped_column(String(64))
@@ -404,12 +424,6 @@ class SampleItem(Base):
         "MatchRating",
         back_populates="sample_item",
         cascade="all, delete, delete-orphan",
-    )
-
-    # Indexes
-    __table_args__ = (
-        Index("idx_sample_item_sample_batch", "sample_batch_id"),
-        Index("idx_sample_item_sample_file", "sample_file_id"),
     )
 
 
@@ -555,10 +569,8 @@ class TargetIon(Base):
     )
     ionization_mechanism_id: Mapped[str] = mapped_column(
         String(16),
-        ForeignKey(
-            "ionization_mechanism.ionization_mechanism_id",
-            ondelete="CASCADE",
-        ),
+        ForeignKey("ionization_mechanism.ionization_mechanism_id", ondelete="CASCADE"),
+        index=True,
     )
     target_ion_formula: Mapped[str] = mapped_column(String(256))
     filter_params: Mapped[Optional[dict]] = mapped_column(JSON)
@@ -582,11 +594,6 @@ class TargetIon(Base):
         "MatchRating",
         back_populates="target_ion",
         cascade="all, delete, delete-orphan",
-    )
-
-    # Indexes
-    __table_args__ = (
-        Index("idx_target_ion_ionization_mechanism", "ionization_mechanism_id"),
     )
 
 
@@ -657,10 +664,7 @@ class TargetIsotope(Base):
     )
     target_isotope_formula: Mapped[str] = mapped_column(String(256))
     mz: Mapped[float] = mapped_column(Float)
-    relative_abundance: Mapped[float] = mapped_column(
-        Float,
-        CheckConstraint("relative_abundance >= 0 AND relative_abundance <= 1"),
-    )
+    relative_abundance: Mapped[float] = mapped_column(Float)
     resolution: Mapped[str] = mapped_column(String(8))
 
     # Relationships
@@ -669,6 +673,13 @@ class TargetIsotope(Base):
         "MatchIsotope",
         back_populates="target_isotope",
         cascade="all, delete, delete-orphan",
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "relative_abundance >= 0 AND relative_abundance <= 1",
+            name="relative_abundance_range",
+        ),
     )
 
 
@@ -681,13 +692,10 @@ class MatchSample(Base):
     sample_item_id: Mapped[str] = mapped_column(
         String(16),
         ForeignKey("sample_item.sample_item_id", ondelete="CASCADE"),
+        index=True,
     )
-    match_score: Mapped[float] = mapped_column(
-        Float, CheckConstraint("match_score BETWEEN 0 AND 1")
-    )
-    match_category: Mapped[int] = mapped_column(
-        Integer, CheckConstraint("match_category BETWEEN 0 AND 2")
-    )
+    match_score: Mapped[float] = mapped_column(Float)
+    match_category: Mapped[int] = mapped_column(Integer)
     sample_peak_intensity_sum: Mapped[float] = mapped_column(Float)
     match_sample_utc_created: Mapped[Optional[dt]] = mapped_column(
         TIMESTAMP(timezone=True)
@@ -699,8 +707,10 @@ class MatchSample(Base):
     # Relationships
     sample_item = relationship("SampleItem", back_populates="match_sample")
 
-    # Indexes
-    __table_args__ = (Index("idx_match_sample_sample_item", "sample_item_id"),)
+    __table_args__ = (
+        CheckConstraint("match_score BETWEEN 0 AND 1", name="match_score_range"),
+        CheckConstraint("match_category BETWEEN 0 AND 2", name="match_category_range"),
+    )
 
 
 class MatchCollection(Base):
@@ -712,17 +722,14 @@ class MatchCollection(Base):
     sample_item_id: Mapped[str] = mapped_column(
         String(16),
         ForeignKey("sample_item.sample_item_id", ondelete="CASCADE"),
+        index=True,
     )
     target_collection_id: Mapped[str] = mapped_column(
         String(16),
         ForeignKey("target_collection.target_collection_id", ondelete="CASCADE"),
     )
-    match_score: Mapped[float] = mapped_column(
-        Float, CheckConstraint("match_score BETWEEN 0 AND 1")
-    )
-    match_category: Mapped[int] = mapped_column(
-        Integer, CheckConstraint("match_category BETWEEN 0 AND 2")
-    )
+    match_score: Mapped[float] = mapped_column(Float)
+    match_category: Mapped[int] = mapped_column(Integer)
     sample_peak_intensity_sum: Mapped[float] = mapped_column(Float)
     match_collection_utc_created: Mapped[Optional[dt]] = mapped_column(
         TIMESTAMP(timezone=True)
@@ -738,7 +745,10 @@ class MatchCollection(Base):
     )
 
     # Indexes
-    __table_args__ = (Index("idx_match_collection_sample_item", "sample_item_id"),)
+    __table_args__ = (
+        CheckConstraint("match_score BETWEEN 0 AND 1", name="match_score_range"),
+        CheckConstraint("match_category BETWEEN 0 AND 2", name="match_category_range"),
+    )
 
 
 class MatchCompound(Base):
@@ -750,17 +760,14 @@ class MatchCompound(Base):
     sample_item_id: Mapped[str] = mapped_column(
         String(16),
         ForeignKey("sample_item.sample_item_id", ondelete="CASCADE"),
+        index=True,
     )
     target_compound_id: Mapped[str] = mapped_column(
         String(16),
         ForeignKey("target_compound.target_compound_id", ondelete="CASCADE"),
     )
-    match_score: Mapped[float] = mapped_column(
-        Float, CheckConstraint("match_score BETWEEN 0 AND 1")
-    )
-    match_category: Mapped[int] = mapped_column(
-        Integer, CheckConstraint("match_category BETWEEN 0 AND 2")
-    )
+    match_score: Mapped[float] = mapped_column(Float)
+    match_category: Mapped[int] = mapped_column(Integer)
     sample_peak_intensity_sum: Mapped[float] = mapped_column(Float)
     match_compound_utc_created: Mapped[Optional[dt]] = mapped_column(
         TIMESTAMP(timezone=True)
@@ -774,7 +781,10 @@ class MatchCompound(Base):
     target_compound = relationship("TargetCompound", back_populates="match_compound")
 
     # Indexes
-    __table_args__ = (Index("idx_match_compound_sample_item", "sample_item_id"),)
+    __table_args__ = (
+        CheckConstraint("match_score BETWEEN 0 AND 1", name="match_score_range"),
+        CheckConstraint("match_category BETWEEN 0 AND 2", name="match_category_range"),
+    )
 
 
 class MatchIon(Base):
@@ -786,18 +796,15 @@ class MatchIon(Base):
     sample_item_id: Mapped[str] = mapped_column(
         String(16),
         ForeignKey("sample_item.sample_item_id", ondelete="CASCADE"),
+        index=True,
     )
     target_ion_id: Mapped[str] = mapped_column(
         String(16),
         ForeignKey("target_ion.target_ion_id", ondelete="CASCADE"),
         index=True,
     )
-    match_score: Mapped[float] = mapped_column(
-        Float, CheckConstraint("match_score BETWEEN 0 AND 1")
-    )
-    match_category: Mapped[int] = mapped_column(
-        Integer, CheckConstraint("match_category BETWEEN 0 AND 2")
-    )
+    match_score: Mapped[float] = mapped_column(Float)
+    match_category: Mapped[int] = mapped_column(Integer)
     sample_peak_intensity_sum: Mapped[float] = mapped_column(Float)
     match_ion_utc_created: Mapped[Optional[dt]] = mapped_column(
         TIMESTAMP(timezone=True)
@@ -810,8 +817,10 @@ class MatchIon(Base):
     sample_item = relationship("SampleItem", back_populates="match_ion")
     target_ion = relationship("TargetIon", back_populates="match_ion")
 
-    # Indexes
-    __table_args__ = (Index("idx_match_ion_sample_item", "sample_item_id"),)
+    __table_args__ = (
+        CheckConstraint("match_score BETWEEN 0 AND 1", name="match_score_range"),
+        CheckConstraint("match_category BETWEEN 0 AND 2", name="match_category_range"),
+    )
 
 
 class MatchRating(Base):
@@ -831,15 +840,15 @@ class MatchRating(Base):
     match_rating_utc_created: Mapped[Optional[dt]] = mapped_column(
         TIMESTAMP(timezone=True)
     )
-    rating: Mapped[int] = mapped_column(
-        Integer, CheckConstraint("rating BETWEEN 0 AND 2")
-    )
+    rating: Mapped[int] = mapped_column(Integer)
     checklist: Mapped[Optional[dict]] = mapped_column(JSON)
     environment: Mapped[Optional[dict]] = mapped_column(JSON)
 
     # Relationships
     sample_item = relationship("SampleItem", back_populates="match_rating")
     target_ion = relationship("TargetIon", back_populates="match_rating")
+
+    __table_args__ = (CheckConstraint("rating BETWEEN 0 AND 2", name="rating_range"),)
 
 
 class MatchIsotope(Base):
@@ -856,17 +865,19 @@ class MatchIsotope(Base):
     sample_item_id: Mapped[str] = mapped_column(
         String(16),
         ForeignKey("sample_item.sample_item_id", ondelete="CASCADE"),
+        index=True,
     )
-    sample_peak_id: Mapped[str] = mapped_column(String(20))
+    sample_peak_id: Mapped[str] = mapped_column(
+        String(20),
+        index=True,
+    )
     sample_peak_mz: Mapped[float] = mapped_column(Float)
     sample_peak_intensity: Mapped[float] = mapped_column(Float)
     sample_peak_intensity_relative: Mapped[float] = mapped_column(Float)
     sample_peak_tof: Mapped[float] = mapped_column(Float)
     match_abundance_error: Mapped[float] = mapped_column(Float)
     match_mz_error: Mapped[float] = mapped_column(Float)
-    match_score: Mapped[float] = mapped_column(
-        Float, CheckConstraint("match_score BETWEEN 0 AND 1")
-    )
+    match_score: Mapped[float] = mapped_column(Float)
     match_isotope_utc_created: Mapped[Optional[dt]] = mapped_column(
         TIMESTAMP(timezone=True)
     )
@@ -878,10 +889,8 @@ class MatchIsotope(Base):
     sample_item = relationship("SampleItem", back_populates="match_isotope")
     target_isotope = relationship("TargetIsotope", back_populates="match_isotope")
 
-    # Indexes
     __table_args__ = (
-        Index("idx_match_isotope_sample_item", "sample_item_id"),
-        Index("idx_match_isotope_sample_peak_id", "sample_peak_id"),
+        CheckConstraint("match_score BETWEEN 0 AND 1", name="match_score_range"),
     )
 
 

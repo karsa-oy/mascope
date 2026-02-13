@@ -67,8 +67,9 @@ async def configure_database_engine(
         database_url = db_cfg.get_postgres_url(
             password=postgres_password, env_name=runtime.env.name
         )
+        db_name = db_cfg.get_postgres_database_name(env_name=runtime.env.name)
         runtime.logger.info(
-            f"Using PostgreSQL at {db_cfg.host}:{db_cfg.port}/{db_cfg.database}"
+            f"Using PostgreSQL at {db_cfg.host}:{db_cfg.port}/{db_name}"
         )
 
     trace_mode = runtime.config.log_level.lower() == "trace"
