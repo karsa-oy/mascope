@@ -3,6 +3,8 @@ Functions for target ions and target isotopes generation.
 """
 
 import re
+from itertools import combinations_with_replacement
+from math import comb
 
 import numpy as np
 from IsoSpecPy import IsoThreshold
@@ -388,6 +390,9 @@ def _combine_with_custom_elements(
 ) -> tuple[list[float], list[float], list[str]]:
     """Multiply base isotope pattern with custom element isotope distributions.
 
+    For custom elements with multiple atoms (e.g., ^N2), enumerates all isotope
+    combinations following multinomial distribution.
+
     :param base_formula: Formula string for the base (non-custom) part
     :param base_masses: Base isotope masses
     :param base_probs: Base isotope probabilities
@@ -406,50 +411,82 @@ def _combine_with_custom_elements(
         )
 
         for custom_data in custom_elements.values():
-            for isotope in custom_data["isotopes"]:
-                # Calculate combined mass and probability
-                count = custom_data["count"]
-                mass = base_mass + isotope["mass"] * count
-                prob = base_prob * isotope["abundance"]
-                # Check if the combined abundance meets the threshold to be included
-                if prob < ISOTOPE_ABUNDANCE_THRESHOLD:
+            # Generate all isotope combinations for this custom element
+            for combo_mass, combo_prob, combo_formula in _generate_isotope_combinations(
+                custom_data
+            ):
+                total_prob = base_prob * combo_prob
+                if total_prob < ISOTOPE_ABUNDANCE_THRESHOLD:
                     continue
 
-                # Build formula for this custom element isotope
-                custom_formula = _build_custom_element_formula(
-                    custom_data["regular_symbol"],
-                    count,
-                    isotope["mass_number"],
-                    custom_data["lightest_mass_number"],
-                )
-
-                combined_masses.append(mass)
-                combined_probs.append(prob)
-                combined_formulae.append(custom_formula + base_isotope_formula)
+                combined_masses.append(base_mass + combo_mass)
+                combined_probs.append(total_prob)
+                combined_formulae.append(combo_formula + base_isotope_formula)
 
     return combined_masses, combined_probs, combined_formulae
 
 
-def _build_custom_element_formula(
-    symbol: str, count: int, mass_number: int, lightest_mass_number: int
-) -> str:
-    """Build formula string for a custom element isotope.
+def _generate_isotope_combinations(
+    custom_data: dict,
+) -> list[tuple[float, float, str]]:
+    """Generate all isotope combinations for a custom element.
 
-    :param symbol: Regular element symbol (e.g., "N")
-    :param count: Number of atoms
-    :param mass_number: Mass number of the isotope
-    :param lightest_mass_number: Mass number of the lightest isotope (no label needed)
-    :return: Formula string (e.g., "N", "[15N]", "N2", "[15N]N")
+    For n atoms with k isotopes, generates all distributions following
+    multinomial probability. E.g., ^N2 with 2% 14N / 98% 15N yields:
+    - N2: 0.02**2 = 0.04%
+    - [15N]N: 2 * 0.02 * 0.98 = 3.92%
+    - [15N]2: 0.98**2 = 96.04%
+
+    :param custom_data: Dict with 'count', 'regular_symbol', 'lightest_mass_number', 'isotopes'
+    :return: List of (mass, probability, formula) tuples
     """
-    if mass_number == lightest_mass_number:
-        # Lightest isotope - no bracket label needed
-        return f"{symbol}{count if count > 1 else ''}"
+    count = custom_data["count"]
+    symbol = custom_data["regular_symbol"]
+    isotopes = custom_data["isotopes"]
+    lightest = custom_data["lightest_mass_number"]
 
-    # Heavy isotope - use bracket notation
-    if count == 1:
-        return f"[{mass_number}{symbol}]"
-    else:
-        return f"[{mass_number}{symbol}]{symbol}{count - 1}"
+    results = []
+    for combo in combinations_with_replacement(range(len(isotopes)), count):
+        # Count occurrences of each isotope index
+        counts_per_isotope = {i: combo.count(i) for i in set(combo)}
+
+        # Mass = sum of (isotope_mass × count)
+        mass = sum(isotopes[i]["mass"] * c for i, c in counts_per_isotope.items())
+
+        # Probability = multinomial_coeff × product(abundance^count)
+        prob = _multinomial_coeff(count, list(counts_per_isotope.values()))
+        for i, c in counts_per_isotope.items():
+            prob *= isotopes[i]["abundance"] ** c
+
+        # Build formula: heavy isotopes first (descending mass), then light
+        formula_parts = []
+        for i, c in sorted(
+            counts_per_isotope.items(),
+            key=lambda x: isotopes[x[0]]["mass_number"],
+            reverse=True,
+        ):
+            if c == 0:
+                continue
+            mass_num = isotopes[i]["mass_number"]
+            count_str = str(c) if c > 1 else ""
+            if mass_num == lightest:
+                formula_parts.append(f"{symbol}{count_str}")
+            else:
+                formula_parts.append(f"[{mass_num}{symbol}]{count_str}")
+
+        results.append((mass, prob, "".join(formula_parts)))
+
+    return results
+
+
+def _multinomial_coeff(n: int, counts: list[int]) -> int:
+    """Calculate multinomial coefficient n! / (k1! * k2! * ...)."""
+    result = 1
+    remaining = n
+    for k in counts:
+        result *= comb(remaining, k)
+        remaining -= k
+    return result
 
 
 def generate_target_ions_from_mass(
