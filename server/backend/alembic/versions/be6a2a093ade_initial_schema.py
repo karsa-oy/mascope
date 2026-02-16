@@ -1,9 +1,9 @@
 # pylint: disable=no-member
 """Initial schema
 
-Revision ID: 87eedb8aeb5d
+Revision ID: be6a2a093ade
 Revises:
-Create Date: 2026-02-13 13:59:51.401875
+Create Date: 2026-02-19 16:40:13.458115
 
 """
 from typing import Sequence, Union
@@ -14,7 +14,7 @@ import sqlalchemy as sa
 from mascope_backend.db.views import Sample
 
 # revision identifiers, used by Alembic.
-revision: str = "87eedb8aeb5d"
+revision: str = "be6a2a093ade"
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -397,6 +397,12 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("target_isotope_id", name=op.f("pk_target_isotope")),
     )
+    op.create_index(
+        op.f("ix_target_isotope_target_ion_id"),
+        "target_isotope",
+        ["target_ion_id"],
+        unique=False,
+    )
     op.create_table(
         "match_collection",
         sa.Column("match_collection_id", sa.String(length=32), nullable=False),
@@ -520,6 +526,9 @@ def upgrade() -> None:
         ["sample_item_id"],
         unique=False,
     )
+    op.create_index(
+        op.f("ix_match_ion_target_ion_id"), "match_ion", ["target_ion_id"], unique=False
+    )
     op.create_table(
         "match_isotope",
         sa.Column("match_isotope_id", sa.String(length=32), nullable=False),
@@ -532,7 +541,6 @@ def upgrade() -> None:
         sa.Column("sample_peak_tof", sa.Float(), nullable=False),
         sa.Column("match_abundance_error", sa.Float(), nullable=False),
         sa.Column("match_mz_error", sa.Float(), nullable=False),
-        sa.Column("match_isotope_similarity", sa.Float(), nullable=False),
         sa.Column("match_score", sa.Float(), nullable=False),
         sa.Column(
             "match_isotope_utc_created", sa.TIMESTAMP(timezone=True), nullable=True
@@ -568,6 +576,12 @@ def upgrade() -> None:
         op.f("ix_match_isotope_sample_peak_id"),
         "match_isotope",
         ["sample_peak_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_match_isotope_target_isotope_id"),
+        "match_isotope",
+        ["target_isotope_id"],
         unique=False,
     )
     op.create_table(
@@ -649,9 +663,13 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_match_sample_sample_item_id"), table_name="match_sample")
     op.drop_table("match_sample")
     op.drop_table("match_rating")
+    op.drop_index(
+        op.f("ix_match_isotope_target_isotope_id"), table_name="match_isotope"
+    )
     op.drop_index(op.f("ix_match_isotope_sample_peak_id"), table_name="match_isotope")
     op.drop_index(op.f("ix_match_isotope_sample_item_id"), table_name="match_isotope")
     op.drop_table("match_isotope")
+    op.drop_index(op.f("ix_match_ion_target_ion_id"), table_name="match_ion")
     op.drop_index(op.f("ix_match_ion_sample_item_id"), table_name="match_ion")
     op.drop_table("match_ion")
     op.drop_index(op.f("ix_match_compound_sample_item_id"), table_name="match_compound")
@@ -660,6 +678,7 @@ def downgrade() -> None:
         op.f("ix_match_collection_sample_item_id"), table_name="match_collection"
     )
     op.drop_table("match_collection")
+    op.drop_index(op.f("ix_target_isotope_target_ion_id"), table_name="target_isotope")
     op.drop_table("target_isotope")
     op.drop_table("target_collection_in_sample_batch")
     op.drop_index(op.f("ix_sample_item_sample_file_id"), table_name="sample_item")

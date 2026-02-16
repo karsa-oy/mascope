@@ -20,8 +20,12 @@ async def run():
     await create_db_backup()
 
     old_version, new_version = 43, 44
-    old_db_path = os.path.join(runtime.config.database, f"mascope.v{old_version}.db")
-    new_db_path = os.path.join(runtime.config.database, f"mascope.v{new_version}.db")
+    old_db_path = os.path.join(
+        runtime.config.database.data_dir, f"mascope.v{old_version}.db"
+    )
+    new_db_path = os.path.join(
+        runtime.config.database.data_dir, f"mascope.v{new_version}.db"
+    )
 
     shutil.copyfile(old_db_path, new_db_path)
     await configure_database_engine(new_version)
