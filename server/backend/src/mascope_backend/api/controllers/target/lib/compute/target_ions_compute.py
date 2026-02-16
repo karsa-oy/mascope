@@ -411,6 +411,9 @@ def _combine_with_custom_elements(
                 count = custom_data["count"]
                 mass = base_mass + isotope["mass"] * count
                 prob = base_prob * isotope["abundance"]
+                # Check if the combined abundance meets the threshold to be included
+                if prob < ISOTOPE_ABUNDANCE_THRESHOLD:
+                    continue
 
                 # Build formula for this custom element isotope
                 custom_formula = _build_custom_element_formula(
