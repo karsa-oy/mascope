@@ -182,11 +182,22 @@ async def _load_peaks_and_averaged_signal(
     :rtype: tuple[xr.DataArray, xr.DataArray, xr.DataArray]
     """
 
-    # --- Get averaged signal around target isotopes (+-DMZ) --- #
+    instrument_type = get_instrument_type(sample.filename)
+    match instrument_type:
+        case "tof":
+            peak_data_type = "area"
+            dmz = DMZ_TOF
+        case "orbi":
+            peak_data_type = "height"
+            dmz = DMZ_ORBI
+        case _:
+            raise ValueError(f"Unknown instrument type: {instrument_type}")
+
+    # --- Get averaged signal around target isotopes (+-dmz) --- #
     match_mzs = [
         iso.sample_peak_mz for iso in isotopes if iso.sample_peak_mz is not None
     ]
-    mz_min, mz_max = min(match_mzs) - DMZ, max(match_mzs) + DMZ
+    mz_min, mz_max = min(match_mzs) - dmz, max(match_mzs) + dmz
     averaged_signal = (
         m_compute.get_sum_signal(
             sample.filename,
@@ -214,14 +225,6 @@ async def _load_peaks_and_averaged_signal(
 
     # --- Prepare peak timeseries with instrument-specific data type --- #
     # Leave instrument-specific peak data type in the timeseries
-    instrument_type = get_instrument_type(sample.filename)
-    match instrument_type:
-        case "tof":
-            peak_data_type = "area"
-        case "orbi":
-            peak_data_type = "height"
-        case _:
-            raise ValueError(f"Unknown instrument type: {instrument_type}")
     peak_timeseries = get_peaks(peak_timeseries, peak_data_type).compute()
 
     # Set Nan for times not in timestamps to ensure gaps in timeseries

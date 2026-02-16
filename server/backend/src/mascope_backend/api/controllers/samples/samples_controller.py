@@ -400,7 +400,6 @@ async def get_sample_peaks(
                     MatchIsotope.sample_peak_id,
                     MatchIsotope.match_mz_error,
                     MatchIsotope.match_abundance_error,
-                    MatchIsotope.match_isotope_similarity,
                     MatchIsotope.match_score,
                     MatchIsotope.sample_peak_intensity,
                     TargetIsotope.target_isotope_id,
