@@ -253,73 +253,200 @@ def predict_isotopes(
     raw_ion: Formula, ion_formula: str
 ) -> tuple[list[float], list[float], list[str]]:
     """Predicts isotope masses and abundances for a given ion formula using IsoSpecPy.
-    raw_ion is used to extract custom element isotopic patterns if needed.
+
+    Handles custom elements (e.g., ^N for isotopically labelled nitrogen) by:
+    1. Computing isotope pattern for the non-custom part using IsoSpecPy
+    2. Multiplying with custom element isotope distributions
 
     :param raw_ion: Formula instance of the ion
     :type raw_ion: Formula
     :param ion_formula: Ion formula string
     :type ion_formula: str
     :raises UnknownCustomElement: If a custom element is unknown.
-    :return: 3-tuple lists of
-        (m/z values, relative abundances, isotope formulae)
+    :return: 3-tuple lists of (m/z values, relative abundances, isotope formulae)
     :rtype: tuple[list[float], list[float], list[str]]
     """
-    custom_elements = []
-    if "^" in ion_formula:
-        # Find custom element properties
-        elements = raw_ion._elements  # pylint: disable=protected-access
-        for symbol in elements:
-            if symbol.startswith("^"):
-                try:
-                    element = ELEMENTS[symbol]
-                except KeyError as e:
-                    raise UnknownCustomElement(symbol) from e
-                custom_elements.append(symbol)
-                isotope_masses = [iso.mz for iso in element.isotopes.values()]
-                isotope_abundances = [
-                    iso.abundance for iso in element.isotopes.values()
-                ]
-                isotope_counts = [
-                    raw_ion._elements[symbol][0]  # pylint: disable=protected-access
-                ]
-                # Remove custom element notation for isotope prediction
-                pattern = rf"{re.escape(symbol)}\d*"
-                ion_formula = re.sub(pattern, "", ion_formula)
-                # Parse the ion formula again without custom elements
-                ion_formula = Formula(ion_formula).formula
+    custom_elements = _extract_custom_elements(raw_ion, ion_formula)
+    base_formula = _remove_custom_elements_from_formula(ion_formula, custom_elements)
 
-    iso_params = {
-        "formula": ion_formula,
-        "threshold": ISOTOPE_ABUNDANCE_THRESHOLD,
-        "get_confs": True,
-    }
-    if len(custom_elements) > 0:
-        # Use custom isotope abundances and masses for custom elements
-        iso_params["atomCounts"] = (
-            isotope_counts  # pylint: disable=possibly-used-before-assignment
+    # Compute isotope pattern for the base (non-custom) part
+    base_masses, base_probs, base_labels = _compute_base_isotope_pattern(base_formula)
+
+    # Combine with custom element isotope patterns if present
+    if custom_elements:
+        masses, probs, formulae = _combine_with_custom_elements(
+            base_formula, base_masses, base_probs, base_labels, custom_elements
         )
-        iso_params["isotopeMasses"] = [isotope_masses]
-        iso_params["isotopeProbabilities"] = [
-            isotope_abundances  # pylint: disable=possibly-used-before-assignment
+    else:
+        masses = base_masses
+        probs = base_probs
+        formulae = [
+            replace_atom_with_isotope(base_formula, label) for label in base_labels
         ]
 
-    predicted_peaks = IsoThreshold(**iso_params)
-    # Masses are corrected for the electron charge
-    masses_high_res = [
-        (float(m) - ELECTRON.mass * raw_ion.charge) / abs(raw_ion.charge)
-        for m in predicted_peaks.masses
-    ]
-    # Probabilities are basically relative abundances
-    probs_high_res = [float(p) for p in predicted_peaks.probs]
-    # Build isotope formulae
-    isotope_labels = extract_isotope_labels(ion_formula, predicted_peaks)
-    charge = charge_string(raw_ion)
-    isotope_formulae = [
-        replace_atom_with_isotope(ion_formula, label) + charge
-        for label in isotope_labels
-    ]
+    # Correct masses for electron charge and add charge string to formulae
+    charge = raw_ion.charge
+    masses = [(m - ELECTRON.mass * charge) / abs(charge) for m in masses]
+    charge_str = charge_string(raw_ion)
+    formulae = [f + charge_str for f in formulae]
 
-    return masses_high_res, probs_high_res, isotope_formulae
+    return masses, probs, formulae
+
+
+def _extract_custom_elements(raw_ion: Formula, ion_formula: str) -> dict[str, dict]:
+    """Extract custom element data from a formula.
+
+    :param raw_ion: Formula instance containing element data
+    :param ion_formula: Ion formula string to check for custom elements
+    :return: Dict mapping custom element symbols to their properties
+    :raises UnknownCustomElement: If a custom element is not in ELEMENTS
+    """
+    custom_elements = {}
+
+    if "^" not in ion_formula:
+        return custom_elements
+
+    elements = raw_ion._elements  # pylint: disable=protected-access
+    for symbol in elements:
+        if not symbol.startswith("^"):
+            continue
+
+        try:
+            element = ELEMENTS[symbol]
+        except KeyError as e:
+            raise UnknownCustomElement(symbol) from e
+
+        isotope_keys = list(element.isotopes.keys())
+        custom_elements[symbol] = {
+            "count": elements[symbol][0],
+            "regular_symbol": symbol[1:],  # Remove ^ prefix
+            "lightest_mass_number": isotope_keys[0],
+            "isotopes": [
+                {
+                    "mass": iso.mz,
+                    "abundance": iso.abundance,
+                    "mass_number": iso.massnumber,
+                }
+                for iso in element.isotopes.values()
+            ],
+        }
+
+    return custom_elements
+
+
+def _remove_custom_elements_from_formula(
+    ion_formula: str, custom_elements: dict[str, dict]
+) -> str:
+    """Remove custom elements from formula string for IsoSpecPy calculation.
+
+    :param ion_formula: Original ion formula string
+    :param custom_elements: Dict of custom element data
+    :return: Formula string with custom elements removed, normalized
+    """
+    result = ion_formula
+    for symbol in custom_elements:
+        pattern = rf"{re.escape(symbol)}\d*"
+        result = re.sub(pattern, "", result)
+
+    if result:
+        result = Formula(result).formula
+
+    return result
+
+
+def _compute_base_isotope_pattern(
+    formula: str,
+) -> tuple[list[float], list[float], list[str]]:
+    """Compute isotope pattern for a formula using IsoSpecPy.
+
+    :param formula: Chemical formula string (without custom elements)
+    :return: 3-tuple of (masses, probabilities, isotope labels)
+    """
+    if not formula:
+        # Empty formula (e.g., just custom elements with nothing else)
+        return [0.0], [1.0], [""]
+
+    predicted_peaks = IsoThreshold(
+        formula=formula,
+        threshold=ISOTOPE_ABUNDANCE_THRESHOLD,
+        get_confs=True,
+    )
+
+    masses = [float(m) for m in predicted_peaks.masses]
+    probs = [float(p) for p in predicted_peaks.probs]
+    labels = extract_isotope_labels(formula, predicted_peaks)
+
+    return masses, probs, labels
+
+
+def _combine_with_custom_elements(
+    base_formula: str,
+    base_masses: list[float],
+    base_probs: list[float],
+    base_labels: list[str],
+    custom_elements: dict[str, dict],
+) -> tuple[list[float], list[float], list[str]]:
+    """Multiply base isotope pattern with custom element isotope distributions.
+
+    :param base_formula: Formula string for the base (non-custom) part
+    :param base_masses: Base isotope masses
+    :param base_probs: Base isotope probabilities
+    :param base_labels: Base isotope labels (e.g., "M0", "17O")
+    :param custom_elements: Dict of custom element data
+    :return: 3-tuple of combined (masses, probabilities, formulae)
+    """
+    combined_masses = []
+    combined_probs = []
+    combined_formulae = []
+
+    for base_mass, base_prob, base_label in zip(base_masses, base_probs, base_labels):
+        # Convert label to proper formula (e.g., "M0" -> "O3", "17O" -> "[17O]O2")
+        base_isotope_formula = (
+            replace_atom_with_isotope(base_formula, base_label) if base_formula else ""
+        )
+
+        for custom_data in custom_elements.values():
+            for isotope in custom_data["isotopes"]:
+                # Calculate combined mass and probability
+                count = custom_data["count"]
+                mass = base_mass + isotope["mass"] * count
+                prob = base_prob * isotope["abundance"]
+
+                # Build formula for this custom element isotope
+                custom_formula = _build_custom_element_formula(
+                    custom_data["regular_symbol"],
+                    count,
+                    isotope["mass_number"],
+                    custom_data["lightest_mass_number"],
+                )
+
+                combined_masses.append(mass)
+                combined_probs.append(prob)
+                combined_formulae.append(custom_formula + base_isotope_formula)
+
+    return combined_masses, combined_probs, combined_formulae
+
+
+def _build_custom_element_formula(
+    symbol: str, count: int, mass_number: int, lightest_mass_number: int
+) -> str:
+    """Build formula string for a custom element isotope.
+
+    :param symbol: Regular element symbol (e.g., "N")
+    :param count: Number of atoms
+    :param mass_number: Mass number of the isotope
+    :param lightest_mass_number: Mass number of the lightest isotope (no label needed)
+    :return: Formula string (e.g., "N", "[15N]", "N2", "[15N]N")
+    """
+    if mass_number == lightest_mass_number:
+        # Lightest isotope - no bracket label needed
+        return f"{symbol}{count if count > 1 else ''}"
+
+    # Heavy isotope - use bracket notation
+    if count == 1:
+        return f"[{mass_number}{symbol}]"
+    else:
+        return f"[{mass_number}{symbol}]{symbol}{count - 1}"
 
 
 def generate_target_ions_from_mass(
