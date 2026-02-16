@@ -167,6 +167,9 @@ def _get_compound_formula(
     :return: Compound formula as Formula instance, or None for empty formula "()"
     :rtype: Formula | None
     """
+    runtime.logger.debug(
+        f"Processing compound formula '{target_compound_formula}' with ionization mechanism '{ionization_mechanism}'"
+    )
     # Handle the special case when generating ions for empty formula "()"
     if target_compound_formula == "()":
         compound_formula = None
@@ -186,8 +189,9 @@ def _get_compound_formula(
         mechanism_formula = Formula(ionization_mechanism[1:])
         for (
             element,
-            counts,
+            iso_counts,
         ) in mechanism_formula._elements.items():  # pylint: disable=protected-access
+            # Check if element to be subtracted exists in compound formula
             if (
                 element
                 not in compound_formula._elements  # pylint: disable=protected-access
@@ -196,15 +200,16 @@ def _get_compound_formula(
                     f"Element {element} from mechanism formula {mechanism_formula.formula} "
                     f"not in compound formula {compound_formula.formula}"
                 )
-            count = counts[0]
-            if (
-                compound_formula._elements[element][  # pylint: disable=protected-access
-                    0
-                ]
-                < count
-            ):
+            # Check if there are enough atoms of the element to be subtracted
+            mech_count = sum(iso_counts.values())
+            compound_count = sum(
+                compound_formula._elements[  # pylint: disable=protected-access
+                    element
+                ].values()
+            )
+            if mech_count > compound_count:
                 raise SkipIonizationMechanism(
-                    f"Cannot subtract {count} of element {element} from compound formula "
+                    f"Cannot subtract {mech_count} of element {element} from compound formula "
                     f"{compound_formula.formula}"
                 )
     else:
