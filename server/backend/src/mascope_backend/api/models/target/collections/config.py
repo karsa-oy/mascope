@@ -25,7 +25,7 @@ class TargetCollectionConfig(BaseModel):
     CALIBRANTS_BATCH_TYPES: list = ["ANALYSIS"]
 
     # Compound limits by collection type
-    DIAGNOSTICS_MAX_COMPOUNDS: int = 10
+    DIAGNOSTICS_MAX_COMPOUNDS: int = 50
 
     def get_allowed_batch_types(self, target_collection_type: str) -> list:
         """Get allowed batch types for a target collection type."""
