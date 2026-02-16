@@ -86,11 +86,9 @@ onBeforeUnmount(() => {
     </template>
     <template #icons>
       <span style="opacity: 0.5"
-        >{{
-          app.data.peak.list.filter(
-            (p) => p.target_isotope_formula !== null && p.target_isotope_formula !== ''
-          ).length
-        }}/{{ app.data.peak.list.length }}
+        >{{ app.data.peak.list.filter((p) => p.match.length > 0).length }}/{{
+          app.data.peak.list.length
+        }}
         peaks matched
       </span></template
     >
