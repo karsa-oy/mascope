@@ -1,0 +1,6 @@
+# Normalize all text files to LF
+* text=auto eol=lf
+
+# Windows batch files must keep CRLF - broken if converted to LF on Windows
+*.bat text eol=crlf
+*.cmd text eol=crlf
