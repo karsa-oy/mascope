@@ -272,27 +272,24 @@ class GetUsersQueryParams(QueryParamsModel):
     limit: int | None = Field(None, description="Number of results per page.")
 
     @model_validator(mode="after")
-    @classmethod
-    def validate_roles(cls, values):
+    def validate_roles(self):
         role_access_levels = auth_settings.ROLE_ACCESS_LEVELS
-        role_name_min = values.role_name_min
-        role_name_max = values.role_name_max
 
         # Validate role_name_min exists in configuration
-        if role_name_min and role_name_min not in role_access_levels:
-            raise ValueError(f"Invalid role_name_min: '{role_name_min}'.")
+        if self.role_name_min and self.role_name_min not in role_access_levels:
+            raise ValueError(f"Invalid role_name_min: '{self.role_name_min}'.")
 
         # Validate role_name_max exists in configuration
-        if role_name_max and role_name_max not in role_access_levels:
-            raise ValueError(f"Invalid role_name_max: '{role_name_max}'.")
+        if self.role_name_max and self.role_name_max not in role_access_levels:
+            raise ValueError(f"Invalid role_name_max: '{self.role_name_max}'.")
 
         # Validate role_name_min <= role_name_max based on access levels
-        if role_name_min and role_name_max:
-            min_level = role_access_levels[role_name_min]
-            max_level = role_access_levels[role_name_max]
+        if self.role_name_min and self.role_name_max:
+            min_level = role_access_levels[self.role_name_min]
+            max_level = role_access_levels[self.role_name_max]
             if min_level > max_level:
                 raise ValueError(
-                    f"Invalid range: role_name_min '{role_name_min}' cannot have a higher access level than role_name_max '{role_name_max}'."
+                    f"Invalid range: role_name_min '{self.role_name_min}' cannot have a higher access level than role_name_max '{self.role_name_max}'."
                 )
 
-        return values
+        return self

@@ -65,34 +65,32 @@ class SampleItemValidator(SampleItemBaseValidator, CommonValidators):
         return v
 
     @model_validator(mode="after")
-    @classmethod
-    def validate_time_range(cls, values):
+    def validate_time_range(self):
         """Validate t0 is less than t1 when both are provided."""
-        t0, t1 = values.t0, values.t1
-        if t0 is not None and t1 is not None and t0 >= t1:
+        if self.t0 is not None and self.t1 is not None and self.t0 >= self.t1:
             raise ValueError("t0 must be less than t1")
-        return values
+        return self
 
     @model_validator(mode="after")
-    @classmethod
-    def validate_sample_type_filter_requirements(cls, values):
+    def validate_sample_type_filter_requirements(self):
         """Validate filter_id requirements based on sample_item_type."""
-        sample_type, filter_id = values.sample_item_type, values.filter_id
-
         if (
-            sample_type in sample_item_config.SAMPLE_TYPES_FILTER_ID_REQUIRED
-            and not filter_id
-        ):
-            raise ValueError(f"Sample item type '{sample_type}' requires a filter ID.")
-        elif (
-            sample_type in sample_item_config.SAMPLE_TYPES_FILTER_ID_NOT_ALLOWED
-            and filter_id
+            self.sample_item_type in sample_item_config.SAMPLE_TYPES_FILTER_ID_REQUIRED
+            and not self.filter_id
         ):
             raise ValueError(
-                f"Sample item type '{sample_type}' cannot have a filter ID."
+                f"Sample item type '{self.sample_item_type}' requires a filter ID."
+            )
+        elif (
+            self.sample_item_type
+            in sample_item_config.SAMPLE_TYPES_FILTER_ID_NOT_ALLOWED
+            and self.filter_id
+        ):
+            raise ValueError(
+                f"Sample item type '{self.sample_item_type}' cannot have a filter ID."
             )
 
-        return values
+        return self
 
 
 class SampleItemBase(BaseModel):

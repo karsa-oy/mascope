@@ -95,28 +95,21 @@ class WorkspaceCreate(WorkspaceBase):
     """Model used for workspace creation requests."""
 
     @model_validator(mode="after")
-    @classmethod
-    def validate_acquisition_constraints(cls, values):
+    def validate_acquisition_constraints(self):
         """Validate rules for ACQUISITION workspaces."""
-        workspace_type, instrument, workspace_name = (
-            values.workspace_type,
-            values.instrument,
-            values.workspace_name,
-        )
-
-        if workspace_type == "ACQUISITION":
+        if self.workspace_type == "ACQUISITION":
             # ACQUISITION workspaces must have instrument
-            if not instrument:
+            if not self.instrument:
                 raise ValueError("Acquisition workspaces must specify an instrument")
 
             # Validate name ends with instrument (case-insensitive)
-            if not workspace_name.lower().endswith(instrument.lower()):
+            if not self.workspace_name.lower().endswith(self.instrument.lower()):
                 raise ValueError(
                     f"Acquisition workspace name should end with the instrument name. "
-                    f"Suggested: '{workspace_config.ACQUISITION_NAME_PREFIX} {instrument}'"
+                    f"Suggested: '{workspace_config.ACQUISITION_NAME_PREFIX} {self.instrument}'"
                 )
 
-        return values
+        return self
 
 
 class WorkspaceRead(WorkspaceBase):

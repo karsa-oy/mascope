@@ -83,17 +83,16 @@ class SetInstrumentConfigBody(BaseModel):
     )
 
     @model_validator(mode="after")
-    @classmethod
-    def either_new_or_existing(cls, values):
+    def either_new_or_existing(self):
         expected_either = "Instrument config: expecting either an instrument_function_id argument or a new_record"
-        both = values.instrument_function_id and values.new_record
+        both = self.instrument_function_id and self.new_record
         if both:
             raise ValueError(f"{expected_either} but both were provided.")
-        neither = (not values.instrument_function_id) and (not values.new_record)
+        neither = (not self.instrument_function_id) and (not self.new_record)
         if neither:
             raise ValueError(f"{expected_either} but neither was provided.")
 
-        return values
+        return self
 
 
 class FitInstrumentConfigBody(BaseModel):

@@ -24,22 +24,19 @@ class MatchRecordsQueryParams(QueryParamsModel):
     )
 
     @model_validator(mode="after")
-    @classmethod
-    def validate_sample_filter(cls, values):
+    def validate_sample_filter(self):
         """Validate that sample_item_id or sample_batch_id is provided"""
-        sample_item_id, sample_batch_id = values.sample_item_id, values.sample_batch_id
-
-        if not sample_item_id and not sample_batch_id:
+        if not self.sample_item_id and not self.sample_batch_id:
             raise ValueError(
                 "Please specify either sample_item_id or sample_batch_id to retrieve match records."
             )
 
-        if sample_item_id and sample_batch_id:
+        if self.sample_item_id and self.sample_batch_id:
             raise ValueError(
                 "Please specify only one: either a sample item ID or a sample batch ID, not both."
             )
 
-        return values
+        return self
 
 
 class MatchIonRecordsBody(RequestBodyModel):
@@ -59,44 +56,32 @@ class MatchIonRecordsBody(RequestBodyModel):
     )
 
     @model_validator(mode="after")
-    @classmethod
-    def validate_sample_filter(cls, values):
+    def validate_sample_filter(self):
         """Validate that sample_item_id or sample_batch_id is provided"""
-        sample_item_ids, sample_batch_id = (
-            values.sample_item_ids,
-            values.sample_batch_id,
-        )
-
-        if not sample_item_ids and not sample_batch_id:
+        if not self.sample_item_ids and not self.sample_batch_id:
             raise ValueError(
                 "Please specify either sample_item_ids or sample_batch_id to retrieve match records."
             )
 
-        if sample_item_ids and sample_batch_id:
+        if self.sample_item_ids and self.sample_batch_id:
             raise ValueError(
                 "Please specify only one: either sample item IDs or a sample batch ID, not both."
             )
 
-        if sample_item_ids and len(sample_item_ids) == 0:
+        if self.sample_item_ids and len(self.sample_item_ids) == 0:
             raise ValueError("sample_item_ids list cannot be empty if provided.")
 
-        return values
+        return self
 
     @model_validator(mode="after")
-    @classmethod
-    def validate_target_filter(cls, values):
+    def validate_target_filter(self):
         """Validate that only one of target_collection_id and target_ion_ids is provided"""
-        target_collection_id, target_ion_ids = (
-            values.target_collection_id,
-            values.target_ion_ids,
-        )
-
-        if target_collection_id and target_ion_ids:
+        if self.target_collection_id and self.target_ion_ids:
             raise ValueError(
                 "Please specify only one: either a target collection ID or target ion IDs, not both."
             )
 
-        return values
+        return self
 
 
 class MatchIsotopeRecordsQueryParams(MatchRecordsQueryParams):
@@ -110,20 +95,14 @@ class MatchIsotopeRecordsQueryParams(MatchRecordsQueryParams):
     )
 
     @model_validator(mode="after")
-    @classmethod
-    def validate_target_filter(cls, values):
+    def validate_target_filter(self):
         """Validate that only one of target_collection_id and target_ion_id is provided"""
-        target_collection_id, target_ion_id = (
-            values.target_collection_id,
-            values.target_ion_id,
-        )
-
-        if target_collection_id and target_ion_id:
+        if self.target_collection_id and self.target_ion_id:
             raise ValueError(
                 "Please specify only one: either a target collection ID or a target ion ID, not both."
             )
 
-        return values
+        return self
 
 
 class MatchRecordsResponse(BaseModel):

@@ -57,25 +57,22 @@ class SampleBatchValidator(SampleBatchBaseValidator):
         return polarity
 
     @model_validator(mode="after")
-    @classmethod
-    def validate_polarity_by_batch_type(cls, values):
+    def validate_polarity_by_batch_type(self):
         """Validate polarity constraints based on sample batch type."""
-        sample_batch_type, polarity = values.sample_batch_type, values.polarity
-
-        if sample_batch_type == "ACQUISITION":
-            if polarity not in sample_batch_config.ACQUISITION_POLARITY:
+        if self.sample_batch_type == "ACQUISITION":
+            if self.polarity not in sample_batch_config.ACQUISITION_POLARITY:
                 raise ValueError(
                     f"Invalid acquisition batch polarity. Must be one of: {', '.join(sample_batch_config.ACQUISITION_POLARITY)}. "
-                    f"Got: '{polarity}'"
+                    f"Got: '{self.polarity}'"
                 )
-        elif sample_batch_type == "ANALYSIS":
-            if polarity != sample_batch_config.ANALYSIS_POLARITY:
+        elif self.sample_batch_type == "ANALYSIS":
+            if self.polarity != sample_batch_config.ANALYSIS_POLARITY:
                 raise ValueError(
                     f"Analysis batch should have polarity '{sample_batch_config.ANALYSIS_POLARITY}'. "
-                    f"Got: '{polarity}'"
+                    f"Got: '{self.polarity}'"
                 )
 
-        return values
+        return self
 
 
 class SampleBatchBase(SampleBatchValidator, BaseModel):
@@ -253,15 +250,13 @@ class SampleBatchImportSamplesBody(BaseModel):
     )
 
     @model_validator(mode="after")
-    @classmethod
-    def check_sample_items(cls, values):
-        sample_items = values.sample_items
-        batch_ids = {sample.sample_batch_id for sample in sample_items}
+    def check_sample_items(self):
+        batch_ids = {sample.sample_batch_id for sample in self.sample_items}
         if len(batch_ids) > 1:
             raise ValueError(
                 "All samples should be imported to the same batch, please check if the sample batch ID is the same for all importing samples."
             )
-        return values
+        return self
 
 
 class SampleBatchCopyBody(BaseModel):

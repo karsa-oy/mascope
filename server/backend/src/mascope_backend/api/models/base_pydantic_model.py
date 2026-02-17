@@ -72,8 +72,7 @@ class CommonValidators:
         return polarity
 
     @model_validator(mode="after")
-    @classmethod
-    def validate_time_range(cls, values):
+    def validate_time_range(self):
         """
         Validates that t_max is greater than t_min when both are provided.
         Safely handles models that don't have these fields.
@@ -83,8 +82,8 @@ class CommonValidators:
         :return: The validated model instance
         """
         # Safely get time values using getattr with None defaults
-        t_min = getattr(values, "t_min", None)
-        t_max = getattr(values, "t_max", None)
+        t_min = getattr(self, "t_min", None)
+        t_max = getattr(self, "t_max", None)
 
         # Only validate if both fields exist and both have values
         if t_min is not None and t_max is not None:
@@ -93,6 +92,6 @@ class CommonValidators:
                     "Maximum time limit must be greater than minimum time limit"
                 )
 
-        return values
+        return self
 
     # Future common validators can be added here

@@ -45,15 +45,12 @@ class TargetCollectionValidator(TargetCollectionBaseValidator):
     """Validators for all fields."""
 
     @model_validator(mode="after")
-    @classmethod
-    def validate_diagnostics_compound_limit(cls, values):
+    def validate_diagnostics_compound_limit(self):
         """Validate compound limits for DIAGNOSTICS collections."""
-        target_collection_type = values.target_collection_type
-
-        if target_collection_type == "DIAGNOSTICS":
+        if self.target_collection_type == "DIAGNOSTICS":
             # Count total compounds
-            compound_ids_count = len(values.target_compound_ids or [])
-            compounds_create_count = len(values.target_compounds_create or [])
+            compound_ids_count = len(self.target_compound_ids or [])
+            compounds_create_count = len(self.target_compounds_create or [])
             total_compounds = compound_ids_count + compounds_create_count
 
             max_compounds = target_collection_config.DIAGNOSTICS_MAX_COMPOUNDS
@@ -63,7 +60,7 @@ class TargetCollectionValidator(TargetCollectionBaseValidator):
                     f"Provided {total_compounds} compounds"
                 )
 
-        return values
+        return self
 
 
 class TargetCollectionBase(TargetCollectionBaseValidator, BaseModel):
@@ -98,15 +95,11 @@ class TargetCollectionCreate(TargetCollectionValidator, TargetCollectionBase):
     )
 
     @model_validator(mode="after")
-    @classmethod
-    def validate_at_least_one_compound_provided(cls, values):
+    def validate_at_least_one_compound_provided(self):
         """Validate at least one compound is provided."""
-        compounds_create = values.target_compounds_create
-        compound_ids = values.target_compound_ids
-
-        if not compounds_create and not compound_ids:
+        if not self.target_compounds_create and not self.target_compound_ids:
             raise ValueError("At least one compound must be provided.")
-        return values
+        return self
 
 
 class TargetCollectionUpdate(TargetCollectionValidator, TargetCollectionBase):

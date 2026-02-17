@@ -110,25 +110,23 @@ class GetSamplePeaksQueryParams(CommonValidators, QueryParamsModel):
     )
 
     @model_validator(mode="after")
-    @classmethod
-    def validate_peak_variables(cls, values):
+    def validate_peak_variables(self):
         """
         Validates that at least one peak type (areas or heights) must be requested.
         """
-        if not values.areas and not values.heights:
+        if not self.areas and not self.heights:
             raise ValueError(
                 "You need to request either peak areas, peak heights, or both. At least one of 'areas' or 'heights' must be set to True."
             )
-        return values
+        return self
 
     @model_validator(mode="after")
-    @classmethod
-    def validate_mz_range(cls, values):
+    def validate_mz_range(self):
         """
         Validates that both mz_min and mz_max must be provided together.
         """
-        mz_min = getattr(values, "mz_min", None)
-        mz_max = getattr(values, "mz_max", None)
+        mz_min = getattr(self, "mz_min", None)
+        mz_max = getattr(self, "mz_max", None)
 
         # Both must be provided together for m/z filtering
         if (mz_min is None) != (mz_max is None):  # XOR - exactly one is None
@@ -137,7 +135,7 @@ class GetSamplePeaksQueryParams(CommonValidators, QueryParamsModel):
         if mz_min is not None and mz_max is not None and mz_max <= mz_min:
             raise ValueError("mz_max must be greater than mz_min")
 
-        return values
+        return self
 
 
 class GetSamplePeakTimeseriesBody(CommonValidators, RequestBodyModel):
@@ -194,13 +192,12 @@ class GetSampleSpectrumQueryParams(CommonValidators, QueryParamsModel):
     )
 
     @model_validator(mode="after")
-    @classmethod
-    def validate_mz_range(cls, values):
+    def validate_mz_range(self):
         """
         Validates that both mz_min and mz_max must be provided together.
         """
-        mz_min = getattr(values, "mz_min", None)
-        mz_max = getattr(values, "mz_max", None)
+        mz_min = getattr(self, "mz_min", None)
+        mz_max = getattr(self, "mz_max", None)
 
         # Both must be provided together for m/z filtering
         if (mz_min is None) != (mz_max is None):  # XOR - exactly one is None
@@ -209,4 +206,4 @@ class GetSampleSpectrumQueryParams(CommonValidators, QueryParamsModel):
         if mz_min is not None and mz_max is not None and mz_max <= mz_min:
             raise ValueError("mz_max must be greater than mz_min")
 
-        return values
+        return self

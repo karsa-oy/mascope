@@ -58,17 +58,16 @@ class BaseMatchParams(BaseModel):
     )
 
     @model_validator(mode="after")
-    @classmethod
-    def validate_thresholds(cls, values):
+    def validate_thresholds(self):
         if (
-            values.possible_match_threshold is not None
-            and values.probable_match_threshold is not None
-            and values.possible_match_threshold > values.probable_match_threshold
+            self.possible_match_threshold is not None
+            and self.probable_match_threshold is not None
+            and self.possible_match_threshold > self.probable_match_threshold
         ):
             raise ValueError(
                 "Possible match threshold must be less than or equal to probable match threshold"
             )
-        return values
+        return self
 
 
 class TofMatchParams(BaseMatchParams):

@@ -175,13 +175,12 @@ class GetSampleFilePeaksQueryParams(QueryParamsModel):
     )
 
     @model_validator(mode="after")
-    @classmethod
-    def validate_peak_variables(cls, values):
-        if not values.areas and not values.heights:
+    def validate_peak_variables(self):
+        if not self.areas and not self.heights:
             raise ValueError(
                 "You need to request either peak areas, peak heights, or both. At least one of 'areas' or 'heights' must be set to True. "
             )
-        return values
+        return self
 
 
 class GetSampleFilePeakTimeseriesBody(BaseModel):
@@ -226,29 +225,27 @@ class GetSpectrumQueryParams(CommonValidators, QueryParamsModel):
     )
 
     @model_validator(mode="after")
-    @classmethod
-    def validate_time_fields_required_together(cls, values):
+    def validate_time_fields_required_together(self):
         """
         Additional validation: both t_min and t_max must be provided together.
         The basic t_max > t_min validation is inherited from CommonValidators.
         """
-        t_min = getattr(values, "t_min", None)
-        t_max = getattr(values, "t_max", None)
+        t_min = getattr(self, "t_min", None)
+        t_max = getattr(self, "t_max", None)
 
         # Specific model logic: both must be provided together
         if (t_min is None) != (t_max is None):  # XOR - exactly one is None
             raise ValueError("Both t_min and t_max must be provided together")
 
-        return values
+        return self
 
     @model_validator(mode="after")
-    @classmethod
-    def validate_mz_range(cls, values):
+    def validate_mz_range(self):
         """
         Validates m/z range with same logic as time range.
         """
-        mz_min = getattr(values, "mz_min", None)
-        mz_max = getattr(values, "mz_max", None)
+        mz_min = getattr(self, "mz_min", None)
+        mz_max = getattr(self, "mz_max", None)
 
         if (mz_min is None) != (mz_max is None):
             raise ValueError("Both mz_min and mz_max must be provided together")
@@ -256,7 +253,7 @@ class GetSpectrumQueryParams(CommonValidators, QueryParamsModel):
         if mz_min is not None and mz_max is not None and mz_max <= mz_min:
             raise ValueError("mz_max must be greater than mz_min")
 
-        return values
+        return self
 
 
 class DeleteSampleFilesBody(RequestBodyModel):

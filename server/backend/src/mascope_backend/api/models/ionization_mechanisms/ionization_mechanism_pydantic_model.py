@@ -68,11 +68,10 @@ class IonizationMechanismBaseValidator:
         return value
 
     @model_validator(mode="after")
-    @classmethod
-    def validate_ionization_mechanism_and_polarity(cls, values):
+    def validate_ionization_mechanism_and_polarity(self):
         """Validate ionization mechanism polarity matches ending charge."""
-        polarity = values.ionization_mechanism_polarity
-        ionization_mechanism = values.ionization_mechanism
+        polarity = self.ionization_mechanism_polarity
+        ionization_mechanism = self.ionization_mechanism
 
         # Match the polarity with the final ion charge
         if len(ionization_mechanism) == 1:
@@ -81,7 +80,7 @@ class IonizationMechanismBaseValidator:
                 raise ValueError(
                     f"Ionization mechanism {ionization_mechanism}: polarity {polarity} is inconsistent with the mechanism."
                 )
-            return values
+            return self
 
         if polarity == "+" and not (
             ionization_mechanism[0] == ionization_mechanism[-1]
@@ -96,7 +95,7 @@ class IonizationMechanismBaseValidator:
                 f"Ionization mechanism {ionization_mechanism}: polarity {polarity} is inconsistent with the mechanism."
             )
 
-        return values
+        return self
 
 
 class IonizationMechanismBase(IonizationMechanismBaseValidator, BaseModel):

@@ -15,18 +15,16 @@ class GetMzCalibrationQueryParams(QueryParamsModel):
     )
 
     @model_validator(mode="after")
-    @classmethod
-    def check_sample_item_id_or_instrument(cls, values):
-        sample_item_id, instrument = values.sample_item_id, values.instrument
-        if not sample_item_id and not instrument:
+    def check_sample_item_id_or_instrument(self):
+        if not self.sample_item_id and not self.instrument:
             raise ValueError(
                 "Please specify a sample item ID or an instrument name to search for m/z calibration."
             )
-        if sample_item_id and instrument:
+        if self.sample_item_id and self.instrument:
             raise ValueError(
                 "Please specify only one: either a sample item ID or an instrument name, not both."
             )
-        return values
+        return self
 
 
 class MzCalibrationParams(BaseModel):
