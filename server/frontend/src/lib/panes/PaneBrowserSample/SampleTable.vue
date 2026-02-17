@@ -43,19 +43,22 @@ const filters = ref({
   global: { value: null, matchMode: FilterMatchMode.CONTAINS }
 })
 
-const filteredSamples = computed(() => {
-  if (!filters.value.global?.value) {
-    return samples.value
-  }
+const filteredSamples = ref([])
 
-  const filterLower = filters.value.global.value.toLowerCase()
-  return samples.value.filter((sample) => {
-    return Object.values(sample).some((value) => {
-      if (value == null) return false
-      return String(value).toLowerCase().includes(filterLower)
-    })
-  })
-})
+const onFilter = (event) => {
+  filteredSamples.value = event.filteredValue ?? []
+}
+
+// reset filteredSamples when samples change and global filter is empty
+watch(
+  samples,
+  (newSamples) => {
+    if (!filters.value.global?.value) {
+      filteredSamples.value = newSamples
+    }
+  },
+  { immediate: true }
+)
 
 const batchStatus = computed(() => {
   if (!batch.value) return null
@@ -163,6 +166,7 @@ const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top)
       :sortField="customizer.config.sortField"
       :sortOrder="customizer.config.sortOrder"
       v-model:filters="filters"
+      @filter="onFilter"
       @sort="
         ({ sortField, sortOrder }) => {
           customizer.config.sortField = sortField
