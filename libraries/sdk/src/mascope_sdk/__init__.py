@@ -619,6 +619,7 @@ def get_sample_peaks(
     areas: bool = True,
     heights: bool = True,
     average: bool = True,
+    matches: bool = False,
     t_min: float | None = None,
     t_max: float | None = None,
     mz_min: float | None = None,
@@ -645,6 +646,10 @@ def get_sample_peaks(
     :param average: If True, return averaged peak data across time dimension. If False, return summed
                    peak data. Defaults to True.
     :type average: bool, optional
+    :param matches: If True, include matched compounds/ions/isotopes information for each peak in the response.
+                    Defaults to False to avoid potentially large response size. If True, the response will include
+                    an additional "matches" field for each peak containing lists of matched compounds/ions/isotopes.
+    :type matches: bool, optional
     :param t_min: Minimum time limit in seconds for filtering the peak data. If not provided, uses the
                   sample's acquisition start time. Must be within the sample's acquisition time range.
     :type t_min: float, optional
@@ -661,6 +666,7 @@ def get_sample_peaks(
         - "mz": list of m/z values of the peaks in the sample
         - "area": list of peak areas (if requested)
         - "height": list of peak heights (if requested)
+        - "match": list of matched compounds/ions/isotopes (if requested)
         Returns None if no peaks are found or if an error occurs.
     :rtype: dict or None
     """
@@ -669,6 +675,7 @@ def get_sample_peaks(
         "areas": str(areas).lower(),
         "heights": str(heights).lower(),
         "average": str(average).lower(),
+        "matches": str(matches).lower(),
         **{
             k: v
             for k, v in {
