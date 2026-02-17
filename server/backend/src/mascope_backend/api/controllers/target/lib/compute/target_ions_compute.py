@@ -3,7 +3,7 @@ Functions for target ions and target isotopes generation.
 """
 
 import re
-from itertools import combinations_with_replacement
+from itertools import combinations_with_replacement, product as cartesian_product
 from math import comb
 
 import numpy as np
@@ -396,7 +396,11 @@ def _combine_with_custom_elements(
     """Multiply base isotope pattern with custom element isotope distributions.
 
     For custom elements with multiple atoms (e.g., ^N2), enumerates all isotope
-    combinations following multinomial distribution.
+    combinations following multinomial distribution. For multiple custom elements
+    (e.g., ^H and ^N), computes the Cartesian product of their combinations.
+
+    Duplicate formulas (from different isotope paths yielding same composition)
+    are merged by summing probabilities.
 
     :param base_formula: Formula string for the base (non-custom) part
     :param base_masses: Base isotope masses
@@ -405,9 +409,18 @@ def _combine_with_custom_elements(
     :param custom_elements: Dict of custom element data
     :return: 3-tuple of combined (masses, probabilities, formulae)
     """
-    combined_masses = []
-    combined_probs = []
-    combined_formulae = []
+    # Generate isotope combinations for each custom element
+    custom_combinations = [
+        _generate_isotope_combinations(custom_data)
+        for custom_data in custom_elements.values()
+    ]
+
+    # Compute Cartesian product of all custom element combinations
+    all_custom_combos = list(cartesian_product(*custom_combinations))
+
+    # Use dict to merge duplicate formulas
+    # Key: normalized formula, Value: (mass, accumulated_prob)
+    formula_data: dict[str, tuple[float, float]] = {}
 
     for base_mass, base_prob, base_label in zip(base_masses, base_probs, base_labels):
         # Convert label to proper formula (e.g., "M0" -> "O3", "17O" -> "[17O]O2")
@@ -415,20 +428,72 @@ def _combine_with_custom_elements(
             replace_atom_with_isotope(base_formula, base_label) if base_formula else ""
         )
 
-        for custom_data in custom_elements.values():
-            # Generate all isotope combinations for this custom element
-            for combo_mass, combo_prob, combo_formula in _generate_isotope_combinations(
-                custom_data
-            ):
-                total_prob = base_prob * combo_prob
-                if total_prob < ISOTOPE_ABUNDANCE_THRESHOLD:
-                    continue
+        for custom_combo in all_custom_combos:
+            # Multiply all custom element contributions
+            total_mass = base_mass + sum(c[0] for c in custom_combo)
+            total_prob = base_prob
+            for c in custom_combo:
+                total_prob *= c[1]
 
-                combined_masses.append(base_mass + combo_mass)
-                combined_probs.append(total_prob)
-                combined_formulae.append(combo_formula + base_isotope_formula)
+            if total_prob < ISOTOPE_ABUNDANCE_THRESHOLD:
+                continue
+
+            # Concatenate custom element formulae
+            custom_formula = "".join(c[2] for c in custom_combo)
+
+            # Combine and normalize using Formula to merge elements (e.g. NN -> N2)
+            # Then reorder to put isotope labels at the front
+            raw_combined = custom_formula + base_isotope_formula
+            normalized = _reorder_isotopes_first(
+                Formula(raw_combined).formula if raw_combined else ""
+            )
+
+            # Merge duplicates by summing probabilities
+            if normalized in formula_data:
+                existing_mass, existing_prob = formula_data[normalized]
+                # Use probability-weighted average mass (masses should be nearly identical)
+                new_prob = existing_prob + total_prob
+                new_mass = (
+                    existing_mass * existing_prob + total_mass * total_prob
+                ) / new_prob
+                formula_data[normalized] = (new_mass, new_prob)
+            else:
+                formula_data[normalized] = (total_mass, total_prob)
+
+    # Convert back to lists
+    combined_formulae = list(formula_data.keys())
+    combined_masses = [formula_data[f][0] for f in combined_formulae]
+    combined_probs = [formula_data[f][1] for f in combined_formulae]
 
     return combined_masses, combined_probs, combined_formulae
+
+
+def _reorder_isotopes_first(formula: str) -> str:
+    """Reorder formula to put isotope labels (e.g., [15N], [18O]) at the beginning.
+
+    :param formula: Chemical formula string
+    :return: Formula with isotope labels moved to the front
+
+    Examples
+    --------
+    >>> _reorder_isotopes_first("HN[15N]O6")
+    '[15N]HNO6'
+    >>> _reorder_isotopes_first("[18O]C2H4[15N]")
+    '[18O][15N]C2H4'
+    >>> _reorder_isotopes_first("C6H12O6")
+    'C6H12O6'
+    >>> _reorder_isotopes_first("")
+    ''
+    """
+    if not formula or "[" not in formula:
+        return formula
+
+    # Extract all isotope labels like [15N], [18O], [2H], [15N]2, etc.
+    isotope_pattern = r"\[\d+[A-Za-z]+\]\d*"
+    isotopes = re.findall(isotope_pattern, formula)
+    remaining = re.sub(isotope_pattern, "", formula)
+
+    return "".join(isotopes) + remaining
 
 
 def _generate_isotope_combinations(
