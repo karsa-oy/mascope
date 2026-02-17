@@ -7,12 +7,8 @@ import { useApp } from '@/stores'
 export const useBatchTableConfig = defineStore('browser.sample.batchTable', () => {
   const app = useApp()
 
-  // Store filtered batch list as reported by PrimeVue DataTable
+  // Filtered batch list - synced from BatchTable component
   const filteredBatchList = ref([])
-
-  const setFilteredBatchList = (list) => {
-    filteredBatchList.value = list ?? []
-  }
 
   const config = ref({
     sortField: 'sample_batch_name',
@@ -72,21 +68,9 @@ export const useBatchTableConfig = defineStore('browser.sample.batchTable', () =
     { immediate: true }
   )
 
-  // Initialize filteredBatchList when batch list changes (for when no filter is active)
-  watch(
-    () => app.data.batch.list,
-    (newList) => {
-      if (!config.value.filters?.global?.value) {
-        filteredBatchList.value = newList ?? []
-      }
-    },
-    { immediate: true }
-  )
-
   return {
     config,
     filteredBatchList,
-    setFilteredBatchList,
     resetConfig
   }
 })

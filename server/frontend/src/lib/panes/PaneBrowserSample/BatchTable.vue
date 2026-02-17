@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 
 import { useWindowSize } from '@vueuse/core'
 
@@ -19,6 +19,28 @@ const app = useApp()
 const contextMenu = useBatchContextMenu()
 const batchTable = useBatchTableConfig()
 const batchStatusStore = useBatchStatus()
+const batchDataTable = ref(null)
+
+// Track filtered count for display
+const filteredCount = ref(0)
+
+// Handle filter event - update local count and store's filtered list
+const onFilter = (event) => {
+  const filteredList = event.filteredValue ?? []
+  filteredCount.value = filteredList.length
+  batchTable.filteredBatchList = filteredList
+}
+
+// Initialize when batch list changes (for when no filter is active)
+watch(
+  () => app.data.batch.list,
+  (newList) => {
+    const list = newList ?? []
+    filteredCount.value = list.length
+    batchTable.filteredBatchList = list
+  },
+  { immediate: true }
+)
 
 const { height } = useWindowSize()
 const padding = 100
@@ -29,7 +51,7 @@ const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top)
   <BaseTabbedPanel
     :label="
       batchTable.config.filters?.global?.value
-        ? `Batches (${batchTable.filteredBatchList?.length}/${app.data.batch.list?.length})`
+        ? `Batches (${filteredCount}/${app.data.batch.list?.length})`
         : `Batches (${app.data.batch.list?.length})`
     "
     icon="pi pi-tags"
@@ -76,6 +98,7 @@ const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top)
       </div>
     </template>
     <DataTable
+      ref="batchDataTable"
       :value="app.data.batch.list"
       dataKey="sample_batch_id"
       selectionMode="single"
@@ -94,7 +117,7 @@ const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top)
       :sortField="batchTable.config.sortField"
       :sortOrder="batchTable.config.sortOrder"
       v-model:filters="batchTable.config.filters"
-      @filter="(event) => batchTable.setFilteredBatchList(event.filteredValue)"
+      @filter="onFilter"
       @sort="
         ({ sortField, sortOrder }) => {
           batchTable.config.sortField = sortField

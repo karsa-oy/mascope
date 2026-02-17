@@ -43,19 +43,19 @@ const filters = ref({
   global: { value: null, matchMode: FilterMatchMode.CONTAINS }
 })
 
-const filteredSamples = ref([])
+// Track filtered count for display
+const filteredCount = ref(0)
 
+// Update filtered count when filter event fires
 const onFilter = (event) => {
-  filteredSamples.value = event.filteredValue ?? []
+  filteredCount.value = event.filteredValue?.length ?? 0
 }
 
-// reset filteredSamples when samples change and global filter is empty
+// Initialize/reset filtered count when samples change
 watch(
   samples,
   (newSamples) => {
-    if (!filters.value.global?.value) {
-      filteredSamples.value = newSamples
-    }
+    filteredCount.value = newSamples.length
   },
   { immediate: true }
 )
@@ -98,7 +98,9 @@ onBeforeUnmount(() => {
 const onKeyDown = (event) => {
   if ((event.ctrlKey || event.metaKey) && event.key === 'a') {
     event.preventDefault()
-    app.data.sample.selected = [...filteredSamples.value]
+    // Read processedData imperatively (not reactively) to get filtered rows
+    const filteredRows = sampleTable.value?.processedData ?? samples.value
+    app.data.sample.selected = [...filteredRows]
   }
 }
 
@@ -111,7 +113,7 @@ const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top)
   <BaseTabbedPanel
     :label="
       filters.global?.value
-        ? `Samples (${filteredSamples.length}/${samples.length})`
+        ? `Samples (${filteredCount}/${samples.length})`
         : `Samples (${samples.length})`
     "
     icon="pi pi-tags"
