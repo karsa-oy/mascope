@@ -57,6 +57,16 @@ def charge_string(raw_ion: Formula) -> str:
     :type raw_ion: Formula
     :return: Charge string, either + or -
     :rtype: str
+
+    Examples
+    --------
+    >>> from mascope_molmass import Formula
+    >>> charge_string(Formula("H+"))
+    '+'
+    >>> charge_string(Formula("Cl-"))
+    '-'
+    >>> charge_string(Formula("H2O"))
+    ''
     """
     charge_str = ""
     if raw_ion.charge == -1:
@@ -346,6 +356,17 @@ def _remove_custom_elements_from_formula(
 ) -> str:
     """Remove custom elements from formula string for IsoSpecPy calculation.
 
+    Examples
+    --------
+    >>> _remove_custom_elements_from_formula("HN^NO6", {"^N": {}})
+    'HNO6'
+    >>> _remove_custom_elements_from_formula("[18O]C2H4^N", {"^N": {}})
+    'C2H4[18O]'
+    >>> _remove_custom_elements_from_formula("C6H12O6", {})
+    'C6H12O6'
+    >>> _remove_custom_elements_from_formula("", {})
+    ''
+
     :param ion_formula: Original ion formula string
     :param custom_elements: Dict of custom element data
     :return: Formula string with custom elements removed, normalized
@@ -509,6 +530,50 @@ def _generate_isotope_combinations(
 
     :param custom_data: Dict with 'count', 'regular_symbol', 'lightest_mass_number', 'isotopes'
     :return: List of (mass, probability, formula) tuples
+
+    Examples
+    --------
+    Single atom with two isotopes (like ^N with 2% 14N / 98% 15N):
+
+    >>> data = {
+    ...     "count": 1,
+    ...     "regular_symbol": "N",
+    ...     "lightest_mass_number": 14,
+    ...     "isotopes": [
+    ...         {"mass": 14.003, "abundance": 0.02, "mass_number": 14},
+    ...         {"mass": 15.000, "abundance": 0.98, "mass_number": 15},
+    ...     ],
+    ... }
+    >>> result = _generate_isotope_combinations(data)
+    >>> len(result)
+    2
+    >>> result[0]  # Light isotope (14N)
+    (14.003, 0.02, 'N')
+    >>> result[1]  # Heavy isotope (15N)
+    (15.0, 0.98, '[15N]')
+
+    Two atoms - multinomial distribution (^N2):
+
+    >>> data2 = {
+    ...     "count": 2,
+    ...     "regular_symbol": "N",
+    ...     "lightest_mass_number": 14,
+    ...     "isotopes": [
+    ...         {"mass": 14.003, "abundance": 0.02, "mass_number": 14},
+    ...         {"mass": 15.000, "abundance": 0.98, "mass_number": 15},
+    ...     ],
+    ... }
+    >>> result2 = _generate_isotope_combinations(data2)
+    >>> len(result2)  # N2, [15N]N, [15N]2
+    3
+    >>> result2[0]  # N2: 0.02^2 = 0.0004
+    (28.006, 0.0004, 'N2')
+    >>> result2[1][1]  # [15N]N: 2 * 0.02 * 0.98 = 0.0392
+    0.0392
+    >>> result2[1][2]  # Formula shows heavy isotope first
+    '[15N]N'
+    >>> result2[2][0], round(result2[2][1], 4), result2[2][2]  # [15N]2: 0.98^2 = 0.9604
+    (30.0, 0.9604, '[15N]2')
     """
     count = custom_data["count"]
     symbol = custom_data["regular_symbol"]
@@ -550,7 +615,17 @@ def _generate_isotope_combinations(
 
 
 def _multinomial_coeff(n: int, counts: list[int]) -> int:
-    """Calculate multinomial coefficient n! / (k1! * k2! * ...)."""
+    """Calculate multinomial coefficient n! / (k1! * k2! * ...).
+
+    Examples
+    --------
+    >>> _multinomial_coeff(4, [2, 2])  # 4! / (2! * 2!) = 6
+    6
+    >>> _multinomial_coeff(3, [1, 1, 1])  # 3! / (1! * 1! * 1!) = 6
+    6
+    >>> _multinomial_coeff(5, [3, 2])  # 5! / (3! * 2!) = 10
+    10
+    """
     result = 1
     remaining = n
     for k in counts:

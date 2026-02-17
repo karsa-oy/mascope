@@ -15,6 +15,9 @@ Tests that verify individual components in isolation with external dependencies 
 - **Libraries unit tests**: Test that core library functions work correctly in isolation
   - Example: Testing signal processing algorithms independently with controlled inputs
   - Focus: Function behavior, edge cases, error handling
+- **Doctests**: Test isolated functions with inline examples
+  - Example: Test that regular expression used for ion formula parsing returns correct result
+  - Focus: Function behavior, edge cases, error handling
 
 ### **Integration tests**
 
@@ -274,6 +277,7 @@ mascope test run -n workspace_crud -v
 ```
 
 Run library tests:
+
 ```bash
 # Run all SDK library tests
 mascope test run libraries -m sdk
