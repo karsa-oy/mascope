@@ -408,6 +408,7 @@ async def get_sample_peaks(
                     TargetIon.target_ion_id,
                     TargetIon.target_ion_formula,
                     TargetIon.ionization_mechanism_id,
+                    TargetIon.filter_params,
                     TargetCompound.target_compound_formula,
                     TargetCollection.target_collection_id,
                     label("instrument", sample.instrument),
