@@ -34,7 +34,7 @@ const loading = computed(() => app.data.match.visualized.isotopes === null)
     <DataTable
       v-else
       :value="app.data.match.visualized.isotopes"
-      :dataKey="(isotope) => isotope.target_isotope_id"
+      dataKey="target_isotope_id"
       selectionMode="single"
       v-model:selection="app.data.match.visualized.isotopeSelected"
       size="small"

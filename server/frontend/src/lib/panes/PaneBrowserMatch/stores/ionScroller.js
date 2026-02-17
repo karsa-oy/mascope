@@ -81,7 +81,7 @@ export const useIonScroller = defineStore('browser.match.ion.scroller', () => {
           container.scrollTop = displayIndex * itemSize
 
           setTimeout(() => {
-            document.getElementById(`target-ion-${ionId}`)?.scrollIntoView({
+            document.getElementById(ionId)?.scrollIntoView({
               behavior: 'smooth',
               block: 'nearest'
             })
