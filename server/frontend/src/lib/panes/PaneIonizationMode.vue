@@ -278,7 +278,7 @@ defineExpose({
         'ionization_mode_polarity'
       ]"
       scrollable
-      scrollHeight="calc(85vh - 300px)"
+      scrollHeight="calc(85vh - 350px)"
       tableStyle="min-width: 800px"
     >
       <Column header="Name" style="min-width: 150px">
