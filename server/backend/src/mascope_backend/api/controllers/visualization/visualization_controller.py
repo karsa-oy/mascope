@@ -96,7 +96,7 @@ async def visualize_ion_focus(
             peak_min_intensity=peak_min_intensity,
             mz_tolerance=mz_tolerance,
             isotope_ratio_tolerance=isotope_ratio_tolerance,
-            mz_range=(
+            dmz=(
                 DMZ_ORBI if get_instrument_type(sample.filename) == "orbi" else DMZ_TOF
             ),
         )
@@ -154,7 +154,7 @@ class IsotopeContext:
     peak_min_intensity: float
     mz_tolerance: float
     isotope_ratio_tolerance: float
-    mz_range: float
+    dmz: float
     color_offset: int = COLOR_OFFSET
 
 
@@ -305,7 +305,7 @@ def _process_isotope(
     isotope_result = IsotopeResult(
         main_isotope_height=ctx.main_isotope_height, sum_timeseries=sum_timeseries
     )
-    mz_min, mz_max = iso.mz - ctx.mz_range, iso.mz + ctx.mz_range
+    mz_min, mz_max = iso.mz - ctx.dmz, iso.mz + ctx.dmz
     isotope_averaged_spec = ctx.averaged_signal.sel(mz=slice(mz_min, mz_max))
     isotope_peak_heights = ctx.mean_peak_heights.sel(mz=slice(mz_min, mz_max))
 

@@ -1,4 +1,5 @@
 # pylint: disable=line-too-long
+import asyncio
 from datetime import datetime
 
 import numpy as np
@@ -455,47 +456,45 @@ async def get_sample_peaks(
             match_rows = result.all()
 
         # Apply filtering parameters
-        match_df = apply_match_params(pd.DataFrame(match_rows))
+        match_df = apply_match_params(
+            pd.DataFrame([row._asdict() for row in match_rows])
+        )
 
-        # Build a mapping from sample_peak_id to match data
-        # Group by isotope id to avoid duplicates, collecting all collection IDs
         sample_peak_ids = sample_file_data.peak_id.values.tolist()
-        peak_id_to_match = {peak_id: {} for peak_id in sample_peak_ids}
 
-        for _, row in match_df.iterrows():
-            if row.match_category == 0:
-                continue  # Skip matches that were filtered out
-            if row.sample_peak_id in peak_id_to_match:
-                # Use isotope id as key to deduplicate
-                if row.target_isotope_id not in peak_id_to_match[row.sample_peak_id]:
-                    # Select fields to return in the response
-                    peak_id_to_match[row.sample_peak_id][row.target_isotope_id] = {
-                        "target_isotope_id": row.target_isotope_id,
-                        "target_isotope_formula": row.target_isotope_formula,
-                        "target_ion_id": row.target_ion_id,
-                        "target_ion_formula": row.target_ion_formula,
-                        "target_compound_formula": row.target_compound_formula,
-                        "target_collection_ids": [row.target_collection_id],
-                        "ionization_mechanism_id": row.ionization_mechanism_id,
-                    }
-                else:
-                    # Same isotope in another collection - add collection ID if not already present
-                    if (
-                        row.target_collection_id
-                        not in peak_id_to_match[row.sample_peak_id][
-                            row.target_isotope_id
-                        ]["target_collection_ids"]
-                    ):
-                        peak_id_to_match[row.sample_peak_id][row.target_isotope_id][
-                            "target_collection_ids"
-                        ].append(row.target_collection_id)
+        if match_df.empty:
+            # Early exit for no proper matches
+            response_data["match"] = [[] for _ in sample_peak_ids]
+        else:
+            # Filter out non-matches
+            match_df = match_df[match_df.match_category > 0]
+            agg = (
+                match_df.groupby(["sample_peak_id", "target_isotope_id"], sort=False)
+                .agg(
+                    target_isotope_formula=("target_isotope_formula", "first"),
+                    target_ion_id=("target_ion_id", "first"),
+                    target_ion_formula=("target_ion_formula", "first"),
+                    target_compound_formula=("target_compound_formula", "first"),
+                    ionization_mechanism_id=("ionization_mechanism_id", "first"),
+                    target_collection_ids=(
+                        "target_collection_id",
+                        lambda tci: list(pd.unique(tci.tolist())),
+                    ),
+                )
+                .reset_index()
+            )
 
-        # Create list of matches in the same order as sample_peak_ids
-        # Convert dict values to list for each peak
-        response_data["match"] = [
-            list(peak_id_to_match.get(peak_id, {}).values())
-            for peak_id in sample_peak_ids
-        ]
+            # Map peak_id to list of match dicts
+            grouped = agg.groupby("sample_peak_id", sort=False)
+            peak_id_to_match = {
+                pid: grp.drop(columns=["sample_peak_id"]).to_dict(orient="records")
+                for pid, grp in grouped
+            }
+
+            # Keep original peak order
+            response_data["match"] = [
+                peak_id_to_match.get(pid, []) for pid in sample_peak_ids
+            ]
     else:
         response_data["match"] = None
 
