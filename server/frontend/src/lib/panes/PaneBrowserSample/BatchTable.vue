@@ -29,7 +29,7 @@ const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top)
   <BaseTabbedPanel
     :label="
       batchTable.config.filters?.global?.value
-        ? `Batches (${batchTable.sortedFilteredBatchList?.length}/${app.data.batch.list?.length})`
+        ? `Batches (${batchTable.filteredBatchList?.length}/${app.data.batch.list?.length})`
         : `Batches (${app.data.batch.list?.length})`
     "
     icon="pi pi-tags"
@@ -94,6 +94,7 @@ const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top)
       :sortField="batchTable.config.sortField"
       :sortOrder="batchTable.config.sortOrder"
       v-model:filters="batchTable.config.filters"
+      @filter="(event) => batchTable.setFilteredBatchList(event.filteredValue)"
       @sort="
         ({ sortField, sortOrder }) => {
           batchTable.config.sortField = sortField

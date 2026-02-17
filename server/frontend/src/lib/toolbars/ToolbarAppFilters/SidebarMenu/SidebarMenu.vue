@@ -33,24 +33,24 @@ const batchTable = useBatchTableConfig()
 const batch = computed(() => app.data.batch.focused)
 
 const batchIndex = computed(() => {
-  if (!batch.value || batchTable.sortedFilteredBatchList.length === 0) return -1
-  return batchTable.sortedFilteredBatchList.findIndex(
+  if (!batch.value || batchTable.filteredBatchList.length === 0) return -1
+  return batchTable.filteredBatchList.findIndex(
     (b) => b.sample_batch_id === batch.value.sample_batch_id
   )
 })
 
 const previousBatch = () => {
-  if (batchTable.sortedFilteredBatchList.length === 0) return
+  if (batchTable.filteredBatchList.length === 0) return
   const currentIndex = batchIndex.value
   if (currentIndex <= 0) return
-  app.data.batch.focused = batchTable.sortedFilteredBatchList[currentIndex - 1]
+  app.data.batch.focused = batchTable.filteredBatchList[currentIndex - 1]
 }
 
 const nextBatch = () => {
-  if (batchTable.sortedFilteredBatchList.length === 0) return
+  if (batchTable.filteredBatchList.length === 0) return
   const currentIndex = batchIndex.value
-  if (currentIndex >= batchTable.sortedFilteredBatchList.length - 1) return
-  app.data.batch.focused = batchTable.sortedFilteredBatchList[currentIndex + 1]
+  if (currentIndex >= batchTable.filteredBatchList.length - 1) return
+  app.data.batch.focused = batchTable.filteredBatchList[currentIndex + 1]
 }
 
 watchEffect(() => {
@@ -114,7 +114,7 @@ watchEffect(() => {
         v-tooltip.bottom="
           batchIndex > 0
             ? 'Previous batch: ' +
-              (batchTable.sortedFilteredBatchList[batchIndex - 1]?.sample_batch_name ?? '')
+              (batchTable.filteredBatchList[batchIndex - 1]?.sample_batch_name ?? '')
             : undefined
         "
         text
@@ -145,15 +145,15 @@ watchEffect(() => {
       />
       <Button
         v-tooltip.bottom="
-          batchIndex < batchTable.sortedFilteredBatchList.length - 1
+          batchIndex < batchTable.filteredBatchList.length - 1
             ? 'Next batch: ' +
-              (batchTable.sortedFilteredBatchList[batchIndex + 1]?.sample_batch_name ?? '')
+              (batchTable.filteredBatchList[batchIndex + 1]?.sample_batch_name ?? '')
             : undefined
         "
         text
         icon="pi pi-arrow-right"
         @click="nextBatch"
-        :disabled="batchIndex >= batchTable.sortedFilteredBatchList.length - 1"
+        :disabled="batchIndex >= batchTable.filteredBatchList.length - 1"
       />
     </template>
   </menu>

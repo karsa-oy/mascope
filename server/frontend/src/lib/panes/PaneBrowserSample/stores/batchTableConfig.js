@@ -7,6 +7,13 @@ import { useApp } from '@/stores'
 export const useBatchTableConfig = defineStore('browser.sample.batchTable', () => {
   const app = useApp()
 
+  // Store filtered batch list as reported by PrimeVue DataTable
+  const filteredBatchList = ref([])
+
+  const setFilteredBatchList = (list) => {
+    filteredBatchList.value = list ?? []
+  }
+
   const config = ref({
     sortField: 'sample_batch_name',
     sortOrder: -1,
@@ -65,52 +72,21 @@ export const useBatchTableConfig = defineStore('browser.sample.batchTable', () =
     { immediate: true }
   )
 
-  // sorted batch list
-  const sortedBatchList = computed(() => {
-    if (!app.data.batch.list || app.data.batch.list.length === 0) return []
-
-    const list = [...app.data.batch.list]
-    const { sortField, sortOrder } = config.value
-
-    if (!sortField) return list
-
-    return list.sort((a, b) => {
-      const aVal = a[sortField]
-      const bVal = b[sortField]
-
-      if (aVal == null && bVal == null) return 0
-      if (aVal == null) return 1
-      if (bVal == null) return -1
-
-      if (typeof aVal === 'string' && typeof bVal === 'string') {
-        return sortOrder * aVal.localeCompare(bVal)
+  // Initialize filteredBatchList when batch list changes (for when no filter is active)
+  watch(
+    () => app.data.batch.list,
+    (newList) => {
+      if (!config.value.filters?.global?.value) {
+        filteredBatchList.value = newList ?? []
       }
-
-      return sortOrder * (aVal < bVal ? -1 : aVal > bVal ? 1 : 0)
-    })
-  })
-
-  // sorted and filtered batch list
-  const sortedFilteredBatchList = computed(() => {
-    let list = sortedBatchList.value
-
-    const globalFilter = config.value.filters?.global?.value
-    if (!globalFilter) return list
-
-    // Apply global filter - check if any field contains the filter value (case-insensitive)
-    const filterLower = globalFilter.toLowerCase()
-    return list.filter((batch) => {
-      return Object.values(batch).some((value) => {
-        if (value == null) return false
-        return String(value).toLowerCase().includes(filterLower)
-      })
-    })
-  })
+    },
+    { immediate: true }
+  )
 
   return {
     config,
-    sortedBatchList,
-    sortedFilteredBatchList,
+    filteredBatchList,
+    setFilteredBatchList,
     resetConfig
   }
 })
