@@ -64,28 +64,14 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
     })
     const sampleChanged = sampleId !== cache.sampleId
     const ionChanged = ionId !== cache.ionId
-    const collectionChanged = collectionId !== cache.collectionId
-    const isotopeChanged = isotopeId !== cache.isotopeId
-
-    // Return early if nothing has changed
-    if (!sampleChanged && !ionChanged && !collectionChanged) {
-      if (isotopeChanged) {
-        // Only isotope changed - update selection without reloading
-        const newSelectedIsotope = isotopes.value?.find(
-          (iso) => iso.target_isotope_id === isotopeId
-        )
-        isotopeSelected.value = newSelectedIsotope ?? null
-      }
-      return
-    }
 
     // resolve ion filter params
     const ionMatchParams = matchIon.list.find((ion) => ion.target_ion_id === ionId)?.filter_params[
       sample.focused.instrument
     ]
 
-    // Reset filter parameters if the sample has changed and no new filter_parames to set are provided
-    if (sampleChanged && !ionMatchParams) {
+    // Reset filter parameters if the sample or ion has changed and no new filter_parames to set are provided
+    if ((sampleChanged || ionChanged) && !ionMatchParams) {
       matchParams.set()
     }
 

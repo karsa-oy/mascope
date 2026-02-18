@@ -24,6 +24,8 @@ const scale = ref({
   log: false
 })
 
+const loading = computed(() => app.data.match.visualized.isotopes === null)
+
 // Compute UI-based match category for display
 const uiMatchCategory = computed(() => {
   const ion = app.data.match.visualized.ion
@@ -51,7 +53,7 @@ const heights = computed(() => [
       <div>
         <SidebarMatchParams v-model:open="sidebarOpen" />
       </div>
-      <h2>
+      <h2 v-if="!loading">
         <BaseMatchTag
           :matchScore="app.data.match.visualized.ion?.match?.match_score"
           :matchCategory="uiMatchCategory"
