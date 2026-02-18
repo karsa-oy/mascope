@@ -16,6 +16,12 @@ const app = useApp()
 // --- Computed ---
 const ionFormula = () => app.data.match.visualized.ion?.target_ion_formula
 const loading = computed(() => app.data.match.visualized.isotopes === null)
+
+// Compute UI-based match category for display
+const uiMatchCategory = (match) => {
+  if (!match) return
+  return app.data.match.params.uiCategory(match)
+}
 </script>
 
 <template>
@@ -51,7 +57,7 @@ const loading = computed(() => app.data.match.visualized.isotopes === null)
         <template #body="{ data }">
           <BaseMatchTag
             :match-score="data.match?.match_score"
-            :match-category="data.match?.match_category"
+            :match-category="uiMatchCategory(data.match)"
             :alarming="data.match?.alarming"
             :tooltip="
               data.match?.sample_peak_intensity
