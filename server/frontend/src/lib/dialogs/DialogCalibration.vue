@@ -20,12 +20,21 @@ const mzFit = useMzFit({ unmount: true })
 const confirm = useConfirm()
 
 const app = useApp()
+const layer = 'dialog_calibration' // Help-mode layer for dialog
 
 const visible = defineModel('visible')
 
 const props = defineProps({
   context: {
     type: Object
+  }
+})
+
+watch(visible, (value) => {
+  if (!value) {
+    app.ui.help.set(null)
+  } else {
+    app.ui.help.set(layer)
   }
 })
 
@@ -93,11 +102,15 @@ const unsynced = computed(() =>
 
 watch(previewSample, refit)
 
-watch(() => mzFit.mzCalibrationParams, () => {
-  if (unsynced.value && visible.value) {
-    refit()
-  }
-}, { deep: true })
+watch(
+  () => mzFit.mzCalibrationParams,
+  () => {
+    if (unsynced.value && visible.value) {
+      refit()
+    }
+  },
+  { deep: true }
+)
 
 async function refit() {
   const sample = batch.value ? previewSample.value : original.value
@@ -181,7 +194,11 @@ const formatter = new Intl.NumberFormat('en-US', {
 </script>
 
 <template>
-  <Dialog :header="title" v-model:visible="visible" :style="{ width: samples ? '1200px' : '800px' }">
+  <Dialog
+    :header="title"
+    v-model:visible="visible"
+    :style="{ width: samples ? '1200px' : '800px' }"
+  >
     <div class="dialog-content">
       <section class="settings-section">
         <h3>Calibration Settings</h3>
@@ -248,7 +265,14 @@ const formatter = new Intl.NumberFormat('en-US', {
             <div
               v-else
               class="center"
-              style="height: 100%; width: 100%; overflow: hidden; display: flex; align-items: center; justify-content: center"
+              style="
+                height: 100%;
+                width: 100%;
+                overflow: hidden;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+              "
             >
               <ProgressSpinner v-if="!(mzFit.status == 'error')" />
               <Message v-else severity="error" style="inline-size: 400px; overflow-wrap: anywhere">
