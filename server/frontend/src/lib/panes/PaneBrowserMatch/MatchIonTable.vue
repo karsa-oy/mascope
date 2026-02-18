@@ -153,6 +153,7 @@ function toggleRowExpansion(ionId) {
     expandedRows.value = { [ionId]: true }
     expandedIonId.value = ionId
     focusMatchIon(ionId)
+    app.ui.tab.active = 'match'
   }
 }
 
