@@ -16,7 +16,7 @@ export const useTab = defineStore('app.ui.tab', () => {
     (visualized) => {
       if (!visualized && active.value === 'match') {
         active.value = data.batch.focused ? 'batch' : DEFAULT_TAB
-      } else if (visualized) {
+      } else if (visualized && active.value !== 'sample') {
         active.value = 'match'
       }
     }
