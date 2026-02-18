@@ -478,7 +478,7 @@ async def get_sample_peaks(
                     ionization_mechanism_id=("ionization_mechanism_id", "first"),
                     target_collection_ids=(
                         "target_collection_id",
-                        lambda tci: list(pd.unique(tci.tolist())),
+                        lambda tci: pd.unique(tci).tolist(),
                     ),
                 )
                 .reset_index()
