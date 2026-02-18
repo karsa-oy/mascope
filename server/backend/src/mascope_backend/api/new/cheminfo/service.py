@@ -110,9 +110,6 @@ async def retrieve_cheminfo_by_mz(
         resp.raise_for_status()  # Raise exception for 4XX/5XX responses
         data = resp.json()
 
-    if len(data.get("result", [])) == 0:
-        raise ValueError(f"{data.get('log', 'No results')}")
-
     # Process and format the results
     results = []
     for raw in data.get("result", []):
@@ -239,7 +236,7 @@ async def match_cheminfo_by_mz(
     # Return early if no ChemInfo data
     if not cheminfo_data:
         return {
-            "message": "No ChemInfo data available to match",
+            "message": "No matching compositions found by ChemInfo for the specified m/z and parameters.",
             "results": 0,
             "total": 0,
             "data": [],

@@ -45,6 +45,22 @@ const displayedMatches = ref(0)
 const loading = ref(false)
 const lastRequestParams = ref(null)
 
+// Regex pattern for formula range validation: "C0-100 H0-100 Cl0-10"
+// Supports:
+//   - Standard elements: C0-100, Cl0-10
+//   - Isotope notation: [15N]0-1, [13C]0-5
+//   - Custom elements (caret prefix): ^N0-1
+const ELEMENT_PATTERN = '(?:[A-Z][a-z]?|\\^[A-Z][a-z]?|\\[\\d*[A-Z][a-z]?\\])'
+const RANGE_PATTERN = '\\d+-\\d+'
+const FORMULA_RANGE_PATTERN = new RegExp(
+  `^(${ELEMENT_PATTERN}${RANGE_PATTERN})(\\s+${ELEMENT_PATTERN}${RANGE_PATTERN})*$`
+)
+
+const isFormulaRangeValid = computed(() => {
+  if (!formulaRangeModel.value) return true // Empty is handled elsewhere
+  return FORMULA_RANGE_PATTERN.test(formulaRangeModel.value.trim())
+})
+
 onMounted(() => {
   // Load configuration from api on component creation
   api.http
@@ -67,7 +83,9 @@ onMounted(() => {
 })
 
 const updateFormulaRange = () => {
-  params.formulaRange = formulaRangeModel.value
+  if (isFormulaRangeValid.value) {
+    params.formulaRange = formulaRangeModel.value.trim()
+  }
 }
 
 // Set up notification handler for ChemInfo match results
@@ -147,7 +165,7 @@ watchDebounced(
   // The callback function that runs 800ms after dependencies stop changing
   async (deps) => {
     // Skip if config not loaded or no peak selected
-    if (!chemConfig.value || !deps.peakFocused) {
+    if (!chemConfig.value || !deps.peakFocused || !deps.mzPrecision || !deps.formulaRange) {
       results.value = []
       loading.value = false
       lastRequestParams.value = null
@@ -256,7 +274,7 @@ const expanded = ref({})
     <div class="col" style="gap: 1rem; align-items: stretch; max-width: 900px">
       <menu class="topbar">
         <FloatLabel style="flex: 0 0 80px">
-          <InputNumber v-model="params.mzPrecision" id="mzPrecision" :max="100" fluid />
+          <InputNumber v-model="params.mzPrecision" id="mzPrecision" :min="1" :max="100" fluid />
           <label for="mzPrecision">m/z precision</label>
         </FloatLabel>
         <FloatLabel style="flex-grow: 1">
@@ -264,8 +282,13 @@ const expanded = ref({})
             v-model="formulaRangeModel"
             id="formulaRange"
             fluid
+            :invalid="!isFormulaRangeValid"
             @blur="updateFormulaRange"
             @keydown.enter="updateFormulaRange"
+            v-tooltip.bottom="{
+              value: 'Format: Element + range, e.g. C0-100 H0-200 [15N]0-1 ^N0-1',
+              showDelay: 500
+            }"
           />
           <label for="formulaRange">formula range</label>
         </FloatLabel>
@@ -426,8 +449,8 @@ const expanded = ref({})
             No peak selected</strong
           >
           <i style="opacity: 0.6">
-            Select peaks by clicking rows in the peak browser to the left, or by clicking the
-            vertical grey peak detection lines in the spectrum chart.
+            Select peaks by clicking rows in the peak browser to the left, or by clicking in the
+            spectrum chart.
           </i>
         </div>
       </div>
@@ -441,15 +464,12 @@ const expanded = ref({})
             <span class="pi ph ph-info" />
             No results found
           </strong>
-          <i style="opacity: 0.6">
-            Consider checking that formula ranges account for ionization mechanisms selected.
-          </i>
+          <i style="opacity: 0.6"> Consider broadening the m/z precision or formula range. </i>
         </div>
       </div>
       <div v-if="loading" class="center" style="width: 100%; height: 220px">
         <div class="col">
           <ProgressSpinner />
-          <strong>Loading...</strong>
         </div>
       </div>
     </div>
