@@ -355,7 +355,10 @@ const expanded = ref({})
         </Column>
         <Column>
           <template #body="{ data }">
-            <PopoverTargetCompoundAdd :formula="data.target_compound_formula" />
+            <PopoverTargetCompoundAdd
+              :formula="data.target_compound_formula"
+              :formula-editable="false"
+            />
           </template>
         </Column>
         <template #expansion="{ data }">

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, watch } from 'vue'
 
 import Popover from 'primevue/popover'
 import FloatLabel from 'primevue/floatlabel'
@@ -7,7 +7,6 @@ import InputText from 'primevue/inputtext'
 import Button from 'primevue/button'
 import { useConfirm } from 'primevue/useconfirm'
 
-import { api } from '@/api'
 import { isValidChemicalFormula, findExistingCompound } from '@/lib/chem'
 import { useApp } from '@/stores'
 
@@ -22,14 +21,20 @@ const props = defineProps({
   formula: {
     required: false,
     type: String
+  },
+  formulaEditable: {
+    type: Boolean,
+    default: true
   }
 })
 
 const popover = ref()
 
+const existingCompoundName = ref(null)
+
 const input = reactive({
   target_compound_formula: props.formula ?? '',
-  target_compound_name: null,
+  target_compound_name: existingCompoundName.value ?? null,
   cas_number: null
 })
 
@@ -52,6 +57,24 @@ const alreadyInCollection = computed(
     targetCompounds.value.some(
       (comp) => comp.target_compound_id === existingCompound.value.target_compound_id
     )
+)
+
+// Auto-populate name field when existing compound is found
+// Prefer a compound with a name over one without
+watch(
+  () => existingCompound.value,
+  (compound) => {
+    if (!compound) return
+
+    const existing = app.data.target.compound.list.filter(
+      ({ target_compound_formula }) => target_compound_formula === compound.target_compound_formula
+    )
+    const compoundWithName = existing.find((comp) => comp.target_compound_name?.trim()) ?? compound
+    if (compoundWithName) {
+      input.target_compound_name = compoundWithName.target_compound_name
+    }
+  },
+  { immediate: true }
 )
 
 // UI status and button configuration
@@ -198,15 +221,24 @@ const addButtonDisabled = computed(
           :invalid="input.target_compound_formula.length > 0 && invalidFormula"
           required
           autofocus="true"
+          :disabled="!props.formulaEditable"
         />
         <label for="add-compound-formula"> Formula </label>
       </FloatLabel>
       <FloatLabel style="margin: 1rem 0">
-        <InputText id="add-compound-name" v-model="input.target_compound_name" />
+        <InputText
+          id="add-compound-name"
+          v-model="input.target_compound_name"
+          :disabled="Boolean(existingCompound)"
+        />
         <label for="add-compound-name"> Name </label>
       </FloatLabel>
       <FloatLabel style="margin: 1rem 0">
-        <InputText id="add-compound-cas" v-model="input.cas_number" />
+        <InputText
+          id="add-compound-cas"
+          v-model="input.cas_number"
+          :disabled="Boolean(existingCompound)"
+        />
         <label for="add-compound-cas"> CAS </label>
       </FloatLabel>
       <Button
