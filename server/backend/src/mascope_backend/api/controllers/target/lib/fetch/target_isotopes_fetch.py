@@ -78,6 +78,7 @@ async def fetch_sample_unmatched_target_isotopes(
                 IonizationMechanism.ionization_mechanism_polarity,
                 IonizationMechanism.ionization_mechanism,
             )
+            .distinct(TargetIsotope.target_isotope_id)
             .select_from(TargetIsotope)
             .join(TargetIon, TargetIon.target_ion_id == TargetIsotope.target_ion_id)
             .join(
