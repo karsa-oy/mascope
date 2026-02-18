@@ -418,7 +418,7 @@ watch(
         <template #body="{ data }">
           <BaseCopyableField
             :field="data.target_compound_formula"
-            :tooltip="{ value: data.target_compound_name, position: 'right' }"
+            :tooltip="data.target_compound_name"
           />
         </template>
         <template #filter="{ filterModel, filterCallback }">
