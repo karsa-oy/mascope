@@ -30,6 +30,7 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
   const cache = reactive({
     sampleId: null,
     ionId: null,
+    isotopeId: null,
     collectionId: null
   })
 
@@ -64,9 +65,17 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
     const sampleChanged = sampleId !== cache.sampleId
     const ionChanged = ionId !== cache.ionId
     const collectionChanged = collectionId !== cache.collectionId
+    const isotopeChanged = isotopeId !== cache.isotopeId
 
     // Return early if nothing has changed
     if (!sampleChanged && !ionChanged && !collectionChanged) {
+      if (isotopeChanged) {
+        // Only isotope changed - update selection without reloading
+        const newSelectedIsotope = isotopes.value?.find(
+          (iso) => iso.target_isotope_id === isotopeId
+        )
+        isotopeSelected.value = newSelectedIsotope ?? null
+      }
       return
     }
 
@@ -81,7 +90,7 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
     }
 
     // Update cache before "load" to prevent duplicate calls
-    Object.assign(cache, { sampleId, ionId, collectionId })
+    Object.assign(cache, { sampleId, ionId, isotopeId, collectionId })
 
     // Load matches and activate visualization
     await load({ sampleId, ionId, collectionId, isotopeId, init: true })
@@ -100,7 +109,7 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
     ion.value = null
     isotopes.value = null
     isotopeSelected.value = null
-    Object.assign(cache, { sampleId: null, ionId: null, collectionId: null })
+    Object.assign(cache, { sampleId: null, ionId: null, isotopeId: null, collectionId: null })
   }
 
   async function load({ sampleId, ionId, collectionId, isotopeId, init } = { init: true }) {
@@ -192,10 +201,11 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
 
       const sampleId = focusedSample.sample_item_id
       const ionId = cache.ionId
+      const isotopeId = cache.isotopeId
       const collectionId = cache.collectionId
 
       // Update visualization with new sample but same ion/collection
-      await set({ sampleId, ionId, collectionId })
+      await set({ sampleId, ionId, isotopeId, collectionId })
     }
   )
 

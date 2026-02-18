@@ -149,6 +149,7 @@ onBeforeUnmount(() => {
                         ) || match.target_collection_ids[0], // Otherwise just take the first one,
                       isotopeId: data.match[index].target_isotope_id
                     })
+                    app.ui.tab.active = 'match'
                   }
                 }
               "
