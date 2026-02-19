@@ -52,7 +52,6 @@ defineExpose({
 })
 </script>
 
-<!-- TODO: Enable ionization mechanism deletion after resolving issue https://github.com/karsa-oy/mascope/issues/1345 -->
 <template>
   <menu class="row" style="margin-top: 1.5rem">
     <FloatLabel style="flex-grow: 1">
@@ -94,7 +93,6 @@ defineExpose({
             icon="pi pi-trash"
             text
             size="small"
-            disabled
             @click="
               () => {
                 confirm.require({

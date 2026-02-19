@@ -639,6 +639,7 @@ class TargetIsotope(Base):
             "target_ion.target_ion_id",
             ondelete="CASCADE",
         ),
+        index=True,
     )
     target_isotope_formula: Mapped[str] = mapped_column(String(256))
     mz: Mapped[float] = mapped_column(Float)
@@ -763,6 +764,7 @@ class MatchIon(Base):
     target_ion_id: Mapped[str] = mapped_column(
         String(16),
         ForeignKey("target_ion.target_ion_id", ondelete="CASCADE"),
+        index=True,
     )
     match_score: Mapped[float] = mapped_column(
         Float, CheckConstraint("match_score BETWEEN 0 AND 1")
@@ -817,6 +819,7 @@ class MatchIsotope(Base):
     target_isotope_id: Mapped[str] = mapped_column(
         String(16),
         ForeignKey("target_isotope.target_isotope_id", ondelete="CASCADE"),
+        index=True,
     )
     sample_item_id: Mapped[str] = mapped_column(
         String(16),

@@ -318,16 +318,8 @@ def create_indexes(conn, table_name, schema_info):
         index_name = index_sql.split(" ")[0]
         # Check if the index already exists
         if index_name not in existing_indexes:
-            # If the index is prefixed with 'ix_', it is a unique index
-            if index_name.startswith("ix_"):
-                cursor.execute(f"CREATE UNIQUE INDEX IF NOT EXISTS {index_sql}")
-                runtime.logger.info(
-                    f"🆕 Created unique index {index_name} on {table_name}"
-                )
-            # Otherwise, create a regular index
-            else:
-                cursor.execute(f"CREATE INDEX IF NOT EXISTS {index_sql}")
-                runtime.logger.info(f"🆕 Created index {index_name} on {table_name}")
+            cursor.execute(f"CREATE INDEX IF NOT EXISTS {index_sql}")
+            runtime.logger.info(f"🆕 Created index {index_name} on {table_name}")
             indexes_created += 1
 
     return indexes_created
