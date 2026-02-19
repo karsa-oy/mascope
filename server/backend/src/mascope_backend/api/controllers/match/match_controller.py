@@ -34,6 +34,7 @@ from mascope_backend.api.controllers.samples.samples_controller import (
 )
 from mascope_backend.api.controllers.target.lib.fetch.target_isotopes_fetch import (
     fetch_sample_unmatched_target_isotopes,
+    fetch_existing_main_isotope_references,
 )
 from mascope_backend.api.lib.api_features import (
     api_controller,
@@ -339,10 +340,10 @@ async def match_compute_sample(
     :return: A dictionary with status message.
     :rtype: dict
     """
-    # Step 1: Gather sample information
+    # -- Gather sample information
     sample = await fetch_sample(sample_item_id)
 
-    # Step 2: Check if m/z calibration is verified for the sample
+    # -- Check if m/z calibration is verified for the sample
     # TODO_calibration split on orbi/tof?
     verified = (
         sample.mz_calibration.get("verified", False)
@@ -357,13 +358,21 @@ async def match_compute_sample(
         f"...Computing match isotopes for sample {sample.sample_item_name}: {sample_item_id} ..."
     )
 
-    # Step 3: Fetch target isotopes needing computation, applies all filters centrally on db lvl
+    # -- Fetch target isotopes needing computation, applies all filters centrally on db lvl
     match_params = await default_match_params(sample_item_id)
     target_isotopes_df = await fetch_sample_unmatched_target_isotopes(
         sample, match_params
     )
 
-    # Step 4: Compute match_isotopes for the sample
+    # -- Fetch existing main isotope references for abundance error calculation
+    existing_reference_df = None
+    if target_isotopes_df is not None and not target_isotopes_df.empty:
+        unmatched_ion_ids = target_isotopes_df["target_ion_id"].unique().tolist()
+        existing_reference_df = await fetch_existing_main_isotope_references(
+            sample.sample_item_id, unmatched_ion_ids
+        )
+
+    # -- Compute match_isotopes for the sample
     computed_match_isotopes_count = 0
     if target_isotopes_df is not None and not target_isotopes_df.empty:
         progress_notification = UserNotification(
@@ -379,11 +388,11 @@ async def match_compute_sample(
             },
         )
         match_data = await compute_and_create_sample_match_isotope_data(
-            sample, target_isotopes_df, progress_notification
+            sample, target_isotopes_df, existing_reference_df, progress_notification
         )
         computed_match_isotopes_count = len(match_data["match_isotopes"])
 
-    # Step 5: Aggregate higher-level matches and update timestamps
+    # -- Aggregate higher-level matches and update timestamps
     match_aggregate_result = await aggregate_and_create_matches(
         sample_item_id=sample_item_id
     )
@@ -395,7 +404,7 @@ async def match_compute_sample(
         )
         await update_sample_modified_timestamps(sample_item_ids=[sample_item_id])
 
-    # Determine status based on outcomes
+    # -- Determine status based on outcomes
     message = f"Finished computing matches ({match_aggregate_status}) for sample '{sample.sample_item_name}'."
     if computed_match_isotopes_count > 0:
         compute_status = "success"
@@ -414,7 +423,7 @@ async def match_compute_sample(
     message += f" (status: {compute_status})"
     runtime.logger.debug(message)
 
-    # Step 6: Return sample with computed match data and status message
+    # -- Return sample with computed match data and status message
     return {
         "status": compute_status,
         "message": message,
@@ -1114,9 +1123,20 @@ async def match_compute_batch(
                     f"No new target isotopes to compute match isotopes for the sample '{sample.sample_item_name}'."
                 )
             else:
+                # Fetch existing main isotope references for abundance error calculation
+                unmatched_ion_ids = (
+                    target_isotopes_df["target_ion_id"].unique().tolist()
+                )
+                existing_reference_df = await fetch_existing_main_isotope_references(
+                    sample.sample_item_id, unmatched_ion_ids
+                )
+
                 # Step 3: Compute match_isotopes if the sample has passed all checks.
                 match_data = await compute_and_create_sample_match_isotope_data(
-                    sample, target_isotopes_df, progress_notification
+                    sample,
+                    target_isotopes_df,
+                    existing_reference_df,
+                    progress_notification,
                 )
                 # Track samples with matches
                 if not match_data["match_isotopes"].empty:

@@ -19,6 +19,7 @@ async def compute_match_isotopes(
     target_isotopes_df: pd.DataFrame,
     match_params: BaseMatchParams | None = None,
     polarity: Literal["+", "-"] | None = None,
+    existing_reference_df: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """
     Compute matches between target isotopes and sample file peaks.
@@ -43,6 +44,10 @@ async def compute_match_isotopes(
     :type match_params: BaseMatchParams | None
     :param polarity: Polarity of the sample, either "+" or "-".
     :type polarity: Literal["+", "-"], optional
+    :param existing_reference_df: DataFrame containing existing main isotope reference data
+        (target_ion_id, sample_peak_intensity, relative_abundance) for proper abundance error
+        calculation when computing additional isotopes for ions that already have matches.
+    :type existing_reference_df: pd.DataFrame | None, optional
     :return: DataFrame with match details for all target isotopes, including those without matches
     :rtype: pd.DataFrame
     :raises ValueError: If an error occurs during the matching process.
@@ -116,7 +121,9 @@ async def compute_match_isotopes(
         # Calculate match stats for isotopes with actual matches
         if matched_mask.any():
             runtime.logger.debug("Calculate match statistics for matched isotopes")
-            match_isotope_df = calculate_match_stats(match_isotope_df)
+            match_isotope_df = calculate_match_stats(
+                match_isotope_df, existing_reference_df
+            )
 
         # Set default values for unmatched isotopes
         unmatched_mask = ~matched_mask
@@ -331,11 +338,18 @@ def _match_assign(match_isotope_df: pd.DataFrame, parsed_peaks: dict) -> pd.Data
     return match_isotope_df
 
 
-def calculate_match_stats(match_isotope_df: pd.DataFrame) -> pd.DataFrame:
+def calculate_match_stats(
+    match_isotope_df: pd.DataFrame,
+    existing_reference_df: pd.DataFrame | None = None,
+) -> pd.DataFrame:
     """Calculate match statistics for isotopes.
 
     :param match_isotope_df: DataFrame containing matched isotopes with their properties.
     :type match_isotope_df: pd.DataFrame
+    :param existing_reference_df: Optional DataFrame containing existing main isotope reference
+        data (target_ion_id, sample_peak_intensity, relative_abundance) from previously computed
+        matches. When provided, these references take priority for abundance error calculation.
+    :type existing_reference_df: pd.DataFrame | None, optional
     :return: DataFrame with match statistics for each isotope, including relative peak intensities,
               abundance matching errors, isotope similarities, m/z errors, and match scores.
     :rtype: pd.DataFrame
@@ -351,6 +365,28 @@ def calculate_match_stats(match_isotope_df: pd.DataFrame) -> pd.DataFrame:
         idx_max_abundance,
         ["target_ion_id", "sample_peak_intensity", "relative_abundance"],
     ].reset_index(drop=True)
+
+    ## If existing reference data is provided, use it to override main isotope references
+    ## for ions that have prior computed matches (e.g., when adding additional isotopes)
+    if existing_reference_df is not None and not existing_reference_df.empty:
+        # Get ion IDs that have existing references
+        existing_ion_ids = set(existing_reference_df["target_ion_id"].unique())
+
+        # For ions with existing references, replace with the existing data
+        # Keep only new ions in main_isotope_df
+        main_isotope_df = main_isotope_df[
+            ~main_isotope_df["target_ion_id"].isin(existing_ion_ids)
+        ]
+
+        # Combine: existing references + new main isotopes
+        main_isotope_df = pd.concat(
+            [existing_reference_df, main_isotope_df], ignore_index=True
+        )
+        runtime.logger.debug(
+            f"Using {len(existing_ion_ids)} existing main isotope references "
+            f"for abundance error calculation"
+        )
+
     ## Join the main isotopes with the full match_isotope_df to get the reference values
     abundance_reference_df = pd.merge(
         match_isotope_df,

@@ -7,6 +7,7 @@ by comparing current target associations against existing matches.
 
 import pandas as pd
 from sqlalchemy import select
+from sqlalchemy.sql import func
 
 from mascope_backend.api.new.ionization.modes.util import (
     fetch_sample_ionization_mechanism_ids,
@@ -26,6 +27,80 @@ from mascope_backend.db import (
 from mascope_backend.runtime import runtime
 from mascope_file.name import get_instrument_type
 from mascope_match.params import BaseMatchParams
+
+
+async def fetch_existing_main_isotope_references(
+    sample_item_id: str,
+    target_ion_ids: list[str],
+) -> pd.DataFrame:
+    """
+    Fetches existing main isotope reference data for abundance error calculation.
+
+    For each target_ion_id that has existing matches, retrieves the main isotope's
+    (highest relative_abundance) sample_peak_intensity and relative_abundance values.
+
+    :param sample_item_id: Sample item ID to query matches for
+    :type sample_item_id: str
+    :param target_ion_ids: List of target ion IDs to find references for
+    :type target_ion_ids: list[str]
+    :return: DataFrame with columns (target_ion_id, sample_peak_intensity, relative_abundance)
+    :rtype: pd.DataFrame
+    """
+    if not target_ion_ids:
+        return pd.DataFrame()
+
+    async with async_session() as session:
+        # Subquery to find max relative_abundance per target_ion_id from existing matches
+        max_abundance_subquery = (
+            select(
+                TargetIsotope.target_ion_id,
+                func.max(TargetIsotope.relative_abundance).label("max_abundance"),
+            )
+            .join(
+                MatchIsotope,
+                MatchIsotope.target_isotope_id == TargetIsotope.target_isotope_id,
+            )
+            .where(
+                MatchIsotope.sample_item_id == sample_item_id,
+                TargetIsotope.target_ion_id.in_(target_ion_ids),
+            )
+            .group_by(TargetIsotope.target_ion_id)
+            .subquery()
+        )
+
+        # Get the main isotope data (highest relative_abundance) per ion
+        stmt = (
+            select(
+                TargetIsotope.target_ion_id,
+                MatchIsotope.sample_peak_intensity,
+                TargetIsotope.relative_abundance,
+            )
+            .join(
+                MatchIsotope,
+                MatchIsotope.target_isotope_id == TargetIsotope.target_isotope_id,
+            )
+            .join(
+                max_abundance_subquery,
+                (TargetIsotope.target_ion_id == max_abundance_subquery.c.target_ion_id)
+                & (
+                    TargetIsotope.relative_abundance
+                    == max_abundance_subquery.c.max_abundance
+                ),
+            )
+            .where(MatchIsotope.sample_item_id == sample_item_id)
+        )
+
+        rows = (await session.execute(stmt)).all()
+
+    if not rows:
+        return pd.DataFrame()
+
+    df = pd.DataFrame([row._asdict() for row in rows])
+    runtime.logger.debug(
+        f"Found {len(df)} existing main isotope references "
+        f"for {len(target_ion_ids)} target ions"
+    )
+    return df
 
 
 async def fetch_sample_unmatched_target_isotopes(

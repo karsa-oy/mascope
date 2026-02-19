@@ -24,6 +24,7 @@ from mascope_match import (
 async def compute_and_create_sample_match_isotope_data(
     sample: Sample,
     target_isotopes_df: pd.DataFrame,
+    existing_reference_df: pd.DataFrame | None = None,
     notification: UserNotification | None = None,
 ) -> dict[str, pd.DataFrame]:
     """
@@ -35,6 +36,10 @@ async def compute_and_create_sample_match_isotope_data(
     :type sample: Sample
     :param target_isotopes_df: A DataFrame containing target isotope information for match computation.
     :type target_isotopes_df: DataFrame
+    :param existing_reference_df: Optional DataFrame containing existing main isotope reference data
+        (target_ion_id, sample_peak_intensity, relative_abundance) for proper abundance error
+        calculation when computing additional isotopes for ions that already have matches.
+    :type existing_reference_df: pd.DataFrame | None
     :param notification: Optional notification for sending progress user notifications of match computation.
     :type notification: UserNotification | None
     :return: Dictionary containing match_isotopes DataFrames
@@ -51,6 +56,7 @@ async def compute_and_create_sample_match_isotope_data(
         filename=sample.filename,
         target_isotopes_df=target_isotopes_df,
         polarity=sample.polarity,
+        existing_reference_df=existing_reference_df,
     )
     if match_isotope_df.empty:
         runtime.logger.warning(
