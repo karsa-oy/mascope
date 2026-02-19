@@ -312,8 +312,7 @@ async def create_match_ions(
     """
     Creates match ions for a given sample item based on the provided list of
     aggregated match ion data.
-    Skips creation of existing records, which prevents duplication and
-    allows safe re-calling after orphaned match removal operations.
+    Updates existing records if data differs, skips if identical, creates if new.
 
     :param match_ions: List of match ion data for creating matches
     :type match_ions: list[MatchIonBase]
@@ -330,68 +329,95 @@ async def create_match_ions(
     for match_ion in match_ions:
         grouped_match_ions[match_ion.sample_item_id].append(match_ion)
 
-    new_match_ions = []
-    existing_count = 0
+    processed_ions = []
+    updated_count = 0
+    unchanged_count = 0
 
     async with async_session() as session:
         for sample_item_id, m_ions in grouped_match_ions.items():
-            # Step 2: Check for existing match ions to avoid duplication.
+            # Step 2: Get existing match ions for this sample
             target_ion_ids = [mi.target_ion_id for mi in m_ions]
-            existing_ion_ids = set(
-                (
+            existing_ions = {
+                row.target_ion_id: row
+                for row in (
                     await session.execute(
-                        select(MatchIon.target_ion_id).where(
+                        select(MatchIon).where(
                             MatchIon.sample_item_id == sample_item_id,
                             MatchIon.target_ion_id.in_(target_ion_ids),
                         )
                     )
                 ).scalars()
-            )
+            }
 
-            if existing_ion_ids:
-                existing_count += len(existing_ion_ids)
-                runtime.logger.trace(
-                    f"Match ions already exist for sample '{sample_item_id}' "
-                    f"and {len(existing_ion_ids)} target ions - skipping"
-                )
+            for new_ion in m_ions:
+                existing = existing_ions.get(new_ion.target_ion_id)
 
-            # Step 3: Create new match ions for non-existing combinations
-            new_ions = [mi for mi in m_ions if mi.target_ion_id not in existing_ion_ids]
-            for match_ion in new_ions:
-                new_match_ion = MatchIon(
-                    match_ion_id=gen_id(32),
-                    **match_ion.model_dump(),
-                    match_ion_utc_created=datetime.now(timezone.utc),
-                )
-                session.add(new_match_ion)
-                new_match_ions.append(new_match_ion)
+                if existing:
+                    # Step 3: Compare and update if different
+                    needs_update = (
+                        existing.match_score != new_ion.match_score
+                        or existing.match_category != new_ion.match_category
+                        or existing.sample_peak_intensity_sum
+                        != new_ion.sample_peak_intensity_sum
+                    )
 
-        # Step 4: Commit the transaction and refresh the newly created match ions.
-        if new_match_ions:
+                    if needs_update:
+                        existing.match_score = new_ion.match_score
+                        existing.match_category = new_ion.match_category
+                        existing.sample_peak_intensity_sum = (
+                            new_ion.sample_peak_intensity_sum
+                        )
+                        existing.match_ion_utc_modified = datetime.now(timezone.utc)
+                        updated_count += 1
+                        processed_ions.append(existing)
+                        runtime.logger.trace(
+                            f"Updated match ion for sample '{sample_item_id}' "
+                            f"and ion '{new_ion.target_ion_id}'"
+                        )
+                    else:
+                        unchanged_count += 1
+                        runtime.logger.trace(
+                            f"Match ion unchanged for sample '{sample_item_id}' "
+                            f"and ion '{new_ion.target_ion_id}'"
+                        )
+                else:
+                    # Step 4: Create new match ion
+                    new_match_ion = MatchIon(
+                        match_ion_id=gen_id(32),
+                        **new_ion.model_dump(),
+                        match_ion_utc_created=datetime.now(timezone.utc),
+                    )
+                    session.add(new_match_ion)
+                    processed_ions.append(new_match_ion)
+
+        # Step 5: Commit transaction and refresh
+        if processed_ions:
             await session.commit()
-            for ion in new_match_ions:
+            for ion in processed_ions:
                 await session.refresh(ion)
 
-    # Step 5: Generate result message
+    # Step 6: Generate result message
     total_requested = len(match_ions)
-    new_count = len(new_match_ions)
+    created_count = len(processed_ions) - updated_count
 
-    if new_count > 0 and existing_count > 0:
+    if created_count > 0 and (updated_count > 0 or unchanged_count > 0):
         status = "partial"
-        message = f"Created {new_count}/{total_requested} new match ions, {existing_count} already existed"
-    elif new_count > 0:
+        message = f"Processed {total_requested} match ions: {created_count} created, {updated_count} updated, {unchanged_count} unchanged"
+    elif created_count > 0 or updated_count > 0:
         status = "success"
-        message = f"Created {new_count}/{total_requested} match ion{'s' if new_count != 1 else ''}"
+        action = "created" if created_count > 0 else "updated"
+        count = created_count if created_count > 0 else updated_count
+        message = f"{action.title()} {count}/{total_requested} match ion{'s' if count != 1 else ''}"
     else:
         status = "skipped"
-        message = f"All {existing_count} match ions already existed"
+        message = f"All {unchanged_count} match ions unchanged"
 
     runtime.logger.info(message)
 
     return {
         "status": status,
         "message": message,
-        "data": [match_ion.to_dict() for match_ion in new_match_ions],
+        "data": [ion.to_dict() for ion in processed_ions],
     }
 
 
