@@ -70,7 +70,6 @@ onBeforeUnmount(() => {
   <Panel
     class="browser"
     style="border: none; min-width: 280px; max-width: 400px; width: 100%"
-    v-if="app.data.peak.list.length > 0"
     :pt="
       app.ui.help.top(`
         <h1>Peak Browser</h1>

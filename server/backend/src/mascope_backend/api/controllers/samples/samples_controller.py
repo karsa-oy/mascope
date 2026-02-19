@@ -354,6 +354,19 @@ async def get_sample_peaks(
     else:
         average_factor = 1
 
+    if sample_file_data.mz.size == 0:
+        return {
+            "message": f"No peaks found in sample '{sample.sample_item_name}' with polarity '{sample.polarity}'.",
+            "results": 0,
+            "data": {
+                "peak_id": [],
+                "mz": [],
+                "area": [] if areas else None,
+                "height": [] if heights else None,
+                "match": [] if matches else None,
+            },
+        }
+
     # --- Extract and format the data ---
     response_data = {
         "peak_id": sample_file_data.peak_id.values,
@@ -367,24 +380,6 @@ async def get_sample_peaks(
         )
 
     response_data = {key: value.tolist() for key, value in response_data.items()}
-
-    # --- Format the response for the case where no peaks were detected ---
-    if not response_data.get("mz", []):
-        message = (
-            f"No peaks found in sample '{sample.sample_item_name}' with polarity '{sample.polarity}'. "
-            f"The file was processed, but no peaks were detected in the target m/z range."
-        )
-        return {
-            "message": message,
-            "results": 0,
-            "data": {
-                "peak_id": [],
-                "mz": [],
-                "area": [] if areas else None,
-                "height": [] if heights else None,
-                "match": [] if matches else None,
-            },
-        }
 
     # --- Remove empty fields from the response ---
     if not areas:

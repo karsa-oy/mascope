@@ -239,6 +239,7 @@ const expanded = ref({})
 
 <template>
   <Panel
+    v-if="app.data.peak.list.length > 0"
     class="browser"
     style="border: none; flex-grow: 1; max-width: 900px"
     :pt="
