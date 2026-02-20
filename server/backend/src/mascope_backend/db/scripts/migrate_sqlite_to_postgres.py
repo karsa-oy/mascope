@@ -16,9 +16,9 @@ Process:
 
 import asyncio
 from datetime import datetime as dt, timezone as tz
-from zoneinfo import ZoneInfo
 
 from sqlalchemy import event, func, select, text
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 
 from mascope_backend.db import configure_database_engine
@@ -36,6 +36,8 @@ from mascope_backend.db.ops.restore import db_restore
 from mascope_backend.db.secrets import postgres_password
 from mascope_backend.db.utils import get_current_db_version
 from mascope_backend.runtime import runtime
+
+BATCH_INSERT_SIZE = 1000
 
 db_cfg = runtime.config.database
 
@@ -125,33 +127,56 @@ async def migrate_table(
     :return: Number of rows migrated.
     :rtype: int
     """
-
     Model = get_model_class(table_name)
 
     # Read all rows from SQLite
-    result = await sqlite_session.execute(select(Model))
-    rows = result.scalars().all()
+    total_count = await sqlite_session.scalar(select(func.count()).select_from(Model))
 
-    if not rows:
+    if total_count == 0:
+        runtime.logger.info(f"  {table_name}: empty, skipping")
         return 0
 
-    # Convert to dicts and add timezone info
-    row_dicts = []
-    for row in rows:
+    runtime.logger.info(f"  {table_name}: {total_count} rows")
+
+    # Stream rows instead of loading all into memory
+    result = await sqlite_session.stream(select(Model))
+
+    total = 0
+    batch = []
+
+    async for (row,) in result:
         data = row.to_dict()
 
-        # Add timezone to all datetime columns
         for key, value in data.items():
             if isinstance(value, dt):
                 data[key] = add_timezone_to_datetime(key, value, table_name)
 
-        row_dicts.append(data)
+        batch.append(data)
 
-    # Bulk insert to PostgreSQL
-    postgres_session.add_all([Model(**data) for data in row_dicts])
-    await postgres_session.flush()
+        if len(batch) >= BATCH_INSERT_SIZE:
+            await _insert_batch(postgres_session, Model, batch)
+            total += len(batch)
+            batch = []
+            pct = total / total_count * 100
+            runtime.logger.info(f"    {total}/{total_count} ({pct:.1f}%)")
 
-    return len(rows)
+    # Remaining rows
+    if batch:
+        await _insert_batch(postgres_session, Model, batch)
+        total += len(batch)
+
+    runtime.logger.info(f"    ✅ {total}/{total_count} (100%)")
+    return total
+
+
+async def _insert_batch(
+    session: AsyncSession,
+    Model,
+    batch: list[dict],
+) -> None:
+    """Core insert using insert, bypassing ORM overhead."""
+    await session.execute(pg_insert(Model.__table__).values(batch))
+    await session.flush()
 
 
 async def reset_sequences(postgres_session: AsyncSession) -> None:
@@ -225,12 +250,9 @@ async def run():
 
     # --- Setup SQLite engine ---
     current_db_version = get_current_db_version()
-    if current_db_version is None:
-        runtime.logger.error("No database found. Please create a database first.")
-        return
 
     # early check of correect paths resolutions
-    if current_db_version is None or current_db_version == 0:
+    if not current_db_version:
         runtime.logger.error("Error resolving paths to the current SQLite DB.")
         return
 
@@ -275,13 +297,13 @@ async def run():
 
         for table_name in TABLE_ORDER:
             count = await migrate_table(table_name, sqlite_session, postgres_session)
+            await postgres_session.commit()
             total_migrated += count
-            runtime.logger.info(f"{table_name:40} {count:6} rows")
 
-        await postgres_session.commit()
-        runtime.logger.info(f"Total migrated: {total_migrated} rows")
+    runtime.logger.info(f"Total migrated: {total_migrated} rows")
 
-        # Reset sequences AFTER all data inserted
+    # Reset sequences AFTER all data inserted
+    async with PostgresSession() as postgres_session:
         await reset_sequences(postgres_session)
 
     # --- Re-enable event listeners ---
