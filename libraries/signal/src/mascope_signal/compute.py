@@ -554,51 +554,59 @@ async def load_peak_timeseries(
     runtime.logger.debug(
         f"Loading peak timeseries for {peak_timeseries.mz.size} m/z values from {base_filename}"
     )
-    to_compute_mask = np.invert(peak_timeseries.is_timeseries_computed.values)
+
+    is_computed = peak_timeseries.is_timeseries_computed.values
+    to_compute_mask = np.invert(is_computed)
+
     if not np.any(to_compute_mask):
         runtime.logger.debug(
             f"All peak timeseries are cached in {base_filename}, loading from file."
         )
         return peak_timeseries
 
-    # --- Compute missing peak timeseries ---
+    # --- Compute the missing peak timeseries ---
     mz_coords = peak_timeseries.mz.values
     mzs_to_compute = mz_coords[to_compute_mask]
-    new_peak_timeseries = await get_peak_timeseries(base_filename, mzs_to_compute)
 
+    # Load only the metadata we need (relatively small arrays)
     sum_peak_heights = peak_timeseries.sum_peak_heights.sel(mz=mzs_to_compute).values
     sum_peak_areas = peak_timeseries.sum_peak_areas.sel(mz=mzs_to_compute).values
+    time_coords = peak_timeseries.time.values
+
+    # Compute new timeseries (this is the heavy computation)
+    new_peak_timeseries = await get_peak_timeseries(base_filename, mzs_to_compute)
 
     # Normalize peak timeseries intensities to 1
-    new_peak_timeseries_norm = new_peak_timeseries / new_peak_timeseries.sum(dim="time")
-    new_peak_timeseries_norm = new_peak_timeseries_norm.values
+    timeseries_sum = new_peak_timeseries.sum(dim="time")
+    timeseries_sum = xr.where(timeseries_sum == 0, 1, timeseries_sum)
+    new_peak_timeseries_norm = (new_peak_timeseries / timeseries_sum).values
 
-    # Restore peak timeseries intensities using fitted peak areas and heights
-    new_peak_timeseries_area = new_peak_timeseries_norm * sum_peak_areas[:, np.newaxis]
-    new_peak_timeseries_height = (
-        new_peak_timeseries_norm * sum_peak_heights[:, np.newaxis]
+    # Restore peak timeseries intensities
+    new_peak_areas = new_peak_timeseries_norm * sum_peak_areas[:, np.newaxis]
+    new_peak_heights = new_peak_timeseries_norm * sum_peak_heights[:, np.newaxis]
+
+    # --- Create a dataset for the update ---
+    # This contains only the changed values, fully in memory
+    update_dataset = xr.Dataset(
+        data_vars={
+            "peak_areas": (["mz", "time"], new_peak_areas),
+            "peak_heights": (["mz", "time"], new_peak_heights),
+            "is_timeseries_computed": (
+                ["mz"],
+                np.ones(len(mzs_to_compute), dtype=bool),
+            ),
+        },
+        coords={
+            "mz": mzs_to_compute,
+            "time": time_coords,
+        },
     )
 
-    # Insert/merge computed timeseries into the cached peak_timeseries dataset
-    try:
-        # Assign peak_areas and peak_heights for the computed mzs
-        peak_timeseries["peak_areas"].loc[dict(mz=mzs_to_compute)] = (
-            new_peak_timeseries_area
-        )
-        peak_timeseries["peak_heights"].loc[dict(mz=mzs_to_compute)] = (
-            new_peak_timeseries_height
-        )
-        # Mark timeseries as computed
-        peak_timeseries["is_timeseries_computed"].loc[dict(mz=mzs_to_compute)] = True
+    # --- Write the updates to disk ---
+    await m_io.write_peaks(update_dataset, base_filename)
 
-    except Exception as e:
-        runtime.logger.error(f"Failed to merge computed peak timeseries: {e}")
-        raise
-
-    # --- Store new peak timeseries in the sample file ---
-    await m_io.write_peaks(peak_timeseries, base_filename)
-
-    return peak_timeseries
+    # --- Return a clean lazy reference ---
+    return m_io.load_peak_data(base_filename).sel(mz=mzs, method="nearest")
 
 
 async def get_peak_timeseries(
