@@ -16,7 +16,6 @@ from mascope_file.runtime import runtime
 
 
 CONCURRENT_WRITE_LIMIT = 2  # Max number of concurrent writes to prevent OutOfMemory
-SYSTEM = platform.system()  # 'Windows', 'Linux'
 # Global lock for zarr file writes - prevents concurrent modifications
 _zarr_write_locks: dict[str, threading.Lock] = {}
 _zarr_write_locks_lock = threading.Lock()
@@ -532,11 +531,6 @@ async def _partial_update_peaks(
                     chunk_info["max_mz_idx"],
                 )
 
-            # Sync to ensure all data is flushed to disk after updates.
-            # Important on Linux where writes may be buffered.
-            if SYSTEM != "Windows":
-                os.sync()
-
     await asyncio.to_thread(_write_all_chunks)
 
     runtime.logger.debug(
@@ -591,11 +585,18 @@ def _get_chunk_metadata(
 
     # Find indices for matching
     indexer = np.searchsorted(existing_mz, mz_update)
-    # Verify the matches are exact
-    valid_mask = indexer < len(existing_mz)
-    if not np.all(valid_mask):
-        runtime.logger.warning(
-            f"Some m/z values not found in existing data: {mz_update[~valid_mask]}"
+
+    # Clip indices to valid range before comparison
+    clipped_indexer = np.clip(indexer, 0, len(existing_mz) - 1)
+
+    # Verify exact matches
+    exact_match_mask = np.isclose(existing_mz[clipped_indexer], mz_update)
+
+    if not np.all(exact_match_mask):
+        missing_mz = mz_update[np.invert(exact_match_mask)]
+        raise ValueError(
+            f"Cannot update m/z values not present in existing data: {missing_mz}. "
+            "Running peak detection first should resolve this issue."
         )
 
     chunk_indices = indexer // actual_mz_chunk_size
