@@ -78,7 +78,7 @@ table_configs = {
         "columns": {
             "instrument_function_id": ("VARCHAR(32)", 1, None, 1),
             "instrument": ("VARCHAR(64)", 1, None, 0),
-            "method_file": ("VARCHAR(256)", 1, None, 0),
+            "method_file": ("VARCHAR(512)", 1, None, 0),
             "datetime_utc": ("TIMESTAMP", 1, None, 0),
             "peakshape": ("JSON", 0, None, 0),
             "resolution_function": ("JSON", 0, None, 0),
@@ -88,7 +88,7 @@ table_configs = {
             CREATE TABLE instrument_function (
                 instrument_function_id VARCHAR(32) NOT NULL, 
                 instrument VARCHAR(64) NOT NULL, 
-                method_file VARCHAR(256) NOT NULL, 
+                method_file VARCHAR(512) NOT NULL, 
                 datetime_utc TIMESTAMP NOT NULL, 
                 peakshape JSON, 
                 resolution_function JSON, 
@@ -230,7 +230,7 @@ table_configs = {
             "mz": ("FLOAT", 1, None, 0),
             "relative_abundance": ("FLOAT", 1, None, 0),
             "resolution": ("VARCHAR(8)", 1, None, 0),
-            "target_isotope_formula": ("VARCHAR(256)", 1, None, 0),
+            "target_isotope_formula": ("VARCHAR(4096)", 1, None, 0),
         },
         "fks": {
             "target_ion_id": (
@@ -249,7 +249,7 @@ table_configs = {
                 relative_abundance FLOAT NOT NULL
                     CHECK (relative_abundance BETWEEN 0 AND 1),
                 resolution VARCHAR(8) NOT NULL,
-                target_isotope_formula VARCHAR(256) NOT NULL
+                target_isotope_formula VARCHAR(4096) NOT NULL
             );
         """,
         "indexes": [
@@ -563,7 +563,7 @@ table_configs = {
             "instrument_function_id": ("VARCHAR(32)", 0, None, 0),
             "filename": ("VARCHAR(256)", 1, None, 0),
             "instrument": ("VARCHAR(64)", 1, None, 0),
-            "method_file": ("VARCHAR(256)", 0, None, 0),
+            "method_file": ("VARCHAR(512)", 0, None, 0),
             "datetime": ("TIMESTAMP", 1, None, 0),
             "datetime_utc": ("TIMESTAMP", 1, None, 0),
             "length": ("FLOAT", 1, None, 0),
@@ -585,7 +585,7 @@ table_configs = {
                 instrument_function_id VARCHAR(32), 
                 filename VARCHAR(256) NOT NULL UNIQUE,
                 instrument VARCHAR(64) NOT NULL,
-                method_file VARCHAR(256),
+                method_file VARCHAR(512),
                 datetime TIMESTAMP NOT NULL,
                 datetime_utc TIMESTAMP NOT NULL,
                 length FLOAT NOT NULL,

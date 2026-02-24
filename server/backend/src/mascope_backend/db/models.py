@@ -325,7 +325,7 @@ class SampleFile(Base):
     )
     filename: Mapped[str] = mapped_column(String(256), unique=True)
     instrument: Mapped[str] = mapped_column(String(64))
-    method_file: Mapped[Optional[str]] = mapped_column(String(256))
+    method_file: Mapped[Optional[str]] = mapped_column(String(512))
     datetime: Mapped[dt] = mapped_column(
         TIMESTAMP(timezone=False), nullable=False  # stored literal local time
     )
@@ -662,7 +662,9 @@ class TargetIsotope(Base):
         ),
         index=True,
     )
-    target_isotope_formula: Mapped[str] = mapped_column(String(256))
+    target_isotope_formula: Mapped[str] = mapped_column(
+        String(4096)
+    )  # lower length limit #1360 https://github.com/karsa-oy/mascope/issues/1360
     mz: Mapped[float] = mapped_column(Float)
     relative_abundance: Mapped[float] = mapped_column(Float)
     resolution: Mapped[str] = mapped_column(String(8))
@@ -912,7 +914,7 @@ class InstrumentFunction(Base):
 
     instrument_function_id: Mapped[str] = mapped_column(String(32), primary_key=True)
     instrument: Mapped[str] = mapped_column(String(64))
-    method_file: Mapped[str] = mapped_column(String(256))
+    method_file: Mapped[str] = mapped_column(String(512))
     datetime_utc: Mapped[dt] = mapped_column(TIMESTAMP(timezone=True))
     peakshape: Mapped[Optional[dict]] = mapped_column(JSON)
     resolution_function: Mapped[Optional[dict]] = mapped_column(JSON)
