@@ -62,8 +62,12 @@ def main(args: Annotated[Optional[List[str]], typer.Argument()] = None) -> None:
     runtime = Runtime("frontend")
     runtime.state.mode = "prod"
 
-    # Get database name from config
     db_cfg = runtime.full_config.backend.database
+    backend_cfg = runtime.full_config.backend
+    file_converter_cfg = runtime.full_config.file_converter
+    frontend_cfg = runtime.full_config.frontend
+    redis_cfg = runtime.full_config.backend.redis
+
     db_name = db_cfg.get_postgres_database_name(env_name=runtime.env.name)
 
     command = f"docker compose --file '{compose_path}' {' '.join(args)}"
@@ -90,6 +94,20 @@ def main(args: Annotated[Optional[List[str]], typer.Argument()] = None) -> None:
             MASCOPE_DB_NAME=db_name,
             MASCOPE_DB_USER=db_cfg.user,
             MASCOPE_PATH=os.environ["MASCOPE_PATH"],
+            # Container names injection
+            MASCOPE_DB_CONTAINER_NAME=db_cfg.get_postgres_container_name(mode="prod"),
+            MASCOPE_REDIS_CONTAINER_NAME=redis_cfg.get_redis_container_name(
+                mode="prod"
+            ),
+            MASCOPE_BACKEND_CONTAINER_NAME=backend_cfg.get_backend_container_name(
+                mode="prod"
+            ),
+            MASCOPE_FILE_CONVERTER_CONTAINER_NAME=file_converter_cfg.get_file_converter_container_name(
+                mode="prod"
+            ),
+            MASCOPE_FRONTEND_CONTAINER_NAME=frontend_cfg.get_frontend_container_name(
+                mode="prod"
+            ),
         ),
     )
 

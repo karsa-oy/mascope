@@ -398,7 +398,7 @@ workers = 1  # Single worker for hot reload
 
 [backend.redis]
 host = "localhost"  # Local Redis container
-container_name = "mascope_redis_dev"
+container_name = "redis"
 
 [file-converter]
 server = "localhost"  # Connect to local backend
@@ -1076,7 +1076,7 @@ api.http.post(
     // config
     use: "create",
     type: "create_workspace",
-  }
+  },
 );
 ```
 
@@ -1241,7 +1241,7 @@ const data = useData(
     selection: true, // enable selection
     read: (sample_batch_id) =>
       api.http.get(`/sample/batches/${sample_batch_id}`), // optional: single record fetch
-  }
+  },
 );
 ```
 
@@ -1449,7 +1449,7 @@ export const useWorkspace = defineStore("app.data.workspace", () => {
           use: "read",
           type: "read_workspace",
         }),
-    }
+    },
   );
 
   return {
@@ -1505,7 +1505,7 @@ const data = useData(
       sample_batch_id: useBatch().focusedId,
       ...useFilter().get("sample"), // cross-dimensional filters getter (need implementation)
     }),
-  }
+  },
 );
 ```
 
@@ -1615,7 +1615,7 @@ const layer = "my_dialog";
         `
         <h1>This is in the <i>my_dialog</i> layer</h1>
       `,
-        { layer }
+        { layer },
       )
     "
   />

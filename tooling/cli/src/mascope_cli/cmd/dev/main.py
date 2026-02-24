@@ -108,11 +108,13 @@ def _run_dev_compose(args: list[str]):
             "MASCOPE_ENV": runtime.env.name,
             "MASCOPE_PATH": os.environ["MASCOPE_PATH"],
             # Inject config values
-            "POSTGRES_CONTAINER_NAME": db_cfg.container_name,
-            "POSTGRES_PORT": str(db_cfg.port),
-            "POSTGRES_USER": db_cfg.user,
-            "REDIS_CONTAINER_NAME": redis_cfg.container_name,
-            "REDIS_PORT": str(redis_cfg.port),
+            "MASCOPE_DB_CONTAINER_NAME": db_cfg.get_postgres_container_name(mode="dev"),
+            "MASCOPE_DB_PORT": str(db_cfg.port),
+            "MASCOPE_DB_USER": db_cfg.user,
+            "MASCOPE_REDIS_CONTAINER_NAME": redis_cfg.get_redis_container_name(
+                mode="dev"
+            ),
+            "MASCOPE_REDIS_PORT": str(redis_cfg.port),
         },
     )
 

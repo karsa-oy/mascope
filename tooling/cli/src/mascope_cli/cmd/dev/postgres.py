@@ -19,7 +19,9 @@ dev_postgres_app = typer.Typer()
 
 def _is_container_running() -> bool:
     """Check if PostgreSQL container is running."""
-    container_name = runtime.full_config.backend.database.container_name
+    container_name = runtime.full_config.backend.database.get_postgres_container_name(
+        mode="dev"
+    )
 
     try:
         result = subprocess.run(
@@ -52,7 +54,7 @@ def _is_server_ready() -> bool:
         [
             "docker",
             "exec",
-            db_cfg.container_name,
+            db_cfg.get_postgres_container_name(mode="dev"),
             "pg_isready",
             "-U",
             db_cfg.user,
@@ -81,7 +83,7 @@ def _is_database_ready() -> bool:
         [
             "docker",
             "exec",
-            db_cfg.container_name,
+            db_cfg.get_postgres_container_name(mode="dev"),
             "psql",
             "-U",
             db_cfg.user,
@@ -227,7 +229,7 @@ def status():
     runtime.logger.info(
         f"DB name: {db_cfg.get_postgres_database_name(runtime.env.name)}"
     )
-    runtime.logger.info(f"Container: {db_cfg.container_name}")
+    runtime.logger.info(f"Container: {db_cfg.get_postgres_container_name('dev')}")
 
     # Display pool configuration
     runtime.logger.info("=== Connection Pool ===")
@@ -273,7 +275,9 @@ def logs(
         runtime.logger.info("Run 'mascope dev up' to start")
         return
 
-    container_name = runtime.full_config.backend.database.container_name
+    container_name = runtime.full_config.backend.database.get_postgres_container_name(
+        mode="dev"
+    )
     cmd = ["docker", "logs"]
 
     if follow:
@@ -327,7 +331,7 @@ def cli():
         )
 
     runtime.logger.info(
-        f"Opening psql CLI (container: {db_cfg.container_name}, database: {target_db})"
+        f"Opening psql CLI (container: {db_cfg.get_postgres_container_name(mode='dev')}, database: {target_db})"
     )
     runtime.logger.info("Type '\\q' or press Ctrl+D to close")
 
@@ -337,7 +341,7 @@ def cli():
                 "docker",
                 "exec",
                 "-it",
-                db_cfg.container_name,
+                db_cfg.get_postgres_container_name(mode="dev"),
                 "psql",
                 "-h",
                 "localhost",  # Force TCP/IP connection

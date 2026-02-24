@@ -17,7 +17,9 @@ dev_redis_app = typer.Typer()
 
 def _is_container_running() -> bool:
     """Check if Redis container is running."""
-    container_name = runtime.full_config.backend.redis.container_name
+    container_name = runtime.full_config.backend.redis.get_redis_container_name(
+        mode="dev"
+    )
 
     try:
         result = subprocess.run(
@@ -46,7 +48,7 @@ def _is_redis_responding() -> bool:
         [
             "docker",
             "exec",
-            redis_cfg.container_name,
+            redis_cfg.get_redis_container_name(mode="dev"),
             "redis-cli",
             "-p",
             str(redis_cfg.port),
@@ -138,7 +140,7 @@ def status():
     runtime.logger.info("=== Configuration ===")
     runtime.logger.info(f"Host: {redis_cfg.host}:{redis_cfg.port}")
     runtime.logger.info(f"URL:  {redis_cfg.get_redis_url()}")
-    runtime.logger.info(f"Container: {redis_cfg.container_name}")
+    runtime.logger.info(f"Container: {redis_cfg.get_redis_container_name(mode='dev')}")
 
     # Status
     runtime.logger.info("=== Status ===")
@@ -178,7 +180,9 @@ def logs(
         runtime.logger.info("Run 'mascope dev up' to start")
         return
 
-    container_name = runtime.full_config.backend.redis.container_name
+    container_name = runtime.full_config.backend.redis.get_redis_container_name(
+        mode="dev"
+    )
     cmd = ["docker", "logs"]
 
     if follow:
@@ -227,7 +231,7 @@ def cli():
                 "docker",
                 "exec",
                 "-it",
-                redis_cfg.container_name,
+                redis_cfg.get_redis_container_name(mode="dev"),
                 "redis-cli",
                 "-p",
                 str(redis_cfg.port),

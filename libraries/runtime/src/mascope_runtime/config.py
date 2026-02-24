@@ -60,7 +60,7 @@ class DatabaseConfig(BaseModel):
     user: str = "mascope_user"  # password loaded via secret
 
     # Container settings (PostgreSQL only)
-    container_name: str = "mascope_dev_postgres"
+    container_name: str = "postgres"  # base name
 
     # Connection timeout
     connection_timeout: int = 30  # How long to wait when database is locked
@@ -103,6 +103,15 @@ class DatabaseConfig(BaseModel):
         if self.type == "sqlite":
             return {"timeout": self.connection_timeout}
         return {}
+
+    def get_postgres_container_name(self, mode: str) -> str:
+        """
+        Get mode-qualified postgres container name.
+
+        :param mode: Runtime mode ('dev'/'prod')
+        :return: e.g. 'mascope_dev_postgres', 'mascope_prod_postgres'
+        """
+        return f"mascope_{mode}_{self.container_name}"
 
     def get_postgres_database_name(self, env_name: str) -> str:
         """
@@ -165,7 +174,16 @@ class RedisConfig(BaseModel):
 
     host: str = "localhost"
     port: int = 6379
-    container_name: str = "mascope_dev_redis"
+    container_name: str = "redis"  # base name
+
+    def get_redis_container_name(self, mode: str) -> str:
+        """
+        Get mode-qualified redis container name.
+
+        :param mode: Runtime mode ('dev'/'prod')
+        :return: e.g. 'mascope_dev_redis', 'mascope_prod_redis'
+        """
+        return f"mascope_{mode}_{self.container_name}"
 
     def get_redis_url(self) -> str:
         """Build Redis URL from host and port."""
@@ -177,6 +195,7 @@ class BackendConfig(ModuleConfig):
     Backend module specific configuration options
     """
 
+    container_name: str = "backend"  # base name
     database: DatabaseConfig = DatabaseConfig()
     filestreams: str = r"./filestreams"  # path to the file streams folder
     redis: RedisConfig = RedisConfig()
@@ -198,12 +217,22 @@ class BackendConfig(ModuleConfig):
             return max(1, cpu_cores // 2)
         return self.workers
 
+    def get_backend_container_name(self, mode: str) -> str:
+        """
+        Get mode-qualified backend container name.
+
+        :param mode: Runtime mode ('dev'/'prod')
+        :return: e.g. 'mascope_dev_backend', 'mascope_prod_backend'
+        """
+        return f"mascope_{mode}_{self.container_name}"
+
 
 class FileConverterConfig(ModuleConfig):
     """
     File converter module specific configuration options
     """
 
+    container_name: str = "file_converter"  # base name
     server: str = (
         r"backend"  # production host URL; the default works in our docker compose network
     )
@@ -211,6 +240,15 @@ class FileConverterConfig(ModuleConfig):
     raw_threads: int = 2  # number of threads for converting Orbitrap files
     h5_threads: int = 2  # number of threads for converting Tof files
     interval: int = 3  # polling interval (s) when checking the file system
+
+    def get_file_converter_container_name(self, mode: str) -> str:
+        """
+        Get mode-qualified file converter container name.
+
+        :param mode: Runtime mode ('dev'/'prod')
+        :return: e.g. 'mascope_dev_file_converter', 'mascope_prod_file_converter'
+        """
+        return f"mascope_{mode}_{self.container_name}"
 
 
 class TofAgentConfig(ModuleConfig):
@@ -251,7 +289,17 @@ class FrontendConfig(ModuleConfig):
     """
 
     acquisition_filter: DatetimeRange | str | None = None
+    container_name: str = "frontend"  # base name
     sample_table_defaults: SampleTableDefaults = SampleTableDefaults()
+
+    def get_frontend_container_name(self, mode: str) -> str:
+        """
+        Get mode-qualified frontend container name.
+
+        :param mode: Runtime mode ('dev'/'prod')
+        :return: e.g. 'mascope_dev_frontend', 'mascope_prod_frontend'
+        """
+        return f"mascope_{mode}_{self.container_name}"
 
 
 class CliConfig(ModuleConfig):

@@ -13,14 +13,14 @@ name: mascope_dev
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: ${POSTGRES_CONTAINER_NAME:-mascope_dev_postgres}
+    container_name: ${MASCOPE_DB_CONTAINER_NAME:-mascope_dev_postgres}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432" # Exposed for DBeaver, psql, etc.
+      - "${MASCOPE_DB_PORT:-5432}:5432" # Exposed for DBeaver, psql, etc.
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-mascope_user}
+      MASCOPE_DB_USER: ${MASCOPE_DB_USER:-mascope_user}
       POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mascope_user}"]
+      test: ["CMD-SHELL", "pg_isready -U ${MASCOPE_DB_USER:-mascope_user}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -32,9 +32,9 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: ${REDIS_CONTAINER_NAME:-mascope_dev_redis}
+    container_name: ${MASCOPE_REDIS_CONTAINER_NAME:-mascope_dev_redis}
     ports:
-      - "${REDIS_PORT:-6379}:6379" # Exposed for redis-cli access
+      - "${MASCOPE_REDIS_PORT:-6379}:6379" # Exposed for redis-cli access
     command: redis-server --appendonly yes
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
