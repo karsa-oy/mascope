@@ -39,6 +39,7 @@ class TestModule(str, Enum):
     SYSTEM = "system"
     MASCOPE_SDK = "sdk"
     MASCOPE_TOOLS = "tools"
+    MASCOPE_FILE = "file"
     ALL = "all"
 
 
@@ -99,7 +100,11 @@ def run(
     """
     # Default to backend if no components specified
     if not components:
-        if module in (TestModule.MASCOPE_SDK, TestModule.MASCOPE_TOOLS):
+        if module in (
+            TestModule.MASCOPE_SDK,
+            TestModule.MASCOPE_TOOLS,
+            TestModule.MASCOPE_FILE,
+        ):
             components = [TestComponent.LIBRARIES]
         else:
             components = [TestComponent.BACKEND, TestComponent.LIBRARIES]
@@ -128,8 +133,12 @@ def run_backend_tests(
     # Path to tests - always use forward slashes for paths
     test_path = "server/backend/tests/"
 
-    # Prevent sdk/tools from being treated as backend modules
-    if module in (TestModule.MASCOPE_SDK, TestModule.MASCOPE_TOOLS):
+    # Prevent library modules from being treated as backend modules
+    if module in (
+        TestModule.MASCOPE_SDK,
+        TestModule.MASCOPE_TOOLS,
+        TestModule.MASCOPE_FILE,
+    ):
         typer.echo("Module belongs to libraries; running library tests instead.")
         return run_library_tests(module, test_name, verbose)
 
@@ -201,6 +210,8 @@ def run_library_tests(
             test_path = f"{test_path}sdk/tests/"
         elif module == TestModule.MASCOPE_TOOLS:
             test_path = f"{test_path}tools/tests/"
+        elif module == TestModule.MASCOPE_FILE:
+            test_path = f"{test_path}file/tests/"
         else:
             typer.echo(
                 "Warning: Library tests are not separated into unit/integration/system modules. "
@@ -264,6 +275,7 @@ def show():
     libraries_root_dir = "libraries"
     sdk_tests_dir = os.path.join(libraries_root_dir, "sdk", "tests")
     tools_tests_dir = os.path.join(libraries_root_dir, "tools", "tests")
+    file_tests_dir = os.path.join(libraries_root_dir, "file", "tests")
 
     # ----- Backend tests -----
     if os.path.exists(backend_tests_dir):
@@ -366,6 +378,7 @@ def show():
 
     _show_library_section("libraries/sdk/tests", sdk_tests_dir)
     _show_library_section("libraries/tools/tests", tools_tests_dir)
+    _show_library_section("libraries/file/tests", file_tests_dir)
 
     typer.echo("\nUsage examples:")
     typer.echo("  mascope test show                      # Show available tests")
@@ -373,4 +386,5 @@ def show():
     typer.echo("  mascope test run -m unit               # Run only backend unit tests")
     typer.echo("  mascope test run libraries -m sdk      # Run SDK library tests")
     typer.echo("  mascope test run libraries -m tools    # Run Tools library tests")
+    typer.echo("  mascope test run libraries -m file     # Run File library tests")
     typer.echo("  mascope test run -n workspace_model    # Run specific test by name")
