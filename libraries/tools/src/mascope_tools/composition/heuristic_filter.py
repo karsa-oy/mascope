@@ -377,8 +377,15 @@ def extract_isotope_labels(
     Requires IsoDistribution with confs.
 
     Examples:
-        >>> extract_isotope_labels("C6H12O6", predicted_isotopes)
-        ['13C', '13C2', '13C+2H', ...]
+        >>> extract_isotope_labels(
+        ...     "C6H12O6",
+        ...     IsoThreshold(
+        ...         formula="C6H12O6",
+        ...         threshold=ISOTOPE_ABUNDANCE_THRESHOLD,
+        ...         get_confs=True
+        ...     )
+        ... )
+        ['M0', '13C', '18O']
 
     :param ion_formula: Ion formula string.
     :type ion_formula: str

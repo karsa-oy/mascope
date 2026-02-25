@@ -207,11 +207,11 @@ def run_library_tests(
     # Handle module selection using the enum value
     if module and module != TestModule.ALL:
         if module == TestModule.MASCOPE_SDK:
-            test_path = f"{test_path}sdk/tests/"
+            test_path = f"{test_path}sdk/"
         elif module == TestModule.MASCOPE_TOOLS:
-            test_path = f"{test_path}tools/tests/"
+            test_path = f"{test_path}tools/"
         elif module == TestModule.MASCOPE_FILE:
-            test_path = f"{test_path}file/tests/"
+            test_path = f"{test_path}file/"
         else:
             typer.echo(
                 "Warning: Library tests are not separated into unit/integration/system modules. "
@@ -254,6 +254,9 @@ def run_library_tests(
     # Add options
     if verbose:
         command.append("-v")
+
+    # Include doctests
+    command.append("--doctest-modules")
 
     # Join command parts
     cmd_str = " ".join(command)

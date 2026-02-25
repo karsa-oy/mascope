@@ -520,7 +520,7 @@ def replace_atom_with_isotope(ion_formula: str, isotope_label: str) -> str:
         >>> replace_atom_with_isotope("C10H15N-", "15N")
         '[15N]C10H15-'
         >>> replace_atom_with_isotope("C5H5+", "13C+2H")
-        '[13C][2H]C4H45+'
+        '[13C][2H]C4H4+'
         >>> replace_atom_with_isotope("C3H7O2-", "M0")
         'C3H7O2-'
 
