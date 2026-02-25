@@ -210,8 +210,11 @@ async def _load_peaks_and_averaged_signal(
         .compute()
     )
 
-    # --- Load peak timeseries for matched isotopes --- #
-    peak_timeseries = await m_compute.load_peak_timeseries(sample.filename, match_mzs)
+    # --- Load peak timeseries for peaks in target isotopes range --- #
+    mzs_to_load = (
+        m_io.load_peak_data(sample.filename).sel(mz=slice(mz_min, mz_max)).mz.values
+    )
+    peak_timeseries = await m_compute.load_peak_timeseries(sample.filename, mzs_to_load)
 
     # --- Get peak heights to plot isotope expected heights ---
     scan_timestamps = m_compute.get_scan_timestamps(
