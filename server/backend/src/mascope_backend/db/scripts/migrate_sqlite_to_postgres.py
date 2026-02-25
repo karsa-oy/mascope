@@ -196,14 +196,26 @@ async def reset_sequences(postgres_session: AsyncSession) -> None:
     # role.role_id
     await postgres_session.execute(
         text(
-            "SELECT setval('role_role_id_seq', COALESCE((SELECT MAX(role_id) FROM role), 1), true)"
+            """
+        SELECT setval(
+            pg_get_serial_sequence('role', 'role_id'),
+            COALESCE((SELECT MAX(role_id) FROM role), 1),
+            true
+        )
+    """
         )
     )
 
     # user.id
     await postgres_session.execute(
         text(
-            "SELECT setval('user_id_seq', COALESCE((SELECT MAX(id) FROM \"user\"), 1), true)"
+            """
+        SELECT setval(
+            pg_get_serial_sequence('"user"', 'id'),
+            COALESCE((SELECT MAX(id) FROM "user"), 1),
+            true
+        )
+    """
         )
     )
 
