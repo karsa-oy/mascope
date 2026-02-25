@@ -197,7 +197,7 @@ Examples
 Calculate the molecular mass, elemental composition, and mass distribution of
 a molecule from its chemical formula:
 
->>> from molmass import Formula
+>>> from mascope_molmass import Formula
 >>> f = Formula('C8H10N4O2')  # Caffeine
 >>> f
 Formula('C8H10N4O2')
@@ -232,7 +232,7 @@ Mass number...
 
 Access physicochemical and descriptive properties of the chemical elements:
 
->>> from molmass import ELEMENTS, Element
+>>> from mascope_molmass import ELEMENTS, Element
 >>> e = ELEMENTS['C']
 >>> e
 Element(
@@ -267,9 +267,9 @@ Element(
 >>> str(ELEMENTS[6])
 'Carbon'
 >>> len(ELEMENTS)
-109
+110
 >>> sum(e.mass for e in ELEMENTS)
-14693.181589001...
+14708.161789001...
 >>> for e in ELEMENTS:
 ...     e.validate()
 ...
@@ -1425,21 +1425,21 @@ class FormulaError(ValueError):
         >>> Formula('abc').formula
         Traceback (most recent call last):
          ...
-        molmass.molmass.FormulaError: unexpected character 'a'
+        mascope_molmass.molmass.FormulaError: unexpected character 'a'
         abc
         ^
 
         >>> Formula('(H2O)2-H2O').formula
         Traceback (most recent call last):
          ...
-        molmass.molmass.FormulaError: subtraction not allowed
+        mascope_molmass.molmass.FormulaError: subtraction not allowed
         (H2O)2-H2O
         ......^
 
         >>> Formula('[11C]').formula
         Traceback (most recent call last):
          ...
-        molmass.molmass.FormulaError: unknown isotope '11C'
+        mascope_molmass.molmass.FormulaError: unknown isotope '11C'
         [11C]
         .^
 
