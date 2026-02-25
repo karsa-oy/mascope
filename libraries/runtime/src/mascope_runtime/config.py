@@ -430,7 +430,7 @@ class RuntimeConfigLoader:
                 result[key] = value
         return result
 
-    def _load_tomls(self):
+    def _load_tomls(self) -> dict:
         """
         Load configuration with three-layer overlay system:
 
@@ -485,7 +485,7 @@ class RuntimeConfigLoader:
 
         return raw_config
 
-    def _resolve_paths(self, unresolved: any | None = None) -> None:
+    def _resolve_paths(self, unresolved: dict) -> dict:
         """
         Iterates through an unresolved config or - when recursing -
         a subdict thereof. When encountering a path-like string value,
@@ -493,6 +493,8 @@ class RuntimeConfigLoader:
         uses the runtime env path by default, except for package
         paths which are resolved relative to the runtime root path.
 
+        :param unresolved: Raw config dictionary with unresolved paths
+        :type unresolved: dict
         :return: Resolved config dictionary
         :rtype: dict
         """
@@ -527,11 +529,15 @@ class RuntimeConfigLoader:
                 resolved[key] = value
         return resolved
 
-    def _resolve_loglevels(self, unresolved: dict, fallback: LogLevel = "info") -> None:
+    def _resolve_loglevels(self, unresolved: dict, fallback: LogLevel = "info") -> dict:
         """
         Iterates through the root level of the unresolved config,
         resolving log levels based on various inputs.
 
+        :param unresolved: Config dictionary with unresolved log levels
+        :type unresolved: dict
+        :param fallback: Fallback log level if none specified (default: "info")
+        :type fallback: LogLevel
         :return: Resolved config dictionary
         :rtype: dict
         """
@@ -554,18 +560,20 @@ class RuntimeConfigLoader:
             )
         return resolved
 
-    def _validate_options(self, unvalidated: dict) -> None:
+    def _validate_options(self, unvalidated: dict) -> RuntimeConfig:
         """
         Validates the resolved but unvalidated config dict using
         the Pydantic model.
 
+        :param unvalidated: Resolved config dictionary without validation
+        :type unvalidated: dict
         :return: Validated configuration model
         :rtype: RuntimeConfig
         """
         return RuntimeConfig(**unvalidated)
 
 
-def load_config(runtime: Runtime):
+def load_config(runtime: Runtime) -> RuntimeConfig:
     """
     Init a runtime config loader using the runtime,
     and return the resolved and validated config.
