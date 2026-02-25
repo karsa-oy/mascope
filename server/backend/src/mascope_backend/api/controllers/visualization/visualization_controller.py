@@ -354,13 +354,16 @@ def _process_isotope(
     # Convert to float32 for more efficient serialization to the frontend
     peak_x = isotope_peak_heights.mz.values.astype(np.float32)
     peak_y = isotope_peak_heights.values.astype(np.float32)
-    # Triplicate each peak to create vertical lines in the plot
-    peak_x = np.repeat(peak_x, 3).tobytes()
-    peak_y = (
-        np.column_stack([np.zeros_like(peak_y), peak_y, np.zeros_like(peak_y)])
-        .flatten()
-        .tobytes()
-    )
+    # Multiplicate each peak to create vertical lines in the plot
+    peak_x = np.repeat(peak_x, 4)
+    peak_y = np.column_stack(
+        [
+            np.zeros_like(peak_y),
+            peak_y,
+            np.zeros_like(peak_y),
+            np.full_like(peak_y, np.nan),
+        ]
+    ).flatten()
     # Add all peaks trace for the isotope
     isotope_result.spectrum_traces.append(
         {
@@ -368,8 +371,8 @@ def _process_isotope(
             "type": "scatter",
             "mode": "lines",
             "line": {"color": "grey"},
-            "x": peak_x,
-            "y": peak_y,
+            "x": peak_x.tobytes(),
+            "y": peak_y.tobytes(),
             "unit": UNITS,
         }
     )
