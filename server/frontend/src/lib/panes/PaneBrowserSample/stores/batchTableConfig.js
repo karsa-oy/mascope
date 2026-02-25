@@ -68,9 +68,33 @@ export const useBatchTableConfig = defineStore('browser.sample.batchTable', () =
     { immediate: true }
   )
 
+  // Apply sorting to filtered list for consistent navigation
+  const sortedFilteredBatchList = computed(() => {
+    const list = [...filteredBatchList.value]
+    const { sortField, sortOrder } = config.value
+
+    if (!sortField) return list
+
+    return list.sort((a, b) => {
+      const aVal = a[sortField]
+      const bVal = b[sortField]
+
+      if (aVal == null && bVal == null) return 0
+      if (aVal == null) return sortOrder
+      if (bVal == null) return -sortOrder
+
+      if (typeof aVal === 'string') {
+        return sortOrder * aVal.localeCompare(bVal)
+      }
+
+      return sortOrder * (aVal - bVal)
+    })
+  })
+
   return {
     config,
     filteredBatchList,
+    sortedFilteredBatchList,
     resetConfig
   }
 })

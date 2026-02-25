@@ -19,7 +19,6 @@ const app = useApp()
 const contextMenu = useBatchContextMenu()
 const batchTable = useBatchTableConfig()
 const batchStatusStore = useBatchStatus()
-const batchDataTable = ref(null)
 
 // Track filtered count for display
 const filteredCount = ref(0)
