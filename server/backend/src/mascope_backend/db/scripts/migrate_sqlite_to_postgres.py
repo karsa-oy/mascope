@@ -83,30 +83,33 @@ def get_model_class(table_name: str):
 
 def add_timezone_to_datetime(column_name: str, value: dt, table_name: str) -> dt:
     """
-    Add appropriate timezone to naive datetime from SQLite.
+    Restore timezone info to naive datetimes read from SQLite.
+
+    SQLite stores all datetimes as naive strings regardless of tzinfo -
+    timezone is silently stripped on write and not restored on read.
 
     Rules:
-    - Columns ending with '_utc' -> UTC
-    - sample_file.datetime: Keep naive (instrument local time, no timezone)
-    - All others -> UTC (safe default)
+    - Already tz-aware: return as-is (shouldn't happen in practice)
+    - sample_file.datetime: keep naive - instrument local time, timezone unknown
+    - All others: tag as UTC - all system timestamps (created_at, registered_at,
+      datetime_utc, etc.) are generated with dt.now(timezone.utc) in the application
+      layer.
 
     :param column_name: Name of the datetime column
-    :param value: Naive datetime from SQLite
+    :param value: Naive datetime read from SQLite
     :param table_name: Name of the table
-    :return: Timezone-aware datetime
+    :return: Timezone-aware datetime (or naive for instrument local time)
     """
     if value.tzinfo is not None:
         return value  # Already has timezone
 
-    # sample_file.datetime: local instrument time, store as naive literal
+    # sample_file.datetime: local instrument time - keep naive
+    # PostgreSQL stores this as TIMESTAMP WITHOUT TIME ZONE intentionally
     if table_name == "sample_file" and column_name == "datetime":
         return value
 
-    # UTC columns: anything ending with _utc
-    if column_name.endswith("_utc"):
-        return value.replace(tzinfo=tz.utc)
-
-    # Default: UTC (safe for registered_at, created_at, etc.)
+    # All system timestamps are UTC by convention (generated with dt.now(timezone.utc))
+    # _utc suffix columns are explicit, others (created_at, registered_at, etc.) are implicit UTC
     return value.replace(tzinfo=tz.utc)
 
 
@@ -139,7 +142,9 @@ async def migrate_table(
     runtime.logger.info(f"  {table_name}: {total_count} rows")
 
     # Stream rows instead of loading all into memory
-    result = await sqlite_session.stream(select(Model))
+    result = await sqlite_session.stream(
+        select(Model).execution_options(yield_per=BATCH_INSERT_SIZE)
+    )
 
     total = 0
     batch = []
