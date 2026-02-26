@@ -606,7 +606,10 @@ async def load_peak_timeseries(
     await m_io.write_peaks(update_dataset, base_filename)
 
     # --- Return a clean lazy reference ---
-    return m_io.load_peak_data(base_filename).sel(mz=mzs, method="nearest")
+    peak_timeseries = m_io.load_peak_data(base_filename).sel(mz=mzs, method="nearest")
+    # Remove duplicate m/z values if any
+    _, unique_idx = np.unique(peak_timeseries.mz.values, return_index=True)
+    return peak_timeseries.isel(mz=np.sort(unique_idx))
 
 
 async def get_peak_timeseries(
