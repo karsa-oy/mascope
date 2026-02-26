@@ -37,6 +37,35 @@ def parse_composition(formula_string: str, multiplier: int = 1) -> Composition:
     """Recursevely parses formulas like "(CH3CH2)2NH", "((CH3CH2)2NH)H", "(C6H10O2)H", "CH4N2OH"
     into pyteomics.Composition
 
+    Examples
+    --------
+    >>> parse_composition("(CH3CH2)2NH", 1)
+    Composition({'C': 4, 'H': 11, 'N': 1})
+    >>> parse_composition("((CH3CH2)2NH)H", 1)
+    Composition({'C': 4, 'H': 12, 'N': 1})
+    >>> parse_composition("(C6H12O6)H", 1)
+    Composition({'C': 6, 'H': 13, 'O': 6})
+    >>> parse_composition("CH4N2OH", 1)
+    Composition({'C': 1, 'H': 5, 'N': 2, 'O': 1})
+    >>> parse_composition("HN^NO6", 1)
+    Composition({'H': 1, 'N': 1, '^N': 1, 'O': 6})
+    >>> parse_composition("[18O]C2H4^N", 1)
+    Composition({'O': 1, 'C': 2, 'H': 4, '^N': 1})
+    >>> parse_composition("H2O", 2)
+    Composition({'H': 4, 'O': 2})
+    >>> parse_composition("(H2O)", 2)
+    Composition({'H': 4, 'O': 2})
+    >>> parse_composition("(H2O)2", 1)
+    Composition({'H': 4, 'O': 2})
+    >>> parse_composition("((H2O)2)2", 1)
+    Composition({'H': 8, 'O': 4})
+    >>> parse_composition("^NO3", 1)
+    Composition({'^N': 1, 'O': 3})
+    >>> parse_composition("HHCCOO", 1)
+    Composition({'H': 2, 'C': 2, 'O': 2})
+    >>> parse_composition("", 1)
+    Composition({})
+
     :param formula_string: String containing the formula to parse.
     :type formula_string: str
     :param multiplier: Multiplier after brackets, defaults to 1
@@ -44,38 +73,55 @@ def parse_composition(formula_string: str, multiplier: int = 1) -> Composition:
     :return: Parsed composition as a pyteomics.Composition object.
     :rtype: Composition
     """
-    pattern = r"(\([^\(\)]+\))(\d*)"
     elements = Composition(formula="")
+    s = formula_string
+    while "(" in s:
+        # Find the first '(' and its matching ')'
+        open_idx = s.find("(")
+        depth = 1
+        close_idx = open_idx + 1
+        while close_idx < len(s) and depth > 0:
+            if s[close_idx] == "(":
+                depth += 1
+            elif s[close_idx] == ")":
+                depth -= 1
+            close_idx += 1
+        if depth != 0:
+            # Unmatched parenthesis, skip
+            break
+        # Extract group and multiplier
+        group = s[open_idx + 1 : close_idx - 1]
+        # Find multiplier after group
+        mult_str = ""
+        idx = close_idx
+        while idx < len(s) and s[idx].isdigit():
+            mult_str += s[idx]
+            idx += 1
+        group_mult = int(mult_str) if mult_str else 1
+        before = s[:open_idx]
+        after = s[idx:]
+        elements += parse_composition(before, multiplier)
+        elements += parse_composition(group, group_mult * multiplier)
+        s = after
+    # Parse remaining string (elements outside brackets)
     i = 0
-    while i < len(formula_string):
-        # Find next bracketed group
-        match = re.search(pattern, formula_string[i:])
-        if match:
-            start = i + match.start()
-            end = i + match.end()
-            # Parse before bracket
-            before = formula_string[i:start]
-            elements = elements + parse_composition(before, 1)
-            # Parse inside bracket
-            group = match.group(1)[1:-1]
-            group_mult = int(match.group(2)) if match.group(2) else 1
-            elements = elements + parse_composition(group, group_mult)
-            i = end
+    while i < len(s):
+        m = re.match(r"(\^?[A-Z][a-z]?)(\d*)", s[i:])
+        if m:
+            elem = m.group(1)
+            count = int(m.group(2)) if m.group(2) else 1
+            elements[elem] += count * multiplier
+            i += len(m.group(0))
         else:
-            # Parse remaining string (elements outside brackets)
-            m = re.match(r"([A-Z][a-z]?)(\d*)", formula_string[i:])
-            if m:
-                elem = m.group(1)
-                count = int(m.group(2)) if m.group(2) else 1
-                elements[elem] += count * multiplier
-                i += len(m.group(0))
-            else:
-                i += 1
+            i += 1
     return elements
 
 
 def to_hill_order(elements: dict) -> str:
     """Convert a dictionary of elements to Hill notation string."""
+    # For empty formula, return '()'
+    if not elements:
+        return "()"
     # Filter out zero and negative counts (can be if -H- is the ionization mechanism)
     elements = {k: v for k, v in elements.items() if v > 0}
     atomic_symbols = list(elements.keys())
@@ -178,6 +224,25 @@ def parse_atom_count_ranges(count_ranges: str) -> list:
 def normalize_formula_with_isotopes(formula: str) -> str:
     """
     Normalize a chemical formula by removing explicit isotope notations.
+
+    NOTE: This function does not combine isotopes with their non-isotopic counterparts,
+    it simply removes the isotope brackets. Use `parse_composition` to get a combined composition
+    if needed.
+
+    Examples
+    --------
+    >>> normalize_formula_with_isotopes("HN^NO6")
+    'HN^NO6'
+    >>> normalize_formula_with_isotopes("[18O]C2H4^N")
+    'OC2H4^N'
+    >>> normalize_formula_with_isotopes("[18O]2C2H4^N")
+    'O2C2H4^N'
+    >>> normalize_formula_with_isotopes("C6H12O6")
+    'C6H12O6'
+    >>> normalize_formula_with_isotopes("[13C]C5[2H]H11[18O]O5")
+    'CC5HH11OO5'
+    >>> normalize_formula_with_isotopes("")
+    ''
 
     :param formula: Chemical formula string, e.g. "[13C]H4[18O]"
     :type formula: str
