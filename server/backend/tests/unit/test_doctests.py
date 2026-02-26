@@ -25,7 +25,7 @@ import sys
 import pytest
 
 # Package prefix to scan for doctests
-PACKAGE_PREFIX = "mascope_backend"
+PACKAGE_PREFIX = "mascope"
 
 
 def _find_modules_with_doctests():
