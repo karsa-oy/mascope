@@ -209,7 +209,6 @@ class TofDaqStreamer(Thread):
         self._base_filename = None
         self._filepath = None
         self._polarity = None
-        TwCleanupDll()
 
     def on_recorder_closed(self):
         """TofDaq Recorder closed callback"""

@@ -210,8 +210,9 @@ async def streamer_processor(streamer) -> None:
         :return: Returns nothing
         :rtype: None
         """
+        runtime.logger.debug(f"Received data from streamer: {data}")
         filename = data["filename"]
-        instrument_name = filename.split("_")[0]
+        instrument_name = filename.split("_")[0] if filename else None
         polarity = data.get("polarity")
         spec_i = data["i"]  # scan index
         notification_data = {
