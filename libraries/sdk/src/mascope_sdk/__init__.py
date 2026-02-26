@@ -1,7 +1,36 @@
+"""Mascope SDK - Python client for the Mascope API.
+
+This library provides a Pythonic interface to the Mascope mass spectrometry
+data analysis platform. It is designed for researchers working in Jupyter
+notebooks who want to load and analyze data from a Mascope server.
+
+For detailed documentation, see the README and docstrings.
+"""
+
 import warnings
 
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 
+# Version of the SDK
+__version__ = "2026.2.24"
+
+# New API exports
+from .client import MascopeClient
+from .exceptions import (
+    AuthenticationError,
+    ConfigurationError,
+    ConnectionError,
+    MascopeAPIError,
+    MascopeConnectionError,
+    MascopeError,
+    MascopeTimeoutError,
+    NotFoundError,
+    ServerError,
+    TimeoutError,
+    ValidationError,
+)
+
+# Legacy API exports (deprecated, kept for backwards compatibility)
 from ._legacy import (
     # Internal helpers (used by agents)
     SERVICE_NAME,
@@ -34,6 +63,20 @@ from ._legacy import (
 warnings.simplefilter("ignore", InsecureRequestWarning)
 
 __all__ = [
+    # New API (recommended)
+    "MascopeClient",
+    # Exceptions
+    "MascopeError",
+    "ConfigurationError",
+    "MascopeAPIError",
+    "AuthenticationError",
+    "NotFoundError",
+    "ValidationError",
+    "ServerError",
+    "ConnectionError",  # Alias for MascopeConnectionError
+    "TimeoutError",  # Alias for MascopeTimeoutError
+    "MascopeConnectionError",
+    "MascopeTimeoutError",
     # Legacy functions (deprecated, kept for backwards compatibility)
     "get_workspaces",
     "get_sample_batches",

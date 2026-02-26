@@ -1,7 +1,25 @@
 """Legacy API functions (deprecated).
 
 This module contains deprecated functions that are scheduled for removal
-in a future release.
+in a future release. These functions are preserved for backwards compatibility
+but new code should use :class:`MascopeClient` instead.
+
+.. deprecated::
+    All functions in this module are deprecated. Use :class:`MascopeClient` for new code.
+
+Migration Guide:
+    Old API::
+
+        from mascope_sdk import get_workspaces, get_sample_batches
+        workspaces = get_workspaces(url, token)
+        batches = get_sample_batches(url, token, workspace_id)
+
+    New API::
+
+        from mascope_sdk import MascopeClient
+        mascope = MascopeClient()  # Loads credentials from .env
+        workspaces = mascope.workspaces.list()
+        batches = mascope.batches.list(workspace_id)
 """
 
 import functools
