@@ -212,7 +212,7 @@ const addButtonDisabled = computed(
   <Popover ref="popover">
     <div class="col" style="gap: 0rem">
       <h4 style="margin: 1rem 0">
-        Add compound to '{{ targetCollection.target_collection_name }}'
+        Add compound to '{{ targetCollection?.target_collection_name ?? 'selected collection' }}'
       </h4>
       <FloatLabel style="margin: 1rem 0">
         <InputText
