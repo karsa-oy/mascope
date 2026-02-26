@@ -22,6 +22,11 @@ from mascope_backend.db import (
 )
 from mascope_backend.runtime import runtime
 from mascope_match.params import BaseMatchParams
+from mascope_tools.composition.utils import (
+    normalize_formula_with_isotopes,
+    parse_composition,
+    to_hill_order,
+)
 
 
 @api_controller()
@@ -119,6 +124,9 @@ async def retrieve_cheminfo_by_mz(
             # Revert explicit isotope format back to custom element format
             for custom_elem, replaced_with in custom_element_dict.items():
                 formula = formula.replace(replaced_with, custom_elem)
+            formula = to_hill_order(
+                parse_composition(normalize_formula_with_isotopes(formula))
+            )
             results.append(
                 {
                     "sample_peak_mz": mz,
