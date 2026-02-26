@@ -310,7 +310,10 @@ def _process_isotope(
     )
     mz_min, mz_max = iso.mz - ctx.dmz, iso.mz + ctx.dmz
     isotope_averaged_spec = ctx.averaged_signal.sel(mz=slice(mz_min, mz_max))
-    isotope_peak_heights = ctx.mean_peak_heights.sel(mz=slice(mz_min, mz_max))
+    if ctx.mean_peak_heights.mz.size > 0:
+        isotope_peak_heights = ctx.mean_peak_heights.sel(mz=slice(mz_min, mz_max))
+    else:
+        isotope_peak_heights = None
 
     if isotope_averaged_spec.size == 0:
         # No spectrum in the given mz range
@@ -354,6 +357,8 @@ def _process_isotope(
         }
     )
 
+    if isotope_peak_heights is None:
+        return isotope_result
     # Convert to float32 for more efficient serialization to the frontend
     peak_x = isotope_peak_heights.mz.values.astype(np.float32)
     peak_y = isotope_peak_heights.values.astype(np.float32)
