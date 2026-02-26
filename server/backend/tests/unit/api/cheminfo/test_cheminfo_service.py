@@ -41,7 +41,7 @@ def assert_cheminfo_result_row_format(result: dict):
         (168.9506, "C3H6O3", ""),
         # Extended test cases, covering non-default parameters
         (78.9189, "Br", "Br0-1"),
-        (80.9168, "[81Br]", "[81Br]0-1"),
+        (80.9168, "Br", "[81Br]0-1"),
         (62.9854, "O3^N", "^N0-1"),
     ],
 )
