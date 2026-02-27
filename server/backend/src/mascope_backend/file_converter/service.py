@@ -1,8 +1,11 @@
 import os
 from multiprocessing import Queue
+from queue import Queue as ThreadQueue
 from threading import Event
 from time import sleep
 
+from mascope_backend.file_converter.peak_guard import PeakDetectionGuard
+from mascope_backend.file_converter.peak_recompute_worker import PeakRecomputeWorker
 from mascope_backend.file_converter.socket.client import FileConverterSocketClient
 from mascope_backend.file_converter.watcher import FSWatcher
 from mascope_thermo.processor import RawProcessor
@@ -32,7 +35,14 @@ def main():
 SHUTDOWN_EVENT = Event()
 HOST = runtime.config.server if runtime.mode == "prod" else "localhost"
 URL = f"http://{HOST}:{runtime.meta.api_port}"
-SOCKET_CLIENT = FileConverterSocketClient(URL)
+# Number of peak detection requests that can run in parallel.
+# Controls how many PeakRecomputeWorker threads are spawned.
+PEAK_CONCURRENCY = 1
+PEAK_GUARD = PeakDetectionGuard()
+PEAK_RECOMPUTE_QUEUE: ThreadQueue = ThreadQueue()
+SOCKET_CLIENT = FileConverterSocketClient(
+    URL, peak_recompute_queue=PEAK_RECOMPUTE_QUEUE
+)
 
 
 def run():
@@ -55,6 +65,7 @@ def run():
             socket_client=SOCKET_CLIENT,
             file_queue=h5_file_queue,
             shutdown_event=SHUTDOWN_EVENT,
+            peak_guard=PEAK_GUARD,
         )
         for _ in range(runtime.config.h5_threads)
     ]
@@ -74,6 +85,7 @@ def run():
             socket_client=SOCKET_CLIENT,
             file_queue=raw_file_queue,
             shutdown_event=SHUTDOWN_EVENT,
+            peak_guard=PEAK_GUARD,
         )
         for _ in range(runtime.config.raw_threads)
     ]
@@ -92,6 +104,19 @@ def run():
     for processor in processors:
         processor.start()
 
+    # Peak detection workers (handle peak detection requests from backend)
+    peak_recompute_workers = [
+        PeakRecomputeWorker(
+            socket_client=SOCKET_CLIENT,
+            peak_recompute_queue=PEAK_RECOMPUTE_QUEUE,
+            peak_guard=PEAK_GUARD,
+            shutdown_event=SHUTDOWN_EVENT,
+        )
+        for _ in range(PEAK_CONCURRENCY)
+    ]
+    for worker in peak_recompute_workers:
+        worker.start()
+
     try:
         # Run main loop
         main()
@@ -104,6 +129,8 @@ def run():
             processor.join()
         raw_fs_watcher.join()
         h5_fs_watcher.join()
+        for worker in peak_recompute_workers:
+            worker.join()
 
 
 if __name__ == "__main__":

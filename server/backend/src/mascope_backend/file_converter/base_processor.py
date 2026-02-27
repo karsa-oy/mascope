@@ -25,6 +25,7 @@ from .api import (
     create_sample_file_db_record,
     delete_sample_file_by_filename,
 )
+from .peak_guard import PeakDetectionGuard
 from .runtime import runtime
 from .schema import SampleFileProps
 
@@ -110,6 +111,7 @@ class BaseFileProcessor(Thread, ABC, metaclass=FileProcessorMeta):
         socket_client,
         file_queue=Queue(),
         shutdown_event=Event(),
+        peak_guard: PeakDetectionGuard | None = None,
     ):
         Thread.__init__(self)
         runtime.logger.info(f"{self.__class__.__name__} initialized")
@@ -119,6 +121,7 @@ class BaseFileProcessor(Thread, ABC, metaclass=FileProcessorMeta):
         self.shutdown_event = shutdown_event
         self.cancel_event = Event()
         self.active = Event()
+        self.peak_guard = peak_guard
 
         self.file_to_process = None  # Path to the file to process
         self.file_handle = None  # Abstract file reference, managed by context manager
@@ -205,8 +208,22 @@ class BaseFileProcessor(Thread, ABC, metaclass=FileProcessorMeta):
     def _compute_peaks(
         self, filename: str, instrument_functions: tuple[any, any, any]
     ) -> None:
-        """Compute peaks for the processed file."""
-        asyncio.run(compute_peaks(filename, instrument_functions))
+        """Compute peaks for the processed file.
+
+        Gets the global peak detection guard so that only one file
+        is fitted at a time across the whole file converter service.
+        """
+        if self.peak_guard is not None:
+            is_acquired, acquisition_failure_reason = self.peak_guard.acquire(filename)
+            if not is_acquired:
+                raise RuntimeError(acquisition_failure_reason)
+        try:
+            asyncio.run(compute_peaks(filename, instrument_functions))
+        finally:
+            # Release the guard in case of any exception to avoid deadlocks,
+            # but only if it was acquired successfully
+            if self.peak_guard is not None:
+                self.peak_guard.release(filename)
 
     def _copy_file_to_filestore(self, source_path: str, target_dir: str) -> None:
         """Copy raw file to filestore."""
@@ -372,8 +389,6 @@ class BaseFileProcessor(Thread, ABC, metaclass=FileProcessorMeta):
     ) -> None:
         """Process file with orphaned directory handling."""
         filename = sample_file_props.filename
-        file_basename = os.path.basename(self.file_to_process)
-        instrument = get_instrument_name(filename)
 
         try:
             self._emit_progress_notification(0)

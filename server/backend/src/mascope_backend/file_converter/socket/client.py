@@ -8,11 +8,13 @@ from mascope_backend.runtime import runtime
 class FileConverterSocketClient:
     """Socket.IO client for file converter service"""
 
-    def __init__(self, url: str):
+    def __init__(self, url: str, peak_recompute_queue=None):
         self.url = url
         self.sio = socketio.Client(logger=False, ssl_verify=False)
         self.context_manager = FileContextManager()
-        self.event_handler = SocketEventHandler(self)
+        self.event_handler = SocketEventHandler(
+            self, peak_recompute_queue=peak_recompute_queue
+        )
         self._print_registered_events()
 
     def _print_registered_events(self):

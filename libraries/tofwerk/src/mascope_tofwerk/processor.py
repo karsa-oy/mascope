@@ -19,11 +19,12 @@ from mascope_tofwerk.tofwerk import open_h5_file
 class H5Processor(BaseFileProcessor):
     """Read and process TOF h5 files"""
 
-    def __init__(self, socket_client, file_queue, shutdown_event):
+    def __init__(self, socket_client, file_queue, shutdown_event, peak_guard=None):
         super().__init__(
             socket_client=socket_client,
             file_queue=file_queue,
             shutdown_event=shutdown_event,
+            peak_guard=peak_guard,
         )
 
     @property

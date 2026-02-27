@@ -6,10 +6,11 @@ and filestore records via HTTP requests to the API service.
 """
 
 from datetime import datetime, timedelta
-
+from types import SimpleNamespace
 import requests
 
 from mascope_backend.api.new.instrument_configs.schemas import PeakShape
+from mascope_backend.api.new.instrument_configs.lib import parse_instrument_functions
 from mascope_file.name import get_instrument_name
 
 from .runtime import runtime
@@ -18,6 +19,54 @@ from .schema import SampleFileProps
 
 HOST = runtime.config.server if runtime.mode == "prod" else "localhost"
 URL = f"http://{HOST}:{runtime.meta.api_port}"
+
+
+def fetch_instrument_functions(
+    filename: str, access_token: str
+) -> tuple[dict, callable]:
+    """Fetch instrument functions for a sample file via HTTP and parse them.
+
+    Calls "GET /api/instrument_configs/by_filename/{filename}" on the backend
+    API and reconstructs the peakshape dict + resolution function callable.
+
+    :param filename: Sample filename whose instrument config to fetch.
+    :type filename: str
+    :param access_token: Bearer token for request authentication.
+    :type access_token: str
+    :return: Tuple of (peakshape_dict, resolution_function_callable).
+    :rtype: tuple[dict, callable]
+    :raises ValueError: If the backend returns no instrument config.
+    :raises Exception: If the HTTP request fails.
+    """
+
+    headers = {
+        "X-Service-Name": "file-converter",
+        "Authorization": f"Bearer {access_token}",
+    }
+
+    try:
+        response = requests.get(
+            f"{URL}/api/instrument_configs/by_filename/{filename}",
+            headers=headers,
+            timeout=30,
+        )
+        if response.status_code != 200:
+            raise ValueError(
+                f"Failed to fetch instrument config for {filename}: HTTP {response.status_code}"
+            )
+
+        data = response.json().get("data", {})
+        # parse_instrument_functions expects a model with .peakshape and .resolution_function
+        instrument_config = SimpleNamespace(
+            peakshape=data["peakshape"],
+            resolution_function=data["resolution_function"],
+        )
+        return parse_instrument_functions(instrument_config)
+
+    except requests.exceptions.RequestException as e:
+        raise Exception(
+            f"Failed to fetch instrument functions for {filename}: {e}"
+        ) from e
 
 
 def create_sample_file_db_record(

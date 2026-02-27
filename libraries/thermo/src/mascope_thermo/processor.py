@@ -22,11 +22,13 @@ class RawProcessor(BaseFileProcessor):
         socket_client,
         file_queue,
         shutdown_event,
+        peak_guard=None,
     ):
         super().__init__(
             socket_client=socket_client,
             file_queue=file_queue,
             shutdown_event=shutdown_event,
+            peak_guard=peak_guard,
         )
 
     @property

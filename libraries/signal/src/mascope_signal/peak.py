@@ -25,10 +25,18 @@ from mascope_signal.runtime import runtime
 # Restrict large chunks for dask
 dask.config.set(**{"array.slicing.split_large_chunks": True})
 
-# Set up a global ProcessPoolExecutor
 cpu_cores = os.cpu_count()
 max_workers = max(1, cpu_cores // 2)
-EXECUTOR = ProcessPoolExecutor(max_workers=max_workers)
+_EXECUTOR: ProcessPoolExecutor | None = None
+
+
+def _get_executor() -> ProcessPoolExecutor:
+    """Get or create the global ProcessPoolExecutor (lazy initialization)."""
+    global _EXECUTOR
+    if _EXECUTOR is None:
+        _EXECUTOR = ProcessPoolExecutor(max_workers=max_workers)
+    return _EXECUTOR
+
 
 # Define the delta m/z around unit masses for peak detection
 DMZ = 0.5
@@ -227,11 +235,12 @@ class TofPeakDetector(BasePeakDetector):
         specs_to_fit = self._segment_spectrum_for_fitting()
 
         loop = asyncio.get_event_loop()
+        executor = _get_executor()
 
         # Fill in asynchronous operations
         futures = [
             loop.run_in_executor(
-                EXECUTOR,
+                executor,
                 m_fitting.fit_n_peaks,
                 mz_chunk,
                 spec_chunk,

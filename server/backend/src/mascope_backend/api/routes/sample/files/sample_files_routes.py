@@ -3,7 +3,7 @@ import shutil
 from datetime import datetime, timedelta, timezone
 from typing import Callable
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
 from tuspyserver import create_tus_router
 
 from mascope_backend.api.controllers.sample.files.process.service import (
@@ -11,7 +11,6 @@ from mascope_backend.api.controllers.sample.files.process.service import (
     re_process_sample_files,
 )
 from mascope_backend.api.controllers.sample.files.sample_files_controller import (
-    compute_sample_file_peaks,
     create_sample_file,
     delete_sample_file,
     delete_sample_files,
@@ -42,6 +41,8 @@ from mascope_backend.api.new.auth.access_token.service import get_access_token
 from mascope_backend.api.new.auth.dependencies import editor_user, guest_user
 from mascope_backend.db.id import gen_id
 from mascope_backend.runtime import runtime
+from mascope_backend.socket import sio
+from mascope_backend.socket.emitter import event_emitter
 
 
 sample_files_router = APIRouter(prefix="/api/sample/files", tags=["Sample Files"])
@@ -186,28 +187,52 @@ async def compute_sample_file_peaks_route(
     background_tasks: BackgroundTasks,
     user=Depends(editor_user),
 ):
-    """Compute all peaks for a sample file asynchronously.
+    """Delegate peak computation for a sample file to the File Converter service.
 
     :param sample_file_id: ID of the sample file to compute peaks for.
-    :param background_tasks: FastAPI background task manager.
+    :param background_tasks: FastAPI background task manager
+        (unused, kept for compatibility).
     :param user: Authenticated user with editor access.
     :return: Process initiation message.
     """
-    # Verify the existance of sample file
+    # Verify sample file existence
     sample_file_data = await get_sample_file(sample_file_id)
     filename = sample_file_data.get("data").get("filename")
 
-    process_id = gen_id(8)
+    # Check that the file converter service is connected
+    try:
+        connected_clients = list(
+            sio.manager.get_participants(namespace="/file-converter", room=None)
+        )
+    except Exception:
+        # If the manager is not available or any error occurs,
+        # assume no clients are connected
+        connected_clients = False
 
-    background_tasks.add_task(
-        compute_sample_file_peaks,
-        sample_file_id=sample_file_id,
-        independent_transaction=True,
-        user_id=user.id,
-        process_id=process_id,
+    if not connected_clients:
+        raise HTTPException(
+            status_code=503,
+            detail="File converter service is not available or not running.",
+        )
+
+    process_id = gen_id(8)
+    access_token = await get_access_token(user=user, service_name="file-converter")
+
+    # Emit peak detection request to file converter service via Socket.IO
+    await event_emitter.emit(
+        "file-converter.peak_detection_request",
+        {
+            "filename": filename,
+            "sample_file_id": sample_file_id,
+            "user_id": user.id,
+            "username": user.username,
+            "role_id": user.role_id,
+            "access_token": access_token,
+        },
     )
+
     return {
-        "message": f"Computing all peaks data for sample file '{filename}', please wait.",
+        "message": f"Peak detection requested for sample file '{filename}'. The file converter service will process it.",
         "process_id": process_id,
     }
 
