@@ -11,7 +11,7 @@ dependencies = [
     "h5py~=3.11",
     "numpy~=1.26",
     "pandas~=2.2",
-    "pillow~=10.3",
+    "pillow~=12.1",
     "xarray>=2025.06.1",
 ]
 
