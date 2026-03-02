@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 import asyncio
 import os
 import math
+import threading
 from collections.abc import Callable
 from concurrent.futures import ProcessPoolExecutor
 import numpy as np
@@ -29,13 +30,23 @@ dask.config.set(**{"array.slicing.split_large_chunks": True})
 cpu_cores = os.cpu_count()
 max_workers = max(1, cpu_cores // 2)
 _EXECUTOR: ProcessPoolExecutor | None = None
+_EXECUTOR_LOCK = threading.Lock()
 
 
 def _get_executor() -> ProcessPoolExecutor:
-    """Get or create the global ProcessPoolExecutor (lazy initialization)."""
+    """Get or create the global ProcessPoolExecutor (lazy initialization).
+
+    The external check makes sure we don't acquire the lock unnecessarily
+    after the executor is created.
+
+    The internal check is needed to avoid race condition where multiple
+    threads pass the first check before the executor is initialized.
+    """
     global _EXECUTOR
     if _EXECUTOR is None:
-        _EXECUTOR = ProcessPoolExecutor(max_workers=max_workers)
+        with _EXECUTOR_LOCK:
+            if _EXECUTOR is None:
+                _EXECUTOR = ProcessPoolExecutor(max_workers=max_workers)
     return _EXECUTOR
 
 
