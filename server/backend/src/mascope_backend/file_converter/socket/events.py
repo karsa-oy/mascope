@@ -37,17 +37,13 @@ class SocketEventHandler:
         def on_peak_detection_request(data):
             """Handles peak detection requests from the backend.
 
-            Registers a temporary file context for authentication, then
-            enqueues the request for the PeakRecomputeWorker thread.
-
-            Authentication is required since peak detection needs to fetch instrument
-            functions via HTTP as the file converter has no DB access.
+            Enqueues the request for the PeakRecomputeWorker thread.
+            Auth credentials (access_token, user_id) are carried inside
+            the queue item.
             """
             runtime.logger.info(
                 f"Received peak detection request for {data['filename']}"
             )
-            context = _build_file_context(data)
-            self.client.context_manager.register_file(context)
 
             if self._peak_recompute_queue is not None:
                 self._peak_recompute_queue.put(data)

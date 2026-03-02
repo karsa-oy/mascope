@@ -42,6 +42,19 @@ class PeakRecomputeWorker(Thread):
         self.peak_guard = peak_guard
         self.shutdown_event = shutdown_event
 
+    def _emit_with_auth(self, event: str, data: dict, auth: dict):
+        """Emit a socket event with auth credentials payload.
+
+        :param event: Socket.IO event name to emit
+        :type event: str
+        :param data: Event payload data (e.g. filename, progress, etc.)
+        :type data: dict
+        :param auth: Authentication credentials to include in the payload.
+        :type auth: dict
+        """
+        payload = {**data, **auth}
+        self.socket_client.sio.emit(event, payload, namespace="/file-converter")
+
     def run(self):
         runtime.logger.info("PeakRecomputeWorker started")
 
@@ -53,6 +66,13 @@ class PeakRecomputeWorker(Thread):
 
             filename = peak_detection_request.get("filename")
             sample_file_id = peak_detection_request.get("sample_file_id")
+            process_id = peak_detection_request.get("process_id")
+
+            # Auth credentials travel with the queue item
+            auth = {
+                "access_token": peak_detection_request.get("access_token"),
+                "user_id": peak_detection_request.get("user_id"),
+            }
 
             runtime.logger.info(
                 f"PeakRecomputeWorker: processing peak detection for '{filename}'"
@@ -61,35 +81,56 @@ class PeakRecomputeWorker(Thread):
             is_acquired, failure_reason = self.peak_guard.acquire(filename)
             if not is_acquired:
                 # Duplicate — emit warning back to backend
-                self.socket_client.emit(
+                self._emit_with_auth(
                     "peak_detection_error",
                     {
                         "filename": filename,
                         "sample_file_id": sample_file_id,
+                        "process_id": process_id,
                         "error": failure_reason,
                     },
+                    auth,
                 )
                 continue
 
             try:
-                # Fetch instrument functions via HTTP (file converter has no DB access)
-                auth_context = self.socket_client.context_manager.get_context(filename)
-                if not auth_context:
-                    raise RuntimeError(f"No auth context available for '{filename}'")
+                access_token = peak_detection_request.get("access_token")
                 instrument_functions = fetch_instrument_functions(
-                    filename, auth_context.access_token
+                    filename, access_token
                 )
-                asyncio.run(compute_peaks(filename, instrument_functions))
+
+                def progress_callback(progress: int):
+                    """Emit peak detection progress to the backend."""
+                    self._emit_with_auth(
+                        "peak_detection_progress",
+                        {
+                            "filename": filename,
+                            "sample_file_id": sample_file_id,
+                            "process_id": process_id,
+                            "progress": progress,
+                        },
+                        auth,
+                    )
+
+                asyncio.run(
+                    compute_peaks(
+                        filename,
+                        instrument_functions,
+                        progress_callback=progress_callback,
+                    )
+                )
 
                 runtime.logger.info(
                     f"PeakRecomputeWorker: peak detection complete for '{filename}'"
                 )
-                self.socket_client.emit(
+                self._emit_with_auth(
                     "peak_detection_complete",
                     {
                         "filename": filename,
                         "sample_file_id": sample_file_id,
+                        "process_id": process_id,
                     },
+                    auth,
                 )
 
             except Exception as e:
@@ -97,17 +138,17 @@ class PeakRecomputeWorker(Thread):
                     f"PeakRecomputeWorker: peak detection failed for '{filename}': "
                     f"{e}\n{traceback.format_exc()}"
                 )
-                self.socket_client.emit(
+                self._emit_with_auth(
                     "peak_detection_error",
                     {
                         "filename": filename,
                         "sample_file_id": sample_file_id,
+                        "process_id": process_id,
                         "error": str(e),
                     },
+                    auth,
                 )
             finally:
                 self.peak_guard.release(filename)
-                # Clear the temporary auth context registered for this request
-                self.socket_client.context_manager.clear_context(filename)
 
         runtime.logger.info("PeakRecomputeWorker stopped")

@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 import asyncio
 import os
 import math
+from collections.abc import Callable
 from concurrent.futures import ProcessPoolExecutor
 import numpy as np
 import pandas as pd
@@ -116,7 +117,9 @@ class BasePeakDetector(ABC):
         runtime.logger.info("Writing peak timeseries completed.")
 
     @abstractmethod
-    async def detect_peaks(self):
+    async def detect_peaks(
+        self, progress_callback: Callable[[int], None] | None = None
+    ):
         raise NotImplementedError("Subclasses must implement detect_peaks method")
 
     @abstractmethod
@@ -131,32 +134,39 @@ class BasePeakDetector(ABC):
 
 
 class OrbiPeakDetector(BasePeakDetector):
-    async def detect_peaks(self, **kwargs):
+    async def detect_peaks(
+        self, progress_callback: Callable[[int], None] | None = None, **kwargs
+    ):
         """Detect peaks in the summed Orbitrap spectrum.
 
+        :param progress_callback: Optional callback invoked with progress percentage (0-100).
+        :type progress_callback: Callable[[int], None] | None
         :return: Sample file data with updated peak information
         :rtype: xarray.Dataset
         """
+        progress_callback(10)
         runtime.logger.debug("Reading centroids from the Thermo file...")
         # Get CALIBRATED centroids
         try:
             peaks_pos = await self._extract_peaks_for_polarity("+")
         except Exception as e:
-            runtime.logger.debug("No positive polarity data found.")
+            runtime.logger.debug(f"No positive polarity data found: {e}")
             peaks_pos = None
         try:
             peaks_neg = await self._extract_peaks_for_polarity("-")
         except Exception as e:
-            runtime.logger.debug("No negative polarity data found.")
+            runtime.logger.debug(f"No negative polarity data found: {e}")
             peaks_neg = None
 
         datasets = [ds for ds in [peaks_pos, peaks_neg] if ds is not None]
         peaks = xarray.concat(datasets, dim="mz").sortby("mz")
 
+        progress_callback(80)
         runtime.logger.debug("Computing peak timeseries...")
         self._allocate_peak_timeseries(peaks)
         self._flag_weak_peaks()
         self._flag_satellite_peaks()
+        progress_callback(100)
 
     async def _extract_peaks_for_polarity(self, polarity: str) -> xarray.Dataset:
         """A workaround to extract peaks for a given polarity from Thermo Orbitrap files."""
@@ -222,12 +232,15 @@ class TofPeakDetector(BasePeakDetector):
     async def detect_peaks(
         self,
         max_n_peaks: int = 5,
+        progress_callback: Callable[[int], None] | None = None,
         **kwargs,
     ) -> xarray.Dataset:
         """Detect peaks in the summed TOF spectrum around each unit mass in u_list.
 
         :param max_n_peaks: Maximum number of peaks to fit per unit mass, by default 5
         :type max_n_peaks: int, optional
+        :param progress_callback: Optional callback invoked with progress percentage (0-100).
+        :type progress_callback: Callable[[int], None] | None
         :return: Sample file data with updated peak information
         :rtype: xarray.Dataset
         """
@@ -254,7 +267,7 @@ class TofPeakDetector(BasePeakDetector):
         ]
 
         peaks = []
-        last_progress = None
+        last_progress = 0
         fit_warnings = set()
         runtime.logger.debug("Run peak detection")
         for i, future in enumerate(asyncio.as_completed(futures)):
@@ -267,6 +280,7 @@ class TofPeakDetector(BasePeakDetector):
             rounded_progress = math.floor(progress / 10) * 10
             if rounded_progress != last_progress:
                 runtime.logger.info(f"Peak detection progress: {rounded_progress}%")
+                progress_callback(rounded_progress)
             last_progress = rounded_progress
 
         # Log unique warnings
@@ -456,10 +470,22 @@ class TofZarrPeakDetector(TofPeakDetector):
     pass
 
 
-async def compute_peaks(filename: str, instrument_functions: tuple):
-    """Compute peaks for a sample file."""
+async def compute_peaks(
+    filename: str,
+    instrument_functions: tuple,
+    progress_callback: Callable[[int], None] | None = None,
+):
+    """Compute peaks for a sample file.
+
+    :param filename: Path to the sample file.
+    :type filename: str
+    :param instrument_functions: Tuple containing peak shape and resolution function.
+    :type instrument_functions: tuple
+    :param progress_callback: Optional callback invoked with progress percentage (0-100).
+    :type progress_callback: Callable[[int], None] | None
+    """
     peak_detector = get_peak_detector(filename, instrument_functions)
-    await peak_detector.detect_peaks()
+    await peak_detector.detect_peaks(progress_callback=progress_callback)
     await peak_detector.write_peaks_to_zarr()
 
 

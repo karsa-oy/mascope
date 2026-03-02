@@ -91,6 +91,34 @@ async def file_processing_success(sid, success_data):
 
 @sio.event(namespace="/file-converter")
 @file_converter_socket_auth(minimum_role="editor")
+async def peak_detection_progress(sid, data):
+    """Handle peak detection progress events from the file converter service.
+
+    Emitted periodically while peak detection is running.
+    """
+    user_id = data.get("user_id")
+    filename = data.get("filename")
+    sample_file_id = data.get("sample_file_id")
+    process_id = data.get("process_id")
+    progress = data.get("progress", 0)
+
+    notification = UserNotification(
+        process_id=process_id,
+        type="compute_sample_file_peaks",
+        status="pending",
+        message=f"Peak detection for '{filename}': {progress}%",
+        data={
+            "filename": filename,
+            "sample_file_id": sample_file_id,
+        },
+        progress=progress,
+    )
+
+    await emit_user_notification(notification=notification, user_id=user_id)
+
+
+@sio.event(namespace="/file-converter")
+@file_converter_socket_auth(minimum_role="editor")
 async def peak_detection_complete(sid, data):
     """Handle peak detection completion events from the file converter service.
 
@@ -99,9 +127,10 @@ async def peak_detection_complete(sid, data):
     user_id = data.get("user_id")
     filename = data.get("filename")
     sample_file_id = data.get("sample_file_id")
+    process_id = data.get("process_id")
 
     notification = UserNotification(
-        process_id=gen_id(8),
+        process_id=process_id,
         type="compute_sample_file_peaks",
         status="success",
         message=f"Peak detection completed for '{filename}'.",
@@ -126,10 +155,11 @@ async def peak_detection_error(sid, data):
     user_id = data.get("user_id")
     filename = data.get("filename")
     sample_file_id = data.get("sample_file_id")
+    process_id = data.get("process_id")
     error_message = data.get("error", "Unknown peak detection error")
 
     notification = UserNotification(
-        process_id=gen_id(8),
+        process_id=process_id,
         type="compute_sample_file_peaks",
         status="error",
         message=f"Peak detection failed for '{filename}': {error_message}",

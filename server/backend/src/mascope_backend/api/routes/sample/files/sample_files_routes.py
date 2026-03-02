@@ -43,6 +43,10 @@ from mascope_backend.db.id import gen_id
 from mascope_backend.runtime import runtime
 from mascope_backend.socket import sio
 from mascope_backend.socket.emitter import event_emitter
+from mascope_backend.socket.notifications import (
+    UserNotification,
+    emit_user_notification,
+)
 
 
 sample_files_router = APIRouter(prefix="/api/sample/files", tags=["Sample Files"])
@@ -224,12 +228,28 @@ async def compute_sample_file_peaks_route(
         {
             "filename": filename,
             "sample_file_id": sample_file_id,
+            "process_id": process_id,
             "user_id": user.id,
             "username": user.username,
             "role_id": user.role_id,
             "access_token": access_token,
         },
     )
+
+    # Send an immediate "pending" notification so the UI shows a progress
+    # bar as soon as the request is accepted.
+    pending_notification = UserNotification(
+        process_id=process_id,
+        type="compute_sample_file_peaks",
+        status="pending",
+        message=f"Peak detection queued for '{filename}'...",
+        data={
+            "filename": filename,
+            "sample_file_id": sample_file_id,
+        },
+        progress=5,  # Start with 5% to indicate it's in progress
+    )
+    await emit_user_notification(notification=pending_notification, user_id=user.id)
 
     return {
         "message": f"Peak detection requested for sample file '{filename}'. The file converter service will process it.",
