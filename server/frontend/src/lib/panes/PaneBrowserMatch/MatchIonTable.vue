@@ -15,10 +15,16 @@ import { collectionTypeIcons } from '@/lib/constants'
 import { prettyTrim } from '@/lib/utils'
 
 import { useApp } from '@/stores'
-import { useCollectionContextMenu, useIonContextMenu, useIonScroller } from './stores'
+import {
+  useCollectionContextMenu,
+  useIonContextMenu,
+  useIonScroller,
+  useIonTableCustomizer
+} from './stores'
 import { useSampleScroller } from '@/lib/panes/PaneBrowserSample/stores'
 import MatchCollectionContextMenu from './MatchCollectionContextMenu.vue'
 import MatchIonContextMenu from './MatchIonContextMenu.vue'
+import MatchIonTableCustomizer from './MatchIonTableCustomizer.vue'
 
 const app = useApp()
 const ionTable = ref(null)
@@ -26,6 +32,13 @@ const collectionContextMenu = useCollectionContextMenu()
 const ionContextMenu = useIonContextMenu()
 const sampleScroller = useSampleScroller()
 const ionScroller = useIonScroller()
+const ionTableCustomizer = useIonTableCustomizer()
+
+const isColumnVisible = (field) => {
+  const cols = ionTableCustomizer.config.columns
+  if (!cols || cols.length === 0) return true
+  return cols.some((c) => c.field === field)
+}
 
 // --- Breadcrumb Navigation ---
 const breadcrumb = computed(() => {
@@ -331,7 +344,10 @@ watch(
     "
   >
     <template #menu>
-      <PopoverTargetCompoundAdd :collection="app.data.match.collection.focused" />
+      <div class="row">
+        <PopoverTargetCompoundAdd :collection="app.data.match.collection.focused" />
+        <MatchIonTableCustomizer />
+      </div>
     </template>
 
     <DataTable
@@ -413,7 +429,13 @@ watch(
       </Column>
 
       <!-- Ion Formula Column -->
-      <Column field="target_ion_formula" header="Ion" sortable style="min-width: 10rem">
+      <Column
+        v-if="isColumnVisible('target_ion_formula')"
+        field="target_ion_formula"
+        header="Ion"
+        sortable
+        style="min-width: 10rem"
+      >
         <template #body="{ data }">
           <div
             :id="`target-ion-${data.target_ion_id}`"
@@ -436,6 +458,7 @@ watch(
 
       <!-- Compound name column -->
       <Column
+        v-if="isColumnVisible('target_compound_name')"
         field="target_compound_name"
         header="Name"
         sortable
@@ -457,6 +480,7 @@ watch(
 
       <!-- Compound formula column -->
       <Column
+        v-if="isColumnVisible('target_compound_formula')"
         field="target_compound_formula"
         header="Compound"
         sortable
@@ -481,6 +505,7 @@ watch(
 
       <!-- Ionization Mechanism Column -->
       <Column
+        v-if="isColumnVisible('ionization_mechanism')"
         field="ionization_mechanism"
         header="Mechanism"
         sortable
