@@ -413,8 +413,34 @@ watch(
         </template>
       </Column>
 
-      <!-- Compound (formula & name) Column -->
-      <Column field="target_compound_formula" header="Compound" sortable style="min-width: 10rem">
+      <!-- Compound name column -->
+      <Column
+        field="target_compound_name"
+        header="Name"
+        sortable
+        style="min-width: 10rem"
+      >
+        <template #body="{ data }">
+          <BaseCopyableField :field="data.target_compound_name" />
+        </template>
+        <template #filter="{ filterModel, filterCallback }">
+          <InputText
+            v-model="filterModel.value"
+            type="text"
+            @input="filterCallback()"
+            placeholder="Search compound..."
+            size="small"
+          />
+        </template>
+      </Column>
+
+      <!-- Compound formula column -->
+      <Column
+        field="target_compound_formula"
+        header="Compound"
+        sortable
+        style="min-width: 10rem"
+      >
         <template #body="{ data }">
           <BaseCopyableField
             :field="data.target_compound_formula"
