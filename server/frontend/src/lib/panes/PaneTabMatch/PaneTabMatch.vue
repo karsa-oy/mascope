@@ -64,6 +64,11 @@ const heights = computed(() => [
         <i>{{ app.data.match.visualized.ion?.target_ion_formula }}</i>
         {{ app.data.match.visualized.ion ? ' of compound ' : '' }}
         <i>{{ app.data.match.visualized.ion?.target_compound_formula }}</i>
+        {{
+          app.data.match.visualized.ion?.target_compound_name
+            ? ' (' + app.data.match.visualized.ion.target_compound_name + ')'
+            : ''
+        }}
       </h2>
       <ToolbarMatchRating />
     </menu>
