@@ -157,19 +157,32 @@ async def peak_detection_error(sid, data):
     sample_file_id = data.get("sample_file_id")
     process_id = data.get("process_id")
     error_message = data.get("error", "Unknown peak detection error")
+    status = data.get("status", "error")
 
-    notification = UserNotification(
-        process_id=process_id,
-        type="compute_sample_file_peaks",
-        status="error",
-        message=f"Peak detection failed for '{filename}': {error_message}",
-        data={
-            "filename": filename,
-            "sample_file_id": sample_file_id,
-        },
-        error={
-            "message": error_message,
-        },
-    )
+    if status == "warning":
+        notification = UserNotification(
+            process_id=process_id,
+            type="compute_sample_file_peaks",
+            status="warning",
+            message=error_message,
+            data={
+                "filename": filename,
+                "sample_file_id": sample_file_id,
+            },
+        )
+    else:
+        notification = UserNotification(
+            process_id=process_id,
+            type="compute_sample_file_peaks",
+            status="error",
+            message=f"Peak detection failed for '{filename}': {error_message}",
+            data={
+                "filename": filename,
+                "sample_file_id": sample_file_id,
+            },
+            error={
+                "message": error_message,
+            },
+        )
 
     await emit_user_notification(notification=notification, user_id=user_id)

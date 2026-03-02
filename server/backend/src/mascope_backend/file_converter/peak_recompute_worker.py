@@ -78,21 +78,7 @@ class PeakRecomputeWorker(Thread):
                 f"PeakRecomputeWorker: processing peak detection for '{filename}'"
             )
 
-            is_acquired, failure_reason = self.peak_guard.acquire(filename)
-            if not is_acquired:
-                # Duplicate — emit warning back to backend
-                self._emit_with_auth(
-                    "peak_detection_error",
-                    {
-                        "filename": filename,
-                        "sample_file_id": sample_file_id,
-                        "process_id": process_id,
-                        "error": failure_reason,
-                    },
-                    auth,
-                )
-                continue
-
+            # Start peak detection and emit progress updates back to the backend until complete
             try:
                 access_token = peak_detection_request.get("access_token")
                 instrument_functions = fetch_instrument_functions(

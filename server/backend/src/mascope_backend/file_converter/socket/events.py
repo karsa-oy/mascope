@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING
 
+from mascope_backend.file_converter.peak_guard import PeakDetectionGuard
 from mascope_backend.file_converter.socket.session import FileContext
 from mascope_backend.runtime import runtime
 
@@ -14,9 +15,11 @@ class SocketEventHandler:
         self,
         client: "FileConverterSocketClient",
         peak_recompute_queue: "Queue | None" = None,
+        peak_guard: "PeakDetectionGuard | None" = None,
     ):
         self.client = client
         self._peak_recompute_queue = peak_recompute_queue
+        self._peak_guard = peak_guard
         self.register_events()
 
     def register_events(self):
@@ -37,20 +40,44 @@ class SocketEventHandler:
         def on_peak_detection_request(data):
             """Handles peak detection requests from the backend.
 
-            Enqueues the request for the PeakRecomputeWorker thread.
+            Acquires the peak detection guard before enqueuing so that
+            duplicate requests for the same file are rejected immediately
+            instead of sitting in the queue.
+
             Auth credentials (access_token, user_id) are carried inside
             the queue item.
             """
+            filename = data["filename"]
             runtime.logger.info(
-                f"Received peak detection request for {data['filename']}"
+                f"Received peak detection request for {filename}"
             )
 
-            if self._peak_recompute_queue is not None:
-                self._peak_recompute_queue.put(data)
-            else:
+            if self._peak_recompute_queue is None:
                 runtime.logger.error(
                     "Peak detection queue not available - ignoring request"
                 )
+                return
+
+            if self._peak_guard is not None:
+                is_acquired, failure_reason = self._peak_guard.acquire(filename)
+                if not is_acquired:
+                    runtime.logger.warning(failure_reason)
+                    self.client.sio.emit(
+                        "peak_detection_error",
+                        {
+                            "filename": filename,
+                            "sample_file_id": data.get("sample_file_id"),
+                            "process_id": data.get("process_id"),
+                            "error": failure_reason,
+                            "status": "warning",
+                            "access_token": data.get("access_token"),
+                            "user_id": data.get("user_id"),
+                        },
+                        namespace="/file-converter",
+                    )
+                    return
+
+            self._peak_recompute_queue.put(data)
 
 
 def _build_file_context(data: dict) -> FileContext:

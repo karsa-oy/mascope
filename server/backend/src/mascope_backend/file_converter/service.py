@@ -41,7 +41,7 @@ PEAK_CONCURRENCY = 1
 PEAK_GUARD = PeakDetectionGuard()
 PEAK_RECOMPUTE_QUEUE: ThreadQueue = ThreadQueue()
 SOCKET_CLIENT = FileConverterSocketClient(
-    URL, peak_recompute_queue=PEAK_RECOMPUTE_QUEUE
+    URL, peak_recompute_queue=PEAK_RECOMPUTE_QUEUE, peak_guard=PEAK_GUARD
 )
 
 
