@@ -6,7 +6,7 @@ import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
-import { FilterMatchMode } from '@primevue/core/api'
+import { FilterMatchMode, FilterOperator } from '@primevue/core/api'
 
 import { BaseTabbedPanel, BaseMatchTag, BaseCopyableField } from '@/lib/base'
 import { PopoverTargetCompoundAdd } from '@/lib/dialogs'
@@ -112,17 +112,26 @@ const expanderIcon = computed(() =>
 // --- Filtering ---
 // Filters configuration for each column
 const filters = ref({
-  target_ion_formula: { value: null, matchMode: FilterMatchMode.CONTAINS },
-  target_compound_name: { value: null, matchMode: FilterMatchMode.CONTAINS },
-  target_compound_formula: { value: null, matchMode: FilterMatchMode.IN },
-  ionization_mechanism: { value: null, matchMode: FilterMatchMode.EQUALS }
+  target_ion_formula: {
+    operator: FilterOperator.AND,
+    constraints: [{ value: null, matchMode: FilterMatchMode.CONTAINS }]
+  },
+  target_compound_name: {
+    operator: FilterOperator.AND,
+    constraints: [{ value: null, matchMode: FilterMatchMode.CONTAINS }]
+  },
+  target_compound_formula: {
+    operator: FilterOperator.AND,
+    constraints: [{ value: null, matchMode: FilterMatchMode.CONTAINS }]
+  },
+  ionization_mechanism: {
+    operator: FilterOperator.AND,
+    constraints: [{ value: null, matchMode: FilterMatchMode.EQUALS }]
+  }
 })
 
 // Unique values for dropdown filters
 const filterOptions = computed(() => ({
-  compounds: [
-    ...new Set(app.data.match.ion.list.map((ion) => ion.target_compound_formula).filter(Boolean))
-  ],
   mechanisms: [
     ...new Set(app.data.match.ion.list.map((ion) => ion.ionization_mechanism).filter(Boolean))
   ]
@@ -181,7 +190,9 @@ const autoSelectTopMatches = (top = 30) => {
 const onKeyDown = (event) => {
   if ((event.ctrlKey || event.metaKey) && event.key === 'a') {
     event.preventDefault()
-    app.data.match.ion.selected = [...app.data.match.ion.list]
+    // Read processedData to get filtered rows
+    const filteredRows = ionTable.value?.processedData ?? app.data.match.ion.list
+    app.data.match.ion.selected = [...filteredRows]
   }
 }
 
@@ -278,7 +289,17 @@ watch(
   (focused) => {
     if (!focused) {
       // Clear dropdown when mechanism unfocused externally (chip, etc)
-      filters.value.ionization_mechanism.value = null
+      filters.value.ionization_mechanism.constraints[0].value = null
+    }
+  }
+)
+
+// Watch mechanism filter value and sync unfocus when cleared externally (filter menu "Clear" button)
+watch(
+  () => filters.value.ionization_mechanism.constraints[0].value,
+  (value) => {
+    if (!value) {
+      app.data.ionization.mechanism.unfocus()
     }
   }
 )
@@ -459,7 +480,13 @@ watch(
       </Column>
 
       <!-- Ionization Mechanism Column -->
-      <Column field="ionization_mechanism" header="Mechanism" sortable style="min-width: 10rem">
+      <Column
+        field="ionization_mechanism"
+        header="Mechanism"
+        sortable
+        style="min-width: 10rem"
+        :filterMatchModeOptions="[{ label: 'Equals', value: 'equals' }]"
+      >
         <template #body="{ data }">
           <BaseCopyableField :field="data.ionization_mechanism"> </BaseCopyableField>
         </template>
