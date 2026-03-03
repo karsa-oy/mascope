@@ -43,23 +43,47 @@ async def register_service(service_name: str, sid: str) -> None:
         )
 
 
-async def unregister_service(service_name: str) -> None:
-    """
-    Remove a service's presence key from Redis.
+# Lua script for check-and-delete operation on disconnect.
+# Deletes the key only when its value matches the given sid,
+# preventing a stale disconnect if the service reconnected with a new sid
+# before the disconnect handler ran.
+_UNREGISTER_SCRIPT = """
+if redis.call('GET', KEYS[1]) == ARGV[1] then
+    return redis.call('DEL', KEYS[1])
+else
+    return 0
+end
+"""
 
+
+async def unregister_service(service_name: str, sid: str) -> None:
+    """
     Called from the Socket.IO disconnect handler when a service disconnects.
+
+    Removes a service's presence key from Redis only if the stored sid
+    matches the disconnecting sid.
 
     :param service_name: Service identifier (e.g., "file-converter")
     :type service_name: str
+    :param sid: Socket.IO session ID of the disconnecting service
+    :type sid: str
     """
     worker_pid = os.getpid()
     key = storage_config.service_key(service_name)
 
     try:
-        await redis_storage_client.client.delete(key)
-        runtime.logger.debug(
-            f"Service '{service_name}' unregistered [Worker {worker_pid}]"
+        deleted = await redis_storage_client.client.eval(
+            _UNREGISTER_SCRIPT, 1, key, sid
         )
+        if deleted:
+            runtime.logger.debug(
+                f"Service '{service_name}' unregistered (sid={sid}) [Worker {worker_pid}]"
+            )
+        else:
+            runtime.logger.debug(
+                f"Service '{service_name}' disconnect skipped — sid mismatch "
+                f"(disconnecting={sid}) [Worker {worker_pid}]"
+            )
     except Exception as e:
         runtime.logger.error(
             f"Failed to unregister service '{service_name}': {e} [Worker {worker_pid}]"

@@ -57,7 +57,7 @@ async def disconnect(sid: str) -> None:
     :type sid: str
     """
     worker_pid = os.getpid()
-    await unregister_service("file-converter")
+    await unregister_service("file-converter", sid)
     runtime.logger.debug(
         f"File converter service disconnected: {sid} [Worker {worker_pid}]"
     )
