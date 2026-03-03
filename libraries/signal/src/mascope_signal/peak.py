@@ -155,6 +155,9 @@ class OrbiPeakDetector(BasePeakDetector):
         :return: Sample file data with updated peak information
         :rtype: xarray.Dataset
         """
+        # Handle None progress callback by using a no-op function
+        progress_callback = progress_callback or (lambda progress: None)
+
         progress_callback(10)
         runtime.logger.debug("Reading centroids from the Thermo file...")
         # Get CALIBRATED centroids
@@ -255,6 +258,9 @@ class TofPeakDetector(BasePeakDetector):
         :return: Sample file data with updated peak information
         :rtype: xarray.Dataset
         """
+        # Handle None progress callback by using a no-op function
+        progress_callback = progress_callback or (lambda progress: None)
+
         self._sample_interval = self._sample_file_props.get("sample_interval", 0.25)
         specs_to_fit = self._segment_spectrum_for_fitting()
 
