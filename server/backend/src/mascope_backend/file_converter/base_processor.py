@@ -210,8 +210,8 @@ class BaseFileProcessor(Thread, ABC, metaclass=FileProcessorMeta):
     ) -> None:
         """Compute peaks for the processed file.
 
-        Gets the global peak detection guard so that only one file
-        is fitted at a time across the whole file converter service.
+        Uses the peak detection guard to avoid running peak detection
+        concurrently for the same file (per filename).
         """
         if self.peak_guard is not None:
             is_acquired, acquisition_failure_reason = self.peak_guard.acquire(filename)
