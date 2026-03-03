@@ -11,6 +11,7 @@ import os
 
 from mascope_backend.runtime import runtime
 from mascope_backend.socket import sio
+from mascope_backend.socket.storage.services import register_service, unregister_service
 
 
 @sio.event(namespace="/file-converter")
@@ -30,6 +31,7 @@ async def connect(sid: str, environ: dict) -> bool:
     try:
         service_name = environ.get("HTTP_X_SERVICE_NAME")
         if service_name == "file-converter":
+            await register_service("file-converter", sid)
             runtime.logger.debug(
                 f"File converter service connected with sid {sid} [Worker {worker_pid}]"
             )
@@ -55,6 +57,7 @@ async def disconnect(sid: str) -> None:
     :type sid: str
     """
     worker_pid = os.getpid()
+    await unregister_service("file-converter")
     runtime.logger.debug(
         f"File converter service disconnected: {sid} [Worker {worker_pid}]"
     )

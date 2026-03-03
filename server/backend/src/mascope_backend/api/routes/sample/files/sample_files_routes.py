@@ -41,8 +41,8 @@ from mascope_backend.api.new.auth.access_token.service import get_access_token
 from mascope_backend.api.new.auth.dependencies import editor_user, guest_user
 from mascope_backend.db.id import gen_id
 from mascope_backend.runtime import runtime
-from mascope_backend.socket import sio
 from mascope_backend.socket.emitter import event_emitter
+from mascope_backend.socket.storage.services import is_service_connected
 from mascope_backend.socket.notifications import (
     UserNotification,
     emit_user_notification,
@@ -204,16 +204,7 @@ async def compute_sample_file_peaks_route(
     filename = sample_file_data.get("data").get("filename")
 
     # Check that the file converter service is connected
-    try:
-        connected_clients = list(
-            sio.manager.get_participants(namespace="/file-converter", room=None)
-        )
-    except Exception:
-        # If the manager is not available or any error occurs,
-        # assume no clients are connected
-        connected_clients = False
-
-    if not connected_clients:
+    if not await is_service_connected("file-converter"):
         raise HTTPException(
             status_code=503,
             detail="File converter service is not available or not running.",

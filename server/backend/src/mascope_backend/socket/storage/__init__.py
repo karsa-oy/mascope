@@ -16,6 +16,11 @@ from mascope_backend.socket.storage.exceptions import SocketSessionError
 from mascope_backend.socket.storage.rooms import (
     room_tracker,
 )
+from mascope_backend.socket.storage.services import (
+    is_service_connected,
+    register_service,
+    unregister_service,
+)
 from mascope_backend.socket.storage.sessions import (
     clear_user_session,
     get_session_user,
@@ -30,4 +35,7 @@ __all__ = [
     "clear_user_session",
     "get_session_user",
     "SocketSessionError",
+    "register_service",
+    "unregister_service",
+    "is_service_connected",
 ]

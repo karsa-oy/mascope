@@ -22,6 +22,7 @@ class SocketStorageConfig(BaseModel):
     session_key_prefix: str = "mascope:session:"  # Session storage keys
     room_members_key_prefix: str = "mascope:rooms:members:"  # Users in room
     room_user_key_prefix: str = "mascope:rooms:user:"  # Rooms user is in
+    service_key_prefix: str = "mascope:service:"  # Service presence keys
 
     def session_key(self, sid: str, namespace: str) -> str:
         """
@@ -54,6 +55,18 @@ class SocketStorageConfig(BaseModel):
         :return: Full Redis key (e.g., "mascope:rooms:user:5")
         """
         return f"{self.room_user_key_prefix}{user_id}"
+
+
+    def service_key(self, service_name: str) -> str:
+        """
+        Build Redis key for service presence.
+
+        :param service_name: Service identifier (e.g., "file-converter")
+        :type service_name: str
+        :return: Full Redis key (e.g., "mascope:service:file-converter")
+        :rtype: str
+        """
+        return f"{self.service_key_prefix}{service_name}"
 
 
 # Global storage config instance
