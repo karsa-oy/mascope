@@ -89,11 +89,7 @@ class PeakRecomputeLoop(Thread):
                 f"PeakRecomputeLoop: processing peak detection for '{filename}'"
             )
             try:
-                # fetch_instrument_functions is a blocking HTTP call
-                # run it in the default thread-pool so it doesn't block
-                # the event loop and other tasks keep running.
-                instrument_functions = await asyncio.to_thread(
-                    fetch_instrument_functions,
+                instrument_functions = fetch_instrument_functions(
                     filename,
                     request.get("access_token"),
                 )
