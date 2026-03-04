@@ -6,9 +6,8 @@ import os
 import shutil
 import traceback
 from abc import ABC, ABCMeta, abstractmethod
-from multiprocessing import Queue
 from pathlib import Path
-from queue import Empty
+from queue import Empty, Queue
 from threading import Event, Thread
 
 import mascope_sdk

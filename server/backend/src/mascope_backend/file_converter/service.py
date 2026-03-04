@@ -1,6 +1,5 @@
 import os
-from multiprocessing import Queue
-from queue import Queue as ThreadQueue
+from queue import Queue
 from threading import Event
 from time import sleep
 
@@ -39,7 +38,7 @@ URL = f"http://{HOST}:{runtime.meta.api_port}"
 # Controls the asyncio.Semaphore inside the PeakRecomputeLoop.
 PEAK_CONCURRENCY = 3
 PEAK_GUARD = PeakDetectionGuard()
-PEAK_RECOMPUTE_QUEUE: ThreadQueue = ThreadQueue()
+PEAK_RECOMPUTE_QUEUE = Queue()
 SOCKET_CLIENT = FileConverterSocketClient(
     URL, peak_recompute_queue=PEAK_RECOMPUTE_QUEUE, peak_guard=PEAK_GUARD
 )
