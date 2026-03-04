@@ -49,19 +49,6 @@ class PeakRecomputeWorker(Thread):
         self.peak_guard = peak_guard
         self.shutdown_event = shutdown_event
 
-    def _emit_with_auth(self, event: str, data: dict, auth: dict):
-        """Emit a socket event with auth credentials payload.
-
-        :param event: Socket.IO event name to emit
-        :type event: str
-        :param data: Event payload data (e.g. filename, progress, etc.)
-        :type data: dict
-        :param auth: Authentication credentials to include in the payload.
-        :type auth: dict
-        """
-        payload = {**data, **auth}
-        self.socket_client.sio.emit(event, payload, namespace="/file-converter")
-
     def _process_request(self, request: dict) -> None:
         """Process a single peak-detection request.
 
@@ -85,7 +72,7 @@ class PeakRecomputeWorker(Thread):
             )
 
             def progress_callback(progress: int):
-                self._emit_with_auth(
+                self.socket_client.emit(
                     "peak_detection_progress",
                     {
                         "filename": filename,
@@ -105,7 +92,8 @@ class PeakRecomputeWorker(Thread):
             runtime.logger.info(
                 f"PeakRecomputeWorker: peak detection complete for '{filename}'"
             )
-            self._emit_with_auth(
+
+            self.socket_client.emit(
                 "peak_detection_complete",
                 {
                     "filename": filename,
@@ -120,7 +108,7 @@ class PeakRecomputeWorker(Thread):
                 f"PeakRecomputeWorker: peak detection failed for '{filename}': "
                 f"{e}\n{traceback.format_exc()}"
             )
-            self._emit_with_auth(
+            self.socket_client.emit(
                 "peak_detection_error",
                 {
                     "filename": filename,

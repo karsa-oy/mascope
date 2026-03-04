@@ -47,17 +47,33 @@ class FileConverterSocketClient:
             runtime.logger.error(f"Failed to connect: {str(e)}")
             raise
 
-    def emit(self, event: str, data: dict):
-        """Emit event with user context if available"""
+    def emit(self, event: str, data: dict, auth: dict = {}):
+        """Emit an event to the server, with optional auth.
+        If auth is not provided, will try to fill from file context
+        (if filename is in data and context exists).
+
+        :param event: Event name to emit
+        :type event: str
+        :param data: Event data dict
+        :type data: dict
+        :param auth: Optional auth dict with 'access_token' and 'user_id'.
+        :type auth: dict | None, optional
+        """
         try:
-            # Add user context if available
+            file_context = None
             if "filename" in data:
-                context = self.context_manager.get_context(data["filename"])
-                if context:
+                # If filename is provided, try to get file context (for auth fallback)
+                file_context = self.context_manager.get_context(data["filename"])
+            if auth:
+                # If auth is provided, it takes precedence over file context
+                data.update(auth)
+            else:
+                # If no auth provided, try to fill from file context (if exists)
+                if file_context is not None:
                     data.update(
                         {
-                            "access_token": context.access_token,
-                            "user_id": context.user_id,
+                            "access_token": file_context.access_token,
+                            "user_id": file_context.user_id,
                         }
                     )
             self.sio.emit(event, data, namespace="/file-converter")
