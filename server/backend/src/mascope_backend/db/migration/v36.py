@@ -92,7 +92,7 @@ async def _migrate_orbi_files():
             updated_props["mz_calibration"] = None
             _overwrite_props(sample_file.filename, updated_props)
 
-            await compute_peaks(sample_file.filename, if_exists="replace")
+            compute_peaks(sample_file.filename, if_exists="replace")
 
             runtime.logger.info(f"Rematching samples for file {sample_file.filename}.")
             await _rematch_sample_files_by_id(sample_file.sample_file_id)

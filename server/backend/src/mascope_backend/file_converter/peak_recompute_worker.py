@@ -106,11 +106,11 @@ class PeakRecomputeLoop(Thread):
                         auth,
                     )
 
-                await compute_peaks(
-                    filename,
-                    instrument_functions,
-                    progress_callback=progress_callback,
-                )
+            compute_peaks(
+                filename,
+                instrument_functions,
+                progress_callback=progress_callback,
+            )
 
                 runtime.logger.info(
                     f"PeakRecomputeLoop: peak detection complete for '{filename}'"

@@ -71,7 +71,7 @@ async def refit_peaks():
             instrument_functions = await read_instrument_functions(
                 filename=sample_file.filename
             )
-            await compute_peaks(sample_file.filename, instrument_functions)
+            compute_peaks(sample_file.filename, instrument_functions)
         except FileNotFoundError:
             runtime.logger.error(
                 f"Error computing peaks for sample file {sample_file.filename}. File not found."

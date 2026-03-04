@@ -217,7 +217,7 @@ class BaseFileProcessor(Thread, ABC, metaclass=FileProcessorMeta):
             if not is_acquired:
                 raise RuntimeError(acquisition_failure_reason)
         try:
-            asyncio.run(compute_peaks(filename, instrument_functions))
+            compute_peaks(filename, instrument_functions)
         finally:
             # Release the guard in case of any exception to avoid deadlocks,
             # but only if it was acquired successfully

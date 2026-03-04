@@ -487,7 +487,7 @@ class TofZarrPeakDetector(TofPeakDetector):
     pass
 
 
-async def compute_peaks(
+def compute_peaks(
     filename: str,
     instrument_functions: tuple,
     progress_callback: Callable[[int], None] | None = None,
@@ -502,8 +502,8 @@ async def compute_peaks(
     :type progress_callback: Callable[[int], None] | None
     """
     peak_detector = get_peak_detector(filename, instrument_functions)
-    await peak_detector.detect_peaks(progress_callback=progress_callback)
-    await peak_detector.write_peaks_to_zarr()
+    asyncio.run(peak_detector.detect_peaks(progress_callback=progress_callback))
+    asyncio.run(peak_detector.write_peaks_to_zarr())
 
 
 def get_peak_detector(
