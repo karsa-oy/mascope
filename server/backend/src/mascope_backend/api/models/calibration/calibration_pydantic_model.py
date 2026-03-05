@@ -36,6 +36,10 @@ class MzCalibrationParams(BaseModel):
         None,
         description="Maximum allowed mean m/z error after calibration for the calibration to be accepted.",
     )
+    snr_threshold: float | None = Field(
+        None,
+        description="Minimum required signal-to-noise ratio for calibration peaks.",
+    )
     match_score_min: float = Field(
         calibration_config.DEFAULT_MATCH_SCORE_MIN,
         description="Minimum required match score for a peak to be considered a valid calibration match.",
@@ -49,15 +53,48 @@ class MzCalibrationParams(BaseModel):
         description="Minimum relative abundance required for an isotope peak to be considered in calibration.",
     )
 
+    def with_defaults(self, defaults: "MzCalibrationParams") -> "MzCalibrationParams":
+        """Fill in any missing parameters with default values from another
+        MzCalibrationParams instance.
+        The use case: automatic processing pipeline, where the params below
+        are not provided by the user, but we want to fill them in with sensible defaults.
+
+        :param defaults:
+        :type defaults: MzCalibrationParams
+        :return: A new MzCalibrationParams instance with missing values filled in from defaults.
+        :rtype: MzCalibrationParams
+        """
+        return self.model_copy(
+            update={
+                "refine_window": (
+                    self.refine_window
+                    if self.refine_window is not None
+                    else defaults.refine_window
+                ),
+                "mz_error_tolerance": (
+                    self.mz_error_tolerance
+                    if self.mz_error_tolerance is not None
+                    else defaults.mz_error_tolerance
+                ),
+                "snr_threshold": (
+                    self.snr_threshold
+                    if self.snr_threshold is not None
+                    else defaults.snr_threshold
+                ),
+            }
+        )
+
 
 class OrbiCalibrationParams(MzCalibrationParams):
     mz_error_tolerance: float = Field(calibration_config.ORBI_MZ_ERROR_TOLERANCE)
     refine_window: int = Field(calibration_config.ORBI_DEFAULT_REFINE_WINDOW)
+    snr_threshold: float = Field(calibration_config.ORBI_SNR_THRESHOLD)
 
 
 class TofCalibrationParams(MzCalibrationParams):
     mz_error_tolerance: float = Field(calibration_config.TOF_MZ_ERROR_TOLERANCE)
     refine_window: int = Field(calibration_config.TOF_DEFAULT_REFINE_WINDOW)
+    snr_threshold: float = Field(calibration_config.TOF_SNR_THRESHOLD)
 
 
 class CalibrationFitParams(MzCalibrationParams):

@@ -193,15 +193,16 @@ class BaseCalibrationHandler:
         :rtype: xarray.DataArray
         """
         instrument_type = m_name.get_instrument_type(self.filename)
+        snr = peak_timeseries.signal_to_noise.values
+
         match instrument_type:
             case "orbi":
                 peaks = peak_timeseries.peak_heights
             case "tof":
                 peaks = peak_timeseries.peak_areas
 
-        # Keep only peaks with positive intensities across all time points
-        positive_mask = (peaks.values > 0).all(axis=peaks.get_axis_num("time"))
-        filtered_peaks = peaks.sel(mz=peaks.mz.values[positive_mask])
+        snr_is_ok = snr >= self.params.snr_threshold
+        filtered_peaks = peaks.sel(mz=peaks.mz.values[snr_is_ok])
 
         return filtered_peaks
 

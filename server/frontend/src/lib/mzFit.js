@@ -12,7 +12,8 @@ export const useMzFit = ({ unmount } = { unmount: false }) => {
     match_score_min: 0,
     isotope_abundance_min: 0.15,
     peak_intensity_min: 0, //1000,
-    refine_window: 100
+    refine_window: 100,
+    snr_threshold: 10.0
   }
 
   // state

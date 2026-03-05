@@ -30,6 +30,12 @@ const mzCalibrationParams = defineModel('mzCalibrationParams')
       :range="{ min: 0, max: 100000, step: 1000 }"
       :small="true"
     />
+    <BaseParamField
+      label="Min. signal-to-noise ratio"
+      v-model:param="mzCalibrationParams.snr_threshold"
+      :range="{ min: 0, max: 1000, step: 10 }"
+      :small="true"
+    />
   </div>
 </template>
 

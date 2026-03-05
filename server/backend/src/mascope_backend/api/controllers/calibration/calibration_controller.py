@@ -181,17 +181,14 @@ async def calibration_mz_fit(
 
     # m/z fit the sample file
     default_calibration_params = calibration_params_factory(filename=sample.filename)
-    if mz_calibration_params.mz_error_tolerance is None:
-        # m/z tolerance was not passed, use default value
-        mz_calibration_params.mz_error_tolerance = (
-            default_calibration_params.mz_error_tolerance
-        )
+    resolved_mz_params = mz_calibration_params.with_defaults(default_calibration_params)
+
     calibration_parameters = CalibrationFitParams(
         filename=sample.filename,
         calibration_collection_id=ionization_mode.calibration_collection_id,
         ionization_mechanism_ids=ionization_mode.ionization_mechanism_ids,
         polarity=ionization_mode.ionization_mode_polarity,
-        **mz_calibration_params.model_dump(),
+        **resolved_mz_params.model_dump(),
     )
     calibration_handler = get_calibration_handler(
         sample.filename, calibration_parameters, notification

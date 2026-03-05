@@ -19,10 +19,12 @@ class CalibrationConfig(BaseModel):
     # TOF calibration parameters
     TOF_MZ_ERROR_TOLERANCE: int = 15  # in ppm
     TOF_DEFAULT_REFINE_WINDOW: int = 100
+    TOF_SNR_THRESHOLD: float = 10.0
 
     # Orbi calibration parameters
     ORBI_MZ_ERROR_TOLERANCE: int = 5  # in ppm
     ORBI_DEFAULT_REFINE_WINDOW: int = 10
+    ORBI_SNR_THRESHOLD: float = 10.0
 
 
 # Global calibration configuration instance
