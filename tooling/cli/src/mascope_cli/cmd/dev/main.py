@@ -311,7 +311,7 @@ def run(
         mascope dev up                     # Dependencies only
         mascope dev migrate upgrade        # Migrations manually
     """
-    selected_modules = modules or ["backend", "frontend"]
+    selected_modules = modules or ["backend", "frontend", "file-converter"]
 
     # --- Resolve module names/tags to actual modules ---
     resolved_modules = _resolve_modules(selected_modules)
