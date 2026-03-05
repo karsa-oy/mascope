@@ -11,13 +11,13 @@ from sqlalchemy import (
 )
 
 import mascope_signal.compute as m_compute
-from mascope_backend.api.controllers.sample.lib.fetch_affected_sample_data import (
-    fetch_affected_sample_data,
-)
 from mascope_backend.api.controllers.samples.samples_controller import get_samples
 from mascope_backend.api.controllers.workspace.acquisition.service import (
     create_acquisition_workspaces,
     delete_acquisition_workspaces,
+)
+from mascope_backend.api.controllers.sample.lib.fetch_affected_sample_data import (
+    fetch_affected_sample_data,
 )
 from mascope_backend.api.lib.api_features import (
     api_controller,
@@ -32,9 +32,6 @@ from mascope_backend.api.models.sample.files.sample_file_pydantic_model import (
     SampleFileCreate,
     SampleFileUpdate,
 )
-from mascope_backend.api.new.instrument_configs.lib import (
-    read_instrument_functions,
-)
 from mascope_backend.api.new.instruments import get_instruments
 from mascope_backend.db import SampleFile, User, async_session
 from mascope_backend.db.id import gen_id
@@ -43,12 +40,16 @@ from mascope_backend.socket import event_emitter
 from mascope_backend.socket.records.service import (
     emit_record_created,
     emit_record_deleted,
-    emit_record_reload,
     emit_record_updated,
+)
+from mascope_backend.socket.storage.services import is_service_connected
+from mascope_backend.socket.notifications import (
+    UserNotification,
+    emit_user_notification,
 )
 from mascope_file.io import load_peak_data
 from mascope_file.name import parse_path_from_item_filename
-from mascope_signal.peak import compute_peaks, get_peaks
+from mascope_signal.peak import get_peaks
 
 
 # TODO_configuration Default sample file upload params
@@ -985,8 +986,9 @@ async def get_sample_file_peaks(
 )
 async def compute_sample_file_peaks(
     sample_file_id: str,
+    user: User,
+    access_token: str,
     independent_transaction: bool = False,
-    user_id: int | None = None,
     process_id: str | None = None,
     parent_id: str | None = None,
 ) -> dict:
@@ -994,17 +996,19 @@ async def compute_sample_file_peaks(
     Computes all peak data for a specific sample file, performing the operation as a background task.
 
     Steps:
-    1. Fetch the sample file details using the provided ID.
-    2. Load necessary instrument functions based on the filename.
-    3. Determine the instrument type and set the appropriate threshold for peak detection.
-    4. Execute the peak detection process.
+    - Fetch the sample file details using the provided ID.
+    - Check if File Converter service is connected and get access token for the user.
+    - Emit a Socket.IO event to the File Converter service to start peak detection for the sample file.
+    - Send an immediate "pending" notification to the user to indicate that peak detection has been queued.
 
     :param sample_file_id: ID of the sample file for which peaks are to be computed.
     :type sample_file_id: str
+    :param user: The authenticated user performing the operation, used for notifications.
+    :type user: User
+    :param access_token: Pre-validated user's access token for file converter service.
+    :type access_token: str
     :param independent_transaction: Flag to indicate if the operation should be treated as an independent transaction.
     :type independent_transaction: bool, optional
-    :param user_id: Current user triggered operation (for user notifications)
-    :type user_id: int | None, optional
     :param process_id: Optional identifier for the processing task, used for tracking.
     :type process_id: Optional[str]
     :param parent_id: Optional identifier of the parent task, if this task is part of a larger workflow.
@@ -1012,29 +1016,55 @@ async def compute_sample_file_peaks(
     :return: A dictionary containing a message with the outcome and the data about the peaks detected.
     :rtype: dict
     """
-    # Step 1: Fetch the sample file
+    # --- Fetch the sample file details using the provided ID ---
     sample_file_data = await get_sample_file(sample_file_id)
     filename = sample_file_data.get("data").get("filename")
 
-    # Get affected samples data for this file
+    # --- Check if File Converter service is connected ---
+    if not await is_service_connected("file-converter"):
+        raise HTTPException(
+            status_code=503,
+            detail="File converter service is not available or not running.",
+        )
+
     (
         affected_sample_item_ids,
         _,
         *_,
     ) = await fetch_affected_sample_data(sample_file_ids=[sample_file_id])
-    # Step 2: Load instrument functions and determine instrument type.
-    instrument_functions = await read_instrument_functions(filename=filename)
-    await compute_peaks(filename, instrument_functions)
 
-    # Return completion message and peak details.
-    sample_file = load_peak_data(filename)
-    message = f"Detected {sample_file.mz.size} peaks for file '{filename}'"
-    runtime.logger.info(message)
+    # --- Emit peak detection request to file converter service via Socket.IO event ---
+    await event_emitter.emit(
+        "file-converter.peak_detection_request",
+        {
+            "filename": filename,
+            "sample_file_id": sample_file_id,
+            "affected_sample_item_ids": affected_sample_item_ids,
+            "process_id": process_id,
+            "user_id": user.id,
+            "username": user.username,
+            "role_id": user.role_id,
+            "access_token": access_token,
+        },
+    )
 
-    await emit_record_reload(record_type="peak", room=affected_sample_item_ids)
+    # Send an immediate "pending" notification so the UI shows a progress
+    # bar as soon as the request is accepted.
+    pending_notification = UserNotification(
+        process_id=process_id,
+        type="compute_sample_file_peaks",
+        status="pending",
+        message=f"Peak detection queued for '{filename}'...",
+        data={
+            "filename": filename,
+            "sample_file_id": sample_file_id,
+        },
+        progress=5,  # Start with 5% to indicate it's in progress
+    )
+    await emit_user_notification(notification=pending_notification, user_id=user.id)
 
     return {
-        "message": message,
+        "message": f"Peak detection requested for sample file '{filename}'",
         "_notification_data": {
             "sample_file_id": sample_file_id,
             "filename": filename,

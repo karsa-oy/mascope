@@ -189,7 +189,7 @@ async def match_remove_batch_route(
 
 
 @match_router.post("/rematch/sample/{sample_item_id}")
-@api_route(status_code=202)
+@api_route(status_code=202, token_access=True)
 async def rematch_sample_route(
     sample_item_id: str,
     background_tasks: BackgroundTasks,

@@ -267,3 +267,34 @@ def create_instrument_config_db_record(
         raise Exception(
             f"Failed to create database record due to request error: {e}"
         ) from e
+
+
+def rematch_sample(
+    sample_item_id: str, access_token: str, full_remove: bool = False, timeout: int = 30
+) -> dict:
+    """
+    Trigger a rematch for a sample via the backend rematch route.
+
+    :param sample_item_id: Sample item id to rematch
+    :param access_token: Bearer token for authentication
+    :param full_remove: If True, request a full removal before recompute
+    :param timeout: HTTP request timeout in seconds
+    :return: Response JSON from the backend (expected keys: 'message', 'process_id')
+    :raises Exception: On network error or non-expected HTTP status
+    """
+    headers = {
+        "X-Service-Name": "file-converter",
+        "Authorization": f"Bearer {access_token}",
+    }
+    params = {"full_remove": "true" if full_remove else "false"}
+
+    try:
+        resp = requests.post(
+            f"{URL}/api/match/rematch/sample/{sample_item_id}",
+            headers=headers,
+            params=params,
+            timeout=timeout,
+        )
+        return resp.json()
+    except requests.exceptions.RequestException as e:
+        raise Exception(f"Failed to request rematch for {sample_item_id}: {e}") from e

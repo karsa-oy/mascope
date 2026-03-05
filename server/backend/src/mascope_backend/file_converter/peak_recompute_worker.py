@@ -19,7 +19,10 @@ import traceback
 from queue import Empty, Queue
 from threading import Event, Thread
 
-from mascope_backend.file_converter.api import fetch_instrument_functions
+from mascope_backend.file_converter.api import (
+    fetch_instrument_functions,
+    rematch_sample,
+)
 from mascope_backend.file_converter.peak_guard import PeakDetectionGuard
 from mascope_backend.file_converter.runtime import runtime
 from mascope_signal.peak import compute_peaks
@@ -56,6 +59,7 @@ class PeakRecomputeWorker(Thread):
         """
         filename = request.get("filename")
         sample_file_id = request.get("sample_file_id")
+        affected_sample_item_ids = request.get("affected_sample_item_ids", [])
         process_id = request.get("process_id")
         auth = {
             "access_token": request.get("access_token"),
@@ -88,6 +92,14 @@ class PeakRecomputeWorker(Thread):
                 instrument_functions,
                 progress_callback=progress_callback,
             )
+
+            if affected_sample_item_ids:
+                for sample_item_id in affected_sample_item_ids:
+                    rematch_sample(
+                        sample_item_id=sample_item_id,
+                        access_token=auth["access_token"],
+                        full_remove=True,
+                    )
 
             runtime.logger.info(
                 f"PeakRecomputeWorker: peak detection complete for '{filename}'"
