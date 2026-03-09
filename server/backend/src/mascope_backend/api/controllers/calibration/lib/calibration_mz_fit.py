@@ -78,7 +78,7 @@ class BaseCalibrationHandler:
         )
         target_isotopes_df = pd.DataFrame(target_isotopes_result["data"])
 
-        peaks = await self._load_peaks(
+        peaks = await self._load_and_filter_peaks(
             target_mzs=target_isotopes_df.mz,
         )
 
@@ -147,11 +147,19 @@ class BaseCalibrationHandler:
 
         return match_df, good_matches_df
 
-    async def _load_peaks(
+    async def _load_and_filter_peaks(
         self,
         target_mzs: pd.Series,
     ):
         """Load peak timeseries of the potential calibration peaks.
+
+        Performs filtering based on:
+        - SNR threshold: Only peaks with signal-to-noise ratio above the specified
+            threshold are retained.
+        - m/z proximity: Only peaks within the refine window (in ppm) of any target
+            m/z are retained.
+        - Instrument resolution: peaks that are too close to each other based on
+            the instrument resolution.
 
         :param target_mzs: Series of target m/z values to be matched against the sample peaks.
         :type target_mzs: pd.Series
@@ -159,15 +167,20 @@ class BaseCalibrationHandler:
         :rtype: xarray.DataArray
         """
         target_mzs = np.asarray(target_mzs)
-        all_mzs = m_io.load_coord(self.filename, "peak_timeseries", "mz")
+        peak_data = m_io.load_peak_data(self.filename)
+        all_mzs = peak_data.mz.values
+        snr = peak_data.signal_to_noise.values
+
+        snr_is_ok = snr >= self.params.snr_threshold
+        snr_filtered_mzs = all_mzs[snr_is_ok]
 
         # --- Filter m/z values to those within the refine window of any target m/z ---
         mz_mask = np.any(
-            np.abs(all_mzs[:, None] - target_mzs[None, :])
+            np.abs(snr_filtered_mzs[:, None] - target_mzs[None, :])
             <= self.params.refine_window * 1e-6 * target_mzs[None, :],
             axis=1,
         )
-        in_refine_window_mzs = all_mzs[mz_mask]
+        in_refine_window_mzs = snr_filtered_mzs[mz_mask]
 
         # --- Further filter intersecting peaks based on the instrument resolution ---
         if in_refine_window_mzs.size <= 1:
@@ -203,14 +216,11 @@ class BaseCalibrationHandler:
         if sample_file_type in ["orbi_zarr", "tof_zarr"]:
             peak_timeseries = peak_timeseries.dropna(dim="mz", how="all")
 
-        peaks = self._parse_and_filter_peaks(peak_timeseries)
+        return self._extract_intensity(peak_timeseries)
 
-        return peaks
-
-    def _parse_and_filter_peaks(self, peak_timeseries: "xarray.Dataset") -> "Dataarray":  # type: ignore # noqa: F821
+    def _extract_intensity(self, peak_timeseries: "xarray.Dataset") -> "Dataarray":  # type: ignore # noqa: F821
         """
-        Parse and filter peaks from the peak timeseries.
-        Only peaks with positive intensities across all time points are retained.
+        Extract peak intensities from the timeseries dataset based on the instrument type.
 
         :param peak_timeseries: Timeseries dataset of peaks.
         :type peak_timeseries: xarray.Dataset
@@ -218,18 +228,12 @@ class BaseCalibrationHandler:
         :rtype: xarray.DataArray
         """
         instrument_type = m_name.get_instrument_type(self.filename)
-        snr = peak_timeseries.signal_to_noise.values
 
         match instrument_type:
             case "orbi":
-                peaks = peak_timeseries.peak_heights
+                return peak_timeseries.peak_heights
             case "tof":
-                peaks = peak_timeseries.peak_areas
-
-        snr_is_ok = snr >= self.params.snr_threshold
-        filtered_peaks = peaks.sel(mz=peaks.mz.values[snr_is_ok])
-
-        return filtered_peaks
+                return peak_timeseries.peak_areas
 
     def _match_max_in_range(
         self,
