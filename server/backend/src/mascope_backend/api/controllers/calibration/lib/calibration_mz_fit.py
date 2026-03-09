@@ -24,6 +24,9 @@ from mascope_backend.api.models.calibration.calibration_pydantic_model import (
     OrbiCalibrationParams,
     TofCalibrationParams,
 )
+from mascope_backend.api.new.instrument_configs.lib import (
+    read_instrument_functions,
+)
 from mascope_backend.runtime import runtime
 from mascope_backend.socket.notifications import (
     send_progress_user_notification,
@@ -157,12 +160,34 @@ class BaseCalibrationHandler:
         """
         target_mzs = np.asarray(target_mzs)
         all_mzs = m_io.load_coord(self.filename, "peak_timeseries", "mz")
+
+        # --- Filter m/z values to those within the refine window of any target m/z ---
         mz_mask = np.any(
             np.abs(all_mzs[:, None] - target_mzs[None, :])
             <= self.params.refine_window * 1e-6 * target_mzs[None, :],
             axis=1,
         )
-        potential_calibration_mzs = all_mzs[mz_mask]
+        in_refine_window_mzs = all_mzs[mz_mask]
+
+        # --- Further filter intersecting peaks based on the instrument resolution ---
+        if in_refine_window_mzs.size <= 1:
+            potential_calibration_mzs = in_refine_window_mzs
+        else:
+            _, resolution_function = await read_instrument_functions(self.filename)
+            fwhm = in_refine_window_mzs / resolution_function(in_refine_window_mzs)
+            left_peak_edges = in_refine_window_mzs - fwhm / 2
+            right_peak_edges = in_refine_window_mzs + fwhm / 2
+            overlap_with_next = np.logical_and(
+                right_peak_edges[:-1] >= left_peak_edges[1:],
+                left_peak_edges[:-1] <= right_peak_edges[1:],
+            )
+            non_overlap_mask = np.ones(in_refine_window_mzs.size, dtype=bool)
+            # element i should be kept only if it doesn't overlap with previous nor next
+            non_overlap_mask[:-1] &= ~overlap_with_next  # i doesn't overlap with next
+            non_overlap_mask[
+                1:
+            ] &= ~overlap_with_next  # i doesn't overlap with previous
+            potential_calibration_mzs = in_refine_window_mzs[non_overlap_mask]
 
         scan_timestamps = m_compute.get_scan_timestamps(
             self.filename, polarity=self.params.polarity
