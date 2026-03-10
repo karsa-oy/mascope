@@ -258,6 +258,20 @@ class BaseCalibrationHandler:
 
         return isotope_row
 
+    def _remove_outliers(self, calibration_df: pd.DataFrame) -> pd.DataFrame:
+        """Remove outlier peaks from the calibration results based on
+        the median absolute deviation (MAD) of the m/z errors.
+
+        :param calibration_df: DataFrame containing calibration results.
+        :type calibration_df: pd.DataFrame
+        :return: DataFrame with outliers removed.
+        :rtype: pd.DataFrame
+        """
+        mz_errors = calibration_df["calibration_mz_error"]
+        mad = np.median(np.abs(mz_errors - np.median(mz_errors)))
+        outlier_mask = np.abs(mz_errors - np.median(mz_errors)) > 3 * mad
+        return calibration_df[~outlier_mask]
+
     def _get_summary_row(self, calibration_df):
         match_mz_error = abs(calibration_df["match_mz_error"]).mean()
         calibration_mz_error = abs(calibration_df["calibration_mz_error"]).mean()
@@ -337,6 +351,14 @@ class TofCalibrationHandler(BaseCalibrationHandler):
                 mz_error_diff=abs(self.stats["post_dmz"]) - abs(self.stats["pre_dmz"]),
                 calibrant_to_tic=calibrant_to_tic,
             )
+
+            calibration_df = self._remove_outliers(calibration_df)
+            if len(calibration_df) < 3:
+                self.fit_result = None
+                self.stats = good_matches_df.to_dict("records")
+                self.warning = "Not enough calibration peaks after outlier removal"
+                return
+
             self.stats = calibration_df.to_dict("records")
             summary_row = self._get_summary_row(calibration_df)
             self.stats.append(summary_row)
@@ -448,6 +470,12 @@ class OrbiCalibrationHandler(BaseCalibrationHandler):
             mz_error_diff=abs(self.stats["post_dmz"]) - abs(self.stats["pre_dmz"]),
             calibrant_to_tic=calibrant_to_tic,
         )
+        calibration_df = self._remove_outliers(calibration_df)
+        if calibration_df.empty:
+            self.fit_result = None
+            self.stats = good_matches_df.to_dict("records")
+            self.warning = "Not enough calibration peaks after outlier removal"
+            return
 
         calibration_inaccurate = np.all(
             np.abs(calibration_df["calibration_mz_error"])
