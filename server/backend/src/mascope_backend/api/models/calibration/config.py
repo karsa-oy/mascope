@@ -24,7 +24,7 @@ class CalibrationConfig(BaseModel):
     # Orbi calibration parameters
     ORBI_MZ_ERROR_TOLERANCE: int = 5  # in ppm
     ORBI_DEFAULT_REFINE_WINDOW: int = 10
-    ORBI_SNR_THRESHOLD: float = 10.0
+    ORBI_SNR_THRESHOLD: float = 50.0
 
 
 # Global calibration configuration instance
