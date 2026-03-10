@@ -155,6 +155,7 @@ class BaseCalibrationHandler:
         """Load peak timeseries of the potential calibration peaks.
 
         Performs filtering based on:
+        - Polarity: Only peaks matching the specified polarity are retained.
         - SNR threshold: Only peaks with signal-to-noise ratio above the specified
             threshold are retained.
         - m/z proximity: Only peaks within the refine window (in ppm) of any target
@@ -170,18 +171,19 @@ class BaseCalibrationHandler:
         target_mzs = np.asarray(target_mzs)
         peak_data = m_io.load_peak_data(self.filename)
         all_mzs = peak_data.mz.values
-        snr = peak_data.signal_to_noise.values
 
-        snr_is_ok = snr >= self.params.snr_threshold
-        snr_filtered_mzs = all_mzs[snr_is_ok]
+        # --- Initial filter based on polarity and SNR threshold ---
+        polarity_mask = peak_data.polarity == self.params.polarity
+        snr_is_ok = peak_data.signal_to_noise.values >= self.params.snr_threshold
+        filtered_mzs = all_mzs[polarity_mask & snr_is_ok]
 
         # --- Filter m/z values to those within the refine window of any target m/z ---
         mz_mask = np.any(
-            np.abs(snr_filtered_mzs[:, None] - target_mzs[None, :])
+            np.abs(filtered_mzs[:, None] - target_mzs[None, :])
             <= self.params.refine_window * 1e-6 * target_mzs[None, :],
             axis=1,
         )
-        in_refine_window_mzs = snr_filtered_mzs[mz_mask]
+        in_refine_window_mzs = filtered_mzs[mz_mask]
 
         # --- Further filter intersecting peaks based on the instrument resolution ---
         if in_refine_window_mzs.size <= 1:
@@ -225,7 +227,7 @@ class BaseCalibrationHandler:
 
         :param peak_timeseries: Timeseries dataset of peaks.
         :type peak_timeseries: xarray.Dataset
-        :return: Filtered DataArray of peaks with positive intensities.
+        :return: DataArray of peak intensities (either heights or areas).
         :rtype: xarray.DataArray
         """
         instrument_type = m_name.get_instrument_type(self.filename)
