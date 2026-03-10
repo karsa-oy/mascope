@@ -30,6 +30,7 @@ from mascope_backend.api.new.instrument_configs.lib import (
 from mascope_backend.runtime import runtime
 from mascope_backend.socket.notifications import (
     send_progress_user_notification,
+    UserNotification,
 )
 from mascope_match.compute.isotopes import (
     calculate_match_stats,
@@ -45,7 +46,7 @@ class BaseCalibrationHandler:
         self,
         filename: str,
         params: CalibrationFitParams,
-        notification: object = None,
+        notification: UserNotification | None = None,
     ):
         self.filename = filename
         self.params = params
@@ -351,12 +352,14 @@ class TofCalibrationHandler(BaseCalibrationHandler):
                 mz_error_diff=abs(self.stats["post_dmz"]) - abs(self.stats["pre_dmz"]),
                 calibrant_to_tic=calibrant_to_tic,
             )
-
             calibration_df = self._remove_outliers(calibration_df)
             if len(calibration_df) < 3:
                 self.fit_result = None
-                self.stats = good_matches_df.to_dict("records")
-                self.warning = "Not enough calibration peaks after outlier removal"
+                self.stats = calibration_df.to_dict("records")
+                self.warning = (
+                    "Not enough calibration peaks after outlier removal. "
+                    "At least 3 peaks are required for a reliable calibration fit."
+                )
                 return
 
             self.stats = calibration_df.to_dict("records")
@@ -471,11 +474,6 @@ class OrbiCalibrationHandler(BaseCalibrationHandler):
             calibrant_to_tic=calibrant_to_tic,
         )
         calibration_df = self._remove_outliers(calibration_df)
-        if calibration_df.empty:
-            self.fit_result = None
-            self.stats = good_matches_df.to_dict("records")
-            self.warning = "Not enough calibration peaks after outlier removal"
-            return
 
         calibration_inaccurate = np.all(
             np.abs(calibration_df["calibration_mz_error"])
