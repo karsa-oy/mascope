@@ -15,12 +15,15 @@ from sqlalchemy.pool import NullPool
 from sqlalchemy import create_engine, text
 import typer
 
+from mascope_cli.pg import dirs, pg_dump
+
 from mascope_cli.runtime import runtime
 
 dev_migrate_app = typer.Typer()
 
 # Alembic working directory
 BACKEND_PATH = Path(os.environ["MASCOPE_PATH"]) / "server" / "backend"
+_PATH = "dev"
 
 
 def _check_prerequisites() -> bool:
@@ -127,6 +130,21 @@ def run_migrations(target: str = "head") -> bool:
     """
     if not _check_prerequisites():
         return False
+
+    # Safety backup before applying migrations.
+    # Failure is non-fatal — a missing backup should not block migration in dev.
+    # In prod this is handled by db-init.sh before alembic runs.
+    try:
+        db_cfg = runtime.full_config.backend.database
+        container = db_cfg.get_postgres_container_name(mode=_PATH)
+        database = db_cfg.get_postgres_database_name(runtime.env.name)
+        dump_dir, mount = dirs(transfer=False, mode=_PATH)
+        path = pg_dump(
+            container, db_cfg.user, database, dump_dir, mount, label="pre-migration"
+        )
+        runtime.logger.success(f"Pre-migration backup: {path.name}")
+    except RuntimeError as e:
+        runtime.logger.warning(f"Pre-migration backup failed: {e}")
 
     runtime.logger.info(f"Applying migrations to: {target}")
 

@@ -12,12 +12,17 @@ RUN apt update && apt install -y \
     wget \
     build-essential \
     cmake \
-    # PostgreSQL client (for db_init container)
-    postgresql-client \
     # jemalloc to avoid DLL segfaults
     libjemalloc2 \
     && rm -rf /var/lib/apt/lists/*
 
+# Install latest PostgreSQL client (for db_init container)
+RUN wget -q -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
+    && echo "deb http://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" \
+        > /etc/apt/sources.list.d/pgdg.list \
+    && apt update \
+    && apt install -y postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
 
 # use jemalloc to avoid DLL segfaults (free(): invalid pointer)
 ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2

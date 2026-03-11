@@ -119,6 +119,32 @@ else
     fi
 fi
 
+# --------- Pre-migration backup ---------
+log_info "Creating pre-migration backup..."
+
+BACKUP_DIR="/backups"
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+BACKUP_FILE="${BACKUP_DIR}/${MASCOPE_DB_NAME}_${TIMESTAMP}_pre-migration.dump"
+
+# pg_dump connects directly over the compose network — no docker exec needed.
+# PGPASSWORD is already exported above. Custom format (-Fc) matches the
+# format produced by the CLI's pg_dump wrapper in admin.py, so dumps are
+# interchangeable with mascope prod db backup list / restore.
+if pg_dump \
+    -h "$PGHOST" \
+    -U "$PGUSER" \
+    --format=custom \
+    --no-owner \
+    --no-acl \
+    --file="$BACKUP_FILE" \
+    "$MASCOPE_DB_NAME" 2>&1; then
+    log_info "Pre-migration backup created: $(basename "$BACKUP_FILE")"
+else
+    # Non-fatal on first run — database was just created and is empty.
+    log_warn "Pre-migration backup failed (non-fatal — expected on first run)"
+    rm -f "$BACKUP_FILE"
+fi
+
 # --------- Run Alembic migrations ---------
 log_info "Checking migrations..."
 
