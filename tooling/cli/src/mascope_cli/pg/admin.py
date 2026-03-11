@@ -16,6 +16,7 @@ Design constraints:
   container names, paths, and credentials from config before calling.
 """
 
+import os
 import subprocess
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -159,6 +160,17 @@ def pg_dump(
         raise RuntimeError(
             f"pg_dump reported success but output file not found on host: {host_path}\n"
             f"Verify that '{target_dir}' is correctly bind-mounted as '{mount}' in '{container}'."
+        )
+
+    # Files written via `docker exec` are owned by the container's root user.
+    # Chown back to the host user so the CLI can delete/prune them without sudo.
+    # Only needed on Linux — on Windows scp creates the file directly as the
+    # current user so no chown is required.
+    if os.name != "nt":
+        uid, gid = os.getuid(), os.getgid()
+        _docker_exec(
+            container,
+            ["chown", f"{uid}:{gid}", container_path],
         )
 
     return host_path

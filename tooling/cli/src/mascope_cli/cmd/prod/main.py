@@ -187,8 +187,8 @@ def up(
     """
     Start production containers.
 
-    Runs `docker compose up --detach` by default. Pass `--detach` to stream
-    combined logs to the terminal until Ctrl+C.
+    Streams logs to terminal by default (foreground). Pass --detach to run
+    in the background and return the terminal immediately.
 
     \b
     Examples:
@@ -200,9 +200,8 @@ def up(
     args = ["up"]
     if rebuild:
         args.append("--build")
-    if not detach:
+    if detach:
         args.append("--detach")
-    # Without --detach, compose streams combined logs to terminal by default
     _run_compose(args)
 
 

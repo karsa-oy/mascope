@@ -119,31 +119,6 @@ else
     fi
 fi
 
-# --------- Pre-migration backup ---------
-log_info "Creating pre-migration backup..."
-
-BACKUP_DIR="/backups"
-TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-BACKUP_FILE="${BACKUP_DIR}/${MASCOPE_DB_NAME}_${TIMESTAMP}_pre-migration.dump"
-
-# pg_dump connects directly over the compose network — no docker exec needed.
-# PGPASSWORD is already exported above. Custom format (-Fc) matches the
-# format produced by the CLI's pg_dump wrapper in admin.py, so dumps are
-# interchangeable with mascope prod db backup list / restore.
-if pg_dump \
-    -h "$PGHOST" \
-    -U "$PGUSER" \
-    --format=custom \
-    --no-owner \
-    --no-acl \
-    --file="$BACKUP_FILE" \
-    "$MASCOPE_DB_NAME" 2>&1; then
-    log_info "Pre-migration backup created: $(basename "$BACKUP_FILE")"
-else
-    # Non-fatal on first run — database was just created and is empty.
-    log_warn "Pre-migration backup failed (non-fatal — expected on first run)"
-    rm -f "$BACKUP_FILE"
-fi
 
 # --------- Run Alembic migrations ---------
 log_info "Checking migrations..."
@@ -196,6 +171,42 @@ else
     log_warn "Pending migrations detected"
     log_info "Current revision: ${CURRENT_REV}"
     log_info "Target revision:  ${HEAD_REV}"
+
+    # --------- Pre-migration backup ---------
+    # Only taken when actual migrations are pending on a non-empty database.
+    # pg_dump runs inside this init container as root
+    BACKUP_DIR="/backups"
+    TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+    BACKUP_FILE="${BACKUP_DIR}/${MASCOPE_DB_NAME}_${TIMESTAMP}_pre-migration.dump"
+ 
+    log_info "Creating pre-migration backup..."
+ 
+    # pg_dump connects directly over the compose network — no docker exec needed.
+    # PGPASSWORD is already exported above. Custom format (-Fc) matches the
+    # format produced by the CLI's pg_dump wrapper in admin.py, so dumps are
+    # interchangeable with mascope prod db backup list / restore.
+    if pg_dump \
+        -h "$PGHOST" \
+        -U "$PGUSER" \
+        --format=custom \
+        --no-owner \
+        --no-acl \
+        --file="$BACKUP_FILE" \
+        "$MASCOPE_DB_NAME" 2>&1; then
+ 
+        log_info "Pre-migration backup created: $(basename "$BACKUP_FILE")"
+ 
+        # Init container runs as root; chown to the owner of the /backups mount
+        # so the host user (and CLI) can manage the file without sudo.
+        MOUNT_OWNER=$(stat -c '%u:%g' "$BACKUP_DIR")
+        chown "$MOUNT_OWNER" "$BACKUP_FILE"
+        log_info "Chowned backup to ${MOUNT_OWNER}"
+    else
+        log_error "Pre-migration backup failed — aborting to protect data"
+        rm -f "$BACKUP_FILE"
+        exit 1
+    fi
+
     log_info "Applying migrations..."
     
     if "$ALEMBIC_BIN" upgrade head 2>&1; then
