@@ -24,9 +24,9 @@ from mascope_cli.cmd.dev.migrate import (
     check_pending_migrations,
     run_migrations,
 )
-from mascope_cli.cmd.dev.postgres import (
+from mascope_cli.cmd.dev.db import (
     create_database,
-    dev_postgres_app,
+    dev_db_app,
     wait_for_server,
 )
 from mascope_cli.cmd.dev.redis import dev_redis_app, wait_for_redis
@@ -38,6 +38,8 @@ dev_app = typer.Typer()
 
 concurrently = "concurrently.cmd" if platform.system() == "Windows" else "concurrently"
 
+
+_MODE = "dev"
 # Path to dev docker-compose file
 DEV_COMPOSE_PATH = Path(os.environ["MASCOPE_PATH"]) / "docker-compose.dev.yaml"
 
@@ -52,7 +54,7 @@ def main():
 # Add subcommands
 dev_app.add_typer(dev_docker_app, name="docker")
 dev_app.add_typer(dev_migrate_app, name="migrate")
-dev_app.add_typer(dev_postgres_app, name="postgres")
+dev_app.add_typer(dev_db_app, name="db")
 dev_app.add_typer(dev_redis_app, name="redis")
 dev_app.add_typer(dev_tools_app, name="tools")
 
