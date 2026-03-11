@@ -26,6 +26,8 @@ services:
       retries: 5
     volumes:
       - ${MASCOPE_PATH}/.runtime/database/dev:/var/lib/postgresql/data
+      - ${MASCOPE_PATH}/.runtime/database/backups/dev:/backups
+      - ${MASCOPE_PATH}/.runtime/database/transfer:/transfer
     secrets:
       - postgres_password
     restart: unless-stopped

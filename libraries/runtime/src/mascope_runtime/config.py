@@ -12,6 +12,7 @@ import os
 import tomllib
 from typing import Literal
 import typing
+from pathlib import Path
 from pydantic import BaseModel
 
 if typing.TYPE_CHECKING:
@@ -61,6 +62,9 @@ class DatabaseConfig(BaseModel):
 
     # Container settings (PostgreSQL only)
     container_name: str = "postgres"  # base name
+    # Mount base names — must match compose bind mount targets
+    backups_mount: str = "backups"
+    transfer_mount: str = "transfer"
 
     # Connection timeout
     connection_timeout: int = 30  # How long to wait when database is locked
@@ -145,6 +149,61 @@ class DatabaseConfig(BaseModel):
         """
         db_name = self.get_postgres_database_name(env_name)
         return f"postgresql+psycopg2://{self.user}:{password}@{self.host}:{self.port}/{db_name}"
+
+    def get_backups_dir(self, mode: str) -> Path:
+        """
+        Resolve the host-side backups directory for the given mode.
+
+        Matches the compose bind mount:
+            ${MASCOPE_PATH}/.runtime/database/backups/{mode}:/{backups_mount}
+
+        :param mode: Runtime mode ('dev' or 'prod').
+        :type mode: str
+        :return: Absolute path to .runtime/database/backups/{mode}/.
+        :rtype: Path
+        """
+        return (
+            Path(os.environ["MASCOPE_PATH"])
+            / ".runtime"
+            / "database"
+            / "backups"
+            / mode
+        )
+
+    def get_transfer_dir(self, mascope_path: str | None = None) -> Path:
+        """
+        Resolve the host-side transfer directory.
+
+        Shared between dev and prod postgres containers. Matches the compose
+        bind mount:
+            ${MASCOPE_PATH}/.runtime/database/transfer:/{transfer_mount}
+
+        :param mascope_path: Override for `MASCOPE_PATH`. When `None`, reads
+                            from the environment variable. Pass a remote
+                            machine's path (queried via SSH) to construct
+                            the equivalent path on that machine.
+        :type mascope_path: str | None
+        :return: Absolute path to `.runtime/database/transfer/`.
+        :rtype: Path
+        """
+        base = mascope_path or os.environ["MASCOPE_PATH"]
+        return Path(base) / ".runtime" / "database" / "transfer"
+
+    def get_backups_mount(self) -> str:
+        """
+        Container mount point for the backups directory (e.g. '/backups').
+
+        :rtype: str
+        """
+        return f"/{self.backups_mount}"
+
+    def get_transfer_mount(self) -> str:
+        """
+        Container mount point for the transfer directory (e.g. '/transfer').
+
+        :rtype: str
+        """
+        return f"/{self.transfer_mount}"
 
 
 class ModuleConfig(BaseModel):
