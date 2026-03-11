@@ -49,6 +49,11 @@ def main():
     """
     Manage your development environment
     """
+    runtime.state.override("mode", _MODE)
+    runtime.reload_config()
+    runtime.logger.info(
+        f'Running at env "{runtime.env.name}" in {runtime.state.mode} mode'
+    )
 
 
 # Add subcommands
@@ -69,7 +74,7 @@ def _check_data_dirs():
     Note: Currently Redis uses named volume, not bind mount, so no directory needed
     """
     # PostgreSQL data directory (dev mode)
-    postgres_dir = Path(os.environ["MASCOPE_PATH"]) / ".runtime" / "database" / "dev"
+    postgres_dir = Path(os.environ["MASCOPE_PATH"]) / ".runtime" / "database" / _MODE
     if not postgres_dir.exists():
         postgres_dir.mkdir(parents=True, exist_ok=True)
         runtime.logger.success(f"PostgreSQL data directory created at {postgres_dir}")
@@ -106,15 +111,14 @@ def _run_dev_compose(args: list[str]):
 
     lib.run(
         command=f"docker compose --file '{DEV_COMPOSE_PATH}' {' '.join(args)}",
-        vars={
+        env_vars={
             "MASCOPE_ENV": runtime.env.name,
             "MASCOPE_PATH": os.environ["MASCOPE_PATH"],
-            # Inject config values
-            "MASCOPE_DB_CONTAINER_NAME": db_cfg.get_postgres_container_name(mode="dev"),
+            "MASCOPE_DB_CONTAINER_NAME": db_cfg.get_postgres_container_name(mode=_MODE),
             "MASCOPE_DB_PORT": str(db_cfg.port),
             "MASCOPE_DB_USER": db_cfg.user,
             "MASCOPE_REDIS_CONTAINER_NAME": redis_cfg.get_redis_container_name(
-                mode="dev"
+                mode=_MODE
             ),
             "MASCOPE_REDIS_PORT": str(redis_cfg.port),
         },
@@ -141,7 +145,7 @@ def _run_application(
         selected.append({"name": "lab", "run": "uv run jupyter lab"})
 
     # Set mode to dev
-    runtime.state.mode = "dev"
+    runtime.state.mode = _MODE
 
     # Set config env var
     frontend_runtime = Runtime("frontend", log=False)
@@ -294,6 +298,7 @@ def run(
     ] = False,
 ):
     """
+    \b
     Run application services in development environment:
     - Checks Docker is running
     - Starts dependencies (PostgreSQL, Redis)
@@ -305,12 +310,14 @@ def run(
 
     Run `mascope groups` to discover the full list of runtime groups.
 
+    \b
     Examples:
         mascope dev run                    # Backend + frontend (default)
         mascope dev run backend            # Backend only
         mascope dev run file-converter     # Explicit services
         mascope dev run file               # Module group tag
 
+    \b
     Manual control:
         mascope dev up                     # Dependencies only
         mascope dev migrate upgrade        # Migrations manually

@@ -123,6 +123,15 @@ class Runtime:
         """
         return self._full_config
 
+    def reload_config(self) -> None:
+        """
+        Reload full configuration from disk using current runtime state.
+
+        Call after changing mode via state.override() to ensure config
+        reflects the correct mode-specific TOML layer.
+        """
+        self._full_config = load_config(self)
+
     @property
     def logger(self):
         """

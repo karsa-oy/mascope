@@ -74,6 +74,13 @@ def main() -> None:
         mascope prod db backup
         mascope prod db restore --yes
     """
+    # Override mode without writing to state.json — prevents state.json from a
+    # previous dev/prod run from contaminating this invocation's config.
+    runtime.state.override("mode", _MODE)
+    runtime.reload_config()
+    runtime.logger.info(
+        f'Running at env "{runtime.env.name}" in {runtime.state.mode} mode'
+    )
 
 
 #  --- Internal helpers ---

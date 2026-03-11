@@ -1,3 +1,12 @@
+"""
+Mascope CLI entry point.
+
+Defines the top-level `mascope` command group, shared options (env override,
+log level, log grep), and the utility commands `modules`, `groups`, and `path`.
+All environment-specific functionality is delegated to sub-apps under
+`mascope_cli.cmd`.
+"""
+
 from typing import Optional
 import os
 import typer
@@ -50,29 +59,32 @@ def main(
     """
     Mascope development CLI
 
-
     The `mascope` CLI offers a series of commands for managing development and
     production environments, as well as the database. A few top-level options
     are shared between dev and prod modes, but most functionality and options
-    are delegated to the specific commands. Type `mascope <cmd> --help` to
-    learn more about one of the commands listed below.
+    are delegated to the specific commands.
+
+    \b
+    Type `mascope <cmd> --help` to learn more about a specific command.
     """
     # construct the version string from git
     os.environ["MASCOPE_VERSION"] = runtime.parse_version()
-    # override env with CLI option (null if not provided)
+
+    # override active env with CLI option (null if not provided)
     runtime.state.override("env", env)
-    # use `dev` mode by default
-    runtime.state.mode = "dev"
-    # set the log level shown in the terminal logs
+
+    # Set log level for terminal output. Always sync the env var so docker
+    # compose never sees a stale value from a previous invocation.
     if log_level:
         os.environ["MASCOPE_LOGLEVEL"] = log_level.upper()
-    else:
-        os.environ.pop("MASCOPE_LOGLEVEL") if "MASCOPE_LOGLEVEL" in os.environ else ...
-    # highlight lines matching the grep pattern in terminal logs
+    elif "MASCOPE_LOGLEVEL" in os.environ:
+        del os.environ["MASCOPE_LOGLEVEL"]
+
+    # Set grep highlight pattern for terminal logs
     if log_grep:
         os.environ["MASCOPE_LOGGREP"] = log_grep
-    else:
-        os.environ.pop("MASCOPE_LOGGREP") if "MASCOPE_LOGGREP" in os.environ else ...
+    elif "MASCOPE_LOGGREP" in os.environ:
+        del os.environ["MASCOPE_LOGGREP"]
 
 
 @app.command()
