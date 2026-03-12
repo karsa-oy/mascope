@@ -276,7 +276,9 @@ class BaseCalibrationHandler:
         target_mz = isotope_row["mz"]
         mz_tolerance = self.params.refine_window * 1e-6 * target_mz
 
-        in_range_mask = np.abs(peaks["mz"] - target_mz) <= mz_tolerance
+        delta_mz = np.abs(peaks["mz"] - target_mz)
+        # Increase the threshold by one float step to include peaks that are exactly on the boundary
+        in_range_mask = delta_mz <= mz_tolerance + np.finfo(float).eps * target_mz
         mz_in_range = peaks["mz"][in_range_mask]
         tof_in_range = peaks["tof"][in_range_mask]
         intensity_in_range = peaks["intensity"][in_range_mask]
