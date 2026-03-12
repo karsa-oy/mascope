@@ -168,58 +168,87 @@ class BaseCalibrationHandler:
         :return: DataArray containing detected peaks with their m/z, intensity, and time information.
         :rtype: xarray.DataArray
         """
-        target_mzs = np.asarray(target_mzs)
         peak_data = m_io.load_peak_data(self.filename)
+
+        candidate_mzs = self._filter_mzs_by_polarity_and_snr(peak_data)
+        candidate_mzs = self._filter_mzs_by_refine_window(
+            candidate_mzs,
+            np.asarray(target_mzs),
+        )
+        candidate_mzs = await self._filter_overlapping_peaks(candidate_mzs)
+
+        peak_timeseries = await self._load_peak_timeseries(candidate_mzs)
+        peak_timeseries = self._drop_empty_peak_timeseries(peak_timeseries)
+
+        return self._extract_intensity(peak_timeseries)
+
+    def _filter_mzs_by_polarity_and_snr(self, peak_data) -> np.ndarray:
+        """Filter m/z values based on polarity and signal-to-noise ratio (SNR) thresholds."""
         all_mzs = peak_data.mz.values
-
-        # --- Initial filter based on polarity and SNR threshold ---
         polarity_mask = peak_data.polarity == self.params.polarity
-        snr_is_ok = peak_data.signal_to_noise.values >= self.params.snr_threshold
-        filtered_mzs = all_mzs[polarity_mask & snr_is_ok]
+        snr_mask = peak_data.signal_to_noise.values >= self.params.snr_threshold
+        return all_mzs[polarity_mask & snr_mask]
 
-        # --- Filter m/z values to those within the refine window of any target m/z ---
+    def _filter_mzs_by_refine_window(
+        self,
+        peak_mzs: np.ndarray,
+        target_mzs: np.ndarray,
+    ) -> np.ndarray:
+        """Filter m/z values to retain only those within the refine window of any target m/z."""
         mz_mask = np.any(
-            np.abs(filtered_mzs[:, None] - target_mzs[None, :])
+            np.abs(peak_mzs[:, None] - target_mzs[None, :])
             <= self.params.refine_window * 1e-6 * target_mzs[None, :],
             axis=1,
         )
-        in_refine_window_mzs = filtered_mzs[mz_mask]
+        return peak_mzs[mz_mask]
 
-        # --- Further filter intersecting peaks based on the instrument resolution ---
-        if in_refine_window_mzs.size <= 1:
-            potential_calibration_mzs = in_refine_window_mzs
-        else:
-            _, resolution_function = await read_instrument_functions(self.filename)
-            fwhm = in_refine_window_mzs / resolution_function(in_refine_window_mzs)
-            left_peak_edges = in_refine_window_mzs - fwhm / 2
-            right_peak_edges = in_refine_window_mzs + fwhm / 2
-            overlap_with_next = np.logical_and(
-                right_peak_edges[:-1] >= left_peak_edges[1:],
-                left_peak_edges[:-1] <= right_peak_edges[1:],
-            )
-            non_overlap_mask = np.ones(in_refine_window_mzs.size, dtype=bool)
-            # element i should be kept only if it doesn't overlap with previous nor next
-            non_overlap_mask[:-1] &= ~overlap_with_next  # i doesn't overlap with next
-            non_overlap_mask[
-                1:
-            ] &= ~overlap_with_next  # i doesn't overlap with previous
-            potential_calibration_mzs = in_refine_window_mzs[non_overlap_mask]
+    async def _filter_overlapping_peaks(self, peak_mzs: np.ndarray) -> np.ndarray:
+        """Filter out peaks that are too close to each other based on the instrument resolution."""
+        if peak_mzs.size <= 1:
+            return peak_mzs
+        _, resolution_function = await read_instrument_functions(self.filename)
+        return self._remove_overlapping_mzs(peak_mzs, resolution_function)
 
-        scan_timestamps = m_compute.get_scan_timestamps(
-            self.filename, polarity=self.params.polarity
+    @staticmethod
+    def _remove_overlapping_mzs(
+        peak_mzs: np.ndarray,
+        resolution_function,
+    ) -> np.ndarray:
+        """Remove peaks that are too close to each other based on the instrument resolution."""
+        sorted_idx = np.argsort(peak_mzs)
+        sorted_mzs = peak_mzs[sorted_idx]
+
+        fwhm = sorted_mzs / resolution_function(sorted_mzs)
+        left_edges = sorted_mzs - fwhm / 2
+        right_edges = sorted_mzs + fwhm / 2
+
+        overlap_with_next = np.logical_and(
+            right_edges[:-1] >= left_edges[1:],
+            left_edges[:-1] <= right_edges[1:],
         )
-        peak_timeseries = (
-            await m_compute.load_peak_timeseries(
-                self.filename, potential_calibration_mzs
-            )
-        ).sel(time=scan_timestamps, method="nearest")
+        keep_mask = np.ones(sorted_mzs.size, dtype=bool)
+        keep_mask[:-1] &= ~overlap_with_next
+        keep_mask[1:] &= ~overlap_with_next
+        return sorted_mzs[keep_mask]
 
-        # Reverse compatibility with older zarr files
+    async def _load_peak_timeseries(self, peak_mzs: np.ndarray):
+        """Load peak timeseries for the given m/z values and filter to scan timestamps."""
+        scan_timestamps = m_compute.get_scan_timestamps(
+            self.filename,
+            polarity=self.params.polarity,
+        )
+        return (await m_compute.load_peak_timeseries(self.filename, peak_mzs)).sel(
+            time=scan_timestamps, method="nearest"
+        )
+
+    def _drop_empty_peak_timeseries(self, peak_timeseries):
+        """Drop peaks with empty timeseries (all None values)
+        for orbi_zarr, tof_zarr sample file types.
+        """
         sample_file_type = m_name.get_sample_file_type(self.filename)
         if sample_file_type in ["orbi_zarr", "tof_zarr"]:
-            peak_timeseries = peak_timeseries.dropna(dim="mz", how="all")
-
-        return self._extract_intensity(peak_timeseries)
+            return peak_timeseries.dropna(dim="mz", how="all")
+        return peak_timeseries
 
     def _extract_intensity(self, peak_timeseries: "xarray.Dataset") -> "Dataarray":  # type: ignore # noqa: F821
         """
