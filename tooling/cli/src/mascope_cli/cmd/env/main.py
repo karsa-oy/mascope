@@ -14,6 +14,16 @@ from rich.console import Console
 from rich.table import Table
 
 from mascope_cli.runtime import runtime
+from mascope_cli.cmd.env._create import (
+    create_env_local,
+    create_env_remote,
+    validate_env_name,
+)
+from mascope_cli.cmd.env._paths import (
+    env_exists_local,
+    env_exists_remote,
+    parse_address,
+)
 from mascope_cli.cmd.env._sync import sync_db, sync_filestore
 from mascope_runtime import Runtime
 
@@ -107,6 +117,52 @@ def use(
 
 
 @env_app.command()
+def create(
+    name: Annotated[
+        str,
+        typer.Argument(
+            metavar="NAME",
+            help="Name of the environment to create. No spaces or path separators.",
+        ),
+    ],
+) -> None:
+    """
+    Create a new local runtime environment.
+
+    Creates the environment directory at `.runtime/env/{NAME}/` under
+    `MASCOPE_PATH`. Raises an error if the environment already exists.
+
+    The new environment will appear in `mascope env list` and can be
+    activated with `mascope env use NAME`.
+
+    \b
+    Examples:
+        mascope env create tof1
+        mascope env create test-env-2
+    """
+    try:
+        validate_env_name(name)
+    except ValueError as e:
+        runtime.logger.error(str(e))
+        raise typer.Exit(1)
+
+    if env_exists_local(name):
+        runtime.logger.error(
+            f"Environment '{name}' already exists. "
+            "Use 'mascope env list' to see available environments."
+        )
+        raise typer.Exit(1)
+
+    try:
+        create_env_local(name)
+    except (ValueError, FileExistsError, OSError) as e:
+        runtime.logger.error(f"Failed to create environment '{name}': {e}")
+        raise typer.Exit(1)
+
+    runtime.logger.success(f"Environment '{name}' created.")
+
+
+@env_app.command()
 def sync(
     source_env: Annotated[
         str,
@@ -158,6 +214,14 @@ def sync(
             help="Skip synchronizing the PostgreSQL database.",
         ),
     ] = False,
+    yes: Annotated[
+        bool,
+        typer.Option(
+            "--yes",
+            "-y",
+            help="Skip confirmation prompts (for creating missing target env).",
+        ),
+    ] = False,
 ):
     """
     Sync a runtime env from source to target.
@@ -169,6 +233,9 @@ def sync(
     By default, both the filestore (via rsync) and the database (via
     pg_dump/pg_restore through a staging transfer directory) are synced.
     Use `--skip-filestore` or `--skip-db` to opt out of either.
+
+    If the target environment directory does not exist, you will be prompted
+    to create it. Pass `--yes` to create it automatically without prompting.
 
     The database sync always stages through `.runtime/database/transfer/`.
     On success, the transfer dump is deleted and 7-day retention pruning runs.
@@ -197,15 +264,38 @@ def sync(
         )
         raise typer.Exit(1)
 
-    errors: list[str] = []
+    # --- target env existence check ---
+    target_remote, target_env_name = parse_address(target_env)
 
-    if not skip_filestore:
-        runtime.logger.info("--- Filestore sync ---")
+    if target_remote is not None:
+        target_missing = not env_exists_remote(target_remote, target_env_name)
+    else:
+        target_missing = not env_exists_local(target_env_name)
+
+    if target_missing:
+        location = target_remote if target_remote else "local"
+        if not yes:
+            confirmed = typer.confirm(
+                f"Target environment '{target_env_name}' does not exist on {location}. "
+                f"Create it?"
+            )
+            if not confirmed:
+                runtime.logger.error(
+                    "Sync aborted — target environment does not exist."
+                )
+                raise typer.Exit(1)
+
         try:
-            sync_filestore(source_env, target_env)
-        except Exception as e:
-            runtime.logger.error(f"Filestore sync failed: {e}")
-            errors.append("filestore")
+            if target_remote is not None:
+                create_env_remote(target_remote, target_env_name)
+            else:
+                create_env_local(target_env_name)
+        except (ValueError, FileExistsError, RuntimeError, OSError) as e:
+            runtime.logger.error(f"Failed to create target environment: {e}")
+            raise typer.Exit(1)
+
+    # --- Sync ---
+    errors: list[str] = []
 
     if not skip_db:
         runtime.logger.info("--- Database sync ---")
@@ -214,6 +304,14 @@ def sync(
         except (ValueError, RuntimeError) as e:
             runtime.logger.error(f"Database sync failed: {e}")
             errors.append("database")
+
+    if not skip_filestore:
+        runtime.logger.info("--- Filestore sync ---")
+        try:
+            sync_filestore(source_env, target_env)
+        except Exception as e:
+            runtime.logger.error(f"Filestore sync failed: {e}")
+            errors.append("filestore")
 
     if errors:
         runtime.logger.error(f"Sync completed with errors in: {', '.join(errors)}")

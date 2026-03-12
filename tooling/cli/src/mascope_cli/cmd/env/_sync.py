@@ -37,35 +37,12 @@ from mascope_cli.pg import (
     purge_old_dumps,
 )
 from mascope_cli.cmd import lib
+from mascope_cli.cmd.env._paths import (
+    get_remote_mascope_path,
+    parse_address,
+)
 from mascope_cli.pg.admin import create_database as admin_create_database
 from mascope_cli.runtime import runtime
-
-
-# --- Address parsing ---
-
-
-def parse_address(address: str) -> tuple[str | None, str]:
-    """
-    Parse a sync address into `(remote, env_name)`.
-
-    Accepts two formats:
-    - `ENV`           — local environment, no remote
-    - `USER@HOST:ENV` — remote environment
-
-    :param address: Raw address string from CLI argument.
-    :type address: str
-    :return: `(remote, env_name)` where `remote` is `None` for local addresses.
-    :rtype: tuple[str | None, str]
-    :raises ValueError: If the address contains `@` but no `:` separator.
-    """
-    if "@" in address:
-        if ":" not in address:
-            raise ValueError(
-                f"Invalid remote address '{address}': expected USER@HOST:ENV format."
-            )
-        remote, env_name = address.split(":", 1)
-        return remote, env_name
-    return None, address
 
 
 # --- Platform helpers ---
@@ -130,7 +107,7 @@ def _resolve_rsync_path(remote: str | None, env_name: str) -> str:
 
     For remote addresses, queries `MASCOPE_PATH` via `mascope path` over SSH
     to construct the full env path without hard-coding it locally.
-    See `_get_remote_mascope_path` for resolution details.
+    See `get_remote_mascope_path` for resolution details.
 
     :param remote: Remote identifier (`USER@HOST`) or `None` for local.
     :type remote: str | None
@@ -140,7 +117,7 @@ def _resolve_rsync_path(remote: str | None, env_name: str) -> str:
     :rtype: str
     """
     if remote is not None:
-        mascope_path = _get_remote_mascope_path(remote)
+        mascope_path = get_remote_mascope_path(remote)
         return f"{remote}:{mascope_path}/.runtime/env/{env_name}/"
     return runtime.path(".runtime", "env", f"{env_name}/")
 
@@ -191,45 +168,6 @@ def sync_filestore(source: str, target: str) -> None:
 # --- Remote SSH helpers ---
 
 
-def _get_remote_mascope_path(remote: str) -> str:
-    """
-    Resolve `MASCOPE_PATH` on a remote machine by running `mascope path`
-    via SSH.
-
-    `MASCOPE_PATH` is set in `/etc/environment` and read directly by the
-    `mascope` process — it is NOT exported into the SSH shell environment,
-    so `echo $MASCOPE_PATH` returns empty. `mascope path` is the only
-    reliable way to retrieve it remotely.
-
-    The command is single-quoted to prevent the local shell (PowerShell
-    on Windows) from splitting arguments before SSH passes them to the
-    remote bash process.
-
-    :param remote: Remote identifier in `USER@HOST` format.
-    :type remote: str
-    :return: Value of `MASCOPE_PATH` on the remote machine.
-    :rtype: str
-    :raises RuntimeError: If SSH fails or `mascope path` returns empty.
-    """
-    result = subprocess.run(
-        ["ssh", remote, "bash", "-l", "-c", "'mascope path'"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    path = result.stdout.strip()
-    runtime.logger.debug(
-        f"_get_remote_mascope_path({remote}): returncode={result.returncode} "
-        f"stdout={result.stdout!r} stderr={result.stderr!r} path={path!r}"
-    )
-    if not path:
-        raise RuntimeError(
-            f"Could not resolve MASCOPE_PATH on {remote} via 'mascope path'. "
-            "Ensure Mascope is installed on the remote via tooling/ubuntu.sh."
-        )
-    return path
-
-
 def _ssh_run(remote: str, cmd: str) -> None:
     """
     Execute a command on a remote machine via SSH using a login shell.
@@ -275,7 +213,7 @@ def _remote_transfer_dir(remote: str) -> str:
     :return: Absolute POSIX path string on the remote machine.
     :rtype: str
     """
-    mascope_path = _get_remote_mascope_path(remote)
+    mascope_path = get_remote_mascope_path(remote)
     path = runtime.full_config.backend.database.get_transfer_dir(
         mascope_path=mascope_path
     )
