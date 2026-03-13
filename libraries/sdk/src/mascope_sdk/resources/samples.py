@@ -6,6 +6,7 @@ from typing import Any
 
 import pandas as pd
 
+from .._resolve import resolve_id
 from ._base import BaseResource
 
 
@@ -22,8 +23,8 @@ class SamplesResource(BaseResource):
 
         mascope = MascopeClient()
 
-        # List samples in a batch
-        samples = mascope.samples.list(batch_id="batch-123")
+        # List samples by batch name
+        samples = mascope.samples.list("My Batch")
 
         # Get spectrum data
         spectrum = mascope.samples.get_spectrum(sample_id="sample-456")
@@ -32,24 +33,63 @@ class SamplesResource(BaseResource):
         peaks = mascope.samples.get_peaks(sample_id="sample-456")
     """
 
-    def list(self, batch_id: str) -> pd.DataFrame | None:
+    def _resolve_batch_id(self, batch: str, workspace: str | None = None) -> str:
+        """Resolve a batch name or ID to a batch ID.
+
+        Searches across all workspaces unless a workspace is specified.
+        """
+        if workspace is not None:
+            # Resolve workspace first, then search within it
+            batches = self._client.batches.list(workspace)
+        else:
+            # Search across all workspaces
+            workspaces = self._client.workspaces.list()
+            if workspaces is None or workspaces.empty:
+                raise ValueError("No workspaces found.")
+            frames = []
+            for _, ws in workspaces.iterrows():
+                ws_batches = self._client.batches.list(ws["workspace_id"])
+                if ws_batches is not None and not ws_batches.empty:
+                    frames.append(ws_batches)
+            batches = pd.concat(frames, ignore_index=True) if frames else None
+
+        return resolve_id(
+            batch,
+            batches,
+            id_column="sample_batch_id",
+            name_column="sample_batch_name",
+            entity_label="batch",
+        )
+
+    def list(self, batch: str, *, workspace: str | None = None) -> pd.DataFrame | None:
         """List all samples in a sample batch.
 
-        :param batch_id: The ID of the sample batch to list samples from.
-        :type batch_id: str
+        :param batch: Batch name (or substring) or batch ID.
+        :type batch: str
+        :param workspace: Optional workspace name or ID to narrow the batch search.
+                          If not provided, searches across all workspaces.
+        :type workspace: str, optional
         :return: A DataFrame containing sample information, or None if no samples found.
                  Columns include ``sample_item_id``, ``sample_item_name``, and additional
                  sample metadata.
         :rtype: pd.DataFrame | None
+        :raises ValueError: If the batch cannot be resolved.
         :raises AuthenticationError: If authentication fails.
-        :raises NotFoundError: If the batch is not found.
         :raises MascopeAPIError: If the API request fails.
 
         Example::
 
-            samples = mascope.samples.list(batch_id="batch-123")
-            print(samples[["sample_item_id", "sample_item_name"]])
+            # By batch name
+            samples = mascope.samples.list("Uronium")
+
+            # Narrow to a specific workspace
+            samples = mascope.samples.list("Uronium", workspace="KORBI2")
         """
+        batch_id = self._resolve_batch_id(batch, workspace=workspace)
+        return self._list_by_id(batch_id)
+
+    def _list_by_id(self, batch_id: str) -> pd.DataFrame | None:
+        """List samples by batch ID (no name resolution)."""
         data = self._get("samples", params={"sample_batch_id": batch_id})
         if not data:
             return None

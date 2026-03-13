@@ -7,6 +7,7 @@ from typing import Any
 
 import pandas as pd
 
+from .._resolve import resolve_id
 from ._base import BaseResource
 
 
@@ -22,31 +23,50 @@ class BatchesResource(BaseResource):
 
         mascope = MascopeClient()
 
-        # List batches in a workspace
-        batches = mascope.batches.list(workspace_id="ws-123")
+        # List batches by workspace name (substring match)
+        batches = mascope.batches.list("My Workspace")
 
-        # Get detailed batch data including all samples
-        batch_data = mascope.batches.get_data(batch_id="batch-456")
+        # Or by workspace ID
+        batches = mascope.batches.list("ws-123")
     """
 
-    def list(self, workspace_id: str) -> pd.DataFrame | None:
+    def _resolve_workspace_id(self, workspace: str) -> str:
+        """Resolve a workspace name or ID to a workspace ID."""
+        workspaces = self._client.workspaces.list()
+        return resolve_id(
+            workspace,
+            workspaces,
+            id_column="workspace_id",
+            name_column="workspace_name",
+            entity_label="workspace",
+        )
+
+    def list(self, workspace: str) -> pd.DataFrame | None:
         """List all sample batches in a workspace.
 
-        :param workspace_id: The ID of the workspace to list batches from.
-        :type workspace_id: str
+        :param workspace: Workspace name (or substring) or workspace ID.
+        :type workspace: str
         :return: A DataFrame containing sample batch information with columns
-                 including ``sample_batch_id`` and ``name``, or None if no
-                 batches are found.
+                 including ``sample_batch_id`` and ``sample_batch_name``, or
+                 None if no batches are found.
         :rtype: pd.DataFrame | None
+        :raises ValueError: If the workspace cannot be resolved.
         :raises AuthenticationError: If authentication fails.
-        :raises NotFoundError: If the workspace is not found.
         :raises MascopeAPIError: If the API request fails.
 
         Example::
 
-            batches = mascope.batches.list(workspace_id="ws-123")
-            print(batches[["sample_batch_id", "name"]])
+            # By name
+            batches = mascope.batches.list("My Workspace")
+
+            # By ID
+            batches = mascope.batches.list("GwvleF1LJtEcfUQg")
         """
+        workspace_id = self._resolve_workspace_id(workspace)
+        return self._list_by_id(workspace_id)
+
+    def _list_by_id(self, workspace_id: str) -> pd.DataFrame | None:
+        """List batches by workspace ID (no name resolution)."""
         data = self._get("sample/batches", params={"workspace_id": workspace_id})
         if not data:
             return None
