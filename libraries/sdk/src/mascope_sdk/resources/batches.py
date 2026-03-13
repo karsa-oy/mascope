@@ -67,10 +67,15 @@ class BatchesResource(BaseResource):
 
     def _list_by_id(self, workspace_id: str) -> pd.DataFrame | None:
         """List batches by workspace ID (no name resolution)."""
+        cache_key = f"batches:{workspace_id}"
+        if cache_key in self._client._cache:
+            return self._client._cache[cache_key]
         data = self._get("sample/batches", params={"workspace_id": workspace_id})
         if not data:
             return None
-        return pd.DataFrame(data)
+        df = pd.DataFrame(data)
+        self._client._cache[cache_key] = df
+        return df
 
     def get_data(self, batch_id: str) -> dict[str, Any]:
         """Retrieve detailed data for all samples in a batch.

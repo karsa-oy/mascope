@@ -14,6 +14,52 @@ if TYPE_CHECKING:
     from .client import MascopeClient
 
 
+def _resolve_sample(client: MascopeClient, sample: str) -> str:
+    """Resolve a sample name or ID to a sample_item_id.
+
+    Searches the metadata cache first (fast, no API calls if samples were
+    previously listed). Falls back to ``samples.get()`` for a direct ID lookup.
+
+    :param client: The MascopeClient instance.
+    :param sample: Sample name (or substring) or sample ID.
+    :return: The resolved sample_item_id.
+    :raises ValueError: If the sample cannot be found.
+    """
+    from ._resolve import resolve_id
+    from .exceptions import NotFoundError
+
+    # Search cached sample lists
+    cached_samples = [
+        df for key, df in client._cache.items() if key.startswith("samples:")
+    ]
+    if cached_samples:
+        all_samples = pd.concat(cached_samples, ignore_index=True)
+        try:
+            return resolve_id(
+                sample,
+                all_samples,
+                id_column="sample_item_id",
+                name_column="sample_item_name",
+                entity_label="sample",
+            )
+        except ValueError:
+            pass  # Not in cache, try direct API call
+
+    # Fall back to direct API call by ID
+    try:
+        sample_data = client.samples.get(sample)
+        if sample_data:
+            return sample_data["sample_item_id"]
+    except NotFoundError:
+        pass
+
+    raise ValueError(
+        f"Sample '{sample}' not found. "
+        "Load samples first with samples.list() or load_peaks(), "
+        "then retry with the sample name."
+    )
+
+
 def _collect_sample_tasks(
     client: MascopeClient,
     workspace: str,
@@ -273,17 +319,8 @@ def load_peaks_by_stage(
             "stages must be a non-empty list of (t_min, t_max[, name]) tuples"
         )
 
-    # Resolve sample name or ID
-    from .exceptions import NotFoundError
-
-    try:
-        sample_data = client.samples.get(sample)
-    except NotFoundError:
-        raise ValueError(
-            f"Sample '{sample}' not found. "
-            "Use samples.list() to find available sample IDs."
-        )
-    sample_id = sample_data["sample_item_id"]
+    # Resolve sample name or ID using cached sample lists
+    sample_id = _resolve_sample(client, sample)
 
     # Normalise stages to (t_min, t_max, name | None)
     normalised: list[tuple[float, float, str | None]] = []

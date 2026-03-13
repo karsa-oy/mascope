@@ -208,6 +208,9 @@ class MascopeClient:
         self._verify_ssl = verify_ssl
         self._service_name = service_name
 
+        # Metadata cache for workspace/batch/sample listings
+        self._cache: dict[str, pd.DataFrame] = {}
+
         # Initialize resource objects (lazy imports to avoid circular dependencies)
         self._workspaces: Any = None
         self._batches: Any = None
@@ -500,6 +503,18 @@ class MascopeClient:
             heights=heights,
             max_workers=max_workers,
         )
+
+    def clear_cache(self) -> None:
+        """Clear the metadata cache.
+
+        Call this when workspaces, batches, or samples have changed on the
+        server and you want subsequent calls to fetch fresh data.
+
+        Example::
+
+            mascope.clear_cache()
+        """
+        self._cache.clear()
 
     def __repr__(self) -> str:
         return f"MascopeClient(url='{self._url}')"

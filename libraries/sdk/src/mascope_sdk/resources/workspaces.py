@@ -39,7 +39,12 @@ class WorkspacesResource(BaseResource):
             workspaces = mascope.workspaces.list()
             print(workspaces[["workspace_id", "name"]])
         """
+        cache_key = "workspaces"
+        if cache_key in self._client._cache:
+            return self._client._cache[cache_key]
         data = self._get("workspaces")
         if not data:
             return None
-        return pd.DataFrame(data)
+        df = pd.DataFrame(data)
+        self._client._cache[cache_key] = df
+        return df

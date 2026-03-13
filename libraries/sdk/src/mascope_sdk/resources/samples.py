@@ -90,10 +90,15 @@ class SamplesResource(BaseResource):
 
     def _list_by_id(self, batch_id: str) -> pd.DataFrame | None:
         """List samples by batch ID (no name resolution)."""
+        cache_key = f"samples:{batch_id}"
+        if cache_key in self._client._cache:
+            return self._client._cache[cache_key]
         data = self._get("samples", params={"sample_batch_id": batch_id})
         if not data:
             return None
-        return pd.DataFrame(data)
+        df = pd.DataFrame(data)
+        self._client._cache[cache_key] = df
+        return df
 
     def get(self, sample_id: str) -> dict | None:
         """Get details of a specific sample.
