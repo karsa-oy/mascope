@@ -3,9 +3,13 @@
 This module provides the main client class for interacting with the Mascope API.
 """
 
+from __future__ import annotations
+
 import os
 from pathlib import Path
 from typing import Any
+
+import pandas as pd
 
 from .exceptions import ConfigurationError
 
@@ -275,6 +279,84 @@ class MascopeClient:
 
             self._ionization = IonizationResource(self)
         return self._ionization
+
+    def load_peaks(
+        self,
+        workspace: str,
+        batches: str | None = None,
+        *,
+        matches: bool = True,
+        areas: bool = True,
+        heights: bool = True,
+        average: bool = True,
+        max_workers: int = 8,
+    ) -> pd.DataFrame | None:
+        """Load peaks for all samples across one or more batches.
+
+        This is a high-level convenience method that handles the typical workflow
+        of selecting a workspace, filtering batches by name, iterating all samples,
+        and concatenating peak data into a single DataFrame enriched with batch and
+        sample metadata.
+
+        Requests are made concurrently for better performance. A progress bar is
+        displayed during loading.
+
+        :param workspace: Workspace name (or substring) or workspace ID.
+        :type workspace: str
+        :param batches: Optional substring filter on batch names (case-insensitive).
+                        If not provided, all batches in the workspace are loaded.
+        :type batches: str, optional
+        :param matches: Include matched compounds/ions/isotopes. Defaults to True.
+        :type matches: bool
+        :param areas: Include peak areas. Defaults to True.
+        :type areas: bool
+        :param heights: Include peak heights. Defaults to True.
+        :type heights: bool
+        :param average: Return averaged data across time. Defaults to True.
+        :type average: bool
+        :param max_workers: Maximum number of concurrent requests. Defaults to 8.
+        :type max_workers: int
+        :return: A DataFrame containing all peaks enriched with columns:
+
+                 - ``sample_batch_name``: Name of the batch the sample belongs to
+                 - ``sample_item_name``: Name of the sample
+                 - ``sample_item_utc_created``: Timestamp of the sample
+
+                 Plus all columns from :meth:`~mascope_sdk.resources.samples.SamplesResource.get_peaks`.
+                 Returns None if no peaks are found.
+        :rtype: pd.DataFrame | None
+        :raises ValueError: If the workspace or batches cannot be resolved.
+
+        Example::
+
+            mascope = MascopeClient()
+
+            # Load all peaks from batches containing "Uronium"
+            peaks = mascope.load_peaks(
+                workspace="My Workspace",
+                batches="Uronium",
+            )
+
+            # Chronological timeseries per compound
+            peaks.sort_values("sample_item_utc_created").groupby(
+                "target_compound_formula"
+            )["area"].sum()
+
+            # Load all peaks from all batches
+            peaks = mascope.load_peaks(workspace="My Workspace")
+        """
+        from ._loaders import load_peaks as _load_peaks
+
+        return _load_peaks(
+            self,
+            workspace,
+            batches,
+            matches=matches,
+            areas=areas,
+            heights=heights,
+            average=average,
+            max_workers=max_workers,
+        )
 
     def __repr__(self) -> str:
         return f"MascopeClient(url='{self._url}')"
