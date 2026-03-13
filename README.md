@@ -928,7 +928,7 @@ flowchart TB
 In production, multiple Uvicorn workers run behind [Nginx](https://nginx.org/en/docs/http/load_balancing.html) with sticky sessions (`ip_hash`).
 Redis coordinates Socket.IO events across workers via pub/sub and stores user sessions for cross-worker authentication.
 
-### Backend DB
+## Backend DB
 
 We use SQLite as our database, and the `db` folder includes a variety of scripts to help manage the database:
 
@@ -948,7 +948,93 @@ It's responsible for transforming incoming data files and recording correspondin
 database. Its a distinct [module](#runtime-modules) which is launched independently using the
 [CLI](#runtime-cli).
 
----
+## Scheduled Database Backups (Cron)
+
+Mascope uses `cron` to automate PostgreSQL backups via the `mascope prod db backup` CLI commands.
+Cron jobs are **per-user, per-machine** - they are not tied to a project directory or environment.
+All backup commands operate on the **active environment's database only**.
+
+Backups are written to `.runtime/database/backups/prod/` as compressed `.dump` files
+(PostgreSQL custom format via `pg_dump -Fc`).
+
+### Prerequisites
+
+Before setting up cron, confirm the required values on the server:
+
+```bash
+# Confirm mascope is installed and its location
+which mascope                  # should return /home/<user>/.local/bin/mascope
+
+# Confirm MASCOPE_PATH (set in /etc/environment by ubuntu.sh, NOT exported into SSH/cron sessions)
+echo $MASCOPE_PATH             # e.g. /home/karsa/Mascope
+
+# Confirm docker is available
+which docker                   # should return /usr/bin/docker
+```
+
+### Crontab setup
+
+Edit the crontab with:
+
+```bash
+crontab -e    # opens in $EDITOR (nano by default)
+crontab -l    # view current crontab
+```
+
+The crontab requires explicit environment variables -cron does **not** load `/etc/environment`
+or the user's shell profile:
+
+```
+SHELL=/usr/bin/bash
+PATH=/home/karsa/.local/bin:/usr/bin:/usr/local/bin
+MASCOPE_PATH=/home/karsa/Mascope
+```
+
+- `PATH` -must include `~/.local/bin` (where `uv tool` installs `mascope`) and `/usr/bin` (where `docker` lives)
+- `MASCOPE_PATH` -required by the `mascope` runtime to locate the project; set by `tooling/ubuntu.sh` in `/etc/environment` but **not** automatically exported into cron
+
+### Recommended crontab
+
+Backup create and delete are **chained in a single job** with `&&` to avoid simultaneous
+writes to `state.json`:
+
+```
+SHELL=/usr/bin/bash
+PATH=/home/karsa/.local/bin:/usr/bin:/usr/local/bin
+MASCOPE_PATH=/home/karsa/Mascope
+
+# Daily backup at 4 AM -create then prune, 7-day retention, active env only
+0 4 * * * { mascope prod db backup create --yes && mascope prod db backup delete --retention-days 7; } 2>&1 | logger -t mascope-prod-db-backup
+```
+
+Both stdout and stderr are captured and forwarded to syslog under the tag `mascope-prod-db-backup`.
+
+### Useful commands
+
+```bash
+# View recent backup files and sizes
+mascope prod db backup list -a
+
+# Manual backup (active env)
+mascope prod db backup create --yes
+
+# Preview what deletion would remove (dry run)
+mascope prod db backup delete --retention-days 7 --dry-run
+
+# Check recent cron execution logs
+grep mascope-prod-db-backup /var/log/syslog | tail -20
+
+```
+
+### Notes
+
+- Use https://crontab.guru to generate and verify cron expressions.
+- `pg_dump` for large databases (tens of GB) can take several minutes - this is normal.
+  The backup file will grow incrementally in `.runtime/database/backups/prod/` while in progress.
+- Backup filenames embed a timestamp and optional `cron` label, e.g.
+  `mascope_test_env_20260313_040001_cron.dump`
+- Deletion only affects dumps matching the **active environment** - other environments'
+  dumps in the same directory are untouched.
 
 ## 🖥️ Frontend
 
