@@ -239,6 +239,20 @@ class SamplesResource(BaseResource):
                 )
             df = df.drop(columns=["match"])
 
+            # Resolve ionization_mechanism_id to human-readable name
+            mechanisms = self._client.ionization.list()
+            if mechanisms is not None and not mechanisms.empty:
+                id_to_name = dict(
+                    zip(
+                        mechanisms["ionization_mechanism_id"],
+                        mechanisms["ionization_mechanism"],
+                    )
+                )
+                df["ionization_mechanism"] = df["ionization_mechanism_id"].map(
+                    id_to_name
+                )
+                df = df.drop(columns=["ionization_mechanism_id"])
+
         return df
 
     def get_peak_timeseries(

@@ -41,7 +41,12 @@ class IonizationResource(BaseResource):
                 mechanisms["name"].str.contains("protonation", case=False)
             ]
         """
+        cache_key = "ionization_mechanisms"
+        if cache_key in self._client._cache:
+            return self._client._cache[cache_key]
         data = self._get("ionization_mechanisms")
         if not data:
             return None
-        return pd.DataFrame(data)
+        df = pd.DataFrame(data)
+        self._client._cache[cache_key] = df
+        return df
