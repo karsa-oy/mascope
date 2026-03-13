@@ -200,6 +200,153 @@ def load_peaks(
     return result
 
 
+def load_peaks_by_stage(
+    client: MascopeClient,
+    sample: str,
+    stages: list[tuple[float, ...]],
+    *,
+    matches: bool = True,
+    areas: bool = True,
+    heights: bool = True,
+    max_workers: int = 8,
+) -> pd.DataFrame | None:
+    """Load averaged peaks for each time-range stage of a single sample.
+
+    For each stage (time range), requests the averaged peak list from the API
+    and concatenates the results into a single DataFrame. This is useful when
+    a measurement consists of several stages (e.g. blank, sample introduction,
+    wash) and the scientist wants to compare the peak list per stage.
+
+    Requests are made concurrently for better performance.
+
+    :param client: The MascopeClient instance.
+    :type client: MascopeClient
+    :param sample: Sample name or sample ID. If a name is given, it is
+                   resolved via the API. Use ``samples.list()`` to find
+                   available samples.
+    :type sample: str
+    :param stages: List of time-range tuples defining stages. Each element can
+                   be ``(t_min, t_max)`` or ``(t_min, t_max, name)`` where
+                   *name* is a human-readable label for the stage.
+    :type stages: list[tuple[float, float] | tuple[float, float, str]]
+    :param matches: Include matched compounds/ions/isotopes. Defaults to True.
+    :type matches: bool
+    :param areas: Include peak areas. Defaults to True.
+    :type areas: bool
+    :param heights: Include peak heights. Defaults to True.
+    :type heights: bool
+    :param max_workers: Maximum number of concurrent requests. Defaults to 8.
+    :type max_workers: int
+    :return: A DataFrame containing peaks with columns:
+
+             - ``stage``: 0-based stage index
+             - ``stage_name``: Stage label (from the tuple, or None)
+             - ``t_min``: Start time of the stage in seconds
+             - ``t_max``: End time of the stage in seconds
+
+             Plus all columns from :meth:`~mascope_sdk.resources.samples.SamplesResource.get_peaks`.
+             Returns None if no peaks are found.
+    :rtype: pd.DataFrame | None
+    :raises ValueError: If stages is empty or the sample cannot be found.
+
+    Example::
+
+        mascope = MascopeClient()
+
+        # Define named stages
+        stages = [
+            (0, 30, "blank"),
+            (30, 120, "sample"),
+            (120, 180, "wash"),
+        ]
+
+        peaks = mascope.load_peaks_by_stage(
+            sample="my-sample-id",
+            stages=stages,
+        )
+
+        # Compare areas between stages
+        peaks.groupby("stage_name")["area"].sum()
+    """
+    if not stages:
+        raise ValueError(
+            "stages must be a non-empty list of (t_min, t_max[, name]) tuples"
+        )
+
+    # Resolve sample name or ID
+    from .exceptions import NotFoundError
+
+    try:
+        sample_data = client.samples.get(sample)
+    except NotFoundError:
+        raise ValueError(
+            f"Sample '{sample}' not found. "
+            "Use samples.list() to find available sample IDs."
+        )
+    sample_id = sample_data["sample_item_id"]
+
+    # Normalise stages to (t_min, t_max, name | None)
+    normalised: list[tuple[float, float, str | None]] = []
+    for s in stages:
+        if len(s) == 3:
+            normalised.append((s[0], s[1], str(s[2])))
+        else:
+            normalised.append((s[0], s[1], None))
+
+    def _fetch_stage_peaks(
+        stage_idx: int,
+        t_min: float,
+        t_max: float,
+        stage_name: str | None,
+    ) -> pd.DataFrame | None:
+        peaks = client.samples.get_peaks(
+            sample_id,
+            matches=matches,
+            areas=areas,
+            heights=heights,
+            average=True,
+            t_min=t_min,
+            t_max=t_max,
+        )
+        if peaks is None or peaks.empty:
+            return None
+
+        peaks["stage"] = stage_idx
+        peaks["stage_name"] = stage_name
+        peaks["t_min"] = t_min
+        peaks["t_max"] = t_max
+        return peaks
+
+    frames: list[pd.DataFrame] = []
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {
+            executor.submit(_fetch_stage_peaks, idx, t_min, t_max, name): idx
+            for idx, (t_min, t_max, name) in enumerate(normalised)
+        }
+        with tqdm(
+            total=len(futures),
+            desc="Loading stages",
+            unit="stage",
+            file=sys.stderr,
+            bar_format="{l_bar}{bar:30}{r_bar}",
+            colour="green",
+        ) as pbar:
+            for future in as_completed(futures):
+                result = future.result()
+                if result is not None:
+                    frames.append(result)
+                pbar.update(1)
+
+    if not frames:
+        logger.warning("No peaks found")
+        return None
+
+    result = pd.concat(frames, ignore_index=True)
+    result = result.sort_values("stage").reset_index(drop=True)
+    logger.info("Loaded {} peaks across {} stages", len(result), len(stages))
+    return result
+
+
 _FORMULA_COLUMNS = {
     "compound": "target_compound_formula",
     "ion": "target_ion_formula",

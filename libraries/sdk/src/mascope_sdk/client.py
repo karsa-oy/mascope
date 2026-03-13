@@ -433,6 +433,74 @@ class MascopeClient:
             max_workers=max_workers,
         )
 
+    def load_peaks_by_stage(
+        self,
+        sample: str,
+        stages: list[tuple[float, ...]],
+        *,
+        matches: bool = True,
+        areas: bool = True,
+        heights: bool = True,
+        max_workers: int = 8,
+    ) -> pd.DataFrame | None:
+        """Load averaged peaks for each time-range stage of a single sample.
+
+        For each stage (time range), requests the averaged peak list and
+        concatenates everything into a single DataFrame. Useful when a
+        measurement has distinct phases (e.g. blank, sample introduction, wash).
+
+        :param sample: Sample name or sample ID.
+        :type sample: str
+        :param stages: List of time-range tuples. Each element can be
+                       ``(t_min, t_max)`` or ``(t_min, t_max, name)`` where
+                       *name* is a human-readable label for the stage.
+        :type stages: list[tuple[float, float] | tuple[float, float, str]]
+        :param matches: Include matched compounds/ions/isotopes. Defaults to True.
+        :type matches: bool
+        :param areas: Include peak areas. Defaults to True.
+        :type areas: bool
+        :param heights: Include peak heights. Defaults to True.
+        :type heights: bool
+        :param max_workers: Maximum number of concurrent requests. Defaults to 8.
+        :type max_workers: int
+        :return: A DataFrame with stage-enriched peak data. Extra columns:
+
+                 - ``stage``: 0-based stage index
+                 - ``stage_name``: Stage label (or None)
+                 - ``t_min`` / ``t_max``: Time range in seconds
+
+                 Returns None if no peaks are found.
+        :rtype: pd.DataFrame | None
+
+        Example::
+
+            mascope = MascopeClient()
+
+            stages = [
+                (0, 30, "blank"),
+                (30, 120, "sample"),
+                (120, 180, "wash"),
+            ]
+
+            peaks = mascope.load_peaks_by_stage(
+                sample="my-sample-id",
+                stages=stages,
+            )
+
+            peaks.groupby("stage_name")["area"].sum()
+        """
+        from ._loaders import load_peaks_by_stage as _load_peaks_by_stage
+
+        return _load_peaks_by_stage(
+            self,
+            sample,
+            stages,
+            matches=matches,
+            areas=areas,
+            heights=heights,
+            max_workers=max_workers,
+        )
+
     def __repr__(self) -> str:
         return f"MascopeClient(url='{self._url}')"
 
