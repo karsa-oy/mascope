@@ -1,7 +1,5 @@
 from datetime import datetime
 
-from pydantic import ConfigDict, Field, model_validator
-
 from mascope_backend.api.models.base_pydantic_model import (
     CommonValidators,
     QueryParamsModel,
@@ -10,7 +8,7 @@ from mascope_backend.api.models.base_pydantic_model import (
 from mascope_backend.api.models.sample.items.sample_item_pydantic_model import (
     GetSampleItemsQueryValidator,
 )
-
+from pydantic import ConfigDict, Field, model_validator
 
 # TODO_configuration move to sample configs when refactoring
 DEFAULT_PEAK_MZ_TOLERANCE_PPM = 1.0
@@ -143,11 +141,18 @@ class GetSamplePeakTimeseriesBody(CommonValidators, RequestBodyModel):
     Request body for retrieving timeseries data of a specific peak in a sample.
 
     This model defines the parameters needed to extract and return timeseries data
-    for the closest peak to a given m/z value within specified tolerance and time limits.
+    for a peak identified by either its ``peak_id`` or its ``m/z`` value.
+    When ``peak_id`` is provided, the peak's m/z is resolved from the sample's peak data
+    and ``peak_mz`` and ``peak_mz_tolerance_ppm`` are ignored.
     """
 
-    peak_mz: float = Field(
-        ..., description="The m/z value of the peak to retrieve timeseries for"
+    peak_id: str | None = Field(
+        None,
+        description="The unique peak identifier. If provided, peak_mz and peak_mz_tolerance_ppm are ignored.",
+    )
+    peak_mz: float | None = Field(
+        None,
+        description="The m/z value of the peak to retrieve timeseries for. Required if peak_id is not provided.",
     )
     peak_mz_tolerance_ppm: float = Field(
         DEFAULT_PEAK_MZ_TOLERANCE_PPM,
@@ -163,6 +168,12 @@ class GetSamplePeakTimeseriesBody(CommonValidators, RequestBodyModel):
     )
 
     model_config = ConfigDict(from_attributes=True)
+
+    @model_validator(mode="after")
+    def validate_peak_identifier(self):
+        if self.peak_id is None and self.peak_mz is None:
+            raise ValueError("Either peak_id or peak_mz must be provided")
+        return self
 
 
 class GetSampleSpectrumQueryParams(CommonValidators, QueryParamsModel):

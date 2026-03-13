@@ -2,11 +2,9 @@
 import asyncio
 from datetime import datetime
 
+import mascope_signal.compute as m_compute
 import numpy as np
 import pandas as pd
-from sqlalchemy import Float, Integer, and_, asc, cast, desc, func, label, select
-
-import mascope_signal.compute as m_compute
 from mascope_backend.api.controllers.samples.lib.samples_fetch import fetch_sample
 from mascope_backend.api.lib.api_features import api_controller
 from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
@@ -27,8 +25,9 @@ from mascope_backend.db import (
 )
 from mascope_backend.db.views import Sample
 from mascope_backend.runtime import runtime
-from mascope_file.io import load_peak_data
+from mascope_file.io import load_coord, load_peak_data
 from mascope_signal.peak import get_peaks
+from sqlalchemy import Float, Integer, and_, asc, cast, desc, func, label, select
 
 
 @api_controller()
@@ -524,46 +523,66 @@ async def get_sample_peaks(
 @api_controller()
 async def get_sample_peak_timeseries(
     sample_item_id: str,
-    peak_mz: float,
-    peak_mz_tolerance_ppm: float,
+    peak_id: str | None = None,
+    peak_mz: float | None = None,
+    peak_mz_tolerance_ppm: float | None = None,
     t_min: float | None = None,
     t_max: float | None = None,
 ) -> dict:
     """
     Get timeseries of a given peak in a specified sample.
 
-    Returns the timeseries of the closest peak to a given m/z, filtered by the sample's
-    polarity and time range, if found within given m/z tolerance.
+    The peak can be identified by either ``peak_id`` (exact) or ``peak_mz``
+    (nearest within tolerance). When ``peak_id`` is provided, its m/z is
+    resolved from the sample's peak data and ``peak_mz`` / tolerance are ignored.
 
-    Steps:
-    1. Get sample data and extract required fields.
-    2. Validate and set time limits based on sample's t0/t1 values.
-    3. Get filtered scan timestamps using the sample's polarity and time range.
-    4. Load the sample file data and get peaks.
-    5. Filter sample file peaks by the scan timestamps and select the nearest peak
-        to the requested m/z within the specified tolerance.
-    6. Validate m/z tolerance and return timeseries data of the selected peak.
+    Returns the timeseries of the peak, filtered by the sample's polarity
+    and time range.
 
     :param sample_item_id: Sample item ID
     :type sample_item_id: str
+    :param peak_id: Unique peak identifier; if provided, peak_mz is ignored
+    :type peak_id: str | None
     :param peak_mz: m/z of the peak to get timeseries for
-    :type peak_mz: float
-    :param peak_mz_tolerance_ppm: Tolerance for m/z difference
-        for the requested peak and the nearest one found from data
-    :type peak_mz_tolerance_ppm: float
-    :param t_min: Minimum time limit in seconds, must be within sample's acquisition time range
+    :type peak_mz: float | None
+    :param peak_mz_tolerance_ppm: Tolerance for m/z difference (only used with peak_mz)
+    :type peak_mz_tolerance_ppm: float | None
+    :param t_min: Minimum time limit in seconds
     :type t_min: float | None
-    :param t_max: Maximum time limit in seconds, must be within sample's acquisition time range
+    :param t_max: Maximum time limit in seconds
     :type t_max: float | None
-    :raises HTTPException: Raised if sample is not found or time limits are invalid
+    :raises ValueError: If neither peak_id nor peak_mz is provided
+    :raises NotFoundException: If sample, sample file, or peak_id is not found
     :return: Dictionary with keys:
-        "mz": m/z of the peak in sample (None if no peak within tolerance)
-        "height": peak height at time points (empty if no peak within tolerance)
+        "peak_id": peak ID (if resolved),
+        "mz": m/z of the peak in sample (None if no peak within tolerance),
+        "height": peak height at time points (empty if no peak within tolerance),
         "time": time coordinates (empty if no peak within tolerance)
     :rtype: dict
     """
     # Step 1: Get sample data and extract required fields
     sample = await fetch_sample(sample_item_id)
+
+    # Step 1b: Resolve peak_id to m/z if provided
+    resolved_peak_id = None
+    if peak_id is not None:
+        try:
+            peak_ids = load_coord(sample.filename, "peak_timeseries", "peak_id")
+            mz_values = load_coord(sample.filename, "peak_timeseries", "mz")
+        except FileNotFoundError as e:
+            raise NotFoundException(
+                f"Sample file with name '{sample.filename}' was not found or has not been processed"
+            ) from e
+
+        mask = peak_ids == peak_id
+        if not mask.any():
+            raise NotFoundException(
+                f"Peak ID '{peak_id}' not found in sample '{sample.sample_item_name}'"
+            )
+
+        peak_mz = float(mz_values[mask][0])
+        peak_mz_tolerance_ppm = float("inf")  # exact match, skip tolerance check
+        resolved_peak_id = peak_id
 
     # Step 2: Validate and set effective time limits with auto-correction
     t_min_eff, t_max_eff, time_adjustment_info = _validate_time_range(
@@ -583,6 +602,7 @@ async def get_sample_peak_timeseries(
             "message": f"No scans found for sample '{sample.filename}' with polarity '{sample.polarity}' in time range [{t_min_eff}, {t_max_eff}] seconds.",
             "results": 0,
             "data": {
+                "peak_id": resolved_peak_id,
                 "mz": None,
                 "height": [],
                 "time": [],
@@ -601,6 +621,7 @@ async def get_sample_peak_timeseries(
             "message": f"No peaks found for sample '{sample.filename}' with polarity '{sample.polarity}' in time range [{t_min_eff}, {t_max_eff}] seconds.",
             "results": 0,
             "data": {
+                "peak_id": resolved_peak_id,
                 "mz": None,
                 "height": [],
                 "time": [],
@@ -629,7 +650,7 @@ async def get_sample_peak_timeseries(
         return {
             "message": message,
             "results": 0,
-            "data": {"mz": None, "height": [], "time": []},
+            "data": {"peak_id": resolved_peak_id, "mz": None, "height": [], "time": []},
         }
 
     message = (
@@ -645,10 +666,15 @@ async def get_sample_peak_timeseries(
     heights_array = np.where(np.isnan(heights_array), None, heights_array)
     heights_list = heights_array.tolist()
 
+    # Resolve peak_id from the timeseries if not already provided
+    if resolved_peak_id is None and hasattr(peak_timeseries, "peak_id"):
+        resolved_peak_id = str(peak_timeseries.peak_id.item())
+
     return {
         "message": message,
         "results": len(peak_timeseries.time.values),
         "data": {
+            "peak_id": resolved_peak_id,
             "mz": peak_mz_data,
             "height": heights_list,
             "time": peak_timeseries.time.values.tolist(),
