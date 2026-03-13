@@ -221,6 +221,7 @@ class SamplesResource(BaseResource):
                 "target_isotope_formula",
                 "target_ion_id",
                 "target_ion_formula",
+                "target_compound_name",
                 "target_compound_formula",
                 "ionization_mechanism_id",
                 "target_collection_ids",
@@ -238,22 +239,27 @@ class SamplesResource(BaseResource):
     def get_peak_timeseries(
         self,
         sample_id: str,
-        mz: float,
+        mz: float | None = None,
         *,
+        peak_id: str | None = None,
         mz_tolerance_ppm: float = 1.0,
         t_min: float | None = None,
         t_max: float | None = None,
     ) -> pd.DataFrame | None:
         """Get timeseries data for a specific peak.
 
-        Retrieves intensity values over time for a peak at the specified m/z value.
-        Uses automatic polarity filtering based on sample metadata.
+        The peak can be identified by either ``peak_id`` (exact) or ``mz``
+        (nearest within tolerance). When ``peak_id`` is provided, ``mz`` and
+        ``mz_tolerance_ppm`` are ignored.
 
         :param sample_id: The ID of the sample.
         :type sample_id: str
-        :param mz: The m/z value of the peak.
-        :type mz: float
-        :param mz_tolerance_ppm: m/z tolerance in ppm for peak matching. Defaults to 1.0.
+        :param mz: The m/z value of the peak. Required if ``peak_id`` is not provided.
+        :type mz: float, optional
+        :param peak_id: The unique peak identifier. If provided, ``mz`` is ignored.
+        :type peak_id: str, optional
+        :param mz_tolerance_ppm: m/z tolerance in ppm for peak matching (only used with ``mz``).
+                                 Defaults to 1.0.
         :type mz_tolerance_ppm: float
         :param t_min: Minimum time in seconds. Uses sample start if not provided.
         :type t_min: float, optional
@@ -261,36 +267,42 @@ class SamplesResource(BaseResource):
         :type t_max: float, optional
         :return: A DataFrame containing timeseries data with columns:
 
+                 - ``peak_id``: Peak identifier
                  - ``time``: Time in seconds
                  - ``height``: Intensity value at each time point
                  - ``mz``: Actual m/z of the matched peak
 
                  Returns None if no matching peak is found.
         :rtype: pd.DataFrame | None
+        :raises ValueError: If neither ``peak_id`` nor ``mz`` is provided.
         :raises AuthenticationError: If authentication fails.
-        :raises NotFoundError: If the sample is not found.
+        :raises NotFoundError: If the sample or peak is not found.
         :raises MascopeAPIError: If the API request fails.
 
         Example::
 
-            # Get timeseries for a peak at m/z 180.063
-            timeseries = mascope.samples.get_peak_timeseries(
+            # By peak_id (exact)
+            ts = mascope.samples.get_peak_timeseries(
+                sample_id="sample-456",
+                peak_id="abc123",
+            )
+
+            # By m/z (nearest match)
+            ts = mascope.samples.get_peak_timeseries(
                 sample_id="sample-456",
                 mz=180.063,
                 mz_tolerance_ppm=5.0,
             )
-
-            if timeseries is not None:
-                import matplotlib.pyplot as plt
-                plt.plot(timeseries["time"], timeseries["height"])
-                plt.xlabel("Time (s)")
-                plt.ylabel("Intensity")
-                plt.show()
         """
-        body: dict[str, Any] = {
-            "peak_mz": mz,
-            "peak_mz_tolerance_ppm": mz_tolerance_ppm,
-        }
+        if peak_id is None and mz is None:
+            raise ValueError("Either peak_id or mz must be provided")
+
+        body: dict[str, Any] = {}
+        if peak_id is not None:
+            body["peak_id"] = peak_id
+        else:
+            body["peak_mz"] = mz
+            body["peak_mz_tolerance_ppm"] = mz_tolerance_ppm
         if t_min is not None:
             body["t_min"] = t_min
         if t_max is not None:
@@ -300,7 +312,7 @@ class SamplesResource(BaseResource):
         if not data:
             return None
 
-        # Extract time and height arrays, include mz
+        actual_peak_id = data.get("peak_id")
         actual_mz = data.get("mz")
         time_values = data.get("time", [])
         height_values = data.get("height", [])
@@ -310,6 +322,7 @@ class SamplesResource(BaseResource):
 
         return pd.DataFrame(
             {
+                "peak_id": actual_peak_id,
                 "time": time_values,
                 "height": height_values,
                 "mz": actual_mz,

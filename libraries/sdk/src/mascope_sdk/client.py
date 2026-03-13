@@ -320,7 +320,7 @@ class MascopeClient:
 
                  - ``sample_batch_name``: Name of the batch the sample belongs to
                  - ``sample_item_name``: Name of the sample
-                 - ``sample_item_utc_created``: Timestamp of the sample
+                 - ``datetime_utc``: Measurement start timestamp (UTC)
 
                  Plus all columns from :meth:`~mascope_sdk.resources.samples.SamplesResource.get_peaks`.
                  Returns None if no peaks are found.
@@ -338,7 +338,7 @@ class MascopeClient:
             )
 
             # Chronological timeseries per compound
-            peaks.sort_values("sample_item_utc_created").groupby(
+            peaks.sort_values("datetime_utc").groupby(
                 "target_compound_formula"
             )["area"].sum()
 
@@ -355,6 +355,81 @@ class MascopeClient:
             areas=areas,
             heights=heights,
             average=average,
+            max_workers=max_workers,
+        )
+
+    def load_peak_timeseries(
+        self,
+        workspace: str,
+        batches: str | None = None,
+        *,
+        compound: str | None = None,
+        ion: str | None = None,
+        isotope: str | None = None,
+        max_workers: int = 8,
+    ) -> pd.DataFrame | None:
+        """Load intra-sample peak timeseries for matched peaks across batches.
+
+        Resolves a compound, ion, or isotope formula to the corresponding peak
+        IDs via match data, then fetches the per-scan timeseries for each peak
+        in each sample. The hierarchy is:
+        compound -> ions -> isotopes -> peaks (1:1).
+
+        Provide exactly one of ``compound``, ``ion``, or ``isotope``.
+
+        Requests are made concurrently for better performance. Two progress bars
+        are displayed: one for peak discovery and one for timeseries loading.
+
+        :param workspace: Workspace name (or substring) or workspace ID.
+        :type workspace: str
+        :param batches: Optional substring filter on batch names (case-insensitive).
+        :type batches: str, optional
+        :param compound: Target compound name or formula (e.g. ``"Urea"`` or ``"CH4N2O"``).
+        :type compound: str, optional
+        :param ion: Target ion formula (e.g. ``"CH5N2O+"``).
+        :type ion: str, optional
+        :param isotope: Target isotope formula (e.g. ``"CH5N2O+"``).
+        :type isotope: str, optional
+        :param max_workers: Maximum number of concurrent requests. Defaults to 8.
+        :type max_workers: int
+        :return: A DataFrame with one row per time point per peak, containing:
+
+                 - ``sample_batch_name``: Batch name
+                 - ``sample_item_id``: Sample ID
+                 - ``sample_item_name``: Sample name
+                 - ``datetime_utc``: Sample measurement start timestamp (UTC)
+                 - ``peak_id``: Peak identifier
+                 - ``mz``: Actual m/z of the peak
+                 - ``target_compound_name``, ``target_compound_formula``,
+                   ``target_ion_formula``, ``target_isotope_formula``: Match metadata
+                 - ``time``: Relative time in seconds within the sample
+                 - ``height``: Intensity at each time point
+                 - ``datetime``: Absolute datetime (``datetime_utc`` + ``time``)
+
+                 Returns None if no matching peaks are found.
+        :rtype: pd.DataFrame | None
+        :raises ValueError: If zero or more than one formula is provided.
+
+        Example::
+
+            mascope = MascopeClient()
+
+            # Get intra-sample timeseries for all Urea peaks
+            ts = mascope.load_peak_timeseries(
+                workspace="My Workspace",
+                batches="Uronium",
+                compound="CH4N2O",
+            )
+        """
+        from ._loaders import load_peak_timeseries as _load_peak_timeseries
+
+        return _load_peak_timeseries(
+            self,
+            workspace,
+            batches,
+            compound=compound,
+            ion=ion,
+            isotope=isotope,
             max_workers=max_workers,
         )
 

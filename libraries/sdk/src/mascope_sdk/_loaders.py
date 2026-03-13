@@ -14,6 +14,64 @@ if TYPE_CHECKING:
     from .client import MascopeClient
 
 
+def _collect_sample_tasks(
+    client: MascopeClient,
+    workspace: str,
+    batches: str | None = None,
+) -> tuple[list[tuple[Any, str]], str]:
+    """Resolve workspace/batches and collect (sample_row, batch_name) pairs.
+
+    :param client: The MascopeClient instance.
+    :param workspace: Workspace name (or substring) or workspace ID.
+    :param batches: Optional substring filter on batch names.
+    :return: Tuple of (sample_tasks, workspace_id).
+    :raises ValueError: If workspace or batches cannot be resolved.
+    """
+    from ._resolve import resolve_id
+
+    workspaces = client.workspaces.list()
+    workspace_id = resolve_id(
+        workspace,
+        workspaces,
+        id_column="workspace_id",
+        name_column="workspace_name",
+        entity_label="workspace",
+    )
+    logger.info("Loading workspace '{}'", workspace)
+
+    all_batches = client.batches._list_by_id(workspace_id)
+    if all_batches is None or all_batches.empty:
+        logger.warning("No batches found in workspace")
+        return [], workspace_id
+
+    if batches is not None:
+        all_batches = all_batches[
+            all_batches["sample_batch_name"].str.contains(batches, case=False, na=False)
+        ]
+        if all_batches.empty:
+            logger.warning("No batches matching '{}'", batches)
+            return [], workspace_id
+
+    batch_names = all_batches["sample_batch_name"].tolist()
+    logger.info("Found {} batch(es): {}", len(all_batches), batch_names)
+
+    sample_tasks: list[tuple[Any, str]] = []
+    for _, batch_row in all_batches.iterrows():
+        batch_id = batch_row["sample_batch_id"]
+        batch_name = batch_row["sample_batch_name"]
+
+        samples = client.samples._list_by_id(batch_id)
+        if samples is None or samples.empty:
+            logger.info("Batch '{}': no samples, skipping", batch_name)
+            continue
+
+        logger.info("Batch '{}': {} sample(s)", batch_name, len(samples))
+        for _, sample_row in samples.iterrows():
+            sample_tasks.append((sample_row, batch_name))
+
+    return sample_tasks, workspace_id
+
+
 def load_peaks(
     client: MascopeClient,
     workspace: str,
@@ -55,7 +113,7 @@ def load_peaks(
 
              - ``sample_batch_name``: Name of the batch the sample belongs to
              - ``sample_item_name``: Name of the sample
-             - ``sample_item_utc_created``: Timestamp of the sample
+             - ``datetime_utc``: Measurement start timestamp (UTC)
 
              Plus all columns from :meth:`~mascope_sdk.resources.samples.SamplesResource.get_peaks`.
              Returns None if no peaks are found.
@@ -73,59 +131,14 @@ def load_peaks(
         )
 
         # Chronological timeseries per compound
-        peaks.sort_values("sample_item_utc_created").groupby(
+        peaks.sort_values("datetime_utc").groupby(
             "target_compound_formula"
         )["area"].sum()
 
         # Load all peaks from all batches
         peaks = mascope.load_peaks(workspace="My Workspace")
     """
-    # Resolve workspace
-    from ._resolve import resolve_id
-
-    workspaces = client.workspaces.list()
-    workspace_id = resolve_id(
-        workspace,
-        workspaces,
-        id_column="workspace_id",
-        name_column="workspace_name",
-        entity_label="workspace",
-    )
-    logger.info("Loading workspace '{}'", workspace)
-
-    # Get batches
-    all_batches = client.batches._list_by_id(workspace_id)
-    if all_batches is None or all_batches.empty:
-        logger.warning("No batches found in workspace")
-        return None
-
-    # Filter batches by name
-    if batches is not None:
-        all_batches = all_batches[
-            all_batches["sample_batch_name"].str.contains(batches, case=False, na=False)
-        ]
-        if all_batches.empty:
-            logger.warning("No batches matching '{}'", batches)
-            return None
-
-    batch_names = all_batches["sample_batch_name"].tolist()
-    logger.info("Found {} batch(es): {}", len(all_batches), batch_names)
-
-    # Collect all (sample_row, batch_name) pairs across batches
-    sample_tasks: list[tuple[Any, str]] = []
-    for _, batch_row in all_batches.iterrows():
-        batch_id = batch_row["sample_batch_id"]
-        batch_name = batch_row["sample_batch_name"]
-
-        samples = client.samples._list_by_id(batch_id)
-        if samples is None or samples.empty:
-            logger.info("Batch '{}': no samples, skipping", batch_name)
-            continue
-
-        logger.info("Batch '{}': {} sample(s)", batch_name, len(samples))
-        for _, sample_row in samples.iterrows():
-            sample_tasks.append((sample_row, batch_name))
-
+    sample_tasks, _ = _collect_sample_tasks(client, workspace, batches)
     if not sample_tasks:
         logger.warning("No samples found")
         return None
@@ -150,11 +163,11 @@ def load_peaks(
             "sample_item_name",
             sample_row["sample_item_name"],
         )
-        if "sample_item_utc_created" in sample_row.index:
+        if "datetime_utc" in sample_row.index:
             peaks.insert(
                 peaks.columns.get_loc("sample_item_name") + 1,
-                "sample_item_utc_created",
-                sample_row["sample_item_utc_created"],
+                "datetime_utc",
+                sample_row["datetime_utc"],
             )
         return peaks
 
@@ -184,4 +197,247 @@ def load_peaks(
 
     result = pd.concat(frames, ignore_index=True)
     logger.info("Loaded {} peaks total", len(result))
+    return result
+
+
+_FORMULA_COLUMNS = {
+    "compound": "target_compound_formula",
+    "ion": "target_ion_formula",
+    "isotope": "target_isotope_formula",
+}
+
+_NAME_COLUMNS = {
+    "compound": "target_compound_name",
+}
+
+
+def load_peak_timeseries(
+    client: MascopeClient,
+    workspace: str,
+    batches: str | None = None,
+    *,
+    compound: str | None = None,
+    ion: str | None = None,
+    isotope: str | None = None,
+    max_workers: int = 8,
+) -> pd.DataFrame | None:
+    """Load intra-sample peak timeseries for matched peaks across batches.
+
+    Resolves a compound, ion, or isotope formula to the corresponding peak IDs
+    via match data, then fetches the per-scan timeseries for each peak in each
+    sample. The hierarchy is: compound -> ions -> isotopes -> peaks (1:1).
+
+    Provide exactly one of ``compound``, ``ion``, or ``isotope``.
+
+    Requests are made concurrently for better performance. A progress bar is
+    displayed during loading.
+
+    :param client: The MascopeClient instance.
+    :type client: MascopeClient
+    :param workspace: Workspace name (or substring) or workspace ID.
+    :type workspace: str
+    :param batches: Optional substring filter on batch names (case-insensitive).
+    :type batches: str, optional
+    :param compound: Target compound name or formula (e.g. ``"Urea"`` or ``"CH4N2O"``).
+    :type compound: str, optional
+    :param ion: Target ion formula to resolve (e.g. ``"CH5N2O+"``).
+    :type ion: str, optional
+    :param isotope: Target isotope formula to resolve (e.g. ``"CH5N2O+"``).
+    :type isotope: str, optional
+    :param max_workers: Maximum number of concurrent requests. Defaults to 8.
+    :type max_workers: int
+    :return: A DataFrame with one row per time point per peak, containing:
+
+             - ``sample_batch_name``: Batch name
+             - ``sample_item_id``: Sample ID
+             - ``sample_item_name``: Sample name
+             - ``datetime_utc``: Sample measurement start timestamp (UTC)
+             - ``peak_id``: Peak identifier
+             - ``mz``: Actual m/z of the peak
+             - ``target_compound_name``: Matched compound name
+             - ``target_compound_formula``: Matched compound formula
+             - ``target_ion_formula``: Matched ion formula
+             - ``target_isotope_formula``: Matched isotope formula
+             - ``time``: Relative time in seconds within the sample
+             - ``height``: Intensity at each time point
+             - ``datetime``: Absolute datetime (``datetime_utc`` + ``time``)
+
+             Returns None if no matching peaks are found.
+    :rtype: pd.DataFrame | None
+    :raises ValueError: If zero or more than one formula parameter is provided.
+
+    Example::
+
+        mascope = MascopeClient()
+
+        # Timeseries for all peaks matched to Urea
+        ts = mascope.load_peak_timeseries(
+            workspace="My Workspace",
+            batches="Uronium",
+            compound="CH4N2O",
+        )
+
+        # Plot per-isotope timeseries for one sample
+        import matplotlib.pyplot as plt
+        sample = ts[ts["sample_item_name"] == ts["sample_item_name"].iloc[0]]
+        for isotope_formula, group in sample.groupby("target_isotope_formula"):
+            plt.plot(group["time"], group["height"], label=isotope_formula)
+        plt.legend()
+        plt.show()
+    """
+    # Validate exactly one formula is provided
+    provided = {
+        k: v
+        for k, v in {"compound": compound, "ion": ion, "isotope": isotope}.items()
+        if v is not None
+    }
+    if len(provided) != 1:
+        raise ValueError(
+            "Provide exactly one of 'compound', 'ion', or 'isotope'. "
+            f"Got: {list(provided.keys()) or 'none'}"
+        )
+    formula_level, formula_value = next(iter(provided.items()))
+    formula_column = _FORMULA_COLUMNS[formula_level]
+
+    # Step 1: Discover samples across batches
+    sample_tasks, _ = _collect_sample_tasks(client, workspace, batches)
+    if not sample_tasks:
+        logger.warning("No samples found")
+        return None
+
+    # Step 2: Load peaks with matches for each sample (concurrent)
+    # to discover which peak_ids match the formula
+    logger.info("Resolving peaks matching {} = '{}'", formula_column, formula_value)
+
+    def _get_matched_peaks(
+        sample_row: Any, batch_name: str
+    ) -> list[tuple[Any, str, str, str | None, str | None, str | None, str | None]]:
+        """Return (sample_row, batch_name, peak_id, compound_name, compound_formula, ion, isotope)."""
+        sample_id = sample_row["sample_item_id"]
+        peaks = client.samples.get_peaks(sample_id, matches=True)
+        if peaks is None or peaks.empty:
+            return []
+
+        # Match by formula OR by name (for compounds)
+        mask = peaks[formula_column] == formula_value
+        name_column = _NAME_COLUMNS.get(formula_level)
+        if name_column and name_column in peaks.columns:
+            mask = mask | (peaks[name_column] == formula_value)
+        matched = peaks[mask]
+        if matched.empty:
+            return []
+
+        result = []
+        for _, peak_row in matched.iterrows():
+            result.append(
+                (
+                    sample_row,
+                    batch_name,
+                    peak_row["peak_id"],
+                    peak_row.get("target_compound_name"),
+                    peak_row.get("target_compound_formula"),
+                    peak_row.get("target_ion_formula"),
+                    peak_row.get("target_isotope_formula"),
+                )
+            )
+        return result
+
+    # Collect all peak tasks across all samples
+    all_peak_tasks: list[
+        tuple[Any, str, str, str | None, str | None, str | None, str | None]
+    ] = []
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {
+            executor.submit(_get_matched_peaks, sr, bn): (sr, bn)
+            for sr, bn in sample_tasks
+        }
+        with tqdm(
+            total=len(futures),
+            desc="Finding peaks",
+            unit="sample",
+            file=sys.stderr,
+            bar_format="{l_bar}{bar:30}{r_bar}",
+        ) as pbar:
+            for future in as_completed(futures):
+                all_peak_tasks.extend(future.result())
+                pbar.update(1)
+
+    if not all_peak_tasks:
+        logger.warning("No peaks matching {} = '{}'", formula_column, formula_value)
+        return None
+
+    logger.info(
+        "Found {} peak(s) across {} sample(s)",
+        len(all_peak_tasks),
+        len({t[0]["sample_item_id"] for t in all_peak_tasks}),
+    )
+
+    # Step 3: Fetch timeseries for each peak (concurrent)
+    def _fetch_timeseries(
+        sample_row: Any,
+        batch_name: str,
+        peak_id: str,
+        compound_name: str | None,
+        compound_formula: str | None,
+        ion_formula: str | None,
+        isotope_formula: str | None,
+    ) -> pd.DataFrame | None:
+        ts = client.samples.get_peak_timeseries(
+            sample_id=sample_row["sample_item_id"],
+            peak_id=peak_id,
+        )
+        if ts is None or ts.empty:
+            return None
+
+        # Enrich with context
+        ts.insert(0, "sample_batch_name", batch_name)
+        ts.insert(1, "sample_item_id", sample_row["sample_item_id"])
+        ts.insert(2, "sample_item_name", sample_row["sample_item_name"])
+        if "datetime_utc" in sample_row.index:
+            sample_t0 = pd.Timestamp(sample_row["datetime_utc"])
+            ts.insert(3, "datetime_utc", sample_t0)
+            # Compute absolute datetime from sample start + relative time
+            ts["datetime"] = sample_t0 + pd.to_timedelta(ts["time"], unit="s")
+
+        # Add match context
+        ts["target_compound_name"] = compound_name
+        ts["target_compound_formula"] = compound_formula
+        ts["target_ion_formula"] = ion_formula
+        ts["target_isotope_formula"] = isotope_formula
+        return ts
+
+    frames: list[pd.DataFrame] = []
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {
+            executor.submit(
+                _fetch_timeseries,
+                task[0],
+                task[1],
+                task[2],
+                task[3],
+                task[4],
+                task[5],
+                task[6],
+            ): task
+            for task in all_peak_tasks
+        }
+        with tqdm(
+            total=len(futures),
+            desc="Loading timeseries",
+            unit="peak",
+            file=sys.stderr,
+            bar_format="{l_bar}{bar:30}{r_bar}",
+        ) as pbar:
+            for future in as_completed(futures):
+                result = future.result()
+                if result is not None:
+                    frames.append(result)
+                pbar.update(1)
+
+    if not frames:
+        logger.warning("No timeseries data loaded")
+        return None
+
+    result = pd.concat(frames, ignore_index=True)
+    logger.info("Loaded {} timeseries points total", len(result))
     return result

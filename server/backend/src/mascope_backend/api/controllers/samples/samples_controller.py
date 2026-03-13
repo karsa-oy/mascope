@@ -420,6 +420,7 @@ async def get_sample_peaks(
                     TargetIon.target_ion_formula,
                     TargetIon.ionization_mechanism_id,
                     TargetIon.filter_params,
+                    TargetCompound.target_compound_name,
                     TargetCompound.target_compound_formula,
                     TargetCollection.target_collection_id,
                     label("instrument", sample.instrument),
@@ -484,6 +485,7 @@ async def get_sample_peaks(
                     target_isotope_formula=("target_isotope_formula", "first"),
                     target_ion_id=("target_ion_id", "first"),
                     target_ion_formula=("target_ion_formula", "first"),
+                    target_compound_name=("target_compound_name", "first"),
                     target_compound_formula=("target_compound_formula", "first"),
                     ionization_mechanism_id=("ionization_mechanism_id", "first"),
                     target_collection_ids=(
