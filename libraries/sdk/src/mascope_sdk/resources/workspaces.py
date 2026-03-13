@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pandas as pd
+
 from ._base import BaseResource
 
 
@@ -19,24 +21,25 @@ class WorkspacesResource(BaseResource):
 
         # List all workspaces
         workspaces = mascope.workspaces.list()
-        for ws in workspaces:
-            print(f"{ws['name']}: {ws['id']}")
+        print(workspaces[["workspace_id", "name"]])
     """
 
-    def list(self) -> list[dict]:
+    def list(self) -> pd.DataFrame | None:
         """List all accessible workspaces.
 
-        :return: A list of workspace dictionaries, each containing at least
-                 ``id`` (unique workspace identifier), ``name`` (workspace name),
-                 and additional workspace metadata.
-        :rtype: list[dict]
+        :return: A DataFrame containing workspace information with columns
+                 including ``workspace_id`` and ``name``, or None if no
+                 workspaces are found.
+        :rtype: pd.DataFrame | None
         :raises AuthenticationError: If authentication fails.
         :raises MascopeAPIError: If the API request fails.
 
         Example::
 
             workspaces = mascope.workspaces.list()
-            for ws in workspaces:
-                print(f"Workspace: {ws['name']} (ID: {ws['id']})")
+            print(workspaces[["workspace_id", "name"]])
         """
-        return self._get("workspaces") or []
+        data = self._get("workspaces")
+        if not data:
+            return None
+        return pd.DataFrame(data)

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import pandas as pd
+
 from ._base import BaseResource
 
 
@@ -12,6 +14,7 @@ class SamplesResource(BaseResource):
 
     Provides methods to retrieve sample data, spectra, peaks, and timeseries.
     Samples represent individual measurement files within a sample batch.
+    All methods return pandas DataFrames for easy data analysis.
 
     Example::
 
@@ -25,21 +28,19 @@ class SamplesResource(BaseResource):
         # Get spectrum data
         spectrum = mascope.samples.get_spectrum(sample_id="sample-456")
 
-        # Get peak data
+        # Get peak data with match information
         peaks = mascope.samples.get_peaks(sample_id="sample-456")
     """
 
-    def list(self, batch_id: str) -> list[dict]:
+    def list(self, batch_id: str) -> pd.DataFrame | None:
         """List all samples in a sample batch.
 
         :param batch_id: The ID of the sample batch to list samples from.
         :type batch_id: str
-        :return: A list of sample dictionaries, each containing at least:
-
-                 - ``id``: Unique sample identifier
-                 - ``name``: Sample name
-                 - Additional sample metadata
-        :rtype: list[dict]
+        :return: A DataFrame containing sample information, or None if no samples found.
+                 Columns include ``sample_item_id``, ``sample_item_name``, and additional
+                 sample metadata.
+        :rtype: pd.DataFrame | None
         :raises AuthenticationError: If authentication fails.
         :raises NotFoundError: If the batch is not found.
         :raises MascopeAPIError: If the API request fails.
@@ -47,10 +48,12 @@ class SamplesResource(BaseResource):
         Example::
 
             samples = mascope.samples.list(batch_id="batch-123")
-            for sample in samples:
-                print(f"Sample: {sample['name']} (ID: {sample['id']})")
+            print(samples[["sample_item_id", "sample_item_name"]])
         """
-        return self._get("samples", params={"sample_batch_id": batch_id}) or []
+        data = self._get("samples", params={"sample_batch_id": batch_id})
+        if not data:
+            return None
+        return pd.DataFrame(data)
 
     def get(self, sample_id: str) -> dict | None:
         """Get details of a specific sample.
@@ -66,7 +69,7 @@ class SamplesResource(BaseResource):
         Example::
 
             sample = mascope.samples.get(sample_id="sample-456")
-            print(f"Sample: {sample['name']}")
+            print(f"Sample: {sample['sample_item_name']}")
             print(f"Polarity: {sample.get('polarity')}")
         """
         return self._get(f"samples/{sample_id}")
@@ -78,16 +81,17 @@ class SamplesResource(BaseResource):
         areas: bool = True,
         heights: bool = True,
         average: bool = True,
-        matches: bool = False,
+        matches: bool = True,
         t_min: float | None = None,
         t_max: float | None = None,
         mz_min: float | None = None,
         mz_max: float | None = None,
-    ) -> dict | None:
+    ) -> pd.DataFrame | None:
         """Get peak data from a sample.
 
         Retrieves detected peaks with automatic polarity filtering based on
-        sample metadata. Supports optional time and m/z range filtering.
+        sample metadata. Match data is automatically flattened into columns
+        for easy analysis.
 
         :param sample_id: The ID of the sample to retrieve peaks from.
         :type sample_id: str
@@ -97,7 +101,7 @@ class SamplesResource(BaseResource):
         :type heights: bool
         :param average: Return averaged data across time. Defaults to True.
         :type average: bool
-        :param matches: Include matched compounds/ions/isotopes. Defaults to False.
+        :param matches: Include matched compounds/ions/isotopes. Defaults to True.
         :type matches: bool
         :param t_min: Minimum time in seconds. Uses sample start if not provided.
         :type t_min: float, optional
@@ -107,35 +111,40 @@ class SamplesResource(BaseResource):
         :type mz_min: float, optional
         :param mz_max: Maximum m/z value for filtering.
         :type mz_max: float, optional
-        :return: A dictionary containing:
+        :return: A DataFrame containing peak data with columns:
 
-                 - ``mz``: List of m/z values
-                 - ``area``: List of peak areas (if requested)
-                 - ``height``: List of peak heights (if requested)
-                 - ``match``: List of matched compounds (if requested)
+                 - ``sample_item_id``: The sample ID
+                 - ``peak_id``: Unique peak identifier
+                 - ``mz``: m/z value
+                 - ``area``: Peak area (if requested)
+                 - ``height``: Peak height (if requested)
+                 - ``target_isotope_id``: Matched isotope ID (if matches requested)
+                 - ``target_isotope_formula``: Matched isotope formula
+                 - ``target_ion_id``: Matched ion ID
+                 - ``target_ion_formula``: Matched ion formula
+                 - ``target_compound_formula``: Matched compound formula
+                 - ``ionization_mechanism_id``: Ionization mechanism ID
+                 - ``target_collection_ids``: List of target collection IDs
 
                  Returns None if no peaks are found.
-        :rtype: dict | None
+        :rtype: pd.DataFrame | None
         :raises AuthenticationError: If authentication fails.
         :raises NotFoundError: If the sample is not found.
         :raises MascopeAPIError: If the API request fails.
 
         Example::
 
-            # Get all peaks
+            # Get all peaks with match information
             peaks = mascope.samples.get_peaks(sample_id="sample-456")
+
+            # Filter to only matched peaks
+            matched = peaks[peaks["target_compound_formula"].notna()]
 
             # Get peaks in a specific m/z range
             peaks = mascope.samples.get_peaks(
                 sample_id="sample-456",
                 mz_min=100,
                 mz_max=200,
-            )
-
-            # Get peaks with match information
-            peaks = mascope.samples.get_peaks(
-                sample_id="sample-456",
-                matches=True,
             )
         """
         params: dict[str, Any] = {
@@ -144,7 +153,6 @@ class SamplesResource(BaseResource):
             "average": str(average).lower(),
             "matches": str(matches).lower(),
         }
-        # Add optional range parameters
         if t_min is not None:
             params["t_min"] = t_min
         if t_max is not None:
@@ -154,7 +162,38 @@ class SamplesResource(BaseResource):
         if mz_max is not None:
             params["mz_max"] = mz_max
 
-        return self._get(f"samples/{sample_id}/peaks", params=params)
+        data = self._get(f"samples/{sample_id}/peaks", params=params)
+        if not data:
+            return None
+
+        # Convert to DataFrame
+        df = pd.DataFrame(data)
+
+        # Add sample context column at the beginning
+        df.insert(0, "sample_item_id", sample_id)
+
+        # Flatten match data if present
+        # match column contains a list of matches (can be empty or have multiple)
+        # We extract fields from the first match if present
+        if "match" in df.columns and matches:
+            match_keys = [
+                "target_isotope_id",
+                "target_isotope_formula",
+                "target_ion_id",
+                "target_ion_formula",
+                "target_compound_formula",
+                "ionization_mechanism_id",
+                "target_collection_ids",
+            ]
+            for key in match_keys:
+                df[key] = df["match"].apply(
+                    lambda x, k=key: (
+                        x[0].get(k) if isinstance(x, list) and len(x) > 0 else None
+                    )
+                )
+            df = df.drop(columns=["match"])
+
+        return df
 
     def get_peak_timeseries(
         self,
@@ -164,7 +203,7 @@ class SamplesResource(BaseResource):
         mz_tolerance_ppm: float = 1.0,
         t_min: float | None = None,
         t_max: float | None = None,
-    ) -> dict | None:
+    ) -> pd.DataFrame | None:
         """Get timeseries data for a specific peak.
 
         Retrieves intensity values over time for a peak at the specified m/z value.
@@ -180,14 +219,14 @@ class SamplesResource(BaseResource):
         :type t_min: float, optional
         :param t_max: Maximum time in seconds. Uses sample end if not provided.
         :type t_max: float, optional
-        :return: A dictionary containing:
+        :return: A DataFrame containing timeseries data with columns:
 
-                 - ``mz``: Actual m/z of the matched peak (None if no match)
-                 - ``height``: List of intensity values over time
-                 - ``time``: List of time points in seconds
+                 - ``time``: Time in seconds
+                 - ``height``: Intensity value at each time point
+                 - ``mz``: Actual m/z of the matched peak
 
                  Returns None if no matching peak is found.
-        :rtype: dict | None
+        :rtype: pd.DataFrame | None
         :raises AuthenticationError: If authentication fails.
         :raises NotFoundError: If the sample is not found.
         :raises MascopeAPIError: If the API request fails.
@@ -201,11 +240,11 @@ class SamplesResource(BaseResource):
                 mz_tolerance_ppm=5.0,
             )
 
-            if timeseries:
+            if timeseries is not None:
                 import matplotlib.pyplot as plt
-                plt.plot(timeseries['time'], timeseries['height'])
-                plt.xlabel('Time (s)')
-                plt.ylabel('Intensity')
+                plt.plot(timeseries["time"], timeseries["height"])
+                plt.xlabel("Time (s)")
+                plt.ylabel("Intensity")
                 plt.show()
         """
         body: dict[str, Any] = {
@@ -217,7 +256,25 @@ class SamplesResource(BaseResource):
         if t_max is not None:
             body["t_max"] = t_max
 
-        return self._post(f"samples/{sample_id}/peaks/timeseries", data=body)
+        data = self._post(f"samples/{sample_id}/peaks/timeseries", data=body)
+        if not data:
+            return None
+
+        # Extract time and height arrays, include mz
+        actual_mz = data.get("mz")
+        time_values = data.get("time", [])
+        height_values = data.get("height", [])
+
+        if not time_values:
+            return None
+
+        return pd.DataFrame(
+            {
+                "time": time_values,
+                "height": height_values,
+                "mz": actual_mz,
+            }
+        )
 
     def get_spectrum(
         self,
@@ -227,7 +284,7 @@ class SamplesResource(BaseResource):
         t_max: float | None = None,
         mz_min: float | None = None,
         mz_max: float | None = None,
-    ) -> dict | None:
+    ) -> pd.DataFrame | None:
         """Get spectrum data from a sample.
 
         Retrieves the averaged mass spectrum with automatic polarity filtering.
@@ -244,14 +301,13 @@ class SamplesResource(BaseResource):
         :type mz_min: float, optional
         :param mz_max: Maximum m/z value for filtering.
         :type mz_max: float, optional
-        :return: A dictionary containing:
+        :return: A DataFrame containing spectrum data with columns:
 
-                 - ``mz``: List of m/z values
-                 - ``intensity``: List of intensity values
-                 - ``intensity_unit``: Unit of intensity measurements
+                 - ``mz``: m/z values
+                 - ``intensity``: Intensity values
 
                  Returns None if no spectrum data is found.
-        :rtype: dict | None
+        :rtype: pd.DataFrame | None
         :raises AuthenticationError: If authentication fails.
         :raises NotFoundError: If the sample is not found.
         :raises MascopeAPIError: If the API request fails.
@@ -261,18 +317,11 @@ class SamplesResource(BaseResource):
             # Get full spectrum
             spectrum = mascope.samples.get_spectrum(sample_id="sample-456")
 
-            # Get spectrum in a specific m/z range
-            spectrum = mascope.samples.get_spectrum(
-                sample_id="sample-456",
-                mz_min=100,
-                mz_max=500,
-            )
-
             # Plot the spectrum
             import matplotlib.pyplot as plt
-            plt.stem(spectrum['mz'], spectrum['intensity'])
-            plt.xlabel('m/z')
-            plt.ylabel(f"Intensity ({spectrum['intensity_unit']})")
+            plt.stem(spectrum["mz"], spectrum["intensity"])
+            plt.xlabel("m/z")
+            plt.ylabel("Intensity")
             plt.show()
         """
         params: dict[str, Any] = {}
@@ -285,7 +334,16 @@ class SamplesResource(BaseResource):
         if mz_max is not None:
             params["mz_max"] = mz_max
 
-        return self._get(f"samples/{sample_id}/spectrum", params=params or None)
+        data = self._get(f"samples/{sample_id}/spectrum", params=params or None)
+        if not data:
+            return None
+
+        return pd.DataFrame(
+            {
+                "mz": data.get("mz", []),
+                "intensity": data.get("intensity", []),
+            }
+        )
 
     def get_spectra(
         self,
@@ -295,7 +353,7 @@ class SamplesResource(BaseResource):
         t_max: float | None = None,
         mz_min: float | None = None,
         mz_max: float | None = None,
-    ) -> list[dict] | None:
+    ) -> pd.DataFrame | None:
         """Get spectra for multiple samples.
 
         Retrieves averaged spectra for a list of samples with optional filtering.
@@ -311,9 +369,14 @@ class SamplesResource(BaseResource):
         :type mz_min: float, optional
         :param mz_max: Maximum m/z value for filtering.
         :type mz_max: float, optional
-        :return: A list of spectrum dictionaries, one per sample.
+        :return: A DataFrame containing spectra data with columns:
+
+                 - ``sample_item_id``: The sample ID
+                 - ``mz``: m/z values
+                 - ``intensity``: Intensity values
+
                  Returns None if no data is found.
-        :rtype: list[dict] | None
+        :rtype: pd.DataFrame | None
         :raises AuthenticationError: If authentication fails.
         :raises MascopeAPIError: If the API request fails.
 
@@ -322,6 +385,9 @@ class SamplesResource(BaseResource):
             spectra = mascope.samples.get_spectra(
                 sample_ids=["sample-1", "sample-2", "sample-3"]
             )
+            # Group by sample
+            for sample_id, group in spectra.groupby("sample_item_id"):
+                print(f"Sample {sample_id}: {len(group)} points")
         """
         params: dict[str, Any] = {"sample_item_ids": sample_ids}
         if t_min is not None:
@@ -333,7 +399,27 @@ class SamplesResource(BaseResource):
         if mz_max is not None:
             params["mz_max"] = mz_max
 
-        return self._get("samples/spectra", params=params)
+        data = self._get("samples/spectra", params=params)
+        if not data:
+            return None
+
+        # Combine all spectra into one DataFrame with sample_item_id column
+        frames = []
+        for i, spectrum in enumerate(data):
+            sample_id = sample_ids[i] if i < len(sample_ids) else None
+            df = pd.DataFrame(
+                {
+                    "sample_item_id": sample_id,
+                    "mz": spectrum.get("mz", []),
+                    "intensity": spectrum.get("intensity", []),
+                }
+            )
+            frames.append(df)
+
+        if not frames:
+            return None
+
+        return pd.concat(frames, ignore_index=True)
 
     def get_centroids(self, sample_ids: list[str]) -> dict | None:
         """Get centroid data for multiple samples.
@@ -347,5 +433,9 @@ class SamplesResource(BaseResource):
         :rtype: dict | None
         :raises AuthenticationError: If authentication fails.
         :raises MascopeAPIError: If the API request fails.
+
+        .. note::
+            This method returns a dict rather than DataFrame due to the
+            complex nested structure of per-scan centroid data.
         """
         return self._get("samples/centroids", params={"sample_item_ids": sample_ids})

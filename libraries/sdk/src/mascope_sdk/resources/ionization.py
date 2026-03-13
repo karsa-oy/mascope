@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pandas as pd
+
 from ._base import BaseResource
 
 
@@ -19,26 +21,27 @@ class IonizationResource(BaseResource):
 
         # List available ionization mechanisms
         mechanisms = mascope.ionization.list()
-        for mech in mechanisms:
-            print(f"{mech['name']}: {mech['id']}")
+        print(mechanisms[["ionization_mechanism_id", "name"]])
     """
 
-    def list(self) -> list[dict]:
+    def list(self) -> pd.DataFrame | None:
         """List all available ionization mechanisms.
 
-        :return: A list of ionization mechanism dictionaries, each containing
-                 ``id`` (unique mechanism identifier), ``name`` (mechanism name),
-                 and additional mechanism metadata.
-        :rtype: list[dict]
+        :return: A DataFrame containing ionization mechanism information with
+                 columns including ``ionization_mechanism_id`` and ``name``,
+                 or None if no mechanisms are found.
+        :rtype: pd.DataFrame | None
         :raises AuthenticationError: If authentication fails.
         :raises MascopeAPIError: If the API request fails.
 
         Example::
 
             mechanisms = mascope.ionization.list()
-            protonation_ids = [
-                m['id'] for m in mechanisms
-                if 'protonation' in m['name'].lower()
+            protonation = mechanisms[
+                mechanisms["name"].str.contains("protonation", case=False)
             ]
         """
-        return self._get("ionization_mechanisms") or []
+        data = self._get("ionization_mechanisms")
+        if not data:
+            return None
+        return pd.DataFrame(data)

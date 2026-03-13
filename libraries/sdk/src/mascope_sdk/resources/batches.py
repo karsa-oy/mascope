@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
+import pandas as pd
+
 from ._base import BaseResource
 
 
@@ -27,15 +29,15 @@ class BatchesResource(BaseResource):
         batch_data = mascope.batches.get_data(batch_id="batch-456")
     """
 
-    def list(self, workspace_id: str) -> list[dict]:
+    def list(self, workspace_id: str) -> pd.DataFrame | None:
         """List all sample batches in a workspace.
 
         :param workspace_id: The ID of the workspace to list batches from.
         :type workspace_id: str
-        :return: A list of sample batch dictionaries, each containing at least
-                 ``id`` (unique batch identifier), ``name`` (batch name),
-                 and additional batch metadata.
-        :rtype: list[dict]
+        :return: A DataFrame containing sample batch information with columns
+                 including ``sample_batch_id`` and ``name``, or None if no
+                 batches are found.
+        :rtype: pd.DataFrame | None
         :raises AuthenticationError: If authentication fails.
         :raises NotFoundError: If the workspace is not found.
         :raises MascopeAPIError: If the API request fails.
@@ -43,10 +45,12 @@ class BatchesResource(BaseResource):
         Example::
 
             batches = mascope.batches.list(workspace_id="ws-123")
-            for batch in batches:
-                print(f"Batch: {batch['name']}")
+            print(batches[["sample_batch_id", "name"]])
         """
-        return self._get("sample/batches", params={"workspace_id": workspace_id}) or []
+        data = self._get("sample/batches", params={"workspace_id": workspace_id})
+        if not data:
+            return None
+        return pd.DataFrame(data)
 
     def get_data(self, batch_id: str) -> dict[str, Any]:
         """Retrieve detailed data for all samples in a batch.
