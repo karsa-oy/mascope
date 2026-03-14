@@ -292,13 +292,11 @@ def drop(
     ] = None,
     yes: Annotated[
         bool,
-        typer.Option("--yes", "-y", help="Confirm destructive operation. Required."),
+        typer.Option("--yes", "-y", help="Confirm destructive operation."),
     ] = False,
 ) -> None:
     """
     Drop an environment's database, terminating all active connections first.
-
-    `--yes` is required. No interactive fallback in production.
 
     \b
     Examples:

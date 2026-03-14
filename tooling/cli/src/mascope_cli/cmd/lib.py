@@ -57,7 +57,7 @@ def run(
     env = os.environ.copy()
     env.update(_vars)
 
-    subprocess.run(
+    return subprocess.run(
         shlex.split(command),
         cwd=_cwd,
         stderr=subprocess.STDOUT,

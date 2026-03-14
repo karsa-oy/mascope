@@ -98,7 +98,7 @@ def pg_dump(
     must be bind-mounted from `target_dir` on the host. The returned path
     points to the file on the host.
 
-    Filename format: `{database}_{label}_{timestamp}.dump`
+    Filename format: `{database}_{timestamp}_{label}.dump`
     or `{database}_{timestamp}.dump` when label is empty.
 
     :param container: PostgreSQL container name (e.g. `mascope_prod_postgres`).
