@@ -162,7 +162,9 @@ def sync_filestore(source: str, target: str) -> None:
     cmd = f"{rsync} {flags} -e {ssh} {src} {dest}"
     runtime.logger.info(f"Syncing filestore: {src} → {dest}")
     runtime.logger.info(cmd)
-    lib.run(cmd)
+    result = lib.run(cmd)
+    if result.returncode != 0:
+        raise RuntimeError(f"Filestore sync failed (exit {result.returncode})")
 
 
 # --- Remote SSH helpers ---

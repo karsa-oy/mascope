@@ -22,7 +22,7 @@ def run(
     runtime: Optional[Runtime] = None,
     env_vars: Optional[dict[str, str]] = None,
     cwd: Optional[str] = None,
-) -> None:
+) -> subprocess.CompletedProcess:
     """
     Execute a shell command in a subprocess.
 
@@ -30,6 +30,10 @@ def run(
     process environment variables (including `MASCOPE_LOGLEVEL`,
     `MASCOPE_LOGGREP`, etc.) remain visible to the subprocess. Caller-supplied
     `env_vars` take precedence over inherited values.
+
+    Returns the completed process result. Callers that need to detect failure
+    should check `result.returncode`. Most callers can ignore the return value —
+    the subprocess output is streamed directly to the terminal.
 
     :param command: Shell command string to execute. Split via `shlex.split`
                     before passing to the subprocess — no shell interpolation.
@@ -43,6 +47,8 @@ def run(
     :param cwd: Working directory for the subprocess. Defaults to
                 `runtime.path()` when not provided.
     :type cwd: str, optional
+    :return: Completed process result.
+    :rtype: subprocess.CompletedProcess
     """
     _runtime = runtime or cli_runtime
     _vars = env_vars or {}
