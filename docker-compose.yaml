@@ -19,13 +19,13 @@ services:
     # ports:
     #   - "${MASCOPE_DB_PORT:-5432}:5432" # Exposed for DBeaver, psql, etc.
     environment:
-      MASCOPE_DB_USER: ${MASCOPE_DB_USER:-mascope_user}
+      POSTGRES_USER: ${MASCOPE_DB_USER:-mascope_user}
       POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "pg_isready -h localhost -U ${MASCOPE_DB_USER:-mascope_user} -d postgres",
+          "pg_isready -h localhost -U ${POSTGRES_USER:-mascope_user} -d postgres",
         ]
       interval: 10s
       timeout: 5s
