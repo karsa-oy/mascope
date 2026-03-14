@@ -346,7 +346,7 @@ def create(
         runtime.logger.info(f"Database '{db_name}' already exists")
         return
 
-    if not create_database():
+    if not create_database(target_env):
         runtime.logger.error(f"Failed to create database '{db_name}'")
         raise typer.Exit(1)
 
@@ -520,8 +520,8 @@ def restore(
 
         runtime.logger.info(f"Creating empty '{database}'...")
         # psycopg2-based path: dev port is exposed, provides idempotency check
-        if not create_database():
-            raise RuntimeError("Failed to recreate database after drop")
+        if not create_database(target_env):
+            raise RuntimeError(f"Failed to recreate database '{database}' after drop")
 
         runtime.logger.info(f"Restoring from '{resolved.name}'...")
         pg_restore(container, db_cfg.user, database, resolved, mount)
