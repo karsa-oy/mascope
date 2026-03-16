@@ -6,7 +6,6 @@ import asyncio
 import os
 
 import uvicorn
-
 from mascope_backend.app.startup import init_main_process
 from mascope_backend.runtime import runtime
 
@@ -65,6 +64,7 @@ def run():
         port=runtime.meta.api_port,
         workers=workers,
         reload=enable_reload,
+        reload_excludes=["libraries/sdk/*"] if enable_reload else None,
         log_level="critical",
         use_colors=True,
     )
