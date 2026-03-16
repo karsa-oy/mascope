@@ -3,6 +3,8 @@
 This module provides the main client class for interacting with the Mascope API.
 """
 
+# pylint: disable=import-outside-toplevel
+
 from __future__ import annotations
 
 import os
@@ -222,12 +224,12 @@ class MascopeClient:
     @property
     def url(self) -> str:
         """The base URL of the Mascope instance."""
-        return self._url
+        return self._url  # type: ignore
 
     @property
     def access_token(self) -> str:
         """The API access token."""
-        return self._access_token
+        return self._access_token  # type: ignore
 
     @property
     def workspaces(self) -> "WorkspacesResource":
@@ -330,12 +332,12 @@ class MascopeClient:
         :type max_workers: int
         :return: A DataFrame containing all peaks enriched with columns:
 
-                 - ``sample_batch_name``: Name of the batch the sample belongs to
-                 - ``sample_item_name``: Name of the sample
-                 - ``datetime_utc``: Measurement start timestamp (UTC)
+            - ``sample_batch_name``: Name of the batch the sample belongs to
+            - ``sample_item_name``: Name of the sample
+            - ``datetime_utc``: Measurement start timestamp (UTC)
 
-                 Plus all columns from :meth:`~mascope_sdk.resources.samples.SamplesResource.get_peaks`.
-                 Returns None if no peaks are found.
+            Plus all columns from :meth:`~mascope_sdk.resources.samples.SamplesResource.get_peaks`.
+            Returns None if no peaks are found.
         :rtype: pd.DataFrame | None
         :raises ValueError: If the workspace or batches cannot be resolved.
         :raises KeyboardInterrupt: If the user declines the confirmation prompt.
@@ -557,7 +559,8 @@ class MascopeClient:
 
 
 # Type hints for lazy-loaded resources
-from typing import TYPE_CHECKING
+# pylint: disable=wrong-import-order, wrong-import-position
+from typing import TYPE_CHECKING  # noqa: E402
 
 if TYPE_CHECKING:
     from .resources.batches import BatchesResource

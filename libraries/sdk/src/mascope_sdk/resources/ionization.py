@@ -42,11 +42,11 @@ class IonizationResource(BaseResource):
             ]
         """
         cache_key = "ionization_mechanisms"
-        if cache_key in self._client._cache:
-            return self._client._cache[cache_key]
+        if cache_key in self._client._cache:  # pylint: disable=protected-access
+            return self._client._cache[cache_key]  # pylint: disable=protected-access
         data = self._get("ionization_mechanisms")
         if not data:
             return None
         df = pd.DataFrame(data)
-        self._client._cache[cache_key] = df
+        self._client._cache[cache_key] = df  # pylint: disable=protected-access
         return df

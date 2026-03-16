@@ -64,7 +64,7 @@ class SamplesResource(BaseResource):
 
     def _resolve_batch_ids(
         self, batches: str, workspace: str | None = None
-    ) -> list[str]:
+    ) -> list[str]:  # type: ignore
         """Resolve a batch substring to one or more batch IDs."""
         all_batches = self._get_all_batches(workspace)
         if all_batches is None or all_batches.empty:
@@ -84,7 +84,7 @@ class SamplesResource(BaseResource):
             )
         return matches["sample_batch_id"].tolist()
 
-    def list(
+    def list(  # pylint: disable=dangerous-default-value
         self,
         batch: str | None = None,
         *,
@@ -164,13 +164,13 @@ class SamplesResource(BaseResource):
     def _list_by_id(self, batch_id: str) -> pd.DataFrame | None:
         """List samples by batch ID (no name resolution)."""
         cache_key = f"samples:{batch_id}"
-        if cache_key in self._client._cache:
-            return self._client._cache[cache_key]
+        if cache_key in self._client._cache:  # pylint: disable=protected-access
+            return self._client._cache[cache_key]  # pylint: disable=protected-access
         data = self._get("samples", params={"sample_batch_id": batch_id})
         if not data:
             return None
         df = pd.DataFrame(data)
-        self._client._cache[cache_key] = df
+        self._client._cache[cache_key] = df  # pylint: disable=protected-access
         return df
 
     def get(self, sample_id: str) -> dict | None:
@@ -492,7 +492,7 @@ class SamplesResource(BaseResource):
 
     def get_spectra(
         self,
-        sample_ids: list[str],
+        sample_ids: list[str],  # type: ignore
         *,
         t_min: float | None = None,
         t_max: float | None = None,
@@ -566,7 +566,7 @@ class SamplesResource(BaseResource):
 
         return pd.concat(frames, ignore_index=True)
 
-    def get_centroids(self, sample_ids: list[str]) -> dict | None:
+    def get_centroids(self, sample_ids: list[str]) -> dict | None:  # type: ignore
         """Get centroid data for multiple samples.
 
         Retrieves per-scan centroid data for the specified samples.
