@@ -60,6 +60,30 @@ def _resolve_sample(client: MascopeClient, sample: str) -> str:
     )
 
 
+def _confirm_sample_count(count: int, threshold: int) -> None:
+    """Ask the user to confirm if sample count exceeds *threshold*.
+
+    Raises ``KeyboardInterrupt`` when the user declines.
+    """
+    logger.warning(
+        "The requested number of samples ({}) exceeds the confirmation threshold of {}. Please check the confirmation prompt.",
+        count,
+        threshold,
+    )
+    try:
+        answer = input(
+            f"About to load data for {count} samples. This may take a while."
+            f" Continue? [y/N] "
+        )
+    except EOFError:
+        # Non-interactive environment (e.g. script) - proceed silently
+        return
+    if answer.strip().lower() not in ("y", "yes"):
+        raise KeyboardInterrupt(
+            f"Cancelled by user ({count} samples exceeded threshold of {threshold})"
+        )
+
+
 def _collect_sample_tasks(
     client: MascopeClient,
     workspace: str,
@@ -139,6 +163,7 @@ def load_peaks(
     areas: bool = True,
     heights: bool = True,
     average: bool = True,
+    confirm_above: int | None = 100,
     max_workers: int = 8,
 ) -> pd.DataFrame | None:
     """Load peaks for all samples across one or more batches.
@@ -167,6 +192,11 @@ def load_peaks(
     :type heights: bool
     :param average: Return averaged data across time. Defaults to True.
     :type average: bool
+    :param confirm_above: If the number of samples exceeds this threshold,
+                          an interactive confirmation prompt is shown before
+                          loading starts. Set to ``None`` to disable.
+                          Defaults to 20.
+    :type confirm_above: int | None
     :param max_workers: Maximum number of concurrent requests. Defaults to 8.
     :type max_workers: int
     :return: A DataFrame containing all peaks enriched with columns:
@@ -179,6 +209,7 @@ def load_peaks(
              Returns None if no peaks are found.
     :rtype: pd.DataFrame | None
     :raises ValueError: If the workspace or batches cannot be resolved.
+    :raises KeyboardInterrupt: If the user declines the confirmation prompt.
 
     Example::
 
@@ -196,13 +227,19 @@ def load_peaks(
             samples="blank",
         )
 
-        # Load all peaks from all batches
-        peaks = mascope.load_peaks(workspace="My Workspace")
+        # Disable confirmation prompt
+        peaks = mascope.load_peaks(
+            workspace="My Workspace",
+            confirm_above=None,
+        )
     """
     sample_tasks, _ = _collect_sample_tasks(client, workspace, batches, samples=samples)
     if not sample_tasks:
         logger.warning("No samples found")
         return None
+
+    if confirm_above is not None and len(sample_tasks) > confirm_above:
+        _confirm_sample_count(len(sample_tasks), confirm_above)
 
     # Load peaks concurrently with progress bar
     def _fetch_peaks(sample_row: Any, batch_name: str) -> pd.DataFrame | None:
@@ -419,6 +456,7 @@ def load_peak_timeseries(
     compound: str | None = None,
     ion: str | None = None,
     isotope: str | None = None,
+    confirm_above: int | None = 20,
     max_workers: int = 8,
 ) -> pd.DataFrame | None:
     """Load intra-sample peak timeseries for matched peaks across batches.
@@ -446,6 +484,11 @@ def load_peak_timeseries(
     :type ion: str, optional
     :param isotope: Target isotope formula to resolve (e.g. ``"CH5N2O+"``).
     :type isotope: str, optional
+    :param confirm_above: If the number of samples exceeds this threshold,
+                          an interactive confirmation prompt is shown before
+                          loading starts. Set to ``None`` to disable.
+                          Defaults to 20.
+    :type confirm_above: int | None
     :param max_workers: Maximum number of concurrent requests. Defaults to 8.
     :type max_workers: int
     :return: A DataFrame with one row per time point per peak, containing:
@@ -466,6 +509,7 @@ def load_peak_timeseries(
              Returns None if no matching peaks are found.
     :rtype: pd.DataFrame | None
     :raises ValueError: If zero or more than one formula parameter is provided.
+    :raises KeyboardInterrupt: If the user declines the confirmation prompt.
 
     Example::
 
@@ -505,6 +549,9 @@ def load_peak_timeseries(
     if not sample_tasks:
         logger.warning("No samples found")
         return None
+
+    if confirm_above is not None and len(sample_tasks) > confirm_above:
+        _confirm_sample_count(len(sample_tasks), confirm_above)
 
     # Step 2: Load peaks with matches for each sample (concurrent)
     # to discover which peak_ids match the formula

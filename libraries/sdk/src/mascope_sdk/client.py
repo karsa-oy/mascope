@@ -293,6 +293,7 @@ class MascopeClient:
         areas: bool = True,
         heights: bool = True,
         average: bool = True,
+        confirm_above: int | None = 100,
         max_workers: int = 8,
     ) -> pd.DataFrame | None:
         """Load peaks for all samples across one or more batches.
@@ -320,6 +321,11 @@ class MascopeClient:
         :type heights: bool
         :param average: Return averaged data across time. Defaults to True.
         :type average: bool
+        :param confirm_above: If the number of samples exceeds this threshold,
+                              an interactive confirmation prompt is shown before
+                              loading starts. Set to ``None`` to disable.
+                              Defaults to 20.
+        :type confirm_above: int | None
         :param max_workers: Maximum number of concurrent requests. Defaults to 8.
         :type max_workers: int
         :return: A DataFrame containing all peaks enriched with columns:
@@ -332,6 +338,7 @@ class MascopeClient:
                  Returns None if no peaks are found.
         :rtype: pd.DataFrame | None
         :raises ValueError: If the workspace or batches cannot be resolved.
+        :raises KeyboardInterrupt: If the user declines the confirmation prompt.
 
         Example::
 
@@ -349,10 +356,16 @@ class MascopeClient:
                 samples="blank",
             )
 
-            # Load all peaks from all batches
-            peaks = mascope.load_peaks(workspace="My Workspace")
+            # Load all peaks, skip confirmation
+            peaks = mascope.load_peaks(
+                workspace="My Workspace",
+                confirm_above=None,
+            )
         """
         from ._loaders import load_peaks as _load_peaks
+
+        if max_workers > 8:
+            raise ValueError("max_workers cannot exceed 8 to avoid overloading the API")
 
         return _load_peaks(
             self,
@@ -363,6 +376,7 @@ class MascopeClient:
             areas=areas,
             heights=heights,
             average=average,
+            confirm_above=confirm_above,
             max_workers=max_workers,
         )
 
@@ -375,6 +389,7 @@ class MascopeClient:
         compound: str | None = None,
         ion: str | None = None,
         isotope: str | None = None,
+        confirm_above: int | None = 20,
         max_workers: int = 8,
     ) -> pd.DataFrame | None:
         """Load intra-sample peak timeseries for matched peaks across batches.
@@ -401,6 +416,11 @@ class MascopeClient:
         :type ion: str, optional
         :param isotope: Target isotope formula (e.g. ``"CH5N2O+"``).
         :type isotope: str, optional
+        :param confirm_above: If the number of samples exceeds this threshold,
+                              an interactive confirmation prompt is shown before
+                              loading starts. Set to ``None`` to disable.
+                              Defaults to 20.
+        :type confirm_above: int | None
         :param max_workers: Maximum number of concurrent requests. Defaults to 8.
         :type max_workers: int
         :return: A DataFrame with one row per time point per peak, containing:
@@ -419,6 +439,7 @@ class MascopeClient:
                  Returns None if no matching peaks are found.
         :rtype: pd.DataFrame | None
         :raises ValueError: If zero or more than one formula is provided.
+        :raises KeyboardInterrupt: If the user declines the confirmation prompt.
 
         Example::
 
@@ -433,6 +454,9 @@ class MascopeClient:
         """
         from ._loaders import load_peak_timeseries as _load_peak_timeseries
 
+        if max_workers > 8:
+            raise ValueError("max_workers cannot exceed 8 to avoid overloading the API")
+
         return _load_peak_timeseries(
             self,
             workspace,
@@ -441,6 +465,7 @@ class MascopeClient:
             compound=compound,
             ion=ion,
             isotope=isotope,
+            confirm_above=confirm_above,
             max_workers=max_workers,
         )
 
@@ -501,6 +526,9 @@ class MascopeClient:
             peaks.groupby("stage_name")["area"].sum()
         """
         from ._loaders import load_peaks_by_stage as _load_peaks_by_stage
+
+        if max_workers > 8:
+            raise ValueError("max_workers cannot exceed 8 to avoid overloading the API")
 
         return _load_peaks_by_stage(
             self,
