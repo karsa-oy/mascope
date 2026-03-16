@@ -64,12 +64,14 @@ def _collect_sample_tasks(
     client: MascopeClient,
     workspace: str,
     batches: str | None = None,
+    samples: str | None = None,
 ) -> tuple[list[tuple[Any, str]], str]:
     """Resolve workspace/batches and collect (sample_row, batch_name) pairs.
 
     :param client: The MascopeClient instance.
     :param workspace: Workspace name (or substring) or workspace ID.
     :param batches: Optional substring filter on batch names.
+    :param samples: Optional substring filter on sample names.
     :return: Tuple of (sample_tasks, workspace_id).
     :raises ValueError: If workspace or batches cannot be resolved.
     """
@@ -106,13 +108,22 @@ def _collect_sample_tasks(
         batch_id = batch_row["sample_batch_id"]
         batch_name = batch_row["sample_batch_name"]
 
-        samples = client.samples._list_by_id(batch_id)
-        if samples is None or samples.empty:
+        batch_samples = client.samples._list_by_id(batch_id)
+        if batch_samples is None or batch_samples.empty:
             logger.info("Batch '{}': no samples, skipping", batch_name)
             continue
 
-        logger.info("Batch '{}': {} sample(s)", batch_name, len(samples))
-        for _, sample_row in samples.iterrows():
+        if samples is not None:
+            batch_samples = batch_samples[
+                batch_samples["sample_item_name"].str.contains(
+                    samples, case=False, na=False
+                )
+            ]
+            if batch_samples.empty:
+                continue
+
+        logger.info("Batch '{}': {} sample(s)", batch_name, len(batch_samples))
+        for _, sample_row in batch_samples.iterrows():
             sample_tasks.append((sample_row, batch_name))
 
     return sample_tasks, workspace_id
@@ -123,6 +134,7 @@ def load_peaks(
     workspace: str,
     batches: str | None = None,
     *,
+    samples: str | None = None,
     matches: bool = True,
     areas: bool = True,
     heights: bool = True,
@@ -145,6 +157,8 @@ def load_peaks(
     :param batches: Optional substring filter on batch names (case-insensitive).
                     If not provided, all batches in the workspace are loaded.
     :type batches: str, optional
+    :param samples: Optional substring filter on sample names (case-insensitive).
+    :type samples: str, optional
     :param matches: Include matched compounds/ions/isotopes. Defaults to True.
     :type matches: bool
     :param areas: Include peak areas. Defaults to True.
@@ -176,15 +190,16 @@ def load_peaks(
             batches="Uronium",
         )
 
-        # Chronological timeseries per compound
-        peaks.sort_values("datetime_utc").groupby(
-            "target_compound_formula"
-        )["area"].sum()
+        # Filter by sample name
+        peaks = mascope.load_peaks(
+            workspace="My Workspace",
+            samples="blank",
+        )
 
         # Load all peaks from all batches
         peaks = mascope.load_peaks(workspace="My Workspace")
     """
-    sample_tasks, _ = _collect_sample_tasks(client, workspace, batches)
+    sample_tasks, _ = _collect_sample_tasks(client, workspace, batches, samples=samples)
     if not sample_tasks:
         logger.warning("No samples found")
         return None
@@ -400,6 +415,7 @@ def load_peak_timeseries(
     workspace: str,
     batches: str | None = None,
     *,
+    samples: str | None = None,
     compound: str | None = None,
     ion: str | None = None,
     isotope: str | None = None,
@@ -422,6 +438,8 @@ def load_peak_timeseries(
     :type workspace: str
     :param batches: Optional substring filter on batch names (case-insensitive).
     :type batches: str, optional
+    :param samples: Optional substring filter on sample names (case-insensitive).
+    :type samples: str, optional
     :param compound: Target compound name or formula (e.g. ``"Urea"`` or ``"CH4N2O"``).
     :type compound: str, optional
     :param ion: Target ion formula to resolve (e.g. ``"CH5N2O+"``).
@@ -435,7 +453,7 @@ def load_peak_timeseries(
              - ``sample_batch_name``: Batch name
              - ``sample_item_id``: Sample ID
              - ``sample_item_name``: Sample name
-             - ``datetime_utc``: Sample measurement start timestamp (UTC)
+             - ``datetime_utc``: Absolute datetime per data point (UTC)
              - ``peak_id``: Peak identifier
              - ``mz``: Actual m/z of the peak
              - ``target_compound_name``: Matched compound name
@@ -444,7 +462,6 @@ def load_peak_timeseries(
              - ``target_isotope_formula``: Matched isotope formula
              - ``time``: Relative time in seconds within the sample
              - ``height``: Intensity at each time point
-             - ``datetime``: Absolute datetime (``datetime_utc`` + ``time``)
 
              Returns None if no matching peaks are found.
     :rtype: pd.DataFrame | None
@@ -484,7 +501,7 @@ def load_peak_timeseries(
     formula_column = _FORMULA_COLUMNS[formula_level]
 
     # Step 1: Discover samples across batches
-    sample_tasks, _ = _collect_sample_tasks(client, workspace, batches)
+    sample_tasks, _ = _collect_sample_tasks(client, workspace, batches, samples=samples)
     if not sample_tasks:
         logger.warning("No samples found")
         return None
@@ -579,9 +596,12 @@ def load_peak_timeseries(
         ts.insert(2, "sample_item_name", sample_row["sample_item_name"])
         if "datetime_utc" in sample_row.index:
             sample_t0 = pd.Timestamp(sample_row["datetime_utc"])
-            ts.insert(3, "datetime_utc", sample_t0)
-            # Compute absolute datetime from sample start + relative time
-            ts["datetime"] = sample_t0 + pd.to_timedelta(ts["time"], unit="s")
+            # Absolute datetime per data point = sample start + relative time
+            ts.insert(
+                3,
+                "datetime_utc",
+                sample_t0 + pd.to_timedelta(ts["time"], unit="s"),
+            )
 
         # Add match context
         ts["target_compound_name"] = compound_name

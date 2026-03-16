@@ -33,60 +33,133 @@ class SamplesResource(BaseResource):
         peaks = mascope.samples.get_peaks(sample_id="sample-456")
     """
 
-    def _resolve_batch_id(self, batch: str, workspace: str | None = None) -> str:
-        """Resolve a batch name or ID to a batch ID.
-
-        Searches across all workspaces unless a workspace is specified.
-        """
+    def _get_all_batches(self, workspace: str | None = None) -> pd.DataFrame | None:
+        """Collect all batches, optionally scoped to a workspace."""
         if workspace is not None:
-            # Resolve workspace first, then search within it
-            batches = self._client.batches.list(workspace)
-        else:
-            # Search across all workspaces
-            workspaces = self._client.workspaces.list()
-            if workspaces is None or workspaces.empty:
-                raise ValueError("No workspaces found.")
-            frames = []
-            for _, ws in workspaces.iterrows():
-                ws_batches = self._client.batches.list(ws["workspace_id"])
-                if ws_batches is not None and not ws_batches.empty:
-                    frames.append(ws_batches)
-            batches = pd.concat(frames, ignore_index=True) if frames else None
+            return self._client.batches.list(workspace)
 
+        workspaces = self._client.workspaces.list()
+        if workspaces is None or workspaces.empty:
+            raise ValueError("No workspaces found.")
+        frames = []
+        for _, ws in workspaces.iterrows():
+            ws_batches = self._client.batches.list(ws["workspace_id"])
+            if ws_batches is not None and not ws_batches.empty:
+                frames.append(ws_batches)
+        return pd.concat(frames, ignore_index=True) if frames else None
+
+    def _resolve_batch_id(self, batch: str, workspace: str | None = None) -> str:
+        """Resolve a batch name or ID to a single batch ID.
+
+        Raises if zero or multiple batches match.
+        """
+        all_batches = self._get_all_batches(workspace)
         return resolve_id(
             batch,
-            batches,
+            all_batches,
             id_column="sample_batch_id",
             name_column="sample_batch_name",
             entity_label="batch",
         )
 
-    def list(self, batch: str, *, workspace: str | None = None) -> pd.DataFrame | None:
-        """List all samples in a sample batch.
+    def _resolve_batch_ids(
+        self, batches: str, workspace: str | None = None
+    ) -> list[str]:
+        """Resolve a batch substring to one or more batch IDs."""
+        all_batches = self._get_all_batches(workspace)
+        if all_batches is None or all_batches.empty:
+            raise ValueError("No batches found.")
 
-        :param batch: Batch name (or substring) or batch ID.
-        :type batch: str
-        :param workspace: Optional workspace name or ID to narrow the batch search.
+        # Exact ID match
+        if batches in all_batches["sample_batch_id"].values:
+            return [batches]
+
+        matches = all_batches[
+            all_batches["sample_batch_name"].str.contains(batches, case=False, na=False)
+        ]
+        if matches.empty:
+            available = all_batches["sample_batch_name"].tolist()
+            raise ValueError(
+                f"No batch matching '{batches}'. Available batches: {available}"
+            )
+        return matches["sample_batch_id"].tolist()
+
+    def list(
+        self,
+        batch: str | None = None,
+        *,
+        batches: str | None = None,
+        workspace: str | None = None,
+    ) -> pd.DataFrame | None:
+        """List samples from one or more batches.
+
+        Provide exactly one of ``batch`` or ``batches``:
+
+        - ``batch`` resolves to a single batch (raises if the substring
+          matches more than one).
+        - ``batches`` resolves to all batches whose name contains the
+          given substring.
+
+        :param batch: Batch name (or substring) or batch ID. Must match
+                      exactly one batch.
+        :type batch: str, optional
+        :param batches: Batch name substring. Returns samples from every
+                        matching batch.
+        :type batches: str, optional
+        :param workspace: Optional workspace name or ID to narrow the search.
                           If not provided, searches across all workspaces.
         :type workspace: str, optional
-        :return: A DataFrame containing sample information, or None if no samples found.
-                 Columns include ``sample_item_id``, ``sample_item_name``, and additional
-                 sample metadata.
+        :return: A DataFrame containing sample information, or None if no
+                 samples found. When ``batches`` is used the result includes
+                 a ``sample_batch_name`` column.
         :rtype: pd.DataFrame | None
-        :raises ValueError: If the batch cannot be resolved.
+        :raises ValueError: If both or neither of ``batch``/``batches`` are
+                            provided, or if ''batch'' matches multiple batches.
         :raises AuthenticationError: If authentication fails.
         :raises MascopeAPIError: If the API request fails.
 
         Example::
 
-            # By batch name
-            samples = mascope.samples.list("Uronium")
+            # Single batch (raises if ambiguous)
+            samples = mascope.samples.list(batch="Uronium March")
 
-            # Narrow to a specific workspace
-            samples = mascope.samples.list("Uronium", workspace="KORBI2")
+            # All matching batches
+            samples = mascope.samples.list(batches="Uronium")
+
+            # Narrow to a workspace
+            samples = mascope.samples.list(batch="Uronium", workspace="KORBI2")
         """
-        batch_id = self._resolve_batch_id(batch, workspace=workspace)
-        return self._list_by_id(batch_id)
+        if (batch is None) == (batches is None):
+            raise ValueError("Provide exactly one of 'batch' or 'batches'.")
+
+        if batch is not None:
+            batch_id = self._resolve_batch_id(batch, workspace=workspace)
+            return self._list_by_id(batch_id)
+
+        # batches (plural) - collect samples from all matching batches
+        assert batches is not None  # guaranteed by the check above
+        batch_ids = self._resolve_batch_ids(batches, workspace=workspace)
+        all_batches_df = self._get_all_batches(workspace)
+
+        frames: list[pd.DataFrame] = []
+        for bid in batch_ids:
+            samples = self._list_by_id(bid)
+            if samples is not None and not samples.empty:
+                batch_name = ""
+                if all_batches_df is not None:
+                    row = all_batches_df.loc[
+                        all_batches_df["sample_batch_id"] == bid, "sample_batch_name"
+                    ]
+                    if not row.empty:
+                        batch_name = row.iloc[0]
+                df = samples.copy()
+                df.insert(0, "sample_batch_name", batch_name)
+                frames.append(df)
+
+        if not frames:
+            return None
+
+        return pd.concat(frames, ignore_index=True)
 
     def _list_by_id(self, batch_id: str) -> pd.DataFrame | None:
         """List samples by batch ID (no name resolution)."""

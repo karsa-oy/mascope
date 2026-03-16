@@ -288,6 +288,7 @@ class MascopeClient:
         workspace: str,
         batches: str | None = None,
         *,
+        samples: str | None = None,
         matches: bool = True,
         areas: bool = True,
         heights: bool = True,
@@ -309,6 +310,8 @@ class MascopeClient:
         :param batches: Optional substring filter on batch names (case-insensitive).
                         If not provided, all batches in the workspace are loaded.
         :type batches: str, optional
+        :param samples: Optional substring filter on sample names (case-insensitive).
+        :type samples: str, optional
         :param matches: Include matched compounds/ions/isotopes. Defaults to True.
         :type matches: bool
         :param areas: Include peak areas. Defaults to True.
@@ -340,10 +343,11 @@ class MascopeClient:
                 batches="Uronium",
             )
 
-            # Chronological timeseries per compound
-            peaks.sort_values("datetime_utc").groupby(
-                "target_compound_formula"
-            )["area"].sum()
+            # Filter to specific samples
+            peaks = mascope.load_peaks(
+                workspace="My Workspace",
+                samples="blank",
+            )
 
             # Load all peaks from all batches
             peaks = mascope.load_peaks(workspace="My Workspace")
@@ -354,6 +358,7 @@ class MascopeClient:
             self,
             workspace,
             batches,
+            samples=samples,
             matches=matches,
             areas=areas,
             heights=heights,
@@ -366,6 +371,7 @@ class MascopeClient:
         workspace: str,
         batches: str | None = None,
         *,
+        samples: str | None = None,
         compound: str | None = None,
         ion: str | None = None,
         isotope: str | None = None,
@@ -387,6 +393,8 @@ class MascopeClient:
         :type workspace: str
         :param batches: Optional substring filter on batch names (case-insensitive).
         :type batches: str, optional
+        :param samples: Optional substring filter on sample names (case-insensitive).
+        :type samples: str, optional
         :param compound: Target compound name or formula (e.g. ``"Urea"`` or ``"CH4N2O"``).
         :type compound: str, optional
         :param ion: Target ion formula (e.g. ``"CH5N2O+"``).
@@ -400,14 +408,13 @@ class MascopeClient:
                  - ``sample_batch_name``: Batch name
                  - ``sample_item_id``: Sample ID
                  - ``sample_item_name``: Sample name
-                 - ``datetime_utc``: Sample measurement start timestamp (UTC)
+                 - ``datetime_utc``: Absolute datetime per data point (UTC)
                  - ``peak_id``: Peak identifier
                  - ``mz``: Actual m/z of the peak
                  - ``target_compound_name``, ``target_compound_formula``,
                    ``target_ion_formula``, ``target_isotope_formula``: Match metadata
                  - ``time``: Relative time in seconds within the sample
                  - ``height``: Intensity at each time point
-                 - ``datetime``: Absolute datetime (``datetime_utc`` + ``time``)
 
                  Returns None if no matching peaks are found.
         :rtype: pd.DataFrame | None
@@ -430,6 +437,7 @@ class MascopeClient:
             self,
             workspace,
             batches,
+            samples=samples,
             compound=compound,
             ion=ion,
             isotope=isotope,
