@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 import pandas as pd
+from loguru import logger
+from tqdm import tqdm
 
 from .._resolve import resolve_id
 from ._base import BaseResource
@@ -90,6 +94,15 @@ class SamplesResource(BaseResource):
         *,
         batches: str | None = None,
         workspace: str | None = None,
+        drop_columns: list[str] | None = [  # type: ignore
+            "instrument_function_id",
+            "sample_file_id",
+            "ionization_mode_id",
+            "locked",
+            "sample_item_utc_created",
+            "sample_item_utc_modified",
+            "match",
+        ],
     ) -> pd.DataFrame | None:
         """List samples from one or more batches.
 
@@ -141,25 +154,48 @@ class SamplesResource(BaseResource):
         batch_ids = self._resolve_batch_ids(batches, workspace=workspace)
         all_batches_df = self._get_all_batches(workspace)
 
-        frames: list[pd.DataFrame] = []
-        for bid in batch_ids:
+        # Build a batch_id -> batch_name lookup
+        id_to_name: dict[str, str] = {}
+        if all_batches_df is not None:
+            for _, row in all_batches_df.iterrows():
+                id_to_name[row["sample_batch_id"]] = row["sample_batch_name"]
+
+        logger.info("Listing samples from {} batch(es)", len(batch_ids))
+
+        def _fetch_batch_samples(bid: str) -> pd.DataFrame | None:
             samples = self._list_by_id(bid)
-            if samples is not None and not samples.empty:
-                batch_name = ""
-                if all_batches_df is not None:
-                    row = all_batches_df.loc[
-                        all_batches_df["sample_batch_id"] == bid, "sample_batch_name"
-                    ]
-                    if not row.empty:
-                        batch_name = row.iloc[0]
-                df = samples.copy()
-                df.insert(0, "sample_batch_name", batch_name)
-                frames.append(df)
+            if samples is None or samples.empty:
+                return None
+            df = samples.copy()
+            df.insert(0, "sample_batch_name", id_to_name.get(bid, ""))
+            return df
+
+        frames: list[pd.DataFrame] = []
+        with ThreadPoolExecutor(max_workers=min(8, len(batch_ids))) as executor:
+            futures = {
+                executor.submit(_fetch_batch_samples, bid): bid for bid in batch_ids
+            }
+            with tqdm(
+                total=len(futures),
+                desc="Listing samples",
+                unit="batch",
+                file=sys.stderr,
+                bar_format="{l_bar}{bar:30}{r_bar}",
+                colour="green",
+            ) as pbar:
+                for future in as_completed(futures):
+                    result = future.result()
+                    if result is not None:
+                        frames.append(result)
+                    pbar.update(1)
 
         if not frames:
             return None
 
-        return pd.concat(frames, ignore_index=True)
+        df = pd.concat(frames, ignore_index=True)
+        if drop_columns is not None:
+            df = df.drop(columns=drop_columns)
+        return df
 
     def _list_by_id(self, batch_id: str) -> pd.DataFrame | None:
         """List samples by batch ID (no name resolution)."""
