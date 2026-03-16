@@ -6,6 +6,7 @@ import json
 from typing import Any
 
 import pandas as pd
+from loguru import logger
 
 from .._resolve import resolve_id
 from ._base import BaseResource
@@ -70,11 +71,12 @@ class BatchesResource(BaseResource):
         cache_key = f"batches:{workspace_id}"
         if cache_key in self._client._cache:  # pylint: disable=protected-access
             return self._client._cache[cache_key]  # pylint: disable=protected-access
+        logger.info("Fetching batches for workspace '{}'", workspace_id)
         data = self._get("sample/batches", params={"workspace_id": workspace_id})
         if not data:
             return None
         df = pd.DataFrame(data)
-        self._client._cache[cache_key] = df
+        logger.info("Found {} batch(es)", len(df))
         self._client._cache[cache_key] = df  # pylint: disable=protected-access
         return df
 

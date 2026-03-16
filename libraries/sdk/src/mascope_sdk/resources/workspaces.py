@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pandas as pd
+from loguru import logger
 
 from ._base import BaseResource
 
@@ -42,9 +43,11 @@ class WorkspacesResource(BaseResource):
         cache_key = "workspaces"
         if cache_key in self._client._cache:
             return self._client._cache[cache_key]
+        logger.info("Fetching workspaces")
         data = self._get("workspaces")
         if not data:
             return None
         df = pd.DataFrame(data)
+        logger.info("Found {} workspace(s)", len(df))
         self._client._cache[cache_key] = df
         return df
