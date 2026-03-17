@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from ._base import BaseResource
+from ._base import BaseResource, _coerce_datetime_columns
 
 
 class IonizationResource(BaseResource):
@@ -47,6 +47,6 @@ class IonizationResource(BaseResource):
         data = self._get("ionization_mechanisms")
         if not data:
             return None
-        df = pd.DataFrame(data)
+        df = _coerce_datetime_columns(pd.DataFrame(data))
         self._client._cache[cache_key] = df  # pylint: disable=protected-access
         return df

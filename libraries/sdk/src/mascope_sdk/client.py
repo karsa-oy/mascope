@@ -264,7 +264,7 @@ class MascopeClient:
         :param confirm_above: If the number of samples exceeds this threshold,
                               an interactive confirmation prompt is shown before
                               loading starts. Set to ``None`` to disable.
-                              Defaults to 20.
+                              Defaults to 100.
         :type confirm_above: int | None
         :param max_workers: Maximum number of concurrent requests. Defaults to 8.
         :type max_workers: int
