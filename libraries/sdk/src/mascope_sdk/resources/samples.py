@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 import pandas as pd
 from loguru import logger
-from tqdm import tqdm
 
+from .._progress import progress_bar
 from .._resolve import resolve_id
 from ._base import BaseResource, _coerce_datetime_columns
 
@@ -175,13 +174,8 @@ class SamplesResource(BaseResource):
             futures = {
                 executor.submit(_fetch_batch_samples, bid): bid for bid in batch_ids
             }
-            with tqdm(
-                total=len(futures),
-                desc="Listing samples",
-                unit="batch",
-                file=sys.stderr,
-                bar_format="{l_bar}{bar:30}{r_bar}",
-                colour="green",
+            with progress_bar(
+                len(futures), desc="Listing samples", unit="batch"
             ) as pbar:
                 for future in as_completed(futures):
                     result = future.result()

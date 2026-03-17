@@ -28,7 +28,7 @@ class MascopeClient:
     2. **`.env` file** (recommended for Jupyter notebooks):
         Create a `.env` file in your working directory or any parent directory::
 
-            MASCOPE_URL=https://your-mascope-instance.com
+            MASCOPE_URL=https://example.mascope.app
             MASCOPE_ACCESS_TOKEN=your-api-token
 
     3. **Explicit parameters**:
@@ -112,7 +112,9 @@ class MascopeClient:
             mascope = MascopeClient(env_file="/path/to/.env")
         """
         # Load .env file
-        dotenv_path = str(env_file) if env_file is not None else find_dotenv(usecwd=True)
+        dotenv_path = (
+            str(env_file) if env_file is not None else find_dotenv(usecwd=True)
+        )
         env_vars = dotenv_values(dotenv_path) if dotenv_path else {}
 
         # Resolve URL (parameter > env var > .env file)
@@ -153,6 +155,9 @@ class MascopeClient:
         self._matching: Any = None
         self._cheminfo: Any = None
         self._ionization: Any = None
+
+        # Pre-instantiate workspaces resource for early error detection
+        self.workspaces.list()
 
     @property
     def url(self) -> str:

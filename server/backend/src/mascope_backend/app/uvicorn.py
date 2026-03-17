@@ -64,7 +64,7 @@ def run():
         port=runtime.meta.api_port,
         workers=workers,
         reload=enable_reload,
-        reload_excludes=["libraries/sdk/*"] if enable_reload else None,
+        reload_excludes=["../../../../../libraries/sdk/*"] if enable_reload else None,
         log_level="critical",
         use_colors=True,
     )

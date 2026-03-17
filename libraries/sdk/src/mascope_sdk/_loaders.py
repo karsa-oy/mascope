@@ -4,13 +4,13 @@
 
 from __future__ import annotations
 
-import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 from loguru import logger
-from tqdm import tqdm
+
+from ._progress import progress_bar
 
 if TYPE_CHECKING:
     from .client import MascopeClient
@@ -283,14 +283,7 @@ def load_peaks(
             executor.submit(_fetch_peaks, sample_row, batch_name): sample_row
             for sample_row, batch_name in sample_tasks
         }
-        with tqdm(
-            total=len(futures),
-            desc="Loading peaks",
-            unit="sample",
-            file=sys.stderr,
-            bar_format="{l_bar}{bar:30}{r_bar}",
-            colour="green",
-        ) as pbar:
+        with progress_bar(len(futures), desc="Loading peaks", unit="sample") as pbar:
             for future in as_completed(futures):
                 result = future.result()
                 if result is not None:
@@ -420,14 +413,7 @@ def load_peaks_by_stage(
             executor.submit(_fetch_stage_peaks, idx, t_min, t_max, name): idx
             for idx, (t_min, t_max, name) in enumerate(normalised)
         }
-        with tqdm(
-            total=len(futures),
-            desc="Loading stages",
-            unit="stage",
-            file=sys.stderr,
-            bar_format="{l_bar}{bar:30}{r_bar}",
-            colour="green",
-        ) as pbar:
+        with progress_bar(len(futures), desc="Loading stages", unit="stage") as pbar:
             for future in as_completed(futures):
                 result = future.result()
                 if result is not None:
@@ -613,14 +599,7 @@ def load_peak_timeseries(
             executor.submit(_get_matched_peaks, sr, bn): (sr, bn)
             for sr, bn in sample_tasks
         }
-        with tqdm(
-            total=len(futures),
-            desc="Finding peaks",
-            unit="sample",
-            file=sys.stderr,
-            bar_format="{l_bar}{bar:30}{r_bar}",
-            colour="green",
-        ) as pbar:
+        with progress_bar(len(futures), desc="Finding peaks", unit="sample") as pbar:
             for future in as_completed(futures):
                 all_peak_tasks.extend(future.result())
                 pbar.update(1)
@@ -687,14 +666,7 @@ def load_peak_timeseries(
             ): task
             for task in all_peak_tasks
         }
-        with tqdm(
-            total=len(futures),
-            desc="Loading timeseries",
-            unit="peak",
-            file=sys.stderr,
-            bar_format="{l_bar}{bar:30}{r_bar}",
-            colour="green",
-        ) as pbar:
+        with progress_bar(len(futures), desc="Loading timeseries", unit="peak") as pbar:
             for future in as_completed(futures):
                 result = future.result()
                 if result is not None:
