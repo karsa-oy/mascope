@@ -144,7 +144,7 @@ class MascopeClient:
         access_token: str | None = None,
         *,
         env_file: Path | str | None = None,
-        verify_ssl: bool = False,
+        verify_ssl: bool = True,
         service_name: str = "mascope_sdk",
     ):
         """Initialize the Mascope client.
@@ -158,8 +158,7 @@ class MascopeClient:
         :param env_file: Optional path to a ``.env`` file. If not provided, searches
                         for ``.env`` in the current directory and parent directories.
         :type env_file: Path | str | None, optional
-        :param verify_ssl: Whether to verify SSL certificates. Defaults to False
-                          for compatibility with self-signed certificates.
+        :param verify_ssl: Whether to verify SSL certificates. Defaults to True.
         :type verify_ssl: bool, optional
         :param service_name: Service name for request headers.
         :type service_name: str, optional
@@ -172,7 +171,7 @@ class MascopeClient:
 
             # Explicit configuration
             mascope = MascopeClient(
-                url="https://mascope.example.com",
+                url="https://example.mascope.app",
                 access_token="your-token"
             )
 

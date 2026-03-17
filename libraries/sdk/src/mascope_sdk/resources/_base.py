@@ -69,8 +69,8 @@ class BaseResource:
             access_token=self._client.access_token,
             params=params,
             stream=stream,
-            verify_ssl=self._client._verify_ssl,
-            service_name=self._client._service_name,
+            verify_ssl=self._client._verify_ssl,  # pylint: disable=protected-access
+            service_name=self._client._service_name,  # pylint: disable=protected-access
         )
         if stream:
             return response
@@ -95,7 +95,7 @@ class BaseResource:
             path=path,
             access_token=self._client.access_token,
             data=data,
-            verify_ssl=self._client._verify_ssl,
-            service_name=self._client._service_name,
+            verify_ssl=self._client._verify_ssl,  # pylint: disable=protected-access
+            service_name=self._client._service_name,  # pylint: disable=protected-access
         )
         return response.json().get("data")

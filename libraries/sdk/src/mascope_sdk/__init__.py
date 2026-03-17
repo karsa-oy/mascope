@@ -7,12 +7,10 @@ notebooks who want to load and analyze data from a Mascope server.
 For detailed documentation, see the README and docstrings.
 """
 
-import warnings
+from importlib.metadata import version
 
-from requests.packages.urllib3.exceptions import InsecureRequestWarning
-
-# Version of the SDK
-__version__ = "2026.2.24"
+# Version of the SDK (read from pyproject.toml via installed package metadata)
+__version__ = version("mascope_sdk")
 
 # Legacy API exports (deprecated, kept for backwards compatibility)
 from ._legacy import (  # Internal helpers (used by agents); Deprecated public functions
@@ -58,9 +56,6 @@ from .exceptions import (
     TimeoutError,
     ValidationError,
 )
-
-# Suppress only the InsecureRequestWarning from requests
-warnings.simplefilter("ignore", InsecureRequestWarning)
 
 __all__ = [
     # New API (recommended)
