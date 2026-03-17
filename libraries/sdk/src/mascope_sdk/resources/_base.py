@@ -4,10 +4,31 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+import pandas as pd
+from loguru import logger
+
 from .._http import http_get, http_post
 
 if TYPE_CHECKING:
     from ..client import MascopeClient
+
+
+def _coerce_datetime_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Convert known datetime columns to proper datetime types.
+
+    Columns ending with a UTC suffix are converted to ``datetime64[ns, UTC]``.
+    Columns matching a local datetime name are converted to ``datetime64[ns]``.
+    """
+    for col in df.columns:
+        if pd.api.types.is_datetime64_any_dtype(df[col]):
+            continue
+        if "datetime" in col:
+            is_utc = "utc" in col
+            try:
+                df[col] = pd.to_datetime(df[col], utc=is_utc)
+            except Exception as e:  # pylint: disable=broad-except
+                logger.warning(f"Failed to convert column {col} to datetime: {e}")
+    return df
 
 
 class BaseResource:

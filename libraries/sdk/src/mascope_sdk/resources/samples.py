@@ -11,7 +11,7 @@ from loguru import logger
 from tqdm import tqdm
 
 from .._resolve import resolve_id
-from ._base import BaseResource
+from ._base import BaseResource, _coerce_datetime_columns
 
 
 class SamplesResource(BaseResource):
@@ -205,7 +205,7 @@ class SamplesResource(BaseResource):
         data = self._get("samples", params={"sample_batch_id": batch_id})
         if not data:
             return None
-        df = pd.DataFrame(data)
+        df = _coerce_datetime_columns(pd.DataFrame(data))
         self._client._cache[cache_key] = df  # pylint: disable=protected-access
         return df
 

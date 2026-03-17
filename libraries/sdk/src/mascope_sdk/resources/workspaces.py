@@ -5,7 +5,7 @@ from __future__ import annotations
 import pandas as pd
 from loguru import logger
 
-from ._base import BaseResource
+from ._base import BaseResource, _coerce_datetime_columns
 
 
 class WorkspacesResource(BaseResource):
@@ -47,7 +47,7 @@ class WorkspacesResource(BaseResource):
         data = self._get("workspaces")
         if not data:
             return None
-        df = pd.DataFrame(data)
+        df = _coerce_datetime_columns(pd.DataFrame(data))
         logger.info("Found {} workspace(s)", len(df))
         self._client._cache[cache_key] = df
         return df

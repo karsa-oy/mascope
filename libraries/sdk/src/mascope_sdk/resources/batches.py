@@ -9,7 +9,7 @@ import pandas as pd
 from loguru import logger
 
 from .._resolve import resolve_id
-from ._base import BaseResource
+from ._base import BaseResource, _coerce_datetime_columns
 
 
 class BatchesResource(BaseResource):
@@ -75,7 +75,7 @@ class BatchesResource(BaseResource):
         data = self._get("sample/batches", params={"workspace_id": workspace_id})
         if not data:
             return None
-        df = pd.DataFrame(data)
+        df = _coerce_datetime_columns(pd.DataFrame(data))
         logger.info("Found {} batch(es)", len(df))
         self._client._cache[cache_key] = df  # pylint: disable=protected-access
         return df
