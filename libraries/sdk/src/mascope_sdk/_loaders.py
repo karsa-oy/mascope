@@ -461,9 +461,9 @@ def load_peak_timeseries(
     batches: str | None = None,
     *,
     samples: str | None = None,
-    compound: str | None = None,
-    ion: str | None = None,
-    isotope: str | None = None,
+    compound: str | list[str] | None = None,
+    ion: str | list[str] | None = None,
+    isotope: str | list[str] | None = None,
     confirm_above: int | None = 20,
     max_workers: int = 8,
 ) -> pd.DataFrame | None:
@@ -473,7 +473,9 @@ def load_peak_timeseries(
     via match data, then fetches the per-scan timeseries for each peak in each
     sample. The hierarchy is: compound -> ions -> isotopes -> peaks (1:1).
 
-    Provide exactly one of ``compound``, ``ion``, or ``isotope``.
+    Provide exactly one of ``compound``, ``ion``, or ``isotope``. Each accepts
+    a single string or a list of strings to load timeseries for multiple
+    targets in a single pass (peaks are discovered once per sample).
 
     Requests are made concurrently for better performance. A progress bar is
     displayed during loading.
@@ -486,12 +488,12 @@ def load_peak_timeseries(
     :type batches: str, optional
     :param samples: Optional substring filter on sample names (case-insensitive).
     :type samples: str, optional
-    :param compound: Target compound name or formula (e.g. ``"Urea"`` or ``"CH4N2O"``).
-    :type compound: str, optional
-    :param ion: Target ion formula to resolve (e.g. ``"CH5N2O+"``).
-    :type ion: str, optional
-    :param isotope: Target isotope formula to resolve (e.g. ``"CH5N2O+"``).
-    :type isotope: str, optional
+    :param compound: Target compound name(s) or formula(s).
+    :type compound: str | list[str], optional
+    :param ion: Target ion formula(s) to resolve.
+    :type ion: str | list[str], optional
+    :param isotope: Target isotope formula(s) to resolve.
+    :type isotope: str | list[str], optional
     :param confirm_above: If the number of samples exceeds this threshold,
                           an interactive confirmation prompt is shown before
                           loading starts. Set to ``None`` to disable.
@@ -530,15 +532,14 @@ def load_peak_timeseries(
             compound="CH4N2O",
         )
 
-        # Plot per-isotope timeseries for one sample
-        import matplotlib.pyplot as plt
-        sample = ts[ts["sample_item_name"] == ts["sample_item_name"].iloc[0]]
-        for isotope_formula, group in sample.groupby("target_isotope_formula"):
-            plt.plot(group["time"], group["height"], label=isotope_formula)
-        plt.legend()
-        plt.show()
+        # Multiple compounds in one call
+        ts = mascope.load_peak_timeseries(
+            workspace="My Workspace",
+            batches="Uronium",
+            compound=["CH4N2O", "Lactic acid"],
+        )
     """
-    # Validate exactly one formula is provided
+    # Validate exactly one formula parameter is provided
     provided = {
         k: v
         for k, v in {"compound": compound, "ion": ion, "isotope": isotope}.items()
@@ -549,10 +550,15 @@ def load_peak_timeseries(
             "Provide exactly one of 'compound', 'ion', or 'isotope'. "
             f"Got: {list(provided.keys()) or 'none'}"
         )
-    formula_level, formula_value = next(iter(provided.items()))
+    formula_level, formula_raw = next(iter(provided.items()))
     formula_column = _FORMULA_COLUMNS[formula_level]
+    # Normalise to a list of values
+    formula_values: list[str] = (
+        formula_raw if isinstance(formula_raw, list) else [formula_raw]
+    )
+    formula_set = set(formula_values)
 
-    # Step 1: Discover samples across batches
+    # --- Discover samples across batches ---
     sample_tasks, _ = _collect_sample_tasks(client, workspace, batches, samples=samples)
     if not sample_tasks:
         logger.warning("No samples found")
@@ -561,9 +567,9 @@ def load_peak_timeseries(
     if confirm_above is not None and len(sample_tasks) > confirm_above:
         _confirm_sample_count(len(sample_tasks), confirm_above)
 
-    # Step 2: Load peaks with matches for each sample (concurrent)
+    # --- Load peaks with matches for each sample (concurrent) ---
     # to discover which peak_ids match the formula
-    logger.info("Resolving peaks matching {} = '{}'", formula_column, formula_value)
+    logger.info("Resolving peaks matching {} in {}", formula_column, formula_values)
 
     def _get_matched_peaks(
         sample_row: Any, batch_name: str
@@ -575,10 +581,10 @@ def load_peak_timeseries(
             return []
 
         # Match by formula OR by name (for compounds)
-        mask = peaks[formula_column] == formula_value
+        mask = peaks[formula_column].isin(formula_set)
         name_column = _NAME_COLUMNS.get(formula_level)
         if name_column and name_column in peaks.columns:
-            mask = mask | (peaks[name_column] == formula_value)
+            mask = mask | peaks[name_column].isin(formula_set)
         matched = peaks[mask]
         if matched.empty:
             return []
@@ -620,7 +626,7 @@ def load_peak_timeseries(
                 pbar.update(1)
 
     if not all_peak_tasks:
-        logger.warning("No peaks matching {} = '{}'", formula_column, formula_value)
+        logger.warning("No peaks matching {} in {}", formula_column, formula_values)
         return None
 
     logger.info(
@@ -629,7 +635,7 @@ def load_peak_timeseries(
         len({t[0]["sample_item_id"] for t in all_peak_tasks}),
     )
 
-    # Step 3: Fetch timeseries for each peak (concurrent)
+    # --- Fetch timeseries for each peak (concurrent) ---
     def _fetch_timeseries(
         sample_row: Any,
         batch_name: str,

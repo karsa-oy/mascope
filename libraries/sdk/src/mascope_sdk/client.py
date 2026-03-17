@@ -321,9 +321,9 @@ class MascopeClient:
         batches: str | None = None,
         *,
         samples: str | None = None,
-        compound: str | None = None,
-        ion: str | None = None,
-        isotope: str | None = None,
+        compound: str | list[str] | None = None,
+        ion: str | list[str] | None = None,
+        isotope: str | list[str] | None = None,
         confirm_above: int | None = 20,
         max_workers: int = 8,
     ) -> pd.DataFrame | None:
@@ -334,7 +334,9 @@ class MascopeClient:
         in each sample. The hierarchy is:
         compound -> ions -> isotopes -> peaks (1:1).
 
-        Provide exactly one of ``compound``, ``ion``, or ``isotope``.
+        Provide exactly one of ``compound``, ``ion``, or ``isotope``. Each
+        accepts a single string or a list of strings to load timeseries for
+        multiple targets in a single pass.
 
         Requests are made concurrently for better performance. Two progress bars
         are displayed: one for peak discovery and one for timeseries loading.
@@ -345,12 +347,12 @@ class MascopeClient:
         :type batches: str, optional
         :param samples: Optional substring filter on sample names (case-insensitive).
         :type samples: str, optional
-        :param compound: Target compound name or formula (e.g. ``"Urea"`` or ``"CH4N2O"``).
-        :type compound: str, optional
-        :param ion: Target ion formula (e.g. ``"CH5N2O+"``).
-        :type ion: str, optional
-        :param isotope: Target isotope formula (e.g. ``"CH5N2O+"``).
-        :type isotope: str, optional
+        :param compound: Target compound name(s) or formula(s).
+        :type compound: str | list[str], optional
+        :param ion: Target ion formula(s).
+        :type ion: str | list[str], optional
+        :param isotope: Target isotope formula(s).
+        :type isotope: str | list[str], optional
         :param confirm_above: If the number of samples exceeds this threshold,
                               an interactive confirmation prompt is shown before
                               loading starts. Set to ``None`` to disable.
@@ -373,18 +375,24 @@ class MascopeClient:
 
                  Returns None if no matching peaks are found.
         :rtype: pd.DataFrame | None
-        :raises ValueError: If zero or more than one formula is provided.
+        :raises ValueError: If zero or more than one formula parameter is provided.
         :raises KeyboardInterrupt: If the user declines the confirmation prompt.
 
         Example::
 
             mascope = MascopeClient()
 
-            # Get intra-sample timeseries for all Urea peaks
+            # Single compound
             ts = mascope.load_peak_timeseries(
                 workspace="My Workspace",
                 batches="Uronium",
                 compound="CH4N2O",
+            )
+
+            # Multiple compounds in one call
+            ts = mascope.load_peak_timeseries(
+                workspace="My Workspace",
+                compound=["CH4N2O", "Lactic acid"],
             )
         """
         from ._loaders import load_peak_timeseries as _load_peak_timeseries
