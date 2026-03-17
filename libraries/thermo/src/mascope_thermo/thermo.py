@@ -79,13 +79,13 @@ class ScanSelector:
         polarity: Literal["+", "-"] | None = None,
         t_min: float | None = None,
         t_max: float | None = None,
-        scan_type: Literal["Ms", "Ms2"] | None = "Ms",
+        ms_type: Literal["Ms", "Ms2"] | None = "Ms",
     ):
         self._RawFile = RawFile
         self._polarity = polarity
         self._t_min = t_min
         self._t_max = t_max
-        self._scan_type = scan_type
+        self._ms_type = ms_type
 
         self.raw_scan_filters = [
             self._RawFile.GetFilterForScanNumber(i) for i in self.all_scan_indices
@@ -142,15 +142,15 @@ class ScanSelector:
 
         return np.logical_and(t_min_adj <= start_times_s, start_times_s <= t_max_adj)
 
-    def _scan_type_mask(self) -> np.ndarray:
-        """Creates a boolean mask for the specified scan type."""
-        if self._scan_type not in ["Ms", "Ms2"]:
+    def _ms_type_mask(self) -> np.ndarray:
+        """Creates a boolean mask for the specified MS scan type."""
+        if self._ms_type not in ["Ms", "Ms2"]:
             raise ValueError(
-                f"Invalid scan type '{self._scan_type}' provided. Scan type must be 'Ms' or 'Ms2'."
+                f"Invalid scan type '{self._ms_type}' provided. MS can type must be 'Ms' or 'Ms2'."
             )
         return np.array(
             [
-                filter.MSOrder.ToString() == self._scan_type
+                filter.MSOrder.ToString() == self._ms_type
                 for filter in self.raw_scan_filters
             ]
         )
@@ -168,15 +168,15 @@ class ScanSelector:
         if self._t_min is not None or self._t_max is not None:
             mask &= self._time_mask()
 
-        if self._scan_type:
-            mask &= self._scan_type_mask()
+        if self._ms_type:
+            mask &= self._ms_type_mask()
 
         filtered_indices = np.array(self.all_scan_indices)[mask]
 
         if len(filtered_indices) == 0:
             raise ValueError(
                 "No scans found matching the specified filters: "
-                f"polarity='{self._polarity}', time_range=({self._t_min}, {self._t_max}), scan_type='{self._scan_type}'"
+                f"polarity='{self._polarity}', time_range=({self._t_min}, {self._t_max}), ms_type='{self._ms_type}'"
             )
 
         return filtered_indices.tolist()
@@ -854,10 +854,8 @@ class RawFileMetadata:
         CycleNumber
         """
         with RawFileManager(self.datafile_path) as RawFile:
-            scan_selector = ScanSelector(RawFile, scan_type=None)
-            scan_statistics = scan_selector.raw_scan_stats
-
-            stat_list = [
+            scan_selector = ScanSelector(RawFile, ms_type=None)
+            stat_names = [
                 "HighMass",
                 "LowMass",
                 "LongWavelength",
@@ -879,13 +877,22 @@ class RawFileMetadata:
                 "ScanType",
                 "CycleNumber",
             ]
-
-            scan_stats = dict()
-            for i, ss in zip(scan_selector.scan_indices_1based, scan_statistics):
-                scan_stats[i] = [getattr(ss, stat) for stat in stat_list]
+            # The scan type is not included in the scan statistics,
+            # so we need to get it from the raw scan filters
+            scan_stats = {
+                scan_index: {
+                    **{name: getattr(stats, name) for name in stat_names},
+                    "MsType": scan_filter.MSOrder.ToString(),
+                }
+                for scan_index, stats, scan_filter in zip(
+                    scan_selector.scan_indices_1based,
+                    scan_selector.raw_scan_stats,
+                    scan_selector.raw_scan_filters,
+                    strict=True,
+                )
+            }
 
             scan_stats_df = pd.DataFrame.from_dict(scan_stats, orient="columns")
-            scan_stats_df.index = stat_list
 
             return scan_stats_df
 
@@ -912,7 +919,7 @@ class RawFileMetadata:
         """
         result = {"time": [], "data": []}
         with RawFileManager(self.datafile_path) as RawFile:
-            scan_selector = ScanSelector(RawFile, scan_type=None)
+            scan_selector = ScanSelector(RawFile, ms_type=None)
             scans = scan_selector.scans
             scan_times = scan_selector.scan_times
             for timestamp, scan in zip(scan_times, scans):
