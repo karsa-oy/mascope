@@ -1,5 +1,7 @@
 """High-level data loading functions for the Mascope SDK."""
 
+# pylint: disable=import-outside-toplevel
+
 from __future__ import annotations
 
 import sys
@@ -30,7 +32,9 @@ def _resolve_sample(client: MascopeClient, sample: str) -> str:
 
     # Search cached sample lists
     cached_samples = [
-        df for key, df in client._cache.items() if key.startswith("samples:")
+        df
+        for key, df in client._cache.items()  # pylint: disable=protected-access
+        if key.startswith("samples:")
     ]
     if cached_samples:
         all_samples = pd.concat(cached_samples, ignore_index=True)
@@ -111,7 +115,9 @@ def _collect_sample_tasks(
     )
     logger.info("Loading workspace '{}'", workspace)
 
-    all_batches = client.batches._list_by_id(workspace_id)
+    all_batches = client.batches._list_by_id(  # pylint: disable=protected-access
+        workspace_id
+    )
     if all_batches is None or all_batches.empty:
         logger.warning("No batches found in workspace")
         return [], workspace_id
@@ -132,7 +138,9 @@ def _collect_sample_tasks(
         batch_id = batch_row["sample_batch_id"]
         batch_name = batch_row["sample_batch_name"]
 
-        batch_samples = client.samples._list_by_id(batch_id)
+        batch_samples = client.samples._list_by_id(  # pylint: disable=protected-access
+            batch_id
+        )
         if batch_samples is None or batch_samples.empty:
             logger.info("Batch '{}': no samples, skipping", batch_name)
             continue
@@ -605,6 +613,7 @@ def load_peak_timeseries(
             unit="sample",
             file=sys.stderr,
             bar_format="{l_bar}{bar:30}{r_bar}",
+            colour="green",
         ) as pbar:
             for future in as_completed(futures):
                 all_peak_tasks.extend(future.result())
@@ -678,6 +687,7 @@ def load_peak_timeseries(
             unit="peak",
             file=sys.stderr,
             bar_format="{l_bar}{bar:30}{r_bar}",
+            colour="green",
         ) as pbar:
             for future in as_completed(futures):
                 result = future.result()

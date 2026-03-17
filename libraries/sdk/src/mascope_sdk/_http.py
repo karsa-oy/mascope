@@ -8,7 +8,7 @@ import json
 from typing import Any
 
 import requests
-from requests.exceptions import Timeout, RequestException
+from requests.exceptions import RequestException, Timeout
 
 from .exceptions import (
     AuthenticationError,
@@ -70,7 +70,7 @@ def _raise_for_status(response: requests.Response, url: str) -> None:
             status_code=status_code,
             url=url,
         )
-    elif status_code >= 500:
+    elif status_code is not None and status_code >= 500:
         raise ServerError(
             message=message,
             status_code=status_code,

@@ -41,13 +41,13 @@ class WorkspacesResource(BaseResource):
             print(workspaces[["workspace_id", "name"]])
         """
         cache_key = "workspaces"
-        if cache_key in self._client._cache:
-            return self._client._cache[cache_key]
+        if cache_key in self._client._cache:  # pylint: disable=protected-access
+            return self._client._cache[cache_key]  # pylint: disable=protected-access
         logger.info("Fetching workspaces")
         data = self._get("workspaces")
         if not data:
             return None
         df = _coerce_datetime_columns(pd.DataFrame(data))
         logger.info("Found {} workspace(s)", len(df))
-        self._client._cache[cache_key] = df
+        self._client._cache[cache_key] = df  # pylint: disable=protected-access
         return df
