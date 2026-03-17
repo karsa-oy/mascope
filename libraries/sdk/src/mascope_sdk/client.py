@@ -12,76 +12,9 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
+from dotenv import dotenv_values, find_dotenv
 
 from .exceptions import ConfigurationError
-
-
-def _parse_env_file(env_path: Path) -> dict[str, str]:
-    """Parse a .env file and return a dictionary of key-value pairs.
-
-    This is a simple parser that handles basic .env files without requiring
-    the python-dotenv package.
-
-    :param env_path: Path to the .env file.
-    :type env_path: Path
-    :return: Dictionary of environment variables from the file.
-    :rtype: dict[str, str]
-    """
-    env_vars: dict[str, str] = {}
-
-    if not env_path.exists():
-        return env_vars
-
-    with open(env_path, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            # Skip empty lines and comments
-            if not line or line.startswith("#"):
-                continue
-            # Handle key=value pairs
-            if "=" in line:
-                key, _, value = line.partition("=")
-                key = key.strip()
-                value = value.strip()
-                # Remove surrounding quotes if present
-                if (value.startswith('"') and value.endswith('"')) or (
-                    value.startswith("'") and value.endswith("'")
-                ):
-                    value = value[1:-1]
-                env_vars[key] = value
-
-    return env_vars
-
-
-def _load_env_file(env_path: Path | str | None = None) -> dict[str, str]:
-    """Load environment variables from a .env file.
-
-    Searches for .env file in the following order:
-    1. Explicitly provided path
-    2. Current working directory
-    3. Parent directories (up to 5 levels)
-
-    :param env_path: Optional explicit path to .env file.
-    :type env_path: Path | str | None, optional
-    :return: Dictionary of loaded environment variables.
-    :rtype: dict[str, str]
-    """
-    if env_path is not None:
-        path = Path(env_path)
-        if path.exists():
-            return _parse_env_file(path)
-        return {}
-
-    # Search in current directory and parent directories
-    cwd = Path.cwd()
-    search_paths = [cwd] + list(cwd.parents)[:5]
-
-    for directory in search_paths:
-        env_file = directory / ".env"
-        if env_file.exists():
-            return _parse_env_file(env_file)
-
-    return {}
 
 
 class MascopeClient:
@@ -179,7 +112,8 @@ class MascopeClient:
             mascope = MascopeClient(env_file="/path/to/.env")
         """
         # Load .env file
-        env_vars = _load_env_file(env_file)
+        dotenv_path = str(env_file) if env_file is not None else find_dotenv(usecwd=True)
+        env_vars = dotenv_values(dotenv_path) if dotenv_path else {}
 
         # Resolve URL (parameter > env var > .env file)
         self._url = url or os.environ.get("MASCOPE_URL") or env_vars.get("MASCOPE_URL")
