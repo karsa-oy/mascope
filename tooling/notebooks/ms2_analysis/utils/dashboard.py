@@ -6,13 +6,15 @@ from colorcet import glasbey_hv as colormap
 from IPython.display import display
 
 from .data_extractor import DataExtractor
+from .composition import CompositionMap
 
 MAX_FRAGMENT_TRACES = 20
 
 
 class Ms2Dashboard:
-    def __init__(self, data: DataExtractor):
+    def __init__(self, data: DataExtractor, compositions: CompositionMap):
         self._data = data
+        self._compositions = compositions
         self._half_iso = data.isolation_width / 2
 
         # Build dropdown options
@@ -160,6 +162,18 @@ class Ms2Dashboard:
 
         # --- Fragment spectrum (MS2) ---
         ms2_spec = d.ms2_spectra[pp]
+        comp_df = self._compositions.matches.get(pp, pd.DataFrame())
+        comp_mzs = (
+            comp_df["mz"].values
+            if not comp_df.empty and "mz" in comp_df.columns
+            else np.array([])
+        )
+        comp_ions = (
+            comp_df["ion"].values
+            if not comp_df.empty and "ion" in comp_df.columns
+            else np.array([])
+        )
+
         with self._fig_fragments.batch_update():
             self._fig_fragments.data = []
             if ms2_spec.mz.size > 0:
@@ -167,6 +181,28 @@ class Ms2Dashboard:
                     ms2_spec.mz, ms2_spec.intensity, color="seagreen", name="MS2"
                 ):
                     self._fig_fragments.add_trace(t)
+
+                # Add composition labels above assigned peaks
+                if len(comp_ions) == len(ms2_spec.mz):
+                    label_mzs, label_ints, label_texts = [], [], []
+                    for i, ion in enumerate(comp_ions):
+                        if pd.notna(ion) and str(ion).strip() and ion != "---":
+                            label_mzs.append(float(ms2_spec.mz[i]))
+                            label_ints.append(float(ms2_spec.intensity[i]))
+                            label_texts.append(str(ion))
+                    if label_texts:
+                        self._fig_fragments.add_trace(
+                            go.Scatter(
+                                x=label_mzs,
+                                y=label_ints,
+                                mode="text",
+                                text=label_texts,
+                                textposition="top center",
+                                textfont=dict(size=9),
+                                showlegend=False,
+                                hoverinfo="skip",
+                            )
+                        )
             self._fig_fragments.update_layout(uirevision=str(pp))
 
         # --- Fragment timeseries (normalized) ---
@@ -187,12 +223,26 @@ class Ms2Dashboard:
                         t.isoformat() if hasattr(t, "isoformat") else str(t)
                         for t in row.index
                     ]
+
+                    ion_label = None
+                    if len(comp_mzs) > 0:
+                        idx = np.argmin(np.abs(comp_mzs - frag_mz))
+                        if abs(comp_mzs[idx] - frag_mz) < 0.01:
+                            ion = comp_ions[idx]
+                            if pd.notna(ion) and str(ion).strip() and ion != "---":
+                                ion_label = str(ion).strip()
+                    trace_name = (
+                        f"{frag_mz:.4f} m/z ({ion_label})"
+                        if ion_label
+                        else f"{frag_mz:.4f} m/z"
+                    )
+
                     self._fig_timeseries.add_trace(
                         go.Scatter(
                             x=x_str,
                             y=row.values.astype(float),
                             mode="lines",
-                            name=f"{frag_mz:.4f} m/z",
+                            name=trace_name,
                             line=dict(color=color, width=1.5),
                             hovertemplate=f"m/z {frag_mz:.4f}<br>"
                             "Time: %{x}<br>Rel. Int.: %{y:.4f}<extra></extra>",
