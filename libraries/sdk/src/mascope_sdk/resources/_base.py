@@ -74,6 +74,13 @@ class BaseResource:
         )
         if stream:
             return response
+
+        message = response.json().get("message")
+        if message:
+            logger.debug(f"API response message: {message}")
+            if "warning" in message.lower():
+                logger.warning(f"API warning: {message.split('Warning:')[-1].strip()}")
+
         return response.json().get("data")
 
     def _post(

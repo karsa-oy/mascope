@@ -1,33 +1,26 @@
-# pylint: disable=line-too-long
+# pylint: disable=line-too-long, import-outside-toplevel
 import asyncio
 from datetime import datetime
 
 import mascope_signal.compute as m_compute
 import numpy as np
-import pandas as pd
 from mascope_backend.api.controllers.samples.lib.samples_fetch import fetch_sample
 from mascope_backend.api.lib.api_features import api_controller
 from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
 from mascope_backend.api.models.target.collections.config import (
     target_collection_config,
 )
-from mascope_backend.api.new.match.params.lib import apply_match_params
 from mascope_backend.db import (
     MatchCollection,
-    MatchIsotope,
     MatchSample,
     TargetCollection,
-    TargetCompound,
-    TargetCompoundInTargetCollection,
-    TargetIon,
-    TargetIsotope,
     async_session,
 )
 from mascope_backend.db.views import Sample
 from mascope_backend.runtime import runtime
-from mascope_file.io import load_coord, load_peak_data
+from mascope_file.io import load_coord
 from mascope_signal.peak import get_peaks
-from sqlalchemy import Float, Integer, and_, asc, cast, desc, func, label, select
+from sqlalchemy import Float, Integer, and_, asc, cast, desc, func, select
 
 
 @api_controller()
@@ -295,20 +288,15 @@ async def get_sample_peaks(
     matches: bool = False,
 ) -> dict:
     """
-    Retrieve peak data from a sample with automatic sample's polarity filtering.
+    Retrieve peak data from a sample with automatic polarity filtering.
 
-    This controller extracts peak areas and/or heights for a sample, automatically filtered
-    by the sample's polarity. It supports optional m/z range filtering.
-    The filtering by time is not supported for now and raises an error if provided.
+    Extracts peak areas and/or heights for a sample, automatically filtered
+    by the sample's polarity. Supports optional time and m/z range filtering.
 
-    Steps:
-    - Get sample data
-    - Load sample file peak data and get polarity filter
-    - Apply filtering
-    - Extract and format the data
-    - Format the response for the case where no peaks were detected
-    - Remove empty fields from the response
-    - Return success response
+    When ``t_min`` or ``t_max`` is provided, peak intensities are aggregated
+    from the per-scan timeseries data instead of pre-computed sums.  Peaks
+    whose timeseries have not been computed are excluded, and a warning is
+    included in the response message.
 
     :param sample_item_id: Unique identifier for the sample
     :type sample_item_id: str
@@ -335,41 +323,28 @@ async def get_sample_peaks(
     :return: Dictionary containing filtered peak data with m/z values and areas/heights
     :rtype: dict
     """
+    from mascope_backend.api.controllers.samples.lib.samples_matches import (
+        query_peak_matches,
+    )
+    from mascope_backend.api.controllers.samples.lib.samples_peaks import extract_peaks
 
-    # --- Get sample data ---
     sample = await fetch_sample(sample_item_id)
 
-    if (t_min is not None and t_min > sample.t0) or (
-        t_max is not None and t_max < sample.t1
-    ):
-        raise NotImplementedError(
-            "Time range filtering is not supported for peak data extraction. "
-            "Please omit t_min and t_max parameters."
-        )
+    peak_data = extract_peaks(
+        filename=sample.filename,
+        polarity=sample.polarity,  # type: ignore[attr-defined]
+        sample_t0=sample.t0,  # type: ignore[attr-defined]
+        sample_t1=sample.t1,  # type: ignore[attr-defined]
+        areas=areas,
+        heights=heights,
+        average=average,
+        t_min=t_min,
+        t_max=t_max,
+        mz_min=mz_min,
+        mz_max=mz_max,
+    )
 
-    # --- Load sample file peak data and get polarity filter ---
-    try:
-        sample_file_data = load_peak_data(sample.filename)
-    except FileNotFoundError as e:
-        raise NotFoundException(
-            f"Sample file with name '{sample.filename}' was not found or has not been processed"
-        ) from e
-
-    # --- Apply filtering ---
-    polarity_mask = np.where(sample_file_data.polarity.values == sample.polarity)[0]
-    sample_file_data = sample_file_data.isel(mz=polarity_mask)
-    if mz_min is not None and mz_max is not None:
-        sample_file_data = sample_file_data.sel(mz=slice(mz_min, mz_max))
-
-    if average:
-        timestamps = m_compute.get_scan_timestamps(
-            sample.filename, polarity=sample.polarity
-        )
-        average_factor = len(timestamps) if len(timestamps) > 0 else 1
-    else:
-        average_factor = 1
-
-    if sample_file_data.mz.size == 0:
+    if peak_data.count == 0:
         return {
             "message": f"No peaks found in sample '{sample.sample_item_name}' with polarity '{sample.polarity}'.",
             "results": 0,
@@ -382,142 +357,34 @@ async def get_sample_peaks(
             },
         }
 
-    # --- Extract and format the data ---
-    response_data = {
-        "peak_id": sample_file_data.peak_id.values,
-        "mz": sample_file_data.mz.values,
+    # --- Build response data ---
+    response_data: dict = {
+        "peak_id": peak_data.peak_ids,
+        "mz": peak_data.mz_values,
     }
     if areas:
-        response_data["area"] = sample_file_data.sum_peak_areas.values / average_factor
+        response_data["area"] = peak_data.areas
     if heights:
-        response_data["height"] = (
-            sample_file_data.sum_peak_heights.values / average_factor
-        )
-
-    response_data = {key: value.tolist() for key, value in response_data.items()}
-
-    # --- Remove empty fields from the response ---
-    if not areas:
-        response_data.pop("area", None)
-    if not heights:
-        response_data.pop("height", None)
+        response_data["height"] = peak_data.heights
 
     if matches:
-        # --- Query for peak matches ---
-        async with async_session() as session:
-            # Not all fields are returned in the response, but are needed for match filtering
-            query = (
-                select(
-                    MatchIsotope.sample_peak_id,
-                    MatchIsotope.match_mz_error,
-                    MatchIsotope.match_abundance_error,
-                    MatchIsotope.match_score,
-                    MatchIsotope.sample_peak_intensity,
-                    TargetIsotope.target_isotope_id,
-                    TargetIsotope.relative_abundance,
-                    TargetIsotope.target_isotope_formula,
-                    TargetIon.target_ion_id,
-                    TargetIon.target_ion_formula,
-                    TargetIon.ionization_mechanism_id,
-                    TargetIon.filter_params,
-                    TargetCompound.target_compound_name,
-                    TargetCompound.target_compound_formula,
-                    TargetCollection.target_collection_id,
-                    label("instrument", sample.instrument),
-                )
-                .select_from(MatchIsotope)
-                .join(
-                    TargetIsotope,
-                    TargetIsotope.target_isotope_id == MatchIsotope.target_isotope_id,
-                )
-                .join(
-                    TargetIon,
-                    TargetIon.target_ion_id == TargetIsotope.target_ion_id,
-                )
-                .join(
-                    TargetCompound,
-                    TargetCompound.target_compound_id == TargetIon.target_compound_id,
-                )
-                .join(
-                    TargetCompoundInTargetCollection,
-                    TargetCompoundInTargetCollection.target_compound_id
-                    == TargetCompound.target_compound_id,
-                )
-                .join(
-                    TargetCollection,
-                    TargetCollection.target_collection_id
-                    == TargetCompoundInTargetCollection.target_collection_id,
-                )
-                .join(
-                    MatchCollection,
-                    and_(
-                        MatchCollection.sample_item_id == MatchIsotope.sample_item_id,
-                        MatchCollection.target_collection_id
-                        == TargetCollection.target_collection_id,
-                    ),
-                )
-                .where(
-                    and_(
-                        MatchIsotope.sample_item_id == sample.sample_item_id,
-                        MatchIsotope.match_score > 0,  # pre-filter by match score
-                    )
-                )
-            )
-            result = await session.execute(query)
-            match_rows = result.all()
-
-        # Apply filtering parameters
-        match_df = apply_match_params(
-            pd.DataFrame([row._asdict() for row in match_rows])
+        response_data["match"] = await query_peak_matches(
+            sample.sample_item_id, sample.instrument, peak_data.peak_ids
         )
-
-        sample_peak_ids = sample_file_data.peak_id.values.tolist()
-
-        if match_df.empty:
-            # Early exit for no proper matches
-            response_data["match"] = [[] for _ in sample_peak_ids]
-        else:
-            # Filter out non-matches
-            match_df = match_df[match_df.match_category > 0]
-            agg = (
-                match_df.groupby(["sample_peak_id", "target_isotope_id"], sort=False)
-                .agg(
-                    target_isotope_formula=("target_isotope_formula", "first"),
-                    target_ion_id=("target_ion_id", "first"),
-                    target_ion_formula=("target_ion_formula", "first"),
-                    target_compound_name=("target_compound_name", "first"),
-                    target_compound_formula=("target_compound_formula", "first"),
-                    ionization_mechanism_id=("ionization_mechanism_id", "first"),
-                    target_collection_ids=(
-                        "target_collection_id",
-                        lambda tci: pd.unique(tci).tolist(),
-                    ),
-                )
-                .reset_index()
-            )
-
-            # Map peak_id to list of match dicts
-            grouped = agg.groupby("sample_peak_id", sort=False)
-            peak_id_to_match = {
-                pid: grp.drop(columns=["sample_peak_id"]).to_dict(orient="records")
-                for pid, grp in grouped
-            }
-
-            # Keep original peak order
-            response_data["match"] = [
-                peak_id_to_match.get(pid, []) for pid in sample_peak_ids
-            ]
     else:
         response_data["match"] = None
 
-    # --- Return success response ---
+    # --- Build response message ---
     message = (
-        f"Successfully loaded {len(response_data['mz'])} peaks from sample "
+        f"Successfully loaded {peak_data.count} peaks from sample "
         f"'{sample.sample_item_name}' with polarity '{sample.polarity}'"
     )
+    for warning in peak_data.warnings:
+        message += f" Warning: {warning}"
+
     return {
         "message": message,
-        "results": len(response_data["mz"]),
+        "results": peak_data.count,
         "data": response_data,
     }
 
