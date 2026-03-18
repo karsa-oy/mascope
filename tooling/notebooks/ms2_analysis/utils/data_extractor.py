@@ -6,8 +6,34 @@ import mascope_sdk as msdk
 from mascope_tools.alignment.calibration import CentroidedSpectrum, Spectra
 
 
+DEFAULT_NOISE_THRESHOLD = 10
+
+
 class DataExtractor:
-    def __init__(self, mascope_url: str, access_token: str, sample_file_id: str):
+    def __init__(
+        self,
+        mascope_url: str,
+        access_token: str,
+        sample_file_id: str,
+        params: dict = {},
+    ):
+        """
+        Initialize the DataExtractor by fetching metadata and spectra from the MAScope API,
+        and precomputing necessary data structures for analysis.
+
+        :param mascope_url: Mascope app URL
+        :type mascope_url: str
+        :param access_token: Access token for authentication with the Mascope API
+        :type access_token: str
+        :param sample_file_id: ID of the sample file to analyze
+        :type sample_file_id: str
+        :param params: Optional parameters for data extraction and processing:
+            - noise_threshold: Intensity threshold for filtering out noise peaks in the spectra
+            (default: 10)
+        :type params: dict, optional
+        :raises ValueError:
+        """
+        self.params = params
         meta = msdk.get_sample_file_metadata(mascope_url, access_token, sample_file_id)
 
         if meta is None:
@@ -15,8 +41,11 @@ class DataExtractor:
 
         self.stats = pd.DataFrame(meta["stats_per_scan"])
         centroids_data = meta["centroids_meta"]
-        self.timestamps = centroids_data["time"]
-        self.centroids = centroids_data["data"]
+        self.timestamps: list = centroids_data["time"]
+        self.centroids: list = centroids_data["data"]
+
+        # Filter centroids
+        self.centroids = self._filter_centroids()
 
         # Distinguish MS scans
         self.ms2_mask = self.stats.loc["MsType"] == "Ms2"
@@ -52,6 +81,25 @@ class DataExtractor:
             )
             self.ms1_timeseries = self._ms1_spectra_obj.get_timeseries()
             self.normalized_ms2_timeseries = self._get_normalized_ms2_timeseries()
+
+    def _filter_centroids(self):
+        """Filter out noise peaks:
+        - Based on minimum signal-to-noise ratio threshold defined in params (default: 10)
+        """
+        noise_threshold = self.params.get("noise_threshold", DEFAULT_NOISE_THRESHOLD)
+        filtered_centroids = []
+        for centroid in self.centroids:
+            noise_mask = np.array(centroid["noises"]) >= noise_threshold
+            mask = noise_mask
+            filtered_centroids.append(
+                {
+                    "mzs": np.array(centroid["mzs"])[mask],
+                    "intensities": np.array(centroid["intensities"])[mask],
+                    "noises": np.array(centroid["noises"])[mask],
+                    "resolutions": np.array(centroid["resolutions"])[mask],
+                }
+            )
+        return filtered_centroids
 
     def _get_parent_peaks(self):
         """Extract unique parent peaks from MS2 scans"""
