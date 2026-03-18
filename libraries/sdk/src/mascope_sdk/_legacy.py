@@ -30,9 +30,23 @@ import requests
 from loguru import logger
 from requests.exceptions import HTTPError, RequestException, Timeout
 
-
 # Default service name to use in request header. Override SERVICE_NAME for specific agents
 SERVICE_NAME = "mascope_sdk"
+
+
+def _get_service_name() -> str:
+    """Return the current SERVICE_NAME from the package namespace.
+
+    Agents override ``mascope_sdk.SERVICE_NAME`` at the package level,
+    so we look it up dynamically rather than capturing the module-level
+    default.
+    """
+    import sys  # pylint: disable=C0415 noqa: PLC0415 deferred to avoid import-time cost
+
+    pkg = sys.modules.get("mascope_sdk")
+    if pkg is not None:
+        return getattr(pkg, "SERVICE_NAME", SERVICE_NAME)
+    return SERVICE_NAME
 
 
 def _deprecated(new_api_hint: str):
@@ -94,7 +108,7 @@ def api_get(
     try:
         headers = {
             "Authorization": f"Bearer {access_token}",
-            "X-Service-Name": SERVICE_NAME,
+            "X-Service-Name": _get_service_name(),
         }
 
         # Send GET request with query parameters (if provided)
@@ -167,7 +181,7 @@ def api_post(url: str, path: str, access_token: str, data: dict):
     try:
         headers = {
             "Authorization": f"Bearer {access_token}",
-            "X-Service-Name": SERVICE_NAME,
+            "X-Service-Name": _get_service_name(),
         }
         resp = requests.post(
             full_url, data=json.dumps(data), headers=headers, verify=False, timeout=30
@@ -236,7 +250,7 @@ def api_post_file(
     try:
         headers = {
             "Authorization": f"Bearer {access_token}",
-            "X-Service-Name": SERVICE_NAME,
+            "X-Service-Name": _get_service_name(),
         }
         with open(filepath, "rb") as file:
             resp = requests.post(
