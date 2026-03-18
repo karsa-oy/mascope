@@ -304,9 +304,6 @@ class MascopeClient:
         """
         from ._loaders import load_peaks as _load_peaks
 
-        if max_workers > 8:
-            raise ValueError("max_workers cannot exceed 8 to avoid overloading the API")
-
         return _load_peaks(
             self,
             workspace,
@@ -402,9 +399,6 @@ class MascopeClient:
         """
         from ._loaders import load_peak_timeseries as _load_peak_timeseries
 
-        if max_workers > 8:
-            raise ValueError("max_workers cannot exceed 8 to avoid overloading the API")
-
         return _load_peak_timeseries(
             self,
             workspace,
@@ -474,9 +468,6 @@ class MascopeClient:
             peaks.groupby("stage_name")["area"].sum()
         """
         from ._loaders import load_peaks_by_stage as _load_peaks_by_stage
-
-        if max_workers > 8:
-            raise ValueError("max_workers cannot exceed 8 to avoid overloading the API")
 
         return _load_peaks_by_stage(
             self,

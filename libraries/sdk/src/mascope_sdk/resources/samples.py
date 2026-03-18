@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 import pandas as pd
 from loguru import logger
 
-from .._progress import progress_bar
+from .._concurrent import run_concurrent
 from .._resolve import resolve_id
 from ._base import BaseResource, _coerce_datetime_columns
 
@@ -169,19 +168,13 @@ class SamplesResource(BaseResource):
             df.insert(0, "sample_batch_name", id_to_name.get(bid, ""))
             return df
 
-        frames: list[pd.DataFrame] = []
-        with ThreadPoolExecutor(max_workers=min(8, len(batch_ids))) as executor:
-            futures = {
-                executor.submit(_fetch_batch_samples, bid): bid for bid in batch_ids
-            }
-            with progress_bar(
-                len(futures), desc="Listing samples", unit="batch"
-            ) as pbar:
-                for future in as_completed(futures):
-                    result = future.result()
-                    if result is not None:
-                        frames.append(result)
-                    pbar.update(1)
+        frames: list[pd.DataFrame] = run_concurrent(
+            _fetch_batch_samples,
+            [(bid,) for bid in batch_ids],
+            max_workers=min(8, len(batch_ids)),
+            desc="Listing samples",
+            unit="batch",
+        )
 
         if not frames:
             return None

@@ -4,13 +4,12 @@
 
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 from loguru import logger
 
-from ._progress import progress_bar
+from ._concurrent import run_concurrent
 
 if TYPE_CHECKING:
     from .client import MascopeClient
@@ -277,18 +276,13 @@ def load_peaks(
             )
         return peaks
 
-    frames: list[pd.DataFrame] = []
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {
-            executor.submit(_fetch_peaks, sample_row, batch_name): sample_row
-            for sample_row, batch_name in sample_tasks
-        }
-        with progress_bar(len(futures), desc="Loading peaks", unit="sample") as pbar:
-            for future in as_completed(futures):
-                result = future.result()
-                if result is not None:
-                    frames.append(result)
-                pbar.update(1)
+    frames: list[pd.DataFrame] = run_concurrent(
+        _fetch_peaks,
+        sample_tasks,
+        max_workers=max_workers,
+        desc="Loading peaks",
+        unit="sample",
+    )
 
     if not frames:
         logger.warning("No peaks found")
@@ -407,18 +401,16 @@ def load_peaks_by_stage(
         peaks["t_max"] = t_max
         return peaks
 
-    frames: list[pd.DataFrame] = []
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {
-            executor.submit(_fetch_stage_peaks, idx, t_min, t_max, name): idx
+    frames: list[pd.DataFrame] = run_concurrent(
+        _fetch_stage_peaks,
+        [
+            (idx, t_min, t_max, name)
             for idx, (t_min, t_max, name) in enumerate(normalised)
-        }
-        with progress_bar(len(futures), desc="Loading stages", unit="stage") as pbar:
-            for future in as_completed(futures):
-                result = future.result()
-                if result is not None:
-                    frames.append(result)
-                pbar.update(1)
+        ],
+        max_workers=max_workers,
+        desc="Loading stages",
+        unit="stage",
+    )
 
     if not frames:
         logger.warning("No peaks found")
@@ -591,18 +583,16 @@ def load_peak_timeseries(
         return result
 
     # Collect all peak tasks across all samples
+    matched_lists = run_concurrent(
+        _get_matched_peaks,
+        sample_tasks,
+        max_workers=max_workers,
+        desc="Finding peaks",
+        unit="sample",
+    )
     all_peak_tasks: list[
         tuple[Any, str, str, str | None, str | None, str | None, str | None]
-    ] = []
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {
-            executor.submit(_get_matched_peaks, sr, bn): (sr, bn)
-            for sr, bn in sample_tasks
-        }
-        with progress_bar(len(futures), desc="Finding peaks", unit="sample") as pbar:
-            for future in as_completed(futures):
-                all_peak_tasks.extend(future.result())
-                pbar.update(1)
+    ] = [task for batch in matched_lists for task in batch]
 
     if not all_peak_tasks:
         logger.warning("No peaks matching {} in {}", formula_column, formula_values)
@@ -651,27 +641,13 @@ def load_peak_timeseries(
         ts["target_isotope_formula"] = isotope_formula
         return ts
 
-    frames: list[pd.DataFrame] = []
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {
-            executor.submit(
-                _fetch_timeseries,
-                task[0],
-                task[1],
-                task[2],
-                task[3],
-                task[4],
-                task[5],
-                task[6],
-            ): task
-            for task in all_peak_tasks
-        }
-        with progress_bar(len(futures), desc="Loading timeseries", unit="peak") as pbar:
-            for future in as_completed(futures):
-                result = future.result()
-                if result is not None:
-                    frames.append(result)
-                pbar.update(1)
+    frames: list[pd.DataFrame] = run_concurrent(
+        _fetch_timeseries,
+        all_peak_tasks,
+        max_workers=max_workers,
+        desc="Loading timeseries",
+        unit="peak",
+    )
 
     if not frames:
         logger.warning("No timeseries data loaded")
