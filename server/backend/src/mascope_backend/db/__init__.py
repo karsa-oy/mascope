@@ -15,20 +15,15 @@ import os
 from typing import AsyncGenerator
 
 from sqlalchemy import event, text
-from sqlalchemy.ext.asyncio import (
-    AsyncSession,
-    async_sessionmaker,
-    create_async_engine,
-)
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from mascope_backend.db import models
-from mascope_backend.db.secrets import postgres_password
 from mascope_backend.db.migration_manager import check_db_migration
 from mascope_backend.db.models import *  # noqa: F403, F401 - re-export models
+from mascope_backend.db.secrets import postgres_password
 from mascope_backend.db.utils import get_current_db_version
 from mascope_backend.db.views import Sample
 from mascope_backend.runtime import runtime
-
 
 # Initialize global variables at module load
 ASYNC_SESSION_MAKER = None  # Global async session maker
@@ -101,7 +96,7 @@ async def configure_database_engine(
     )
 
 
-def async_session() -> AsyncSession | None:
+def async_session() -> AsyncSession:
     """
     Session getter for manual session management.
 
@@ -120,8 +115,12 @@ def async_session() -> AsyncSession | None:
             session.flush()  # Optionally flush without committing
 
     :return: A new SQLAlchemy async session.
-    :rtype: AsyncSession | None
+    :rtype: AsyncSession
     """
+    if ASYNC_SESSION_MAKER is None:
+        raise RuntimeError(
+            "Database engine is not configured. Call configure_database_engine() first."
+        )
     return ASYNC_SESSION_MAKER()
 
 
@@ -149,6 +148,10 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
     :yield: Yields an active SQLAlchemy session for database interactions.
     :rtype: AsyncGenerator[AsyncSession, None]
     """
+    if ASYNC_SESSION_MAKER is None:
+        raise RuntimeError(
+            "Database engine is not configured. Call configure_database_engine() first."
+        )
     async with db_semaphore:
         async with ASYNC_SESSION_MAKER() as session:
             yield session
