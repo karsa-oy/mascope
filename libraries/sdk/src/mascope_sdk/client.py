@@ -15,6 +15,7 @@ from typing import Any
 import pandas as pd
 from dotenv import dotenv_values, find_dotenv
 from loguru import logger
+from tqdm import tqdm
 
 from .exceptions import ConfigurationError
 
@@ -39,9 +40,12 @@ def _configure_logging(env_vars: dict[str, str | None]) -> None:
         logger.remove()
 
     _log_handler_id = logger.add(
-        sys.stderr,
+        lambda msg: tqdm.write(
+            msg, end="", file=sys.stderr
+        ),  # Use tqdm.write for clean logging alongside progress bars
         level=level,
         filter="mascope_sdk",
+        colorize=True,
     )
 
 
