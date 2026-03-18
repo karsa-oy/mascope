@@ -445,7 +445,7 @@ class MascopeClient:
     def load_peaks_by_stage(
         self,
         sample: str,
-        stages: list[tuple[float, ...]],
+        stages: list[tuple[float, float] | tuple[float, float, str]],
         *,
         matches: bool = True,
         areas: bool = True,

@@ -296,7 +296,7 @@ def load_peaks(
 def load_peaks_by_stage(
     client: MascopeClient,
     sample: str,
-    stages: list[tuple[float, ...]],
+    stages: list[tuple[float, float] | tuple[float, float, str]],
     *,
     matches: bool = True,
     areas: bool = True,
@@ -372,6 +372,10 @@ def load_peaks_by_stage(
     # Normalise stages to (t_min, t_max, name | None)
     normalised: list[tuple[float, float, str | None]] = []
     for s in stages:
+        if len(s) not in (2, 3):
+            raise ValueError(
+                "Each stage must be a tuple of (t_min, t_max) or (t_min, t_max, name)"
+            )
         if len(s) == 3:
             normalised.append((s[0], s[1], str(s[2])))
         else:

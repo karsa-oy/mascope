@@ -22,14 +22,14 @@ class WorkspacesResource(BaseResource):
 
         # List all workspaces
         workspaces = mascope.workspaces.list()
-        print(workspaces[["workspace_id", "name"]])
+        print(workspaces[["workspace_id", "workspace_name"]])
     """
 
     def list(self) -> pd.DataFrame | None:
         """List all accessible workspaces.
 
         :return: A DataFrame containing workspace information with columns
-                 including ``workspace_id`` and ``name``, or None if no
+                 including ``workspace_id`` and ``workspace_name``, or None if no
                  workspaces are found.
         :rtype: pd.DataFrame | None
         :raises AuthenticationError: If authentication fails.
@@ -38,7 +38,7 @@ class WorkspacesResource(BaseResource):
         Example::
 
             workspaces = mascope.workspaces.list()
-            print(workspaces[["workspace_id", "name"]])
+            print(workspaces[["workspace_id", "workspace_name"]])
         """
         cache_key = "workspaces"
         if cache_key in self._client._cache:  # pylint: disable=protected-access

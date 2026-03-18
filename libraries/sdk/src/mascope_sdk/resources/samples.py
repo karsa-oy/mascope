@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any
 
 import pandas as pd
@@ -66,7 +67,7 @@ class SamplesResource(BaseResource):
 
     def _resolve_batch_ids(
         self, batches: str, workspace: str | None = None
-    ) -> list[str]:  # type: ignore
+    ) -> Sequence[str]:
         """Resolve a batch substring to one or more batch IDs."""
         all_batches = self._get_all_batches(workspace)
         if all_batches is None or all_batches.empty:
@@ -92,15 +93,7 @@ class SamplesResource(BaseResource):
         *,
         batches: str | None = None,
         workspace: str | None = None,
-        drop_columns: list[str] | None = [  # type: ignore
-            "instrument_function_id",
-            "sample_file_id",
-            "ionization_mode_id",
-            "locked",
-            "sample_item_utc_created",
-            "sample_item_utc_modified",
-            "match",
-        ],
+        drop_columns: Sequence[str] | None = None,
     ) -> pd.DataFrame | None:
         """List samples from one or more batches.
 
@@ -123,6 +116,9 @@ class SamplesResource(BaseResource):
         :return: A DataFrame containing sample information, or None if no
                  samples found. When ``batches`` is used the result includes
                  a ``sample_batch_name`` column.
+        :param drop_columns: Optional list of columns to drop from the final DataFrame.
+            If None, a default set of less relevant columns will be dropped.
+        :type drop_columns: list[str], optional
         :rtype: pd.DataFrame | None
         :raises ValueError: If both or neither of ``batch``/``batches`` are
                             provided, or if ''batch'' matches multiple batches.
@@ -142,6 +138,17 @@ class SamplesResource(BaseResource):
         """
         if (batch is None) == (batches is None):
             raise ValueError("Provide exactly one of 'batch' or 'batches'.")
+
+        if drop_columns is None:
+            drop_columns = [
+                "instrument_function_id",
+                "sample_file_id",
+                "ionization_mode_id",
+                "locked",
+                "sample_item_utc_created",
+                "sample_item_utc_modified",
+                "match",
+            ]
 
         if batch is not None:
             batch_id = self._resolve_batch_id(batch, workspace=workspace)
@@ -515,7 +522,7 @@ class SamplesResource(BaseResource):
 
     def get_spectra(
         self,
-        sample_ids: list[str],  # type: ignore
+        sample_ids: Sequence[str],
         *,
         t_min: float | None = None,
         t_max: float | None = None,
@@ -589,7 +596,7 @@ class SamplesResource(BaseResource):
 
         return pd.concat(frames, ignore_index=True)
 
-    def get_centroids(self, sample_ids: list[str]) -> dict | None:  # type: ignore
+    def get_centroids(self, sample_ids: Sequence[str]) -> dict | None:
         """Get centroid data for multiple samples.
 
         Retrieves per-scan centroid data for the specified samples.

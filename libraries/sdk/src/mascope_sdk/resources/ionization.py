@@ -21,14 +21,14 @@ class IonizationResource(BaseResource):
 
         # List available ionization mechanisms
         mechanisms = mascope.ionization.list()
-        print(mechanisms[["ionization_mechanism_id", "name"]])
+        print(mechanisms[["ionization_mechanism_id", "ionization_mechanism"]])
     """
 
     def list(self) -> pd.DataFrame | None:
         """List all available ionization mechanisms.
 
         :return: A DataFrame containing ionization mechanism information with
-                 columns including ``ionization_mechanism_id`` and ``name``,
+                 columns including ``ionization_mechanism_id`` and ``ionization_mechanism``,
                  or None if no mechanisms are found.
         :rtype: pd.DataFrame | None
         :raises AuthenticationError: If authentication fails.
@@ -38,7 +38,7 @@ class IonizationResource(BaseResource):
 
             mechanisms = mascope.ionization.list()
             protonation = mechanisms[
-                mechanisms["name"].str.contains("protonation", case=False)
+                mechanisms["ionization_mechanism"].str.contains("+H+")
             ]
         """
         cache_key = "ionization_mechanisms"
