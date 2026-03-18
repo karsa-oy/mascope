@@ -8,13 +8,41 @@ This module provides the main client class for interacting with the Mascope API.
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
 from dotenv import dotenv_values, find_dotenv
+from loguru import logger
 
 from .exceptions import ConfigurationError
+
+# Track whether we've already configured the SDK's loguru handler
+_log_handler_id: int | None = None
+
+
+def _configure_logging(env_vars: dict[str, str | None]) -> None:
+    """Configure the SDK's loguru handler (env var > .env > default INFO)."""
+    global _log_handler_id  # pylint: disable=global-statement
+
+    level = (
+        os.environ.get("MASCOPE_SDK_LOG_LEVEL")
+        or env_vars.get("MASCOPE_SDK_LOG_LEVEL")
+        or "INFO"
+    ).upper()
+
+    if _log_handler_id is not None:
+        logger.remove(_log_handler_id)
+    else:
+        # First call: remove loguru's default handler to avoid double logging
+        logger.remove()
+
+    _log_handler_id = logger.add(
+        sys.stderr,
+        level=level,
+        filter="mascope_sdk",
+    )
 
 
 class MascopeClient:
@@ -144,6 +172,9 @@ class MascopeClient:
 
         self._verify_ssl = verify_ssl
         self._service_name = service_name
+
+        # Configure loguru log level (env var > .env > default INFO)
+        _configure_logging(env_vars)
 
         # Metadata cache for workspace/batch/sample listings
         self._cache: dict[str, pd.DataFrame] = {}

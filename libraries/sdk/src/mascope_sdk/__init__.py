@@ -13,11 +13,11 @@ from importlib.metadata import version
 __version__ = version("mascope_sdk")
 
 # Legacy API exports (deprecated, kept for backwards compatibility)
+from ._legacy import SERVICE_NAME  # noqa: F401 pylint: disable=unused-import
+from ._legacy import api_get  # noqa: F401 pylint: disable=unused-import
+from ._legacy import api_post  # noqa: F401 pylint: disable=unused-import
+from ._legacy import api_post_file  # noqa: F401 pylint: disable=unused-import
 from ._legacy import (  # Internal helpers (used by agents); Deprecated public functions
-    SERVICE_NAME,  # noqa: F401 pylint: disable=unused-import
-    api_get,  # noqa: F401 pylint: disable=unused-import
-    api_post,  # noqa: F401 pylint: disable=unused-import
-    api_post_file,  # noqa: F401 pylint: disable=unused-import
     get_cheminfo_by_mz,
     get_ionization_mechanisms,
     get_sample,

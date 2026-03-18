@@ -425,6 +425,26 @@ if ts is not None:
 
 ## For Developers
 
+### Logging
+
+The SDK logs operational info (batch resolution, request counts, etc.) via [loguru](https://github.com/Delgan/loguru). The default level is `INFO`.
+
+Set the `MASCOPE_SDK_LOG_LEVEL` environment variable to change it:
+
+```env
+MASCOPE_SDK_LOG_LEVEL=DEBUG    # verbose (HTTP requests, cache hits, etc.)
+MASCOPE_SDK_LOG_LEVEL=WARNING  # quiet (only warnings and errors)
+```
+
+Or in Python before importing the SDK:
+
+```python
+import os
+os.environ["MASCOPE_SDK_LOG_LEVEL"] = "DEBUG"
+
+from mascope_sdk import MascopeClient
+```
+
 ### Error Handling
 
 ```python
