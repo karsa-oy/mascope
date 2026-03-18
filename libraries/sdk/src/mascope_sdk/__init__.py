@@ -14,10 +14,10 @@ __version__ = version("mascope_sdk")
 
 # Legacy API exports (deprecated, kept for backwards compatibility)
 from ._legacy import (  # Internal helpers (used by agents); Deprecated public functions
-    SERVICE_NAME,
-    api_get,
-    api_post,
-    api_post_file,
+    SERVICE_NAME,  # noqa: F401 pylint: disable=unused-import
+    api_get,  # noqa: F401 pylint: disable=unused-import
+    api_post,  # noqa: F401 pylint: disable=unused-import
+    api_post_file,  # noqa: F401 pylint: disable=unused-import
     get_cheminfo_by_mz,
     get_ionization_mechanisms,
     get_sample,
@@ -57,9 +57,39 @@ from .exceptions import (
     ValidationError,
 )
 
+
+def copy_examples(dest: str = "./mascope_examples") -> None:
+    """Copy the bundled example notebooks to a local directory.
+
+    :param dest: Target directory. Created if it doesn't exist.
+                 Existing files are **not** overwritten.
+    """
+    from importlib.resources import files  # pylint: disable=import-outside-toplevel
+    from pathlib import Path  # pylint: disable=import-outside-toplevel
+
+    src = files("mascope_sdk").joinpath("examples")
+    dest_path = Path(dest)
+    dest_path.mkdir(parents=True, exist_ok=True)
+
+    copied = 0
+    for item in src.iterdir():
+        if item.name.endswith(".ipynb"):
+            target = dest_path / item.name
+            if target.exists():
+                print(f"  skip (exists): {target}")
+                continue
+            with open(target, "wb") as f:
+                f.write(item.read_bytes())
+            copied += 1
+            print(f"  copied: {target}")
+
+    print(f"\n{copied} notebook(s) copied to {dest_path.resolve()}")
+
+
 __all__ = [
     # New API (recommended)
     "MascopeClient",
+    "copy_examples",
     # Exceptions
     "MascopeError",
     "ConfigurationError",
