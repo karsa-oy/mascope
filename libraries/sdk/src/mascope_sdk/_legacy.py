@@ -27,8 +27,13 @@ import json
 import warnings
 
 import requests
+
+# Suppress InsecureRequestWarning from urllib3 (legacy API uses verify=False)
+import urllib3
 from loguru import logger
 from requests.exceptions import HTTPError, RequestException, Timeout
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Default service name to use in request header. Override SERVICE_NAME for specific agents
 SERVICE_NAME = "mascope_sdk"

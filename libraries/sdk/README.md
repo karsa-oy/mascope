@@ -445,6 +445,20 @@ os.environ["MASCOPE_SDK_LOG_LEVEL"] = "DEBUG"
 from mascope_sdk import MascopeClient
 ```
 
+### SSL Verification
+
+By default the SDK verifies SSL certificates. To disable verification (e.g. for local development with a self-signed certificate), set:
+
+```env
+MASCOPE_SDK_VERIFY_SSL=false
+```
+
+Or pass it to the constructor:
+
+```python
+mascope = MascopeClient(verify_ssl=False)
+```
+
 ### Error Handling
 
 ```python

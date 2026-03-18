@@ -105,7 +105,7 @@ class MascopeClient:
         access_token: str | None = None,
         *,
         env_file: Path | str | None = None,
-        verify_ssl: bool = True,
+        verify_ssl: bool | None = None,
         service_name: str = "mascope_sdk",
     ):
         """Initialize the Mascope client.
@@ -170,7 +170,17 @@ class MascopeClient:
                 "or pass access_token parameter to MascopeClient()."
             )
 
-        self._verify_ssl = verify_ssl
+        # Resolve verify_ssl (parameter > env var > .env > default True)
+        if verify_ssl is None:
+            env_val = os.environ.get("MASCOPE_SDK_VERIFY_SSL") or env_vars.get(
+                "MASCOPE_SDK_VERIFY_SSL"
+            )
+            self._verify_ssl = (
+                env_val.lower() not in ("0", "false", "no") if env_val else True
+            )
+        else:
+            self._verify_ssl = verify_ssl
+
         self._service_name = service_name
 
         # Configure loguru log level (env var > .env > default INFO)
