@@ -40,6 +40,7 @@ class TestModule(str, Enum):
     MASCOPE_SDK = "sdk"
     MASCOPE_TOOLS = "tools"
     MASCOPE_FILE = "file"
+    MASCOPE_MATCH = "match"
     ALL = "all"
 
 
@@ -104,6 +105,7 @@ def run(
             TestModule.MASCOPE_SDK,
             TestModule.MASCOPE_TOOLS,
             TestModule.MASCOPE_FILE,
+            TestModule.MASCOPE_MATCH,
         ):
             components = [TestComponent.LIBRARIES]
         else:
@@ -138,6 +140,7 @@ def run_backend_tests(
         TestModule.MASCOPE_SDK,
         TestModule.MASCOPE_TOOLS,
         TestModule.MASCOPE_FILE,
+        TestModule.MASCOPE_MATCH,
     ):
         typer.echo("Module belongs to libraries; running library tests instead.")
         return run_library_tests(module, test_name, verbose)
@@ -212,6 +215,8 @@ def run_library_tests(
             test_path = f"{test_path}tools/"
         elif module == TestModule.MASCOPE_FILE:
             test_path = f"{test_path}file/"
+        elif module == TestModule.MASCOPE_MATCH:
+            test_path = f"{test_path}match/"
         else:
             typer.echo(
                 "Warning: Library tests are not separated into unit/integration/system modules. "
@@ -279,6 +284,7 @@ def show():
     sdk_tests_dir = os.path.join(libraries_root_dir, "sdk", "tests")
     tools_tests_dir = os.path.join(libraries_root_dir, "tools", "tests")
     file_tests_dir = os.path.join(libraries_root_dir, "file", "tests")
+    match_tests_dir = os.path.join(libraries_root_dir, "match", "tests")
 
     # ----- Backend tests -----
     if os.path.exists(backend_tests_dir):
@@ -382,6 +388,7 @@ def show():
     _show_library_section("libraries/sdk/tests", sdk_tests_dir)
     _show_library_section("libraries/tools/tests", tools_tests_dir)
     _show_library_section("libraries/file/tests", file_tests_dir)
+    _show_library_section("libraries/match/tests", match_tests_dir)
 
     typer.echo("\nUsage examples:")
     typer.echo("  mascope test show                      # Show available tests")
@@ -390,4 +397,5 @@ def show():
     typer.echo("  mascope test run libraries -m sdk      # Run SDK library tests")
     typer.echo("  mascope test run libraries -m tools    # Run Tools library tests")
     typer.echo("  mascope test run libraries -m file     # Run File library tests")
+    typer.echo("  mascope test run libraries -m match    # Run Match library tests")
     typer.echo("  mascope test run -n workspace_model    # Run specific test by name")
