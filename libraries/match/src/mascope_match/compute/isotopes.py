@@ -356,17 +356,17 @@ def calculate_match_stats(
     """
 
     # --- Collect abundance and intensity reference values ---
-    ## Find the rows with maximum relative_abundance per target ion; "main isotopes"
+    # Find the rows with maximum relative_abundance per target ion; "main isotopes"
     idx_max_abundance = (
         match_isotope_df.groupby("target_ion_id")["relative_abundance"].idxmax().values
     )
-    ## Get the sample_peak_intensity values for the main isotopes
+    # Get the sample_peak_intensity values for the main isotopes
     main_isotope_df = match_isotope_df.loc[
         idx_max_abundance,
         ["target_ion_id", "sample_peak_intensity", "relative_abundance"],
     ].reset_index(drop=True)
 
-    ## If existing reference data is provided, use it to override main isotope references
+    # If existing reference data is provided, use it to override main isotope references
     ## for ions that have prior computed matches (e.g., when adding additional isotopes)
     if existing_reference_df is not None and not existing_reference_df.empty:
         # Get ion IDs that have existing references
@@ -387,7 +387,7 @@ def calculate_match_stats(
             f"for abundance error calculation"
         )
 
-    ## Join the main isotopes with the full match_isotope_df to get the reference values
+    # Join the main isotopes with the full match_isotope_df to get the reference values
     abundance_reference_df = pd.merge(
         match_isotope_df,
         main_isotope_df.rename(
@@ -401,10 +401,14 @@ def calculate_match_stats(
     )
     # --- Compute match abundance error ---
     # Compute relative peak intensities -> [0, 1]
+    sample_peak_intensity_relative = match_isotope_df["sample_peak_intensity"].div(
+        abundance_reference_df["sample_peak_intensity_reference"]
+    )
     match_isotope_df.loc[:, "sample_peak_intensity_relative"] = (
-        match_isotope_df["sample_peak_intensity"]
-        / abundance_reference_df["sample_peak_intensity_reference"]
-    ).fillna(0.0)
+        sample_peak_intensity_relative.where(
+            np.isfinite(sample_peak_intensity_relative), 0.0
+        )
+    )
     # Normalize relative abundances by the main isotope's relative abundance -> [0, 1]
     match_isotope_df.loc[:, "relative_abundance_norm"] = (
         match_isotope_df["relative_abundance"]
