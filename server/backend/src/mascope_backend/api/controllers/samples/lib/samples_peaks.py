@@ -55,7 +55,7 @@ def _load_and_filter(
     polarity_mask = np.where(data.polarity.values == polarity)[0]
     data = data.isel(mz=polarity_mask)
 
-    if mz_min is not None and mz_max is not None:
+    if mz_min is not None or mz_max is not None:
         data = data.sel(mz=slice(mz_min, mz_max))
 
     return data

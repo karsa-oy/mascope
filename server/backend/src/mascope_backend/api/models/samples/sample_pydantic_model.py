@@ -126,10 +126,6 @@ class GetSamplePeaksQueryParams(CommonValidators, QueryParamsModel):
         mz_min = getattr(self, "mz_min", None)
         mz_max = getattr(self, "mz_max", None)
 
-        # Both must be provided together for m/z filtering
-        if (mz_min is None) != (mz_max is None):  # XOR - exactly one is None
-            raise ValueError("Both mz_min and mz_max must be provided together")
-
         if mz_min is not None and mz_max is not None and mz_max <= mz_min:
             raise ValueError("mz_max must be greater than mz_min")
 
