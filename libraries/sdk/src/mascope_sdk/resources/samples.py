@@ -85,7 +85,7 @@ class SamplesResource(BaseResource):
             )
         return matches["sample_batch_id"].tolist()
 
-    def list(  # pylint: disable=dangerous-default-value
+    def list(
         self,
         batch: str | None = None,
         *,
