@@ -96,6 +96,8 @@ class BatchesResource(BaseResource):
                  - ``compounds``: Data for compounds (match + target data combined)
                  - ``ions``: Data for ions (match + target data combined)
                  - ``isotopes``: Data for isotopes (match + target data combined)
+
+                 Or an empty dictionary if no data is found.
         :rtype: dict[str, Any]
         :raises AuthenticationError: If authentication fails.
         :raises NotFoundError: If the batch is not found.

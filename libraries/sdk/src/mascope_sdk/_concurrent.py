@@ -45,7 +45,7 @@ def run_concurrent(
         return []
 
     results: list[T] = []
-    futures: dict[Future[T], tuple[Any, ...]] = {}
+    futures: dict[Future[T | None], tuple[Any, ...]] = {}
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         for args in tasks:
             futures[executor.submit(func, *args)] = args

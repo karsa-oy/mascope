@@ -153,7 +153,7 @@ class SamplesResource(BaseResource):
             return self._list_by_id(batch_id)
 
         # batches (plural) - collect samples from all matching batches
-        assert batches is not None  # guaranteed by the check above
+        assert batches is not None  # for type checker
         batch_ids = self._resolve_batch_ids(batches, workspace=workspace)
         all_batches_df = self._get_all_batches(workspace)
 
@@ -186,7 +186,7 @@ class SamplesResource(BaseResource):
 
         df = pd.concat(frames, ignore_index=True)
         if drop_columns is not None:
-            df = df.drop(columns=drop_columns)
+            df = df.drop(columns=drop_columns, errors="ignore")
         return df
 
     def _list_by_id(self, batch_id: str) -> pd.DataFrame | None:
