@@ -92,9 +92,9 @@ def _collect_sample_tasks(
     """Resolve workspace/batches and collect (sample_row, batch_name) pairs.
 
     :param client: The MascopeClient instance.
-    :param workspace: Workspace name (or substring) or workspace ID.
-    :param batches: Optional substring filter on batch names.
-    :param samples: Optional substring filter on sample names.
+    :param workspace: Workspace name, substring, or regex pattern (or ID).
+    :param batches: Optional filter on batch names (case-insensitive substring or regex).
+    :param samples: Optional filter on sample names (case-insensitive substring or regex).
     :return: Tuple of (sample_tasks, workspace_id).
     :raises ValueError: If workspace or batches cannot be resolved.
     """

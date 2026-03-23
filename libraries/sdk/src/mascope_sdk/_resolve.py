@@ -13,9 +13,13 @@ def resolve_id(
     """Resolve a name or substring to a unique ID.
 
     Checks for an exact ID match first, then falls back to case-insensitive
-    substring matching on the name column. Raises if zero or multiple matches.
+    matching on the name column. The match uses ``pandas.Series.str.contains``,
+    so *value* can be a plain substring **or** a regular expression
+    (e.g. ``"2026-01|2026-02"``).
 
-    :param value: The name (or substring) or ID to resolve.
+    Raises if zero or multiple matches.
+
+    :param value: The name, substring, or regex pattern to resolve (or an exact ID).
     :type value: str
     :param items: DataFrame of available items to match against.
     :type items: pd.DataFrame | None

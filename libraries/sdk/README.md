@@ -148,7 +148,7 @@ The `MascopeClient` can be configured in three ways (in override priority order)
    Set environment variables:
 
    ```bash
-   export MASCOPE_URL=https://mascope.example.app
+   export MASCOPE_URL=https://example.mascope.app
    export MASCOPE_ACCESS_TOKEN=your-token
    ```
 
@@ -276,6 +276,9 @@ mascope = MascopeClient()
 ### Resources
 
 All `list()` methods accept names (or substrings) instead of IDs and return `pd.DataFrame | None`.
+Name filters use `pandas.Series.str.contains` under the hood, so they accept
+plain substrings **or** regular expressions (case-insensitive). For example,
+`batches="2025|2026"` matches batch names containing "2025" or "2026".
 
 #### `mascope.workspaces`
 
@@ -519,6 +522,6 @@ mascope_sdk/
 
 - **`client.py`** owns the public API. High-level loaders (`load_peaks`, etc.) are thin wrappers that delegate to `_loaders.py`.
 - **`resources/`** contains one class per API domain. Each resource inherits `BaseResource` which provides `_get()` / `_post()` helpers and automatic datetime column coercion.
-- **`_concurrent.py`** centralises `ThreadPoolExecutor` usage with `run_concurrent()`, which handles progress bars (tqdm), `None`-filtering, future cancellation on error, and the `max_workers ≤ 8` guard.
-- **`_resolve.py`** handles name → ID resolution with substring matching (used by resources and loaders).
-- **Underscore-prefixed modules** (`_http`, `_loaders`, `_concurrent`, `_resolve`, `_legacy`) are internal — not part of the public API.
+- **`_concurrent.py`** centralises `ThreadPoolExecutor` usage with `run_concurrent()`, which handles progress bars (tqdm), `None`-filtering, future cancellation on error, and the `max_workers <= 8` guard.
+- **`_resolve.py`** handles name -> ID resolution with substring/regex matching (used by resources and loaders).
+- **Underscore-prefixed modules** (`_http`, `_loaders`, `_concurrent`, `_resolve`, `_legacy`) are internal - not part of the public API.

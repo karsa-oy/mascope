@@ -289,12 +289,14 @@ class MascopeClient:
         Requests are made concurrently for better performance. A progress bar is
         displayed during loading.
 
-        :param workspace: Workspace name (or substring) or workspace ID.
+        :param workspace: Workspace name, substring, or regex pattern (or ID).
         :type workspace: str
-        :param batches: Optional substring filter on batch names (case-insensitive).
+        :param batches: Optional filter on batch names (case-insensitive). Accepts
+                        a plain substring or a regex pattern (e.g. ``"2026-01|2026-02"``).
                         If not provided, all batches in the workspace are loaded.
         :type batches: str, optional
-        :param samples: Optional substring filter on sample names (case-insensitive).
+        :param samples: Optional filter on sample names (case-insensitive). Accepts
+                        a plain substring or a regex pattern.
         :type samples: str, optional
         :param matches: Include matched compounds/ions/isotopes. Defaults to True.
         :type matches: bool
@@ -333,10 +335,10 @@ class MascopeClient:
                 batches="Uronium",
             )
 
-            # Filter to specific samples
+            # Filter samples by regex
             peaks = mascope.load_peaks(
                 workspace="My Workspace",
-                samples="blank",
+                samples="blank|control",
             )
 
             # Load all peaks, skip confirmation
@@ -386,11 +388,13 @@ class MascopeClient:
         Requests are made concurrently for better performance. Two progress bars
         are displayed: one for peak discovery and one for timeseries loading.
 
-        :param workspace: Workspace name (or substring) or workspace ID.
+        :param workspace: Workspace name, substring, or regex pattern (or ID).
         :type workspace: str
-        :param batches: Optional substring filter on batch names (case-insensitive).
+        :param batches: Optional filter on batch names (case-insensitive). Accepts
+                        a plain substring or a regex pattern.
         :type batches: str, optional
-        :param samples: Optional substring filter on sample names (case-insensitive).
+        :param samples: Optional filter on sample names (case-insensitive). Accepts
+                        a plain substring or a regex pattern.
         :type samples: str, optional
         :param compound: Target compound name(s) or formula(s).
         :type compound: str | list[str], optional

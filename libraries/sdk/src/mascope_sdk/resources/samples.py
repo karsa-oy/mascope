@@ -97,16 +97,19 @@ class SamplesResource(BaseResource):
 
         Provide exactly one of ``batch`` or ``batches``:
 
-        - ``batch`` resolves to a single batch (raises if the substring
+        - ``batch`` resolves to a single batch (raises if the pattern
           matches more than one).
-        - ``batches`` resolves to all batches whose name contains the
-          given substring.
+        - ``batches`` resolves to all batches whose name matches the
+          given pattern.
 
-        :param batch: Batch name (or substring) or batch ID. Must match
-                      exactly one batch.
+        Both accept a plain substring **or** a regular expression
+        (e.g. ``"2026-01|2026-02"``). Matching is case-insensitive.
+
+        :param batch: Batch name, substring, or regex pattern (or batch ID).
+                      Must match exactly one batch.
         :type batch: str, optional
-        :param batches: Batch name substring. Returns samples from every
-                        matching batch.
+        :param batches: Batch name substring or regex pattern. Returns samples
+                        from every matching batch.
         :type batches: str, optional
         :param workspace: Optional workspace name or ID to narrow the search.
                           If not provided, searches across all workspaces.
