@@ -1,7 +1,5 @@
 """Name-to-ID resolution utilities for the Mascope SDK."""
 
-from __future__ import annotations
-
 import pandas as pd
 
 

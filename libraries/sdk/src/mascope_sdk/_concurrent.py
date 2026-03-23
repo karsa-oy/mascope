@@ -1,7 +1,5 @@
 """Shared progress bar and concurrent execution helpers."""
 
-from __future__ import annotations
-
 import sys
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from typing import Any, Callable, TypeVar

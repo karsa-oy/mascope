@@ -1,7 +1,5 @@
 """Base resource class for Mascope SDK resources."""
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING, Any
 
 import pandas as pd

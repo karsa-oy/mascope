@@ -1,7 +1,5 @@
 """Workspaces resource for the Mascope SDK."""
 
-from __future__ import annotations
-
 import pandas as pd
 from loguru import logger
 

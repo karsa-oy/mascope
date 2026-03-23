@@ -2,17 +2,13 @@
 
 # pylint: disable=import-outside-toplevel
 
-from __future__ import annotations
-
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import pandas as pd
 from loguru import logger
 
 from ._concurrent import run_concurrent
-
-if TYPE_CHECKING:
-    from .client import MascopeClient
+from .client import MascopeClient
 
 
 def _resolve_sample(client: MascopeClient, sample: str) -> str:

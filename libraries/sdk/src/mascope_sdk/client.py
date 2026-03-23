@@ -5,8 +5,6 @@ This module provides the main client class for interacting with the Mascope API.
 
 # pylint: disable=import-outside-toplevel
 
-from __future__ import annotations
-
 import os
 import sys
 from pathlib import Path

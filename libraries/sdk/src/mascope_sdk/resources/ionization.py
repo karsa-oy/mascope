@@ -1,7 +1,5 @@
 """Ionization mechanisms resource for the Mascope SDK."""
 
-from __future__ import annotations
-
 import pandas as pd
 
 from ._base import BaseResource, _coerce_datetime_columns

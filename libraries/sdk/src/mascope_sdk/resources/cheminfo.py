@@ -1,7 +1,5 @@
 """Chemical information resource for the Mascope SDK."""
 
-from __future__ import annotations
-
 from ._base import BaseResource
 
 
