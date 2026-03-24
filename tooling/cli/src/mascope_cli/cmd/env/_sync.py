@@ -4,7 +4,8 @@ Internal implementation for `mascope env sync`.
 Handles filestore sync via rsync and database sync via pg_dump/pg_restore
 across local and remote machines. Not a Typer module — contains no commands.
 
-Callers (`env.py`) are responsible for argument parsing and orchestration.
+Callers (`main.py`) are responsible for argument parsing, orchestration,
+and opening the SSH ControlMaster connection before calling these functions.
 
 Transfer flow for database sync:
 - local → local:  pg_dump source container → transfer/ → pg_restore target container
@@ -41,46 +42,31 @@ from mascope_cli.cmd.env._paths import (
     get_remote_mascope_path,
     parse_address,
 )
+from mascope_cli.cmd.env._ssh import cygwin_bin, get_identity_args
 from mascope_cli.pg.admin import create_database as admin_create_database
 from mascope_cli.runtime import runtime
 
 
-# --- Platform helpers ---
-
-
-def _cygwin_bin(name: str) -> str:
-    """
-    Resolve a binary path, using the Cygwin installation on Windows.
-
-    On Linux/macOS returns `name` unchanged. On Windows returns the Cygwin
-    path `C://cygwin64//bin//{name}.exe` and raises if not found.
-
-    :param name: Binary name (e.g. `"scp"`, `"rsync"`, `"ssh"`).
-    :type name: str
-    :return: Resolved binary path.
-    :rtype: str
-    :raises RuntimeError: On Windows if the Cygwin binary is not found.
-    """
-    if os.name != "nt":
-        return name
-    path = rf"C://cygwin64//bin//{name}.exe"
-    if not os.path.exists(path):
-        raise RuntimeError(
-            f"Cygwin {name} not found at {path}. Please install Cygwin with {name}."
-        )
-    return path
-
-
-def _scp(args: list[str]) -> subprocess.CompletedProcess:
+def _scp(
+    args: list[str],
+    control_args: list[str] | None = None,
+) -> subprocess.CompletedProcess:
     """
     Run an scp command, using Cygwin scp on Windows.
 
-    :param args: scp arguments passed after the binary (source, destination, flags).
+    :param args: scp arguments (source, destination, flags).
     :type args: list[str]
+    :param control_args: SSH multiplexing flags from `SshMux` to reuse an
+                         existing ControlMaster connection. Pass `[]` or
+                         `None` for a standalone connection.
+    :type control_args: list[str] | None
     :return: Completed process result.
     :rtype: subprocess.CompletedProcess
     """
-    return subprocess.run([_cygwin_bin("scp")] + args, check=False)
+    return subprocess.run(
+        [cygwin_bin("scp")] + get_identity_args() + (control_args or []) + args,
+        check=False,
+    )
 
 
 # --- Filestore sync ---
@@ -101,28 +87,39 @@ def _to_cygwin_path(path: str) -> str:
     return cygwin
 
 
-def _resolve_rsync_path(remote: str | None, env_name: str) -> str:
+def _resolve_rsync_path(
+    remote: str | None,
+    env_name: str,
+    control_args: list[str] | None = None,
+) -> str:
     """
     Resolve a sync address to an rsync-compatible path.
 
-    For remote addresses, queries `MASCOPE_PATH` via `mascope path` over SSH
-    to construct the full env path without hard-coding it locally.
-    See `get_remote_mascope_path` for resolution details.
+    For remote addresses, queries `MASCOPE_PATH` via `mascope path` over
+    SSH to construct the full env path without hard-coding it locally.
 
     :param remote: Remote identifier (`USER@HOST`) or `None` for local.
     :type remote: str | None
     :param env_name: Name of the runtime environment.
     :type env_name: str
+    :param control_args: SSH multiplexing flags from `SshMux` to reuse an
+                         existing ControlMaster connection. Pass `[]` or
+                         `None` for a standalone connection.
+    :type control_args: list[str] | None
     :return: rsync-compatible path string with trailing slash.
     :rtype: str
     """
     if remote is not None:
-        mascope_path = get_remote_mascope_path(remote)
+        mascope_path = get_remote_mascope_path(remote, control_args)
         return f"{remote}:{mascope_path}/.runtime/env/{env_name}/"
     return runtime.path(".runtime", "env", f"{env_name}/")
 
 
-def sync_filestore(source: str, target: str) -> None:
+def sync_filestore(
+    source: str,
+    target: str,
+    control_args: list[str] | None = None,
+) -> None:
     """
     Sync the filestore from source to target using rsync.
 
@@ -133,33 +130,36 @@ def sync_filestore(source: str, target: str) -> None:
     :type source: str
     :param target: Target address (`ENV` or `USER@HOST:ENV`).
     :type target: str
+    :param control_args: SSH multiplexing flags from `SshMux` passed to
+                         rsync via its `-e` SSH transport. When provided,
+                         rsync reuses the existing ControlMaster connection —
+                         no additional password prompt. Pass `[]` or
+                         `None` for a standalone connection.
+    :type control_args: list[str] | None
+    :raises RuntimeError: If rsync exits non-zero.
     """
     source_remote, source_env = parse_address(source)
     target_remote, target_env = parse_address(target)
 
-    src = _resolve_rsync_path(source_remote, source_env)
-    dest = _resolve_rsync_path(target_remote, target_env)
+    src = _resolve_rsync_path(source_remote, source_env, control_args)
+    dest = _resolve_rsync_path(target_remote, target_env, control_args)
 
     on_windows = os.name == "nt"
+    ssh_bin = cygwin_bin("ssh") if on_windows else "ssh"
+    rsync_bin = cygwin_bin("rsync") if on_windows else "rsync"
+
     if on_windows:
-        rsync = _cygwin_bin("rsync")
-        ssh = _cygwin_bin("ssh")
         src = _to_cygwin_path(src)
         dest = _to_cygwin_path(dest)
-    else:
-        rsync = "rsync"
-        ssh = "ssh"
 
-    flags = " ".join(
-        [
-            "--progress",
-            "--recursive",
-            "--copy-links",
-            "--keep-dirlinks",
-        ]
-    )
+    identity_opts = " ".join(get_identity_args())
+    mux_opts = " ".join(control_args) if control_args else ""
+    keepalive_opts = "-o ServerAliveInterval=30 -o ServerAliveCountMax=6"
+    ssh_cmd = f"{ssh_bin} {identity_opts} {keepalive_opts} {mux_opts}".strip()
 
-    cmd = f"{rsync} {flags} -e {ssh} {src} {dest}"
+    flags = "--progress --recursive --copy-links --keep-dirlinks --partial --timeout=60"
+    cmd = f"{rsync_bin} {flags} -e '{ssh_cmd}' {src} {dest}"
+
     runtime.logger.info(f"Syncing filestore: {src} → {dest}")
     runtime.logger.info(cmd)
     result = lib.run(cmd)
@@ -170,26 +170,36 @@ def sync_filestore(source: str, target: str) -> None:
 # --- Remote SSH helpers ---
 
 
-def _ssh_run(remote: str, cmd: str) -> None:
+def _ssh_run(
+    remote: str,
+    cmd: str,
+    control_args: list[str] | None = None,
+) -> None:
     """
     Execute a command on a remote machine via SSH using a login shell.
 
-    Uses `bash -l -c` so `~/.bashrc` is sourced and `mascope` is available
-    on PATH (installed to `~/.local/bin` by `uv tool update-shell`).
+    Uses `bash -l -c` so `~/.bashrc` is sourced and `mascope` is
+    available on PATH.
 
-    The command string is single-quoted in the SSH invocation to prevent
-    the local shell (including PowerShell on Windows) from splitting or
-    mangling arguments before they reach the remote bash process.
+    The command string is single-quoted to prevent PowerShell on Windows
+    from splitting multi-word arguments before they reach remote bash.
 
     :param remote: Remote identifier in `USER@HOST` format.
     :type remote: str
     :param cmd: Shell command to execute on the remote.
     :type cmd: str
+    :param control_args: SSH multiplexing flags from `SshMux` to reuse an
+                         existing ControlMaster connection. Pass `[]` or
+                         `None` for a standalone connection.
+    :type control_args: list[str] | None
     :raises RuntimeError: If the SSH command exits non-zero.
     """
-    runtime.logger.debug(f"SSH {remote}: bash -l -c '{cmd}'")
+    runtime.logger.info(f"SSH {remote}: bash -l -c '{cmd}'")
     result = subprocess.run(
-        ["ssh", remote, "bash", "-l", "-c", f"'{cmd}'"],
+        [cygwin_bin("ssh")]
+        + get_identity_args()
+        + (control_args or [])
+        + [remote, "bash", "-l", "-c", f"'{cmd}'"],
         check=False,
     )
     if result.returncode != 0:
@@ -198,24 +208,26 @@ def _ssh_run(remote: str, cmd: str) -> None:
         )
 
 
-def _remote_transfer_dir(remote: str) -> str:
+def _remote_transfer_dir(
+    remote: str,
+    control_args: list[str] | None = None,
+) -> str:
     """
     Return the transfer directory path on a remote machine.
 
-    Delegates to `DatabaseConfig.get_transfer_dir()` with the remote
-    `MASCOPE_PATH` so the path structure stays consistent with the local
-    config — single source of truth for the transfer directory layout.
-
-    The result is cast through `PurePosixPath` to guarantee forward slashes
-    regardless of the local OS — the path is used in SSH/scp commands
-    targeting a Linux remote, so Windows backslashes would break it.
+    Uses `PurePosixPath` to guarantee forward slashes regardless of local
+    OS — the path targets a Linux remote via SSH/scp.
 
     :param remote: Remote identifier in `USER@HOST` format.
     :type remote: str
+    :param control_args: SSH multiplexing flags from `SshMux` to reuse an
+                         existing ControlMaster connection. Pass `[]` or
+                         `None` for a standalone connection.
+    :type control_args: list[str] | None
     :return: Absolute POSIX path string on the remote machine.
     :rtype: str
     """
-    mascope_path = get_remote_mascope_path(remote)
+    mascope_path = get_remote_mascope_path(remote, control_args)
     path = runtime.full_config.backend.database.get_transfer_dir(
         mascope_path=mascope_path
     )
@@ -239,9 +251,9 @@ def _dump_local(mode: str, env_name: str) -> Path:
     """
     Create a transfer dump from a local PostgreSQL container.
 
-    Writes the dump to the local transfer directory, which must be
-    bind-mounted as `/transfer` in the container. Uses label `"sync"`
-    so the filename is identifiable in logs and directory listings.
+    Writes the dump to the local transfer directory (bind-mounted as
+    `/transfer` in the container). Uses label `"sync"` so the filename
+    is identifiable in logs and directory listings.
 
     :param mode: Mode of the local container to dump from (`"dev"` or `"prod"`).
     :type mode: str
@@ -249,7 +261,7 @@ def _dump_local(mode: str, env_name: str) -> Path:
     :type env_name: str
     :return: Host path to the created `.dump` file.
     :rtype: Path
-    :raises RuntimeError: If the server or database is not ready, or if dump fails.
+    :raises RuntimeError: If the server or database is not ready, or dump fails.
     """
     if not is_server_ready(mode):
         raise RuntimeError(
@@ -312,13 +324,17 @@ def _restore_local(mode: str, env_name: str, dump_file: Path) -> None:
 # --- Database sync — remote operations ---
 
 
-def _dump_remote(remote: str, mode: str, env_name: str) -> None:
+def _dump_remote(
+    remote: str,
+    mode: str,
+    env_name: str,
+    control_args: list[str] | None = None,
+) -> None:
     """
     Trigger a transfer dump on a remote machine via SSH.
 
-    Calls `mascope {mode} db backup create --env ENV --transfer` on
-    the remote, writing the dump into the remote transfer directory.
-    The `--label sync` flag is passed so the file is identifiable in logs.
+    Calls `mascope {mode} db backup create --env ENV --transfer --label sync`
+    on the remote, writing the dump into the remote transfer directory.
 
     :param remote: Remote identifier in `USER@HOST` format.
     :type remote: str
@@ -326,14 +342,23 @@ def _dump_remote(remote: str, mode: str, env_name: str) -> None:
     :type mode: str
     :param env_name: Environment name to dump on the remote.
     :type env_name: str
+    :param control_args: SSH multiplexing flags from `SshMux` to reuse an
+                         existing ControlMaster connection. Pass `[]` or
+                         `None` for a standalone connection.
+    :type control_args: list[str] | None
     :raises RuntimeError: If the SSH command fails.
     """
     cmd = f"mascope {mode} db backup create --env {env_name} --transfer --label sync"
     runtime.logger.info(f"Triggering remote dump on {remote}: {cmd}")
-    _ssh_run(remote, cmd)
+    _ssh_run(remote, cmd, control_args)
 
 
-def _restore_remote(remote: str, mode: str, env_name: str) -> None:
+def _restore_remote(
+    remote: str,
+    mode: str,
+    env_name: str,
+    control_args: list[str] | None = None,
+) -> None:
     """
     Trigger a transfer restore on a remote machine via SSH.
 
@@ -346,44 +371,54 @@ def _restore_remote(remote: str, mode: str, env_name: str) -> None:
     :type mode: str
     :param env_name: Environment name to restore into on the remote.
     :type env_name: str
+    :param control_args: SSH multiplexing flags from `SshMux` to reuse an
+                         existing ControlMaster connection. Pass `[]` or
+                         `None` for a standalone connection.
+    :type control_args: list[str] | None
     :raises RuntimeError: If the SSH command fails.
     """
     cmd = f"mascope {mode} db restore --env {env_name} --transfer --yes"
     runtime.logger.info(f"Triggering remote restore on {remote}: {cmd}")
-    _ssh_run(remote, cmd)
+    _ssh_run(remote, cmd, control_args)
 
 
-def _scp_pull(remote: str, db_name: str) -> Path:
+def _scp_pull(
+    remote: str,
+    db_name: str,
+    control_args: list[str] | None = None,
+) -> Path:
     """
     Pull the latest transfer dump for `db_name` from a remote machine.
 
     Lists the remote transfer directory via SSH, finds the newest matching
     file, and copies it to the local transfer directory via scp.
 
-    The `ls` command is single-quoted to prevent PowerShell on Windows from
-    splitting the glob pattern before SSH passes it to the remote bash process.
-    On Windows, the local destination path is converted to a Cygwin
-    `/cygdrive/` path — Cygwin scp interprets `C:\...` as `HOST:PATH`.
-
     :param remote: Remote identifier in `USER@HOST` format.
     :type remote: str
     :param db_name: Database name prefix used to filter files
                     (e.g. `mascope_tof1`).
     :type db_name: str
+    :param control_args: SSH multiplexing flags from `SshMux` to reuse an
+                         existing ControlMaster connection. Pass `[]` or
+                         `None` for a standalone connection.
+    :type control_args: list[str] | None
     :return: Local host path to the downloaded `.dump` file.
     :rtype: Path
     :raises RuntimeError: If no matching file is found on the remote or scp fails.
     """
-    remote_dir = _remote_transfer_dir(remote)
+    remote_dir = _remote_transfer_dir(remote, control_args)
     ls_cmd = f"ls -t {remote_dir}/{db_name}_*.dump 2>/dev/null | head -1"
 
     result = subprocess.run(
-        ["ssh", remote, "bash", "-l", "-c", f"'{ls_cmd}'"],
+        [cygwin_bin("ssh")]
+        + get_identity_args()
+        + (control_args or [])
+        + [remote, "bash", "-l", "-c", f"'{ls_cmd}'"],
         capture_output=True,
         text=True,
         check=False,
     )
-    runtime.logger.debug(
+    runtime.logger.info(
         f"_scp_pull ls on {remote}: returncode={result.returncode} "
         f"stdout={result.stdout!r} stderr={result.stderr!r}"
     )
@@ -398,44 +433,49 @@ def _scp_pull(remote: str, db_name: str) -> Path:
     local_dir.mkdir(parents=True, exist_ok=True)
     local_file = local_dir / filename
 
-    # Cygwin scp interprets Windows paths (C:\...) as HOST:PATH — must use
-    # Cygwin /cygdrive/ paths for local arguments on Windows.
     local_file_arg = (
         _to_cygwin_path(str(local_file)) if os.name == "nt" else str(local_file)
     )
 
     runtime.logger.info(f"Pulling {remote}:{remote_file} → {local_file}")
-    result = _scp([f"{remote}:{remote_file}", local_file_arg])
+    result = _scp([f"{remote}:{remote_file}", local_file_arg], control_args)
     if result.returncode != 0:
         raise RuntimeError(f"scp failed pulling '{remote_file}' from {remote}")
     return local_file
 
 
-def _scp_push(remote: str, dump_file: Path) -> None:
+def _scp_push(
+    remote: str,
+    dump_file: Path,
+    control_args: list[str] | None = None,
+) -> None:
     """
     Push a local transfer dump to the remote machine's transfer directory.
 
     Creates the remote transfer directory if it does not exist, then copies
-    the file via scp. On Windows, the local source path is converted to a
-    Cygwin `/cygdrive/` path — Cygwin scp interprets `C:\...` as `HOST:PATH`.
+    the file via scp.
 
     :param remote: Remote identifier in `USER@HOST` format.
     :type remote: str
     :param dump_file: Local host path to the `.dump` file to push.
     :type dump_file: Path
+    :param control_args: SSH multiplexing flags from `SshMux` to reuse an
+                         existing ControlMaster connection. Pass `[]` or
+                         `None` for a standalone connection.
+    :type control_args: list[str] | None
     :raises RuntimeError: If scp fails.
     """
-    remote_dir = _remote_transfer_dir(remote)
-    _ssh_run(remote, f"mkdir -p {remote_dir}")
+    remote_dir = _remote_transfer_dir(remote, control_args)
+    _ssh_run(remote, f"mkdir -p {remote_dir}", control_args)
 
-    # Cygwin scp interprets Windows paths (C:\...) as HOST:PATH — must use
-    # Cygwin /cygdrive/ paths for local arguments on Windows.
     dump_file_arg = (
         _to_cygwin_path(str(dump_file)) if os.name == "nt" else str(dump_file)
     )
 
     runtime.logger.info(f"Pushing {dump_file.name} → {remote}:{remote_dir}/")
-    result = _scp([dump_file_arg, f"{remote}:{remote_dir}/{dump_file.name}"])
+    result = _scp(
+        [dump_file_arg, f"{remote}:{remote_dir}/{dump_file.name}"], control_args
+    )
     if result.returncode != 0:
         raise RuntimeError(f"scp failed pushing '{dump_file.name}' to {remote}")
 
@@ -458,8 +498,8 @@ def _cleanup_transfer(dump_file: Path, db_name: str, retention_days: int = 7) ->
     :param db_name: Database name prefix used to filter files for pruning
                     (e.g. `mascope_tof1`).
     :type db_name: str
-    :param retention_days: Also delete any other dumps for `db_name` older
-                           than this many days. Default: 7.
+    :param retention_days: Delete dumps for `db_name` older than this many
+                           days. Default: 7.
     :type retention_days: int
     """
     if dump_file.exists():
@@ -480,6 +520,7 @@ def sync_db(
     source_mode: str,
     target: str,
     target_mode: str,
+    control_args: list[str] | None = None,
 ) -> None:
     """
     Sync a PostgreSQL database from source to target.
@@ -491,6 +532,12 @@ def sync_db(
     - local → remote: dump from local container → transfer/ → scp to remote → SSH restore
 
     Remote → remote is not supported — run the command from one of the machines.
+
+    `control_args` should come from the `SshMux` context opened in
+    `main.py` before any remote operations begin. Passing them here
+    ensures all SSH/scp calls in the sync reuse the same authenticated
+    session — no additional prompts. For local → local sync, no SSH is
+    involved and `control_args` is unused.
 
     On successful restore, the transfer dump is deleted and 7-day retention
     pruning runs for the same database. On failure, the dump is preserved for
@@ -504,6 +551,11 @@ def sync_db(
     :type target: str
     :param target_mode: Mode on the target machine (`"dev"` or `"prod"`).
     :type target_mode: str
+    :param control_args: SSH multiplexing flags from the outer `SshMux`
+                         context in `main.py`. Pass `[]` or `None` if
+                         calling standalone (e.g. in tests) — each SSH
+                         call will open its own connection in that case.
+    :type control_args: list[str] | None
     :raises ValueError: If both source and target are remote (unsupported topology).
     :raises RuntimeError: If any step of the sync fails.
     """
@@ -524,29 +576,29 @@ def sync_db(
     )
 
     if source_remote is None and target_remote is None:
-        # local → local
+        # local → local — no SSH involved
         dump_file = _dump_local(source_mode, source_env)
         _restore_local(target_mode, target_env, dump_file)
         _cleanup_transfer(dump_file, source_db)
+        return
 
-    elif source_remote is not None:
+    if source_remote is not None:
         # remote → local
-        _dump_remote(source_remote, source_mode, source_env)
-        dump_file = _scp_pull(source_remote, source_db)
-        remote_file = f"{_remote_transfer_dir(source_remote)}/{dump_file.name}"
+        _dump_remote(source_remote, source_mode, source_env, control_args)
+        dump_file = _scp_pull(source_remote, source_db, control_args)
+        remote_file = (
+            f"{_remote_transfer_dir(source_remote, control_args)}/{dump_file.name}"
+        )
         _restore_local(target_mode, target_env, dump_file)
-        # Clean local transfer dump and prune old local dumps
         _cleanup_transfer(dump_file, source_db)
-        # Remove the staged dump from the remote transfer dir
-        _ssh_run(source_remote, f"rm -f {remote_file}")
-
+        _ssh_run(source_remote, f"rm -f {remote_file}", control_args)
     else:
         # local → remote
         dump_file = _dump_local(source_mode, source_env)
-        _scp_push(target_remote, dump_file)
-        _restore_remote(target_remote, target_mode, target_env)
-        # Clean local transfer dump
+        _scp_push(target_remote, dump_file, control_args)
+        _restore_remote(target_remote, target_mode, target_env, control_args)
         _cleanup_transfer(dump_file, source_db)
-        # Remove the staged dump from the remote transfer dir
-        remote_file = f"{_remote_transfer_dir(target_remote)}/{dump_file.name}"
-        _ssh_run(target_remote, f"rm -f {remote_file}")
+        remote_file = (
+            f"{_remote_transfer_dir(target_remote, control_args)}/{dump_file.name}"
+        )
+        _ssh_run(target_remote, f"rm -f {remote_file}", control_args)

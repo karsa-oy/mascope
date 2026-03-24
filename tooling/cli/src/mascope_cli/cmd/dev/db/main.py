@@ -350,8 +350,6 @@ def create(
         runtime.logger.error(f"Failed to create database '{db_name}'")
         raise typer.Exit(1)
 
-    runtime.logger.success(f"Database '{db_name}' created")
-
 
 @dev_db_app.command()
 def drop(

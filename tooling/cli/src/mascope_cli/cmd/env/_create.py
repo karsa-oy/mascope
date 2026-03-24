@@ -1,8 +1,9 @@
 """
-Internal implementation for `mascope env create`.
+Environment creation helpers for `mascope env` commands.
 
-Handles creation of runtime environment directories locally and on remote
-machines. Not a Typer module — contains no commands.
+Used by `main.py` (env create command) and `_sync.py` (auto-create
+missing target env during sync locally and on remote
+machines). Contains no Typer commands.
 
 An environment is simply a named directory under `.runtime/env/`. Creating
 one makes it visible to `mascope env list`, `mascope env use`, and the
@@ -12,97 +13,87 @@ Callers (`main.py`) are responsible for argument parsing, confirmation
 prompts, and error reporting.
 """
 
+import re
 import subprocess
 
-from pathlib import Path
-
-from mascope_cli.cmd.env._paths import (
-    local_env_dir,
-    remote_env_dir,
-)
+from mascope_cli.cmd.env._paths import local_env_dir, get_remote_mascope_path
+from mascope_cli.cmd.env._ssh import cygwin_bin, get_identity_args
 from mascope_cli.runtime import runtime
-
-
-# --- Validation ---
 
 
 def validate_env_name(name: str) -> None:
     """
-    Validate a proposed environment name.
-
-    Rules:
-    - Must not be empty
-    - Must not contain whitespace
-    - Must not contain path separators (`/` or `\\`)
+    Validate a runtime environment name.
 
     :param name: Proposed environment name.
     :type name: str
-    :raises ValueError: If the name violates any rule.
+    :raises ValueError: If the name is empty, contains whitespace, or contains
+                        path separators.
     """
-    if not name or not name.strip():
+    if not name:
         raise ValueError("Environment name must not be empty.")
-    if any(c in name for c in (" ", "\t", "\n")):
+    if re.search(r"\s", name):
         raise ValueError(f"Environment name '{name}' must not contain whitespace.")
     if "/" in name or "\\" in name:
         raise ValueError(f"Environment name '{name}' must not contain path separators.")
 
 
-# --- Local creation ---
-
-
-def create_env_local(env_name: str) -> Path:
+def create_env_local(name: str) -> None:
     """
     Create a local runtime environment directory.
 
-    The directory is created at `.runtime/env/{env_name}/` under
-    `MASCOPE_PATH`. Raises if it already exists — callers should check
-    with `env_exists_local` first and handle the confirmation flow.
+    Creates `.runtime/env/{name}/` under `MASCOPE_PATH`. Raises if the
+    directory already exists.
 
-    :param env_name: Name of the environment to create.
-    :type env_name: str
-    :return: Absolute path to the created directory.
-    :rtype: Path
-    :raises ValueError: If `env_name` fails validation.
-    :raises FileExistsError: If the environment directory already exists.
+    :param name: Name of the environment to create.
+    :type name: str
+    :raises ValueError: If the name is invalid.
+    :raises FileExistsError: If the environment already exists.
+    :raises OSError: If directory creation fails.
     """
-    validate_env_name(env_name)
-
-    env_dir = local_env_dir(env_name)
+    validate_env_name(name)
+    env_dir = local_env_dir(name)
     if env_dir.exists():
-        raise FileExistsError(f"Environment '{env_name}' already exists at {env_dir}.")
-
+        raise FileExistsError(f"Environment '{name}' already exists at {env_dir}.")
     env_dir.mkdir(parents=True, exist_ok=False)
-    runtime.logger.info(f"Created environment '{env_name}' at {env_dir}")
-    return env_dir
+    runtime.logger.info(f"Created environment '{name}' at {env_dir}")
 
 
-# --- Remote creation ---
-
-
-def create_env_remote(remote: str, env_name: str) -> None:
+def create_env_remote(
+    remote: str,
+    name: str,
+    control_args: list[str] | None = None,
+) -> None:
     """
     Create a runtime environment directory on a remote machine via SSH.
 
-    Uses `mkdir -p` — no CLI dependency on the remote side. The path is
-    constructed from `remote_env_dir` so the layout is consistent with
-    the local structure.
+    Runs `mkdir -p` for `.runtime/env/{name}/` under the remote
+    `MASCOPE_PATH`. Does not depend on the remote CLI — uses only
+    standard shell commands.
 
     :param remote: Remote identifier in `USER@HOST` format.
     :type remote: str
-    :param env_name: Name of the environment to create on the remote.
-    :type env_name: str
-    :raises ValueError: If `env_name` fails validation.
+    :param name: Name of the environment to create.
+    :type name: str
+    :param control_args: SSH multiplexing flags from `SshMux` to reuse an
+                         existing ControlMaster connection. Pass `[]` or
+                         `None` for a standalone connection.
+    :type control_args: list[str] | None
+    :raises ValueError: If the name is invalid.
     :raises RuntimeError: If the SSH command fails.
     """
-    validate_env_name(env_name)
-
-    path = remote_env_dir(remote, env_name)
+    validate_env_name(name)
+    mascope_path = get_remote_mascope_path(remote, control_args)
+    env_dir = f"{mascope_path}/.runtime/env/{name}"
     result = subprocess.run(
-        ["ssh", remote, "bash", "-l", "-c", f"'mkdir -p {path}'"],
+        [cygwin_bin("ssh")]
+        + get_identity_args()
+        + (control_args or [])
+        + [remote, "bash", "-l", "-c", f"'mkdir -p {env_dir}'"],
         check=False,
     )
     if result.returncode != 0:
         raise RuntimeError(
-            f"Failed to create environment '{env_name}' on {remote} at {path}."
+            f"Failed to create environment '{name}' on {remote} (exit {result.returncode})"
         )
-    runtime.logger.info(f"Created environment '{env_name}' on {remote} at {path}")
+    runtime.logger.info(f"Created environment '{name}' on {remote} at {env_dir}")

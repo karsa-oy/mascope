@@ -8,6 +8,7 @@ Contains no Typer commands — implementation only.
 import subprocess
 from pathlib import Path, PurePosixPath
 
+from mascope_cli.cmd.env._ssh import cygwin_bin, get_identity_args
 from mascope_cli.runtime import runtime
 
 
@@ -47,7 +48,11 @@ def local_env_dir(env_name: str) -> Path:
     return Path(runtime.path(".runtime", "env", env_name))
 
 
-def remote_env_dir(remote: str, env_name: str) -> str:
+def remote_env_dir(
+    remote: str,
+    env_name: str,
+    control_args: list[str] | None = None,
+) -> str:
     """
     Return the absolute POSIX path for a named environment directory on a
     remote machine.
@@ -60,10 +65,14 @@ def remote_env_dir(remote: str, env_name: str) -> str:
     :type remote: str
     :param env_name: Name of the runtime environment.
     :type env_name: str
+    :param control_args: SSH multiplexing flags from `SshMux` to reuse an
+                         existing ControlMaster connection. Pass `[]` or
+                         `None` for a standalone connection.
+    :type control_args: list[str] | None
     :return: Absolute POSIX path string on the remote machine.
     :rtype: str
     """
-    mascope_path = get_remote_mascope_path(remote)
+    mascope_path = get_remote_mascope_path(remote, control_args)
     return str(PurePosixPath(mascope_path) / ".runtime" / "env" / env_name)
 
 
@@ -79,7 +88,11 @@ def env_exists_local(env_name: str) -> bool:
     return local_env_dir(env_name).is_dir()
 
 
-def env_exists_remote(remote: str, env_name: str) -> bool:
+def env_exists_remote(
+    remote: str,
+    env_name: str,
+    control_args: list[str] | None = None,
+) -> bool:
     """
     Check whether a named environment directory exists on a remote machine.
 
@@ -90,12 +103,19 @@ def env_exists_remote(remote: str, env_name: str) -> bool:
     :type remote: str
     :param env_name: Name of the runtime environment.
     :type env_name: str
+    :param control_args: SSH multiplexing flags from `SshMux` to reuse an
+                         existing ControlMaster connection. Pass `[]` or
+                         `None` for a standalone connection.
+    :type control_args: list[str] | None
     :return: `True` if the directory exists on the remote, `False` otherwise.
     :rtype: bool
     """
-    path = remote_env_dir(remote, env_name)
+    path = remote_env_dir(remote, env_name, control_args)
     result = subprocess.run(
-        ["ssh", remote, "bash", "-l", "-c", f"'test -d {path} && echo exists'"],
+        [cygwin_bin("ssh")]
+        + get_identity_args()
+        + (control_args or [])
+        + [remote, "bash", "-l", "-c", f"'test -d {path} && echo exists'"],
         capture_output=True,
         text=True,
         check=False,
@@ -103,7 +123,10 @@ def env_exists_remote(remote: str, env_name: str) -> bool:
     return result.stdout.strip() == "exists"
 
 
-def get_remote_mascope_path(remote: str) -> str:
+def get_remote_mascope_path(
+    remote: str,
+    control_args: list[str] | None = None,
+) -> str:
     """
     Resolve `MASCOPE_PATH` on a remote machine by running `mascope path`
     via SSH.
@@ -119,12 +142,19 @@ def get_remote_mascope_path(remote: str) -> str:
 
     :param remote: Remote identifier in `USER@HOST` format.
     :type remote: str
+    :param control_args: SSH multiplexing flags from `SshMux` to reuse an
+                         existing ControlMaster connection. Pass `[]` or
+                         `None` for a standalone connection.
+    :type control_args: list[str] | None
     :return: Value of `MASCOPE_PATH` on the remote machine.
     :rtype: str
     :raises RuntimeError: If SSH fails or `mascope path` returns empty.
     """
     result = subprocess.run(
-        ["ssh", remote, "bash", "-l", "-c", "'mascope path'"],
+        [cygwin_bin("ssh")]
+        + get_identity_args()
+        + (control_args or [])
+        + [remote, "bash", "-l", "-c", "'mascope path'"],
         capture_output=True,
         text=True,
         check=False,

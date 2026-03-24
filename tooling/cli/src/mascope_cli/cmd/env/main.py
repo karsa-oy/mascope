@@ -7,6 +7,7 @@ each containing all state required to run Mascope services (sqlite database,
 filestore, streaming folders).
 """
 
+from contextlib import nullcontext
 from typing import Annotated
 import typer
 
@@ -24,6 +25,7 @@ from mascope_cli.cmd.env._paths import (
     env_exists_remote,
     parse_address,
 )
+from mascope_cli.cmd.env._ssh import SshMux
 from mascope_cli.cmd.env._sync import sync_db, sync_filestore
 from mascope_runtime import Runtime
 
@@ -241,6 +243,12 @@ def sync(
     On success, the transfer dump is deleted and 7-day retention pruning runs.
     On failure, the dump is preserved for manual recovery.
 
+    For remote topologies, a single SSH ControlMaster connection is opened
+    before any remote operations begin — password or passphrase is prompted
+    at most once for the entire sync regardless of how many SSH/scp operations
+    are required (existence check, env creation, dump, transfer, restore,
+    cleanup, filestore rsync).
+
     Remote → remote sync is not supported — run from one of the machines.
 
     \b
@@ -264,54 +272,72 @@ def sync(
         )
         raise typer.Exit(1)
 
-    # --- target env existence check ---
+    # Resolve remote address before opening the mux so we know which host
+    # to connect to. At most one of source/target can be remote.
+    source_remote, _ = parse_address(source_env)
     target_remote, target_env_name = parse_address(target_env)
+    remote = source_remote or target_remote
 
-    if target_remote is not None:
-        target_missing = not env_exists_remote(target_remote, target_env_name)
-    else:
-        target_missing = not env_exists_local(target_env_name)
+    # Open the SSH ControlMaster connection before any remote operations so
+    # the passphrase/password is prompted at most once — covers existence
+    # check, env creation, dump, transfer, restore, cleanup, and filestore
+    # rsync. For local→local sync no SSH is involved and nullcontext([])
+    # is used instead.
+    ctx = SshMux(remote) if remote else nullcontext([])
 
-    if target_missing:
-        location = target_remote if target_remote else "local"
-        if not yes:
-            confirmed = typer.confirm(
-                f"Target environment '{target_env_name}' does not exist on {location}. "
-                f"Create it?"
-            )
-            if not confirmed:
-                runtime.logger.error(
-                    "Sync aborted — target environment does not exist."
+    with ctx as ctl:
+        # --- target env existence check ---
+        if target_remote is not None:
+            target_missing = not env_exists_remote(target_remote, target_env_name, ctl)
+        else:
+            target_missing = not env_exists_local(target_env_name)
+
+        if target_missing:
+            location = target_remote if target_remote else "local"
+            if not yes:
+                confirmed = typer.confirm(
+                    f"Target environment '{target_env_name}' does not exist on "
+                    f"{location}. Create it?"
                 )
+                if not confirmed:
+                    runtime.logger.error(
+                        "Sync aborted — target environment does not exist."
+                    )
+                    raise typer.Exit(1)
+
+            try:
+                if target_remote is not None:
+                    create_env_remote(target_remote, target_env_name, ctl)
+                else:
+                    create_env_local(target_env_name)
+            except (ValueError, FileExistsError, RuntimeError, OSError) as e:
+                runtime.logger.error(f"Failed to create target environment: {e}")
                 raise typer.Exit(1)
 
-        try:
-            if target_remote is not None:
-                create_env_remote(target_remote, target_env_name)
-            else:
-                create_env_local(target_env_name)
-        except (ValueError, FileExistsError, RuntimeError, OSError) as e:
-            runtime.logger.error(f"Failed to create target environment: {e}")
-            raise typer.Exit(1)
+        # --- Sync ---
+        errors: list[str] = []
 
-    # --- Sync ---
-    errors: list[str] = []
+        if not skip_db:
+            runtime.logger.info("--- Database sync ---")
+            try:
+                sync_db(
+                    source_env,
+                    source_mode,
+                    target_env,
+                    target_mode,
+                    control_args=ctl,
+                )
+            except (ValueError, RuntimeError) as e:
+                runtime.logger.error(f"Database sync failed: {e}")
+                errors.append("database")
 
-    if not skip_db:
-        runtime.logger.info("--- Database sync ---")
-        try:
-            sync_db(source_env, source_mode, target_env, target_mode)
-        except (ValueError, RuntimeError) as e:
-            runtime.logger.error(f"Database sync failed: {e}")
-            errors.append("database")
-
-    if not skip_filestore:
-        runtime.logger.info("--- Filestore sync ---")
-        try:
-            sync_filestore(source_env, target_env)
-        except Exception as e:
-            runtime.logger.error(f"Filestore sync failed: {e}")
-            errors.append("filestore")
+        if not skip_filestore:
+            runtime.logger.info("--- Filestore sync ---")
+            try:
+                sync_filestore(source_env, target_env, control_args=ctl)
+            except Exception as e:
+                runtime.logger.error(f"Filestore sync failed: {e}")
+                errors.append("filestore")
 
     if errors:
         runtime.logger.error(f"Sync completed with errors in: {', '.join(errors)}")

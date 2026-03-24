@@ -67,7 +67,7 @@ def _create_database_if_missing(container: str, user: str, database: str) -> boo
         check=False,
     )
     if database in result.stdout:
-        runtime.logger.debug(f"Database '{database}' already exists")
+        runtime.logger.info(f"Database '{database}' already exists")
         return True
 
     try:
