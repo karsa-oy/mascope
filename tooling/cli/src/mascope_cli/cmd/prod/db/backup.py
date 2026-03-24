@@ -74,10 +74,6 @@ def backup_create(
             ),
         ),
     ] = False,
-    yes: Annotated[
-        bool,
-        typer.Option("--yes", "-y", help="Skip confirmation prompt."),
-    ] = False,
 ) -> None:
     """
     Dump the environment's database to a compressed .dump file.
@@ -86,13 +82,11 @@ def backup_create(
     Use --transfer to write to .runtime/database/transfer/ for cross-server
     sync staging.
 
-    `--yes` is required for non-interactive use (e.g. cron jobs).
-
     \b
     Examples:
-        mascope prod db backup create --yes
-        mascope prod db backup create --env tof1 --label pre-migration --yes
-        mascope prod db backup create --transfer --yes
+        mascope prod db backup create
+        mascope prod db backup create --env tof1 --label pre-migration
+        mascope prod db backup create --transfer
     """
     if not check_prerequisites(_MODE, check_docker_desktop=False):
         return
@@ -113,12 +107,6 @@ def backup_create(
     if not is_database_ready(_MODE, source_env):
         runtime.logger.error(f"Database for env '{source_env}' does not exist")
         raise typer.Exit(1)
-
-    if not yes:
-        typer.confirm(
-            f"Back up database for environment '{source_env}'?",
-            abort=True,
-        )
 
     container = db_cfg.get_postgres_container_name(mode=_MODE)
     database = db_cfg.get_postgres_database_name(source_env)

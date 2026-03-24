@@ -316,7 +316,7 @@ def _dump_remote(remote: str, mode: str, env_name: str) -> None:
     """
     Trigger a transfer dump on a remote machine via SSH.
 
-    Calls `mascope {mode} db backup create --env ENV --transfer --yes` on
+    Calls `mascope {mode} db backup create --env ENV --transfer` on
     the remote, writing the dump into the remote transfer directory.
     The `--label sync` flag is passed so the file is identifiable in logs.
 
@@ -328,7 +328,7 @@ def _dump_remote(remote: str, mode: str, env_name: str) -> None:
     :type env_name: str
     :raises RuntimeError: If the SSH command fails.
     """
-    cmd = f"mascope {mode} db backup create --env {env_name} --transfer --label sync --yes"
+    cmd = f"mascope {mode} db backup create --env {env_name} --transfer --label sync"
     runtime.logger.info(f"Triggering remote dump on {remote}: {cmd}")
     _ssh_run(remote, cmd)
 
