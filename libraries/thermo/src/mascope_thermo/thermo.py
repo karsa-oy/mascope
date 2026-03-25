@@ -99,7 +99,7 @@ class ScanSelector:
         ]
 
     @property
-    def all_scan_indices(self) -> list:
+    def all_scan_indices(self) -> list[int]:
         """Returns all scan indices in the raw file."""
         num_of_scans = self._RawFile.RunHeaderEx.SpectraCount
         return list(range(1, num_of_scans + 1))
@@ -161,7 +161,7 @@ class ScanSelector:
         )
 
     @property
-    def scan_indices_1based(self) -> list:
+    def scan_indices_1based(self) -> list[int]:
         """Returns the list of scan indices that match the specified polarity, time range, and scan type.
         The scans are 1-based indexed, as per the Thermo library convention.
         """
@@ -187,7 +187,7 @@ class ScanSelector:
         return filtered_indices.tolist()
 
     @property
-    def scan_indices_0based(self) -> list:
+    def scan_indices_0based(self) -> list[int]:
         """Returns the list of scan indices converted to 0-based indexing for Python."""
         return [i - 1 for i in self.scan_indices_1based]
 
