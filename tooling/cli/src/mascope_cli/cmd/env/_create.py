@@ -25,17 +25,22 @@ def validate_env_name(name: str) -> None:
     """
     Validate a runtime environment name.
 
+    Names must be non-empty and consist only of ASCII letters, digits,
+    underscores, and hyphens (``^[A-Za-z0-9_-]+$``). This excludes
+    whitespace, path separators, and shell metacharacters that would
+    break SSH commands and filesystem operations.
+
     :param name: Proposed environment name.
     :type name: str
-    :raises ValueError: If the name is empty, contains whitespace, or contains
-                        path separators.
+    :raises ValueError: If the name is empty or contains disallowed characters.
     """
     if not name:
         raise ValueError("Environment name must not be empty.")
-    if re.search(r"\s", name):
-        raise ValueError(f"Environment name '{name}' must not contain whitespace.")
-    if "/" in name or "\\" in name:
-        raise ValueError(f"Environment name '{name}' must not contain path separators.")
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", name):
+        raise ValueError(
+            f"Environment name '{name}' is invalid. "
+            "Only letters, digits, underscores, and hyphens are allowed."
+        )
 
 
 def create_env_local(name: str) -> None:
