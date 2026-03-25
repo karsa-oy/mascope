@@ -88,7 +88,7 @@ def backup_create(
         mascope prod db backup create --env tof1 --label pre-migration
         mascope prod db backup create --transfer
     """
-    if not check_prerequisites(_MODE, check_docker_desktop=False):
+    if not check_prerequisites(_MODE):
         return
     if not is_server_ready(_MODE):
         runtime.logger.error("PostgreSQL not running — run 'mascope prod up' first")

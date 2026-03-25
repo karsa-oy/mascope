@@ -150,7 +150,7 @@ def status() -> None:
     Displays current configuration from .mascope.toml, worker settings,
     and Docker container status.
     """
-    if not check_prerequisites(_MODE, check_docker_desktop=True):
+    if not check_prerequisites(_MODE):
         return
 
     db_cfg = runtime.full_config.backend.database
@@ -200,7 +200,7 @@ def logs(
     """
     Show PostgreSQL container logs.
     """
-    if not check_prerequisites(_MODE, check_docker_desktop=True):
+    if not check_prerequisites(_MODE):
         return
 
     if not is_container_running(_MODE):
@@ -250,7 +250,7 @@ def cli(
         \\conninfo                   # Connection info
         \\q                          # Quit
     """
-    if not check_prerequisites(_MODE, check_docker_desktop=True):
+    if not check_prerequisites(_MODE):
         return
 
     if not is_container_running(_MODE):
@@ -323,7 +323,7 @@ def create(
         mascope dev db create               # create active env database
         mascope dev db create --env test    # create test env database
     """
-    if not check_prerequisites(_MODE, check_docker_desktop=True):
+    if not check_prerequisites(_MODE):
         return
 
     if not is_server_ready(_MODE):
@@ -383,7 +383,7 @@ def drop(
         mascope dev db drop --env test       # drop test env database
         mascope dev db drop --env test --yes # skip confirmation
     """
-    if not check_prerequisites(_MODE, check_docker_desktop=True):
+    if not check_prerequisites(_MODE):
         return
     if not is_server_ready(_MODE):
         runtime.logger.error("PostgreSQL not running — run 'mascope dev up' first")
@@ -471,7 +471,7 @@ def restore(
     Omit `dump_file` to automatically use the latest available dump for the
     target environment.
     """
-    if not check_prerequisites(_MODE, check_docker_desktop=True):
+    if not check_prerequisites(_MODE):
         return
     if not is_server_ready(_MODE):
         runtime.logger.error("PostgreSQL not running — run 'mascope dev up' first")
@@ -584,7 +584,7 @@ def clone(
         mascope dev db clone test --yes           # overwrite test without prompt
         mascope dev db clone test --source orbi2  # clone orbi2 env → test
     """
-    if not check_prerequisites(_MODE, check_docker_desktop=True):
+    if not check_prerequisites(_MODE):
         return
     if not is_server_ready(_MODE):
         runtime.logger.error("PostgreSQL not running — run 'mascope dev up' first")

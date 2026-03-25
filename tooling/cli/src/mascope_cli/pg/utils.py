@@ -21,27 +21,19 @@ from mascope_cli.cmd.dev.docker import is_docker_running
 from mascope_cli.runtime import runtime
 
 
-def check_prerequisites(mode: str, check_docker_desktop: bool = False) -> bool:
+def check_prerequisites(mode: str) -> bool:
     """
     Validate that the PostgreSQL environment is configured and reachable.
 
     Checks performed:
     - Database section present in resolved config.
     - Database type is `postgres`.
-    - Docker daemon is running (always checked via `docker info`).
-    - On developer machines (`check_docker_desktop=True`), also verifies
-      Docker Desktop is running — relevant for Windows/macOS where the daemon
-      only starts when the Desktop app is open.
+    - Docker daemon is running (checked via `docker info`).
 
     :param mode: Runtime mode, `"dev"` or `"prod"`. Used only for
                  log messages; config is already resolved by the time this
                  runs.
     :type mode: str
-    :param check_docker_desktop: If `True`, call `is_docker_running()` from the dev docker
-                                 module, which performs the Desktop-specific
-                                 check. Pass `True` for dev, `False` for
-                                 prod (Linux server, no Desktop).
-    :type check_docker_desktop: bool
     :return: `True` if all checks pass, `False` otherwise.
     :rtype: bool
     """
@@ -56,21 +48,9 @@ def check_prerequisites(mode: str, check_docker_desktop: bool = False) -> bool:
         )
         return False
 
-    if check_docker_desktop:
-        if not is_docker_running():
-            runtime.logger.error("Docker daemon is not running")
-            runtime.logger.info("Start Docker Desktop first")
-            return False
-    else:
-        # On prod (Linux server), verify docker CLI is functional
-        result = subprocess.run(
-            ["docker", "info"],
-            capture_output=True,
-            check=False,
-        )
-        if result.returncode != 0:
-            runtime.logger.error("Docker daemon is not running or not accessible")
-            return False
+    if not is_docker_running():
+        runtime.logger.error("Docker daemon is not running or not accessible")
+        return False
 
     return True
 

@@ -67,7 +67,7 @@ def _create_database_if_missing(container: str, user: str, database: str) -> boo
         check=False,
     )
     if database in result.stdout:
-        runtime.logger.info(f"Database '{database}' already exists")
+        runtime.logger.debug(f"Database '{database}' already exists")
         return True
 
     try:
@@ -97,7 +97,7 @@ def status() -> None:
     Displays current configuration from .mascope.toml, connection pool
     settings, and live container status.
     """
-    if not check_prerequisites(_MODE, check_docker_desktop=False):
+    if not check_prerequisites(_MODE):
         return
 
     db_cfg = runtime.full_config.backend.database
@@ -258,7 +258,7 @@ def create(
         mascope prod db create
         mascope prod db create --env tof1
     """
-    if not check_prerequisites(_MODE, check_docker_desktop=False):
+    if not check_prerequisites(_MODE):
         return
     if not is_server_ready(_MODE):
         runtime.logger.error("PostgreSQL not running — run 'mascope prod up' first")
@@ -302,7 +302,7 @@ def drop(
     Examples:
         mascope prod db drop --env tof1 --yes
     """
-    if not check_prerequisites(_MODE, check_docker_desktop=False):
+    if not check_prerequisites(_MODE):
         return
     if not is_server_ready(_MODE):
         runtime.logger.error("PostgreSQL not running — run 'mascope prod up' first")
@@ -383,7 +383,7 @@ def restore(
         mascope prod db restore mascope_tof1_20250101_040000.dump --yes
         mascope prod db restore --transfer --env tof1 --yes
     """
-    if not check_prerequisites(_MODE, check_docker_desktop=False):
+    if not check_prerequisites(_MODE):
         return
     if not is_server_ready(_MODE):
         runtime.logger.error("PostgreSQL not running — run 'mascope prod up' first")
