@@ -211,12 +211,7 @@ class ScanSelector:
     @property
     def scans(self) -> tuple:
         """Returns the scan objects for the filtered scan indices."""
-        all_scans = tuple(
-            Extensions.GetScans(
-                self._RawFile, self.all_scan_indices[0], self.all_scan_indices[-1]
-            )
-        )
-        return tuple(all_scans[i] for i in self.scan_indices_0based)
+        return tuple(Extensions.GetScans(self._RawFile, self.scan_indices_dotnet))
 
 
 def get_polarity_options(datafile_path: str) -> str:
