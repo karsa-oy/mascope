@@ -136,15 +136,16 @@ class ScanSelector:
                 f"Invalid time range: t_min={t_min} s > t_max={t_max} s"
             )
 
-        # Adjust time range with epsilon to account for floating point precision issues
-        epsilon = np.finfo(np.float64).eps * max(t_min, t_max)
+        # Adjust time range as `abs_eps(x) ~ |x∣ * eps` where eps is machine epsilon
+        # to account for floating point precision issues
+        epsilon = np.finfo(np.float64).eps * t_max
         t_min_adj = t_min - epsilon
         t_max_adj = t_max + epsilon
 
         start_times_min = np.array([stats.StartTime for stats in self.raw_scan_stats])
         start_times_s = start_times_min * SECONDS_PER_MINUTE
 
-        return np.logical_and(t_min_adj <= start_times_s, start_times_s <= t_max_adj)
+        return np.logical_and(t_min_adj < start_times_s, start_times_s < t_max_adj)
 
     def _ms_type_mask(self) -> np.ndarray:
         """Creates a boolean mask for the specified MS scan type."""
