@@ -1,6 +1,6 @@
 [project]
 name = "mascope_tools"
-version = "2025.10.27"
+version = "2026.03.25"
 description = "Mascope's public library, containing tools for spectra postprocessing."
 classifiers = [
     "Topic :: Scientific/Engineering :: Atmospheric Science",
@@ -19,7 +19,7 @@ requires-python = ">=3.12"
 readme = "README.md"
 dependencies = [
     "isospecpy>=2.2.3",
-    "mascope-sdk>=2025.10.14",
+    "mascope-sdk>=2026.3.18",
     "numpy>=1.26",
     "scipy>=1.16.1",
     "pandas>=2.3.1",
