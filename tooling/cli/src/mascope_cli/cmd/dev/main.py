@@ -144,9 +144,6 @@ def _run_application(
     if lab:
         selected.append({"name": "lab", "run": "uv run jupyter lab"})
 
-    # Set mode to dev
-    runtime.state.mode = _MODE
-
     # Set config env var
     frontend_runtime = Runtime("frontend", log=False)
     os.environ["MASCOPE_ENV"] = runtime.env.name
