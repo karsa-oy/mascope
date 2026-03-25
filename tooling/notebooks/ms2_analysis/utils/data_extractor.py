@@ -119,18 +119,30 @@ class DataExtractor:
         return parent_peaks.unique()
 
     def _get_hcd_energy_map(self):
-        """Calculate the average HCD energy for each unique parent peak"""
+        """Calculate the average HCD energy for each unique parent peak.
+        Handles step dissociation where energy values may contain multiple
+        comma-separated values (e.g. "4.5,5.8,10.5"), averaging each step
+        position separately across scans."""
         hcd_energy_per_parent_peak = {}
         for parent_peak in self.parent_peaks:
-            hcd = (
-                self.stats.loc["HCD Energy V:"][
-                    self.stats.loc["ScanType"].str.contains(f"{parent_peak}@")
+            raw_values = self.stats.loc["HCD Energy V:"][
+                self.stats.loc["ScanType"].str.contains(f"{parent_peak}@")
+            ]
+            # Split by comma to handle step dissociation energies
+            step_dissociation_values = [
+                [float(v) for v in str(val).split(",")] for val in raw_values
+            ]
+            # Average each step position across scans
+            max_steps = max(len(row) for row in step_dissociation_values)
+            averaged = []
+            for step_idx in range(max_steps):
+                step_values = [
+                    row[step_idx]
+                    for row in step_dissociation_values
+                    if step_idx < len(row)
                 ]
-                .astype(float)
-                .mean()
-                .round(2)
-            )
-            hcd_energy_per_parent_peak[parent_peak] = hcd
+                averaged.append(round(float(np.mean(step_values)), 2))
+            hcd_energy_per_parent_peak[parent_peak] = averaged
         return hcd_energy_per_parent_peak
 
     def _get_isolation_width(self) -> float:

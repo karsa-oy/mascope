@@ -19,7 +19,7 @@ class Ms2Dashboard:
 
         # Build dropdown options
         self._parent_peak_options = {
-            f"{pp:.4f} m/z (HCD {data.hcd_energy_map[pp]}V)": pp
+            f"{pp:.4f} m/z (HCD {','.join(str(v) for v in data.hcd_energy_map[pp])}V)": pp
             for pp in data.parent_peaks
         }
 
