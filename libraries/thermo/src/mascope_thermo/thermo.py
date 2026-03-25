@@ -288,32 +288,35 @@ def get_signal(
             scan_mzs.append(positions[mz_mask])
             scan_specs.append(intensities[mz_mask])
 
-    if not scan_mzs:
-        raise ValueError(
-            f"""No data found in the specified m/z range.
-            M/z range of the raw file: {RawFile.RunHeaderEx.LowMass} - {RawFile.RunHeaderEx.HighMass}
-            """
+        if not scan_mzs:
+            low_mass = RawFile.RunHeaderEx.LowMass
+            high_mass = RawFile.RunHeaderEx.HighMass
+
+            raise ValueError(
+                f"""No data found in the specified m/z range.
+                M/z range of the raw file: {low_mass} - {high_mass}
+                """
+            )
+
+        # Create a sorted union of all unique m/z values
+        all_mzs = np.unique(np.concatenate(scan_mzs))
+
+        # Initialize output array
+        signal_array = np.zeros((len(all_mzs), len(scan_time)), dtype=np.float64)
+
+        # Fill the 2D array using exact mz matching
+        for scan_idx, (mz, intensity) in enumerate(zip(scan_mzs, scan_specs)):
+            # Find indices where the current scan mz values appear in all_mzs
+            indices = np.searchsorted(all_mzs, mz)
+            # Only fill values that exist in this scan
+            signal_array[indices, scan_idx] = intensity
+
+        signal_dask = da.from_array(signal_array, chunks="auto")
+
+        return xr.Dataset(
+            {"signal": (("mz", "time"), signal_dask)},
+            coords={"mz": all_mzs, "time": scan_time},
         )
-
-    # Create a sorted union of all unique m/z values
-    all_mzs = np.unique(np.concatenate(scan_mzs))
-
-    # Initialize output array
-    signal_array = np.zeros((len(all_mzs), len(scan_time)), dtype=np.float64)
-
-    # Fill the 2D array using exact mz matching
-    for scan_idx, (mz, intensity) in enumerate(zip(scan_mzs, scan_specs)):
-        # Find indices where the current scan mz values appear in all_mzs
-        indices = np.searchsorted(all_mzs, mz)
-        # Only fill values that exist in this scan
-        signal_array[indices, scan_idx] = intensity
-
-    signal_dask = da.from_array(signal_array, chunks="auto")
-
-    return xr.Dataset(
-        {"signal": (("mz", "time"), signal_dask)},
-        coords={"mz": all_mzs, "time": scan_time},
-    )
 
 
 def compute_sum_signal(
