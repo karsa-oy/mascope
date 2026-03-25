@@ -179,21 +179,68 @@ mascope env use default           # revert to the default env
 mascope env sync <source> <dest>  # synchronize source env into dest env
 ```
 
-#### Env sync
+### Env sync
 
-The `env sync` command can be used to synchronize runtime environments locally, or to/from a remote host. It uses [rsync](https://linux.die.net/man/1/rsync) and thus supports incremental synchronization. To use it on Windows, [Cygwin](https://www.cygwin.com/) needs to be installed.
+The `env sync` command synchronizes runtime environments locally or to/from a remote host. It transfers both the filestore (via [rsync](https://linux.die.net/man/1/rsync)) and the PostgreSQL database (via `pg_dump`/`pg_restore` staged through a transfer directory). Both source and target require an explicit mode (`dev` or `prod`) to identify which PostgreSQL server to use.
 
-[!IMPORTANT] Install Cygwin into the default location `C:\cygwin64`. During installation, select `rsync` and `openssh` packages to be installed.
+> [!IMPORTANT]
+> Both PostgreSQL containers must be running on source and target machines before executing `env sync`.
 
 Usage examples:
 
-```sh
-mascope env sync default foo      # synchronize local env "default" into local env "foo"
-mascope env sync foo user@192.168.1.100:bar # sync local env "foo" into a remote env "bar"
-mascope env sync user@192.168.1.100:bar baz --skip-filestore # sync remote env "bar" into a local env "baz", without filestore
+```bash
+# local → local
+mascope env sync default dev foo dev
+
+# local → remote
+mascope env sync foo prod user@192.168.1.100:bar prod
+
+# remote → local, database only
+mascope env sync user@192.168.1.100:bar prod baz prod --skip-filestore
+
+# local → local, filestore only
+mascope env sync foo dev bar dev --skip-db
 ```
 
-The `sync` command follows symbolic links on Linux filesystem both ways; syncing into and from a symlinked directory.
+The `sync` command follows symbolic links on Linux filesystem both ways - syncing into and from a symlinked directory.
+
+If the target environment does not exist, you will be prompted to create it. Pass `--yes` to skip the prompt.
+
+On transfer failure the staged dump is preserved in `.runtime/database/transfer/` for manual recovery. On success it is deleted and 7-day retention pruning runs automatically.
+
+### Windows (Cygwin)
+
+To use `env sync` on Windows, [Cygwin](https://www.cygwin.com/) must be installed into the default location `C:\cygwin64`. During installation, select the `rsync` and `openssh` packages.
+
+### SSH key setup
+
+`mascope env sync` issues multiple SSH/scp operations per sync (existence check, env create, dump, transfer, restore, cleanup, rsync). To avoid being prompted for a password or passphrase on each one, configure a dedicated no-passphrase key.
+
+> [!NOTE]
+> This key is only used by `mascope env sync`. If you also want password-free direct `ssh` access from PowerShell or Windows Terminal, that requires a separate key added to the Windows OpenSSH agent.
+
+**Linux** - run in a terminal on the machine you are syncing from:
+
+```bash
+ssh-keygen -t ed25519 -C "mascope-sync" -f ~/.ssh/mascope_sync -N ""
+ssh-copy-id -i ~/.ssh/mascope_sync.pub USER@HOST  # prompted for remote password once
+```
+
+**Windows** - the key must live in **Cygwin's home directory** (`/home/<user>/.ssh/`). A key generated in PowerShell will not be found by the CLI. Open a Cygwin terminal (Start menu → search _Cygwin Terminal_) and run:
+
+```bash
+ssh-keygen -t ed25519 -C "mascope-sync" -f ~/.ssh/mascope_sync -N ""
+ssh-copy-id -i ~/.ssh/mascope_sync.pub USER@HOST  # prompted for remote password once
+```
+
+Verify the key works before running sync:
+
+```bash
+ssh -i ~/.ssh/mascope_sync -o BatchMode=yes USER@HOST echo ok
+# should print: ok
+```
+
+Once the key is in place, `mascope env sync` picks it up automatically - no password or passphrase prompts during sync on either platform.
 
 ### Dependency management
 
