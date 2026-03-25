@@ -362,7 +362,7 @@ def clone_database(
 
     Checks before cloning:
     1. Source database exists — raises `RuntimeError` if not.
-    2. Target database does not exist — raises `TargetDatabaseExistsError`
+    2. Target database does not exist — raises `DatabaseExistsError`
        if it does, allowing the caller to prompt for confirmation and drop it
        before retrying.
     3. No active connections to source — PostgreSQL enforces this at the SQL

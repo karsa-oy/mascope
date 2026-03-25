@@ -1051,7 +1051,7 @@ PATH=/home/karsa/.local/bin:/usr/bin:/usr/local/bin
 MASCOPE_PATH=/home/karsa/Mascope
 
 # Daily backup at 4 AM -create then prune, 7-day retention, active env only
-0 4 * * * { mascope prod db backup create --yes && mascope prod db backup delete --retention-days 7; } 2>&1 | logger -t mascope-prod-db-backup
+0 4 * * * { mascope prod db backup create -l cron && mascope prod db backup delete --retention-days 7; } 2>&1 | logger -t mascope-prod-db-backup
 ```
 
 Both stdout and stderr are captured and forwarded to syslog under the tag `mascope-prod-db-backup`.
@@ -1063,7 +1063,7 @@ Both stdout and stderr are captured and forwarded to syslog under the tag `masco
 mascope prod db backup list -a
 
 # Manual backup (active env)
-mascope prod db backup create --yes
+mascope prod db backup create
 
 # Preview what deletion would remove (dry run)
 mascope prod db backup delete --retention-days 7 --dry-run
