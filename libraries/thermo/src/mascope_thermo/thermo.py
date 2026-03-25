@@ -36,6 +36,10 @@ class ScanTypeError(ValueError):
     pass
 
 
+class NoScansFoundError(ValueError):
+    pass
+
+
 def _validate_mz_range(
     RawFile, mz_min: float | None, mz_max: float | None
 ) -> tuple[float, float]:
@@ -145,8 +149,8 @@ class ScanSelector:
     def _ms_type_mask(self) -> np.ndarray:
         """Creates a boolean mask for the specified MS scan type."""
         if self._ms_type not in ["Ms", "Ms2"]:
-            raise ValueError(
-                f"Invalid scan type '{self._ms_type}' provided. MS can type must be 'Ms' or 'Ms2'."
+            raise ScanTypeError(
+                f"Invalid scan type '{self._ms_type}' provided. MS scan type must be 'Ms' or 'Ms2'."
             )
         return np.array(
             [
@@ -174,7 +178,7 @@ class ScanSelector:
         filtered_indices = np.array(self.all_scan_indices)[mask]
 
         if len(filtered_indices) == 0:
-            raise ValueError(
+            raise NoScansFoundError(
                 "No scans found matching the specified filters: "
                 f"polarity='{self._polarity}', time_range=({self._t_min}, {self._t_max}), ms_type='{self._ms_type}'"
             )
@@ -292,7 +296,7 @@ def get_signal(
             low_mass = RawFile.RunHeaderEx.LowMass
             high_mass = RawFile.RunHeaderEx.HighMass
 
-            raise ValueError(
+            raise InvalidRangeError(
                 f"""No data found in the specified m/z range.
                 M/z range of the raw file: {low_mass} - {high_mass}
                 """
