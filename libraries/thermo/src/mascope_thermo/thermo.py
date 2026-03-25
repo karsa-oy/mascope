@@ -224,7 +224,7 @@ def get_polarity_options(datafile_path: str) -> str:
     :rtype: str
     """
     with RawFileManager(datafile_path) as RawFile:
-        scan_selector = ScanSelector(RawFile)
+        scan_selector = ScanSelector(RawFile, ms_type=None)
 
         polarities = set(
             filter.Polarity.ToString() for filter in scan_selector.raw_scan_filters
