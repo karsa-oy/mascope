@@ -73,9 +73,20 @@ class Ms2Dashboard:
             ]
         )
 
-    def show(self):
+    def show(self, timeseries=False):
         """Display the dashboard in the notebook."""
         self._update()
+        children = [
+            widgets.HBox(
+                [self._parent_dropdown, self._info_label],
+                layout=widgets.Layout(align_items="center"),
+            ),
+            self._fig_survey,
+            self._fig_fragments,
+        ]
+        if timeseries:
+            children.append(self._fig_timeseries)
+        self._dashboard.children = tuple(children)
         display(self._dashboard)
 
     @staticmethod
