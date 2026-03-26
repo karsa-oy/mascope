@@ -7,6 +7,7 @@ from mascope_tools.alignment.calibration import CentroidedSpectrum, Spectra
 
 
 DEFAULT_NOISE_THRESHOLD = 10
+DEFAULT_PARENT_PEAK_TOLERANCE = 0.001
 
 
 class DataExtractor:
@@ -109,33 +110,57 @@ class DataExtractor:
             )
         return filtered_centroids
 
-    def _get_parent_peaks(self):
-        """Extract unique parent peaks from MS2 scans"""
+    def _extract_raw_ms2_parent_peaks(self) -> pd.Series:
+        """Extract the parent peak m/z from ScanType for every MS2 scan.
+        Returns a Series with the same column labels as self.stats, restricted to MS2 scans.
+        """
 
         def extract_parent_peak(scan_type):
-            """Extract the parent peak m/z from the scan type string"""
             match = re.search(r"ms2 ([\d.]+)@", scan_type)
             if match:
                 return float(match.group(1))
-            else:
-                raise ValueError(
-                    f"Failed to extract parent peak from the string: {scan_type}"
-                )
+            raise ValueError(
+                f"Failed to extract parent peak from the string: {scan_type}"
+            )
 
-        scan_type_per_ms2_scan = self.stats.loc["ScanType"][self.ms2_mask]
-        parent_peaks = scan_type_per_ms2_scan.apply(extract_parent_peak)
-        return parent_peaks.unique()
+        return self.stats.loc["ScanType"][self.ms2_mask].apply(extract_parent_peak)
+
+    def _get_parent_peaks(self) -> np.ndarray:
+        """Extract unique parent peaks from MS2 scans, merging near-duplicates
+        that arise from instrument float drift in ScanType strings.
+        Peaks within `params['parent_peak_tolerance']` Da of each other
+        are collapsed into a single representative m/z
+        (median of the cluster, rounded to 4 decimal places).
+        """
+        self.raw_ms2_parent_peaks = self._extract_raw_ms2_parent_peaks()
+        tolerance = self.params.get(
+            "parent_peak_tolerance", DEFAULT_PARENT_PEAK_TOLERANCE
+        )
+
+        sorted_values = np.sort(self.raw_ms2_parent_peaks.unique())
+        clusters: list[list[float]] = []
+        for value in sorted_values:
+            if clusters and (value - clusters[-1][0]) <= tolerance:
+                clusters[-1].append(value)
+            else:
+                clusters.append([value])
+
+        return np.array([round(float(np.median(cluster)), 4) for cluster in clusters])
 
     def _get_hcd_energy_map(self):
         """Calculate the average HCD energy for each unique parent peak.
         Handles step dissociation where energy values may contain multiple
         comma-separated values (e.g. "4.5,5.8,10.5"), averaging each step
         position separately across scans."""
+        tolerance = self.params.get(
+            "parent_peak_tolerance", DEFAULT_PARENT_PEAK_TOLERANCE
+        )
         hcd_energy_per_parent_peak = {}
         for parent_peak in self.parent_peaks:
-            raw_values = self.stats.loc["HCD Energy V:"][
-                self.stats.loc["ScanType"].str.contains(f"{parent_peak}@")
+            matching_cols = self.raw_ms2_parent_peaks.index[
+                np.abs(self.raw_ms2_parent_peaks.values - parent_peak) <= tolerance
             ]
+            raw_values = self.stats.loc["HCD Energy V:"][matching_cols]
             # Split by comma to handle step dissociation energies
             step_dissociation_values = [
                 [float(v) for v in str(val).split(",")] for val in raw_values
@@ -177,13 +202,21 @@ class DataExtractor:
         )
 
     def _get_ms2_masks_per_parent_peak(self):
-        """Create masks for MS2 spectra corresponding to each unique parent peak"""
-        return {
-            parent_peak: self.stats.loc["ScanType"]
-            .str.contains(f"{parent_peak}@")
-            .values
-            for parent_peak in self.parent_peaks
-        }
+        """Create masks for MS2 spectra corresponding to each unique parent peak.
+        Uses numerical tolerance matching to merge near-duplicate parent m/z values.
+        """
+        tolerance = self.params.get(
+            "parent_peak_tolerance", DEFAULT_PARENT_PEAK_TOLERANCE
+        )
+        result = {}
+        for parent_peak in self.parent_peaks:
+            matching_cols = self.raw_ms2_parent_peaks.index[
+                np.abs(self.raw_ms2_parent_peaks.values - parent_peak) <= tolerance
+            ]
+            mask = pd.Series(False, index=self.stats.columns)
+            mask[matching_cols] = True
+            result[parent_peak] = mask.values
+        return result
 
     def _get_ms1_spectra(self):
         """Build MS1 spectra from centroid data"""
