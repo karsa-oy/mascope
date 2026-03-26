@@ -18,6 +18,7 @@ Design constraints:
 
 import os
 import subprocess
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -54,6 +55,40 @@ def _docker_exec(
         check=False,  # callers handle returncode with context-specific errors
         timeout=600,  # 10 min ceiling (large db on slower disks)
     )
+
+
+def _wait_for_dump_in_container(
+    container: str,
+    container_path: str,
+    timeout: int = 60,
+) -> bool:
+    """
+    Poll until a dump file is visible inside the container.
+
+    Docker on Windows uses a virtual filesystem layer (WSL2/VirtioFS)
+    that can introduce a short delay between a file appearing on the host
+    bind-mount and becoming visible inside the container. This function polls
+    via `docker exec test -f` to confirm the file is accessible from the
+    container's perspective.
+
+    :param container: PostgreSQL container name.
+    :type container: str
+    :param container_path: Absolute path to the dump file inside the container
+                           (e.g. `/transfer/mascope_tof1_20260325_120000_sync.dump`).
+    :type container_path: str
+    :param timeout: Maximum seconds to wait before giving up. Default: 60.
+    :type timeout: int
+    :return: `True` if the file becomes visible within `timeout` seconds,
+             `False` otherwise.
+    :rtype: bool
+    """
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        result = _docker_exec(container, ["test", "-f", container_path])
+        if result.returncode == 0:
+            return True
+        time.sleep(1)
+    return False
 
 
 # --- Exceptions ---
@@ -196,7 +231,8 @@ def pg_restore(
 
     The dump file must reside in the directory bind-mounted as `mount` in
     the container — only `dump_file.name` is used to build the container
-    path.
+    path. Before invoking pg_restore, waits up to 60s for the file to become
+    visible inside the container view.
 
     :param container: PostgreSQL container name (e.g. `mascope_prod_postgres`).
     :type container: str
@@ -218,6 +254,13 @@ def pg_restore(
         raise FileNotFoundError(f"Dump file not found: {dump_file}")
 
     container_path = f"{mount}/{dump_file.name}"
+
+    if not _wait_for_dump_in_container(container, container_path):
+        raise RuntimeError(
+            f"Dump file '{dump_file.name}' is not visible inside container "
+            f"'{container}' at '{container_path}' after 60s. "
+            f"Verify that the transfer directory is correctly bind-mounted as '{mount}'."
+        )
 
     result = _docker_exec(
         container,
