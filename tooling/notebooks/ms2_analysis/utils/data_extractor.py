@@ -82,6 +82,14 @@ class DataExtractor:
             self.ms1_timeseries = self._ms1_spectra_obj.get_timeseries()
             self.normalized_ms2_timeseries = self._get_normalized_ms2_timeseries()
 
+        # TIC and parent peak intensities (for fragment table)
+        self.ms1_tic = float(self.ms1_spectrum.intensity.sum())
+        self.ms2_tic = {
+            pp: float(self.ms2_spectra[pp].intensity.sum()) for pp in self.parent_peaks
+        }
+        self.parent_peak_intensities = self._get_parent_peak_intensities()
+        self.ms1_isolation_tic = self._get_ms1_isolation_tic()
+
     def _filter_centroids(self):
         """Filter out noise peaks:
         - Based on minimum signal-to-noise ratio threshold defined in params (default: 10)
@@ -272,3 +280,23 @@ class DataExtractor:
             normalized_ms2_timeseries[pp] = frag_ts.div(aligned_parent, axis=1)
 
         return normalized_ms2_timeseries
+
+    def _get_parent_peak_intensities(self) -> dict:
+        """Look up each parent peak's intensity in the averaged MS1 spectrum"""
+        mz = self.ms1_spectrum.mz
+        intensity = self.ms1_spectrum.intensity
+        result = {}
+        for pp in self.parent_peaks:
+            idx = np.argmin(np.abs(mz - pp))
+            result[pp] = float(intensity[idx])
+        return result
+
+    def _get_ms1_isolation_tic(self) -> dict:
+        """Sum MS1 intensities within the isolation window around each parent peak"""
+        mz = self.ms1_spectrum.mz
+        intensity = self.ms1_spectrum.intensity
+        half_iso = self.isolation_width / 2
+        return {
+            pp: float(intensity[np.abs(mz - pp) <= half_iso].sum())
+            for pp in self.parent_peaks
+        }
