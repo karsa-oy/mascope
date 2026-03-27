@@ -1,7 +1,17 @@
 """
 Functionalities related to the m/z fitting calibration processes.
+
+General calibration workflow:
+- Match potential calibration peaks in the sample file based on the provided calibration collection and parameters.
+- Fit the calibration model to the matched peaks, with different strategies for small vs large numbers of matches.
+    - For large numbers of matches, a single fit is performed and matches with high residual errors are filtered out.
+    - For small numbers of matches, an iterative combinatorial approach is used to find the largest subset of matches that yields a fit with acceptable residuals.
+- Evaluate the fit and filter out matches with high residual errors.
+- Build a calibration DataFrame containing the original and calibrated m/z values, errors, and other relevant statistics for each matched peak.
+- Apply the calibration to the sample file by updating m/z coordinates for existing signals and peaks, and storing the calibration parameters for future use.
 """
 
+from itertools import combinations
 import numpy as np
 import pandas as pd
 from zarr.errors import PathNotFoundError
@@ -39,6 +49,11 @@ from mascope_match.params import (
     UnmatchedIsotopeParams,
 )
 from mascope_tofwerk.calibration import mz_calibrate, tof_to_mass
+
+
+TOF_MINIMUM_CALIBRATION_POINTS = 3
+ORBI_MINIMUM_CALIBRATION_POINTS = 1
+LARGE_SAMPLE_SIZE_THRESHOLD = 5
 
 
 class BaseCalibrationHandler:
@@ -270,7 +285,7 @@ class BaseCalibrationHandler:
     def _match_max_in_range(
         self,
         isotope_row: pd.Series,
-        peaks: dict,  # type: ignore # noqa: F821
+        peaks: dict,
     ):
         """Match the isotope to the peak with the highest intensity within the m/z tolerance range."""
         target_mz = isotope_row["mz"]
@@ -292,19 +307,122 @@ class BaseCalibrationHandler:
 
         return isotope_row
 
-    def _remove_outliers(self, calibration_df: pd.DataFrame) -> pd.DataFrame:
-        """Remove outlier peaks from the calibration results based on
-        the median absolute deviation (MAD) of the m/z errors.
+    def _fit_matches(self, matches_df: pd.DataFrame) -> tuple[dict, dict]:
+        raise NotImplementedError("Subclasses must implement this method.")
 
-        :param calibration_df: DataFrame containing calibration results.
-        :type calibration_df: pd.DataFrame
-        :return: DataFrame with outliers removed.
-        :rtype: pd.DataFrame
-        """
-        mz_errors = calibration_df["calibration_mz_error"]
-        mad = np.median(np.abs(mz_errors - np.median(mz_errors)))
-        outlier_mask = np.abs(mz_errors - np.median(mz_errors)) > 3 * mad
-        return calibration_df[~outlier_mask]
+    def _evaluate_fit(self, matches_df: pd.DataFrame, fit_result: dict) -> dict:
+        raise NotImplementedError("Subclasses must implement this method.")
+
+    @property
+    def _minimum_calibration_points(self) -> int:
+        raise NotImplementedError("Subclasses must implement this method.")
+
+    def _build_calibration_df(
+        self,
+        matches_df: pd.DataFrame,
+        fit_stats: dict,
+    ) -> pd.DataFrame:
+        """Build a DataFrame containing calibration results and statistics for each matched peak."""
+        return matches_df.copy().assign(
+            calibration_mz=fit_stats["new_mz"],
+            calibration_mz_error=fit_stats["post_dmz"],
+            mz_error_diff=abs(fit_stats["post_dmz"]) - abs(fit_stats["pre_dmz"]),
+        )
+
+    def _residual_mask(self, calibration_df: pd.DataFrame) -> pd.Series:
+        """Create a boolean mask to identify matches with acceptable calibration m/z error."""
+        return (
+            calibration_df["calibration_mz_error"].abs()
+            <= self.params.mz_error_tolerance
+        )
+
+    def _candidate_subset_sizes(self, total_points: int) -> range:
+        """Generate a range of subset sizes to consider for small sample calibration fitting."""
+        min_points = self._minimum_calibration_points
+        return range(total_points - 1, min_points - 1, -1)
+
+    def _select_large_sample_matches(self, matches_df: pd.DataFrame) -> pd.DataFrame:
+        """Select matches with acceptable residuals after fitting all matches."""
+        fit_result, _ = self._fit_matches(matches_df)
+        evaluated_df = self._build_calibration_df(
+            matches_df,
+            self._evaluate_fit(matches_df, fit_result),
+        )
+        retained_df = evaluated_df[self._residual_mask(evaluated_df)].copy()
+        if retained_df.empty:
+            return matches_df.copy()
+        return retained_df
+
+    def _select_small_sample_matches(self, matches_df: pd.DataFrame) -> pd.DataFrame:
+        """Iteratively evaluate subsets of matches to find the largest subset with acceptable residuals."""
+        fit_result, _ = self._fit_matches(matches_df)
+        full_eval_df = self._build_calibration_df(
+            matches_df,
+            self._evaluate_fit(matches_df, fit_result),
+        )
+        if self._residual_mask(full_eval_df).all():
+            return full_eval_df
+
+        best_candidate = None
+        all_indices = tuple(range(len(matches_df)))
+        for subset_size in self._candidate_subset_sizes(len(matches_df)):
+            for subset_indices in combinations(all_indices, subset_size):
+                subset_df = matches_df.iloc[list(subset_indices)].copy()
+                subset_fit_result, _ = self._fit_matches(subset_df)
+                evaluated_df = self._build_calibration_df(
+                    matches_df,
+                    self._evaluate_fit(matches_df, subset_fit_result),
+                )
+                retained_mask = evaluated_df.index.isin(subset_indices)
+                retained_errors = evaluated_df.loc[
+                    retained_mask, "calibration_mz_error"
+                ].abs()
+                excluded_errors = evaluated_df.loc[
+                    ~retained_mask, "calibration_mz_error"
+                ].abs()
+
+                retained_consistent = bool(
+                    np.all(retained_errors <= self.params.mz_error_tolerance)
+                )
+                excluded_inconsistent = excluded_errors.empty or bool(
+                    np.all(excluded_errors > self.params.mz_error_tolerance)
+                )
+                if not (retained_consistent and excluded_inconsistent):
+                    continue
+
+                candidate_score = (
+                    len(subset_indices),
+                    -float(retained_errors.mean()),
+                    -float(evaluated_df["calibration_mz_error"].abs().mean()),
+                )
+                if best_candidate is None or candidate_score > best_candidate[0]:
+                    best_candidate = (
+                        candidate_score,
+                        evaluated_df.loc[retained_mask].copy(),
+                    )
+
+        if best_candidate is None:
+            return full_eval_df
+        return best_candidate[1]
+
+    def _select_retained_matches(self, matches_df: pd.DataFrame) -> pd.DataFrame:
+        """Select matches to retain for the final fit based on the number of matches and residual errors."""
+        if len(matches_df) <= LARGE_SAMPLE_SIZE_THRESHOLD:
+            return self._select_small_sample_matches(matches_df)
+        return self._select_large_sample_matches(matches_df)
+
+    def _fit_retained_matches(
+        self,
+        matches_df: pd.DataFrame,
+    ) -> tuple[dict, pd.DataFrame]:
+        """Fit the calibration model to the retained matches and build the final calibration DataFrame."""
+        retained_df = self._select_retained_matches(matches_df)
+        final_fit_result, _ = self._fit_matches(retained_df)
+        final_calibration_df = self._build_calibration_df(
+            retained_df,
+            self._evaluate_fit(retained_df, final_fit_result),
+        )
+        return final_fit_result, final_calibration_df
 
     def _get_summary_row(self, calibration_df):
         match_mz_error = abs(calibration_df["match_mz_error"]).mean()
@@ -324,6 +442,10 @@ class BaseCalibrationHandler:
         """
         raise NotImplementedError("Subclasses must implement this method.")
 
+    async def _send_progress(self, progress: float) -> None:
+        if self.notification is not None:
+            await send_progress_user_notification(self.notification, progress)
+
     async def apply(self, fit: dict):
         """
         Apply method to be implemented by subclasses.
@@ -341,15 +463,43 @@ class BaseCalibrationHandler:
 
 class TofCalibrationHandler(BaseCalibrationHandler):
 
+    @property
+    def _minimum_calibration_points(self) -> int:
+        return TOF_MINIMUM_CALIBRATION_POINTS
+
+    def _fit_matches(self, matches_df: pd.DataFrame) -> tuple[dict, dict]:
+        """Fit the m/z calibration model to the matched peaks using the tofwerk mz_calibrate function."""
+        return mz_calibrate(
+            matches_df["sample_peak_tof"],
+            matches_df["sample_peak_mz"],
+            matches_df["mz"],
+        )
+
+    def _evaluate_fit(self, matches_df: pd.DataFrame, fit_result: dict) -> dict:
+        """Evaluate the fit by calculating the calibrated m/z values and errors for each matched peak."""
+        fit_mode = fit_result["mode"]
+        fit_parameters = fit_result["par"]
+        target_mzs = matches_df["mz"].to_numpy()
+        observed_mzs = matches_df["sample_peak_mz"].to_numpy()
+        observed_tofs = matches_df["sample_peak_tof"].to_numpy()
+        calibrated_mzs = tof_to_mass(observed_tofs, fit_mode, fit_parameters)
+
+        return {
+            "mz": target_mzs,
+            "new_mz": calibrated_mzs,
+            "pre_dmz": 1e6 * (observed_mzs - target_mzs) / target_mzs,
+            "post_dmz": 1e6 * (calibrated_mzs - target_mzs) / target_mzs,
+        }
+
     @api_controller()
     async def fit(self):
         """Fit the m/z calibration for a TOF instrument."""
-        await send_progress_user_notification(self.notification, 0.25)
+        await self._send_progress(0.25)
 
         _, tic_per_scan = m_compute.get_tic_per_scan(self.filename)
         tic = np.sum(tic_per_scan)
 
-        await send_progress_user_notification(self.notification, 0.35)
+        await self._send_progress(0.35)
 
         match_isotope_df, good_matches_df = await self._match_calibration_compounds()
 
@@ -364,42 +514,48 @@ class TofCalibrationHandler(BaseCalibrationHandler):
         calibrant_signal_intensity = good_matches_df["sample_peak_intensity"]
         calibrant_to_tic = calibrant_signal_intensity / tic
 
-        await send_progress_user_notification(self.notification, 0.75)
+        await self._send_progress(0.75)
 
-        if n_relevant_isotopes >= 3 and len(good_matches_df) >= 3:
-            self.fit_result, self.stats = mz_calibrate(
-                good_matches_df["sample_peak_tof"],
-                good_matches_df["sample_peak_mz"],
-                good_matches_df["mz"],
+        if (
+            n_relevant_isotopes >= self._minimum_calibration_points
+            and len(good_matches_df) >= self._minimum_calibration_points
+        ):
+            calibration_matches_df = good_matches_df.copy().assign(
+                calibrant_to_tic=calibrant_to_tic,
             )
-            zero_coefficient = any([coef == 0 for coef in self.fit_result["par"]])
+            initial_fit_result, _ = self._fit_matches(calibration_matches_df)
+            zero_coefficient = any(coef == 0 for coef in initial_fit_result["par"])
             if zero_coefficient:
                 self.fit_result = None
                 self.stats = good_matches_df.to_dict("records")
                 self.error = "Calibration failed"
                 return
 
-            calibration_df = good_matches_df.copy().assign(
-                calibration_mz=self.stats["new_mz"],
-                calibration_mz_error=self.stats["post_dmz"],
-                mz_error_diff=abs(self.stats["post_dmz"]) - abs(self.stats["pre_dmz"]),
-                calibrant_to_tic=calibrant_to_tic,
-            )
-            calibration_df = self._remove_outliers(calibration_df)
-            if len(calibration_df) < 3:
+            calibration_df = self._select_retained_matches(calibration_matches_df)
+            if len(calibration_df) < self._minimum_calibration_points:
                 self.fit_result = None
                 self.stats = calibration_df.to_dict("records")
                 self.warning = (
-                    "Not enough calibration peaks after outlier removal. "
+                    "Not enough calibration peaks after residual filtering. "
                     "At least 3 peaks are required for a reliable calibration fit."
                 )
+                return
+
+            self.fit_result, calibration_df = self._fit_retained_matches(
+                calibration_df,
+            )
+            zero_coefficient = any(coef == 0 for coef in self.fit_result["par"])
+            if zero_coefficient:
+                self.fit_result = None
+                self.stats = calibration_df.to_dict("records")
+                self.error = "Calibration failed"
                 return
 
             self.stats = calibration_df.to_dict("records")
             summary_row = self._get_summary_row(calibration_df)
             self.stats.append(summary_row)
 
-            isotopes_from_single_ion = len(good_matches_df.target_ion_id.unique()) == 1
+            isotopes_from_single_ion = len(calibration_df.target_ion_id.unique()) == 1
             mz_err_too_high = (
                 abs(summary_row["calibration_mz_error"])
                 > self.params.mz_error_tolerance
@@ -408,7 +564,7 @@ class TofCalibrationHandler(BaseCalibrationHandler):
             if calibration_inaccurate:
                 self.warning = "Calibration inaccurate"
 
-            await send_progress_user_notification(self.notification, 0.95)
+            await self._send_progress(0.95)
         else:
             self.fit_result = None
             self.stats = good_matches_df.to_dict("records")
@@ -423,7 +579,10 @@ class TofCalibrationHandler(BaseCalibrationHandler):
 
         nbr_samples = m_compute.get_sum_signal(self.filename).size
         tof = np.arange(nbr_samples)
-        new_mz_axis = tof_to_mass(tof, fit_mode, fit_parameters)
+        new_mz_axis = np.asarray(
+            tof_to_mass(tof, fit_mode, fit_parameters),
+            dtype=np.float64,
+        )
         new_mz_range = new_mz_axis[0], new_mz_axis[-1]
 
         runtime.logger.info(f"Calibrating file: {self.filename}")
@@ -456,27 +615,19 @@ class TofCalibrationHandler(BaseCalibrationHandler):
 
 
 class OrbiCalibrationHandler(BaseCalibrationHandler):
-    @api_controller()
-    async def fit(self):
-        """Fit the m/z calibration for an Orbitrap instrument."""
-        await send_progress_user_notification(self.notification, 0.25)
 
-        match_isotope_df, good_matches_df = await self._match_calibration_compounds()
+    @property
+    def _minimum_calibration_points(self) -> int:
+        return ORBI_MINIMUM_CALIBRATION_POINTS
 
-        await send_progress_user_notification(self.notification, 0.75)
-
-        if good_matches_df.empty:
-            self.warning = "No calibration peaks found"
-            return
-
-        target_mzs = good_matches_df["mz"].to_numpy()
-        observed_mzs = good_matches_df["sample_peak_mz"].to_numpy()
-
+    def _fit_matches(self, matches_df: pd.DataFrame) -> tuple[dict, dict]:
+        """Fit the m/z calibration model to the matched peaks using a one-point calibration approach."""
+        target_mzs = matches_df["mz"].to_numpy()
+        observed_mzs = matches_df["sample_peak_mz"].to_numpy()
         old_factor_scaling = np.median(target_mzs / observed_mzs)
         old_factor = self._get_old_factor()
         calibration_factor = old_factor * old_factor_scaling
-        # Store all factors at the time of fitting for unit testing
-        self.fit_result = {
+        fit_result = {
             "mode": "one-point",
             "par": {
                 "old_factor": old_factor,
@@ -484,29 +635,49 @@ class OrbiCalibrationHandler(BaseCalibrationHandler):
                 "calibration_factor": calibration_factor,
             },
         }
+        fit_stats = self._evaluate_fit(matches_df, fit_result)
+        return fit_result, fit_stats
 
-        # Show stats relative to the original m/z values
-        self.stats = {
-            "mz": observed_mzs,
-            "new_mz": observed_mzs * old_factor_scaling,
+    def _evaluate_fit(self, matches_df: pd.DataFrame, fit_result: dict) -> dict:
+        """Evaluate the fit by calculating the calibrated m/z values and errors
+        for each matched peak based on the one-point calibration factor.
+        """
+        target_mzs = matches_df["mz"].to_numpy()
+        observed_mzs = matches_df["sample_peak_mz"].to_numpy()
+        old_factor_scaling = fit_result["par"]["old_factor_scaling"]
+        calibrated_mzs = observed_mzs * old_factor_scaling
+
+        return {
+            "mz": target_mzs,
+            "new_mz": calibrated_mzs,
             "pre_dmz": 1e6 * (observed_mzs - target_mzs) / target_mzs,
-            "post_dmz": 1e6
-            * (observed_mzs * old_factor_scaling - target_mzs)
-            / target_mzs,
+            "post_dmz": 1e6 * (calibrated_mzs - target_mzs) / target_mzs,
         }
+
+    @api_controller()
+    async def fit(self):
+        """Fit the m/z calibration for an Orbitrap instrument."""
+        await self._send_progress(0.25)
+
+        match_isotope_df, good_matches_df = await self._match_calibration_compounds()
+
+        await self._send_progress(0.75)
+
+        if good_matches_df.empty:
+            self.warning = "No calibration peaks found"
+            return
 
         _, tic_per_scan = m_compute.get_tic_per_scan(self.filename)
         tic = np.sum(tic_per_scan)
         calibrant_signal_intensity = good_matches_df["sample_peak_intensity"]
         calibrant_to_tic = calibrant_signal_intensity / tic
 
-        calibration_df = good_matches_df.copy().assign(
-            calibration_mz=self.stats["new_mz"],
-            calibration_mz_error=self.stats["post_dmz"],
-            mz_error_diff=abs(self.stats["post_dmz"]) - abs(self.stats["pre_dmz"]),
+        calibration_matches_df = good_matches_df.copy().assign(
             calibrant_to_tic=calibrant_to_tic,
         )
-        calibration_df = self._remove_outliers(calibration_df)
+        self.fit_result, calibration_df = self._fit_retained_matches(
+            calibration_matches_df,
+        )
 
         calibration_inaccurate = np.all(
             np.abs(calibration_df["calibration_mz_error"])
@@ -519,7 +690,7 @@ class OrbiCalibrationHandler(BaseCalibrationHandler):
         summary_row = self._get_summary_row(calibration_df)
         self.stats.append(summary_row)
 
-        await send_progress_user_notification(self.notification, 0.95)
+        await self._send_progress(0.95)
 
     async def apply(self, fit: dict):
         """Applies the m/z calibration fit to the sample file.
@@ -600,7 +771,9 @@ class OrbiCalibrationHandler(BaseCalibrationHandler):
 
 
 def get_calibration_handler(
-    filename: str, calibration_params: CalibrationFitParams, notifications: object
+    filename: str,
+    calibration_params: CalibrationFitParams,
+    notifications: UserNotification | None,
 ) -> BaseCalibrationHandler:
     instrument_type = m_name.get_instrument_type(filename)
     match instrument_type:
