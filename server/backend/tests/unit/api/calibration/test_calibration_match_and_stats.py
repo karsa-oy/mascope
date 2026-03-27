@@ -83,42 +83,120 @@ class TestMatchMaxInRange:
         np.testing.assert_allclose(isotope_row["sample_peak_mz"], boundary_mz)
 
 
-class TestRemoveOutliers:
-    """Tests for _remove_outliers.
-
-    Uses median absolute deviation (MAD): outlier when |error - median| > 3 * MAD.
+class TestSelectRetainedMatches:
+    """Tests for residual-based retained peak selection.
 
     Expected behaviors:
-    - If no outliers are present, all rows are kept.
-    - If a clear outlier is present, it is removed.
-    - If only one row is present, it is kept (since we can't define outliers with a single point).
+    - Small samples only drop clearly inconsistent peaks.
+    - Ambiguous small samples keep all peaks.
+    - Larger samples retain only peaks within the post-fit residual tolerance.
     """
 
     def setup_method(self):
         self.orbi_pos_handler = get_test_calibration_handler("orbitrap", "+")
-        self.isotope_row = _make_isotope_row(100.0)
+        self.orbi_pos_handler._get_old_factor = lambda: 1.0
+        self.base_df = pd.DataFrame(
+            {
+                "mz": [100.0, 200.0, 300.0],
+                "sample_peak_mz": [100.0, 200.0, 300.0],
+                "sample_peak_tof": [1000.0, 2000.0, 3000.0],
+                "match_mz_error": [0.0, 0.0, 0.0],
+                "calibrant_to_tic": [0.1, 0.2, 0.3],
+                "target_ion_id": ["ion-1", "ion-2", "ion-3"],
+            }
+        )
 
-    def test_no_outliers(self):
-        df = pd.DataFrame({"calibration_mz_error": [1.0, 1.1, 0.9, 1.05]})
-        result = self.orbi_pos_handler._remove_outliers(df)
+    def test_small_sample_consensus_removes_clear_outlier(self):
+        df = self.base_df.copy()
+        df.loc[2, "sample_peak_mz"] = 330.0
 
-        assert len(result) == 4
+        result = self.orbi_pos_handler._select_retained_matches(df)
 
-    def test_clear_outlier_removed(self):
-        errors = [1.0, 1.1, 0.9, 1.05, 50.0]
-        df = pd.DataFrame({"calibration_mz_error": errors})
+        assert len(result) == 2
+        assert 330.0 not in result["sample_peak_mz"].values
 
-        result = self.orbi_pos_handler._remove_outliers(df)
+    def test_small_sample_consensus_keeps_ambiguous_points(self):
+        df = self.base_df.copy()
+        df["sample_peak_mz"] = [100.00005, 200.00010, 300.00015]
 
-        assert 50.0 not in result["calibration_mz_error"].values
-        assert len(result) == 4
+        result = self.orbi_pos_handler._select_retained_matches(df)
 
-    def test_single_row_kept(self):
-        df = pd.DataFrame({"calibration_mz_error": [5.0]})
+        assert len(result) == 3
 
-        result = self.orbi_pos_handler._remove_outliers(df)
+    def test_large_sample_residual_filter_removes_bad_peak(self):
+        df = pd.DataFrame(
+            {
+                "mz": [100.0, 200.0, 300.0, 400.0, 500.0, 600.0],
+                "sample_peak_mz": [100.0, 200.0, 300.0, 400.0, 500.0, 660.0],
+                "sample_peak_tof": [1000.0, 2000.0, 3000.0, 4000.0, 5000.0, 6000.0],
+                "match_mz_error": [0.0] * 6,
+                "calibrant_to_tic": [0.1] * 6,
+                "target_ion_id": [f"ion-{idx}" for idx in range(6)],
+            }
+        )
 
-        assert len(result) == 1
+        result = self.orbi_pos_handler._select_retained_matches(df)
+
+        assert len(result) == 5
+        assert 660.0 not in result["sample_peak_mz"].values
+
+
+class TestFitRetainedMatches:
+    def setup_method(self):
+        self.orbi_pos_handler = get_test_calibration_handler("orbitrap", "+")
+        self.orbi_pos_handler._get_old_factor = lambda: 1.0
+
+    def test_refits_on_retained_matches(self):
+        df = pd.DataFrame(
+            {
+                "mz": [100.0, 200.0, 300.0],
+                "sample_peak_mz": [100.0, 200.0, 300.0],
+                "sample_peak_tof": [1000.0, 2000.0, 3000.0],
+                "match_mz_error": [0.0, 0.0, 0.0],
+                "calibrant_to_tic": [0.1, 0.2, 0.3],
+                "target_ion_id": ["ion-1", "ion-2", "ion-3"],
+            }
+        )
+        fit_calls = []
+
+        self.orbi_pos_handler._select_retained_matches = (
+            lambda matches_df: matches_df.iloc[:2].copy()
+        )
+
+        def fake_fit_matches(matches_df):
+            fit_calls.append(len(matches_df))
+            scale = float(len(matches_df))
+            return {
+                "mode": "one-point",
+                "par": {
+                    "old_factor": 1.0,
+                    "old_factor_scaling": scale,
+                    "calibration_factor": scale,
+                },
+            }, {
+                "mz": matches_df["mz"].to_numpy(),
+                "new_mz": matches_df["sample_peak_mz"].to_numpy() * scale,
+                "pre_dmz": np.zeros(len(matches_df)),
+                "post_dmz": np.zeros(len(matches_df)),
+            }
+
+        def fake_evaluate_fit(matches_df, fit_result):
+            scale = fit_result["par"]["old_factor_scaling"]
+            return {
+                "mz": matches_df["mz"].to_numpy(),
+                "new_mz": matches_df["sample_peak_mz"].to_numpy() * scale,
+                "pre_dmz": np.zeros(len(matches_df)),
+                "post_dmz": np.zeros(len(matches_df)),
+            }
+
+        self.orbi_pos_handler._fit_matches = fake_fit_matches
+        self.orbi_pos_handler._evaluate_fit = fake_evaluate_fit
+
+        fit_result, calibration_df = self.orbi_pos_handler._fit_retained_matches(df)
+
+        assert fit_calls == [2]
+        assert fit_result["par"]["old_factor_scaling"] == 2.0
+        assert len(calibration_df) == 2
 
 
 class TestGetSummaryRow:
