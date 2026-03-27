@@ -17,6 +17,7 @@ Design constraints:
 """
 
 import os
+import re
 import subprocess
 import time
 from datetime import datetime, timedelta
@@ -534,10 +535,18 @@ def list_dumps(
     """
     List `.dump` files in a backup directory, sorted newest first.
 
+    When `db_name_filter` is provided, only files belonging to that exact
+    database are returned. Matching is anchored to the timestamp separator
+    (`_YYYYMMDD_HHMMSS`)
+
+    Expected filename formats (produced by :func:`pg_dump`)::
+        {database}_{YYYYMMDD}_{HHMMSS}.dump
+        {database}_{YYYYMMDD}_{HHMMSS}_{label}.dump
+
     :param target_dir: Directory to search for dump files.
     :type target_dir: Path
-    :param db_name_filter: If provided, only return files whose name starts
-                           with this string (typically the database name).
+    :param db_name_filter: If provided, only return files whose database name
+                           matches this string exactly
     :type db_name_filter: str | None
     :return: List of `.dump` file paths, newest first. Empty list if
              directory does not exist or contains no matching files.
@@ -553,7 +562,8 @@ def list_dumps(
     )
 
     if db_name_filter:
-        files = [f for f in files if f.name.startswith(db_name_filter)]
+        pattern = re.compile(rf"^{re.escape(db_name_filter)}_\d{{8}}_\d{{6}}[_.]")
+        files = [f for f in files if pattern.match(f.name)]
 
     return files
 
