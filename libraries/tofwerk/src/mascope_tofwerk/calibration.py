@@ -36,7 +36,7 @@ def mz_calibrate(peak_tof, peak_mz, exact_mz):
         x0=p_init,
         args=(exact_mz, peak_tof),
         method="trf",
-        loss="linear",
+        loss="soft_l1",
         max_nfev=1000,
     )
 
