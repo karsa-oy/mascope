@@ -386,6 +386,8 @@ class BaseCalibrationHandler:
         if all_peaks_within_tolerance:
             return matches_df
 
+        # Reset index to ensure correct indexing when evaluating subsets
+        matches_df = matches_df.reset_index(drop=True)
         best_candidate = None
         all_indices = tuple(range(len(matches_df)))
         for subset_size in self._candidate_subset_sizes(len(matches_df)):
