@@ -146,7 +146,7 @@ class DataExtractor:
         sorted_values = np.sort(self.raw_ms2_parent_peaks.unique())
         clusters: list[list[float]] = []
         for value in sorted_values:
-            if clusters and (value - clusters[-1][0]) <= tolerance:
+            if clusters and (value - clusters[-1][-1]) <= tolerance:
                 clusters[-1].append(value)
             else:
                 clusters.append([value])
