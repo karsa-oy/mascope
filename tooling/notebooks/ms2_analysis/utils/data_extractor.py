@@ -16,7 +16,7 @@ class DataExtractor:
         mascope_url: str,
         access_token: str,
         sample_file_id: str,
-        params: dict = {},
+        params: dict | None = None,
     ):
         """
         Initialize the DataExtractor by fetching metadata and spectra from the MAScope API,
@@ -34,7 +34,13 @@ class DataExtractor:
         :type params: dict, optional
         :raises ValueError:
         """
-        self.params = params
+        if params is None:
+            params = {}
+        elif isinstance(params, dict):
+            self.params = params
+        else:
+            raise ValueError("Params must be a dictionary if provided.")
+
         meta = msdk.get_sample_file_metadata(mascope_url, access_token, sample_file_id)
 
         if meta is None:
