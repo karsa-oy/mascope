@@ -432,16 +432,19 @@ class BaseCalibrationHandler:
                         calibration_candidates_df.loc[retained_mask].copy(),
                     )
 
-        if best_candidate is None:
-            # No subset found that cleanly separates in-tolerance from out-of-tolerance points.
-            # Signal that calibration should be skipped by returning an empty DataFrame
-            # (upstream callers treat an empty set as "not enough calibration peaks").
-            self.warning = (
-                "No suitable subset of calibration peaks found; skipping calibration."
-            )
-            return matches_df.iloc[0:0]
+            # If we found at least one valid candidate at this
+            # subset_size, we can stop. Any smaller subset_size will result
+            # in a lower 'best_score' due to the length component.
+            if best_candidate is not None:
+                return best_candidate[1]
 
-        return best_candidate[1]
+        # No subset found that cleanly separates in-tolerance from out-of-tolerance points.
+        # Signal that calibration should be skipped by returning an empty DataFrame
+        # (upstream callers treat an empty set as "not enough calibration peaks").
+        self.warning = (
+            "No suitable subset of calibration peaks found; skipping calibration."
+        )
+        return matches_df.iloc[0:0]
 
     def _select_retained_matches(self, matches_df: pd.DataFrame) -> pd.DataFrame:
         """Splits the logic for selecting retained matches based on the number of matches"""
