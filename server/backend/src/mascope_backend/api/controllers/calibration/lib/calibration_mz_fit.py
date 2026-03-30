@@ -2,13 +2,26 @@
 Functionalities related to the m/z fitting calibration processes.
 
 General calibration workflow:
-- Match potential calibration peaks in the sample file based on the provided calibration collection and parameters.
-- Fit the calibration model to the matched peaks, with different strategies for small vs large numbers of matches.
-    - For large numbers of matches, a single fit is performed and matches with high residual errors are filtered out.
-    - For small numbers of matches, an iterative combinatorial approach is used to find the largest subset of matches that yields a fit with acceptable residuals.
-- Evaluate the fit and filter out matches with high residual errors.
-- Build a calibration DataFrame containing the original and calibrated m/z values, errors, and other relevant statistics for each matched peak.
-- Apply the calibration to the sample file by updating m/z coordinates for existing signals and peaks, and storing the calibration parameters for future use.
+- Load calibration compounds from the selected target collection and fetch their
+   isotopes for the requested ionization mechanisms and instrument resolution.
+- Load detected peaks from the sample file and filter candidate peaks by polarity,
+   signal-to-noise ratio, proximity to target m/z values, and instrument
+   resolution to remove overlapping peaks.
+- Load peak time series for the remaining candidates, reduce them to scan
+   timestamps, and extract instrument-specific peak intensities.
+- Match each target isotope to the most intense sample peak within the refine
+   window and calculate match statistics.
+- Keep only calibration candidates that satisfy abundance, intensity, m/z error,
+   and match-score thresholds.
+- Fit an instrument-specific calibration model:
+   - TOF: multi-point fit using tof and m/z pairs.
+   - Orbitrap: one-point scaling based on observed-to-target m/z ratios.
+- Refine the calibration set by removing peaks with unacceptable residual errors;
+   for small match sets, evaluate all subsets to find the most self-consistent fit.
+- Build calibration statistics, summary metrics, and warnings when calibration is
+   missing, underdetermined, or inaccurate.
+- Apply the accepted calibration by updating stored calibration parameters and
+   rewriting relevant m/z coordinates in the sample file.
 """
 
 from itertools import combinations
@@ -329,7 +342,7 @@ class BaseCalibrationHandler:
             mz_error_diff=abs(fit_stats["post_dmz"]) - abs(fit_stats["pre_dmz"]),
         )
 
-    def _residual_mask(self, calibration_df: pd.DataFrame) -> pd.Series:
+    def _mz_error_mask(self, calibration_df: pd.DataFrame) -> pd.Series:
         """Create a boolean mask to identify matches with acceptable calibration m/z error."""
         return (
             calibration_df["calibration_mz_error"].abs()
@@ -341,43 +354,53 @@ class BaseCalibrationHandler:
         min_points = self._minimum_calibration_points
         return range(total_points - 1, min_points - 1, -1)
 
-    def _select_large_sample_matches(self, matches_df: pd.DataFrame) -> pd.DataFrame:
+    def _select_from_many_matches(self, matches_df: pd.DataFrame) -> pd.DataFrame:
         """Select matches with acceptable residuals after fitting all matches."""
         fit_result, _ = self._fit_matches(matches_df)
         evaluated_df = self._build_calibration_df(
             matches_df,
             self._evaluate_fit(matches_df, fit_result),
         )
-        retained_df = evaluated_df[self._residual_mask(evaluated_df)].copy()
+        retained_df = evaluated_df[self._mz_error_mask(evaluated_df)].copy()
         if retained_df.empty:
             return matches_df.copy()
         return retained_df
 
-    def _select_small_sample_matches(self, matches_df: pd.DataFrame) -> pd.DataFrame:
-        """Iteratively evaluate subsets of matches to find the largest subset with acceptable residuals."""
+    def _select_from_few_matches(self, matches_df: pd.DataFrame) -> pd.DataFrame:
+        """Implements an Exact RANSAC (random sample consensus) algorithm by evaluating all
+        possible subsets of matches and selecting the one with the best combination of number
+        of matches and residual errors that meet the m/z error tolerance criteria.
+
+        The number of combinations for <=5 matches is manageable for a brute force search,
+        thus we do not implement a random sampling approach as in traditional RANSAC.
+        """
         fit_result, _ = self._fit_matches(matches_df)
-        full_eval_df = self._build_calibration_df(
+        unfiltered_calibration_df = self._build_calibration_df(
             matches_df,
             self._evaluate_fit(matches_df, fit_result),
         )
-        if self._residual_mask(full_eval_df).all():
-            return full_eval_df
+
+        all_peaks_within_tolerance = self._mz_error_mask(
+            unfiltered_calibration_df
+        ).all()
+        if all_peaks_within_tolerance:
+            return matches_df
 
         best_candidate = None
         all_indices = tuple(range(len(matches_df)))
         for subset_size in self._candidate_subset_sizes(len(matches_df)):
             for subset_indices in combinations(all_indices, subset_size):
-                subset_df = matches_df.iloc[list(subset_indices)].copy()
-                subset_fit_result, _ = self._fit_matches(subset_df)
-                evaluated_df = self._build_calibration_df(
+                matches_subset = matches_df.iloc[list(subset_indices)].copy()
+                subset_fit_result, _ = self._fit_matches(matches_subset)
+                calibration_candidates_df = self._build_calibration_df(
                     matches_df,
                     self._evaluate_fit(matches_df, subset_fit_result),
                 )
-                retained_mask = evaluated_df.index.isin(subset_indices)
-                retained_errors = evaluated_df.loc[
+                retained_mask = calibration_candidates_df.index.isin(subset_indices)
+                retained_errors = calibration_candidates_df.loc[
                     retained_mask, "calibration_mz_error"
                 ].abs()
-                excluded_errors = evaluated_df.loc[
+                excluded_errors = calibration_candidates_df.loc[
                     ~retained_mask, "calibration_mz_error"
                 ].abs()
 
@@ -390,41 +413,56 @@ class BaseCalibrationHandler:
                 if not (retained_consistent and excluded_inconsistent):
                     continue
 
+                # Score candidates based on:
+                # - first by number of retained matches
+                # - then mean retained error (with negative sign to maximize it)
+                # - then mean excluded error (with negative sign to maximize it)
                 candidate_score = (
                     len(subset_indices),
                     -float(retained_errors.mean()),
-                    -float(evaluated_df["calibration_mz_error"].abs().mean()),
+                    -float(
+                        calibration_candidates_df["calibration_mz_error"].abs().mean()
+                    ),
                 )
                 if best_candidate is None or candidate_score > best_candidate[0]:
                     best_candidate = (
                         candidate_score,
-                        evaluated_df.loc[retained_mask].copy(),
+                        calibration_candidates_df.loc[retained_mask].copy(),
                     )
 
         if best_candidate is None:
-            return full_eval_df
+            # No subset found that cleanly separates in-tolerance from out-of-tolerance points.
+            # Signal that calibration should be skipped by returning an empty DataFrame
+            # (upstream callers treat an empty set as "not enough calibration peaks").
+            self.warning = (
+                "No suitable subset of calibration peaks found; skipping calibration."
+            )
+            return matches_df.iloc[0:0]
+
         return best_candidate[1]
 
     def _select_retained_matches(self, matches_df: pd.DataFrame) -> pd.DataFrame:
-        """Select matches to retain for the final fit based on the number of matches and residual errors."""
+        """Splits the logic for selecting retained matches based on the number of matches"""
         if len(matches_df) <= LARGE_SAMPLE_SIZE_THRESHOLD:
-            return self._select_small_sample_matches(matches_df)
-        return self._select_large_sample_matches(matches_df)
+            return self._select_from_few_matches(matches_df)
+        return self._select_from_many_matches(matches_df)
 
     def _fit_retained_matches(
         self,
         matches_df: pd.DataFrame,
     ) -> tuple[dict, pd.DataFrame]:
         """Fit the calibration model to the retained matches and build the final calibration DataFrame."""
-        retained_df = self._select_retained_matches(matches_df)
-        final_fit_result, _ = self._fit_matches(retained_df)
+        selected_matches_df = self._select_retained_matches(matches_df)
+        final_fit_result, _ = self._fit_matches(selected_matches_df)
         final_calibration_df = self._build_calibration_df(
-            retained_df,
-            self._evaluate_fit(retained_df, final_fit_result),
+            selected_matches_df,
+            self._evaluate_fit(selected_matches_df, final_fit_result),
         )
         return final_fit_result, final_calibration_df
 
     def _get_summary_row(self, calibration_df):
+        """Calculate summary statistics for the calibration results to be included as a summary row
+        in the output."""
         match_mz_error = abs(calibration_df["match_mz_error"]).mean()
         calibration_mz_error = abs(calibration_df["calibration_mz_error"]).mean()
         mz_error_diff = abs(match_mz_error - calibration_mz_error)
@@ -531,31 +569,32 @@ class TofCalibrationHandler(BaseCalibrationHandler):
                 self.error = "Calibration failed"
                 return
 
-            calibration_df = self._select_retained_matches(calibration_matches_df)
-            if len(calibration_df) < self._minimum_calibration_points:
+            self.fit_result, selected_matches_df = self._fit_retained_matches(
+                calibration_matches_df,
+            )
+            if len(selected_matches_df) < self._minimum_calibration_points:
                 self.fit_result = None
-                self.stats = calibration_df.to_dict("records")
+                self.stats = selected_matches_df.to_dict("records")
                 self.warning = (
                     "Not enough calibration peaks after residual filtering. "
                     "At least 3 peaks are required for a reliable calibration fit."
                 )
                 return
 
-            self.fit_result, calibration_df = self._fit_retained_matches(
-                calibration_df,
-            )
             zero_coefficient = any(coef == 0 for coef in self.fit_result["par"])
             if zero_coefficient:
                 self.fit_result = None
-                self.stats = calibration_df.to_dict("records")
+                self.stats = selected_matches_df.to_dict("records")
                 self.error = "Calibration failed"
                 return
 
-            self.stats = calibration_df.to_dict("records")
-            summary_row = self._get_summary_row(calibration_df)
+            self.stats = selected_matches_df.to_dict("records")
+            summary_row = self._get_summary_row(selected_matches_df)
             self.stats.append(summary_row)
 
-            isotopes_from_single_ion = len(calibration_df.target_ion_id.unique()) == 1
+            isotopes_from_single_ion = (
+                len(selected_matches_df.target_ion_id.unique()) == 1
+            )
             mz_err_too_high = (
                 abs(summary_row["calibration_mz_error"])
                 > self.params.mz_error_tolerance
