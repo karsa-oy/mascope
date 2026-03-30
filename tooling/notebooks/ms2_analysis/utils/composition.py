@@ -28,8 +28,8 @@ class CompositionMap:
 
             assigned_peaks, _ = assign_compositions(
                 ms2_peak_df,
-                self._composition_params,
-                self._heuristic_params,
+                self._composition_params.copy(),
+                self._heuristic_params.copy(),
             )
 
             self.matches[pp] = assigned_peaks.sort_values("mz").reset_index(drop=True)
