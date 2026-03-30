@@ -455,9 +455,16 @@ class BaseCalibrationHandler:
     def _fit_retained_matches(
         self,
         matches_df: pd.DataFrame,
-    ) -> tuple[dict, pd.DataFrame]:
+    ) -> tuple[dict | None, pd.DataFrame]:
         """Fit the calibration model to the retained matches and build the final calibration DataFrame."""
         selected_matches_df = self._select_retained_matches(matches_df)
+
+        # No retained points means no fit attempt.
+        if selected_matches_df.empty:
+            if self.warning is None:
+                self.warning = "No calibration peaks found after filtering."
+            return None, selected_matches_df
+
         final_fit_result, _ = self._fit_matches(selected_matches_df)
         final_calibration_df = self._build_calibration_df(
             selected_matches_df,
@@ -577,7 +584,10 @@ class TofCalibrationHandler(BaseCalibrationHandler):
             self.fit_result, selected_matches_df = self._fit_retained_matches(
                 calibration_matches_df,
             )
-            if len(selected_matches_df) < self._minimum_calibration_points:
+            if (
+                self.fit_result is None
+                or len(selected_matches_df) < self._minimum_calibration_points
+            ):
                 self.fit_result = None
                 self.stats = selected_matches_df.to_dict("records")
                 self.warning = (
@@ -722,6 +732,13 @@ class OrbiCalibrationHandler(BaseCalibrationHandler):
         self.fit_result, calibration_df = self._fit_retained_matches(
             calibration_matches_df,
         )
+
+        if self.fit_result is None or calibration_df.empty:
+            self.fit_result = None
+            self.stats = calibration_df.to_dict("records")
+            if self.warning is None:
+                self.warning = "No calibration peaks found after filtering."
+            return
 
         calibration_inaccurate = np.all(
             np.abs(calibration_df["calibration_mz_error"])
