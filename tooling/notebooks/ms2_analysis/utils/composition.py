@@ -32,4 +32,15 @@ class CompositionMap:
                 self._heuristic_params.copy(),
             )
 
+            assigned_peaks = ms2_peak_df[["mz"]].merge(
+                assigned_peaks, on="mz", how="left"
+            )
+            placeholders = {
+                "formula": "---",
+                "ion": "---",
+                "isotope_label": "---",
+                "other_candidates": "",
+            }
+            assigned_peaks = assigned_peaks.fillna(placeholders)
+
             self.matches[pp] = assigned_peaks.sort_values("mz").reset_index(drop=True)
