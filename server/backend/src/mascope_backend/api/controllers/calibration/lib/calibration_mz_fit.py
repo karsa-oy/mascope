@@ -416,15 +416,16 @@ class BaseCalibrationHandler:
                     continue
 
                 # Score candidates based on:
-                # - first by number of retained matches
-                # - then mean retained error (with negative sign to maximize it)
-                # - then mean excluded error (with negative sign to maximize it)
+                # - first by number of retained matches (higher is better)
+                # - then by lower mean retained error
+                # - then by higher mean excluded error
+                excluded_mean_error = (
+                    float(excluded_errors.mean()) if not excluded_errors.empty else 0.0
+                )
                 candidate_score = (
                     len(subset_indices),
                     -float(retained_errors.mean()),
-                    -float(
-                        calibration_candidates_df["calibration_mz_error"].abs().mean()
-                    ),
+                    excluded_mean_error,
                 )
                 if best_candidate is None or candidate_score > best_candidate[0]:
                     best_candidate = (
