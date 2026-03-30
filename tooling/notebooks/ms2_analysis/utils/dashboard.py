@@ -150,11 +150,36 @@ class Ms2Dashboard:
             f"&emsp; <b>Isolation width:</b> {d.isolation_width} m/z"
         )
 
+        # --- Composition data (needed by both MS1 and MS2 charts) ---
+        ms2_spec = d.ms2_spectra[pp]
+        comp_df = self._compositions.matches.get(pp, pd.DataFrame())
+        comp_mzs = (
+            comp_df["mz"].values
+            if not comp_df.empty and "mz" in comp_df.columns
+            else np.array([])
+        )
+        comp_ions = (
+            comp_df["ion"].values
+            if not comp_df.empty and "ion" in comp_df.columns
+            else np.array([])
+        )
+
+        # Look up parent peak composition from MS2 fragment matches
+        parent_ion_label = None
+        if len(comp_mzs) > 0:
+            idx = np.argmin(np.abs(comp_mzs - pp))
+            if abs(comp_mzs[idx] - pp) < half_iso:
+                ion = comp_ions[idx]
+                if pd.notna(ion) and str(ion).strip() and ion != "---":
+                    parent_ion_label = str(ion).strip()
+
         # --- Survey spectrum (MS1 within isolation window) ---
         mz = d.ms1_spectrum.mz
         intensity = d.ms1_spectrum.intensity
         within = np.abs(mz - pp) <= half_iso
         mz_w, int_w = mz[within], intensity[within]
+        ms1_y_max = max(float(np.max(int_w)), 1.0) if len(int_w) > 0 else 1.0
+        ms1_label_offset = 0.03 * ms1_y_max
 
         with self._fig_survey.batch_update():
             self._fig_survey.data = []
@@ -169,25 +194,33 @@ class Ms2Dashboard:
                 ):
                     self._fig_survey.add_trace(t)
                 self._fig_survey.update_xaxes(range=[pp - half_iso, pp + half_iso])
+
+                # Annotate parent peak with its ion composition
+                if parent_ion_label is not None:
+                    pidx = np.argmin(np.abs(mz_w - pp))
+                    self._fig_survey.add_trace(
+                        go.Scatter(
+                            x=[float(mz_w[pidx])],
+                            y=[float(int_w[pidx]) + ms1_label_offset],
+                            mode="text",
+                            text=[parent_ion_label],
+                            textposition="top center",
+                            textfont=dict(size=13),
+                            showlegend=False,
+                            cliponaxis=False,
+                            hoverinfo="skip",
+                        )
+                    )
+                self._fig_survey.update_layout(yaxis_range=[0, ms1_y_max * 1.15])
             self._fig_survey.update_layout(uirevision=str(pp))
 
         # --- Fragment spectrum (MS2) ---
-        ms2_spec = d.ms2_spectra[pp]
-        comp_df = self._compositions.matches.get(pp, pd.DataFrame())
-        comp_mzs = (
-            comp_df["mz"].values
-            if not comp_df.empty and "mz" in comp_df.columns
-            else np.array([])
-        )
-        comp_ions = (
-            comp_df["ion"].values
-            if not comp_df.empty and "ion" in comp_df.columns
-            else np.array([])
-        )
 
         with self._fig_fragments.batch_update():
             self._fig_fragments.data = []
             if ms2_spec.mz.size > 0:
+                ms2_y_max = max(float(np.max(ms2_spec.intensity)), 1.0)
+                ms2_label_offset = 0.03 * ms2_y_max
                 for t in self._make_stem_traces(
                     ms2_spec.mz, ms2_spec.intensity, color="seagreen", name="MS2"
                 ):
@@ -199,7 +232,9 @@ class Ms2Dashboard:
                     for i, ion in enumerate(comp_ions):
                         if pd.notna(ion) and str(ion).strip() and ion != "---":
                             label_mzs.append(float(ms2_spec.mz[i]))
-                            label_ints.append(float(ms2_spec.intensity[i]))
+                            label_ints.append(
+                                float(ms2_spec.intensity[i]) + ms2_label_offset
+                            )
                             label_texts.append(str(ion))
                     if label_texts:
                         self._fig_fragments.add_trace(
@@ -209,11 +244,13 @@ class Ms2Dashboard:
                                 mode="text",
                                 text=label_texts,
                                 textposition="top center",
-                                textfont=dict(size=9),
+                                textfont=dict(size=13),
                                 showlegend=False,
+                                cliponaxis=False,
                                 hoverinfo="skip",
                             )
                         )
+                self._fig_fragments.update_layout(yaxis_range=[0, ms2_y_max * 1.15])
             self._fig_fragments.update_layout(uirevision=str(pp))
 
         # --- Fragment timeseries (normalized) ---
