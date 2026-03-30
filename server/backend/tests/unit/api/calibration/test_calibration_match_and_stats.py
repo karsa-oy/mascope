@@ -145,9 +145,7 @@ class TestFitRetainedMatches:
     def setup_method(self):
         self.orbi_pos_handler = get_test_calibration_handler("orbitrap", "+")
         self.orbi_pos_handler._get_old_factor = lambda: 1.0
-
-    def test_refits_on_retained_matches(self):
-        df = pd.DataFrame(
+        self.base_df = pd.DataFrame(
             {
                 "mz": [100.0, 200.0, 300.0],
                 "sample_peak_mz": [100.0, 200.0, 300.0],
@@ -157,6 +155,9 @@ class TestFitRetainedMatches:
                 "target_ion_id": ["ion-1", "ion-2", "ion-3"],
             }
         )
+
+    def test_refits_on_retained_matches(self):
+        df = self.base_df.copy()
         fit_calls = []
 
         self.orbi_pos_handler._select_retained_matches = (
@@ -197,6 +198,52 @@ class TestFitRetainedMatches:
         assert fit_calls == [2]
         assert fit_result["par"]["old_factor_scaling"] == 2.0
         assert len(calibration_df) == 2
+
+    def test_empty_retained_matches_returns_none_without_refit(self):
+        df = self.base_df.copy()
+
+        self.orbi_pos_handler._select_retained_matches = (
+            lambda matches_df: matches_df.iloc[0:0].copy()
+        )
+
+        def fail_if_fit_called(matches_df):
+            raise AssertionError(
+                "_fit_matches should not be called for empty selections"
+            )
+
+        self.orbi_pos_handler._fit_matches = fail_if_fit_called
+        self.orbi_pos_handler.warning = None
+
+        fit_result, calibration_df = self.orbi_pos_handler._fit_retained_matches(df)
+
+        assert fit_result is None
+        assert calibration_df.empty
+        assert list(calibration_df.columns) == list(df.columns)
+        assert (
+            self.orbi_pos_handler.warning
+            == "No calibration peaks found after filtering."
+        )
+
+    def test_empty_retained_matches_preserves_existing_warning(self):
+        df = self.base_df.copy()
+
+        self.orbi_pos_handler._select_retained_matches = (
+            lambda matches_df: matches_df.iloc[0:0].copy()
+        )
+
+        def fail_if_fit_called(matches_df):
+            raise AssertionError(
+                "_fit_matches should not be called for empty selections"
+            )
+
+        self.orbi_pos_handler._fit_matches = fail_if_fit_called
+        self.orbi_pos_handler.warning = "Existing warning"
+
+        fit_result, calibration_df = self.orbi_pos_handler._fit_retained_matches(df)
+
+        assert fit_result is None
+        assert calibration_df.empty
+        assert self.orbi_pos_handler.warning == "Existing warning"
 
 
 class TestGetSummaryRow:
