@@ -24,6 +24,7 @@ General calibration workflow:
    rewriting relevant m/z coordinates in the sample file.
 """
 
+from abc import abstractmethod
 from itertools import combinations
 import numpy as np
 import pandas as pd
@@ -320,15 +321,18 @@ class BaseCalibrationHandler:
 
         return isotope_row
 
+    @abstractmethod
     def _fit_matches(self, matches_df: pd.DataFrame) -> tuple[dict, dict]:
-        raise NotImplementedError("Subclasses must implement this method.")
+        pass
 
+    @abstractmethod
     def _evaluate_fit(self, matches_df: pd.DataFrame, fit_result: dict) -> dict:
-        raise NotImplementedError("Subclasses must implement this method.")
+        pass
 
     @property
+    @abstractmethod
     def _minimum_calibration_points(self) -> int:
-        raise NotImplementedError("Subclasses must implement this method.")
+        pass
 
     def _build_calibration_df(
         self,
@@ -487,21 +491,21 @@ class BaseCalibrationHandler:
             "calibrant_to_tic": calibrant_to_tic,
         }
 
+    @api_controller()
+    @abstractmethod
     async def fit(self):
-        """
-        Fit method to be implemented by subclasses.
-        """
-        raise NotImplementedError("Subclasses must implement this method.")
+        """Fit the m/z calibration model to the sample file and selected
+        calibration compounds."""
+        pass
 
     async def _send_progress(self, progress: float) -> None:
         if self.notification is not None:
             await send_progress_user_notification(self.notification, progress)
 
+    @abstractmethod
     async def apply(self, fit: dict):
-        """
-        Apply method to be implemented by subclasses.
-        """
-        raise NotImplementedError("Subclasses must implement this method.")
+        """Apply the m/z calibration fit to the sample file by updating relevant m/z coordinates and calibration parameters."""
+        pass
 
     def to_dict(self):
         return {
