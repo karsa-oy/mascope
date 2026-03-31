@@ -19,6 +19,37 @@ SIGMA_MULTIPLIER = 2 * np.sqrt(2 * np.log(2))
 MIN_NUM_PEAKS = 3
 
 
+def r_tof(mz: float | np.ndarray, a: float, b: float):
+    """Calculate TOF resolution function
+
+    :param mz: mz value(-s)
+    :type mz: float or ndarray
+    :param a: imperical coefficient
+    :type a: float
+    :param b: imperical coefficient
+    :type b: float
+    :return: resolution function value(-s)
+    :rtype: float or ndarray
+    """
+    return mz / (a * mz + b)
+
+
+def r_orbi(
+    mz: float | np.ndarray,
+    a: float,
+):
+    """Calculate Orbitrap resolution function
+
+    :param mz: mz value(-s)
+    :type mz: float or ndarray
+    :param a: imperical coefficient
+    :type a: float
+    :return: resolution function value(-s)
+    :rtype: float or ndarray
+    """
+    return a / np.sqrt(mz)
+
+
 def fit_instrument_functions(filename: str, dmz=0.5, r_sq_thres=0.95) -> tuple:
     """Calculate instrument functions
 
@@ -50,7 +81,7 @@ def fit_instrument_functions(filename: str, dmz=0.5, r_sq_thres=0.95) -> tuple:
     mz = sum_signal.mz.values
 
     # Get x-domain, normalized peak shapes and associated peak positions and FWHMs
-    p_x, p_ys, p_mzs, p_fwhms = process_peak_shapes(
+    p_x, p_ys, p_mzs, p_fwhms = _process_peak_shapes(
         mz, spec, instrument_type, dmz, r_sq_thres
     )
     # Check if there are enough peaks for peak shape estimation
@@ -59,8 +90,8 @@ def fit_instrument_functions(filename: str, dmz=0.5, r_sq_thres=0.95) -> tuple:
         runtime.logger.error(error_message)
         raise ValueError(error_message)
 
-    peak_shape, ps_stats = calculate_peakshape(p_x, p_ys)
-    resolution_function, resfun_stats = fit_resolution_function(
+    peak_shape, ps_stats = _calculate_peakshape(p_x, p_ys)
+    resolution_function, resfun_stats = _fit_resolution_function(
         instrument_type, p_mzs, p_fwhms
     )
 
@@ -70,7 +101,7 @@ def fit_instrument_functions(filename: str, dmz=0.5, r_sq_thres=0.95) -> tuple:
     return peak_shape, resolution_function, stats
 
 
-def process_peak_shapes(
+def _process_peak_shapes(
     mz: np.ndarray,
     spec: np.ndarray,
     instrument_type: str,
@@ -109,7 +140,7 @@ def process_peak_shapes(
     :rtype: tuple
     """
     distance = int(dmz / np.median(np.diff(mz)))
-    peak_indices = choose_peaks(spec, distance=distance, n_peaks=n_peaks)
+    peak_indices = _choose_peaks(spec, distance=distance, n_peaks=n_peaks)
 
     p_x = np.linspace(-10, 10, 101)
     p_ys, p_mzs, p_fwhms, p_centers = [], [], [], []
@@ -132,7 +163,7 @@ def process_peak_shapes(
         p_spec_norm = p_spec / p_height
 
         # Fit peak in the region
-        fit = fit_gaussian(instrument_type, dmz, p_mz_norm, p_spec_norm)
+        fit = _fit_gaussian(instrument_type, dmz, p_mz_norm, p_spec_norm)
         p_spec_norm_fit = fit.eval_components()["p_"]
 
         if fit.rsquared < r_sq_thres:
@@ -150,11 +181,11 @@ def process_peak_shapes(
             p_spec_norm[np.where(p_spec_norm < 0)] = 0
 
         top_y = np.max(p_spec_norm_fit)
-        top_x = calculate_center_of_mass(p_mz_norm, p_spec_norm_fit)
+        top_x = _calculate_center_of_mass(p_mz_norm, p_spec_norm_fit)
 
         # Get and store Gaussian peak sigma and width
         try:
-            p_fwhm = calculate_fwhm(p_mz_norm, p_spec_norm_fit)
+            p_fwhm = _calculate_fwhm(p_mz_norm, p_spec_norm_fit)
             p_sigma = p_fwhm / SIGMA_MULTIPLIER
         except Exception:
             continue
@@ -191,7 +222,7 @@ def process_peak_shapes(
     return p_x, p_ys, p_mzs, p_fwhms
 
 
-def fit_gaussian(instrument_type, dmz, x: np.array, y: np.array) -> ModelResult:
+def _fit_gaussian(instrument_type, dmz, x: np.ndarray, y: np.ndarray) -> ModelResult:
     """Fit the spectrum range with a skewed Gaussian peak-shape using lmfit
 
     :param x: mz scale
@@ -229,7 +260,7 @@ def fit_gaussian(instrument_type, dmz, x: np.array, y: np.array) -> ModelResult:
     return fit
 
 
-def choose_peaks(spec: np.ndarray, distance: int, n_peaks=100) -> np.ndarray:
+def _choose_peaks(spec: np.ndarray, distance: int, n_peaks=100) -> np.ndarray:
     """Select peaks from a spectrum based on a specified quartile threshold
 
     This function finds peaks in a given spectrum and returns n_peaks highest.
@@ -261,7 +292,7 @@ def choose_peaks(spec: np.ndarray, distance: int, n_peaks=100) -> np.ndarray:
     return top_n_peak_indices
 
 
-def calculate_center_of_mass(x: np.ndarray, y: np.ndarray) -> float:
+def _calculate_center_of_mass(x: np.ndarray, y: np.ndarray) -> float:
     """Calculate the center of mass for given x and y values
 
     :param x: Array of x-values of the peak
@@ -275,7 +306,7 @@ def calculate_center_of_mass(x: np.ndarray, y: np.ndarray) -> float:
     return center_of_mass
 
 
-def calculate_fwhm(x: np.ndarray, y: np.ndarray) -> float:
+def _calculate_fwhm(x: np.ndarray, y: np.ndarray) -> float | None:
     """Calculate FWHM of the peak
 
     :param x: Array of x-values of the peak
@@ -283,7 +314,7 @@ def calculate_fwhm(x: np.ndarray, y: np.ndarray) -> float:
     :param y: Array of y-values of the peak
     :type y: np.ndarray
     :return: FWHM value
-    :rtype: float
+    :rtype: float | None
     """
     peak_index = np.argmax(y)
     peak_value = y[peak_index]
@@ -315,7 +346,7 @@ def calculate_fwhm(x: np.ndarray, y: np.ndarray) -> float:
     return fwhm
 
 
-def calculate_peakshape(p_x: np.ndarray, p_ys: np.ndarray) -> tuple:
+def _calculate_peakshape(p_x: np.ndarray, p_ys: np.ndarray) -> tuple:
     """Calculate the meadian peak shape array from a 2D array of peaks
 
     :param p_x: array of normalized x-values corresponding to the peaks
@@ -351,7 +382,7 @@ def calculate_peakshape(p_x: np.ndarray, p_ys: np.ndarray) -> tuple:
     y = p_median / max_y
 
     # Normalize width
-    fwhm = calculate_fwhm(x, y)
+    fwhm = _calculate_fwhm(x, y)
     sigma = fwhm / SIGMA_MULTIPLIER
     y /= sigma
 
@@ -359,9 +390,9 @@ def calculate_peakshape(p_x: np.ndarray, p_ys: np.ndarray) -> tuple:
     return peak_shape, {"peakshape": stats}
 
 
-def fit_resolution_function(
+def _fit_resolution_function(
     instrument_type: str, p_mzs: list | np.ndarray, p_fwhms: list | np.ndarray, ndev=1
-) -> partial:
+) -> tuple[partial, dict]:
     """Calculate the resolution function for a given instrument type
 
     The function fits a resolution function based on the type of the instrument
@@ -377,7 +408,7 @@ def fit_resolution_function(
     :param ndev: Number of standard deviations used to filter out FWHM outliers
     :type ndev: int, optional
     :return: Resolution function as partial and dictionary with m/z and fitted FWHM lists
-    :rtype: tuple
+    :rtype: tuple[partial, dict]
     """
     stats = {}
     p_mzs = np.array(p_mzs)
@@ -391,7 +422,7 @@ def fit_resolution_function(
         is_outlier = np.abs(log_f - log_f_med) >= 4 * lof_f_mad
     else:
         # Fit FWHM vs m/z pairs
-        p_fwhms_fit = fit_fwhm(instrument_type, p_mzs, p_fwhms)
+        p_fwhms_fit = _fit_fwhm(instrument_type, p_mzs, p_fwhms)
         residuals = p_fwhms - p_fwhms_fit
         std_dev = np.std(residuals)
         is_outlier = (residuals > ndev * std_dev) | (residuals < -ndev * std_dev)
@@ -428,7 +459,7 @@ def fit_resolution_function(
             )
 
         else:
-            fit_res = curve_fit(inverse_sqrt, mass, resolution)
+            fit_res = curve_fit(_inverse_sqrt, mass, resolution)
             a = fit_res[0][0]
             resolution_function = partial(r_orbi, a=a)
             stats.update(
@@ -449,7 +480,7 @@ def fit_resolution_function(
     return resolution_function, {"resolution_function": stats}
 
 
-def fit_fwhm(
+def _fit_fwhm(
     instrument_type: str, p_mzs: np.ndarray, p_fwhms: np.ndarray
 ) -> np.ndarray:
     """Fit FWHM vs mz data points based on instrument type
@@ -468,10 +499,10 @@ def fit_fwhm(
     """
     if instrument_type == "tof":
         regres = linregress(p_mzs, p_fwhms)
-        p_fwhms_fit = line(p_mzs, regres.slope, regres.intercept)
+        p_fwhms_fit = _line(p_mzs, regres.slope, regres.intercept)
     else:
         coefs = np.polyfit(p_mzs, p_fwhms, 2)
-        p_fwhms_fit = polynome(p_mzs, *coefs)
+        p_fwhms_fit = _polynome(p_mzs, *coefs)
     return p_fwhms_fit
 
 
@@ -512,7 +543,7 @@ def _weighted_linear_fit(
 
 
 def _rational_dynamic_range(mass: np.ndarray, a: float, b: float) -> float:
-    vals = rational_polynome(mass, a, b)
+    vals = _rational_polynome(mass, a, b)
     return (np.max(vals) - np.min(vals)) / (np.mean(vals) + 1e-12)
 
 
@@ -571,7 +602,7 @@ def _fit_tof_rational(mass: np.ndarray, fwhm: np.ndarray) -> dict:
     resolution = mass / fwhm
     try:
         popt, _ = curve_fit(
-            rational_polynome,
+            _rational_polynome,
             mass,
             resolution,
             p0=(a0, b0),
@@ -604,57 +635,26 @@ def _fit_tof_rational(mass: np.ndarray, fwhm: np.ndarray) -> dict:
     }
 
 
-def r_tof(mz: float | np.ndarray, a: float, b: float):
-    """Calculate TOF resolution function
-
-    :param mz: mz value(-s)
-    :type mz: float or ndarray
-    :param a: imperical coefficient
-    :type a: float
-    :param b: imperical coefficient
-    :type b: float
-    :return: resolution function value(-s)
-    :rtype: float or ndarray
-    """
-    return mz / (a * mz + b)
-
-
-def r_orbi(
-    mz: float | np.ndarray,
-    a: float,
-):
-    """Calculate Orbitrap resolution function
-
-    :param mz: mz value(-s)
-    :type mz: float or ndarray
-    :param a: imperical coefficient
-    :type a: float
-    :return: resolution function value(-s)
-    :rtype: float or ndarray
-    """
-    return a / np.sqrt(mz)
-
-
 # Fitting support functions
-def line(x, a, b):
+def _line(x, a, b):
     """Calculates the output of the linear function
     for given values of x (m/z), a (slope), and b (intercept)"""
     return a * x + b
 
 
-def polynome(x, a, b, c):
+def _polynome(x, a, b, c):
     """Calculates the output of the 2nd order polynomial
     for given values of x, a, b, and c"""
     return a * x**2 + b * x + c
 
 
-def rational_polynome(x, a, b):
+def _rational_polynome(x, a, b):
     """Calculates the output of the rational polynome
     for given values of x, a, and b"""
     return x / (a * x + b)
 
 
-def inverse_sqrt(x, a):
+def _inverse_sqrt(x, a):
     """Calculates the output of the inverse square root
     for given values of x and a"""
     return a / np.sqrt(x)

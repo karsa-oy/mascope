@@ -11,7 +11,7 @@ import dask.array as da
 import numpy as np
 import pandas as pd
 import xarray
-from scipy.signal._peak_finding_utils import _select_by_peak_distance
+from scipy.signal._peak_finding_utils import _select_by_peak_distance # ty:ignore[unresolved-import]
 
 import mascope_file.io as m_io
 import mascope_file.name as m_name
@@ -29,7 +29,7 @@ from mascope_tools.alignment.utils import flag_satellite_peaks
 # Restrict large chunks for dask
 dask.config.set(**{"array.slicing.split_large_chunks": True})
 
-cpu_cores = os.cpu_count()
+cpu_cores = os.cpu_count() or 1
 max_workers = max(1, cpu_cores // 2)
 _EXECUTOR: ProcessPoolExecutor | None = None
 _EXECUTOR_LOCK = threading.Lock()
@@ -73,7 +73,13 @@ class BasePeakDetector(ABC):
         self._sample_file_props = m_io.read_props(self._filename)
         self._sum_signal = m_compute.get_sum_signal(self._filename)
 
-        self.peak_timeseries = None
+        self._peak_timeseries: xarray.Dataset | None = None
+
+    @property
+    def peak_timeseries(self) -> xarray.Dataset:
+        if self._peak_timeseries is None:
+            raise PeakDetectionError("Peak timeseries has not been allocated.")
+        return self._peak_timeseries
 
     @property
     def u_list(self):
@@ -82,7 +88,7 @@ class BasePeakDetector(ABC):
         u_list = np.unique(mz_values.astype(int))
         return u_list
 
-    def _allocate_peak_timeseries(self, peaks: xarray.Dataset) -> xarray.Dataset:
+    def _allocate_peak_timeseries(self, peaks: xarray.Dataset) -> None:
         """Allocate peak timeseries dataset structure."""
         # Get the tof values corresponding to the peak mzs
         mz_axis = self._sum_signal.mz.values
@@ -115,7 +121,7 @@ class BasePeakDetector(ABC):
             data_vars=data_vars,
             coords=data_coords,
         )
-        self.peak_timeseries = xarray.merge([peak_timeseries, peaks])
+        self._peak_timeseries = xarray.merge([peak_timeseries, peaks])
 
     async def write_peaks_to_zarr(self, overwrite=True):
         if self.peak_timeseries is None:
@@ -133,17 +139,15 @@ class BasePeakDetector(ABC):
     async def detect_peaks(
         self, progress_callback: Callable[[int], None] | None = None
     ):
-        raise NotImplementedError("Subclasses must implement detect_peaks method")
+        pass
 
     @abstractmethod
     def _flag_weak_peaks(self):
-        raise NotImplementedError("Subclasses must implement _flag_weak_peaks method")
+        pass
 
     @abstractmethod
     def _flag_satellite_peaks(self):
-        raise NotImplementedError(
-            "Subclasses must implement _flag_satellite_peaks method"
-        )
+        pass
 
 
 class OrbiPeakDetector(BasePeakDetector):
@@ -227,7 +231,7 @@ class OrbiPeakDetector(BasePeakDetector):
             self.peak_timeseries.signal_to_noise.values < SIGNAL_TO_NOISE_THRESHOLD
         )
         is_weak = low_snr
-        self.peak_timeseries = self.peak_timeseries.assign(
+        self._peak_timeseries = self.peak_timeseries.assign(
             {"is_weak": (("mz"), is_weak)}
         )
 
@@ -239,7 +243,7 @@ class OrbiPeakDetector(BasePeakDetector):
             }
         )
         peaks_df = flag_satellite_peaks(peaks_df)
-        self.peak_timeseries = self.peak_timeseries.assign(
+        self._peak_timeseries = self.peak_timeseries.assign(
             {"is_satellite": (("mz"), peaks_df["is_satellite_peak"].values)}
         )
 
@@ -247,18 +251,16 @@ class OrbiPeakDetector(BasePeakDetector):
 class TofPeakDetector(BasePeakDetector):
     async def detect_peaks(
         self,
-        max_n_peaks: int = 5,
         progress_callback: Callable[[int], None] | None = None,
+        max_n_peaks: int = 5,
         **kwargs,
-    ) -> xarray.Dataset:
+    ) -> None:
         """Detect peaks in the summed TOF spectrum around each unit mass in u_list.
 
         :param max_n_peaks: Maximum number of peaks to fit per unit mass, by default 5
         :type max_n_peaks: int, optional
         :param progress_callback: Optional callback invoked with progress percentage (0-100).
         :type progress_callback: Callable[[int], None] | None
-        :return: Sample file data with updated peak information
-        :rtype: xarray.Dataset
         """
         # Handle None progress callback by using a no-op function
         progress_callback = progress_callback or (lambda progress: None)
@@ -402,14 +404,14 @@ class TofPeakDetector(BasePeakDetector):
     def _flag_weak_peaks(self):
         """Flag weak peaks. Currently no weak peak criteria for TOF data."""
         is_weak = np.full(len(self.peak_timeseries.mz), False, dtype=bool)
-        self.peak_timeseries = self.peak_timeseries.assign(
+        self._peak_timeseries = self.peak_timeseries.assign(
             {"is_weak": (("mz"), is_weak)}
         )
 
     def _flag_satellite_peaks(self):
         """Flag satellite peaks. Currently no satellite peak criteria for TOF data."""
         is_satellite = np.full(len(self.peak_timeseries.mz), False, dtype=bool)
-        self.peak_timeseries = self.peak_timeseries.assign(
+        self._peak_timeseries = self.peak_timeseries.assign(
             {"is_satellite": (("mz"), is_satellite)}
         )
 
@@ -480,7 +482,7 @@ class OrbiZarrPeakDetector(TofPeakDetector):
             }
         )
         peaks_df = flag_satellite_peaks(peaks_df)
-        self.peak_timeseries = self.peak_timeseries.assign(
+        self._peak_timeseries = self.peak_timeseries.assign(
             {"is_satellite": (("mz"), peaks_df["is_satellite_peak"].values)}
         )
 
@@ -540,10 +542,10 @@ def get_peak_detector(
 
 def filter_peaks(
     peaks: xarray.DataArray,
-    mz_range: tuple = None,
-    t_range: tuple = None,
-    intensity: float = None,
-    distance: float = None,
+    mz_range: tuple | None = None,
+    t_range: tuple | None = None,
+    intensity: float | None = None,
+    distance: float | None = None,
 ) -> xarray.DataArray:
     """
     Filter peaks by m/z range, time range, intensity, and minimum distance.
