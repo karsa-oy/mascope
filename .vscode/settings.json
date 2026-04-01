@@ -1,8 +1,14 @@
 {
   "[python]": {
-    "editor.defaultFormatter": "ms-python.black-formatter"
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.codeActionsOnSave": {
+      "source.organizeImports.ruff": "explicit",
+      "source.fixAll.ruff": "explicit"
+    }
   },
   "editor.formatOnSave": true,
+  "ruff.nativeServer": "on",
+
   // Respect .gitignore files for searches
   "search.useIgnoreFiles": true,
   // NOTE:
@@ -13,18 +19,9 @@
   "search.exclude": {
     // Specific directories/files not covered by .gitignore, or those we want to exclude for performance or relevance reasons:
     "**/.legacy": true, // Exclude legacy files
-    "runtime/testfiles/**": true, // Exclude test files directory within runtime
+    ".runtime/env/**": true, // Exclude runtime filestore, logs etc
     "**/__pycache__": true, // Exclude Python cache directories
     "**/.venv/**": true,
     "**/node_modules/**": true
-  },
-  "python.analysis.exclude": [
-    "runtime/env",
-    ".legacy",
-    "**/node_modules",
-    "**/__pycache__",
-    "**/build",
-    ".git",
-    "**/.venv/**" // exclude virtual environment
-  ]
+  }
 }

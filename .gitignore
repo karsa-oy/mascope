@@ -16,4 +16,4 @@ dist
 /.venv
 
 tofdaq
-/runtime/env/*
+/.runtime/env/*

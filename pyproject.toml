@@ -40,6 +40,7 @@ dev = [
     # testing
     "pytest~=8.2",
     "pytest-asyncio>=0.26,<0.27",
+    "ruff>=0.15.8,<0.16",
 ]
 
 [tool.uv.workspace]
@@ -67,3 +68,24 @@ mascope_molmass = { workspace = true}
 [build-system]
 requires = ["uv_build>=0.6,<0.7"]
 build-backend = "uv_build"
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "I",   # isort
+    "F",   # pyflakes — unused imports, undefined names
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["mascope_*"]
+lines-after-imports = 2
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
