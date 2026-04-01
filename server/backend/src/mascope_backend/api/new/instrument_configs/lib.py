@@ -1,10 +1,7 @@
 from functools import partial
-
+from typing import Callable
 import numpy as np
-from sqlalchemy import (
-    desc,
-    select,
-)
+from sqlalchemy import select
 
 from mascope_backend.api.controllers.sample.lib.sample_file_fetch import (
     fetch_sample_file,
@@ -35,37 +32,10 @@ async def fetch_instrument_config_by_filename(filename: str) -> InstrumentConfig
             runtime.logger.debug(f"Found instrument config by ID for {filename}")
             return instrument_config
 
-        # Fallback to searching by method file and instrument
-        # TODO: Remove fallback after instrument_function_id is fully implemented, see issue #1299
-        runtime.logger.debug(f"Falling back to method_file lookup for {filename}")
-        stmt = (
-            (
-                select(InstrumentConfig)
-                .where(
-                    InstrumentConfig.method_file == sample_file.method_file,
-                    InstrumentConfig.instrument == sample_file.instrument,
-                )
-                .order_by(desc(InstrumentConfig.datetime_utc))
-                .limit(1)
-            )
-            if sample_file.method_file
-            else (
-                select(InstrumentConfig)
-                .where(
-                    InstrumentConfig.instrument == sample_file.instrument,
-                )
-                .order_by(desc(InstrumentConfig.datetime_utc))
-                .limit(1)
-            )
-        )
-        results = await session.execute(stmt)
-        instrument_config = results.scalar_one_or_none()
-    return instrument_config
-
 
 def parse_instrument_functions(
     instrument_config: InstrumentConfig,
-) -> tuple[dict, callable]:
+) -> tuple[dict, Callable]:
     """Parse instrument functions read from the database, into peak shape and resolution function.
 
     :param instrument_config: Instrument configuration object containing peak shape and resolution function details.
@@ -73,7 +43,7 @@ def parse_instrument_functions(
     :return: A tuple containing peak shape details as a dictionary and a resolution function R as a callable.
              The peak shape details include parameters defining the shape of peaks in the mass spectrum.
              The resolution function R takes a mass (m) and returns the resolution at that mass.
-    :rtype: tuple[dict, callable]
+    :rtype: tuple[dict, Callable]
     :raises ValueError: If the instrument configuration does not contain the expected attributes or if they are not
                         in the expected format.
     """
