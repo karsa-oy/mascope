@@ -29,7 +29,10 @@ async def fetch_instrument_config_by_filename(filename: str) -> InstrumentConfig
             )
             results = await session.execute(stmt)
             instrument_config = results.scalar_one_or_none()
-            runtime.logger.debug(f"Found instrument config by ID for {filename}")
+            if instrument_config is not None:
+                runtime.logger.debug(f"Found instrument config by ID for {filename}")
+            else:
+                runtime.logger.debug(f"No instrument config found by ID for {filename}")
             return instrument_config
 
 
@@ -86,7 +89,7 @@ def parse_instrument_functions(
     return peakshape, resolution_function
 
 
-async def read_instrument_functions(filename: str) -> tuple[dict, callable]:
+async def read_instrument_functions(filename: str) -> tuple[dict, Callable]:
     """Read instrument functions from the database and parse them into
     peak shape dictionary and resolution function callable.
 

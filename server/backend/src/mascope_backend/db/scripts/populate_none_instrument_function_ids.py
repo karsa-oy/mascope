@@ -1,7 +1,7 @@
 """
 Maintenance script to backfill instrument_function_id for sample files where it is None.
 
-For each affected sample file, the script uses the fallback lookup tat used to be in
+For each affected sample file, the script uses the fallback lookup that used to be in
 fetch_instrument_config_by_filename (method_file + instrument, or instrument alone)
 to find the most recent matching instrument config, creates a new InstrumentFunction
 row (copy) with a fresh ID, and assigns it to the sample file.
