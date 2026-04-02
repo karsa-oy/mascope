@@ -21,7 +21,6 @@ import requests
 from tests.config import *
 
 from mascope_backend.runtime import runtime
-from mascope_file.name import get_instrument_type
 from mascope_match import compute_match_isotopes
 from mascope_signal.peak import detect_peaks
 

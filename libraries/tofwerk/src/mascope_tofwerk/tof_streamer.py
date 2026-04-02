@@ -17,7 +17,6 @@ import numpy as np
 from mascope_tofwerk.lib.TofDaq import (
     TSharedMemoryDesc,
     TSharedMemoryPointer,
-    TwCleanupDll,
     TwDaqActive,
     TwGetDaqParameterBool,
     TwGetDescriptor,

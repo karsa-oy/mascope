@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """Base file processor class for shared functionality between different file type processors."""
 
-import asyncio
 import os
 import shutil
 import traceback

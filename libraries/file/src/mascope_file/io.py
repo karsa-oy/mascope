@@ -3,7 +3,6 @@ import fnmatch
 import glob
 import json
 import os
-import platform
 import threading
 from shutil import rmtree
 
