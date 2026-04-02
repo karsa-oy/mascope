@@ -215,7 +215,7 @@ def check_wal_status():
                 except Exception as e:
                     runtime.logger.warning(f"Could not get WAL checkpoint status: {e}")
             else:
-                runtime.logger.debug(f"Checkpoint info skipped - not in WAL mode")
+                runtime.logger.debug("Checkpoint info skipped - not in WAL mode")
 
     except Exception as e:
         runtime.logger.error(f"Error checking WAL status: {e}")

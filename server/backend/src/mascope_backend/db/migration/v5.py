@@ -40,25 +40,25 @@ def run():
                 runtime.logger.error(e)
         # Delete all matches
         new_conn.cursor().execute(
-            f"""--sql
+            """--sql
             DELETE FROM match
         """
         )
         new_conn.cursor().execute(
-            f"""--sql
+            """--sql
             ALTER TABLE match
             RENAME COLUMN sample_peak_height TO sample_peak_area;
         """
         )
         new_conn.cursor().execute(
-            f"""--sql
+            """--sql
             ALTER TABLE match
             RENAME COLUMN sample_peak_height_relative TO sample_peak_area_relative;
         """
         )
         # Redo match interferences table
         new_conn.cursor().execute(
-            f"""--sql
+            """--sql
             DROP TABLE match_interference
         """
         )

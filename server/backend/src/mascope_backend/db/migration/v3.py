@@ -223,7 +223,7 @@ def run():
                 runtime.logger.error(e)
         # Delete all matches
         new_conn.cursor().execute(
-            f"""--sql
+            """--sql
             DELETE FROM match
         """
         )

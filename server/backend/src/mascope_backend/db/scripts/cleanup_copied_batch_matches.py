@@ -207,7 +207,7 @@ def main() -> None:
         asyncio.run(run_cleanup(workspace_id=args.workspace))
     except KeyboardInterrupt:
         runtime.logger.info("\nCleanup cancelled by user (Ctrl+C)")
-    except Exception as e:
+    except Exception:
         runtime.logger.exception("Cleanup script failed")
         raise
 

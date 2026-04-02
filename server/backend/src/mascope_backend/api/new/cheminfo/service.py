@@ -316,7 +316,7 @@ async def match_cheminfo_by_mz(
                 # to target m/z is selected, which may not be the same as the one used in
                 # the ChemInfo query.
                 match_mzs = [iso["sample_peak_mz"] for iso in match_isotopes]
-                if not info["sample_peak_mz"] in match_mzs:
+                if info["sample_peak_mz"] not in match_mzs:
                     runtime.logger.debug(
                         f"Requested peak m/z ({info['sample_peak_mz']}) is not in matched m/zs: {match_mzs}. "
                         + f"Skipping the result ({info["target_compound_formula"]})",

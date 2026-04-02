@@ -72,7 +72,7 @@ def run():
 
         # Add isotope correlation column to match table
         new_conn.cursor().execute(
-            f"""--sql
+            """--sql
             ALTER TABLE match
             ADD match_isotope_correlation FLOAT
         """
@@ -80,7 +80,7 @@ def run():
 
         # Add TIC column to sample_file
         new_conn.cursor().execute(
-            f"""--sql
+            """--sql
             ALTER TABLE sample_file
             ADD tic FLOAT
         """
@@ -107,7 +107,7 @@ def run():
                 runtime.logger.error(e)
         # Delete all matches
         new_conn.cursor().execute(
-            f"""--sql
+            """--sql
             DELETE FROM match
         """
         )

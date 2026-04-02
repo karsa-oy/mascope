@@ -52,7 +52,7 @@ if __name__ == "__main__":
         # Check if we are in a date directory
         try:
             datetime.strptime(dirpath.split(os.sep)[-1], "%Y.%m.%d")
-        except ValueError as e:
+        except ValueError:
             # Not a date directory
             continue
         # We are in a date directory, dirnames are sample files

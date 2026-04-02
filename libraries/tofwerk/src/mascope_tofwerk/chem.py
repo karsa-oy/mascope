@@ -124,7 +124,7 @@ def guess_composition(target_mz, el_filter, tolerance=10e-6):
         num_filter = []
         ratio_filter = []
         for row in el_filter:
-            if not ":" in row["el"]:
+            if ":" not in row["el"]:
                 elements.append(row["el"])
                 num_filter.append((row["min"], row["max"]))
         for row in el_filter:

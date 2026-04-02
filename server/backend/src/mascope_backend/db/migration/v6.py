@@ -20,7 +20,7 @@ def run():
     new_conn = sqlite3.connect(database=new_db_path)
     with new_conn:
         new_conn.cursor().execute(
-            f"""--sql
+            """--sql
             ALTER TABLE sample_item
             ADD filter_id VARCHAR(6)
         """
