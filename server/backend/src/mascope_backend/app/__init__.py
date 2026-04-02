@@ -1,2 +1,2 @@
-from .fast import fast
-from .uvicorn import run
+from .fast import fast as fast
+from .uvicorn import run as run

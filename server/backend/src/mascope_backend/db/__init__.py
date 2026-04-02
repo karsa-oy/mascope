@@ -11,7 +11,6 @@ Exports:
 """
 
 import asyncio
-import os
 from typing import AsyncGenerator
 
 from sqlalchemy import event, text

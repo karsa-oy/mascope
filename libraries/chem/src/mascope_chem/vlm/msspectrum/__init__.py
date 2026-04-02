@@ -1,3 +1,4 @@
-__all__ = ["compare", "io", "preprocessing", "visualization"]
-
 from .spectrum import Spectrum
+
+
+__all__: list[str] = ["compare", "io", "preprocessing", "visualization", "Spectrum"]

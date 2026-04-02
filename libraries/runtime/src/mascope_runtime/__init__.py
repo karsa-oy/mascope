@@ -1,2 +1,2 @@
-from .main import Runtime
-from .mode import RuntimeMode
+from .main import Runtime as Runtime
+from .mode import RuntimeMode as RuntimeMode

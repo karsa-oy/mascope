@@ -1,5 +1,5 @@
 """Socket.IO event handlers for client-server communication."""
 
-from .default import connection, subscription
-from .file_converter import connection, conversion
-from .tof_agent import acquisition, connection
+# Imported for side-effects — each submodule registers
+# its own socket handlers on import.
+from . import default, file_converter, tof_agent  # noqa: F401

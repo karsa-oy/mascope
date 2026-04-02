@@ -1,5 +1,4 @@
-# molmass/__init__.py
-
+# ruff: noqa: F401, F403
 from . import elements
 from .elements import *
 from .molmass import *

@@ -7,4 +7,4 @@ communication and the internal event emitters for server-side events.
 
 def init_events():
     """Initialize event handlers and emitters."""
-    from . import emitters, handlers
+    from . import emitters, handlers  # noqa: F401 - imported to trigger registration
