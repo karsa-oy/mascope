@@ -3,23 +3,26 @@ This module provides functions to read and process Thermo Fisher raw files.
 """
 
 from typing import Iterable, Literal
-import pandas as pd
-import numpy as np
-import xarray as xr
+
 import dask.array as da
-from ThermoFisher.CommonCore.RawFileReader import RawFileReaderAdapter
+import numpy as np
+import pandas as pd
+import xarray as xr
+from System import NullReferenceException
+from System.Collections.Generic import List
+from ThermoFisher.CommonCore.Data import Extensions, ToleranceUnits
 from ThermoFisher.CommonCore.Data.Business import (
-    Device,
-    MassOptions,
     ChromatogramSignal,
     ChromatogramTraceSettings,
-    TraceType,
+    Device,
+    MassOptions,
     Range,
+    TraceType,
 )
-from ThermoFisher.CommonCore.Data import ToleranceUnits, Extensions
-from System.Collections.Generic import List
+from ThermoFisher.CommonCore.RawFileReader import RawFileReaderAdapter
+
 from mascope_thermo.runtime import runtime
-from System import NullReferenceException
+
 
 SECONDS_PER_MINUTE = 60
 

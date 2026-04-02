@@ -2,18 +2,18 @@ import asyncio
 import os
 import shutil
 import sys
-import time
 import textwrap
-
+import time
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import Event
 from queue import Empty
+
 import socketio
 import socketio.exceptions
 
+import mascope_sdk
 from mascope_runtime import Runtime
 
-import mascope_sdk
 
 mascope_sdk.SERVICE_NAME = "tof-agent"
 from mascope_sdk import api_post_file

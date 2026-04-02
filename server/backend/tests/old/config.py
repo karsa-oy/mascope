@@ -1,5 +1,6 @@
-import os
 import glob
+import os
+
 
 TEST_SERVER_URL = "http://localhost:8080/"
 # time limit for server start

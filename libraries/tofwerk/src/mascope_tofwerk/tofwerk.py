@@ -1,10 +1,12 @@
-from pathlib import Path
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Iterable, Tuple
+
+import dask.array as da
 import h5py
 import numpy as np
 import xarray as xr
-import dask.array as da
+
 from mascope_tofwerk.runtime import runtime
 
 

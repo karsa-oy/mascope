@@ -4,11 +4,12 @@ Tests model creation, validation, and relationships.
 """
 
 from datetime import datetime, timezone
+
 import pytest
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from mascope_backend.db import Workspace, SampleBatch
+from mascope_backend.db import SampleBatch, Workspace
 
 
 @pytest.mark.asyncio

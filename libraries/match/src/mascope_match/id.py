@@ -6,6 +6,7 @@ TODO refactor to db lib? It is same as `gen_id` util used in the Mascope backend
 
 from nanoid import generate
 
+
 # Used the same alphabet as the backend `gen_id` for consistency
 alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890"
 

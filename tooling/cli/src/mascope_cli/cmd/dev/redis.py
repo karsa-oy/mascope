@@ -7,10 +7,12 @@ Container managed by docker-compose. Use 'mascope dev up/down' for lifecycle man
 import subprocess
 import time
 from typing import Annotated
+
 import typer
 
 from mascope_cli.cmd.dev.docker import is_docker_running
 from mascope_cli.runtime import runtime
+
 
 dev_redis_app = typer.Typer()
 

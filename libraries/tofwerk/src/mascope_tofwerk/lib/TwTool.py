@@ -9,6 +9,7 @@ from numpy.ctypeslib import ndpointer
 
 from mascope_tofwerk.runtime import runtime
 
+
 toollib = None
 
 config = runtime.config.tofwerk_dll

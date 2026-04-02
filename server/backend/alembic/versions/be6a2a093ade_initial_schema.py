@@ -8,10 +8,11 @@ Create Date: 2026-02-19 16:40:13.458115
 """
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 from mascope_backend.db.views import Sample
+
 
 # revision identifiers, used by Alembic.
 revision: str = "be6a2a093ade"

@@ -5,6 +5,7 @@
 import os
 import sys
 
+
 if os.environ.get("VSCODE_CWD"):
     # work around pytest not using PYTHONPATH in VSCode
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))

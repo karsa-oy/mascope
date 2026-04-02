@@ -9,20 +9,20 @@ performing compound matching and saving results for further analysis.
 
 import argparse
 import json
+import logging
 import os
 import time
-import logging
 import traceback
-
-import pandas as pd
-
 from datetime import datetime, timezone
 from logging.handlers import RotatingFileHandler
 
+import pandas as pd
+
 import mascope_sdk
 
+
 mascope_sdk.SERVICE_NAME = "export-agent"
-from mascope_sdk import get_sample_batches, get_samples, get_sample_compounds_matches
+from mascope_sdk import get_sample_batches, get_sample_compounds_matches, get_samples
 
 
 DEFAULT_CONFIG = {

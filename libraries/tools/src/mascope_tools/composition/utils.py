@@ -1,11 +1,13 @@
 import re
+
 from pyteomics.mass import Composition, calculate_mass
+
+from mascope_tools.composition.constants import ELECTRON_MASS
 from mascope_tools.composition.models import (
+    Atom,
     CompositionFinderException,
     IonizationMechanism,
-    Atom,
 )
-from mascope_tools.composition.constants import ELECTRON_MASS
 
 
 def combine_formula_and_ionization(

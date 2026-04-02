@@ -7,7 +7,7 @@ for testing I/O functions in isolation.
 import os
 import shutil
 import tempfile
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest

@@ -1,4 +1,5 @@
 import pytest
+
 from mascope_tools.composition.finder import replace_atom_with_isotope
 
 

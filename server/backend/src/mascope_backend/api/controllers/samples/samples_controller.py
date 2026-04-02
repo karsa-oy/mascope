@@ -2,8 +2,10 @@
 import asyncio
 from datetime import datetime
 
-import mascope_signal.compute as m_compute
 import numpy as np
+from sqlalchemy import Float, Integer, and_, asc, cast, desc, func, select
+
+import mascope_signal.compute as m_compute
 from mascope_backend.api.controllers.samples.lib.samples_fetch import fetch_sample
 from mascope_backend.api.lib.api_features import api_controller
 from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
@@ -20,7 +22,6 @@ from mascope_backend.db.views import Sample
 from mascope_backend.runtime import runtime
 from mascope_file.io import load_coord
 from mascope_signal.peak import get_peaks
-from sqlalchemy import Float, Integer, and_, asc, cast, desc, func, select
 
 
 @api_controller()

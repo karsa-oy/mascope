@@ -1,4 +1,5 @@
 import numpy as np
+
 from mascope_tools.alignment.calibration import CentroidedSpectrum, Spectra
 
 

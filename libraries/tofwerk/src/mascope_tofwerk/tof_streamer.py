@@ -14,9 +14,6 @@ from time import sleep
 
 import numpy as np
 
-from mascope_tofwerk.runtime import runtime
-
-
 from mascope_tofwerk.lib.TofDaq import (
     TSharedMemoryDesc,
     TSharedMemoryPointer,
@@ -28,6 +25,7 @@ from mascope_tofwerk.lib.TofDaq import (
     TwTofDaqRunning,
     TwWaitForNewData,
 )
+from mascope_tofwerk.runtime import runtime
 
 
 def strip_filepath(filepath: str) -> str:

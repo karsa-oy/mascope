@@ -9,28 +9,28 @@ import json
 import os
 import platform
 from pathlib import Path
-from typing import List, Annotated, Optional
+from typing import Annotated, List, Optional
+
 import typer
 
-
-from mascope_cli.runtime import runtime
 from mascope_cli.cmd import lib
-from mascope_cli.cmd.dev.docker import (
-    dev_docker_app,
-    check_and_start_docker,
-)
-from mascope_cli.cmd.dev.migrate import (
-    dev_migrate_app,
-    check_pending_migrations,
-    run_migrations,
-)
 from mascope_cli.cmd.dev.db import (
     create_database,
     dev_db_app,
     wait_for_server,
 )
+from mascope_cli.cmd.dev.docker import (
+    check_and_start_docker,
+    dev_docker_app,
+)
+from mascope_cli.cmd.dev.migrate import (
+    check_pending_migrations,
+    dev_migrate_app,
+    run_migrations,
+)
 from mascope_cli.cmd.dev.redis import dev_redis_app, wait_for_redis
 from mascope_cli.cmd.dev.tools import dev_tools_app
+from mascope_cli.runtime import runtime
 from mascope_runtime import Runtime
 
 

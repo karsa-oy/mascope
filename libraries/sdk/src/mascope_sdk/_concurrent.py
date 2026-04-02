@@ -6,6 +6,7 @@ from typing import Any, Callable, TypeVar
 
 from tqdm import tqdm
 
+
 #: Default tqdm keyword arguments used across the SDK.
 _TQDM_DEFAULTS = {
     "file": sys.stderr,

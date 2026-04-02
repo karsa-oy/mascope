@@ -1,15 +1,16 @@
+from bisect import bisect_left, insort
 from typing import Literal
+
 import numpy as np
 import pandas as pd
-from bisect import bisect_left, insort
 
 import mascope_file.io as m_io
 import mascope_signal.compute as m_compute
 from mascope_file.name import get_instrument_type, get_sample_file_type
+from mascope_match.id import generate_id
+from mascope_match.params import BaseMatchParams, unmatched_isotope_params
 from mascope_match.runtime import runtime
 
-from mascope_match.params import unmatched_isotope_params, BaseMatchParams
-from mascope_match.id import generate_id
 
 MATCH_WINDOW_AMU = 0.5  # Da
 

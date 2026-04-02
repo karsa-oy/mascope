@@ -25,6 +25,7 @@ from mascope_backend.db.utils import get_current_db_version
 from mascope_backend.db.views import Sample
 from mascope_backend.runtime import runtime
 
+
 # Initialize global variables at module load
 ASYNC_SESSION_MAKER = None  # Global async session maker
 db_cfg = runtime.config.database

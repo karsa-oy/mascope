@@ -1,7 +1,9 @@
 import re
 import warnings
-import pandas as pd
+
 import numpy as np
+import pandas as pd
+
 import mascope_sdk as msdk
 from mascope_tools.alignment.calibration import CentroidedSpectrum, Spectra
 

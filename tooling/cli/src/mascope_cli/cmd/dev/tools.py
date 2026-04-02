@@ -9,7 +9,9 @@ developer productivity by automating common tasks, such as managing files or run
 import os
 import subprocess
 from shutil import which
+
 import typer
+
 
 dev_tools_app = typer.Typer(
     help="Additional helper tools to assist in development tasks"

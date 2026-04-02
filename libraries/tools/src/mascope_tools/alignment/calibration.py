@@ -2,12 +2,13 @@
 Implementation of the virtual lock mass (VLM) algorithm based on https://doi.org/10.1038/s41598-019-44923-8
 """
 
+import heapq
+import warnings
 from abc import ABC, abstractmethod
+from collections import deque
+
 import numpy as np
 import pandas as pd
-import heapq
-from collections import deque
-import warnings
 
 
 class Spectrum(ABC):

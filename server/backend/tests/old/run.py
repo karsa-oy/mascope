@@ -1,7 +1,9 @@
+import os
 import subprocess
 from datetime import datetime
-import os
+
 from tests.config import LOG_PATH
+
 
 # Generate the current date-time string
 datetime_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")

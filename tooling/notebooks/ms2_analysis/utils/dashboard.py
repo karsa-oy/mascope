@@ -1,12 +1,13 @@
+import ipywidgets as widgets
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
-import ipywidgets as widgets
 from colorcet import glasbey_hv as colormap
 from IPython.display import display
 
-from .data_extractor import DataExtractor
 from .composition import CompositionMap
+from .data_extractor import DataExtractor
+
 
 MAX_FRAGMENT_TRACES = 20
 

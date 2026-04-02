@@ -1,15 +1,16 @@
 """Python bindings to Tofwerk's TofDaq DLL"""
 
 import ctypes as ct
+import os
 import platform
 import sys
 from enum import Enum
-import numpy as np
-import os
 
+import numpy as np
 from numpy.ctypeslib import ndpointer
 
 from mascope_tofwerk.runtime import runtime
+
 
 libname = {"win32": "TofDaqDll.dll"}
 libdir = ""

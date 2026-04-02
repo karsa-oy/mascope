@@ -20,6 +20,7 @@ from .exceptions import (
     ValidationError,
 )
 
+
 # Default timeout values (connect, read) in seconds
 DEFAULT_TIMEOUT = (30, 300)
 

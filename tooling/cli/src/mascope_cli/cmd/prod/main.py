@@ -27,11 +27,12 @@ import time
 from typing import Annotated, Optional
 
 import typer
-from mascope_runtime import Runtime
 
 from mascope_cli.cmd import lib
 from mascope_cli.cmd.prod.db import prod_db_app
 from mascope_cli.runtime import runtime
+from mascope_runtime import Runtime
+
 
 _MODE = "prod"
 

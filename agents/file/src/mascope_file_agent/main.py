@@ -1,21 +1,20 @@
 import os
-import time
 import shutil
 import sys
 import textwrap
-
+import time
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import Event, Queue
 from queue import Empty
 from threading import Thread
 
 import watchdog
-
 from watchdog.events import PatternMatchingEventHandler
 from watchdog.observers import Observer
 
-from mascope_runtime import Runtime
 import mascope_sdk
+from mascope_runtime import Runtime
+
 
 mascope_sdk.SERVICE_NAME = "file-agent"
 from mascope_sdk import api_post_file

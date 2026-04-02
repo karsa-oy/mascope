@@ -3,7 +3,8 @@ Functions for target ions and target isotopes generation.
 """
 
 import re
-from itertools import combinations_with_replacement, product as cartesian_product
+from itertools import combinations_with_replacement
+from itertools import product as cartesian_product
 from math import comb
 
 import numpy as np
@@ -21,9 +22,10 @@ from mascope_backend.db.id import gen_id
 from mascope_backend.runtime import runtime
 from mascope_molmass import Formula
 from mascope_molmass.elements import ELECTRON, ELEMENTS
-from mascope_tools.composition.utils import normalize_formula_with_isotopes
-from mascope_tools.composition.heuristic_filter import extract_isotope_labels
 from mascope_tools.composition.finder import replace_atom_with_isotope
+from mascope_tools.composition.heuristic_filter import extract_isotope_labels
+from mascope_tools.composition.utils import normalize_formula_with_isotopes
+
 
 # Threshold for high resolution isotope peaks prediction
 # We store "all" isotopes in the database, filter by abundance later if needed

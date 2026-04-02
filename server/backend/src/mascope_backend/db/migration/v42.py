@@ -6,18 +6,18 @@ import asyncio
 import os
 import shutil
 
-from sqlalchemy import select, func, distinct, update
+from sqlalchemy import distinct, func, select, update
 
 from mascope_backend.api.controllers.target.ions.target_ions_controller import (
     create_target_ions,
 )
 from mascope_backend.db import (
-    TargetIon,
     IonizationMechanism,
-    TargetCompound,
-    SampleItem,
-    SampleBatch,
     MatchIon,
+    SampleBatch,
+    SampleItem,
+    TargetCompound,
+    TargetIon,
     async_session,
     configure_database_engine,
 )

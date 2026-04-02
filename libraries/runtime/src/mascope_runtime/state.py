@@ -35,8 +35,8 @@ is used. You can find this file committed in
 `runtime/lib/state.prod.json`
 """
 
-import os
 import json
+import os
 
 
 default_state = {

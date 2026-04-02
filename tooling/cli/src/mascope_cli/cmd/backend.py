@@ -1,10 +1,10 @@
-import typer
+from typing import List, Optional
 
-from typing import Optional, List
+import typer
 from typing_extensions import Annotated
 
-
 import mascope_cli.cmd.lib as lib
+
 
 backend_app = typer.Typer(add_help_option=False)
 

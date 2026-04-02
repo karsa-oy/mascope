@@ -26,6 +26,7 @@ General calibration workflow:
 
 from abc import abstractmethod
 from itertools import combinations
+
 import numpy as np
 import pandas as pd
 from zarr.errors import PathNotFoundError
@@ -53,8 +54,8 @@ from mascope_backend.api.new.instrument_configs.lib import (
 )
 from mascope_backend.runtime import runtime
 from mascope_backend.socket.notifications import (
-    send_progress_user_notification,
     UserNotification,
+    send_progress_user_notification,
 )
 from mascope_match.compute.isotopes import (
     calculate_match_stats,

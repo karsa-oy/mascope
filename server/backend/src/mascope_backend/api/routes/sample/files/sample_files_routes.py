@@ -11,6 +11,7 @@ from mascope_backend.api.controllers.sample.files.process.service import (
     re_process_sample_files,
 )
 from mascope_backend.api.controllers.sample.files.sample_files_controller import (
+    compute_sample_file_peaks,
     create_sample_file,
     delete_sample_file,
     delete_sample_files,
@@ -23,7 +24,6 @@ from mascope_backend.api.controllers.sample.files.sample_files_controller import
     update_sample_file,
     upload_sample_file,
     upload_sample_files,
-    compute_sample_file_peaks,
 )
 from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.models.sample.files.sample_file_pydantic_model import (

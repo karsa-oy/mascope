@@ -6,12 +6,13 @@ Configures Alembic for PostgreSQL schema management using Mascope runtime config
 # pylint: disable=no-member
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config, pool
 from alembic import context
+from sqlalchemy import engine_from_config, pool
 
-from mascope_backend.runtime import runtime
-from mascope_backend.db.secrets import postgres_password
 from mascope_backend.db.models import Base
+from mascope_backend.db.secrets import postgres_password
+from mascope_backend.runtime import runtime
+
 
 # --- Module-level configuration ---
 config = context.config  # Alembic config from alembic.ini

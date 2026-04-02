@@ -18,9 +18,9 @@ from typing import Annotated, Optional
 
 import typer
 
+from mascope_cli.cmd.prod.db.backup import backup_app
 from mascope_cli.pg import (
     check_prerequisites,
-    create_database as admin_create_database,
     dirs,
     drop_database,
     is_container_running,
@@ -30,8 +30,11 @@ from mascope_cli.pg import (
     pg_restore,
     validate_env,
 )
-from mascope_cli.cmd.prod.db.backup import backup_app
+from mascope_cli.pg import (
+    create_database as admin_create_database,
+)
 from mascope_cli.runtime import runtime
+
 
 prod_db_app = typer.Typer()
 prod_db_app.add_typer(backup_app, name="backup")

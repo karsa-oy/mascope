@@ -12,9 +12,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal
 
-import mascope_signal.compute as m_compute
 import numpy as np
 import xarray as xr
+
+import mascope_signal.compute as m_compute
 from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
 from mascope_file.io import load_peak_data
 

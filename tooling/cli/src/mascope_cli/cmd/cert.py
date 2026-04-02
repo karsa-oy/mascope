@@ -3,6 +3,7 @@ import typer
 import mascope_cli.cmd.lib as lib
 from mascope_cli.runtime import runtime
 
+
 cert_app = typer.Typer()
 
 

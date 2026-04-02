@@ -1,10 +1,15 @@
 # __author__ = 'Alexandre Drouin'
 
-from .base import PreprocessorMixin
-from ..spectrum import copy_spectrum_with_new_intensities, copy_spectrum_with_new_mz_and_intensities
-from ..utils import binary_search_for_left_range, binary_search_for_right_range
 import copy
+
 import numpy as np
+
+from ..spectrum import (
+    copy_spectrum_with_new_intensities,
+    copy_spectrum_with_new_mz_and_intensities,
+)
+from ..utils import binary_search_for_left_range, binary_search_for_right_range
+from .base import PreprocessorMixin
 
 
 class ThresholdedPeakFiltering(PreprocessorMixin):

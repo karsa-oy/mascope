@@ -6,25 +6,24 @@
 # - Find a more robust mechanism for handling timeouts and retries (tenacity?)
 
 import asyncio
+import glob
 import json
+import os
+import shutil
 import subprocess
 import time
-import os
 from pathlib import Path
-import glob
-import shutil
-import requests
-import pandas as pd
-import numpy as np
 
+import numpy as np
+import pandas as pd
 import pytest
+import requests
 from tests.config import *
 
-from mascope_file.name import get_instrument_type
-from mascope_signal.peak import detect_peaks
-from mascope_match import compute_match_isotopes
-
 from mascope_backend.runtime import runtime
+from mascope_file.name import get_instrument_type
+from mascope_match import compute_match_isotopes
+from mascope_signal.peak import detect_peaks
 
 
 # Load targets

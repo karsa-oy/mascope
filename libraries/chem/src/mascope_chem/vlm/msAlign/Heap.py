@@ -1,5 +1,6 @@
 from mascope_chem.runtime import runtime
 
+
 max_predicate = lambda a, b: a[2] <= b[2]
 
 

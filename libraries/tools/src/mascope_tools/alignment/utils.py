@@ -1,9 +1,12 @@
 import os
-import mascope_sdk as msdk
+
 import numpy as np
 import pandas as pd
-from .calibration import CentroidedSpectrum, Spectra
+
+import mascope_sdk as msdk
+
 from .caching import CacheManager
+from .calibration import CentroidedSpectrum, Spectra
 
 
 def _is_notebook():

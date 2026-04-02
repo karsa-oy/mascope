@@ -1,7 +1,10 @@
-import typer
 import os
 from typing import Annotated
+
+import typer
+
 from mascope_cli.runtime import runtime
+
 
 logs_app = typer.Typer()
 

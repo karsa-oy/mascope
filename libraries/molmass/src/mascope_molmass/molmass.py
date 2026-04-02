@@ -278,6 +278,7 @@ Element(
 
 from __future__ import annotations
 
+
 __version__ = "2025.12.12"
 
 __all__ = [
@@ -315,6 +316,7 @@ import sys
 from dataclasses import dataclass
 from functools import cached_property, reduce
 from typing import TYPE_CHECKING
+
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Iterator, Sequence

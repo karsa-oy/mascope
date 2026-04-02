@@ -7,6 +7,7 @@ from loguru import logger
 
 from .._http import http_get, http_post
 
+
 if TYPE_CHECKING:
     from ..client import MascopeClient
 

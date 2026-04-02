@@ -7,9 +7,9 @@ import pytest
 from pydantic import ValidationError
 
 from mascope_backend.api.models.workspace.workspace_pydantic_model import (
+    GetWorkspacesQueryParams,
     WorkspaceCreate,
     WorkspaceUpdate,
-    GetWorkspacesQueryParams,
 )
 
 

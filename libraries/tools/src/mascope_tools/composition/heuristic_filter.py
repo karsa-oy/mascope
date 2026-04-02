@@ -3,17 +3,20 @@ Based on 7 Golden Rules by https://bmcbioinformatics.biomedcentral.com/articles/
 """
 
 from typing import Any
+
 import numpy as np
-from scipy.spatial.distance import cosine
 import polars as pl
-from IsoSpecPy import IsoThreshold, ParseFormula, PeriodicTbl, IsoDistribution
+from IsoSpecPy import IsoDistribution, IsoThreshold, ParseFormula, PeriodicTbl
+from scipy.spatial.distance import cosine
+
 from mascope_tools.composition.constants import (
     DEFAULT_ELEMENTAL_RATIO_RANGE,
-    ISOTOPE_ABUNDANCE_THRESHOLD,
     ELECTRON_MASS,
-    ISOTOPE_MATCHING_MZ_TOLERANCE_PPM,
+    ISOTOPE_ABUNDANCE_THRESHOLD,
     ISOTOPE_MATCHING_INTENSITY_TOLERANCE,
+    ISOTOPE_MATCHING_MZ_TOLERANCE_PPM,
 )
+
 
 # Limit isotopic matching to the most plausible candidates
 ISOTOPE_CANDIDATE_LIMIT = 64

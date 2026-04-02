@@ -15,20 +15,21 @@ Process:
 """
 
 import asyncio
-from datetime import datetime as dt, timezone as tz
+from datetime import datetime as dt
+from datetime import timezone as tz
 
 from sqlalchemy import event, func, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from mascope_backend.db import configure_database_engine
 from mascope_backend.db.models import (
     Base,
     SampleBatch,
     SampleItem,
-    update_workspace_on_sample_batch_change,
-    update_sample_batch_on_sample_item_change,
     update_modified_timestamp,
+    update_sample_batch_on_sample_item_change,
+    update_workspace_on_sample_batch_change,
 )
 from mascope_backend.db.ops.backup import create_db_backup
 from mascope_backend.db.ops.maintenance import db_maintenance
@@ -36,6 +37,7 @@ from mascope_backend.db.ops.restore import db_restore
 from mascope_backend.db.secrets import postgres_password
 from mascope_backend.db.utils import get_current_db_version
 from mascope_backend.runtime import runtime
+
 
 BATCH_INSERT_SIZE = 1000
 

@@ -9,10 +9,9 @@ import numpy as np
 import pytest
 import xarray as xr
 import zarr
+from conftest import TEST_FILENAME, TEST_MZ_SIZE, TEST_TIME_SIZE
 
 from mascope_file.io import write_peaks
-
-from conftest import TEST_FILENAME, TEST_MZ_SIZE, TEST_TIME_SIZE
 
 
 class TestWritePeaks:

@@ -1,28 +1,31 @@
 # import type hint w/o circular import error
 from __future__ import annotations
+
 import typing
+
 
 if typing.TYPE_CHECKING:
     import loguru
+
     from mascope_runtime import Runtime
+
     from .mode import RuntimeMode
 
-from loguru import logger
+import datetime
+import glob
+import io
+import json
+import os
+import re
+import sys
+from types import TracebackType
+from typing import Callable, List
 
 import duckdb
-import datetime
-import os
-import glob
-import sys
-import io
-import re
-import json
-from types import TracebackType
-
+from loguru import logger
 from rich.console import Console
 from rich.traceback import Traceback
 
-from typing import List, Callable
 
 highlight = re.compile("SUCCESS|WARNING|ERROR|CRITICAL")
 

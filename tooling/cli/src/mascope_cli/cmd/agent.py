@@ -1,11 +1,11 @@
-import typer
+from typing import List, Optional
 
-from typing import Optional, List
+import typer
 from typing_extensions import Annotated
 
-
-from mascope_cli.runtime import runtime
 from mascope_cli.cmd import lib
+from mascope_cli.runtime import runtime
+
 
 agent_app = typer.Typer(add_help_option=False)
 

@@ -8,13 +8,12 @@ subprocesses.
 """
 
 import os
-import subprocess
 import shlex
+import subprocess
 from typing import Optional
 
-from mascope_runtime import Runtime
-
 from mascope_cli.runtime import runtime as cli_runtime
+from mascope_runtime import Runtime
 
 
 def run(

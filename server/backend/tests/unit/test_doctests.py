@@ -24,6 +24,7 @@ import sys
 
 import pytest
 
+
 # Package prefix to scan for doctests
 PACKAGE_PREFIX = "mascope"
 

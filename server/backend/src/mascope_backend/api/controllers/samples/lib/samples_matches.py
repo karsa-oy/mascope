@@ -7,6 +7,8 @@ applies match filtering parameters, and groups results by peak ID.
 from __future__ import annotations
 
 import pandas as pd
+from sqlalchemy import and_, label, select
+
 from mascope_backend.api.new.match.params.lib import apply_match_params
 from mascope_backend.db import (
     MatchCollection,
@@ -18,7 +20,6 @@ from mascope_backend.db import (
     TargetIsotope,
     async_session,
 )
-from sqlalchemy import and_, label, select
 
 
 async def query_peak_matches(

@@ -28,14 +28,15 @@ valid JWT tokens and including them in cookies.
 """
 
 from datetime import datetime, timedelta, timezone
+
 import jwt
 import pytest
 import pytest_asyncio
 from fastapi.testclient import TestClient
 
-from mascope_backend.app.fast import fast
 from mascope_backend.api.new.auth.config import auth_settings
-from mascope_backend.db import User, Role
+from mascope_backend.app.fast import fast
+from mascope_backend.db import Role, User
 
 
 @pytest_asyncio.fixture(scope="session")

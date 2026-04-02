@@ -2,13 +2,13 @@ import asyncio
 from typing import List, Optional
 
 from sqlalchemy import (
+    String,
     and_,
     asc,
     cast,
     desc,
     func,
     select,
-    String,
 )
 from sqlalchemy.orm import joinedload
 
@@ -45,9 +45,8 @@ from mascope_backend.db import (
     TargetIon,
     async_session,
 )
-from mascope_backend.socket.records.service import emit_record_reload
-
 from mascope_backend.runtime import runtime
+from mascope_backend.socket.records.service import emit_record_reload
 
 
 @api_controller()

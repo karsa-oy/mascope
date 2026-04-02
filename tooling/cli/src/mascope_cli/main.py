@@ -7,17 +7,17 @@ All environment-specific functionality is delegated to sub-apps under
 `mascope_cli.cmd`.
 """
 
-from typing import Optional
 import os
+from typing import Optional
+
 import typer
-
-from typing_extensions import Annotated
-
 from rich.console import Console
 from rich.table import Table
+from typing_extensions import Annotated
 
-from mascope_cli.runtime import runtime
 from mascope_cli import cmd
+from mascope_cli.runtime import runtime
+
 
 app = typer.Typer()
 

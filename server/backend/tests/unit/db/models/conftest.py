@@ -3,9 +3,10 @@ Fixtures for database model tests.
 """
 
 from datetime import datetime, timezone
+
 import pytest_asyncio
 
-from mascope_backend.db import Workspace, SampleBatch
+from mascope_backend.db import SampleBatch, Workspace
 
 
 @pytest_asyncio.fixture

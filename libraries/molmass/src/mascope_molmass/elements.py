@@ -45,6 +45,7 @@ Data sources:
 
 from __future__ import annotations
 
+
 __version__ = "2025.9.4"
 
 __all__ = [
@@ -63,6 +64,7 @@ __all__ = [
 from dataclasses import dataclass
 from functools import cached_property
 from typing import TYPE_CHECKING
+
 
 if TYPE_CHECKING:
     from collections.abc import Iterator

@@ -9,12 +9,11 @@ filestore, streaming folders).
 
 from contextlib import nullcontext
 from typing import Annotated
-import typer
 
+import typer
 from rich.console import Console
 from rich.table import Table
 
-from mascope_cli.runtime import runtime
 from mascope_cli.cmd.env._create import (
     create_env_local,
     create_env_remote,
@@ -27,6 +26,7 @@ from mascope_cli.cmd.env._paths import (
 )
 from mascope_cli.cmd.env._ssh import SshMux
 from mascope_cli.cmd.env._sync import sync_db, sync_filestore
+from mascope_cli.runtime import runtime
 from mascope_runtime import Runtime
 
 

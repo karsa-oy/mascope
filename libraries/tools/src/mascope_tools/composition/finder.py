@@ -3,23 +3,25 @@
 import re
 import warnings
 from typing import Any
+
+import numpy as np
 import pandas as pd
 import polars as pl
-import numpy as np
 from IsoSpecPy import ParseFormula
+
+from mascope_tools.composition import utils
+from mascope_tools.composition.constants import (
+    UNSATURATION_COEFFICIENTS,
+)
 from mascope_tools.composition.heuristic_filter import (
     apply_heuristic_rules,
     match_isotopic_pattern,
 )
-from mascope_tools.composition import utils
 from mascope_tools.composition.models import (
-    SearchContext,
     Atom,
-    Result,
     CompositionFinderWarning,
-)
-from mascope_tools.composition.constants import (
-    UNSATURATION_COEFFICIENTS,
+    Result,
+    SearchContext,
 )
 
 

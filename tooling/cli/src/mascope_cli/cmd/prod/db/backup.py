@@ -31,6 +31,7 @@ from mascope_cli.pg import (
 )
 from mascope_cli.runtime import runtime
 
+
 backup_app = typer.Typer()
 
 _MODE = "prod"

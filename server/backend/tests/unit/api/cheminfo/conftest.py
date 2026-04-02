@@ -4,10 +4,10 @@ Fixtures specific to cheminfo API unit tests.
 
 import pytest
 
+from mascope_backend.api.new.cheminfo.config import cheminfo_config
 from mascope_backend.api.new.cheminfo.schema import (
     CheminfoMatchedQueryBody,
 )
-from mascope_backend.api.new.cheminfo.config import cheminfo_config
 
 
 @pytest.fixture

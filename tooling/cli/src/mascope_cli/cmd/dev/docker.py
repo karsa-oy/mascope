@@ -9,9 +9,11 @@ import os
 import platform
 import subprocess
 import time
+
 import typer
 
 from mascope_cli.runtime import runtime
+
 
 dev_docker_app = typer.Typer()
 

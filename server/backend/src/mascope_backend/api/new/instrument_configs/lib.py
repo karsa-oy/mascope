@@ -8,8 +8,8 @@ from mascope_backend.api.controllers.sample.lib.sample_file_fetch import (
 )
 from mascope_backend.db import InstrumentFunction as InstrumentConfig
 from mascope_backend.db import async_session
-from mascope_signal.instrument_func.fit import r_orbi, r_tof
 from mascope_backend.runtime import runtime
+from mascope_signal.instrument_func.fit import r_orbi, r_tof
 
 
 async def fetch_instrument_config_by_filename(filename: str) -> InstrumentConfig | None:

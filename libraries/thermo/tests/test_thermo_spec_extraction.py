@@ -1,7 +1,8 @@
-import pytest
 import numpy as np
+import pytest
+from conftest import NEG_ORBI_FILE_PATH, POS_ORBI_FILE_PATH
+
 import mascope_thermo.thermo as m_thermo
-from conftest import POS_ORBI_FILE_PATH, NEG_ORBI_FILE_PATH
 
 
 class TestGetPolarityOptions:

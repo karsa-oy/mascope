@@ -22,8 +22,8 @@ import xarray
 from colorcet import fire
 from PIL import Image
 
-
 from mascope_chem.runtime import runtime
+
 
 VIZ_TYPES_SUPPORTED = {"spectrogram", "timeseries", "waterfall"}
 

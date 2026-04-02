@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 from datetime import datetime, timedelta, timezone
+
 import numpy as np
 
 from mascope_backend.api.new.instrument_configs.schemas import (
-    PeakShape,
     InstrumentConfigFitParams,
+    PeakShape,
 )
 from mascope_backend.api.new.instrument_configs.service import fit_instrument_functions
 from mascope_backend.file_converter.base_processor import (
@@ -12,7 +13,6 @@ from mascope_backend.file_converter.base_processor import (
     SampleFileProps,
     with_file_context,
 )
-
 from mascope_tofwerk.tofwerk import open_h5_file
 
 

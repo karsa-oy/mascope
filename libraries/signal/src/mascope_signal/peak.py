@@ -1,28 +1,30 @@
-from abc import ABC, abstractmethod
 import asyncio
-import os
 import math
+import os
 import threading
+from abc import ABC, abstractmethod
 from collections.abc import Callable
 from concurrent.futures import ProcessPoolExecutor
-import numpy as np
-import pandas as pd
-from scipy.signal._peak_finding_utils import _select_by_peak_distance
-import xarray
+
 import dask
 import dask.array as da
+import numpy as np
+import pandas as pd
+import xarray
+from scipy.signal._peak_finding_utils import _select_by_peak_distance
+
+import mascope_file.io as m_io
+import mascope_file.name as m_name
+import mascope_signal.compute as m_compute
+import mascope_signal.fitting as m_fitting
+from mascope_backend.db.id import gen_id
 from mascope_match.params import (
     ORBI_FITTING_THRESHOLD,
     TOF_FITTING_THRESHOLD,
 )
-import mascope_file.name as m_name
-import mascope_file.io as m_io
-import mascope_signal.compute as m_compute
-import mascope_signal.fitting as m_fitting
-from mascope_tools.alignment.utils import flag_satellite_peaks
-from mascope_backend.db.id import gen_id
-
 from mascope_signal.runtime import runtime
+from mascope_tools.alignment.utils import flag_satellite_peaks
+
 
 # Restrict large chunks for dask
 dask.config.set(**{"array.slicing.split_large_chunks": True})

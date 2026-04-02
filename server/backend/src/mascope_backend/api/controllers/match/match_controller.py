@@ -33,8 +33,8 @@ from mascope_backend.api.controllers.samples.samples_controller import (
     get_samples,
 )
 from mascope_backend.api.controllers.target.lib.fetch.target_isotopes_fetch import (
-    fetch_sample_unmatched_target_isotopes,
     fetch_existing_main_isotope_references,
+    fetch_sample_unmatched_target_isotopes,
 )
 from mascope_backend.api.lib.api_features import (
     api_controller,

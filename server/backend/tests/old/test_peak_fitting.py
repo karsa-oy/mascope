@@ -3,15 +3,14 @@ import shutil
 import warnings
 from glob import glob
 
-from test_utils.dataset_generator import GenerationParams, SpectraGenerator
-
-from scipy.stats import norm, skewnorm
 import numpy as np
 import xarray as xarr
-
-from mascope_signal.peak import fit_n_peaks, segment_spec
+from scipy.stats import norm, skewnorm
+from test_utils.dataset_generator import GenerationParams, SpectraGenerator
 
 from mascope_backend.runtime import runtime
+from mascope_signal.peak import fit_n_peaks, segment_spec
+
 
 warnings.filterwarnings("ignore")
 

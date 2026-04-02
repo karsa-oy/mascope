@@ -21,11 +21,11 @@ import asyncio
 
 from sqlalchemy import select
 
-from mascope_backend.db import SampleBatch, async_session, configure_database_engine
-from mascope_backend.db.utils import get_current_db_version
 from mascope_backend.api.controllers.sample.batches.status.service import (
     update_sample_batch_status,
 )
+from mascope_backend.db import SampleBatch, async_session, configure_database_engine
+from mascope_backend.db.utils import get_current_db_version
 from mascope_backend.runtime import runtime
 
 

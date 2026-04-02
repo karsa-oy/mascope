@@ -5,11 +5,11 @@ import os
 import platform
 
 # from .TofDaq import TPeakPar  #TODO: commented out since not used and not compatible with linux
-
 import numpy as np
 from numpy.ctypeslib import ndpointer
 
 from mascope_tofwerk.runtime import runtime
+
 
 h5lib = None
 

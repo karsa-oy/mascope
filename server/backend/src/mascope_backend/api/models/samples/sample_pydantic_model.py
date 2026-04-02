@@ -1,5 +1,7 @@
 from datetime import datetime
 
+from pydantic import ConfigDict, Field, model_validator
+
 from mascope_backend.api.models.base_pydantic_model import (
     CommonValidators,
     QueryParamsModel,
@@ -8,7 +10,7 @@ from mascope_backend.api.models.base_pydantic_model import (
 from mascope_backend.api.models.sample.items.sample_item_pydantic_model import (
     GetSampleItemsQueryValidator,
 )
-from pydantic import ConfigDict, Field, model_validator
+
 
 # TODO_configuration move to sample configs when refactoring
 DEFAULT_PEAK_MZ_TOLERANCE_PPM = 1.0

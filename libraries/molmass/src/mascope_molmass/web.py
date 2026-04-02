@@ -59,6 +59,7 @@ Instead, for example, create a Flask app and serve it on a production server::
 
 from __future__ import annotations
 
+
 __all__ = ['main', 'response']
 
 import os
@@ -67,6 +68,7 @@ import sys
 from html import escape
 from typing import TYPE_CHECKING
 
+
 if TYPE_CHECKING:
     from typing import Any
 
@@ -74,9 +76,8 @@ try:
     from . import molmass
     from .elements import ELEMENTS
 except ImportError:
-    from elements import ELEMENTS  # type: ignore[no-redef]
-
     import molmass  # type: ignore[no-redef]
+    from elements import ELEMENTS  # type: ignore[no-redef]
 
 DEBUG = False
 

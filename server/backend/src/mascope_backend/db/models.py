@@ -43,6 +43,7 @@ from mascope_backend.api.models.target.collections.config import (
 from mascope_backend.api.models.workspace.config import workspace_config
 from mascope_backend.runtime import runtime
 
+
 # Naming convention for all constraints and indexes.
 # Provides predictable names in Alembic migrations (required for DROP/ALTER operations).
 # Convention:

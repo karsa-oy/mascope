@@ -18,10 +18,11 @@ import psycopg2
 import typer
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 
+from mascope_cli.cmd.dev.db.backup import backup_app
 from mascope_cli.pg import (
+    DatabaseExistsError,
     check_prerequisites,
     clone_database,
-    DatabaseExistsError,
     dirs,
     drop_database,
     is_container_running,
@@ -31,7 +32,6 @@ from mascope_cli.pg import (
     pg_restore,
     validate_env,
 )
-from mascope_cli.cmd.dev.db.backup import backup_app
 from mascope_cli.runtime import runtime
 
 

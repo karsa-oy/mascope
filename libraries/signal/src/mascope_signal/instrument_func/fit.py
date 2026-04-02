@@ -1,15 +1,15 @@
 from functools import partial
+
 import numpy as np
+from lmfit.model import ModelResult
+from lmfit.models import SkewedGaussianModel, SplineModel
+from scipy.interpolate import interp1d
+from scipy.optimize import curve_fit
 from scipy.signal import find_peaks
 from scipy.stats import linregress
-from scipy.optimize import curve_fit
-from scipy.interpolate import interp1d
-from lmfit.models import SplineModel, SkewedGaussianModel
-from lmfit.model import ModelResult
 
 from mascope_file.name import get_instrument_type
 from mascope_signal.compute import get_sum_signal
-
 from mascope_signal.runtime import runtime
 
 

@@ -9,15 +9,16 @@ import os
 import subprocess
 from pathlib import Path
 from typing import Annotated
-from alembic.script import ScriptDirectory
-from alembic.config import Config
-from sqlalchemy.pool import NullPool
-from sqlalchemy import create_engine, text
+
 import typer
+from alembic.config import Config
+from alembic.script import ScriptDirectory
+from sqlalchemy import create_engine, text
+from sqlalchemy.pool import NullPool
 
 from mascope_cli.pg import dirs, pg_dump
-
 from mascope_cli.runtime import runtime
+
 
 dev_migrate_app = typer.Typer()
 

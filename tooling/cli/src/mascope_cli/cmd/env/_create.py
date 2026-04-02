@@ -16,7 +16,7 @@ prompts, and error reporting.
 import re
 import subprocess
 
-from mascope_cli.cmd.env._paths import local_env_dir, get_remote_mascope_path
+from mascope_cli.cmd.env._paths import get_remote_mascope_path, local_env_dir
 from mascope_cli.cmd.env._ssh import cygwin_bin, get_identity_args
 from mascope_cli.runtime import runtime
 

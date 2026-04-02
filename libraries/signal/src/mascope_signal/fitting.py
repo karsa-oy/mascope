@@ -1,7 +1,8 @@
-from typing import Iterable
 import warnings
-import numpy as np
+from typing import Iterable
+
 import lmfit
+import numpy as np
 from scipy.integrate import simpson
 from scipy.spatial.distance import pdist
 

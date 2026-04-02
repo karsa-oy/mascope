@@ -6,8 +6,8 @@ import pytest
 from pydantic import ValidationError
 
 from mascope_backend.api.new.cheminfo.schema import (
-    CheminfoQueryBody,
     CheminfoMatchedQueryBody,
+    CheminfoQueryBody,
 )
 
 

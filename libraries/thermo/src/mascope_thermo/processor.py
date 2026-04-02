@@ -1,17 +1,16 @@
 from datetime import datetime, timezone
 
 from mascope_backend.api.new.instrument_configs.schemas import (
-    PeakShape,
     InstrumentConfigFitParams,
+    PeakShape,
 )
 from mascope_backend.api.new.instrument_configs.service import fit_instrument_functions
-
 from mascope_backend.file_converter.base_processor import (
     BaseFileProcessor,
     SampleFileProps,
     with_file_context,
 )
-from mascope_thermo.thermo import get_polarity_options, RawFileManager
+from mascope_thermo.thermo import RawFileManager, get_polarity_options
 
 
 class RawProcessor(BaseFileProcessor):

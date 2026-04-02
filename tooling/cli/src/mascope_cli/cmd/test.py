@@ -14,11 +14,13 @@ Usage:
 
 import os
 from enum import Enum
+
 import typer
 from typing_extensions import Annotated
 
 import mascope_cli.cmd.lib as lib
 from mascope_cli.runtime import runtime
+
 
 test_app = typer.Typer()
 

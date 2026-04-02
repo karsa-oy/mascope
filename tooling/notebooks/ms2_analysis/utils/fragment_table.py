@@ -1,11 +1,13 @@
 import base64
+
+import ipywidgets as widgets
 import numpy as np
 import pandas as pd
-import ipywidgets as widgets
 from IPython.display import display
 
-from .data_extractor import DataExtractor
 from .composition import CompositionMap
+from .data_extractor import DataExtractor
+
 
 DEFAULT_MAX_FRAGMENTS = 10
 COMPOSITION_MATCH_TOLERANCE = 0.01

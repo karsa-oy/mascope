@@ -8,12 +8,15 @@ three-layer overlay system.
 """
 
 from __future__ import annotations
+
 import os
 import tomllib
-from typing import Literal
 import typing
 from pathlib import Path
+from typing import Literal
+
 from pydantic import BaseModel
+
 
 if typing.TYPE_CHECKING:
     from mascope_runtime import Runtime

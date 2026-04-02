@@ -6,4 +6,5 @@ import sys
 
 from .molmass import main
 
+
 sys.exit(main())

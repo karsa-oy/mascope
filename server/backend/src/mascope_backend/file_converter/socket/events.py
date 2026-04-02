@@ -7,6 +7,7 @@ from mascope_backend.runtime import runtime
 
 if TYPE_CHECKING:
     from queue import Queue
+
     from .client import FileConverterSocketClient
 
 

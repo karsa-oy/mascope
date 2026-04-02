@@ -17,6 +17,7 @@ from tqdm import tqdm
 
 from .exceptions import ConfigurationError
 
+
 # Track whether we've already configured the SDK's loguru handler
 _log_handler_id: int | None = None
 
@@ -545,6 +546,7 @@ class MascopeClient:
 # Type hints for lazy-loaded resources
 # pylint: disable=wrong-import-order, wrong-import-position
 from typing import TYPE_CHECKING  # noqa: E402
+
 
 if TYPE_CHECKING:
     from .resources.batches import BatchesResource

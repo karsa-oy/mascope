@@ -7,10 +7,11 @@ and filestore records via HTTP requests to the API service.
 
 from datetime import datetime, timedelta
 from types import SimpleNamespace
+
 import requests
 
-from mascope_backend.api.new.instrument_configs.schemas import PeakShape
 from mascope_backend.api.new.instrument_configs.lib import parse_instrument_functions
+from mascope_backend.api.new.instrument_configs.schemas import PeakShape
 from mascope_file.name import get_instrument_name
 
 from .runtime import runtime

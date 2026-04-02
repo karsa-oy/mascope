@@ -3,15 +3,16 @@ import os
 
 import pytest
 
+from mascope_backend.api.controllers.target.ions.target_ions_controller import (
+    create_target_ions,
+)
 from mascope_backend.db import (
     IonizationMechanism,
     TargetCompound,
     TargetIon,
     TargetIsotope,
 )
-from mascope_backend.api.controllers.target.ions.target_ions_controller import (
-    create_target_ions,
-)
+
 
 HERE = os.path.dirname(__file__)
 with open(os.path.join(HERE, "ions.json"), "r") as f:

@@ -6,6 +6,7 @@ This module defines constants, configurations, and parameter models used in matc
 
 from pydantic import BaseModel, Field, model_validator
 
+
 # Fitting thresholds
 TOF_FITTING_THRESHOLD = 0.9
 ORBI_FITTING_THRESHOLD = 0.6

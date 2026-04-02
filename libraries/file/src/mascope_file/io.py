@@ -1,15 +1,15 @@
-import platform
+import asyncio
 import fnmatch
+import glob
 import json
 import os
-import glob
+import platform
+import threading
 from shutil import rmtree
+
 import numpy as np
 import xarray as xr
 import zarr
-import asyncio
-import threading
-
 
 import mascope_file.name as m_name
 from mascope_file.runtime import runtime

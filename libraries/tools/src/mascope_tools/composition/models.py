@@ -1,11 +1,12 @@
-from dataclasses import dataclass, asdict
-from mascope_tools.composition.constants import (
-    DEFAULT_MAXIMUM_UNSATURATION,
-    DEFAULT_MAXIMUM_ROWS,
-    DEFAULT_SEARCH_ELEMENT_COUNT_RANGES,
-    DEFAULT_MASS_RANGE_THRESHOLD_PPM,
-)
+from dataclasses import asdict, dataclass
+
 from mascope_tools.composition import utils
+from mascope_tools.composition.constants import (
+    DEFAULT_MASS_RANGE_THRESHOLD_PPM,
+    DEFAULT_MAXIMUM_ROWS,
+    DEFAULT_MAXIMUM_UNSATURATION,
+    DEFAULT_SEARCH_ELEMENT_COUNT_RANGES,
+)
 
 
 class CompositionFinderException(Exception):

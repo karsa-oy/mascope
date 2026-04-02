@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+
 _TESTS_DIR = Path(__file__).parent
 
 POS_ORBI_FILE_PATH = str(

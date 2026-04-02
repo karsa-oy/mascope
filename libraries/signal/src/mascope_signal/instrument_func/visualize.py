@@ -1,9 +1,12 @@
 from functools import partial
-from xarray import DataArray
+
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from xarray import DataArray
+
 from mascope_signal.fitting import gen_peak
+
 
 subtitles = ("FWHM", "Chosen peak", "Resolution function")
 
