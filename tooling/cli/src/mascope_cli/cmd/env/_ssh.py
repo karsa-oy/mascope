@@ -159,8 +159,7 @@ class SshMux:
                 pass
 
         runtime.logger.info(
-            f"SshMux: opening ControlMaster to {self._remote} "
-            f"(socket: {self._socket})"
+            f"SshMux: opening ControlMaster to {self._remote} (socket: {self._socket})"
         )
         result = subprocess.run(
             [

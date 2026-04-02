@@ -580,9 +580,7 @@ class ImageGenerator(Process):
                 runtime.logger.critical(f"KeyboardInterrupt for PID: {os.getpid()}")
                 break
             except Exception as e:
-                runtime.logger.critical(
-                    f"Exception {str(e)} for PID: {os.getpid()}"
-                )
+                runtime.logger.critical(f"Exception {str(e)} for PID: {os.getpid()}")
                 break
             if data is not None:
                 # Select function to generate the image

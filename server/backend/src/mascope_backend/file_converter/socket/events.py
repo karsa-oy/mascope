@@ -49,9 +49,7 @@ class SocketEventHandler:
             the queue item.
             """
             filename = data["filename"]
-            runtime.logger.info(
-                f"Received peak detection request for {filename}"
-            )
+            runtime.logger.info(f"Received peak detection request for {filename}")
 
             if self._peak_recompute_queue is None:
                 runtime.logger.error(

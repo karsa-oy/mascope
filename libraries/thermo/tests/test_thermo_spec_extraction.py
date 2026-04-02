@@ -36,13 +36,13 @@ class TestGetSignal:
 
     def test_correct_signal_extraction(self):
         assert self.sig.mz.size > 0, "Expected m/z array to have more than 0 elements"
-        assert (
-            self.sig.time.size > 0
-        ), "Expected time array to have more than 0 elements"
+        assert self.sig.time.size > 0, (
+            "Expected time array to have more than 0 elements"
+        )
         # Check the signal has non-zero values
-        assert (
-            self.sig.signal.sum() > 0
-        ), "Expected intensity values to sum to more than 0"
+        assert self.sig.signal.sum() > 0, (
+            "Expected intensity values to sum to more than 0"
+        )
 
     def test_invalid_polarity(self):
         with pytest.raises(ValueError):
@@ -64,9 +64,9 @@ class TestComputeSumSignal:
         )
 
         assert sum_sig.mz.size > 0, "Expected m/z array to have more than 0 elements"
-        assert (
-            n_scans == n_scans_pos
-        ), "Expected number of combined scans to be the same for None and '+' polarity"
+        assert n_scans == n_scans_pos, (
+            "Expected number of combined scans to be the same for None and '+' polarity"
+        )
         np.testing.assert_array_equal(
             sum_sig.values,
             sum_sig_pos.values,
@@ -89,18 +89,18 @@ class TestGetTicPerScan:
     def test_correct_tic_extraction(self):
         scan_timestamps, tic_per_scan = m_thermo.get_tic_per_scan(POS_ORBI_FILE_PATH)
         assert tic_per_scan.size > 0, "Expected TIC array to have more than 0 elements"
-        assert (
-            scan_timestamps.size > 0
-        ), "Expected scan timestamps array to have more than 0 elements"
+        assert scan_timestamps.size > 0, (
+            "Expected scan timestamps array to have more than 0 elements"
+        )
 
     def test_one_timestamp_extraction(self):
         scan_timestamps, tic_per_scan = m_thermo.get_tic_per_scan(
             POS_ORBI_FILE_PATH, timestamps=[0]
         )
         assert tic_per_scan.size == 1, "Expected TIC array to have exactly 1 element"
-        assert (
-            scan_timestamps.size == 1
-        ), "Expected scan timestamps array to have exactly 1 element"
+        assert scan_timestamps.size == 1, (
+            "Expected scan timestamps array to have exactly 1 element"
+        )
 
 
 class TestGetPeakTimeseries:
@@ -135,9 +135,9 @@ class TestGetPeakTimeseries:
             "mz",
             "time",
         ), "Expected dimensions to be ('mz', 'time')"
-        assert peak_ts.mz.size == len(
-            self.test_mzs
-        ), "Expected one trace per requested m/z"
+        assert peak_ts.mz.size == len(self.test_mzs), (
+            "Expected one trace per requested m/z"
+        )
         assert peak_ts.time.size > 0, "Expected non-empty time axis"
 
         diffs_ppm = np.abs(peak_ts.mz.values - self.test_mzs) / self.test_mzs * 1e6
@@ -184,9 +184,9 @@ class TestGetCentroids:
         assert masses.size > 0, "Expected centroid masses to be non-empty"
         assert intensities.size > 0, "Expected centroid intensities to be non-empty"
         assert resolutions.size > 0, "Expected centroid resolutions to be non-empty"
-        assert (
-            signal_to_noise.size > 0
-        ), "Expected centroid signal-to-noise values to be non-empty"
+        assert signal_to_noise.size > 0, (
+            "Expected centroid signal-to-noise values to be non-empty"
+        )
 
         assert (
             masses.size == intensities.size == resolutions.size == signal_to_noise.size
@@ -194,9 +194,9 @@ class TestGetCentroids:
         assert np.isfinite(masses).all(), "Expected finite centroid masses"
         assert np.isfinite(intensities).all(), "Expected finite centroid intensities"
         assert np.isfinite(resolutions).all(), "Expected finite centroid resolutions"
-        assert np.isfinite(
-            signal_to_noise
-        ).all(), "Expected finite signal-to-noise values"
+        assert np.isfinite(signal_to_noise).all(), (
+            "Expected finite signal-to-noise values"
+        )
         assert np.all(intensities >= 0), "Expected non-negative centroid intensities"
 
     def test_average_flag_scales_intensity(self):
@@ -252,9 +252,9 @@ class TestGetCentroids:
         )
 
         assert masses.size > 0, "Expected centroid masses after time filtering"
-        assert (
-            intensities.size > 0
-        ), "Expected centroid intensities after time filtering"
+        assert intensities.size > 0, (
+            "Expected centroid intensities after time filtering"
+        )
         assert (
             masses.size == intensities.size == resolutions.size == signal_to_noise.size
         )
@@ -322,18 +322,18 @@ class TestGetCentroidsPerScan:
                 == signal_to_noise.size
             )
             assert np.isfinite(masses).all(), "Expected finite centroid masses"
-            assert np.isfinite(
-                intensities
-            ).all(), "Expected finite centroid intensities"
-            assert np.isfinite(
-                resolutions
-            ).all(), "Expected finite centroid resolutions"
-            assert np.isfinite(
-                signal_to_noise
-            ).all(), "Expected finite signal-to-noise values"
-            assert np.all(
-                intensities >= 0
-            ), "Expected non-negative centroid intensities"
+            assert np.isfinite(intensities).all(), (
+                "Expected finite centroid intensities"
+            )
+            assert np.isfinite(resolutions).all(), (
+                "Expected finite centroid resolutions"
+            )
+            assert np.isfinite(signal_to_noise).all(), (
+                "Expected finite signal-to-noise values"
+            )
+            assert np.all(intensities >= 0), (
+                "Expected non-negative centroid intensities"
+            )
 
     def test_time_range_filtering_and_timestamp_alignment(self):
         scan_times = m_thermo.get_scan_timestamps(POS_ORBI_FILE_PATH, polarity="+")

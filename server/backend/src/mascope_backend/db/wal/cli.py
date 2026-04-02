@@ -33,7 +33,7 @@ def set_journal_mode_cmd(
         "wal",
         help="Journal mode to set",
         show_default=True,
-    )
+    ),
 ):
     """Set journal mode (wal or delete)."""
     # Validation is done in set_journal_mode function
@@ -53,7 +53,7 @@ def wal_checkpoint_cmd(
         "RESTART",
         help="Checkpoint mode (PASSIVE, FULL, RESTART, TRUNCATE)",
         show_default=True,
-    )
+    ),
 ):
     """
     Execute WAL checkpoint operation.

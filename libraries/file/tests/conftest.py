@@ -55,7 +55,6 @@ def mock_runtime(temp_filestore):
         patch("mascope_file.name.runtime") as mock_name_runtime,
         patch("mascope_file.io.runtime") as mock_io_runtime,
     ):
-
         mock_name_runtime.filestore = mock_filestore
         mock_io_runtime.filestore = mock_filestore
         mock_io_runtime.logger = mock_logger

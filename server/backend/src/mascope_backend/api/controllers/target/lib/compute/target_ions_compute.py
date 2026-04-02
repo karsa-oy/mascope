@@ -205,8 +205,7 @@ def _get_compound_formula(
         ) in mechanism_formula._elements.items():  # pylint: disable=protected-access
             # Check if element to be subtracted exists in compound formula
             if (
-                element
-                not in compound_formula._elements  # pylint: disable=protected-access
+                element not in compound_formula._elements  # pylint: disable=protected-access
             ):
                 raise SkipIonizationMechanism(
                     f"Element {element} from mechanism formula {mechanism_formula.formula} "

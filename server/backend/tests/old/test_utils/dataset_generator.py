@@ -179,7 +179,6 @@ class SpectraGenerator:
 
         # generate pure Gaussian peaks
         if self.params.ms == "orbi":
-
             peaks = [
                 heights[i]
                 * np.exp(-0.5 * ((self.mz_grid - positions[i]) / sigmas[i]) ** 2)

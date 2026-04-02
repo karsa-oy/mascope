@@ -60,7 +60,7 @@ Instead, for example, create a Flask app and serve it on a production server::
 from __future__ import annotations
 
 
-__all__ = ['main', 'response']
+__all__ = ["main", "response"]
 
 import os
 import re
@@ -208,7 +208,7 @@ def response(
     url: str,
     template: str | None = None,
     help: str | None = None,  # noqa: A002
-    heads: str = '',
+    heads: str = "",
 ) -> str:
     """Return HTML document from submitted web form.
 
@@ -225,14 +225,14 @@ def response(
     if help is None:
         help = HELP  # noqa: A001
 
-    formula = form.get('q', '')
+    formula = form.get("q", "")
     if not formula:
-        formula = ''
-    if formula == 'groups':
-        formula = ''
+        formula = ""
+    if formula == "groups":
+        formula = ""
         content = groups()
-    elif formula == 'isotopes':
-        formula = ''
+    elif formula == "isotopes":
+        formula = ""
         content = isotopes()
     elif formula:
         content = analyze(formula[:100])
@@ -263,11 +263,9 @@ def analyze(
 
     def html(formula: str) -> str:
         # return formula as HTML string
-        formula = re.sub(r'\](\d*[+-]+)$', r']<sup>\1</sup>', formula)
-        formula = re.sub(
-            r'\[(\d+)([A-Za-z]{1,2})\]', r'<sup>\1</sup>\2', formula
-        )
-        return re.sub(r'([A-Za-z]{1,2})(\d+)', r'\1<sub>\2</sub>', formula)
+        formula = re.sub(r"\](\d*[+-]+)$", r"]<sup>\1</sup>", formula)
+        formula = re.sub(r"\[(\d+)([A-Za-z]{1,2})\]", r"<sup>\1</sup>\2", formula)
+        return re.sub(r"([A-Za-z]{1,2})(\d+)", r"\1<sub>\2</sub>", formula)
 
     spectrum: molmass.Spectrum | None
     result: list[str] = ['<h2 class="hidden">Results</h2>']
@@ -301,109 +299,107 @@ def analyze(
 
         result.append(
             f'<tr class="spacer"><th scope="row">Nominal mass</th>'
-            f'<td>{f.nominal_mass}</td></tr>'
+            f"<td>{f.nominal_mass}</td></tr>"
         )
         if f.mass != f.isotope.mass:
             # formula is not an isotope
             result.append(
-                f'<tr><th scope="row">Average mass</th>'
-                f'<td>{f.mass:.{prec}f}</td></tr>'
+                f'<tr><th scope="row">Average mass</th><td>{f.mass:.{prec}f}</td></tr>'
             )
         result.append(
             f'<tr><th scope="row">Monoisotopic mass</th>'
-            f'<td>{f.isotope.mass:.{prec}f}</td>'
-            f'<td>{f.isotope.abundance * 100:.4f}%</td></tr>'
+            f"<td>{f.isotope.mass:.{prec}f}</td>"
+            f"<td>{f.isotope.abundance * 100:.4f}%</td></tr>"
         )
         if spectrum:
             result.append(
                 '<tr><th scope="row">Most abundant mass</th>'
-                f'<td>{spectrum.peak.mass:.{prec}f}</td>'
-                f'<td>{spectrum.peak.fraction * 100:.4f}%</td></tr>'
+                f"<td>{spectrum.peak.mass:.{prec}f}</td>"
+                f"<td>{spectrum.peak.fraction * 100:.4f}%</td></tr>"
             )
             result.append(
                 '<tr><th scope="row">Mean of distribution</th>'
-                f'<td>{spectrum.mean:.{prec}}</td></tr>'
+                f"<td>{spectrum.mean:.{prec}}</td></tr>"
             )
         result.append(
             '<tr class="spacer"><th scope="row">Number of atoms</th>'
-            f'<td>{f.atoms}</td></tr>'
+            f"<td>{f.atoms}</td></tr>"
         )
-        result.append('</table>')
+        result.append("</table>")
 
         if len(composition) > 1:
             result.extend(
                 (
-                    '<!--h3>Elemental Composition</h3-->',
-                    '<table class="table">'
-                    '<caption>Elemental Composition</caption>',
-                    '<tr>',
+                    "<!--h3>Elemental Composition</h3-->",
+                    '<table class="table"><caption>Elemental Composition</caption>',
+                    "<tr>",
                     '<th scope="col">Element</th>',
                     '<th scope="col">Count</th>',
                     '<th scope="col">Relative mass</th>',
                     '<th scope="col">Fraction %</th>',
-                    '</tr>',
+                    "</tr>",
                 )
             )
             for i in composition.values():
-                symbol = re.sub(r'^(\d+)(.+)', r'<sup>\1</sup>\2', i.symbol)
+                symbol = re.sub(r"^(\d+)(.+)", r"<sup>\1</sup>\2", i.symbol)
                 result.extend(
                     (
-                        '<tr>',
+                        "<tr>",
                         f'<th scope="row">{symbol}</th>',
-                        f'<td>{i.count}</td>',
-                        f'<td>{i.mass:.{prec}f}</td>',
-                        f'<td>{i.fraction * 100:.4f}</td>',
-                        '</tr>',
+                        f"<td>{i.count}</td>",
+                        f"<td>{i.mass:.{prec}f}</td>",
+                        f"<td>{i.fraction * 100:.4f}</td>",
+                        "</tr>",
                     )
                 )
-            result.append('</table>')
+            result.append("</table>")
 
         if spectrum is not None and len(spectrum) > 1:
             if abs(spectrum._charge) > 1:  # noqa: SLF001
                 mz = '\n<th scope="col">m/z</th>'
             else:
-                mz = ''
+                mz = ""
             result.extend(
                 (
-                    '<!--h3>Mass Distribution</h3-->',
+                    "<!--h3>Mass Distribution</h3-->",
                     '<table class="table">',
-                    '<caption>Mass Distribution</caption>',
-                    '<tr>',
+                    "<caption>Mass Distribution</caption>",
+                    "<tr>",
                     '<th scope="col">Mass number</th>',
                     '<th scope="col">Relative mass</th>',
                     '<th scope="col">Fraction %</th>',
                     '<th scope="col">Intensity %</th>',
                     mz,
-                    '</tr>',
+                    "</tr>",
                 )
             )
             for item in spectrum.values():
                 if mz:
-                    mz = f'<td>{item.mz:.{prec}f}</td>'
+                    mz = f"<td>{item.mz:.{prec}f}</td>"
                 result.extend(
                     (
-                        '<tr>',
+                        "<tr>",
                         f'<th scope="row">{item.massnumber}</th>',
-                        f'<td>{item.mass:.{prec}f}</td>',
-                        f'<td>{item.fraction * 100.:.6}</td>',
-                        f'<td>{item.intensity:.6}</td>{mz}',
-                        '</tr>',
+                        f"<td>{item.mass:.{prec}f}</td>",
+                        f"<td>{item.fraction * 100.0:.6}</td>",
+                        f"<td>{item.intensity:.6}</td>{mz}",
+                        "</tr>",
                     )
                 )
-            result.append('</table>')
+            result.append("</table>")
 
     except Exception as exc:
         if DEBUG:
             raise
         msg = str(exc).splitlines()
         text = msg[0][0].upper() + msg[0][1:]
-        details = '\n'.join(msg[1:])
+        details = "\n".join(msg[1:])
         result.append(
-            f'<h3>Error: {escape(text, quote=True)}</h3>'
-            f'<pre>{escape(details, quote=True)}</pre>'
+            f"<h3>Error: {escape(text, quote=True)}</h3>"
+            f"<pre>{escape(details, quote=True)}</pre>"
         )
 
-    return '\n'.join(i for i in result if i)
+    return "\n".join(i for i in result if i)
 
 
 def isotopes() -> str:
@@ -418,9 +414,7 @@ def isotopes() -> str:
     <th scope="col" align="right">Abundance</th>
     </tr>
     {rows}
-    </table>""".strip().replace(
-        '    ', ''
-    )
+    </table>""".strip().replace("    ", "")
 
     rows: list[str] = []
     for ele in ELEMENTS:
@@ -434,16 +428,16 @@ def isotopes() -> str:
             iso = ele.isotopes[massnumber]
             rows.extend(
                 (
-                    '<tr>',
+                    "<tr>",
                     '<td align="right">'
                     f'<a href="?q={massnumber}{ele.symbol}">'
-                    f'<sup>{massnumber}</sup>{ele.symbol}</a></td>',
+                    f"<sup>{massnumber}</sup>{ele.symbol}</a></td>",
                     f'<td align="right">{iso.mass:.8f}</td>',
-                    f'<td align="right">{iso.abundance * 100.:.8f}</td>',
-                    '</tr>',
+                    f'<td align="right">{iso.abundance * 100.0:.8f}</td>',
+                    "</tr>",
                 )
             )
-    return template.format(rows='\n'.join(rows))
+    return template.format(rows="\n".join(rows))
 
 
 def groups() -> str:
@@ -457,16 +451,14 @@ def groups() -> str:
     <th scope="col">Formula</th>
     </tr>
     {rows}
-    </table>""".strip().replace(
-        '    ', ''
-    )
+    </table>""".strip().replace("    ", "")
 
-    result: list[str] = ['<!--h2>Abbreviations of chemical groups</h2-->']
+    result: list[str] = ["<!--h2>Abbreviations of chemical groups</h2-->"]
     for group, title in (
-        (molmass.GROUPS, 'Chemical Groups'),
-        (molmass.AMINOACIDS, 'Amino Acids'),
-        (molmass.DEOXYNUCLEOTIDES, 'Deoxynucleotides'),
-        (molmass.NUCLEOTIDES, 'Nucleotides'),
+        (molmass.GROUPS, "Chemical Groups"),
+        (molmass.AMINOACIDS, "Amino Acids"),
+        (molmass.DEOXYNUCLEOTIDES, "Deoxynucleotides"),
+        (molmass.NUCLEOTIDES, "Nucleotides"),
     ):
         rows: list[str] = []
         for key in sorted(group):
@@ -474,11 +466,10 @@ def groups() -> str:
             if isinstance(value, str):
                 link = key if group is molmass.GROUPS else value
                 rows.append(
-                    f'<tr><td>{key}</td>'
-                    f'<td><a href="?q={link}">{value}</a></td></tr>'
+                    f'<tr><td>{key}</td><td><a href="?q={link}">{value}</a></td></tr>'
                 )
-        result.append(template.format(title=title, rows='\n'.join(rows)))
-    return '\n'.join(result)
+        result.append(template.format(title=title, rows="\n".join(rows)))
+    return "\n".join(result)
 
 
 def webbrowser(url: str, /, delay: float = 1.0) -> None:
@@ -511,16 +502,16 @@ def cgi(url: str, *, open_browser: bool = True, debug: bool = True) -> int:
         cgitb.enable()
 
     dirname, filename = os.path.split(__file__)
-    if filename[-1] != 'y':
+    if filename[-1] != "y":
         filename = filename[:-1]  # don't use .pyc or .pyo
-    if not url.endswith('/'):
-        url += '/'
+    if not url.endswith("/"):
+        url += "/"
     url += filename
     if dirname:
         os.chdir(dirname)
 
-    if os.getenv('SERVER_NAME'):
-        print('Content-type: text/html\n\n')  # noqa: T201
+    if os.getenv("SERVER_NAME"):
+        print("Content-type: text/html\n\n")  # noqa: T201
         request = cgi.FieldStorage()
         request.get = request.getfirst
         print(response(request, url))  # noqa: T201
@@ -531,20 +522,18 @@ def cgi(url: str, *, open_browser: bool = True, debug: bool = True) -> int:
         def is_cgi(self: Any) -> bool:
             # monkey patch for CGIHTTPRequestHandler.is_cgi
             if filename in self.path:
-                self.cgi_info = '', self.path[1:]
+                self.cgi_info = "", self.path[1:]
                 return True
             return False
 
         CGIHTTPRequestHandler.is_cgi = is_cgi  # type: ignore[method-assign]
-        print('Running CGI script at', url)  # noqa: T201
+        print("Running CGI script at", url)  # noqa: T201
         if open_browser:
             webbrowser(url)
         urlp = urlparse(url)
         if urlp.hostname is None or urlp.port is None:
-            raise ValueError(f'invalid URL {url!r}')
-        HTTPServer(
-            (urlp.hostname, urlp.port), CGIHTTPRequestHandler
-        ).serve_forever()
+            raise ValueError(f"invalid URL {url!r}")
+        HTTPServer((urlp.hostname, urlp.port), CGIHTTPRequestHandler).serve_forever()
     return 0
 
 
@@ -570,7 +559,7 @@ def main(
 
     """
     if url is None:
-        url = 'http://127.0.0.1:5001/'
+        url = "http://127.0.0.1:5001/"
 
     try:
         from flask import Flask, request
@@ -581,16 +570,14 @@ def main(
 
     urlp = urlparse(url)
     if urlp.hostname is None or urlp.port is None:
-        raise ValueError(f'invalid URL {url!r}')
+        raise ValueError(f"invalid URL {url!r}")
 
     app = Flask(__name__)
 
-    @app.route('/', methods=['GET'])
+    @app.route("/", methods=["GET"])
     def root() -> str:
         nonlocal form
-        r = response(
-            request.args if form is None else form, url=request.base_url
-        )
+        r = response(request.args if form is None else form, url=request.base_url)
         form = None
         return r
 
@@ -601,5 +588,5 @@ def main(
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

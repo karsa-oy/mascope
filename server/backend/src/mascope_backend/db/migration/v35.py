@@ -47,7 +47,7 @@ async def run():
     failed_sample_files = []
     for i, sample_file in enumerate(sample_files):
         runtime.logger.info(
-            f"({i+1}/{num_of_files}) Updating .props for file {sample_file.filename}"
+            f"({i + 1}/{num_of_files}) Updating .props for file {sample_file.filename}"
         )
         try:
             props = m_io.read_props(sample_file.filename)

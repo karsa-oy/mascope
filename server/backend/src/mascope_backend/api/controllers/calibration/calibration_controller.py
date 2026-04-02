@@ -206,7 +206,7 @@ async def calibration_mz_fit(
     }
 
     if calibration_data["error"] is not None:
-        error_message = f"m/z fitting for sample '{sample.sample_item_name}' failed: {calibration_data["error"]}"
+        error_message = f"m/z fitting for sample '{sample.sample_item_name}' failed: {calibration_data['error']}"
         runtime.logger.error(calibration_data["error"])
         raise ApiException(
             error_message,
@@ -217,7 +217,7 @@ async def calibration_mz_fit(
             422,
         )
     elif calibration_data["warning"] is not None:
-        warning_message = f"m/z fitting sample '{sample.sample_item_name}' warning: {calibration_data["warning"]}"
+        warning_message = f"m/z fitting sample '{sample.sample_item_name}' warning: {calibration_data['warning']}"
         raise_api_warning(
             warning_message,
             {

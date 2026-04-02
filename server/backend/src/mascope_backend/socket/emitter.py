@@ -1,8 +1,8 @@
 """
 Central event emitter for internal application events.
 
-This module provides a central event system for handling internal application state 
-changes that may result in socket.io communications. It separates internal event 
+This module provides a central event system for handling internal application state
+changes that may result in socket.io communications. It separates internal event
 handling from Socket.IO client-server communication.
 
 Client-Server:

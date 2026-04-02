@@ -52,6 +52,6 @@ async def test_calibration_fitting():
         if calibration_handler.warning:
             warnings.warn(f"{sample.filename}: {calibration_handler.warning}")
         if calibration_handler.warning != "No calibration peaks found":
-            assert (
-                calibration_handler.fit_result is not None
-            ), f"Failed to fit calibration for {filetype} ({sample.filename})"
+            assert calibration_handler.fit_result is not None, (
+                f"Failed to fit calibration for {filetype} ({sample.filename})"
+            )

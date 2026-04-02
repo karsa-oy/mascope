@@ -52,7 +52,6 @@ async def modify_schema():
     """
     runtime.logger.info("Executing schema migration...")
     async with async_session() as session:
-
         runtime.logger.info("Add polarity, tic, t0, t1 columns to sample_item...")
         await session.execute(
             text("ALTER TABLE sample_item ADD COLUMN polarity VARCHAR(1);")

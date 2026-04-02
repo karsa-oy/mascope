@@ -51,7 +51,7 @@ async def run():
     n_filenames = len(unique_filenames)
     for i, filename in enumerate(unique_filenames):
         runtime.logger.info(
-            f"{i+1}/{n_filenames} Delete peaks from the sample file {filename}..."
+            f"{i + 1}/{n_filenames} Delete peaks from the sample file {filename}..."
         )
         try:
             delete_peaks(filename)
@@ -62,7 +62,7 @@ async def run():
     n_sample_items = len(sample_item_list)
     for i, sample_item in enumerate(sample_item_list):
         runtime.logger.info(
-            f"{i+1}/{n_sample_items} Compute matches for {sample_item["sample_item_name"]}, id={sample_item["sample_item_id"]}..."
+            f"{i + 1}/{n_sample_items} Compute matches for {sample_item['sample_item_name']}, id={sample_item['sample_item_id']}..."
         )
         try:
             await match_remove_sample(
@@ -79,7 +79,7 @@ async def run():
             )
         except Exception as e:
             runtime.logger.error(
-                f"Error computing matches for {sample_item["sample_item_name"]}: {e}"
+                f"Error computing matches for {sample_item['sample_item_name']}: {e}"
             )
             continue
 

@@ -295,9 +295,7 @@ class FileConverterConfig(ModuleConfig):
     """
 
     container_name: str = "file_converter"  # base name
-    server: str = (
-        r"backend"  # production host URL; the default works in our docker compose network
-    )
+    server: str = r"backend"  # production host URL; the default works in our docker compose network
     source: str = r"./filestreams"  # folder to monitor for files to convert
     raw_threads: int = 2  # number of threads for converting Orbitrap files
     h5_threads: int = 2  # number of threads for converting Tof files

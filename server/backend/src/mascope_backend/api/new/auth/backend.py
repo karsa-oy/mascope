@@ -2,7 +2,7 @@
 Authentication backend configuration for Mascope Server.
 
 This file configures the authentication backends used in the FastAPI Users implementation.
-It defines the cookie transport and JWT strategy for mascope web-based interface, 
+It defines the cookie transport and JWT strategy for mascope web-based interface,
 and bearer transport with database access tokens for the mascope_sdk jupyter library authentication.
 """
 

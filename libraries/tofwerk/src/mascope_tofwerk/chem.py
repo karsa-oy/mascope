@@ -149,7 +149,8 @@ def guess_composition(target_mz, el_filter, tolerance=10e-6):
     if len(ratio_filter) > 0:
         nbrFilters = len(num_filter) + len(ratio_filter)
         elementIndex1 = np.array(
-            list(range(len(elements))) + list(list(zip(*ratio_filter))[0]), dtype=np.int32
+            list(range(len(elements))) + list(list(zip(*ratio_filter))[0]),
+            dtype=np.int32,
         )  # Element index for count filters, first element index for ratio filters.
         elementIndex2 = np.array(
             [-1] * len(elements) + list(list(zip(*ratio_filter))[1]), dtype=np.int32

@@ -265,9 +265,7 @@ class Ms2Dashboard:
                 for i, frag_mz in enumerate(top_mzs):
                     row = norm_ts.loc[frag_mz]
                     rgb = colormap[i % len(colormap)]
-                    color = (
-                        f"rgb({int(rgb[0]*255)},{int(rgb[1]*255)},{int(rgb[2]*255)})"
-                    )
+                    color = f"rgb({int(rgb[0] * 255)},{int(rgb[1] * 255)},{int(rgb[2] * 255)})"
                     x_str = [
                         t.isoformat() if hasattr(t, "isoformat") else str(t)
                         for t in row.index

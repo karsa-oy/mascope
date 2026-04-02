@@ -93,18 +93,15 @@ def tof_to_mass(tof: np.ndarray, mode: int, par: list) -> float | np.ndarray:
             # from i(m) = p1 * np.power(m, p3) + p2
             return ((tof - par[1]) / par[0]) ** (1 / par[2])
         case 3:
-            objective = (
-                lambda m, tof_val: par[0] * np.sqrt(m)
-                + par[1]
-                + par[2] * (m - par[3]) ** 2
-                - tof_val
+            objective = lambda m, tof_val: (
+                par[0] * np.sqrt(m) + par[1] + par[2] * (m - par[3]) ** 2 - tof_val
             )
             return np.vectorize(lambda tof_val: solve_numerically(objective, tof_val))(
                 tof
             )
         case 4:
-            objective = (
-                lambda m, tof_val: par[0] * np.sqrt(m)
+            objective = lambda m, tof_val: (
+                par[0] * np.sqrt(m)
                 + par[1]
                 + par[2] * m**2
                 + par[3] * m

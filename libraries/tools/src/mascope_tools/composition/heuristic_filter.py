@@ -189,7 +189,7 @@ def apply_heuristic_rules(
     for i, rule in enumerate(HEURISTIC_RULES):
         if candidates.is_empty():
             log_messages.append(
-                f"No candidates from passed the rule: {HEURISTIC_RULES[i-1].__name__}"
+                f"No candidates from passed the rule: {HEURISTIC_RULES[i - 1].__name__}"
             )
             break
         rule_mask, rule_log_messages = rule(candidates, params=params)

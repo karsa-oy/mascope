@@ -173,9 +173,9 @@ class TestRemoveOverlappingMzs:
             peak_mzs, _constant_resolution(10_000)
         )
 
-        assert (
-            test_mzs.size == 0
-        ), "Expected all peaks in the overlapping chain to be removed"
+        assert test_mzs.size == 0, (
+            "Expected all peaks in the overlapping chain to be removed"
+        )
 
     def test_single_peak_returned_as_is(self):
         peak_mzs = np.array([100.0], dtype=np.float64)

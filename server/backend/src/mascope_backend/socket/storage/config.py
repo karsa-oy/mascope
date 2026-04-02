@@ -56,7 +56,6 @@ class SocketStorageConfig(BaseModel):
         """
         return f"{self.room_user_key_prefix}{user_id}"
 
-
     def service_key(self, service_name: str) -> str:
         """
         Build Redis key for service presence.

@@ -154,17 +154,17 @@ class TestWritePeaks:
         updated = xr.open_zarr(existing_peak_timeseries_zarr)
 
         for idx in update_indices:
-            assert not np.any(
-                np.isnan(updated["peak_areas"].isel(mz=idx).values)
-            ), f"Index {idx} should have non-NaN values"
+            assert not np.any(np.isnan(updated["peak_areas"].isel(mz=idx).values)), (
+                f"Index {idx} should have non-NaN values"
+            )
             assert updated["is_timeseries_computed"].isel(mz=idx).values
 
         # Verify non-updated indices remain NaN
         non_updated = [i for i in range(TEST_MZ_SIZE) if i not in update_indices]
         for idx in non_updated[:5]:  # Check first few
-            assert np.all(
-                np.isnan(updated["peak_areas"].isel(mz=idx).values)
-            ), f"Index {idx} should still be NaN"
+            assert np.all(np.isnan(updated["peak_areas"].isel(mz=idx).values)), (
+                f"Index {idx} should still be NaN"
+            )
 
         updated.close()
 

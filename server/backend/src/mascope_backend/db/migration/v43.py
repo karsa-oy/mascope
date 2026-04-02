@@ -110,9 +110,9 @@ async def migrate():
     await rematch_affected_samples(ion_rematch_samples_all)
 
 
-async def handle_ion_group_updates() -> (
-    tuple[list[TargetIsotope], dict[str, list[str]]]
-):
+async def handle_ion_group_updates() -> tuple[
+    list[TargetIsotope], dict[str, list[str]]
+]:
     """Provides the list of updated isotopes and the list of ions
     that triggers batch status change to 'rematch'
 

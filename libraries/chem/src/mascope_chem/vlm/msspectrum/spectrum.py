@@ -78,9 +78,9 @@ class Spectrum(object):
             current_unique_mz = unique_mz[0]
             for i, mz in enumerate(mz_values):
                 if mz != current_unique_mz:
-                    unique_mz_intensities[
-                        current_unique_mz_idx
-                    ] = acc  # Flush the accumulator
+                    unique_mz_intensities[current_unique_mz_idx] = (
+                        acc  # Flush the accumulator
+                    )
                     acc = 0  # Reset the accumulator
                     current_unique_mz_idx += 1  # Go to the next unique mz value
                     current_unique_mz = unique_mz[

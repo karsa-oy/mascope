@@ -69,9 +69,7 @@ async def collect_unique_build_params() -> tuple[list[dict[str, Any]], dict[str,
     runtime.logger.info(f"Found {len(sample_batches)} sample batches to process")
 
     # Step 2: Collect unique combinations
-    unique_combinations = (
-        {}
-    )  # Key: (normalized_mechanisms_tuple, calibration_collection, polarity) -> mode_data
+    unique_combinations = {}  # Key: (normalized_mechanisms_tuple, calibration_collection, polarity) -> mode_data
     batch_to_combinations = {}  # batch_id -> combination_keys
 
     for batch in sample_batches:

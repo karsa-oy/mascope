@@ -617,7 +617,7 @@ async def rematch_batches(
                     processed_samples[key] += batch_data.get(key, 0)
 
             # Categorize batch rematch result
-            batch_collections[f"{batch_result["status"]}_batches"].append(
+            batch_collections[f"{batch_result['status']}_batches"].append(
                 sample_batch_id
             )
 
@@ -855,7 +855,7 @@ async def rematch_batch(
         total_samples = compute_data.get("total_samples_count", 0)
 
         removed = f"all {removed_count}" if full_remove else f"{removed_count} orphaned"
-        remove_summary = f"{removed if removed_count else "no"} match isotopes removed"
+        remove_summary = f"{removed if removed_count else 'no'} match isotopes removed"
         compute_summary = f"{computed_count}/{total_samples} samples computed missing matches successfully"
         failed_summary = (
             f"match computation failed for {failed_count}/{total_samples} samples"
@@ -993,7 +993,7 @@ async def match_remove_batch(
 
     if status == "success":
         await update_sample_modified_timestamps(sample_batch_ids=[sample_batch_id])
-        remove_message = f"{f"All {removed_match_isotopes_count}" if full_remove else f"{removed_match_isotopes_count} orphaned"} match isotopes removed"
+        remove_message = f"{f'All {removed_match_isotopes_count}' if full_remove else f'{removed_match_isotopes_count} orphaned'} match isotopes removed"
     else:
         remove_message = "No orphaned matches found"
 

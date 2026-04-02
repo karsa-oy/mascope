@@ -74,9 +74,11 @@ async def visualize_ion_focus(
     sample, isotopes = await asyncio.gather(sample_task, isotope_task)
 
     # -- Extract data for IsotopeContext --- #
-    peak_timeseries, mean_peak_heights, averaged_signal = (
-        await _load_peaks_and_averaged_signal(sample, isotopes)
-    )
+    (
+        peak_timeseries,
+        mean_peak_heights,
+        averaged_signal,
+    ) = await _load_peaks_and_averaged_signal(sample, isotopes)
     isotope_relative_abundances = [iso.relative_abundance for iso in isotopes]
 
     # --- Process each isotope and generate visualization traces --- #

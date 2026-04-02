@@ -518,7 +518,6 @@ class BaseCalibrationHandler:
 
 
 class TofCalibrationHandler(BaseCalibrationHandler):
-
     @property
     def _minimum_calibration_points(self) -> int:
         return TOF_MINIMUM_CALIBRATION_POINTS
@@ -675,7 +674,6 @@ class TofCalibrationHandler(BaseCalibrationHandler):
 
 
 class OrbiCalibrationHandler(BaseCalibrationHandler):
-
     @property
     def _minimum_calibration_points(self) -> int:
         return ORBI_MINIMUM_CALIBRATION_POINTS

@@ -71,7 +71,7 @@ async def _migrate_orbi_files():
     failed_sample_files_flag = False
     for i, sample_file in enumerate(sample_files):
         runtime.logger.info(
-            f"({i+1}/{num_of_files}) Checking file {sample_file.filename}"
+            f"({i + 1}/{num_of_files}) Checking file {sample_file.filename}"
         )
         try:
             props = m_io.read_props(sample_file.filename)
@@ -121,7 +121,7 @@ async def _migrate_tof_files():
     for i, sample_file in enumerate(sample_files):
         try:
             runtime.logger.info(
-                f"({i+1}/{num_of_files}) Deleting cached sum signals for file {sample_file.filename}"
+                f"({i + 1}/{num_of_files}) Deleting cached sum signals for file {sample_file.filename}"
             )
             _remove_sum_signals(sample_file, cached=True)
         except Exception as e:

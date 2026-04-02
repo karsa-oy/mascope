@@ -192,12 +192,12 @@ def check_wal_status():
             runtime.logger.info(f"  WAL file exists: {wal_file_exists}")
             if wal_file_exists:
                 runtime.logger.info(
-                    f"  WAL size: {wal_size} bytes ({wal_size/1024:.1f}KB)"
+                    f"  WAL size: {wal_size} bytes ({wal_size / 1024:.1f}KB)"
                 )
             runtime.logger.info(f"  SHM file exists: {shm_file_exists}")
             if shm_file_exists:
                 runtime.logger.info(
-                    f"  SHM size: {shm_size} bytes ({shm_size/1024:.1f}KB)"
+                    f"  SHM size: {shm_size} bytes ({shm_size / 1024:.1f}KB)"
                 )
 
             # If WAL mode is active, get checkpoint statistics

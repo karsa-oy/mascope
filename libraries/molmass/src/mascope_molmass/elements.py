@@ -268,9 +268,9 @@ class Element:
                 f"Element(\n    {self.number}, {self.symbol!r}, {self.name!r}",
                 f"group={self.group}, period={self.period},"
                 f" block={self.block!r}, series={self.series}",
-                f"mass={self.mass}, eleneg={self.eleneg}," f" eleaffin={self.eleaffin}",
-                f"covrad={self.covrad}, atmrad={self.atmrad}," f" vdwrad={self.vdwrad}",
-                f"tboil={self.tboil}, tmelt={self.tmelt}," f" density={self.density}",
+                f"mass={self.mass}, eleneg={self.eleneg}, eleaffin={self.eleaffin}",
+                f"covrad={self.covrad}, atmrad={self.atmrad}, vdwrad={self.vdwrad}",
+                f"tboil={self.tboil}, tmelt={self.tmelt}, density={self.density}",
                 f"eleconfig={self.eleconfig!r}",
                 f"oxistates={self.oxistates!r}",
                 f"ionenergy={ionenergy}",

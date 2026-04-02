@@ -328,7 +328,8 @@ class SampleFile(Base):
     instrument: Mapped[str] = mapped_column(String(64))
     method_file: Mapped[Optional[str]] = mapped_column(String(512))
     datetime: Mapped[dt] = mapped_column(
-        TIMESTAMP(timezone=False), nullable=False  # stored literal local time
+        TIMESTAMP(timezone=False),
+        nullable=False,  # stored literal local time
     )
     datetime_utc: Mapped[dt] = mapped_column(TIMESTAMP(timezone=True))  # stored as UTC
     length: Mapped[float] = mapped_column(Float)

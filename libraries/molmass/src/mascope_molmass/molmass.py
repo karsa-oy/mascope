@@ -1401,7 +1401,7 @@ class Spectrum:
             return ""
         a = len(str(self.range[-1]))
         mz = "  m/z" if abs(self._charge) > 1 else ""
-        result = [f'A{" " * a} Relative mass  Fraction %  Intensity %{mz}']
+        result = [f"A{' ' * a} Relative mass  Fraction %  Intensity %{mz}"]
         precision = precision_digits(self.peak.mass, 9)
         for entry in self.values():
             mz = f"  {entry.mz:<13.{precision}f}" if mz else ""
@@ -2053,9 +2053,9 @@ def join_charge(formula: str, charge: int, separator: str = "", /) -> str:
     """
     if charge != 0:
         if separator:
-            formula = f'{formula}{separator}{format_charge(charge, "")}'
+            formula = f"{formula}{separator}{format_charge(charge, '')}"
         else:
-            formula = f'[{formula}]{format_charge(charge, "")}'
+            formula = f"[{formula}]{format_charge(charge, '')}"
     return formula
 
 

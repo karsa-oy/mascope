@@ -22,9 +22,9 @@ def test_replace_atom_with_isotope():
     ]
     for ion, isotope_label, expected in test_cases:
         result = replace_atom_with_isotope(ion, isotope_label)
-        assert (
-            result == expected
-        ), f"replace_atom_with_isotope({ion}, {isotope_label}) = {result}, expected {expected}"
+        assert result == expected, (
+            f"replace_atom_with_isotope({ion}, {isotope_label}) = {result}, expected {expected}"
+        )
 
     # Cases that should raise ValueError
     error_cases = [

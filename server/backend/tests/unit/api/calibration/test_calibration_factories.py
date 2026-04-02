@@ -23,7 +23,6 @@ def _make_params(polarity="+"):
 
 
 class TestGetCalibrationHandler:
-
     def test_tof_returns_tof_handler(self):
         handler = get_calibration_handler("tofwerk", _make_params(), None)
         assert isinstance(handler, TofCalibrationHandler)
@@ -40,7 +39,6 @@ class TestGetCalibrationHandler:
 
 
 class TestCalibrationParamsFactory:
-
     def test_tof_returns_tof_params_with_defaults(self):
         params = calibration_params_factory("tofwerk")
         assert isinstance(params, TofCalibrationParams)

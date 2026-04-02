@@ -75,6 +75,6 @@ def test_doctests(doctest_module):
         doctest_module,
         optionflags=doctest.NORMALIZE_WHITESPACE | doctest.ELLIPSIS,
     )
-    assert (
-        results.failed == 0
-    ), f"{results.failed} doctest(s) failed in {doctest_module.__name__}"
+    assert results.failed == 0, (
+        f"{results.failed} doctest(s) failed in {doctest_module.__name__}"
+    )

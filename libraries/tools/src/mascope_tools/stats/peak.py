@@ -60,7 +60,6 @@ def assign_intensity_change_score(
         smoothing_window += 1
 
     for mz, series in matched_peak_timeseries.iterrows():
-
         # --- Handle missing points ---
         series_numeric = pd.to_numeric(series, errors="coerce")
         series_filled = series_numeric.interpolate(method="linear").bfill().ffill()

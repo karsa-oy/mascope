@@ -506,8 +506,6 @@ async def compile_samples_df(
             "match_category",
             "sample_peak_intensity_sum",
         ]
-    ].fillna(
-        0
-    )
+    ].fillna(0)
 
     return samples_df

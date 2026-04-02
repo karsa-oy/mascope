@@ -176,7 +176,7 @@ def test_get_workspaces_pagination(editor_client, workspace_create_data):
     """Test pagination for workspace list endpoint."""
     # Create multiple workspaces
     for i in range(5):
-        payload = {**workspace_create_data, "workspace_name": f"Workspace {i+1}"}
+        payload = {**workspace_create_data, "workspace_name": f"Workspace {i + 1}"}
         editor_client.post("/api/workspaces", json=payload)
 
     # Get first page (2 items)
@@ -361,9 +361,9 @@ def test_workspace_delete_cascades_to_sample_batches(
     # Step 3: Verify the sample batch exists and is linked to the workspace
     get_batch_response = editor_client.get(f"/api/sample/batches/{sample_batch_id}")
     assert get_batch_response.status_code == 200, "Failed to get sample batch"
-    assert (
-        get_batch_response.json()["data"]["workspace_id"] == workspace_id
-    ), "Sample batch not linked to correct workspace"
+    assert get_batch_response.json()["data"]["workspace_id"] == workspace_id, (
+        "Sample batch not linked to correct workspace"
+    )
 
     # Step 4: Delete the workspace
     delete_workspace_response = editor_client.delete(f"/api/workspaces/{workspace_id}")
@@ -373,17 +373,17 @@ def test_workspace_delete_cascades_to_sample_batches(
     get_deleted_batch_response = editor_client.get(
         f"/api/sample/batches/{sample_batch_id}"
     )
-    assert (
-        get_deleted_batch_response.status_code == 404
-    ), "Sample batch was not deleted with workspace"
+    assert get_deleted_batch_response.status_code == 404, (
+        "Sample batch was not deleted with workspace"
+    )
 
     # Step 6: Verify workspace is deleted (should return 404)
     get_deleted_workspace_response = editor_client.get(
         f"/api/workspaces/{workspace_id}"
     )
-    assert (
-        get_deleted_workspace_response.status_code == 404
-    ), "Workspace was not deleted"
+    assert get_deleted_workspace_response.status_code == 404, (
+        "Workspace was not deleted"
+    )
 
 
 # ============= Error Handling Tests =============

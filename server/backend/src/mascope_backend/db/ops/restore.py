@@ -247,7 +247,6 @@ def delete_all_orphaned_records(conn):
         for local_col, (ref_table, ref_col, on_update, on_delete) in table_config[
             "fks"
         ].items():
-
             # Only check CASCADE relationships (SET NULL shouldn't create orphans)
             if on_delete == "CASCADE":
                 deleted = _delete_orphans_for_fk(

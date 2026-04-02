@@ -122,11 +122,12 @@ async def auto_process_sample_file(
     ).get("data")
 
     # --- Create ACQUISITION batches and sample items for each sample file ionization mode --- #
-    acquisition_samples, acquisition_sample_batches = (
-        await create_acquisition_batches_and_items(
-            sample_file=sample_file,
-            workspace_id=acquisition_workspace.get("workspace_id"),
-        )
+    (
+        acquisition_samples,
+        acquisition_sample_batches,
+    ) = await create_acquisition_batches_and_items(
+        sample_file=sample_file,
+        workspace_id=acquisition_workspace.get("workspace_id"),
     )
 
     # Extract batch and sample IDs for notifications
@@ -614,7 +615,7 @@ async def calibrate_with_retry(
             if i == CALIBRATION_ITERATIONS:
                 runtime.logger.error(
                     f"Failed to calibrate m/z with m/z tolerance {mz_calibration_params.mz_error_tolerance} "
-                    f"for sample item {sample["sample_item_name"]}: {e}"
+                    f"for sample item {sample['sample_item_name']}: {e}"
                 )
             else:
                 # Double the m/z error tolerance, check refinement window limits, then retry
@@ -629,6 +630,6 @@ async def calibrate_with_retry(
                     )
                 runtime.logger.warning(
                     f"Not enough calibration peaks with m/z error tolerance {old_tolerance}, "
-                    f"retrying m/z calibration for sample {sample["sample_item_name"]} with "
+                    f"retrying m/z calibration for sample {sample['sample_item_name']} with "
                     f"mz_error_tolerance={mz_calibration_params.mz_error_tolerance}."
                 )

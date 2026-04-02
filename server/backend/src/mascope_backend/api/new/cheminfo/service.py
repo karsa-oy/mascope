@@ -319,7 +319,7 @@ async def match_cheminfo_by_mz(
                 if info["sample_peak_mz"] not in match_mzs:
                     runtime.logger.debug(
                         f"Requested peak m/z ({info['sample_peak_mz']}) is not in matched m/zs: {match_mzs}. "
-                        + f"Skipping the result ({info["target_compound_formula"]})",
+                        + f"Skipping the result ({info['target_compound_formula']})",
                     )
                     # Skip this result as the match is for a wrong peak
                     continue

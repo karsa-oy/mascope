@@ -152,7 +152,7 @@ async def test_get_workspaces_pagination(test_workspaces, page, limit):
         ("unit-test-1", True),  # exist in test_workspaces
         ("unit-test-2", True),  # exist in test_workspaces
         ("nonexistent-id", False),  # not exist
-        (f"{"a" * 100}", False),  # long id
+        (f"{'a' * 100}", False),  # long id
         ("", False),  # empty string
     ],
 )
@@ -176,7 +176,7 @@ async def test_get_workspace_existence(test_workspaces, workspace_id, should_exi
         workspace_data = result["data"]
         assert workspace_data["workspace_id"] == workspace_id
         assert (
-            f"Workspace '{workspace_data["workspace_name"]}' retrieved successfully"
+            f"Workspace '{workspace_data['workspace_name']}' retrieved successfully"
             in result["message"]
         )
 

@@ -82,9 +82,11 @@ async def update_sample_modified_timestamps(
 
     if sample_item_ids:
         # Update specific sample items + their parent batches
-        affected_sample_item_ids, affected_sample_batch_ids, *_ = (
-            await fetch_affected_sample_data(sample_item_ids=sample_item_ids)
-        )
+        (
+            affected_sample_item_ids,
+            affected_sample_batch_ids,
+            *_,
+        ) = await fetch_affected_sample_data(sample_item_ids=sample_item_ids)
     elif sample_batch_ids:
         # Update ALL sample items in the specified batches + the batches themselves
         async with async_session() as session:

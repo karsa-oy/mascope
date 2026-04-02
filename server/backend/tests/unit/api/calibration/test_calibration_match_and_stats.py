@@ -160,8 +160,8 @@ class TestFitRetainedMatches:
         df = self.base_df.copy()
         fit_calls = []
 
-        self.orbi_pos_handler._select_retained_matches = (
-            lambda matches_df: matches_df.iloc[:2].copy()
+        self.orbi_pos_handler._select_retained_matches = lambda matches_df: (
+            matches_df.iloc[:2].copy()
         )
 
         def fake_fit_matches(matches_df):
@@ -202,8 +202,8 @@ class TestFitRetainedMatches:
     def test_empty_retained_matches_returns_none_without_refit(self):
         df = self.base_df.copy()
 
-        self.orbi_pos_handler._select_retained_matches = (
-            lambda matches_df: matches_df.iloc[0:0].copy()
+        self.orbi_pos_handler._select_retained_matches = lambda matches_df: (
+            matches_df.iloc[0:0].copy()
         )
 
         def fail_if_fit_called(matches_df):
@@ -227,8 +227,8 @@ class TestFitRetainedMatches:
     def test_empty_retained_matches_preserves_existing_warning(self):
         df = self.base_df.copy()
 
-        self.orbi_pos_handler._select_retained_matches = (
-            lambda matches_df: matches_df.iloc[0:0].copy()
+        self.orbi_pos_handler._select_retained_matches = lambda matches_df: (
+            matches_df.iloc[0:0].copy()
         )
 
         def fail_if_fit_called(matches_df):

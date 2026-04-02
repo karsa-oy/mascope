@@ -46,7 +46,7 @@ def restore(
     tables: list[str] | None = typer.Argument(
         None,
         help="Tables to restore. If not provided, all configured tables will be restored.",
-    )
+    ),
 ):
     """
     Restore a Mascope database.

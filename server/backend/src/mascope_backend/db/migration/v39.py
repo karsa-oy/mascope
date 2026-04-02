@@ -192,7 +192,9 @@ async def rematch_failed_samples() -> None:
     """Rematch samples that failed during the migration process."""
     n_for_rematch = len(failed_sample_filenames)
     for i, filename in enumerate(failed_sample_filenames):
-        runtime.logger.info(f"({i+1}/{n_for_rematch}) Re-processing file {filename}...")
+        runtime.logger.info(
+            f"({i + 1}/{n_for_rematch}) Re-processing file {filename}..."
+        )
         try:
             instrument_functions = await read_instrument_functions(filename=filename)
             peak_detector = get_peak_detector(filename, instrument_functions)
@@ -211,7 +213,7 @@ async def rematch_failed_samples() -> None:
                 )
                 if rematch_response["status"] == "failed":
                     runtime.logger.error(
-                        f"Failed to rematch {sample["sample_item_id"]}."
+                        f"Failed to rematch {sample['sample_item_id']}."
                     )
 
         except Exception as e:

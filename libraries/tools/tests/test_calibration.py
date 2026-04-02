@@ -28,15 +28,15 @@ def test_compute_sum_spectrum_basic():
     expected_intensity = np.array([100, 100], dtype=np.float64)
     expected_peak_id = np.array([list([1, 10]), list([2, 20])], dtype=object)
 
-    assert np.array_equal(
-        sum_spectrum.mz, expected_mz
-    ), f"{sum_spectrum.mz} m/z values do not match expected {expected_mz}"
-    assert np.array_equal(
-        sum_spectrum.intensity, expected_intensity
-    ), f"{sum_spectrum.intensity} intensity values do not match expected {expected_intensity}"
+    assert np.array_equal(sum_spectrum.mz, expected_mz), (
+        f"{sum_spectrum.mz} m/z values do not match expected {expected_mz}"
+    )
+    assert np.array_equal(sum_spectrum.intensity, expected_intensity), (
+        f"{sum_spectrum.intensity} intensity values do not match expected {expected_intensity}"
+    )
 
     # Peak ID must be compared element-wise due to being arrays of arrays
     for actual, expected in zip(sum_spectrum.peak_id, expected_peak_id):
-        assert list(actual) == list(
-            expected
-        ), f"{actual} peak ID does not match expected {expected}"
+        assert list(actual) == list(expected), (
+            f"{actual} peak ID does not match expected {expected}"
+        )

@@ -297,11 +297,14 @@ async def create_sample_items(
     # --- Fetch created samples with full data (includes filename) and affected sample batches ---
     created_item_ids = [si["sample_item_id"] for si in sample_items_data]
 
-    _, affected_sample_batch_ids, affected_samples, _ = (
-        await fetch_affected_sample_data(
-            sample_item_ids=created_item_ids,
-            include_objects=True,
-        )
+    (
+        _,
+        affected_sample_batch_ids,
+        affected_samples,
+        _,
+    ) = await fetch_affected_sample_data(
+        sample_item_ids=created_item_ids,
+        include_objects=True,
     )
 
     # Preserve insertion order

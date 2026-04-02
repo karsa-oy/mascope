@@ -4,7 +4,6 @@ from mascope_backend.api.controllers.target.lib.compute import target_ions_compu
 
 
 class TargetIonsComputeTests(unittest.TestCase):
-
     def test_generate_target_ions_and_isotopes(self):
         # Create an instance of TargetCompoundBase with known properties.
         compound = create_sample_target_compound()

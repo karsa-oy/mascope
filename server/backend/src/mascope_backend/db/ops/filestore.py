@@ -39,7 +39,7 @@ async def delete_sum_signal(cached_only=False):
         runtime.logger.info(
             (
                 f"Deleting sum_signal from sample file {sample_file.filename}: ",
-                f"{i+1}/{len(sample_files)}",
+                f"{i + 1}/{len(sample_files)}",
             )
         )
         sample_data_path = parse_path_from_item_filename(sample_file.filename)
@@ -64,7 +64,7 @@ async def refit_peaks():
         runtime.logger.info(
             (
                 f"Computing peaks for sample file {sample_file.filename}: ",
-                f"{i+1}/{len(sample_files)}",
+                f"{i + 1}/{len(sample_files)}",
             )
         )
         try:

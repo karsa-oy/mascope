@@ -603,14 +603,14 @@ async def delete_sample_files(
         item_count = len(all_sample_item_ids)
         item_text = f"{item_count} sample items" if item_count > 1 else "a sample item"
         message_parts.append(
-            f"Skipped {count} sample file{plural} because {"they are" if count > 1 else "it is"} associated with {item_text}"
+            f"Skipped {count} sample file{plural} because {'they are' if count > 1 else 'it is'} associated with {item_text}"
         )
 
     if skipped_files_not_found:
         count = len(skipped_files_not_found)
         plural = "s" if count > 1 else ""
         message_parts.append(
-            f"Skipped {count} sample file{plural} because {"they were" if count > 1 else "it was"} not found"
+            f"Skipped {count} sample file{plural} because {'they were' if count > 1 else 'it was'} not found"
         )
 
     message = ". ".join(message_parts) + "." if message_parts else "No files deleted."

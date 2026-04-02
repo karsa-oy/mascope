@@ -16,6 +16,7 @@ class ThresholdedPeakFiltering(PreprocessorMixin):
     """
     A pre-processor for removing the peaks that are less intense than a given threshold.
     """
+
     def __init__(self, threshold=1.0, remove_mz_values=True):
         """
         Constructor.
@@ -52,12 +53,16 @@ class ThresholdedPeakFiltering(PreprocessorMixin):
             if not self.remove_mz_values:
                 intensity_values = copy.deepcopy(spectra_list[i].intensity_values)
                 intensity_values[intensity_values <= self.threshold] = 0.0
-                spectra_list[i] = copy_spectrum_with_new_intensities(spectrum, intensity_values)
+                spectra_list[i] = copy_spectrum_with_new_intensities(
+                    spectrum, intensity_values
+                )
             else:
                 keep_mask = spectra_list[i].intensity_values > self.threshold
-                spectra_list[i] = copy_spectrum_with_new_mz_and_intensities(spectrum,
-                                                                            spectra_list[i].mz_values[keep_mask],
-                                                                            spectra_list[i].intensity_values[keep_mask])
+                spectra_list[i] = copy_spectrum_with_new_mz_and_intensities(
+                    spectrum,
+                    spectra_list[i].mz_values[keep_mask],
+                    spectra_list[i].intensity_values[keep_mask],
+                )
         return spectra_list
 
 
@@ -65,6 +70,7 @@ class MassRangeSelection(PreprocessorMixin):
     """
     A pre-processor for removing the peaks that are outside a given window on the m/z range
     """
+
     def __init__(self, lower_range=50.0, upper_range=2000.0):
         """
         Constructor.
@@ -105,7 +111,10 @@ class MassRangeSelection(PreprocessorMixin):
             lower_idx = binary_search_for_left_range(mz_values, self.lower_range)
             upper_idx = binary_search_for_right_range(mz_values, self.upper_range) + 1
 
-            spectra_list[i] = copy_spectrum_with_new_mz_and_intensities(spectrum, mz_values[lower_idx:upper_idx],
-                                                                        intensity_values[lower_idx:upper_idx])
+            spectra_list[i] = copy_spectrum_with_new_mz_and_intensities(
+                spectrum,
+                mz_values[lower_idx:upper_idx],
+                intensity_values[lower_idx:upper_idx],
+            )
 
         return spectra_list

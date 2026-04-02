@@ -183,7 +183,7 @@ async def test_target_compounds_by_mass(
     async with async_session_factory() as session:
         target_compounds = [
             TargetCompound(
-                target_compound_id=f"target-compound-by-mass-{i+1}",
+                target_compound_id=f"target-compound-by-mass-{i + 1}",
                 target_compound_name=None,
                 target_compound_formula=mass,
                 cas_number=None,

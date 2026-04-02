@@ -498,7 +498,6 @@ def calibrate_aligned_spectra(
 
 
 class _Heap:
-
     def __init__(self, spectra_list: list[tuple[np.ndarray, np.ndarray, np.ndarray]]):
         self._heap = []
         self._spectra_list = spectra_list

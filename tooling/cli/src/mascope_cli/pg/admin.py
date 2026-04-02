@@ -344,8 +344,7 @@ def drop_database(
     )
     if result.returncode != 0:
         raise RuntimeError(
-            f"dropdb failed for database '{database}'.\n"
-            f"stderr: {result.stderr.strip()}"
+            f"dropdb failed for database '{database}'.\nstderr: {result.stderr.strip()}"
         )
 
 
