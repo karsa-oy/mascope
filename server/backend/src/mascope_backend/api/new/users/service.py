@@ -89,9 +89,7 @@ async def get_users(
             )
 
         # Step 3: Get total count for pagination
-        count_query = select(func.count()).select_from(  # pylint: disable=not-callable
-            query.subquery()
-        )
+        count_query = select(func.count()).select_from(query.subquery())
         total = await session.scalar(count_query)
 
         # Step 4: Apply pagination and execute the query

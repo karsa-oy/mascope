@@ -2,7 +2,6 @@
 Target collection validation helpers.
 """
 
-# pylint: disable=not-callable
 from sqlalchemy import func, select
 from sqlalchemy.orm import joinedload
 

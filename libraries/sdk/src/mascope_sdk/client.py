@@ -3,8 +3,6 @@
 This module provides the main client class for interacting with the Mascope API.
 """
 
-# pylint: disable=import-outside-toplevel
-
 import os
 import sys
 from pathlib import Path
@@ -24,7 +22,7 @@ _log_handler_id: int | None = None
 
 def _configure_logging(env_vars: dict[str, str | None]) -> None:
     """Configure the SDK's loguru handler (env var > .env > default INFO)."""
-    global _log_handler_id  # pylint: disable=global-statement
+    global _log_handler_id
 
     level = (
         os.environ.get("MASCOPE_SDK_LOG_LEVEL")
@@ -544,7 +542,6 @@ class MascopeClient:
 
 
 # Type hints for lazy-loaded resources
-# pylint: disable=wrong-import-order, wrong-import-position
 from typing import TYPE_CHECKING  # noqa: E402
 
 

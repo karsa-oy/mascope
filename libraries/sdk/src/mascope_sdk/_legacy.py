@@ -47,7 +47,7 @@ def _get_service_name() -> str:
     so we look it up dynamically rather than capturing the module-level
     default.
     """
-    import sys  # pylint: disable=C0415 noqa: PLC0415 deferred to avoid import-time cost
+    import sys
 
     pkg = sys.modules.get("mascope_sdk")
     if pkg is not None:

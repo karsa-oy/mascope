@@ -70,9 +70,7 @@ async def get_target_compound_in_target_collection(
                 )
 
         # Get total count
-        count_stmt = select(func.count()).select_from(  # pylint: disable=not-callable
-            stmt
-        )
+        count_stmt = select(func.count()).select_from(stmt)
         total = await session.scalar(count_stmt)
 
         # Apply pagination if provided

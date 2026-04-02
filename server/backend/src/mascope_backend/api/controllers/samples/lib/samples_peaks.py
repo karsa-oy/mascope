@@ -5,8 +5,6 @@ and m/z filtering, and computing area/height aggregations either from
 pre-computed sums (full sample) or from timeseries data (time-filtered).
 """
 
-# pylint: disable=import-outside-toplevel
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field

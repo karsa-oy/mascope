@@ -42,9 +42,7 @@ def with_file_context(prop_getter) -> callable:
 
     def wrapper(self):
         # Use the class's context manager, passing the file path
-        with self._file_context_manager(  # pylint: disable=protected-access
-            self.file_to_process
-        ) as file_handle:
+        with self._file_context_manager(self.file_to_process) as file_handle:
             self.file_handle = file_handle
             prop = prop_getter(self)
 

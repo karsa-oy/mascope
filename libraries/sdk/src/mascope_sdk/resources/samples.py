@@ -195,13 +195,13 @@ class SamplesResource(BaseResource):
     def _list_by_id(self, batch_id: str) -> pd.DataFrame | None:
         """List samples by batch ID (no name resolution)."""
         cache_key = f"samples:{batch_id}"
-        if cache_key in self._client._cache:  # pylint: disable=protected-access
-            return self._client._cache[cache_key]  # pylint: disable=protected-access
+        if cache_key in self._client._cache:
+            return self._client._cache[cache_key]
         data = self._get("samples", params={"sample_batch_id": batch_id})
         if not data:
             return None
         df = _coerce_datetime_columns(pd.DataFrame(data))
-        self._client._cache[cache_key] = df  # pylint: disable=protected-access
+        self._client._cache[cache_key] = df
         return df
 
     def get(self, sample_id: str) -> dict | None:

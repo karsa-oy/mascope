@@ -1,4 +1,3 @@
-# pylint: disable=not-callable
 """
 Ionization mechanisms controller for managing ionization mechanism operations.
 """

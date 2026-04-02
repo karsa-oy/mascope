@@ -1,5 +1,3 @@
-# pylint: disable=line-too-long
-# pylint: disable=not-callable
 """
 Match Controller
 

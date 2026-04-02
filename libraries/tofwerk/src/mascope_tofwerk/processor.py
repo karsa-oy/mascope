@@ -260,9 +260,7 @@ class H5Processor(BaseFileProcessor):
         )
 
         # Get resolution function coefficients
-        partial_coefficients = (
-            resolution_function_partial.keywords  # pylint: disable=no-member
-        )
+        partial_coefficients = resolution_function_partial.keywords
         resolution_function = [partial_coefficients["a"], partial_coefficients["b"]]
 
         return (

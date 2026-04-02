@@ -147,9 +147,7 @@ async def get_target_compounds(
                 stmt = stmt.order_by(asc(getattr(TargetCompound, sort)))
 
         # Step 5: Count total results
-        count_stmt = select(func.count()).select_from(  # pylint: disable=not-callable
-            stmt.subquery()
-        )
+        count_stmt = select(func.count()).select_from(stmt.subquery())
         total = await session.scalar(count_stmt)
 
         # Step 6: Apply pagination and execute

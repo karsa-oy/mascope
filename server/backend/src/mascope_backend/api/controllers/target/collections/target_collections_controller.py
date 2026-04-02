@@ -1,5 +1,3 @@
-# pylint: disable=line-too-long
-# pylint: disable=not-callable
 import asyncio
 
 from sqlalchemy import and_, asc, delete, desc, func, or_, select
@@ -115,9 +113,7 @@ async def get_target_collections(
                 stmt = stmt.order_by(asc(getattr(TargetCollection, sort)))
 
         # Get total count for pagination
-        count_stmt = select(func.count()).select_from(  # pylint: disable=not-callable
-            stmt
-        )
+        count_stmt = select(func.count()).select_from(stmt)
         total = await session.scalar(count_stmt)
 
         # Apply pagination

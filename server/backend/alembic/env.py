@@ -3,7 +3,6 @@
 Configures Alembic for PostgreSQL schema management using Mascope runtime config.
 """
 
-# pylint: disable=no-member
 from logging.config import fileConfig
 
 from alembic import context

@@ -55,7 +55,7 @@ PORT = None
 URL = None
 SHUTDOWN_EVENT = Event()
 
-runtime = None  # pylint: disable=invalid-name
+runtime = None
 
 executor = ThreadPoolExecutor(max_workers=3)
 
@@ -73,7 +73,7 @@ def process_file_upload(filepath: str, max_retries: int = 10) -> None:
         except ValueError as ve:
             runtime.logger.error(f"File upload failed: {ve}")
             break  # do not retry on validation errors
-        except Exception as e:  # pylint: disable=broad-except
+        except Exception as e:
             runtime.logger.warning(
                 f"Upload attempt {attempt}/{max_retries} for file "
                 f"{os.path.basename(filepath)} failed: {e.__class__.__name__}({e})"
@@ -153,7 +153,7 @@ def initialize() -> None:
     :return: Return nothing
     :rtype: None
     """
-    global runtime  # pylint: disable=global-statement
+    global runtime
     # check if we are running in a pyinstaller bundle
     bundled = getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS")
     if bundled:
@@ -206,7 +206,7 @@ class FileSystemWatcher:
             """
             try:
                 self.client.on_filesystem_object_created(event.src_path)
-            except Exception as e:  # pylint: disable=broad-except
+            except Exception as e:
                 runtime.logger.error(f"Exception {e.__class__.__name__}({e})")
 
         def on_moved(self, event: watchdog.events.FileSystemEvent) -> None:
@@ -217,7 +217,7 @@ class FileSystemWatcher:
             """
             try:
                 self.client.on_filesystem_object_created(event.dest_path)
-            except Exception as e:  # pylint: disable=broad-except
+            except Exception as e:
                 runtime.logger.error(f"Exception {e.__class__.__name__}({e})")
 
     def __init__(self, client, path: str, mask: str, recursive=False):
@@ -259,7 +259,7 @@ class FileSystemWatcher:
                 time.sleep(1)
             except KeyboardInterrupt:
                 self.client.shutdown_event.set()
-            except Exception as e:  # pylint: disable=broad-except
+            except Exception as e:
                 runtime.logger.error(f"Exception {e.__class__.__name__}({e})")
         self.stop()
 
@@ -353,7 +353,7 @@ class FileUploader:
 
         except KeyboardInterrupt:
             runtime.logger.info("Shutdown requested by user.")
-        except Exception as e:  # pylint: disable=broad-except
+        except Exception as e:
             runtime.logger.error(f"{e.__class__.__name__}({e})")
         finally:
             self.shutdown_event.set()
@@ -367,9 +367,9 @@ def run() -> None:
     # Initialize runtime
     initialize()
 
-    global URL  # pylint: disable=global-statement
-    global HOST  # pylint: disable=global-statement
-    global PORT  # pylint: disable=global-statement
+    global URL
+    global HOST
+    global PORT
 
     PORT = runtime.meta.api_port
     HOST = runtime.config.host

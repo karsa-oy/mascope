@@ -1,4 +1,3 @@
-# pylint: disable=no-member
 """Initial schema
 
 Revision ID: be6a2a093ade

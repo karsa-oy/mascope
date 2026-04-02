@@ -67,15 +67,15 @@ class BatchesResource(BaseResource):
     def _list_by_id(self, workspace_id: str) -> pd.DataFrame | None:
         """List batches by workspace ID (no name resolution)."""
         cache_key = f"batches:{workspace_id}"
-        if cache_key in self._client._cache:  # pylint: disable=protected-access
-            return self._client._cache[cache_key]  # pylint: disable=protected-access
+        if cache_key in self._client._cache:
+            return self._client._cache[cache_key]
         logger.info("Fetching batches for workspace '{}'", workspace_id)
         data = self._get("sample/batches", params={"workspace_id": workspace_id})
         if not data:
             return None
         df = _coerce_datetime_columns(pd.DataFrame(data))
         logger.info("Found {} batch(es)", len(df))
-        self._client._cache[cache_key] = df  # pylint: disable=protected-access
+        self._client._cache[cache_key] = df
         return df
 
     def get_data(self, batch_id: str) -> dict[str, Any]:

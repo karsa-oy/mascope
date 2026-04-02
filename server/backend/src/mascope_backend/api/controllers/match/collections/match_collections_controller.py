@@ -97,9 +97,7 @@ async def get_match_collections(
                     query = query.order_by(sort_expression.asc())
 
         # Step 4: Count total matching collections
-        count_stmt = select(func.count()).select_from(  # pylint: disable=not-callable
-            query.subquery()
-        )
+        count_stmt = select(func.count()).select_from(query.subquery())
         total = await session.scalar(count_stmt)
 
         # Step 5: Apply pagination

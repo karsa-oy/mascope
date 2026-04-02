@@ -119,9 +119,7 @@ async def get_sample_files(
         )
 
         # --- Apply pagination
-        total = await session.scalar(
-            select(func.count()).select_from(stmt)  # pylint: disable=not-callable
-        )
+        total = await session.scalar(select(func.count()).select_from(stmt))
         if page is not None and limit is not None:
             stmt = stmt.offset(page * limit).limit(limit)
 

@@ -1,4 +1,3 @@
-# pylint: disable=logging-fstring-interpolation,logging-format-interpolation,broad-exception-caught
 #!/usr/bin/env python3
 """
 Mascope CSV Export Agent

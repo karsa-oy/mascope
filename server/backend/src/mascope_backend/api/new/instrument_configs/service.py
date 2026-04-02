@@ -129,9 +129,7 @@ async def get_instrument_configs(
             )
 
         # -- Apply pagination --
-        total = await session.scalar(
-            select(func.count()).select_from(stmt)  # pylint: disable=not-callable
-        )
+        total = await session.scalar(select(func.count()).select_from(stmt))
         if page is not None and limit is not None:
             stmt = stmt.offset(page * limit).limit(limit)
 
@@ -350,9 +348,7 @@ async def fit_instrument_config(
     )
 
     # Get resolution function coefficients
-    partial_coefficients = (
-        resolution_function_partial.keywords  # pylint: disable=no-member
-    )
+    partial_coefficients = resolution_function_partial.keywords
     if instrument_type == "tof":
         resolution_function = [partial_coefficients["a"], partial_coefficients["b"]]
     else:

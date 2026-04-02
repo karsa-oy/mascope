@@ -1,4 +1,3 @@
-# pylint: disable=line-too-long
 from fastapi import APIRouter, BackgroundTasks, Depends
 from fastapi.params import Query
 

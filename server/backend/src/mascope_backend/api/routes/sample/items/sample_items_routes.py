@@ -35,7 +35,7 @@ sample_items_router = APIRouter(prefix="/api/sample/items", tags=["Sample Items"
 @api_route()
 async def get_sample_items_route(
     query_params: GetSampleItemsQueryParams = Query(),
-    user=Depends(guest_user),  # pylint: disable=unused-argument
+    user=Depends(guest_user),
 ):
     """Retrieve a list of sample items.
 
@@ -50,7 +50,7 @@ async def get_sample_items_route(
 @api_route()
 async def get_sample_item_route(
     sample_item_id: str,
-    user=Depends(guest_user),  # pylint: disable=unused-argument
+    user=Depends(guest_user),
 ):
     """Retrieve details of a specific sample item by ID.
 
@@ -65,7 +65,7 @@ async def get_sample_item_route(
 @api_route(status_code=201)
 async def create_sample_item_route(
     sample_item: SampleItemCreate,
-    user=Depends(editor_user),  # pylint: disable=unused-argument
+    user=Depends(editor_user),
 ):
     """Create a new sample item.
 

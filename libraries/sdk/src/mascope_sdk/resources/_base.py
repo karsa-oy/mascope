@@ -25,7 +25,7 @@ def _coerce_datetime_columns(df: pd.DataFrame) -> pd.DataFrame:
             is_utc = "utc" in col
             try:
                 df[col] = pd.to_datetime(df[col], utc=is_utc)
-            except Exception as e:  # pylint: disable=broad-except
+            except Exception as e:
                 logger.warning(f"Failed to convert column {col} to datetime: {e}")
     return df
 
@@ -68,8 +68,8 @@ class BaseResource:
             access_token=self._client.access_token,
             params=params,
             stream=stream,
-            verify_ssl=self._client._verify_ssl,  # pylint: disable=protected-access
-            service_name=self._client._service_name,  # pylint: disable=protected-access
+            verify_ssl=self._client._verify_ssl,
+            service_name=self._client._service_name,
         )
         if stream:
             return response
@@ -101,7 +101,7 @@ class BaseResource:
             path=path,
             access_token=self._client.access_token,
             data=data,
-            verify_ssl=self._client._verify_ssl,  # pylint: disable=protected-access
-            service_name=self._client._service_name,  # pylint: disable=protected-access
+            verify_ssl=self._client._verify_ssl,
+            service_name=self._client._service_name,
         )
         return response.json().get("data")

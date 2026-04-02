@@ -212,9 +212,7 @@ async def get_target_isotopes(
                 stmt = stmt.order_by(asc(getattr(TargetIsotope, sort)))
 
         # Step 5: Get total count
-        total = await session.scalar(
-            select(func.count()).select_from(stmt)  # pylint: disable=not-callable
-        )
+        total = await session.scalar(select(func.count()).select_from(stmt))
 
         # Step 6: Apply pagination
         if page is not None and limit is not None:

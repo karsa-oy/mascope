@@ -1,4 +1,3 @@
-# pylint: disable=not-callable
 from datetime import datetime, timezone
 
 from sqlalchemy import (

@@ -18,7 +18,7 @@ async def check_first_owner_registration() -> bool:
     """
     async with async_session() as session:
         owner_count = await session.scalar(
-            select(func.count())  # pylint: disable=not-callable
+            select(func.count())
             .select_from(User)
             .where(User.role_id == auth_settings.ROLE_ACCESS_LEVELS["owner"])
         )

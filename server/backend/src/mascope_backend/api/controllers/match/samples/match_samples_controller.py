@@ -90,9 +90,7 @@ async def get_match_samples(
                     query = query.order_by(sort_expression.asc())
 
         # Count total matching samples
-        count_stmt = select(func.count()).select_from(  # pylint: disable=not-callable
-            query.subquery()
-        )
+        count_stmt = select(func.count()).select_from(query.subquery())
         total = await session.scalar(count_stmt)
 
         # Apply pagination

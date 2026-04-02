@@ -63,7 +63,7 @@ PORT = None
 URL = None
 SHUTDOWN_EVENT = Event()
 
-runtime = None  # pylint: disable=invalid-name
+runtime = None
 sio = socketio.AsyncClient(logger=False, ssl_verify=False)
 executor = ThreadPoolExecutor(max_workers=3)
 
@@ -81,7 +81,7 @@ def process_file_upload(filepath: str, max_retries: int = 10) -> None:
         except ValueError as ve:
             runtime.logger.error(f"File upload failed: {ve}")
             break  # do not retry on validation errors
-        except Exception as e:  # pylint: disable=broad-except
+        except Exception as e:
             runtime.logger.warning(
                 f"Upload attempt {attempt}/{max_retries} for file "
                 f"{os.path.basename(filepath)} failed: {e.__class__.__name__}({e})"
@@ -160,7 +160,7 @@ def initialize() -> None:
     :return: Return nothing
     :rtype: None
     """
-    global runtime  # pylint: disable=global-statement
+    global runtime
     # check if we are running in a pyinstaller bundle
     bundled = getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS")
     if bundled:
@@ -263,7 +263,7 @@ async def streamer_processor(streamer) -> None:
         except Empty:
             # No new data, try again soon
             await asyncio.sleep(0.1)
-        except Exception as e:  # pylint: disable=broad-except
+        except Exception as e:
             runtime.logger.error(f"Failed to process data from the TOF streamer: {e}")
 
 
@@ -307,13 +307,13 @@ def run() -> None:
     # Initialize runtime
     initialize()
     # TofDaqStreamer has to be imported after runtime initialization
-    from mascope_tofwerk.tof_streamer import (  # pylint: disable=import-outside-toplevel
+    from mascope_tofwerk.tof_streamer import (
         TofDaqStreamer,
     )
 
-    global URL  # pylint: disable=global-statement
-    global HOST  # pylint: disable=global-statement
-    global PORT  # pylint: disable=global-statement
+    global URL
+    global HOST
+    global PORT
 
     PORT = runtime.meta.api_port
     HOST = runtime.config.host
@@ -348,7 +348,7 @@ def run() -> None:
         loop.run_until_complete(main())
     except KeyboardInterrupt:
         runtime.logger.info("Keyboard interrupt received")
-    except Exception as e:  # pylint: disable=broad-except
+    except Exception as e:
         runtime.logger.error(f"Encountered an error: {e}")
     finally:
         runtime.logger.info("Shutting down...")

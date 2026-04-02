@@ -48,7 +48,7 @@ class IonizationMechanismBaseValidator:
         try:
             mechanism_formula = Formula(value[1:]) if len(value) > 1 else Formula(value)
             # Access _elements to trigger parsing and potentially raise an error
-            mechanism_formula._elements  # pylint: disable=pointless-statement,protected-access
+            mechanism_formula._elements
         except Exception as e:
             raise ValueError(
                 f"Invalid ionization mechanism formula '{value}': {str(e)}"

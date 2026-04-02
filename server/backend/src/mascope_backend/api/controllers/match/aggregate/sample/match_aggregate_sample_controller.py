@@ -1,4 +1,3 @@
-# pylint: disable=line-too-long
 import pandas as pd
 from sqlalchemy import (
     select,

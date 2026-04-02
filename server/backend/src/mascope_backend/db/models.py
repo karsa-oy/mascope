@@ -121,7 +121,7 @@ class User(SQLAlchemyBaseUserTable[int], Base):
         from mascope_backend.api.new.auth.config import auth_settings
 
         query = (
-            select(func.count())  # pylint: disable=not-callable
+            select(func.count())
             .select_from(User)
             .where(
                 User.role_id == auth_settings.ROLE_ACCESS_LEVELS["owner"],

@@ -1,4 +1,3 @@
-# pylint: disable=line-too-long
 """
 Controller for sample files auto-processing pipeline.
 
@@ -330,7 +329,7 @@ async def re_process_sample_files(
                 }
             )
             continue
-        except Exception as e:  # pylint: disable=broad-except
+        except Exception as e:
             # Other unexpected errors
             failed_files.append(
                 {
@@ -420,7 +419,7 @@ async def re_process_sample_files(
                     "message": f"Processing failed: {ae.user_message}",
                 }
             )
-        except Exception as e:  # pylint: disable=broad-except
+        except Exception as e:
             failed_files.append(
                 {
                     "sample_file_id": sample_file.sample_file_id,

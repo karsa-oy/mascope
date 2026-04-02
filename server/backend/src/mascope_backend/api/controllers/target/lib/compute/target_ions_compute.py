@@ -121,7 +121,7 @@ def generate_target_ions_from_composition(
             continue
 
         # Strip brackets [] and charge from formula
-        ion_formula = raw_ion._formula_nocharge  # pylint: disable=protected-access
+        ion_formula = raw_ion._formula_nocharge
         # Remove potential explicit isotopes in the formula
         ion_formula = Formula(normalize_formula_with_isotopes(ion_formula)).formula
 
@@ -202,22 +202,16 @@ def _get_compound_formula(
         for (
             element,
             iso_counts,
-        ) in mechanism_formula._elements.items():  # pylint: disable=protected-access
+        ) in mechanism_formula._elements.items():
             # Check if element to be subtracted exists in compound formula
-            if (
-                element not in compound_formula._elements  # pylint: disable=protected-access
-            ):
+            if element not in compound_formula._elements:
                 raise SkipIonizationMechanism(
                     f"Element {element} from mechanism formula {mechanism_formula.formula} "
                     f"not in compound formula {compound_formula.formula}"
                 )
             # Check if there are enough atoms of the element to be subtracted
             mech_count = sum(iso_counts.values())
-            compound_count = sum(
-                compound_formula._elements[  # pylint: disable=protected-access
-                    element
-                ].values()
-            )
+            compound_count = sum(compound_formula._elements[element].values())
             if mech_count > compound_count:
                 raise SkipIonizationMechanism(
                     f"Cannot subtract {mech_count} of element {element} from compound formula "
@@ -324,7 +318,7 @@ def _extract_custom_elements(raw_ion: Formula, ion_formula: str) -> dict[str, di
     if "^" not in ion_formula:
         return custom_elements
 
-    elements = raw_ion._elements  # pylint: disable=protected-access
+    elements = raw_ion._elements
     for symbol in elements:
         if not symbol.startswith("^"):
             continue
@@ -688,9 +682,7 @@ def generate_target_ions_from_mass(
                 ]
             else:
                 # Abstraction mechanism, no knowledge of the isotopic pattern
-                raw_isotopes = [
-                    (-raw_ion.mz, 1.0)  # pylint: disable=invalid-unary-operand-type
-                ]
+                raw_isotopes = [(-raw_ion.mz, 1.0)]
         else:
             # Special case: electron transfer
             is_addition = mechanism[0] == "-"

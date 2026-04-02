@@ -6,7 +6,6 @@ modules so that their runtimes are properly initialized before use.
 """
 
 # ruff: noqa: F401
-# pylint: disable=unused-import
 
 # Initialize dependency module runtimes (required for proper initialization)
 import mascope_chem.runtime

@@ -1,4 +1,3 @@
-# pylint: disable=line-too-long
 """
 Maintenance script to clean up corrupted matches in copied batches.
 

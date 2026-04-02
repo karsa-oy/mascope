@@ -1,4 +1,3 @@
-# pylint: disable=line-too-long
 """
 This module contains all the functionalities related to the calibration processes. It provides endpoints and
 background tasks to process calibration and related operations.

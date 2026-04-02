@@ -1,4 +1,3 @@
-# pylint: disable=line-too-long
 """
 Maintenance script to set all batches to 'rematch' status.
 

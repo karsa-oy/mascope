@@ -44,9 +44,7 @@ async def get_target_collections_in_sample_batch(
                 stmt = stmt.order_by(asc(getattr(TargetCollectionInSampleBatch, sort)))
 
         # Get total count
-        count_stmt = select(func.count()).select_from(  # pylint: disable=not-callable
-            stmt
-        )
+        count_stmt = select(func.count()).select_from(stmt)
         total = await session.scalar(count_stmt)
 
         # Get paginated results

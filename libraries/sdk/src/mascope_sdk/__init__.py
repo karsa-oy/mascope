@@ -15,10 +15,10 @@ __version__ = version("mascope_sdk")
 
 # Legacy API exports (deprecated, kept for backwards compatibility)
 from ._legacy import (  # Internal helpers (used by agents); Deprecated public functions
-    SERVICE_NAME,  # noqa: F401 pylint: disable=unused-import
-    api_get,  # noqa: F401 pylint: disable=unused-import
-    api_post,  # noqa: F401 pylint: disable=unused-import
-    api_post_file,  # noqa: F401 pylint: disable=unused-import
+    SERVICE_NAME,  # noqa: F401
+    api_get,  # noqa: F401
+    api_post,  # noqa: F401
+    api_post_file,  # noqa: F401
     get_cheminfo_by_mz,
     get_ionization_mechanisms,
     get_sample,
@@ -42,8 +42,6 @@ from ._legacy import (  # Internal helpers (used by agents); Deprecated public f
 
 # New API exports
 from .client import MascopeClient
-
-# pylint: disable=redefined-builtin
 from .exceptions import (
     AuthenticationError,
     ConfigurationError,
@@ -65,8 +63,8 @@ def copy_examples(dest: str = "./mascope_examples") -> None:
     :param dest: Target directory. Created if it doesn't exist.
                  Existing files are **not** overwritten.
     """
-    from importlib.resources import files  # pylint: disable=import-outside-toplevel
-    from pathlib import Path  # pylint: disable=import-outside-toplevel
+    from importlib.resources import files
+    from pathlib import Path
 
     src = files("mascope_sdk").joinpath("examples")
     dest_path = Path(dest)

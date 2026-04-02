@@ -29,7 +29,7 @@ from mascope_backend.socket.notifications import (
 )
 async def process_sample_item(
     sample_item: SampleItemCreate,
-    independent_transaction: bool = False,  # pylint: disable=unused-argument
+    independent_transaction: bool = False,
     user_id: int | None = None,
     process_id: str | None = None,
 ) -> dict:

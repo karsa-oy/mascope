@@ -100,9 +100,7 @@ async def get_match_isotopes(
             stmt = stmt.order_by(sort_expression)
 
         # Step 5: Count total
-        total = await session.scalar(
-            select(func.count()).select_from(stmt)  # pylint: disable=not-callable
-        )
+        total = await session.scalar(select(func.count()).select_from(stmt))
 
         # Step 6: Apply pagination
         if limit is not None:

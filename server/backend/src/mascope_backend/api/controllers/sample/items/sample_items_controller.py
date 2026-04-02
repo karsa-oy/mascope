@@ -135,9 +135,7 @@ async def get_sample_items(
                 stmt = stmt.order_by(asc(getattr(SampleItem, sort)))
 
         # Step 3: Get total count for pagination
-        count_stmt = select(func.count()).select_from(  # pylint: disable=not-callable
-            stmt
-        )
+        count_stmt = select(func.count()).select_from(stmt)
         total = await session.scalar(count_stmt)
 
         # Step 4: Apply pagination

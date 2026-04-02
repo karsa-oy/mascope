@@ -212,9 +212,7 @@ async def get_target_ions(
                 stmt = stmt.order_by(asc(getattr(TargetIon, sort)))
 
         # Get total count
-        total = await session.scalar(
-            select(func.count()).select_from(stmt)  # pylint: disable=not-callable
-        )
+        total = await session.scalar(select(func.count()).select_from(stmt))
         # Apply pagination conditionally
         if page is not None and limit is not None:
             stmt = stmt.offset(page * limit).limit(limit)
