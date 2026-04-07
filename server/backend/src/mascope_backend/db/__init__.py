@@ -177,6 +177,9 @@ async def init_db():
         await _test_database_connection()
 
         await _check_async_wal_status()
+
+        # Log pool configuration for debugging
+        _log_pool_configuration()
     except Exception as error:
         runtime.logger.error(f"Database initialization error: {error}")
         raise
@@ -236,6 +239,22 @@ async def _check_async_wal_status():
     # PostgreSQL doesn't need WAL checks (it's always WAL)
     except Exception as e:
         runtime.logger.error(f"Error checking database status: {e}")
+
+
+def _log_pool_configuration():
+    """Log connection pool configuration for this worker."""
+    try:
+        engine = ASYNC_SESSION_MAKER.kw["bind"]
+        worker_pid = os.getpid()
+
+        runtime.logger.debug(
+            f"Worker {worker_pid} pool config: "
+            f"size={engine.pool.size()}, "
+            f"max_overflow={engine.pool._max_overflow}, "
+            f"timeout={engine.pool._timeout}s"
+        )
+    except Exception as e:
+        runtime.logger.debug(f"Could not log pool configuration: {e}")
 
 
 __all__ = [

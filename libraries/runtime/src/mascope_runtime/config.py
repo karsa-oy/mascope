@@ -49,6 +49,10 @@ class DatabaseConfig(BaseModel):
     Database configuration settings.
 
     Centralized configuration for PostgreSQL database connections, timeouts, and engine settings.
+
+    NOTE: Connection pool settings are per-worker: with multiple workers setup need to be so
+    that the PostgreSQL max_connections (100 default) is above the total possible connections
+    from all workers.
     """
 
     # Database type selector
@@ -72,14 +76,18 @@ class DatabaseConfig(BaseModel):
     # Connection timeout
     connection_timeout: int = 30  # How long to wait when database is locked
 
-    # SQLAlchemy engine settings
-    pool_size: int = 5  # Base pool size - max persistent connections kept open
+    # SQLAlchemy connection pool settings (per worker)
+    pool_size: int = 3  # Base pool size - persistent connections kept open per worker
     max_overflow: int = (
-        10  # Additional connections allowed beyond pool_size when needed
+        2  # Additional overflow connections allowed per worker under load
     )
-    pool_timeout: int = 60  # Seconds to wait for available connection before timeout
-    pool_pre_ping: bool = True  # Check connection liveness before using from pool
-    expire_on_commit: bool = False  # Keep objects loaded after commit
+    pool_timeout: int = (
+        30  # Seconds to wait for available connection before raising timeout error
+    )
+    pool_pre_ping: bool = (
+        True  # Health check connection before use (prevents stale connections)
+    )
+    expire_on_commit: bool = False  # Keep loaded objects accessible after commit
 
     def get_sqlite_path(self, version: int) -> str:
         """Get full path to SQLite database file."""

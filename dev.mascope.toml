@@ -15,7 +15,7 @@ type = "postgres"   # "sqlite" or "postgres"
 # Connection
 host = "localhost"
 
-# Engine
+# Engine settings for single worker dev setup (higher pool size)
 pool_size = 5
 max_overflow = 10
 

@@ -37,10 +37,12 @@ user = "mascope_user"
 port = 5432
 
 # Connection settings
-connection_timeout = 30 
-pool_size = 5
-max_overflow = 10
-pool_timeout = 60
+connection_timeout = 30
+
+# SQLAlchemy pool settings (per worker)
+pool_size = 3
+max_overflow = 2
+pool_timeout = 30
 pool_pre_ping = true
 expire_on_commit = false
 

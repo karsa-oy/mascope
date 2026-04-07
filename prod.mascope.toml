@@ -14,9 +14,11 @@ type = "sqlite"   # "sqlite" or "postgres"
 # Connection
 host = "postgres"  # Docker Compose service name
 
-# Engine
-pool_size = 20
-max_overflow = 30
+# Engine settings for multi-worker production
+# With auto workers (12 usually): pool_size=3, max_overflow=2 → 12 × 5 = 60 max connections
+# Stays under PostgreSQL max_connections=100 default
+pool_size = 3
+max_overflow = 2
 
 [backend.redis]
 host = "redis"  # Docker Compose service name
