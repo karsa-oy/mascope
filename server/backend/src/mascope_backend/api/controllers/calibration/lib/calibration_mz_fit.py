@@ -492,6 +492,12 @@ class BaseCalibrationHandler:
             "calibrant_to_tic": calibrant_to_tic,
         }
 
+    @property
+    def _has_peaks(self):
+        """Check if the sample file contains any detected peaks that can be used for calibration."""
+        peak_data = m_io.load_peak_data(self.filename)
+        return not peak_data.mz.values.size == 0
+
     @api_controller()
     @abstractmethod
     async def fit(self):
@@ -550,6 +556,11 @@ class TofCalibrationHandler(BaseCalibrationHandler):
     async def fit(self):
         """Fit the m/z calibration for a TOF instrument."""
         await self._send_progress(0.25)
+
+        if not self._has_peaks:
+            self.fit_result = None
+            self.stats = None
+            self.warning = "The sample file has no peaks."
 
         _, tic_per_scan = m_compute.get_tic_per_scan(self.filename)
         tic = np.sum(tic_per_scan)
@@ -716,6 +727,11 @@ class OrbiCalibrationHandler(BaseCalibrationHandler):
     async def fit(self):
         """Fit the m/z calibration for an Orbitrap instrument."""
         await self._send_progress(0.25)
+
+        if not self._has_peaks:
+            self.fit_result = None
+            self.stats = None
+            self.warning = "The sample file has no peaks."
 
         match_isotope_df, good_matches_df = await self._match_calibration_compounds()
 
