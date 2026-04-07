@@ -498,7 +498,7 @@ def compute_peaks(
 ):
     """Compute peaks for a sample file.
 
-    :param filename: Path to the sample file.
+    :param filename: Filename of the sample file.
     :type filename: str
     :param instrument_functions: Tuple containing peak shape and resolution function.
     :type instrument_functions: tuple
@@ -508,6 +508,41 @@ def compute_peaks(
     peak_detector = get_peak_detector(filename, instrument_functions)
     asyncio.run(peak_detector.detect_peaks(progress_callback=progress_callback))
     asyncio.run(peak_detector.write_peaks_to_zarr())
+
+
+def write_empty_peak_timeseries(filename: str) -> None:
+    """Write an empty peak_timeseries.zarr for blank measurements.
+
+    :param filename: Filename of the sample file.
+    :type filename: str
+    """
+    time_coord = m_compute.get_scan_timestamps(filename)
+    empty_dataset = xarray.Dataset(
+        data_vars={
+            "peak_areas": (
+                ("mz", "time"),
+                np.empty((0, time_coord.size), dtype=np.float64),
+            ),
+            "peak_heights": (
+                ("mz", "time"),
+                np.empty((0, time_coord.size), dtype=np.float64),
+            ),
+            "is_timeseries_computed": (("mz",), np.empty(0, dtype=bool)),
+            "is_weak": (("mz",), np.empty(0, dtype=bool)),
+            "is_satellite": (("mz",), np.empty(0, dtype=bool)),
+            "signal_to_noise": (("mz",), np.empty(0, dtype=np.float64)),
+            "sum_peak_areas": (("mz",), np.empty(0, dtype=np.float64)),
+            "sum_peak_heights": (("mz",), np.empty(0, dtype=np.float64)),
+            "polarity": (("mz",), np.empty(0, dtype="<U2")),
+        },
+        coords={
+            "mz": ("mz", np.empty(0, dtype=np.float64)),
+            "time": time_coord,
+            "tof": (("mz",), np.empty(0, dtype=np.float64)),
+            "peak_id": (("mz",), np.empty(0, dtype=f"<U{PEAK_ID_LENGTH}")),
+        },
+    )
+    asyncio.run(m_io.write_peaks(empty_dataset, filename, overwrite=True))
 
 
 def get_peak_detector(

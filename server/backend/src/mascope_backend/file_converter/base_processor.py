@@ -15,7 +15,7 @@ from mascope_file.name import (
     get_instrument_name,
     parse_path_from_item_filename,
 )
-from mascope_signal.peak import compute_peaks
+from mascope_signal.peak import compute_peaks, write_empty_peak_timeseries
 
 from .api import (
     check_sample_file_db_record,
@@ -235,15 +235,17 @@ class BaseFileProcessor(Thread, ABC, metaclass=FileProcessorMeta):
     def _create_db_record(
         self,
         sample_file_props: SampleFileProps,
-        instrument_function_id: str,
+        instrument_function_id: str | None,
     ) -> None:
         """
         Create database record for the sample file.
 
+        None instrument_function_id indicates blank measurement.
+
         :param sample_file_props: File properties
         :type sample_file_props: SampleFileProps
         :param instrument_function_id: FK to instrument config
-        :type instrument_function_id: str
+        :type instrument_function_id: str | None
         :raises RuntimeError: If database record creation fails
         """
         try:
@@ -398,6 +400,15 @@ class BaseFileProcessor(Thread, ABC, metaclass=FileProcessorMeta):
             self._create_filestore_directory(sample_file_props, file_path)
 
             self._emit_progress_notification(10)
+
+            if self._is_blank_measurement:
+                runtime.logger.warning(
+                    f"Blank measurement detected: {filename}, skipping peak detection"
+                )
+                write_empty_peak_timeseries(filename)
+                self._create_db_record(sample_file_props, instrument_function_id=None)
+                self._emit_progress_notification(100)
+                return
 
             # Fit instrument functions and get the ID
             instrument_function_id, *instrument_functions = (
