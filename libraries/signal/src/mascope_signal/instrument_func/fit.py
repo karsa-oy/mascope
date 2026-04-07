@@ -6,7 +6,7 @@ from lmfit.models import SkewedGaussianModel, SplineModel
 from scipy.interpolate import interp1d
 from scipy.optimize import curve_fit
 from scipy.signal import find_peaks
-from scipy.stats import linregress
+from scipy.stats import linregress, median_abs_deviation
 
 from mascope_file.name import get_instrument_type
 from mascope_signal.compute import get_sum_signal
@@ -17,6 +17,9 @@ from mascope_signal.runtime import runtime
 SIGMA_MULTIPLIER = 2 * np.sqrt(2 * np.log(2))
 # Minimum number of peaks required to evaluate instrument functions
 MIN_NUM_PEAKS = 3
+NOISE_THRESHOLD_FACTOR = 5
+AMBIENT_SNR_THRESHOLD = 100
+AMBIENT_R_SQ_THRESHOLD = 0.85
 
 
 def r_tof(mz: float | np.ndarray, a: float, b: float):
@@ -80,9 +83,21 @@ def fit_instrument_functions(filename: str, dmz=0.5, r_sq_thres=0.95) -> tuple:
     spec = sum_signal.values
     mz = sum_signal.mz.values
 
+    effective_r_sq_thres = r_sq_thres
+    if instrument_type == "tof":
+        is_ambient, signal_to_noise = _is_ambient_tof_spectrum(spec)
+        if is_ambient:
+            effective_r_sq_thres = min(r_sq_thres, AMBIENT_R_SQ_THRESHOLD)
+            if effective_r_sq_thres != r_sq_thres:
+                runtime.logger.warning(
+                    "Ambient TOF file detected: overriding r_sq_thres "
+                    f"from {r_sq_thres:.3f} to {effective_r_sq_thres:.3f} "
+                    f"(SNR={signal_to_noise:.2f}, ambient threshold={AMBIENT_SNR_THRESHOLD})."
+                )
+
     # Get x-domain, normalized peak shapes and associated peak positions and FWHMs
     p_x, p_ys, p_mzs, p_fwhms = _process_peak_shapes(
-        mz, spec, instrument_type, dmz, r_sq_thres
+        mz, spec, instrument_type, dmz, effective_r_sq_thres
     )
     # Check if there are enough peaks for peak shape estimation
     if len(p_mzs) < MIN_NUM_PEAKS:
@@ -99,6 +114,27 @@ def fit_instrument_functions(filename: str, dmz=0.5, r_sq_thres=0.95) -> tuple:
     stats = ps_stats | resfun_stats
 
     return peak_shape, resolution_function, stats
+
+
+def _is_ambient_tof_spectrum(spec: np.ndarray) -> tuple[bool, float]:
+    """Detect if TOF spectrum should be treated as ambient using SNR.
+
+    Uses the same MAD-based SNR method as TOF blank detection, but with
+    an ambient-specific threshold.
+    """
+    peak_indices, _ = find_peaks(spec)
+    peak_heights = spec[peak_indices]
+
+    noise_mad = median_abs_deviation(peak_heights, scale="normal")
+    noise_std = 1.4826 * noise_mad
+    noise_threshold = noise_std * NOISE_THRESHOLD_FACTOR
+
+    if noise_threshold <= 0:
+        signal_to_noise = float("inf") if np.max(peak_heights) > 0 else 0.0
+    else:
+        signal_to_noise = float(np.max(peak_heights) / noise_threshold)
+
+    return signal_to_noise < AMBIENT_SNR_THRESHOLD, signal_to_noise
 
 
 def _process_peak_shapes(
