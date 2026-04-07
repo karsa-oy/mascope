@@ -2,7 +2,10 @@
 from datetime import datetime, timedelta, timezone
 
 import numpy as np
+from scipy.stats import median_abs_deviation
+from scipy.signal import find_peaks
 
+import mascope_signal.compute as m_compute
 from mascope_backend.api.new.instrument_configs.schemas import (
     InstrumentConfigFitParams,
     PeakShape,
@@ -14,6 +17,11 @@ from mascope_backend.file_converter.base_processor import (
     with_file_context,
 )
 from mascope_tofwerk.tofwerk import open_h5_file
+
+# Threshold factor for determining blank measurements based on noise level
+NOISE_THRESHOLD_FACTOR = 5
+# Threshold for signal-to-noise ratio to classify a measurement as blank
+BLANK_SNR_THRESHOLD = 10
 
 
 class H5Processor(BaseFileProcessor):
@@ -40,6 +48,29 @@ class H5Processor(BaseFileProcessor):
     def filename(self) -> str:
         """Get the processed filename."""
         return self._strip_filepath(self.file_to_process)
+
+    @property
+    def _is_blank_measurement(self) -> bool:
+        """Determine if the file being processed is a blank/zero measurement
+
+        This is determined by analyzing spikes/peaks in sum signal and comparing the
+        maximum peak height to the noise level (signal to noise ratio).
+        If the maximum peak to noise ratio is below a defined threshold,
+        the measurement is classified as blank.
+        """
+        # Get the sum signal and find potential peaks
+        sum_signal = m_compute.get_sum_signal(self.filename).values
+        peak_indices, _ = find_peaks(sum_signal)
+        peak_heights = sum_signal[peak_indices]
+
+        # Compute noise level
+        noise_mad = median_abs_deviation(peak_heights, scale="normal")
+        noise_std = 1.4826 * noise_mad
+        noise_threshold = noise_std * NOISE_THRESHOLD_FACTOR
+
+        max_signal_to_noise = np.max(peak_heights) / noise_threshold
+
+        return max_signal_to_noise < BLANK_SNR_THRESHOLD
 
     @property
     @with_file_context

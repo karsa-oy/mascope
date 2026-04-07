@@ -55,6 +55,14 @@ class RawProcessor(BaseFileProcessor):
         return filename.replace("_", f"_{timestamp}_", 1)
 
     @property
+    def _is_blank_measurement(self) -> bool:
+        """Determine if the file being processed is a blank/zero measurement
+
+        All Orbitrap raw files are assumed to be non-blank measurements.
+        """
+        return False
+
+    @property
     @with_file_context
     def interval(self) -> float:
         """Mean measurement interval in seconds, i.e. length of one spectrum in the sample

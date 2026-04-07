@@ -152,6 +152,12 @@ class BaseFileProcessor(Thread, ABC, metaclass=FileProcessorMeta):
         """Fit instrument functions."""
         raise NotImplementedError
 
+    @property
+    @abstractmethod
+    def _is_blank_measurement(self) -> bool:
+        """Determine if the file being processed is a blank/zero measurement"""
+        pass
+
     # Common methods - used by all subclasses
     def _check_orphan_sample_file_filestore(self, filename: str) -> bool:
         """Check if file's directory exists in filestore without corresponding database record."""
