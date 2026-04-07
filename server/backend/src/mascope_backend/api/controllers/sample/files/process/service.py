@@ -137,6 +137,9 @@ async def auto_process_sample_file(
         sample["sample_item_id"] for sample in acquisition_samples
     )
 
+    # Blank files are stored without an instrument config and should skip calibration.
+    is_blank_sample_file = sample_file.instrument_function_id is None
+
     # --- Perform calibration and match computation for created ACQUISITION samples --- #
     for sample in acquisition_samples:
         sample_item_id = sample["sample_item_id"]
@@ -147,17 +150,29 @@ async def auto_process_sample_file(
                 IonizationMode, sample["ionization_mode_id"]
             )
 
-        # Perform calibration if calibration collection configured for this ionization mode
-        if ionization_mode and ionization_mode.calibration_collection_id:
+        # Perform calibration only when collection is configured and file is not blank.
+        if (
+            ionization_mode
+            and ionization_mode.calibration_collection_id
+            and not is_blank_sample_file
+        ):
             await calibrate_with_retry(
                 sample=sample,
                 user_id=user_id,
                 process_id=process_id,
             )
+        elif is_blank_sample_file:
+            runtime.logger.info(
+                f"Skipping m/z calibration for blank sample '{sample['sample_item_name']}': "
+                "calibration is not applicable."
+            )
         else:
+            ionization_mode_name = (
+                ionization_mode.ionization_mode_name if ionization_mode else "unknown"
+            )
             runtime.logger.warning(
                 f"Skipping m/z calibration for sample '{sample['sample_item_name']}': "
-                f"Calibration collection is not set for the ionization mode '{ionization_mode.ionization_mode_name}'."
+                f"Calibration collection is not set for the ionization mode '{ionization_mode_name}'."
             )
 
         await match_compute_sample(
