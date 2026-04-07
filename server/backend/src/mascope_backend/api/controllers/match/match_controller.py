@@ -61,6 +61,13 @@ from mascope_backend.socket.notifications import (
 )
 
 
+def _requires_mz_calibration_verification(sample: Sample) -> bool:
+    """Return whether m/z calibration verification gate applies to this sample."""
+    # Blank samples are created without an instrument config and should not be
+    # blocked by m/z calibration verification.
+    return sample.instrument_function_id is not None
+
+
 # -------------------------------------------------------------------
 # Sample level
 # -------------------------------------------------------------------
@@ -343,11 +350,15 @@ async def match_compute_sample(
 
     # -- Check if m/z calibration is verified for the sample
     # TODO_calibration split on orbi/tof?
-    verified = (
-        sample.mz_calibration.get("verified", False)
-        if sample.mz_calibration is not None
-        else True
-    )
+    if _requires_mz_calibration_verification(sample):
+        verified = (
+            sample.mz_calibration.get("verified", False)
+            if sample.mz_calibration is not None
+            else True
+        )
+    else:
+        verified = True
+
     if not verified:
         warning_message = f"m/z calibration is not verified for sample file: {sample.filename}. Please try to calibrate the file."
         raise_api_warning(warning_message, {"sample_item_id": sample_item_id})
@@ -1099,8 +1110,10 @@ async def match_compute_batch(
                 f"Computing match isotopes for sample {item_index + 1}/{total_samples_count}: '{sample.sample_item_name}'"
             )
             # Check if m/z calibration (if exists) is verified for the sample
-            if sample.mz_calibration and not sample.mz_calibration.get(
-                "verified", False
+            if (
+                _requires_mz_calibration_verification(sample)
+                and sample.mz_calibration
+                and not sample.mz_calibration.get("verified", False)
             ):
                 skipped_samples.append(sample.sample_item_id)
                 runtime.logger.debug(
