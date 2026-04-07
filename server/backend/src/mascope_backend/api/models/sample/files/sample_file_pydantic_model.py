@@ -19,12 +19,12 @@ FILE_UPLOAD_SIZE_LIMIT = 2.5 * 1024**3  # 2.5 GB
 
 
 class SampleFileBase(BaseModel):
-    instrument_function_id: str = Field(
-        ..., description="ID of the instrument config used for processing this file"
+    instrument_function_id: str | None = Field(
+        None, description="ID of the instrument config used for processing this file"
     )
     filename: str = Field(..., description="Name of the sample file")
     instrument: str = Field(..., description="Instrument associated with the file")
-    method_file: Optional[str] = Field(None, description="Instrument config name")
+    method_file: str | None = Field(None, description="Instrument config name")
     datetime: dt = Field(
         ..., description="Datetime (local) of creation of the sample file"
     )
@@ -32,8 +32,8 @@ class SampleFileBase(BaseModel):
         ..., description="Datetime (UTC) of creation of the sample file"
     )
     length: float = Field(..., description="Length of the sample file")
-    range: List[float] = Field(..., description="m/z range of the sample file")
-    mz_calibration: Optional[Dict] = Field(
+    range: list[float] = Field(..., description="m/z range of the sample file")
+    mz_calibration: dict | None = Field(
         None, description="m/z calibration function parameters of the sample file"
     )
     polarity: str = Field(..., description="Polarities present in the sample file")
