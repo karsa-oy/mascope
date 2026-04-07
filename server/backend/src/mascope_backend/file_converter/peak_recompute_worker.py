@@ -21,6 +21,7 @@ from threading import Event, Thread
 
 from mascope_backend.file_converter.api import (
     fetch_instrument_functions,
+    is_blank_sample_file,
     rematch_sample,
 )
 from mascope_backend.file_converter.peak_guard import PeakDetectionGuard
@@ -52,17 +53,47 @@ class PeakRecomputeWorker(Thread):
         self.peak_guard = peak_guard
         self.shutdown_event = shutdown_event
 
+    def _emit_blank_sample_warning(
+        self,
+        filename: str,
+        sample_file_id: str | None,
+        process_id: str | None,
+        auth: dict,
+    ) -> None:
+        """Emit a warning when manual peak detection is requested for a blank sample."""
+        warning_message = "No peaks found."
+        self.socket_client.emit(
+            "peak_detection_error",
+            {
+                "filename": filename,
+                "sample_file_id": sample_file_id,
+                "process_id": process_id,
+                "error": warning_message,
+                "status": "warning",
+            },
+            auth,
+        )
+
     def _process_request(self, request: dict) -> None:
         """Process a single peak-detection request.
 
         :param request: Queue item with filename, credentials, etc.
         """
         filename = request.get("filename")
+        access_token = request.get("access_token")
+
+        if not isinstance(filename, str) or not filename:
+            raise ValueError("Peak detection request is missing a valid filename")
+        if not isinstance(access_token, str) or not access_token:
+            raise ValueError(
+                f"Peak detection request for '{filename}' is missing a valid access token"
+            )
+
         sample_file_id = request.get("sample_file_id")
         affected_sample_item_ids = request.get("affected_sample_item_ids", [])
         process_id = request.get("process_id")
         auth = {
-            "access_token": request.get("access_token"),
+            "access_token": access_token,
             "user_id": request.get("user_id"),
         }
 
@@ -70,9 +101,21 @@ class PeakRecomputeWorker(Thread):
             f"PeakRecomputeWorker: processing peak detection for '{filename}'"
         )
         try:
+            if is_blank_sample_file(filename, access_token):
+                runtime.logger.info(
+                    f"PeakRecomputeWorker: skipping peak detection for blank sample '{filename}'"
+                )
+                self._emit_blank_sample_warning(
+                    filename=filename,
+                    sample_file_id=sample_file_id,
+                    process_id=process_id,
+                    auth=auth,
+                )
+                return
+
             instrument_functions = fetch_instrument_functions(
                 filename,
-                request.get("access_token"),
+                access_token,
             )
 
             def progress_callback(progress: int):

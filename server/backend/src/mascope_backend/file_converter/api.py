@@ -168,6 +168,50 @@ def check_sample_file_db_record(filename: str, access_token: str) -> bool:
         raise Exception(f"Failed to check sample file record: {e}") from e
 
 
+def is_blank_sample_file(filename: str, access_token: str) -> bool:
+    """Return whether the sample file is a blank measurement.
+
+    Blank files are persisted without an instrument_function_id.
+
+    :param filename: Sample filename to inspect
+    :type filename: str
+    :param access_token: Access token for request authentication
+    :type access_token: str
+    :return: True if the sample file is blank, False otherwise
+    :rtype: bool
+    :raises Exception: If request fails unexpectedly or file is not found
+    """
+    headers = {
+        "X-Service-Name": "file-converter",
+        "Authorization": f"Bearer {access_token}",
+    }
+    params = {"filename": filename, "limit": 1}
+
+    try:
+        response = requests.get(
+            f"{URL}/api/sample/files", headers=headers, params=params, timeout=10
+        )
+
+        if response.status_code != 200:
+            raise Exception(
+                f"Failed to fetch sample file metadata for {filename}: HTTP {response.status_code}"
+            )
+
+        response_data = response.json()
+        sample_files = response_data.get("data", [])
+        if not sample_files:
+            raise Exception(f"Sample file {filename} not found")
+
+        sample_file = sample_files[0]
+        return sample_file.get("instrument_function_id") is None
+
+    except requests.exceptions.RequestException as e:
+        runtime.logger.error(
+            f"Failed to fetch sample file metadata for {filename}: {e}"
+        )
+        raise Exception(f"Failed to fetch sample file metadata: {e}") from e
+
+
 def delete_sample_file_by_filename(filename: str, access_token: str) -> bool:
     """Delete sample file from filestore by filename via HTTP request.
 
