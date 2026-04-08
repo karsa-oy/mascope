@@ -2,8 +2,8 @@
 from datetime import datetime, timedelta, timezone
 
 import numpy as np
-from scipy.stats import median_abs_deviation
 from scipy.signal import find_peaks
+from scipy.stats import median_abs_deviation
 
 import mascope_signal.compute as m_compute
 from mascope_backend.api.new.instrument_configs.schemas import (
@@ -17,6 +17,7 @@ from mascope_backend.file_converter.base_processor import (
     with_file_context,
 )
 from mascope_tofwerk.tofwerk import open_h5_file
+
 
 # Threshold factor for determining blank measurements based on noise level
 NOISE_THRESHOLD_FACTOR = 5
@@ -65,6 +66,9 @@ class H5Processor(BaseFileProcessor):
 
         # Compute noise level
         noise_mad = median_abs_deviation(peak_heights, scale="normal")
+        if noise_mad == 0:
+            # Only one peak, or the signal is saturated, or it's truly empty
+            return True
         noise_std = 1.4826 * noise_mad
         noise_threshold = noise_std * NOISE_THRESHOLD_FACTOR
 
