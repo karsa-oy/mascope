@@ -61,15 +61,13 @@ class PeakRecomputeWorker(Thread):
         auth: dict,
     ) -> None:
         """Emit a warning when manual peak detection is requested for a blank sample."""
-        warning_message = "No peaks found."
         self.socket_client.emit(
-            "peak_detection_error",
+            "peak_detection_warning",
             {
                 "filename": filename,
                 "sample_file_id": sample_file_id,
                 "process_id": process_id,
-                "error": warning_message,
-                "status": "warning",
+                "message": "No peaks found.",
             },
             auth,
         )

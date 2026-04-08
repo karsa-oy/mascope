@@ -146,43 +146,57 @@ async def peak_detection_complete(sid, data):
 
 @sio.event(namespace="/file-converter")
 @file_converter_socket_auth(minimum_role="editor")
+async def peak_detection_warning(sid, data):
+    """Handle peak detection warning events from the file converter service.
+
+    Emitted for non-fatal conditions such as blank samples or duplicate
+    requests that were rejected by the peak detection guard.
+    """
+    user_id = data.get("user_id")
+    filename = data.get("filename")
+    sample_file_id = data.get("sample_file_id")
+    process_id = data.get("process_id")
+    warning_message = data.get("message", "Peak detection could not be completed.")
+
+    notification = UserNotification(
+        process_id=process_id,
+        type="compute_sample_file_peaks",
+        status="warning",
+        message=warning_message,
+        data={
+            "filename": filename,
+            "sample_file_id": sample_file_id,
+        },
+    )
+
+    await emit_user_notification(notification=notification, user_id=user_id)
+
+
+@sio.event(namespace="/file-converter")
+@file_converter_socket_auth(minimum_role="editor")
 async def peak_detection_error(sid, data):
     """Handle peak detection error events from the file converter service.
 
-    Emitted when a delegated peak detection fails or is rejected
-    (as repeated for the same sample file).
+    Emitted when peak detection raises an unexpected exception.
     """
     user_id = data.get("user_id")
     filename = data.get("filename")
     sample_file_id = data.get("sample_file_id")
     process_id = data.get("process_id")
     error_message = data.get("error", "Unknown peak detection error")
-    status = data.get("status", "error")
 
-    if status == "warning":
-        notification = UserNotification(
-            process_id=process_id,
-            type="compute_sample_file_peaks",
-            status="warning",
-            message=error_message,
-            data={
-                "filename": filename,
-                "sample_file_id": sample_file_id,
-            },
-        )
-    else:
-        notification = UserNotification(
-            process_id=process_id,
-            type="compute_sample_file_peaks",
-            status="error",
-            message=f"Peak detection failed for '{filename}': {error_message}",
-            data={
-                "filename": filename,
-                "sample_file_id": sample_file_id,
-            },
-            error={
-                "message": error_message,
-            },
-        )
+    notification = UserNotification(
+        process_id=process_id,
+        type="compute_sample_file_peaks",
+        status="error",
+        message=f"Peak detection failed for '{filename}': {error_message}",
+        data={
+            "filename": filename,
+            "sample_file_id": sample_file_id,
+        },
+        error={
+            "message": error_message,
+        },
+    )
 
     await emit_user_notification(notification=notification, user_id=user_id)

@@ -62,13 +62,12 @@ class SocketEventHandler:
                 if not is_acquired:
                     runtime.logger.warning(failure_reason)
                     self.client.sio.emit(
-                        "peak_detection_error",
+                        "peak_detection_warning",
                         {
                             "filename": filename,
                             "sample_file_id": data.get("sample_file_id"),
                             "process_id": data.get("process_id"),
-                            "error": failure_reason,
-                            "status": "warning",
+                            "message": failure_reason,
                             "access_token": data.get("access_token"),
                             "user_id": data.get("user_id"),
                         },
