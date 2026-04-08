@@ -561,6 +561,7 @@ class TofCalibrationHandler(BaseCalibrationHandler):
             self.fit_result = None
             self.stats = None
             self.warning = "The sample file has no peaks."
+            return
 
         _, tic_per_scan = m_compute.get_tic_per_scan(self.filename)
         tic = np.sum(tic_per_scan)
@@ -732,6 +733,7 @@ class OrbiCalibrationHandler(BaseCalibrationHandler):
             self.fit_result = None
             self.stats = None
             self.warning = "The sample file has no peaks."
+            return
 
         match_isotope_df, good_matches_df = await self._match_calibration_compounds()
 
