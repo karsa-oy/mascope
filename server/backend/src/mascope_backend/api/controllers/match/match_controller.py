@@ -61,11 +61,11 @@ from mascope_backend.socket.notifications import (
 )
 
 
-def _requires_mz_calibration_verification(sample: Sample) -> bool:
-    """Return whether m/z calibration verification gate applies to this sample."""
+def _is_blank_sample(sample: Sample) -> bool:
+    """Return whether the sample is blank (has no peaks)."""
     # Blank samples are created without an instrument config and should not be
     # blocked by m/z calibration verification.
-    return sample.instrument_function_id is not None
+    return sample.instrument_function_id is None
 
 
 # -------------------------------------------------------------------
@@ -348,16 +348,28 @@ async def match_compute_sample(
     # -- Gather sample information
     sample = await fetch_sample(sample_item_id)
 
+    if _is_blank_sample(sample):
+        # Early exit for samples with no peaks (blank samples)
+        warning_message = (
+            f"Sample '{sample.sample_item_name}' has no peaks. Matching is skipped."
+        )
+        raise_api_warning(warning_message, {"sample_item_id": sample_item_id})
+        return {
+            "status": "skipped",
+            "message": warning_message,
+            "_notification_data": {
+                "sample_batch_id": sample.sample_batch_id,
+                "sample_item_id": sample_item_id,
+            },
+        }
+
     # -- Check if m/z calibration is verified for the sample
     # TODO_calibration split on orbi/tof?
-    if _requires_mz_calibration_verification(sample):
-        verified = (
-            sample.mz_calibration.get("verified", False)
-            if sample.mz_calibration is not None
-            else True
-        )
-    else:
-        verified = True
+    verified = (
+        sample.mz_calibration.get("verified", False)
+        if sample.mz_calibration is not None
+        else True
+    )
 
     if not verified:
         warning_message = f"m/z calibration is not verified for sample file: {sample.filename}. Please try to calibrate the file."
@@ -1109,11 +1121,16 @@ async def match_compute_batch(
             runtime.logger.info(
                 f"Computing match isotopes for sample {item_index + 1}/{total_samples_count}: '{sample.sample_item_name}'"
             )
+            if _is_blank_sample(sample):
+                # Skip matching for blank samples
+                skipped_samples.append(sample.sample_item_id)
+                runtime.logger.debug(
+                    f"Skipped blank sample '{sample.sample_item_name}' with ID '{sample.sample_item_id}'."
+                )
+                continue
             # Check if m/z calibration (if exists) is verified for the sample
-            if (
-                _requires_mz_calibration_verification(sample)
-                and sample.mz_calibration
-                and not sample.mz_calibration.get("verified", False)
+            if sample.mz_calibration and not sample.mz_calibration.get(
+                "verified", False
             ):
                 skipped_samples.append(sample.sample_item_id)
                 runtime.logger.debug(
