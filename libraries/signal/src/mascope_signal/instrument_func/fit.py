@@ -223,7 +223,7 @@ def _process_peak_shapes(
         try:
             p_fwhm = _calculate_fwhm(p_mz_norm, p_spec_norm_fit)
             p_sigma = p_fwhm / SIGMA_MULTIPLIER
-        except Exception:
+        except ValueError:
             continue
 
         # Scale peak to width sigma=1
@@ -342,15 +342,16 @@ def _calculate_center_of_mass(x: np.ndarray, y: np.ndarray) -> float:
     return center_of_mass
 
 
-def _calculate_fwhm(x: np.ndarray, y: np.ndarray) -> float | None:
+def _calculate_fwhm(x: np.ndarray, y: np.ndarray) -> float:
     """Calculate FWHM of the peak
 
     :param x: Array of x-values of the peak
     :type x: np.ndarray
     :param y: Array of y-values of the peak
     :type y: np.ndarray
+    :raises ValueError: If half maximum is not crossed on both sides of the peak
     :return: FWHM value
-    :rtype: float | None
+    :rtype: float
     """
     peak_index = np.argmax(y)
     peak_value = y[peak_index]
@@ -377,7 +378,9 @@ def _calculate_fwhm(x: np.ndarray, y: np.ndarray) -> float | None:
 
         fwhm = x_right - x_left
     else:
-        fwhm = None
+        raise ValueError(
+            "Cannot calculate FWHM: half maximum not crossed on both sides of the peak"
+        )
 
     return fwhm
 
@@ -389,11 +392,11 @@ def _calculate_peakshape(p_x: np.ndarray, p_ys: np.ndarray) -> tuple:
     :type p_x: np.ndarray
     :param p_ys: 2D array where each row represents the y-values of a peak
     :type p_ys: np.ndarray
+    :raises ValueError: If the median peak shape is empty (all NaN values)
     :return: Tuple with dictionaries containing x and y values of the median peak shape
              and statistics
     :rtype: tuple
     """
-    stats = {}
     num_of_peaks = len(p_ys)
     if num_of_peaks < 10:
         runtime.logger.warning(
@@ -406,9 +409,11 @@ def _calculate_peakshape(p_x: np.ndarray, p_ys: np.ndarray) -> tuple:
     # Calculate median peak shape
     p_median = np.median(np.array([p_y for p_y in p_ys]), axis=0)
 
-    # Check if p_median is empty
-    if p_median.all() == np.nan:
-        runtime.logger.error("Median peak shape is empty")
+    is_peak_shape_empty = np.all(np.isnan(p_median))
+    if is_peak_shape_empty:
+        raise ValueError(
+            "Failed to compute instrument functions: median peak shape is empty"
+        )
 
     # Shift x-values so that the max y is at x=0
     max_index = np.argmax(p_median)
