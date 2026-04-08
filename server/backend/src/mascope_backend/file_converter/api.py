@@ -169,7 +169,7 @@ def check_sample_file_db_record(filename: str, access_token: str) -> bool:
 
 
 def is_blank_sample_file(filename: str, access_token: str) -> bool:
-    """Return whether the sample file is a blank measurement.
+    """Return whether the sample file is a blank measurement (has no peaks).
 
     Blank files are persisted without an instrument_function_id.
 

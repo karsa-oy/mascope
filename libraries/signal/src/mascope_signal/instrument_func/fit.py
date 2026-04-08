@@ -27,9 +27,9 @@ def r_tof(mz: float | np.ndarray, a: float, b: float):
 
     :param mz: mz value(-s)
     :type mz: float or ndarray
-    :param a: imperical coefficient
+    :param a: empirical coefficient
     :type a: float
-    :param b: imperical coefficient
+    :param b: empirical coefficient
     :type b: float
     :return: resolution function value(-s)
     :rtype: float or ndarray
@@ -45,7 +45,7 @@ def r_orbi(
 
     :param mz: mz value(-s)
     :type mz: float or ndarray
-    :param a: imperical coefficient
+    :param a: empirical coefficient
     :type a: float
     :return: resolution function value(-s)
     :rtype: float or ndarray
@@ -383,13 +383,14 @@ def _calculate_fwhm(x: np.ndarray, y: np.ndarray) -> float | None:
 
 
 def _calculate_peakshape(p_x: np.ndarray, p_ys: np.ndarray) -> tuple:
-    """Calculate the meadian peak shape array from a 2D array of peaks
+    """Calculate the median peak shape array from a 2D array of peaks
 
     :param p_x: array of normalized x-values corresponding to the peaks
     :type p_x: np.ndarray
     :param p_ys: 2D array where each row represents the y-values of a peak
     :type p_ys: np.ndarray
-    :return: Tuple with dictionaries containing x and y values of the median peak shape and statistics
+    :return: Tuple with dictionaries containing x and y values of the median peak shape
+             and statistics
     :rtype: tuple
     """
     stats = {}

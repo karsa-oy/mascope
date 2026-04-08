@@ -20,7 +20,12 @@ FILE_UPLOAD_SIZE_LIMIT = 2.5 * 1024**3  # 2.5 GB
 
 class SampleFileBase(BaseModel):
     instrument_function_id: str | None = Field(
-        None, description="ID of the instrument config used for processing this file"
+        None,
+        description=(
+            "ID of the instrument config used for processing this file. "
+            "None values means the sample file is blank "
+            "(has no peaks to compute the instrument function from)."
+        ),
     )
     filename: str = Field(..., description="Name of the sample file")
     instrument: str = Field(..., description="Instrument associated with the file")
