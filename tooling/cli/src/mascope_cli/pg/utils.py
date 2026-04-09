@@ -26,7 +26,6 @@ def check_prerequisites(mode: str) -> bool:
 
     Checks performed:
     - Database section present in resolved config.
-    - Database type is `postgres`.
     - Docker daemon is running (checked via `docker info`).
 
     :param mode: Runtime mode, `"dev"` or `"prod"`. Used only for
@@ -36,15 +35,8 @@ def check_prerequisites(mode: str) -> bool:
     :return: `True` if all checks pass, `False` otherwise.
     :rtype: bool
     """
-    if not (db_cfg := runtime.full_config.backend.database):
+    if not runtime.full_config.backend.database:
         runtime.logger.warning("Database not configured in .mascope.toml")
-        return False
-
-    if db_cfg.type != "postgres":
-        runtime.logger.warning(
-            f"Database type is '{db_cfg.type}', not 'postgres' — "
-            f"mascope {mode} db commands require PostgreSQL"
-        )
         return False
 
     if not is_docker_running():

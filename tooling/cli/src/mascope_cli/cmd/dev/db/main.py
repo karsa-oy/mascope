@@ -157,7 +157,6 @@ def status() -> None:
 
     # Display PostgreSQL configuration
     runtime.logger.info("\n=== Database Configuration ===")
-    runtime.logger.info(f"Type: {db_cfg.type}")
     runtime.logger.info(f"Host: {db_cfg.host}")
     runtime.logger.info(f"Port: {db_cfg.port}")
     runtime.logger.info(f"User: {db_cfg.user}")

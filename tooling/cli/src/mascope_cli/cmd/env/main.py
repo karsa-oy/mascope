@@ -3,8 +3,8 @@ Runtime environment management commands.
 
 Provides commands to list, activate, and sync Mascope runtime environments.
 Environments are named directories under `{MASCOPE_PATH}/.runtime/env/`,
-each containing all state required to run Mascope services (sqlite database,
-filestore, streaming folders).
+each containing all state required to run Mascope services (filestore,
+streaming folders).
 """
 
 from contextlib import nullcontext
@@ -40,7 +40,7 @@ def main():
 
     Runtime envs are folders in the `.runtime/env` directory under your
     `MASCOPE_PATH`. They contain all the state needed to run Mascope apps
-    and/or services, e.g. the sqlite database, file stores, and file streaming folders.
+    and/or services, e.g. file stores or file streaming folders.
     """
 
 

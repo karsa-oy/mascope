@@ -106,7 +106,6 @@ def status() -> None:
     db_cfg = runtime.full_config.backend.database
 
     runtime.logger.info("\n=== Database Configuration ===")
-    runtime.logger.info(f"Type: {db_cfg.type}")
     runtime.logger.info(f"User: {db_cfg.user}")
     runtime.logger.info(
         f"DB name: {db_cfg.get_postgres_database_name(runtime.env.name)}"

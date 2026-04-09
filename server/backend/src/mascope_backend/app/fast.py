@@ -21,10 +21,9 @@ from mascope_backend.api.controllers.workspace.acquisition.service import (
 from mascope_backend.api.lib.exceptions.api_exceptions import handle_exception
 from mascope_backend.api.routes import routers
 from mascope_backend.db import init_db
-from mascope_backend.db.ops.batch.reset_processing_status import (
+from mascope_backend.db.admin.batch.reset_processing_status import (
     reset_stuck_processing_batches,
 )
-from mascope_backend.db.wal.engine import wal_checkpoint
 from mascope_backend.runtime import runtime
 from mascope_backend.socket.storage import redis_storage_client
 
@@ -45,7 +44,6 @@ async def lifespan(app: FastAPI):
 
     Worker shutdown tasks:
     - Disconnect Redis client
-    - Perform WAL checkpoint
 
     :param app: FastAPI application instance
     :raises ConnectionError: If Redis connection fails (non-fatal, logged as warning)
@@ -88,8 +86,6 @@ async def lifespan(app: FastAPI):
         f"Fast App shutdown: closing Redis storage client [Worker {worker_pid}]"
     )
     await redis_storage_client.disconnect()
-
-    await wal_checkpoint()
 
 
 # Initialize FastAPI with the lifespan

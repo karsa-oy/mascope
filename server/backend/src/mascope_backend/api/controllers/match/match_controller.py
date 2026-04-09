@@ -53,7 +53,6 @@ from mascope_backend.db import (
     async_session,
 )
 from mascope_backend.db.id import gen_id
-from mascope_backend.db.wal.engine import wal_checkpoint
 from mascope_backend.runtime import runtime
 from mascope_backend.socket.notifications import (
     UserNotification,
@@ -927,13 +926,12 @@ async def rematch_batch(
                     f"Unexpected rematch_batch status combination: remove={remove_status}, compute={compute_status}"
                 )
 
-        # Update batch status and WAL checkpoint
+        # Update batch status
         await update_sample_batch_status(
             sample_batch_ids=[sample_batch_id],
             status=result_batch_status,
             independent_transaction=True,  # reload UI status icons
         )
-        await wal_checkpoint()
 
         # Step 6: Log final outcome and return structured response
         runtime.logger.info(

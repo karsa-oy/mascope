@@ -345,14 +345,12 @@ def run(
         runtime.logger.error("Redis failed to start")
         raise typer.Exit(1)
 
-    db_cfg = runtime.full_config.backend.database
-    if db_cfg.type == "postgres":
-        if not wait_for_server(max_wait=30):
-            runtime.logger.error("PostgreSQL server failed to start")
-            raise typer.Exit(1)
+    if not wait_for_server(max_wait=30):
+        runtime.logger.error("PostgreSQL server failed to start")
+        raise typer.Exit(1)
 
     # --- migrations (if backend selected + PostgreSQL) ---
-    if backend_selected and db_cfg.type == "postgres":
+    if backend_selected:
         runtime.logger.info("Checking database...")
         if not create_database():
             runtime.logger.error("Failed to create database")

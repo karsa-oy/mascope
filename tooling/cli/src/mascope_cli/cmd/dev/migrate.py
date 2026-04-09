@@ -33,14 +33,8 @@ def _check_prerequisites() -> bool:
 
     :return: True if PostgreSQL configured
     """
-    if not (db_cfg := runtime.full_config.backend.database):
+    if not runtime.full_config.backend.database:
         runtime.logger.warning("Database not configured in .mascope.toml")
-        return False
-
-    if db_cfg.type != "postgres":
-        runtime.logger.warning(
-            f"Migrations only available for PostgreSQL (current: {db_cfg.type})"
-        )
         return False
 
     return True
@@ -94,10 +88,8 @@ def check_pending_migrations() -> bool:
             return False  # No migrations defined
 
         # Get current revision from database
-
         db_cfg = runtime.full_config.backend.database
-        if not db_cfg or db_cfg.type != "postgres":
-            return False
+
         postgres_password = runtime.secret(
             "POSTGRES_PASSWORD_FILE", "postgres_password.txt"
         )

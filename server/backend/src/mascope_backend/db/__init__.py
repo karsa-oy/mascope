@@ -1,7 +1,7 @@
 """
 Database initialization and configuration module.
 
-This module handles SQLite database connection setup, session management,
+This module handles PostgreSQL database connection setup, session management,
 and initialization procedures including schema migrations.
 
 Exports:
@@ -11,16 +11,15 @@ Exports:
 """
 
 import asyncio
+import os
 from typing import AsyncGenerator
 
-from sqlalchemy import event, text
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from mascope_backend.db import models
-from mascope_backend.db.migration_manager import check_db_migration
 from mascope_backend.db.models import *  # noqa: F403, F401 - re-export models
 from mascope_backend.db.secrets import postgres_password
-from mascope_backend.db.utils import get_current_db_version
 from mascope_backend.db.views import Sample
 from mascope_backend.runtime import runtime
 
@@ -34,38 +33,18 @@ db_semaphore = asyncio.Semaphore(db_cfg.pool_size)
 
 
 # Database configuration and session management
-async def configure_database_engine(
-    version: int | None = None,
-    db_type: str | None = None,
-):
+async def configure_database_engine():
     """
-    Configures the database engine based on type and sets up the
-    global session maker using SQLAlchemy's async_sessionmaker.
-    This function is called during initialization to establish
-    a connection with the database.
-
-    :param version: Required for SQLite, ignored for PostgreSQL
-    :param db_type: Override configured type (for explicit control)
+    Configure the PostgreSQL async engine and global session maker
+    using SQLAlchemy's async_sessionmaker.
+    This function is called during initialization (once per worker during startup)
+    to establish a connection with the database.
     """
-    # Use explicit type or fall back to config
-    engine_type = db_type or db_cfg.type
-    database_url = ""
-    if engine_type == "sqlite":
-        if version is None:
-            raise ValueError("SQLite requires version parameter")
-
-        database_url = db_cfg.get_sqlite_url(version=version)
-        runtime.logger.info(
-            f"Using SQLite v{version} at {db_cfg.get_sqlite_path(version)}"
-        )
-    if engine_type == "postgres":
-        database_url = db_cfg.get_postgres_url(
-            password=postgres_password, env_name=runtime.env.name
-        )
-        db_name = db_cfg.get_postgres_database_name(env_name=runtime.env.name)
-        runtime.logger.info(
-            f"Using PostgreSQL at {db_cfg.host}:{db_cfg.port}/{db_name}"
-        )
+    database_url = db_cfg.get_postgres_url(
+        password=postgres_password, env_name=runtime.env.name
+    )
+    db_name = db_cfg.get_postgres_database_name(env_name=runtime.env.name)
+    runtime.logger.info(f"Using PostgreSQL at {db_cfg.host}:{db_cfg.port}/{db_name}")
 
     trace_mode = runtime.config.log_level.lower() == "trace"
 
@@ -76,18 +55,7 @@ async def configure_database_engine(
         pool_size=db_cfg.pool_size,
         max_overflow=db_cfg.max_overflow,
         pool_timeout=db_cfg.pool_timeout,
-        connect_args=db_cfg.get_connect_args() if engine_type == "sqlite" else {},
     )
-
-    # Enable foreign keys for every SQLite connection, for PostgreSQL it's default
-    if engine_type == "sqlite":
-
-        @event.listens_for(engine.sync_engine, "connect")
-        def _set_sqlite_pragma(dbapi_conn, connection_record):
-            """Enable foreign key constraints for this connection."""
-            cursor = dbapi_conn.cursor()
-            cursor.execute("PRAGMA foreign_keys=ON")
-            cursor.close()
 
     # Define the global session maker using async_sessionmaker
     global ASYNC_SESSION_MAKER
@@ -168,17 +136,8 @@ async def init_db():
     :raises Exception: If engine configuration or connection test fails
     """
     try:
-        if db_cfg.type == "sqlite":
-            current_version = get_current_db_version()
-            await configure_database_engine(version=current_version)
-        elif db_cfg.type == "postgres":
-            await configure_database_engine()
-
+        await configure_database_engine()
         await _test_database_connection()
-
-        await _check_async_wal_status()
-
-        # Log pool configuration for debugging
         _log_pool_configuration()
     except Exception as error:
         runtime.logger.error(f"Database initialization error: {error}")
@@ -187,58 +146,24 @@ async def init_db():
 
 async def _test_database_connection():
     """
-    Test the database connection by executing a simple query.
+    Test connection and log PostgreSQL version.
 
     :raises Exception: If the connection cannot be established
     """
     try:
-        # Test basic connection
         async with async_session() as session:
-            await session.execute(text("SELECT 1"))
-        runtime.logger.info("Database connection established successfully.")
+            result = await session.execute(text("SELECT version()"))
+            pg_version = result.scalar()
+            runtime.logger.info(
+                f"PostgreSQL connection established successfully. Version: {pg_version}"
+            )
 
-        # Database-specific checks
-        if db_cfg.type == "sqlite":
-            async with async_session() as session:
-                result = await session.execute(text("PRAGMA foreign_keys"))
-                fk_status = "enabled" if result.scalar() == 1 else "disabled"
-                runtime.logger.debug(f"SQLite foreign keys status: {fk_status}")
-        else:  # postgres
-            async with async_session() as session:
-                result = await session.execute(text("SELECT version()"))
-                pg_version = result.scalar()
-                runtime.logger.debug(f"PostgreSQL version: {pg_version}")
-
-                # Test list databases
-                result = await session.execute(text("SELECT datname FROM pg_database"))
-                databases = [row[0] for row in result.fetchall()]
-                runtime.logger.debug(f"Available databases: {databases}\n")
-
+            result = await session.execute(text("SELECT datname FROM pg_database"))
+            databases = [row[0] for row in result.fetchall()]
+            runtime.logger.debug(f"Available databases: {databases}")
     except Exception as e:
-        runtime.logger.error(f"Error while establishing the database connection: {e}")
+        runtime.logger.error(f"Database connection failed: {e}")
         raise
-
-
-async def _check_async_wal_status():
-    """
-    Check WAL status using configured SQLAlchemy async session.
-    """
-    try:
-        if db_cfg.type == "sqlite":
-            async with async_session() as session:
-                journal_mode = (
-                    await session.execute(text("PRAGMA journal_mode"))
-                ).scalar()
-                busy_timeout = (
-                    await session.execute(text("PRAGMA busy_timeout"))
-                ).scalar()
-
-                runtime.logger.debug(
-                    f"Database WAL status: journal mode - {journal_mode}, busy timeout - {busy_timeout}ms"
-                )
-    # PostgreSQL doesn't need WAL checks (it's always WAL)
-    except Exception as e:
-        runtime.logger.error(f"Error checking database status: {e}")
 
 
 def _log_pool_configuration():
@@ -263,8 +188,6 @@ __all__ = [
     "async_session",
     "get_async_session",
     "init_db",
-    # Migration manager
-    "check_db_migration",
     # Views
     "Sample",
     # Models (dynamically included from models.__all__)
