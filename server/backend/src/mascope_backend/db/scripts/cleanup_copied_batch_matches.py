@@ -27,8 +27,7 @@ from mascope_backend.api.controllers.match.targets.batch.match_targets_batch_con
     get_batch_data,
 )
 from mascope_backend.db import SampleBatch, async_session, configure_database_engine
-from mascope_backend.db.ops.match.remove_batch_matches import remove_batch_matches
-from mascope_backend.db.utils import get_current_db_version
+from mascope_backend.db.admin.match.remove_batch_matches import remove_batch_matches
 from mascope_backend.runtime import runtime
 
 
@@ -121,38 +120,13 @@ def display_batch_summary(batches: list[dict]) -> None:
     )
 
 
-def get_user_confirmation() -> bool:
-    """
-    Prompt user for confirmation to proceed with cleanup.
-
-    :return: True if user confirms, False otherwise
-    """
-    print(
-        "WARNING: This will remove all match data from the above batches and set them to 'rematch' status."
-    )
-
-    while True:
-        response = input("Proceed with cleanup? (yes/no): ").strip().lower()
-        if response in ("yes", "y"):
-            return True
-        if response in ("no", "n"):
-            return False
-        print("Please answer 'yes' or 'no'")
-
-
 async def run_cleanup(workspace_id: str | None = None) -> None:
     """
     Main cleanup logic: find batches, confirm, and remove matches.
 
     :param workspace_id: Optional workspace ID to limit scope
     """
-    current_db_version = get_current_db_version()
-    if current_db_version is None:
-        runtime.logger.error("No database found. Please create a database first.")
-        return
-
-    await configure_database_engine(current_db_version)
-    runtime.logger.info(f"Connected to database v{current_db_version}")
+    await configure_database_engine()
 
     batches = await find_copied_batches(workspace_id=workspace_id)
 
@@ -163,10 +137,6 @@ async def run_cleanup(workspace_id: str | None = None) -> None:
         return
 
     display_batch_summary(batches)
-
-    if not get_user_confirmation():
-        runtime.logger.info("Cleanup cancelled by user")
-        return
 
     runtime.logger.info("Executing cleanup...")
     batch_ids = [b["sample_batch"]["sample_batch_id"] for b in batches]

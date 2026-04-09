@@ -7,22 +7,29 @@ Rules:
 - match_abundance_error NaN values remain unchanged
 
 Usage:
-    uv run python -m mascope_backend.db.scripts.sanitize_match_isotope_non_finite
+    mascope dev db script run sanitize_match_isotope_non_finite
+    mascope prod db script run sanitize_match_isotope_non_finite --yes
 
 Date: 2026-03-19
 """
 
 import asyncio
 
-from mascope_backend.db.ops.match.sanitize_match_isotope_non_finite import (
-    init_db_and_sanitize_match_isotope_non_finite,
+from mascope_backend.db import configure_database_engine
+from mascope_backend.db.admin.match.sanitize_match_isotope_non_finite import (
+    sanitize_match_isotope_non_finite,
 )
 from mascope_backend.runtime import runtime
 
 
 async def run_sanitize() -> None:
-    """Run match_isotope non-finite sanitation and log detailed summary."""
-    result = await init_db_and_sanitize_match_isotope_non_finite()
+    """
+    Initialize database and run match_isotope non-finite sanitation
+    and log detailed summary.
+    """
+    await configure_database_engine()
+
+    result = await sanitize_match_isotope_non_finite()
 
     runtime.logger.info("=" * 80)
     runtime.logger.info("MATCH_ISOTOPE SANITATION COMPLETE")

@@ -33,7 +33,7 @@ async def update_owners_superuser_rights() -> dict:
     async with async_session() as session:
         update_result = await session.execute(
             update(User)
-            .where(User.role_id == owner_role_id, User.is_superuser == 0)
+            .where(User.role_id == owner_role_id, ~User.is_superuser)
             .values(is_superuser=True)
         )
 

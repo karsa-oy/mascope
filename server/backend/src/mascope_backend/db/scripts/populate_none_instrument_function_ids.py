@@ -24,7 +24,6 @@ from mascope_backend.db import (
     configure_database_engine,
 )
 from mascope_backend.db.id import gen_id
-from mascope_backend.db.utils import get_current_db_version
 from mascope_backend.runtime import runtime
 
 
@@ -114,13 +113,7 @@ async def populate_none_instrument_function_ids() -> dict:
 
 async def run() -> None:
     """Initialise the database and run the backfill."""
-    current_db_version = get_current_db_version()
-    if current_db_version is None:
-        runtime.logger.error("No database found. Please create a database first.")
-        return
-
-    await configure_database_engine(current_db_version)
-    runtime.logger.info(f"Connected to database v{current_db_version}")
+    await configure_database_engine()
 
     result = await populate_none_instrument_function_ids()
 
