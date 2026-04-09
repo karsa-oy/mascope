@@ -19,6 +19,7 @@ import typer
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 
 from mascope_cli.cmd.dev.db.backup import backup_app
+from mascope_cli.cmd.dev.db.scripts import dev_db_scripts_app
 from mascope_cli.pg import (
     DatabaseExistsError,
     check_prerequisites,
@@ -37,6 +38,7 @@ from mascope_cli.runtime import runtime
 
 dev_db_app = typer.Typer()
 dev_db_app.add_typer(backup_app, name="backup")
+dev_db_app.add_typer(dev_db_scripts_app, name="script")
 
 _MODE = "dev"
 

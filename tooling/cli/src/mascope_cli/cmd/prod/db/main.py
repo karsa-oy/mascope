@@ -19,6 +19,7 @@ from typing import Annotated, Optional
 import typer
 
 from mascope_cli.cmd.prod.db.backup import backup_app
+from mascope_cli.cmd.prod.db.scripts import prod_db_scripts_app
 from mascope_cli.pg import (
     check_prerequisites,
     dirs,
@@ -38,6 +39,7 @@ from mascope_cli.runtime import runtime
 
 prod_db_app = typer.Typer()
 prod_db_app.add_typer(backup_app, name="backup")
+prod_db_app.add_typer(prod_db_scripts_app, name="script")
 
 _MODE = "prod"
 
