@@ -4,8 +4,8 @@ Maintenance script to clean invalid access tokens from the database.
 Removes tokens with NULL or disallowed service names.
 
 Usage:
-    mascope dev db script run clean-access-tokens
-    mascope prod db script run clean-access-tokens --yes
+    mascope dev db script run clean_access_tokens
+    mascope prod db script run clean_access_tokens
 
 Date: 2026-04-09
 """

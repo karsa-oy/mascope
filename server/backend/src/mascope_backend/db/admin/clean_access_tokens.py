@@ -23,9 +23,6 @@ async def clean_access_tokens() -> int:
     1. NULL service names
     2. Service names not in the allowed list
 
-    Assumes a database connection is already established.
-    Creates a backup before making changes.
-
     :return: Number of deleted tokens
     :rtype: int
     """

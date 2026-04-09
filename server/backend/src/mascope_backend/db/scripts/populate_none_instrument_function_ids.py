@@ -7,7 +7,8 @@ to find the most recent matching instrument config, creates a new InstrumentFunc
 row (copy) with a fresh ID, and assigns it to the sample file.
 
 Usage:
-    uv run python -m mascope_backend.db.scripts.populate_none_instrument_function_ids
+    mascope dev db script run populate_none_instrument_function_ids
+    mascope prod db script run populate_none_instrument_function_ids
 
 Date: 2026-04-01
 Issue: #1299

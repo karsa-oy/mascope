@@ -8,11 +8,11 @@ This script finds batches with 'copy' in their name, displays them for review,
 requests confirmation, then removes all match data and sets them to 'rematch' status.
 
 Usage:
-# Interactive cleanup
-uv run python -m mascope_backend.db.maintenance_scripts.cleanup_copied_batch_matches
+    mascope dev db script run cleanup_copied_batch_matches
 
-# Limit to specific workspace
-uv run python -m mascope_backend.db.maintenance_scripts.cleanup_copied_batch_matches --workspace abc123
+    # To limit to a specific workspace (optional):
+    mascope prod db script run cleanup_copied_batch_matches --workspace <workspace_id>
+
 
 Date: 2025-10-21
 Issue: #1170
