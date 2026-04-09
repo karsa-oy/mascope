@@ -146,12 +146,12 @@ def get_sum_signal(
 
             # Find the closest time points in the data to the provided time range
             closest_t_min = (
-                signal.time.sel(time=t_min, method="nearest").item()
+                signal.time.sel(time=t_min, method="nearest").compute().item()
                 if t_min is not None
                 else signal.time.min()
             )
             closest_t_max = (
-                signal.time.sel(time=t_max, method="nearest").item()
+                signal.time.sel(time=t_max, method="nearest").compute().item()
                 if t_max is not None
                 else signal.time.max()
             )

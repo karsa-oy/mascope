@@ -498,8 +498,10 @@ async def get_sample_peak_timeseries(
         }
     # Step 5: Filter sample file peaks to include times in filtered time_array and
     # select nearest to requested peak m/z
-    peak_timeseries = peaks.sel(time=time_array, method="nearest").sel(
-        mz=peak_mz, method="nearest"
+    peak_timeseries = (
+        peaks.sel(time=time_array, method="nearest")
+        .sel(mz=peak_mz, method="nearest")
+        .compute()
     )
 
     # Step 6: Validate m/z tolerance and return timeseries data

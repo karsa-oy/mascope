@@ -1114,7 +1114,7 @@ async def get_sample_file_peak_timeseries(
         raise NotFoundException(f"Sample file with name '{filename}' not found")
 
     # Step 3: From sample file peaks, select nearest to requested peak m/z
-    peak_timeseries = peaks.sel(mz=peak_mz, method="nearest")
+    peak_timeseries = peaks.sel(mz=peak_mz, method="nearest").compute()
     peak_mz_data = peak_timeseries.mz.item()
     # Calculate difference of the sample peak m/z to requested peak m/z
     mz_diff = peak_mz_data - peak_mz  # [Th]
