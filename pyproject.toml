@@ -23,7 +23,6 @@ dependencies = [
 [project.scripts]
 mascope = "mascope_cli.main:app"
 mascope-backend = "mascope_backend.main:exec"
-mascope-db = "mascope_backend.db.main:exec"
 
 [dependency-groups]
 dev = [
