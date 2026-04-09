@@ -91,9 +91,6 @@ services:
 
       # Mount filestore (matches resolved path in config)
       - ${MASCOPE_FILESTORE}:/app/.runtime/env/${MASCOPE_ENV:-default}/filestore
-
-      # Mount SQLite database (TODO temporary, for migrationin prod - remove after migration complete)
-      - ./.runtime/env/${MASCOPE_ENV:-default}/database:/app/.runtime/env/${MASCOPE_ENV:-default}/database
     environment:
       MASCOPE_ENV: ${MASCOPE_ENV}
       MASCOPE_LOGLEVEL: ${MASCOPE_LOGLEVEL}
