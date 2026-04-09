@@ -26,18 +26,10 @@ filestreams = './filestreams'
 run = "uv run mascope-backend run api-server"
 
 [backend.database]
-type = "sqlite"   # "sqlite" or "postgres"
-
-# Storage
-data_dir = "./database"  # Base path for all DB files (SQLite only: env./database/mascope.v43.db)
-
-# PostgreSQL connection (used when type="postgres")
+# PostgreSQL connection 
 database = "mascope"
 user = "mascope_user"
 port = 5432
-
-# Connection settings
-connection_timeout = 30
 
 # SQLAlchemy pool settings (per worker)
 pool_size = 3

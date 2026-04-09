@@ -10,12 +10,10 @@ workers = 1  # uvicorn workers ("auto" || int)
 log_level = "debug"
 
 [backend.database]
-type = "postgres"   # "sqlite" or "postgres"
-
-# Connection
+# PostgreSQL connection 
 host = "localhost"
 
-# Engine settings for single worker dev setup (higher pool size)
+# SQLAlchemy engine pool settings for single worker dev setup (higher pool size)
 pool_size = 5
 max_overflow = 10
 

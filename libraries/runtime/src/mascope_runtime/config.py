@@ -46,35 +46,25 @@ class MetaConfig(BaseModel):
 
 class DatabaseConfig(BaseModel):
     """
-    Database configuration settings.
+    PostgreSQL database configuration - connections, timeouts, and engine settings.
 
-    Centralized configuration for PostgreSQL database connections, timeouts, and engine settings.
-
-    NOTE: Connection pool settings are per-worker: with multiple workers setup need to be so
-    that the PostgreSQL max_connections (100 default) is above the total possible connections
-    from all workers.
+    NOTE: Connection pool settings are per-worker: total possible connections
+    across all workers must stay under PostgreSQL max_connections (default 100).
     """
 
-    # Database type selector
-    type: Literal["sqlite", "postgres"] = "sqlite"
-
-    # Storage paths (relative to runtime env)
-    data_dir: str = "./database"  # SQLite only: env./database/mascope.v43.db
-
     # PostgreSQL connection settings
-    host: str = "localhost"
+    host: str = "localhost"  # dev default, in prod the host is postgres container name
     port: int = 5432
     database: str = "mascope"  # Base name - actual will be mascope_{env}
     user: str = "mascope_user"  # password loaded via secret
 
-    # Container settings (PostgreSQL only)
-    container_name: str = "postgres"  # base name
+    # Container settings
+    container_name: str = (
+        "postgres"  # base name, actual will be mascope_{mode}_postgres
+    )
     # Mount base names — must match compose bind mount targets
     backups_mount: str = "backups"
     transfer_mount: str = "transfer"
-
-    # Connection timeout
-    connection_timeout: int = 30  # How long to wait when database is locked
 
     # SQLAlchemy connection pool settings (per worker)
     pool_size: int = 3  # Base pool size - persistent connections kept open per worker
@@ -88,36 +78,6 @@ class DatabaseConfig(BaseModel):
         True  # Health check connection before use (prevents stale connections)
     )
     expire_on_commit: bool = False  # Keep loaded objects accessible after commit
-
-    def get_sqlite_path(self, version: int) -> str:
-        """Get full path to SQLite database file."""
-        return os.path.join(self.data_dir, f"mascope.v{version}.db")
-
-    def get_sqlite_url(self, version: int) -> str:
-        """
-        Build SQLite async URL (aiosqlite driver).
-
-        :param version: Database schema version
-        :return: SQLite async connection URL
-        """
-        return f"sqlite+aiosqlite:///{self.get_sqlite_path(version)}"
-
-    def get_sqlite_url_sync(self, version: int) -> str:
-        """
-        Build SQLite sync URL (sqlite3 driver).
-
-        Used by Alembic for migrations.
-
-        :param version: Database schema version
-        :return: SQLite sync connection URL
-        """
-        return f"sqlite:///{self.get_sqlite_path(version)}"
-
-    def get_connect_args(self) -> dict:
-        """Get database-specific connect_args for engine."""
-        if self.type == "sqlite":
-            return {"timeout": self.connection_timeout}
-        return {}
 
     def get_postgres_container_name(self, mode: str) -> str:
         """
@@ -632,7 +592,6 @@ class RuntimeConfigLoader:
                         "database",
                         "log_path",
                         "source",
-                        "data_dir",
                     ]:
                         self.runtime.logger.trace(
                             f"Path resolved: {key}: '{value}' → '{resolved_path}'"

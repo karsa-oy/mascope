@@ -9,13 +9,11 @@
 workers = "auto" # uvicorn workers ("auto" || int)
 
 [backend.database]
-type = "sqlite"   # "sqlite" or "postgres"
-
-# Connection
+# PostgreSQL connection 
 host = "postgres"  # Docker Compose service name
 
-# Engine settings for multi-worker production
-# With auto workers (12 usually): pool_size=3, max_overflow=2 → 12 × 5 = 60 max connections
+# SQLAlchemy engine pool settings for multi-worker production
+# NOTE: With auto workers (12 usually): pool_size=3, max_overflow=2 → 12 × 5 = 60 max connections
 # Stays under PostgreSQL max_connections=100 default
 pool_size = 3
 max_overflow = 2
