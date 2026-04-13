@@ -81,8 +81,8 @@ def get_scan_timestamps(
 
 def get_sum_signal(
     base_filename: str,
-    t_min: float = None,
-    t_max: float = None,
+    t_min: float | None = None,
+    t_max: float | None = None,
     polarity: Literal["+", "-"] | None = None,
     average: bool = False,
 ) -> xr.DataArray:
@@ -315,7 +315,7 @@ def load_signal(
 ) -> xr.Dataset:
     """Load signal from the sample file
 
-    Suports m/z and time slicing.
+    Supports m/z and time slicing.
 
     :param base_filename: Sample file filename
     :type base_filename: str
@@ -846,3 +846,36 @@ def align_peak_collection(
     vlm_max_mz = vlm_corrector.points_mz.max()
 
     return aligned_peaks, vlm_min_mz, vlm_max_mz
+
+
+# --- TODO Refactoring to split logic for different sample types ---
+# This is a placeholder for future refactoring to improve maintainability
+class OrbiRawComputer:
+    pass
+
+
+class TofH5Computer:
+    pass
+
+
+class TofZarrComputer:
+    pass
+
+
+class OrbiZarrComputer:
+    pass
+
+
+def compute_factory(base_filename: str):
+    sample_type = m_name.get_sample_file_type(base_filename)
+    match sample_type:
+        case "orbi_raw":
+            return OrbiRawComputer()
+        case "tof_h5":
+            return TofH5Computer()
+        case "tof_zarr":
+            return TofZarrComputer()
+        case "orbi_zarr":
+            return OrbiZarrComputer()
+        case _:
+            raise NotImplementedError(f"Unsupported sample type: {sample_type}")
