@@ -68,8 +68,10 @@ def get_scan_timestamps(
                 # Load time coordinate from each group and concatenate
                 time_arrays = [z[group]["time"][:] for group in groups]
                 time_array = np.concatenate(time_arrays)
-                # Filter by time if t_min and/or t_max are provided
-                # Using epsilon to avoid floating point precision issues
+
+            # Filter by time if t_min and/or t_max are provided
+            # Using epsilon to avoid floating point precision issues
+            if time_array.size:
                 epsilon = np.finfo(np.float64).eps * max(time_array)
                 if t_min is not None:
                     time_array = time_array[time_array >= t_min - epsilon]
@@ -77,6 +79,33 @@ def get_scan_timestamps(
                     time_array = time_array[time_array <= t_max + epsilon]
 
             return time_array
+
+
+def _get_averaging_factor(
+    base_filename: str,
+    sample_type: str,
+    t_min: float | None,
+    t_max: float | None,
+    polarity: Literal["+", "-"] | None,
+) -> int:
+    """Get deterministic averaging factor for average=True paths."""
+    if sample_type in ("tof_zarr", "orbi_zarr"):
+        signal = load_signal(base_filename)
+        closest_t_min = (
+            signal.time.sel(time=t_min, method="nearest").compute().item()
+            if t_min is not None
+            else signal.time.min().compute().item()
+        )
+        closest_t_max = (
+            signal.time.sel(time=t_max, method="nearest").compute().item()
+            if t_max is not None
+            else signal.time.max().compute().item()
+        )
+        signal_slice = signal.sel(time=slice(closest_t_min, closest_t_max))
+        return signal_slice.sizes["time"]
+
+    time_coord = get_scan_timestamps(base_filename, t_min, t_max, polarity)
+    return time_coord.size
 
 
 def get_sum_signal(
@@ -103,12 +132,21 @@ def get_sum_signal(
     :rtype: xr.DataArray
     """
 
+    sample_type = m_name.get_sample_file_type(base_filename)
     cached_name = _get_sum_signal_hash_name(t_min, t_max, polarity)
+    averaging_factor = None
+    if average:
+        averaging_factor = _get_averaging_factor(
+            base_filename,
+            sample_type,
+            t_min,
+            t_max,
+            polarity,
+        )
+
     try:
         sum_signal = _get_cached_sum_signal(base_filename, cached_name)
         if average:
-            time_coord = get_scan_timestamps(base_filename, t_min, t_max, polarity)
-            averaging_factor = time_coord.size
             return sum_signal / averaging_factor
         return sum_signal
     except FileNotFoundError:
@@ -124,11 +162,10 @@ def get_sum_signal(
         )
 
     sample_path = m_name.parse_path_from_item_filename(base_filename)
-    sample_type = m_name.get_sample_file_type(base_filename)
     match sample_type:
         case "orbi_raw":
             datafile_path = os.path.join(sample_path, "data.raw")
-            sum_signal, averaging_factor = m_thermo.compute_sum_signal(
+            sum_signal, _ = m_thermo.compute_sum_signal(
                 datafile_path,
                 t_min=t_min,
                 t_max=t_max,
@@ -136,7 +173,7 @@ def get_sum_signal(
             )
         case "tof_h5":
             datafile_path = os.path.join(sample_path, "data.h5")
-            sum_signal, averaging_factor = m_tofwerk.compute_sum_signal(
+            sum_signal, _ = m_tofwerk.compute_sum_signal(
                 datafile_path,
                 t_min=t_min,
                 t_max=t_max,
@@ -160,9 +197,6 @@ def get_sum_signal(
             # Slice the dataset for the time range
             signal_slice = signal.sel(time=slice(closest_t_min, closest_t_max))
 
-            # Get the number of data points in the time coordinate
-            time_data_points = signal_slice.sizes["time"]
-
             # Interpolate missing values
             signal_slice = signal_slice.interpolate_na(dim="mz", method="linear")
             # Fill the remaining nan values with zeros if any
@@ -178,7 +212,6 @@ def get_sum_signal(
                 coords={"mz": signal_slice.mz},
                 name="sum_signal",
             )
-            averaging_factor = time_data_points
 
     if cached_name != "sum_signal":
         # Check if calibration factor is available in the sample file properties
@@ -210,11 +243,10 @@ def get_sum_signal(
     )
     if concurrent_sum_signal is not None:
         sum_signal = concurrent_sum_signal
-        if average:
-            time_coord = get_scan_timestamps(base_filename, t_min, t_max, polarity)
-            averaging_factor = time_coord.size
 
     if average:
+        if averaging_factor is None:
+            raise RuntimeError("Averaging factor was not initialized")
         return sum_signal / averaging_factor
 
     return sum_signal
