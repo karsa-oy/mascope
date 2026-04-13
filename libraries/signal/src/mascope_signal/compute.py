@@ -2,6 +2,7 @@ import asyncio
 import hashlib
 import json
 import os
+from contextlib import suppress
 from typing import Iterable, Literal
 
 import dask.array as da
@@ -202,17 +203,16 @@ def get_sum_signal(
                     sum_signal = sum_signal.assign_coords(mz=full_sum_signal_mz)
 
     # Save the computed sum signal to the sample file for future use
-    filename_sum_signal = m_name.filename_to_zarr_path(base_filename, cached_name)
-    runtime.logger.warning(f"Saving computed sum signal to {filename_sum_signal}")
-    try:
-        sum_signal.to_zarr(filename_sum_signal)
-    except FileNotFoundError as fe:
-        if ".partial" in str(fe):
-            raise Exception(
-                f"The path is probably too long: {filename_sum_signal}"
-            ) from fe
-        else:
-            raise
+    concurrent_sum_signal = _write_cached_sum_signal(
+        base_filename,
+        cached_name,
+        sum_signal,
+    )
+    if concurrent_sum_signal is not None:
+        sum_signal = concurrent_sum_signal
+        if average:
+            time_coord = get_scan_timestamps(base_filename, t_min, t_max, polarity)
+            averaging_factor = time_coord.size
 
     if average:
         return sum_signal / averaging_factor
@@ -238,6 +238,71 @@ def _get_cached_sum_signal(base_filename, cached_name):
     sample_file = m_io.load_file(base_filename, vars=[cached_name])
     sum_signal = sample_file.sum_signal
     return sum_signal
+
+
+def _try_get_cached_sum_signal(
+    base_filename: str,
+    cached_name: str,
+) -> xr.DataArray | None:
+    """Try to load cached sum signal, return None if it doesn't exist or
+    is inaccessible due to concurrent write."""
+    with suppress(FileNotFoundError, KeyError, AttributeError):
+        return _get_cached_sum_signal(base_filename, cached_name)
+    return None
+
+
+def _write_cached_sum_signal(
+    base_filename: str,
+    cached_name: str,
+    sum_signal: xr.DataArray,
+) -> xr.DataArray | None:
+    """Helper function to write the computed sum signal to the sample file with
+    concurrency handling. If another process has already written the sum signal
+    concurrently, it will load and return the existing cached sum signal.
+
+    :param base_filename: Sample file filename
+    :type base_filename: str
+    :param cached_name: The name to use for caching the sum signal
+    :type cached_name: str
+    :param sum_signal: The computed sum signal to cache
+    :type sum_signal: xr.DataArray
+    :return: The cached sum signal if it was created concurrently, otherwise None
+    :rtype: xr.DataArray | None
+    """
+    filename_sum_signal = m_name.filename_to_zarr_path(base_filename, cached_name)
+    runtime.logger.warning(f"Saving computed sum signal to {filename_sum_signal}")
+
+    synchronizer = m_io.get_zarr_synchronizer(filename_sum_signal)
+    write_lock = m_io.get_zarr_write_lock(filename_sum_signal)
+
+    with write_lock:
+        cached_sum_signal = _try_get_cached_sum_signal(base_filename, cached_name)
+        if cached_sum_signal is not None:
+            # Check cache -> it's there -> return it instead of writing
+            runtime.logger.debug(
+                f"Using existing cached sum signal at {filename_sum_signal}"
+            )
+            return cached_sum_signal
+
+        try:
+            sum_signal.to_zarr(filename_sum_signal, synchronizer=synchronizer)
+        except zarr.errors.ContainsGroupError:
+            # Someone else created it just before/during open_group
+            runtime.logger.debug(
+                f"Sum signal cache was created concurrently at {filename_sum_signal}"
+            )
+            cached_sum_signal = _try_get_cached_sum_signal(base_filename, cached_name)
+            if cached_sum_signal is not None:
+                return cached_sum_signal
+            raise
+        except FileNotFoundError as fe:
+            if ".partial" in str(fe):
+                raise Exception(
+                    f"The path is probably too long: {filename_sum_signal}"
+                ) from fe
+            raise
+
+    return None
 
 
 def load_signal(

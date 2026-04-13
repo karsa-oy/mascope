@@ -20,7 +20,7 @@ _zarr_write_locks: dict[str, threading.Lock] = {}
 _zarr_write_locks_lock = threading.Lock()
 
 
-def _get_zarr_write_lock(zarr_path: str) -> threading.Lock:
+def get_zarr_write_lock(zarr_path: str) -> threading.Lock:
     """Get or create a write lock for a specific zarr file.
 
     :param zarr_path: Path to the zarr file
@@ -443,7 +443,7 @@ async def _full_overwrite_peaks(
     :param peak_timeseries_path: Path to the zarr file
     :param synchronizer: Zarr synchronizer for process-safe access
     """
-    write_lock = _get_zarr_write_lock(peak_timeseries_path)
+    write_lock = get_zarr_write_lock(peak_timeseries_path)
 
     def _write():
         with write_lock:
@@ -514,7 +514,7 @@ async def _partial_update_peaks(
             task["subset_data"] = task["subset_data"].compute()
 
     # Get the write lock for this zarr file
-    write_lock = _get_zarr_write_lock(peak_timeseries_path)
+    write_lock = get_zarr_write_lock(peak_timeseries_path)
 
     def _write_all_chunks():
         """Write all chunks one by one under a single lock."""
