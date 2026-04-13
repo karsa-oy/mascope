@@ -43,6 +43,7 @@ class TestModule(str, Enum):
     MASCOPE_TOOLS = "tools"
     MASCOPE_FILE = "file"
     MASCOPE_MATCH = "match"
+    MASCOPE_SIGNAL = "signal"
     MASCOPE_THERMO = "thermo"
     ALL = "all"
 
@@ -109,6 +110,7 @@ def run(
             TestModule.MASCOPE_TOOLS,
             TestModule.MASCOPE_FILE,
             TestModule.MASCOPE_MATCH,
+            TestModule.MASCOPE_SIGNAL,
             TestModule.MASCOPE_THERMO,
         ):
             components = [TestComponent.LIBRARIES]
@@ -145,6 +147,7 @@ def run_backend_tests(
         TestModule.MASCOPE_TOOLS,
         TestModule.MASCOPE_FILE,
         TestModule.MASCOPE_MATCH,
+        TestModule.MASCOPE_SIGNAL,
         TestModule.MASCOPE_THERMO,
     ):
         typer.echo("Module belongs to libraries; running library tests instead.")
@@ -222,6 +225,8 @@ def run_library_tests(
             test_path = f"{test_path}file/"
         elif module == TestModule.MASCOPE_MATCH:
             test_path = f"{test_path}match/"
+        elif module == TestModule.MASCOPE_SIGNAL:
+            test_path = f"{test_path}signal/"
         elif module == TestModule.MASCOPE_THERMO:
             test_path = f"{test_path}thermo/"
         else:
@@ -292,6 +297,7 @@ def show():
     tools_tests_dir = os.path.join(libraries_root_dir, "tools", "tests")
     file_tests_dir = os.path.join(libraries_root_dir, "file", "tests")
     match_tests_dir = os.path.join(libraries_root_dir, "match", "tests")
+    signal_tests_dir = os.path.join(libraries_root_dir, "signal", "tests")
     thermo_tests_dir = os.path.join(libraries_root_dir, "thermo", "tests")
 
     # ----- Backend tests -----
@@ -397,6 +403,7 @@ def show():
     _show_library_section("libraries/tools/tests", tools_tests_dir)
     _show_library_section("libraries/file/tests", file_tests_dir)
     _show_library_section("libraries/match/tests", match_tests_dir)
+    _show_library_section("libraries/signal/tests", signal_tests_dir)
     _show_library_section("libraries/thermo/tests", thermo_tests_dir)
 
     typer.echo("\nUsage examples:")
@@ -407,4 +414,5 @@ def show():
     typer.echo("  mascope test run libraries -m tools    # Run Tools library tests")
     typer.echo("  mascope test run libraries -m file     # Run File library tests")
     typer.echo("  mascope test run libraries -m match    # Run Match library tests")
+    typer.echo("  mascope test run libraries -m signal   # Run Signal library tests")
     typer.echo("  mascope test run -n workspace_model    # Run specific test by name")
