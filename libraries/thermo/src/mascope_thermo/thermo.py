@@ -931,10 +931,19 @@ class RawFileMetadata:
             for timestamp, scan in zip(scan_times, scans):
                 centroid_scan = scan.CentroidScan
                 if centroid_scan is not None and centroid_scan.Length > 0:
-                    mzs = np.frombuffer(centroid_scan.Masses).tolist()
-                    intensities = np.frombuffer(centroid_scan.Intensities).tolist()
-                    resolutions = np.frombuffer(centroid_scan.Resolutions).tolist()
-                    noises = np.frombuffer(centroid_scan.Noises).tolist()
+                    mzs = np.frombuffer(centroid_scan.Masses)
+                    intensities = np.frombuffer(centroid_scan.Intensities)
+                    resolutions = np.frombuffer(centroid_scan.Resolutions)
+                    noises = np.frombuffer(centroid_scan.Noises)
+
+                    valid_resolution_mask = np.isfinite(resolutions) & (resolutions > 0)
+                    valid_intensity_mask = np.isfinite(intensities) & (intensities > 0)
+                    valid_mask = valid_resolution_mask & valid_intensity_mask
+
+                    mzs = mzs[valid_mask].tolist()
+                    intensities = intensities[valid_mask].tolist()
+                    resolutions = resolutions[valid_mask].tolist()
+                    noises = noises[valid_mask].tolist()
                 else:
                     mzs = []
                     intensities = []
