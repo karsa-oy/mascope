@@ -1,6 +1,13 @@
 import pytest
 
 from mascope_tools.composition.finder import replace_atom_with_isotope
+from mascope_tools.composition.models import CompositionFinderException
+from mascope_tools.composition.utils import (
+    combine_formula_and_ionization,
+    parse_atom_count_ranges,
+    parse_ionization,
+    to_hill_order,
+)
 
 
 def test_replace_atom_with_isotope():
@@ -34,3 +41,45 @@ def test_replace_atom_with_isotope():
     for ion, isotope_label in error_cases:
         with pytest.raises(ValueError):
             replace_atom_with_isotope(ion, isotope_label)
+
+
+def test_parse_atom_count_ranges_accepts_bracket_first_isotopes():
+    atoms = parse_atom_count_ranges("C0-50 H0-100 [15N]0-1 [13C]0-2")
+    symbols = [atom.symbol for atom in atoms]
+
+    assert symbols == ["C", "H", "[15N]", "[13C]"]
+    assert atoms[2].min_count == 0
+    assert atoms[2].max_count == 1
+    assert atoms[3].min_count == 0
+    assert atoms[3].max_count == 2
+
+
+def test_parse_atom_count_ranges_rejects_legacy_element_first_isotopes():
+    with pytest.raises(CompositionFinderException, match="Invalid isotope format"):
+        parse_atom_count_ranges("C0-50 H0-100 N[15]0-1")
+
+
+def test_parse_atom_count_ranges_rejects_malformed_tokens():
+    with pytest.raises(CompositionFinderException, match="Invalid element count range"):
+        parse_atom_count_ranges("C0-50 [15]0-1")
+
+
+def test_to_hill_order_places_isotopes_first():
+    formula = to_hill_order({"O": 3, "[15N]": 1})
+    assert formula == "[15N]O3"
+
+
+def test_to_hill_order_normalizes_element_first_isotope_keys():
+    formula = to_hill_order({"O": 3, "N[15]": 1})
+    assert formula == "[15N]O3"
+
+
+def test_to_hill_order_keeps_standard_hill_order_for_regular_elements():
+    formula = to_hill_order({"H": 12, "O": 6, "C": 6})
+    assert formula == "C6H12O6"
+
+
+def test_combine_formula_and_ionization_accepts_isotope_formula():
+    ionization_mechanism = parse_ionization("+")
+    ion_formula = combine_formula_and_ionization("[15N]O3", ionization_mechanism)
+    assert ion_formula == "[15N]O3+"
