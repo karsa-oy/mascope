@@ -75,22 +75,86 @@ const availableMechanisms = computed(() => {
 })
 
 // Mode operations
+// Mechanisms available for the currently edited mode's polarity
+const editAvailableMechanisms = computed(() => {
+  if (!edited.value?.ionization_mode_polarity) {
+    return []
+  }
+  return app.data.ionization.mechanism.list.filter(
+    (m) => m.ionization_mechanism_polarity === edited.value.ionization_mode_polarity
+  )
+})
+
+const editHasChanges = computed(() => {
+  if (!edited.value) return false
+  const e = edited.value
+  const o = e._original
+  return (
+    e.ionization_mode_name !== o.ionization_mode_name ||
+    e.ionization_mode_token !== o.ionization_mode_token ||
+    e.ionization_mode_polarity !== o.ionization_mode_polarity ||
+    JSON.stringify([...e.ionization_mechanism_ids].sort()) !==
+      JSON.stringify([...o.ionization_mechanism_ids].sort()) ||
+    e.calibration_collection_id !== o.calibration_collection_id ||
+    e.diagnostic_collection_id !== o.diagnostic_collection_id
+  )
+})
+
 const mode = {
   edit: (data) => {
     edited.value = {
       ionization_mode_id: data.ionization_mode_id,
       ionization_mode_name: data.ionization_mode_name,
       ionization_mode_token: data.ionization_mode_token,
+      ionization_mode_polarity: data.ionization_mode_polarity,
+      ionization_mechanism_ids: [...data.ionization_mechanism_ids],
       calibration_collection_id: data.calibration_collection_id,
-      diagnostic_collection_id: data.diagnostic_collection_id
+      diagnostic_collection_id: data.diagnostic_collection_id,
+      // Store original values to detect changes
+      _original: {
+        ionization_mode_name: data.ionization_mode_name,
+        ionization_mode_token: data.ionization_mode_token,
+        ionization_mode_polarity: data.ionization_mode_polarity,
+        ionization_mechanism_ids: [...data.ionization_mechanism_ids],
+        calibration_collection_id: data.calibration_collection_id,
+        diagnostic_collection_id: data.diagnostic_collection_id
+      }
     }
   },
   cancel: resetEdit,
   save: async () => {
-    if (edited.value) {
-      const { ionization_mode_id, ...updateData } = edited.value
+    if (!edited.value) return
+
+    const mechanismsChanged =
+      JSON.stringify([...edited.value.ionization_mechanism_ids].sort()) !==
+      JSON.stringify([...edited.value._original.ionization_mechanism_ids].sort())
+
+    const doSave = async () => {
+      const { ionization_mode_id, _original, ...updateData } = edited.value
       await app.data.ionization.mode.update(ionization_mode_id, updateData)
       resetEdit()
+    }
+
+    if (mechanismsChanged) {
+      confirm.require({
+        icon: 'pi pi-exclamation-triangle',
+        header: 'Confirm ionization mode update',
+        message:
+          'Changing the ionization mechanisms will affected all associated samples.' +
+          'Batches containing those samples will need to be re-matched. Do you want to proceed?',
+        accept: doSave,
+        acceptProps: {
+          icon: 'pi pi-check',
+          label: 'Update',
+          severity: 'warn'
+        },
+        rejectProps: {
+          label: 'Cancel',
+          severity: 'secondary'
+        }
+      })
+    } else {
+      await doSave()
     }
   },
   delete: (data) => {
@@ -123,6 +187,16 @@ watch(
   () => add.ionization_mode_polarity,
   () => {
     add.ionization_mechanism_ids = []
+  }
+)
+
+// Reset edited mechanisms when edited polarity changes
+watch(
+  () => edited.value?.ionization_mode_polarity,
+  (newVal, oldVal) => {
+    if (edited.value && oldVal && newVal !== oldVal) {
+      edited.value.ionization_mechanism_ids = []
+    }
   }
 )
 
@@ -305,13 +379,39 @@ defineExpose({
 
       <Column header="Polarity" style="width: 120px">
         <template #body="{ data }">
-          {{ data.ionization_mode_polarity }}
+          <Select
+            v-if="editing(data)"
+            v-model="edited.ionization_mode_polarity"
+            :options="polarityOptions"
+            optionLabel="label"
+            optionValue="value"
+            style="width: 100%"
+            v-tooltip="{
+              value: 'Changing polarity will reset mechanism selections',
+              showDelay: 500
+            }"
+          />
+          <span v-else>{{ data.ionization_mode_polarity }}</span>
         </template>
       </Column>
 
       <Column header="Mechanisms" style="min-width: 200px">
         <template #body="{ data }">
-          <div style="display: flex; flex-wrap: wrap; gap: 0.25rem">
+          <MultiSelect
+            v-if="editing(data)"
+            v-model="edited.ionization_mechanism_ids"
+            :options="editAvailableMechanisms"
+            :showToggleAll="false"
+            optionLabel="ionization_mechanism"
+            optionValue="ionization_mechanism_id"
+            style="width: 100%"
+            placeholder="Select mechanisms"
+            v-tooltip="{
+              value: 'Choose one or more ionization mechanisms for this mode',
+              showDelay: 500
+            }"
+          />
+          <div v-else style="display: flex; flex-wrap: wrap; gap: 0.25rem">
             <span
               v-for="mechanismId in data.ionization_mechanism_ids"
               :key="mechanismId"
@@ -401,6 +501,7 @@ defineExpose({
                 text
                 size="small"
                 severity="secondary"
+                :disabled="!edited?.ionization_mechanism_ids?.length || !editHasChanges"
                 @click="mode.save"
               />
             </template>
