@@ -654,7 +654,7 @@ async def delete_target_collection(
         assoc.target_compound_id for assoc in target_collection.target_compound
     }
 
-    # Query ionization modes that reference this collection (will be SET NULL on delete)
+    # Query ionization modes that reference this collection (deletion not allowed)
     async with async_session() as session:
         affected_modes_result = await session.execute(
             select(IonizationMode).where(
@@ -664,9 +664,19 @@ async def delete_target_collection(
                 )
             )
         )
+        affected_ionization_modes = list(affected_modes_result.scalars())
         affected_ionization_mode_ids = [
-            mode.ionization_mode_id for mode in affected_modes_result.scalars()
+            mode.ionization_mode_id for mode in affected_ionization_modes
         ]
+
+    # -- Block deletion if collection is used by any ionization mode --
+    if affected_ionization_modes:
+        mode_names = [mode.ionization_mode_name for mode in affected_ionization_modes]
+        raise ValueError(
+            f"Cannot delete collection '{target_collection.target_collection_name}' "
+            f"because it is used as a calibration or diagnostic collection by ionization mode(s): "
+            f"{', '.join(mode_names)}. Remove the association first."
+        )
 
     # -- Identify orphan compounds if their deletion is requested --
     orphan_compound_ids = []
