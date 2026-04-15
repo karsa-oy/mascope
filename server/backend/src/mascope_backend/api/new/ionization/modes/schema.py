@@ -11,17 +11,6 @@ class IonizationModeBaseValidator:
             raise ValueError('Polarity must be either "+" or "-"')
         return value
 
-    @field_validator("ionization_mechanism_ids")
-    @classmethod
-    def validate_ionization_mechanism_ids(cls, value: list[str]):
-        if not isinstance(value, list):
-            raise ValueError("ionization_mechanism_ids must be a list")
-        if not all(isinstance(item, str) for item in value):
-            raise ValueError("All items in ionization_mechanism_ids must be strings")
-        if not len(value):
-            raise ValueError("ionization_mechanism_ids must contain at least one ID")
-        return value
-
 
 class IonizationModeTokenValidator:
     @field_validator("ionization_mode_token")
@@ -51,7 +40,8 @@ class IonizationModeBase(
         ..., max_length=1, description="Polarity of the ionization mode (+ or -)"
     )
     ionization_mechanism_ids: list[str] = Field(
-        default_factory=list,
+        ...,
+        min_length=1,
         description="List of ionization mechanism IDs to apply for the scheme",
     )
     calibration_collection_id: str | None = Field(
@@ -91,7 +81,8 @@ class IonizationModeUpdate(
         ..., max_length=1, description="Polarity of the ionization mode (+ or -)"
     )
     ionization_mechanism_ids: list[str] = Field(
-        default_factory=list,
+        ...,
+        min_length=1,
         description="List of ionization mechanism IDs to apply for the scheme",
     )
     calibration_collection_id: str | None = Field(

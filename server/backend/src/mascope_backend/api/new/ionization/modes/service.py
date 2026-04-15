@@ -236,19 +236,31 @@ async def update_ionization_mode(
         new_polarity = update_data.get(
             "ionization_mode_polarity", ionization_mode.ionization_mode_polarity
         )
-        if new_mechanism_ids:
+        # Validate when either mechanisms or polarity is being updated
+        effective_mechanism_ids = (
+            new_mechanism_ids
+            if new_mechanism_ids is not None
+            else ionization_mode.ionization_mechanism_ids
+        )
+        if (
+            "ionization_mechanism_ids" in update_data
+            or "ionization_mode_polarity" in update_data
+        ):
             mechanisms_result = await session.execute(
                 select(IonizationMechanism).where(
-                    IonizationMechanism.ionization_mechanism_id.in_(new_mechanism_ids)
+                    IonizationMechanism.ionization_mechanism_id.in_(
+                        effective_mechanism_ids
+                    )
                 )
             )
             mechanisms = mechanisms_result.scalars().all()
-            found_ids = {m.ionization_mechanism_id for m in mechanisms}
-            missing = set(new_mechanism_ids) - found_ids
-            if missing:
-                raise ValueError(
-                    f"Ionization mechanism(s) not found: {', '.join(missing)}"
-                )
+            if new_mechanism_ids is not None:
+                found_ids = {m.ionization_mechanism_id for m in mechanisms}
+                missing = set(new_mechanism_ids) - found_ids
+                if missing:
+                    raise ValueError(
+                        f"Ionization mechanism(s) not found: {', '.join(missing)}"
+                    )
             mismatched = [
                 m.ionization_mechanism
                 for m in mechanisms
