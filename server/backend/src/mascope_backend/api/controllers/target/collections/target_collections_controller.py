@@ -38,7 +38,6 @@ from mascope_backend.db.id import gen_id
 from mascope_backend.runtime import runtime
 from mascope_backend.socket.records.service import (
     emit_record_reload,
-    emit_record_updated,
 )
 
 
@@ -665,9 +664,6 @@ async def delete_target_collection(
             )
         )
         affected_ionization_modes = list(affected_modes_result.scalars())
-        affected_ionization_mode_ids = [
-            mode.ionization_mode_id for mode in affected_ionization_modes
-        ]
 
     # -- Block deletion if collection is used by any ionization mode --
     if affected_ionization_modes:
@@ -726,17 +722,6 @@ async def delete_target_collection(
             except ApiException as e:
                 runtime.logger.warning(
                     f"Failed to delete orphan compound {compound_id}: {e.user_message}"
-                )
-
-    # -- Emit record updates for ionization modes (CASCADE SET NULL occurred) --
-    for ionization_mode_id in affected_ionization_mode_ids:
-        async with async_session() as session:
-            mode = await session.get(IonizationMode, ionization_mode_id)
-            if mode:
-                await emit_record_updated(
-                    record_type="ionization_mode",
-                    record_id=ionization_mode_id,
-                    record=mode.to_dict(),
                 )
 
     # -- Emit reload events for independent transactions --
