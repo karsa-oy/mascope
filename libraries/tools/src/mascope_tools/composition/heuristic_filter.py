@@ -162,8 +162,8 @@ HEURISTIC_RULES = [
 
 def apply_heuristic_rules(
     candidates: list[dict[str, Any]],
-    params: dict[str, Any] = None,
-) -> list[dict[str, Any]]:
+    params: dict[str, Any] | None = None,
+) -> tuple[list[dict[str, Any]], list[str]]:
     """
     Filter candidate formulas using the heuristic rules.
     Returns only those that pass all rules.

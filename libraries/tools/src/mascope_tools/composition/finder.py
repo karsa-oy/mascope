@@ -20,6 +20,7 @@ from mascope_tools.composition.heuristic_filter import (
 from mascope_tools.composition.models import (
     Atom,
     CompositionFinderWarning,
+    IonizationMechanism,
     Result,
     SearchContext,
 )
@@ -42,8 +43,10 @@ else:
 
 
 def assign_compositions(
-    peaks: pd.DataFrame, params: dict, heuristic_params: dict | None = None
-) -> pd.DataFrame:
+    peaks: pd.DataFrame,
+    params: dict[str, float | str | bool],
+    heuristic_params: dict[str, dict[str, tuple[float, float]]] | None = None,
+) -> tuple[pd.DataFrame, dict[float, list[str]]]:
     """Assign molecular compositions to a set of peaks.
 
     :param peaks: DataFrame with 'mz' and 'intensity' columns.
@@ -53,7 +56,7 @@ def assign_compositions(
     :param heuristic_params: Parameters for heuristic filtering.
     :type heuristic_params: dict, optional
     :return: A DataFrame with assigned compositions and related information.
-    :rtype: pd.DataFrame
+    :rtype: tuple[pd.DataFrame, dict[float, list[str]]]
     """
     # Convert peaks to Polars DataFrame
     peaks = pl.from_pandas(peaks).sort("mz")
@@ -406,7 +409,7 @@ def get_ionization_mech_string_list(params: dict) -> list:
 
 def get_neutral_mass_and_ionization_mech(
     target_mass: float, ion: str
-) -> tuple[float, str]:
+) -> tuple[float, IonizationMechanism | None]:
     if ion:
         ionization_mech = utils.parse_ionization(ion)
         if ionization_mech.addition:
