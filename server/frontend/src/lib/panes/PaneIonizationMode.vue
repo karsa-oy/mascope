@@ -140,7 +140,7 @@ const mode = {
         icon: 'pi pi-exclamation-triangle',
         header: 'Confirm ionization mode update',
         message:
-          'Changing the ionization mechanisms will affected all associated samples.' +
+          'Changing the ionization mechanisms will affect all associated samples.' +
           'Batches containing those samples will need to be re-matched. Do you want to proceed?',
         accept: doSave,
         acceptProps: {

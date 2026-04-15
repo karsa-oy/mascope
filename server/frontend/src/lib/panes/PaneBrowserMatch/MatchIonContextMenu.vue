@@ -49,7 +49,7 @@ watch(
     }
 
     const message = isCalibrants
-      ? `Removing compound '${contextMenu.compoundLabel}' from calibration collection '${collection.target_collection_name}'` +
+      ? `Removing compound '${contextMenu.compoundLabel}' from calibration collection '${collection.target_collection_name}' ` +
         `affects how associated samples are calibrated. Are you sure you want to proceed?`
       : `Are you sure you want to remove compound '${contextMenu.compoundLabel}' from target collection 
       '${collection.target_collection_name}' used in ${batchCount} batches? This will require rematching the affected batches.`
