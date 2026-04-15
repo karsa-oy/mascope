@@ -10,9 +10,7 @@ import polars as pl
 from pyteomics.mass import Composition
 
 from mascope_tools.composition import utils
-from mascope_tools.composition.constants import (
-    UNSATURATION_COEFFICIENTS,
-)
+from mascope_tools.composition.constants import UNSATURATION_COEFFICIENTS
 from mascope_tools.composition.heuristic_filter import (
     apply_heuristic_rules,
     match_isotopic_pattern,
@@ -483,7 +481,7 @@ def _formula_sort_key(formula: str) -> tuple[int, int, str]:
         4: Non-carbon containing
     """
     try:
-        atoms = set(Composition(formula=formula))
+        atoms = set(Composition(formula=utils.to_pyteomics(formula)))
         if "C" not in atoms:
             return (4, len(atoms), formula)
         if atoms <= {"C", "H"}:
@@ -550,7 +548,7 @@ def replace_atom_with_isotope(ion_formula: str, isotope_label: str) -> str:
     # Separate the charge at the end of the formula, if any
     ion_charge = ion_formula[-1] if ion_formula[-1] in "+-" else ""
     ion_formula = ion_formula[:-1] if ion_charge else ion_formula
-    element_counts = Composition(formula=ion_formula)
+    element_counts = Composition(formula=utils.to_pyteomics(ion_formula))
 
     new_formula_parts = []
     for iso in isotope_labels:

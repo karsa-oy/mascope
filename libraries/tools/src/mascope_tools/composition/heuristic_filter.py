@@ -17,7 +17,10 @@ from mascope_tools.composition.constants import (
     ISOTOPE_MATCHING_INTENSITY_TOLERANCE,
     ISOTOPE_MATCHING_MZ_TOLERANCE_PPM,
 )
-from mascope_tools.composition.utils import normalize_formula_with_isotopes
+from mascope_tools.composition.utils import (
+    normalize_formula_with_isotopes,
+    to_pyteomics,
+)
 
 
 # Limit isotopic matching to the most plausible candidates
@@ -405,7 +408,7 @@ def extract_isotope_labels(
         # Remove charge character for parsing
         ion_formula = ion_formula[:-1]
     try:
-        composition = Composition(formula=ion_formula)
+        composition = Composition(formula=to_pyteomics(ion_formula))
         elements = list(composition.keys())
         elemental_masses = [PeriodicTbl.symbol_to_masses[el] for el in elements]
         isotope_labels = [

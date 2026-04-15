@@ -10,7 +10,7 @@ from mascope_tools.composition.models import (
 )
 
 
-def _to_pyteomics(formula: str) -> str:
+def to_pyteomics(formula: str) -> str:
     """Convert bracket-first isotope notation to Pyteomics element-first.
     e.g. '[15N]O3' -> 'N[15]O3'
     """
@@ -24,7 +24,7 @@ def combine_formula_and_ionization(
     Combine a neutral formula and ionization into a single ion formula in Hill notation.
     """
     # Parse formula (Pyteomics requires element-first notation)
-    comp_formula = Composition(formula=_to_pyteomics(formula))
+    comp_formula = Composition(formula=to_pyteomics(formula))
     comp_ionization = (
         Composition(formula=ionization_mechanism.formula)
         if ionization_mechanism
