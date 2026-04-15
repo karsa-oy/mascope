@@ -159,13 +159,13 @@ def to_hill_order(elements: dict) -> str:
         if bracket_match:
             mass_num, element = bracket_match.groups()
             priority = 0 if element == "C" else 1 if element == "H" else 2
-            return (priority, element, 1, int(mass_num), symbol)
+            return (priority, element, 0, int(mass_num), symbol)
 
         plain_match = re.fullmatch(r"([A-Z][a-z]?)", symbol)
         if plain_match:
             element = plain_match.group(1)
             priority = 0 if element == "C" else 1 if element == "H" else 2
-            return (priority, element, 0, 0, symbol)
+            return (priority, element, 1, 0, symbol)
 
         return (3, symbol, 1, 0, symbol)
 

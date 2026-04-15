@@ -69,6 +69,11 @@ def test_to_hill_order_places_isotopes_first():
     assert formula == "[15N]O3"
 
 
+def test_to_hill_order_places_isotope_before_same_plain_element():
+    formula = to_hill_order({"C": 5, "[13C]": 1, "H": 12, "O": 6})
+    assert formula == "[13C]C5H12O6"
+
+
 def test_to_hill_order_normalizes_element_first_isotope_keys():
     formula = to_hill_order({"O": 3, "N[15]": 1})
     assert formula == "[15N]O3"
