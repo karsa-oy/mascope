@@ -261,13 +261,45 @@ function execute() {
       break
     }
     case 'update': {
-      app.data.target.collection.update({
-        ...common,
-        target_collection_id,
-        target_compound_ids,
-        target_compounds_create
-      })
-      break
+      const doUpdate = () => {
+        app.data.target.collection.update({
+          ...common,
+          target_collection_id,
+          target_compound_ids,
+          target_compounds_create
+        })
+        action.value = null
+      }
+      if (info.type === 'CALIBRANTS') {
+        const compoundsChanged = !equals(
+          compounds.initial,
+          compounds.selected,
+          'target_compound_id'
+        )
+        const compoundsCreated = compounds.created.length > 0
+        if (compoundsChanged || compoundsCreated) {
+          confirm.require({
+            icon: 'pi pi-exclamation-triangle',
+            header: 'Edit calibration collection',
+            message:
+              'Editing a calibration collection affects how associated samples are calibrated. ' +
+              'Are you sure you want to proceed?',
+            accept: doUpdate,
+            acceptProps: {
+              icon: 'pi pi-check',
+              label: 'Save',
+              severity: 'warn'
+            },
+            rejectProps: {
+              label: 'Cancel',
+              severity: 'secondary'
+            }
+          })
+          return
+        }
+      }
+      doUpdate()
+      return
     }
     case 'update_batches': {
       app.data.target.collection.update({
@@ -1138,6 +1170,11 @@ watchEffect(async () => {
     </template>
     <!-- delete -->
     <template v-else-if="action == 'delete'">
+      <InlineMessage severity="warn" style="margin-bottom: 1rem">
+        <b>This will permanently delete the collection itself.</b> <br />
+        To remove a collection from a batch without deleting it, right-click the batch and select
+        "Edit batch targets" instead.
+      </InlineMessage>
       <p style="max-width: 50ch">
         Would you like to keep or remove compounds from {{ info.name }}
         that are not part of any other collection?

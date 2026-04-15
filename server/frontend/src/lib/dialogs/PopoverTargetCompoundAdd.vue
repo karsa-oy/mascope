@@ -159,7 +159,27 @@ const addCompound = async () => {
 
 const confirmation = async () => {
   const batchCount = app.data.target.collection.detailed?.sample_batches_count ?? 0
-  if (batchCount > 1) {
+  const isCalibrants = targetCollection.value?.target_collection_type === 'CALIBRANTS'
+  if (isCalibrants) {
+    confirm.require({
+      icon: 'pi pi-exclamation-triangle',
+      header: 'Edit calibration collection',
+      message:
+        'Adding a compound to a calibration collection affects how associated samples are calibrated. ' +
+        'Are you sure you want to proceed?',
+      accept: addCompound,
+      acceptProps: {
+        icon: 'pi pi-plus',
+        label: 'Add',
+        severity: 'warn'
+      },
+      rejectProps: {
+        icon: 'pi pi-times',
+        label: 'Cancel',
+        severity: 'secondary'
+      }
+    })
+  } else if (batchCount > 1) {
     confirm.require({
       icon: 'pi pi-exclamation-triangle',
       header: `Add compound to ${batchCount} batches`,

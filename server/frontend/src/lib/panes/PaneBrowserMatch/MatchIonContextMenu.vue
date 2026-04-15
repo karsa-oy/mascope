@@ -30,27 +30,40 @@ watch(
 
     const batchCount = collection?.sample_batches_count ?? 0
 
+    const isCalibrants = collection?.target_collection_type === 'CALIBRANTS'
+
+    const doRemove = () => {
+      const remainingCompoundIds = [
+        ...new Set(
+          app.data.match.ion.list
+            .filter((ion) => ion.target_compound_id !== ionRecord.target_compound_id)
+            .map((ion) => ion.target_compound_id)
+        )
+      ]
+      app.data.target.collection.update({
+        target_collection_id: collection.target_collection_id,
+        target_collection_name: collection.target_collection_name,
+        target_collection_type: collection.target_collection_type,
+        target_compound_ids: remainingCompoundIds
+      })
+    }
+
+    const message = isCalibrants
+      ? `Removing compound '${contextMenu.compoundLabel}' from calibration collection '${collection.target_collection_name}'` +
+        `affects how associated samples are calibrated. Are you sure you want to proceed?`
+      : `Are you sure you want to remove compound '${contextMenu.compoundLabel}' from target collection 
+      '${collection.target_collection_name}' used in ${batchCount} batches? This will require rematching the affected batches.`
+
     confirm.require({
       icon: 'pi pi-exclamation-triangle',
       header: `Remove target compound '${contextMenu.compoundLabel}'`,
-      message: `Are you sure you want to remove compound '${contextMenu.compoundLabel}' from target collection 
-      '${collection.target_collection_name}' used in ${batchCount} batches? This will require rematching the affected batches.`,
-      accept: () => {
-        const remainingCompoundIds = [
-          ...new Set(
-            app.data.match.ion.list
-              .filter((ion) => ion.target_compound_id !== ionRecord.target_compound_id)
-              .map((ion) => ion.target_compound_id)
-          )
-        ]
-        app.data.target.collection.update({
-          target_collection_id: collection.target_collection_id,
-          target_collection_name: collection.target_collection_name,
-          target_collection_type: collection.target_collection_type,
-          target_compound_ids: remainingCompoundIds
-        })
+      message,
+      accept: doRemove,
+      acceptProps: {
+        icon: 'pi pi-minus',
+        label: 'Remove',
+        severity: isCalibrants ? 'warn' : undefined
       },
-      acceptProps: { icon: 'pi pi-minus', label: 'Remove' },
       rejectProps: { label: 'Cancel', severity: 'secondary' }
     })
 
