@@ -7,7 +7,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import polars as pl
-from IsoSpecPy import ParseFormula
+from pyteomics.mass import Composition
 
 from mascope_tools.composition import utils
 from mascope_tools.composition.constants import (
@@ -108,6 +108,10 @@ def assign_compositions(
             main_candidate["formula"] = main_candidate.get("formula", "---")
             main_candidate["other_candidates"] = all_candidates
 
+            if all_matched_isotopes:
+                all_matched_isotopes = [
+                    m for m in all_matched_isotopes if len(m.get("masses", [])) > 0
+                ]
             if all_matched_isotopes:
                 isotopic_results, assigned_mzs = process_isotopes(
                     main_candidate, all_matched_isotopes, assigned_mzs
@@ -479,7 +483,7 @@ def _formula_sort_key(formula: str) -> tuple[int, int, str]:
         4: Non-carbon containing
     """
     try:
-        atoms = set(ParseFormula(formula).keys())
+        atoms = set(Composition(formula=formula))
         if "C" not in atoms:
             return (4, len(atoms), formula)
         if atoms <= {"C", "H"}:
@@ -546,7 +550,7 @@ def replace_atom_with_isotope(ion_formula: str, isotope_label: str) -> str:
     # Separate the charge at the end of the formula, if any
     ion_charge = ion_formula[-1] if ion_formula[-1] in "+-" else ""
     ion_formula = ion_formula[:-1] if ion_charge else ion_formula
-    element_counts = ParseFormula(ion_formula)
+    element_counts = Composition(formula=ion_formula)
 
     new_formula_parts = []
     for iso in isotope_labels:

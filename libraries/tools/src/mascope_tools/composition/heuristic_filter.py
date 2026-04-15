@@ -6,7 +6,8 @@ from typing import Any
 
 import numpy as np
 import polars as pl
-from IsoSpecPy import IsoDistribution, IsoThreshold, ParseFormula, PeriodicTbl
+from IsoSpecPy import IsoDistribution, IsoThreshold, PeriodicTbl
+from pyteomics.mass import Composition
 from scipy.spatial.distance import cosine
 
 from mascope_tools.composition.constants import (
@@ -16,6 +17,7 @@ from mascope_tools.composition.constants import (
     ISOTOPE_MATCHING_INTENSITY_TOLERANCE,
     ISOTOPE_MATCHING_MZ_TOLERANCE_PPM,
 )
+from mascope_tools.composition.utils import normalize_formula_with_isotopes
 
 
 # Limit isotopic matching to the most plausible candidates
@@ -39,7 +41,9 @@ def rule_element_ratio(
     formulas = candidates.get_column("formula").to_list()
 
     # Parse all formulas once and convert to a structured format
-    counts_list = [ParseFormula(f) for f in formulas]
+    counts_list = [
+        Composition(formula=normalize_formula_with_isotopes(f)) for f in formulas
+    ]
 
     # Get all unique elements across all formulas
     all_elements = set()
@@ -401,7 +405,7 @@ def extract_isotope_labels(
         # Remove charge character for parsing
         ion_formula = ion_formula[:-1]
     try:
-        composition = ParseFormula(ion_formula)
+        composition = Composition(formula=ion_formula)
         elements = list(composition.keys())
         elemental_masses = [PeriodicTbl.symbol_to_masses[el] for el in elements]
         isotope_labels = [

@@ -10,14 +10,21 @@ from mascope_tools.composition.models import (
 )
 
 
+def _to_pyteomics(formula: str) -> str:
+    """Convert bracket-first isotope notation to Pyteomics element-first.
+    e.g. '[15N]O3' -> 'N[15]O3'
+    """
+    return re.sub(r"\[(\d+)([A-Z][a-z]?)\]", r"\2[\1]", formula)
+
+
 def combine_formula_and_ionization(
     formula: str, ionization_mechanism: IonizationMechanism
 ) -> str:
     """
     Combine a neutral formula and ionization into a single ion formula in Hill notation.
     """
-    # Parse formula
-    comp_formula = Composition(formula=formula)
+    # Parse formula (Pyteomics requires element-first notation)
+    comp_formula = Composition(formula=_to_pyteomics(formula))
     comp_ionization = (
         Composition(formula=ionization_mechanism.formula)
         if ionization_mechanism
@@ -126,10 +133,45 @@ def to_hill_order(elements: dict) -> str:
         return "()"
     # Filter out zero and negative counts (can be if -H- is the ionization mechanism)
     elements = {k: v for k, v in elements.items() if v > 0}
-    atomic_symbols = list(elements.keys())
-    atomic_symbols.sort(key=lambda x: (0 if x == "C" else 1 if x == "H" else 2, x))
+
+    def normalize_symbol(symbol: str) -> str:
+        # Accept both [15N] and N[15] and canonicalize to [15N].
+        bracket_first = re.fullmatch(r"\[(\d+)([A-Z][a-z]?)\]", symbol)
+        if bracket_first:
+            return symbol
+
+        element_first = re.fullmatch(r"([A-Z][a-z]?)\[(\d+)\]", symbol)
+        if element_first:
+            element, mass_num = element_first.groups()
+            return f"[{mass_num}{element}]"
+
+        return symbol
+
+    normalized_elements = {}
+    for symbol, count in elements.items():
+        normalized_symbol = normalize_symbol(symbol)
+        normalized_elements[normalized_symbol] = (
+            normalized_elements.get(normalized_symbol, 0) + count
+        )
+
+    def hill_sort_key(symbol: str) -> tuple[int, str, int, int, str]:
+        bracket_match = re.fullmatch(r"\[(\d+)([A-Z][a-z]?)\]", symbol)
+        if bracket_match:
+            mass_num, element = bracket_match.groups()
+            priority = 0 if element == "C" else 1 if element == "H" else 2
+            return (priority, element, 1, int(mass_num), symbol)
+
+        plain_match = re.fullmatch(r"([A-Z][a-z]?)", symbol)
+        if plain_match:
+            element = plain_match.group(1)
+            priority = 0 if element == "C" else 1 if element == "H" else 2
+            return (priority, element, 0, 0, symbol)
+
+        return (3, symbol, 1, 0, symbol)
+
+    atomic_symbols = sorted(normalized_elements.keys(), key=hill_sort_key)
     formula = "".join(
-        f"{symbol}{elements[symbol] if elements[symbol] > 1 else ''}"
+        f"{symbol}{normalized_elements[symbol] if normalized_elements[symbol] > 1 else ''}"
         for symbol in atomic_symbols
     )
     formula = remove_ones_from_formula(formula)
@@ -203,23 +245,57 @@ def parse_atom_count_ranges(count_ranges: str) -> list:
     """Parse a string of element count ranges into a list of Atom objects.
 
     :param count_ranges: String containing element count ranges.
-        e.g. "C0-30 H0-40 N0-3 O0-20 O[18]0-1 C[13]0-2"
+        e.g. "C0-30 H0-40 N0-3 O0-20 [18O]0-1 [13C]0-2"
     :type count_ranges: str
     :return: List of Atom objects.
     :rtype: list
     """
-    pattern = r"([A-Z][a-z]?(?:\[\d+\])?)(\d+)-(\d+)"
+    standard_pattern = re.compile(r"^([A-Z][a-z]?)(\d+)-(\d+)$")
+    isotope_pattern = re.compile(r"^\[(\d+)([A-Z][a-z]?)\](\d+)-(\d+)$")
+    legacy_isotope_pattern = re.compile(r"^[A-Z][a-z]?\[\d+\]\d+-\d+$")
+
     atoms = []
-    for match in re.finditer(pattern, count_ranges):
-        element, min_count, max_count = match.groups()
+    tokens = count_ranges.split()
+    for token in tokens:
+        match = standard_pattern.fullmatch(token)
+        if match:
+            element, min_count, max_count = match.groups()
+            symbol = element
+            mass_formula = symbol
+        else:
+            match = isotope_pattern.fullmatch(token)
+            if match:
+                mass_number, element, min_count, max_count = match.groups()
+                symbol = f"[{mass_number}{element}]"
+                mass_formula = f"{element}[{mass_number}]"
+            else:
+                if legacy_isotope_pattern.fullmatch(token):
+                    raise CompositionFinderException(
+                        (
+                            f"Invalid isotope format '{token}'. "
+                            "Use bracket-first notation like '[15N]0-1'."
+                        )
+                    )
+                raise CompositionFinderException(
+                    f"Invalid element count range token '{token}'."
+                )
+
+        min_count_i = int(min_count)
+        max_count_i = int(max_count)
+        if min_count_i > max_count_i:
+            raise CompositionFinderException(
+                f"Invalid range '{token}': min count cannot exceed max count."
+            )
+
         atoms.append(
             Atom(
-                symbol=element,
-                min_count=int(min_count),
-                max_count=int(max_count),
-                mass=calculate_mass(formula=element, charge=0),
+                symbol=symbol,
+                min_count=min_count_i,
+                max_count=max_count_i,
+                mass=calculate_mass(formula=mass_formula, charge=0),
             )
         )
+
     return atoms
 
 
@@ -252,4 +328,5 @@ def normalize_formula_with_isotopes(formula: str) -> str:
     :rtype: str
     """
     normalized_formula = re.sub(r"\[\d+([A-Za-z]+)\]", r"\1", formula)
+    normalized_formula = re.sub(r"([A-Z][a-z]?)\[\d+\]", r"\1", normalized_formula)
     return normalized_formula
