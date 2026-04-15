@@ -74,7 +74,9 @@ class IonizationModeCreate(IonizationModeBase):
     pass
 
 
-class IonizationModeUpdate(IonizationModeTokenValidator, BaseModel):
+class IonizationModeUpdate(
+    IonizationModeBaseValidator, IonizationModeTokenValidator, BaseModel
+):
     """Model for updating an existing ionization mode."""
 
     ionization_mode_name: str = Field(
@@ -84,6 +86,13 @@ class IonizationModeUpdate(IonizationModeTokenValidator, BaseModel):
         None,
         max_length=256,
         description="Unique filename token for the ionization mode",
+    )
+    ionization_mode_polarity: str = Field(
+        ..., max_length=1, description="Polarity of the ionization mode (+ or -)"
+    )
+    ionization_mechanism_ids: list[str] = Field(
+        default_factory=list,
+        description="List of ionization mechanism IDs to apply for the scheme",
     )
     calibration_collection_id: str | None = Field(
         None,

@@ -1,5 +1,8 @@
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, distinct, or_, select
 
+from mascope_backend.api.controllers.sample.batches.status.service import (
+    update_sample_batch_status,
+)
 from mascope_backend.api.controllers.sample.lib.sample_file_fetch import (
     fetch_sample_file,
 )
@@ -9,7 +12,13 @@ from mascope_backend.api.new.ionization.modes.schema import (
     IonizationModeCreate,
     IonizationModeUpdate,
 )
-from mascope_backend.db import IonizationMode, SampleBatch, SampleItem, async_session
+from mascope_backend.db import (
+    IonizationMechanism,
+    IonizationMode,
+    SampleBatch,
+    SampleItem,
+    async_session,
+)
 from mascope_backend.db.id import gen_id
 from mascope_backend.socket.records.service import (
     emit_record_created,
@@ -188,8 +197,11 @@ async def update_ionization_mode(
     Steps:
     - Fetch the ionization mode by its ID from the database.
     - Check for token conflicts if token is being updated.
+    - Validate mechanism-polarity consistency.
     - Validate calibration and diagnostic collection updates (only adding is allowed).
-    - Check for name conflicts with existing acquisition batches
+    - Check for conflicts with existing acquisition batches.
+    - Block updates if any affected batch is currently processing.
+    - If mechanisms changed, set affected batches to "rematch" status.
     - Update the fields that were provided in the request.
     - Commit the changes and return the updated ionization mode.
 
@@ -219,6 +231,35 @@ async def update_ionization_mode(
                     " already exists"
                 )
 
+        # Validate mechanism-polarity consistency
+        new_mechanism_ids = update_data.get("ionization_mechanism_ids")
+        new_polarity = update_data.get(
+            "ionization_mode_polarity", ionization_mode.ionization_mode_polarity
+        )
+        if new_mechanism_ids:
+            mechanisms_result = await session.execute(
+                select(IonizationMechanism).where(
+                    IonizationMechanism.ionization_mechanism_id.in_(new_mechanism_ids)
+                )
+            )
+            mechanisms = mechanisms_result.scalars().all()
+            found_ids = {m.ionization_mechanism_id for m in mechanisms}
+            missing = set(new_mechanism_ids) - found_ids
+            if missing:
+                raise ValueError(
+                    f"Ionization mechanism(s) not found: {', '.join(missing)}"
+                )
+            mismatched = [
+                m.ionization_mechanism
+                for m in mechanisms
+                if m.ionization_mechanism_polarity != new_polarity
+            ]
+            if mismatched:
+                raise ValueError(
+                    f"Mechanism(s) {', '.join(mismatched)} do not match "
+                    f"polarity '{new_polarity}'"
+                )
+
         # Check for calibration and diagnostic collection updates
         # Only allow adding if not yet defined, don't allow removal or changing
         if (
@@ -246,9 +287,37 @@ async def update_ionization_mode(
         if update_data.get("diagnostic_collection_id") is None:
             update_data.pop("diagnostic_collection_id", None)
 
-        # Check affected acquisition batches. If there are acquisition batches for this
-        # ionization mode, only allow updating the token (to release it)
-        affected_batches = await session.execute(
+        # Determine if mechanisms are changing
+        mechanisms_changed = "ionization_mechanism_ids" in update_data and set(
+            update_data["ionization_mechanism_ids"]
+        ) != set(ionization_mode.ionization_mechanism_ids)
+
+        # Find affected sample batches (batches containing samples using this mode)
+        affected_batch_ids_result = await session.execute(
+            select(distinct(SampleItem.sample_batch_id)).where(
+                SampleItem.ionization_mode_id == ionization_mode_id
+            )
+        )
+        affected_batch_ids = list(affected_batch_ids_result.scalars().all())
+
+        if affected_batch_ids:
+            # Block if any affected batch is currently processing
+            processing_batches = await session.execute(
+                select(SampleBatch).where(
+                    and_(
+                        SampleBatch.sample_batch_id.in_(affected_batch_ids),
+                        SampleBatch.status == "processing",
+                    )
+                )
+            )
+            if processing_batches.scalars().first():
+                raise ValueError(
+                    f"Cannot update ionization mode '{ionization_mode.ionization_mode_name}', "
+                    "as one or more affected batches are currently processing."
+                )
+
+        # Check affected acquisition batches for name changes
+        affected_acq_batches = await session.execute(
             select(SampleBatch).where(
                 and_(
                     SampleBatch.sample_batch_type == "ACQUISITION",
@@ -263,19 +332,17 @@ async def update_ionization_mode(
                 )
             )
         )
-        if affected_batches.scalars().first():
-            # If there are affected samples, only allow updating the token (to release it)
+        if affected_acq_batches.scalars().first():
             for key, value in update_data.items():
                 match key:
                     case "ionization_mode_token":
-                        # Token can always be updated
                         continue
                     case "diagnostic_collection_id" | "calibration_collection_id":
-                        # Allow setting calibration and diagnostic collection if not yet defined
-                        # NOTE: This does not affect existing acquisition batches
+                        continue
+                    case "ionization_mechanism_ids" | "ionization_mode_polarity":
+                        # Mechanisms and polarity can be updated (triggers rematch)
                         continue
                     case _:
-                        # Other fields cannot be changed if the mode is used in acquisition batches
                         if getattr(ionization_mode, key) != value:
                             raise ValueError(
                                 f"Cannot update ionization mode '{ionization_mode.ionization_mode_name}', "
@@ -289,6 +356,14 @@ async def update_ionization_mode(
         # Commit and return
         await session.commit()
         await session.refresh(ionization_mode)
+
+    # If mechanisms changed and there are affected batches, set them to rematch
+    if mechanisms_changed and affected_batch_ids:
+        await update_sample_batch_status(
+            sample_batch_ids=affected_batch_ids,
+            status="rematch",
+            independent_transaction=True,
+        )
 
     await emit_record_updated(
         record_type="ionization_mode",
