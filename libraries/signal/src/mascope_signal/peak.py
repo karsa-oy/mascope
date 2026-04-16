@@ -11,7 +11,9 @@ import dask.array as da
 import numpy as np
 import pandas as pd
 import xarray
-from scipy.signal._peak_finding_utils import _select_by_peak_distance # ty:ignore[unresolved-import]
+from scipy.signal._peak_finding_utils import (
+    _select_by_peak_distance,  # ty:ignore[unresolved-import]
+)
 
 import mascope_file.io as m_io
 import mascope_file.name as m_name
@@ -324,6 +326,19 @@ class TofPeakDetector(BasePeakDetector):
         peak_mzs = peak_mzs[positive_mask]
         peak_heights = peak_heights[positive_mask]
         peak_areas = peak_areas[positive_mask]
+
+        # Sort peaks by m/z before deduplication to ensure correct grouping of close peaks
+        sort_indices = np.argsort(peak_mzs)
+        peak_mzs = peak_mzs[sort_indices]
+        peak_heights = peak_heights[sort_indices]
+        peak_areas = peak_areas[sort_indices]
+
+        peak_mzs, peak_heights, peak_areas = self._deduplicate_peaks(
+            peak_mzs,
+            peak_heights,
+            peak_areas,
+        )
+
         polarity = m_compute.get_polarity_options(self._filename)
         signal_to_noise = self._compute_snr(peak_mzs, peak_heights)
         peaks = xarray.Dataset(
@@ -334,7 +349,6 @@ class TofPeakDetector(BasePeakDetector):
                 "polarity": (("mz"), np.full(peak_mzs.shape, polarity)),
             }
         ).assign_coords(mz=("mz", peak_mzs))
-        peaks = peaks.sortby("mz")
 
         runtime.logger.debug("Computing peak timeseries...")
         self._allocate_peak_timeseries(peaks)
@@ -413,6 +427,64 @@ class TofPeakDetector(BasePeakDetector):
         is_satellite = np.full(len(self.peak_timeseries.mz), False, dtype=bool)
         self._peak_timeseries = self.peak_timeseries.assign(
             {"is_satellite": (("mz"), is_satellite)}
+        )
+
+    def _deduplicate_peaks(
+        self,
+        peak_mzs: np.ndarray,
+        peak_heights: np.ndarray,
+        peak_areas: np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Remove numerically duplicated peaks. This may occur at segment edges.
+        Assumes peaks are sorted by m/z.
+
+        Algorithm:
+        - Compute an absolute tolerance based on the mz_axis spacing
+        - Group peaks with near-equal m/z values within this tolerance.
+        - For each group, keep the peak with the highest height (and latest index in
+            case of ties).
+        """
+        if peak_mzs.size <= 1:
+            return peak_mzs, peak_heights, peak_areas
+
+        # Compute m/z spacing tolerance based on the minimum spacing in the mz axis
+        mz_axis = self._sum_signal.mz.values
+        mz_axis_spacing_diffs = np.abs(np.diff(mz_axis))
+        spacing_tol = np.min(mz_axis_spacing_diffs) / 2
+
+        # Group consecutive near-equal m/z values
+        same_as_prev = np.isclose(
+            peak_mzs[1:], peak_mzs[:-1], rtol=0.0, atol=spacing_tol
+        )
+        group_id = np.empty(peak_mzs.size, dtype=np.intp)
+        group_id[0] = 0
+        group_id[1:] = np.cumsum(~same_as_prev)
+
+        # Pick best per group:
+        # - higher peak_heights first
+        # - for ties, later index first
+        peak_indices = np.arange(peak_mzs.size, dtype=np.intp)
+        order = np.lexsort((-peak_indices, -peak_heights, group_id))
+        ordered_groups = group_id[order]
+        first_in_group = np.r_[True, ordered_groups[1:] != ordered_groups[:-1]]
+        keep_indices = order[first_in_group]
+        filtered_out_indices = order[~first_in_group]
+
+        if filtered_out_indices.size > 0:
+            filtered_out_peaks = (
+                peak_mzs[filtered_out_indices],
+                peak_heights[filtered_out_indices],
+                peak_areas[filtered_out_indices],
+            )
+            runtime.logger.debug(
+                f"Deduplicated {filtered_out_peaks[0].size} close peaks: "
+                f"m/z={filtered_out_peaks[0]}, heights={filtered_out_peaks[1]}"
+            )
+
+        return (
+            peak_mzs[keep_indices],
+            peak_heights[keep_indices],
+            peak_areas[keep_indices],
         )
 
 
