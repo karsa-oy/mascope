@@ -4,6 +4,7 @@ import sys
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from typing import Any, Callable, TypeVar
 
+from loguru import logger
 from tqdm import tqdm
 
 
@@ -46,6 +47,7 @@ def run_concurrent(
         return []
 
     results: list[T] = []
+    errors: list[tuple[tuple[Any, ...], Exception]] = []
     futures: dict[Future[T | None], tuple[Any, ...]] = {}
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         for args in tasks:
@@ -54,9 +56,14 @@ def run_concurrent(
         pbar = progress_bar(len(futures), desc=desc, unit=unit)
         try:
             for future in as_completed(futures):
-                result = future.result()
-                if result is not None:
-                    results.append(result)
+                try:
+                    result = future.result()
+                    if result is not None:
+                        results.append(result)
+                except Exception as exc:
+                    args = futures[future]
+                    errors.append((args, exc))
+                    logger.warning("Task failed ({}): {}", desc, exc)
                 pbar.update(1)
         except BaseException:
             # Cancel remaining futures so shutdown() doesn't block
@@ -65,5 +72,13 @@ def run_concurrent(
             raise
         finally:
             pbar.close()
+
+    if errors:
+        logger.warning(
+            "{} of {} task(s) failed — returning {} partial result(s)",
+            len(errors),
+            len(tasks),
+            len(results),
+        )
 
     return results
