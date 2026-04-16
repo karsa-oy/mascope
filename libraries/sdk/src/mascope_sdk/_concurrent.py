@@ -36,9 +36,10 @@ def run_concurrent(
     Each element of *tasks* is an args-tuple unpacked into *func*.
     Returns a list of non-None results.
 
-    On error, all pending futures are cancelled before re-raising so
-    that ``ThreadPoolExecutor.shutdown(wait=True)`` does not block on
-    futures that haven't started yet.
+    Individual task failures (``Exception``) are logged and skipped so that
+    the remaining tasks can complete.  A summary is logged at the end when
+    any tasks failed.  ``BaseException`` (e.g. ``KeyboardInterrupt``) still
+    propagates immediately after cancelling pending futures.
     """
     if max_workers > 8:
         raise ValueError("max_workers cannot exceed 8 to avoid overloading the API")
@@ -47,7 +48,7 @@ def run_concurrent(
         return []
 
     results: list[T] = []
-    errors: list[tuple[tuple[Any, ...], Exception]] = []
+    n_errors = 0
     futures: dict[Future[T | None], tuple[Any, ...]] = {}
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         for args in tasks:
@@ -61,8 +62,7 @@ def run_concurrent(
                     if result is not None:
                         results.append(result)
                 except Exception as exc:
-                    args = futures[future]
-                    errors.append((args, exc))
+                    n_errors += 1
                     logger.warning("Task failed ({}): {}", desc, exc)
                 pbar.update(1)
         except BaseException:
@@ -73,10 +73,10 @@ def run_concurrent(
         finally:
             pbar.close()
 
-    if errors:
+    if n_errors:
         logger.warning(
-            "{} of {} task(s) failed — returning {} partial result(s)",
-            len(errors),
+            "{} of {} task(s) failed - returning {} partial result(s)",
+            n_errors,
             len(tasks),
             len(results),
         )
