@@ -10,6 +10,7 @@ from typing import Any
 
 import requests
 from loguru import logger
+from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import RequestException, Timeout
 
 from .exceptions import (
@@ -147,7 +148,6 @@ def http_get(
         "X-Service-Name": service_name,
     }
 
-    last_exc: Exception | None = None
     for attempt in range(1, RETRY_MAX_ATTEMPTS + 1):
         try:
             response = requests.get(
@@ -162,32 +162,41 @@ def http_get(
             return response
 
         except Timeout as e:
-            last_exc = MascopeTimeoutError(f"Request timed out: {e}", url=full_url)
-            last_exc.__cause__ = e
+            if attempt == RETRY_MAX_ATTEMPTS:
+                raise MascopeTimeoutError(
+                    f"Request timed out: {e}", url=full_url
+                ) from e
+            exc_for_log: Exception = e
+        except RequestsConnectionError as e:
+            if attempt == RETRY_MAX_ATTEMPTS:
+                raise MascopeConnectionError(
+                    f"Could not connect. Please check the URL and your network connection: {e}",
+                    url=full_url,
+                ) from e
+            exc_for_log = e
         except RequestException as e:
-            last_exc = MascopeConnectionError(
-                f"Could not connect. Please check the URL and your network connection: {e}",
+            # Non-transient request error (SSL, proxy, invalid URL, …)
+            raise MascopeConnectionError(
+                f"Request failed: {e}",
                 url=full_url,
-            )
-            last_exc.__cause__ = e
+            ) from e
         except Exception as e:
-            if not _is_retryable(e):
+            if not _is_retryable(e) or attempt == RETRY_MAX_ATTEMPTS:
                 raise
-            last_exc = e
+            exc_for_log = e
 
-        if attempt < RETRY_MAX_ATTEMPTS:
-            delay = RETRY_BACKOFF_BASE**attempt
-            logger.warning(
-                "GET {} failed (attempt {}/{}), retrying in {}s: {}",
-                full_url,
-                attempt,
-                RETRY_MAX_ATTEMPTS,
-                delay,
-                last_exc,
-            )
-            time.sleep(delay)
+        delay = RETRY_BACKOFF_BASE**attempt
+        logger.warning(
+            "GET {} failed (attempt {}/{}), retrying in {}s: {}",
+            full_url,
+            attempt,
+            RETRY_MAX_ATTEMPTS,
+            delay,
+            exc_for_log,
+        )
+        time.sleep(delay)
 
-    raise last_exc  # type: ignore[misc]
+    assert False, "unreachable"  # noqa: B011
 
 
 def http_post(
@@ -231,7 +240,6 @@ def http_post(
         "X-Service-Name": service_name,
     }
 
-    last_exc: Exception | None = None
     for attempt in range(1, RETRY_MAX_ATTEMPTS + 1):
         try:
             response = requests.post(
@@ -245,32 +253,41 @@ def http_post(
             return response
 
         except Timeout as e:
-            last_exc = MascopeTimeoutError(f"Request timed out: {e}", url=full_url)
-            last_exc.__cause__ = e
+            if attempt == RETRY_MAX_ATTEMPTS:
+                raise MascopeTimeoutError(
+                    f"Request timed out: {e}", url=full_url
+                ) from e
+            exc_for_log: Exception = e
+        except RequestsConnectionError as e:
+            if attempt == RETRY_MAX_ATTEMPTS:
+                raise MascopeConnectionError(
+                    f"Could not connect. Please check the URL and your network connection: {e}",
+                    url=full_url,
+                ) from e
+            exc_for_log = e
         except RequestException as e:
-            last_exc = MascopeConnectionError(
-                f"Could not connect. Please check the URL and your network connection: {e}",
+            # Non-transient request error (SSL, proxy, invalid URL, …)
+            raise MascopeConnectionError(
+                f"Request failed: {e}",
                 url=full_url,
-            )
-            last_exc.__cause__ = e
+            ) from e
         except Exception as e:
-            if not _is_retryable(e):
+            if not _is_retryable(e) or attempt == RETRY_MAX_ATTEMPTS:
                 raise
-            last_exc = e
+            exc_for_log = e
 
-        if attempt < RETRY_MAX_ATTEMPTS:
-            delay = RETRY_BACKOFF_BASE**attempt
-            logger.warning(
-                "POST {} failed (attempt {}/{}), retrying in {}s: {}",
-                full_url,
-                attempt,
-                RETRY_MAX_ATTEMPTS,
-                delay,
-                last_exc,
-            )
-            time.sleep(delay)
+        delay = RETRY_BACKOFF_BASE**attempt
+        logger.warning(
+            "POST {} failed (attempt {}/{}), retrying in {}s: {}",
+            full_url,
+            attempt,
+            RETRY_MAX_ATTEMPTS,
+            delay,
+            exc_for_log,
+        )
+        time.sleep(delay)
 
-    raise last_exc  # type: ignore[misc]
+    assert False, "unreachable"  # noqa: B011
 
 
 def http_post_file(
