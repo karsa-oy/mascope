@@ -5,9 +5,11 @@ These are internal implementation details and should not be used directly by SDK
 """
 
 import json
+import time
 from typing import Any
 
 import requests
+from loguru import logger
 from requests.exceptions import RequestException, Timeout
 
 from .exceptions import (
@@ -23,6 +25,13 @@ from .exceptions import (
 
 # Default timeout values (connect, read) in seconds
 DEFAULT_TIMEOUT = (30, 300)
+
+#: Status codes that are safe to retry (transient server errors).
+_RETRYABLE_STATUS_CODES = {502, 503, 504}
+
+#: Default retry settings.
+RETRY_MAX_ATTEMPTS = 4
+RETRY_BACKOFF_BASE = 2  # seconds; delays will be 2, 4, 8, ...
 
 
 def _extract_error_message(response: requests.Response) -> str:
@@ -85,6 +94,15 @@ def _raise_for_status(response: requests.Response, url: str) -> None:
         )
 
 
+def _is_retryable(exc: Exception) -> bool:
+    """Return True if the exception is transient and the request can be retried."""
+    if isinstance(exc, (MascopeConnectionError, MascopeTimeoutError)):
+        return True
+    if isinstance(exc, ServerError) and exc.status_code in _RETRYABLE_STATUS_CODES:
+        return True
+    return False
+
+
 def http_get(
     url: str,
     path: str,
@@ -129,25 +147,47 @@ def http_get(
         "X-Service-Name": service_name,
     }
 
-    try:
-        response = requests.get(
-            full_url,
-            params=params,
-            headers=headers,
-            verify=verify_ssl,
-            timeout=timeout,
-            stream=stream,
-        )
-        _raise_for_status(response, full_url)
-        return response
+    last_exc: Exception | None = None
+    for attempt in range(1, RETRY_MAX_ATTEMPTS + 1):
+        try:
+            response = requests.get(
+                full_url,
+                params=params,
+                headers=headers,
+                verify=verify_ssl,
+                timeout=timeout,
+                stream=stream,
+            )
+            _raise_for_status(response, full_url)
+            return response
 
-    except Timeout as e:
-        raise MascopeTimeoutError(f"Request timed out: {e}", url=full_url) from e
-    except RequestException as e:
-        raise MascopeConnectionError(
-            f"Could not connect. Please check the URL and your network connection: {e}",
-            url=full_url,
-        ) from e
+        except Timeout as e:
+            last_exc = MascopeTimeoutError(f"Request timed out: {e}", url=full_url)
+            last_exc.__cause__ = e
+        except RequestException as e:
+            last_exc = MascopeConnectionError(
+                f"Could not connect. Please check the URL and your network connection: {e}",
+                url=full_url,
+            )
+            last_exc.__cause__ = e
+        except Exception as e:
+            if not _is_retryable(e):
+                raise
+            last_exc = e
+
+        if attempt < RETRY_MAX_ATTEMPTS:
+            delay = RETRY_BACKOFF_BASE**attempt
+            logger.warning(
+                "GET {} failed (attempt {}/{}), retrying in {}s: {}",
+                full_url,
+                attempt,
+                RETRY_MAX_ATTEMPTS,
+                delay,
+                last_exc,
+            )
+            time.sleep(delay)
+
+    raise last_exc  # type: ignore[misc]
 
 
 def http_post(
@@ -191,24 +231,46 @@ def http_post(
         "X-Service-Name": service_name,
     }
 
-    try:
-        response = requests.post(
-            full_url,
-            data=json.dumps(data),
-            headers=headers,
-            verify=verify_ssl,
-            timeout=timeout,
-        )
-        _raise_for_status(response, full_url)
-        return response
+    last_exc: Exception | None = None
+    for attempt in range(1, RETRY_MAX_ATTEMPTS + 1):
+        try:
+            response = requests.post(
+                full_url,
+                data=json.dumps(data),
+                headers=headers,
+                verify=verify_ssl,
+                timeout=timeout,
+            )
+            _raise_for_status(response, full_url)
+            return response
 
-    except Timeout as e:
-        raise MascopeTimeoutError(f"Request timed out: {e}", url=full_url) from e
-    except RequestException as e:
-        raise MascopeConnectionError(
-            f"Could not connect. Please check the URL and your network connection: {e}",
-            url=full_url,
-        ) from e
+        except Timeout as e:
+            last_exc = MascopeTimeoutError(f"Request timed out: {e}", url=full_url)
+            last_exc.__cause__ = e
+        except RequestException as e:
+            last_exc = MascopeConnectionError(
+                f"Could not connect. Please check the URL and your network connection: {e}",
+                url=full_url,
+            )
+            last_exc.__cause__ = e
+        except Exception as e:
+            if not _is_retryable(e):
+                raise
+            last_exc = e
+
+        if attempt < RETRY_MAX_ATTEMPTS:
+            delay = RETRY_BACKOFF_BASE**attempt
+            logger.warning(
+                "POST {} failed (attempt {}/{}), retrying in {}s: {}",
+                full_url,
+                attempt,
+                RETRY_MAX_ATTEMPTS,
+                delay,
+                last_exc,
+            )
+            time.sleep(delay)
+
+    raise last_exc  # type: ignore[misc]
 
 
 def http_post_file(
