@@ -110,6 +110,10 @@ async def query_peak_matches(
     if match_df.empty:
         return [[] for _ in peak_ids]
 
+    # Sort by score descending so "first" in the aggregation and the
+    # per-peak list order both reflect the best-scoring match.
+    match_df = match_df.sort_values("match_score", ascending=False)
+
     agg = (
         match_df.groupby(["sample_peak_id", "target_isotope_id"], sort=False)
         .agg(
