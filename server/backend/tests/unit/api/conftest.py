@@ -22,8 +22,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import pytest_asyncio
+from test_utils import gen_test_id
 
 from mascope_backend.db import IonizationMechanism, TargetCompound, Workspace
+
+
+# Stable IDs for session-scoped workspace fixtures that are referenced
+# by value in parametrized tests (e.g. test_get_workspace_existence).
+_WORKSPACE_ID_1 = "unit-test-1"
+_WORKSPACE_ID_2 = "unit-test-2"
 
 
 @pytest_asyncio.fixture(scope="session")
@@ -42,42 +49,42 @@ async def test_ionization_mechanisms(
     async with async_session_factory() as session:
         ionization_mechanisms = [
             IonizationMechanism(
-                ionization_mechanism_id="unit-test-1",
+                ionization_mechanism_id=gen_test_id(),
                 ionization_mechanism_polarity="-",
                 ionization_mechanism="-H+",
             ),
             IonizationMechanism(
-                ionization_mechanism_id="unit-test-2",
+                ionization_mechanism_id=gen_test_id(),
                 ionization_mechanism_polarity="-",
                 ionization_mechanism="+Br-",
             ),
             IonizationMechanism(
-                ionization_mechanism_id="unit-test-3",
+                ionization_mechanism_id=gen_test_id(),
                 ionization_mechanism_polarity="-",
                 ionization_mechanism="+NO3-",
             ),
             IonizationMechanism(
-                ionization_mechanism_id="unit-test-4",
+                ionization_mechanism_id=gen_test_id(),
                 ionization_mechanism_polarity="+",
                 ionization_mechanism="+H+",
             ),
             IonizationMechanism(
-                ionization_mechanism_id="unit-test-5",
+                ionization_mechanism_id=gen_test_id(),
                 ionization_mechanism_polarity="+",
                 ionization_mechanism="+(CH4N2O)H+",
             ),
             IonizationMechanism(
-                ionization_mechanism_id="unit-test-6",
+                ionization_mechanism_id=gen_test_id(),
                 ionization_mechanism_polarity="+",
                 ionization_mechanism="+",
             ),
             IonizationMechanism(
-                ionization_mechanism_id="unit-test-7",
+                ionization_mechanism_id=gen_test_id(),
                 ionization_mechanism_polarity="-",
                 ionization_mechanism="-",
             ),
             IonizationMechanism(
-                ionization_mechanism_id="unit-test-8",
+                ionization_mechanism_id=gen_test_id(),
                 ionization_mechanism_polarity="-",
                 ionization_mechanism="+^NO3-",
             ),
@@ -113,37 +120,37 @@ async def test_target_compounds_by_composition(
         # They are not exhaustive and can be adjusted as needed for your tests.
         target_compounds = [
             TargetCompound(
-                target_compound_id="target-compound-by-composition-1",
+                target_compound_id=gen_test_id(),
                 target_compound_name=None,
                 target_compound_formula="()",
                 cas_number=None,
             ),
             TargetCompound(
-                target_compound_id="target-compound-by-composition-2",
+                target_compound_id=gen_test_id(),
                 target_compound_name="Water",
                 target_compound_formula="H2O",
                 cas_number="7732-18-5",
             ),
             TargetCompound(
-                target_compound_id="target-compound-by-composition-3",
+                target_compound_id=gen_test_id(),
                 target_compound_name="Urea",
                 target_compound_formula="CH4N2O",
                 cas_number="57-13-6",
             ),
             TargetCompound(
-                target_compound_id="target-compound-by-composition-4",
+                target_compound_id=gen_test_id(),
                 target_compound_name="a-Pinene",
                 target_compound_formula="C10H16",
                 cas_number="80-56-8",
             ),
             TargetCompound(
-                target_compound_id="target-compound-by-composition-5",
+                target_compound_id=gen_test_id(),
                 target_compound_name="Nitric acid dimer",
                 target_compound_formula="(HNO3)2",
                 cas_number=None,
             ),
             TargetCompound(
-                target_compound_id="target-compound-by-composition-6",
+                target_compound_id=gen_test_id(),
                 target_compound_name="Isotopically labeled nitric acid",
                 target_compound_formula="H^NO3",
                 cas_number=None,
@@ -166,8 +173,8 @@ async def test_target_compounds_by_mass(
 ) -> list[tuple[float, TargetCompound]]:
     """Create test target compound records by mass instead of composition.
 
-    This fixture populates the database with target compounds that can be used
-    by multiple unit tests. The compounds are created once per test session.
+    Session-scoped: created once and reused across all unit tests that need
+    mass-based target compounds.
 
     :param async_session_factory: Factory for creating database sessions
     :type async_session_factory: callable
@@ -183,9 +190,9 @@ async def test_target_compounds_by_mass(
     async with async_session_factory() as session:
         target_compounds = [
             TargetCompound(
-                target_compound_id=f"target-compound-by-mass-{i + 1}",
+                target_compound_id=gen_test_id(),
                 target_compound_name=None,
-                target_compound_formula=mass,
+                target_compound_formula=str(mass),
                 cas_number=None,
             )
             for i, mass in enumerate(masses)
@@ -203,79 +210,68 @@ async def test_target_compounds_by_mass(
 
 
 @pytest_asyncio.fixture(scope="session")
-async def test_workspaces(async_session_factory):
+async def test_workspaces(async_session_factory) -> list[Workspace]:
     """Create test workspace records in the unit test database.
 
-    This fixture populates the database with test workspaces that can be used
-    by multiple unit tests. The workspaces are created once per test session
-    for better performance.
+    Session-scoped: created once and reused across all unit tests that need
+    workspace data. IDs are stable module-level constants because parametrized
+    tests reference them by value (e.g. `test_get_workspace_existence`).
 
     :param async_session_factory: Factory for creating database sessions
     :return: List of created workspace objects
-    :rtype: list
+    :rtype: list[Workspace]
     """
     async with async_session_factory() as session:
         workspaces = [
             Workspace(
-                workspace_id="unit-test-1",
+                workspace_id=_WORKSPACE_ID_1,
                 workspace_name="Unit Test Workspace 1",
                 workspace_description="This is a unit test workspace",
                 workspace_type="ANALYSIS",
                 instrument=None,
-                locked=0,
+                locked=False,
                 icon=None,
                 workspace_utc_created=datetime.now(timezone.utc),
             ),
             Workspace(
-                workspace_id="unit-test-2",
+                workspace_id=_WORKSPACE_ID_2,
                 workspace_name="Unit Test Workspace 2",
                 workspace_description="This is another unit test workspace",
                 workspace_type="ANALYSIS",
                 instrument=None,
-                locked=0,
+                locked=False,
                 icon=None,
                 workspace_utc_created=datetime.now(timezone.utc),
             ),
         ]
-
         for workspace in workspaces:
             session.add(workspace)
-
         await session.commit()
-
-        # Refresh to get all attributes
         for workspace in workspaces:
             await session.refresh(workspace)
-
         return workspaces
 
 
 @pytest.fixture
 def mock_emit_record_factory():
-    """Factory fixture for creating emit_record_* function mocks for different controllers.
+    """Factory fixture for creating emit_record_* function mocks for
+    different controllers.
 
-    This fixture returns a function that creates specific controller mocks for the
-    emit_record_created, emit_record_updated, and emit_record_deleted functions.
+    Returns a callable that patches `emit_record_created`, `emit_record_updated`,
+    and `emit_record_deleted` at the given module path and returns a container with
+    all three as `AsyncMock` attributes.
 
-    Benefits:
-    1. Prevents real Socket.IO events during tests
-    2. Allows verification of event emissions (event name, data, namespace, room)
-    3. Records all calls to emit for assertion checking
+    Usage:
+        @pytest.fixture
+        def mock_emit_workspace(mock_emit_record_factory):
+            return mock_emit_record_factory(
+                "mascope_backend.api.controllers.workspace.workspace_controller"
+            )
 
-    Verification Methods:
-    - Verify created was called: mock_emit.created.assert_called_once()
-    - Verify with specific args: mock_emit.updated.assert_called_with(record_type="workspace", ...)
-    - Check call count: assert mock_emit.deleted.call_count == 2
-    - Full history: mock_emit.created.call_args_list
-
-    Usage in controller-specific conftest.py:
-    @pytest.fixture
-    def mock_emit_workspace(mock_emit_record_factory):
-        return mock_emit_record_factory("mascope_backend.api.controllers.workspace.workspace_controller")
-
-    In tests:
-    def test_something(mock_emit_workspace):
+    Verification:
         mock_emit_workspace.created.assert_called_once()
+        mock_emit_workspace.updated.assert_called_with(record_type="workspace", ...)
+        assert mock_emit_workspace.deleted.call_count == 2
 
     :return: A function that creates and configures emit_record mocks
     :rtype: callable
