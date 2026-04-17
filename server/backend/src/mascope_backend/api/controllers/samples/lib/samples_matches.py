@@ -113,6 +113,7 @@ async def query_peak_matches(
     agg = (
         match_df.groupby(["sample_peak_id", "target_isotope_id"], sort=False)
         .agg(
+            match_score=("match_score", "first"),
             target_isotope_formula=("target_isotope_formula", "first"),
             target_ion_id=("target_ion_id", "first"),
             target_ion_formula=("target_ion_formula", "first"),

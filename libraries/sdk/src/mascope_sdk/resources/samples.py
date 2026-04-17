@@ -326,6 +326,7 @@ class SamplesResource(BaseResource):
         # We extract fields from the first match if present
         if "match" in df.columns and matches:
             match_keys = [
+                "match_score",
                 "target_isotope_id",
                 "target_isotope_formula",
                 "target_ion_id",
