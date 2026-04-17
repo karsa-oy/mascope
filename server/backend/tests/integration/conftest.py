@@ -2,13 +2,13 @@
 Test fixtures specific to integration tests.
 
 This module establishes the test database and session infrastructure specifically
-for integration tests. It creates an isolated in-memory database just for integration tests,
-so that they don't interfere with unit or other test categories.
+for integration tests. It creates an isolated PostgreSQL database just for
+integration tests so that they don't interfere with unit or other test categories.
 
 Key components:
 - Integration test-specific database engine and session fixtures
-- Database patching to ensure application code uses the test database
-- Session fixtures for integration test database access
+- Database patching to redirect application code to the test database
+- Session factory for integration test database access
 
 Integration testing approach:
 - Tests how components work together
@@ -18,31 +18,33 @@ Integration testing approach:
 """
 
 import pytest
+import pytest_asyncio
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 import mascope_backend.db as db_module
 
 
-@pytest.fixture(scope="session")
-def async_engine(async_engine_factory):
-    """Create an async SQLite in-memory database engine specifically for integration tests.
+@pytest_asyncio.fixture(scope="session")
+async def async_engine(async_engine_factory):
+    """Create an async PostgreSQL engine specifically for integration tests.
 
-    This fixture creates an isolated database engine for integration tests, so that
-    they don't interfere with other test categories.
+    Must be async and await the factory — see `async_engine_factory` in root
+    `conftest.py` for why `asyncio.run()` cannot be used here.
 
-    :param async_engine_factory: Factory to create database engines
+    :param async_engine_factory: Async factory to create database engines
     :return: SQLAlchemy async engine instance
     :rtype: AsyncEngine
     """
-    return async_engine_factory("integration_tests")
+    return await async_engine_factory("integration_tests")
 
 
 @pytest.fixture(scope="session")
 def async_session_factory(async_engine):
     """Create an async session factory for integration tests.
 
-    This session factory is used by both session-scoped fixtures (for persistent test data)
-    and function-scoped fixtures (for isolated test operations).
+    Session-scoped: one factory instance shared across all integration tests.
+    Used directly by session-scoped fixtures (persistent test data such as
+    roles and users) and indirectly via function-scoped session fixtures.
 
     :param async_engine: The SQLAlchemy async engine for integration tests
     :type async_engine: AsyncEngine
@@ -52,26 +54,20 @@ def async_session_factory(async_engine):
     return async_sessionmaker(
         async_engine,
         expire_on_commit=False,  # Keeps objects usable after commit without requerying
-        autoflush=False,  # Prevents automatic DB synchronization for more explicit control in tests
+        autoflush=False,  # Prevents automatic DB sync for more control in tests
     )
 
 
 @pytest.fixture(scope="session", autouse=True)
 def patch_db(async_session_factory):
-    """Patch the application's database session maker for integration tests.
+    """Redirect all application database access to the integration test database.
 
-    This fixture automatically runs for all integration tests so that the application
-    connects to the integration test database. It patches the global ASYNC_SESSION_MAKER variable,
-    which affects both:
-    - async_session() function used in controllers and services
-    - get_async_session() dependency used in API routes
+    Patches `db_module.ASYNC_SESSION_MAKER` for the duration of the test
+    session. This affects both `async_session()` (used in controllers and
+    services) and `get_async_session()` (FastAPI dependency injection).
 
-    NOTE: The autouse=True parameter makes this patching happens automatically for every integration test,
-    preventing the need to explicitly include this fixture in each test function.
-
-    Without this patching  fixture, application code that directly calls async_session() would try
-    to use the real database connection, which would either be unavailable or risk
-    damaging real data.
+    autouse=True: runs automatically for every integration test without
+    explicit inclusion in each test function.
 
     :param async_session_factory: The test session factory
     :type async_session_factory: async_sessionmaker

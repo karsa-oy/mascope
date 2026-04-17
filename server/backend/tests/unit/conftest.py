@@ -2,13 +2,13 @@
 Test fixtures specific to unit tests.
 
 This module establishes the test database and session infrastructure specifically
-for unit tests. It creates an isolated in-memory database just for unit tests
+for unit tests. It creates an isolated PostgreSQL database just for unit tests
 so that they don't interfere with integration or other test categories.
 
 Key components:
 - Unit test-specific database engine and session fixtures
-- Database patching to set application code to use the test database
-- Session factory fixtures for unit test database access
+- Database patching to redirect application code to the test database
+- Session factory for unit test database access
 
 Unit testing approach:
 - Tests individual components in isolation from the rest of the system
@@ -18,31 +18,33 @@ Unit testing approach:
 """
 
 import pytest
+import pytest_asyncio
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 import mascope_backend.db as db_module
 
 
-@pytest.fixture(scope="session")
-def async_engine(async_engine_factory):
-    """Create an async SQLite in-memory database engine specifically for unit tests.
+@pytest_asyncio.fixture(scope="session")
+async def async_engine(async_engine_factory):
+    """Create an async PostgreSQL engine specifically for unit tests.
 
-    This fixture creates an isolated database engine for unit tests, so that
-    they don't interfere with other test categories.
+    Must be async and await the factory — see `async_engine_factory` in root
+    `conftest.py` for why `asyncio.run()` cannot be used here.
 
-    :param async_engine_factory: Factory to create database engines
+    :param async_engine_factory: Async factory to create database engines
     :return: SQLAlchemy async engine instance
     :rtype: AsyncEngine
     """
-    return async_engine_factory("unit_tests")
+    return await async_engine_factory("unit_tests")
 
 
 @pytest.fixture(scope="session")
 def async_session_factory(async_engine):
     """Create an async session factory for unit tests.
 
-    This session factory is used by both session-scoped fixtures (for persistent test data)
-    and function-scoped fixtures (for isolated test operations).
+    Session-scoped: one factory instance shared across all unit tests.
+    Used directly by session-scoped fixtures (persistent test data) and
+    indirectly via the `session` fixture for function-scoped test isolation.
 
     :param async_engine: The SQLAlchemy async engine for unit tests
     :type async_engine: AsyncEngine
@@ -52,26 +54,20 @@ def async_session_factory(async_engine):
     return async_sessionmaker(
         async_engine,
         expire_on_commit=False,  # Keeps objects usable after commit without requerying
-        autoflush=False,  # Prevents automatic DB synchronization for more explicit control in tests
+        autoflush=False,  # Prevents automatic DB synch for more control in tests
     )
 
 
 @pytest.fixture(scope="session", autouse=True)
 def patch_db(async_session_factory):
-    """Patch the application's database session maker for unit tests.
+    """Redirect all application database access to the unit test database.
 
-    This fixture automatically runs for all unit tests so that the application
-    connects to the unit test database. It patches the global ASYNC_SESSION_MAKER variable,
-    which affects both:
-    - async_session() function used in controllers and services
-    - get_async_session() dependency used in API routes
+    Patches `db_module.ASYNC_SESSION_MAKER` for the duration of the test
+    session. This affects both `async_session()` (used in controllers and
+    services) and `get_async_session()` (FastAPI dependency injection).
 
-    NOTE: The autouse=True parameter makes this patching happens automatically for every unit test,
-    preventing the need to explicitly include this fixture in each test function.
-
-    Without this patching  fixture, application code that directly calls async_session() would try
-    to use the real database connection, which would either be unavailable or risk
-    damaging real data.
+    autouse=True: runs automatically for every unit test without explicit
+    inclusion in each test function.
 
     :param async_session_factory: The test session factory
     :type async_session_factory: async_sessionmaker

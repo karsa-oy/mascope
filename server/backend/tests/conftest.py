@@ -1,82 +1,189 @@
 """
 Global pytest fixtures and factory functions for the entire test suite.
 
-This module provides core testing infrastructure that is shared across all test categories
-(unit, integration, etc.). It defines factory fixtures that allow each test category to create
-its own isolated testing environment.
+This module provides core testing infrastructure shared across all test categories
+(unit, integration, etc.). The factory creates isolated PostgreSQL databases per
+test category, dropped and recreated each session for a clean slate.
+
+Local dev: requires `mascope dev up` (postgres at localhost:5432).
+CI: PostgreSQL service container, credentials via `POSTGRES_TEST_PASSWORD` env var.
+
+Password resolution order:
+    1. `POSTGRES_TEST_PASSWORD` env var — CI and explicit local override
+    2. `.runtime/secrets/postgres_password.txt` — standard local dev (via MASCOPE_PATH)
+
+Connection settings (host/port/user) are controlled via `TEST_DB_*` env vars,
+defaulting to the standard dev postgres container values. These are intentionally
+independent of `runtime.config.database` to keep test infrastructure hermetic —
+tests must not be affected by whichever Mascope env happens to be active.
+
+Async fixture design:
+    `async_engine_factory` is a session-scoped async fixture that yields an async
+    callable. Callers must use `@pytest_asyncio.fixture(scope="session")` and must
+    `await` the factory call so that all engine setup runs inside
+    pytest-asyncio's managed session event loop.
 
 Design principles:
-- Test isolation: Different test categories (unit, integration) use separate isolated databases
-- Reusable components: Core functionality is provided as factories
-- Explicit organization: Test fixtures are organized by their scope and purpose
+- Ephemeral: databases created fresh each session, dropped on teardown
+- Isolated: separate database per category (`mascope_test_unit_tests`, etc.)
 - Fixture dependency chain: Always from narrower scope to wider scope
   (function → class → module → session), never the reverse
+- Explicit organization: Test fixtures are organized by their scope and purpose
 """
 
-import asyncio
+import os
+from pathlib import Path
 
-import pytest
+import pytest_asyncio
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import create_async_engine
-from sqlalchemy.pool import StaticPool
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from mascope_backend.db import Base
 
 
-@pytest.fixture(scope="session")
-def async_engine_factory():
-    """Factory fixture that creates in-memory SQLite engines for different test categories.
+# --- Credential resolution ---
 
-    This factory enables different test categories (unit, integration, etc.) to create
-    their own isolated in-memory database engines. Each engine gets its own connection pool
-    for complete isolation between test categories.
 
-    Usage in category-specific conftest.py files:
-        @pytest.fixture(scope="session")
-        def async_engine(async_engine_factory):
-            return async_engine_factory("unit_tests")  # or "integration_tests", etc.
+def _get_test_password() -> str:
+    """Resolve PostgreSQL password for test connections.
 
-    :return: Function to create engine instances
+    Steps:
+    - POSTGRES_TEST_PASSWORD env var (CI and explicit local override)
+    - Secret file fallback (standard local dev via MASCOPE_PATH)
+
+    :return: PostgreSQL password string
+    :rtype: str
+    :raises RuntimeError: If neither source is available
+    """
+    # --- POSTGRES_TEST_PASSWORD env var (CI and explicit local override) ---
+    password = os.environ.get("POSTGRES_TEST_PASSWORD")
+    if password:
+        return password
+
+    # --- Secret file fallback (standard local dev via MASCOPE_PATH) ---
+    mascope_path = os.environ.get("MASCOPE_PATH")
+    if not mascope_path:
+        raise RuntimeError(
+            "Cannot resolve test DB password: "
+            "set POSTGRES_TEST_PASSWORD or MASCOPE_PATH env var"
+        )
+    secret_path = Path(mascope_path) / ".runtime" / "secrets" / "postgres_password.txt"
+    if not secret_path.exists():
+        raise RuntimeError(
+            f"Cannot resolve test DB password: secret file not found at {secret_path}"
+        )
+    return secret_path.read_text().strip()
+
+
+def _get_test_db_url(db_name: str) -> str:
+    """Build asyncpg URL for a named test database.
+
+    :param db_name: Target database name
+    :type db_name: str
+    :return: SQLAlchemy async connection URL
+    :rtype: str
+    """
+    host = os.environ.get("TEST_DB_HOST", "localhost")
+    port = os.environ.get("TEST_DB_PORT", "5432")
+    user = os.environ.get("TEST_DB_USER", "mascope_user")
+    password = _get_test_password()
+    return f"postgresql+asyncpg://{user}:{password}@{host}:{port}/{db_name}"
+
+
+def _get_admin_url() -> str:
+    """Build asyncpg URL for admin operations against the `postgres` maintenance DB.
+
+    :return: SQLAlchemy async connection URL
+    :rtype: str
+    """
+    host = os.environ.get("TEST_DB_HOST", "localhost")
+    port = os.environ.get("TEST_DB_PORT", "5432")
+    user = os.environ.get("TEST_DB_USER", "mascope_user")
+    password = _get_test_password()
+    return f"postgresql+asyncpg://{user}:{password}@{host}:{port}/postgres"
+
+
+# --- Engine factory fixture ---
+
+
+@pytest_asyncio.fixture(scope="session")
+async def async_engine_factory():
+    """Async factory fixture that creates isolated PostgreSQL engines per test category.
+
+    Yields an async callable. Each call creates a `mascope_test_{category}` database
+    from scratch (drop if exists, create, run `Base.metadata.create_all`) inside the
+    pytest-asyncio session event loop. All engines and databases are tracked and cleaned
+    up after the full test session ends.
+
+    Must be called as an async session-scoped fixture in category-specific
+    conftest.py files:
+        @pytest_asyncio.fixture(scope="session")
+        async def async_engine(async_engine_factory):
+            return await async_engine_factory("unit_tests")
+
+    :return: Async callable producing per-category AsyncEngine instances
     :rtype: callable
     """
-    created_engines = []
+    created: list[tuple[AsyncEngine, str]] = []
 
-    def _create_engine(category_name):
-        """Create an in-memory SQLite engine for a specific test category.
+    async def _create_engine(category_name: str) -> AsyncEngine:
+        """Create and initialise a PostgreSQL engine for `category_name`.
 
-        :param category_name: Name of the test category (e.g., "unit", "integration")
+        Steps:
+        - Terminate stale connections and drop any existing test database
+        - Create fresh isolated test database
+        - Build engine and create schema via SQLAlchemy metadata
+
+        :param category_name: Test category identifier (e.g. `unit_tests`)
         :type category_name: str
-        :return: Configured AsyncEngine instance
+        :return: Configured AsyncEngine connected to the test database
         :rtype: AsyncEngine
         """
-        # Create an isolated in-memory database
-        engine = create_async_engine(
-            "sqlite+aiosqlite:///:memory:",
-            connect_args={"check_same_thread": False},
-            poolclass=StaticPool,
-            echo=False,
+        db_name = f"mascope_test_{category_name}"
+
+        # --- Terminate stale connections and drop any existing test database ---
+        admin_engine = create_async_engine(
+            _get_admin_url(),
+            isolation_level="AUTOCOMMIT",
         )
+        async with admin_engine.connect() as conn:
+            await conn.execute(
+                text(
+                    "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+                    "WHERE datname = :db AND pid <> pg_backend_pid()"
+                ),
+                {"db": db_name},
+            )
+            await conn.execute(text(f'DROP DATABASE IF EXISTS "{db_name}"'))
 
-        # Create all tables
-        async def setup_db():
-            async with engine.begin() as conn:
-                await conn.run_sync(Base.metadata.create_all)
-                #  debugging marker to identify database when looking at the SQLite connections
-                await conn.execute(
-                    text(f"PRAGMA application_id = {hash(category_name) & 0x7FFFFFFF}")
-                )
+            # --- Create fresh isolated test database ---
+            await conn.execute(text(f'CREATE DATABASE "{db_name}"'))
+        await admin_engine.dispose()
 
-        asyncio.run(setup_db())
+        # --- Build engine and create schema via SQLAlchemy metadata ---
+        engine = create_async_engine(_get_test_db_url(db_name), echo=False)
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
 
-        # Keep track of created engines for cleanup
-        created_engines.append((engine, category_name))
+        created.append((engine, db_name))
         return engine
 
     yield _create_engine
 
-    # Cleanup all engines
-    async def cleanup_engines():
-        for engine, category in created_engines:
-            await engine.dispose()
-
-    asyncio.run(cleanup_engines())
+    # Teardown: drop all test databases created during this session
+    admin_engine = create_async_engine(
+        _get_admin_url(),
+        isolation_level="AUTOCOMMIT",
+    )
+    for engine, db_name in created:
+        await engine.dispose()
+        async with admin_engine.connect() as conn:
+            await conn.execute(
+                text(
+                    "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+                    "WHERE datname = :db AND pid <> pg_backend_pid()"
+                ),
+                {"db": db_name},
+            )
+            await conn.execute(text(f'DROP DATABASE IF EXISTS "{db_name}"'))
+    await admin_engine.dispose()
