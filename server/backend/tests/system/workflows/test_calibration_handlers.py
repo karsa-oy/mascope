@@ -2,7 +2,11 @@ import os
 import warnings
 
 import pytest
-from utils import FakeNotification, collect_samples, get_orbi_raw_files_collection
+from workflow_utils import (
+    FakeNotification,
+    collect_samples,
+    get_orbi_raw_files_collection,
+)
 
 from mascope_backend.api.controllers.calibration.lib.calibration_mz_fit import (
     get_calibration_handler,
