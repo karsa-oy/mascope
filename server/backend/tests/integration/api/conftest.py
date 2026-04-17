@@ -2,7 +2,7 @@
 API integration test fixtures.
 
 This module provides fixtures for testing the full API request/response cycle
-through FastAPI's TestClient. It focuses on realistic end-to-end testing of API
+through FastAPI's AsyncClient. It focuses on realistic end-to-end testing of API
 endpoints with proper authentication and database access.
 
 Key components:
@@ -12,19 +12,27 @@ Key components:
 - Fundamental database fixtures (roles, users) used by authentication
 
 Integration testing approach for API:
-- Test API endpoints through the HTTP interface
+- Test API endpoints through the HTTP interface using httpx.AsyncClient
 - Verify role-based access control (RBAC) works correctly
 - Test realistic request/response flows
 - Verify proper error handling and status codes
 - Test with realistic authentication
 
+Why AsyncClient instead of TestClient:
+    TestClient runs the ASGI app in a separate thread with its own event loop.
+    asyncpg connections are bound to the event loop they were created in and
+    cannot be used from a different loop. This causes `InterfaceError: cannot
+    perform operation: another operation is in progress` when TestClient's
+    thread loop tries to use connections from the session-scoped test engine.
+    AsyncClient runs in the same event loop as the test session, so all asyncpg
+    operations stay on one loop.
+
 NOTE: Authentication and RBAC
-These fixtures use a similar approach to Mascope app authentication system  by generating
-valid JWT tokens and including them in cookies.
-    1. The JWT token contains the user_id, which the application uses to determine permissions
-    2. When a client makes a request, the application validates the JWT token
-    3. The application then checks if the user's role has sufficient permissions for the operation
-    4. If permissions are insufficient, the application returns 401 (Unauthorized) or 403 (Forbidden)
+    These fixtures emulate the full Mascope authentication flow:
+    1. JWT token is generated with the user's ID as subject
+    2. Token is injected into the client's cookies
+    3. On each request, the app validates the token and resolves the user's role
+    4. Role-based access control returns 403 for insufficient permissions
 """
 
 from datetime import datetime, timedelta, timezone
@@ -32,7 +40,7 @@ from datetime import datetime, timedelta, timezone
 import jwt
 import pytest
 import pytest_asyncio
-from fastapi.testclient import TestClient
+from httpx import ASGITransport, AsyncClient
 
 from mascope_backend.api.new.auth.config import auth_settings
 from mascope_backend.app.fast import fast
@@ -41,61 +49,52 @@ from mascope_backend.db import Role, User
 
 @pytest_asyncio.fixture(scope="session")
 async def roles(async_session_factory):
-    """Create role fixtures for testing.
+    """Create role records for the integration test session.
 
-    This fixture has session scope because roles are fundamental data that doesn't change
-    between tests. By creating roles once at the beginning of the test session:
-        1. Improves test performance by avoiding repeated role creation
-        2. Consistent role data is available to all tests
+    Session-scoped: roles are fundamental reference data that don't change
+    between tests. Created once at session start and reused by all tests
+    that need role-based access control.
 
-    This fixture uses async_session_factory directly (not the session fixture) because
-    pytest doesn't allow session-scoped fixtures to depend on narrower-scoped fixtures.
+    Uses `async_session_factory` directly — session-scoped fixtures cannot
+    depend on narrower-scoped fixtures.
 
-    :param async_session_factory: Factory for creating sessions
+    :param async_session_factory: Factory for creating database sessions
     :type async_session_factory: async_sessionmaker
-    :return: Dictionary of created role objects
+    :return: Dictionary mapping role name to Role object
     :rtype: dict[str, Role]
     """
     async with async_session_factory() as session:
-        # Create roles from auth_settings.ROLE_ACCESS_LEVELS
         roles_config = {
             role_name: Role(role_id=access_level, role_name=role_name)
             for role_name, access_level in auth_settings.ROLE_ACCESS_LEVELS.items()
         }
-
         for role in roles_config.values():
             session.add(role)
-
         await session.commit()
         return roles_config
 
 
 @pytest_asyncio.fixture(scope="session")
 async def test_users(async_session_factory, roles):
-    """Create test users with different roles (session-scoped).
+    """Create test users with each role for the integration test session.
 
-    This fixture has session scope:
-    1. Users are created only once for all tests, improving performance
-    2. All tests have access to the same consistent set of test users
-    3. Integration tests can rely on persistent user identities for authentication
+    Session-scoped: users are created once and reused across all tests.
+    Consistent user identities are required for JWT token generation and
+    RBAC verification across the session.
 
-    Like the roles fixture, this uses async_session_factory directly rather than
-    the function-scoped session fixture to respect pytest's scope hierarchy.
-
-    :param async_session_factory: Factory for creating sessions
+    :param async_session_factory: Factory for creating database sessions
     :type async_session_factory: async_sessionmaker
-    :param roles: Dict of role objects
+    :param roles: Dict of role objects keyed by role name
     :type roles: dict[str, Role]
-    :return: Dictionary of user objects by role
+    :return: Dictionary mapping role name to User object
     :rtype: dict[str, User]
     """
-    # Create a session specifically for this fixture
     async with async_session_factory() as session:
         users = {
             "guest": User(
                 email="guest@test.com",
                 username="guest_user",
-                hashed_password="123456",  # Not a real hash for testing
+                hashed_password="123456",
                 is_active=True,
                 is_verified=False,
                 role_id=roles["guest"].role_id,
@@ -126,163 +125,114 @@ async def test_users(async_session_factory, roles):
                 role_id=roles["owner"].role_id,
             ),
         }
-
         for user in users.values():
             session.add(user)
-
-        # commit instead of flush since this is session-level data
         await session.commit()
-
-        # Refresh users to get their IDs
         for user in users.values():
             await session.refresh(user)
-
         return users
-    # The session will be closed when the test session ends
 
 
 @pytest.fixture
 def create_jwt_auth_token():
-    """
-    Create a valid JWT token for testing protected api endpoints.
+    """Return a factory function that generates valid JWT tokens for test users.
 
-    This fixture returns a function that generates valid authentication tokens
-    for testing role-based access control. The tokens generated match the
-    format and claims expected by the application's authentication system.
+    Tokens match the format expected by the application's authentication system:
+    subject is the user UUID, audience and algorithm match `auth_settings`.
 
-    :return: A function that creates JWT tokens for specified users
+    :return: Callable that accepts a User and returns a JWT token string
     :rtype: Callable[[User], str]
     """
 
-    def _create_token(user):
-        # Create token payload matching your app's expectations
+    def _create_token(user: User) -> str:
         payload = {
-            "sub": str(user.id),  # Subject (user ID), used for authentication and RBAC
-            "aud": auth_settings.JWT_AUDIENCE,  # Audience
-            "exp": datetime.now(timezone.utc) + timedelta(days=1),  # Expiration
-            "iat": datetime.now(timezone.utc),  # Issued at
+            "sub": str(user.id),
+            "aud": auth_settings.JWT_AUDIENCE,
+            "exp": datetime.now(timezone.utc) + timedelta(days=1),
+            "iat": datetime.now(timezone.utc),
         }
-
-        # Generate the token using your app's settings
-        token = jwt.encode(
+        return jwt.encode(
             payload, auth_settings.JWT_SECRET_KEY, algorithm=auth_settings.JWT_ALGORITHM
         )
-
-        return token
 
     return _create_token
 
 
-@pytest.fixture
-def guest_client(test_users, create_jwt_auth_token):
+def _make_async_client(user: User, create_jwt_auth_token) -> AsyncClient:
+    """Construct an AsyncClient with a JWT auth cookie for `user`.
+
+    :param user: Authenticated test user
+    :param create_jwt_auth_token: Token factory from the fixture
+    :return: Configured AsyncClient (not yet entered as context manager)
+    :rtype: AsyncClient
     """
-    Create a TestClient authenticated as a guest user.
+    token = create_jwt_auth_token(user)
+    client = AsyncClient(
+        transport=ASGITransport(app=fast),
+        base_url="http://test",
+        cookies={auth_settings.COOKIE_NAME: token},
+    )
+    return client
 
-    This fixture creates a test client with guest-level permissions by:
-        1. Generating a valid JWT token containing the guest user's user_id
-        2. Adding this token to the client's cookies
 
-    The client will use the test database because of the patch_db fixture.
+@pytest_asyncio.fixture
+async def guest_client(test_users, create_jwt_auth_token):
+    """AsyncClient authenticated as a guest user.
 
-    :param test_users: Dictionary of test user objects
-    :type test_users: dict
-    :param create_jwt_auth_token: Function to create JWT tokens
-    :type create_jwt_auth_token: callable
-    :return: TestClient with guest permissions
-    :rtype: TestClient
+    Guest users can read workspaces but cannot create, update, or delete.
+
+    :param test_users: Dict of test user objects
+    :param create_jwt_auth_token: JWT token factory
+    :return: Authenticated AsyncClient with guest permissions
+    :rtype: AsyncClient
     """
-    # Generate a valid JWT token for the guest user
-    token = create_jwt_auth_token(test_users["guest"])
-
-    # Create a client with proper authentication
-    client = TestClient(fast)
-
-    # Set the auth cookie with the JWT token
-    client.cookies.set(auth_settings.COOKIE_NAME, token)
-
-    yield client
+    async with _make_async_client(test_users["guest"], create_jwt_auth_token) as client:
+        yield client
 
 
-@pytest.fixture
-def editor_client(test_users, create_jwt_auth_token):
+@pytest_asyncio.fixture
+async def editor_client(test_users, create_jwt_auth_token):
+    """AsyncClient authenticated as an editor user.
+
+    Editor users can perform all CRUD operations on workspaces.
+
+    :param test_users: Dict of test user objects
+    :param create_jwt_auth_token: JWT token factory
+    :return: Authenticated AsyncClient with editor permissions
+    :rtype: AsyncClient
     """
-    Create a TestClient authenticated as an editor user.
+    async with _make_async_client(
+        test_users["editor"], create_jwt_auth_token
+    ) as client:
+        yield client
 
-    Editor users have all guest permissions plus additional capabilities
-    specific to their role.
 
-    :param test_users: Dictionary of test user objects
-    :type test_users: dict
-    :param create_jwt_auth_token: Function to create JWT tokens
-    :type create_jwt_auth_token: callable
-    :return: TestClient with editor permissions
-    :rtype: TestClient
+@pytest_asyncio.fixture
+async def admin_client(test_users, create_jwt_auth_token):
+    """AsyncClient authenticated as an admin user.
+
+    :param test_users: Dict of test user objects
+    :param create_jwt_auth_token: JWT token factory
+    :return: Authenticated AsyncClient with admin permissions
+    :rtype: AsyncClient
     """
-    # Generate a valid JWT token for the editor user
-    token = create_jwt_auth_token(test_users["editor"])
-
-    # Create a client with proper authentication
-    client = TestClient(fast)
-
-    # Set the auth cookie with the JWT token
-    client.cookies.set(auth_settings.COOKIE_NAME, token)
-
-    yield client
+    async with _make_async_client(test_users["admin"], create_jwt_auth_token) as client:
+        yield client
 
 
-@pytest.fixture
-def admin_client(test_users, create_jwt_auth_token):
-    """
-    Create a TestClient authenticated as an admin user.
-
-    Admin users have all guest and editor permissions plus additional
-    capabilities specific to their role.
-
-    :param test_users: Dictionary of test user objects
-    :type test_users: dict
-    :param create_jwt_auth_token: Function to create JWT tokens
-    :type create_jwt_auth_token: callable
-    :return: TestClient with admin permissions
-    :rtype: TestClient
-    """
-    # Generate a valid JWT token for the admin user
-    token = create_jwt_auth_token(test_users["admin"])
-
-    # Create a client with proper authentication
-    client = TestClient(fast)
-
-    # Set the auth cookie with the JWT token
-    client.cookies.set(auth_settings.COOKIE_NAME, token)
-
-    yield client
-
-
-@pytest.fixture
-def owner_client(test_users, create_jwt_auth_token):
-    """
-    Create a TestClient authenticated as an owner user.
+@pytest_asyncio.fixture
+async def owner_client(test_users, create_jwt_auth_token):
+    """AsyncClient authenticated as an owner user.
 
     Owner users have full access to all system capabilities.
 
-    :param session: Database session for tests
-    :type session: AsyncSession
-    :param test_users: Dictionary of test user objects
-    :type test_users: dict
-    :param create_jwt_auth_token: Function to create JWT tokens
-    :type create_jwt_auth_token: callable
-    :return: TestClient with owner permissions
-    :rtype: TestClient
+    :param test_users: Dict of test user objects
+    :param create_jwt_auth_token: JWT token factory
+    :return: Authenticated AsyncClient with owner permissions
+    :rtype: AsyncClient
     """
-    # Generate a valid JWT token for the owner user
-    token = create_jwt_auth_token(test_users["owner"])
-
-    # Create a client with proper authentication
-    client = TestClient(fast)
-
-    # Set the auth cookie with the JWT token
-    client.cookies.set(auth_settings.COOKIE_NAME, token)
-
-    yield client
+    async with _make_async_client(test_users["owner"], create_jwt_auth_token) as client:
+        yield client
 
 
 @pytest.fixture
@@ -303,8 +253,6 @@ def workspace_create_data():
 def workspace_update_data():
     """Sample data for workspace update requests.
 
-    This fixture provides a consistent dataset for testing workspace update endpoints.
-
     :return: Dictionary with workspace update data
     :rtype: dict
     """
@@ -318,13 +266,11 @@ def workspace_update_data():
 def sample_batch_create_data():
     """Sample data for sample batch creation requests.
 
-    This fixture provides a consistent dataset for testing sample batch creation endpoints.
-
     :return: Dictionary with sample batch creation data
     :rtype: dict
     """
     return {
         "sample_batch_name": "New Test Sample Batch",
         "sample_batch_description": "Sample batch for testing",
-        "target_collection_ids": ["collection1", "collection2"],
+        "target_collection_ids": [],
     }
