@@ -79,14 +79,6 @@ class PeakRecomputeWorker(Thread):
         """
         filename = request.get("filename")
         access_token = request.get("access_token")
-
-        if not isinstance(filename, str) or not filename:
-            raise ValueError("Peak detection request is missing a valid filename")
-        if not isinstance(access_token, str) or not access_token:
-            raise ValueError(
-                f"Peak detection request for '{filename}' is missing a valid access token"
-            )
-
         sample_file_id = request.get("sample_file_id")
         affected_sample_item_ids = request.get("affected_sample_item_ids", [])
         process_id = request.get("process_id")
@@ -95,10 +87,17 @@ class PeakRecomputeWorker(Thread):
             "user_id": request.get("user_id"),
         }
 
-        runtime.logger.info(
-            f"PeakRecomputeWorker: processing peak detection for '{filename}'"
-        )
         try:
+            if not isinstance(filename, str) or not filename:
+                raise ValueError("Peak detection request is missing a valid filename")
+            if not isinstance(access_token, str) or not access_token:
+                raise ValueError(
+                    f"Peak detection request for '{filename}' is missing a valid access token"
+                )
+
+            runtime.logger.info(
+                f"PeakRecomputeWorker: processing peak detection for '{filename}'"
+            )
             if is_blank_sample_file(filename, access_token):
                 runtime.logger.info(
                     f"PeakRecomputeWorker: skipping peak detection for blank sample '{filename}'"
@@ -182,5 +181,11 @@ class PeakRecomputeWorker(Thread):
                 request = self.queue.get(timeout=1)
             except Empty:
                 continue
-            self._process_request(request)
+            try:
+                self._process_request(request)
+            except Exception as e:
+                runtime.logger.error(
+                    f"PeakRecomputeWorker: unexpected error while processing request: "
+                    f"{e}\n{traceback.format_exc()}"
+                )
         runtime.logger.info("PeakRecomputeWorker stopped")
