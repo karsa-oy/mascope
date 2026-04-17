@@ -995,6 +995,183 @@ It's responsible for transforming incoming data files and recording correspondin
 database. Its a distinct [module](#runtime-modules) which is launched independently using the
 [CLI](#runtime-cli).
 
+# PostgreSQL Tuning Reference
+
+Settings live in `[backend.database]` in `.mascope.toml` layer files.
+Postgres tuning parameters are passed as `-c` flags via Docker Compose command override.
+`shm_size` is a Docker field - applied via `shm_size:` in compose, never passed to postgres.
+
+**References:**
+
+- [PostgreSQL Parameter Tuning Best Practices - mydbops](https://www.mydbops.com/blog/postgresql-parameter-tuning-best-practices)
+- [How to Tune Database Parameters - EnterpriseDB](https://www.enterprisedb.com/postgres-tutorials/comprehensive-guide-how-tune-database-parameters-and-configuration-postgresql)
+- [PostgreSQL Resource Consumption Docs](https://www.postgresql.org/docs/current/runtime-config-resource.html)
+
+## Recommended Values
+
+| Setting                        | PG Default | Base (dev, ~16 GB SSD) | Prod (64 GB NVMe) |
+| ------------------------------ | ---------- | ---------------------- | ----------------- |
+| `shared_buffers`               | 128MB      | 512MB                  | 16GB              |
+| `effective_cache_size`         | 4GB        | 4GB                    | 48GB              |
+| `work_mem`                     | 4MB        | 32MB                   | 64MB              |
+| `maintenance_work_mem`         | 64MB       | 512MB                  | 4GB               |
+| `autovacuum_work_mem`          | -1         | -1                     | 2GB               |
+| `wal_buffers`                  | auto ~16MB | 16MB                   | 16MB              |
+| `min_wal_size`                 | 80MB       | 512MB                  | 1GB               |
+| `max_wal_size`                 | 1GB        | 2GB                    | 4GB               |
+| `checkpoint_completion_target` | 0.9        | 0.9                    | 0.9               |
+| `wal_compression`              | off        | on                     | on                |
+| `random_page_cost`             | 4.0        | 1.1                    | 1.1               |
+| `effective_io_concurrency`     | 1          | 200                    | 200               |
+| `default_statistics_target`    | 100        | 100                    | 100               |
+| `jit`                          | on         | off                    | off               |
+| `autovacuum_max_workers`       | 3          | 3                      | 4                 |
+| `shm_size` (Docker)            | 64m        | 1g                     | 20g               |
+
+## Memory
+
+### shared_buffers
+
+PostgreSQL's dedicated data page cache. The single largest performance lever - pages cached here
+cost zero I/O on repeated reads. Rule: **25% of RAM**. Above ~40% competes with the OS page cache
+and yields diminishing returns. PostgreSQL's 128MB default is a historical artifact.
+
+### effective_cache_size
+
+Planner hint only - **no memory is allocated**. Tells the planner how much total cache
+(shared_buffers + OS page cache) is available. Too low causes the planner to prefer sequential
+scans over index scans on large tables. Set to **75% of RAM**.
+
+### work_mem
+
+Per-operation memory for sorts, hash joins, hash aggregates, window functions.
+**Allocated per operation per connection** - a query with three sort nodes uses 3× work_mem.
+Too low causes disk spills (10–100× slower). Worst-case formula:
+
+```
+workers × (pool_size + max_overflow) × ops_per_query × work_mem
+# Prod: 12 × 5 × 3 × 64MB = ~11GB - acceptable on 64GB
+```
+
+Diagnostic: set `log_temp_files = 0` and watch for spill entries in logs (see below).
+
+### maintenance_work_mem
+
+Memory for `VACUUM`, `CREATE INDEX`, `ALTER TABLE`, `pg_restore`. Only a few maintenance ops
+run concurrently so this can be set high safely. The difference between 64MB and 4GB on a
+450M-row index build is significant.
+
+### autovacuum_work_mem
+
+Memory per autovacuum worker. `-1` inherits `maintenance_work_mem`. Set explicitly in prod
+so background autovacuum workers don't consume the full `maintenance_work_mem` allocation.
+
+### wal_buffers
+
+Shared memory buffer for WAL records before flush to disk. Auto-tunes to 1/32 of
+`shared_buffers`, capped at 16MB. Set explicitly so it's visible in config.
+**Requires container restart** (shared memory allocation).
+
+## Checkpoints and WAL
+
+### min_wal_size / max_wal_size
+
+WAL files below `min_wal_size` are recycled rather than deleted. `max_wal_size` is the ceiling
+before a checkpoint is forced. Too small causes I/O spikes from forced checkpoints. Scale with
+`shared_buffers` - a larger buffer pool accumulates more dirty data between checkpoints.
+
+### checkpoint_completion_target
+
+Fraction of the checkpoint interval over which dirty page writes are spread. At `0.9`,
+writes are distributed evenly - no I/O spike at checkpoint boundary. Default since PG14
+but set explicitly for visibility.
+
+### wal_compression
+
+Compresses WAL records before writing. Reduces WAL volume and disk usage at minor CPU cost.
+`on` uses zlib - available in standard `postgres:16-alpine`.
+`lz4` requires PostgreSQL compiled with `--with-lz4` (**not in the standard image**).
+
+## Planner
+
+### random_page_cost
+
+Cost of a random page fetch relative to sequential (always 1.0). Default 4.0 assumes spinning
+disk - causes the planner to avoid index scans and prefer sequential scans even when an index
+would be faster. Set to **1.1 for SSD/NVMe** where random reads are nearly as fast as sequential.
+Getting this wrong causes full table scans on large tables that have usable indexes.
+
+### effective_io_concurrency
+
+Concurrent I/O requests for bitmap heap scans. Default 1 assumes a single spinning disk.
+Set to **200 for SSD/NVMe**. No effect on sequential scans.
+
+### default_statistics_target
+
+Histogram depth per column collected during `ANALYZE`. Higher values give the planner more
+accurate row estimates for skewed data. PostgreSQL default 100 is adequate as a baseline.
+For heavily skewed columns (isotope counts, intensity values), set per-column:
+
+```sql
+ALTER TABLE match_isotopes ALTER COLUMN intensity SET STATISTICS 500;
+ANALYZE match_isotopes;
+```
+
+### jit
+
+JIT compilation benefits long analytical queries but adds overhead on short transactional ones.
+Disabled for Mascope's mixed workload - re-evaluate with profiling data if specific long queries
+would benefit.
+
+## Autovacuum
+
+### autovacuum_max_workers
+
+Parallel autovacuum workers. Each consumes `autovacuum_work_mem`. Default 3 is fine for dev;
+4 in prod with many large tables prevents dead tuple accumulation.
+
+The global `autovacuum_vacuum_scale_factor` default of 0.2 means vacuum triggers after 20% of
+the table is modified - on a 450M-row table that's 90M dead tuples before cleanup. For large
+tables, override per-table:
+
+```sql
+ALTER TABLE match_isotopes SET (
+    autovacuum_vacuum_scale_factor = 0.01,
+    autovacuum_analyze_scale_factor = 0.005
+);
+```
+
+## Docker: shm_size
+
+`/dev/shm` tmpfs inside the postgres container. PostgreSQL uses it for shared_buffers, WAL
+buffers, lock tables, and IPC. Docker default 64MB causes crashes with any real shared_buffers:
+
+```
+ERROR: could not resize shared memory segment: No space left on device
+```
+
+Rule: `shm_size >= shared_buffers + 2GB overhead (WAL buffers, lock tables, IPC)`
+
+> **Uses Docker byte format: `m` / `g` - not PostgreSQL format `MB` / `GB`.**
+> The Pydantic validator rejects PostgreSQL format values for this field.
+
+## Verifying Settings
+
+```bash
+# Confirm settings applied
+mascope prod db cli -p
+postgres=# SHOW shared_buffers;
+postgres=# SHOW work_mem;
+postgres=# SHOW random_page_cost;
+
+# Check /dev/shm allocation and usage
+docker exec mascope_prod_postgres df -h /dev/shm
+
+# Check postgres shared memory segments
+docker exec mascope_prod_postgres psql -U mascope_user \
+  -c "SELECT name, size FROM pg_shmem_allocations ORDER BY size DESC LIMIT 10;"
+```
+
 ## Scheduled Database Backups (Cron)
 
 Mascope uses `cron` to automate PostgreSQL backups via the `mascope prod db backup` CLI commands.

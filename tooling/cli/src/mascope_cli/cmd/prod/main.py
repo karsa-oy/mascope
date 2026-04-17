@@ -123,17 +123,37 @@ def _compose_env() -> dict[str, str]:
 
     return dict(
         MASCOPE_ENV=runtime.env.name,
+        MASCOPE_PATH=os.environ["MASCOPE_PATH"],
         MASCOPE_RUNTIME=mascope_runtime,
         MASCOPE_FILESTORE=runtime.meta.filestore,
         MASCOPE_TIMEZONE=timezone,
-        MASCOPE_DB_NAME=db_name,
-        MASCOPE_DB_USER=db_cfg.user,
-        MASCOPE_PATH=os.environ["MASCOPE_PATH"],
         # Forwarded explicitly so compose variable interpolation is always
         # satisfied — empty string when --log-level was not passed, which
         # compose treats as "no override" for the container environment.
         MASCOPE_LOGLEVEL=os.environ.get("MASCOPE_LOGLEVEL", ""),
+        # --- Db settings ---
+        MASCOPE_DB_NAME=db_name,
+        MASCOPE_DB_USER=db_cfg.user,
         MASCOPE_DB_CONTAINER_NAME=db_cfg.get_postgres_container_name(mode=_MODE),
+        MASCOPE_DB_SHM_SIZE=db_cfg.shm_size,
+        MASCOPE_DB_SHARED_BUFFERS=db_cfg.shared_buffers,
+        MASCOPE_DB_EFFECTIVE_CACHE_SIZE=db_cfg.effective_cache_size,
+        MASCOPE_DB_WORK_MEM=db_cfg.work_mem,
+        MASCOPE_DB_MAINTENANCE_WORK_MEM=db_cfg.maintenance_work_mem,
+        MASCOPE_DB_AUTOVACUUM_WORK_MEM=db_cfg.autovacuum_work_mem,
+        MASCOPE_DB_WAL_BUFFERS=db_cfg.wal_buffers,
+        MASCOPE_DB_MIN_WAL_SIZE=db_cfg.min_wal_size,
+        MASCOPE_DB_MAX_WAL_SIZE=db_cfg.max_wal_size,
+        MASCOPE_DB_CHECKPOINT_COMPLETION_TARGET=str(
+            db_cfg.checkpoint_completion_target
+        ),
+        MASCOPE_DB_WAL_COMPRESSION=db_cfg.wal_compression,
+        MASCOPE_DB_EFFECTIVE_IO_CONCURRENCY=str(db_cfg.effective_io_concurrency),
+        MASCOPE_DB_RANDOM_PAGE_COST=str(db_cfg.random_page_cost),
+        MASCOPE_DB_DEFAULT_STATISTICS_TARGET=str(db_cfg.default_statistics_target),
+        MASCOPE_DB_JIT=db_cfg.jit,
+        MASCOPE_DB_AUTOVACUUM_MAX_WORKERS=str(db_cfg.autovacuum_max_workers),
+        # --- Container names ---
         MASCOPE_REDIS_CONTAINER_NAME=redis_cfg.get_redis_container_name(mode=_MODE),
         MASCOPE_BACKEND_CONTAINER_NAME=backend_cfg.get_backend_container_name(
             mode=_MODE

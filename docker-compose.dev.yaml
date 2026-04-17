@@ -14,11 +14,45 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: ${MASCOPE_DB_CONTAINER_NAME:-mascope_dev_postgres}
-    ports:
-      - "${MASCOPE_DB_PORT:-5432}:5432" # Exposed for DBeaver, psql, etc.
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=${MASCOPE_DB_SHARED_BUFFERS:-512MB}"
+      - "-c"
+      - "effective_cache_size=${MASCOPE_DB_EFFECTIVE_CACHE_SIZE:-4GB}"
+      - "-c"
+      - "work_mem=${MASCOPE_DB_WORK_MEM:-32MB}"
+      - "-c"
+      - "maintenance_work_mem=${MASCOPE_DB_MAINTENANCE_WORK_MEM:-512MB}"
+      - "-c"
+      - "autovacuum_work_mem=${MASCOPE_DB_AUTOVACUUM_WORK_MEM:--1}"
+      - "-c"
+      - "wal_buffers=${MASCOPE_DB_WAL_BUFFERS:-16MB}"
+      - "-c"
+      - "min_wal_size=${MASCOPE_DB_MIN_WAL_SIZE:-512MB}"
+      - "-c"
+      - "max_wal_size=${MASCOPE_DB_MAX_WAL_SIZE:-2GB}"
+      - "-c"
+      - "checkpoint_completion_target=${MASCOPE_DB_CHECKPOINT_COMPLETION_TARGET:-0.9}"
+      - "-c"
+      - "wal_compression=${MASCOPE_DB_WAL_COMPRESSION:-on}"
+      - "-c"
+      - "effective_io_concurrency=${MASCOPE_DB_EFFECTIVE_IO_CONCURRENCY:-200}"
+      - "-c"
+      - "random_page_cost=${MASCOPE_DB_RANDOM_PAGE_COST:-1.1}"
+      - "-c"
+      - "default_statistics_target=${MASCOPE_DB_DEFAULT_STATISTICS_TARGET:-100}"
+      - "-c"
+      - "jit=${MASCOPE_DB_JIT:-off}"
+      - "-c"
+      - "autovacuum_max_workers=${MASCOPE_DB_AUTOVACUUM_MAX_WORKERS:-3}"
     environment:
       POSTGRES_USER: ${MASCOPE_DB_USER:-mascope_user}
       POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    ports:
+      - "${MASCOPE_DB_PORT:-5432}:5432" # Exposed for DBeaver, psql, etc.
+    shm_size: ${MASCOPE_DB_SHM_SIZE:-1g}
+    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mascope_user}"]
       interval: 5s
@@ -30,7 +64,6 @@ services:
       - ${MASCOPE_PATH}/.runtime/database/transfer:/transfer
     secrets:
       - postgres_password
-    restart: unless-stopped
 
   redis:
     image: redis:7-alpine

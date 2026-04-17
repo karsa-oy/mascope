@@ -10,12 +10,13 @@ three-layer overlay system.
 from __future__ import annotations
 
 import os
+import re
 import tomllib
 import typing
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 if typing.TYPE_CHECKING:
@@ -46,27 +47,32 @@ class MetaConfig(BaseModel):
 
 class DatabaseConfig(BaseModel):
     """
-    PostgreSQL database configuration - connections, timeouts, and engine settings.
+    PostgreSQL database configuration — connections, pool, engine and server tuning.
 
     NOTE: Connection pool settings are per-worker: total possible connections
     across all workers must stay under PostgreSQL max_connections (default 100).
+    See postgres README.md for tuning parameter explanations.
+
     """
 
-    # PostgreSQL connection settings
+    # --- Connection ---
     host: str = "localhost"  # dev default, in prod the host is postgres container name
     port: int = 5432
     database: str = "mascope"  # Base name - actual will be mascope_{env}
     user: str = "mascope_user"  # password loaded via secret
 
-    # Container settings
+    # --- Docker ---
     container_name: str = (
         "postgres"  # base name, actual will be mascope_{mode}_postgres
     )
     # Mount base names — must match compose bind mount targets
     backups_mount: str = "backups"
     transfer_mount: str = "transfer"
+    # /dev/shm tmpfs size. NOT a postgres flag — applied via compose shm_size field.
+    # Must be >= shared_buffers + ~2GB. Uses Docker format: m/g (not MB/GB).
+    shm_size: str = "1g"
 
-    # SQLAlchemy connection pool settings (per worker)
+    # --- SQLAlchemy pool (per worker) ---
     pool_size: int = 3  # Base pool size - persistent connections kept open per worker
     max_overflow: int = (
         2  # Additional overflow connections allowed per worker under load
@@ -78,6 +84,50 @@ class DatabaseConfig(BaseModel):
         True  # Health check connection before use (prevents stale connections)
     )
     expire_on_commit: bool = False  # Keep loaded objects accessible after commit
+
+    # --- PostgreSQL: memory ---
+    shared_buffers: str = "512MB"  # primary data cache; 25% RAM on prod
+    effective_cache_size: str = (
+        "4GB"  # planner hint only, no allocation; 75% RAM on prod
+    )
+    work_mem: str = "32MB"  # per sort/hash-join op per connection
+    maintenance_work_mem: str = "512MB"  # VACUUM, CREATE INDEX, pg_restore
+    autovacuum_work_mem: str = "-1"  # -1 = inherit maintenance_work_mem
+    wal_buffers: str = "16MB"  # WAL shared memory buffer; 16MB is practical ceiling
+
+    # --- PostgreSQL: checkpoints and WAL ---
+    min_wal_size: str = "512MB"  # minimum WAL retained on disk
+    max_wal_size: str = "2GB"  # WAL ceiling before forced checkpoint
+    checkpoint_completion_target: float = (
+        0.9  # spread checkpoint writes over 90% of interval
+    )
+    wal_compression: str = "on"  # zlib WAL compression; lz4 requires build flag
+
+    # --- PostgreSQL: planner ---
+    effective_io_concurrency: int = (
+        200  # concurrent I/O requests; 200 for SSD/NVMe, 1 for HDD
+    )
+    random_page_cost: float = (
+        1.1  # relative cost of random vs sequential read; 1.1 for SSD
+    )
+    default_statistics_target: int = (
+        100  # planner histogram depth; raise for skewed distributions
+    )
+    jit: str = "off"  # JIT compilation; off for mixed/short-query workloads
+
+    # --- PostgreSQL: autovacuum ---
+    autovacuum_max_workers: int = 3  # parallel autovacuum workers
+
+    @field_validator("shm_size")
+    @classmethod
+    def validate_shm_size_format(cls, v: str) -> str:
+        """Reject PostgreSQL-format values (MB/GB) — Docker only accepts m/g."""
+        if not re.fullmatch(r"\d+[bkmg]", v.lower()):
+            raise ValueError(
+                f"shm_size must use Docker format (e.g. '1g', '256m'), got '{v}'. "
+                "See postgres README.md."
+            )
+        return v.lower()
 
     def get_postgres_container_name(self, mode: str) -> str:
         """

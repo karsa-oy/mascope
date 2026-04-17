@@ -9,14 +9,54 @@
 workers = "auto" # uvicorn workers ("auto" || int)
 
 [backend.database]
-# PostgreSQL connection 
+# --- PostgreSQL connection ---
 host = "postgres"  # Docker Compose service name
+user = "mascope_user"
+port = 5432
 
+# --- Docker ---
+shm_size = "20g" # shared_buffers (16GB) + 2GB IPC overhead + 2GB headroom
+
+# --- SQLAlchemy pool (per worker) ---
 # SQLAlchemy engine pool settings for multi-worker production
 # NOTE: With auto workers (12 usually): pool_size=3, max_overflow=2 → 12 × 5 = 60 max connections
 # Stays under PostgreSQL max_connections=100 default
 pool_size = 3
 max_overflow = 2
+pool_timeout = 30
+pool_pre_ping = true
+expire_on_commit = false
+
+# 64 GB RAM, 24-core, NVMe.
+# Values from PGTune (mixed workload profile) minus unsupported flags.
+# See postgres README.md for full explanation.
+
+# --- PostgreSQL: memory ---
+shared_buffers = "16GB"           # 25% of 64GB RAM; primary data cache
+effective_cache_size = "48GB"     # planner hint; ~75% of available RAM
+work_mem = "64MB"                 # per sort/hash op; raise if EXPLAIN shows disk spills
+maintenance_work_mem = "4GB"      # index builds, VACUUM; safe bump over 64MB default
+autovacuum_work_mem = "2GB"       # explicit per-worker override; ignores maintenance_work_mem
+wal_buffers = "16MB"              # practical ceiling; good for any concurrent write load
+
+# --- PostgreSQL: checkpoints and WAL ---
+min_wal_size = "1GB"              # minimum WAL retained
+max_wal_size = "4GB"              # ceiling before forced checkpoint
+checkpoint_completion_target = 0.9  # spread checkpoint I/O over 90% of interval
+
+# Note: wal_compression = "on" uses zlib. "lz4" requires postgres built with --with-lz4
+# (not available in standard postgres:16-alpine image).
+wal_compression = "on"
+
+# --- PostgreSQL: planner ---
+effective_io_concurrency = 200    # SSD/NVMe on dev machines; set 1 for HDD
+random_page_cost = 1.1            # SSD random read cost; 4.0 for HDD
+default_statistics_target = 100   # histogram depth per column; raise for skewed data
+jit = "off"                       # JIT adds overhead on short queries; off for mixed workload
+
+# --- PostgreSQL: autovacuum ---
+autovacuum_max_workers = 4        # parallel vacuum workers
+
 
 [backend.redis]
 host = "redis"  # Docker Compose service name
