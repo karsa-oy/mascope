@@ -188,4 +188,27 @@ class PeakRecomputeWorker(Thread):
                     f"PeakRecomputeWorker: unexpected error while processing request: "
                     f"{e}\n{traceback.format_exc()}"
                 )
+                try:
+                    filename = request.get("filename", "unknown")
+                    sample_file_id = request.get("sample_file_id")
+                    process_id = request.get("process_id")
+                    auth = {
+                        "access_token": request.get("access_token"),
+                        "user_id": request.get("user_id"),
+                    }
+                    self.socket_client.emit(
+                        "peak_detection_error",
+                        {
+                            "filename": filename,
+                            "sample_file_id": sample_file_id,
+                            "process_id": process_id,
+                            "error": f"Unexpected error: {e}",
+                        },
+                        auth,
+                    )
+                except Exception as emit_error:
+                    runtime.logger.error(
+                        f"PeakRecomputeWorker: failed to emit error message after processing failure: "
+                        f"{emit_error}\n{traceback.format_exc()}"
+                    )
         runtime.logger.info("PeakRecomputeWorker stopped")
