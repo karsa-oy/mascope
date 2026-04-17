@@ -12,6 +12,23 @@ jobs:
     strategy:
       fail-fast: true
 
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: mascope_user
+          # Hardcoded test-only value — matches POSTGRES_TEST_PASSWORD in the test step.
+          # Not a production credential; this container is ephemeral to the CI job.
+          POSTGRES_PASSWORD: test_postgres_password_for_testing_only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -32,7 +49,8 @@ jobs:
           echo "SERVER_OWNER_SECRET_KEY_FILE=test_server_owner_secret.txt" >> $GITHUB_ENV
           echo "test_server_owner_secret_key_for_testing_only" > test_server_owner_secret.txt
 
-          # Set up PostgreSQL password for tests (not actually used, unit tests use mocks)
+          # Still required: runtime reads this on init.
+          # The actual test DB password is POSTGRES_TEST_PASSWORD in the test step below.
           echo "POSTGRES_PASSWORD_FILE=test_postgres_password.txt" >> $GITHUB_ENV
           echo "test_postgres_password_for_testing_only" > test_postgres_password.txt
 
@@ -50,5 +68,11 @@ jobs:
         env:
           SKIP_TOFWERK_DLL: 1 # skip Tofwerk DLL loading
           SKIP_CALIBRATION_FITTING_TEST: 1
+          # Test database connection — matches the postgres service container above.
+          # TEST_DB_HOST/PORT/USER mirror DatabaseConfig defaults (localhost:5432/mascope_user).
+          TEST_DB_HOST: localhost
+          TEST_DB_PORT: 5432
+          TEST_DB_USER: mascope_user
+          POSTGRES_TEST_PASSWORD: test_postgres_password_for_testing_only
         run: |
           uv run pytest server/backend/tests/ -v
