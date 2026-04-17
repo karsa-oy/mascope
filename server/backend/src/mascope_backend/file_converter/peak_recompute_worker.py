@@ -18,6 +18,7 @@ unique filenames.
 import traceback
 from queue import Empty, Queue
 from threading import Event, Thread
+from typing import Any
 
 from mascope_backend.file_converter.api import (
     fetch_instrument_functions,
@@ -72,6 +73,21 @@ class PeakRecomputeWorker(Thread):
             auth,
         )
 
+    @staticmethod
+    def _build_auth(access_token: object, user_id: object) -> dict[str, Any]:
+        """Build auth payload only when a valid access token is present.
+
+        Returning an empty dict allows FileConverterSocketClient.emit() to
+        fall back to context_manager credentials when available.
+        """
+        if not access_token:
+            return {}
+
+        auth = {"access_token": access_token}
+        if user_id is not None:
+            auth["user_id"] = user_id
+        return auth
+
     def _process_request(self, request: dict) -> None:
         """Process a single peak-detection request.
 
@@ -79,20 +95,19 @@ class PeakRecomputeWorker(Thread):
         """
         filename = request.get("filename")
         access_token = request.get("access_token")
+        user_id = request.get("user_id")
         sample_file_id = request.get("sample_file_id")
         affected_sample_item_ids = request.get("affected_sample_item_ids", [])
         process_id = request.get("process_id")
-        auth = {
-            "access_token": access_token,
-            "user_id": request.get("user_id"),
-        }
+        auth = self._build_auth(access_token=access_token, user_id=user_id)
 
         try:
             if not isinstance(filename, str) or not filename:
                 raise ValueError("Peak detection request is missing a valid filename")
             if not isinstance(access_token, str) or not access_token:
                 raise ValueError(
-                    f"Peak detection request for '{filename}' is missing a valid access token"
+                    f"Peak detection request for '{filename}' is missing a "
+                    "valid access token"
                 )
 
             runtime.logger.info(
@@ -100,7 +115,10 @@ class PeakRecomputeWorker(Thread):
             )
             if is_blank_sample_file(filename, access_token):
                 runtime.logger.info(
-                    f"PeakRecomputeWorker: skipping peak detection for blank sample '{filename}'"
+                    (
+                        "PeakRecomputeWorker: skipping peak detection for "
+                        f"blank sample '{filename}'"
+                    )
                 )
                 self._emit_blank_sample_warning(
                     filename=filename,
@@ -137,7 +155,7 @@ class PeakRecomputeWorker(Thread):
                 for sample_item_id in affected_sample_item_ids:
                     rematch_sample(
                         sample_item_id=sample_item_id,
-                        access_token=auth["access_token"],
+                        access_token=access_token,
                         full_remove=True,
                     )
 
@@ -192,10 +210,10 @@ class PeakRecomputeWorker(Thread):
                     filename = request.get("filename", "unknown")
                     sample_file_id = request.get("sample_file_id")
                     process_id = request.get("process_id")
-                    auth = {
-                        "access_token": request.get("access_token"),
-                        "user_id": request.get("user_id"),
-                    }
+                    auth = self._build_auth(
+                        access_token=request.get("access_token"),
+                        user_id=request.get("user_id"),
+                    )
                     self.socket_client.emit(
                         "peak_detection_error",
                         {
@@ -208,7 +226,8 @@ class PeakRecomputeWorker(Thread):
                     )
                 except Exception as emit_error:
                     runtime.logger.error(
-                        f"PeakRecomputeWorker: failed to emit error message after processing failure: "
+                        "PeakRecomputeWorker: failed to emit error message after "
+                        "processing failure: "
                         f"{emit_error}\n{traceback.format_exc()}"
                     )
         runtime.logger.info("PeakRecomputeWorker stopped")
