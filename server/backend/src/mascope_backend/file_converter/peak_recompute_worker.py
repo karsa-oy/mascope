@@ -189,7 +189,8 @@ class PeakRecomputeWorker(Thread):
                 auth,
             )
         finally:
-            self.peak_guard.release(filename)
+            if isinstance(filename, str) and filename:
+                self.peak_guard.release(filename)
 
     def run(self) -> None:
         """Thread entry point: pull requests from the queue and process them."""
@@ -207,13 +208,20 @@ class PeakRecomputeWorker(Thread):
                     f"{e}\n{traceback.format_exc()}"
                 )
                 try:
-                    filename = request.get("filename", "unknown")
-                    sample_file_id = request.get("sample_file_id")
-                    process_id = request.get("process_id")
-                    auth = self._build_auth(
-                        access_token=request.get("access_token"),
-                        user_id=request.get("user_id"),
-                    )
+                    if isinstance(request, dict):
+                        filename = request.get("filename", "unknown")
+                        sample_file_id = request.get("sample_file_id")
+                        process_id = request.get("process_id")
+                        auth = self._build_auth(
+                            access_token=request.get("access_token"),
+                            user_id=request.get("user_id"),
+                        )
+                    else:
+                        filename = "unknown"
+                        sample_file_id = None
+                        process_id = None
+                        auth = {}
+
                     self.socket_client.emit(
                         "peak_detection_error",
                         {
