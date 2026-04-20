@@ -59,31 +59,31 @@ Tests that verify complete application workflows from end to end.
 ## Directory Structure Overview 📂
 
 ```
-
 server/backend/tests/
-├── conftest.py                    # Core pytest fixtures, db engine factory
+├── conftest.py                    # Core pytest fixtures, PostgreSQL engine factory
 ├── pytest.ini                     # Test configuration and settings
+├── test_utils.py                  # Shared test utilities (gen_test_id)
 ├── README.md                      # Documentation for the test framework
 ├── unit/                          # Individual components in isolation
-│   ├── conftest.py                # Unit tests database engine and session fixtures
+│   ├── conftest.py                # Unit test database engine and session fixtures
 │   ├── api/                       # API component unit tests
-│   │   ├── conftest.py            # API-specific mocks (socketio, dependencies)
+│   │   ├── conftest.py            # API-specific mocks (socketio, dependencies), session-scoped test data
 │   │   ├── workspace/             # Workspace-specific unit tests
 │   │   │   ├── conftest.py        # Workspace test data fixtures
 │   │   │   ├── test_workspace_schema.py  # Test Pydantic model validation, constraints
 │   │   │   └── test_workspace_service.py # Test controller logic
 │   │   ├── other resources....
 │   ├── db/                        # Database component unit tests
-│   │   ├── conftest.py            # DB-specific fixtures for isolated model testing
+│   │   ├── conftest.py            # Function-scoped session fixture for isolated model testing
 │   │   └── models/                # SQLAlchemy model tests
-│   │       ├── conftest.py        # Test data fixtures for database model tests.
+│   │       ├── conftest.py        # Test data fixtures for database model tests
 │   │       ├── test_workspace_model.py   # Test workspace model
 │   ├── libraries/                 # Library components unit tests
 │       ├── conftest.py            # Fixtures for library testing
 ├── integration/                   # Tests for component interactions
 │   ├── conftest.py                # Integration test database/session setup
 │   ├── api/                       # API integration tests by resource
-│   │   ├── conftest.py            # Authenticated TestClient fixtures for RBAC
+│   │   ├── conftest.py            # AsyncClient fixtures for RBAC, roles, users
 │   │   └── workspace/             # Workspace API integration tests
 │   │   │   └── test_workspace_crud.py  # Workspace CRUD lifecycle tests
 │   │   ├── other resources....
@@ -100,6 +100,7 @@ server/backend/tests/
 │   │   └── test_peak_detection.py     # Peak detection pipeline
 │   ├── workflows/                 # Business process workflow tests
 │   │   ├── conftest.py            # Workflow execution fixtures
+│   │   ├── workflow_utils.py      # Workflow-specific test helpers
 │   │   ├── test_sample_processing.py   # Sample creation and analysis workflow
 │   │   └── test_workspace_lifecycle.py # Complete workspace/batch/sample lifecycle
 │   ├── regression/                # Tests for previously fixed bugs
@@ -151,11 +152,15 @@ libraries/
 
 ### Test tools
 
-- **TestClient**: FastAPI testing utility
-  - Creates a test version of application without starting a server
-  - Each TestClient instance is a separate application instance with its own state
-  - Simulates HTTP requests: `client.get("/api/workspaces")`
-  - TestClient is synchronous
+- **AsyncClient**: Primary HTTP test client for API integration tests
+  - Uses `httpx.AsyncClient` with `ASGITransport(app=fast)` and `base_url="http://test"`
+  - Runs in the same event loop as the test session — required for asyncpg compatibility (see [FastAPI Async Tests](https://fastapi.tiangolo.com/advanced/async-tests/#example))
+  - Simulates HTTP requests: `await client.get("/api/workspaces")`
+  - All API integration tests are `async def` with `@pytest.mark.asyncio`
+- **TestClient**: FastAPI's synchronous test client — not used in integration tests
+  - Would cause `InterfaceError: cannot perform operation: another operation is in progress`
+  - because it runs the ASGI app in a separate thread with its own event loop, incompatible
+  - with asyncpg connections that are bound to the session event loop
 - **Mocking**: Replacing real objects with test doubles
   - `AsyncMock`: For mocking async functions
   - `patch`: For temporarily replacing objects during tests
@@ -163,11 +168,26 @@ libraries/
 
 ### Database testing
 
-- **In-memory SQLite**: Isolated test databases
-  - Uses `"sqlite+aiosqlite:///:memory:"` connection string
-  - Each test category gets its own isolated database
-  - Database patching redirects app connections to test database
-  - Automatically discarded after test completion
+- **Isolated PostgreSQL databases**: One ephemeral database per test category
+  - Created at session start: `mascope_test_unit_tests`, `mascope_test_integration_tests`
+  - Dropped at session end; schema is recreated fresh on every run via `Base.metadata.create_all`
+  - Requires the dev PostgreSQL container to be running locally (`mascope dev up`)
+  - In CI, a `postgres:16-alpine` service container is started automatically by GitHub Actions
+- **Database patching**: `patch_db` fixture with `autouse=True` redirects `ASYNC_SESSION_MAKER`
+  - Affects both `async_session()` (controllers/services) and `get_async_session()` (FastAPI DI)
+  - Ensures all application code operates on the isolated test database for the duration of the session
+- **Event loop requirements**: asyncpg socket transports are bound to the event loop they were
+  created in and cannot be transferred. `asyncio_default_fixture_loop_scope = session` and
+  `asyncio_default_test_loop_scope = session` in `pytest.ini` ensure all fixtures and tests
+  share one loop, preventing `InterfaceError: cannot perform operation: another operation is in progress`
+
+### Test ID generation
+
+- **`gen_test_id(size=16)`** in `tests/test_utils.py` generates random IDs using `nanoid`
+  - Default size matches the `VARCHAR(16)` primary key constraint enforced by PostgreSQL
+  - Use for all model fixtures that require a primary key: `workspace_id=gen_test_id()`
+  - Pass `size` explicitly when a column has a different length constraint
+  - Stable module-level constants are used only where parametrized tests must reference IDs by value
 
 ### Configuration file pytest.ini
 
@@ -177,46 +197,84 @@ libraries/
     - `python_files = test_*.py`: Files considered as tests
     - `norecursedirs = tests/old`: Directories to exclude
   - **Asyncio settings**:
-    - `asyncio_mode = strict`: Requires marking async tests explicitly
-    - `asyncio_default_fixture_loop_scope = session`: Single event loop for all tests
+    - `asyncio_mode = strict`: Requires marking async tests explicitly with `@pytest.mark.asyncio`
+    - `asyncio_default_fixture_loop_scope = session`: Single event loop for all async fixtures
+    - `asyncio_default_test_loop_scope = session`: Test functions share the session event loop —
+      required so that asyncpg connections created in session-scoped fixtures are accessible
+      from test functions without crossing event loop boundaries
 
 ## Core Implementation Patterns 🔧
 
 ### Database isolation architecture
 
-- **Factory-based database creation**: The root `conftest.py` provides a session-scoped `async_engine_factory` that creates isolated in-memory SQLite databases for different test categories, keeping unit and integration tests completely separate.
-- **Category-specific engines**: Unit and integration tests each create their own isolated database using the factory. The `async_engine` fixture specified in each test category level conftest files (e.g., "unit_tests", "integration_tests") to maintain isolation. System tests will likely use real test datasets instead of in-memory databases.
-- **Automatic database patching**: The `patch_db` fixture with `autouse=True` redirects all application database access to the test database, allowing application code to interact with test data without modification.
+- **Async factory-based database creation**: The root `conftest.py` provides a session-scoped
+  `async_engine_factory` — an async fixture that yields an async callable. Each call creates an
+  ephemeral `mascope_test_{category}` PostgreSQL database (drop if exists → create → `create_all`),
+  tracked for teardown at session end. The factory must be awaited from an async session-scoped
+  fixture — using `asyncio.run()` would create a separate event loop, leaving asyncpg transports
+  bound to a dead loop and causing `InterfaceError` on first use.
+- **Category-specific engines**: Unit and integration tests each call the factory with their
+  category name (`"unit_tests"`, `"integration_tests"`) to get a fully isolated engine and database.
+  System tests use real datasets and are not wired to the factory.
+- **Automatic database patching**: The `patch_db` fixture with `autouse=True` replaces
+  `db_module.ASYNC_SESSION_MAKER` for the duration of the session, redirecting all application
+  database access to the test database without requiring any changes to test functions.
 
 ### Authentication testing infrastructure
 
-- **Role hierarchy persistence**: For API integration tests, session-scoped fixtures create persistent user and role records that mirror the application's authorization system. The `roles` and `test_users` fixtures establish this foundational data once per test session.
-- **JWT token infrastructure**: Specifically for API integration tests, the `create_jwt_auth_token` fixture provides a function that generates valid JWT tokens matching the application's security specifications, with proper payload structure and signing.
-- **Role-based client fixtures**: For testing protected routes, pre-configured TestClient instances (`guest_client`, `editor_client`, `admin_client`, `owner_client`) provide realistic authentication context for verifying role-based access control (RBAC).
-- **Complete auth simulation**: Rather than mocking authentication logic, the API integration tests emulate the entire authentication flow, including token generation, cookie-based token storage, and server-side validation.
+- **Role hierarchy persistence**: For API integration tests, session-scoped fixtures create
+  persistent `Role` and `User` records that mirror the application's authorization system.
+  The `roles` and `test_users` fixtures establish this foundational data once per session.
+- **JWT token infrastructure**: The `create_jwt_auth_token` fixture provides a factory function
+  that generates valid JWT tokens matching the application's security specifications, with proper
+  payload structure (`sub`, `aud`, `exp`, `iat`) and signing via `auth_settings`.
+- **Role-based client fixtures**: Pre-configured `AsyncClient` instances (`guest_client`,
+  `editor_client`, `admin_client`, `owner_client`) inject auth cookies at construction time via
+  the `cookies=` parameter, providing realistic RBAC context for each test.
+- **Complete auth simulation**: Tests emulate the full authentication flow — token generation,
+  cookie injection, server-side JWT validation, and role resolution — rather than mocking it.
 
 ### Mock implementation strategies
 
-- **Factory pattern for mocks**: The `mock_emit_record_factory` creates specialized mocks for the `emit_record_created`, `emit_record_updated`, and `emit_record_deleted` functions. The factory patches the exact module path where controllers import these functions. Each controller needs to be patched at its specific import path, not at a global level.
-- **Component-specific mocks**: Specialized fixtures like `mock_emit_workspace` target specific modules with the correct import paths, preventing side effects in other components. The mock returns a `MagicMock` container with three `AsyncMock` attributes (`created`, `updated`, `deleted`) for verifying each type of record event emission.
-- **Verification support**: Mocks include pre-configured `AsyncMock` instances for the async `emit_record_*` functions, allowing tests to verify event emissions with assertions like:
-  - `mock_emit_workspace.created.assert_called_once()` - Verify creation event
-  - `mock_emit_workspace.updated.assert_called_once()` - Verify update event
-  - `mock_emit_workspace.deleted.assert_called_once()` - Verify deletion event
-  - `call_args.kwargs["record_type"]` - Verify specific event parameters
+- **Factory pattern for mocks**: The `mock_emit_record_factory` creates specialized mocks for
+  `emit_record_created`, `emit_record_updated`, and `emit_record_deleted`. The factory patches
+  the exact module path where controllers import these functions — each controller must be patched
+  at its specific import path, not globally.
+- **Component-specific mocks**: Fixtures like `mock_emit_workspace` target specific module paths,
+  preventing side effects in other components. The mock returns a `MagicMock` container with three
+  `AsyncMock` attributes (`created`, `updated`, `deleted`) for verifying each emission type.
+- **Verification support**:
+  - `mock_emit_workspace.created.assert_called_once()` — verify creation event
+  - `mock_emit_workspace.updated.assert_called_with(record_type="workspace", ...)` — verify update
+  - `mock_emit_workspace.deleted.call_count == 2` — verify delete count
+  - `call_args.kwargs["record_type"]` — verify specific event parameters
 
 ### Test data management
 
 - **Proximity vs. DRY balance**: Test fixtures follow two complementary approaches:
   - **Proximity principle**: Keep fixtures close to their tests in component-specific conftest files
   - **DRY principle**: Share common fixtures at appropriate levels to avoid duplication
-- **Layered test data**: Component-specific fixtures provide standardized test data (e.g., `workspace_create_data`) for consistent testing scenarios across multiple tests.
-- **Model factories**: Fixtures like `workspace_create_model` create properly structured Pydantic models for validation and schema testing.
-- **Isolation strategy**: Session-scoped fixtures provide persistent reference data for efficiency, while function-scoped fixtures offer test-specific isolation.
+- **ID generation**: Use `gen_test_id()` from `test_utils.py` for all model primary keys.
+  PostgreSQL enforces `VARCHAR(16)` length and foreign key constraints that SQLite silently ignored.
+- **Layered test data**: Component-specific fixtures provide standardized test data (e.g.,
+  `workspace_create_data`) for consistent testing scenarios across multiple tests.
+- **Isolation strategy**: Session-scoped fixtures provide persistent reference data (roles, users,
+  ionization mechanisms) for efficiency. Function-scoped fixtures (`session` in `unit/db/conftest.py`)
+  provide per-test isolation — data flushed but not committed is rolled back on session close.
 
 ## Running Tests ▶️
 
-The test framework can be executed using either pytest directly or the specialized Mascope CLI testing commands.
+### Prerequisites
+
+Local tests require the dev PostgreSQL container to be running:
+
+```bash
+mascope dev up
+```
+
+This starts the `mascope_dev_postgres` container at `localhost:5432`. The test factory creates
+and drops `mascope_test_unit_tests` and `mascope_test_integration_tests` databases against it.
+Password is read from `.runtime/secrets/postgres_password.txt` via `MASCOPE_PATH`.
 
 ### Using pytest directly 🐍
 
@@ -225,77 +283,67 @@ Run tests from the repository root:
 ```bash
 # Run all tests
 pytest server/backend/tests/
+
 # Run a specific test file
 pytest server/backend/tests/unit/api/workspace/test_workspace_schema.py
 ```
 
 Common pytest options:
 
-- `v`: Verbose output showing each test name
-- `s`: Show print statements during test execution
-- `durations=10`: Show execution time for the 10 slowest tests
-- `k "workspace"`: Run only tests with "workspace" in their name
+- `-v`: Verbose output showing each test name
+- `-s`: Show print statements during test execution
+- `--durations=10`: Show execution time for the 10 slowest tests
+- `-k "workspace"`: Run only tests with "workspace" in their name
 
 ### Using Mascope CLI 💻
 
-The Mascope CLI provides a specialized interface for running and discovering tests:
+The Mascope CLI provides a specialized interface for running and discovering tests.
 
-### Discovering available tests 🔍
-
-List all available test modules and files:
+#### Discovering available tests 🔍
 
 ```bash
 mascope test list
 ```
 
-This command displays tests organized by category (unit, integration, system) with their specific names, making it easy to identify which tests to run.
+This command displays tests organized by category (unit, integration, system) with their specific names.
 
-### Running tests ▶️
-
-Run all backend tests:
+#### Running tests ▶️
 
 ```bash
+# Run all backend tests
 mascope test run
-```
 
-Run specific test categories:
-
-```bash
 # Run only unit tests
 mascope test run -m unit
+
 # Run only integration tests
 mascope test run -m integration
-```
 
-Run a specific test by name:
-
-```bash
-# Run the workspace_model test
+# Run a specific test by name
 mascope test run -n workspace_model
+
 # Run with verbose output
 mascope test run -n workspace_crud -v
-```
 
-Run library tests:
-
-```bash
 # Run all SDK library tests
 mascope test run libraries -m sdk
+
 # Run all Tools library tests
 mascope test run libraries -m tools
 ```
 
 ### CI/CD integration 🚀
 
-Tests run automatically on GitHub Actions when creating or updating pull requests to the develop branch. The workflow is defined in `.github/workflows/tests.yaml` and:
-
-- Runs on each PR to develop branch (opened, synchronized, or reopened)
-- Executes all tests with verbose output (`v` flag)
+Tests run automatically on GitHub Actions on each PR to the `develop` branch. The workflow
+(`.github/workflows/tests.yaml`) starts a `postgres:16-alpine` service container before the
+test job runs, with credentials matching `POSTGRES_TEST_PASSWORD` in the test step env block.
+The container is destroyed when the job completes.
 
 ### Recommended testing workflow 📋
 
-1. **Explore available tests** using `mascope test list` to understand what tests exist
-2. **Run focused tests** during development with `mascope test run -n test_name` to verify specific functionality
-3. **Run category tests** before committing with `mascope test run -m unit` or `mascope test run -m integration`
-4. **Run the full test suite** before major PRs with `mascope test run`
-5. **Review GitHub Actions results** and logs after creating a PR
+1. **Start dependencies** with `mascope dev up` before running any tests locally
+2. **Explore available tests** using `mascope test list` to understand what tests exist
+3. **Run focused tests** during development with `mascope test run -n test_name` to verify specific functionality
+4. **Run category tests** before committing with `mascope test run -m unit` or `mascope test run -m integration`
+5. **Run the full test suite** before major PRs with `mascope test run`
+6. **Review GitHub Actions results** and logs after creating a PR

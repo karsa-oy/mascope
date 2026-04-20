@@ -310,12 +310,8 @@ async def test_workspace_delete_cascades_to_sample_batches(
     workspace_id = create_workspace_response.json()["data"]["workspace_id"]
 
     sample_batch_data = {**sample_batch_create_data, "workspace_id": workspace_id}
-    print(f"⚠️⚠️⚠️⚠️⚠️⚠️ Creating sample batch with data: {sample_batch_data}")
     create_batch_response = await editor_client.post(
         "/api/sample/batches", json=sample_batch_data
-    )
-    print(
-        f"⚠️⚠️⚠️⚠️⚠️⚠️ Create batch response: {create_batch_response.status_code} - {create_batch_response.text}"
     )
     assert create_batch_response.status_code == 201
     sample_batch_id = create_batch_response.json()["data"]["sample_batch_id"]

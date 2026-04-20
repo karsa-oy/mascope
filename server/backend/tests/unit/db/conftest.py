@@ -1,9 +1,12 @@
 """
 Fixtures for database unit tests.
 
-Provides a function-scoped session for isolated per-test database access.
-Each test gets a fresh session; uncommitted state does not leak between tests
-because SQLAlchemy closes the session on exit.
+Provides a function-scoped session for per-test database access.
+Each test gets a fresh session; state that is flushed but not committed
+is discarded when SQLAlchemy closes the session on exit. Committed changes
+persist in the shared test database for the remainder of the session —
+db model tests should use flush() only and avoid commit() to maintain
+test independence.
 """
 
 import pytest_asyncio
@@ -11,7 +14,11 @@ import pytest_asyncio
 
 @pytest_asyncio.fixture(scope="function")
 async def session(async_session_factory):
-    """Create an isolated database session for a single test function.
+    """Create a database session for a single test function.
+
+    Function-scoped so each test starts with a clean transaction context.
+    DB model tests use flush() only — committed changes would persist in the
+    shared per-category database and could affect later tests.
 
     asyncpg requires all session operations to run in the same event loop
     as the engine. With `asyncio_default_test_loop_scope = session` in

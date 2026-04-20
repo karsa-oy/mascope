@@ -2,8 +2,9 @@
 API integration test fixtures.
 
 This module provides fixtures for testing the full API request/response cycle
-through FastAPI's AsyncClient. It focuses on realistic end-to-end testing of API
-endpoints with proper authentication and database access.
+through `httpx.AsyncClient` with `ASGITransport`. It focuses on realistic
+end-to-end testing of API endpoints with proper authentication and database
+access.
 
 Key components:
 - Authentication fixtures (JWT token generation, authenticated clients)
