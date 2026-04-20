@@ -260,20 +260,29 @@ class SamplesResource(BaseResource):
         :type mz_min: float, optional
         :param mz_max: Maximum m/z value for filtering.
         :type mz_max: float, optional
-        :return: A DataFrame containing peak data with columns:
+        :return: A DataFrame containing peak data. When a peak has
+                 multiple isotope matches, it is expanded into one row
+                 per match. Unmatched peaks have a single row with
+                 ``NaN`` match columns.  Use ``target_ion_id`` /
+                 ``target_compound_id`` for grouping to avoid
+                 double-counting when different compounds share the
+                 same formula.
+
+                 Key columns:
 
                  - ``sample_item_id``: The sample ID
-                 - ``peak_id``: Unique peak identifier
-                 - ``mz``: m/z value
-                 - ``area``: Peak area (if requested)
-                 - ``height``: Peak height (if requested)
-                 - ``target_isotope_id``: Matched isotope ID (if matches requested)
-                 - ``target_isotope_formula``: Matched isotope formula
-                 - ``target_ion_id``: Matched ion ID
-                 - ``target_ion_formula``: Matched ion formula
-                 - ``target_compound_formula``: Matched compound formula
-                 - ``ionization_mechanism_id``: Ionization mechanism ID
-                 - ``target_collection_ids``: List of target collection IDs
+                 - ``peak_id``: Peak identifier (may repeat across
+                   rows for multi-matched peaks)
+                 - ``mz``, ``area``, ``height``
+                 - ``match_score_isotope``, ``match_score_ion``,
+                   ``match_score_compound``
+                 - ``relative_abundance``
+                 - ``target_isotope_id``, ``target_isotope_formula``
+                 - ``target_ion_id``, ``target_ion_formula``
+                 - ``target_compound_id``, ``target_compound_name``,
+                   ``target_compound_formula``
+                 - ``ionization_mechanism``
+                 - ``target_collection_ids``
 
                  Returns None if no peaks are found.
         :rtype: pd.DataFrame | None
@@ -322,8 +331,10 @@ class SamplesResource(BaseResource):
         df.insert(0, "sample_item_id", sample_id)
 
         # Flatten match data if present
-        # match column contains a list of matches (can be empty or have multiple)
-        # We extract fields from the first match if present
+        # Each peak has a list of matches (can be empty or have multiple).
+        # We explode into one row per match so all candidate attributions
+        # are visible.  Peaks without matches keep a single row with NaN
+        # match columns.
         if "match" in df.columns and matches:
             match_keys = [
                 "match_score_isotope",
@@ -332,16 +343,23 @@ class SamplesResource(BaseResource):
                 "target_isotope_formula",
                 "target_ion_id",
                 "target_ion_formula",
+                "target_compound_id",
                 "target_compound_name",
                 "target_compound_formula",
                 "ionization_mechanism_id",
                 "target_collection_ids",
             ]
+
+            # Replace empty lists with [None] so unmatched peaks survive
+            # the explode as a single row with NaN match columns.
+            df["match"] = df["match"].apply(
+                lambda x: x if isinstance(x, list) and len(x) > 0 else [None]
+            )
+            df = df.explode("match", ignore_index=True)
+
             for key in match_keys:
                 df[key] = df["match"].apply(
-                    lambda x, k=key: (
-                        x[0].get(k) if isinstance(x, list) and len(x) > 0 else None
-                    )
+                    lambda x, k=key: x.get(k) if isinstance(x, dict) else None
                 )
             df = df.drop(columns=["match"])
 
@@ -365,13 +383,13 @@ class SamplesResource(BaseResource):
                 compound_scores = (
                     df.loc[has_match]
                     .drop_duplicates(subset=["target_ion_id"])
-                    .groupby("target_compound_formula", sort=False)["match_score_ion"]
+                    .groupby("target_compound_id", sort=False)["match_score_ion"]
                     .max()
                     .rename("match_score_compound")
                 )
                 df = df.merge(
                     compound_scores,
-                    left_on="target_compound_formula",
+                    left_on="target_compound_id",
                     right_index=True,
                     how="left",
                 )
