@@ -290,8 +290,9 @@ class MascopeClient:
 
         :param workspace: Workspace name, substring, or regex pattern (or ID).
         :type workspace: str
-        :param batches: Optional filter on batch names (case-insensitive). Accepts
-                        a plain substring or a regex pattern (e.g. ``"2026-01|2026-02"``).
+        :param batches: Optional filter on batch names (case-insensitive).
+                        Accepts a plain substring or a regex pattern
+                        (e.g. ``"2026-01|2026-02"``).
                         If not provided, all batches in the workspace are loaded.
         :type batches: str, optional
         :param samples: Optional filter on sample names (case-insensitive). Accepts
@@ -318,7 +319,15 @@ class MascopeClient:
             - ``sample_item_name``: Name of the sample
             - ``datetime_utc``: Measurement start timestamp (UTC)
 
-            Plus all columns from :meth:`~mascope_sdk.resources.samples.SamplesResource.get_peaks`.
+            Plus all columns from :meth:`~mascope_sdk.resources.samples\
+            .SamplesResource.get_peaks`.
+
+            When a peak matches multiple isotopes it is expanded
+            into one row per match.  Use ``target_ion_id`` /
+            ``target_compound_id`` for grouping to avoid
+            double-counting peaks whose matches share the same
+            formula.
+
             Returns None if no peaks are found.
         :rtype: pd.DataFrame | None
         :raises ValueError: If the workspace or batches cannot be resolved.

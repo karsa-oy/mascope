@@ -105,11 +105,12 @@ class MatchingResource(BaseResource):
 
         :param sample_id: The ID of the sample to search in.
         :type sample_id: str
-        :param formulas: List of chemical formulas to match (e.g., ["C6H12O6", "C12H22O11"]).
+        :param formulas: List of chemical formulas to match
+                         (e.g., ["C6H12O6", "C12H22O11"]).
         :type formulas: list[str]
         :param match_params: Optional matching parameters (see :meth:`match_compound`).
         :type match_params: dict[str, Any], optional
-        :param ionization_mechanism_ids: Optional list of ionization mechanism IDs to use.
+        :param ionization_mechanism_ids: Optional list of mechanism IDs to use.
         :type ionization_mechanism_ids: list[str], optional
         :return: A dictionary containing match data for all compounds.
                  Returns None if no matches are found.

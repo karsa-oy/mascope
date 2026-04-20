@@ -61,7 +61,10 @@ def _confirm_sample_count(count: int, threshold: int) -> None:
     Raises ``KeyboardInterrupt`` when the user declines.
     """
     logger.warning(
-        "The requested number of samples ({}) exceeds the confirmation threshold of {}. Please check the confirmation prompt.",
+        (
+            "The requested number of samples ({}) exceeds the confirmation threshold "
+            "{}. Please check the confirmation prompt."
+        ),
         count,
         threshold,
     )
@@ -89,8 +92,9 @@ def _collect_sample_tasks(
 
     :param client: The MascopeClient instance.
     :param workspace: Workspace name, substring, or regex pattern (or ID).
-    :param batches: Optional filter on batch names (case-insensitive substring or regex).
-    :param samples: Optional filter on sample names (case-insensitive substring or regex).
+    :param batches: Optional filter on batch names (case-insensitive substring or regex)
+    :param samples: Optional filter on sample names (case-insensitive substring or
+      regex)
     :return: Tuple of (sample_tasks, workspace_id).
     :raises ValueError: If workspace or batches cannot be resolved.
     """
@@ -200,7 +204,15 @@ def load_peaks(
              - ``sample_item_name``: Name of the sample
              - ``datetime_utc``: Measurement start timestamp (UTC)
 
-             Plus all columns from :meth:`~mascope_sdk.resources.samples.SamplesResource.get_peaks`.
+             Plus all columns from
+               :meth:`~mascope_sdk.resources.samples.SamplesResource.get_peaks`.
+
+             When a peak matches multiple isotopes it is expanded into
+             one row per match.  Use ``target_ion_id`` /
+             ``target_compound_id`` for grouping to avoid
+             double-counting peaks whose matches share the same
+             formula.
+
              Returns None if no peaks are found.
     :rtype: pd.DataFrame | None
     :raises ValueError: If the workspace or batches cannot be resolved.
@@ -325,7 +337,8 @@ def load_peaks_by_stage(
              - ``t_min``: Start time of the stage in seconds
              - ``t_max``: End time of the stage in seconds
 
-             Plus all columns from :meth:`~mascope_sdk.resources.samples.SamplesResource.get_peaks`.
+             Plus all columns from
+               :meth:`~mascope_sdk.resources.samples.SamplesResource.get_peaks`.
              Returns None if no peaks are found.
     :rtype: pd.DataFrame | None
     :raises ValueError: If stages is empty or the sample cannot be found.
@@ -361,7 +374,7 @@ def load_peaks_by_stage(
     normalised: list[tuple[float, float, str | None]] = []
     for s in stages:
         if len(s) == 3:
-            normalised.append((s[0], s[1], str(s[2])))  # type: ignore[misc]
+            normalised.append((s[0], s[1], str(s[2])))  # type: ignore
         elif len(s) == 2:
             normalised.append((s[0], s[1], None))
         else:
@@ -544,7 +557,9 @@ def load_peak_timeseries(
     def _get_matched_peaks(
         sample_row: Any, batch_name: str
     ) -> list[tuple[Any, str, str, str | None, str | None, str | None, str | None]]:
-        """Return (sample_row, batch_name, peak_id, compound_name, compound_formula, ion, isotope)."""
+        """Return (sample_row, batch_name, peak_id, compound_name, compound_formula,
+        ion, isotope).
+        """
         sample_id = sample_row["sample_item_id"]
         peaks = client.samples.get_peaks(sample_id, matches=True)
         if peaks is None or peaks.empty:

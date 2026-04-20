@@ -435,8 +435,8 @@ class SamplesResource(BaseResource):
         :type mz: float, optional
         :param peak_id: The unique peak identifier. If provided, ``mz`` is ignored.
         :type peak_id: str, optional
-        :param mz_tolerance_ppm: m/z tolerance in ppm for peak matching (only used with ``mz``).
-                                 Defaults to 1.0.
+        :param mz_tolerance_ppm: m/z tolerance in ppm for peak matching
+                                 (only used with ``mz``). Defaults to 1.0.
         :type mz_tolerance_ppm: float
         :param t_min: Minimum time in seconds. Uses sample start if not provided.
         :type t_min: float, optional

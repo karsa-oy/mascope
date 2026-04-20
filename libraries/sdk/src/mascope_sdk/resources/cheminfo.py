@@ -43,8 +43,9 @@ class ChemInfoResource(BaseResource):
         :type mz: float
         :param ionization_mechanism_ids: List of ionization mechanism IDs to consider.
         :type ionization_mechanism_ids: list[str]
-        :param formula_ranges: Element ranges to consider, e.g., "C0-100 H0-100 O0-100 N0-100".
-                              Defaults to common organic elements.
+        :param formula_ranges: Element ranges to consider, e.g.
+                               "C0-100 H0-100 O0-100 N0-100".
+                               Defaults to common organic elements.
         :type formula_ranges: str, optional
         :param mz_tolerance: The m/z tolerance in ppm. Defaults to 30.0.
         :type mz_tolerance: float, optional

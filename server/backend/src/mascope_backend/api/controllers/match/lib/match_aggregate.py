@@ -38,8 +38,9 @@ async def set_ions_match_category(
 ) -> pd.DataFrame:
     """Set the match_category field for each ion in the DataFrame.
 
-    This function determines the match_category for each ion based on match score and predefined thresholds.
-    It uses provided filters, or defaults if none are provided, and falls back to ion-specific filters when available.
+    This function determines the match_category for each ion based on match score and
+    predefined thresholds. It uses provided filters, or defaults if none are provided,
+    and falls back to ion-specific filters when available.
 
     :param match_ions_df: DataFrame containing ion data with match scores.
     :type match_ions_df: pd.DataFrame
@@ -84,7 +85,8 @@ async def set_ions_match_category(
 
 async def set_alarm_mode(dataframe: pd.DataFrame) -> pd.DataFrame:
     """
-    Set the alarm_mode field for each entry in the DataFrame based on the list of provided alarms_list.
+    Set the alarm_mode field for each entry in the DataFrame based on the list of
+    provided alarms_list.
 
     :param dataframe: DataFrame containing sample/batch match filter data.
     :type dataframe: pd.DataFrame
@@ -104,18 +106,21 @@ async def aggregate_match_isotopes(
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Filter the fields of aggregated filtered match isotopes dataframe.
-    (used for backwards compatibility of get_sample_aggregate_matches, may be removed further)
+    (used for backwards compatibility of get_sample_aggregate_matches, may be removed
+    further)
 
-    This function processes the sample/batch match filter dataframe to aggregate isotope data.
-    It prepares two DataFrames:
+    This function processes the sample/batch match filter dataframe to aggregate isotope
+    data. It prepares two DataFrames:
     1) match_isotopes_data_df with detailed data for further aggregation,
     2) match_isotopes_df with reduced data for frontend display.
 
-    :param filtered_match_isotope_df: DataFrame containing sample/batch match filter data to aggregate.
+    :param filtered_match_isotope_df: DataFrame containing sample/batch match filter
+      data to aggregate.
     :type filtered_match_isotope_df: pd.DataFrame
     :return: Tuple of DataFrames with aggregated matchIsotopes data.
     :rtype: (pd.DataFrame, pd.DataFrame)
-    (compute_match_isotopes, apply_match_params and combine data, aggregate_match_isotopes)
+      (compute_match_isotopes, apply_match_params and combine data,
+      aggregate_match_isotopes)
     """
     # Select relevant columns for detailed aggregation (backend processing)
     match_isotopes_data_df = filtered_match_isotope_df.loc[
@@ -176,18 +181,24 @@ async def aggregate_match_ions(
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Aggregate fields for match ions from aggregated filtered match isotopes dataframe.
-    Provided filters are passed to set_ions_match_category, if none match_params are provided, stored ion-specidic or default params will be applied.
+    Provided filters are passed to set_ions_match_category, if none match_params are
+    provided, stored ion-specific or default params will be applied.
 
     It prepares two DataFrames:
-    1) match_ions_data_df with detailed data for correct further aggregation on collection/sample lvl,
-    2) match_ions_df with reduced data and dropped duplicates (same compound in different collections).
+    1) match_ions_data_df with detailed data for correct further aggregation on
+       collection/sample level,
+    2) match_ions_df with reduced data and dropped duplicates (same compound in
+       different collections).
 
-    The match_score is calculated as a weighted sum of individual isotopes' match scores, weighted by their relative abundance.
-    The sample_peak_intensity is summed across all isotopes in the group, the _sum is added to the field name.
+    The match_score is calculated as a weighted sum of individual isotopes' match scores
+    weighted by their relative abundance.
+    The sample_peak_intensity is summed across all isotopes in the group, the _sum is
+    added to the field name.
 
     :param filtered_match_isotope_df: DataFrame containing isotope data to aggregate.
     :type filtered_match_isotope_df: pd.DataFrame
-    :param match_params: Optional ion-specific filter parameters to set_ions_match_category.
+    :param match_params: Optional ion-specific filter parameters to
+      set_ions_match_category.
     :type match_params: Optional[BaseMatchParams]
     :return: Tuple of DataFrames with aggregated match ions data.
     :rtype: (pd.DataFrame, pd.DataFrame)
@@ -228,9 +239,12 @@ async def aggregate_match_ions(
             }
         )
     )
-    # Prepare a simplified DataFrame for storing in database (keep instrument and match_params for correct set_ions_match_category)
-    # Drop duplicates for match ions based on target_ion_id for each sample, so each sample would have the unique match ions
-    # (even of there is same compound=>ion present in different target collections of the sample)
+    # Prepare a simplified DataFrame for storing in database (keep instrument and
+    # match_params for correct set_ions_match_category)
+    # Drop duplicates for match ions based on target_ion_id for each sample, so each
+    # sample would have the unique match ions
+    # (even if there is same compound=>ion present in different target collections of
+    # the sample)
     match_ions_df = match_ions_data_df.drop(
         columns=[
             "target_compound_id",
@@ -252,11 +266,14 @@ def aggregate_match_ions_light(
     filtered_match_isotope_df: pd.DataFrame,
 ) -> pd.DataFrame:
     """
-    Aggregate fields for match ions from the lighter then in main pipeline (aggregate_match_ions) computed and filtered match isotope DataFrame.
-    Used in the aggregate_sample_match_compound to aggregate simple match_ions_data_df after compute_match_isotopes and apply_match_params.
+    Aggregate fields for match ions from the lighter then in main pipeline
+    (aggregate_match_ions) computed and filtered match isotope DataFrame.
+    Used in the aggregate_sample_match_compound to aggregate simple match_ions_data_df
+    after compute_match_isotopes and apply_match_params.
 
-    This function groups the filtered match isotope DataFrame by 'target_ion_id' and aggregates relevant data,
-    such as summing up 'sample_peak_intensity' and computing a weighted 'match_score'.
+    This function groups the filtered match isotope DataFrame by 'target_ion_id' and
+    aggregates relevant data, such as summing up 'sample_peak_intensity' and computing
+    a weighted 'match_score'.
 
     :param filtered_match_isotope_df: DataFrame containing filtered match isotope data.
     :type filtered_match_isotope_df: pd.DataFrame
@@ -285,15 +302,18 @@ async def aggregate_match_compounds(
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Aggregate fields for match compounds from aggregated match ions dataframe.
 
-    This function sorts the ions dataframe by match_category and match_score in descending order
-    and then groups by target_compound_id and other relevant fields to compute the aggregated
-    values for match_score, match_category, sample_peak_intensity_sum.
-    It preserves the highest match_score of ion from the most alarming match_category (the most alarming ion)
-    and sums up the sample_peak_intensity_sum for the entire group.
+    This function sorts the ions dataframe by match_category and match_score in
+    descending order and then groups by target_compound_id and other relevant fields to
+    compute the aggregated values for match_score, match_category,
+    sample_peak_intensity_sum. It preserves the highest match_score of ion from the most
+    alarming match_category (the most alarming ion) and sums up the
+    sample_peak_intensity_sum for the entire group.
 
     It prepares two DataFrames:
-    1) match_compounds_data_df with detailed data for correct further aggregation on collection/sample lvl,
-    2) match_compounds_df with reduced data and dropped duplicates (same compound in different collections).
+    1) match_compounds_data_df with detailed data for correct further aggregation on
+       collection/sample lvl,
+    2) match_compounds_df with reduced data and dropped duplicates (same compound in
+       different collections).
 
 
     :param match_ions_df: DataFrame containing ion data to aggregate.
@@ -329,8 +349,10 @@ async def aggregate_match_compounds(
     ].astype(int)
 
     # Prepare a simplified DataFrame for storing in database
-    # Drop duplicates for match compounds based on target_ion_id for each sample, so each sample would have the unique match compounds
-    # (even of there is same compound present in different target collections of the sample)
+    # Drop duplicates for match compounds based on target_ion_id for each sample, so
+    # each sample would have the unique match compounds
+    # (even if there is same compound present in different target collections of the
+    # sample)
     match_compounds_df = match_compounds_data_df.drop(
         columns=[
             "target_collection_id",
@@ -345,11 +367,14 @@ async def aggregate_match_compounds(
 
 def aggregate_match_compounds_light(match_ions_df: pd.DataFrame) -> pd.DataFrame:
     """
-    Aggregate fields for match compounds from the lighter then in main pipeline (aggregate_match_compounds) match ions DataFrame.
-    Used in the aggregate_sample_match_compound to aggregate simpler match_compounds_data_df from result of aggregate_match_ions_light.
+    Aggregate fields for match compounds from the lighter then in main pipeline
+    (aggregate_match_compounds) match ions DataFrame. Used in the
+    aggregate_sample_match_compound to aggregate simpler match_compounds_data_df from
+    result of aggregate_match_ions_light.
 
-    This function groups the match ions DataFrame by 'target_compound_id' and aggregates relevant data,
-    such as computing a weighted 'match_score' and summing up 'sample_peak_intensity'.
+    This function groups the match ions DataFrame by 'target_compound_id' and aggregates
+    relevant data, such as computing a weighted 'match_score' and summing up
+    'sample_peak_intensity'.
 
     :param match_ions_df: DataFrame containing match ions data.
     :type match_ions_df: pd.DataFrame
@@ -371,11 +396,12 @@ def aggregate_match_compounds_light(match_ions_df: pd.DataFrame) -> pd.DataFrame
 async def aggregate_match_collections(compounds_df: pd.DataFrame) -> pd.DataFrame:
     """Aggregate fields for match collections from aggregated match compounds dataframe.
 
-    This function sorts the compounds dataframe by match_category and match_score in descending order
-    and then groups by target_collection_id and other relevant fields to compute the aggregated
-    values for match_score, match_category, sample_peak_intensity_sum.
-    It preserves the highest match_score of compound from the most alarming match_category (the most alarming compound in collection)
-    and sums up the sample_peak_intensity_sum for the entire group.
+    This function sorts the compounds dataframe by match_category and match_score in
+    descending order and then groups by target_collection_id and other relevant fields
+    to compute the aggregated values for match_score, match_category,
+    sample_peak_intensity_sum. It preserves the highest match_score of compound from the
+    most alarming match_category (the most alarming compound in collection) and sums up
+    the sample_peak_intensity_sum for the entire group.
 
     :param compounds_df: DataFrame containing aggregated match compound data.
     :type compounds_df: pd.DataFrame
@@ -409,10 +435,11 @@ async def aggregate_match_collections(compounds_df: pd.DataFrame) -> pd.DataFram
 async def aggregate_match_samples(compounds_df: pd.DataFrame) -> pd.DataFrame:
     """Aggregate fields for match samples from compounds dataframe.
 
-    This function sorts the compounds dataframe by alarm_mode, match_category and match_score in descending order
-    and then groups by sample_item_id and other relevant fields to compute the aggregated
-    values for match_score, match_category, sample_peak_intensity_sum.
-    It preserves the highest match_score of compound where alarm_mode and match_category is the highest (the most alarming compound of sample)
+    This function sorts the compounds dataframe by alarm_mode, match_category and
+    match_score in descending order and then groups by sample_item_id and other relevant
+    fields to compute the aggregated values for match_score, match_category,
+    sample_peak_intensity_sum. It preserves the highest match_score of compound where
+    alarm_mode and match_category is the highest (the most alarming compound of sample)
     and sums up the sample_peak_intensity_sum for the entire group.
 
     :param compounds_df: DataFrame containing aggregated match compound data.
@@ -448,17 +475,22 @@ async def compile_samples_df(
     samples_df: pd.DataFrame,
     match_samples_df: pd.DataFrame,
 ) -> pd.DataFrame:
-    """Compile samples dataframe data (from database SampleView) with aggregated match results.
+    """Compile samples dataframe data (from database SampleView) with aggregated match
+    results.
 
-    This function merges the samples dataframe with the aggregated match results from the match_samples dataframe.
-    It adds the match_score, match_category, sample_peak_intensity_sum fields to each sample.
-    The 'matched' field is calculated to indicate whether the sample has any match results.
+    This function merges the samples dataframe with the aggregated match results from
+    the match_samples dataframe. It adds the match_score, match_category,
+    sample_peak_intensity_sum fields to each sample. The 'matched' field is calculated
+    to indicate whether the sample has any match results.
 
-    The aggregation logic in match_samples_df ensures that each sample's aggregated fields represent:
-      - The highest match_score of compound from the most alarming match_category (the most alarming compound of sample)
+    The aggregation logic in match_samples_df ensures that each sample's aggregated
+    fields represent:
+      - The highest match_score of compound from the most alarming match_category
+        (the most alarming compound of sample)
       - The sum of sample_peak_intensity for all compounds of the sample
 
-    NaN values in aggregated fields are replaced with 0, indicating no matches or data for those fields.
+    NaN values in aggregated fields are replaced with 0, indicating no matches or data
+    for those fields.
 
     :param samples_df: DataFrame containing original database sample data.
     :type samples_df: pd.DataFrame

@@ -170,7 +170,10 @@ def http_get(
         except RequestsConnectionError as e:
             if attempt == RETRY_MAX_ATTEMPTS:
                 raise MascopeConnectionError(
-                    f"Could not connect. Please check the URL and your network connection: {e}",
+                    (
+                        "Could not connect. "
+                        f"Please check the URL and your network connection: {e}"
+                    ),
                     url=full_url,
                 ) from e
             exc_for_log = e
@@ -261,7 +264,10 @@ def http_post(
         except RequestsConnectionError as e:
             if attempt == RETRY_MAX_ATTEMPTS:
                 raise MascopeConnectionError(
-                    f"Could not connect. Please check the URL and your network connection: {e}",
+                    (
+                        "Could not connect. "
+                        f"Please check the URL and your network connection: {e}"
+                    ),
                     url=full_url,
                 ) from e
             exc_for_log = e

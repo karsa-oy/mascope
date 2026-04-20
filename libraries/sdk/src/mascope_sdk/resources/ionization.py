@@ -26,8 +26,8 @@ class IonizationResource(BaseResource):
         """List all available ionization mechanisms.
 
         :return: A DataFrame containing ionization mechanism information with
-                 columns including ``ionization_mechanism_id`` and ``ionization_mechanism``,
-                 or None if no mechanisms are found.
+                 columns including ``ionization_mechanism_id`` and
+                 ``ionization_mechanism``, or None if no mechanisms are found.
         :rtype: pd.DataFrame | None
         :raises AuthenticationError: If authentication fails.
         :raises MascopeAPIError: If the API request fails.

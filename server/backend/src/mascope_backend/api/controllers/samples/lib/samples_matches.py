@@ -58,7 +58,7 @@ async def query_peak_matches(
                 TargetCollection.target_collection_id,
                 label(
                     "instrument",
-                    instrument,  # type: ignore[arg-type]
+                    instrument,  # type: ignore
                 ),  # Add instrument as a column for filtering logic
             )
             .select_from(MatchIsotope)
