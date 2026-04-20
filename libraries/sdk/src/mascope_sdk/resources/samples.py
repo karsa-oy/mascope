@@ -326,7 +326,8 @@ class SamplesResource(BaseResource):
         # We extract fields from the first match if present
         if "match" in df.columns and matches:
             match_keys = [
-                "match_score",
+                "match_score_isotope",
+                "relative_abundance",
                 "target_isotope_id",
                 "target_isotope_formula",
                 "target_ion_id",
@@ -343,6 +344,40 @@ class SamplesResource(BaseResource):
                     )
                 )
             df = df.drop(columns=["match"])
+
+            # Ion-level match score: weighted sum of isotope scores
+            # by relative abundance.
+            has_match = df["match_score_isotope"].notna()
+            if has_match.any():
+                ion_groups = df.loc[has_match].groupby("target_ion_id", sort=False)
+                ion_scores = ion_groups.apply(
+                    lambda g: (
+                        g["match_score_isotope"] * g["relative_abundance"]
+                    ).sum(),
+                    include_groups=False,
+                )
+                ion_scores.name = "match_score_ion"
+                df = df.merge(
+                    ion_scores, left_on="target_ion_id", right_index=True, how="left"
+                )
+
+                # Compound-level match score: max of ion scores.
+                compound_scores = (
+                    df.loc[has_match]
+                    .drop_duplicates(subset=["target_ion_id"])
+                    .groupby("target_compound_formula", sort=False)["match_score_ion"]
+                    .max()
+                    .rename("match_score_compound")
+                )
+                df = df.merge(
+                    compound_scores,
+                    left_on="target_compound_formula",
+                    right_index=True,
+                    how="left",
+                )
+            else:
+                df["match_score_ion"] = None
+                df["match_score_compound"] = None
 
             # Resolve ionization_mechanism_id to human-readable name
             mechanisms = self._client.ionization.list()
