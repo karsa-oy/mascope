@@ -10,7 +10,7 @@ from IsoSpecPy import IsoDistribution, IsoThreshold, PeriodicTbl
 from pyteomics.mass import Composition
 from scipy.spatial.distance import cosine
 
-from mascope_tools.composition.constants import (
+from mascope_tools.composition.config import (
     DEFAULT_ELEMENTAL_RATIO_RANGE,
     ELECTRON_MASS,
     ISOTOPE_ABUNDANCE_THRESHOLD,

@@ -1,7 +1,7 @@
 from dataclasses import asdict, dataclass
 
 from mascope_tools.composition import utils
-from mascope_tools.composition.constants import (
+from mascope_tools.composition.config import (
     DEFAULT_MASS_RANGE_THRESHOLD_PPM,
     DEFAULT_MAXIMUM_ROWS,
     DEFAULT_MAXIMUM_UNSATURATION,

@@ -10,7 +10,7 @@ import polars as pl
 from pyteomics.mass import Composition
 
 from mascope_tools.composition import utils
-from mascope_tools.composition.constants import UNSATURATION_COEFFICIENTS
+from mascope_tools.composition.config import UNSATURATION_COEFFICIENTS
 from mascope_tools.composition.heuristic_filter import (
     apply_heuristic_rules,
     match_isotopic_pattern,

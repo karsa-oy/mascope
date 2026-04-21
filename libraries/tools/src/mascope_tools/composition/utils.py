@@ -2,7 +2,7 @@ import re
 
 from pyteomics.mass import Composition, calculate_mass
 
-from mascope_tools.composition.constants import ELECTRON_MASS
+from mascope_tools.composition.config import ELECTRON_MASS
 from mascope_tools.composition.models import (
     Atom,
     CompositionFinderException,
