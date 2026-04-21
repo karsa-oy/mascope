@@ -367,14 +367,16 @@ class SamplesResource(BaseResource):
             # by relative abundance.
             has_match = df["match_score_isotope"].notna()
             if has_match.any():
-                ion_groups = df.loc[has_match].groupby("target_ion_id", sort=False)
-                ion_scores = ion_groups.apply(
-                    lambda g: (
-                        g["match_score_isotope"] * g["relative_abundance"]
-                    ).sum(),
-                    include_groups=False,
+                matched_rows = df.loc[has_match]
+                weighted = (
+                    matched_rows["match_score_isotope"]
+                    * matched_rows["relative_abundance"]
                 )
-                ion_scores.name = "match_score_ion"
+                ion_scores = (
+                    weighted.groupby(matched_rows["target_ion_id"], sort=False)
+                    .sum()
+                    .rename("match_score_ion")
+                )
                 df = df.merge(
                     ion_scores, left_on="target_ion_id", right_index=True, how="left"
                 )
