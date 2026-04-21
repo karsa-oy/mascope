@@ -75,6 +75,13 @@ def _get_test_password() -> str:
     return secret_path.read_text().strip()
 
 
+# --- Connection URLs ---
+
+# Intentionally reads from TEST_DB_* env vars rather than runtime.config.database
+# to keep test infrastructure hermetic — connection params must not vary with the
+# active Mascope env.
+
+
 def _get_test_db_url(db_name: str) -> str:
     """Build asyncpg URL for a named test database.
 
@@ -101,6 +108,47 @@ def _get_admin_url() -> str:
     user = os.environ.get("TEST_DB_USER", "mascope_user")
     password = _get_test_password()
     return f"postgresql+asyncpg://{user}:{password}@{host}:{port}/postgres"
+
+
+# --- Startup check ---
+
+
+def _check_postgres_available() -> None:
+    """Fail fast with a clear message if the PostgreSQL server is not reachable.
+
+    Runs at collection time so tests don't spend time collecting only to fail
+    on the first fixture setup. Skipped when `POSTGRES_TEST_PASSWORD` is not
+    set and `MASCOPE_PATH` is not set — this covers import-only scenarios.
+    """
+    import psycopg2
+
+    try:
+        password = _get_test_password()
+    except RuntimeError:
+        return  # can't resolve credentials, let the fixture fail with its own error
+
+    host = os.environ.get("TEST_DB_HOST", "localhost")
+    port = int(os.environ.get("TEST_DB_PORT", "5432"))
+    user = os.environ.get("TEST_DB_USER", "mascope_user")
+
+    try:
+        conn = psycopg2.connect(
+            host=host,
+            port=port,
+            user=user,
+            password=password,
+            database="postgres",
+            connect_timeout=3,
+        )
+        conn.close()
+    except psycopg2.OperationalError:
+        raise RuntimeError(
+            f"\n\nCannot connect to PostgreSQL at {host}:{port}.\n"
+            "Run 'mascope dev up' before running tests locally.\n"
+        )
+
+
+_check_postgres_available()
 
 
 # --- Engine factory fixture ---
