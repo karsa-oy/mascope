@@ -319,8 +319,8 @@ class MascopeClient:
             - ``sample_item_name``: Name of the sample
             - ``datetime_utc``: Measurement start timestamp (UTC)
 
-            Plus all columns from :meth:`~mascope_sdk.resources.samples\
-            .SamplesResource.get_peaks`.
+            Plus all columns from
+            :meth:`~mascope_sdk.resources.samples.SamplesResource.get_peaks`.
 
             When a peak matches multiple isotopes it is expanded
             into one row per match.  Use ``target_ion_id`` /

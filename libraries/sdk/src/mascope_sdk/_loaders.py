@@ -557,9 +557,8 @@ def load_peak_timeseries(
     def _get_matched_peaks(
         sample_row: Any, batch_name: str
     ) -> list[tuple[Any, str, str, str | None, str | None, str | None, str | None]]:
-        """Return (sample_row, batch_name, peak_id, compound_name, compound_formula,
-        ion, isotope).
-        """
+        """Return (sample_row, batch_name, peak_id, compound_name,compound_formula,
+        ion, isotope)."""
         sample_id = sample_row["sample_item_id"]
         peaks = client.samples.get_peaks(sample_id, matches=True)
         if peaks is None or peaks.empty:
