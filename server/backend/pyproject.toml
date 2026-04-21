@@ -15,7 +15,6 @@ dependencies = [
     "mascope_signal",
     "mascope_match",
     # external
-    # "aiosqlite>=0.21,<0.22", # Used for SQLite in-memory testing
     "colorcet~=3.1",
     "fastapi>=0.115,<0.116",
     "fastapi-users[oauth, sqlalchemy]>=15.0.2,<16",
