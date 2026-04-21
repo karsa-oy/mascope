@@ -1,7 +1,7 @@
 import pytest
 
+from mascope_tools.composition.exceptions import CompositionFinderException
 from mascope_tools.composition.finder import replace_atom_with_isotope
-from mascope_tools.composition.models import CompositionFinderException
 from mascope_tools.composition.utils import (
     combine_formula_and_ionization,
     parse_atom_count_ranges,

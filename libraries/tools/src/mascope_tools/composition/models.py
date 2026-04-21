@@ -9,18 +9,6 @@ from mascope_tools.composition.config import (
 )
 
 
-class CompositionFinderException(Exception):
-    pass
-
-
-class CompositionFinderWarning(UserWarning):
-    pass
-
-
-class HeuristicRuleWarning(UserWarning):
-    pass
-
-
 @dataclass
 class Atom:
     symbol: str

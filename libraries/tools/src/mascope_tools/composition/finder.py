@@ -11,13 +11,15 @@ from pyteomics.mass import Composition
 
 from mascope_tools.composition import utils
 from mascope_tools.composition.config import UNSATURATION_COEFFICIENTS
+from mascope_tools.composition.exceptions import (
+    CompositionFinderWarning,
+)
 from mascope_tools.composition.heuristic_filter import (
     apply_heuristic_rules,
     match_isotopic_pattern,
 )
 from mascope_tools.composition.models import (
     Atom,
-    CompositionFinderWarning,
     IonizationMechanism,
     Result,
     SearchContext,
