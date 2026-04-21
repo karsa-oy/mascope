@@ -288,6 +288,9 @@ def load_peaks(
         logger.warning("No peaks found")
         return None
 
+    # Drop all-NA columns per frame to avoid FutureWarning on concat
+    # with mixed empty/populated columns.
+    frames = [f.dropna(axis=1, how="all") for f in frames]
     result = pd.concat(frames, ignore_index=True)
     logger.info("Loaded {} peaks total", len(result))
     return result
@@ -421,6 +424,7 @@ def load_peaks_by_stage(
         logger.warning("No peaks found")
         return None
 
+    frames = [f.dropna(axis=1, how="all") for f in frames]
     result = pd.concat(frames, ignore_index=True)
     result = result.sort_values("stage").reset_index(drop=True)
     logger.info("Loaded {} peaks across {} stages", len(result), len(stages))
@@ -659,6 +663,7 @@ def load_peak_timeseries(
         logger.warning("No timeseries data loaded")
         return None
 
+    frames = [f.dropna(axis=1, how="all") for f in frames]
     result = pd.concat(frames, ignore_index=True)
     logger.info("Loaded {} timeseries points total", len(result))
     return result
