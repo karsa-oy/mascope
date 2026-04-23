@@ -2,9 +2,9 @@
 
 import re
 import warnings
+from math import ceil, floor
 from typing import Iterator
 
-import numpy as np
 import pandas as pd
 import polars as pl
 from pyteomics.mass import Composition
@@ -356,14 +356,12 @@ def recursive_search(
     # Feasible count bounds for this atom (neutral mass domain)
     feasible_min = max(
         atom.min_count,
-        int(np.ceil(((target_mz - shift) - tol - current_mass - max_inner) / atom.mass))
+        int(ceil(((target_mz - shift) - tol - current_mass - max_inner) / atom.mass))
         - 1,
     )
     feasible_max = min(
         atom.max_count,
-        int(
-            np.floor(((target_mz - shift) + tol - current_mass - min_inner) / atom.mass)
-        )
+        int(floor(((target_mz - shift) + tol - current_mass - min_inner) / atom.mass))
         + 1,
     )
     if feasible_min > feasible_max:
