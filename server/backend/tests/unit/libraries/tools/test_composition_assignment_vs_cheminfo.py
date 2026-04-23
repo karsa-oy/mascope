@@ -9,6 +9,7 @@ from mascope_backend.api.new.cheminfo.utils import (
     to_custom_element_format,
     to_explicit_isotope_format,
 )
+from mascope_tools.composition import CompositionSearchConfig
 from mascope_tools.composition.finder import find_compositions
 from mascope_tools.composition.utils import (
     normalize_formula_with_isotopes,
@@ -74,22 +75,15 @@ def _find_mascope_formulas(
     """Fetch candidate formulas from Mascope Tools
     for a given m/z and formula ranges."""
     explicit_ranges, _ = to_explicit_isotope_format(formula_ranges)
-    params = {
-        "monoisotopic_mass": mz,
-        "target_monoisotopic_mass": mz,
-        "mass_range_ppm": cheminfo_config.DEFAULT_MZ_PRECISION,
-        "element_count_ranges": explicit_ranges,
-        "ionizations": ",".join(ionization_mechanisms),
-        # Keep this high enough so strict set equality is meaningful.
-        "max_result_rows": 1000,
-    }
+    config = CompositionSearchConfig(
+        ionizations=",".join(ionization_mechanisms),
+        mass_range_ppm=cheminfo_config.DEFAULT_MZ_PRECISION,
+        element_count_ranges=explicit_ranges,
+        max_result_rows=1000,
+    )
 
-    result = find_compositions(params)
-    return {
-        _normalize_formula(row.get("formula", ""))
-        for row in result.get("results", [])
-        if row.get("formula")
-    }
+    results = find_compositions(mz, config)
+    return {_normalize_formula(result.get("formula", "")) for result in results}
 
 
 class TestDirectCompositionAssignment:
