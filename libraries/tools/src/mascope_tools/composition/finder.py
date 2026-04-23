@@ -162,7 +162,7 @@ def find_compositions(target_mz: float, config: CompositionSearchConfig) -> list
     :rtype: list[dict]
     """
     atoms = utils.parse_atom_count_ranges(config.element_count_ranges)
-    atoms.sort(key=lambda a: a.mass)
+    atoms.sort(key=lambda a: a.mass, reverse=True)
 
     ionization_mech_string_list = get_ionization_mech_string_list(config.ionizations)
     mz_tolerance_da = target_mz * config.mass_range_ppm * 1e-6
