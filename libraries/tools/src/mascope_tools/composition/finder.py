@@ -53,8 +53,8 @@ def assign_compositions(
 
     :param peaks: DataFrame with 'mz' and 'intensity' columns.
     :type peaks: pd.DataFrame
-    :param params: Parameters for composition finding.
-    :type params: dict
+    :param config: Configuration parameters for the composition search.
+    :type config: CompositionSearchConfig
     :param heuristics: Optional heuristic filter configuration.
     :type heuristics: HeuristicFilterConfig, optional
     :return: A DataFrame with assigned compositions and related information.
@@ -203,7 +203,7 @@ def find_compositions(target_mz: float, config: CompositionSearchConfig) -> list
             )
             continue
 
-        # --- Negative neutral masse case (ionization mechanism inapplicable) ---
+        # --- Negative neutral mass case (ionization mechanism inapplicable) ---
         if required_neutral_mass <= 0:
             continue
 
