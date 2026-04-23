@@ -367,27 +367,33 @@ def recursive_search(
     if feasible_min > feasible_max:
         return
 
-    for atom_count in range(feasible_min, feasible_max + 1):
-        if state.results_found >= config.max_result_rows:
-            return
-        new_mass = current_mass + atom_count * atom.mass
+    # Reuse a single counts buffer through recursion to avoid repeated list allocations.
+    counts.append(0)
+    try:
+        for atom_count in range(feasible_min, feasible_max + 1):
+            if state.results_found >= config.max_result_rows:
+                return
+            counts[-1] = atom_count
+            new_mass = current_mass + atom_count * atom.mass
 
-        if idx < len(state.atoms) - 1:
-            min_mass = new_mass + min_inner
-            max_mass = new_mass + max_inner
-            min_ion = min_mass + shift
-            max_ion = max_mass + shift
+            if idx < len(state.atoms) - 1:
+                min_mass = new_mass + min_inner
+                max_mass = new_mass + max_inner
+                min_ion = min_mass + shift
+                max_ion = max_mass + shift
 
-            # Too heavy already (even minimal remaining mass overshoots)
-            if (min_ion - target_mz) > tol:
-                break
-            # Still too light (even maximal remaining mass below window)
-            if (target_mz - max_ion) > tol:
-                continue
+                # Too heavy already (even minimal remaining mass overshoots)
+                if (min_ion - target_mz) > tol:
+                    break
+                # Still too light (even maximal remaining mass below window)
+                if (target_mz - max_ion) > tol:
+                    continue
 
-        yield from recursive_search(
-            idx + 1, counts + [atom_count], new_mass, target_mz, state, config
-        )
+            yield from recursive_search(
+                idx + 1, counts, new_mass, target_mz, state, config
+            )
+    finally:
+        counts.pop()
 
 
 def get_ionization_mech_string_list(ionizations: str) -> list[str]:
