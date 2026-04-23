@@ -6,7 +6,7 @@ import { debounce, instrumentType as getInstrumentType } from '@/lib/utils'
 
 import { useUi } from '@/stores/ui'
 
-import { useWorkspace } from '../workspace'
+import { useDataset } from '../dataset'
 import { useSample } from '../sample'
 import { useMatchCollection, useMatchIon } from '../match'
 
@@ -170,9 +170,9 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
     })
   }
 
-  // Clear visualization when workspace changes
-  const workspace = useWorkspace()
-  watch(() => workspace.focused, clear)
+  // Clear visualization when dataset changes
+  const dataset = useDataset()
+  watch(() => dataset.focused, clear)
 
   // Update visualization when sample focus changes (but keep same ion and collection)
   watch(

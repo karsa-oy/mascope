@@ -84,36 +84,36 @@ def _confirm_sample_count(count: int, threshold: int) -> None:
 
 def _collect_sample_tasks(
     client: MascopeClient,
-    workspace: str,
+    dataset: str,
     batches: str | None = None,
     samples: str | None = None,
 ) -> tuple[list[tuple[Any, str]], str]:
-    """Resolve workspace/batches and collect (sample_row, batch_name) pairs.
+    """Resolve dataset/batches and collect (sample_row, batch_name) pairs.
 
     :param client: The MascopeClient instance.
-    :param workspace: Workspace name, substring, or regex pattern (or ID).
+    :param dataset: Dataset name, substring, or regex pattern (or ID).
     :param batches: Optional filter on batch names (case-insensitive substring or regex)
     :param samples: Optional filter on sample names (case-insensitive substring or
       regex)
-    :return: Tuple of (sample_tasks, workspace_id).
-    :raises ValueError: If workspace or batches cannot be resolved.
+    :return: Tuple of (sample_tasks, dataset_id).
+    :raises ValueError: If dataset or batches cannot be resolved.
     """
     from ._resolve import resolve_id
 
-    workspaces = client.workspaces.list()
-    workspace_id = resolve_id(
-        workspace,
-        workspaces,
-        id_column="workspace_id",
-        name_column="workspace_name",
-        entity_label="workspace",
+    datasets = client.datasets.list()
+    dataset_id = resolve_id(
+        dataset,
+        datasets,
+        id_column="dataset_id",
+        name_column="dataset_name",
+        entity_label="dataset",
     )
-    logger.info("Loading workspace '{}'", workspace)
+    logger.info("Loading dataset '{}'", dataset)
 
-    all_batches = client.batches._list_by_id(workspace_id)
+    all_batches = client.batches._list_by_id(dataset_id)
     if all_batches is None or all_batches.empty:
-        logger.warning("No batches found in workspace")
-        return [], workspace_id
+        logger.warning("No batches found in dataset")
+        return [], dataset_id
 
     if batches is not None:
         all_batches = all_batches[
@@ -121,7 +121,7 @@ def _collect_sample_tasks(
         ]
         if all_batches.empty:
             logger.warning("No batches matching '{}'", batches)
-            return [], workspace_id
+            return [], dataset_id
 
     batch_names = all_batches["sample_batch_name"].tolist()
     logger.info("Found {} batch(es): {}", len(all_batches), batch_names)
@@ -149,12 +149,12 @@ def _collect_sample_tasks(
         for _, sample_row in batch_samples.iterrows():
             sample_tasks.append((sample_row, batch_name))
 
-    return sample_tasks, workspace_id
+    return sample_tasks, dataset_id
 
 
 def load_peaks(
     client: MascopeClient,
-    workspace: str,
+    dataset: str,
     batches: str | None = None,
     *,
     samples: str | None = None,
@@ -167,7 +167,7 @@ def load_peaks(
 ) -> pd.DataFrame | None:
     """Load peaks for all samples across one or more batches.
 
-    Handles the typical workflow of selecting a workspace, filtering batches
+    Handles the typical workflow of selecting a dataset, filtering batches
     by name, iterating all samples, and concatenating peak data into a single
     DataFrame enriched with batch and sample metadata.
 
@@ -176,10 +176,10 @@ def load_peaks(
 
     :param client: The MascopeClient instance.
     :type client: MascopeClient
-    :param workspace: Workspace name (or substring) or workspace ID.
-    :type workspace: str
+    :param dataset: Dataset name (or substring) or dataset ID.
+    :type dataset: str
     :param batches: Optional substring filter on batch names (case-insensitive).
-                    If not provided, all batches in the workspace are loaded.
+                    If not provided, all batches in the dataset are loaded.
     :type batches: str, optional
     :param samples: Optional substring filter on sample names (case-insensitive).
     :type samples: str, optional
@@ -215,7 +215,7 @@ def load_peaks(
 
              Returns None if no peaks are found.
     :rtype: pd.DataFrame | None
-    :raises ValueError: If the workspace or batches cannot be resolved.
+    :raises ValueError: If the dataset or batches cannot be resolved.
     :raises KeyboardInterrupt: If the user declines the confirmation prompt.
 
     Example::
@@ -224,23 +224,23 @@ def load_peaks(
 
         # Load all peaks from batches containing "Uronium"
         peaks = mascope.load_peaks(
-            workspace="My Workspace",
+            dataset="My Dataset",
             batches="Uronium",
         )
 
         # Filter by sample name
         peaks = mascope.load_peaks(
-            workspace="My Workspace",
+            dataset="My Dataset",
             samples="blank",
         )
 
         # Disable confirmation prompt
         peaks = mascope.load_peaks(
-            workspace="My Workspace",
+            dataset="My Dataset",
             confirm_above=None,
         )
     """
-    sample_tasks, _ = _collect_sample_tasks(client, workspace, batches, samples=samples)
+    sample_tasks, _ = _collect_sample_tasks(client, dataset, batches, samples=samples)
     if not sample_tasks:
         logger.warning("No samples found")
         return None
@@ -444,7 +444,7 @@ _NAME_COLUMNS = {
 
 def load_peak_timeseries(
     client: MascopeClient,
-    workspace: str,
+    dataset: str,
     batches: str | None = None,
     *,
     samples: str | None = None,
@@ -469,8 +469,8 @@ def load_peak_timeseries(
 
     :param client: The MascopeClient instance.
     :type client: MascopeClient
-    :param workspace: Workspace name (or substring) or workspace ID.
-    :type workspace: str
+    :param dataset: Dataset name (or substring) or dataset ID.
+    :type dataset: str
     :param batches: Optional substring filter on batch names (case-insensitive).
     :type batches: str, optional
     :param samples: Optional substring filter on sample names (case-insensitive).
@@ -514,14 +514,14 @@ def load_peak_timeseries(
 
         # Timeseries for all peaks matched to Urea
         ts = mascope.load_peak_timeseries(
-            workspace="My Workspace",
+            dataset="My Dataset",
             batches="Uronium",
             compound="CH4N2O",
         )
 
         # Multiple compounds in one call
         ts = mascope.load_peak_timeseries(
-            workspace="My Workspace",
+            dataset="My Dataset",
             batches="Uronium",
             compound=["CH4N2O", "Lactic acid"],
         )
@@ -546,7 +546,7 @@ def load_peak_timeseries(
     formula_set = set(formula_values)
 
     # --- Discover samples across batches ---
-    sample_tasks, _ = _collect_sample_tasks(client, workspace, batches, samples=samples)
+    sample_tasks, _ = _collect_sample_tasks(client, dataset, batches, samples=samples)
     if not sample_tasks:
         logger.warning("No samples found")
         return None

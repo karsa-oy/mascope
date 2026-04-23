@@ -9,7 +9,7 @@ from .cheminfo import ChemInfoResource
 from .ionization import IonizationResource
 from .matching import MatchingResource
 from .samples import SamplesResource
-from .workspaces import WorkspacesResource
+from .datasets import DatasetsResource
 
 
 __all__ = [
@@ -18,5 +18,5 @@ __all__ = [
     "IonizationResource",
     "MatchingResource",
     "SamplesResource",
-    "WorkspacesResource",
+    "DatasetsResource",
 ]

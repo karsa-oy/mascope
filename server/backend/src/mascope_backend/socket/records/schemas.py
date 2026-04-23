@@ -33,7 +33,7 @@ class RecordEvent(BaseModel):
     record_type: str = Field(
         ...,
         description="Record type (matches frontend store name)",
-        examples=["batch", "workspace", "target_collection"],
+        examples=["batch", "dataset", "target_collection"],
     )
     record_id: str | None = Field(
         None, description="Primary key of affected record (optional for reload)"

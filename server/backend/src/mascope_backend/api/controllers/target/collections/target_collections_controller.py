@@ -185,7 +185,7 @@ async def get_target_collection(target_collection_id: str) -> dict:
         # Add associated sample batches to the target collection dictionary
         sample_batches = [
             {
-                "workspace_id": sb.sample_batch.workspace_id,
+                "dataset_id": sb.sample_batch.dataset_id,
                 "sample_batch_id": sb.sample_batch.sample_batch_id,
                 "sample_batch_name": sb.sample_batch.sample_batch_name,
             }

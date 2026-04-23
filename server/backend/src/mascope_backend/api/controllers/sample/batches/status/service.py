@@ -74,10 +74,10 @@ async def update_sample_batch_status(
         updated_count = result.rowcount
         await session.commit()
 
-        # Get affected workspaces for room targeting
+        # Get affected datasets for room targeting
         batches = (
             await session.execute(
-                select(SampleBatch.sample_batch_id, SampleBatch.workspace_id).where(
+                select(SampleBatch.sample_batch_id, SampleBatch.dataset_id).where(
                     SampleBatch.sample_batch_id.in_(sample_batch_ids)
                 )
             )
@@ -85,14 +85,14 @@ async def update_sample_batch_status(
 
         # Emit targeted partial (status field) update events for each batch
         if independent_transaction:
-            for batch_id, workspace_id in batches:
+            for batch_id, dataset_id in batches:
                 await emit_record_updated(
                     record_type="batch",
                     record_id=batch_id,
                     record={
                         "status": status,
                     },  # Partial record - only changed field
-                    room=workspace_id,
+                    room=dataset_id,
                     changed_fields=["status"],  # Signals frontend to merge
                 )
 

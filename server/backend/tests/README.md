@@ -7,10 +7,10 @@
 Tests that verify individual components in isolation with external dependencies mocked.
 
 - **API unit tests**: Validate Pydantic models, service/controllers without actual HTTP requests
-  - Example: Testing the `workspace_controller` functions directly to verify business logic with mocked socketio service
+  - Example: Testing the `dataset_controller` functions directly to verify business logic with mocked socketio service
   - Focus: Schema validation, service logic, error handling
 - **DB unit tests**: Verify database models, queries, and relationships in isolation
-  - Example: Testing that `Workspace` model properties and relationships to `SampleBatch` work correctly
+  - Example: Testing that `Dataset` model properties and relationships to `SampleBatch` work correctly
   - Focus: Model validation, relationships, cascading behaviors
 - **Libraries unit tests**: Test that core library functions work correctly in isolation
   - Example: Testing signal processing algorithms independently with controlled inputs
@@ -24,7 +24,7 @@ Tests that verify individual components in isolation with external dependencies 
 Tests that verify interactions between multiple components but not the entire system.
 
 - **API integration tests**: Test complete HTTP request/response cycle with real dependencies
-  - Example: Testing CRUD operations on the `/api/workspaces` endpoint with authentication, verifying role-based access control (RBAC) for different user roles
+  - Example: Testing CRUD operations on the `/api/datasets` endpoint with authentication, verifying role-based access control (RBAC) for different user roles
   - Focus: HTTP status codes, response formats, role-based access control (RBAC)
 - **DB integration tests**: Verify multi-model interactions and complex query operations
   - Example: Testing relationships between tables and model, deep cascade-delete tests, database integrity tests, test backup/restore functionality
@@ -41,7 +41,7 @@ Tests that verify complete application workflows from end to end.
   - Focus: Data integrity through transformation stages, algorithm accuracy
 - **Workflows**: Test complete business processes involving multiple API endpoints
   - Example: Testing the complete sample analysis workflow (creation, processing)
-  - Example: Creating a workspace, adding sample batches, importing data.
+  - Example: Creating a dataset, adding sample batches, importing data.
   - Example: Verifying data export and report generation processes
   - Focus: End-to-end user scenarios, business logic correctness
 - **Regression**: Ensure previously fixed bugs don't reappear
@@ -68,24 +68,24 @@ server/backend/tests/
 │   ├── conftest.py                # Unit test database engine and session fixtures
 │   ├── api/                       # API component unit tests
 │   │   ├── conftest.py            # API-specific mocks (socketio, dependencies), session-scoped test data
-│   │   ├── workspace/             # Workspace-specific unit tests
-│   │   │   ├── conftest.py        # Workspace test data fixtures
-│   │   │   ├── test_workspace_schema.py  # Test Pydantic model validation, constraints
-│   │   │   └── test_workspace_service.py # Test controller logic
+│   │   ├── dataset/             # Dataset-specific unit tests
+│   │   │   ├── conftest.py        # Dataset test data fixtures
+│   │   │   ├── test_dataset_schema.py  # Test Pydantic model validation, constraints
+│   │   │   └── test_dataset_service.py # Test controller logic
 │   │   ├── other resources....
 │   ├── db/                        # Database component unit tests
 │   │   ├── conftest.py            # Function-scoped session fixture for isolated model testing
 │   │   └── models/                # SQLAlchemy model tests
 │   │       ├── conftest.py        # Test data fixtures for database model tests
-│   │       ├── test_workspace_model.py   # Test workspace model
+│   │       ├── test_dataset_model.py   # Test dataset model
 │   ├── libraries/                 # Library components unit tests
 │       ├── conftest.py            # Fixtures for library testing
 ├── integration/                   # Tests for component interactions
 │   ├── conftest.py                # Integration test database/session setup
 │   ├── api/                       # API integration tests by resource
 │   │   ├── conftest.py            # AsyncClient fixtures for RBAC, roles, users
-│   │   └── workspace/             # Workspace API integration tests
-│   │   │   └── test_workspace_crud.py  # Workspace CRUD lifecycle tests
+│   │   └── dataset/             # Dataset API integration tests
+│   │   │   └── test_dataset_crud.py  # Dataset CRUD lifecycle tests
 │   │   ├── other resources....
 │   ├── db/                        # Database integration tests
 │   │   ├── conftest.py            # Multi-model database fixtures
@@ -102,7 +102,7 @@ server/backend/tests/
 │   │   ├── conftest.py            # Workflow execution fixtures
 │   │   ├── workflow_utils.py      # Workflow-specific test helpers
 │   │   ├── test_sample_processing.py   # Sample creation and analysis workflow
-│   │   └── test_workspace_lifecycle.py # Complete workspace/batch/sample lifecycle
+│   │   └── test_dataset_lifecycle.py # Complete dataset/batch/sample lifecycle
 │   ├── regression/                # Tests for previously fixed bugs
 │   │   ├── conftest.py            # Bug reproduction fixtures
 │   │   └── test_fixed_bugs.py     # Tests for specific historical bug fixes
@@ -155,7 +155,7 @@ libraries/
 - **AsyncClient**: Primary HTTP test client for API integration tests
   - Uses `httpx.AsyncClient` with `ASGITransport(app=fast)` and `base_url="http://test"`
   - Runs in the same event loop as the test session — required for asyncpg compatibility (see [FastAPI Async Tests](https://fastapi.tiangolo.com/advanced/async-tests/#example))
-  - Simulates HTTP requests: `await client.get("/api/workspaces")`
+  - Simulates HTTP requests: `await client.get("/api/datasets")`
   - All API integration tests are `async def` with `@pytest.mark.asyncio`
 - **TestClient**: FastAPI's synchronous test client — not used in integration tests
   - Would cause `InterfaceError: cannot perform operation: another operation is in progress`
@@ -185,7 +185,7 @@ libraries/
 
 - **`gen_test_id(size=16)`** in `tests/test_utils.py` generates random IDs using `nanoid`
   - Default size matches the `VARCHAR(16)` primary key constraint enforced by PostgreSQL
-  - Use for all model fixtures that require a primary key: `workspace_id=gen_test_id()`
+  - Use for all model fixtures that require a primary key: `dataset_id=gen_test_id()`
   - Pass `size` explicitly when a column has a different length constraint
   - Stable module-level constants are used only where parametrized tests must reference IDs by value
 
@@ -240,13 +240,13 @@ libraries/
   `emit_record_created`, `emit_record_updated`, and `emit_record_deleted`. The factory patches
   the exact module path where controllers import these functions — each controller must be patched
   at its specific import path, not globally.
-- **Component-specific mocks**: Fixtures like `mock_emit_workspace` target specific module paths,
+- **Component-specific mocks**: Fixtures like `mock_emit_dataset` target specific module paths,
   preventing side effects in other components. The mock returns a `MagicMock` container with three
   `AsyncMock` attributes (`created`, `updated`, `deleted`) for verifying each emission type.
 - **Verification support**:
-  - `mock_emit_workspace.created.assert_called_once()` — verify creation event
-  - `mock_emit_workspace.updated.assert_called_with(record_type="workspace", ...)` — verify update
-  - `mock_emit_workspace.deleted.call_count == 2` — verify delete count
+  - `mock_emit_dataset.created.assert_called_once()` — verify creation event
+  - `mock_emit_dataset.updated.assert_called_with(record_type="dataset", ...)` — verify update
+  - `mock_emit_dataset.deleted.call_count == 2` — verify delete count
   - `call_args.kwargs["record_type"]` — verify specific event parameters
 
 ### Test data management
@@ -257,7 +257,7 @@ libraries/
 - **ID generation**: Use `gen_test_id()` from `test_utils.py` for all model primary keys.
   PostgreSQL enforces `VARCHAR(16)` length and foreign key constraints that SQLite silently ignored.
 - **Layered test data**: Component-specific fixtures provide standardized test data (e.g.,
-  `workspace_create_data`) for consistent testing scenarios across multiple tests.
+  `dataset_create_data`) for consistent testing scenarios across multiple tests.
 - **Isolation strategy**: Session-scoped fixtures provide persistent reference data (roles, users,
   ionization mechanisms) for efficiency. Function-scoped fixtures (`session` in `unit/db/conftest.py`)
   provide per-test isolation — data flushed but not committed is rolled back on session close.
@@ -285,7 +285,7 @@ Run tests from the repository root:
 pytest server/backend/tests/
 
 # Run a specific test file
-pytest server/backend/tests/unit/api/workspace/test_workspace_schema.py
+pytest server/backend/tests/unit/api/dataset/test_dataset_schema.py
 ```
 
 Common pytest options:
@@ -293,7 +293,7 @@ Common pytest options:
 - `-v`: Verbose output showing each test name
 - `-s`: Show print statements during test execution
 - `--durations=10`: Show execution time for the 10 slowest tests
-- `-k "workspace"`: Run only tests with "workspace" in their name
+- `-k "dataset"`: Run only tests with "dataset" in their name
 
 ### Using Mascope CLI 💻
 
@@ -320,10 +320,10 @@ mascope test run -m unit
 mascope test run -m integration
 
 # Run a specific test by name
-mascope test run -n workspace_model
+mascope test run -n dataset_model
 
 # Run with verbose output
-mascope test run -n workspace_crud -v
+mascope test run -n dataset_crud -v
 
 # Run all SDK library tests
 mascope test run libraries -m sdk

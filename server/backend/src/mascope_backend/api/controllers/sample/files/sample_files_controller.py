@@ -15,9 +15,9 @@ from mascope_backend.api.controllers.sample.lib.fetch_affected_sample_data impor
     fetch_affected_sample_data,
 )
 from mascope_backend.api.controllers.samples.samples_controller import get_samples
-from mascope_backend.api.controllers.workspace.acquisition.service import (
-    create_acquisition_workspaces,
-    delete_acquisition_workspaces,
+from mascope_backend.api.controllers.dataset.acquisition.service import (
+    create_acquisition_datasets,
+    delete_acquisition_datasets,
 )
 from mascope_backend.api.lib.api_features import (
     api_controller,
@@ -181,7 +181,7 @@ async def create_sample_file(
     2. Construct a new SampleFile object with provided data and add it to the session.
     3. Commit the transaction to persist the new sample file in the database.
     4. Refresh the instance to get the created data from the database.
-    5. Reload instruments and create acquisition workspaces if needed
+    5. Reload instruments and create acquisition datasets if needed
     6. Trigger automatic processing of the sample file
     7. Return the created sample file data.
 
@@ -233,8 +233,8 @@ async def create_sample_file(
         )
 
         if new_sample_file.instrument not in initial_instruments:
-            # New instrument detected - create workspaces and emit instrument events
-            await create_acquisition_workspaces()
+            # New instrument detected - create datasets and emit instrument events
+            await create_acquisition_datasets()
 
         # Step 6: Trigger automatic processing of the sample file
         from mascope_backend.api.controllers.sample.files.process.service import (
@@ -578,8 +578,8 @@ async def delete_sample_files(
             for instrument in instruments_affected
             if instrument not in final_instruments
         ]:
-            # Clean up orphaned workspaces and emit instrument deletion events
-            await delete_acquisition_workspaces()
+            # Clean up orphaned datasets and emit instrument deletion events
+            await delete_acquisition_datasets()
 
     # --- Prepare response data and message ---
     skipped_files = skipped_files_associations + skipped_files_not_found
@@ -670,11 +670,11 @@ async def update_sample_file(
     final_instruments = set(
         [i["instrument"] for i in (await get_instruments())["data"]]
     )
-    # Handle instrument changes and handle acquisition workspaces creation/deletion
+    # Handle instrument changes and handle acquisition datasets creation/deletion
     if final_instruments > initial_instruments:  # Check for added instruments
-        await create_acquisition_workspaces()
+        await create_acquisition_datasets()
     if initial_instruments > final_instruments:  # Check for removed instruments
-        await delete_acquisition_workspaces()
+        await delete_acquisition_datasets()
 
     return {
         "message": f"Sample file '{sample_file.filename}' updated successfully.",

@@ -27,7 +27,7 @@ def resolve_id(
     :type id_column: str
     :param name_column: Column name containing the names.
     :type name_column: str
-    :param entity_label: Human-readable label for error messages (e.g. "workspace").
+    :param entity_label: Human-readable label for error messages (e.g. "dataset").
     :type entity_label: str
     :return: The resolved ID.
     :rtype: str

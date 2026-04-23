@@ -65,13 +65,13 @@ mascope_sdk.copy_examples("./tutorials")
 
 This creates a `tutorials/` folder with the following notebooks:
 
-| #   | Notebook                           | Topic                                                     |
-| --- | ---------------------------------- | --------------------------------------------------------- |
-| 1   | `01_getting_started.ipynb`         | Connect, list workspaces/batches/samples, view a spectrum |
-| 2   | `02_batch_timeseries.ipynb`        | Load peaks across batches, filter, and plot               |
-| 3   | `03_intra_sample_timeseries.ipynb` | Per-scan intensity timeseries for specific compounds      |
-| 4   | `04_mass_defect_plot.ipynb`        | Mass defect visualization                                 |
-| 5   | `05_peaks_by_stage.ipynb`          | Compare measurement stages within a single sample         |
+| #   | Notebook                           | Topic                                                   |
+| --- | ---------------------------------- | ------------------------------------------------------- |
+| 1   | `01_getting_started.ipynb`         | Connect, list datasets/batches/samples, view a spectrum |
+| 2   | `02_batch_timeseries.ipynb`        | Load peaks across batches, filter, and plot             |
+| 3   | `03_intra_sample_timeseries.ipynb` | Per-scan intensity timeseries for specific compounds    |
+| 4   | `04_mass_defect_plot.ipynb`        | Mass defect visualization                               |
+| 5   | `05_peaks_by_stage.ipynb`          | Compare measurement stages within a single sample       |
 
 Open them in VS Code (or any Jupyter-compatible IDE) and run the cells. Each notebook is self-contained, just make sure your `.env` credentials are set up first (see [Configuration](#configuration)).
 
@@ -98,11 +98,11 @@ from mascope_sdk import MascopeClient
 # Auto-loads credentials from .env
 mascope = MascopeClient()
 
-# List workspaces (returns a DataFrame)
-workspaces = mascope.workspaces.list()
+# List datasets (returns a DataFrame)
+datasets = mascope.datasets.list()
 
-# List batches by workspace name
-batches = mascope.batches.list("My Workspace")
+# List batches by dataset name
+batches = mascope.batches.list("My Dataset")
 
 # List samples from a single batch (raises if ambiguous)
 samples = mascope.samples.list(batch="My Batch")
@@ -111,10 +111,10 @@ samples = mascope.samples.list(batch="My Batch")
 samples = mascope.samples.list(batches="Uronium")
 
 # Load peaks across all samples in matching batches
-peaks = mascope.load_peaks(workspace="My Workspace", batches="Uronium")
+peaks = mascope.load_peaks(dataset="My Dataset", batches="Uronium")
 
 # Load peaks across a subset of samples, within matching batches
-peaks = mascope.load_peaks(workspace="My Workspace", batches="Uronium", samples="12:")
+peaks = mascope.load_peaks(dataset="My Dataset", batches="Uronium", samples="12:")
 
 # Plot a sample spectrum (based on sample id)
 spectrum = mascope.samples.get_spectrum(sample_id=samples.iloc[0]["sample_item_id"])
@@ -175,7 +175,7 @@ The `MascopeClient` can be configured in three ways (in override priority order)
 
 ## High-Level Loaders
 
-The SDK provides three convenience loaders that handle workspace/batch/sample resolution, concurrent requests, and progress bars automatically. These are the recommended way to load data for analysis.
+The SDK provides three convenience loaders that handle dataset/batch/sample resolution, concurrent requests, and progress bars automatically. These are the recommended way to load data for analysis.
 
 ---
 
@@ -185,16 +185,16 @@ Load averaged peaks ("sum spectrum") for all samples across one or more batches,
 
 ```python
 # All peaks from batches matching "Uronium"
-peaks = mascope.load_peaks(workspace="My Workspace", batches="Uronium")
+peaks = mascope.load_peaks(dataset="My Dataset", batches="Uronium")
 
 # Filter by sample name
-peaks = mascope.load_peaks(workspace="My Workspace", samples="blank")
+peaks = mascope.load_peaks(dataset="My Dataset", samples="blank")
 
 # All peaks from every batch (skip confirmation prompt)
-peaks = mascope.load_peaks(workspace="My Workspace", confirm_above=None)
+peaks = mascope.load_peaks(dataset="My Dataset", confirm_above=None)
 
 # Without match data, areas only
-peaks = mascope.load_peaks(workspace="My Workspace", matches=False, heights=False)
+peaks = mascope.load_peaks(dataset="My Dataset", matches=False, heights=False)
 ```
 
 ---
@@ -206,14 +206,14 @@ Load per-scan intensity timeseries for peaks matching a compound, ion, or isotop
 ```python
 # Timeseries for all peaks matched to Urea (by name or formula)
 ts = mascope.load_peak_timeseries(
-    workspace="My Workspace",
+    dataset="My Dataset",
     batches="Uronium",
     compound="Urea",       # or compound="CH4N2O"
 )
 
 # Multiple compounds in one call
 ts = mascope.load_peak_timeseries(
-    workspace="My Workspace",
+    dataset="My Dataset",
     compound=["Urea", "Lactic acid"],
 )
 
@@ -256,7 +256,7 @@ Key columns: `stage`, `stage_name`, `t_min`, `t_max`, plus all columns from `get
 
 ## Caching
 
-Workspace, batch, sample, and ionization mechanism listings are cached (in volatile memory) automatically after the first call. This speeds up repeated name resolution and avoids redundant API calls. When data on the server changes (e.g. new batch created), the cache needs to be cleared to reload the data on the next call. The cache is not persisted on disk, so restarting the kernel always clears the cache.
+Dataset, batch, sample, and ionization mechanism listings are cached (in volatile memory) automatically after the first call. This speeds up repeated name resolution and avoids redundant API calls. When data on the server changes (e.g. new batch created), the cache needs to be cleared to reload the data on the next call. The cache is not persisted on disk, so restarting the kernel always clears the cache.
 
 ```python
 # Clear the cache when server data changes
@@ -280,23 +280,23 @@ Name filters use `pandas.Series.str.contains` under the hood, so they accept
 plain substrings **or** regular expressions (case-insensitive). For example,
 `batches="2025|2026"` matches batch names containing "2025" or "2026".
 
-#### `mascope.workspaces`
+#### `mascope.datasets`
 
-| Method   | Description                    | Returns             |
-| -------- | ------------------------------ | ------------------- |
-| `list()` | List all accessible workspaces | `pd.DataFrame│None` |
+| Method   | Description                  | Returns             |
+| -------- | ---------------------------- | ------------------- |
+| `list()` | List all accessible datasets | `pd.DataFrame│None` |
 
 #### `mascope.batches`
 
-| Method            | Description                           | Returns             |
-| ----------------- | ------------------------------------- | ------------------- |
-| `list(workspace)` | List batches in a workspace (by name) | `pd.DataFrame│None` |
+| Method          | Description                         | Returns             |
+| --------------- | ----------------------------------- | ------------------- |
+| `list(dataset)` | List batches in a dataset (by name) | `pd.DataFrame│None` |
 
 #### `mascope.samples`
 
 | Method                                          | Description                                          | Returns             |
 | ----------------------------------------------- | ---------------------------------------------------- | ------------------- |
-| `list(batch=, batches=, workspace=, samples=)`  | List samples from one or more batches                | `pd.DataFrame│None` |
+| `list(batch=, batches=, dataset=, samples=)`    | List samples from one or more batches                | `pd.DataFrame│None` |
 | `get(sample_id)`                                | Get sample details                                   | `dict│None`         |
 | `get_peaks(sample_id, ...)`                     | Get peak data with optional match/filter/time params | `pd.DataFrame│None` |
 | `get_peak_timeseries(sample_id, mz=, peak_id=)` | Get intensity over time for a peak                   | `pd.DataFrame│None` |
@@ -336,7 +336,7 @@ from mascope_sdk import MascopeClient
 
 mascope = MascopeClient()
 
-peaks = mascope.load_peaks(workspace="My Workspace", batches="Uronium")
+peaks = mascope.load_peaks(dataset="My Dataset", batches="Uronium")
 
 # Filter to matched peaks and summarise by compound
 matched = peaks[peaks["target_compound_formula"].notna()]
@@ -353,7 +353,7 @@ from mascope_sdk import MascopeClient
 mascope = MascopeClient()
 
 ts = mascope.load_peak_timeseries(
-    workspace="My Workspace",
+    dataset="My Dataset",
     compound="Urea",
 )
 
@@ -413,8 +413,8 @@ if ts is not None:
 
 | Old API                                                       | New API                                               |
 | ------------------------------------------------------------- | ----------------------------------------------------- |
-| `get_workspaces(url, token)`                                  | `mascope.workspaces.list()`                           |
-| `get_sample_batches(url, token, ws_id)`                       | `mascope.batches.list("Workspace Name")`              |
+| `get_datasets(url, token)`                                    | `mascope.datasets.list()`                             |
+| `get_sample_batches(url, token, ws_id)`                       | `mascope.batches.list("Dataset Name")`                |
 | `get_samples(url, token, batch_id)`                           | `mascope.samples.list(batch="Batch Name")`            |
 | `get_sample(url, token, sample_id)`                           | `mascope.samples.get(sample_id)`                      |
 | `get_sample_peaks(url, token, sample_id)`                     | `mascope.samples.get_peaks(sample_id)`                |
@@ -506,10 +506,10 @@ mascope_sdk/
 ├── _resolve.py          # Name-to-ID resolution helpers
 ├── _loaders.py          # High-level loaders (load_peaks, load_peak_timeseries, load_peaks_by_stage)
 ├── _concurrent.py       # ThreadPoolExecutor wrapper with progress bars and cancellation
-├── _legacy.py           # Deprecated functional API (get_workspaces, get_samples, etc.)
+├── _legacy.py           # Deprecated functional API (get_datasets, get_samples, etc.)
 ├── resources/
 │   ├── _base.py         # BaseResource: shared HTTP helpers and datetime coercion
-│   ├── workspaces.py    # WorkspacesResource
+│   ├── datasets.py    # DatasetsResource
 │   ├── batches.py       # BatchesResource
 │   ├── samples.py       # SamplesResource (peaks, spectra, timeseries)
 │   ├── matching.py      # MatchingResource (compound matching)

@@ -13,10 +13,10 @@ import { useSample } from './modules/sample'
 import { useTargetCollection, useTargetCompound } from './modules/target'
 import { useTemplate } from './modules/template'
 import { useUser } from './modules/user'
-import { useWorkspace } from './modules/workspace'
+import { useDataset } from './modules/dataset'
 
 export const useData = () => ({
-  workspace: useWorkspace(),
+  dataset: useDataset(),
   ionization: {
     mechanism: useIonizationMechanism(),
     mode: useIonizationMode()

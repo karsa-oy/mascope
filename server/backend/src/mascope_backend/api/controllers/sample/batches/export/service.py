@@ -13,7 +13,7 @@ from mascope_backend.api.controllers.match.targets.batch.match_targets_batch_con
 from mascope_backend.api.controllers.sample.batches.export.util import (
     auto_adjust_column_width,
 )
-from mascope_backend.api.controllers.workspace.workspace_controller import get_workspace
+from mascope_backend.api.controllers.dataset.dataset_controller import get_dataset
 from mascope_backend.api.lib.api_features import (
     api_controller_background_task,
 )
@@ -58,10 +58,10 @@ async def sample_batch_export_spreadsheet(
 
     runtime.logger.info(f"Exporting spreadsheet for batch '{sample_batch_name}'")
 
-    # --- Fetch workspace and target collections ---
-    workspace_id = sample_batch.get("workspace_id")
-    workspace = (
-        (await get_workspace(workspace_id)).get("data") if workspace_id else None
+    # --- Fetch dataset and target collections ---
+    dataset_id = sample_batch.get("dataset_id")
+    dataset = (
+        (await get_dataset(dataset_id)).get("data") if dataset_id else None
     )
 
     collections = (
@@ -89,7 +89,7 @@ async def sample_batch_export_spreadsheet(
         ["Description", sample_batch["sample_batch_description"]],
         ["Type", sample_batch["sample_batch_type"]],
         ["Polarity", sample_batch["polarity"]],
-        ["Workspace", workspace.get("workspace_name")],
+        ["Dataset", dataset.get("dataset_name")],
         [""],
         ["Target collections", collections_str],
         [""],

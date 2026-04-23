@@ -82,7 +82,7 @@ from mascope_backend.api.routes.target.isotopes.target_isotopes_routes import (
 from mascope_backend.api.routes.visualization.visualization_routes import (
     visualization_router,
 )
-from mascope_backend.api.routes.workspace.workspace_routes import workspace_router
+from mascope_backend.api.routes.dataset.dataset_routes import dataset_router
 
 
 routers = [
@@ -94,7 +94,7 @@ routers = [
     owner_router,
     roles_router,
     params_router,
-    workspace_router,
+    dataset_router,
     sample_batches_router,
     samples_router,
     sample_files_router,

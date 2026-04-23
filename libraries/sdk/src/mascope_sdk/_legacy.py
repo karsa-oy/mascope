@@ -18,8 +18,8 @@ Migration Guide:
 
         from mascope_sdk import MascopeClient
         mascope = MascopeClient()  # Loads credentials from .env
-        workspaces = mascope.workspaces.list()
-        batches = mascope.batches.list(workspace_id)
+        datasets = mascope.datasets.list()
+        batches = mascope.batches.list(dataset_id)
 """
 
 import functools
@@ -308,59 +308,59 @@ def api_post_file(
 
 
 ################
-# Workspaces API
+# Datasets API
 
 
-@_deprecated("MascopeClient().workspaces.list()")
+@_deprecated("MascopeClient().datasets.list()")
 def get_workspaces(mascope_url: str, access_token: str) -> list:
-    """Get Mascope workspaces from a URL.
+    """Get Mascope datasets from a URL.
 
     .. deprecated::
-        Use :meth:`MascopeClient.workspaces.list` instead.
+        Use :meth:`MascopeClient.datasets.list` instead.
 
     :param mascope_url: Mascope URL.
     :type mascope_url: str
     :param access_token: Authorization token for API access.
     :type access_token: str
-    :return: List of workspace dictionaries.
+    :return: List of dataset dictionaries.
     :rtype: list
     """
-    resp = api_get(url=mascope_url, path="workspaces", access_token=access_token)
+    resp = api_get(url=mascope_url, path="datasets", access_token=access_token)
     # Check if the request was successful
     if not resp:
         logger.error(
-            f"Failed to retrieve workspaces from {mascope_url}. Please check the URL and try again."
+            f"Failed to retrieve datasets from {mascope_url}. Please check the URL and try again."
         )
         return []
 
     content = json.loads(resp.content)
-    workspaces = content.get("data", [])
-    if not workspaces:
-        logger.error("No workspaces found. Please create a new workspace.")
+    datasets = content.get("data", [])
+    if not datasets:
+        logger.error("No datasets found. Please create a new dataset.")
 
-    return workspaces
+    return datasets
 
 
 ####################
 # Sample batches API
 
 
-@_deprecated("MascopeClient().batches.list(workspace_id)")
+@_deprecated("MascopeClient().batches.list(dataset_id)")
 def get_sample_batches(mascope_url: str, access_token: str, workspace_id: str) -> list:
-    """Get Mascope sample batches of a workspace.
+    """Get Mascope sample batches of a dataset.
 
     :param mascope_url: The base URL of the Mascope instance.
     :type mascope_url: str
     :param access_token: Authorization token for API access.
     :type access_token: str
-    :param workspace_id: The ID of the workspace from which to retrieve sample batches.
+    :param workspace_id: The ID of the dataset from which to retrieve sample batches.
     :type workspace_id: str
     :return: A list of sample batch dictionaries.
              Returns an empty list if no sample batches are found or if an error occurs.
     :rtype: list
     """
     # Prepare query parameters
-    query_params = {"workspace_id": workspace_id}
+    query_params = {"dataset_id": workspace_id}
 
     # Perform the GET request with query parameters
     resp = api_get(

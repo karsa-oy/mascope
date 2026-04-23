@@ -6,20 +6,20 @@ import Listbox from 'primevue/listbox'
 import ContextMenu from 'primevue/contextmenu'
 
 import { useApp } from '@/stores'
-import { DialogWorkspaceOp } from '@/lib/dialogs'
+import { DialogDatasetOp } from '@/lib/dialogs'
 
 import { useSidebarMenu } from './state.js'
 
 const app = useApp()
 const sidebarMenu = useSidebarMenu()
-const open = computed(() => sidebarMenu.open && sidebarMenu.tab === 'workspaces')
+const open = computed(() => sidebarMenu.open && sidebarMenu.tab === 'datasets')
 
 const dialog = ref()
-const workspaceContextMenu = ref()
-const selectedWorkspace = ref(null)
+const datasetContextMenu = ref()
+const selectedDataset = ref(null)
 
 watch(
-  () => app.data.workspace.focused,
+  () => app.data.dataset.focused,
   () => {
     if (sidebarMenu.open) {
       sidebarMenu.open = false
@@ -27,7 +27,7 @@ watch(
   }
 )
 
-const layer = 'sidebar_workspaces_tab'
+const layer = 'sidebar_datasets_tab'
 watchEffect(() => {
   if (open.value) {
     app.ui.help.set(layer)
@@ -41,17 +41,17 @@ const vHelpLayer = app.ui.help.directive(layer)
   <div
     v-help-layer.right="
       `
-      <b>Workspaces</b>
+      <b>Datasets</b>
       <p>
-        Select and manage workspaces. Workspaces are like folders
-        containing batches. Click on a workspace to open it and see its batches.
+        Select and manage datasets. Datasets are like folders
+        containing batches. Click on a dataset to open it and see its batches.
       </p>
-      <p>Click on the Create button to create a new workspace</p>
+      <p>Click on the Create button to create a new dataset</p>
       `
     "
   >
     <div class="row" style="align-items: center">
-      <h2>Workspaces</h2>
+      <h2>Datasets</h2>
       <Button
         icon="pi pi-plus"
         @click="
@@ -65,31 +65,31 @@ const vHelpLayer = app.ui.help.directive(layer)
     </div>
     <section>
       <Listbox
-        :modelValue="app.data.workspace.focused"
+        :modelValue="app.data.dataset.focused"
         @update:modelValue="
           (value) => {
             if (value) {
-              // Selecting a different workspace
-              app.data.workspace.focused = value
+              // Selecting a different dataset
+              app.data.dataset.focused = value
             } else if (!value && sidebarMenu.open) {
-              // Tried to deselect (clicked same workspace) - close sidebar
+              // Tried to deselect (clicked same dataset) - close sidebar
               sidebarMenu.open = false
             }
           }
         "
         @contextmenu.prevent
         filter
-        :filterPlaceholder="'Search workspaces'"
-        :options="app.data.workspace.list"
-        optionLabel="workspace_name"
+        :filterPlaceholder="'Search datasets'"
+        :options="app.data.dataset.list"
+        optionLabel="dataset_name"
         listStyle="height: calc(100vh - 300px)"
         :pt="
           app.ui.help.bottom_start(`
-          <h1>Workspace Selector</h1>
+          <h1>Dataset Selector</h1>
 
-          <p>Workspaces are the like folders that organize samples
+          <p>Datasets are the like folders that organize samples
           and targets relating to specific projects in one place.
-          You can modify, create or delete workspaces by clicking
+          You can modify, create or delete datasets by clicking
           the ellipsis icon to the right of the dropdown.</p>
     `)
         "
@@ -101,8 +101,8 @@ const vHelpLayer = app.ui.help.directive(layer)
             @contextmenu="
               (event) => {
                 event.preventDefault()
-                selectedWorkspace = option
-                workspaceContextMenu.toggle(event)
+                selectedDataset = option
+                datasetContextMenu.toggle(event)
               }
             "
           >
@@ -116,7 +116,7 @@ const vHelpLayer = app.ui.help.directive(layer)
             >
               <path
                 d="M216,72H130.67L102.93,51.2a16.12,16.12,0,0,0-9.6-3.2H40A16,16,0,0,0,24,64V200a16,16,0,0,0,16,16H216.89A15.13,15.13,0,0,0,232,200.89V88A16,16,0,0,0,216,72Zm0,128H40V64H93.33L123.2,86.4A8,8,0,0,0,128,88h88Z"
-                v-if="option.workspace_type === 'ANALYSIS'"
+                v-if="option.dataset_type === 'ANALYSIS'"
               ></path>
               <path
                 v-else
@@ -124,8 +124,8 @@ const vHelpLayer = app.ui.help.directive(layer)
               ></path>
             </svg>
             <div class="col" style="gap: 1rem; align-items: flex-start">
-              {{ option.workspace_name }}
-              <span style="opacity: 0.5">{{ option.workspace_description }}</span>
+              {{ option.dataset_name }}
+              <span style="opacity: 0.5">{{ option.dataset_description }}</span>
             </div>
           </div>
         </template>
@@ -133,18 +133,18 @@ const vHelpLayer = app.ui.help.directive(layer)
     </section>
   </div>
   <ContextMenu
-    ref="workspaceContextMenu"
+    ref="datasetContextMenu"
     appendTo="self"
     :model="[
       {
-        label: 'Edit workspace',
+        label: 'Edit dataset',
         icon: 'pi pi-pen-to-square',
         command: () => {
           dialog = 'edit'
         }
       },
       {
-        label: 'Delete workspace',
+        label: 'Delete dataset',
         icon: 'pi pi-trash',
         command: () => {
           dialog = 'delete'
@@ -152,5 +152,5 @@ const vHelpLayer = app.ui.help.directive(layer)
       }
     ]"
   />
-  <DialogWorkspaceOp v-model:action="dialog" :workspace="selectedWorkspace" />
+  <DialogDatasetOp v-model:action="dialog" :dataset="selectedDataset" />
 </template>

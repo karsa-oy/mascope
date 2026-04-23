@@ -10,8 +10,8 @@ requests confirmation, then removes all match data and sets them to 'rematch' st
 Usage:
     mascope dev db script run cleanup_copied_batch_matches
 
-    # To limit to a specific workspace (optional):
-    mascope prod db script run cleanup_copied_batch_matches --workspace <workspace_id>
+    # To limit to a specific dataset (optional):
+    mascope prod db script run cleanup_copied_batch_matches --dataset <dataset_id>
 
 
 Date: 2025-10-21
@@ -31,18 +31,18 @@ from mascope_backend.db.admin.match.remove_batch_matches import remove_batch_mat
 from mascope_backend.runtime import runtime
 
 
-async def find_copied_batches(workspace_id: str | None = None) -> list[dict]:
+async def find_copied_batches(dataset_id: str | None = None) -> list[dict]:
     """
     Find all sample batches with 'copy' in their name and fetch their detailed data.
 
-    :param workspace_id: Optional workspace ID to filter results
+    :param dataset_id: Optional dataset ID to filter results
     :return: List of batch data dictionaries with match counts
     """
     async with async_session() as session:
         query = select(SampleBatch).where(SampleBatch.sample_batch_name.ilike("%copy%"))
 
-        if workspace_id:
-            query = query.where(SampleBatch.workspace_id == workspace_id)
+        if dataset_id:
+            query = query.where(SampleBatch.dataset_id == dataset_id)
 
         result = await session.execute(query)
         batches = result.scalars().all()
@@ -72,7 +72,7 @@ async def find_copied_batches(workspace_id: str | None = None) -> list[dict]:
                     "sample_batch": {
                         "sample_batch_id": batch.sample_batch_id,
                         "sample_batch_name": batch.sample_batch_name,
-                        "workspace_id": batch.workspace_id,
+                        "dataset_id": batch.dataset_id,
                         "status": batch.status,
                     },
                     "counts": {
@@ -104,7 +104,7 @@ def display_batch_summary(batches: list[dict]) -> None:
 
         print(f"\n{i}. {batch['sample_batch_name']}")
         print(f"   ID: {batch['sample_batch_id']}")
-        print(f"   Workspace: {batch['workspace_id']}")
+        print(f"   Dataset: {batch['dataset_id']}")
         print(f"   Status: {batch['status']}")
         print(f"   Samples: {counts['samples']}")
         print(
@@ -120,15 +120,15 @@ def display_batch_summary(batches: list[dict]) -> None:
     )
 
 
-async def run_cleanup(workspace_id: str | None = None) -> None:
+async def run_cleanup(dataset_id: str | None = None) -> None:
     """
     Main cleanup logic: find batches, confirm, and remove matches.
 
-    :param workspace_id: Optional workspace ID to limit scope
+    :param dataset_id: Optional dataset ID to limit scope
     """
     await configure_database_engine()
 
-    batches = await find_copied_batches(workspace_id=workspace_id)
+    batches = await find_copied_batches(dataset_id=dataset_id)
 
     if not batches:
         runtime.logger.info(
@@ -166,14 +166,14 @@ def main() -> None:
         description="Clean up corrupted matches in copied batches",
     )
     parser.add_argument(
-        "--workspace",
-        help="Limit cleanup to specific workspace",
+        "--dataset",
+        help="Limit cleanup to specific dataset",
     )
 
     args = parser.parse_args()
 
     try:
-        asyncio.run(run_cleanup(workspace_id=args.workspace))
+        asyncio.run(run_cleanup(dataset_id=args.dataset))
     except KeyboardInterrupt:
         runtime.logger.info("\nCleanup cancelled by user (Ctrl+C)")
     except Exception:

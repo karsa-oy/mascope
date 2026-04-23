@@ -25,7 +25,7 @@ export const batchCollectionTypes = {
   ACQUISITION: ['DIAGNOSTICS']
 }
 
-export const getAllowedWorkspaceTypes = (collectionType) => {
+export const getAllowedDatasetTypes = (collectionType) => {
   return collectionBatchTypes[collectionType] || []
 }
 

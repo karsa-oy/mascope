@@ -1,7 +1,7 @@
 """
-Acquisition workspace pydantic models for API validation and serialization.
+Acquisition dataset pydantic models for API validation and serialization.
 
-Defines data models for acquisition workspace related requests and responses
+Defines data models for acquisition dataset related requests and responses
 """
 
 from pydantic import Field, field_validator
@@ -9,16 +9,16 @@ from pydantic import Field, field_validator
 from mascope_backend.api.models.base_pydantic_model import QueryParamsModel
 
 
-class GetAcquisitionWorkspaceQueryParams(QueryParamsModel):
+class GetAcquisitionDatasetQueryParams(QueryParamsModel):
     """
-    Query parameters for filtering ACQUISITION workspace.
+    Query parameters for filtering ACQUISITION dataset.
 
-    This model defines the parameters that can be passed to the get_acquisition_workspace endpoint
+    This model defines the parameters that can be passed to the get_acquisition_dataset endpoint
     """
 
     instrument: str | None = Field(
         None,
-        description="Filter by instrument associated with the acquisition workspace.",
+        description="Filter by instrument associated with the acquisition dataset.",
     )
 
     @field_validator("instrument")

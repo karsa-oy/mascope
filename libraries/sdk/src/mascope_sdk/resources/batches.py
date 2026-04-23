@@ -13,7 +13,7 @@ from ._base import BaseResource, _coerce_datetime_columns
 class BatchesResource(BaseResource):
     """Resource for sample batch operations.
 
-    Sample batches group related samples together within a workspace.
+    Sample batches group related samples together within a dataset.
     They contain metadata about the batch and references to individual samples.
 
     Example::
@@ -22,55 +22,58 @@ class BatchesResource(BaseResource):
 
         mascope = MascopeClient()
 
-        # List batches by workspace name (substring match)
-        batches = mascope.batches.list("My Workspace")
+        # List batches by dataset name (substring match)
+        batches = mascope.batches.list("My Dataset")
 
-        # Or by workspace ID
+        # Or by dataset ID
         batches = mascope.batches.list("ws-123")
     """
 
-    def _resolve_workspace_id(self, workspace: str) -> str:
-        """Resolve a workspace name or ID to a workspace ID."""
-        workspaces = self._client.workspaces.list()
+    def _resolve_dataset_id(self, dataset: str) -> str:
+        """Resolve a dataset name or ID to a dataset ID."""
+        datasets = self._client.datasets.list()
         return resolve_id(
-            workspace,
-            workspaces,
-            id_column="workspace_id",
-            name_column="workspace_name",
-            entity_label="workspace",
+            dataset,
+            datasets,
+            id_column="dataset_id",
+            name_column="dataset_name",
+            entity_label="dataset",
         )
 
-    def list(self, workspace: str) -> pd.DataFrame | None:
-        """List all sample batches in a workspace.
+    def list(self, dataset: str = None, **kwargs) -> pd.DataFrame | None:
+        """List all sample batches in a dataset.
 
-        :param workspace: Workspace name (or substring) or workspace ID.
-        :type workspace: str
+        :param dataset: Dataset name (or substring) or dataset ID.
+        :type dataset: str
         :return: A DataFrame containing sample batch information with columns
                  including ``sample_batch_id`` and ``sample_batch_name``, or
                  None if no batches are found.
         :rtype: pd.DataFrame | None
-        :raises ValueError: If the workspace cannot be resolved.
+        :raises ValueError: If the dataset cannot be resolved.
         :raises AuthenticationError: If authentication fails.
         :raises MascopeAPIError: If the API request fails.
 
         Example::
 
             # By name
-            batches = mascope.batches.list("My Workspace")
+            batches = mascope.batches.list("My Dataset")
 
             # By ID
             batches = mascope.batches.list("GwvleF1LJtEcfUQg")
         """
-        workspace_id = self._resolve_workspace_id(workspace)
-        return self._list_by_id(workspace_id)
+        from mascope_sdk.client import _compat_dataset_kwarg
 
-    def _list_by_id(self, workspace_id: str) -> pd.DataFrame | None:
-        """List batches by workspace ID (no name resolution)."""
-        cache_key = f"batches:{workspace_id}"
+        dataset = _compat_dataset_kwarg(dataset, kwargs, "batches.list")
+        dataset_id = self._resolve_dataset_id(dataset)
+        return self._list_by_id(dataset_id)
+
+    def _list_by_id(self, dataset_id: str) -> pd.DataFrame | None:
+        """List batches by dataset ID (no name resolution)."""
+        cache_key = f"batches:{dataset_id}"
         if cache_key in self._client._cache:
             return self._client._cache[cache_key]
-        logger.info("Fetching batches for workspace '{}'", workspace_id)
-        data = self._get("sample/batches", params={"workspace_id": workspace_id})
+        logger.info("Fetching batches for dataset '{}'", dataset_id)
+        data = self._get("sample/batches", params={"dataset_id": dataset_id})
         if not data:
             return None
         df = _coerce_datetime_columns(pd.DataFrame(data))

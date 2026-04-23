@@ -1,7 +1,7 @@
 """
 Controller for sample files auto-processing pipeline.
 
-Handles automated creation of ACQUISITION workspaces, batches, and sample items, and matching the samples.
+Handles automated creation of ACQUISITION datasets, batches, and sample items, and matching the samples.
 """
 
 import asyncio
@@ -32,8 +32,8 @@ from mascope_backend.api.controllers.sample.lib.fetch_affected_sample_data impor
 from mascope_backend.api.controllers.sample.lib.sample_file_fetch import (
     fetch_sample_file,
 )
-from mascope_backend.api.controllers.workspace.acquisition.service import (
-    get_acquisition_workspace,
+from mascope_backend.api.controllers.dataset.acquisition.service import (
+    get_acquisition_dataset,
 )
 from mascope_backend.api.lib.api_features import api_controller_background_task
 from mascope_backend.api.lib.exceptions.api_exceptions import (
@@ -86,12 +86,12 @@ async def auto_process_sample_file(
     """
     Main orchestrator for automatic sample file processing pipeline.
 
-    Processes uploaded sample files automatically into ACQUISITION workspaces,
+    Processes uploaded sample files automatically into ACQUISITION datasets,
     creating the all data hierarchy if needed.
 
     Steps:
     - Validate sample file existence
-    - Get ACQUISITION workspace for the instrument
+    - Get ACQUISITION dataset for the instrument
     - Create ACQUISITION batches and sample items for each sample file ionization mode
     - Perform calibration and match computation for created ACQUISITION samples
     - Schedule rematch tasks for other affected samples
@@ -115,9 +115,9 @@ async def auto_process_sample_file(
     # --- Validate sample file existence --- #
     sample_file = await fetch_sample_file(sample_file_id=sample_file_id)
 
-    # --- Get ACQUISITION workspace for the instrument --- #
-    acquisition_workspace = (
-        await get_acquisition_workspace(sample_file.instrument)
+    # --- Get ACQUISITION dataset for the instrument --- #
+    acquisition_dataset = (
+        await get_acquisition_dataset(sample_file.instrument)
     ).get("data")
 
     # --- Create ACQUISITION batches and sample items for each sample file ionization mode --- #
@@ -126,7 +126,7 @@ async def auto_process_sample_file(
         acquisition_sample_batches,
     ) = await create_acquisition_batches_and_items(
         sample_file=sample_file,
-        workspace_id=acquisition_workspace.get("workspace_id"),
+        dataset_id=acquisition_dataset.get("dataset_id"),
     )
 
     # Extract batch and sample IDs for notifications
@@ -486,20 +486,20 @@ async def re_process_sample_files(
 
 
 async def create_acquisition_batches_and_items(
-    sample_file: SampleFile, workspace_id: str
+    sample_file: SampleFile, dataset_id: str
 ) -> tuple[list[dict], list[dict]]:
     """
     Create ACQUISITION batches and sample items for each ionization mode of sample file.
 
     For each ionization mode in the sample file:
-    - Get or create daily ACQUISITION batch in provided acquisition workspace
+    - Get or create daily ACQUISITION batch in provided acquisition dataset
     - Create ACQUISITION sample item within the batch
     - Configure batch with appropriate target collections and ionization mechanisms
 
     :param sample_file: Sample file record containing polarities and metadata
     :type sample_file: SampleFile
-    :param workspace_id: ID of ACQUISITION workspace to create batches in
-    :type workspace_id: str
+    :param dataset_id: ID of ACQUISITION dataset to create batches in
+    :type dataset_id: str
     :return: Tuple of (created sample items, created/retrieved batches)
     :rtype: tuple[list[dict], list[dict]]
     """
@@ -521,7 +521,7 @@ async def create_acquisition_batches_and_items(
             # Check if batch already exists
             batch_data = (
                 await get_sample_batches(
-                    workspace_id=workspace_id,
+                    dataset_id=dataset_id,
                     sample_batch_type=["ACQUISITION"],
                     sample_batch_name=batch_name,
                 )
@@ -559,7 +559,7 @@ async def create_acquisition_batches_and_items(
                 acquisition_sample_batch = (
                     await create_sample_batch(
                         sample_batch=SampleBatchCreate(
-                            workspace_id=workspace_id,
+                            dataset_id=dataset_id,
                             sample_batch_name=batch_name,
                             sample_batch_description=f"Auto-generated daily acquisition batch for {sample_file.instrument}",
                             sample_batch_type="ACQUISITION",

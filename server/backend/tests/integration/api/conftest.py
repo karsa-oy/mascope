@@ -180,7 +180,7 @@ def _make_async_client(user: User, create_jwt_auth_token) -> AsyncClient:
 async def guest_client(test_users, create_jwt_auth_token):
     """AsyncClient authenticated as a guest user.
 
-    Guest users can read workspaces but cannot create, update, or delete.
+    Guest users can read datasets but cannot create, update, or delete.
 
     :param test_users: Dict of test user objects
     :param create_jwt_auth_token: JWT token factory
@@ -195,7 +195,7 @@ async def guest_client(test_users, create_jwt_auth_token):
 async def editor_client(test_users, create_jwt_auth_token):
     """AsyncClient authenticated as an editor user.
 
-    Editor users can perform all CRUD operations on workspaces.
+    Editor users can perform all CRUD operations on datasets.
 
     :param test_users: Dict of test user objects
     :param create_jwt_auth_token: JWT token factory
@@ -237,29 +237,29 @@ async def owner_client(test_users, create_jwt_auth_token):
 
 
 @pytest.fixture
-def workspace_create_data():
-    """Sample data for workspace creation requests.
+def dataset_create_data():
+    """Sample data for dataset creation requests.
 
-    :return: Dictionary with workspace creation data
+    :return: Dictionary with dataset creation data
     :rtype: dict
     """
     return {
-        "workspace_name": "New Test Workspace",
-        "workspace_description": "Created during integration test",
-        "workspace_type": "ANALYSIS",
+        "dataset_name": "New Test Dataset",
+        "dataset_description": "Created during integration test",
+        "dataset_type": "ANALYSIS",
     }
 
 
 @pytest.fixture
-def workspace_update_data():
-    """Sample data for workspace update requests.
+def dataset_update_data():
+    """Sample data for dataset update requests.
 
-    :return: Dictionary with workspace update data
+    :return: Dictionary with dataset update data
     :rtype: dict
     """
     return {
-        "workspace_name": "Updated Test Workspace",
-        "workspace_description": "Updated during integration test",
+        "dataset_name": "Updated Test Dataset",
+        "dataset_description": "Updated during integration test",
     }
 
 

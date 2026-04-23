@@ -1,8 +1,8 @@
 import { expect, mergeTests } from '@playwright/test'
 
-import { workspace, sample, instrument } from './fixtures'
+import { dataset, sample, instrument } from './fixtures'
 
-const test = mergeTests(workspace, instrument, sample)
+const test = mergeTests(dataset, instrument, sample)
 
 test.describe('sample ops', () => {
   test('process sample (create)', async ({

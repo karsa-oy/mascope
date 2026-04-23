@@ -34,27 +34,27 @@ class SamplesResource(BaseResource):
         peaks = mascope.samples.get_peaks(sample_id="sample-456")
     """
 
-    def _get_all_batches(self, workspace: str | None = None) -> pd.DataFrame | None:
-        """Collect all batches, optionally scoped to a workspace."""
-        if workspace is not None:
-            return self._client.batches.list(workspace)
+    def _get_all_batches(self, dataset: str | None = None) -> pd.DataFrame | None:
+        """Collect all batches, optionally scoped to a dataset."""
+        if dataset is not None:
+            return self._client.batches.list(dataset)
 
-        workspaces = self._client.workspaces.list()
-        if workspaces is None or workspaces.empty:
-            raise ValueError("No workspaces found.")
+        datasets = self._client.datasets.list()
+        if datasets is None or datasets.empty:
+            raise ValueError("No datasets found.")
         frames = []
-        for _, ws in workspaces.iterrows():
-            ws_batches = self._client.batches.list(ws["workspace_id"])
+        for _, ws in datasets.iterrows():
+            ws_batches = self._client.batches.list(ws["dataset_id"])
             if ws_batches is not None and not ws_batches.empty:
                 frames.append(ws_batches)
         return pd.concat(frames, ignore_index=True) if frames else None
 
-    def _resolve_batch_id(self, batch: str, workspace: str | None = None) -> str:
+    def _resolve_batch_id(self, batch: str, dataset: str | None = None) -> str:
         """Resolve a batch name or ID to a single batch ID.
 
         Raises if zero or multiple batches match.
         """
-        all_batches = self._get_all_batches(workspace)
+        all_batches = self._get_all_batches(dataset)
         return resolve_id(
             batch,
             all_batches,
@@ -64,10 +64,10 @@ class SamplesResource(BaseResource):
         )
 
     def _resolve_batch_ids(
-        self, batches: str, workspace: str | None = None
+        self, batches: str, dataset: str | None = None
     ) -> Sequence[str]:
         """Resolve a batch substring to one or more batch IDs."""
-        all_batches = self._get_all_batches(workspace)
+        all_batches = self._get_all_batches(dataset)
         if all_batches is None or all_batches.empty:
             raise ValueError("No batches found.")
 
@@ -90,7 +90,7 @@ class SamplesResource(BaseResource):
         batch: str | None = None,
         *,
         batches: str | None = None,
-        workspace: str | None = None,
+        dataset: str | None = None,
         drop_columns: Sequence[str] | None = None,
     ) -> pd.DataFrame | None:
         """List samples from one or more batches.
@@ -111,9 +111,9 @@ class SamplesResource(BaseResource):
         :param batches: Batch name substring or regex pattern. Returns samples
                         from every matching batch.
         :type batches: str, optional
-        :param workspace: Optional workspace name or ID to narrow the search.
-                          If not provided, searches across all workspaces.
-        :type workspace: str, optional
+        :param dataset: Optional dataset name or ID to narrow the search.
+                          If not provided, searches across all datasets.
+        :type dataset: str, optional
         :return: A DataFrame containing sample information, or None if no
                  samples found. When ``batches`` is used the result includes
                  a ``sample_batch_name`` column.
@@ -134,8 +134,8 @@ class SamplesResource(BaseResource):
             # All matching batches
             samples = mascope.samples.list(batches="Uronium")
 
-            # Narrow to a workspace
-            samples = mascope.samples.list(batch="Uronium", workspace="KORBI2")
+            # Narrow to a dataset
+            samples = mascope.samples.list(batch="Uronium", dataset="KORBI2")
         """
         if (batch is None) == (batches is None):
             raise ValueError("Provide exactly one of 'batch' or 'batches'.")
@@ -152,13 +152,13 @@ class SamplesResource(BaseResource):
             ]
 
         if batch is not None:
-            batch_id = self._resolve_batch_id(batch, workspace=workspace)
+            batch_id = self._resolve_batch_id(batch, dataset=dataset)
             return self._list_by_id(batch_id)
 
         # batches (plural) - collect samples from all matching batches
         assert batches is not None  # for type checker
-        batch_ids = self._resolve_batch_ids(batches, workspace=workspace)
-        all_batches_df = self._get_all_batches(workspace)
+        batch_ids = self._resolve_batch_ids(batches, dataset=dataset)
+        all_batches_df = self._get_all_batches(dataset)
 
         # Build a batch_id -> batch_name lookup
         id_to_name: dict[str, str] = {}

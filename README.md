@@ -593,7 +593,7 @@ agents/           # Agent applications
 
 ### CSV Export Agent
 
-The CSV Export Agent is an agent application designed to allow integrating Mascope data into external data architectures. It monitors new samples arriving in a specified workspace, and computes matches for a configurable list of target compounds. The results are exported into a structured text file, to be ingested into the external system.
+The CSV Export Agent is an agent application designed to allow integrating Mascope data into external data architectures. It monitors new samples arriving in a specified dataset, and computes matches for a configurable list of target compounds. The results are exported into a structured text file, to be ingested into the external system.
 
 #### Build
 
@@ -743,7 +743,7 @@ await emit_record_created(
     record_type="batch",           # Frontend store name
     record_id=str(batch.sample_batch_id),       # Record ID should be string
     record=batch_dict,             # Full record as dict
-    room=workspace_id              # Optional: target specific room
+    room=dataset_id              # Optional: target specific room
 )
 
 # Full update
@@ -751,7 +751,7 @@ await emit_record_updated(
     record_type="batch",
     record_id=str(batch.sample_batch_id),
     record=batch_dict,
-    room=batch.workspace_id,
+    room=batch.dataset_id,
 )
 
 # Partial update (frontend merges fields)
@@ -766,7 +766,7 @@ await emit_record_updated(
 await emit_record_deleted(
     record_type="batch",
     record_id=str(batch.sample_batch_id),
-    room=workspace_id
+    room=dataset_id
 )
 
 ```
@@ -1374,18 +1374,18 @@ import { api } from "@/api";
 
 #### Frontend HTTP Client
 
-The frontend HTTP API uses [Axios](https://axios-http.com/docs/intro), exposing its API as transparently as possible. For example, this is how you create a workspace with the client:
+The frontend HTTP API uses [Axios](https://axios-http.com/docs/intro), exposing its API as transparently as possible. For example, this is how you create a dataset with the client:
 
 ```js
-// create a new workspace:
+// create a new dataset:
 api.http.post(
   // method
-  `/workspaces`, // path
-  { workspace_name: "Foo" }, // body
+  `/datasets`, // path
+  { dataset_name: "Foo" }, // body
   {
     // config
     use: "create",
-    type: "create_workspace",
+    type: "create_dataset",
   },
 );
 ```
@@ -1506,8 +1506,8 @@ While the UI stores are implemented in a variety of ways, Data stores frequently
 import { useApp } from "@/stores";
 const app = useApp();
 
-// get all workspace
-app.data.workspace.list;
+// get all dataset
+app.data.dataset.list;
 // create a batch
 app.data.batch.create({
   //...
@@ -1542,11 +1542,11 @@ import { useData } from "@/stores/data/lib";
 
 const data = useData(
   "batch", // name - used for auto-registering socket events (batch_created, batch_updated, etc.)
-  ({ workspace_id }) =>
-    api.http.get(`/sample/batches`, { params: { workspace_id } }), // main load method, populates list, params passed from deps
+  ({ dataset_id }) =>
+    api.http.get(`/sample/batches`, { params: { dataset_id } }), // main load method, populates list, params passed from deps
   {
     key: "sample_batch_id", // primary key field
-    deps: () => ({ workspace_id: useWorkspace().focusedId }), // dependencies that trigger loading, become method params
+    deps: () => ({ dataset_id: useDataset().focusedId }), // dependencies that trigger loading, become method params
     events: ["match_reload"], // only cross-store events (regular events auto-registered)
     selection: true, // enable selection
     read: (sample_batch_id) =>
@@ -1600,9 +1600,9 @@ Separate load method can be specified, to be used in external calls:
 All data loading is triggered by dependency changes. When `deps()` returns different values, the store automatically reloads:
 
 ```js
-// Store reloads when workspace focus changes
+// Store reloads when dataset focus changes
 deps: () => ({
-  workspace_id: useWorkspace().focusedId,
+  dataset_id: useDataset().focusedId,
 });
 
 // Store reloads when batch OR collection focus changes
@@ -1736,28 +1736,28 @@ import { defineStore } from "pinia";
 import { useData } from "@/stores/data/lib";
 import { ref } from "vue";
 
-export const useWorkspace = defineStore("app.data.workspace", () => {
+export const useDataset = defineStore("app.data.dataset", () => {
   const detailed = ref(null);
 
   const data = useData(
-    "workspace",
+    "dataset",
     () =>
-      api.http.get("/workspaces", {
+      api.http.get("/datasets", {
         use: "read",
-        type: "load_workspaces",
+        type: "load_datasets",
       }),
     {
-      key: "workspace_id",
+      key: "dataset_id",
       events: [], // Only cross-store events if needed
       selection: {
         mode: "single",
         persist: true,
         subscribe: true,
       },
-      read: (workspace_id) =>
-        api.http.get(`/workspaces/${workspace_id}`, {
+      read: (dataset_id) =>
+        api.http.get(`/datasets/${dataset_id}`, {
           use: "read",
-          type: "read_workspace",
+          type: "read_dataset",
         }),
     },
   );
@@ -1765,20 +1765,20 @@ export const useWorkspace = defineStore("app.data.workspace", () => {
   return {
     ...data,
     // Custom CRUD operations
-    create: (workspace) =>
-      api.http.post("/workspaces", workspace, {
+    create: (dataset) =>
+      api.http.post("/datasets", dataset, {
         use: "create",
-        type: "create_workspace",
+        type: "create_dataset",
       }),
-    update: (workspace) =>
-      api.http.patch(`/workspaces/${workspace.workspace_id}`, workspace, {
+    update: (dataset) =>
+      api.http.patch(`/datasets/${dataset.dataset_id}`, dataset, {
         use: "update",
-        type: "update_workspace",
+        type: "update_dataset",
       }),
-    delete: (workspace) =>
-      api.http.delete(`/workspaces/${workspace.workspace_id}`, {
+    delete: (dataset) =>
+      api.http.delete(`/datasets/${dataset.dataset_id}`, {
         use: "delete",
-        type: "delete_workspace",
+        type: "delete_dataset",
       }),
   };
 });

@@ -1,8 +1,8 @@
 import { expect, mergeTests } from '@playwright/test'
 
-import { workspace, sample, instrument } from './fixtures'
+import { dataset, sample, instrument } from './fixtures'
 
-const test = mergeTests(workspace, sample, instrument)
+const test = mergeTests(dataset, sample, instrument)
 
 test.describe('batch ops', () => {
   test('create batch', async ({ freshBatch }) => {

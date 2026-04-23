@@ -31,7 +31,7 @@ export const useBatchTableConfig = defineStore('browser.sample.batchTable', () =
 
   // local storage persistence
 
-  const storageKey = computed(() => `sample-browser-workspace[${app.data.workspace.focusedId}]`)
+  const storageKey = computed(() => `sample-browser-dataset[${app.data.dataset.focusedId}]`)
 
   // write to local storage
   function writeConfig() {
@@ -57,11 +57,11 @@ export const useBatchTableConfig = defineStore('browser.sample.batchTable', () =
   // write to local storage when any options update
   watch(() => config.value, writeConfig, { deep: true })
 
-  // read from local storage when workspace changes
+  // read from local storage when dataset changes
   watch(
-    () => app.data.workspace.focusedId,
+    () => app.data.dataset.focusedId,
     () => {
-      if (app.data.workspace.focusedId) {
+      if (app.data.dataset.focusedId) {
         readConfig()
       }
     },

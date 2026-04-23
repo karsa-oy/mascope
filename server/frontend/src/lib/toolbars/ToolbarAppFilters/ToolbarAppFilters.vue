@@ -22,7 +22,7 @@ const filtering = ref(false)
       app.ui.help.bottom(`
         <h1>Topbar</h1>
         <p>
-          On the left, there is workspace navigation and home menu with settings
+          On the left, there is dataset navigation and home menu with settings
           and notification log.
         </p>
         <p>

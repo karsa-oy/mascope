@@ -16,6 +16,25 @@ from tqdm import tqdm
 from .exceptions import ConfigurationError
 
 
+def _compat_dataset_kwarg(dataset, kwargs, method_name):
+    """Accept ``workspace=`` as a deprecated alias for ``dataset=``."""
+    if "workspace" in kwargs:
+        import warnings
+
+        warnings.warn(
+            f"'{method_name}(workspace=...)' is deprecated, "
+            f"use '{method_name}(dataset=...)' instead.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        if dataset is not None:
+            raise TypeError(
+                f"{method_name}() got both 'dataset' and 'workspace' arguments"
+            )
+        return kwargs.pop("workspace")
+    return dataset
+
+
 # Track whether we've already configured the SDK's loguru handler
 _log_handler_id: int | None = None
 
@@ -72,8 +91,8 @@ class MascopeClient:
     :vartype url: str
     :ivar access_token: The API access token.
     :vartype access_token: str
-    :ivar workspaces: Resource for workspace operations.
-    :vartype workspaces: WorkspacesResource
+    :ivar datasets: Resource for dataset operations.
+    :vartype datasets: DatasetsResource
     :ivar batches: Resource for sample batch operations.
     :vartype batches: BatchesResource
     :ivar samples: Resource for sample operations.
@@ -90,8 +109,8 @@ class MascopeClient:
         # Auto-configure from .env or environment variables
         mascope = MascopeClient()
 
-        # List all workspaces
-        workspaces = mascope.workspaces.list()
+        # List all datasets
+        datasets = mascope.datasets.list()
 
         # Get samples from a batch
         samples = mascope.samples.list(sample_batch_id="batch-123")
@@ -187,19 +206,19 @@ class MascopeClient:
         # Configure loguru log level (env var > .env > default INFO)
         _configure_logging(env_vars)
 
-        # Metadata cache for workspace/batch/sample listings
+        # Metadata cache for dataset/batch/sample listings
         self._cache: dict[str, pd.DataFrame] = {}
 
         # Initialize resource objects (lazy imports to avoid circular dependencies)
-        self._workspaces: Any = None
+        self._datasets: Any = None
         self._batches: Any = None
         self._samples: Any = None
         self._matching: Any = None
         self._cheminfo: Any = None
         self._ionization: Any = None
 
-        # Pre-instantiate workspaces resource for early error detection
-        self.workspaces.list()
+        # Pre-instantiate datasets resource for early error detection
+        self.datasets.list()
 
     @property
     def url(self) -> str:
@@ -212,13 +231,13 @@ class MascopeClient:
         return self._access_token  # type: ignore
 
     @property
-    def workspaces(self) -> "WorkspacesResource":
-        """Resource for workspace operations."""
-        if self._workspaces is None:
-            from .resources.workspaces import WorkspacesResource
+    def datasets(self) -> "DatasetsResource":
+        """Resource for dataset operations."""
+        if self._datasets is None:
+            from .resources.datasets import DatasetsResource
 
-            self._workspaces = WorkspacesResource(self)
-        return self._workspaces
+            self._datasets = DatasetsResource(self)
+        return self._datasets
 
     @property
     def batches(self) -> "BatchesResource":
@@ -267,7 +286,7 @@ class MascopeClient:
 
     def load_peaks(
         self,
-        workspace: str,
+        dataset: str = None,
         batches: str | None = None,
         *,
         samples: str | None = None,
@@ -277,23 +296,24 @@ class MascopeClient:
         average: bool = True,
         confirm_above: int | None = 100,
         max_workers: int = 8,
+        **kwargs,
     ) -> pd.DataFrame | None:
         """Load peaks for all samples across one or more batches.
 
         This is a high-level convenience method that handles the typical workflow
-        of selecting a workspace, filtering batches by name, iterating all samples,
+        of selecting a dataset, filtering batches by name, iterating all samples,
         and concatenating peak data into a single DataFrame enriched with batch and
         sample metadata.
 
         Requests are made concurrently for better performance. A progress bar is
         displayed during loading.
 
-        :param workspace: Workspace name, substring, or regex pattern (or ID).
-        :type workspace: str
+        :param dataset: Dataset name, substring, or regex pattern (or ID).
+        :type dataset: str
         :param batches: Optional filter on batch names (case-insensitive).
                         Accepts a plain substring or a regex pattern
                         (e.g. ``"2026-01|2026-02"``).
-                        If not provided, all batches in the workspace are loaded.
+                        If not provided, all batches in the dataset are loaded.
         :type batches: str, optional
         :param samples: Optional filter on sample names (case-insensitive). Accepts
                         a plain substring or a regex pattern.
@@ -330,7 +350,7 @@ class MascopeClient:
 
             Returns None if no peaks are found.
         :rtype: pd.DataFrame | None
-        :raises ValueError: If the workspace or batches cannot be resolved.
+        :raises ValueError: If the dataset or batches cannot be resolved.
         :raises KeyboardInterrupt: If the user declines the confirmation prompt.
 
         Example::
@@ -339,27 +359,28 @@ class MascopeClient:
 
             # Load all peaks from batches containing "Uronium"
             peaks = mascope.load_peaks(
-                workspace="My Workspace",
+                dataset="My Dataset",
                 batches="Uronium",
             )
 
             # Filter samples by regex
             peaks = mascope.load_peaks(
-                workspace="My Workspace",
+                dataset="My Dataset",
                 samples="blank|control",
             )
 
             # Load all peaks, skip confirmation
             peaks = mascope.load_peaks(
-                workspace="My Workspace",
+                dataset="My Dataset",
                 confirm_above=None,
             )
         """
         from ._loaders import load_peaks as _load_peaks
 
+        dataset = _compat_dataset_kwarg(dataset, kwargs, "load_peaks")
         return _load_peaks(
             self,
-            workspace,
+            dataset,
             batches,
             samples=samples,
             matches=matches,
@@ -372,7 +393,7 @@ class MascopeClient:
 
     def load_peak_timeseries(
         self,
-        workspace: str,
+        dataset: str = None,
         batches: str | None = None,
         *,
         samples: str | None = None,
@@ -381,6 +402,7 @@ class MascopeClient:
         isotope: str | list[str] | None = None,
         confirm_above: int | None = 20,
         max_workers: int = 8,
+        **kwargs,
     ) -> pd.DataFrame | None:
         """Load intra-sample peak timeseries for matched peaks across batches.
 
@@ -396,8 +418,8 @@ class MascopeClient:
         Requests are made concurrently for better performance. Two progress bars
         are displayed: one for peak discovery and one for timeseries loading.
 
-        :param workspace: Workspace name, substring, or regex pattern (or ID).
-        :type workspace: str
+        :param dataset: Dataset name, substring, or regex pattern (or ID).
+        :type dataset: str
         :param batches: Optional filter on batch names (case-insensitive). Accepts
                         a plain substring or a regex pattern.
         :type batches: str, optional
@@ -441,22 +463,23 @@ class MascopeClient:
 
             # Single compound
             ts = mascope.load_peak_timeseries(
-                workspace="My Workspace",
+                dataset="My Dataset",
                 batches="Uronium",
                 compound="CH4N2O",
             )
 
             # Multiple compounds in one call
             ts = mascope.load_peak_timeseries(
-                workspace="My Workspace",
+                dataset="My Dataset",
                 compound=["CH4N2O", "Lactic acid"],
             )
         """
         from ._loaders import load_peak_timeseries as _load_peak_timeseries
 
+        dataset = _compat_dataset_kwarg(dataset, kwargs, "load_peak_timeseries")
         return _load_peak_timeseries(
             self,
-            workspace,
+            dataset,
             batches,
             samples=samples,
             compound=compound,
@@ -537,7 +560,7 @@ class MascopeClient:
     def clear_cache(self) -> None:
         """Clear the metadata cache.
 
-        Call this when workspaces, batches, or samples have changed on the
+        Call this when datasets, batches, or samples have changed on the
         server and you want subsequent calls to fetch fresh data.
 
         Example::
@@ -557,7 +580,7 @@ from typing import TYPE_CHECKING  # noqa: E402
 if TYPE_CHECKING:
     from .resources.batches import BatchesResource
     from .resources.cheminfo import ChemInfoResource
+    from .resources.datasets import DatasetsResource
     from .resources.ionization import IonizationResource
     from .resources.matching import MatchingResource
     from .resources.samples import SamplesResource
-    from .resources.workspaces import WorkspacesResource

@@ -30,7 +30,7 @@ from mascope_backend.api.new.auth.dependencies import editor_user, guest_user
 from mascope_backend.api.routes.sample.batches.export.routes import (
     sample_batches_export_router,
 )
-from mascope_backend.db import SampleBatch, Workspace
+from mascope_backend.db import SampleBatch, Dataset
 from mascope_backend.db.id import gen_id
 
 
@@ -185,7 +185,7 @@ async def delete_sample_batch_route(
     :return: A dictionary containing a message and process ID.
     :rtype: dict
     """
-    # Fetch sample batch to have access to workspace_id and verify sample batch existence
+    # Fetch sample batch to have access to dataset_id and verify sample batch existence
     sample_batch_result = await get_sample_batch(sample_batch_id)
     sample_batch = sample_batch_result.get("data")
     sample_batch_name = sample_batch["sample_batch_name"]
@@ -198,7 +198,7 @@ async def delete_sample_batch_route(
     background_tasks.add_task(
         delete_sample_batch,
         sample_batch_id=sample_batch_id,
-        workspace_id=sample_batch["workspace_id"],
+        dataset_id=sample_batch["dataset_id"],
         independent_transaction=True,
         user_id=user.id,
         process_id=process_id,
@@ -267,7 +267,7 @@ async def copy_sample_batch_route(
     background_tasks: BackgroundTasks,
     user=Depends(editor_user),
 ):
-    """Copy an existing sample batch to a new workspace.
+    """Copy an existing sample batch to a new dataset.
 
     :param sample_batch_id: The unique identifier of the sample batch to copy.
     :type sample_batch_id: str
@@ -280,15 +280,15 @@ async def copy_sample_batch_route(
     :return: A dictionary containing a message and process ID.
     :rtype: dict
     """
-    # Can't copy to locked workspace
-    await locked_access(user, Workspace, body.workspace_id)
+    # Can't copy to locked dataset
+    await locked_access(user, Dataset, body.dataset_id)
 
     process_id = gen_id(8)
 
     background_tasks.add_task(
         copy_sample_batch,
         sample_batch_id=sample_batch_id,
-        workspace_id=body.workspace_id,
+        dataset_id=body.dataset_id,
         sample_batch_name=body.sample_batch_name,
         sample_batch_description=body.sample_batch_description,
         independent_transaction=True,

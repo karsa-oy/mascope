@@ -77,7 +77,7 @@ from mascope_backend.db import (
     SampleBatch,
     SampleFile,
     TargetCollectionInSampleBatch,
-    Workspace,
+    Dataset,
     async_session,
 )
 from mascope_backend.db.id import gen_id
@@ -100,7 +100,7 @@ from mascope_tools.alignment.calibration import Spectra
 
 @api_controller()
 async def get_sample_batches(
-    workspace_id: str | None = None,
+    dataset_id: str | None = None,
     sample_batch_name: str | None = None,
     sample_batch_type: list[str] | None = None,
     status: list[str] | None = None,
@@ -111,18 +111,18 @@ async def get_sample_batches(
     limit: int | None = None,
 ) -> dict:
     """
-    Retrieves a paginated list of sample batches, optionally filtered by workspace ID, and sorted by a specified column.
+    Retrieves a paginated list of sample batches, optionally filtered by dataset ID, and sorted by a specified column.
 
     Steps:
     1. Construct a SQLAlchemy query to select all sample batches.
-    2. Apply optional workspace ID filtering if specified.
+    2. Apply optional dataset ID filtering if specified.
     3. Apply sorting based on the provided sort and order parameters.
     4. Apply pagination based on the provided page and limit parameters.
     5. Execute the query to fetch the results.
     6. Convert the results into a list of dictionaries for JSON serialization.
 
-    :param workspace_id: ID of the workspace to filter sample batches by, defaults to None.
-    :type workspace_id: str, optional
+    :param dataset_id: ID of the dataset to filter sample batches by, defaults to None.
+    :type dataset_id: str, optional
     :param sample_batch_name: Name of the sample batch to filter by, defaults to None.
     :type sample_batch_name: str, optional
     :param sample_batch_type: Type of sample batch to filter by (ACQUISITION or ANALYSIS), defaults to None.
@@ -150,8 +150,8 @@ async def get_sample_batches(
         stmt = select(SampleBatch)
 
         # Step 2: Filter by provided parameters
-        if workspace_id:
-            stmt = stmt.filter(SampleBatch.workspace_id == workspace_id)
+        if dataset_id:
+            stmt = stmt.filter(SampleBatch.dataset_id == dataset_id)
 
         if sample_batch_name:
             stmt = stmt.filter(SampleBatch.sample_batch_name == sample_batch_name)
@@ -307,7 +307,7 @@ async def create_sample_batch(
 
     Steps:
     - Validate batch constraints:
-        - workspace type constraints for ACQUISITION batches
+        - dataset type constraints for ACQUISITION batches
         - target collection type constraints for the sample batch type
         - ionization mechanism polarity compatibility
     - Construct a new SampleBatch object with the provided details and a generated unique ID.
@@ -323,19 +323,19 @@ async def create_sample_batch(
     :rtype: dict
     """
     async with async_session() as session:
-        # --- Validate workspace type for ACQUISITION batches ---
+        # --- Validate dataset type for ACQUISITION batches ---
         if sample_batch.sample_batch_type == "ACQUISITION":
             if not (
-                workspace := await session.get(Workspace, sample_batch.workspace_id)
+                dataset := await session.get(Dataset, sample_batch.dataset_id)
             ):
                 raise NotFoundException(
-                    f"Workspace with ID '{sample_batch.workspace_id}' not found"
+                    f"Dataset with ID '{sample_batch.dataset_id}' not found"
                 )
 
-            if workspace.workspace_type != "ACQUISITION":
+            if dataset.dataset_type != "ACQUISITION":
                 raise ValueError(
-                    "ACQUISITION sample batches can only be created in ACQUISITION workspaces. "
-                    f"Workspace '{workspace.workspace_name}' is of type '{workspace.workspace_type}'"
+                    "ACQUISITION sample batches can only be created in ACQUISITION datasets. "
+                    f"Dataset '{dataset.dataset_name}' is of type '{dataset.dataset_type}'"
                 )
 
         # Validate target collection type constraints
@@ -380,7 +380,7 @@ async def create_sample_batch(
             record_type="batch",
             record_id=new_sample_batch.sample_batch_id,
             record=batch_data,
-            room=new_sample_batch.workspace_id,
+            room=new_sample_batch.dataset_id,
         )
 
     # --- Return created sample batch data ---
@@ -497,7 +497,7 @@ async def update_sample_batch(
             record_type="batch",
             record_id=sample_batch_id,
             record=batch_data,
-            room=batch.workspace_id,
+            room=batch.dataset_id,
         )
 
         # If collections changed, also emit match.collection reload
@@ -521,7 +521,7 @@ async def update_sample_batch(
 )
 async def delete_sample_batch(
     sample_batch_id: str,
-    workspace_id: str = None,
+    dataset_id: str = None,
     independent_transaction: bool = False,
     user_id: int | None = None,
     process_id=None,
@@ -537,8 +537,8 @@ async def delete_sample_batch(
 
     :param sample_batch_id: Unique identifier of the sample batch to delete.
     :type sample_batch_id: str
-    :param workspace_id: ID of the workspace associated with the sample batch, used for event emission.
-    :type workspace_id: str, optional
+    :param dataset_id: ID of the dataset associated with the sample batch, used for event emission.
+    :type dataset_id: str, optional
     :param independent_transaction: Indicates if the deletion should be considered an independent transaction, which affects event emission.
     :type independent_transaction: bool, optional
     :param user_id: Current user triggered operation (for user notifications)
@@ -562,7 +562,7 @@ async def delete_sample_batch(
     # --- Emit deletion event if independent transaction ---
     if independent_transaction:
         await emit_record_deleted(
-            record_type="batch", record_id=sample_batch_id, room=workspace_id
+            record_type="batch", record_id=sample_batch_id, room=dataset_id
         )
 
     return {
@@ -712,7 +712,7 @@ async def import_sample_items(
 )
 async def copy_sample_batch(
     sample_batch_id: str,
-    workspace_id: str,
+    dataset_id: str,
     sample_batch_name: str,
     sample_batch_description: str,
     independent_transaction: bool = False,
@@ -720,12 +720,12 @@ async def copy_sample_batch(
     process_id=None,
 ) -> dict:
     """
-    Copies a sample batch, including its associated sample items and target collections, into a specified workspace with a new name and description.
+    Copies a sample batch, including its associated sample items and target collections, into a specified dataset with a new name and description.
     The function ensures all related entities like sample items and target collections are also copied over to maintain the integrity of the sample batch data.
-    Called as a background task from the endpoint, so it also handles sio notification and workspace reloading upon successful copying or if any errors occur.
+    Called as a background task from the endpoint, so it also handles sio notification and dataset reloading upon successful copying or if any errors occur.
 
     Steps:
-    1. Validate the workspace into which the sample batch is being copied.
+    1. Validate the dataset into which the sample batch is being copied.
     2. Fetch and validate the original sample batch from the database.
     3. Prepare TargetCollectionInSampleBatch records associated with the original sample batch.
     4. Create a new sample batch with updated information and copy all other data.
@@ -733,8 +733,8 @@ async def copy_sample_batch(
 
     :param sample_batch_id: ID of the original sample batch to be copied.
     :type sample_batch_id: str
-    :param workspace_id: ID of the workspace where the new sample batch will be placed.
-    :type workspace_id: str
+    :param dataset_id: ID of the dataset where the new sample batch will be placed.
+    :type dataset_id: str
     :param sample_batch_name: Name for the new copied sample batch.
     :type sample_batch_name: str
     :param sample_batch_description: Description for the new copied sample batch.
@@ -745,14 +745,14 @@ async def copy_sample_batch(
     :type user_id: int | None, optional
     :param process_id: Process identifier for progress tracking
     :type process_id: str | None, optional
-    :raises NotFoundException: If the workspace or original sample batch is not found.
+    :raises NotFoundException: If the dataset or original sample batch is not found.
     """
     async with async_session() as session:
-        # Step 1: Validate the workspace into which the sample batch is being copied.
-        workspace = await session.get(Workspace, workspace_id)
+        # Step 1: Validate the dataset into which the sample batch is being copied.
+        dataset = await session.get(Dataset, dataset_id)
 
-        if not workspace:
-            raise NotFoundException(f"Workspace with ID '{workspace_id}' not found")
+        if not dataset:
+            raise NotFoundException(f"Dataset with ID '{dataset_id}' not found")
 
         # Step 2: Fetch and validate the original sample batch from the database with related TargetCollectionInSampleBatch and SampleItem records
         stmt = (
@@ -779,7 +779,7 @@ async def copy_sample_batch(
     # Step 4: Create a new sample batch with type conversion
     # batch type: ACQUISITION → ANALYSIS, polarity "+" or "-" to "+-".
     new_sample_batch_body = SampleBatchCreate(
-        workspace_id=workspace_id,
+        dataset_id=dataset_id,
         sample_batch_name=sample_batch_name,
         sample_batch_description=sample_batch_description,
         sample_batch_type=(
@@ -818,7 +818,7 @@ async def copy_sample_batch(
     new_sample_batch_id = new_sample_batch["sample_batch_id"]
     return {
         "data": new_sample_batch,
-        "message": f"Sample batch '{sample_batch_name}' was successfully copied to workspace '{workspace.workspace_name}'.",
+        "message": f"Sample batch '{sample_batch_name}' was successfully copied to dataset '{dataset.dataset_name}'.",
         "_notification_data": {
             "sample_item_id": new_sample_batch_id,
         },

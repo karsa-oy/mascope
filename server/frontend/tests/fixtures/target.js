@@ -1,4 +1,4 @@
-import { default as base } from './workspace'
+import { default as base } from './dataset'
 
 export default base.extend({
   targetBrowser: async ({ page }, use) => {

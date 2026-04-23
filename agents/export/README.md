@@ -1,6 +1,6 @@
 # Mascope CSV Export Agent
 
-A Python application that continuously monitors a Mascope server for new sample data in a specified workspace, processes samples with compound matching, and saves results to text files.
+A Python application that continuously monitors a Mascope server for new sample data in a specified dataset, processes samples with compound matching, and saves results to text files.
 
 ## Features
 
@@ -29,9 +29,9 @@ The application uses a JSON configuration file (`config.json`) to specify the co
 
   > To generate the access token, log in to Mascope and via the _🏠Home menu_ enter _⚙️Settings_. In the _API access token_ section generate _CSV Export Agent_ token (or use an existing one).
 
-- `workspace_id`: The workspace ID to monitor for samples
+- `dataset_id`: The dataset ID to monitor for samples
 
-  > To retrieve the `workspace_id` of the Workspace you wish to monitor, the easiest way is to use a web browser and (while logged in) navigate to `https://<org>.mascope.app/api/workspaces`. Find the correct workspace and copy-paste the `workspace_id` into the configuration file.
+  > To retrieve the `dataset_id` of the Dataset you wish to monitor, the easiest way is to use a web browser and (while logged in) navigate to `https://<org>.mascope.app/api/datasets`. Find the correct dataset and copy-paste the `dataset_id` into the configuration file.
 
 - `target_compounds`: Array of molecular formulas to search for (e.g., `["H2SO4", "CH2O2", "C3H6O3"]`)
   > Note, these are the parent molecule formulae of interest. The ion compositions will be derived from these based on the ionization mechanisms configured for the batches from which the samples will be processed.
@@ -59,7 +59,7 @@ The application uses a JSON configuration file (`config.json`) to specify the co
 {
   "mascope_url": "https://org.mascope.app",
   "access_token": "your-access-token-here",
-  "workspace_id": "your-workspace-id",
+  "dataset_id": "your-dataset-id",
   "target_compounds": ["H2SO4", "CH2O2", "C3H6O3", "NH3"],
   "match_params": {
     "mz_tolerance": 15.0,
@@ -77,7 +77,7 @@ The application uses a JSON configuration file (`config.json`) to specify the co
 
 After configuring, to run the monitor continuously (checks for new samples every configured interval), simply run the executable `Mascope-CSV-Export-Agent.exe`.
 
-> **NOTE**: When running the agent for the first time (after initial configuration), it will process all samples from all batches of the configured workspace.
+> **NOTE**: When running the agent for the first time (after initial configuration), it will process all samples from all batches of the configured dataset.
 
 > Consequently, in case you wish to edit the target list and recompute data retrospectively, you may stop the agent, delete `state.json`, and relaunch to trigger re-processing.
 
@@ -109,7 +109,7 @@ After configuring, to run the monitor continuously (checks for new samples every
 
 ## How It Works
 
-1. **Batch Detection**: Queries the Mascope server for all sample batches in the specified workspace
+1. **Batch Detection**: Queries the Mascope server for all sample batches in the specified dataset
 2. **Change Detection**: Compares batch modification timestamps with last check times
 3. **Sample Filtering**: For modified batches, finds samples created since last check
 4. **Compound Matching**: Searches each new sample for target compounds using the Mascope SDK

@@ -27,7 +27,7 @@ from mascope_sdk import get_sample_batches, get_sample_compounds_matches, get_sa
 DEFAULT_CONFIG = {
     "mascope_url": "http://localhost:8090",
     "access_token": "",
-    "workspace_id": "",
+    "dataset_id": "",
     "target_compounds": ["CH2O2", "C3H6O3"],
     "match_params": {
         "mz_tolerance": 15.0,
@@ -140,7 +140,7 @@ class DataMonitor:
 
     def validate_config(self):
         """Validate configuration and create output directory."""
-        required_fields = ["mascope_url", "access_token", "workspace_id"]
+        required_fields = ["mascope_url", "access_token", "dataset_id"]
 
         for field in required_fields:
             if not self.config.get(field):
@@ -158,7 +158,7 @@ class DataMonitor:
             batches = get_sample_batches(
                 mascope_url=self.config["mascope_url"],
                 access_token=self.config["access_token"],
-                workspace_id=self.config["workspace_id"],
+                dataset_id=self.config["dataset_id"],
             )
 
             if not batches:

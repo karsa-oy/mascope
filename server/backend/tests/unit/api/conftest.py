@@ -6,7 +6,7 @@ without relying on the actual API endpoints. It focuses on testing the business
 logic of API controllers in isolation from the HTTP layer.
 
 Key components:
-- Test data fixtures (workspaces, models, etc.)
+- Test data fixtures (datasets, models, etc.)
 - Mock fixtures for Socket.IO and other external dependencies
 - Factory fixtures for creating controller-specific mocks
 
@@ -24,13 +24,13 @@ import pytest
 import pytest_asyncio
 from test_utils import gen_test_id
 
-from mascope_backend.db import IonizationMechanism, TargetCompound, Workspace
+from mascope_backend.db import IonizationMechanism, TargetCompound, Dataset
 
 
-# Stable IDs for session-scoped workspace fixtures that are referenced
-# by value in parametrized tests (e.g. test_get_workspace_existence).
-_WORKSPACE_ID_1 = "unit-test-1"
-_WORKSPACE_ID_2 = "unit-test-2"
+# Stable IDs for session-scoped dataset fixtures that are referenced
+# by value in parametrized tests (e.g. test_get_dataset_existence).
+_DATASET_ID_1 = "unit-test-1"
+_DATASET_ID_2 = "unit-test-2"
 
 
 @pytest_asyncio.fixture(scope="session")
@@ -210,46 +210,46 @@ async def test_target_compounds_by_mass(
 
 
 @pytest_asyncio.fixture(scope="session")
-async def test_workspaces(async_session_factory) -> list[Workspace]:
-    """Create test workspace records in the unit test database.
+async def test_datasets(async_session_factory) -> list[Dataset]:
+    """Create test dataset records in the unit test database.
 
     Session-scoped: created once and reused across all unit tests that need
-    workspace data. IDs are stable module-level constants because parametrized
-    tests reference them by value (e.g. `test_get_workspace_existence`).
+    dataset data. IDs are stable module-level constants because parametrized
+    tests reference them by value (e.g. `test_get_dataset_existence`).
 
     :param async_session_factory: Factory for creating database sessions
-    :return: List of created workspace objects
-    :rtype: list[Workspace]
+    :return: List of created dataset objects
+    :rtype: list[Dataset]
     """
     async with async_session_factory() as session:
-        workspaces = [
-            Workspace(
-                workspace_id=_WORKSPACE_ID_1,
-                workspace_name="Unit Test Workspace 1",
-                workspace_description="This is a unit test workspace",
-                workspace_type="ANALYSIS",
+        datasets = [
+            Dataset(
+                dataset_id=_DATASET_ID_1,
+                dataset_name="Unit Test Dataset 1",
+                dataset_description="This is a unit test dataset",
+                dataset_type="ANALYSIS",
                 instrument=None,
                 locked=False,
                 icon=None,
-                workspace_utc_created=datetime.now(timezone.utc),
+                dataset_utc_created=datetime.now(timezone.utc),
             ),
-            Workspace(
-                workspace_id=_WORKSPACE_ID_2,
-                workspace_name="Unit Test Workspace 2",
-                workspace_description="This is another unit test workspace",
-                workspace_type="ANALYSIS",
+            Dataset(
+                dataset_id=_DATASET_ID_2,
+                dataset_name="Unit Test Dataset 2",
+                dataset_description="This is another unit test dataset",
+                dataset_type="ANALYSIS",
                 instrument=None,
                 locked=False,
                 icon=None,
-                workspace_utc_created=datetime.now(timezone.utc),
+                dataset_utc_created=datetime.now(timezone.utc),
             ),
         ]
-        for workspace in workspaces:
-            session.add(workspace)
+        for dataset in datasets:
+            session.add(dataset)
         await session.commit()
-        for workspace in workspaces:
-            await session.refresh(workspace)
-        return workspaces
+        for dataset in datasets:
+            await session.refresh(dataset)
+        return datasets
 
 
 @pytest.fixture
@@ -263,15 +263,15 @@ def mock_emit_record_factory():
 
     Usage:
         @pytest.fixture
-        def mock_emit_workspace(mock_emit_record_factory):
+        def mock_emit_dataset(mock_emit_record_factory):
             return mock_emit_record_factory(
-                "mascope_backend.api.controllers.workspace.workspace_controller"
+                "mascope_backend.api.controllers.dataset.dataset_controller"
             )
 
     Verification:
-        mock_emit_workspace.created.assert_called_once()
-        mock_emit_workspace.updated.assert_called_with(record_type="workspace", ...)
-        assert mock_emit_workspace.deleted.call_count == 2
+        mock_emit_dataset.created.assert_called_once()
+        mock_emit_dataset.updated.assert_called_with(record_type="dataset", ...)
+        assert mock_emit_dataset.deleted.call_count == 2
 
     :return: A function that creates and configures emit_record mocks
     :rtype: callable

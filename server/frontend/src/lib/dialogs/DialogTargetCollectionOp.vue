@@ -29,7 +29,7 @@ import { fromSpreadsheet, equals } from '@/lib/table'
 import { BaseClipboardContext } from '@/lib/base'
 import { isValidChemicalFormula, isSameCompound, findExistingCompound } from '@/lib/chem'
 import { clone } from '@/lib/utils'
-import { collectionTypes, getAllowedWorkspaceTypes, getAllowedBatchTypes } from '@/lib/constants'
+import { collectionTypes, getAllowedDatasetTypes, getAllowedBatchTypes } from '@/lib/constants'
 
 const confirm = useConfirm()
 
@@ -64,16 +64,16 @@ const compounds = reactive({
   deleted: []
 })
 
-// Batches state - spans multiple workspaces
+// Batches state - spans multiple datasets
 const batches = reactive({
-  loaded: [], // Batches from current workspace only
-  selected: [], // Selected batches across ALL workspaces
+  loaded: [], // Batches from current dataset only
+  selected: [], // Selected batches across ALL datasets
   initial: [] // Initial selection snapshot for change tracking
 })
 
 // UI selection state
 const selected = reactive({
-  workspace: null,
+  dataset: null,
   source: 'collection',
   collection: 'all-compounds', // for adding compounds
   search: '',
@@ -165,25 +165,25 @@ const changes = computed(() =>
   })
 )
 
-const filteredWorkspaces = computed(() => {
-  if (!info.type) return app.data.workspace.list
+const filteredDatasets = computed(() => {
+  if (!info.type) return app.data.dataset.list
 
-  const allowedWorkspaceTypes = getAllowedWorkspaceTypes(info.type)
-  return app.data.workspace.list
-    .filter((workspace) => allowedWorkspaceTypes.includes(workspace.workspace_type))
+  const allowedDatasetTypes = getAllowedDatasetTypes(info.type)
+  return app.data.dataset.list
+    .filter((dataset) => allowedDatasetTypes.includes(dataset.dataset_type))
     .sort((a, b) => {
-      // ensure the current workspace comes first if it's allowed
-      if (a.workspace_id == app.data.workspace.focusedId) return -1
-      if (b.workspace_id == app.data.workspace.focusedId) return 1
+      // ensure the current dataset comes first if it's allowed
+      if (a.dataset_id == app.data.dataset.focusedId) return -1
+      if (b.dataset_id == app.data.dataset.focusedId) return 1
       return 0
     })
-    .map((workspace, index) => ({
+    .map((dataset, index) => ({
       // create labels, demarcating the current one
-      ...workspace,
+      ...dataset,
       label:
-        workspace.workspace_id === app.data.workspace.focusedId
-          ? `${workspace.workspace_name} (current)`
-          : workspace.workspace_name
+        dataset.dataset_id === app.data.dataset.focusedId
+          ? `${dataset.dataset_name} (current)`
+          : dataset.dataset_name
     }))
 })
 
@@ -428,37 +428,37 @@ const addCompoundButtonDisabled = computed(
 )
 
 /**
- * Computed property that filters global batch selection to current workspace.
- * This allows batches.selected to track selections across all workspaces,
- * while the DataTable only shows/modifies batches from the current workspace.
+ * Computed property that filters global batch selection to current dataset.
+ * This allows batches.selected to track selections across all datasets,
+ * while the DataTable only shows/modifies batches from the current dataset.
  */
-const workspaceBatchSelection = computed({
+const datasetBatchSelection = computed({
   get() {
-    if (!selected.workspace) return []
-    // Filter global selection to only show batches from current workspace
+    if (!selected.dataset) return []
+    // Filter global selection to only show batches from current dataset
     return batches.selected.filter(
-      (batch) => batch.workspace_id === selected.workspace.workspace_id
+      (batch) => batch.dataset_id === selected.dataset.dataset_id
     )
   },
   set(newSelection) {
-    if (!selected.workspace) return
+    if (!selected.dataset) return
 
-    // Remove batches from current workspace, keep batches from other workspaces
-    const otherWorkspaceBatches = batches.selected.filter(
-      (batch) => batch.workspace_id !== selected.workspace.workspace_id
+    // Remove batches from current dataset, keep batches from other datasets
+    const otherDatasetBatches = batches.selected.filter(
+      (batch) => batch.dataset_id !== selected.dataset.dataset_id
     )
 
-    // Combine with new selection from current workspace
-    batches.selected = [...otherWorkspaceBatches, ...newSelection]
+    // Combine with new selection from current dataset
+    batches.selected = [...otherDatasetBatches, ...newSelection]
   }
 })
 
 /**
- * Load batches for a specific workspace and collection type.
- * Only loads batches for the given workspace - doesn't modify selection state.
+ * Load batches for a specific dataset and collection type.
+ * Only loads batches for the given dataset - doesn't modify selection state.
  */
-async function loadBatches(workspace, collectionType) {
-  if (!workspace || !collectionType) {
+async function loadBatches(dataset, collectionType) {
+  if (!dataset || !collectionType) {
     batches.loaded = []
     return
   }
@@ -466,7 +466,7 @@ async function loadBatches(workspace, collectionType) {
 
   const latest = await api.http.get(`/sample/batches`, {
     params: {
-      workspace_id: workspace.workspace_id,
+      dataset_id: dataset.dataset_id,
       sample_batch_type: allowedBatchTypes
     },
     use: 'read',
@@ -515,26 +515,26 @@ async function init(mode) {
       info.name = ''
       info.desc = ''
       info.type = 'TARGETS'
-      selected.workspace = app.data.workspace.focused
+      selected.dataset = app.data.dataset.focused
       break
     }
     case 'update_batches': {
       selected.tab = 'batches'
 
-      // Load all batches from the collection (across all workspaces)
+      // Load all batches from the collection (across all datasets)
       // Clone to avoid mutating the original collection data
       batches.selected = clone(original.value?.sample_batches ?? [])
 
-      // Don't allow selecting immutable ACQUISITION workspaces
-      if (app.data.workspace.focused.workspace_type === 'ACQUISITION') {
-        selected.workspace = null
+      // Don't allow selecting immutable ACQUISITION datasets
+      if (app.data.dataset.focused.dataset_type === 'ACQUISITION') {
+        selected.dataset = null
       } else {
-        // Set workspace for display and load batches
-        selected.workspace = app.data.workspace.focused
-        await loadBatches(selected.workspace, info.type)
+        // Set dataset for display and load batches
+        selected.dataset = app.data.dataset.focused
+        await loadBatches(selected.dataset, info.type)
       }
 
-      // Update "select all" checkbox to reflect current workspace state
+      // Update "select all" checkbox to reflect current dataset state
       selected.all.batches =
         batches.loaded.length > 0
           ? batches.loaded.every((batch) =>
@@ -601,7 +601,7 @@ watch(visible, (value) => {
     app.ui.help.set(null)
     action.value = null
     // Reset all state for fresh data on next open
-    selected.workspace = null
+    selected.dataset = null
     selected.tab = 'compounds'
     selected.collection = 'all-compounds'
     selected.source = 'collection'
@@ -625,7 +625,7 @@ watch(visible, (value) => {
 /**
  * Handle collection type changes.
  * Only active during create/update_batches modes.
- * Resets workspace if it becomes incompatible with new type.
+ * Resets dataset if it becomes incompatible with new type.
  */
 watch(
   () => info.type,
@@ -639,11 +639,11 @@ watch(
         return
       }
 
-      // Reset workspace if it's incompatible with new collection type
-      if (selected.workspace) {
-        const allowedWorkspaceTypes = getAllowedWorkspaceTypes(newType)
-        if (!allowedWorkspaceTypes.includes(selected.workspace.workspace_type)) {
-          selected.workspace = null
+      // Reset dataset if it's incompatible with new collection type
+      if (selected.dataset) {
+        const allowedDatasetTypes = getAllowedDatasetTypes(newType)
+        if (!allowedDatasetTypes.includes(selected.dataset.dataset_type)) {
+          selected.dataset = null
         }
       }
 
@@ -654,26 +654,26 @@ watch(
 )
 
 /**
- * Load batches when workspace or collection type changes.
- * Updates checkbox state to reflect current workspace selection.
+ * Load batches when dataset or collection type changes.
+ * Updates checkbox state to reflect current dataset selection.
  */
 watch(
-  [() => selected.workspace, () => info.type],
-  async ([newWorkspace, newType], [oldWorkspace, oldType]) => {
+  [() => selected.dataset, () => info.type],
+  async ([newDataset, newType], [oldDataset, oldType]) => {
     // Skip during initialization - init handles the first load
     if (initializing.value) return
 
-    // Skip if no workspace or type (invalid state)
-    if (!newWorkspace || !newType) {
+    // Skip if no dataset or type (invalid state)
+    if (!newDataset || !newType) {
       batches.loaded = []
       selected.all.batches = false
       return
     }
 
-    // Load batches for the new workspace
-    await loadBatches(newWorkspace, newType)
+    // Load batches for the new dataset
+    await loadBatches(newDataset, newType)
 
-    // Update "select all" checkbox based on what's selected in current workspace
+    // Update "select all" checkbox based on what's selected in current dataset
     selected.all.batches =
       batches.loaded.length > 0
         ? batches.loaded.every((batch) =>
@@ -1091,10 +1091,10 @@ watchEffect(async () => {
           <TabPanel value="batches">
             <div class="row" style="height: 400px; align-items: stretch; gap: 0.5rem">
               <Listbox
-                v-model="selected.workspace"
-                dataKey="workspace_id"
+                v-model="selected.dataset"
+                dataKey="dataset_id"
                 optionLabel="label"
-                :options="filteredWorkspaces"
+                :options="filteredDatasets"
                 scrollHeight="380px"
                 :virtualScrollerOptions="{ itemSize: 28.41 }"
                 style="min-width: 200px; min-height: 350px"
@@ -1104,7 +1104,7 @@ watchEffect(async () => {
                 <DataTable
                   :key="key.batches"
                   dataKey="sample_batch_id"
-                  v-model:selection="workspaceBatchSelection"
+                  v-model:selection="datasetBatchSelection"
                   :value="batches.loaded"
                   scrollable
                   scrollHeight="350px"

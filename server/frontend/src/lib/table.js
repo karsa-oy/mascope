@@ -35,8 +35,8 @@ export function fromSpreadsheet(text, fields) {
 /*
  *  Compare records or record arrays by a field
  *
- *  e.g. equals(app.data.workspace.list, selected.workspaces, workspace_id)
- *  will check that the selected workspace ids match those in the store
+ *  e.g. equals(app.data.dataset.list, selected.datasets, dataset_id)
+ *  will check that the selected dataset ids match those in the store
  *  and equals(app.data.sample.focused, selected.sample, sample_item_id) will
  *  check that the selected sample has the same id as the active one.
  */

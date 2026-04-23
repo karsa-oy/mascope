@@ -81,7 +81,7 @@ export const useBatchContextMenu = defineStore('browser.sample.batchCtxMenu', ()
           if (clipboard.op === 'copy') {
             await app.data.batch.copy({
               sample_batch_id: clipboard.batch.sample_batch_id,
-              workspace_id: app.data.workspace.focusedId,
+              dataset_id: app.data.dataset.focusedId,
               sample_batch_name: generateCopyName(clipboard.batch.sample_batch_name),
               sample_batch_description: clipboard.batch.sample_batch_description
             })

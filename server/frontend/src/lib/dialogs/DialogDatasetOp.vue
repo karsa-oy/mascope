@@ -13,7 +13,7 @@ const app = useApp()
 const action = defineModel('action')
 
 const props = defineProps({
-  workspace: {
+  dataset: {
     type: Object
   }
 })
@@ -22,8 +22,8 @@ const original = computed(() => {
   if (action.value == 'create') {
     return null
   }
-  // Use the passed workspace prop if available, otherwise use the focused workspace
-  return props.workspace ?? app.data.workspace.focused
+  // Use the passed dataset prop if available, otherwise use the focused dataset
+  return props.dataset ?? app.data.dataset.focused
 })
 
 const info = reactive({
@@ -45,11 +45,11 @@ watch(visible, (value) => {
 })
 
 const title = computed(() => {
-  const name = info.initial?.workspace_name ?? ''
+  const name = info.initial?.dataset_name ?? ''
   return {
-    create: `Create a new workspace`,
-    edit: `Edit workspace '${name}'`,
-    delete: `Delete workspace '${name}'`
+    create: `Create a new dataset`,
+    edit: `Edit dataset '${name}'`,
+    delete: `Delete dataset '${name}'`
   }[action.value]
 })
 
@@ -64,39 +64,39 @@ const executeLabel = computed(() => {
 async function execute() {
   switch (action.value) {
     /**
-     * Handles the creation of a new workspace.
-     * - After successfully creating the workspace, it sets up a one-time watcher.
-     * - The watcher focuses on the newly created workspace once it is added to the workspace list.
+     * Handles the creation of a new dataset.
+     * - After successfully creating the dataset, it sets up a one-time watcher.
+     * - The watcher focuses on the newly created dataset once it is added to the dataset list.
      */
     case 'create': {
-      const response = await app.data.workspace.create({
-        workspace_name: info.name,
-        workspace_description: info.desc
+      const response = await app.data.dataset.create({
+        dataset_name: info.name,
+        dataset_description: info.desc
       })
-      app.data.workspace.lazyFocus({
-        workspace_id: response.data.workspace_id
+      app.data.dataset.lazyFocus({
+        dataset_id: response.data.dataset_id
       })
       break
     }
     case 'edit': {
-      app.data.workspace.update({
-        workspace_id: original.value.workspace_id,
-        workspace_name: info.name,
-        workspace_description: info.desc
+      app.data.dataset.update({
+        dataset_id: original.value.dataset_id,
+        dataset_name: info.name,
+        dataset_description: info.desc
       })
       break
     }
     /**
-     * Handles the deletion of a workspace.
-     * - Determines the next workspace to focus on (previous in the list or next one).
-     * - Sets up a one-time watcher to focus on the new workspace after the current one is deleted.
+     * Handles the deletion of a dataset.
+     * - Determines the next dataset to focus on (previous in the list or next one).
+     * - Sets up a one-time watcher to focus on the new dataset after the current one is deleted.
      */
     case 'delete': {
-      if (app.data.workspace.list.length > 1) {
-        app.data.workspace.delete(original.value)
+      if (app.data.dataset.list.length > 1) {
+        app.data.dataset.delete(original.value)
       } else {
         info.message =
-          'You cannot delete the last remaining workspace in the database. Create a new workspace before deleting this one.'
+          'You cannot delete the last remaining dataset in the database. Create a new dataset before deleting this one.'
       }
       break
     }
@@ -109,8 +109,8 @@ async function execute() {
 // Initialize the dialog fields based on the selected action
 watch(action, init)
 function init() {
-  info.name = original.value?.workspace_name
-  info.desc = original.value?.workspace_description
+  info.name = original.value?.dataset_name
+  info.desc = original.value?.dataset_description
   ;((info.message = null), (info.initial = original.value))
 }
 
@@ -124,18 +124,18 @@ const invalid = computed(() =>
     <section>
       <template v-if="action !== 'delete'">
         <FloatLabel>
-          <InputText id="workspace-name" v-model="info.name" />
-          <label for="workspace-name">Name</label>
+          <InputText id="dataset-name" v-model="info.name" />
+          <label for="dataset-name">Name</label>
         </FloatLabel>
         <FloatLabel>
-          <InputText id="workspace-desc" v-model="info.desc" />
-          <label for="workspace-desc">Description</label>
+          <InputText id="dataset-desc" v-model="info.desc" />
+          <label for="dataset-desc">Description</label>
         </FloatLabel>
       </template>
       <template v-else>
         <p v-if="info.message">{{ info.message }}</p>
         <p v-else>
-          Are you sure you want to delete the '{{ info.initial?.workspace_name }}' workspace?
+          Are you sure you want to delete the '{{ info.initial?.dataset_name }}' dataset?
         </p>
       </template>
     </section>

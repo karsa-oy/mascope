@@ -9,11 +9,11 @@ from sqlalchemy import select
 from mascope_backend.api.new.auth.config import auth_settings
 from mascope_backend.api.new.auth.exceptions import ForbiddenAccessException
 from mascope_backend.api.new.roles.exceptions import InvalidRoleException
-from mascope_backend.db import SampleBatch, SampleItem, User, Workspace, async_session
+from mascope_backend.db import SampleBatch, SampleItem, User, Dataset, async_session
 
 
 # Type alias for allowed lockable sqlalchemy models
-LockableModel = Union[Type[Workspace], Type[SampleBatch], Type[SampleItem]]
+LockableModel = Union[Type[Dataset], Type[SampleBatch], Type[SampleItem]]
 
 
 async def locked_access(
@@ -27,7 +27,7 @@ async def locked_access(
 
     :param user: Current authenticated user
     :type user: User
-    :param model: SQLAlchemy model class (Workspace, SampleBatch, or SampleItem)
+    :param model: SQLAlchemy model class (Dataset, SampleBatch, or SampleItem)
     :type model: LockableModel
     :param ids: Single ID or list of IDs to check
     :type ids: Union[str, list[str]]

@@ -1,4 +1,4 @@
-import { default as base } from './workspace'
+import { default as base } from './dataset'
 
 export default base.extend({
   sampleBrowser: async ({ page }, use) => {
@@ -15,7 +15,7 @@ export default base.extend({
     await use({ name, browserRow })
   },
   // eslint-disable-next-line no-unused-vars
-  freshBatch: async ({ page, freshWorkspace, sampleBrowser }, use) => {
+  freshBatch: async ({ page, freshDataset, sampleBrowser }, use) => {
     const testId = Math.random().toString(36).slice(2, 7)
     const name = `Test Batch ${testId}`
     // open dialog

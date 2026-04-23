@@ -59,8 +59,8 @@ const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top)
       app.ui.help.right(`
         <h1>Sample Browser: Batches</h1>
 
-        <p>Shows all batches in the currently selected workspace 
-        (${app.data.workspace.focused.workspace_name}).
+        <p>Shows all batches in the currently selected dataset 
+        (${app.data.dataset.focused.dataset_name}).
         </p>
 
         <p>Click on a batch to open it and see the samples within.</p>

@@ -45,7 +45,7 @@ const allowedTypes = computed(() => {
 
   // Special case: TOF instruments can use CALIBRANTS for ACQUISITION batches
   if (props.batch.type === 'ACQUISITION') {
-    const currentInstrument = app.data.workspace.focused?.instrument
+    const currentInstrument = app.data.dataset.focused?.instrument
     if (instrumentType(currentInstrument) === 'tof') {
       allowed = [...new Set([...allowed, 'CALIBRANTS'])]
     }

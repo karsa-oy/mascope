@@ -1,7 +1,7 @@
 """
 SQLAlchemy ORM models for the Mascope application.
 
-This module defines all database models including user management, workspaces,
+This module defines all database models including user management, datasets,
 samples, targets, and analysis matches.
 """
 
@@ -40,7 +40,7 @@ from mascope_backend.api.models.sample.items.config import sample_item_config
 from mascope_backend.api.models.target.collections.config import (
     target_collection_config,
 )
-from mascope_backend.api.models.workspace.config import workspace_config
+from mascope_backend.api.models.dataset.config import dataset_config
 from mascope_backend.runtime import runtime
 
 
@@ -199,34 +199,34 @@ class AccessToken(SQLAlchemyBaseAccessTokenTable[int], Base):
         return len(invalid_tokens)
 
 
-class Workspace(Base):
-    """Workspace container for organizing sample batches."""
+class Dataset(Base):
+    """Dataset container for organizing sample batches."""
 
-    __tablename__ = "workspace"
+    __tablename__ = "dataset"
 
-    workspace_id: Mapped[str] = mapped_column(String(16), primary_key=True)
-    workspace_name: Mapped[str] = mapped_column(String(256))
-    workspace_description: Mapped[Optional[str]] = mapped_column(Text)
-    workspace_type: Mapped[str] = mapped_column(
+    dataset_id: Mapped[str] = mapped_column(String(16), primary_key=True)
+    dataset_name: Mapped[str] = mapped_column(String(256))
+    dataset_description: Mapped[Optional[str]] = mapped_column(Text)
+    dataset_type: Mapped[str] = mapped_column(
         String(64),
-        server_default=text(f"'{workspace_config.DEFAULT_WORKSPACE_TYPE}'"),
+        server_default=text(f"'{dataset_config.DEFAULT_DATASET_TYPE}'"),
     )
     locked: Mapped[int] = mapped_column(
         Integer,
-        server_default=text(f"'{workspace_config.DEFAULT_LOCKED_STATUS}'"),
+        server_default=text(f"'{dataset_config.DEFAULT_LOCKED_STATUS}'"),
     )
     instrument: Mapped[Optional[str]] = mapped_column(String(64))
     icon: Mapped[Optional[dict]] = mapped_column(JSON)
-    workspace_utc_created: Mapped[Optional[dt]] = mapped_column(
+    dataset_utc_created: Mapped[Optional[dt]] = mapped_column(
         TIMESTAMP(timezone=True)
     )
-    workspace_utc_modified: Mapped[Optional[dt]] = mapped_column(
+    dataset_utc_modified: Mapped[Optional[dt]] = mapped_column(
         TIMESTAMP(timezone=True)
     )
 
     # Relationships
     sample_batch = relationship(
-        "SampleBatch", back_populates="workspace", cascade="all, delete, delete-orphan"
+        "SampleBatch", back_populates="dataset", cascade="all, delete, delete-orphan"
     )
 
 
@@ -236,9 +236,9 @@ class SampleBatch(Base):
     __tablename__ = "sample_batch"
 
     sample_batch_id: Mapped[str] = mapped_column(String(16), primary_key=True)
-    workspace_id: Mapped[str] = mapped_column(
+    dataset_id: Mapped[str] = mapped_column(
         String(16),
-        ForeignKey("workspace.workspace_id", ondelete="CASCADE"),
+        ForeignKey("dataset.dataset_id", ondelete="CASCADE"),
     )
     sample_batch_name: Mapped[str] = mapped_column(String(256))
     sample_batch_description: Mapped[Optional[str]] = mapped_column(Text)
@@ -266,7 +266,7 @@ class SampleBatch(Base):
     )
 
     # Relationships
-    workspace = relationship("Workspace", back_populates="sample_batch")
+    dataset = relationship("Dataset", back_populates="sample_batch")
     sample_items = relationship(
         "SampleItem",
         back_populates="sample_batch",
@@ -282,17 +282,17 @@ class SampleBatch(Base):
 @event.listens_for(SampleBatch, "after_insert")
 @event.listens_for(SampleBatch, "after_update")
 @event.listens_for(SampleBatch, "after_delete")
-def update_workspace_on_sample_batch_change(mapper, connection, target):
-    """Update Workspace timestamp when SampleBatch changes"""
-    if target.workspace_id:
+def update_dataset_on_sample_batch_change(mapper, connection, target):
+    """Update Dataset timestamp when SampleBatch changes"""
+    if target.dataset_id:
         stmt = (
-            update(Workspace)
-            .where(Workspace.workspace_id == target.workspace_id)
-            .values(workspace_utc_modified=dt.now(timezone.utc))
+            update(Dataset)
+            .where(Dataset.dataset_id == target.dataset_id)
+            .values(dataset_utc_modified=dt.now(timezone.utc))
         )
         connection.execute(stmt)
         runtime.logger.debug(
-            f"Updated Workspace '{target.workspace_id}' timestamp due to SampleBatch change."
+            f"Updated Dataset '{target.dataset_id}' timestamp due to SampleBatch change."
         )
 
 
@@ -930,7 +930,7 @@ __all__ = [
     "User",
     "Role",
     "AccessToken",
-    "Workspace",
+    "Dataset",
     "SampleBatch",
     "SampleFile",
     "SampleItem",

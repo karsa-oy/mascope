@@ -11,11 +11,11 @@ export const useFilter = defineStore(`app.filter`, () => {
   const target_collection = shallowRef([])
   const match_collection = shallowRef([])
   const match_ion = shallowRef([])
-  const workspace = shallowRef([])
+  const dataset = shallowRef([])
 
   const allFilters = {
     instrument,
-    workspace,
+    dataset,
     batch,
     sample,
     target_collection,

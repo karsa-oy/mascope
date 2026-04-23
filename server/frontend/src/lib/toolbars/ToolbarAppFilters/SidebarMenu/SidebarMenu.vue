@@ -10,11 +10,11 @@ import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 import ContextMenu from 'primevue/contextmenu'
 
-import { DialogWorkspaceOp } from '@/lib/dialogs'
+import { DialogDatasetOp } from '@/lib/dialogs'
 import { BatchContextMenu, useBatchContextMenu, useBatchTableConfig } from '@/lib/panes'
 
 import { useSidebarMenu } from './state.js'
-import WorkspacePane from './WorkspacePane.vue'
+import DatasetPane from './DatasetPane.vue'
 import UserSettingsPane from './UserSettingsPane.vue'
 import NotificationPane from './NotificationPane.vue'
 import NotificationOverlay from './NotificationOverlay.vue'
@@ -25,7 +25,7 @@ const app = useApp()
 const sidebarMenu = useSidebarMenu()
 
 const dialog = ref()
-const workspaceContextMenu = ref()
+const datasetContextMenu = ref()
 const batchContextMenu = useBatchContextMenu()
 const batchTable = useBatchTableConfig()
 
@@ -55,7 +55,7 @@ const nextBatch = () => {
 
 watchEffect(() => {
   if (!sidebarMenu.open) {
-    sidebarMenu.tab = 'workspaces'
+    sidebarMenu.tab = 'datasets'
   }
 })
 
@@ -89,9 +89,9 @@ watchEffect(() => {
     <span class="pi ph ph-caret-right" style="opacity: 0.5" />
     <Button
       icon="pi ph ph-folder"
-      :label="app.data.workspace.focused?.workspace_name"
+      :label="app.data.dataset.focused?.dataset_name"
       v-tooltip.bottom="
-        `${app.data.workspace.focused?.workspace_description ?? 'No description'}
+        `${app.data.dataset.focused?.dataset_description ?? 'No description'}
                          (right click for options)`
       "
       severity="secondary"
@@ -104,7 +104,7 @@ watchEffect(() => {
       @contextmenu="
         (event) => {
           event.preventDefault()
-          workspaceContextMenu.toggle(event)
+          datasetContextMenu.toggle(event)
         }
       "
     />
@@ -168,7 +168,7 @@ watchEffect(() => {
     >
       <template #header>
         <TabList>
-          <Tab value="workspaces" v-tooltip.bottom="'Workspaces'">
+          <Tab value="datasets" v-tooltip.bottom="'Datasets'">
             <span class="pi ph ph-folder" />
           </Tab>
           <Tab value="notifications" v-tooltip.bottom="'Notifications'">
@@ -182,8 +182,8 @@ watchEffect(() => {
         </TabList>
       </template>
       <TabPanels>
-        <TabPanel value="workspaces">
-          <WorkspacePane />
+        <TabPanel value="datasets">
+          <DatasetPane />
         </TabPanel>
         <TabPanel value="notifications">
           <NotificationPane />
@@ -206,25 +206,25 @@ watchEffect(() => {
     </Drawer>
   </Tabs>
   <ContextMenu
-    ref="workspaceContextMenu"
+    ref="datasetContextMenu"
     appendTo="self"
     :model="[
       {
-        label: 'Create workspace',
+        label: 'Create dataset',
         icon: 'pi pi-plus',
         command: () => {
           dialog = 'create'
         }
       },
       {
-        label: 'Edit workspace',
+        label: 'Edit dataset',
         icon: 'pi pi-pen-to-square',
         command: () => {
           dialog = 'edit'
         }
       },
       {
-        label: 'Delete workspace',
+        label: 'Delete dataset',
         icon: 'pi pi-trash',
         command: () => {
           dialog = 'delete'
@@ -232,7 +232,7 @@ watchEffect(() => {
       }
     ]"
   />
-  <DialogWorkspaceOp v-model:action="dialog" />
+  <DialogDatasetOp v-model:action="dialog" />
   <BatchContextMenu />
 </template>
 

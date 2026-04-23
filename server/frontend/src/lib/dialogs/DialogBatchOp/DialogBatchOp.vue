@@ -86,7 +86,7 @@ const updated = computed(() => {
     sample_batch_name: selected.info.name,
     sample_batch_description: selected.info.desc,
     sample_batch_polarity: selected.info.polarity,
-    workspace_id: app.data.workspace.focusedId,
+    dataset_id: app.data.dataset.focusedId,
     target_collection_ids: selected.targets.map((row) => row.target_collection_id)
   }
   switch (action.value) {

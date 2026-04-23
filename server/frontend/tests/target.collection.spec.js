@@ -1,8 +1,8 @@
 import { expect, mergeTests } from '@playwright/test'
 
-import { workspace, sample, target } from './fixtures'
+import { dataset, sample, target } from './fixtures'
 
-const test = mergeTests(workspace, sample, target)
+const test = mergeTests(dataset, sample, target)
 
 test.describe('target collection ops', () => {
   test('create target collection', async ({ freshCollection }) => {

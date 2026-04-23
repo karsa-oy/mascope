@@ -8,7 +8,7 @@ and test modules (unit, integration, system).
 Usage:
     mascope test run              # Run all backend tests
     mascope test run -m unit      # Run only unit tests
-    mascope test run -n workspace_model # Run specific test by name
+    mascope test run -n dataset_model # Run specific test by name
     mascope test list             # List available tests
 """
 
@@ -101,7 +101,7 @@ def run(
       mascope test run                      # Run all backend tests\n
       mascope test run -v                   # Run tests with verbose output\n
       mascope test run -m unit              # Run only unit tests\n
-      mascope test run -n workspace_model   # Run a specific test by name\n
+      mascope test run -n dataset_model   # Run a specific test by name\n
     """
     # Default to backend if no components specified
     if not components:
@@ -415,4 +415,4 @@ def show():
     typer.echo("  mascope test run libraries -m file     # Run File library tests")
     typer.echo("  mascope test run libraries -m match    # Run Match library tests")
     typer.echo("  mascope test run libraries -m signal   # Run Signal library tests")
-    typer.echo("  mascope test run -n workspace_model    # Run specific test by name")
+    typer.echo("  mascope test run -n dataset_model    # Run specific test by name")

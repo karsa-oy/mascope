@@ -4,7 +4,7 @@ import { api } from '@/api'
 
 import { useData } from '@/lib/store'
 
-import { useWorkspace } from './workspace'
+import { useDataset } from './dataset'
 
 export const useBatch = defineStore('app.data.batch', () => {
   const name = 'batch'
@@ -12,16 +12,16 @@ export const useBatch = defineStore('app.data.batch', () => {
 
   const data = useData(
     name,
-    ({ workspace_id }) =>
+    ({ dataset_id }) =>
       api.http.get(`/sample/batches`, {
-        params: { workspace_id },
+        params: { dataset_id },
         use: 'read',
         type: 'load_batches'
       }),
     {
       key,
       deps: () => ({
-        workspace_id: useWorkspace().focusedId
+        dataset_id: useDataset().focusedId
       }),
       selection: {
         subscribe: true
@@ -52,11 +52,11 @@ export const useBatch = defineStore('app.data.batch', () => {
         use: 'process',
         type: 'delete_batch'
       }),
-    copy: ({ sample_batch_id, workspace_id, sample_batch_name, sample_batch_description }) =>
+    copy: ({ sample_batch_id, dataset_id, sample_batch_name, sample_batch_description }) =>
       api.http.post(
         `/sample/batches/${sample_batch_id}/copy`,
         {
-          workspace_id,
+          dataset_id,
           sample_batch_name,
           sample_batch_description
         },

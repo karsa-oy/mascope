@@ -15,8 +15,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from mascope_backend.api.controllers.workspace.acquisition.service import (
-    create_acquisition_workspaces,
+from mascope_backend.api.controllers.dataset.acquisition.service import (
+    create_acquisition_datasets,
 )
 from mascope_backend.api.lib.exceptions.api_exceptions import handle_exception
 from mascope_backend.api.routes import routers
@@ -252,15 +252,15 @@ async def init_app_data() -> None:
     Check that required application data exists in the database.
 
     This function is called by each worker during startup to verify that
-    necessary application data (workspaces, default records, etc.) is present.
+    necessary application data (datasets, default records, etc.) is present.
     It's idempotent and safe to call multiple times.
 
     Operations:
     - Reset any stuck processing states from previous run
-    - Auto-create acquisition workspaces for all instruments
+    - Auto-create acquisition datasets for all instruments
     """
     # Reset stuck processing batches from previous run
     await reset_stuck_processing_batches()
 
-    # Auto-create acquisition workspaces for all instruments
-    await create_acquisition_workspaces()
+    # Auto-create acquisition datasets for all instruments
+    await create_acquisition_datasets()

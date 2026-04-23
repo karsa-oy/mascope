@@ -78,8 +78,8 @@ class SampleBatchValidator(SampleBatchBaseValidator):
 class SampleBatchBase(SampleBatchValidator, BaseModel):
     """Base model with common fields for SampleBatch."""
 
-    workspace_id: str = Field(
-        ..., description="ID of the workspace associated with the sample batch"
+    dataset_id: str = Field(
+        ..., description="ID of the dataset associated with the sample batch"
     )
     sample_batch_name: str = Field(..., description="Name of the sample batch")
     sample_batch_description: str | None = Field(
@@ -168,9 +168,9 @@ class SampleBatchUpdateStatusBody(BaseModel):
 
 
 class GetSampleBatchesQueryParams(QueryParamsModel):
-    workspace_id: str | None = Field(
+    dataset_id: str | None = Field(
         None,
-        description="Filter by the workspace ID for which you want to fetch the sample batches.",
+        description="Filter by the dataset ID for which you want to fetch the sample batches.",
     )
     sample_batch_name: str | None = Field(
         None, description="Filter by name of the sample batch"
@@ -260,8 +260,8 @@ class SampleBatchImportSamplesBody(BaseModel):
 
 
 class SampleBatchCopyBody(BaseModel):
-    workspace_id: str = Field(
-        ..., description="ID of the workspace where to copy the batch"
+    dataset_id: str = Field(
+        ..., description="ID of the dataset where to copy the batch"
     )
     sample_batch_name: str = Field(..., description="Name of the new sample batch")
     sample_batch_description: str | None = Field(
