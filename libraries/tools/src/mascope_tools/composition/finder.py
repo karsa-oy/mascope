@@ -2,7 +2,7 @@
 
 import re
 import warnings
-from typing import Any
+from typing import Iterator
 
 import numpy as np
 import pandas as pd
@@ -20,9 +20,11 @@ from mascope_tools.composition.heuristic_filter import (
 )
 from mascope_tools.composition.models import (
     Atom,
+    CompositionSearchConfig,
+    CompositionSearchState,
+    HeuristicFilterConfig,
     IonizationMechanism,
     Result,
-    SearchContext,
 )
 
 
@@ -44,8 +46,8 @@ else:
 
 def assign_compositions(
     peaks: pd.DataFrame,
-    params: dict[str, float | str | bool],
-    heuristic_params: dict[str, dict[str, tuple[float, float]]] | None = None,
+    config: CompositionSearchConfig,
+    heuristics: HeuristicFilterConfig | None = None,
 ) -> tuple[pd.DataFrame, dict[float, list[str]]]:
     """Assign molecular compositions to a set of peaks.
 
@@ -53,15 +55,16 @@ def assign_compositions(
     :type peaks: pd.DataFrame
     :param params: Parameters for composition finding.
     :type params: dict
-    :param heuristic_params: Parameters for heuristic filtering.
-    :type heuristic_params: dict, optional
+    :param heuristics: Optional heuristic filter configuration.
+    :type heuristics: HeuristicFilterConfig, optional
     :return: A DataFrame with assigned compositions and related information.
     :rtype: tuple[pd.DataFrame, dict[float, list[str]]]
     """
     # Convert peaks to Polars DataFrame
-    peaks = pl.from_pandas(peaks).sort("mz")
-    peak_height_threshold = params.get("peak_height_threshold", 0.0)
-    peaks_to_match = peaks.filter(pl.col("intensity") >= peak_height_threshold)
+    peaks_df = pl.from_pandas(peaks).sort("mz")
+    peaks_to_match = peaks_df.filter(
+        pl.col("intensity") >= config.peak_height_threshold
+    )
     peaks_to_match = peaks_to_match.sort("mz")
 
     mzs = peaks_to_match["mz"].to_numpy()
@@ -70,11 +73,8 @@ def assign_compositions(
     for mz in tqdm(mzs, desc="Assigning compositions..."):
         if mz in assigned_mzs:
             continue
-        params["monoisotopic_mass"] = mz
-        params["target_monoisotopic_mass"] = mz
 
-        compositions = find_compositions(params)
-        comp_results = compositions.get("results", [])
+        comp_results = find_compositions(mz, config)
         all_candidates = (
             ", ".join([r["formula"] for r in comp_results[1:]])
             if len(comp_results) > 1
@@ -83,12 +83,12 @@ def assign_compositions(
 
         if comp_results:
             candidates, log_messages = apply_heuristic_rules(
-                comp_results, params=heuristic_params
+                comp_results, heuristics_config=heuristics
             )
             mass_log_messages[mz] = log_messages
             if candidates:
                 candidates, all_matched_isotopes = match_isotopic_pattern(
-                    candidates, peaks
+                    candidates, peaks_df
                 )
             else:
                 all_matched_isotopes = []
@@ -151,6 +151,81 @@ def assign_compositions(
     return matches, mass_log_messages
 
 
+def find_compositions(target_mz: float, config: CompositionSearchConfig) -> list[dict]:
+    """Find molecular compositions based on the provided parameters.
+
+    :param target_mz: The target m/z value for which to find compositions.
+    :type target_mz: float
+    :param config: Configuration parameters for the composition search.
+    :type config: CompositionSearchConfig
+    :return: A list of dictionaries containing composition results.
+    :rtype: list[dict]
+    """
+    atoms = utils.parse_atom_count_ranges(config.element_count_ranges)
+    atoms.sort(key=lambda a: a.mass)
+
+    ionization_mech_string_list = get_ionization_mech_string_list(config.ionizations)
+    mz_tolerance_da = target_mz * config.mass_range_ppm * 1e-6
+
+    # Initialise list of results across all ionization mechanisms
+    all_results: list[Result] = []
+
+    # Precompute minimal and maximal remaining masses for pruning the search space
+    min_inner_mass, max_inner_mass = calc_min_max_inner_mass(atoms)
+
+    for ionization_mech_string in ionization_mech_string_list:
+        # Reset number of found compositions for this ionization mechanism
+        ionization_mechanism = utils.parse_ionization(ionization_mech_string)
+
+        # Ion shift: ion m/z = neutral_mass + ion_shift
+        ion_shift = (
+            ionization_mechanism.mass
+            if ionization_mechanism.addition
+            else -ionization_mechanism.mass
+        )
+        # Neutral mass that would give the target m/z with this ionization mechanism
+        required_neutral_mass = target_mz - ion_shift
+
+        # --- Ionization peak case: no analyte mass (neutral mass ~ 0) ---
+        if abs(required_neutral_mass) <= mz_tolerance_da:
+            ion_charge = "+" if ionization_mechanism.charge > 0 else "-"
+            ion_formula = ionization_mechanism.formula + ion_charge
+            all_results.append(
+                Result(
+                    formula="Ionization peak",
+                    neutral_mass=0.0,
+                    composition_error_ppm=0.0,
+                    unsaturation=None,
+                    ion=ion_formula,
+                    ionization_mechanism=ionization_mechanism.mascope_notation,
+                    observed_mass=target_mz,
+                )
+            )
+            continue
+
+        # --- Negative neutral masse case (ionization mechanism inapplicable) ---
+        if required_neutral_mass <= 0:
+            continue
+
+        # --- Regular case: search for matching compositions --- #
+        # Initialize search runtime state per ionization mechanism
+        state = CompositionSearchState(
+            ion_shift=ion_shift,
+            mz_tolerance_da=mz_tolerance_da,
+            atoms=atoms,
+            min_inner_mass=min_inner_mass,
+            max_inner_mass=max_inner_mass,
+            ionization_mechanism=ionization_mechanism,
+        )
+
+        for res in recursive_search(0, [], 0.0, target_mz, state, config):
+            all_results.append(res)
+
+    all_results.sort(key=lambda r: r.composition_error_ppm)
+
+    return [r.to_dict() for r in all_results]
+
+
 def process_isotopes(
     main_candidate: dict, all_matched_isotopes: list, assigned_mzs: set
 ) -> tuple:
@@ -211,161 +286,83 @@ def process_isotopes(
     return results_per_peak, assigned_mzs
 
 
-def find_compositions(params: dict[str, Any]) -> dict:
-    """Find molecular compositions based on the provided parameters.
-
-    :param params: Parameters for the composition search.
-    :type params: dict[str, Any]
-    :return: A dictionary containing the search results and related information.
-    :rtype: dict
-    """
-    ctx = SearchContext()
-    ctx.build(params)
-    ctx.atoms = utils.parse_atom_count_ranges(ctx.element_count_ranges)
-    ctx.atoms.sort(key=lambda a: a.mass)
-
-    ctx.min_inner_mass, ctx.max_inner_mass = calc_min_max_inner_mass(ctx.atoms)
-
-    ionization_mech_string_list = get_ionization_mech_string_list(params)
-
-    target_mz = ctx.target_monoisotopic_mass
-    ctx.abs_tolerance = target_mz * ctx.mass_range * 1e-6  # ppm -> Da around target m/z
-
-    all_results: list[Result] = []
-
-    for ionization_mech_string in ionization_mech_string_list:
-        ionization_mech = utils.parse_ionization(ionization_mech_string)
-
-        # Ion shift: ion m/z = neutral_mass + ion_shift
-        ion_shift = (
-            ionization_mech.mass if ionization_mech.addition else -ionization_mech.mass
-        )
-        required_neutral_mass = (
-            target_mz - ion_shift
-        )  # what neutral mass would give the target m/z
-
-        # Ionization peak case: no analyte mass (neutral mass ~ 0)
-        if abs(required_neutral_mass) <= ctx.abs_tolerance:
-            ion_charge = "+" if ionization_mech.charge > 0 else "-"
-            ion_formula = ionization_mech.formula + ion_charge
-            all_results.append(
-                Result(
-                    formula="Ionization peak",
-                    neutral_mass=0.0,
-                    composition_error_ppm=0.0,
-                    unsaturation=None,
-                    ion=ion_formula,
-                    ionization_mechanism=ionization_mech.mascope_notation,
-                    observed_mass=target_mz,
-                )
-            )
-            continue
-
-        # Skip mechanisms that would imply negative / zero neutral masses
-        if required_neutral_mass <= 0:
-            continue
-
-        # Store mechanism info in context for recursion
-        ctx.ionization_mechanism = ionization_mech
-        ctx.ion_shift = ion_shift
-        ctx.results_found = 0  # reset per ionization mechanism
-
-        for res in recursive_search(0, [], 0.0, ctx):
-            all_results.append(res)
-
-    all_results.sort(key=lambda r: r.composition_error_ppm)
-
-    return_result_count_only = utils.parse_bool(
-        params.get("return_result_count_only", False)
-    )
-    return_typed_format = utils.parse_bool(params.get("return_typed_format", False))
-    if return_result_count_only:
-        return {"count": len(all_results)}
-
-    return {
-        "results": [format_result(r, return_typed_format) for r in all_results],
-        "count": len(all_results),
-        "options": params,
-    }
-
-
-def recursive_search(idx: int, counts: list, current_mass: float, ctx: SearchContext):
+def recursive_search(
+    idx: int,
+    counts: list,
+    current_mass: float,
+    target_mz: float,
+    state: CompositionSearchState,
+    config: CompositionSearchConfig,
+) -> Iterator[Result]:
     """A recursive function to explore all possible combinations of atom counts.
 
     :param idx: Current index in the list of atoms.
     :type idx: int
     :param counts: Current counts of each atom type.
     :type counts: list
-    :param current_mass: Current total mass of the composition.
+    :param current_mass: Current total mass of the composition based on counts.
     :type current_mass: float
-    :param ctx: Search context containing parameters and state.
-    :type ctx: SearchContext
+    :param target_mz: The target m/z value for which to find compositions.
+    :type target_mz: float
+    :param state: Current state of the composition search.
+    :type state: CompositionSearchState
+    :param config: Configuration parameters for the composition search.
+    :type config: CompositionSearchConfig
     :yield: Result objects for valid compositions.
     :rtype: Iterator[Result]
     """
-    if ctx.results_found >= ctx.max_result_rows:
+    if state.results_found >= config.max_result_rows:
         return
 
     # Evaluate full composition
-    if idx == len(ctx.atoms):
-        ion_mz = current_mass + ctx.ion_shift
-        if abs(ion_mz - ctx.target_monoisotopic_mass) <= ctx.abs_tolerance:
-            if ctx.use_unsaturation:
-                unsat = get_unsaturation(ctx.atoms, counts)
-                if not (ctx.min_unsaturation <= unsat <= ctx.max_unsaturation):
+    if idx == len(state.atoms):
+        ion_mz = current_mass + state.ion_shift
+        if abs(ion_mz - target_mz) <= state.mz_tolerance_da:
+            if config.use_unsaturation:
+                unsat = get_unsaturation(state.atoms, counts)
+                if not (config.min_unsaturation <= unsat <= config.max_unsaturation):
                     return
-                if ctx.only_integer_unsaturation and not unsat.is_integer():
+                if config.only_integer_unsaturation and not unsat.is_integer():
                     return
             else:
                 unsat = None
 
             atomic_counts = {
-                ctx.atoms[i].symbol: counts[i] for i in range(len(ctx.atoms))
+                state.atoms[i].symbol: counts[i] for i in range(len(state.atoms))
             }
             formula = utils.to_hill_order(atomic_counts)
-            ctx.results_found += 1
+            state.results_found += 1
             ion_formula = utils.combine_formula_and_ionization(
-                formula, ctx.ionization_mechanism
+                formula, state.ionization_mechanism
             )
-            error_ppm = (
-                abs(ion_mz - ctx.target_monoisotopic_mass)
-                / ctx.target_monoisotopic_mass
-                * 1e6
-            )
+            error_ppm = abs(ion_mz - target_mz) / target_mz * 1e6
             yield Result(
                 formula=formula,
                 neutral_mass=current_mass,
                 composition_error_ppm=error_ppm,
                 unsaturation=unsat,
                 ion=ion_formula,
-                ionization_mechanism=ctx.ionization_mechanism.mascope_notation,
-                observed_mass=ctx.target_monoisotopic_mass,
+                ionization_mechanism=state.ionization_mechanism.mascope_notation,
+                observed_mass=target_mz,
             )
         return
 
-    atom = ctx.atoms[idx]
-    min_inner = ctx.min_inner_mass
-    max_inner = ctx.max_inner_mass
-    tol = ctx.abs_tolerance
-    shift = ctx.ion_shift
-    target_mz = ctx.target_monoisotopic_mass
+    atom = state.atoms[idx]
+    min_inner = state.min_inner_mass[idx]
+    max_inner = state.max_inner_mass[idx]
+    tol = state.mz_tolerance_da
+    shift = state.ion_shift
 
     # Feasible count bounds for this atom (neutral mass domain)
     feasible_min = max(
         atom.min_count,
-        int(
-            np.ceil(
-                ((target_mz - shift) - tol - current_mass - max_inner[idx]) / atom.mass
-            )
-        )
+        int(np.ceil(((target_mz - shift) - tol - current_mass - max_inner) / atom.mass))
         - 1,
     )
     feasible_max = min(
         atom.max_count,
         int(
-            np.floor(
-                ((target_mz - shift) + tol - current_mass - min_inner[idx]) / atom.mass
-            )
+            np.floor(((target_mz - shift) + tol - current_mass - min_inner) / atom.mass)
         )
         + 1,
     )
@@ -373,13 +370,13 @@ def recursive_search(idx: int, counts: list, current_mass: float, ctx: SearchCon
         return
 
     for atom_count in range(feasible_min, feasible_max + 1):
-        if ctx.results_found >= ctx.max_result_rows:
+        if state.results_found >= config.max_result_rows:
             return
         new_mass = current_mass + atom_count * atom.mass
 
-        if idx < len(ctx.atoms) - 1:
-            min_mass = new_mass + min_inner[idx]
-            max_mass = new_mass + max_inner[idx]
+        if idx < len(state.atoms) - 1:
+            min_mass = new_mass + min_inner
+            max_mass = new_mass + max_inner
             min_ion = min_mass + shift
             max_ion = max_mass + shift
 
@@ -390,21 +387,13 @@ def recursive_search(idx: int, counts: list, current_mass: float, ctx: SearchCon
             if (target_mz - max_ion) > tol:
                 continue
 
-        yield from recursive_search(idx + 1, counts + [atom_count], new_mass, ctx)
+        yield from recursive_search(
+            idx + 1, counts + [atom_count], new_mass, target_mz, state, config
+        )
 
 
-def format_result(r, return_typed_format):
-    """Format a Result object into a dictionary."""
-    base = r.to_dict()
-    base["formula"] = (
-        {"type": "formula", "value": r.formula} if return_typed_format else r.formula
-    )
-    return base
-
-
-def get_ionization_mech_string_list(params: dict) -> list:
+def get_ionization_mech_string_list(ionizations: str) -> list[str]:
     """Get a list of ionizations from the params dictionary."""
-    ionizations = params.get("ionizations", None)
     if ionizations:
         return [ionization for ionization in ionizations.split(",")]
     else:
@@ -426,7 +415,7 @@ def get_neutral_mass_and_ionization_mech(
     return target_mass, None
 
 
-def calc_min_max_inner_mass(atoms):
+def calc_min_max_inner_mass(atoms) -> tuple[list[float], list[float]]:
     """Prepare suffix arrays of minimal and maximal remaining masses AFTER each index.
 
     Returns:

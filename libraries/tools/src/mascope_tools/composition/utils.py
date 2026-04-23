@@ -241,14 +241,14 @@ def parse_bool(val):
     return str(val).lower() in ("1", "true", "yes", "on")
 
 
-def parse_atom_count_ranges(count_ranges: str) -> list:
+def parse_atom_count_ranges(count_ranges: str) -> list[Atom]:
     """Parse a string of element count ranges into a list of Atom objects.
 
     :param count_ranges: String containing element count ranges.
         e.g. "C0-30 H0-40 N0-3 O0-20 [18O]0-1 [13C]0-2"
     :type count_ranges: str
     :return: List of Atom objects.
-    :rtype: list
+    :rtype: list[Atom]
     """
     standard_pattern = re.compile(r"^([A-Z][a-z]?)(\d+)-(\d+)$")
     isotope_pattern = re.compile(r"^\[(\d+)([A-Z][a-z]?)\](\d+)-(\d+)$")

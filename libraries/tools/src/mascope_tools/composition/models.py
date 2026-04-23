@@ -1,15 +1,9 @@
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 
-from mascope_tools.composition import utils
-from mascope_tools.composition.config import (
-    DEFAULT_MASS_RANGE_THRESHOLD_PPM,
-    DEFAULT_MAXIMUM_ROWS,
-    DEFAULT_MAXIMUM_UNSATURATION,
-    DEFAULT_SEARCH_ELEMENT_COUNT_RANGES,
-)
+from mascope_tools.composition import config
 
 
-@dataclass
+@dataclass(frozen=True)
 class Atom:
     symbol: str
     min_count: int
@@ -17,7 +11,7 @@ class Atom:
     mass: float
 
 
-@dataclass
+@dataclass(frozen=True)
 class IonizationMechanism:
     mascope_notation: str
     addition: bool
@@ -26,42 +20,64 @@ class IonizationMechanism:
     mass: float
 
 
-@dataclass
-class SearchContext:
-    atoms: list[Atom] = None
-    min_inner_mass: float = None
-    max_inner_mass: float = None
-    neutral_mass: float = None
-    mass_range: float = None
-    use_unsaturation: bool = False
+@dataclass(frozen=True)
+class CompositionSearchConfig:
+    """Composition search parameters requested by the user"""
+
+    ionizations: str
     min_unsaturation: float = 0.0
-    max_unsaturation: float = DEFAULT_MAXIMUM_UNSATURATION
+    max_unsaturation: float = config.DEFAULT_MAXIMUM_UNSATURATION
     only_integer_unsaturation: bool = False
-    max_result_rows: int = DEFAULT_MAXIMUM_ROWS
-    ionization_mechanism: IonizationMechanism | None = None
-    ion_shift: float = 0.0
-    target_monoisotopic_mass: float = None
+    max_result_rows: int = config.DEFAULT_MAXIMUM_ROWS
+    use_unsaturation: bool = False
+    element_count_ranges: str = config.DEFAULT_SEARCH_ELEMENT_COUNT_RANGES
+    mass_range_ppm: float = config.DEFAULT_MASS_RANGE_THRESHOLD_PPM
+    peak_height_threshold: float = 0.0
+
+
+@dataclass()
+class CompositionSearchState:
+    """Current state of the composition search for a given m/z"""
+
+    ion_shift: float
+    mz_tolerance_da: float
+    atoms: list[Atom]
+    min_inner_mass: list[float]
+    max_inner_mass: list[float]
+    ionization_mechanism: IonizationMechanism
     results_found: int = 0
 
-    def build(self, params: dict):
-        self.mass_range = float(
-            params.get("mass_range_ppm", DEFAULT_MASS_RANGE_THRESHOLD_PPM)
-        )
-        self.max_result_rows = int(params.get("max_result_rows", DEFAULT_MAXIMUM_ROWS))
-        self.element_count_ranges = params.get(
-            "element_count_ranges", DEFAULT_SEARCH_ELEMENT_COUNT_RANGES
-        )
-        self.min_unsaturation = float(params.get("min_unsaturation", 0))
-        self.max_unsaturation = float(params.get("max_unsaturation", 50))
-        self.only_integer_unsaturation = utils.parse_bool(
-            params.get("only_integer_unsaturation", False)
-        )
-        self.use_unsaturation = utils.parse_bool(params.get("use_unsaturation", False))
-        self.target_monoisotopic_mass = float(
-            params.get(
-                "monoisotopic_mass", params.get("target_monoisotopic_mass", "-1")
-            )
-        )
+
+@dataclass(frozen=True)
+class HeuristicFilterConfig:
+    """Heuristic filter parameters
+
+    carbon_element_ratio_range uses default values from
+    mascope_tools.composition.config.DEFAULT_ELEMENTAL_RATIO_RANGE if not provided,
+    while non_carbon_element_ratio_range defaults to an empty dict, meaning no
+    filtering based on non-carbon element ratios.
+
+    Parameter examples:
+    carbon_element_ratio_range = {
+        "H/C": (1.0, 3.0),
+        "N/C": (0.0, 2),
+        "O/C": (0.0, 2),
+        "S/C": (0.001, 1)
+    }
+    non_carbon_element_ratio_range = {
+        "K/Na": (0, 5.0),
+        "H/N": (0, 5.0),
+        "H/S": (0, 5.0),
+    }
+    """
+
+    non_carbon_element_ratio_range: dict[str, tuple[float, float]] = field(
+        default_factory=dict
+    )
+
+    carbon_element_ratio_range: dict[str, tuple[float, float]] = field(
+        default_factory=lambda: config.DEFAULT_ELEMENTAL_RATIO_RANGE.copy()
+    )
 
 
 @dataclass

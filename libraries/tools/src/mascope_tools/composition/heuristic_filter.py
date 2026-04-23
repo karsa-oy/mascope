@@ -11,12 +11,12 @@ from pyteomics.mass import Composition
 from scipy.spatial.distance import cosine
 
 from mascope_tools.composition.config import (
-    DEFAULT_ELEMENTAL_RATIO_RANGE,
     ELECTRON_MASS,
     ISOTOPE_ABUNDANCE_THRESHOLD,
     ISOTOPE_MATCHING_INTENSITY_TOLERANCE,
     ISOTOPE_MATCHING_MZ_TOLERANCE_PPM,
 )
+from mascope_tools.composition.models import HeuristicFilterConfig
 from mascope_tools.composition.utils import (
     normalize_formula_with_isotopes,
     to_pyteomics,
@@ -28,14 +28,9 @@ ISOTOPE_CANDIDATE_LIMIT = 64
 
 
 def rule_element_ratio(
-    candidates: pl.DataFrame, **kwargs
+    candidates: pl.DataFrame, heuristics_config: HeuristicFilterConfig, **kwargs
 ) -> tuple[pl.Series, list[str]]:
     log_messages = []
-    params = kwargs.get("params", {})
-    carbon_element_ratio_range = params.get(
-        "carbon_element_ratio_range", DEFAULT_ELEMENTAL_RATIO_RANGE
-    )
-    non_carbon_element_ratio_range = params.get("non_carbon_element_ratio_range", {})
 
     # Early return if no candidates
     if candidates.is_empty():
@@ -115,17 +110,17 @@ def rule_element_ratio(
         return rule_mask
 
     # Apply carbon-specific ratios to formulas with carbon
-    if np.any(has_carbon) and carbon_element_ratio_range:
+    if np.any(has_carbon) and heuristics_config.carbon_element_ratio_range:
         carbon_mask = apply_ratio_rules_vectorized(
-            carbon_element_ratio_range, has_carbon
+            heuristics_config.carbon_element_ratio_range, has_carbon
         )
         final_mask &= carbon_mask
 
     # Apply non-carbon ratios to formulas without carbon
     no_carbon = np.logical_not(has_carbon)
-    if np.any(no_carbon) and non_carbon_element_ratio_range:
+    if np.any(no_carbon) and heuristics_config.non_carbon_element_ratio_range:
         non_carbon_mask = apply_ratio_rules_vectorized(
-            non_carbon_element_ratio_range, no_carbon
+            heuristics_config.non_carbon_element_ratio_range, no_carbon
         )
         final_mask &= non_carbon_mask
 
@@ -169,7 +164,7 @@ HEURISTIC_RULES = [
 
 def apply_heuristic_rules(
     candidates: list[dict[str, Any]],
-    params: dict[str, Any] | None = None,
+    heuristics_config: HeuristicFilterConfig | None = None,
 ) -> tuple[list[dict[str, Any]], list[str]]:
     """
     Filter candidate formulas using the heuristic rules.
@@ -178,32 +173,34 @@ def apply_heuristic_rules(
     :param candidates: List of candidate formula dicts (or Result objects).
     :return: Filtered list of candidates.
     """
-    if params is None:
-        params = {}
+    if heuristics_config is None:
+        heuristics_config = HeuristicFilterConfig()
     log_messages = []
-    candidates = pl.DataFrame(candidates)
-    if candidates.is_empty():
+    candidates_df = pl.DataFrame(candidates)
+    if candidates_df.is_empty():
         log_messages.append("No candidates provided for heuristic filtering.")
         return [], log_messages
 
-    if "Ionization peak" in candidates.get_column("formula").to_list():
+    if "Ionization peak" in candidates_df.get_column("formula").to_list():
         # Skip all rules for ionization peaks
         return (
-            candidates.filter(pl.col("formula") == "Ionization peak").to_dicts(),
+            candidates_df.filter(pl.col("formula") == "Ionization peak").to_dicts(),
             log_messages,
         )
 
     for i, rule in enumerate(HEURISTIC_RULES):
-        if candidates.is_empty():
+        if candidates_df.is_empty():
             log_messages.append(
                 f"No candidates from passed the rule: {HEURISTIC_RULES[i - 1].__name__}"
             )
             break
-        rule_mask, rule_log_messages = rule(candidates, params=params)
+        rule_mask, rule_log_messages = rule(
+            candidates_df, heuristics_config=heuristics_config
+        )
         log_messages.extend(rule_log_messages)
-        candidates = candidates.filter(rule_mask)
+        candidates_df = candidates_df.filter(rule_mask)
 
-    return candidates.to_dicts(), log_messages
+    return candidates_df.to_dicts(), log_messages
 
 
 def match_isotopic_pattern(
