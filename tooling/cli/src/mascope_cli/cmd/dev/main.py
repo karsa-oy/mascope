@@ -285,14 +285,17 @@ def down(
 @dev_app.command()
 def run(
     modules: Annotated[
-        List[str],
+        Optional[List[str]],
         typer.Argument(
-            help="List of modules or module groups to run; see `mascope modules --runnable` to see runnable modules",
+            help=(
+                "List of modules or module groups to run; see "
+                "`mascope modules --runnable` to see runnable modules"
+            ),
             show_default="backend frontend",
         ),
     ] = None,
     host: Annotated[
-        Optional[bool],
+        bool,
         typer.Option(
             "--host",
             "-h",
@@ -300,7 +303,7 @@ def run(
         ),
     ] = False,
     lab: Annotated[
-        Optional[bool],
+        bool,
         typer.Option(
             "--lab",
             "-l",
@@ -308,11 +311,19 @@ def run(
         ),
     ] = False,
     reload: Annotated[
-        Optional[bool],
+        bool,
         typer.Option(
             "--reload",
             "-r",
             help="Spawn the backend in a seperate terminal tab to enable HMR in Windows",
+        ),
+    ] = False,
+    skip_migrations: Annotated[
+        bool,
+        typer.Option(
+            "--skip-migrations",
+            "-s",
+            help="Skip database migrations",
         ),
     ] = False,
 ):
@@ -321,7 +332,7 @@ def run(
     Run application services in development environment:
     - Checks Docker is running
     - Starts dependencies (PostgreSQL, Redis)
-    - Runs migrations (if backend + PostgreSQL configured)
+    - Runs migrations (if backend + PostgreSQL configured and not skipped)
     - Starts application
 
     Pass modules to run as arguments. You can also use
@@ -381,9 +392,13 @@ def run(
         runtime.logger.info("Checking migrations...")
         if check_pending_migrations():
             runtime.logger.info("Pending migrations detected")
-
-            if not run_migrations():
-                raise typer.Exit(1)
+            if not skip_migrations:
+                runtime.logger.info("Applying migrations...")
+                if not run_migrations():
+                    runtime.logger.error("Failed to apply migrations")
+                    raise typer.Exit(1)
+            else:
+                runtime.logger.warning("Skipping migrations as requested")
         else:
             runtime.logger.success("Database up to date")
 
