@@ -146,7 +146,7 @@ def run_migrations(target: str = "head") -> bool:
         runtime.logger.success("Migrations applied")
         return True
     else:
-        runtime.logger.error("Migration failed")
+        runtime.logger.error("Migration failed: {}", result.stderr)
         return False
 
 
@@ -282,7 +282,7 @@ def downgrade(
     if result.returncode == 0:
         runtime.logger.success("Rollback completed")
     else:
-        runtime.logger.error("Rollback failed")
+        runtime.logger.error("Rollback failed: {}", result.stderr)
         raise typer.Exit(1)
 
 
@@ -336,7 +336,7 @@ def revision(
     if result.returncode == 0:
         runtime.logger.success("Migration created")
     else:
-        runtime.logger.error("Failed to create migration")
+        runtime.logger.error("Failed to create migration: {}", result.stderr)
         raise typer.Exit(1)
 
 
