@@ -158,7 +158,7 @@ class DataMonitor:
             batches = get_sample_batches(
                 mascope_url=self.config["mascope_url"],
                 access_token=self.config["access_token"],
-                dataset_id=self.config["dataset_id"],
+                workspace_id=self.config["dataset_id"],
             )
 
             if not batches:
