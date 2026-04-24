@@ -40,7 +40,7 @@ class BatchesResource(BaseResource):
             entity_label="dataset",
         )
 
-    def list(self, dataset: str = None, **kwargs) -> pd.DataFrame | None:
+    def list(self, dataset: str) -> pd.DataFrame | None:
         """List all sample batches in a dataset.
 
         :param dataset: Dataset name (or substring) or dataset ID.
@@ -61,9 +61,6 @@ class BatchesResource(BaseResource):
             # By ID
             batches = mascope.batches.list("GwvleF1LJtEcfUQg")
         """
-        from mascope_sdk.client import _compat_dataset_kwarg
-
-        dataset = _compat_dataset_kwarg(dataset, kwargs, "batches.list")
         dataset_id = self._resolve_dataset_id(dataset)
         return self._list_by_id(dataset_id)
 

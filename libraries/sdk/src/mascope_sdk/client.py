@@ -32,6 +32,8 @@ def _compat_dataset_kwarg(dataset, kwargs, method_name):
                 f"{method_name}() got both 'dataset' and 'workspace' arguments"
             )
         return kwargs.pop("workspace")
+    elif dataset is None:
+        raise ValueError(f"{method_name}() missing required 'dataset' argument")
     return dataset
 
 
@@ -286,7 +288,8 @@ class MascopeClient:
 
     def load_peaks(
         self,
-        dataset: str = None,
+        dataset: str
+        | None = None,  # TODO: Make dataset a required positional argument when removing workspace compatibility
         batches: str | None = None,
         *,
         samples: str | None = None,
@@ -393,7 +396,8 @@ class MascopeClient:
 
     def load_peak_timeseries(
         self,
-        dataset: str = None,
+        dataset: str
+        | None = None,  # TODO: Make dataset a required positional argument when removing workspace compatibility
         batches: str | None = None,
         *,
         samples: str | None = None,
