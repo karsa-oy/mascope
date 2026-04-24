@@ -338,7 +338,18 @@ def get_workspaces(mascope_url: str, access_token: str) -> list:
     if not datasets:
         logger.error("No datasets found. Please create a new dataset.")
 
-    return datasets
+    # For backwards compatibility, translate dataset keys to workspace keys
+    # in the response
+    workspaces = []
+    for dataset in datasets:
+        workspaces.append(
+            {
+                key.replace("dataset", "workspace"): value
+                for key, value in dataset.items()
+            }
+        )
+
+    return workspaces
 
 
 ####################
