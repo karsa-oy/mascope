@@ -1,6 +1,5 @@
 import traceback
 
-import httpx
 from sqlalchemy import select
 
 from mascope_backend.api.controllers.match.aggregate.sample.match_aggregate_sample_controller import (
@@ -12,9 +11,8 @@ from mascope_backend.api.lib.api_features import (
 )
 from mascope_backend.api.new.cheminfo.config import cheminfo_config
 from mascope_backend.api.new.cheminfo.utils import (
-    to_cheminfo_ionization_format,
+    to_custom_element_format,
     to_explicit_isotope_format,
-    to_mascope_ion_mech,
 )
 from mascope_backend.db import (
     IonizationMechanism,
@@ -22,9 +20,12 @@ from mascope_backend.db import (
 )
 from mascope_backend.runtime import runtime
 from mascope_match.params import BaseMatchParams
+from mascope_tools.composition import CompositionSearchConfig
+from mascope_tools.composition.finder import find_compositions
 from mascope_tools.composition.utils import (
     normalize_formula_with_isotopes,
     parse_composition,
+    parse_ionization,
     to_hill_order,
 )
 
@@ -39,16 +40,15 @@ async def retrieve_cheminfo_by_mz(
     order: None | str = None,
 ) -> dict:
     """
-    Query the ChemInfo database by mz and other optional parameters.
+    Find molecular compositions for a given m/z value using Mascope Tools.
 
     Steps:
     - Fetch ionization mechanisms from database
-    - Prepare request parameters and convert ionization mechanisms to ChemInfo format
-      + Possible "custom elements" in formulas are converted to explicit isotope format,
-        e.g. "^N" to "[15N]"
-    - Make HTTP request to ChemInfo API
-    - Process and format the results
-      + Possible explicit isotope formats in formulas are reverted back to custom element format
+    - Convert custom element notation to explicit isotope notation for Mascope Tools,
+      e.g. "^N" to "[15N]"
+    - Run local composition search via Mascope Tools
+    - Map results to the expected response format
+      + Explicit isotope formats in formulas are reverted back to custom element format
         e.g. "[15N]" to "^N"
     - Apply sorting
 
@@ -94,56 +94,72 @@ async def retrieve_cheminfo_by_mz(
                 f"No ionization mechanisms found with the provided IDs: {ionization_mechanism_ids}"
             )
 
-    # Prepare request parameters and convert ionization mechanisms to ChemInfo format
-    formula_ranges, custom_element_dict = to_explicit_isotope_format(formula_ranges)
-    params = {
-        "mass": mz,
-        "ionizations": (
-            ",".join([to_cheminfo_ionization_format(i) for i in ionization_mechanisms])
-        ),
-        "precision": mz_precision,
-        "ranges": formula_ranges,
-        "allowNeutral": "false",
-    }
-    # Make API request to ChemInfo
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            f"{cheminfo_config.BASE_URL}/v1/mfFromMonoisotopicMass",
-            params=params,
-            timeout=cheminfo_config.REQUEST_TIMEOUT,
-        )
-        resp.raise_for_status()  # Raise exception for 4XX/5XX responses
-        data = resp.json()
+    # Convert custom element notation to explicit isotope notation
+    # for both formula ranges and ionization mechanisms
+    formula_ranges, _ = to_explicit_isotope_format(formula_ranges)
+    explicit_ionizations = [
+        to_explicit_isotope_format(i)[0] for i in ionization_mechanisms
+    ]
+    # Map explicit ionization notation back to DB mechanism objects
+    explicit_to_db_mech = dict(zip(explicit_ionizations, all_ionization_mechanisms))
 
-    # Process and format the results
+    # Build composition search config and run local composition finder
+    config = CompositionSearchConfig(
+        ionizations=",".join(explicit_ionizations),
+        mass_range_ppm=mz_precision,
+        element_count_ranges=formula_ranges,
+        use_unsaturation=True,
+        min_unsaturation=-1000.0,
+        max_unsaturation=10000.0,
+        max_result_rows=1000,
+    )
+    composition_results = find_compositions(mz, config)
+
+    # Map Mascope Tools results to the expected response format
     results = []
-    for raw in data.get("result", []):
-        # Process each compound result from ChemInfo
+    for raw in composition_results:
         try:
-            formula = raw["mf"] if len(raw["mf"]) else "()"
-            # Revert explicit isotope format back to custom element format
-            for custom_elem, replaced_with in custom_element_dict.items():
-                formula = formula.replace(replaced_with, custom_elem)
+            # Convert explicit isotope notation back to custom element
+            # notation and re-normalize to Hill order
+            formula = to_custom_element_format(raw["formula"])
             formula = to_hill_order(
                 parse_composition(normalize_formula_with_isotopes(formula))
             )
+
+            # Find matching ionization mechanism from database.
+            # Results use explicit isotope notation (e.g. +[15N]O3-)
+            ion_mech_str = raw.get("ionization_mechanism", "")
+            db_mech = explicit_to_db_mech.get(ion_mech_str)
+            if not db_mech:
+                runtime.logger.warning(
+                    f"No matching DB ionization mechanism "
+                    f"for '{ion_mech_str}', skipping result"
+                )
+                continue
+
+            # Compute theoretical ion m/z from neutral mass
+            # and ionization mechanism
+            ion_mech = parse_ionization(ion_mech_str)
+            neutral_mass = raw["neutral_mass"]
+            theoretical_mz = neutral_mass + (
+                ion_mech.mass if ion_mech.addition else -ion_mech.mass
+            )
+
             results.append(
                 {
                     "sample_peak_mz": mz,
                     "target_compound_formula": formula,
-                    "target_compound_unsaturation": raw["unsaturation"],
-                    "ionization_mechanism": to_mascope_ion_mech(
-                        raw["ionization"]["mf"], all_ionization_mechanisms
-                    ),
-                    "target_isotope_mz": raw["ms"]["em"],
-                    "target_isotope_mz_error_ppm": raw["ms"]["ppm"],
+                    "target_compound_unsaturation": raw.get("unsaturation"),
+                    "ionization_mechanism": db_mech.to_dict(),
+                    "target_isotope_mz": theoretical_mz,
+                    "target_isotope_mz_error_ppm": raw["composition_error_ppm"],
                 }
             )
         except Exception as e:
             runtime.logger.error(
                 f"Error processing result {raw}:\n{e}: {traceback.format_exc()}"
             )
-            # Skip malformed results rather than failing the entire request
+            # Skip malformed results rather than failing
             continue
 
     # Apply sorting
