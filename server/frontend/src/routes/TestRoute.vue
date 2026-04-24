@@ -10,7 +10,7 @@ api.http
   .get('/datasets', {
     headers: {
       use: 'read',
-      type: 'read_datasets'
+      type: 'load_datasets'
     }
   })
   .then(console.log)
