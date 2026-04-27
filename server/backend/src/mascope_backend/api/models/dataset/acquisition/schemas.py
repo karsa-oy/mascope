@@ -13,7 +13,8 @@ class GetAcquisitionDatasetQueryParams(QueryParamsModel):
     """
     Query parameters for filtering ACQUISITION dataset.
 
-    This model defines the parameters that can be passed to the get_acquisition_dataset endpoint
+    This model defines the parameters that can be passed to the get_acquisition_dataset
+    endpoint
     """
 
     instrument: str | None = Field(

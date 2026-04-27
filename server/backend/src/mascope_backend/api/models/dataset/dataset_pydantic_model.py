@@ -38,7 +38,8 @@ class DatasetBaseValidator:
         Validates that `dataset_name` is not an empty string or just whitespace.
 
         :param dataset_name: The name provided for the dataset.
-        :raises ValueError: If the dataset_name is an empty string or contains only whitespace.
+        :raises ValueError: If the dataset_name is an empty string or contains only
+                            whitespace.
         :return: The dataset_name if it is valid.
         """
         if dataset_name is not None and dataset_name.strip() == "":
@@ -106,7 +107,8 @@ class DatasetCreate(DatasetBase):
             if not self.dataset_name.lower().endswith(self.instrument.lower()):
                 raise ValueError(
                     f"Acquisition dataset name should end with the instrument name. "
-                    f"Suggested: '{dataset_config.ACQUISITION_NAME_PREFIX} {self.instrument}'"
+                    "Suggested: "
+                    f"{dataset_config.ACQUISITION_NAME_PREFIX} {self.instrument}"
                 )
 
         return self
@@ -128,7 +130,8 @@ class DatasetRead(DatasetBase):
 
 
 class DatasetUpdate(DatasetBaseValidator, BaseModel):
-    """Model used for dataset update requests - only user-editable fields, all fields optional."""
+    """Model used for dataset update requests - only user-editable fields,
+    all fields optional."""
 
     dataset_name: str | None = Field(None, description="Name of the dataset")
     dataset_description: str | None = Field(
@@ -155,19 +158,28 @@ class GetDatasetsQueryParams(DatasetBaseValidator, QueryParamsModel):
     )
     dataset_type: list[str] | None = Field(
         default=None,
-        description="Filter by dataset types (ACQUISITION, ANALYSIS). Can specify multiple types.",
+        description=(
+            "Filter by dataset types (ACQUISITION, ANALYSIS). Can specify many."
+        ),
     )
     instrument: list[str] | None = Field(
         None,
-        description="Filter by instrument associated with the dataset.  Can specify multiple instruments.",
+        description=(
+            "Filter by instrument associated with the dataset. Can specify many."
+        ),
     )
     sort: str | None = Field(
         "dataset_utc_created",
-        description="Column name by which you want to sort the results. The column name should be one of the columns in the dataset table.",
+        description=(
+            "Column name by which you want to sort the results. "
+            "The column name should be one of the columns in the dataset table."
+        ),
     )
     order: str | None = Field(
         "asc",
-        description="Sorting order which can be asc for ascending or desc for descending.",
+        description=(
+            "Sorting order which can be asc for ascending or desc for descending."
+        ),
     )
     page: int | None = Field(None, description="Page number for pagination.")
     limit: int | None = Field(None, description="Number of results per page.")
@@ -182,6 +194,7 @@ class GetDatasetsQueryParams(DatasetBaseValidator, QueryParamsModel):
             for dataset_type in dataset_types:
                 if dataset_type not in dataset_config.DATASET_TYPES:
                     raise ValueError(
-                        f"Invalid dataset type '{dataset_type}'. Must be one of: {dataset_config.DATASET_TYPES}"
+                        f"Invalid dataset type '{dataset_type}'. "
+                        f"Must be one of: {dataset_config.DATASET_TYPES}"
                     )
         return dataset_types

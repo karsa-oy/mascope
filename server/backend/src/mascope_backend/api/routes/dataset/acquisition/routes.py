@@ -32,7 +32,8 @@ async def get_acquisition_dataset_route(
 ):
     """Retrieve a list of datasets.
 
-    :param query_params: Query parameters for sorting and pagination, defaults to Depends().
+    :param query_params: Query parameters for sorting and pagination, defaults to
+                         Depends().
     :type query_params: GetDatasetsQueryParams, optional
     :param user: The current authenticated user, defaults to Depends(guest_user).
     :type user: User, optional

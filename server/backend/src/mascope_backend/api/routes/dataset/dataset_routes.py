@@ -16,9 +16,9 @@ from mascope_backend.api.controllers.dataset.dataset_controller import (
 )
 from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.models.dataset.dataset_pydantic_model import (
-    GetDatasetsQueryParams,
     DatasetCreate,
     DatasetUpdate,
+    GetDatasetsQueryParams,
 )
 from mascope_backend.api.new.auth.access_rules import locked_access
 from mascope_backend.api.new.auth.dependencies import (
@@ -43,7 +43,8 @@ async def get_datasets_route(
 ):
     """Retrieve a list of datasets.
 
-    :param query_params: Query parameters for sorting and pagination, defaults to Depends().
+    :param query_params: Query parameters for sorting and pagination, defaults to
+                         Depends().
     :type query_params: GetDatasetsQueryParams, optional
     :param user: The current authenticated user, defaults to Depends(guest_user).
     :type user: User, optional
@@ -81,7 +82,8 @@ async def update_dataset_route(
     :type dataset_id: str
     :param dataset_update: The dataset update data.
     :type dataset_update: DatasetUpdate
-    :param user: The current authenticated user with editor permissions, defaults to Depends(editor_user).
+    :param user: The current authenticated user with editor permissions, defaults to
+                 Depends(editor_user).
     :type user: User, optional
     :return: A dictionary containing the updated dataset details.
     :rtype: dict
@@ -102,7 +104,8 @@ async def create_dataset_route(dataset: DatasetCreate, user=Depends(editor_user)
 
     :param dataset: The dataset creation data.
     :type dataset: DatasetCreate
-    :param user: The current authenticated user with editor permissions, defaults to Depends(editor_user).
+    :param user: The current authenticated user with editor permissions, defaults to
+                 Depends(editor_user).
     :type user: User, optional
     :return: A dictionary containing the newly created dataset's details.
     :rtype: dict
@@ -119,13 +122,12 @@ async def delete_dataset_route(dataset_id: str, user=Depends(editor_user)):
 
     :param dataset_id: The unique identifier of the dataset.
     :type dataset_id: str
-    :param user: The current authenticated user with editor permissions, defaults to Depends(editor_user).
+    :param user: The current authenticated user with editor permissions, defaults to
+                 Depends(editor_user).
     :type user: User, optional
     :return: A dictionary confirming deletion (if applicable).
     :rtype: dict or None
     """
     # Check if locked dataset - only owners can delete
     await locked_access(user, Dataset, dataset_id, min_role="owner")
-    return await delete_dataset(
-        dataset_id=dataset_id, independent_transaction=True
-    )
+    return await delete_dataset(dataset_id=dataset_id, independent_transaction=True)

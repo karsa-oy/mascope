@@ -35,7 +35,8 @@ async def get_datasets(
     limit: int | None = None,
 ) -> dict:
     """
-    Retrieves a paginated list of datasets, optionally sorted by a specified column in either ascending or descending order.
+    Retrieves a paginated list of datasets, optionally sorted by a specified column in
+    either ascending or descending order.
 
     Steps:
     1. Construct a SQLAlchemy query to select all datasets.
@@ -46,13 +47,16 @@ async def get_datasets(
 
     :param dataset_name: Filter datasets by name, defaults to None
     :type dataset_name: str | None, optional
-    :param dataset_type: Filter datasets by type (ACQUISITION or ANALYSIS), defaults to None
+    :param dataset_type: Filter datasets by type (ACQUISITION or ANALYSIS), defaults to
+                         None
     :type dataset_type: list[str] | None, optional
-    :param instrument: Filter datasets by instrument associated with the dataset, defaults to None
+    :param instrument: Filter datasets by instrument associated with the dataset,
+                       defaults to None
     :type instrument: list[str] | None, optional
     :param sort: Column to sort by, defaults to "dataset_utc_created"
     :type sort: str, optional
-    :param order: Sorting order ('asc' for ascending, 'desc' for descending), defaults to "asc"
+    :param order: Sorting order ('asc' for ascending, 'desc' for descending),
+                  defaults to "asc"
     :type order: str, optional
     :param page: Page number for pagination, defaults to None (no pagination).
     :type page: int | None, optional
@@ -103,8 +107,7 @@ async def get_datasets(
         "message": "Datasets retrieved successfully",
         "results": total,
         "data": [
-            DatasetRead.model_validate(dataset).model_dump()
-            for dataset in datasets
+            DatasetRead.model_validate(dataset).model_dump() for dataset in datasets
         ],
     }
 
@@ -156,7 +159,8 @@ async def create_dataset(
 
     :param dataset: Dataset creation details from the request body.
     :type dataset: DatasetCreate
-    :param independent_transaction: Flag to indicate if the operation should be treated as an independent transaction, defaults to False.
+    :param independent_transaction: Flag to indicate if the operation should be treated
+                                    as an independent transaction, defaults to False.
     :type independent_transaction: bool, optional
     :return: The created dataset's details.
     :rtype: dict
@@ -203,7 +207,8 @@ async def update_dataset(
     independent_transaction: bool = False,
 ) -> dict:
     """
-    Updates an existing dataset with new data provided in the dataset update request body.
+    Updates an existing dataset with new data provided in the dataset update request
+    body.
 
     Steps:
     1. Fetch the existing dataset by its ID from the database.
@@ -216,7 +221,8 @@ async def update_dataset(
     :type dataset_id: str
     :param dataset_update: The new data for the dataset update.
     :type dataset_update: DatasetUpdate
-    :param independent_transaction: Flag indicating if operation is independent transaction, defaults to False.
+    :param independent_transaction: Flag indicating if operation is independent
+                                    transaction, defaults to False.
     :type independent_transaction: bool, optional
     :raises NotFoundException: If no dataset is found with the provided ID.
     :return: The updated dataset data as a dictionary.
@@ -237,10 +243,16 @@ async def update_dataset(
             new_name = update_data.get("dataset_name", None)
             instrument = existing_dataset.instrument
 
+            if instrument is None:
+                raise ValueError(
+                    "Acquisition dataset must have an associated instrument."
+                )
+
             if new_name and not new_name.lower().endswith(instrument.lower()):
                 raise ValueError(
                     f"Acquisition dataset name should end with the instrument name. "
-                    f"Suggested: '{dataset_config.ACQUISITION_NAME_PREFIX} {instrument}'"
+                    "Suggested: "
+                    f"{dataset_config.ACQUISITION_NAME_PREFIX} {instrument}"
                 )
 
         # Step 3: Update the dataset properties
@@ -278,12 +290,14 @@ async def delete_dataset(
 
     Steps:
     1. Fetch the dataset by its ID from the database.
-    2. If the dataset is found, delete it from the session and commit the changes to the database.
+    2. If the dataset is found, delete it from the session and commit the changes to
+       the database.
     3. Emit socket.io events to inform clients about the dataset deletion.
 
     :param dataset_id: The unique identifier of the dataset to delete.
     :type dataset_id: str
-    :param independent_transaction: Flag indicating if operation is independent transaction, defaults to False.
+    :param independent_transaction: Flag indicating if operation is independent
+                                    transaction, defaults to False.
     :type independent_transaction: bool, optional
     :raises NotFoundException: If no dataset is found with the provided ID.
     """
