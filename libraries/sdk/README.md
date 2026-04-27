@@ -413,7 +413,7 @@ if ts is not None:
 
 | Old API                                                       | New API                                               |
 | ------------------------------------------------------------- | ----------------------------------------------------- |
-| `get_datasets(url, token)`                                    | `mascope.datasets.list()`                             |
+| `get_workspaces(url, token)`                                  | `mascope.datasets.list()`                             |
 | `get_sample_batches(url, token, ws_id)`                       | `mascope.batches.list("Dataset Name")`                |
 | `get_samples(url, token, batch_id)`                           | `mascope.samples.list(batch="Batch Name")`            |
 | `get_sample(url, token, sample_id)`                           | `mascope.samples.get(sample_id)`                      |
