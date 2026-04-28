@@ -1,26 +1,33 @@
 import pandas as pd
 
-from mascope_tools.composition.finder import assign_compositions
+from mascope_tools.composition import (
+    CompositionSearchConfig,
+    HeuristicFilterConfig,
+    assign_compositions,
+)
 
 from .data_extractor import DataExtractor
 
 
 class CompositionMap:
     def __init__(
-        self, data: DataExtractor, composition_params: dict, heuristic_params: dict
+        self,
+        data: DataExtractor,
+        composition_config: CompositionSearchConfig,
+        heuristic_config: HeuristicFilterConfig,
     ):
         """Computes compositions for ms2 averaged peaks/centroids
 
         :param data: DataExtractor object containing the MS2 spectra and parent peaks
         :type data: DataExtractor
-        :param composition_params: Parameters for composition assignment
-        :type composition_params: dict
-        :param heuristic_params: Additional heuristic parameters for composition assignment
-        :type heuristic_params: dict
+        :param composition_config: Parameters for composition assignment
+        :type composition_config: CompositionSearchConfig
+        :param heuristic_config: Additional heuristic parameters for composition assignment
+        :type heuristic_config: HeuristicFilterConfig
         """
         self._data = data
-        self._composition_params = composition_params
-        self._heuristic_params = heuristic_params
+        self._composition_config = composition_config
+        self._heuristic_config = heuristic_config
 
         self.matches = {}
         for pp in data.parent_peaks:
@@ -30,8 +37,8 @@ class CompositionMap:
 
             assigned_peaks, _ = assign_compositions(
                 ms2_peak_df,
-                self._composition_params.copy(),
-                self._heuristic_params.copy(),
+                self._composition_config,
+                self._heuristic_config,
             )
 
             assigned_peaks = ms2_peak_df[["mz"]].merge(
