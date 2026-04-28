@@ -1,7 +1,9 @@
+import pandas as pd
 import pytest
 
 from mascope_tools.composition.exceptions import CompositionFinderException
-from mascope_tools.composition.finder import replace_atom_with_isotope
+from mascope_tools.composition.finder import assign_compositions, replace_atom_with_isotope
+from mascope_tools.composition.models import CompositionSearchConfig
 from mascope_tools.composition.utils import (
     combine_formula_and_ionization,
     parse_atom_count_ranges,
@@ -62,6 +64,27 @@ def test_parse_atom_count_ranges_rejects_legacy_element_first_isotopes():
 def test_parse_atom_count_ranges_rejects_malformed_tokens():
     with pytest.raises(CompositionFinderException, match="Invalid element count range"):
         parse_atom_count_ranges("C0-50 [15]0-1")
+
+
+def test_assign_compositions_no_matches():
+    """assign_compositions should not raise when no peaks match any composition."""
+    # Use m/z values far outside what C0-2 H0-2 can produce with H+ ionization
+    peaks = pd.DataFrame({"mz": [9999.0, 9998.0], "intensity": [100.0, 100.0]})
+    config = CompositionSearchConfig(
+        ionizations="H+",
+        element_count_ranges="C0-2 H0-2",
+        mass_range_ppm=5.0,
+    )
+    matches, log_messages = assign_compositions(peaks, config)
+
+    assert isinstance(matches, pd.DataFrame)
+    assert len(matches) == 2
+    assert "mz" in matches.columns
+    assert "formula" in matches.columns
+    assert "ion" in matches.columns
+    assert "isotope_label" in matches.columns
+    assert (matches["formula"] == "---").all()
+    assert (matches["ion"] == "---").all()
 
 
 def test_to_hill_order_places_isotopes_first():

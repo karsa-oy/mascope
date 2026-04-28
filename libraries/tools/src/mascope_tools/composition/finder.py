@@ -131,14 +131,19 @@ def assign_compositions(
 
     matches = pd.DataFrame(results_per_peak)
     # --- Format results --- #
-    matches = matches.sort_values(by=["mz", "mz_error_ppm"])
+    sort_by = [c for c in ["mz", "mz_error_ppm"] if c in matches.columns]
+    matches = matches.sort_values(by=sort_by)
     # Drop duplicate m/z entries, keeping the one with the lowest mz_error_ppm
     matches = matches.drop_duplicates(subset=["mz"], keep="first")
     matches = sort_matches_by_formula(matches)
     # Add isotope label to ion string
     matches = update_ion_with_isotope_label(matches)
     # Show mz, formula, ion, isotope_label and then all other columns
-    first_columns = ["mz", "formula", "ion", "isotope_label", "ionization_mechanism"]
+    first_columns = [
+        c
+        for c in ["mz", "formula", "ion", "isotope_label", "ionization_mechanism"]
+        if c in matches.columns
+    ]
     cols = first_columns + [col for col in matches.columns if col not in first_columns]
     matches = matches[cols].reset_index(drop=True)
 
