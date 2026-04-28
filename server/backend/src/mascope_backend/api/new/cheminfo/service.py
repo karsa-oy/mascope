@@ -31,7 +31,7 @@ from mascope_tools.composition.utils import (
 
 
 @api_controller()
-async def retrieve_cheminfo_by_mz(
+async def retrieve_compositions_by_mz(
     mz: float,
     ionization_mechanism_ids: list[str],
     mz_precision: float = cheminfo_config.DEFAULT_MZ_PRECISION,
@@ -184,7 +184,7 @@ async def retrieve_cheminfo_by_mz(
     success_notification_rooms=["user_id"],
     error_notification_rooms=["user_id"],
 )
-async def match_cheminfo_by_mz(
+async def match_compositions_by_mz(
     sample_item_id: str,
     mz: float,
     mz_precision: float = 30,
@@ -244,7 +244,7 @@ async def match_cheminfo_by_mz(
     """
     # Get composition data
     runtime.logger.info(f"Starting composition search for m/z {mz}")
-    cheminfo_result = await retrieve_cheminfo_by_mz(
+    cheminfo_result = await retrieve_compositions_by_mz(
         mz=mz,
         ionization_mechanism_ids=ionization_mechanism_ids,
         mz_precision=mz_precision,

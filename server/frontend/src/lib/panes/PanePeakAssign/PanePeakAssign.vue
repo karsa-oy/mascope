@@ -89,7 +89,7 @@ const updateFormulaRange = () => {
 }
 
 // Set up notification handler for composition match results
-const notificationHandler = app.ui.notification.on('match_cheminfo_by_mz', (payload) => {
+const notificationHandler = app.ui.notification.on('match_compositions_by_mz', (payload) => {
   if (payload.status === 'error') {
     loading.value = false
     return
@@ -201,7 +201,7 @@ watchDebounced(
       },
       {
         use: 'read',
-        type: 'match_cheminfo_by_mz'
+        type: 'match_compositions_by_mz'
       }
     )
   },

@@ -7,8 +7,8 @@ from mascope_backend.api.new.cheminfo.schema import (
     CheminfoQueryBody,
 )
 from mascope_backend.api.new.cheminfo.service import (
-    match_cheminfo_by_mz,
-    retrieve_cheminfo_by_mz,
+    match_compositions_by_mz,
+    retrieve_compositions_by_mz,
 )
 from mascope_backend.db.id import gen_id
 
@@ -18,7 +18,7 @@ cheminfo_router = APIRouter(prefix="/api/cheminfo", tags=["cheminfo"])
 
 @cheminfo_router.post("/mz/query")
 @api_route(token_access=True)
-async def retrieve_cheminfo_by_mz_route(
+async def retrieve_compositions_by_mz_route(
     body: CheminfoQueryBody, user=Depends(guest_user)
 ) -> dict:
     """
@@ -33,12 +33,12 @@ async def retrieve_cheminfo_by_mz_route(
     :return: List of potential molecular formulas matching the m/z value
     :rtype: dict
     """
-    return await retrieve_cheminfo_by_mz(**body.model_dump())
+    return await retrieve_compositions_by_mz(**body.model_dump())
 
 
 @cheminfo_router.post("/mz/match/sample/{sample_item_id}")
 @api_route(status_code=202)
-async def match_cheminfo_mz_route(
+async def match_compositions_by_mz_route(
     sample_item_id: str,
     body: CheminfoMatchedQueryBody,
     background_tasks: BackgroundTasks,
@@ -59,7 +59,7 @@ async def match_cheminfo_mz_route(
 
     # Add background task for processing
     background_tasks.add_task(
-        match_cheminfo_by_mz,
+        match_compositions_by_mz,
         sample_item_id=sample_item_id,
         mz=body.mz,
         mz_precision=body.mz_precision,

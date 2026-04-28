@@ -5,7 +5,7 @@ Unit tests for the cheminfo service functions.
 import pytest
 
 from mascope_backend.api.new.cheminfo.service import (
-    retrieve_cheminfo_by_mz,
+    retrieve_compositions_by_mz,
 )
 
 
@@ -46,19 +46,19 @@ def assert_cheminfo_result_row_format(result: dict):
     ],
 )
 @pytest.mark.asyncio
-async def test_retrieve_cheminfo_by_mz(
+async def test_retrieve_compositions_by_mz(
     mz, expected_formula, formula_ranges_addition, cheminfo_query_data: dict
 ):
-    """Test retrieving cheminfo data by m/z values for basic list.
+    """Test retrieving composition data by m/z values for basic list.
 
-    This test checks that the cheminfo service can retrieve data for a list of m/z values,
+    This test checks that the composition search service can retrieve data for a list of m/z values,
     validates the result format, and ensures that the expected formulae are present in the results.
     """
     cheminfo_query_data["mz"] = mz
     cheminfo_query_data["formula_ranges"] = (
         f"{cheminfo_query_data['formula_ranges']} {formula_ranges_addition}"
     )
-    result = await retrieve_cheminfo_by_mz(**cheminfo_query_data)
+    result = await retrieve_compositions_by_mz(**cheminfo_query_data)
     assert_cheminfo_query_result_format(result)
 
     result_formulae = []
