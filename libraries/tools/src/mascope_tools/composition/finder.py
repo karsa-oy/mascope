@@ -59,6 +59,19 @@ def assign_compositions(
     peaks_to_match = peaks_df.filter(
         pl.col("intensity") >= config.peak_height_threshold
     )
+    if peaks_to_match.is_empty():
+        warnings.warn(
+            "No peaks above the intensity threshold. Returning empty results.",
+            CompositionFinderWarning,
+        )
+        peaks_df = peaks_df.with_columns(
+            formula=pl.lit("---"),
+            ion=pl.lit("---"),
+            isotope_label=pl.lit("---"),
+            other_candidates=pl.lit(""),
+        )
+        return peaks_df.to_pandas(), {}
+
     peaks_to_match = peaks_to_match.sort("mz")
 
     mzs = peaks_to_match["mz"].to_numpy()
