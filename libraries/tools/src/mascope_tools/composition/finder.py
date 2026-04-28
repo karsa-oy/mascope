@@ -184,11 +184,12 @@ def find_compositions(target_mz: float, config: CompositionSearchConfig) -> list
         if abs(required_neutral_mass) <= mz_tolerance_da:
             ion_charge = "+" if ionization_mechanism.charge > 0 else "-"
             ion_formula = ionization_mechanism.formula + ion_charge
+            compositions_error_ppm = abs(target_mz - ion_shift) / target_mz * 1e6
             all_results.append(
                 Result(
-                    formula="Ionization peak",
+                    formula="()",
                     neutral_mass=0.0,
-                    composition_error_ppm=0.0,
+                    composition_error_ppm=compositions_error_ppm,
                     unsaturation=None,
                     ion=ion_formula,
                     ionization_mechanism=ionization_mechanism.mascope_notation,

@@ -22,8 +22,6 @@ def _normalize_formula(formula: str) -> str:
     """Normalize formulas for cross-system comparisons."""
     if formula is None or formula == "":
         return "()"
-    if formula == "Ionization peak":
-        return "()"
 
     custom_formula = to_custom_element_format(formula)
     normalized_formula = normalize_formula_with_isotopes(custom_formula)

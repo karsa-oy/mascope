@@ -181,10 +181,10 @@ def apply_heuristic_rules(
         log_messages.append("No candidates provided for heuristic filtering.")
         return [], log_messages
 
-    if "Ionization peak" in candidates_df.get_column("formula").to_list():
+    if "()" in candidates_df.get_column("formula").to_list():
         # Skip all rules for ionization peaks
         return (
-            candidates_df.filter(pl.col("formula") == "Ionization peak").to_dicts(),
+            candidates_df.filter(pl.col("formula") == "()").to_dicts(),
             log_messages,
         )
 
@@ -231,7 +231,7 @@ def match_isotopic_pattern(
     )
 
     # If ionization peak: skip isotopic matching and return score 1.0
-    if "Ionization peak" in candidates_df.get_column("formula").to_list():
+    if "()" in candidates_df.get_column("formula").to_list():
         candidates_df = candidates_df.with_columns(
             pl.lit(1.0, dtype=pl.Float64).alias("isotopic_pattern_score")
         )
