@@ -280,7 +280,11 @@ def create_instrument_config_db_record(
     # Construct the request body based on the function parameters
     utc_offset = timedelta(seconds=int(sample_file_props.utc_offset))
     date = sample_file_props.timestamp
-    date_utc = (datetime.fromisoformat(date) - utc_offset).isoformat()
+    date_utc = (
+        (datetime.fromisoformat(date) - utc_offset)
+        .replace(tzinfo=timezone.utc)
+        .isoformat()
+    )
 
     data = {
         "instrument": get_instrument_name(sample_file_props.filename),
