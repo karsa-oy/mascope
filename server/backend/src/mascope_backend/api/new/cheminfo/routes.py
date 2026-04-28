@@ -66,8 +66,6 @@ async def match_compositions_by_mz_route(
         formula_ranges=body.formula_ranges,
         ionization_mechanism_ids=body.ionization_mechanism_ids,
         match_params=body.match_params,
-        sort=body.sort,
-        order=body.order,
         independent_transaction=True,
         user_id=user.id,
         process_id=process_id,

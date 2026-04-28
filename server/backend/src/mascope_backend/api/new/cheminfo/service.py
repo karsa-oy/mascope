@@ -36,8 +36,6 @@ async def retrieve_compositions_by_mz(
     ionization_mechanism_ids: list[str],
     mz_precision: float = cheminfo_config.DEFAULT_MZ_PRECISION,
     formula_ranges: str = cheminfo_config.DEFAULT_FORMULA_RANGE,
-    sort: None | str = None,
-    order: None | str = None,
 ) -> dict:
     """
     Find molecular compositions for a given m/z value using Mascope Tools.
@@ -50,7 +48,6 @@ async def retrieve_compositions_by_mz(
     - Map results to the expected response format
       + Explicit isotope formats in formulas are reverted back to custom element format
         e.g. "[15N]" to "^N"
-    - Apply sorting
 
     NOTE: Conversion between custom element notation and explicit isotope notation is only a
     best guess. E.g. "[15N]" will always be converted to "^N" even if the user intended to refer to
@@ -64,10 +61,6 @@ async def retrieve_compositions_by_mz(
     :type formula_ranges: str
     :param ionization_mechanism_ids: List of ionization mechanism IDs to query against
     :type ionization_mechanism_ids: None | list[str]
-    :param sort: Field to sort results by
-    :type sort: None | str
-    :param order: Sort order ('asc' or 'desc')
-    :type order: None | str
     :return: Metadata and a result array of records containing the following fields:
         - target_compound_formula
         - target_compound_unsaturation
@@ -162,21 +155,13 @@ async def retrieve_compositions_by_mz(
             # Skip malformed results rather than failing
             continue
 
-    # Apply sorting
-    total_results = len(results)
-
-    # Apply sorting if requested
-    sorted_results = results
-    if sort and all(sort in item for item in results):
-        reverse = order.lower() == "desc"
-        sorted_results.sort(key=lambda x: x.get(sort, 0), reverse=reverse)
-
     # Return formatted response
+    total_results = len(results)
     return {
-        "message": f"Retrieved {len(sorted_results)} composition results for m/z query",
-        "results": len(sorted_results),
+        "message": f"Retrieved {total_results} composition results for m/z query",
+        "results": total_results,
         "total": total_results,
-        "data": sorted_results,
+        "data": results,
     }
 
 
@@ -191,8 +176,6 @@ async def match_compositions_by_mz(
     formula_ranges: str | None = "C0-100 H0-100 O0-100 N0-100",
     ionization_mechanism_ids: list[str] | None = None,
     match_params: BaseMatchParams | None = None,
-    sort: None | str = None,
-    order: None | str = "asc",
     independent_transaction: bool = False,
     user_id: None | int = None,
     process_id: None | str = None,
@@ -222,10 +205,6 @@ async def match_compositions_by_mz(
     :type ionization_mechanism_ids: None | list[str]
     :param match_params: Parameters for customizing the matching algorithm
     :type match_params: None | BaseMatchParams
-    :param sort: Field to sort results by
-    :type sort: None | str
-    :param order: Sort order ('asc' or 'desc')
-    :type order: None | str
     :param independent_transaction: Whether this is an independent transaction
     :type independent_transaction: bool
     :param user_id: Current user triggered operation (for user notifications)
@@ -249,8 +228,6 @@ async def match_compositions_by_mz(
         ionization_mechanism_ids=ionization_mechanism_ids,
         mz_precision=mz_precision,
         formula_ranges=formula_ranges,
-        sort=sort,
-        order=order,
     )
 
     cheminfo_data = cheminfo_result.get("data", [])

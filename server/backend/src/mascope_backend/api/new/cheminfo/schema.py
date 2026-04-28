@@ -17,14 +17,6 @@ class CheminfoQueryBody(BaseModel):
     ionization_mechanism_ids: list[str] = Field(
         ..., description="The ionization mechanism IDs to query against"
     )
-    sort: None | str = Field(
-        None,
-        description="The field to sort results by, should be one of the fields in the result data structure",
-    )
-    order: None | str = Field(
-        None,
-        description="Sort order: 'asc' for ascending or 'desc' for descending",
-    )
 
 
 class CheminfoMatchedQueryBody(CheminfoQueryBody):
