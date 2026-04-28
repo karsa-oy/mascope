@@ -11,6 +11,7 @@ for the distinction from Alembic schema migrations.
 
 import importlib
 import importlib.util
+import os
 import subprocess
 from pathlib import Path
 from typing import Annotated
@@ -26,6 +27,10 @@ prod_db_scripts_app = typer.Typer()
 _MODE = "prod"
 _SCRIPTS_MODULE = "mascope_backend.db.scripts"
 _PYTHON = "/root/.local/share/uv/tools/mascope/bin/python"
+
+# Environment variables forwarded from the host into the backend container
+# when running scripts via `docker exec -e`.
+_FORWARDED_ENV_VARS = ["MIN_DATETIME"]
 
 
 def _discover_scripts() -> dict[str, str]:
@@ -147,8 +152,15 @@ def run_script(
     backend_container = runtime.full_config.backend.get_backend_container_name(_MODE)
     runtime.logger.info(f"Running in '{backend_container}': {module}")
 
+    # Forward selected host env vars into the container
+    env_args: list[str] = []
+    for var in _FORWARDED_ENV_VARS:
+        val = os.environ.get(var)
+        if val is not None:
+            env_args += ["-e", f"{var}={val}"]
+
     result = subprocess.run(
-        ["docker", "exec", backend_container, _PYTHON, "-m", module],
+        ["docker", "exec", *env_args, backend_container, _PYTHON, "-m", module],
         check=False,
     )
 
