@@ -98,6 +98,15 @@ def run_script(
 
     Takes an automatic pre-execution backup before running.
 
+    Some scripts accept configuration via environment variables.
+    For example, to pass MIN_DATETIME:
+
+    \b
+    Linux / macOS:
+        MIN_DATETIME=2025-06-01T00:00:00 mascope dev db script run <script>
+    Windows PowerShell:
+        $env:MIN_DATETIME="2025-06-01T00:00:00"; mascope dev db script run <script>
+
     \b
     Examples:
         mascope dev db script run populate_none_instrument_function_ids
