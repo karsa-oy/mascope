@@ -88,7 +88,7 @@ const updateFormulaRange = () => {
   }
 }
 
-// Set up notification handler for ChemInfo match results
+// Set up notification handler for composition match results
 const notificationHandler = app.ui.notification.on('match_cheminfo_by_mz', (payload) => {
   if (payload.status === 'error') {
     loading.value = false

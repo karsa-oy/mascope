@@ -1,5 +1,5 @@
 """
-Utility functions for working with the ChemInfo API.
+Utility functions for cheminfo composition search.
 """
 
 import re
@@ -9,7 +9,7 @@ import mascope_molmass
 
 def to_cheminfo_ionization_format(ionization: str) -> str:
     """
-    Convert Mascope ionization mechanism format to ChemInfo API format.
+    Convert Mascope ionization mechanism format to composition finder ionization format.
 
     Mascope ionization mechanisms are defined in the format:
         <modification operation><modification formula><polarity of modification>
@@ -20,7 +20,7 @@ def to_cheminfo_ionization_format(ionization: str) -> str:
         Therefore the polarity of the resulting ion for operation "+" is the same as the polarity of the modification,
         and for operation "-" it is the opposite.
 
-    The ChemInfo API accepts ionizations in the format:
+    The composition finder accepts ionizations in the format:
         <polarity>(<modification formula>)<modification operation>
     where:
     - "polarity" is the charge polarity of the resulting ion ("+" or "-")
@@ -28,14 +28,14 @@ def to_cheminfo_ionization_format(ionization: str) -> str:
     - "modification operation" is either "-1" for subtraction or "" (empty string) for addition.
 
     Examples how Mascope ionization mechanisms get converted:
-    - "+H+" (Mascope) becomes "+(H)" (ChemInfo)
-    - "+Cl-" (Mascope) becomes "-(Cl)" (ChemInfo)
-    - "+" (Mascope) becomes "+()" (ChemInfo)
-    - "-H+" (Mascope) becomes "-(H)-1" (ChemInfo)
+    - "+H+" (Mascope) becomes "+(H)" (composition finder)
+    - "+Cl-" (Mascope) becomes "-(Cl)" (composition finder)
+    - "+" (Mascope) becomes "+()" (composition finder)
+    - "-H+" (Mascope) becomes "-(H)-1" (composition finder)
 
     :param ionization: Ionization mechanism string in Mascope format
     :type ionization: str
-    :return: Ionization string formatted for ChemInfo API
+    :return: Ionization string formatted for composition finder
     :rtype: str
     """
     if len(ionization) == 1:
@@ -52,7 +52,7 @@ def to_cheminfo_ionization_format(ionization: str) -> str:
     polarity = (
         mod_polarity if ionization[0] == "+" else ("-" if mod_polarity == "+" else "+")
     )
-    # Strip custom element notation from body for ChemInfo API
+    # Strip custom element notation from body for composition finder
     body, _ = to_explicit_isotope_format(body)
 
     return f"{polarity}({body}){operation}"
@@ -130,16 +130,16 @@ def to_explicit_isotope_format(formula_ranges: str) -> str:
 
 def to_mascope_ion_mech(ionization: str, all_ionization_mechanisms: list) -> dict:
     """
-    Convert ChemInfo API ionization format back to Mascope format and find the matching mechanism.
+    Convert composition finder ionization format back to Mascope format and find the matching mechanism.
 
-    The ChemInfo API returns ionizations in formats like:
+    The composition finder returns ionizations in formats like:
     - "+(H)+" for protonation
     - "(-1)(H)-1" for deprotonation
 
     This function parses this format and finds the matching ionization mechanism in provided
     Mascope database ionization mechanisms.
 
-    :param ionization: Ionization string in ChemInfo format
+    :param ionization: Ionization string in composition finder format
     :type ionization: str
     :param all_ionization_mechanisms: List of ionization mechanisms from the database
     :type all_ionization_mechanisms: List[IonizationMechanism]
@@ -152,7 +152,7 @@ def to_mascope_ion_mech(ionization: str, all_ionization_mechanisms: list) -> dic
     match = re.search(pattern, ionization)
 
     if not match:
-        raise ValueError(f"Invalid ionization format from ChemInfo: {ionization}")
+        raise ValueError(f"Invalid ionization format: {ionization}")
 
     polarity = "-" if match.group(1) == "(-1)" else "+"
     body = match.group(2) or ""

@@ -5,7 +5,7 @@ from mascope_match.params import BaseMatchParams
 
 
 class CheminfoQueryBody(BaseModel):
-    mz: float = Field(..., description="The m/z value to query ChemInfo for")
+    mz: float = Field(..., description="The m/z value to search compositions for")
     mz_precision: float = Field(
         cheminfo_config.DEFAULT_MZ_PRECISION,
         description="The precision (tolerance in ppm) for m/z matching, i.e. the query returns matches between m/z +/- m/z precision",

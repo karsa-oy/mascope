@@ -173,7 +173,7 @@ async def retrieve_cheminfo_by_mz(
 
     # Return formatted response
     return {
-        "message": f"Retrieved {len(sorted_results)} m/z query results from ChemInfo",
+        "message": f"Retrieved {len(sorted_results)} composition results for m/z query",
         "results": len(sorted_results),
         "total": total_results,
         "data": sorted_results,
@@ -199,11 +199,11 @@ async def match_cheminfo_by_mz(
     parent_id: None | str = None,
 ) -> dict:
     """
-    Match a specific m/z value against molecular structures from ChemInfo and compute potential
-    match data for specified sample.
+    Find molecular compositions for a given m/z value and compute potential
+    match data for a specified sample.
 
     Steps:
-    - Query ChemInfo for compounds matching the m/z value
+    - Find compositions matching the m/z value using Mascope Tools
     - Match these compounds against a specified sample
     - Combine and format the results
 
@@ -242,8 +242,8 @@ async def match_cheminfo_by_mz(
         - target_isotope_mz_error_ppm
     :rtype: dict
     """
-    # Get ChemInfo data
-    runtime.logger.info(f"Starting ChemInfo query for m/z {mz}")
+    # Get composition data
+    runtime.logger.info(f"Starting composition search for m/z {mz}")
     cheminfo_result = await retrieve_cheminfo_by_mz(
         mz=mz,
         ionization_mechanism_ids=ionization_mechanism_ids,
@@ -257,10 +257,10 @@ async def match_cheminfo_by_mz(
     cheminfo_results = cheminfo_result.get("results", 0)
     cheminfo_total = cheminfo_result.get("total", 0)
 
-    # Return early if no ChemInfo data
+    # Return early if no composition data
     if not cheminfo_data:
         return {
-            "message": "No matching compositions found by ChemInfo for the specified m/z and parameters.",
+            "message": "No matching compositions found for the specified m/z and parameters.",
             "results": 0,
             "total": 0,
             "data": [],
@@ -275,9 +275,9 @@ async def match_cheminfo_by_mz(
         f"Matching {cheminfo_results} compounds against sample {sample_item_id}"
     )
 
-    # Compute matches for the ChemInfo results
-    ## Matches are computed for all ionization mechanisms for each returned formula
-    ## and later filtered to keep only the one matching the original ChemInfo result
+    # Compute matches for the composition results
+    # Matches are computed for all ionization mechanisms for each returned formula
+    # and later filtered to keep only the one matching the original composition result
     matches_result = await aggregate_sample_match_compounds(
         sample_item_id=sample_item_id,
         target_compound_formulas=[
@@ -292,7 +292,7 @@ async def match_cheminfo_by_mz(
     # Combine results data with cheminfo data
     data = []
     for info in cheminfo_data:
-        # Find match data for the current ChemInfo result
+        # Find match data for the current composition finder result
         match_index = next(
             (
                 index
@@ -305,17 +305,17 @@ async def match_cheminfo_by_mz(
         if match_index is None:
             runtime.logger.warning(
                 (
-                    "Match data not found for ChemInfo result: ",
+                    "Match data not found for composition result: ",
                     f"{info['target_compound_formula']}",
                 )
             )
-            runtime.logger.debug(f"ChemInfo result: {info}")
-            # Skip this ChemInfo result if no match found
+            runtime.logger.debug(f"Composition result: {info}")
+            # Skip this composition result if no match found
             continue
         match_compound = matches[match_index]
 
         # Iterate over match ions to find the one that matches the ionization mechanism
-        # of the current ChemInfo result
+        # of the current composition result
         for match_ion in match_compound.get("children", []):
             match_ion.update(
                 {"target_compound_formula": info["target_compound_formula"]}
@@ -327,10 +327,10 @@ async def match_cheminfo_by_mz(
                 == info_ionization_mechanism["ionization_mechanism_id"]
             ):
                 match_isotopes = match_ion.get("children", [])
-                # Make sure the matched peak is the one in the original ChemInfo result
+                # Make sure the matched peak is the one in the original composition result
                 # This is important because when computing matches, the closest peak
                 # to target m/z is selected, which may not be the same as the one used in
-                # the ChemInfo query.
+                # the composition search.
                 match_mzs = [iso["sample_peak_mz"] for iso in match_isotopes]
                 if info["sample_peak_mz"] not in match_mzs:
                     runtime.logger.debug(
@@ -355,9 +355,7 @@ async def match_cheminfo_by_mz(
         "total": cheminfo_total,
         "data": data,
     }
-    message = (
-        f"Matched {len(data)} potential compounds with m/z {mz:.4f} from ChemInfo."
-    )
+    message = f"Matched {len(data)} potential compounds with m/z {mz:.4f}."
     runtime.logger.info(message)
     return {
         "message": message,

@@ -1,5 +1,5 @@
 """
-Configuration settings for ChemInfo API integration.
+Configuration settings for composition search (cheminfo).
 """
 
 from pydantic import BaseModel
@@ -7,13 +7,13 @@ from pydantic import BaseModel
 
 class ChemInfoConfig(BaseModel):
     """
-    Configuration settings for the ChemInfo API integration.
+    Configuration settings for composition search (cheminfo).
     """
 
-    # Base URL for the ChemInfo API
+    # Base URL for the ChemInfo website (kept for reference)
     BASE_URL: str = "https://info.cheminfo.org"
 
-    # Timeout in seconds for HTTP requests to ChemInfo API
+    # Timeout in seconds for HTTP requests (legacy, kept for reference)
     REQUEST_TIMEOUT: float = 10.0
 
     # Default precision for m/z matching in ppm
@@ -26,5 +26,5 @@ class ChemInfoConfig(BaseModel):
     DEBOUNCE_DELAY_MS: int = 800
 
 
-# Global config instance for ChemInfo integration
+# Global config instance for composition search (cheminfo)
 cheminfo_config = ChemInfoConfig()

@@ -22,9 +22,9 @@ async def retrieve_cheminfo_by_mz_route(
     body: CheminfoQueryBody, user=Depends(guest_user)
 ) -> dict:
     """
-    Query the ChemInfo database for molecular formulas matching a given m/z value.
+    Find molecular compositions matching a given m/z value.
 
-    This endpoint queries the external ChemInfo API to find potential molecular formulas
+    This endpoint uses Mascope Tools to find potential molecular formulas
     that match the provided m/z value within the specified precision. Results can be
     filtered by formula ranges and ionization mechanisms.
 
@@ -45,10 +45,10 @@ async def match_cheminfo_mz_route(
     user=Depends(guest_user),
 ) -> dict:
     """
-    Query the ChemInfo database by m/z and other optional parameters.
+    Find and match molecular compositions for a given m/z value.
 
-    This endpoint first queries the ChemInfo database for potential molecular formulas
-    matching the given m/z, then matches these formulas against a specific sample.
+    This endpoint finds potential molecular formulas matching the given m/z
+    using Mascope Tools, then matches these formulas against a specific sample.
 
     :param body: request query options; the only required field is `mz`
     :type body: CheminfoQueryBody
