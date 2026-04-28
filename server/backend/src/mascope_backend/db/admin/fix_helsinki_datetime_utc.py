@@ -46,6 +46,7 @@ _HELSINKI_OFFSETS_SECONDS = [7200, 10800, 14400, 21600]
 
 async def fix_helsinki_datetime_utc(
     min_datetime: datetime | None = None,
+    utc_offset_hours: int = 0,
 ) -> dict:
     """Correct datetime_utc for sample_file rows affected by the Helsinki
     timezone bug.
@@ -57,6 +58,11 @@ async def fix_helsinki_datetime_utc(
     :param min_datetime: If set, only rows with ``datetime >= min_datetime``
         are considered.  Use this to skip legacy data where the Helsinki
         offset was intentional.
+    :param utc_offset_hours: The correct UTC offset in hours for the data
+        being fixed.  Defaults to 0 (client PCs in UTC).  For data
+        where the client PC is in a known timezone, pass the offset
+        (e.g. 2 for EET, 3 for EEST) so that
+        ``datetime_utc = datetime - utc_offset_hours``.
     :return: Summary ``{"affected": int, "updated": int, "previewed": list}``
     :rtype: dict
     """
@@ -69,6 +75,11 @@ async def fix_helsinki_datetime_utc(
             f"Applying cutoff: only rows with datetime >= {min_datetime.isoformat()}"
         )
 
+    # Correct UTC value: datetime minus the true client offset
+    offset_interval = f"'{utc_offset_hours} hours'"
+    corrected_expr = f"(datetime - INTERVAL {offset_interval}) AT TIME ZONE 'UTC'"
+    runtime.logger.info(f"Target UTC offset: {utc_offset_hours}h")
+
     async with async_session() as session:
         # --- Preview affected rows ---
         preview_result = await session.execute(
@@ -77,7 +88,7 @@ async def fix_helsinki_datetime_utc(
                        filename,
                        datetime,
                        datetime_utc,
-                       datetime AT TIME ZONE 'UTC' AS corrected_utc,
+                       {corrected_expr} AS corrected_utc,
                        EXTRACT(EPOCH FROM (
                            (datetime AT TIME ZONE 'UTC') - datetime_utc
                        ))::int AS offset_seconds
@@ -125,7 +136,7 @@ async def fix_helsinki_datetime_utc(
         update_result = await session.execute(
             text(f"""
                 UPDATE sample_file
-                SET datetime_utc = datetime AT TIME ZONE 'UTC'
+                SET datetime_utc = {corrected_expr}
                 WHERE EXTRACT(EPOCH FROM (
                           (datetime AT TIME ZONE 'UTC') - datetime_utc
                       ))::int = ANY(:offsets)

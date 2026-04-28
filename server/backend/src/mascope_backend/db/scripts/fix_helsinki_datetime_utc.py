@@ -24,6 +24,16 @@ Usage:
     # Windows PowerShell:
     $env:MIN_DATETIME="2025-06-01T00:00:00"; mascope dev db script run fix_helsinki_datetime_utc
 
+    # For a client PC with a known UTC offset (e.g. +2h):
+    UTC_OFFSET_HOURS=2 mascope dev db script run fix_helsinki_datetime_utc
+
+    # Combine both:
+    # Linux / macOS:
+    MIN_DATETIME=2025-06-01T00:00:00 UTC_OFFSET_HOURS=2 mascope dev db script run fix_helsinki_datetime_utc
+
+    # Windows PowerShell:
+    $env:MIN_DATETIME="2025-06-01T00:00:00"; $env:UTC_OFFSET_HOURS="2"; mascope dev db script run fix_helsinki_datetime_utc
+
 Date: 2026-04-28
 """
 
@@ -56,7 +66,12 @@ async def run() -> None:
     elif _MIN_DATETIME is not None:
         min_dt = datetime.fromisoformat(_MIN_DATETIME)
 
-    result = await fix_helsinki_datetime_utc(min_datetime=min_dt)
+    utc_offset_hours = int(os.environ.get("UTC_OFFSET_HOURS", "0"))
+
+    result = await fix_helsinki_datetime_utc(
+        min_datetime=min_dt,
+        utc_offset_hours=utc_offset_hours,
+    )
 
     runtime.logger.info("=" * 80)
     runtime.logger.info("FIX HELSINKI DATETIME_UTC COMPLETE")

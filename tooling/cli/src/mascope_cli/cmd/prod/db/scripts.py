@@ -30,7 +30,7 @@ _PYTHON = "/root/.local/share/uv/tools/mascope/bin/python"
 
 # Environment variables forwarded from the host into the backend container
 # when running scripts via `docker exec -e`.
-_FORWARDED_ENV_VARS = ["MIN_DATETIME"]
+_FORWARDED_ENV_VARS = ["MIN_DATETIME", "UTC_OFFSET_HOURS"]
 
 
 def _discover_scripts() -> dict[str, str]:
