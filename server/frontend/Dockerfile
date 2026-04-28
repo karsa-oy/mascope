@@ -14,7 +14,7 @@ RUN npm run build
 FROM nginx:1.27-alpine
 
 # set timezone
-ENV MASCOPE_TIMEZONE=Europe/Helsinki
+ENV MASCOPE_TIMEZONE=Etc/UTC
 RUN ln -snf /usr/share/zoneinfo/$MASCOPE_TIMEZONE /etc/localtime && echo $MASCOPE_TIMEZONE > /etc/timezone
 
 WORKDIR /app

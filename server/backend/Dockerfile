@@ -2,7 +2,7 @@ FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 
 # Environment setup
 ENV MASCOPE_PATH=/app
-ENV MASCOPE_TIMEZONE=Europe/Helsinki
+ENV MASCOPE_TIMEZONE=Etc/UTC
 ENV PATH=/root/.local/bin:$PATH
 RUN ln -snf /usr/share/zoneinfo/$MASCOPE_TIMEZONE /etc/localtime && echo $MASCOPE_TIMEZONE > /etc/timezone
 
