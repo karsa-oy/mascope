@@ -38,12 +38,6 @@ def _is_notebook():
         return False
 
 
-if _is_notebook():
-    from tqdm.notebook import tqdm
-else:
-    from tqdm import tqdm
-
-
 def assign_compositions(
     peaks: pd.DataFrame,
     config: CompositionSearchConfig,
@@ -70,7 +64,7 @@ def assign_compositions(
     mzs = peaks_to_match["mz"].to_numpy()
     results_per_peak, assigned_mzs, mass_log_messages = [], set(), {}
 
-    for mz in tqdm(mzs, desc="Assigning compositions..."):
+    for mz in mzs:
         if mz in assigned_mzs:
             continue
 
