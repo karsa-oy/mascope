@@ -5,7 +5,7 @@ This module provides functions to interact with the sample file database
 and filestore records via HTTP requests to the API service.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import requests
@@ -89,7 +89,11 @@ def create_sample_file_db_record(
 
     utc_offset = timedelta(seconds=int(data.utc_offset))
     date = data.timestamp
-    date_utc = (datetime.fromisoformat(date) - utc_offset).isoformat()
+    date_utc = (
+        (datetime.fromisoformat(date) - utc_offset)
+        .replace(tzinfo=timezone.utc)
+        .isoformat()
+    )
 
     sample_file_db_record = {
         "instrument_function_id": instrument_function_id,
