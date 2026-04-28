@@ -118,8 +118,8 @@ def _compose_env() -> dict[str, str]:
     else:
         # Windows uses a different timezone system than Linux/macOS; converting
         # from the Windows format proved difficult, and the app is deployed on
-        # Linux anyway, so a hardcoded value is good enough for now.
-        timezone = "Europe/Helsinki"
+        # Linux anyway, so Etc/UTC is a safe default.
+        timezone = "Etc/UTC"
 
     return dict(
         MASCOPE_ENV=runtime.env.name,
