@@ -25,7 +25,13 @@ This document is structured as follows:
   - [CLI development](#cli-development)
 - 🤖 **[Agents](#-agents)** - Python instrument agents
 - 📡 **[Backend](#-backend)** - Python API server
-  - [Backend database](#backend-database)
+  - [Backend tech](#backend-tech)
+  - [Multi-worker architecture](#multi-worker-architecture)
+  - [Backend API](#backend-api)
+  - [Backend auth](#backend-auth)
+  - [Backend app](#backend-app)
+  - [Backend file converter](#backend-file-converter)
+- 💾 **[Database](#-database)** - PostgreSQL setup, migrations and operations
   - [Schema migrations](#schema-migrations)
   - [Database management commands](#database-management-commands)
   - [PostgreSQL tuning reference](#postgresql-tuning-reference)
@@ -312,7 +318,7 @@ Running Mascope in `prod` mode requires the following "secrets" to be present in
 - `server_owner_secret_key.txt`: First owner registration private key (arbitrary string)
 
 > [!NOTE]
-> `postgres_password.txt` is also required for dev mode. See [Secrets](#secrets-1) under Backend Database for setup instructions.
+> `postgres_password.txt` is also required for dev mode. See [Secrets](#secrets-1) under Database for setup instructions.
 
 For testing the `prod` mode in local development environment, a self-signed SSL certificate can be generated using the script: `mascope cert gen`. The certificate as well as other secrets must be in place prior to building the containers.
 
@@ -327,8 +333,9 @@ the `mascope` [CLI](#cli). Mascope developers can use the CLI to select Mascope 
 these are folders containing the full state of a Mascope app (database, files, etc). Runtimes can be configured
 with a set of [configuration files](#runtime-config) global app options for libraries, servers, services and agents.
 
-The app can be run in two [modes](#runtime-modes): [dev](#dev-mode) and [prod](#prod-mode). Dev
-mode runs the app's modules with uv and Vite. Prod mode builds four docker containers: the backend, nginx reverse proxy serving the frontend bundle, the file converter, and redis.
+The app can be run in two [modes](#runtime-modes): [dev](#dev-mode) and [prod](#prod-mode). Dev mode runs the app's modules
+with uv and Vite. Prod mode starts the production Docker stack: `postgres`, redis, the `db_init` initialization step, the backend,
+nginx reverse proxy serving the frontend bundle, the file converter.
 
 ### Mascope path
 
@@ -757,22 +764,6 @@ Then restart the agent, and the correct config is loaded and the agent is ready 
 > [!IMPORTANT]
 > Windows prevents applications from writing into `Program Files` directory. Therefore, when testing the agent with TofDaq Recorder, its data directory must be outside `Program Files`.
 
-### Backend File Converter
-
-The file converter is an independent service responsible for transforming incoming sample files
-and recording corresponding metadata to the database.
-
-**Dev** — runs as a local module. Included by default in `mascope dev run` alongside `backend`
-and `frontend`. Can also be launched explicitly:
-
-```sh
-mascope dev run file-converter               # file-converter only
-mascope dev run backend file-converter       # backend + file-converter
-```
-
-**Prod** — runs as the `file_converter` container in `docker-compose.yaml`, started automatically
-with `mascope prod up`. No separate command needed.
-
 ## 📡 Backend
 
 ```sh
@@ -1093,7 +1084,23 @@ flowchart TB
 In production, multiple Uvicorn workers run behind [Nginx](https://nginx.org/en/docs/http/load_balancing.html) with sticky sessions (`ip_hash`).
 Redis coordinates Socket.IO events across workers via pub/sub and stores user sessions for cross-worker authentication.
 
-## Backend Database
+### Backend File Converter
+
+The file converter is an independent service responsible for transforming incoming sample files
+and recording corresponding metadata to the database.
+
+**Dev** — runs as a local module. Included by default in `mascope dev run` alongside `backend`
+and `frontend`. Can also be launched explicitly:
+
+```sh
+mascope dev run file-converter               # file-converter only
+mascope dev run backend file-converter       # backend + file-converter
+```
+
+**Prod** — runs as the `file_converter` container in `docker-compose.yaml`, started automatically
+with `mascope prod up`. No separate command needed.
+
+## 💾 Database
 
 Mascope uses **PostgreSQL 16** as its primary database, accessed via **SQLAlchemy 2.x** (async,
 `asyncpg` driver) for application code and **psycopg2** for Alembic migrations (standard Alembic
@@ -1170,6 +1177,8 @@ max_overflow = 2
 
 To check live connections: `mascope prod db cli` → `SELECT count(*) FROM pg_stat_activity;`
 
+---
+
 ### Schema migrations
 
 Schema is managed exclusively by Alembic. SQLAlchemy models are the source of truth - use
@@ -1198,6 +1207,8 @@ mascope dev migrate revision          # create a new revision (use --autogenerat
 **Prod** - the `db_init` container applies migrations automatically on every `mascope prod up`.
 No manual intervention is needed. If pending migrations are detected on a non-empty database,
 a pre-migration backup is created in `.runtime/database/backups/prod/` before applying.
+
+---
 
 ### Database management commands
 
@@ -1277,6 +1288,8 @@ The prod postgres port is not exposed — use `mascope prod db cli` for direct p
 If a GUI is needed, temporarily enable a Docker Compose port mapping (for example via a compose override file),
 or use SSH port-forwarding to the host running the container.
 
+---
+
 ### PostgreSQL Tuning Reference
 
 Settings live in `[backend.database]` in `.mascope.toml` layer files.
@@ -1312,116 +1325,92 @@ Postgres tuning parameters are passed as `-c` flags via Docker Compose command o
 
 ### Memory
 
-#### shared_buffers
+- **`shared_buffers`** — PostgreSQL's dedicated data page cache. The single largest performance
+  lever - pages cached here cost zero I/O on repeated reads. Rule: **25% of RAM**. Above ~40%
+  competes with the OS page cache and yields diminishing returns. PostgreSQL's 128MB default is
+  a historical artifact.
 
-PostgreSQL's dedicated data page cache. The single largest performance lever - pages cached here
-cost zero I/O on repeated reads. Rule: **25% of RAM**. Above ~40% competes with the OS page cache
-and yields diminishing returns. PostgreSQL's 128MB default is a historical artifact.
+- **`effective_cache_size`** — Planner hint only, **no memory is allocated**. Tells the planner
+  how much total cache (shared_buffers + OS page cache) is available. Too low causes the planner
+  to prefer sequential scans over index scans on large tables. Set to **75% of RAM**.
 
-#### effective_cache_size
+- **`work_mem`** — Per-operation memory for sorts, hash joins, hash aggregates, window functions.
+  **Allocated per operation per connection** - a query with three sort nodes uses 3× work_mem.
+  Too low causes disk spills (10–100× slower). Worst-case formula:
 
-Planner hint only - **no memory is allocated**. Tells the planner how much total cache
-(shared_buffers + OS page cache) is available. Too low causes the planner to prefer sequential
-scans over index scans on large tables. Set to **75% of RAM**.
+  ```
+  workers × (pool_size + max_overflow) × ops_per_query × work_mem
+  # Prod: 12 × 5 × 3 × 64MB = ~11GB - acceptable on 64GB
+  ```
 
-#### work_mem
+  Diagnostic: set `log_temp_files = 0` and watch for spill entries in logs.
 
-Per-operation memory for sorts, hash joins, hash aggregates, window functions.
-**Allocated per operation per connection** - a query with three sort nodes uses 3× work_mem.
-Too low causes disk spills (10–100× slower). Worst-case formula:
+- **`maintenance_work_mem`** — Memory for `VACUUM`, `CREATE INDEX`, `ALTER TABLE`, `pg_restore`.
+  Only a few maintenance ops run concurrently so this can be set high safely.
 
-```
-workers × (pool_size + max_overflow) × ops_per_query × work_mem
-# Prod: 12 × 5 × 3 × 64MB = ~11GB - acceptable on 64GB
-```
+- **`autovacuum_work_mem`** — Memory per autovacuum worker. `-1` inherits `maintenance_work_mem`.
+  Set explicitly in prod so background autovacuum workers don't consume the full
+  `maintenance_work_mem` allocation.
 
-Diagnostic: set `log_temp_files = 0` and watch for spill entries in logs (see below).
-
-#### maintenance_work_mem
-
-Memory for `VACUUM`, `CREATE INDEX`, `ALTER TABLE`, `pg_restore`. Only a few maintenance ops
-run concurrently so this can be set high safely. The difference between 64MB and 4GB on a
-450M-row index build is significant.
-
-#### autovacuum_work_mem
-
-Memory per autovacuum worker. `-1` inherits `maintenance_work_mem`. Set explicitly in prod
-so background autovacuum workers don't consume the full `maintenance_work_mem` allocation.
-
-#### wal_buffers
-
-Shared memory buffer for WAL records before flush to disk. Auto-tunes to 1/32 of
-`shared_buffers`, capped at 16MB. Set explicitly so it's visible in config.
-**Requires container restart** (shared memory allocation).
+- **`wal_buffers`** — Shared memory buffer for WAL records before flush to disk. Auto-tunes to
+  1/32 of `shared_buffers`, capped at 16MB. Set explicitly so it's visible in config.
+  **Requires container restart** (shared memory allocation).
 
 ### Checkpoints and WAL
 
-#### min_wal_size / max_wal_size
+- **`min_wal_size` / `max_wal_size`** — WAL files below `min_wal_size` are recycled rather than
+  deleted. `max_wal_size` is the ceiling before a checkpoint is forced. Too small causes I/O
+  spikes from forced checkpoints. Scale with `shared_buffers` - a larger buffer pool accumulates
+  more dirty data between checkpoints.
 
-WAL files below `min_wal_size` are recycled rather than deleted. `max_wal_size` is the ceiling
-before a checkpoint is forced. Too small causes I/O spikes from forced checkpoints. Scale with
-`shared_buffers` - a larger buffer pool accumulates more dirty data between checkpoints.
+- **`checkpoint_completion_target`** — Fraction of the checkpoint interval over which dirty page
+  writes are spread. At `0.9`, writes are distributed evenly - no I/O spike at checkpoint
+  boundary. Default since PG14 but set explicitly for visibility.
 
-#### checkpoint_completion_target
-
-Fraction of the checkpoint interval over which dirty page writes are spread. At `0.9`,
-writes are distributed evenly - no I/O spike at checkpoint boundary. Default since PG14
-but set explicitly for visibility.
-
-#### wal_compression
-
-Compresses WAL records before writing. Reduces WAL volume and disk usage at minor CPU cost.
-`on` uses zlib - available in standard `postgres:16-alpine`.
-`lz4` requires PostgreSQL compiled with `--with-lz4` (**not in the standard image**).
+- **`wal_compression`** — Compresses WAL records before writing. Reduces WAL volume and disk
+  usage at minor CPU cost. `on` uses zlib - available in standard `postgres:16-alpine`.
+  `lz4` requires PostgreSQL compiled with `--with-lz4` (**not in the standard image**).
 
 ### Planner
 
-#### random_page_cost
+- **`random_page_cost`** — Cost of a random page fetch relative to sequential (always 1.0).
+  Default 4.0 assumes spinning disk - causes the planner to avoid index scans and prefer
+  sequential scans even when an index would be faster. Set to **1.1 for SSD/NVMe** where random
+  reads are nearly as fast as sequential. Getting this wrong causes full table scans on large
+  tables that have usable indexes.
 
-Cost of a random page fetch relative to sequential (always 1.0). Default 4.0 assumes spinning
-disk - causes the planner to avoid index scans and prefer sequential scans even when an index
-would be faster. Set to **1.1 for SSD/NVMe** where random reads are nearly as fast as sequential.
-Getting this wrong causes full table scans on large tables that have usable indexes.
+- **`effective_io_concurrency`** — Concurrent I/O requests for bitmap heap scans. Default 1
+  assumes a single spinning disk. Set to **200 for SSD/NVMe**. No effect on sequential scans.
 
-#### effective_io_concurrency
+- **`default_statistics_target`** — Histogram depth per column collected during `ANALYZE`. Higher
+  values give the planner more accurate row estimates for skewed data. PostgreSQL default 100 is
+  adequate as a baseline. For heavily skewed columns (isotope counts, intensity values), set
+  per-column:
 
-Concurrent I/O requests for bitmap heap scans. Default 1 assumes a single spinning disk.
-Set to **200 for SSD/NVMe**. No effect on sequential scans.
+  ```sql
+  ALTER TABLE match_isotopes ALTER COLUMN intensity SET STATISTICS 500;
+  ANALYZE match_isotopes;
+  ```
 
-#### default_statistics_target
-
-Histogram depth per column collected during `ANALYZE`. Higher values give the planner more
-accurate row estimates for skewed data. PostgreSQL default 100 is adequate as a baseline.
-For heavily skewed columns (isotope counts, intensity values), set per-column:
-
-```sql
-ALTER TABLE match_isotopes ALTER COLUMN intensity SET STATISTICS 500;
-ANALYZE match_isotopes;
-```
-
-#### jit
-
-JIT compilation benefits long analytical queries but adds overhead on short transactional ones.
-Disabled for Mascope's mixed workload - re-evaluate with profiling data if specific long queries
-would benefit.
+- **`jit`** — JIT compilation benefits long analytical queries but adds overhead on short
+  transactional ones. Disabled for Mascope's mixed workload - re-evaluate with profiling data
+  if specific long queries would benefit.
 
 ### Autovacuum
 
-#### autovacuum_max_workers
+- **`autovacuum_max_workers`** — Parallel autovacuum workers. Each consumes `autovacuum_work_mem`.
+  Default 3 is fine for dev; 4 in prod with many large tables prevents dead tuple accumulation.
 
-Parallel autovacuum workers. Each consumes `autovacuum_work_mem`. Default 3 is fine for dev;
-4 in prod with many large tables prevents dead tuple accumulation.
+  The global `autovacuum_vacuum_scale_factor` default of 0.2 means vacuum triggers after 20% of
+  the table is modified - on a 450M-row table that's 90M dead tuples before cleanup. For large
+  tables, override per-table:
 
-The global `autovacuum_vacuum_scale_factor` default of 0.2 means vacuum triggers after 20% of
-the table is modified - on a 450M-row table that's 90M dead tuples before cleanup. For large
-tables, override per-table:
-
-```sql
-ALTER TABLE match_isotopes SET (
-    autovacuum_vacuum_scale_factor = 0.01,
-    autovacuum_analyze_scale_factor = 0.005
-);
-```
+  ```sql
+  ALTER TABLE match_isotopes SET (
+      autovacuum_vacuum_scale_factor = 0.01,
+      autovacuum_analyze_scale_factor = 0.005
+  );
+  ```
 
 ### Docker: shm_size
 
@@ -1454,7 +1443,9 @@ docker exec mascope_prod_postgres psql -U mascope_user \
   -c "SELECT name, size FROM pg_shmem_allocations ORDER BY size DESC LIMIT 10;"
 ```
 
-## Scheduled Database Backups (Cron)
+---
+
+### Scheduled Database Backups (Cron)
 
 Mascope uses `cron` to automate PostgreSQL backups via the `mascope prod db backup` CLI commands.
 Cron jobs are **per-user, per-machine** - they are not tied to a project directory or environment.
