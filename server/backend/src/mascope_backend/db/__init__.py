@@ -64,17 +64,29 @@ async def configure_database_engine():
     )
 
 
+async def dispose_engine() -> None:
+    """
+    Dispose the async engine and close all connection pool connections.
+    No-op if the engine has not been configured.
+
+    :return: None
+    """
+    if ASYNC_SESSION_MAKER is None:
+        return
+    engine = ASYNC_SESSION_MAKER.kw["bind"]
+    await engine.dispose()
+
+
 def async_session() -> AsyncSession:
     """
     Session getter for manual session management.
 
     This function returns a new SQLAlchemy session that needs to be manually handled.
-    It is useful for scenarios where we need fine-grained control over the session's lifecycle,
-    such as flushing manually or performing tasks outside the session block.
+    It is useful for scenarios where we need fine-grained control over the session's
+    lifecycle, such as flushing manually or performing tasks outside the session block.
 
     Key points:
     - Requires manual management (you must use `async with`).
-    - Offers flexibility for doing tasks outside the session (e.g., logging or computation).
     - Useful for batch processing where manual flushes or commits are required.
 
     Example usage:
@@ -185,6 +197,7 @@ def _log_pool_configuration():
 __all__ = [
     # Connection management
     "configure_database_engine",
+    "dispose_engine",
     "async_session",
     "get_async_session",
     "init_db",
