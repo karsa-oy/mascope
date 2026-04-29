@@ -12,7 +12,7 @@ Exports:
 
 import asyncio
 import os
-from typing import AsyncGenerator
+from typing import AsyncGenerator, cast
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -27,8 +27,7 @@ from mascope_runtime.config import BackendConfig
 
 # Initialize global variables at module load
 ASYNC_SESSION_MAKER: async_sessionmaker[AsyncSession] | None = None
-assert isinstance(runtime.config, BackendConfig)
-db_cfg = runtime.config.database
+db_cfg = cast(BackendConfig, runtime.config).database
 
 # Semaphore to limit concurrent database operations
 db_semaphore = asyncio.Semaphore(db_cfg.pool_size)
