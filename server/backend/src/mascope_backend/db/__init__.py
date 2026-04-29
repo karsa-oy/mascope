@@ -2,7 +2,7 @@
 Database initialization and configuration module.
 
 This module handles PostgreSQL database connection setup, session management,
-and initialization procedures including schema migrations.
+and initialization procedures.
 
 Exports:
 - Database connection functions (configure_database_engine, async_session, etc.)
@@ -22,10 +22,12 @@ from mascope_backend.db.models import *  # noqa: F403, F401 - re-export models
 from mascope_backend.db.secrets import postgres_password
 from mascope_backend.db.views import Sample
 from mascope_backend.runtime import runtime
+from mascope_runtime.config import BackendConfig
 
 
 # Initialize global variables at module load
-ASYNC_SESSION_MAKER = None  # Global async session maker
+ASYNC_SESSION_MAKER: async_sessionmaker[AsyncSession] | None = None
+assert isinstance(runtime.config, BackendConfig)
 db_cfg = runtime.config.database
 
 # Semaphore to limit concurrent database operations
@@ -33,12 +35,14 @@ db_semaphore = asyncio.Semaphore(db_cfg.pool_size)
 
 
 # Database configuration and session management
-async def configure_database_engine():
+async def configure_database_engine() -> None:
     """
     Configure the PostgreSQL async engine and global session maker
     using SQLAlchemy's async_sessionmaker.
     This function is called during initialization (once per worker during startup)
     to establish a connection with the database.
+
+    :return: None
     """
     database_url = db_cfg.get_postgres_url(
         password=postgres_password, env_name=runtime.env.name
@@ -46,7 +50,7 @@ async def configure_database_engine():
     db_name = db_cfg.get_postgres_database_name(env_name=runtime.env.name)
     runtime.logger.info(f"Using PostgreSQL at {db_cfg.host}:{db_cfg.port}/{db_name}")
 
-    trace_mode = runtime.config.log_level.lower() == "trace"
+    trace_mode: bool = runtime.config.log_level == "trace"
 
     engine = create_async_engine(
         database_url,
@@ -116,7 +120,7 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
     Key points:
     - Automatically manages session lifecycle (opened and closed at the correct time).
     - Integrates with FastAPI `Depends()` to inject the session into routes.
-    - Suitable for typical request-response workflows where session lifecycle should be automated.
+    - Useful for request-response workflows where session lifecycle should be automated.
 
     Example usage in a FastAPI route:
         from fastapi import Depends
@@ -138,7 +142,7 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
 
 
 # Initialization and main interface functions
-async def init_db():
+async def init_db() -> None:
     """
     Initialize database connection for a worker process.
 
@@ -146,6 +150,7 @@ async def init_db():
     It configures the database engine for this worker's connection pool.
 
     :raises Exception: If engine configuration or connection test fails
+    :return: None
     """
     try:
         await configure_database_engine()
@@ -156,11 +161,12 @@ async def init_db():
         raise
 
 
-async def _test_database_connection():
+async def _test_database_connection() -> None:
     """
     Test connection and log PostgreSQL version.
 
     :raises Exception: If the connection cannot be established
+    :return: None
     """
     try:
         async with async_session() as session:
@@ -178,8 +184,14 @@ async def _test_database_connection():
         raise
 
 
-def _log_pool_configuration():
-    """Log connection pool configuration for this worker."""
+def _log_pool_configuration() -> None:
+    """
+    Log connection pool configuration for this worker.
+
+    :return: None
+    """
+    if ASYNC_SESSION_MAKER is None:
+        return
     try:
         engine = ASYNC_SESSION_MAKER.kw["bind"]
         worker_pid = os.getpid()
