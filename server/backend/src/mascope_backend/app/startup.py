@@ -65,5 +65,11 @@ async def init_main_process() -> None:
         runtime.logger.info("Main process: initializing acquisition datasets")
         await create_acquisition_datasets()
     finally:
-        # Always dispose even if a task raises, to avoid leaked connections
-        await dispose_engine()
+        # Dispose engine regardless of task outcome; catch disposal errors
+        # so they never mask the original startup exception
+        try:
+            await dispose_engine()
+        except Exception as e:
+            runtime.logger.error(
+                f"Main process: failed to dispose database engine: {e}"
+            )

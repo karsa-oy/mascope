@@ -71,14 +71,18 @@ async def configure_database_engine() -> None:
 async def dispose_engine() -> None:
     """
     Dispose the async engine and close all connection pool connections.
+    Resets ASYNC_SESSION_MAKER to None so any accidental post-dispose
+    call to async_session() fails immediately.
     No-op if the engine has not been configured.
 
     :return: None
     """
+    global ASYNC_SESSION_MAKER
     if ASYNC_SESSION_MAKER is None:
         return
     engine = ASYNC_SESSION_MAKER.kw["bind"]
     await engine.dispose()
+    ASYNC_SESSION_MAKER = None
 
 
 def async_session() -> AsyncSession:
