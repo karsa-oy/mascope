@@ -274,6 +274,8 @@ def down(
 
     Data in bind mounts (PostgreSQL) is preserved.
     """
+    check_and_start_docker()
+
     args = ["down"]
     if volumes:
         args.append("-v")
