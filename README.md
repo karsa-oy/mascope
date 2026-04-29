@@ -14,9 +14,15 @@ This document is structured as follows:
   - [Prod commands](#prod-commands)
   - [Env commands](#env-commands)
 - 🚂 **[Runtime](#-runtime)** - devops tooling
+  - [Runtime modes](#runtime-modes)
+    - [Dev mode](#dev-mode)
+    - [Prod mode](#prod-mode)
+  - [Runtime modules](#runtime-modules)
   - [Runtime envs](#runtime-envs)
   - [Database isolation across envs and modes](#database-isolation-across-envs-and-modes)
   - [Runtime config](#runtime-config)
+  - [Runtime logging](#runtime-logging)
+  - [CLI development](#cli-development)
 - 🤖 **[Agents](#-agents)** - Python instrument agents
 - 📡 **[Backend](#-backend)** - Python API server
   - [Backend database](#backend-database)
@@ -130,6 +136,8 @@ See the [CLI development](#cli-development) section to learn how to extend the C
 
 ### Dev Commands
 
+Running Mascope in [dev mode](#dev-mode):
+
 ```sh
 mascope dev run                               # run the backend & frontend (deps + migrations + app)
 mascope dev run --reload                      # HMR for the backend on Windows
@@ -167,8 +175,8 @@ mascope dev redis logs        # View Redis logs (--follow, --tail options)
 mascope dev redis cli         # Open Redis CLI for debugging
 
 # Or access Redis CLI directly
-docker exec -it mascope_redis_dev redis-cli    # Dev mode
-docker exec -it mascope-redis-1 redis-cli      # Prod mode
+docker exec -it mascope_dev_redis redis-cli    # Dev mode
+docker exec -it mascope_prod_redis redis-cli   # Prod mode
 ```
 
 **Useful Redis CLI commands:**
@@ -192,19 +200,22 @@ See [Redis CLI documentation](https://redis.io/docs/latest/develop/tools/cli/) f
 
 ### Prod Commands
 
-Running in prod mode:
+Running Mascope in [prod mode](#prod-mode):
 
-```bash
-mascope prod up            # start prod containers (db_init runs migrations automatically)
-mascope prod up --build    # force rebuild before starting
-mascope prod ps            # container status
-mascope prod down          # stop and remove containers
-mascope prod build         # build container images
+```sh
+mascope prod up             # start prod containers (db_init runs migrations automatically)
+mascope prod up --build     # force rebuild before starting
+mascope prod ps             # container status
+mascope prod down           # stop and remove containers
+mascope prod build          # build container images
+mascope prod logs --follow backend          # tail logs for a specific service
+mascope prod restart postgres               # restart a specific container
+mascope prod docker exec -it postgres bash  # pass arbitrary args to docker compose
 ```
 
-In production, the `db_init` container runs before the backend starts. It creates the
-active env's database if it doesn't exist, then applies any pending Alembic migrations.
-The backend only starts after `db_init` exits successfully.
+In production, the `db_init` container runs before the backend starts. It creates the active
+env's database if it doesn't exist, then applies any pending Alembic migrations. The backend
+only starts after `db_init` exits successfully.
 
 ---
 
@@ -368,40 +379,48 @@ The runtime can be executed in two major modes: `dev` and `prod`. While `dev` mo
 
 #### Dev mode
 
-The development environment works by running dev server commands for each [module](#runtime-modules).
-These commands use `uv` to run Python services and `vite` to run the frontend dev server, along with scripts for other operations or services.
+The development environment runs application services locally (via `uv` and `vite`) against a
+dedicated `mascope_dev` Docker Compose stack defined in `docker-compose.dev.yaml`. The stack
+provides two infrastructure containers:
 
-**Prerequisites:**
+- **`mascope_dev_postgres`** — PostgreSQL server (port `5432` exposed for DBeaver/psql)
+- **`mascope_dev_redis`** — Redis server (port `6379` exposed for redis-cli)
 
-- Docker daemon running (required for Redis and PostgreSQL server)
-- Redis container will auto-start when running `mascope dev run backend`
+The infrastructure stack can be managed independently:
 
-By default, running `mascope dev run` spins up the `backend` (with Redis) and `frontend` dev servers and joins their logs to one output. To enable HMR for the `backend` on Windows, run
-`mascope dev run --reload`. You can also specify other modules (run `mascope module --runnable` to see which). For an overview of the `dev` mode api, run `mascope dev --help`.
+```sh
+mascope dev up      # start PostgreSQL + Redis containers only
+mascope dev down    # stop and remove them
+```
+
+`mascope dev run` starts the full environment in one command — it brings up the infrastructure
+stack, creates the active env's database if missing, applies pending migrations, then launches
+the application modules (default: `backend`, `frontend`, `file-converter`). To enable HMR for
+the backend on Windows, run `mascope dev run --reload`. You can also specify individual [module](#runtime-modules)
+or group tags — run `mascope modules --runnable` and `mascope groups` to see what's available.
+For the full `dev` command reference run `mascope dev --help`.
 
 #### Prod mode
 
-The production deployment for the mascope server consists of containerized services orchestrated via `docker compose`:
+The production deployment consists of containerized services orchestrated via `docker compose`
+(`docker-compose.yaml`):
 
-- **db_init**: Init container — creates the env database and applies Alembic migrations before the backend starts
-- **redis**: Redis server for Socket.IO coordination and session storage
-- **backend**: Multi-worker Python API server (Uvicorn + FastAPI + Socket.IO)
-- **frontend**: Nginx reverse proxy serving Vue.js bundle with sticky sessions
-- **file_converter**: Service responsible for transforming incoming sample files and recording corresponding metadata to the
-  database.
+- **`db_init`**: Init container — creates the env database and applies Alembic migrations before the backend starts
+- **`postgres`**: PostgreSQL database server
+- **`redis`**: Redis server for Socket.IO coordination and session storage
+- **`backend`**: Multi-worker Python API server (Uvicorn + FastAPI + Socket.IO)
+- **`file_converter`**: Transforms incoming sample files and records metadata to the database
+- **`frontend`**: Nginx reverse proxy serving the Vue.js bundle with sticky sessions
 
-The containers share a Docker network and use health checks for proper startup order (redis → backend → frontend). See `docker-compose.yaml` for full configuration.
-
-See `mascope prod --help` for extensive documentation, but in short:
+Startup order enforced by health checks: `postgres` + `redis` → `db_init` → `backend` → `file_converter` + `frontend`. See `docker-compose.yaml` for full configuration.
 
 ```sh
-mascope prod build  # build the containers
-mascope prod up     # start the server (detached)
-mascope prod logs   # attach to the logs
-mascope prod down   # stope the server
+mascope prod build          # build container images
+mascope prod up             # start all containers (detached)
+mascope prod up --build     # build then start
+mascope prod logs           # attach to logs
+mascope prod down           # stop and remove containers
 ```
-
-You can also run `mascope prod up --build` to build and run the containers.
 
 ### Runtime Modules
 
@@ -416,7 +435,7 @@ Modules' [configuration](#runtime-config) is scoped to that module and exposed t
 ### Runtime Envs
 
 The Mascope app organises all persistent state - configuration, files, logs - in a folder called
-a _runtime env_. Environments represent isolated datasets: for example, `julich` and `cloud` are
+a _runtime env_. Environments represent isolated datasets: for example, `lab` and `cloud` are
 separate envs each with their own filestore and database.
 
 To list available envs, run `mascope env list`. To activate env `foo`, run `mascope env use foo`.
@@ -463,10 +482,10 @@ the env name with hyphens replaced by underscores:
 | Active env | Dev database       | Prod database      |
 | ---------- | ------------------ | ------------------ |
 | `default`  | `mascope_default`  | `mascope_default`  |
-| `julich`   | `mascope_julich`   | `mascope_julich`   |
+| `lab`      | `mascope_lab`      | `mascope_lab`      |
 | `test-env` | `mascope_test_env` | `mascope_test_env` |
 
-This means `mascope_julich` in the dev postgres and `mascope_julich` in the prod postgres are
+This means `mascope_lab` in the dev postgres and `mascope_lab` in the prod postgres are
 completely separate databases, each populated independently via migrations or `env sync`.
 Switching envs with `mascope env use` does not affect which databases exist - it only determines
 which database name is used by the next command.
@@ -743,12 +762,12 @@ Then restart the agent, and the correct config is loaded and the agent is ready 
 The file converter is an independent service responsible for transforming incoming sample files
 and recording corresponding metadata to the database.
 
-**Dev** — runs as a local module alongside the backend. Launched automatically with the default
-`mascope dev run` (includes `file-converter`), or explicitly:
+**Dev** — runs as a local module. Included by default in `mascope dev run` alongside `backend`
+and `frontend`. Can also be launched explicitly:
 
 ```sh
-mascope dev run file-converter      # file-converter only
-mascope dev run backend file-converter  # backend + file-converter
+mascope dev run file-converter               # file-converter only
+mascope dev run backend file-converter       # backend + file-converter
 ```
 
 **Prod** — runs as the `file_converter` container in `docker-compose.yaml`, started automatically
@@ -800,8 +819,8 @@ Redis is required for cross-worker Socket.IO coordination. The backend uses two 
 
 **Redis Containers:**
 
-- **Dev**: `mascope_redis_dev` (local Docker container, accessible via `mascope dev redis cli`)
-- **Prod**: `mascope-redis-1` (runs inside Docker Compose stack, accessible via `docker exec -it mascope-redis-1 redis-cli`)
+- **Dev**: `mascope_dev_redis` (local Docker container, accessible via `mascope dev redis cli`)
+- **Prod**: `mascope_prod_redis` (runs inside Docker Compose stack, accessible via `docker exec -it mascope_prod_redis redis-cli`)
 
 Session data persists in Redis with a 24-hour TTL, automatically refreshed on user activity.
 
@@ -1114,6 +1133,10 @@ echo "your_password_here" > .runtime/secrets/postgres_password.txt
 
 Both compose files mount this file as a Docker secret at `/run/secrets/postgres_password`.
 Use a strong, unique password for production servers.
+
+> [!NOTE]
+> Avoid special characters in the password — `@` is known to break connection URL parsing
+> and other characters may cause similar issues. Stick to alphanumeric characters and hyphens.
 
 ### Connection pool
 
