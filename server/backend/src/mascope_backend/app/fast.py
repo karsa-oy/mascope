@@ -15,15 +15,9 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from mascope_backend.api.controllers.dataset.acquisition.service import (
-    create_acquisition_datasets,
-)
 from mascope_backend.api.lib.exceptions.api_exceptions import handle_exception
 from mascope_backend.api.routes import routers
 from mascope_backend.db import init_db
-from mascope_backend.db.admin.batch.reset_processing_status import (
-    reset_stuck_processing_batches,
-)
 from mascope_backend.runtime import runtime
 from mascope_backend.socket.storage import redis_storage_client
 
@@ -35,12 +29,11 @@ async def lifespan(app: FastAPI):
 
     This context manager handles worker-specific startup and shutdown tasks.
     Each worker process runs this independently after the main process has
-    completed initialization (database migrations, file cleanup, etc.).
+    completed initialization.
 
     Worker startup tasks:
     - Configure database engine and connection pool for this worker
     - Connect to Redis for cross-worker session storage
-    - Verify application data exists (idempotent checks)
 
     Worker shutdown tasks:
     - Disconnect Redis client
@@ -71,12 +64,6 @@ async def lifespan(app: FastAPI):
             f"Fast App startup: Redis storage client failed to connect: {e} [Worker {worker_pid}]"
         )
         runtime.logger.warning("Multi-worker storage sharing will not work")
-
-    # Initialize application components
-    runtime.logger.info(
-        f"Fast App startup: initializing application [Worker {worker_pid}]"
-    )
-    await init_app_data()
 
     # Yield control back to FastAPI
     yield
@@ -245,22 +232,3 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
     context_message = f"Unhandled exception on {request.method} {request.url.path}"
     # Handle the exception and get the response
     return handle_exception(exc, context_message, response_type="http")
-
-
-async def init_app_data() -> None:
-    """
-    Check that required application data exists in the database.
-
-    This function is called by each worker during startup to verify that
-    necessary application data (datasets, default records, etc.) is present.
-    It's idempotent and safe to call multiple times.
-
-    Operations:
-    - Reset any stuck processing states from previous run
-    - Auto-create acquisition datasets for all instruments
-    """
-    # Reset stuck processing batches from previous run
-    await reset_stuck_processing_batches()
-
-    # Auto-create acquisition datasets for all instruments
-    await create_acquisition_datasets()

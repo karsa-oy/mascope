@@ -1,32 +1,46 @@
 """
 Main process startup initialization.
 
-This module contains one-time initialization logic that runs once
-before the application starts accepting requests.
+This module contains one-time initialization logic that runs once in the main
+process before any workers are spawned. Running tasks here prevents per-worker
+race conditions on shared state.
 
-It handles tasks:
+Tasks:
 - File system cleanup and setup
-- Application state reset
+- Application state reset (stuck batch recovery)
+- Idempotent data initialization (acquisition datasets)
 """
 
 import os
 import shutil
 
+from mascope_backend.api.controllers.dataset.acquisition.service import (
+    create_acquisition_datasets,
+)
+from mascope_backend.db import configure_database_engine, dispose_engine
+from mascope_backend.db.admin.batch.reset_processing_status import (
+    reset_stuck_processing_batches,
+)
 from mascope_backend.runtime import runtime
 from mascope_file.gc import gc_filestore
 
 
-async def init_main_process():
+async def init_main_process() -> None:
     """
-    Runs once per server startup, before workers are spawned.
+    Runs once per server startup in the main process, before workers are spawned.
 
-    - Clean and recreate temporary file directory
+    Initialization order:
+    - Reset temp directory
     - Garbage collect orphaned files from filestore
-
-    Does NOT configure database connections - each worker does that independently.
+    - Configure a short-lived DB engine for one-time startup tasks
+    - Reset any batches stuck in 'processing' from a previous run
+    - Auto-create missing acquisition datasets for all instruments
+    - Dispose the engine — each worker initialises its own independently
 
     :raises Exception: If any critical initialization step fails
+    :return: None
     """
+    # --- Filesystem ---
     # Reset temp directory
     runtime.logger.info("Main process: initializing temp directory")
     temp_dir = runtime.env.path("temp")
@@ -37,3 +51,19 @@ async def init_main_process():
     # Clean filestore
     runtime.logger.info("Main process: garbage collecting filestore")
     gc_filestore()
+
+    # --- Database ---
+    # Configure a short-lived engine so startup tasks can use async_session.
+    # Disposed after tasks complete; workers configure their own engines in lifespan.
+    runtime.logger.info("Main process: configuring database engine")
+    await configure_database_engine()
+
+    try:
+        runtime.logger.info("Main process: resetting stuck processing batches")
+        await reset_stuck_processing_batches()
+
+        runtime.logger.info("Main process: initializing acquisition datasets")
+        await create_acquisition_datasets()
+    finally:
+        # Always dispose even if a task raises, to avoid leaked connections
+        await dispose_engine()
