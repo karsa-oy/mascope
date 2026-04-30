@@ -15,8 +15,7 @@ DEFAULT_PARENT_PEAK_TOLERANCE = 0.001
 class DataExtractor:
     def __init__(
         self,
-        mascope_url: str,
-        access_token: str,
+        mascope: msdk.MascopeClient,
         sample_file_id: str,
         params: dict | None = None,
     ):
@@ -24,10 +23,8 @@ class DataExtractor:
         Initialize the DataExtractor by fetching metadata and spectra from the MAScope API,
         and precomputing necessary data structures for analysis.
 
-        :param mascope_url: Mascope app URL
-        :type mascope_url: str
-        :param access_token: Access token for authentication with the Mascope API
-        :type access_token: str
+        :param mascope: An instance of the MascopeClient to use for API calls
+        :type mascope: msdk.MascopeClient
         :param sample_file_id: ID of the sample file to analyze
         :type sample_file_id: str
         :param params: Optional parameters for data extraction and processing:
@@ -43,7 +40,9 @@ class DataExtractor:
         else:
             raise ValueError("Params must be a dictionary if provided.")
 
-        meta = msdk.get_sample_file_metadata(mascope_url, access_token, sample_file_id)
+        meta = msdk.get_sample_file_metadata(
+            mascope.url, mascope.access_token, sample_file_id
+        )
 
         if meta is None:
             raise ValueError("Failed to retrieve metadata for the sample file.")
