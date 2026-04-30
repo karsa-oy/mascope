@@ -19,6 +19,7 @@ from mascope_backend.api.new.users.first_owner.routes import (
 from mascope_backend.api.new.users.me.routes import me_router
 from mascope_backend.api.new.users.owner.routes import owner_router
 from mascope_backend.api.new.users.routes import users_router
+from mascope_backend.api.new.workspaces.routes import workspaces_router
 from mascope_backend.api.routes.attribute_templates.attribute_templates_routes import (
     attribute_templates_router,
 )
@@ -93,6 +94,7 @@ routers = [
     admin_router,
     owner_router,
     roles_router,
+    workspaces_router,
     params_router,
     dataset_router,
     sample_batches_router,
