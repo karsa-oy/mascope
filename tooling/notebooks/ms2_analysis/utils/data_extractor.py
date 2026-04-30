@@ -224,6 +224,23 @@ class DataExtractor:
             mask = pd.Series(False, index=self.stats.columns)
             mask[matching_cols] = True
             result[parent_peak] = mask.values
+
+        # Check if number of scans per parent is the same for all parents
+        num_scans_per_parent = {pp: mask.sum() for pp, mask in result.items()}
+        unique_scan_counts = set(num_scans_per_parent.values())
+        if len(unique_scan_counts) > 1:
+            print(
+                "Number of MS2 scans per parent peak is not consistent. "
+                "`parent_peak_tolerance` may be too low or too high."
+            )
+            majority_value = max(
+                unique_scan_counts, key=list(num_scans_per_parent.values()).count
+            )
+            for pp, count in num_scans_per_parent.items():
+                if count != majority_value:
+                    print(
+                        f"Parent peak {pp} has {count} MS2 scans, which differs from the majority count of {majority_value}."
+                    )
         return result
 
     def _get_ms1_spectra(self):
