@@ -14,8 +14,10 @@ import { useTargetCollection, useTargetCompound } from './modules/target'
 import { useTemplate } from './modules/template'
 import { useUser } from './modules/user'
 import { useDataset } from './modules/dataset'
+import { useWorkspace } from './modules/workspace'
 
 export const useData = () => ({
+  workspace: useWorkspace(),
   dataset: useDataset(),
   ionization: {
     mechanism: useIonizationMechanism(),
