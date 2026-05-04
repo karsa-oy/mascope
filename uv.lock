@@ -1843,7 +1843,7 @@ requires-dist = [
 
 [[package]]
 name = "mascope-tools"
-version = "2026.4.15"
+version = "2026.5.4"
 source = { editable = "libraries/tools" }
 dependencies = [
     { name = "isospecpy" },
