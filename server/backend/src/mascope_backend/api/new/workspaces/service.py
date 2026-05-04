@@ -7,7 +7,7 @@ Provides core CRUD operations for workspaces and workspace membership.
 from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
-from sqlalchemy import asc, select
+from sqlalchemy import asc, func, select
 
 from mascope_backend.api.lib.api_features import api_controller
 from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
@@ -18,6 +18,28 @@ from mascope_backend.api.new.workspaces.exceptions import (
 )
 from mascope_backend.db import User, Workspace, WorkspaceMember, async_session
 from mascope_backend.db.id import gen_id
+
+
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
+
+
+async def _check_last_owner(session, workspace_id: str) -> None:
+    """Raise 403 if the workspace has only one owner."""
+    result = await session.execute(
+        select(func.count())
+        .select_from(WorkspaceMember)
+        .where(
+            WorkspaceMember.workspace_id == workspace_id,
+            WorkspaceMember.workspace_role == "owner",
+        )
+    )
+    if result.scalar() <= 1:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Each workspace must have at least one owner.",
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -237,6 +259,11 @@ async def update_workspace_member(
             raise WorkspaceMemberNotFoundException(
                 f"User {user_id} is not a member of workspace {workspace_id}."
             )
+
+        # Prevent demoting the last owner
+        if member.workspace_role == "owner" and workspace_role != "owner":
+            await _check_last_owner(session, workspace_id)
+
         member.workspace_role = workspace_role
         await session.commit()
         return {"data": member.to_dict()}
@@ -257,6 +284,10 @@ async def remove_workspace_member(workspace_id: str, user_id: int) -> dict:
             raise WorkspaceMemberNotFoundException(
                 f"User {user_id} is not a member of workspace {workspace_id}."
             )
+
+        if member.workspace_role == "owner":
+            await _check_last_owner(session, workspace_id)
+
         await session.delete(member)
         await session.commit()
         return {
