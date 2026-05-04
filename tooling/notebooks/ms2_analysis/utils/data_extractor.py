@@ -33,12 +33,10 @@ class DataExtractor:
         :type params: dict, optional
         :raises ValueError:
         """
-        if params is None:
-            params = {}
-        elif isinstance(params, dict):
+        if isinstance(params, dict):
             self.params = params
         else:
-            raise ValueError("Params must be a dictionary if provided.")
+            self.params = {}
 
         meta = msdk.get_sample_file_metadata(
             mascope.url, mascope.access_token, sample_file_id
