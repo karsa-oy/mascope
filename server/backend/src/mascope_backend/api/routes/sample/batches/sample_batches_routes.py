@@ -62,8 +62,7 @@ async def get_sample_batches_route(
     :return: A dictionary containing total count and list of sample batches.
     :rtype: dict
     """
-    if query_params.dataset_id:
-        await check_dataset_access(query_params.dataset_id, user, "guest")
+    await check_dataset_access(query_params.dataset_id, user, "guest")
     return await get_sample_batches(**query_params.model_dump())
 
 
