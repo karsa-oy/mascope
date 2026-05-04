@@ -9,22 +9,22 @@ from ._base import BaseResource, _coerce_datetime_columns
 class DatasetsResource(BaseResource):
     """Resource for dataset operations.
 
-    Datasets are the top-level organizational unit in Mascope, containing
-    sample batches and related data.
+    Datasets belong to a workspace and contain sample batches and related data.
+    The workspace is determined by the ``MascopeClient`` configuration.
 
     Example::
 
         from mascope_sdk import MascopeClient
 
-        mascope = MascopeClient()
+        mascope = MascopeClient(workspace="My Workspace")
 
-        # List all datasets
+        # List all datasets in the workspace
         datasets = mascope.datasets.list()
         print(datasets[["dataset_id", "dataset_name"]])
     """
 
     def list(self) -> pd.DataFrame | None:
-        """List all accessible datasets.
+        """List all datasets in the current workspace.
 
         :return: A DataFrame containing dataset information with columns
                  including ``dataset_id`` and ``dataset_name``, or None if no
@@ -38,11 +38,12 @@ class DatasetsResource(BaseResource):
             datasets = mascope.datasets.list()
             print(datasets[["dataset_id", "dataset_name"]])
         """
-        cache_key = "datasets"
+        workspace_id = self._client.workspace_id
+        cache_key = f"datasets:{workspace_id}"
         if cache_key in self._client._cache:
             return self._client._cache[cache_key]
         logger.info("Fetching datasets")
-        data = self._get("datasets")
+        data = self._get(f"workspaces/{workspace_id}/datasets")
         if not data:
             return None
         df = _coerce_datetime_columns(pd.DataFrame(data))
