@@ -1,11 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import (
-    asc,
-    desc,
-    func,
-    select,
-)
+from sqlalchemy import asc, desc, func, select
 
 from mascope_backend.api.lib.api_features import api_controller
 from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
@@ -26,6 +21,7 @@ from mascope_backend.socket.records import (
 
 @api_controller()
 async def get_datasets(
+    workspace_id: str | None = None,
     dataset_name: str | None = None,
     dataset_type: list[str] | None = None,
     instrument: list[str] | None = None,
@@ -45,6 +41,9 @@ async def get_datasets(
     4. Execute the query to fetch the results.
     5. Convert the results into a list of dictionaries for JSON serialization.
 
+    :param workspace_id: Optional workspace ID to filter datasets by their associated
+                         workspace.
+    :type workspace_id: str | None, optional
     :param dataset_name: Filter datasets by name, defaults to None
     :type dataset_name: str | None, optional
     :param dataset_type: Filter datasets by type (ACQUISITION or ANALYSIS), defaults to
@@ -72,6 +71,11 @@ async def get_datasets(
         )
     async with async_session() as session:
         stmt = select(Dataset)
+
+        # Filter by workspace if specified (routes always provide this;
+        # internal/system callers may omit for cross-workspace queries)
+        if workspace_id is not None:
+            stmt = stmt.filter(Dataset.workspace_id == workspace_id)
 
         # Step 1: Filter by provided parameters
         if dataset_name:
@@ -113,17 +117,20 @@ async def get_datasets(
 
 
 @api_controller()
-async def get_dataset(dataset_id: str) -> dict:
+async def get_dataset(dataset_id: str, workspace_id: str | None = None) -> dict:
     """
     Retrieves a single dataset by its unique ID.
 
     Steps:
     1. Execute a query to fetch the dataset with the specified ID.
     2. Check if the dataset exists. If not, raise a NotFoundException.
-    3. Return the dataset's details as a dictionary.
+    3. Verify the dataset belongs to the specified workspace.
+    4. Return the dataset's details as a dictionary.
 
     :param dataset_id: Unique identifier of the dataset to retrieve.
     :type dataset_id: str
+    :param workspace_id: ID of the workspace the dataset must belong to.
+    :type workspace_id: str
     :raises NotFoundException: If the dataset with the given ID is not found.
     :return: The requested dataset's details.
     :rtype: dict
@@ -132,8 +139,10 @@ async def get_dataset(dataset_id: str) -> dict:
         # Step 1: Fetch dataset by ID
         dataset = await session.get(Dataset, dataset_id)
 
-        if not dataset:
-            # Step 2: If dataset not found, raise exception
+        if not dataset or (
+            workspace_id is not None and dataset.workspace_id != workspace_id
+        ):
+            # Step 2: If dataset not found or wrong workspace, raise exception
             raise NotFoundException(f"Dataset with ID '{dataset_id}' not found")
 
     # Step 3: Return dataset details
@@ -145,6 +154,7 @@ async def get_dataset(dataset_id: str) -> dict:
 
 @api_controller()
 async def create_dataset(
+    workspace_id: str,
     dataset: DatasetCreate,
     independent_transaction: bool = False,
 ) -> dict:
@@ -157,6 +167,8 @@ async def create_dataset(
     3. Emit a signal to inform clients about the creation of the new dataset.
     4. Return the details of the created dataset.
 
+    :param workspace_id: The ID of the workspace to which the dataset belongs.
+    :type workspace_id: str
     :param dataset: Dataset creation details from the request body.
     :type dataset: DatasetCreate
     :param independent_transaction: Flag to indicate if the operation should be treated
@@ -169,6 +181,7 @@ async def create_dataset(
         # Step 1: Generate unique ID and create new dataset
         new_dataset = Dataset(
             dataset_id=gen_id(16),
+            workspace_id=workspace_id,
             **dataset.model_dump(),
             locked=(
                 1
@@ -204,6 +217,7 @@ async def create_dataset(
 async def update_dataset(
     dataset_id: str,
     dataset_update: DatasetUpdate,
+    workspace_id: str | None = None,
     independent_transaction: bool = False,
 ) -> dict:
     """
@@ -221,6 +235,9 @@ async def update_dataset(
     :type dataset_id: str
     :param dataset_update: The new data for the dataset update.
     :type dataset_update: DatasetUpdate
+    :param workspace_id: The workspace the dataset belongs to (optional, used for
+                         validation).
+    :type workspace_id: str | None, optional
     :param independent_transaction: Flag indicating if operation is independent
                                     transaction, defaults to False.
     :type independent_transaction: bool, optional
@@ -232,7 +249,9 @@ async def update_dataset(
     async with async_session() as session:
         update_data = dataset_update.model_dump(exclude_unset=True)
         existing_dataset = await session.get(Dataset, dataset_id)
-        if not existing_dataset:
+        if not existing_dataset or (
+            workspace_id is not None and existing_dataset.workspace_id != workspace_id
+        ):
             raise NotFoundException(f"Dataset with ID '{dataset_id}' not found")
 
         # Step 2: Validate ACQUISITION dataset constraints
@@ -283,7 +302,9 @@ async def update_dataset(
 
 @api_controller()
 async def delete_dataset(
-    dataset_id: str, independent_transaction: bool = False
+    dataset_id: str,
+    workspace_id: str | None = None,
+    independent_transaction: bool = False,
 ) -> dict:
     """
     Deletes a dataset by its unique identifier.
@@ -304,7 +325,9 @@ async def delete_dataset(
     # Step 1: Fetch the dataset
     async with async_session() as session:
         dataset = await session.get(Dataset, dataset_id)
-        if not dataset:
+        if not dataset or (
+            workspace_id is not None and dataset.workspace_id != workspace_id
+        ):
             raise NotFoundException(f"Dataset with ID '{dataset_id}' not found")
 
         # Step 2: Delete the dataset and commit changes

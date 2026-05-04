@@ -24,6 +24,7 @@ from mascope_backend.api.routes.attribute_templates.attribute_templates_routes i
     attribute_templates_router,
 )
 from mascope_backend.api.routes.calibration.calibration_routes import calibration_router
+from mascope_backend.api.routes.dataset.dataset_routes import dataset_router
 from mascope_backend.api.routes.ionization_mechanisms.ionization_mechanisms_routes import (
     ionization_mechanisms_router,
 )
@@ -83,7 +84,6 @@ from mascope_backend.api.routes.target.isotopes.target_isotopes_routes import (
 from mascope_backend.api.routes.visualization.visualization_routes import (
     visualization_router,
 )
-from mascope_backend.api.routes.dataset.dataset_routes import dataset_router
 
 
 routers = [

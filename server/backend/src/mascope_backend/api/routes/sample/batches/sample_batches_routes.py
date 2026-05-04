@@ -26,11 +26,20 @@ from mascope_backend.api.models.sample.batches.sample_batch_pydantic_model impor
     SampleBatchUpdateStatusBody,
 )
 from mascope_backend.api.new.auth.access_rules import locked_access
-from mascope_backend.api.new.auth.dependencies import editor_user, guest_user
+from mascope_backend.api.new.auth.dependencies import (
+    current_active_user,
+    editor_user,
+    guest_user,
+)
+from mascope_backend.api.new.workspaces.dependencies import (
+    check_batch_access,
+    check_dataset_access,
+    require_batch_role,
+)
 from mascope_backend.api.routes.sample.batches.export.routes import (
     sample_batches_export_router,
 )
-from mascope_backend.db import SampleBatch, Dataset
+from mascope_backend.db import Dataset, SampleBatch
 from mascope_backend.db.id import gen_id
 
 
@@ -53,6 +62,8 @@ async def get_sample_batches_route(
     :return: A dictionary containing total count and list of sample batches.
     :rtype: dict
     """
+    if query_params.dataset_id:
+        await check_dataset_access(query_params.dataset_id, user, "guest")
     return await get_sample_batches(**query_params.model_dump())
 
 
@@ -60,7 +71,8 @@ async def get_sample_batches_route(
 @api_route()
 async def get_sample_batch_route(
     sample_batch_id: str,
-    user=Depends(guest_user),
+    user=Depends(current_active_user),
+    membership=Depends(require_batch_role("guest")),
 ):
     """Retrieve details of a specific sample batch by ID.
 
@@ -79,17 +91,18 @@ async def get_sample_batch_route(
 async def get_batch_targets_route(
     sample_batch_id: str,
     query_params: GetSampleBatchTargetsQueryParams = Depends(),
-    user=Depends(guest_user),
+    user=Depends(current_active_user),
+    membership=Depends(require_batch_role("guest")),
 ):
     """Retrieve all targets associated with a specific sample batch.
 
-    :param sample_batch_id: ID of the sample batch for which targets are being retrieved.
+    :param sample_batch_id: ID of the sample batch for which targets are being retrieved
     :type sample_batch_id: str
     :param query_params: Query parameters for deduplication and pagination.
     :type query_params: GetSampleBatchTargetsQueryParams
     :param user: The current authenticated user with guest permissions.
     :type user: User
-    :return: A dictionary containing the target collections, compounds, ions, and isotopes.
+    :return: A dictionary containing the target collections, compounds, ions, isotopes.
     :rtype: dict
     """
     return await get_batch_targets(sample_batch_id, **query_params.model_dump())
@@ -110,6 +123,7 @@ async def create_sample_batch_route(
     :return: A dictionary containing the newly created sample batch's details.
     :rtype: dict
     """
+    await check_dataset_access(body.dataset_id, user, "editor")
     return await create_sample_batch(sample_batch=body, independent_transaction=True)
 
 
@@ -132,6 +146,8 @@ async def update_sample_batch_status_route(
     :return: Update results with count of affected batches and details
     :rtype: dict
     """
+    for batch_id in body.sample_batch_ids:
+        await check_batch_access(batch_id, user, "editor")
     return await update_sample_batch_status(
         sample_batch_ids=body.sample_batch_ids,
         status=body.status,
@@ -144,7 +160,8 @@ async def update_sample_batch_status_route(
 async def update_sample_batch_route(
     sample_batch_id: str,
     body: SampleBatchUpdate,
-    user=Depends(editor_user),
+    user=Depends(current_active_user),
+    membership=Depends(require_batch_role("editor")),
 ):
     """Update details of an existing sample batch.
 
@@ -172,7 +189,8 @@ async def update_sample_batch_route(
 async def delete_sample_batch_route(
     sample_batch_id: str,
     background_tasks: BackgroundTasks,
-    user=Depends(editor_user),
+    user=Depends(current_active_user),
+    membership=Depends(require_batch_role("editor")),
 ):
     """Delete a specific sample batch by ID.
 
@@ -216,7 +234,8 @@ async def import_sample_items_route(
     sample_batch_id: str,
     body: SampleBatchImportSamplesBody,
     background_tasks: BackgroundTasks,
-    user=Depends(editor_user),
+    user=Depends(current_active_user),
+    membership=Depends(require_batch_role("editor")),
 ):
     """Import sample items into a specific sample batch.
 
@@ -254,7 +273,10 @@ async def import_sample_items_route(
         process_id=process_id,
     )
     return {
-        "message": f"Importing {len(body.sample_items)} samples to the sample batch '{sample_batch_name}', please wait.",
+        "message": (
+            f"Importing {len(body.sample_items)} samples to the sample batch "
+            f"'{sample_batch_name}', please wait."
+        ),
         "process_id": process_id,
     }
 
@@ -265,7 +287,8 @@ async def copy_sample_batch_route(
     sample_batch_id: str,
     body: SampleBatchCopyBody,
     background_tasks: BackgroundTasks,
-    user=Depends(editor_user),
+    user=Depends(current_active_user),
+    membership=Depends(require_batch_role("editor")),
 ):
     """Copy an existing sample batch to a new dataset.
 
@@ -282,6 +305,8 @@ async def copy_sample_batch_route(
     """
     # Can't copy to locked dataset
     await locked_access(user, Dataset, body.dataset_id)
+    # Check ACL on destination dataset
+    await check_dataset_access(body.dataset_id, user, "editor")
 
     process_id = gen_id(8)
 
@@ -306,7 +331,8 @@ async def copy_sample_batch_route(
 async def sample_batch_export_peaks_route(
     sample_batch_id: str,
     background_tasks: BackgroundTasks,
-    user=Depends(editor_user),
+    user=Depends(current_active_user),
+    membership=Depends(require_batch_role("editor")),
 ):
     """Export peak data for a specific sample batch.
 
@@ -344,7 +370,8 @@ async def sample_batch_export_peaks_route(
 async def get_sample_batch_peaks_route(
     sample_batch_id: str,
     background_tasks: BackgroundTasks,
-    user=Depends(editor_user),
+    user=Depends(current_active_user),
+    membership=Depends(require_batch_role("editor")),
 ):
     """Get batch peaks.
 

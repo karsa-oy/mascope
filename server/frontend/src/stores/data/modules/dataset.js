@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import { api } from '@/api'
 
 import { useData } from '@/lib/store'
+import { useWorkspace } from './workspace'
 
 export const useDataset = defineStore('app.data.dataset', () => {
   const name = 'dataset'
@@ -10,13 +11,16 @@ export const useDataset = defineStore('app.data.dataset', () => {
 
   const data = useData(
     name,
-    () =>
-      api.http.get(`/datasets`, {
+    ({ workspace_id }) =>
+      api.http.get(`/workspaces/${workspace_id}/datasets`, {
         use: 'read',
         type: 'load_datasets'
       }),
     {
       key,
+      deps: () => ({
+        workspace_id: useWorkspace().focusedId
+      }),
       selection: {
         mode: 'single',
         subscribe: true,
@@ -34,7 +38,7 @@ export const useDataset = defineStore('app.data.dataset', () => {
     ...data,
     // backend
     create: (dataset) =>
-      api.http.post(`/datasets`, dataset, {
+      api.http.post(`/workspaces/${useWorkspace().focusedId}/datasets`, dataset, {
         use: 'create',
         type: 'create_dataset'
       }),
