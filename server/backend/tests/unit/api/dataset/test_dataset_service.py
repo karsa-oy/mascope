@@ -194,15 +194,14 @@ async def test_get_dataset_existence(test_datasets, dataset_id, should_exist):
         with pytest.raises(ApiException) as exc_info:
             await dataset_service.get_dataset(dataset_id)
         assert (
-            f"Dataset with ID '{dataset_id}' not found"
-            in exc_info.value.user_message
+            f"Dataset with ID '{dataset_id}' not found" in exc_info.value.user_message
         )
         assert exc_info.value.status_code == 404
 
 
 @pytest.mark.asyncio
 async def test_create_dataset(
-    dataset_create_model, mock_emit_dataset, async_session_factory
+    dataset_create_model, mock_emit_dataset, async_session_factory, unit_test_workspace
 ):
     """Test creating a new dataset.
 
@@ -215,10 +214,13 @@ async def test_create_dataset(
     :param dataset_create_model: Sample dataset creation data
     :param mock_emit_dataset: Mocked Socket.IO for event verification
     :param async_session_factory: Factory for creating database sessions
+    :param unit_test_workspace: Workspace fixture
     """
     # Execute the controller function
     result = await dataset_service.create_dataset(
-        dataset=dataset_create_model, independent_transaction=True
+        workspace_id=unit_test_workspace.workspace_id,
+        dataset=dataset_create_model,
+        independent_transaction=True,
     )
 
     # Verify response structure
@@ -234,8 +236,7 @@ async def test_create_dataset(
     dataset_data = result["data"]
     assert dataset_data["dataset_name"] == dataset_create_model.dataset_name
     assert (
-        dataset_data["dataset_description"]
-        == dataset_create_model.dataset_description
+        dataset_data["dataset_description"] == dataset_create_model.dataset_description
     )
     assert "dataset_id" in dataset_data
     assert "dataset_utc_created" in dataset_data
@@ -246,8 +247,7 @@ async def test_create_dataset(
         assert db_dataset is not None
         assert db_dataset.dataset_name == dataset_create_model.dataset_name
         assert (
-            db_dataset.dataset_description
-            == dataset_create_model.dataset_description
+            db_dataset.dataset_description == dataset_create_model.dataset_description
         )
 
     # Verify emit_record_created was called
@@ -325,10 +325,7 @@ async def test_update_dataset(
         async with async_session_factory() as session:
             updated_dataset = await session.get(Dataset, dataset_id)
             assert updated_dataset is not None
-            assert (
-                updated_dataset.dataset_name
-                == dataset_update_model.dataset_name
-            )
+            assert updated_dataset.dataset_name == dataset_update_model.dataset_name
             assert (
                 updated_dataset.dataset_description
                 == dataset_update_model.dataset_description
@@ -337,12 +334,11 @@ async def test_update_dataset(
         # Negative case - dataset should not exist
         with pytest.raises(ApiException) as exc_info:
             await dataset_service.update_dataset(
-                dataset_id, dataset_update_model, True
+                dataset_id, dataset_update_model, independent_transaction=True
             )
 
         assert (
-            f"Dataset with ID '{dataset_id}' not found"
-            in exc_info.value.user_message
+            f"Dataset with ID '{dataset_id}' not found" in exc_info.value.user_message
         )
         assert exc_info.value.status_code == 404
 
@@ -383,7 +379,9 @@ async def test_partial_update_dataset(
     update_model = DatasetUpdate(**partial_update)
 
     # Execute update
-    result = await dataset_service.update_dataset(dataset_id, update_model, True)
+    result = await dataset_service.update_dataset(
+        dataset_id, update_model, independent_transaction=True
+    )
 
     # Verify response
     assert "updated successfully" in result["message"]
@@ -430,14 +428,14 @@ async def test_update_both_fields_dataset(
     }
 
     update_model = DatasetUpdate(**update_data)
-    result = await dataset_service.update_dataset(dataset_id, update_model, True)
+    result = await dataset_service.update_dataset(
+        dataset_id, update_model, independent_transaction=True
+    )
 
     # Verify response
     assert "updated successfully" in result["message"]
     assert result["data"]["dataset_name"] == update_data["dataset_name"]
-    assert (
-        result["data"]["dataset_description"] == update_data["dataset_description"]
-    )
+    assert result["data"]["dataset_description"] == update_data["dataset_description"]
 
     # Verify emit_record_updated was called
     mock_emit_dataset.updated.assert_called_once()
@@ -446,10 +444,7 @@ async def test_update_both_fields_dataset(
     async with async_session_factory() as session:
         updated_dataset = await session.get(Dataset, dataset_id)
         assert updated_dataset.dataset_name == update_data["dataset_name"]
-        assert (
-            updated_dataset.dataset_description
-            == update_data["dataset_description"]
-        )
+        assert updated_dataset.dataset_description == update_data["dataset_description"]
 
 
 @pytest.mark.asyncio
@@ -489,7 +484,9 @@ async def test_delete_dataset(
             dataset_name = dataset.dataset_name
 
         # Positive case - dataset should exist and be deleted
-        result = await dataset_service.delete_dataset(dataset_id, True)
+        result = await dataset_service.delete_dataset(
+            dataset_id, independent_transaction=True
+        )
 
         # Verify response structure
         assert isinstance(result, dict)
@@ -510,10 +507,11 @@ async def test_delete_dataset(
     else:
         # Negative case - dataset should not exist
         with pytest.raises(ApiException) as exc_info:
-            await dataset_service.delete_dataset(dataset_id, True)
+            await dataset_service.delete_dataset(
+                dataset_id, independent_transaction=True
+            )
 
         assert (
-            f"Dataset with ID '{dataset_id}' not found"
-            in exc_info.value.user_message
+            f"Dataset with ID '{dataset_id}' not found" in exc_info.value.user_message
         )
         assert exc_info.value.status_code == 404

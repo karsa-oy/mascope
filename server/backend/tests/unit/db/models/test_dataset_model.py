@@ -10,14 +10,15 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from test_utils import gen_test_id
 
-from mascope_backend.db import SampleBatch, Dataset
+from mascope_backend.db import Dataset, SampleBatch
 
 
 @pytest.mark.asyncio
-async def test_create_dataset(session):
+async def test_create_dataset(session, db_test_workspace):
     """Test creating a dataset with valid data."""
     dataset = Dataset(
         dataset_id=gen_test_id(),
+        workspace_id=db_test_workspace.workspace_id,
         dataset_name="Create Test Dataset",
         dataset_description="Testing dataset creation",
         dataset_utc_created=datetime.now(timezone.utc),
@@ -35,10 +36,11 @@ async def test_create_dataset(session):
 
 
 @pytest.mark.asyncio
-async def test_dataset_name_required(session):
+async def test_dataset_name_required(session, db_test_workspace):
     """Test that dataset_name is required."""
     dataset = Dataset(
         dataset_id=gen_test_id(),
+        workspace_id=db_test_workspace.workspace_id,
         dataset_description="A test dataset without name",
     )
     session.add(dataset)
@@ -72,10 +74,11 @@ async def test_dataset_relationship(session, db_test_dataset, db_test_sample_bat
 
 
 @pytest.mark.asyncio
-async def test_cascade_delete(session):
+async def test_cascade_delete(session, db_test_workspace):
     """Test that deleting a dataset cascades to sample batches."""
     dataset = Dataset(
         dataset_id=gen_test_id(),
+        workspace_id=db_test_workspace.workspace_id,
         dataset_name="Cascade Test Dataset",
         dataset_utc_created=datetime.now(timezone.utc),
     )

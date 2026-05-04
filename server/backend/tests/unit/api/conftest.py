@@ -17,6 +17,7 @@ Unit testing approach for API components:
 - Verify database interactions work as expected
 """
 
+from collections.abc import Callable
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -24,7 +25,7 @@ import pytest
 import pytest_asyncio
 from test_utils import gen_test_id
 
-from mascope_backend.db import Dataset, IonizationMechanism, TargetCompound
+from mascope_backend.db import Dataset, IonizationMechanism, TargetCompound, Workspace
 
 
 # Stable IDs for session-scoped dataset fixtures that are referenced
@@ -104,12 +105,12 @@ async def test_ionization_mechanisms(
 
 @pytest_asyncio.fixture(scope="session")
 async def test_target_compounds_by_composition(
-    async_session_factory: callable,
+    async_session_factory: Callable,
 ) -> list[TargetCompound]:
     """Create test target compound records by composition in the unit test database.
 
     :param async_session_factory: Factory for creating database sessions
-    :type async_session_factory: callable
+    :type async_session_factory: Callable
 
     :return: List of created target compound objects
     :rtype: list[TargetCompound]
@@ -169,7 +170,7 @@ async def test_target_compounds_by_composition(
 
 @pytest_asyncio.fixture(scope="session")
 async def test_target_compounds_by_mass(
-    async_session_factory,
+    async_session_factory: Callable,
 ) -> list[tuple[float, TargetCompound]]:
     """Create test target compound records by mass instead of composition.
 
@@ -177,9 +178,10 @@ async def test_target_compounds_by_mass(
     mass-based target compounds.
 
     :param async_session_factory: Factory for creating database sessions
-    :type async_session_factory: callable
+    :type async_session_factory: Callable
 
-    :return: List of tuples containing target compound masses and their corresponding objects
+    :return: List of tuples containing target compound masses and their corresponding
+             objects
     :rtype: list[tuple[float, TargetCompound]]
     """
 
@@ -210,7 +212,22 @@ async def test_target_compounds_by_mass(
 
 
 @pytest_asyncio.fixture(scope="session")
-async def test_datasets(async_session_factory) -> list[Dataset]:
+async def unit_test_workspace(async_session_factory):
+    """Create a workspace for unit tests that need datasets."""
+    async with async_session_factory() as session:
+        ws = Workspace(
+            workspace_id="unit-test-ws",
+            workspace_name="Unit Test Workspace",
+            workspace_utc_created=datetime.now(timezone.utc),
+        )
+        session.add(ws)
+        await session.commit()
+        await session.refresh(ws)
+        return ws
+
+
+@pytest_asyncio.fixture(scope="session")
+async def test_datasets(async_session_factory, unit_test_workspace) -> list[Dataset]:
     """Create test dataset records in the unit test database.
 
     Session-scoped: created once and reused across all unit tests that need
@@ -222,9 +239,11 @@ async def test_datasets(async_session_factory) -> list[Dataset]:
     :rtype: list[Dataset]
     """
     async with async_session_factory() as session:
+        ws_id = unit_test_workspace.workspace_id
         datasets = [
             Dataset(
                 dataset_id=_DATASET_ID_1,
+                workspace_id=ws_id,
                 dataset_name="Unit Test Dataset 1",
                 dataset_description="This is a unit test dataset",
                 dataset_type="ANALYSIS",
@@ -235,6 +254,7 @@ async def test_datasets(async_session_factory) -> list[Dataset]:
             ),
             Dataset(
                 dataset_id=_DATASET_ID_2,
+                workspace_id=ws_id,
                 dataset_name="Unit Test Dataset 2",
                 dataset_description="This is another unit test dataset",
                 dataset_type="ANALYSIS",
