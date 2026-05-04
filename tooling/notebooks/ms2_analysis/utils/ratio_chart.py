@@ -21,16 +21,20 @@ class RatioChart:
         data: DataExtractor,
         compositions: CompositionMap,
         target_fragment: str,
+        parent_filter: set[float] | None = None,
     ):
         self._data = data
         self._compositions = compositions
         self._target_fragment = target_fragment.strip()
+        self._parent_filter = parent_filter
         self._ratio_df = self._build_ratio_df()
 
     def _build_ratio_df(self) -> pd.DataFrame:
         """Build a DataFrame with the target fragment fraction for each parent peak."""
         rows = []
         for pp in self._data.parent_peaks:
+            if self._parent_filter is not None and pp not in self._parent_filter:
+                continue
             ms2_spec = self._data.ms2_spectra[pp]
             ms2_tic = self._data.ms2_tic[pp]
             comp_df = self._compositions.matches.get(pp, pd.DataFrame())
@@ -182,7 +186,7 @@ class RatioChart:
         fig.update_layout(
             barmode="stack",
             font=dict(family="Arial, Helvetica, sans-serif", size=11),
-            height=max(400, 350),
+            height=400,
             width=max(700, n * 35 + 200),
             legend=dict(
                 x=0.98,
