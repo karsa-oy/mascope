@@ -46,13 +46,15 @@ async def get_target_collections(
     target_collection_name: str | None = None,
     sample_batch_id: str | None = None,
     target_collection_type: list[str] | None = None,
-    sort: str = None,
-    order: str = None,
+    workspace_id: str | None = None,
+    sort: str | None = None,
+    order: str | None = None,
     page: int | None = None,
     limit: int | None = None,
 ) -> dict:
     """
-    Retrieves a paginated list of target collections, optionally sorted by a specified column in either ascending or descending order.
+    Retrieves a paginated list of target collections, optionally sorted by a specified
+    column in either ascending or descending order.
 
     Steps:
     - Construct a SQLAlchemy query to select all target collections.
@@ -62,16 +64,23 @@ async def get_target_collections(
     - Execute the query to fetch the results.
     - Convert the results into a list of dictionaries for JSON serialization.
 
-    :param target_collection_name: The name of the target collection for which you want to fetch the target collections, defaults to None
+    :param target_collection_name: The name of the target collection for which you want
+                                   to fetch the target collections, defaults to None
     :type target_collection_name: str | None, optional
-    :param sample_batch_id: Filter collections associated with a specific sample batch ID, defaults to None.
+    :param sample_batch_id: Filter collections associated with a specific sample batch
+                            ID, defaults to None.
     :type sample_batch_id: str | None, optional
-    :param target_collection_type: Filter by target collection types, can specify multiple types, defaults to None
+    :param workspace_id: Filter collections by workspace ID. Null-workspace (global)
+                         collections are always included. Defaults to None.
+    :type workspace_id: str | None, optional
+    :param target_collection_type: Filter by target collection types, can specify
+    multiple types, defaults to None
     :type target_collection_type: list[str] | None, optional
     :param sort:  Column to sort by, defaults to "sample_item_utc_created"
-    :type sort: str, optional
-    :param order: Sorting order ('asc' for ascending, 'desc' for descending), defaults to "asc"
-    :type order: str, optional
+    :type sort: str | None, optional
+    :param order: Sorting order ('asc' for ascending, 'desc' for descending), defaults
+                  to "asc"
+    :type order: str | None, optional
     :param page: Page number for pagination, defaults to None (no pagination).
     :type page: int | None, optional
     :param limit: Number of items per page, defaults to None (no pagination).
@@ -103,6 +112,14 @@ async def get_target_collections(
         if target_collection_type:
             stmt = stmt.where(
                 TargetCollection.target_collection_type.in_(target_collection_type)
+            )
+
+        if workspace_id:
+            stmt = stmt.where(
+                or_(
+                    TargetCollection.workspace_id == workspace_id,
+                    TargetCollection.workspace_id.is_(None),
+                )
             )
         # Apply sorting if specified
         if sort:
@@ -136,16 +153,20 @@ async def get_target_collection(target_collection_id: str) -> dict:
     Retrieves a detailed targert collection by its unique ID.
 
     Steps:
-    1. Initialize a database session and construct a query to fetch the target collection by the specified ID, including associated target compounds and sample batches.
+    1. Initialize a database session and construct a query to fetch the target
+       collection by the specified ID, including associated target compounds and sample
+       batches.
     2. Execute the query and retrieve the first result.
     3. Check if the target collection exists. If not, raise a NotFoundException.
-    4. Convert the target collection and its associations (target compounds and sample batches) to dictionaries.
+    4. Convert the target collection and its associations (target compounds and sample
+       batches) to dictionaries.
     5. Return the target collection's details as a dictionary.
 
     :param target_collection_id: Unique identifier of the target collection to retrieve.
     :type target_collection_id: str
     :raises NotFoundException: If the target collection with the given ID is not found.
-    :return: The requested target collection's details including associated target compounds and sample batches.
+    :return: The requested target collection's details including associated target
+             compounds and sample batches.
     :rtype: dict
     """
     # Step 1: Initialize session and construct query
@@ -199,7 +220,10 @@ async def get_target_collection(target_collection_id: str) -> dict:
 
         # Step 5: Return target collection details
         return {
-            "message": f"Details for target collection '{target_collection.target_collection_name}' retrieved.",
+            "message": (
+                "Details for target collection "
+                f"'{target_collection.target_collection_name}' retrieved."
+            ),
             "data": target_collection_dict,
         }
 
@@ -269,7 +293,7 @@ async def create_target_collection(
             excluded_count = len(set(target_compound_ids) - existing_compounds)
             if excluded_count > 0:
                 runtime.logger.warning(
-                    f"{excluded_count} added compound ID(s) were not found in db and excluded"
+                    f"{excluded_count} added compound ID(s) were not found in the db"
                 )
 
     # Combine all (created and added) compound IDs
@@ -287,6 +311,7 @@ async def create_target_collection(
             target_collection_name=target_collection_create.target_collection_name,
             target_collection_description=target_collection_create.target_collection_description,
             target_collection_type=target_collection_create.target_collection_type,
+            workspace_id=target_collection_create.workspace_id,
         )
         session.add(new_collection)
 
@@ -447,7 +472,7 @@ async def update_target_collection(
             )
             if excluded_compounds_count > 0:
                 runtime.logger.warning(
-                    f"{excluded_compounds_count} provided compound ID(s) were not found and excluded."
+                    f"{excluded_compounds_count} provided compound ID(s) were not found"
                 )
 
     # Step 5: Detect changes between current and proposed state
@@ -554,8 +579,8 @@ async def update_target_collection(
         post_update_compound_count = len(target_collection_db.target_compound)
 
     # Step 7: Set rematch status for affected sample batches
-    #   TODO_match If collection type changes, all affected batches need new
-    #   match_collection, match_sample
+    # TODO_match If collection type changes, all affected batches need new
+    # match_collection, match_sample
     needs_rematch = (
         changes["compounds"] or changes["batches"] or changes["collection_type"]
     )
@@ -633,7 +658,8 @@ async def delete_target_collection(
     Affected sample batches are set to "rematch" status.
 
     Steps:
-    - Fetch target collection and identify affected batches, compounds and ionization modes
+    - Fetch target collection and identify affected batches, compounds and ionization
+      modes
     - Identify orphan compounds if deletion is requested
     - Delete the target collection from database
     - Set rematch status for affected sample batches
@@ -750,7 +776,7 @@ async def delete_target_collection(
     )
 
     if deleted_compound_count > 0:
-        message += f", {deleted_compound_count} orphan compound{'s' if deleted_compound_count != 1 else ''} deleted"
+        message += f", {deleted_compound_count} orphan compounds deleted"
 
     if affected_sample_batch_ids and batch_status_result:
         message = f"{message}. {batch_status_result.get('message', '')}"

@@ -6,14 +6,20 @@ including change detection, validation utilities, and data transformation
 functions used across target collection-related controllers.
 """
 
+from mascope_backend.api.models.target.collections.target_collection_pydantic_model import (
+    TargetCollectionUpdate,
+)
+from mascope_backend.db import (
+    TargetCollection,
+)
 from mascope_backend.runtime import runtime
 
 
 def detect_target_collection_changes(
-    target_collection_db,
-    target_collection_update,
-    updated_compound_ids: set | None = None,
-) -> dict[str, bool]:
+    target_collection_db: TargetCollection,
+    target_collection_update: TargetCollectionUpdate,
+    updated_compound_ids: set[str] | None = None,
+) -> dict[str, bool | set[str]]:
     """
     Detects changes between existing target collection and update data.
 
@@ -25,10 +31,11 @@ def detect_target_collection_changes(
     :type target_collection_db: TargetCollection
     :param target_collection_update: Pydantic model containing proposed updates
     :type target_collection_update: TargetCollectionUpdate
-    :param updated_compound_ids: Final compound IDs that should be associated with the collection
-    :type updated_compound_ids: set | None
-    :return: Dictionary mapping change types to boolean flags
-    :rtype: dict[str, bool]
+    :param updated_compound_ids: Final compound IDs that should be associated with the
+                                 collection
+    :type updated_compound_ids: set[str] | None
+    :return: Dictionary mapping change types to boolean flags and sets of IDs
+    :rtype: dict[str, bool | set[str]]
     """
     sample_batches_db = {sb.sample_batch_id for sb in target_collection_db.sample_batch}
     target_compounds_db = {
