@@ -52,8 +52,7 @@ async def get_sample_items_route(
     :param user: The current authenticated user with guest permissions.
     :return: A dictionary containing the total count and list of sample items.
     """
-    if query_params.sample_batch_id:
-        await check_batch_access(query_params.sample_batch_id, user, "guest")
+    await check_batch_access(query_params.sample_batch_id, user, "guest")
     return await get_sample_items(**query_params.model_dump())
 
 

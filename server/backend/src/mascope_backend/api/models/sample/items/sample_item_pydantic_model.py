@@ -213,8 +213,8 @@ class GetSampleItemsQueryParams(GetSampleItemsQueryValidator, QueryParamsModel):
     Inherits polarity validation from CommonValidators and URL decoding from QueryParamsModel.
     """
 
-    sample_batch_id: str | None = Field(
-        None,
+    sample_batch_id: str = Field(
+        ...,
         description="The sample batch ID for which you want to fetch the sample items",
     )
     sample_file_id: str | None = Field(
