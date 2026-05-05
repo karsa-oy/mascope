@@ -804,19 +804,27 @@ def get_polarity_options(base_filename: str) -> str:
 
 def get_metadata(
     base_filename: str,
-) -> m_thermo.RawFileMetadata | None:
+) -> m_thermo.RawFileMetadataLegacy | None:
     """Get metadata from the sample file
+
+    #TODO_deprecation: This function is deprecated and should be removed in future versions.
+    # Metadata retrieval should be done using the new mascope_signal.metadata module.
 
     :param base_filename: Sample file filename
     :type base_filename: str
     :return: Metadata class instance or None if the file type is not supported
-    :rtype: RawFileMetadata | None
+    :rtype: RawFileMetadataLegacy | None
     """
+    runtime.logger.warning(
+        "Metadata retrieval using compute.get_metadata is deprecated and will be "
+        "removed in future versions. "
+        "Please use the new mascope_signal.metadata module."
+    )
     sample_type = m_name.get_sample_file_type(base_filename)
     match sample_type:
         case "orbi_raw":
             datafile_path = m_name.filename_to_datafile_path(base_filename)
-            return m_thermo.RawFileMetadata(datafile_path)
+            return m_thermo.RawFileMetadataLegacy(datafile_path)
         case "tof_h5":
             raise NotImplementedError(
                 "Metadata retrieval for h5 files is not implemented"

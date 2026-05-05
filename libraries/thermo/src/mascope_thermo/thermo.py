@@ -690,7 +690,7 @@ def get_centroids_per_scan(
         return centroids
 
 
-class RawFileMetadata:
+class RawFileMetadataLegacy:
     """Class to access metadata of a Thermo Fisher raw file."""
 
     def __init__(self, datafile_path: str):
