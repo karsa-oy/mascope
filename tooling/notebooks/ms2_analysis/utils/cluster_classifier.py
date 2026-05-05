@@ -6,7 +6,7 @@ from mascope_tools.alignment.calibration import CentroidedSpectrum
 from mascope_tools.composition.config import ELECTRON_MASS
 from mascope_tools.composition.utils import parse_ionization
 
-from .composition import CompositionMap
+from .composition import CompositionMap, get_composition_label
 from .config import MIN_TIC_FRACTION, MZ_MATCH_TOLERANCE
 from .data_extractor import DataExtractor
 
@@ -124,7 +124,7 @@ class ClusterClassifier:
             analyte_int = self._find_peak_intensity(ms2, analyte_frag_mz)
 
             # --- Parent composition label ---
-            parent_comp = self._parent_composition(pp, comp_df)
+            parent_comp = get_composition_label(pp, comp_df)
 
             # --- Classify ---
             min_intensity = tic * MIN_TIC_FRACTION
@@ -186,15 +186,3 @@ class ClusterClassifier:
         if np.abs(ms2.mz[idx] - target_mz) < MZ_MATCH_TOLERANCE:
             return float(ms2.intensity[idx])
         return 0.0
-
-    @staticmethod
-    def _parent_composition(pp: float, comp_df: pd.DataFrame) -> str:
-        if comp_df.empty or "ion" not in comp_df.columns:
-            return "---"
-        diffs = np.abs(comp_df["mz"].values - pp)
-        closest = int(np.argmin(diffs))
-        if diffs[closest] < MZ_MATCH_TOLERANCE:
-            ion = comp_df["ion"].iloc[closest]
-            if pd.notna(ion) and str(ion).strip() and str(ion).strip() != "---":
-                return str(ion).strip()
-        return "---"

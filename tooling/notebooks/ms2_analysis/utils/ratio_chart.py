@@ -5,8 +5,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from IPython.display import HTML, display
 
-from .composition import CompositionMap
-from .config import MZ_MATCH_TOLERANCE
+from .composition import CompositionMap, get_composition_label
 from .data_extractor import DataExtractor
 
 
@@ -60,14 +59,7 @@ class RatioChart:
                 continue
 
             # Parent composition label
-            parent_comp = "---"
-            if not comp_df.empty and "ion" in comp_df.columns:
-                diffs = np.abs(comp_df["mz"].values - pp)
-                closest = np.argmin(diffs)
-                if diffs[closest] < MZ_MATCH_TOLERANCE:
-                    ion = comp_df["ion"].iloc[closest]
-                    if pd.notna(ion) and str(ion).strip() and str(ion).strip() != "---":
-                        parent_comp = str(ion).strip()
+            parent_comp = get_composition_label(pp, comp_df)
 
             rows.append(
                 {

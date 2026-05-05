@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 from IPython.display import HTML, display
 
 from .cluster_classifier import ClusterClassifier
-from .composition import CompositionMap
+from .composition import CompositionMap, get_composition_label
 from .config import MZ_MATCH_TOLERANCE
 from .data_extractor import DataExtractor
 from .ratio_chart import _COLOR_FRAGMENT, _COLOR_PARENT, RatioChart
@@ -176,7 +176,7 @@ class FragmentationAnalysis:
             if total <= 0:
                 continue
 
-            parent_comp = self._get_composition_label(pp, comp_df)
+            parent_comp = get_composition_label(pp, comp_df)
 
             rows.append(
                 {
@@ -342,8 +342,8 @@ class FragmentationAnalysis:
                 continue
 
             # Composition labels
-            parent_comp = self._get_composition_label(pp, comp_df)
-            frag_comp = self._get_composition_label(ms2.mz[frag_idx], comp_df)
+            parent_comp = get_composition_label(pp, comp_df)
+            frag_comp = get_composition_label(ms2.mz[frag_idx], comp_df)
 
             rows.append(
                 {
@@ -473,17 +473,3 @@ class FragmentationAnalysis:
                 f"{caption}</p>"
             )
         )
-
-    # --- Helpers ---
-
-    @staticmethod
-    def _get_composition_label(mz: float, comp_df: pd.DataFrame) -> str:
-        if comp_df.empty or "ion" not in comp_df.columns:
-            return "---"
-        diffs = np.abs(comp_df["mz"].values - mz)
-        closest = int(np.argmin(diffs))
-        if diffs[closest] < MZ_MATCH_TOLERANCE:
-            ion = comp_df["ion"].iloc[closest]
-            if pd.notna(ion) and str(ion).strip() and str(ion).strip() != "---":
-                return str(ion).strip()
-        return "---"

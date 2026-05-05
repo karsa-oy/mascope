@@ -5,8 +5,8 @@ import numpy as np
 import pandas as pd
 from IPython.display import display
 
-from .composition import CompositionMap
-from .config import DEFAULT_MAX_FRAGMENTS, MZ_MATCH_TOLERANCE
+from .composition import CompositionMap, get_composition_label
+from .config import DEFAULT_MAX_FRAGMENTS
 from .data_extractor import DataExtractor
 
 
@@ -98,14 +98,7 @@ class FragmentTable:
         hcd = self._data.hcd_energy_map[pp]
         comp_df = self._compositions.matches.get(pp, pd.DataFrame())
 
-        parent_comp = "---"
-        if not comp_df.empty and "ion" in comp_df.columns:
-            diffs = np.abs(comp_df["mz"].values - pp)
-            closest = np.argmin(diffs)
-            if diffs[closest] < MZ_MATCH_TOLERANCE:
-                ion = comp_df["ion"].iloc[closest]
-                if pd.notna(ion) and str(ion).strip() and str(ion).strip() != "---":
-                    parent_comp = str(ion).strip()
+        parent_comp = get_composition_label(pp, comp_df)
 
         return {
             "intensity": parent_int,
