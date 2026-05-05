@@ -139,11 +139,11 @@ def upgrade() -> None:
             "INSERT INTO workspace "
             "(workspace_id, workspace_name, workspace_description, "
             " workspace_status, is_system, workspace_utc_created, workspace_utc_modified) "
-            "VALUES (:wid, :wname, :wdesc, 'active', false, NOW(), NOW())"
+            "VALUES (:wid, :wname, :wdesc, 'active', true, NOW(), NOW())"
         ).bindparams(
             wid=default_workspace_id,
             wname="Default Workspace",
-            wdesc="Auto-created during migration. All pre-existing non-acquisition datasets were assigned here.",
+            wdesc="System workspace for pre-existing datasets. Cannot be deleted.",
         )
     )
 
