@@ -148,7 +148,7 @@ class RatioChart:
             go.Bar(
                 x=x_pos,
                 y=df["fragment_frac"].tolist(),
-                name="Target fragment",
+                name=f"Target fragment ({self._target_fragment})",
                 marker=dict(color=_COLOR_FRAGMENT, line=dict(color="black", width=0.5)),
                 hovertemplate=(
                     "<i>m</i>/<i>z</i> %{customdata:.2f}<br>"
