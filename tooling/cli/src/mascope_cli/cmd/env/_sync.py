@@ -363,8 +363,9 @@ def _restore_remote(
     """
     Trigger a transfer restore on a remote machine via SSH.
 
-    Calls `mascope {mode} db restore --env ENV --transfer --yes` on the
-    remote, restoring from the pushed dump_file in the remote transfer directory.
+    Calls `mascope {mode} db restore` cmd on the remote server, which
+    restores the `env_name` database in the specified `mode` postgres server
+    from the pushed to remote server transfer directory `dump_file` .
 
     :param remote: Remote identifier in `USER@HOST` format.
     :type remote: str

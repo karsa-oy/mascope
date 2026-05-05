@@ -30,6 +30,7 @@ from mascope_cli.cmd.dev.migrate import (
 )
 from mascope_cli.cmd.dev.redis import dev_redis_app, wait_for_redis
 from mascope_cli.cmd.dev.tools import dev_tools_app
+from mascope_cli.pg.utils import check_data_dirs
 from mascope_cli.runtime import runtime
 from mascope_runtime import Runtime
 
@@ -62,24 +63,6 @@ dev_app.add_typer(dev_migrate_app, name="migrate")
 dev_app.add_typer(dev_db_app, name="db")
 dev_app.add_typer(dev_redis_app, name="redis")
 dev_app.add_typer(dev_tools_app, name="tools")
-
-
-def _check_data_dirs():
-    """
-    Create PostgreSQL data directory if not exists.
-
-    Creates directories with user permissions before Docker starts
-    to avoid root-owned directories.
-
-    Note: Currently Redis uses named volume, not bind mount, so no directory needed
-    """
-    # PostgreSQL data directory (dev mode)
-    postgres_dir = Path(os.environ["MASCOPE_PATH"]) / ".runtime" / "database" / _MODE
-    if not postgres_dir.exists():
-        postgres_dir.mkdir(parents=True, exist_ok=True)
-        runtime.logger.success(f"PostgreSQL data directory created at {postgres_dir}")
-    else:
-        runtime.logger.debug(f"PostgreSQL data directory located at {postgres_dir}")
 
 
 def _resolve_modules(module_names: List[str]) -> List[dict]:
@@ -246,7 +229,7 @@ def up(
     check_and_start_docker()
 
     # Prepare data directories before starting containers
-    _check_data_dirs()
+    check_data_dirs(_MODE)
 
     args = ["up"]
     if detach:
@@ -372,7 +355,7 @@ def run(
     check_and_start_docker()
 
     # --- check dependencies running ---
-    _check_data_dirs()
+    check_data_dirs(_MODE)
     _run_dev_compose(["up", "-d"])
 
     # --- wait for services ---

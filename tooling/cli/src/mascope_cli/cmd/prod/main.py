@@ -30,6 +30,7 @@ import typer
 
 from mascope_cli.cmd import lib
 from mascope_cli.cmd.prod.db import prod_db_app
+from mascope_cli.pg.utils import check_data_dirs
 from mascope_cli.runtime import runtime
 from mascope_runtime import Runtime
 
@@ -218,6 +219,8 @@ def up(
         mascope prod up --detach
         mascope prod up --build --detach
     """
+    # Check database bind-mount dirs before starting containers
+    check_data_dirs(_MODE)
     args = ["up"]
     if rebuild:
         args.append("--build")

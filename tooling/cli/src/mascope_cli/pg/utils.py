@@ -13,6 +13,7 @@ Design constraints:
   config is always current.
 """
 
+import os
 import subprocess
 from pathlib import Path
 
@@ -187,3 +188,41 @@ def dirs(transfer: bool, mode: str) -> tuple[Path, str]:
     if transfer:
         return db_cfg.get_transfer_dir(), db_cfg.get_transfer_mount()
     return db_cfg.get_backups_dir(mode=mode), db_cfg.get_backups_mount()
+
+
+def check_data_dirs(mode: str) -> None:
+    """
+    Pre-create all database bind-mount directories as the current user,
+    to avoid root-owned directories.
+
+    Docker creates missing mount target directories as root when a container
+    starts, causing permission issues for subsequent CLI and scp operations.
+    Creating them before any container starts ensures they are
+    owned by the host user.
+
+    Directories managed:
+    - .runtime/database/{mode}/         — PostgreSQL data
+    - .runtime/database/backups/{mode}/ — backup dumps
+    - .runtime/database/transfer/       — cross-server sync staging (shared dev/prod)
+
+    :param mode: Runtime mode, `"dev"` or `"prod"`.
+    :type mode: str
+    """
+    db_root = Path(os.environ["MASCOPE_PATH"]) / ".runtime" / "database"
+
+    dirs_to_create = [
+        db_root / mode,
+        db_root / "backups" / mode,
+        db_root / "transfer",
+    ]
+
+    for d in dirs_to_create:
+        if d.exists():
+            if not d.is_dir():
+                raise RuntimeError(
+                    f"Expected directory path but found non-directory: {d}"
+                )
+            runtime.logger.debug(f"Directory exists: {d}")
+            continue
+        d.mkdir(parents=True, exist_ok=True)
+        runtime.logger.success(f"Created directory: {d}")
