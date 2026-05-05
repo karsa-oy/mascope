@@ -690,31 +690,27 @@ def get_centroids_per_scan(
         return centroids
 
 
-class RawFileMetadataLegacy:
+class RawFileMetadata:
     """Class to access metadata of a Thermo Fisher raw file."""
 
-    def __init__(self, datafile_path: str):
+    def __init__(
+        self,
+        datafile_path: str,
+        t_min: float | None = None,
+        t_max: float | None = None,
+        polarity: Literal["+", "-"] | None = None,
+        scan_type: Literal["Ms", "Ms2"] | None = "Ms",
+    ):
         self.datafile_path = datafile_path
+        self.t_min = t_min
+        self.t_max = t_max
+        self.polarity = polarity
+        self.scan_type = scan_type
 
     @property
-    def num_of_scans(self):
-        """Number of scans in the raw file."""
-        with RawFileManager(self.datafile_path) as RawFile:
-            return RawFile.RunHeaderEx.SpectraCount
-
-    @property
-    def instrument(self):
-        """Instrument metadata. The following information is available:
-        Name
-        Model
-        SerialNumber
-        SoftwareVersion
-        HardwareVersion
-        Flags
-        AxisLabelX
-        AxisLabelY
-        IsValid
-        HasAccurateMassPrecursors
+    def instrument_details(self) -> dict:
+        """Information about the instrument used for the acquisition.
+        ChannelLabels and Units are not included as they are not serializable.
         """
         with RawFileManager(self.datafile_path) as RawFile:
             instrument_data = RawFile.GetInstrumentData()
@@ -725,8 +721,6 @@ class RawFileMetadataLegacy:
                 "SerialNumber",
                 "SoftwareVersion",
                 "HardwareVersion",
-                # "ChannelLabels", not serializable
-                # "Units", not serializable
                 "Flags",
                 "AxisLabelX",
                 "AxisLabelY",
@@ -734,133 +728,37 @@ class RawFileMetadataLegacy:
                 "HasAccurateMassPrecursors",
             ]
 
-            instrument_dict = {
-                row: getattr(instrument_data, row) for row in instrument_data_list
-            }
-            instrument_df = pd.DataFrame.from_dict(
-                instrument_dict, orient="index", columns=["Value"]
-            )
-            return instrument_df
+            return {row: getattr(instrument_data, row) for row in instrument_data_list}
 
     @property
-    def trailer(self):
-        """Trailer information of the raw file. The following information is available:
-
-        Scan Description
-        Multiple Injection
-        Multi Inject Info
-        AGC
-        Micro Scan Count
-        Scan Segment
-        Scan Event
-        Master Index
-        Master Scan Number
-        Charge State
-        Monoisotopic M/Z
-        Error in isotopic envelope fit
-        Ion Injection Time (ms)
-        Max. Ion Time (ms)
-        FT Resolution
-        MS2 Isolation Width
-        MS2 Isolation Offset
-        AGC Target
-        HCD Energy
-        HCD Energy V
-        Analyzer Temperature
-
-        === Mass Calibration: ===
-        Conversion Parameter B
-        Conversion Parameter C
-        Temperature Comp. (ppm)
-        RF Comp. (ppm)
-        Space Charge Comp. (ppm)
-        Resolution Comp. (ppm)
-        Number of Lock Masses
-        Lock Mass #1 (m/z)
-        Lock Mass #2 (m/z)
-        Lock Mass #3 (m/z)
-        LM Search Window (ppm)
-        LM Search Window (mmu)
-        Number of LM Found
-        Last Locking (sec)
-        LM m/z-Correction (ppm)
-
-        === Ion Optics Settings: ===
-        S-Lens RF Level
-
-        ====  Diagnostic Data:  ====
-        Application Mode
-        Mild Trapping Mode
-        APD
-        OT Intens Comp Factor
-        Res. Dep. Intens
-        Q Trans Comp
-        PrOSA NumF
-        PrOSA Comp
-        PrOSA ScScr
-        RawOvFtT
-        Dynamic RT Shift (min)
-        LC FWHM parameter
-        PS Inj. Time (ms)
-        AGC PS Mode
-        AGC PS Diag
-        AGC Target Adjust
-        AGC Diag 1
-        AGC Diag 2
-        HCD abs. Offset
-        Source CID eV
-        AGC Fill
-        Injection t0
-        t0 FLP
-        Iso Para R
-        Inj Para R
-        Access Id
-        Analog In A (V)
-        Analog In B (V)
-        FAIMS Attached
-        FAIMS Voltage On
-        FAIMS CV
+    def scan_acquisition_settings(self) -> dict:
+        """Acquisition settings for each scan (injection time, AGC target,
+        isolation width, HCD energy, lock-mass info, etc.)
         """
         with RawFileManager(self.datafile_path) as RawFile:
-            trailer_dict = {}
+            scan_selector = ScanSelector(
+                RawFile, self.polarity, self.t_min, self.t_max, self.scan_type
+            )
+            settings_dict = {}
             header_labels = None
-            for i in range(1, self.num_of_scans + 1):
+            for i in scan_selector.scan_indices_1based:
                 header = RawFile.GetTrailerExtraInformation(i)
                 if header_labels is None:
                     header_labels = list(header.Labels)
-                trailer_dict[i] = list(header.Values)
+                settings_dict[i] = list(header.Values)
 
-            trailer_df = pd.DataFrame.from_dict(trailer_dict, orient="columns")
-            trailer_df.set_index(pd.Index(header_labels), inplace=True)
-            return trailer_df
+            return {
+                "header_labels": header_labels,
+                "settings": settings_dict,
+            }
 
     @property
-    def statistics(self):
-        """Get per scan statistics:
-
-        HighMass
-        LowMass
-        LongWavelength
-        ShortWavelength
-        BasePeakIntensity
-        BasePeakMass
-        TIC
-        StartTime
-        PacketCount
-        NumberOfChannels
-        ScanNumber
-        ScanEventNumber
-        SegmentNumber
-        IsCentroidScan
-        Frequency
-        IsUniformTime
-        AbsorbanceUnitScale
-        WavelengthStep
-        ScanType
-        CycleNumber
-        """
+    def scan_statistics(self) -> dict:
+        """Get per scan statistics"""
         with RawFileManager(self.datafile_path) as RawFile:
-            scan_selector = ScanSelector(RawFile, ms_type=None)
+            scan_selector = ScanSelector(
+                RawFile, self.polarity, self.t_min, self.t_max, self.scan_type
+            )
             stat_names = [
                 "HighMass",
                 "LowMass",
@@ -885,7 +783,7 @@ class RawFileMetadataLegacy:
             ]
             # The scan type is not included in the scan statistics,
             # so we need to get it from the raw scan filters
-            scan_stats = {
+            return {
                 scan_index: {
                     **{name: getattr(stats, name) for name in stat_names},
                     "MsType": scan_filter.MSOrder.ToString(),
@@ -898,9 +796,40 @@ class RawFileMetadataLegacy:
                 )
             }
 
-            scan_stats_df = pd.DataFrame.from_dict(scan_stats, orient="columns")
 
-            return scan_stats_df
+class RawFileMetadataLegacy(RawFileMetadata):
+    """Class to access metadata of a Thermo Fisher raw file."""
+
+    @property
+    def num_of_scans(self):
+        """Number of scans in the raw file."""
+        with RawFileManager(self.datafile_path) as RawFile:
+            return RawFile.RunHeaderEx.SpectraCount
+
+    @property
+    def instrument(self):
+        instrument_dict = self.instrument_details
+        instrument_df = pd.DataFrame.from_dict(
+            instrument_dict, orient="index", columns=["Value"]
+        )
+        return instrument_df
+
+    @property
+    def trailer(self):
+        """Trailer information of the raw file"""
+        trailer_data = self.scan_acquisition_settings
+        trailer_dict = trailer_data["settings"]
+        header_labels = trailer_data["header_labels"]
+
+        trailer_df = pd.DataFrame.from_dict(trailer_dict, orient="columns")
+        trailer_df.set_index(pd.Index(header_labels), inplace=True)
+        return trailer_df
+
+    @property
+    def statistics(self):
+        """Scan statistics of the raw file"""
+        scan_stats = self.scan_statistics
+        return pd.DataFrame.from_dict(scan_stats, orient="columns")
 
     @property
     def centroids_meta(self):
