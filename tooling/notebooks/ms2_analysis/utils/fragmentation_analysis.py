@@ -5,12 +5,12 @@ from IPython.display import HTML, display
 
 from .cluster_classifier import ClusterClassifier
 from .composition import CompositionMap
+from .config import MZ_MATCH_TOLERANCE
 from .data_extractor import DataExtractor
 from .ratio_chart import _COLOR_FRAGMENT, _COLOR_PARENT, RatioChart
 
 
 _COLOR_TYPE_B = "#D55E00"  # Okabe-Ito orange (colorblind-friendly)
-_MZ_MATCH_TOLERANCE = 0.01
 
 
 class FragmentationAnalysis:
@@ -168,7 +168,7 @@ class FragmentationAnalysis:
 
             # Reagent ion by m/z proximity
             reagent_idx = int(np.argmin(np.abs(ms2.mz - reagent_mz)))
-            if np.abs(ms2.mz[reagent_idx] - reagent_mz) > _MZ_MATCH_TOLERANCE:
+            if np.abs(ms2.mz[reagent_idx] - reagent_mz) > MZ_MATCH_TOLERANCE:
                 continue
             reagent_tic_pct = float(ms2.intensity[reagent_idx]) / tic * 100
 
@@ -333,7 +333,7 @@ class FragmentationAnalysis:
             # Analyte fragment at parent_mz - proton_transfer_mass
             frag_mz = pp - pt_mass
             frag_idx = int(np.argmin(np.abs(ms2.mz - frag_mz)))
-            if np.abs(ms2.mz[frag_idx] - frag_mz) > _MZ_MATCH_TOLERANCE:
+            if np.abs(ms2.mz[frag_idx] - frag_mz) > MZ_MATCH_TOLERANCE:
                 continue
             frag_tic_pct = float(ms2.intensity[frag_idx]) / tic * 100
 
@@ -482,7 +482,7 @@ class FragmentationAnalysis:
             return "---"
         diffs = np.abs(comp_df["mz"].values - mz)
         closest = int(np.argmin(diffs))
-        if diffs[closest] < _MZ_MATCH_TOLERANCE:
+        if diffs[closest] < MZ_MATCH_TOLERANCE:
             ion = comp_df["ion"].iloc[closest]
             if pd.notna(ion) and str(ion).strip() and str(ion).strip() != "---":
                 return str(ion).strip()

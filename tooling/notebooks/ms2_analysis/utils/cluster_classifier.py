@@ -2,18 +2,14 @@ import numpy as np
 import pandas as pd
 from pyteomics.mass import calculate_mass
 
+from mascope_tools.alignment.calibration import CentroidedSpectrum
 from mascope_tools.composition.config import ELECTRON_MASS
 from mascope_tools.composition.utils import parse_ionization
 
 from .composition import CompositionMap
+from .config import MIN_TIC_FRACTION, MZ_MATCH_TOLERANCE
 from .data_extractor import DataExtractor
 
-
-# Tolerance for matching fragment peaks by m/z (Da)
-_MZ_MATCH_TOLERANCE = 0.01
-
-# Minimum fraction of MS2 TIC for a fragment to be considered present
-_MIN_TIC_FRACTION = 0.01
 
 # Hydrogen atom mass for proton-transfer correction
 _H_MASS: float = calculate_mass(formula="H")
@@ -131,7 +127,7 @@ class ClusterClassifier:
             parent_comp = self._parent_composition(pp, comp_df)
 
             # --- Classify ---
-            min_intensity = tic * _MIN_TIC_FRACTION
+            min_intensity = tic * MIN_TIC_FRACTION
             if reagent_int < min_intensity and analyte_int < min_intensity:
                 frag_type = "Undetermined"
             elif reagent_int >= analyte_int:
@@ -175,7 +171,7 @@ class ClusterClassifier:
             if not reagent_rows.empty:
                 reagent_mz = reagent_rows.iloc[0]["mz"]
                 idx = np.argmin(np.abs(ms2.mz - reagent_mz))
-                if np.abs(ms2.mz[idx] - reagent_mz) < _MZ_MATCH_TOLERANCE:
+                if np.abs(ms2.mz[idx] - reagent_mz) < MZ_MATCH_TOLERANCE:
                     return float(ms2.intensity[idx])
 
         # Fallback: match by reagent ion m/z
@@ -187,7 +183,7 @@ class ClusterClassifier:
         if ms2.mz.size == 0:
             return 0.0
         idx = int(np.argmin(np.abs(ms2.mz - target_mz)))
-        if np.abs(ms2.mz[idx] - target_mz) < _MZ_MATCH_TOLERANCE:
+        if np.abs(ms2.mz[idx] - target_mz) < MZ_MATCH_TOLERANCE:
             return float(ms2.intensity[idx])
         return 0.0
 
@@ -197,7 +193,7 @@ class ClusterClassifier:
             return "---"
         diffs = np.abs(comp_df["mz"].values - pp)
         closest = int(np.argmin(diffs))
-        if diffs[closest] < _MZ_MATCH_TOLERANCE:
+        if diffs[closest] < MZ_MATCH_TOLERANCE:
             ion = comp_df["ion"].iloc[closest]
             if pd.notna(ion) and str(ion).strip() and str(ion).strip() != "---":
                 return str(ion).strip()

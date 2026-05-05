@@ -6,10 +6,9 @@ import plotly.graph_objects as go
 from IPython.display import HTML, display
 
 from .composition import CompositionMap
+from .config import MZ_MATCH_TOLERANCE
 from .data_extractor import DataExtractor
 
-
-COMPOSITION_MATCH_TOLERANCE = 0.01
 
 _COLOR_FRAGMENT = "#0072B2"  # Okabe-Ito blue (colorblind-friendly)
 _COLOR_PARENT = "#AAAAAA"  # Muted grey
@@ -65,7 +64,7 @@ class RatioChart:
             if not comp_df.empty and "ion" in comp_df.columns:
                 diffs = np.abs(comp_df["mz"].values - pp)
                 closest = np.argmin(diffs)
-                if diffs[closest] < COMPOSITION_MATCH_TOLERANCE:
+                if diffs[closest] < MZ_MATCH_TOLERANCE:
                     ion = comp_df["ion"].iloc[closest]
                     if pd.notna(ion) and str(ion).strip() and str(ion).strip() != "---":
                         parent_comp = str(ion).strip()

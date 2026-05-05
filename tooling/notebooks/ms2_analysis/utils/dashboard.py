@@ -6,10 +6,8 @@ from colorcet import glasbey_hv as colormap
 from IPython.display import display
 
 from .composition import CompositionMap
+from .config import MAX_FRAGMENT_TRACES
 from .data_extractor import DataExtractor
-
-
-MAX_FRAGMENT_TRACES = 20
 
 
 class Ms2Dashboard:

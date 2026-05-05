@@ -7,9 +7,7 @@ import pandas as pd
 import mascope_sdk as msdk
 from mascope_tools.alignment.calibration import CentroidedSpectrum, Spectra
 
-
-DEFAULT_NOISE_THRESHOLD = 10
-DEFAULT_PARENT_PEAK_TOLERANCE = 0.001
+from .config import DEFAULT_NOISE_THRESHOLD, DEFAULT_PARENT_PEAK_TOLERANCE
 
 
 class DataExtractor:

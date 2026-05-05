@@ -6,11 +6,8 @@ import pandas as pd
 from IPython.display import display
 
 from .composition import CompositionMap
+from .config import DEFAULT_MAX_FRAGMENTS, MZ_MATCH_TOLERANCE
 from .data_extractor import DataExtractor
-
-
-DEFAULT_MAX_FRAGMENTS = 10
-COMPOSITION_MATCH_TOLERANCE = 0.01
 
 
 class FragmentTable:
@@ -105,7 +102,7 @@ class FragmentTable:
         if not comp_df.empty and "ion" in comp_df.columns:
             diffs = np.abs(comp_df["mz"].values - pp)
             closest = np.argmin(diffs)
-            if diffs[closest] < COMPOSITION_MATCH_TOLERANCE:
+            if diffs[closest] < MZ_MATCH_TOLERANCE:
                 ion = comp_df["ion"].iloc[closest]
                 if pd.notna(ion) and str(ion).strip() and str(ion).strip() != "---":
                     parent_comp = str(ion).strip()
