@@ -357,13 +357,14 @@ def _restore_remote(
     remote: str,
     mode: str,
     env_name: str,
+    dump_file: Path,
     control_args: list[str] | None = None,
 ) -> None:
     """
     Trigger a transfer restore on a remote machine via SSH.
 
     Calls `mascope {mode} db restore --env ENV --transfer --yes` on the
-    remote, restoring from the latest dump in the remote transfer directory.
+    remote, restoring from the pushed dump_file in the remote transfer directory.
 
     :param remote: Remote identifier in `USER@HOST` format.
     :type remote: str
@@ -371,13 +372,20 @@ def _restore_remote(
     :type mode: str
     :param env_name: Environment name to restore into on the remote.
     :type env_name: str
+    :param dump_file: Local host path to the dump file that was pushed to
+                      the remote transfer directory. Only the filename is
+                      used — the remote resolves the full path from its
+                      own transfer directory config.
+    :type dump_file: Path
     :param control_args: SSH multiplexing flags from `SshMux` to reuse an
                          existing ControlMaster connection. Pass `[]` or
                          `None` for a standalone connection.
     :type control_args: list[str] | None
     :raises RuntimeError: If the SSH command fails.
     """
-    cmd = f"mascope {mode} db restore --env {env_name} --transfer --yes"
+    cmd = (
+        f"mascope {mode} db restore {dump_file.name} --env {env_name} --transfer --yes"
+    )
     runtime.logger.info(f"Triggering remote restore on {remote}: {cmd}")
     _ssh_run(remote, cmd, control_args)
 
@@ -596,7 +604,7 @@ def sync_db(
         # local → remote
         dump_file = _dump_local(source_mode, source_env)
         _scp_push(target_remote, dump_file, control_args)
-        _restore_remote(target_remote, target_mode, target_env, control_args)
+        _restore_remote(target_remote, target_mode, target_env, dump_file, control_args)
         _cleanup_transfer(dump_file, source_db)
         remote_file = (
             f"{_remote_transfer_dir(target_remote, control_args)}/{dump_file.name}"
