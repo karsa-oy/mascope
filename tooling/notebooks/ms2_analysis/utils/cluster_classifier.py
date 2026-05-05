@@ -159,11 +159,21 @@ class ClusterClassifier:
             )
         return pd.DataFrame(rows)
 
-    def _find_reagent_intensity(self, ms2, comp_df: pd.DataFrame) -> float:
+    def _find_reagent_intensity(
+        self, ms2: CentroidedSpectrum, comp_df: pd.DataFrame
+    ) -> float:
         """Find the reagent ion intensity in the MS2 spectrum.
 
         First tries composition-based detection (formula == "()" marks a
         reagent ion in the assignment pipeline).  Falls back to m/z proximity.
+
+        :param ms2: MS2 spectrum for this parent peak
+        :type ms2: CentroidedSpectrum
+        :param comp_df: DataFrame with composition matches for this parent peak
+                        (columns should include "mz" and "formula")
+        :type comp_df: pd.DataFrame
+        :return: Intensity of the reagent ion peak, or 0 if not found.
+        :rtype: float
         """
         # Composition-based: look for reagent ion marker
         if not comp_df.empty and "formula" in comp_df.columns:
@@ -178,7 +188,7 @@ class ClusterClassifier:
         return self._find_peak_intensity(ms2, self._reagent_ion_mz)
 
     @staticmethod
-    def _find_peak_intensity(ms2, target_mz: float) -> float:
+    def _find_peak_intensity(ms2: CentroidedSpectrum, target_mz: float) -> float:
         """Return intensity of the closest peak to *target_mz*, or 0."""
         if ms2.mz.size == 0:
             return 0.0

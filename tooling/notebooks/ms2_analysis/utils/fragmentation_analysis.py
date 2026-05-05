@@ -147,6 +147,15 @@ class FragmentationAnalysis:
     # --- Declustering chart building (m/z-based reagent ion lookup) ---
 
     def _build_declustering_df(self, parents: np.ndarray) -> pd.DataFrame:
+        """Build DataFrame for declustering chart, calculating reagent ion and parent
+        fractions for each parent peak.
+
+        :param parents: Parent peaks classified as declustering by the ClusterClassifier
+        :type parents: np.ndarray
+        :return: DataFrame with columns: composition, mz, fragment_frac (reagent ion
+                fraction), parent_frac (parent ion fraction)
+        :rtype: pd.DataFrame
+        """
         parent_set = set(parents)
         reagent_mz = self._classifier.reagent_ion_mz
         rows = []
@@ -311,6 +320,17 @@ class FragmentationAnalysis:
     # --- Proton-transfer chart building ---
 
     def _build_proton_transfer_df(self, parents: np.ndarray) -> pd.DataFrame:
+        """Build DataFrame for proton-transfer chart, calculating analyte fragment and
+        parent fractions for each parent peak.
+
+        :param parents: Parent peaks classified as proton-transfer by the
+                        ClusterClassifier
+        :type parents: np.ndarray
+        :return: DataFrame with columns: composition, fragment_composition, mz,
+                fragment_mz, fragment_frac (analyte fragment fraction),
+                parent_frac (parent ion fraction)
+        :rtype: pd.DataFrame
+        """
         parent_set = set(parents)
         pt_mass = self._classifier.proton_transfer_mass
         rows = []
