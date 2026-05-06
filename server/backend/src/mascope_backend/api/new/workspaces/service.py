@@ -19,6 +19,9 @@ from mascope_backend.api.new.workspaces.exceptions import (
 )
 from mascope_backend.db import User, Workspace, WorkspaceMember, async_session
 from mascope_backend.db.id import gen_id
+from mascope_backend.socket.records.service import (
+    emit_record_reload,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -164,7 +167,9 @@ async def create_workspace(
         session.add(member)
 
         await session.commit()
-        return {"data": workspace.to_dict()}
+
+    await emit_record_reload(record_type="workspace")
+    return {"data": workspace.to_dict()}
 
 
 @api_controller()
@@ -198,7 +203,9 @@ async def update_workspace(
 
         workspace.workspace_utc_modified = datetime.now(timezone.utc)
         await session.commit()
-        return {"data": workspace.to_dict()}
+
+    await emit_record_reload(record_type="workspace")
+    return {"data": workspace.to_dict()}
 
 
 @api_controller()
@@ -220,7 +227,9 @@ async def delete_workspace(workspace_id: str) -> dict:
 
         await session.delete(workspace)
         await session.commit()
-        return {"data": {"workspace_id": workspace_id, "deleted": True}}
+
+    await emit_record_reload(record_type="workspace")
+    return {"data": {"workspace_id": workspace_id, "deleted": True}}
 
 
 # ---------------------------------------------------------------------------
@@ -296,7 +305,9 @@ async def add_workspace_member(
         )
         session.add(member)
         await session.commit()
-        return {"data": member.to_dict()}
+
+    await emit_record_reload(record_type="workspace")
+    return {"data": member.to_dict()}
 
 
 @api_controller()
@@ -337,7 +348,9 @@ async def update_workspace_member(
 
         member.workspace_role = workspace_role
         await session.commit()
-        return {"data": member.to_dict()}
+
+    await emit_record_reload(record_type="workspace")
+    return {"data": member.to_dict()}
 
 
 @api_controller()
@@ -361,6 +374,6 @@ async def remove_workspace_member(workspace_id: str, user_id: int) -> dict:
 
         await session.delete(member)
         await session.commit()
-        return {
-            "data": {"workspace_id": workspace_id, "user_id": user_id, "removed": True}
-        }
+
+    await emit_record_reload(record_type="workspace")
+    return {"data": {"workspace_id": workspace_id, "user_id": user_id, "removed": True}}

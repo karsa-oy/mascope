@@ -18,7 +18,7 @@ export const useWorkspace = defineStore('app.data.workspace', () => {
     {
       key,
       selection: {
-        mode: 'single',
+        mode: 'binary',
         persist: true
       }
     }

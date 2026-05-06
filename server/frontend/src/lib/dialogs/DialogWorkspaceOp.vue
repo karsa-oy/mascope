@@ -72,7 +72,7 @@ async function execute() {
       break
     }
     case 'edit': {
-      app.data.workspace.update({
+      await app.data.workspace.update({
         workspace_id: original.value.workspace_id,
         workspace_name: info.name,
         workspace_description: info.desc
@@ -81,7 +81,7 @@ async function execute() {
     }
     case 'delete': {
       if (app.data.workspace.list.length > 1) {
-        app.data.workspace.delete(original.value)
+        await app.data.workspace.delete(original.value)
       } else {
         info.message =
           'You cannot delete the last remaining workspace. Create a new workspace before deleting this one.'

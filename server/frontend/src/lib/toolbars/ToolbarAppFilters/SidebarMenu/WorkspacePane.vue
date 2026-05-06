@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, watchEffect, computed } from 'vue'
+import { ref, watch, watchEffect, computed, nextTick } from 'vue'
 
 import Button from 'primevue/button'
 import Listbox from 'primevue/listbox'
@@ -21,8 +21,9 @@ const selectedWorkspace = ref(null)
 
 watch(
   () => app.data.workspace.focused,
-  () => {
-    if (sidebarMenu.open) {
+  async (value) => {
+    if (value && sidebarMenu.open) {
+      await nextTick()
       sidebarMenu.open = false
     }
   }

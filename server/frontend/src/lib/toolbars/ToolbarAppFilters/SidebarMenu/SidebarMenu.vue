@@ -61,6 +61,16 @@ watchEffect(() => {
   }
 })
 
+// Auto-open sidebar when no workspace is selected
+watchEffect(() => {
+  if (!app.data.workspace.focused && !sidebarMenu.open) {
+    sidebarMenu.open = true
+  }
+})
+
+// Prevent closing without a workspace selected
+const canClose = computed(() => !!app.data.workspace.focused)
+
 watchEffect(() => {
   if (sidebarMenu.open && sidebarMenu.tab === 'notifications') {
     app.ui.notification.clearRecentBadge()
@@ -189,8 +199,9 @@ watchEffect(() => {
       header="Mascope"
       position="left"
       :style="`width: calc(${app.ui.split.left}vw + 1rem);`"
-      :modal="false"
-      :dismissable="false"
+      :modal="!canClose"
+      :dismissable="canClose"
+      :closable="canClose"
     >
       <template #header>
         <TabList>

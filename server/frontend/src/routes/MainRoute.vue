@@ -9,7 +9,7 @@ import ProgressSpinner from 'primevue/progressspinner'
 import { useApp } from '@/stores'
 
 const app = useApp()
-const ready = computed(() => app.data.dataset.list.length > 0)
+const ready = computed(() => app.data.workspace.list.length > 0)
 </script>
 
 <template>

@@ -97,6 +97,13 @@ export const useData = (
             })
           })
 
+        // Clear persisted selection when the parent genuinely switches
+        // (not on initial load where prev is null).
+        const prevHadValue = prev && Object.values(prev).some((v) => v != null)
+        if (prevHadValue) {
+          selection?.resetPersist?.()
+        }
+
         sync({ context: 'dependencies' })
       }
     })

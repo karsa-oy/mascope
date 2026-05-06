@@ -22,7 +22,7 @@ export const useDataset = defineStore('app.data.dataset', () => {
         workspace_id: useWorkspace().focusedId
       }),
       selection: {
-        mode: 'single',
+        mode: 'binary',
         subscribe: true,
         persist: true
       },
