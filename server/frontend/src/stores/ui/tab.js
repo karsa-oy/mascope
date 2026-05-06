@@ -3,7 +3,7 @@ import { defineStore } from 'pinia'
 
 import { useData } from '../data'
 
-const DEFAULT_TAB = 'acquisitions'
+const DEFAULT_TAB = 'raw files'
 
 export const useTab = defineStore('app.ui.tab', () => {
   const active = ref(DEFAULT_TAB)
