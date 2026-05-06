@@ -597,7 +597,7 @@ async def calibration_mz_calibrate_samples(
             )
         except ApiException as e:
             # Get sample details for the failure report
-            sample = fetch_sample(sample_item_id=sample_item_id)
+            sample = await fetch_sample(sample_item_id=sample_item_id)
 
             # log the error and add the sample to the failed list
             runtime.logger.warning(
